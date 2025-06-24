@@ -1170,18 +1170,17 @@ impl Node {
         {
             return;
         }
-        if !self.behaviours.ib_equivocation && self.leios.ibs_by_vrf.contains_key(&header.vrf) {
-            // Equivocation detected
+        let ibs_with_same_vrf = self.leios.ibs_by_vrf.entry(header.vrf).or_default();
+        ibs_with_same_vrf.push(id);
+        if !self.behaviours.ib_equivocation && ibs_with_same_vrf.len() > 2 {
+            // This is an equivocation, and we've already broadcasted a proof of equivocation (PoE).
+            // Note that if we've seen EXACTLY two ibs with the same VRF, we still validate/propagate the second,
+            // because the second header serves as a PoE to our peers.
             return;
         }
         self.leios
             .ibs
             .insert(id, InputBlockState::Pending(header.clone()));
-        self.leios
-            .ibs_by_vrf
-            .entry(header.vrf)
-            .or_default()
-            .push(id);
         self.schedule_cpu_task(CpuTaskType::IBHeaderValidated(from, header, has_body));
     }
 
@@ -1199,7 +1198,7 @@ impl Node {
             }
             self.send_to(*peer, SimulationMessage::AnnounceIBHeader(id))?;
         }
-        if has_body {
+        if !self.ib_equivocation_detected(&header) && has_body {
             // Whoever sent us this IB header has also announced that they have the body.
             // If we still need it, download it from them.
             self.receive_announce_ib(from, id)?;
@@ -1217,6 +1216,11 @@ impl Node {
             }
             _ => return Ok(()),
         };
+        if self.ib_equivocation_detected(header) {
+            // No reason to download the body of an equivocated IB
+            return Ok(());
+        }
+
         // Do we have capacity to request this block?
         let reqs = self
             .leios
@@ -1247,6 +1251,19 @@ impl Node {
 
     fn receive_ib(&mut self, from: NodeId, ib: Arc<InputBlock>) {
         self.tracker.track_ib_received(ib.header.id, from, self.id);
+        // If we've already received this IB, don't waste CPU time validating it
+        if self
+            .leios
+            .ibs
+            .get(&ib.header.id)
+            .is_some_and(|ib| matches!(ib, InputBlockState::Received(_)))
+        {
+            return;
+        }
+        // If we know that this is an equivocation, don't waste CPU time validating it either
+        if self.ib_equivocation_detected(&ib.header) {
+            return;
+        }
         self.schedule_cpu_task(CpuTaskType::IBBlockValidated(from, ib));
     }
 
@@ -1310,6 +1327,19 @@ impl Node {
                 }
             };
 
+            // NB: below logic is identical to ib_equivocation_detected.
+            // We can't call that method because `reqs` has a mutable borrow on our state :(
+            if !self.behaviours.ib_equivocation
+                && self
+                    .leios
+                    .ibs_by_vrf
+                    .get(&header.vrf)
+                    .is_some_and(|ids| ids.len() > 1)
+            {
+                // Don't bother fetching an equivocated IB
+                continue;
+            }
+
             // Make the request
             self.leios
                 .ibs
@@ -1320,6 +1350,19 @@ impl Node {
         }
 
         Ok(())
+    }
+
+    fn ib_equivocation_detected(&self, header: &InputBlockHeader) -> bool {
+        if self.behaviours.ib_equivocation {
+            // If we WANT to equivocate IBs, we don't bother detecting equivocations either.
+            // This way, relays (which can't equivocate themselves) can still "play along"
+            // with a stake pool's equivocation attack.
+            return false;
+        }
+        self.leios
+            .ibs_by_vrf
+            .get(&header.vrf)
+            .is_some_and(|ids| ids.len() > 1)
     }
 
     fn receive_announce_eb(&mut self, from: NodeId, id: EndorserBlockId) -> Result<()> {
