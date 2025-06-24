@@ -30,8 +30,8 @@ grep -E -v '(Slot|No.*Generated|CpuTask|Lottery)' sim.log | pigz -p 3 -9c > sim.
 wait
 
 cat << EOI > case.csv
-Simulator,Bandwidth [Mb/s]
-Rust,$(basename $PWD)
+Simulator,Conflict fraction
+Rust,$CX
 EOI
 
 zcat sim.log.gz \
@@ -43,6 +43,6 @@ zcat sim.log.gz \
   --resource-file resources.csv \
   --receipt-file receipts.csv
   
-pigz -p 3 -9vf {lifecycle,cpus,resources,receipts}.csv
+pigz -p 3 -9f {lifecycle,cpus,resources,receipts}.csv
 
 cat case.csv
