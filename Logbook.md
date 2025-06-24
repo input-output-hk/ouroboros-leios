@@ -1,5 +1,17 @@
 # Leios logbook
 
+## 2025-06-24
+
+### Bandwidth experiment
+
+Experiments exploring the effect of bandwidth limits at 100 TPS and 300 TPS were completed in [analysis/sims/2025w25/analysis.ipynb](analysis/sims/2025w25/analysis.ipynb). Key findings follow:
+
+1. The following protocol parameters are sufficient for Leios high performance at 100 tx/s (or 300 tx/s): 1 IB/s (or 2 IB/s), 10 slot/stage, 328 kB/IB maximum, 1.5 EB/stage, and multiple shards.
+2. Spatial efficiency is 80%.
+3. All transactions reach the ledger, typically within two minutes.
+4. A 30 Mbps network interface card (NIC) is sufficient for the Leios node.
+5. A 4-core vCPU is also sufficient.
+
 ## 2025-06-20
 
 ### CDDL Specification Draft
