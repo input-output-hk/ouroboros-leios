@@ -195,6 +195,7 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
               ; eta               = eta
               ; stakeDistribution = sd
               ; stageLength       = sl
+              ; lateIBInclusion   = false
               }
         ; sutId         = SUT-id
         ; winning-slots = fromList (L.catMaybes $ L.map winningSlot l)
