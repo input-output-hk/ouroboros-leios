@@ -15,18 +15,20 @@ Sources: [Conway Reward Account](https://github.com/IntersectMBO/cardano-ledger/
 
 The shard assignment for reward accounts is computed implicitly:
 
-$$\text{shard\_id} = \text{hash}(\text{reward\_account}) \bmod \text{total\_shards}$$
+$$\text{shardId} = \text{hash}(\text{rewardAccount}) \bmod \text{totalShards}$$
 
 **Where**:
-- $\text{hash}()$ uses the same hash function as Cardano address derivation
-- $\text{total\_shards}$ is a protocol parameter
+- `hash()` uses the same hash function as Cardano address derivation
+- `total_shards` is a protocol parameter
 - Ensures deterministic shard assignment across all nodes
 
 ## Fee Payment Validation
 
 For fee payment validation, transactions must ensure:
 
-$$\text{hash}(\text{reward\_account}) \bmod \text{total\_shards} = \text{ib\_shard\_id}$$
+$$
+\text{hash}(\text{rewardAccount}) \bmod \text{totalShards} = \text{ibShardId}
+$$
 
 > [!Note]
 > This enables bootstrapping: users can immediately use reward accounts for fee payment without setup overhead.

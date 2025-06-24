@@ -14,7 +14,9 @@ The full sharding design provides two complementary mechanisms for fee payment i
 
 ### 2. Reward Account Sharding ([Spec](./reward-account.md))
 
-- **Mechanism**: Implicit shard assignment via hash function: $\text{shard\_id} = \text{hash}(\text{reward\_account}) \bmod \text{total\_shards}$
+- **Mechanism**: Implicit shard assignment via hash function:
+  
+  $$\text{shardId} = \text{hash}(\text{rewardAccount}) \bmod \text{totalShards}$$
 - **Use Case**: Bootstrapping and immediate fee payment capability  
 - **Network Overhead**: 0 bytes (computed on-demand)
 - **Compatibility**: Uses existing Conway `reward_account = bytes` structure unchanged
