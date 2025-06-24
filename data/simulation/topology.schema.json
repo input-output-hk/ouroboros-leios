@@ -28,7 +28,7 @@
       "properties": {
         "adversarial": {
           "$ref": "#/definitions/UnboundedIbs",
-          "description": "If not null, the node will behave according to the given Behaviour.\n\nOnly supported by Haskell simulation."
+          "description": "If not null, the node will behave according to the given Behaviour."
         },
         "behaviours": {
           "description": "If not null, the node will follow the given behaviours.\n\n\nOnly supported by Rust simulation.",
@@ -72,7 +72,7 @@
       "properties": {
         "adversarial": {
           "$ref": "#/definitions/UnboundedIbs",
-          "description": "If not null, the node will behave according to the given Behaviour.\n\nOnly supported by Haskell simulation."
+          "description": "If not null, the node will behave according to the given Behaviour."
         },
         "behaviours": {
           "description": "If not null, the node will follow the given behaviours.\n\n\nOnly supported by Rust simulation.",
