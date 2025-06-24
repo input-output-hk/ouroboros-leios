@@ -185,6 +185,8 @@ pub struct RawNode {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tx_generation_weight: Option<u64>,
     pub producers: BTreeMap<String, RawLinkInfo>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub adversarial: Option<RawNodeBehaviour>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub behaviours: Vec<RawNodeBehaviour>,
 }
@@ -261,7 +263,7 @@ impl From<RawTopology> for Topology {
         for (index, (name, node)) in value.nodes.iter().enumerate() {
             let id = NodeId::new(index);
             node_ids.insert(name.clone(), id);
-            let behaviours = NodeBehaviours::parse(&node.behaviours);
+            let behaviours = NodeBehaviours::parse(&node.adversarial, &node.behaviours);
             nodes.insert(
                 id,
                 NodeConfiguration {
@@ -605,9 +607,9 @@ pub struct NodeBehaviours {
 }
 
 impl NodeBehaviours {
-    fn parse(behaviours: &[RawNodeBehaviour]) -> Self {
+    fn parse(adversarial: &Option<RawNodeBehaviour>, behaviours: &[RawNodeBehaviour]) -> Self {
         let mut result = NodeBehaviours::default();
-        for behaviour in behaviours {
+        for behaviour in adversarial.iter().chain(behaviours) {
             match behaviour {
                 RawNodeBehaviour::IbEquivocation => {
                     result.ib_equivocation = true;
