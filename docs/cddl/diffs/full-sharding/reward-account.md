@@ -14,7 +14,7 @@ Sources: [Conway Reward Account](https://github.com/IntersectMBO/cardano-ledger/
 ## Transaction Body Extensions
 
 ```diff
-; Conway transaction body extended with reward account collateral field
+; Conway transaction body extended with Leios collateral field
  transaction_body =
    { 0  : set<transaction_input>         ; inputs
    , 1  : [* transaction_output]         ; outputs
@@ -36,12 +36,19 @@ Sources: [Conway Reward Account](https://github.com/IntersectMBO/cardano-ledger/
    , ? 20 : proposal_procedures          ; proposal_procedures
    , ? 21 : coin                         ; current_treasury_value
    , ? 22 : positive_coin                ; donation
-+  , ? 25 : reward_account               ; Reward account for collateral posting
++  , ? 25 : leios_collateral             ; Leios collateral from reward accounts
    }
 ```
-Sources: [Conway Transaction Body](https://github.com/IntersectMBO/cardano-ledger/blob/master/eras/conway/impl/cddl-files/conway.cddl#L130-L151), [Conway Reward Account](https://github.com/IntersectMBO/cardano-ledger/blob/master/eras/conway/impl/cddl-files/conway.cddl#L382)
 
-**Field Selection Rationale**: Field 25 is allocated for reward account collateral specification. Fields 23-24 are reserved for future Conway extensions, making 25 the next available field for Leios reward account sharding extensions.
+## Leios Collateral Structure
+
+```diff
++; Leios collateral using reward accounts (same type as withdrawals)
++leios_collateral = {+ reward_account => coin}
+```
+Sources: [Conway Transaction Body](https://github.com/IntersectMBO/cardano-ledger/blob/master/eras/conway/impl/cddl-files/conway.cddl#L130-L151), [Conway Withdrawals](https://github.com/IntersectMBO/cardano-ledger/blob/master/eras/conway/impl/cddl-files/conway.cddl#L421)
+
+**Field Selection Rationale**: Field 25 is allocated for Leios collateral specification using the same type as Conway withdrawals. Fields 23-24 are reserved for future Conway extensions, making 25 the next available field for Leios reward account sharding extensions.
 
 > [!Note]
 > **Design Rationale**: The explicit reward account field allows transactions to specify which reward account should be used for collateral posting, enabling deterministic shard assignment for fee payment validation.
@@ -57,13 +64,21 @@ $$\text{shardId} = \text{hash}(\text{rewardAccount}) \bmod \text{totalShards}$$
 - `total_shards` is a protocol parameter
 - Ensures deterministic shard assignment across all nodes
 
-## Fee Payment Validation
+## Shard Assignment Validation
 
-For fee payment validation, transactions must ensure:
+For all VKey reward accounts in both `withdrawals` and `leios_collateral` fields, transactions must ensure:
 
 $$
 \text{hash}(\text{rewardAccount}) \bmod \text{totalShards} = \text{ibShardId}
 $$
 
+**Where this validation applies to**:
+- All VKey reward accounts in the `withdrawals` field
+- All VKey reward accounts in the `leios_collateral` field
+- Script reward accounts are exempt from this restriction
+
+> [!Important]
+> **Staking Reward Withdrawal Limitation**: This creates a significant constraint where VKey reward accounts can only withdraw staking rewards in transactions belonging to their assigned shard. Script reward accounts remain unrestricted.
+
 > [!Note]
-> This enables bootstrapping: users can immediately use reward accounts for fee payment without setup overhead.
+> **Collateral Security**: This prevents spending money used for collateral in transactions of a different shard, ensuring collateral integrity across the sharded system.
