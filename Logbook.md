@@ -2,15 +2,51 @@
 
 ## 2025-06-24
 
+### Conflict experiment on simplest Leios variant
+
+Experiments exploring the effect of conflicting transactions at 100 TPS for the simplest Leios variant were completed in [analysis/sims/2025w26/analysis.ipynb](analysis/sims/2025w26/analysis.ipynb).
+
+Assumptions:
+
+- mini-mainnet topology, with 100 Mb/s inter-nodal links
+- 100 tx/s
+- 0.2 IB/s
+- 2097.152 kB/IB maximum
+- 2.5 EB/stage
+- 10 slot/stage
+- aggressive pruning of memory pool
+- txs ordered by arrival in memory pool
+- no overcollateralization
+- no sharding
+- 0%, 25%, or 50% of transactions conflict with other transactions
+
+Findings:
+
+1. Spatial efficiency can be as low as 55%, which is due to the occasional production of an IB before the previous one is received.
+2. Transaction typically reach the ledger within 75 seconds.
+3. All non-conflicted transactions reach the ledger.
+4. NIC bandwidth of 20 Mb/s is sufficient: see figure below.
+5. Four vCPU cores are sufficient.
+6. Even the largest IBs (up to 2 MB) diffuse globally within 5 seconds: see figure below.
+7. IB traffic does not interfere with transaction, vote, EB, or RB traffic.
+8. The occasional large IBs benefit performance by diffusing before the mean time between IBs, which permits pruning of the memory pool before the next IB is typically produced.
+
+![Mean nodal network ingress at 100 TPS when IBs up to 2 MB are allowed](analysis/sims/2025w26/plots/cxs/ingress-average-area.png)
+
+![Diffusion of IBs at 100 TPS when IBs up to 2 MB are allowed](analysis/sims/2025w26/plots/cxs/elapsed-IB.png)
+
 ### Bandwidth experiment
 
 Experiments exploring the effect of bandwidth limits at 100 TPS and 300 TPS were completed in [analysis/sims/2025w25/analysis.ipynb](analysis/sims/2025w25/analysis.ipynb). Key findings follow:
 
-1. The following protocol parameters are sufficient for Leios high performance at 100 tx/s (or 300 tx/s): 1 IB/s (or 2 IB/s), 10 slot/stage, 328 kB/IB maximum, 1.5 EB/stage, and multiple shards.
+1. The following protocol parameters are sufficient for Leios high performance at 100 tx/s (or 300 tx/s): mini-mainnet topology, 1 IB/s (or 2 IB/s), 10 slot/stage, 328 kB/IB maximum, 1.5 EB/stage, and multiple shards.
 2. Spatial efficiency is 80%.
 3. All transactions reach the ledger, typically within two minutes.
 4. A 30 Mbps network interface card (NIC) is sufficient for the Leios node.
 5. A 4-core vCPU is also sufficient.
+6. The results are insensitive to inter-nodal link bandwidths greater than 50 Mb/s, and even at 10 Mb/s the effect of link bandwidth is small: see the figure below.
+
+![Diffusion of IBs at 300 TPS as a function of intra-nodal link bandwidth](analysis/sims/2025w25/plots/bw-2IBps/elapsed-IB.png)
 
 ## 2025-06-20
 
