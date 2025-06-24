@@ -182,7 +182,24 @@ TODO
 
 ## Pruning threads
 
-TODO
+- *IBs 1*.
+  At the end of the Vote(Send) stage for iteration `i`, the node stops diffusing all IBs from `i`.
+  (TODO this should happen at the end of the Endorse stage, but this buffer is being abused as the adoption buffer as well.)
+  It also forgets any of those IBs it had adopted, with the exception of their arrival time, which is used when generating VBs.
+  See `relayIBState`.
+- *EBs 1*.
+  At the end of the Vote(Recv) stage for iteration `i`, the node stops diffusing and completely forgets all EBs from `i` that are not already certified.
+  See `relayEBState`, `votesForEBVar`, and `ibsNeededForEBVar`.
+- *VBs* and *IBs 2*.
+  At the end of the Vote(Recv) stage for iteration `i`, the node stops diffusing and completely forgets all VBs from `i`, except that certified EBs from `i` remember the ID and multiplicity of the VBs that first met quorum.
+  It also forgets the arrival time of IBs from `i`.
+  See `relayVoteState` and `ibDeliveryTimesVar`.
+- *EBs 2*.
+  If the Leios variant is set to `short`, then `maxEndorseBlockAgeSlots` after the end of the Endorse stage for iteration `i`, the node stops diffusing and forgets all EBs from `i` that were certified but are not included by an RB on the selected chain.
+  (TODO these blocks should have stopped diffusing a long time ago, assuming `maxEndorseBlockAgeSlots >> sliceLength`)
+  If the Leios variant is set to `full`, the node never forgets a certified EB.
+  See `relayEBState`, `votesForEBVar`, and `ibsNeededForEBVar`.
+- The node never forgets an RB.
 
 ## Praos diffusion threads
 
@@ -194,30 +211,28 @@ The `LeiosProtocol.Short.Node.LeiosNodeState` record type declares the state sha
 
 ## Leios Diffusion state
 
-TODO
+TODO `relayIBState`, `relayEBState`, `relayVoteState`
 
 ## Waiting&Validation state
 
-TODO
+TODO `ibsNeededForEBVar`, `waitingForRBVar`, `waitingForLedgerStateVar`, `ledgerStateVar`, `ibsValidationActionsVar`
 
 TODO include `taskQueue`
 
 ## Adopted IBs state
 
-TODO
+TODO `relayIBState` abuse
+
+TODO `ibDeliveryTimesVar`
 
 ## Adopted EBs state
 
-TODO
+TODO `relayEBState` abuse
 
 ## Adopted VBs state
 
-TODO
+TODO `votesForEBVar`
 
-## Adopted RBs state
-
-TODO
-
-## Praos Diffusion state
+## Adopted RBs & Praos Diffusion state
 
 TODO
