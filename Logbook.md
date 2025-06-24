@@ -31,9 +31,9 @@ Findings:
 7. IB traffic does not interfere with transaction, vote, EB, or RB traffic.
 8. The occasional large IBs benefit performance by diffusing before the mean time between IBs, which permits pruning of the memory pool before the next IB is typically produced.
 
-![Mean nodal network ingress at 100 TPS when IBs up to 2 MB are allowed](analysis/sims/2025w26/plots/bw-2IBps/ingress-average-area.png)
+![Mean nodal network ingress at 100 TPS when IBs up to 2 MB are allowed](analysis/sims/2025w26/plots/cxs/ingress-average-area.png)
 
-![Diffusion of IBs at 100 TPS when IBs up to 2 MB are allowed](analysis/sims/2025w26/plots/bw-2IBps/elapsed-IB.png)
+![Diffusion of IBs at 100 TPS when IBs up to 2 MB are allowed](analysis/sims/2025w26/plots/cxs/elapsed-IB.png)
 
 ### Bandwidth experiment
 
