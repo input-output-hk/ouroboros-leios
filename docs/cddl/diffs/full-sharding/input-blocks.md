@@ -32,4 +32,4 @@ slot_no = uint64                                                    ; Slot numbe
 
 ## Next
 
-**→ [Sharded Transactions - CDDL](transactions.md)** 
+**→ [Sharded UTxO - CDDL](utxo.md)** 
