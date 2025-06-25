@@ -179,7 +179,7 @@ IBs, VBs, and EBs are each diffused via a corresonding instance of the Relay min
 This is a generalization of the TxSubmission mini protocol and the Mempool in `ouroboros-network` and `ouroboros-consensus`.
 
 Each Relay instance involves one thread per inbound connection (aka "peers") and one thread per outbound connection (aka "followers").
-For an inbound connection, the node is (aggressively/rapidly) pulling IB headers (ie merely IDs for VBs and EBs) and then selectively pulling the IB body (ie VBs and EBs) it wants in a configurable order/prioritization, which is usually FreshestFirst.
+For an inbound connection, the node is (aggressively/rapidly) pulling IB headers (ie merely IDs for VBs and EBs paired with a slot) and then selectively pulling the IB body (ie VBs and EBs) it wants in a configurable order/prioritization, which is usually FreshestFirst.
 It is also configurable which of the peers offering the same body the node fetches it from, which is either just the first or all---all can sometimes reduce latency.
 (TODO the real node will likely request from the second peer if the first hasn't yet replied but not the third.)
 For an outbound connection, the roles are switched.
@@ -189,14 +189,19 @@ The reason RBs do not diffuse via Relay is because they form a chain, so one blo
 
 TODO discuss the other Relay parameters, backpressure, pipelining, etc?
 
-TODO IB headers incur validation delays, but others don't since they're merely IDs
+When an IB header arrives, its validation task is enqueued on the model CPU---for VBs and EBs it's just an ID, not a header, so there's no validation.
+Once that finishes, the Relay logic will decide whether it needs to fetch the body.
+
+- An IB body is not fetched if it's older than the slot to which the buffer as has already been pruned or if it's already in the buffer.
+- An EB is not fetched if it's older than the slot to which the buffer has already been pruned, it's too old to be included by an RB (see `maxEndorseBlockAgeSlots`), or if it's already in the buffer.
+- A VB is not fetched if it's older than the slot to which the buffer has already been pruned or if it's already in the buffer.
 
 Different objects are handled differently when the arrived.
 
 - When an IB that extends the genesis block arrives, its validate-and-adopt task is enqueued on the model CPU.
 - When an IB that extends a non-genesis RB arrives, its validate-and-adopt task is added to `waitingForLedgerStateVar`.
 - When an EB arrives, its validate-and-adopt task is enqueued on the model CPU.
-- When an VB arrives, its validate-and-adopt task is enqueued on the model CPU.
+- When a VB arrives, its validate-and-adopt task is enqueued on the model CPU.
 
 ## Praos diffusion threads
 
@@ -228,7 +233,7 @@ Because those threads use STM to read both the state of pending tasks as well as
 
 The existence of those threads enable very simple logic for the adoption tasks.
 
-- The node adopts a validated IB by starting to diffuse it, adding it to `ibDeliveryTimesVar` and removing it from the todo lists in `ibsNeededForEBVar`.
+- The node adopts a validated IB by starting to diffuse it, adding its `UTCTime` arrival to `ibDeliveryTimesVar`, and removing the IB from the todo lists in `ibsNeededForEBVar`.
 - The node adopts a validated EB by starting to diffuse it, adding it to `relayEBState`, and adding a corresponding todo list of the not-already-available IBs to `ibsNeededForEBVar`.
 - The node adopts a validated VB by starting to diffuse it and adding it to `votesForEBVar`.
 - The node adopts a validated RB by starting to diffuse it and including it whenever calculating its selection; see `preferredChain`.
