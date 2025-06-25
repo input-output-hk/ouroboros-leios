@@ -40,10 +40,10 @@ At the onset of each slot, the node generates whichever IBs, EBs, VBs, and RBs a
 ### Mocked leader schedules
 
 Different objects arise at different rates, but the simulator reuses some common infrastructure for them.
-In particular, for each slot, each node is given a random number between (ie `uniformR (0, 1 :: Double)` from the [random](https://hackage-content.haskell.org/package/random-1.3.1/docs/System-Random.html#v:uniformR) package (which is inclusive).
+In particular, for each slot, each node is given a random number between 0 and 1 (inclusive) (ie `uniformR (0, 1 :: Double)` from the [random](https://hackage-content.haskell.org/package/random-1.3.1/docs/System-Random.html#v:uniformR) package).
 For each object, that number will be mapped to a number of "wins", ie elections, via [Inverse transform sampling](https://en.wikipedia.org/wiki/Inverse_transform_sampling).
 
-The probability distribution of wins is parameterized on the node's stake, which varies per node but not per slot, and on a corresponding protocol parameter, which varies per kind of object.
+The probability distribution of wins is parameterized on the node's stake, which varies per node but not per slot, and on a corresponding protocol parameter, which only varies per kind of object.
 
 ### Generating IBs
 
@@ -75,6 +75,7 @@ If the node should validate its IB before diffusion and adoption, then that cost
 ### Generating EBs
 
 The EB leader schedule allows for a node to generate at most one EB in a slot.
+TODO the Short Leios specification requires that all EBs are all created at the beginning of Endorse, even if they're election slot is not the first slot in the stage.
 
 The probability distribution of the node's EB elections in a slot is determined by the `endorseBlockFrequencyPerStage` parameter.
 
@@ -145,7 +146,7 @@ The probability distribution of the node's RB elections in a slot is determined 
 The distribution is `Bernoulli(stake*inputBlockFrequencyPerSlot)`.
 
 *Remark*.
-That distributions converges to Praos's `Bernoulli(ϕ_stake(inputBlockFrequencyPerSlot))` as `stake` approaches 0.
+That distribution converges to Praos's `Bernoulli(ϕ_stake(inputBlockFrequencyPerSlot))` as `stake` approaches 0.
 
 Each RB (see `LeiosProtocol.Common.RankingBlock`) consists of the following fields.
 
@@ -165,7 +166,7 @@ More details for some fields.
 - The RB extends the node's preferred chain.
 - The tx payload is the constant `rankingBlockLegacyPraosPayloadAvgSize`.
 - The EB is the best eligible EB, if any.
-    - An eligible EB is certified, from an iteration that doesn't already have a certificate on the extended chain, only references IBs are already adopted, and is not more than `maxEndorseBlockAgeSlots` slots older than the RB.
+    - An eligible EB is certified, from an iteration that doesn't already have a certificate on the extended chain, only references IBs that are already adopted, and is not more than `maxEndorseBlockAgeSlots` slots older than the RB.
     - If the Leios variant is set to `short`, the best of the eligible EBs is oldest, on a tie has more IBs, and on a tie arrived earlier.
     - If the Leios variant is set to `full`, the best of the eligible EBs is youngest, on a tie has more IBs, and on a tie arrived earlier.
 
