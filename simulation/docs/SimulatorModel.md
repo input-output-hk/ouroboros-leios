@@ -16,7 +16,7 @@ Certificates are not explicit; for example, a certificate's computational cost i
 Within a single simulated node, the lifetime of every such object follows a common sequence.
 
 - *Generate*, the duration when the node is generating an object.
-- *Receive*, the moment a node receives (the entirety of) an ojbect from a peer.
+- *Receive*, the moment a node receives (the entirety of) an object from a peer.
   (It is often useful to consider a node to have received an object when it finished generating that object.)
 - *Wait*, the duration when the node cannot yet validate an object (eg a known necessary input is missing).
 - *Validate*, the duration when when node is computing whether the object is valid.
@@ -178,7 +178,7 @@ If the node should validate its VB before diffusion and adoption, then that cost
 
 ## Leios diffusion threads
 
-IBs, VBs, and EBs are each diffused via a corresonding instance of the Relay mini protocol and Relay buffer.
+IBs, VBs, and EBs are each diffused via a corresponding instance of the Relay mini protocol and Relay buffer.
 This is a generalization of the TxSubmission mini protocol and the Mempool in `ouroboros-network` and `ouroboros-consensus`.
 
 Each Relay instance involves one thread per inbound connection (aka "peers") and one thread per outbound connection (aka "followers").
@@ -312,9 +312,8 @@ These variables reflect the consequence of adopting an IB, EB, or VB.
   A map from an ID of an adopted IB ID to when that IB arrived.
   Adopting an IB inserts an entry; the adoption might happen much later than the arrival.
   Pruning an IB removes its entry.
-    - This variable---and the IB pruning logic in general---only enables EBs and VBs.
-      In particular, some IBs that are too old to be included in this variable might still be needed in order to apply some RB.
-      This motivates the next variable.
+    - This variable---and the IB pruning logic in general---only enables logic for EBs and VBs.
+      In particular, some IBs that are too old to be included in this variable might still be needed in order to apply some RB, which motivates another variable; see `ibsValidationActionsVar`.
 - `votesForEBVar`.
   A map from an EB ID to its progress towards a quorum of votes.
   Pruning an EB removes its entry.
