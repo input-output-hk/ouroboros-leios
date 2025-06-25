@@ -205,7 +205,7 @@ module _
               ; lateIBInclusion   = lateIBInclusion
               }
         ; sutId         = SUT-id
-        ; winning-slots = fromList (L.catMaybes $ L.map winningSlot l)
+        ; winning-slots = fromList ∘ L.catMaybes $ L.map winningSlot l
         }
 
     open import Leios.Short.Trace.Verifier params renaming (verifyTrace to checkTrace)
@@ -220,8 +220,8 @@ module _
       field refs : AssocList String Blk
 
     instance
-      hhx : Hashable InputBlock (List ℕ)
-      hhx .hash record { header = h } = hash h
+      Hashable-InputBlock : Hashable InputBlock (List ℕ)
+      Hashable-InputBlock .hash record { header = h } = hash h
 
       _ = Show-List
       _ = Show-×
@@ -234,12 +234,6 @@ module _
 
     unquoteDecl Show-EndorserBlockOSig = derive-Show [ (quote EndorserBlockOSig , Show-EndorserBlockOSig) ]
     unquoteDecl Show-Blk = derive-Show [ (quote Blk , Show-Blk) ]
-
-    del : String
-    del = ", "
-
-    nl : String
-    nl = "\n"
 
     blockRefToNat : AssocList String Blk → String → IBRef
     blockRefToNat refs r with refs ⁉ r
@@ -400,6 +394,9 @@ module _
         "Parameters: " ◇ show params ◇ nl ◇
         "Input: " ◇ show i ◇ nl ◇
         "LeiosState: " ◇ show s
+      where
+        nl : String
+        nl = "\n"
 
     format-Err-verifyUpdate : ∀ {μ s} → Err-verifyUpdate μ s → Pair String String
     format-Err-verifyUpdate {μ} (E-Err _) = "Invalid Update" , show μ
