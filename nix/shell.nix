@@ -25,6 +25,7 @@ in
     pkgs.gnuplot
     pkgs.texliveFull
     pkgs.python3Packages.pygments
+    pkgs.entr
   ];
 
   # Agda environment variables.

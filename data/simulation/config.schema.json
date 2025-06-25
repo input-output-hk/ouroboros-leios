@@ -273,6 +273,10 @@
       "description": "Extends Leios so that EB producers include IBs directly from previous pipelines\nwhere no certified EB was observed.\n\nOnly supported by Rust simulation.",
       "type": "boolean"
     },
+    "leios-mempool-aggressive-pruning": {
+      "description": "If true, transactions will be removed from the Leios mempool if they conflict with in-flight IBs.",
+      "type": "boolean"
+    },
     "leios-mempool-sampling-strategy": {
       "$ref": "#/definitions/MempoolSamplingStrategy",
       "description": "The strategy to use when selecting TXs from the Leios mempool."
@@ -355,6 +359,10 @@
       "description": "When `true`, any delays and message sizes are calculated as if\neach block contained as much data as the expected average, rounded up.\nIn particular, for the sake of the above, we consider that:\n  - Each RB includes a certificate.\n  - Certificates contain votes from `vote-threshold` nodes.\n  - Vote bundles vote for `ceil eb-generation-probability` EBs.\n  - EBs reference `ceil (ib-generation-probability * leios-stage-length-slots)` IBs.\nOnly supported by Haskell simulation.",
       "type": "boolean"
     },
+    "tx-conflict-fraction": {
+      "description": "What fraction of TXs (from 0 to 1) should introduce conflicts with transactions which were produced before?\nOnly supported by Rust simulation.",
+      "type": "number"
+    },
     "tx-generation-distribution": {
       "$ref": "#/definitions/Distribution",
       "description": "Only supported by Rust simulation."
@@ -364,6 +372,10 @@
       "description": "Only supported by Rust simulation.",
       "properties": {},
       "type": "number"
+    },
+    "tx-overcollateralization-factor-distribution": {
+      "$ref": "#/definitions/Distribution",
+      "description": "Distribution used to choose the \"over-collateralization factor\" for a transaction.\n0 means the transaction is not over-collateralized, n means it has enough extra collateral to be included in n shards.\nOnly supported by Rust simulation."
     },
     "tx-size-bytes-distribution": {
       "$ref": "#/definitions/Distribution",
