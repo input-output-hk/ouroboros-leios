@@ -99,6 +99,7 @@ data Config = Config
   , leiosStageActiveVotingSlots :: Word
   , leiosVoteSendRecvStages :: Bool
   , leiosVariant :: LeiosVariant
+  , leiosLateIbInclusion :: Bool
   , leiosHeaderDiffusionTimeMs :: DurationMs
   , praosChainQuality :: Double
   , txGenerationDistribution :: Distribution
@@ -171,6 +172,7 @@ instance Default Config where
       , leiosStageActiveVotingSlots = 1
       , leiosVoteSendRecvStages = False
       , leiosVariant = Short
+      , leiosLateIbInclusion = False
       , leiosHeaderDiffusionTimeMs = 1000
       , praosChainQuality = 40
       , txGenerationDistribution = Exp{lambda = 0.85, scale = Just 1000}
@@ -243,6 +245,7 @@ configToKVsWith getter cfg =
     , get @"treatBlocksAsFull" getter cfg
     , get @"cleanupPolicies" getter cfg
     , get @"leiosVariant" getter cfg
+    , get @"leiosLateIbInclusion" getter cfg
     , get @"leiosHeaderDiffusionTimeMs" getter cfg
     , get @"praosChainQuality" getter cfg
     , get @"simulateTransactions" getter cfg
@@ -329,6 +332,7 @@ instance FromJSON Config where
     treatBlocksAsFull <- parseFieldOrDefault @Config @"treatBlocksAsFull" obj
     cleanupPolicies <- parseFieldOrDefault @Config @"cleanupPolicies" obj
     leiosVariant <- parseFieldOrDefault @Config @"leiosVariant" obj
+    leiosLateIbInclusion <- parseFieldOrDefault @Config @"leiosLateIbInclusion" obj
     leiosHeaderDiffusionTimeMs <- parseFieldOrDefault @Config @"leiosHeaderDiffusionTimeMs" obj
     praosChainQuality <- parseFieldOrDefault @Config @"praosChainQuality" obj
     simulateTransactions <- parseFieldOrDefault @Config @"simulateTransactions" obj
