@@ -8,26 +8,25 @@ The full sharding design provides two complementary mechanisms that **prevent tr
 
 ### 1. UTxO Sharding ([Spec](./utxo.md))
 
-- **Mechanism**: Explicit `shard_label` field in transaction outputs
-- **Use Case**: Ongoing operations and precise shard control
+- **Mechanism**: Explicit `shard_label` field in transaction outputs matches implicit IB `shard` derived by its VRF proof
+- **Shard Assignment**: IB shard derived from VRF proof:
+  
+  $$\text{shardId} = \text{vrf\_value} \bmod \text{totalShards}$$
 - **Network Overhead**: +2 bytes per labeled output
 
 ### 2. Reward Account Sharding ([Spec](./reward-account.md))
 
-- **Mechanism**: Implicit shard assignment via hash function:
+- **Mechanism**: Implicit shard assignment where transactions using reward accounts for collateral/withdrawals must match the IB's shard
+- **Shard Assignment**: Reward account shard derived from hash function:
   
   $$\text{shardId} = \text{hash}(\text{rewardAccount}) \bmod \text{totalShards}$$
-- **Use Case**: Bootstrapping and immediate fee payment capability  
 - **Network Overhead**: 0 bytes (computed on-demand)
-- **Compatibility**: Uses existing Conway `reward_account = bytes` structure unchanged
-- **Scope**: Enables immediate onboarding without pre-labeling UTxOs, while broader sharding approach handles conflicts/duplicates through mempool segmentation
 
 ## Sharding Benefits
 
 Both mechanisms contribute to the broader sharding strategy that:
 - **Prevents conflicts** by processing potentially conflicting transactions sequentially within the same shard
 - **Reduces duplicates** through per-shard mempool segmentation  
-- **Maintains throughput** while ensuring transaction validity
 
 ## Comparison
 
@@ -37,7 +36,6 @@ Both mechanisms contribute to the broader sharding strategy that:
 | **Network Overhead** | +2 bytes per output | 0 bytes |
 | **Flexibility** | Can choose shard | Deterministic shard |
 | **Bootstrapping** | Requires labeled UTxOs | Immediate availability |
-| **Use Case** | Ongoing operations | Initial bootstrapping |
 
 > [!Note]
 > **Design Rationale**: These approaches serve different purposes and can be used together or independently. Reward account sharding enables immediate onboarding while UTxO sharding provides operational control.
