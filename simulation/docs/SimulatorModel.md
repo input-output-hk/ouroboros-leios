@@ -1,7 +1,7 @@
 # Introduction
 
-This document summarizes the structure and behaviors of the Haskell Leios simulator.
-The level of detail is between the code itself and the various work-in-progress Leios specifications.
+This work-in-progress document summarizes the structure and behaviors of the Haskell Leios simulator.
+The desired level of detail is between the code itself and the various work-in-progress Leios specifications.
 
 The Leios node is modeled as a set of threads that maintain shared state via the [stm](https://hackage.haskell.org/package/stm) library, as with the existing `ouroboros-network` and `ouroboros-consensus` implementation libraries.
 This document will primarily describe those threads and the components of their shared state.
@@ -193,7 +193,7 @@ TODO IB headers incur validation delays, but others don't since they're merely I
 
 Different objects are handled differently when the arrived.
 
-- When an IB that extends the genesis bock arrives, its validate-and-adopt task is enqueued on the model CPU.
+- When an IB that extends the genesis block arrives, its validate-and-adopt task is enqueued on the model CPU.
 - When an IB that extends a non-genesis RB arrives, its validate-and-adopt task is added to `waitingForLedgerStateVar`.
 - When an EB arrives, its validate-and-adopt task is enqueued on the model CPU.
 - When an VB arrives, its validate-and-adopt task is enqueued on the model CPU.
@@ -202,7 +202,7 @@ Different objects are handled differently when the arrived.
 
 TODO it's ChainSync and BlockFetch, but how much of `ouroboros-network` and `ouroboros-consensus` was left out?
 
-- When an RB that extends the genesis bock arrives, its validate-and-adopt task is enqueued on the model CPU.
+- When an RB that extends the genesis block arrives, its validate-and-adopt task is enqueued on the model CPU.
 - When an RB that extends a non-genesis RB and has no tx payload arrives, its validate-and-adopt task is added to `waitingForRBVar`.
 - When an RB that extends a non-genesis RB and has some tx payload arrives, its validate-and-adopt task is added to `waitingForLedgerStateVar`.
 
@@ -210,31 +210,32 @@ TODO it's ChainSync and BlockFetch, but how much of `ouroboros-network` and `our
 
 There are three threads that reactively notice when a heretofore missing input becomes available, analogous to out-of-order execution via functional units in a superscalar processor.
 
-- One thread is triggering by the adoption of an RB; see `waitingForRBVar`.
-- One by the construction of an RB's ledger state; see `waitingForLedgerStateVar`.
+- A thread triggered by the adoption of an RB; see `waitingForRBVar`.
+- A thread triggered by the construction of an RB's ledger state; see `waitingForLedgerStateVar`.
   (With some Leios variants, the RB validation no longer necessarily provides a ledger state.)
-- One by the arrival of an IB, see `ibsNeededForEBVar`.
+- A thread triggered by the adoption of an IB, see `ibsNeededForEBVar`.
 
-There's also a similar, more general thread that models the scheduling of outstanding tasks on a set of CPU cores; a block cannot be validated until some core is available; see `taskQueue`.
+There's also a similar, more general thread that models the scheduling of outstanding tasks on a set of CPU cores, since a block cannot be validated until some modeled CPU core is available; see `taskQueue`.
 
 Those threads enable the following tasks to happen as soon as the necessary inputs and some CPU core are available.
-Because those threads use STM to read both the state of pending tasks as well as the state of available inputs, it does not matter if the task or the input arrives first.
+Because those threads use STM to read both the state of pending tasks as well as the state of available inputs, it does not matter if the task or the final input arrives first.
 
 - The node must adopt the preceding RB before validating an RB that has no tx payload.
 - The node must construct the ledger state resulting from the preceding RB before it can validate an RB that has some tx payload.
 - The node must construct the ledger state resulting from the identified RB before it can validate an IB.
-- The node must receive all transitively included IBs before it can construct the ledger state resulting from an RB with a certified EB.
-  (TODO this thread has some complicated and unrealistic logic, since the simulator has no way to acquire objects that are no longer diffusing.)
+- The node must adopt all transitively included IBs before it can construct the ledger state resulting from an RB with a certified EB.
+  (TODO this thread has some complicated and unrealistic logic, since the simulator has no way to acquire "missing" that are no longer diffusing.)
 
 The existence of those threads enable very simple logic for the adoption tasks.
 
-- The node adopts a validated IB by starting to diffuse it and adding it to `ibDeliveryTimesVar` and removing it from the todo lists in `ibsNeededForEBVar`.
-- The node adopts a validated EB by starting to diffuse it and adding it to `relayEBState` and add a corresponding todo list of the not-already-available IBs to `ibsNeededForEBVar`.
+- The node adopts a validated IB by starting to diffuse it, adding it to `ibDeliveryTimesVar` and removing it from the todo lists in `ibsNeededForEBVar`.
+- The node adopts a validated EB by starting to diffuse it, adding it to `relayEBState`, and adding a corresponding todo list of the not-already-available IBs to `ibsNeededForEBVar`.
 - The node adopts a validated VB by starting to diffuse it and adding it to `votesForEBVar`.
 - The node adopts a validated RB by starting to diffuse it and including it whenever calculating its selection; see `preferredChain`.
 
 *Remark*.
-The "starting to diffuse" element of each step is somewhat hard to see in the code because its achieved via callbacks.
+The "starting to diffuse" element of each step is somewhat hard to see in the code because it's achieved via callbacks.
+The Relay component invokes the given callback when some object arrives, and that invocation includes another callback that starts diffusing the object.
 
 ## Pruning threads
 
