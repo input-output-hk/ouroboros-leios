@@ -104,13 +104,20 @@ record TraceEvent : Type where
 
 {-# COMPILE GHC TraceEvent = data TraceEvent (TraceEvent) #-}
 
-module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String ℕ)) (sl : ℕ) (eta : ℕ) where
+module _
+  (numberOfParties : ℕ)
+  (sutId : ℕ)
+  (stakeDistr : List (Pair String ℕ))
+  (stageLength : ℕ)
+  (ledgerQuality : ℕ)
+  (lateIBInclusion : Bool) -- TODO: Pass config and topology instead
+  where
 
   from-id : ℕ → Fin numberOfParties
   from-id n =
     case n <? numberOfParties of λ where
       (yes p) → #_ n {numberOfParties} {fromWitness p}
-      (no _) → error "Conversion to Fin not possible!"
+      (no _) → error $ "Conversion to Fin not possible! " ◇ show n ◇ " / " ◇ show numberOfParties
 
   nodePrefix : String
   nodePrefix = "node-"
@@ -119,13 +126,13 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
   SUT-id = from-id sutId
 
   instance
-    sl-NonZero : NonZero sl
-    sl-NonZero with sl ≟ 0
+    stageLength-NonZero : NonZero stageLength
+    stageLength-NonZero with stageLength ≟ 0
     ... | yes _ = error "Stage length is 0"
     ... | no ¬p = ≢-nonZero ¬p
 
-    np-NonZero : NonZero numberOfParties
-    np-NonZero with numberOfParties ≟ 0
+    numberOfParties-NonZero : NonZero numberOfParties
+    numberOfParties-NonZero with numberOfParties ≟ 0
     ... | yes _ = error "Number of parties is 0"
     ... | no ¬p = ≢-nonZero ¬p
 
@@ -137,8 +144,8 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
 
   open FunTot (completeFin numberOfParties) (maximalFin numberOfParties)
 
-  sd : TotalMap (Fin numberOfParties) ℕ
-  sd =
+  stakeDistribution : TotalMap (Fin numberOfParties) ℕ
+  stakeDistribution =
     let (r , l) = fromListᵐ (L.map (λ (x , y) → (nodeId x , y)) stakeDistr)
     in case (¿ total r ¿) of λ where
          (yes p) → record { rel = r ; left-unique-rel = l ; total-rel = p }
@@ -192,10 +199,10 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
         { networkParams =
             record
               { numberOfParties   = numberOfParties
-              ; eta               = eta
-              ; stakeDistribution = sd
-              ; stageLength       = sl
-              ; lateIBInclusion   = false
+              ; ledgerQuality     = ledgerQuality
+              ; stakeDistribution = stakeDistribution
+              ; stageLength       = stageLength
+              ; lateIBInclusion   = lateIBInclusion
               }
         ; sutId         = SUT-id
         ; winning-slots = fromList (L.catMaybes $ L.map winningSlot l)
@@ -385,7 +392,7 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
     unquoteDecl Show-LeiosInput    = derive-Show [ (quote LeiosInput , Show-LeiosInput) ]
 
     s₀ : LeiosState
-    s₀ = initLeiosState tt sd tt ((SUT-id , tt) ∷ [])
+    s₀ = initLeiosState tt stakeDistribution tt ((SUT-id , tt) ∷ [])
 
     format-Err-verifyAction :  ∀ {α i s} → Err-verifyAction α i s → Pair String String
     format-Err-verifyAction {α} {i} {s} (E-Err e) =
