@@ -172,17 +172,34 @@ struct NodeLeiosState {
 
 enum InputBlockState {
     HeaderPending,
-    Pending(InputBlockHeader),
-    Requested(InputBlockHeader),
-    Received(Arc<InputBlock>),
+    Pending {
+        header: InputBlockHeader,
+        header_seen: Timestamp,
+    },
+    Requested {
+        header: InputBlockHeader,
+        header_seen: Timestamp,
+    },
+    Received {
+        ib: Arc<InputBlock>,
+        header_seen: Timestamp,
+    },
 }
 impl InputBlockState {
     fn header(&self) -> Option<&InputBlockHeader> {
         match self {
             Self::HeaderPending => None,
-            Self::Pending(header) => Some(header),
-            Self::Requested(header) => Some(header),
-            Self::Received(ib) => Some(&ib.header),
+            Self::Pending { header, .. } => Some(header),
+            Self::Requested { header, .. } => Some(header),
+            Self::Received { ib, .. } => Some(&ib.header),
+        }
+    }
+    fn header_seen(&self) -> Option<Timestamp> {
+        match self {
+            Self::HeaderPending => None,
+            Self::Pending { header_seen, .. } => Some(*header_seen),
+            Self::Requested { header_seen, .. } => Some(*header_seen),
+            Self::Received { header_seen, .. } => Some(*header_seen),
         }
     }
 }
@@ -937,7 +954,7 @@ impl Node {
                 self.leios.mempool.remove(tx_id);
             }
             for ib_id in &eb.ibs {
-                let Some(InputBlockState::Received(ib)) = self.leios.ibs.get(ib_id) else {
+                let Some(InputBlockState::Received { ib, .. }) = self.leios.ibs.get(ib_id) else {
                     continue;
                 };
                 for tx in &ib.transactions {
@@ -962,10 +979,12 @@ impl Node {
         let Some(EndorserBlockState::Received { eb: eb_body, .. }) = self.leios.ebs.get(eb) else {
             return false;
         };
-        eb_body
-            .ibs
-            .iter()
-            .all(|ib| matches!(self.leios.ibs.get(ib), Some(InputBlockState::Received(_))))
+        eb_body.ibs.iter().all(|ib| {
+            matches!(
+                self.leios.ibs.get(ib),
+                Some(InputBlockState::Received { .. })
+            )
+        })
     }
 
     fn count_txs_in_eb(&self, eb_id: &EndorserBlockId) -> Option<usize> {
@@ -974,7 +993,7 @@ impl Node {
         };
         let mut tx_set = HashSet::new();
         for ib_id in &eb.ibs {
-            let InputBlockState::Received(ib) = self.leios.ibs.get(ib_id)? else {
+            let InputBlockState::Received { ib, .. } = self.leios.ibs.get(ib_id)? else {
                 return None;
             };
             for tx in &ib.transactions {
@@ -1153,7 +1172,7 @@ impl Node {
     fn receive_request_ib_header(&mut self, from: NodeId, id: InputBlockId) -> Result<()> {
         if let Some(ib) = self.leios.ibs.get(&id) {
             if let Some(header) = ib.header() {
-                let have_body = matches!(ib, InputBlockState::Received(_));
+                let have_body = matches!(ib, InputBlockState::Received { .. });
                 self.send_to(from, SimulationMessage::IBHeader(header.clone(), have_body))?;
             }
         }
@@ -1178,9 +1197,13 @@ impl Node {
             // because the second header serves as a PoE to our peers.
             return;
         }
-        self.leios
-            .ibs
-            .insert(id, InputBlockState::Pending(header.clone()));
+        self.leios.ibs.insert(
+            id,
+            InputBlockState::Pending {
+                header: header.clone(),
+                header_seen: self.clock.now(),
+            },
+        );
         self.schedule_cpu_task(CpuTaskType::IBHeaderValidated(from, header, has_body));
     }
 
@@ -1207,12 +1230,16 @@ impl Node {
     }
 
     fn receive_announce_ib(&mut self, from: NodeId, id: InputBlockId) -> Result<()> {
-        let header = match self.leios.ibs.get(&id) {
-            Some(InputBlockState::Pending(header)) => header,
-            Some(InputBlockState::Requested(header))
-                if self.sim_config.relay_strategy == RelayStrategy::RequestFromAll =>
-            {
-                header
+        let (header, header_seen) = match self.leios.ibs.get(&id) {
+            Some(InputBlockState::Pending {
+                header,
+                header_seen,
+            }) => (header, *header_seen),
+            Some(InputBlockState::Requested {
+                header,
+                header_seen,
+            }) if self.sim_config.relay_strategy == RelayStrategy::RequestFromAll => {
+                (header, *header_seen)
             }
             _ => return Ok(()),
         };
@@ -1229,9 +1256,13 @@ impl Node {
             .or_insert(PeerInputBlockRequests::new(&self.sim_config));
         if reqs.active.len() < self.sim_config.max_ib_requests_per_peer {
             // If so, make the request
-            self.leios
-                .ibs
-                .insert(id, InputBlockState::Requested(header.clone()));
+            self.leios.ibs.insert(
+                id,
+                InputBlockState::Requested {
+                    header: header.clone(),
+                    header_seen,
+                },
+            );
             reqs.active.insert(id);
             self.send_to(from, SimulationMessage::RequestIB(id))?;
         } else {
@@ -1242,7 +1273,7 @@ impl Node {
     }
 
     fn receive_request_ib(&mut self, from: NodeId, id: InputBlockId) -> Result<()> {
-        if let Some(InputBlockState::Received(ib)) = self.leios.ibs.get(&id) {
+        if let Some(InputBlockState::Received { ib, .. }) = self.leios.ibs.get(&id) {
             self.tracker.track_ib_sent(ib, self.id, from);
             self.send_to(from, SimulationMessage::IB(ib.clone()))?;
         }
@@ -1256,7 +1287,7 @@ impl Node {
             .leios
             .ibs
             .get(&ib.header.id)
-            .is_some_and(|ib| matches!(ib, InputBlockState::Received(_)))
+            .is_some_and(|ib| matches!(ib, InputBlockState::Received { .. }))
         {
             return;
         }
@@ -1283,11 +1314,17 @@ impl Node {
                 .mempool
                 .retain(|_, seen| !self.leios.input_ids_from_ibs.contains(&seen.tx.input_id));
         }
+        let header_seen = self
+            .leios
+            .ibs
+            .get(&id)
+            .and_then(|state| state.header_seen())
+            .unwrap();
         if self
             .leios
             .ibs
-            .insert(id, InputBlockState::Received(ib))
-            .is_some_and(|ib| matches!(ib, InputBlockState::Received(_)))
+            .insert(id, InputBlockState::Received { ib, header_seen })
+            .is_some_and(|ib| matches!(ib, InputBlockState::Received { .. }))
         {
             return Ok(());
         }
@@ -1314,12 +1351,16 @@ impl Node {
 
         // We now have capacity to request one more IB from this peer
         while let Some(id) = reqs.next() {
-            let header = match self.leios.ibs.get(&id) {
-                Some(InputBlockState::Pending(header)) => header,
-                Some(InputBlockState::Requested(header))
-                    if self.sim_config.relay_strategy == RelayStrategy::RequestFromAll =>
-                {
-                    header
+            let (header, header_seen) = match self.leios.ibs.get(&id) {
+                Some(InputBlockState::Pending {
+                    header,
+                    header_seen,
+                }) => (header, *header_seen),
+                Some(InputBlockState::Requested {
+                    header,
+                    header_seen,
+                }) if self.sim_config.relay_strategy == RelayStrategy::RequestFromAll => {
+                    (header, *header_seen)
                 }
                 _ => {
                     // We fetched this IB from some other node already
@@ -1341,9 +1382,13 @@ impl Node {
             }
 
             // Make the request
-            self.leios
-                .ibs
-                .insert(id, InputBlockState::Requested(header.clone()));
+            self.leios.ibs.insert(
+                id,
+                InputBlockState::Requested {
+                    header: header.clone(),
+                    header_seen,
+                },
+            );
             reqs.active.insert(id);
             self.send_to(from, SimulationMessage::RequestIB(id))?;
             break;
@@ -1631,7 +1676,8 @@ impl Node {
                     state.spent_inputs.insert(tx.input_id);
                 }
                 for ib_id in &eb.ibs {
-                    let Some(InputBlockState::Received(ib)) = self.leios.ibs.get(ib_id) else {
+                    let Some(InputBlockState::Received { ib, .. }) = self.leios.ibs.get(ib_id)
+                    else {
                         continue;
                     };
                     for tx in &ib.transactions {
@@ -1661,7 +1707,13 @@ impl Node {
             .entry(ib.header.id.pipeline)
             .or_default()
             .push(id);
-        self.leios.ibs.insert(id, InputBlockState::Received(ib));
+        self.leios.ibs.insert(
+            id,
+            InputBlockState::Received {
+                ib,
+                header_seen: self.clock.now(),
+            },
+        );
         for peer in &self.consumers {
             self.send_to(*peer, SimulationMessage::AnnounceIBHeader(id))?;
         }
@@ -1764,9 +1816,15 @@ impl Node {
         }
 
         for ib_id in &eb.ibs {
-            let Some(InputBlockState::Received(ib)) = self.leios.ibs.get(ib_id) else {
+            let Some(InputBlockState::Received { ib, header_seen }) = self.leios.ibs.get(ib_id)
+            else {
                 return Err(NoVoteReason::MissingIB);
             };
+            let header_cutoff =
+                Timestamp::from_secs(ib.header.id.slot) + self.sim_config.header_diffusion_time * 2;
+            if *header_seen > header_cutoff {
+                return Err(NoVoteReason::LateIBHeader);
+            }
             if !expected_ib_pipelines.contains(&ib_id.pipeline) {
                 return Err(NoVoteReason::InvalidSlot);
             }
