@@ -73,12 +73,9 @@ $$
 $$
 
 **Where this validation applies to**:
-- All VKey reward accounts in the `withdrawals` field
-- All VKey reward accounts in the `leios_collateral` field
+- All VKey reward accounts in the `withdrawals` field 
+- All VKey reward accounts in the `leios_collateral` field 
 - Script reward accounts are exempt from this restriction
 
 > [!Important]
-> **Staking Reward Withdrawal Limitation**: This creates a significant constraint where VKey reward accounts can only withdraw staking rewards in transactions belonging to their assigned shard. Script reward accounts remain unrestricted.
-
-> [!Note]
-> **Collateral Security**: This prevents spending money used for collateral in transactions of a different shard, ensuring collateral integrity across the sharded system.
+> **Implications**: This creates significant constraints where VKey reward accounts can only withdraw staking rewards or post collateral in transactions belonging to their assigned shard, preventing cross-shard conflicts and ensuring collateral integrity. Script reward accounts remain unrestricted.
