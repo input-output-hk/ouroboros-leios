@@ -4,7 +4,7 @@ leios-variant: full
 # "Random" is meant to ensure that different producers include different TXs.
 leios-mempool-sampling-strategy: random
 
-# Allow EBs to include IBs from previous slots
+# Allow EBs to include IBs from previous pipelines
 leios-late-ib-inclusion: true
 
 # Chain quality controls how far back EB recursion can reach.

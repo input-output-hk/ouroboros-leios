@@ -96,7 +96,8 @@ Each EB (see `LeiosProtocol.Common.EndorseBlock`) consists of the following fiel
 
 More details for some fields.
 
-- An EB from iteration `i` includes the IDs of all IBs that were already adopted, are also from iteration `i`, and arrived before the end of `i`'s Deliver2 stage.
+- If `leios-late-ib-inclusion` is disabled, an EB from iteration `i` includes the IDs of all IBs that were already adopted, are also from iteration `i`, and arrived before the end of `i`'s Deliver2 stage.
+- If `leios-late-ib-inclusion` is enabled, an EB from iteration `i` includes the IDs of all IBs that were already adopted, are from an iteration `j` in the closed interval `[max 0 (i-2), i]`, and arrived before the end of `j`'s contemporary Deliver2 stage.
 - If the Leios variant is set to `short`, this EB includes no EB IDs.
 - If the Leios variant is set to `full`, an EB from iteration `i` includes the ID of the best eligible EB from each iteration with any eligible EBs.
     - An eligible EB has already been adopted, has already been certified, and is from an iteration in the closed interval `[i - min i (2 + pipelinesToReferenceFromEB), i-3]`.
@@ -129,8 +130,10 @@ More details for some fields.
 - A VB from iteration `i` includes the IDs of all EBs that satisfy the following.
     - The EB must have already been adopted.
     - The EB must also be from iteration `i`.
-    - The EB must only include IBs that have already been adopted, are from iteration `i`, and arrived before the end of `i`'s Endorse stage.
-    - The EB must include all IBs that have already been adopted, are from iteration `i`, and arrived before the end of `i`'s Deliver1 stage.
+    - If `leios-late-ib-inclusion` is disabled, the EB must only include IBs that have already been adopted, are from iteration `i`, and arrived before the end of `i`'s Endorse stage.
+    - If `leios-late-ib-inclusion` is disabled, the EB must include all IBs that have already been adopted, are from iteration `i`, and arrived before the end of `i`'s Deliver1 stage.
+    - If `leios-late-ib-inclusion` is enabled, the EB must only include IBs that have already been adopted, are from an iteration `j` in the closed interval `[max 0 (i-2), i]`, and arrived before the end of `j`'s Endorse stage.
+    - If `leios-late-ib-inclusion` is enabled, the EB must include all IBs that have already been adopted, are from an iteration `j` in the closed interval `[max 0 (i-2), i]`, and arrived before the end of `j`'s Deliver1 stage.
     - If the Leios variant is set to `full`, then let X be the EB's included EBs in iteration order; let Y be the EBs this node would have considered eligible if it were to retroactively create an EB for iteration `i` right now with the only extra restriction being ignore EBs that arrived within Δ_hdr of the end of iteration `i`; then `and (zipWith elem X Y)` must be `True`.
       (TODO the `zipWith` is suspicious; whether it would misbehave in various scenarios depends on many implementation details.)
 - The byte size is computed as `voteBundleSizeBytesConstant + voteBundleSizeBytesPerEb * #EBs` (which implies the weighted-vote perspective).
@@ -192,7 +195,7 @@ TODO discuss the other Relay parameters, backpressure, pipelining, etc?
 When an IB header arrives, its validation task is enqueued on the model CPU---for VBs and EBs it's just an ID, not a header, so there's no validation.
 Once that finishes, the Relay logic will decide whether it needs to fetch the body.
 
-- An IB body is not fetched if it's older than the slot to which the buffer as has already been pruned or if it's already in the buffer.
+- An IB body is not fetched if it exists earlier than it should, it's being offered later than it should be, or if it's already in the buffer.
 - An EB is not fetched if it's older than the slot to which the buffer has already been pruned, it's too old to be included by an RB (see `maxEndorseBlockAgeSlots`), or if it's already in the buffer.
 - A VB is not fetched if it's older than the slot to which the buffer has already been pruned or if it's already in the buffer.
 
@@ -233,7 +236,9 @@ Because those threads use STM to read both the state of pending tasks as well as
 
 The existence of those threads enable very simple logic for the adoption tasks.
 
-- The node adopts a validated IB by starting to diffuse it, adding its `UTCTime` arrival to `ibDeliveryTimesVar`, and removing the IB from the todo lists in `ibsNeededForEBVar`.
+- The node adopts a validated IB by starting to diffuse it, removing the IB from the todo lists in `ibsNeededForEBVar`, and recording its ID and which stage it arrived during.
+  See `iBsForEBsAndVotesVar`.
+  If it arrived during the IB's iteration's Propose stage (aka "early") or after the IB's iteration's Endorse stage (aka "tardy"), then the IB is discarded.
 - The node adopts a validated EB by starting to diffuse it, adding it to `relayEBState`, and adding a corresponding todo list of the not-already-available IBs to `ibsNeededForEBVar`.
 - The node adopts a validated VB by starting to diffuse it and adding it to `votesForEBVar`.
 - The node adopts a validated RB by starting to diffuse it and including it whenever calculating its selection; see `preferredChain`.
@@ -245,17 +250,18 @@ The Relay component invokes the given callback when some object arrives, and tha
 ## Pruning threads
 
 - *IBs 1*.
-  At the end of the Vote(Send) stage for iteration `i`, the node stops diffusing all IBs from `i`.
-  (TODO this should happen at the end of the Endorse stage, but this buffer is being abused as the adoption buffer as well.)
-  It also forgets any of those IBs it had adopted, with the exception of their arrival time, which is used when generating VBs.
+  At the end of the Endorse stage for iteration `i`, the node stops diffusing all IBs from `i`.
   See `relayIBState`.
+- *IBs 2*.
+  If `leios-late-ib-inclusion` is disabled, then at the end of the Vote(Send) stage for iteration `i`, the node forgets the arrival times of all IBs from `i`.
+  If `leios-late-ib-inclusion` is enabled, the node instead does that two stages later.
+  See `iBsForEBsAndVotesVar`.
 - *EBs 1*.
   At the end of the Vote(Recv) stage for iteration `i`, the node stops diffusing and completely forgets all EBs from `i` that are not already certified.
   See `relayEBState`, `votesForEBVar`, and `ibsNeededForEBVar`.
-- *VBs* and *IBs 2*.
+- *VBs*.
   At the end of the Vote(Recv) stage for iteration `i`, the node stops diffusing and completely forgets all VBs from `i`, except that certified EBs from `i` remember the ID and multiplicity of the VBs that first met quorum.
-  It also forgets the arrival time of IBs from `i`.
-  See `relayVoteState` and `ibDeliveryTimesVar`.
+  See `relayVoteState`.
 - *EBs 2*.
   If the Leios variant is set to `short`, then `maxEndorseBlockAgeSlots` after the end of the Endorse stage for iteration `i`, the node stops diffusing and forgets all EBs from `i` that were certified but are not included by an RB on the selected chain.
   (TODO these blocks should have stopped diffusing a long time ago, assuming `maxEndorseBlockAgeSlots >> sliceLength`)
@@ -281,7 +287,7 @@ TODO include `taskQueue`
 
 TODO `relayIBState` abuse
 
-TODO `ibDeliveryTimesVar`
+TODO `iBsForEBsAndVotesVar`
 
 ## Adopted EBs state
 
