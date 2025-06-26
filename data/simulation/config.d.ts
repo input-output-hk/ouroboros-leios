@@ -77,7 +77,8 @@ export interface Config {
   "tx-size-bytes-distribution": Distribution;
   /**
    * Distribution used to choose the "over-collateralization factor" for a transaction.
-   * 0 means the transaction is not over-collateralized, n means it has enough extra collateral to be included in n shards.
+   * An "overcollateralization factor" of n means the TX has enough collateral to be included in n+1 shards.
+   * A factor of 0 means the TX has enough collateral to be include in 1 shard; i.e. it is not over-collateralized.
    * Only supported by Rust simulation.  */
   "tx-overcollateralization-factor-distribution": Distribution;
   /** Only supported by Rust simulation. */
