@@ -50,7 +50,7 @@ tx-size-bytes-distribution:
 tx-conflict-fraction: 0
 tx-overcollateralization-factor-distribution:
   distribution: constant
-  value: 3
+  value: 1
 tx-validation-cpu-time-ms: 1.5
 tx-max-size-bytes: 16384
 tx-start-time: 60
@@ -83,7 +83,7 @@ rb-body-legacy-praos-payload-validation-cpu-time-ms-per-byte: 0.0005
 # Input Block Configuration
 ################################################################################
 
-ib-generation-probability: 0.15
+ib-generation-probability: 1.20
 ib-shards: 80
 ib-shard-period-length-slots: 1
 ib-shard-group-count: 8
@@ -102,7 +102,7 @@ ib-shard-group-count: 8
 ib-head-size-bytes: 304
 # 98KB to optimize for 3 TCP round trips
 ib-body-avg-size-bytes: 98304
-ib-body-max-size-bytes: 2097152
+ib-body-max-size-bytes: 262144
 # Here we also use praos blocks as ballpark estimate.
 # Sec 2.3 Forging, of the benchmark cluster report, lists
 #   * Slot start to announced: 0.12975s

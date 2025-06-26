@@ -3,10 +3,9 @@
 
 set -e
 
-mkdir -p results/vars
-
 for d in vars
 do
+  mkdir -p results/$d
   for f in cpus lifecycle resources receipts
   do
     DIR=$(find $d -type f -name $f.csv.gz \( -not -empty \) -printf %h\\n -quit)
