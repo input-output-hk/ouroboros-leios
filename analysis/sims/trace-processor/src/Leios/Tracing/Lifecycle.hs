@@ -136,9 +136,11 @@ parseMessage "EBGenerated" item created =
   withObject "EBGenerated" $ \message ->
     do
       size <- message .: "size_bytes"
-      ibs <- mapM (fmap ((,mempty{toEB = created, inEBs = S.singleton item, references = Sum 1}) . ItemKey "IB") . (.: "id")) =<< message .: "input_blocks"
-      ebs <- mapM (fmap ((,mempty{toEB = created, inEBs = S.singleton item, references = Sum 1}) . ItemKey "EB") . (.: "id")) =<< message .: "endorser_blocks"
-      pure (ItemKey{kind = "EB", item}, mempty{size, created}, M.fromList $ ibs <> ebs)
+      let destination = mempty{toEB = created, inEBs = S.singleton item, references = Sum 1}
+      txs <- mapM (fmap ((,destination) . ItemKey "TX") . (.: "id")) =<< message .: "transactions"
+      ibs <- mapM (fmap ((,destination) . ItemKey "IB") . (.: "id")) =<< message .: "input_blocks"
+      ebs <- mapM (fmap ((,destination) . ItemKey "EB") . (.: "id")) =<< message .: "endorser_blocks"
+      pure (ItemKey{kind = "EB", item}, mempty{size, created}, M.fromList $ txs <> ibs <> ebs)
 parseMessage "RBGenerated" item created =
   withObject "RBGenerated" $ \message ->
     do
@@ -185,6 +187,9 @@ updateEBs itemKey = updateInclusions "EB" itemKey . inEBs
 updateIBs :: Monad m => ItemKey -> ItemInfo -> StateT Index m ()
 updateIBs itemKey = updateInclusions "IB" itemKey . inIBs
 
+updateTXs :: Monad m => ItemKey -> ItemInfo -> StateT Index m ()
+updateTXs itemKey = updateInclusions "TX" itemKey . inEBs
+
 lifecycle :: FilePath -> MVar (Maybe Value) -> IO ()
 lifecycle lifecycleFile events =
   do
@@ -198,11 +203,9 @@ lifecycle lifecycleFile events =
     index <-
       (`execStateT` mempty) $
         do
-          -- Compute the direct metrics from the traces.
           go
-          -- Update arrival in EBs and RBs for IBs.
           mapM_ (uncurry updateEBs) =<< gets M.toList
-          -- Update arrival in EBs and RBs for TXs.
           mapM_ (uncurry updateIBs) =<< gets M.toList
+          mapM_ (uncurry updateTXs) =<< gets M.toList
     writeFile lifecycleFile . unlines . (itemHeader :) $
       uncurry toCSV <$> M.toList index
