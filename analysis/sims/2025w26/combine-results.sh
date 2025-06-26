@@ -3,9 +3,9 @@
 
 set -e
 
-mkdir -p results/cxs
+mkdir -p results/vars
 
-for d in cxs
+for d in vars
 do
   for f in cpus lifecycle resources receipts
   do
