@@ -1,14 +1,13 @@
 # Sharded Transactions - CDDL
 
-The full sharding approach extends Conway transactions with shard assignment and fee payment mechanisms to ensure compatibility with the sharded ledger design.
+The fully-sharded transactions approach extends Conway transactions with shard assignment and fee payment mechanisms to ensure compatibility with the sharded ledger design.
 
 ## Core Sharding Principles
 
 The transaction extensions implement the following design principles from Ledger v0.2:
 - **Shard Assignment**: Transactions are assigned to shards based on their fee-paying UTxOs
-- **Fee Payment**: "Any tx submitted to Leios must pay its fees through labelled UTxOs or reward accounts"
-- **UTxO Labeling**: "UTxOs can be explicitly labelled with a shard id"
-- **Reward Account Sharding**: "Reward accounts are implicitly assigned a shard id based on their hash"
+- **Fee Payment**: Any transaction submitted to Leios must pay its fees through labelled UTxOs
+- **UTxO Labeling**: UTxOs can be explicitly labelled with a shard id
 
 ## UTxO Shard Labeling
 
@@ -24,12 +23,6 @@ The transaction extensions implement the following design principles from Ledger
 ```
 Sources: [Conway CDDL](https://github.com/IntersectMBO/cardano-ledger/blob/master/eras/conway/impl/cddl-files/conway.cddl#162), Ledger v0.2: "UTxOs can be explicitly labelled with a shard id"
 
-## Reward Account Sharding
-
-Sources: Ledger v0.2: "Reward accounts are implicitly assigned a shard id based on their hash"
-
-> [!Important]
-> **TODO**: Missing details.
 
 ## Supporting Types
 
