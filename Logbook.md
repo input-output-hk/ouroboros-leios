@@ -35,6 +35,12 @@ See [analysis/sims/2025w26/analysis-variants-sharding.ipynb](analysis/sims/2025w
 
 ![Temporal efficiency of nine Leios variants](analysis/sims/2025w26/plots/vars/reach-rb-tx.svg)
 
+### Rust simulation
+
+Added support for IB equivocation (WIP, still evaluating impact)
+Minor usability improvements to the CLI tool
+Added sharding to the "full without IBs" variant of Leios.
+
 ## 2025-06-24
 
 ### Conflict experiment on simplest Leios variant
