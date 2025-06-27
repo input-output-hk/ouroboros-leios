@@ -596,6 +596,14 @@ impl Node {
         }
     }
 
+    fn find_available_eb_shards(&self, slot: u64) -> Vec<u64> {
+        if !matches!(self.sim_config.variant, LeiosVariant::FullWithoutIbs) {
+            // EBs only need shards if we don't have IBs.
+            return vec![0];
+        }
+        self.find_available_ib_shards(slot)
+    }
+
     fn find_available_ib_shards(&self, slot: u64) -> Vec<u64> {
         let period = slot / self.sim_config.ib_shard_period_slots;
         let group = period % self.sim_config.ib_shard_groups;
@@ -610,14 +618,16 @@ impl Node {
             // Don't generate EBs before that pipeline, because they would just be empty.
             return;
         }
+        let shards = self.find_available_eb_shards(slot);
         for next_p in vrf_probabilities(self.sim_config.eb_generation_probability) {
-            if self.run_vrf(next_p).is_some() {
+            if let Some(vrf) = self.run_vrf(next_p) {
                 self.tracker.track_eb_lottery_won(EndorserBlockId {
                     slot,
                     pipeline,
                     producer: self.id,
                 });
-                let txs = self.select_txs_for_eb(pipeline);
+                let shard = shards[vrf as usize % shards.len()];
+                let txs = self.select_txs_for_eb(shard, pipeline);
                 let ibs = self.select_ibs_for_eb(pipeline);
                 let ebs = self.select_ebs_for_eb(pipeline);
                 let bytes = self.sim_config.sizes.eb(txs.len(), ibs.len(), ebs.len());
@@ -625,6 +635,7 @@ impl Node {
                     slot,
                     pipeline,
                     producer: self.id,
+                    shard,
                     bytes,
                     txs,
                     ibs,
@@ -1407,27 +1418,15 @@ impl Node {
             vec![Arc::new(tx)]
         } else {
             let ledger_state = self.resolve_ledger_state(rb_ref);
-            let ib_shards = self.sim_config.ib_shards;
-            let tx_may_use_shard = |tx: &Transaction, ib_shard: u64| {
-                for shard in tx.shard..=tx.shard + tx.overcollateralization_factor {
-                    let shard = shard % ib_shards;
-                    if shard == ib_shard {
-                        return true;
-                    }
-                }
-                false
-            };
             self.select_txs(
-                |seen| {
-                    tx_may_use_shard(&seen.tx, shard)
-                        && !ledger_state.spent_inputs.contains(&seen.tx.input_id)
-                },
+                shard,
+                |seen| !ledger_state.spent_inputs.contains(&seen.tx.input_id),
                 self.sim_config.max_ib_size,
             )
         }
     }
 
-    fn select_txs_for_eb(&mut self, pipeline: u64) -> Vec<TransactionId> {
+    fn select_txs_for_eb(&mut self, shard: u64, pipeline: u64) -> Vec<TransactionId> {
         if self.sim_config.variant != LeiosVariant::FullWithoutIbs {
             return vec![];
         }
@@ -1440,6 +1439,7 @@ impl Node {
         let max_seen_at = Timestamp::from_secs(last_legal_slot);
 
         self.select_txs(
+            shard,
             |seen| seen.seen_at <= max_seen_at,
             self.sim_config.max_eb_size,
         )
@@ -1448,16 +1448,31 @@ impl Node {
         .collect()
     }
 
-    fn select_txs<C>(&mut self, condition: C, max_size: u64) -> Vec<Arc<Transaction>>
+    fn select_txs<C>(
+        &mut self,
+        container_shard: u64,
+        condition: C,
+        max_size: u64,
+    ) -> Vec<Arc<Transaction>>
     where
         C: Fn(&SeenTransaction) -> bool,
     {
+        let ib_shards = self.sim_config.ib_shards;
+        let tx_may_use_shard = |tx: &Transaction| {
+            for shard in tx.shard..=tx.shard + tx.overcollateralization_factor {
+                let shard = shard % ib_shards;
+                if shard == container_shard {
+                    return true;
+                }
+            }
+            false
+        };
         let mut candidate_txs: Vec<_> = self
             .leios
             .mempool
             .values()
             .filter_map(|seen| {
-                if condition(seen) {
+                if tx_may_use_shard(&seen.tx) && condition(seen) {
                     Some((seen.tx.id, seen.tx.bytes, seen.tx.input_id))
                 } else {
                     None

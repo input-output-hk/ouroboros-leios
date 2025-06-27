@@ -206,6 +206,7 @@ pub enum Event {
         slot: u64,
         pipeline: u64,
         producer: Node,
+        shard: u64,
         size_bytes: u64,
         transactions: Vec<BlockRef<TransactionId>>,
         input_blocks: Vec<BlockRef<InputBlockId<Node>>>,
@@ -538,6 +539,7 @@ impl EventTracker {
             slot: block.slot,
             pipeline: block.pipeline,
             producer: self.to_node(block.producer),
+            shard: block.shard,
             size_bytes: block.bytes,
             transactions: block.txs.iter().map(|id| BlockRef { id: *id }).collect(),
             input_blocks: block

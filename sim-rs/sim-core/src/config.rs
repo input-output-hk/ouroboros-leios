@@ -514,6 +514,17 @@ impl SimConfiguration {
                 params.ib_shard_group_count
             );
         }
+        if matches!(params.leios_variant, LeiosVariant::FullWithoutIbs)
+            && params.ib_shard_group_count != 1
+            && params.ib_shard_period_length_slots % params.leios_stage_length_slots != 0
+        {
+            bail!(
+                "Invalid sharding configuration. EBs are generated every {} slot(s). This sim is configured to choose EB shards from 1 of {} groups, using a different group every {} slot(s). Some groups would never be chosen.",
+                params.leios_stage_length_slots,
+                params.ib_shard_group_count,
+                params.ib_shard_period_length_slots
+            );
+        }
         Ok(Self {
             seed: 0,
             timestamp_resolution: duration_ms(params.timestamp_resolution_ms),

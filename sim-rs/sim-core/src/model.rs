@@ -170,6 +170,7 @@ pub struct EndorserBlock {
     pub slot: u64,
     pub pipeline: u64,
     pub producer: NodeId,
+    pub shard: u64,
     pub bytes: u64,
     pub txs: Vec<TransactionId>,
     pub ibs: Vec<InputBlockId>,
