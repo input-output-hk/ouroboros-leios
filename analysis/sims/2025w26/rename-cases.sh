@@ -6,5 +6,5 @@ sed -e 's/Label/Variant,Sharding/' \
     -e 's/txrf-/full-with-tx-references,/' \
     -e 's/shard/sharded/' \
     -e 's/simpl/unsharded/' \
-    -e 's/overc/overcollateralized/' \
+    -e 's/overc/overcollateralized-1/' \
     -i vars/*/case.csv
