@@ -33,11 +33,14 @@ export interface Node<Location> {
    * Only supported by Rust simulation.
    */
   "tx-generation-weight"?: number | null;
-  /** If not null, the node will behave according to the given Behaviour.
-  *
-  * Only supported by Haskell simulation.
-  */
+  /** If not null, the node will behave according to the given Behaviour. */
   adversarial?: Behaviour | null;
+  /** If not null, the node will follow the given behaviours.
+   * 
+   * 
+   * Only supported by Rust simulation.
+   */
+  behaviours?: Behaviour[] | null;
 }
 
 /** Link information. */
@@ -69,4 +72,12 @@ export interface UnboundedIbs {
   "starting-at-slot": number;
   "slot-of-generated-ibs": number;
   "ibs-per-slot": number;
+}
+
+/** A node which generates equivocated IBs at any possible opportunity.
+ * 
+ * Only supported by Rust simulation.
+ */
+export interface IbEquivocation {
+  behaviour: "ib-equivocation";
 }

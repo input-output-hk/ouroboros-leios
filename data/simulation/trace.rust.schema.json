@@ -94,6 +94,12 @@
     },
     "GeneratedEndorserBlock": {
       "properties": {
+        "endorser_blocks": {
+          "items": {
+            "$ref": "#/definitions/BlockRef"
+          },
+          "type": "array"
+        },
         "id": {
           "type": "string"
         },
@@ -120,6 +126,7 @@
         }
       },
       "required": [
+        "endorser_blocks",
         "id",
         "input_blocks",
         "pipeline",
