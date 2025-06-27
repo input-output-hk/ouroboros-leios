@@ -16,7 +16,7 @@ Certificates are not explicit; for example, a certificate's computational cost i
 Within a single simulated node, the lifetime of every such object follows a common sequence.
 
 - *Generate*, the duration when the node is generating an object.
-- *Receive*, the moment a node receives (the entirety of) an ojbect from a peer.
+- *Receive*, the moment a node receives (the entirety of) an object from a peer.
   (It is often useful to consider a node to have received an object when it finished generating that object.)
 - *Wait*, the duration when the node cannot yet validate an object (eg a known necessary input is missing).
 - *Validate*, the duration when when node is computing whether the object is valid.
@@ -178,7 +178,7 @@ If the node should validate its VB before diffusion and adoption, then that cost
 
 ## Leios diffusion threads
 
-IBs, VBs, and EBs are each diffused via a corresonding instance of the Relay mini protocol and Relay buffer.
+IBs, VBs, and EBs are each diffused via a corresponding instance of the Relay mini protocol and Relay buffer.
 This is a generalization of the TxSubmission mini protocol and the Mempool in `ouroboros-network` and `ouroboros-consensus`.
 
 Each Relay instance involves one thread per inbound connection (aka "peers") and one thread per outbound connection (aka "followers").
@@ -273,30 +273,77 @@ The Relay component invokes the given callback when some object arrives, and tha
 
 The `LeiosProtocol.Short.Node.LeiosNodeState` record type declares the state shared by the threads.
 
-## Leios Diffusion state
+These components accumulate data over time as the protocol executes.
+Many of the statements in this section are redundant with the Threads section above, so those statements will be terse.
+However, this section is more granular/concrete, and so has some non-redundant information and explains some design decisions.
 
-TODO `relayIBState`, `relayEBState`, `relayVoteState`
+The components are as follows.
 
-## Waiting&Validation state
+## Diffuse state & Praos state
 
-TODO `ibsNeededForEBVar`, `waitingForRBVar`, `waitingForLedgerStateVar`, `ledgerStateVar`, `ibsValidationActionsVar`
+These variables maintain the diffusion state, and also the base protocol state.
 
-TODO include `taskQueue`
+- `praosState`.
+  The state of the Praos components, including Praos diffusion.
+  TODO elaborate on the Praos state
+- `relayIBState`, `relayEBState`, and `relayVoteState`.
+  The IB, EB, and VB Relay buffers.
+- `prunedUncertifiedEBStateToVar` and `prunedVoteStateToVar`.
+  Records the slot of EBs and VBs that the summarizes which objects the node has stopped diffusing due to age.
+  These are used to prevent requesting EBs/VBs that should have already stopped diffusing.
+  Since the relevant Relay header and the wall clock contain enough information to do determine that, these variables are just a convenience/optimization.
 
-## Adopted IBs state
+## Adopt state
 
-TODO `relayIBState` abuse
+These variables reflect the consequence of adopting an IB, EB, or VB.
 
-TODO `iBsForEBsAndVotesVar`
+- `ibsNeededForEBVar`.
+  A map from an EB ID to the set of IDs of its IBs that have not yet been adopted.
+  Adopting an EB inserts a new entry.
+  Pruning an EB removes its entry.
+  Adopting an IB removes it from all sets.
+  Pruning an IB must **not** reinsert it.
+    - There is no analogous state for as-of-yet missing EBs needed by EBs/RBs.
+    - This is because EBs are relatively small, and so, _most of the time_ the EBs will have arrived before they're needed.
+      A Leios implementation would need to deal with this case---at least for EBs required by the best RB---but it doesn't seem worthwhile to complicate the simulators so far.
+    - If the simulations included an adversary who released EBs at the latest possible second, then it might be necessary.
+      But so far they don't, so if some EBs are failing to diffuse in time, other aspects should already be looking quite bad.
+- `iBsForEBsAndVotesVar`.
+  A map from an ID of an adopted IB ID to when that IB arrived.
+  Adopting an IB inserts an entry; the adoption might happen much later than the arrival.
+  Pruning an IB removes its entry.
+    - This variable---and the IB pruning logic in general---only enables logic for EBs and VBs.
+      In particular, some IBs that are too old to be included in this variable might still be needed in order to apply some RB, which motivates another variable; see `ibsValidationActionsVar`.
+- `votesForEBVar`.
+  A map from an EB ID to its progress towards a quorum of votes.
+  Pruning an EB removes its entry.
+  Adopting a VB increments the progress of all of its EB IDs that have not already reached quorum.
+  Pruning a VB does not affect this variable.
 
-## Adopted EBs state
+## Wait-Validate state
 
-TODO `relayEBState` abuse
+These variables maintain tasks blocked on some missing input.
 
-## Adopted VBs state
-
-TODO `votesForEBVar`
-
-## Adopted RBs & Praos Diffusion state
-
-TODO
+- `ibsValidationActionsVar`.
+  A map from IB ID to validate-and-adopt tasks that are blocked on a missing RB ledger state.
+  It is not pruned _per se_; tasks are only removed once they're executed.
+    - Usually, the tasks are executed ASAP once the necessary RB ledger state is no longer missing.
+      However, when the node computes the ledger state of an RB that includes an IB that is still in this map, it executes the validation logic _even if the necessary RB ledger state is still missing_.
+    - A Leios implementation would require the node to somehow urgently fetch the missing RB's chain and its prerequisites from the network, but that would add a great deal of complexity to the simulator.
+      So, despite being unfaithful, the relevant bandwidth is never consumed and the relevant CPU is consumed just-in-time.
+    - If an IB's RB's ledger state is never computed and no ledger state is subsequently computed for an RB that contains that IB, then that IB's entry will remain in this map indefinitely.
+- `waitingForRBVar`.
+  A map from RB header hash to a task.
+  This is used to trigger tasks waiting on the adoption of some RB.
+  Tasks are only removed when they are executed.
+- `waitingForLedgerStateVar`
+  A map from RB header hash to a task.
+  This is used to trigger tasks waiting on the availability of some RB's ledger state.
+  Tasks are only removed when they are executed.
+- `ledgerStateVar`.
+  All RB ledger states that have ever been computed.
+  Note that ledger states are a currently isomorphic to the unit type `()`, so this is effectively a set.
+  It is never pruned.
+- `taskQueue`.
+  A queue of tasks scheduled for the CPU, labeled according to what they model (eg "validate an RB").
+  Tasks are only removed when they are executed.
