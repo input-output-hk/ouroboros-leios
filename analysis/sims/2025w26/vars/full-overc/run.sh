@@ -1,0 +1,1 @@
+../full-simpl/run.sh

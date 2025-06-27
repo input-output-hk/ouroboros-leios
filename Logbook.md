@@ -1,5 +1,40 @@
 # Leios logbook
 
+## 2025-06-27
+
+### Simulation analysis of nine candidate variants of Leios
+
+This new set of simulations examined three basic variants and three sharding strategies.
+
+- Basic
+    - Full 
+    - Full without IBs
+    - Full with transaction references
+- Sharding
+    - Unsharded
+    - Sharded
+    - Overcollateralized 1x (i.e., each tx has a probability of being included in two shards instead of one)
+
+The network and CPU metrics for all of the variants were acceptable, but they had different spatial and temporal efficiencies.
+
+| Variant                 | Sharding              | Spatial Efficiency | Time to Ledger |
+|-------------------------|-----------------------|-------------------:|---------------:|
+| full                    | unsharded             |            52.307% |        64.404s |
+| full                    | sharded               |            92.043% |       137.362s | 
+| full                    | overcollateralized 1x |            89.097% |        94.155s |
+| full without IBs        | unsharded             |            79.050% |        43.057s |
+| full without IBs        | sharded               |            79.052% |        43.052s |
+| full without IBs        | overcollateralized 1x |            79.053% |        43.053s |
+| full with-tx references | unsharded             |            95.999% |        63.763s |
+| full with-tx references | sharded               |            96.466% |       137.324s |
+| full with-tx references | overcollateralized 1x |            96.413% |        94.112s |
+
+See [analysis/sims/2025w26/analysis-variants-sharding.ipynb](analysis/sims/2025w26/analysis-variants-sharding.ipynb) for full details.
+
+![Spatial efficiency of nine Leios variants](analysis/sims/2025w26/plots/vars/spatial-efficiency.svg)
+
+![Temporal efficiency of nine Leios variants](analysis/sims/2025w26/plots/vars/reach-rb-tx.svg)
+
 ## 2025-06-24
 
 ### Conflict experiment on simplest Leios variant
