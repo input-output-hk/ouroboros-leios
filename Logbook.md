@@ -41,6 +41,11 @@ Added support for IB equivocation (WIP, still evaluating impact)
 Minor usability improvements to the CLI tool
 Added sharding to the "full without IBs" variant of Leios.
 
+### Haskell simulation
+
+- Finished first milestone (approx. "Leios rules") of Haskell simulator high-level design document https://github.com/input-output-hk/ouroboros-leios/pull/417, https://github.com/input-output-hk/ouroboros-leios/pull/427
+- Defused floating point-based false alarm that the psuedo-mainnet scenario revealed in an assertion about time https://github.com/input-output-hk/ouroboros-leios/pull/433
+
 ## 2025-06-24
 
 ### Conflict experiment on simplest Leios variant
