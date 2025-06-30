@@ -4,10 +4,90 @@
         <title>Ouroboros Leios Blog</title>
         <link>https://leios.cardano-scaling.org/news</link>
         <description>Ouroboros Leios Blog</description>
-        <lastBuildDate>Tue, 17 Jun 2025 00:00:00 GMT</lastBuildDate>
+        <lastBuildDate>Tue, 24 Jun 2025 00:00:00 GMT</lastBuildDate>
         <docs>https://validator.w3.org/feed/docs/rss2.html</docs>
         <generator>https://github.com/jpmonette/feed</generator>
         <language>en</language>
+        <item>
+            <title><![CDATA[Weekly Summary – June 24, 2025]]></title>
+            <link>https://leios.cardano-scaling.org/news/2025/06/24/weekly-progress-summary</link>
+            <guid>https://leios.cardano-scaling.org/news/2025/06/24/weekly-progress-summary</guid>
+            <pubDate>Tue, 24 Jun 2025 00:00:00 GMT</pubDate>
+            <description><![CDATA[This week, the Leios team conducted comprehensive experiments examining protocol variants, conflict handling, and bandwidth requirements. The team completed analysis of nine candidate Leios variants with different sharding strategies, performed detailed conflict experiments at 100 TPS, and validated bandwidth requirements across multiple throughput scenarios.]]></description>
+            <content:encoded><![CDATA[<p>This week, the Leios team conducted comprehensive experiments examining protocol variants, conflict handling, and bandwidth requirements. The team completed analysis of nine candidate Leios variants with different sharding strategies, performed detailed conflict experiments at 100 TPS, and validated bandwidth requirements across multiple throughput scenarios.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-analysis-of-protocol-variants">Simulation analysis of protocol variants<a class="hash-link" aria-label="Direct link to Simulation analysis of protocol variants" title="Direct link to Simulation analysis of protocol variants" href="https://leios.cardano-scaling.org/news/2025/06/24/weekly-progress-summary#simulation-analysis-of-protocol-variants">​</a></h2>
+<ul>
+<li>Completed comprehensive analysis of nine candidate variants of Leios examining three basic variants and three sharding strategies:<!-- -->
+<ul>
+<li>Basic variants: Full, Full without IBs, Full with transaction references</li>
+<li>Sharding strategies: Unsharded, Sharded, Overcollateralized 1x</li>
+</ul>
+</li>
+<li>Identified significant differences in spatial and temporal efficiencies across variants:<!-- -->
+<ul>
+<li>Full with transaction references achieved highest spatial efficiency (95.999-96.466%)</li>
+<li>Full without IBs demonstrated fastest time to ledger (43.052-43.057s)</li>
+<li>Sharded variants generally showed improved spatial efficiency but increased latency</li>
+</ul>
+</li>
+<li>Documented detailed findings in the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w26/analysis-variants-sharding.ipynb" target="_blank" rel="noopener noreferrer">analysis notebook</a>.</li>
+</ul>
+<p><img decoding="async" loading="lazy" src="https://raw.githubusercontent.com/input-output-hk/ouroboros-leios/main/analysis/sims/2025w26/plots/vars/spatial-efficiency.svg" alt="Spatial efficiency of nine Leios variants" class="img_ev3q"></p>
+<p><img decoding="async" loading="lazy" src="https://raw.githubusercontent.com/input-output-hk/ouroboros-leios/main/analysis/sims/2025w26/plots/vars/reach-rb-tx.svg" alt="Temporal efficiency of nine Leios variants" class="img_ev3q"></p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="conflict-experiments">Conflict experiments<a class="hash-link" aria-label="Direct link to Conflict experiments" title="Direct link to Conflict experiments" href="https://leios.cardano-scaling.org/news/2025/06/24/weekly-progress-summary#conflict-experiments">​</a></h2>
+<ul>
+<li>Conducted experiments exploring the effect of conflicting transactions at 100 TPS using the simplest Leios variant</li>
+<li>Tested scenarios with 0%, 25%, and 50% of transactions conflicting with other transactions</li>
+<li>Key findings from the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w26/analysis.ipynb" target="_blank" rel="noopener noreferrer">conflict analysis</a>:<!-- -->
+<ul>
+<li>Spatial efficiency can be as low as 55% due to occasional IB production before previous reception</li>
+<li>All non-conflicted transactions reach the ledger within 75 seconds</li>
+<li>NIC bandwidth of 20 Mb/s is sufficient for protocol operation</li>
+<li>Four vCPU cores provide adequate processing capacity</li>
+<li>Large IBs (up to 2 MB) diffuse globally within 5 seconds</li>
+<li>IB traffic does not interfere with other protocol message types.</li>
+</ul>
+</li>
+</ul>
+<p><img decoding="async" loading="lazy" src="https://raw.githubusercontent.com/input-output-hk/ouroboros-leios/main/analysis/sims/2025w26/plots/cxs/ingress-average-area.png" alt="Mean nodal network ingress at 100 TPS" class="img_ev3q"></p>
+<p><img decoding="async" loading="lazy" src="https://raw.githubusercontent.com/input-output-hk/ouroboros-leios/main/analysis/sims/2025w26/plots/cxs/elapsed-IB.png" alt="Diffusion of IBs at 100 TPS" class="img_ev3q"></p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="bandwidth-experiments">Bandwidth experiments<a class="hash-link" aria-label="Direct link to Bandwidth experiments" title="Direct link to Bandwidth experiments" href="https://leios.cardano-scaling.org/news/2025/06/24/weekly-progress-summary#bandwidth-experiments">​</a></h2>
+<ul>
+<li>Completed experiments exploring bandwidth limitations at 100 TPS and 300 TPS documented in the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w25/analysis.ipynb" target="_blank" rel="noopener noreferrer">bandwidth analysis</a></li>
+<li>Validated protocol parameters for high performance: mini-mainnet topology, 1-2 IB/s, 10 slot/stage, 328 kB/IB maximum, 1.5 EB/stage, and multiple shards</li>
+<li>Key performance findings:<!-- -->
+<ul>
+<li>Achieved 80% spatial efficiency across tested scenarios</li>
+<li>All transactions reach the ledger within two minutes</li>
+<li>30 Mbps NIC bandwidth is sufficient for Leios node operation</li>
+<li>Four-core vCPU provides adequate processing capacity</li>
+<li>Results insensitive to inter-nodal link bandwidths above 50 Mb/s</li>
+<li>Even 10 Mb/s links show minimal impact on protocol performance.</li>
+</ul>
+</li>
+</ul>
+<p><img decoding="async" loading="lazy" src="https://raw.githubusercontent.com/input-output-hk/ouroboros-leios/main/analysis/sims/2025w25/plots/bw-2IBps/elapsed-IB.png" alt="Diffusion of IBs at 300 TPS by link bandwidth" class="img_ev3q"></p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation-improvements">Rust simulation improvements<a class="hash-link" aria-label="Direct link to Rust simulation improvements" title="Direct link to Rust simulation improvements" href="https://leios.cardano-scaling.org/news/2025/06/24/weekly-progress-summary#rust-simulation-improvements">​</a></h2>
+<ul>
+<li>Added support for IB equivocation (work in progress, evaluating impact)</li>
+<li>Implemented minor usability improvements to the CLI tool</li>
+<li>Added sharding support to the "full without IBs" variant of Leios.</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="cddl-version-1">CDDL Version 1<a class="hash-link" aria-label="Direct link to CDDL Version 1" title="Direct link to CDDL Version 1" href="https://leios.cardano-scaling.org/news/2025/06/24/weekly-progress-summary#cddl-version-1">​</a></h2>
+<ul>
+<li>finalized and merged a first version of the CDDLs for the current variants in discussion for CIP, here in <a href="https://github.com/input-output-hk/ouroboros-leios/pull/396/commits/c450c76ce49aae5a35a0d326de73280795e1074e" target="_blank" rel="noopener noreferrer">PR-396</a>.</li>
+</ul>]]></content:encoded>
+            <category>progress</category>
+            <category>update</category>
+            <category>weekly</category>
+            <category>simulation-analysis</category>
+            <category>variants</category>
+            <category>sharding</category>
+            <category>conflict-experiments</category>
+            <category>bandwidth</category>
+            <category>spatial-efficiency</category>
+            <category>temporal-efficiency</category>
+        </item>
         <item>
             <title><![CDATA[Weekly Summary – June 17, 2025]]></title>
             <link>https://leios.cardano-scaling.org/news/2025/06/17/weekly-progress-summary</link>
@@ -1370,95 +1450,6 @@
             <category>formal-methods</category>
             <category>haskell-simulation</category>
             <category>rust-simulation</category>
-        </item>
-        <item>
-            <title><![CDATA[Weekly Summary – February 3, 2025]]></title>
-            <link>https://leios.cardano-scaling.org/news/2025/02/03/weekly-progress-summary</link>
-            <guid>https://leios.cardano-scaling.org/news/2025/02/03/weekly-progress-summary</guid>
-            <pubDate>Mon, 03 Feb 2025 00:00:00 GMT</pubDate>
-            <description><![CDATA[This week, the Leios team worked on cryptography benchmarking and cost calculator improvements. The team completed a reference implementation for Leios cryptography and enhanced the online cost calculator with user-requested features. They also updated both Haskell and Rust simulations to improve visualization and network modeling capabilities.]]></description>
-            <content:encoded><![CDATA[<p>This week, the Leios team worked on cryptography benchmarking and cost calculator improvements. The team completed a reference implementation for Leios cryptography and enhanced the online cost calculator with user-requested features. They also updated both Haskell and Rust simulations to improve visualization and network modeling capabilities.</p>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="haskell-simulation">Haskell simulation<a class="hash-link" aria-label="Direct link to Haskell simulation" title="Direct link to Haskell simulation" href="https://leios.cardano-scaling.org/news/2025/02/03/weekly-progress-summary#haskell-simulation">​</a></h2>
-<ul>
-<li>Added support for <code>Send</code> and <code>Receive</code> voting stages, providing:<!-- -->
-<ul>
-<li>A new <code>leios-vote-send-recv-stages</code> configuration option</li>
-<li>A configurable stage length via <code>leios-stage-active-voting-slots</code></li>
-</ul>
-</li>
-<li>Implemented multiple diffusion strategies:<!-- -->
-<ul>
-<li>Added oldest-first strategy</li>
-<li>Added configurable strategies for IBs, EBs, and votes via <code>*-diffusion-strategy</code>
-configurations</li>
-</ul>
-</li>
-<li>Created a new <code>small</code> scenario for 100 nodes with 2,000 kB links<!-- -->
-<ul>
-<li>Tuned IB parameters to utilize one-third of link capacity</li>
-<li>Added configurations for both <code>single-stage</code> and <code>send-recv</code> voting</li>
-</ul>
-</li>
-<li>Fixed several simulation behaviors:<!-- -->
-<ul>
-<li>Improved block generation logic</li>
-<li>Prevented duplicate EB inclusion in the base chain</li>
-<li>Confirmed proper EB inclusion timing relative to vote diffusion</li>
-</ul>
-</li>
-<li>The main difference observed between <code>single-stage</code> and <code>send-recv</code> is that the former
-shows a longer tail in the CPU usage CDF when the simulation is run with unlimited
-cores.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="cryptography-implementation">Cryptography implementation<a class="hash-link" aria-label="Direct link to Cryptography implementation" title="Direct link to Cryptography implementation" href="https://leios.cardano-scaling.org/news/2025/02/03/weekly-progress-summary#cryptography-implementation">​</a></h2>
-<p>The Rust benchmarks for Leios cryptography were redesigned as a reference
-implementation:</p>
-<ul>
-<li>Implemented the Fait Accompli sortition</li>
-<li>Enhanced sortition to use rational arithmetic instead of quad-precision floats</li>
-<li>Added Quickcheck tests for all capabilities</li>
-<li>Added benchmarks for serialization</li>
-<li>Optimized vote and certificate size.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="cost-calculator-improvements">Cost calculator improvements<a class="hash-link" aria-label="Direct link to Cost calculator improvements" title="Direct link to Cost calculator improvements" href="https://leios.cardano-scaling.org/news/2025/02/03/weekly-progress-summary#cost-calculator-improvements">​</a></h2>
-<p>The team enhanced the
-<a href="https://leios.cardano-scaling.org/cost-estimator/" target="_blank" rel="noopener noreferrer">online Leios cost calculator</a>:</p>
-<ul>
-<li>Added support for both hyperscale and discount cloud providers</li>
-<li>Made discount providers the default option</li>
-<li>Added option to amortize storage costs perpetually</li>
-<li>Updated defaults:<!-- -->
-<ul>
-<li>Single relay deployment</li>
-<li>More conservative 50% disk compression</li>
-<li>Perpetual storage cost amortization.</li>
-</ul>
-</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="throughput-simulator">Throughput simulator<a class="hash-link" aria-label="Direct link to Throughput simulator" title="Direct link to Throughput simulator" href="https://leios.cardano-scaling.org/news/2025/02/03/weekly-progress-summary#throughput-simulator">​</a></h2>
-<p>The team updated the
-<a href="https://www.insightmaker.com/insight/4DU4kmFVCFDaq30ux29PCe/Cardano-Throughput-v0-3" target="_blank" rel="noopener noreferrer">Cardano throughput simulator</a>
-with:</p>
-<ul>
-<li>The latest cloud-computing cost model</li>
-<li>Synchronized assumptions with an online cost calculator.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation">Rust simulation<a class="hash-link" aria-label="Direct link to Rust simulation" title="Direct link to Rust simulation" href="https://leios.cardano-scaling.org/news/2025/02/03/weekly-progress-summary#rust-simulation">​</a></h2>
-<ul>
-<li>Made minor fixes to the new graph generation strategy</li>
-<li>Planned out a roadmap for visualization work focusing on the Leios transaction
-lifecycle.</li>
-</ul>]]></content:encoded>
-            <category>progress</category>
-            <category>update</category>
-            <category>weekly</category>
-            <category>haskell-simulation</category>
-            <category>cryptography</category>
-            <category>implementation</category>
-            <category>cost-calculator</category>
-            <category>throughput</category>
-            <category>rust-simulation</category>
-            <category>visualization</category>
         </item>
     </channel>
 </rss>
