@@ -1,5 +1,17 @@
 # Leios logbook
 
+## 2025-06-30
+
+### Praos simulations
+
+The Jupyter notebook [analysis/sims/2025w26/analysis-praos.ipynb](analysis/sims/2025w26/analysis-praos.ipynb) contains Rust simulations on mini-mainnet for 50 and 100 TPS on Praos. These can serve as a reference when evaluationg Leios performance. Findings follow:
+
+- Praos *simulations* perform well at 50 TPS.
+- They exhibit congestion-induced forking at 100 TPS.
+- All transaction reach the ledger.
+- Bursty usage of network and CPU does not tax infrastructure resources.
+- Should we request cardano-node benchmark studies of large Praos blocks?
+
 ## 2025-06-27
 
 ### Simulation analysis of nine candidate variants of Leios
