@@ -3,7 +3,7 @@
 
 set -e
 
-for d in vars
+for d in cxs vars praos
 do
   mkdir -p results/$d
   for f in cpus lifecycle resources receipts

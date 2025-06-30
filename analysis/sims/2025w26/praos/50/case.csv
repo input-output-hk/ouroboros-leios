@@ -1,2 +1,2 @@
 Simulator,Variant,Sharding,TPS
-Rust,praos,unsharded,100
+Rust,praos,unsharded,50
