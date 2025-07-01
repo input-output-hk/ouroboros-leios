@@ -10,7 +10,7 @@ use pretty_bytes_rust::{pretty_bytes, PrettyBytesOptions};
 use serde::Serialize;
 use sim_core::{
     clock::Timestamp,
-    config::{NodeId, SimConfiguration},
+    config::{LeiosVariant, NodeId, SimConfiguration},
     events::{BlockRef, Event, Node},
     model::{BlockId, TransactionId},
 };
@@ -43,6 +43,7 @@ enum OutputFormat {
 }
 
 pub struct EventMonitor {
+    variant: LeiosVariant,
     node_ids: Vec<NodeId>,
     pool_ids: Vec<NodeId>,
     maximum_ib_age: u64,
@@ -67,6 +68,7 @@ impl EventMonitor {
         let stage_length = config.stage_length;
         let maximum_ib_age = stage_length * 3;
         Self {
+            variant: config.variant,
             node_ids,
             pool_ids,
             maximum_ib_age,
@@ -239,9 +241,18 @@ impl EventMonitor {
                         }
 
                         total_leios_txs += block_leios_txs.len() as u64;
-                        total_leios_bytes += block_leios_txs.iter()
-                                                            .map(|tx_id| txs.get(tx_id).unwrap().bytes)
-                                                            .sum::<u64>();
+                        if matches!(
+                            self.variant,
+                            LeiosVariant::FullWithTxReferences | LeiosVariant::FullWithoutIbs
+                        ) {
+                            // In variants where transactions are referenced by Leios blocks but not embedded in IBs,
+                            // referenced TXs need to be persisted separately. So count those referenced TX sizes
+                            // against Leios's "space efficiency".
+                            total_leios_bytes += block_leios_txs
+                                .iter()
+                                .map(|tx_id| txs.get(tx_id).unwrap().bytes)
+                                .sum::<u64>();
+                        }
                         let unique_block_leios_txs =
                             block_leios_txs.iter().copied().sorted().dedup().count();
                         info!(
