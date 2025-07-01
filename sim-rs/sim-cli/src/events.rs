@@ -10,7 +10,7 @@ use pretty_bytes_rust::{pretty_bytes, PrettyBytesOptions};
 use serde::Serialize;
 use sim_core::{
     clock::Timestamp,
-    config::{LeiosVariant, NodeId, SimConfiguration},
+    config::{NodeId, SimConfiguration},
     events::{BlockRef, Event, Node},
     model::{BlockId, TransactionId},
 };
@@ -43,7 +43,6 @@ enum OutputFormat {
 }
 
 pub struct EventMonitor {
-    variant: LeiosVariant,
     node_ids: Vec<NodeId>,
     pool_ids: Vec<NodeId>,
     maximum_ib_age: u64,
@@ -68,7 +67,6 @@ impl EventMonitor {
         let stage_length = config.stage_length;
         let maximum_ib_age = stage_length * 3;
         Self {
-            variant: config.variant,
             node_ids,
             pool_ids,
             maximum_ib_age,
@@ -180,6 +178,7 @@ impl EventMonitor {
                 Event::Cpu { .. } => {}
                 Event::TXGenerated { id, size_bytes, .. } => {
                     txs.insert(id, Transaction::new(size_bytes, time));
+                    total_leios_bytes += size_bytes;
                 }
                 Event::TXSent { .. } => {
                     tx_messages.sent += 1;
@@ -474,6 +473,7 @@ impl EventMonitor {
             let txs_per_ib = compute_stats(ibs.values().map(|ib| ib.txs.len() as f64));
             let bytes_per_ib = compute_stats(ibs.values().map(|ib| ib.bytes as f64));
             let ibs_per_tx = compute_stats(ibs_containing_tx.into_values());
+            let txs_per_eb = compute_stats(ebs.values().map(|eb| eb.txs.len() as f64));
             let ibs_per_eb = compute_stats(ebs.values().map(|eb| eb.ibs.len() as f64));
             let ebs_per_ib = compute_stats(ebs_containing_ib.into_values());
             let ib_time_stats = compute_stats(times_to_reach_ib.iter().map(|t| t.as_secs_f64()));
@@ -487,7 +487,7 @@ impl EventMonitor {
             let votes_per_pool = compute_stats(votes_per_pool.into_values());
             let votes_per_eb = compute_stats(eb_votes.into_values());
             let votes_per_bundle = compute_stats(votes_per_bundle.into_values());
-            let space_efficiency = leios_tx_bytes as f64 / total_leios_bytes as f64;
+            let space_efficiency = finalized_tx_bytes as f64 / total_leios_bytes as f64;
 
             info!(
                 "{} IB(s) were generated, on average {:.3} IB(s) per slot.",
@@ -531,6 +531,10 @@ impl EventMonitor {
                 ebs.len() as f64 / total_slots as f64
             );
             info!(
+                "Each EB contained an average of {:.3} transaction(s) (stddev {:.3}). {} EB(s) were empty.",
+                txs_per_eb.mean, txs_per_eb.std_dev, empty_ebs
+            );
+            info!(
                 "Each EB contained an average of {:.3} IB(s) (stddev {:.3}). {} EB(s) were empty.",
                 ibs_per_eb.mean, ibs_per_eb.std_dev, empty_ebs
             );
@@ -564,9 +568,7 @@ impl EventMonitor {
             info!("{} L1 block(s) had a Leios endorsement.", leios_blocks_with_endorsements);
             info!("{} tx(s) ({}) were referenced by a Leios endorsement.", leios_txs, pretty_bytes(leios_tx_bytes, pbo.clone()));
             info!("{} tx(s) ({}) were included directly in a Praos block.", praos_txs, pretty_bytes(praos_tx_bytes, pbo.clone()));
-            if self.variant != LeiosVariant::FullWithoutIbs {
-                info!("Spatial efficiency: {}/{} ({:.3}%) of Leios bytes were unique transactions.", pretty_bytes(leios_tx_bytes, pbo.clone()), pretty_bytes(total_leios_bytes, pbo.clone()), space_efficiency * 100.);
-            }
+            info!("Spatial efficiency: {}/{} ({:.3}%) of Leios bytes were unique transactions.", pretty_bytes(leios_tx_bytes, pbo.clone()), pretty_bytes(total_leios_bytes, pbo.clone()), space_efficiency * 100.);
             info!("{} tx(s) ({:.3}%) referenced by a Leios endorsement were redundant.", total_leios_txs - leios_txs, (total_leios_txs - leios_txs) as f64 / total_leios_txs as f64 * 100.);
             info!(
                 "Each transaction took an average of {:.3}s (stddev {:.3}) to be included in an IB.",
