@@ -213,6 +213,7 @@ data RelayProtocolError
   | RequestedUnknownId
   | IdsNotRequested
   | BodiesNotRequested
+  | WrongSizeBody
   deriving (Show)
 
 instance Exception RelayProtocolError
@@ -384,8 +385,10 @@ newtype WindowSize = WindowSize {value :: Word16}
   deriving (Monoid) via (Sum Word16)
   deriving (Show) via (Quiet WindowSize)
 
-newtype RelayConfig = RelayConfig
+data RelayConfig = RelayConfig
   { maxWindowSize :: WindowSize
+  , maxInFlightPerPeer :: Bytes
+  , maxInFlightAllPeers :: Bytes
   }
 
 --------------------------------
@@ -464,7 +467,6 @@ relayProducer config sst = TC.Yield MsgInit $ idle initRelayProducerLocalState
         return $ TC.Yield (MsgRespondHeaders responseList) (idle lst')
     MsgRequestBodies ids -> TC.Effect $ do
       -- Check that all ids are in the window:
-      -- TODO: Andrea: is a maxWindowSize of 10 large enough for freshest first?
       forM_ ids $ \id' -> do
         when (not $ MultiSet.member id' lst.windowCounts) $ do
           throw RequestedUnknownId
@@ -507,22 +509,30 @@ data RelayConsumerConfig id header body m = RelayConsumerConfig
   , shouldNotRequest :: m (header -> Bool)
   -- ^ headers to ignore, e.g. already received or coming too late.
   , validateHeaders :: [header] -> m ()
+  , bodySizeHeader :: !(header -> Bytes)
+    -- ^ the size of the body according to the header
+  , bodySize :: !(body -> Bytes)
   , headerId :: !(header -> id)
   , prioritize :: !(Map id header -> [header] -> [header])
   -- ^ returns a subset of headers, in order of what should be fetched first.
   --   Note: `prioritize` is given the map of ids in the `window` but
   --   not in-flight or fetched yet (the `available` field of the shared state).
   --
-  --   TODO: For policies like `freshest first` we might need to
-  --   expand of the `window` more aggressively, to make sufficiently
-  --   fresh ids available.
+  --   TODO: For policies like `freshest first` we might need to expand of the
+  --   `window` more aggressively, to make sufficiently many fresh ids
+  --   available.
   , submitBlocks :: !([(header, body)] -> UTCTime -> ([(header, body)] -> STM m ()) -> m ())
-  -- ^ sends blocks to be validated/added to the buffer. Allowed to be
-  -- blocking, but relayConsumer does not assume the blocks made it
-  -- into the relayBuffer. Also takes a delivery time (relevant for
-  -- e.g. IB endorsement) and a callback that expects a subset of
-  -- validated blocks. Callback might be called more than once, with
-  -- different subsets.
+  -- ^ relayConsumer applies this function to bodies when they arrive
+  --
+  -- The relayConsume will not be able to process additional replies from this
+  -- peer until this function returns.
+  --
+  -- The actual arguments also include the body's delivery time (relevant for
+  -- e.g. IB endorsement) and a callback that should be called once the
+  -- processing of a body is complete, ie when the relayConsumer can forget
+  -- that it has already requested this body from this peer (eg once the body's
+  -- validation terminates, regardless of success). The "completion" callback
+  -- can be called more than once, with different subsets.
   , submitPolicy :: !SubmitPolicy
   , maxHeadersToRequest :: !Word16
   -- ^ limit for each 'MsgRequestHeaders'
@@ -532,15 +542,39 @@ data RelayConsumerConfig id header body m = RelayConsumerConfig
 
 data RelayConsumerSharedState id header body m = RelayConsumerSharedState
   { relayBufferVar :: TVar m (RelayBuffer id (header, body))
-  , inFlightVar :: TVar m (Set id)
-  -- ^ Set of ids for which a consumer requested bodies, until they are validated and added to the buffer.
-  --   Ids are also removed if the bodies are not included in the reply or do not validate.
+  , inFlightVar :: TVar m Bytes
+  -- ^ how many bytes of body have been requested but not yet received from this peer
   --
-  -- Current handling not fault tolerant:
-  --   * other consumers will ignore those ids and push them out of
-  --     their window, so they might not be asked for again.
-  --   * if a consumer exits with an exception between requesting bodies and the correponding
-  --     submitBlocks those ids will not be cleared from the in-flight set.
+  -- The real implementation doesn't even use this value, though it should:
+  -- <https://github.com/IntersectMBO/ouroboros-network/issues/1656>. TODO I'm
+  -- guessing it'll be easier to leverage in this simulator, since eg the
+  -- latency and bandwidth are static.
+  , sharedInFlightVar :: TVar m Bytes
+  -- ^ the sum of all peers' 'inFlightVar's
+  , doNotRequestVar :: TVar m (Set id)
+  -- ^ IDs whose bodies the consumer has requested but not yet finished
+  --   processing. The processing of a body finishes immediately if the peer's
+  --   reply skipped it or else when its validation finishes (whether
+  --   successful or not). It's consider in-flight while validating so that
+  --   it's not redundantly fetched again if another peer offers it while it's
+  --   being validated. If it's valid, the common outcome is that it'll be
+  --   added to the relayBuffer and so that'll continue preventing it from
+  --   being fetched again from any peer even after the node is done processing
+  --   it. TODO should also remember which bodies invalid where invalid, but
+  --   there's no need since every block in the simulator is currently valid.
+  --
+  -- Current handling not fault tolerant.
+  --
+  --   * Other consumers will ignore those ids and push them out of their
+  --     window, so they might not be asked for again. This can "lose" a body
+  --     if, eg, the eventual reply skips the body but other peers'
+  --     hypothetical replies wouldn't have. TODO: How does the real
+  --     TxSubmission handle this?
+  --
+  --   * If a consumer exits with an exception between requesting bodies and
+  --     the correponding submitBlocks those ids will not be cleared from the
+  --     in-flight set. Crucially, this variable is sometimes shared by many
+  --     threads.
   }
 
 runRelayConsumer ::
@@ -677,8 +711,8 @@ relayConsumerPipelined config sst =
     RelayConsumer id header body n 'StIdle m ()
   idle = TS.Effect . idleM . return
 
-  -- \| Takes an STM action for the updated local state, so that
-  -- requestBodies can update inFlightVar in the same STM tx.
+  -- \| Takes an STM action for the updated local state, so that requestBodies
+  -- can update 'inFlightVar' and 'doNotRequestVar' the same STM tx.
   idleM ::
     m (RelayConsumerLocalState id header body n) ->
     m (RelayConsumer id header body n 'StIdle m ())
@@ -773,16 +807,19 @@ relayConsumerPipelined config sst =
         atomically $ do
           -- New headers are filtered before becoming available, but we have
           -- to filter `lst.available` again in the same STM tx that sets them as
-          -- `inFlight`.
+          -- `doNotRequest`.
+          doNotRequest <- readTVar sst.doNotRequestVar
           inFlight <- readTVar sst.inFlightVar
+          sharedInFlight <- readTVar sst.sharedInFlightVar
           let !lst =
                 dropFromLST
                   ( \k hd ->
-                      k `Set.member` inFlight
+                      k `Set.member` doNotRequest
                         || isIgnored hd
                   )
                   lst0
-          let hdrsToRequest =
+          let (inFlightSummand, hdrsToRequest)  =
+                takeSize ((config.relay.maxInFlightPerPeer - inFlight) `min` (config.relay.maxInFlightAllPeers - sharedInFlight)) $
                 take (fromIntegral config.maxBodiesToRequest) $
                   config.prioritize lst.available (mapMaybe (`Map.lookup` lst.available) $ Foldable.toList $ lst.window)
           let idsToRequest = map config.headerId hdrsToRequest
@@ -791,7 +828,9 @@ relayConsumerPipelined config sst =
             then return (idle lst)
             else do
               let available2 = Map.withoutKeys lst.available idsToRequestSet
-              modifyTVar' sst.inFlightVar $ Set.union idsToRequestSet
+              modifyTVar' sst.inFlightVar (+ inFlightSummand)
+              modifyTVar' sst.sharedInFlightVar (+ inFlightSummand)
+              modifyTVar' sst.doNotRequestVar $ Set.union idsToRequestSet
               let !lst2 = lst{pendingRequests = Succ $! lst.pendingRequests, available = available2}
               return $
                 TS.YieldPipelined
@@ -801,6 +840,20 @@ relayConsumerPipelined config sst =
                         TS.ReceiverDone (CollectBodies hdrsToRequest bodies)
                   )
                   (requestHeadersNonBlocking lst2)
+
+  -- INVARIANT: @fst@ will less than the given limit
+  --
+  -- INVARIANT: @snd@ will be a prefix of the given headers
+  --
+  -- INVARIANT: @fst@ will be the sum of @map 'bodySizeHeader' . snd@
+  takeSize :: Bytes -> [header] -> (Bytes, [header])
+  takeSize limit = go 0 id
+    where
+      go !acc1 acc2 = \case
+        h:hs | let sz = config.bodySizeHeader h
+             , sz <= limit - acc1
+               -> go (acc1 + sz) (acc2 . (h:)) hs
+        _ -> (acc1, acc2 [])
 
   windowAdjust ::
     forall (n :: N).
@@ -893,12 +946,19 @@ relayConsumerPipelined config sst =
           idsReceived = Map.keysSet bodiesMap
           idsRequested = Map.keysSet requestedMap
 
+      atomically $ do
+        let expectedBytes = sum $ fmap config.bodySizeHeader hdrs
+        modifyTVar' sst.inFlightVar (\x -> x - expectedBytes)
+        modifyTVar' sst.sharedInFlightVar (\x -> x - expectedBytes)
+        let notReceived = idsRequested `Set.difference` idsReceived
+        unless (null notReceived) $ do
+          modifyTVar' sst.doNotRequestVar (`Set.difference` notReceived)
+
+      unless (and $ Map.intersectionWith (\h b -> config.bodySizeHeader h == config.bodySize b) requestedMap bodiesMap) $
+        throw WrongSizeBody
+
       unless (idsReceived `Set.isSubsetOf` idsRequested) $
         throw BodiesNotRequested
-
-      let notReceived = idsRequested `Set.difference` idsReceived
-      unless (Set.null notReceived) $ do
-        atomically $ modifyTVar' sst.inFlightVar (`Set.difference` notReceived)
 
       -- We can match up all the txids we requested, with those we
       -- received.
@@ -968,14 +1028,12 @@ relayConsumerPipelined config sst =
       -- if lst.window has duplicated ids, we might submit duplicated blocks.
       unless (null bodiesToSubmit) $ do
         now <- getCurrentTime
-        config.submitBlocks bodiesToSubmit now $ \validated -> do
+        config.submitBlocks bodiesToSubmit now $ \completed -> do
           -- Note: here we could set a flag to drop this producer if not
           -- all blocks validated.
-          -- TODO: the validation logic should be the one inserting into relayBuffer.
-          modifyTVar' sst.relayBufferVar $
-            flip (Foldable.foldl' (\buf blk@(h, _) -> RB.snocIfNew (config.headerId h) blk buf)) validated
-          -- TODO: won't remove from inFlight blocks not validated.
-          modifyTVar' sst.inFlightVar (`Set.difference` Set.fromList (map (config.headerId . fst) validated))
+          modifyTVar'
+            sst.doNotRequestVar
+            (`Set.difference` Set.fromList (map (config.headerId . fst) completed))
 
       return $
         idle
@@ -996,7 +1054,7 @@ relayConsumerPipelined config sst =
   acknowledgeIds lst idsSeq _ | Seq.null idsSeq = pure lst
   acknowledgeIds lst idsSeq idsMap = do
     isIgnored <- config.shouldNotRequest
-    inFlight <- readTVarIO sst.inFlightVar
+    doNotRequest <- readTVarIO sst.doNotRequestVar
 
     let lst1 =
           assertRelayConsumerLocalStateInvariant $
@@ -1004,7 +1062,7 @@ relayConsumerPipelined config sst =
               { window = lst.window <> idsSeq
               , available = lst.available <> idsMap
               }
-    let lst' = dropFromLST (\id' hd -> isIgnored hd || id' `Set.member` inFlight) lst1
+    let lst' = dropFromLST (\id' hd -> isIgnored hd || id' `Set.member` doNotRequest) lst1
 
     -- Return the next local state
     return lst'

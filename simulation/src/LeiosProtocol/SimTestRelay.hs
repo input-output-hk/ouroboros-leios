@@ -128,13 +128,15 @@ relayNode
   inchans
   outchans = do
     buffer <- newTVarIO RB.empty
-    inFlightVar <- newTVarIO Set.empty
+    sharedInFlightVar <- newTVarIO 0
+    inFlightVar <- newTVarIO 0
+    doNotRequestVar <- newTVarIO Set.empty
     submitq <- newTQueueIO :: m (TQueue m ([TestBlock], [TestBlock] -> STM m ()))
 
     let relayBufferVar = buffer
-    let consumerSST = RelayConsumerSharedState{relayBufferVar, inFlightVar}
+    let consumerSST = RelayConsumerSharedState{relayBufferVar, doNotRequestVar, sharedInFlightVar, inFlightVar}
     let producerSST = RelayProducerSharedState{relayBufferVar = asReadOnly relayBufferVar}
-    let relayConfig = RelayConfig{maxWindowSize = 100}
+    let relayConfig = RelayConfig{maxWindowSize = 100, maxInFlightPerPeer = 0, maxInFlightAllPeers = 0}
     let relayConsumerConfig =
           RelayConsumerConfig
             { relay = relayConfig
@@ -143,6 +145,8 @@ relayNode
                 return $ \hd -> RB.member (testHeaderId hd) rb
             , -- sequential validation of headers
               validateHeaders = map (const 0.1) >>> sum >>> \d -> when (d >= 0) $ threadDelay d
+            , bodySizeHeader = const 0
+            , bodySize = const 0
             , headerId = testHeaderId
             , prioritize = \m _ -> sortOn (Down . testHeaderExpiry) . Map.elems $ m
             , submitPolicy = SubmitAll
