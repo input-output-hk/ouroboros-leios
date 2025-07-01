@@ -40,6 +40,8 @@ import Data.Map (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (isJust, isNothing, mapMaybe)
 import Data.Monoid (Sum (..))
+import Data.MultiSet (MultiSet)
+import qualified Data.MultiSet as MultiSet
 import Data.Sequence.Strict (StrictSeq)
 import qualified Data.Sequence.Strict as Seq
 import Data.Set (Set)
@@ -243,37 +245,37 @@ instance Protocol (RelayState id header body) where
   data Message (RelayState id header body) from to where
     MsgInit ::
       Message (RelayState id header body) StInit StIdle
-    -- \| Request a non-empty list of block identifiers from the client,
-    -- and confirm a number of outstanding block identifiers.
+    -- \| Request a block identifiers from the client, and confirm a number of
+    -- outstanding block identifiers.
     --
-    -- With 'TokBlocking' this is a a blocking operation: the response will
-    -- always have at least one block identifier, and it does not expect
-    -- a prompt response: there is no timeout. This covers the case when there
-    -- is nothing else to do but wait. For example this covers leaf nodes that
+    -- With 'TokBlocking' this is a a blocking operation; the response will
+    -- always have at least one block identifier, and it does not expect a
+    -- prompt response: there is no timeout. This covers the case when there is
+    -- nothing else to do but wait. For example this covers leaf nodes that
     -- rarely, if ever, create and submit a block.
     --
-    -- With 'TokNonBlocking' this is a non-blocking operation: the response
-    -- may be an empty list and this does expect a prompt response. This
-    -- covers high throughput use cases where we wish to pipeline, by
-    -- interleaving requests for additional block identifiers with
-    -- requests for blocks, which requires these requests not block.
+    -- With 'TokNonBlocking' this is a non-blocking operation: the response may
+    -- be an empty list and this does expect a prompt response. This covers
+    -- high throughput use cases where we wish to pipeline, by interleaving
+    -- requests for additional block identifiers with requests for blocks,
+    -- which requires these requests not block.
     --
-    -- The request gives the maximum number of block identifiers that
-    -- can be accepted in the response. This must be greater than zero in the
-    -- 'TokBlocking' case. In the 'TokNonBlocking' case either the numbers
+    -- The 'WindowShrink' argument is the number of outstanding block
+    -- identifiers that are acknowledged by this message. Which specific
+    -- identifiers are being acknowledged is known to the peer based on the
+    -- FIFO order in which the peer provided them.
+    --
+    -- The 'WindowExpand' argument is the maximum number of block identifiers
+    -- that can be accepted in the response. This must be greater than zero in
+    -- the 'TokBlocking' case. In the 'TokNonBlocking' case either the numbers
     -- acknowledged or the number requested must be non-zero. In either case,
     -- the number requested must not put the total outstanding over the fixed
     -- protocol limit.
     --
-    -- The request also gives the number of outstanding block
-    -- identifiers that can now be acknowledged. The actual blocks
-    -- to acknowledge are known to the peer based on the FIFO order in which
-    -- they were provided.
-    --
     -- There is no choice about when to use the blocking case versus the
-    -- non-blocking case, it depends on whether there are any remaining
-    -- unacknowledged blocks (after taking into account the ones
-    -- acknowledged in this message):
+    -- non-blocking case, it is determined by whether there are any remaining
+    -- unacknowledged blocks (after taking into account the ones acknowledged
+    -- in this message):
     --
     -- \* The blocking case must be used when there are zero remaining
     --   unacknowledged blocks.
@@ -288,7 +290,7 @@ instance Protocol (RelayState id header body) where
     -- \| Reply with a list of block identifiers for available
     -- blocks, along with metadata for each block.
     --
-    -- The list must not be longer than the maximum number requested.
+    -- The list must not be longer than the request's 'WindowExpand' argument.
     --
     -- In the 'StBlkIds' 'Blocking' state the list must be non-empty while
     -- in the 'StBlkIds' 'NonBlocking' state the list may be empty.
@@ -319,14 +321,11 @@ instance Protocol (RelayState id header body) where
       Message (RelayState id header body) StIdle StBodies
     -- \| Reply with the requested blocks, or implicitly discard.
     --
-    -- Blocks can become invalid between the time the block
-    -- identifier was sent and the block being requested. Invalid
-    -- (including committed) blocks do not need to be sent.
-    --
-    -- Any block identifiers requested but not provided in this reply
-    -- should be considered as if this peer had never announced them. (Note
-    -- that this is no guarantee that the block is invalid, it may still
-    -- be valid and available from another peer).
+    -- Blocks can become invalid between the time the block identifier was sent
+    -- and the block was requested. Therefore, any block identifiers requested
+    -- but not provided in this reply should be considered as if this peer had
+    -- never announced them. Note that this is no guarantee that the block is
+    -- invalid, it may still be valid and available from another peer.
     MsgRespondBodies ::
       [(id, body)] ->
       Message (RelayState id header body) StBodies StIdle
@@ -406,13 +405,15 @@ runRelayProducer ::
 runRelayProducer config sst chan =
   void $ runPeerWithDriver (chanDriver decideRelayState chan) (relayProducer config sst)
 
+-- | The heap footprint is bounded by `maxWindowSize`
 data RelayProducerLocalState id = RelayProducerLocalState
   { window :: !(StrictSeq (id, RB.Ticket))
+  , windowCounts :: !(MultiSet id)
   , lastTicket :: !RB.Ticket
   }
 
 initRelayProducerLocalState :: RelayProducerLocalState id
-initRelayProducerLocalState = RelayProducerLocalState Seq.empty minBound
+initRelayProducerLocalState = RelayProducerLocalState Seq.empty MultiSet.empty minBound
 
 type RelayProducer id header body st m a = TC.Client (RelayState id header body) 'NonPipelined st m a
 
@@ -430,7 +431,7 @@ relayProducer config sst = TC.Yield MsgInit $ idle initRelayProducerLocalState
       -- Validate the request:
       -- 1. shrink <= windowSize
       let windowSize = fromIntegral (Seq.length lst.window)
-      when @m (shrink.value > windowSize.value) $ do
+      when (shrink.value > windowSize.value) $ do
         throw $ ShrankTooMuch windowSize shrink
       -- 2. windowSize - shrink + expand <= maxWindowSize
       let newWindowSize = WindowSize $ windowSize.value - shrink.value + expand.value
@@ -445,22 +446,27 @@ relayProducer config sst = TC.Yield MsgInit $ idle initRelayProducerLocalState
       -- Find the new entries:
       newEntries <- readNewEntries sst blocking expand lst.lastTicket
       -- Expand the window:
-      let newValues = Seq.fromList [(key, ticket) | RB.EntryWithTicket{..} <- Foldable.toList newEntries]
+      let newEntriesList = [(key, ticket) | RB.EntryWithTicket{..} <- Foldable.toList newEntries]
+      let newValues = Seq.fromList newEntriesList
       let window' = keptValues <> newValues
+      let windowCounts' = lst.windowCounts MultiSet.\\ MultiSet.fromList (map fst newEntriesList)
       let lastTicket' = case newValues of
             Seq.Empty -> lst.lastTicket
             _ Seq.:|> (_, ticket) -> ticket
-      let !lst' = lst{window = window', lastTicket = lastTicket'}
+      let !lst' = RelayProducerLocalState {
+            window = window',
+            windowCounts = windowCounts',
+            lastTicket = lastTicket'
+            }
       let responseList = fmap (fst . (.value)) newEntries
       -- Yield the new entries:
       withSingIBlockingStyle blocking $ do
         return $ TC.Yield (MsgRespondHeaders responseList) (idle lst')
     MsgRequestBodies ids -> TC.Effect $ do
       -- Check that all ids are in the window:
-      -- NOTE: This is O(n^2) which is acceptable only if maxWindowSize is small.
       -- TODO: Andrea: is a maxWindowSize of 10 large enough for freshest first?
       forM_ ids $ \id' -> do
-        when (isNothing (Seq.findIndexL ((== id') . fst) lst.window)) $ do
+        when (not $ MultiSet.member id' lst.windowCounts) $ do
           throw RequestedUnknownId
       -- Read the bodies from the RelayBuffer:
       relayBuffer <- atomically $ readReadOnlyTVar sst.relayBufferVar
@@ -519,7 +525,9 @@ data RelayConsumerConfig id header body m = RelayConsumerConfig
   -- different subsets.
   , submitPolicy :: !SubmitPolicy
   , maxHeadersToRequest :: !Word16
+  -- ^ limit for each 'MsgRequestHeaders'
   , maxBodiesToRequest :: !Word16
+  -- ^ limit for each 'MsgRequestBodies'
   }
 
 data RelayConsumerSharedState id header body m = RelayConsumerSharedState
