@@ -212,12 +212,12 @@ data RelayHeader id = RelayHeader
   {id :: !id,
    slot :: !SlotNo,
    size :: !Bytes
-    -- ^ size of the body, not this header
+    -- ^ size of the body, not the size of this header
   }
   deriving (Show)
 
 instance MessageSize id => MessageSize (RelayHeader id) where
-  messageSizeBytes (RelayHeader x y _z) = messageSizeBytes x + messageSizeBytes y + 4 {- size -}
+  messageSizeBytes (RelayHeader x y z) = messageSizeBytes x + messageSizeBytes y + const 4 z {- size -}
 
 type RelayIBMessage = RelayMessage InputBlockId InputBlockHeader InputBlockBody
 type RelayEBMessage = RelayMessage EndorseBlockId (RelayHeader EndorseBlockId) EndorseBlock
@@ -286,13 +286,13 @@ setupRelay leiosConfig cfg st followers peers = do
   ssts <- do
     case leiosConfig.relayStrategy of
       RequestFromFirst -> do
-        doNotRequestVar <- newTVarIO Set.empty   -- shared by all the peers
+        doNotRequestVar <- newTVarIO Set.empty -- shared by all the peers
         return $
             (\inFlightVar -> RelayConsumerSharedState{relayBufferVar = st.relayBufferVar, sharedInFlightVar, inFlightVar, doNotRequestVar})
               `map` inFlightVars
       RequestFromAll -> do
         let zap = zipWith ($)
-        doNotRequestVars <- replicateM (length peers) $ newTVarIO Set.empty
+        doNotRequestVars <- replicateM n $ newTVarIO Set.empty
         return $
           (\inFlightVar doNotRequestVar -> RelayConsumerSharedState{relayBufferVar = st.relayBufferVar, sharedInFlightVar, inFlightVar, doNotRequestVar})
             `map` inFlightVars

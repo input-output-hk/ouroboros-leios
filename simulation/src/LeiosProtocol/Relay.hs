@@ -385,6 +385,12 @@ newtype WindowSize = WindowSize {value :: Word16}
   deriving (Monoid) via (Sum Word16)
   deriving (Show) via (Quiet WindowSize)
 
+-- | Configuration parameters for an instance of the Relay mini protocol
+--
+-- Both of the in-flight byte limits ought to be significantly larger than the
+-- greatest acceptable size of a body, as enforced by 'shouldNotRequest',
+-- otherwise the consumer thread for a peer that's serving a maximum sized body
+-- might get stuck via starvation.
 data RelayConfig = RelayConfig
   { maxWindowSize :: WindowSize
   , maxInFlightPerPeer :: Bytes
@@ -518,16 +524,15 @@ data RelayConsumerConfig id header body m = RelayConsumerConfig
   --   Note: `prioritize` is given the map of ids in the `window` but
   --   not in-flight or fetched yet (the `available` field of the shared state).
   --
-  --   TODO: For policies like `freshest first` we might need to expand of the
-  --   `window` more aggressively, to make sufficiently many fresh ids
-  --   available.
+  --   TODO: For policies like `freshest first` we might need to expand the
+  --   window more aggressively, to make sufficiently many fresh ids available.
   , submitBlocks :: !([(header, body)] -> UTCTime -> ([(header, body)] -> STM m ()) -> m ())
   -- ^ relayConsumer applies this function to bodies when they arrive
   --
-  -- The relayConsume will not be able to process additional replies from this
+  -- The relayConsumer will not be able to process additional replies from this
   -- peer until this function returns.
   --
-  -- The actual arguments also include the body's delivery time (relevant for
+  -- The actual arguments also include the bodies' delivery time (relevant for
   -- e.g. IB endorsement) and a callback that should be called once the
   -- processing of a body is complete, ie when the relayConsumer can forget
   -- that it has already requested this body from this peer (eg once the body's
@@ -560,10 +565,11 @@ data RelayConsumerSharedState id header body m = RelayConsumerSharedState
   --   being validated. If it's valid, the common outcome is that it'll be
   --   added to the relayBuffer and so that'll continue preventing it from
   --   being fetched again from any peer even after the node is done processing
-  --   it. TODO should also remember which bodies invalid where invalid, but
-  --   there's no need since every block in the simulator is currently valid.
+  --   it. TODO should also remember which bodies that were already fetched and
+  --   found to be invalid, but there's currently no need since every block in
+  --   the simulator is valid.
   --
-  -- Current handling not fault tolerant.
+  -- TODO The maintenacne of this variable is currently not fault tolerant.
   --
   --   * Other consumers will ignore those ids and push them out of their
   --     window, so they might not be asked for again. This can "lose" a body
@@ -819,7 +825,8 @@ relayConsumerPipelined config sst =
                   )
                   lst0
           let (inFlightSummand, hdrsToRequest)  =
-                takeSize ((config.relay.maxInFlightPerPeer - inFlight) `min` (config.relay.maxInFlightAllPeers - sharedInFlight)) $
+                takeSize
+                  ((config.relay.maxInFlightPerPeer - inFlight) `min` (config.relay.maxInFlightAllPeers - sharedInFlight)) $
                 take (fromIntegral config.maxBodiesToRequest) $
                   config.prioritize lst.available (mapMaybe (`Map.lookup` lst.available) $ Foldable.toList $ lst.window)
           let idsToRequest = map config.headerId hdrsToRequest
