@@ -67,6 +67,7 @@ pub struct RawParameters {
     pub leios_stage_active_voting_slots: u64,
     pub leios_late_ib_inclusion: bool,
     pub leios_header_diffusion_time_ms: f64,
+    pub leios_ib_generation_time_ms: f64,
     pub leios_mempool_sampling_strategy: MempoolSamplingStrategy,
     pub leios_mempool_aggressive_pruning: bool,
     pub praos_chain_quality: u64,
@@ -185,6 +186,16 @@ pub struct RawNode {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tx_generation_weight: Option<u64>,
     pub producers: BTreeMap<String, RawLinkInfo>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub adversarial: Option<RawNodeBehaviour>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub behaviours: Vec<RawNodeBehaviour>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", tag = "behaviour")]
+pub enum RawNodeBehaviour {
+    IbEquivocation,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -253,6 +264,7 @@ impl From<RawTopology> for Topology {
         for (index, (name, node)) in value.nodes.iter().enumerate() {
             let id = NodeId::new(index);
             node_ids.insert(name.clone(), id);
+            let behaviours = NodeBehaviours::parse(&node.adversarial, &node.behaviours);
             nodes.insert(
                 id,
                 NodeConfiguration {
@@ -264,6 +276,7 @@ impl From<RawTopology> for Topology {
                     tx_conflict_fraction: node.tx_conflict_fraction,
                     tx_generation_weight: node.tx_generation_weight,
                     consumers: vec![],
+                    behaviours,
                 },
             );
         }
@@ -483,6 +496,7 @@ pub struct SimConfiguration {
     pub vote_threshold: u64,
     pub(crate) praos_fallback: bool,
     pub(crate) header_diffusion_time: Duration,
+    pub(crate) ib_generation_time: Duration,
     pub(crate) relay_strategy: RelayStrategy,
     pub(crate) mempool_strategy: MempoolSamplingStrategy,
     pub(crate) mempool_aggressive_pruning: bool,
@@ -540,6 +554,7 @@ impl SimConfiguration {
             variant: params.leios_variant,
             praos_fallback: params.praos_fallback_enabled,
             header_diffusion_time: duration_ms(params.leios_header_diffusion_time_ms),
+            ib_generation_time: duration_ms(params.leios_ib_generation_time_ms),
             relay_strategy: params.relay_strategy,
             mempool_strategy: params.leios_mempool_sampling_strategy,
             mempool_aggressive_pruning: params.leios_mempool_aggressive_pruning,
@@ -579,6 +594,7 @@ pub struct NodeConfiguration {
     pub tx_conflict_fraction: Option<f64>,
     pub tx_generation_weight: Option<u64>,
     pub consumers: Vec<NodeId>,
+    pub behaviours: NodeBehaviours,
 }
 
 #[derive(Debug, Clone)]
@@ -586,4 +602,23 @@ pub struct LinkConfiguration {
     pub nodes: (NodeId, NodeId),
     pub latency: Duration,
     pub bandwidth_bps: Option<u64>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct NodeBehaviours {
+    pub ib_equivocation: bool,
+}
+
+impl NodeBehaviours {
+    fn parse(adversarial: &Option<RawNodeBehaviour>, behaviours: &[RawNodeBehaviour]) -> Self {
+        let mut result = NodeBehaviours::default();
+        for behaviour in adversarial.iter().chain(behaviours) {
+            match behaviour {
+                RawNodeBehaviour::IbEquivocation => {
+                    result.ib_equivocation = true;
+                }
+            }
+        }
+        result
+    }
 }
