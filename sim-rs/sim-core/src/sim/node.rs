@@ -758,6 +758,7 @@ impl Node {
                 producer: self.id,
                 index,
             };
+            self.leios.ibs_by_vrf.entry(vrf).or_default().push(id);
             self.tracker.track_ib_lottery_won(id);
             index += 1;
             headers.push(InputBlockHeader {
@@ -774,6 +775,11 @@ impl Node {
                     producer: self.id,
                     index,
                 };
+                self.leios
+                    .ibs_by_vrf
+                    .entry(vrf)
+                    .or_default()
+                    .push(equivocated_id);
                 index += 1;
                 headers.push(InputBlockHeader {
                     id: equivocated_id,
@@ -1820,6 +1826,25 @@ impl Node {
             else {
                 return Err(NoVoteReason::MissingIB);
             };
+            let equivocation_header_cutoff = Timestamp::from_secs(ib.header.id.slot)
+                + self.sim_config.header_diffusion_time * 4
+                + self.sim_config.ib_generation_time;
+            let equivocated_ib_ids = self.leios.ibs_by_vrf.get(&ib.header.vrf).unwrap();
+            if !self.behaviours.ib_equivocation {
+                for equivocated_ib_id in equivocated_ib_ids {
+                    if equivocated_ib_id == ib_id {
+                        continue;
+                    }
+                    let equivocated_ib = self.leios.ibs.get(equivocated_ib_id).unwrap();
+                    if equivocated_ib
+                        .header_seen()
+                        .is_some_and(|t| t < equivocation_header_cutoff)
+                    {
+                        return Err(NoVoteReason::EquivocatedIB);
+                    }
+                }
+            }
+
             let header_cutoff = Timestamp::from_secs(ib.header.id.slot)
                 + self.sim_config.header_diffusion_time * 2
                 + self.sim_config.ib_generation_time;
