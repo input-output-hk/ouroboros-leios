@@ -178,7 +178,6 @@ impl EventMonitor {
                 Event::Cpu { .. } => {}
                 Event::TXGenerated { id, size_bytes, .. } => {
                     txs.insert(id, Transaction::new(size_bytes, time));
-                    total_leios_bytes += size_bytes;
                 }
                 Event::TXSent { .. } => {
                     tx_messages.sent += 1;
@@ -240,6 +239,9 @@ impl EventMonitor {
                         }
 
                         total_leios_txs += block_leios_txs.len() as u64;
+                        total_leios_bytes += block_leios_txs.iter()
+                                                            .map(|tx_id| txs.get(tx_id).unwrap().bytes)
+                                                            .sum::<u64>();
                         let unique_block_leios_txs =
                             block_leios_txs.iter().copied().sorted().dedup().count();
                         info!(
@@ -487,7 +489,6 @@ impl EventMonitor {
             let votes_per_pool = compute_stats(votes_per_pool.into_values());
             let votes_per_eb = compute_stats(eb_votes.into_values());
             let votes_per_bundle = compute_stats(votes_per_bundle.into_values());
-            let space_efficiency = finalized_tx_bytes as f64 / total_leios_bytes as f64;
 
             info!(
                 "{} IB(s) were generated, on average {:.3} IB(s) per slot.",
@@ -568,7 +569,8 @@ impl EventMonitor {
             info!("{} L1 block(s) had a Leios endorsement.", leios_blocks_with_endorsements);
             info!("{} tx(s) ({}) were referenced by a Leios endorsement.", leios_txs, pretty_bytes(leios_tx_bytes, pbo.clone()));
             info!("{} tx(s) ({}) were included directly in a Praos block.", praos_txs, pretty_bytes(praos_tx_bytes, pbo.clone()));
-            info!("Spatial efficiency: {}/{} ({:.3}%) of Leios bytes were unique transactions.", pretty_bytes(leios_tx_bytes, pbo.clone()), pretty_bytes(total_leios_bytes, pbo.clone()), space_efficiency * 100.);
+            info!("Spatial efficiency: {}/{} ({:.3}%) of Leios bytes were unique transactions.", pretty_bytes(leios_tx_bytes, pbo.clone()), pretty_bytes(total_leios_bytes, pbo.clone()),
+                  (leios_tx_bytes as f64 / total_leios_bytes as f64) * 100.);
             info!("{} tx(s) ({:.3}%) referenced by a Leios endorsement were redundant.", total_leios_txs - leios_txs, (total_leios_txs - leios_txs) as f64 / total_leios_txs as f64 * 100.);
             info!(
                 "Each transaction took an average of {:.3}s (stddev {:.3}) to be included in an IB.",
