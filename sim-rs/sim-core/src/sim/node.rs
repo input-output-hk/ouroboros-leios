@@ -1820,8 +1820,9 @@ impl Node {
             else {
                 return Err(NoVoteReason::MissingIB);
             };
-            let header_cutoff =
-                Timestamp::from_secs(ib.header.id.slot) + self.sim_config.header_diffusion_time * 2;
+            let header_cutoff = Timestamp::from_secs(ib.header.id.slot)
+                + self.sim_config.header_diffusion_time * 2
+                + self.sim_config.ib_generation_time;
             if *header_seen > header_cutoff {
                 return Err(NoVoteReason::LateIBHeader);
             }

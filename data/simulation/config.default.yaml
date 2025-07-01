@@ -29,6 +29,7 @@ leios-stage-active-voting-slots: 1
 leios-vote-send-recv-stages: false
 leios-late-ib-inclusion: true
 leios-header-diffusion-time-ms: 1000.0
+leios-ib-generation-time-ms: 130.0
 leios-mempool-sampling-strategy: ordered-by-id
 leios-mempool-aggressive-pruning: false
 # TODO: revise default

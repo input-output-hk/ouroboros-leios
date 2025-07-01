@@ -50,6 +50,12 @@ export interface Config {
    * */
   "leios-header-diffusion-time-ms": number;
   /**
+   * The expected time it takes a node to generate an IB.
+   * This is used as part of a validation rule to protect against equivocation attacks.
+   * In practice, it should probably always equal ib-generation-cpu-time-ms.
+   */
+  "leios-ib-generation-time-ms": number;
+  /**
    * The strategy to use when selecting TXs from the Leios mempool.
    */
   "leios-mempool-sampling-strategy": MempoolSamplingStrategy;
