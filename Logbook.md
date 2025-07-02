@@ -33,7 +33,7 @@ Applying 25681 actions
 
   Productivity  97.7% of total user, 97.7% of total elapsed
 ```
-Without initial heap size:
+Without the parameter specificing the minium heap size:
 ```bash
 yves@nucli$ nix run .#leios-trace-verifier -- +RTS -s -RTS --trace-file sim-rs-late.out --config-file data/simulation/config.default.yaml --topology-file leios-trace-verifier/examples/topology.yaml --idSut 0
 Applying 25681 actions
