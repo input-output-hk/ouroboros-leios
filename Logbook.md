@@ -60,7 +60,7 @@ Applying 25681 actions
   Productivity  24.6% of total user, 24.6% of total elapsed
 ```
 #### Profiling
-In order to spot performance bottle-necks in the `leios-trace-verifier`, we can enable profiling as follows:
+In order to spot performance bottle-necks in the `leios-trace-verifier` executable, we can enable profiling as follows:
 
 - Uncomment the profiling parameters in [project.nix](nix/project.nix)
 - Run the `leios-trace-verifier` with the additional command line argument `-pj` to produce a profiling output file
