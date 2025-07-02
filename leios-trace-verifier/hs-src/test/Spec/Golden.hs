@@ -35,14 +35,15 @@ golden = do
   let stakeDistribution = Prelude.zip nodeNames stakes
   let stageLength = toInteger (leiosStageLengthSlots config)
   let idSut = 0
-  let tau = 0 -- TODO: get tau from config
+  let ledgerQuality = ceiling (praosChainQuality config) -- TODO: int in schema?
+  let lateIBInclusion = leiosLateIbInclusion config
   let check :: String -> String -> [FilePath] -> (Text -> Text -> Expectation) -> SpecWith ()
       check label folder files predicate =
         describe label $ do
           forM_ files $ \file ->
             it file $ do
               result <-
-                verifyTrace nrNodes idSut stakeDistribution stageLength tau
+                verifyTrace nrNodes idSut stakeDistribution stageLength ledgerQuality lateIBInclusion
                   . decodeJSONL
                   <$> BSL.readFile (dir </> folder </> file)
               fst (snd result) `predicate` "ok"

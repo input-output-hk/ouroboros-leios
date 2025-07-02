@@ -1294,17 +1294,17 @@
         "iogx": "iogx_2"
       },
       "locked": {
-        "lastModified": 1750836357,
-        "narHash": "sha256-JiBgRXBwen5PgGnhROVSJZiTsXLd0GbnuDQ0v1DkRyQ=",
+        "lastModified": 1750940640,
+        "narHash": "sha256-gaXbYDSus+MYBjq1GbXQaMg6AR7KmtHWckq8HjTJLPE=",
         "owner": "input-output-hk",
         "repo": "ouroboros-leios-formal-spec",
-        "rev": "e39a1568e55f7c52b6419e7dec3c0ab63da83f15",
+        "rev": "86c5d8b8ccf3b16e279bd71efa26fb69000d8416",
         "type": "github"
       },
       "original": {
         "owner": "input-output-hk",
         "repo": "ouroboros-leios-formal-spec",
-        "rev": "e39a1568e55f7c52b6419e7dec3c0ab63da83f15",
+        "rev": "86c5d8b8ccf3b16e279bd71efa26fb69000d8416",
         "type": "github"
       }
     },
