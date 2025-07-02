@@ -56,7 +56,7 @@ This week, the Leios team conducted comprehensive experiments examining protocol
 
 - Added support for IB equivocation (work in progress, evaluating impact)
 - Implemented minor usability improvements to the CLI tool
-- Added sharding support to the "full without IBs" variant of Leios.
+- Added sharding support to the 'full without IBs' variant of Leios.
 
 
 ## CDDL Version 1
