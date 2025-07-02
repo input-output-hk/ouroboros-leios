@@ -10,8 +10,6 @@ Running the `leios-trace-verifier` with a minimum heap size of 1G improves the p
 
 ```bash
 yves@nucli ~/code/ouroboros-leios (yveshauser/full-short-leios-trace-verifier)$ nix run .#leios-trace-verifier -- +RTS -H1G -s -RTS --trace-file sim-rs-late.out --config-file data/simulation/config.default.yaml --topology-file leios-trace-verifier/examples/topology.yaml --idSut 0
-warning: Git tree '/home/yves/code/ouroboros-leios' is dirty
-trace: evaluation warning: Explicitly set the ABI version of 'webkitgtk'
 Applying 25681 actions
  220,151,201,640 bytes allocated in the heap
      853,676,864 bytes copied during GC
@@ -64,12 +62,11 @@ Applying 25681 actions
 #### Profiling
 In order to spot performance bottle-necks in the `leios-trace-verifier`, we can enable profiling as follows:
 
-- Uncomment the profiling parameters in `project.nix`
+- Uncomment the profiling parameters in [project.nix](nix/project.nix)
 - Run the `leios-trace-verifier` with the additional command line argument `-pj` to produce a profiling output file
 
 ```bash
 yves@nucli ~/code/ouroboros-leios (yveshauser/full-short-leios-trace-verifier)$ nix run .#leios-trace-verifier -- +RTS -pj -H1G -s -RTS --trace-file sim-rs-late.out --config-file data/simulation/config.default.yaml --topology-file leios-trace-verifier/examples/topology.yaml --idSut 0
-warning: Git tree '/home/yves/code/ouroboros-leios' is dirty
 Applying 25681 actions
  340,498,733,272 bytes allocated in the heap
    1,762,895,112 bytes copied during GC
@@ -95,6 +92,7 @@ Applying 25681 actions
 
   Productivity  98.3% of total user, 98.3% of total elapsed
 ```
+- Inspect the `leios-trace-verifier.prof` file in [speedscope](https://www.speedscope.app/)
 
 ## 2025-06-30
 
