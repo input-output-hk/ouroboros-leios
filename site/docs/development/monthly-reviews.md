@@ -23,6 +23,7 @@ Until the end of 2024, Leios monthly review meetings were recorded using Google 
 
 ## 2025 (YouTube and Google Meet recordings)
 
+- **June 2025:** [YouTube](https://www.youtube.com/watch?v=NEqeyS_WYjk) | [Google Meet](https://drive.google.com/file/d/1zzyFIq4JDQNUhZPbdYqU1Qr2-TVAze9x/view?usp=sharing) | [Slides](https://docs.google.com/presentation/d/1jD2BVEYNxQRrgwvxKyKNyZYgyh-JurgWmMdFBrkwGLw/edit?usp=sharing)
 - **May 2025:** [YouTube](https://www.youtube.com/watch?v=wXqKpQT2H3Y&list=PLnPTB0CuBOBzWWpnojAK3ZaFy9RdofP6l&index=1) | [Google Meet](https://drive.google.com/file/d/1PEflCWO6loG9iaQaITgwmMX5LSkUV27c/view?usp=sharing) | [Slides](https://docs.google.com/presentation/d/1QNlCG33G6uC86sv4pWWMvxsqwNwXxx9-yjCPqEabpbo/edit?usp=sharing) | [Summary](https://docs.google.com/document/d/1Q0E2R14Mxsg46bwdlopq_1GobFJrZAGoh2Ukj2BtW9s/edit?usp=sharing)
 - **April 2025:** [YouTube](https://www.youtube.com/watch?v=-jddya2E2NA&list=PLnPTB0CuBOBzWWpnojAK3ZaFy9RdofP6l&index=2) | [Google Meet](https://drive.google.com/file/d/1OufvQSHLhC2VHmVr-RLplb6hkdEyfPLi/view?usp=sharing) | [Slides](https://docs.google.com/presentation/d/1pWNLCtYtNVHvKPttUXgXuSXSXmrBp5YqvexPVcTXfQk/edit?usp=sharing)
 - **March 2025:** [YouTube](https://www.youtube.com/watch?v=7K6qXiVsMXg&list=PLnPTB0CuBOBzWWpnojAK3ZaFy9RdofP6l&index=3) | [Google Meet](https://drive.google.com/file/d/1aCM-RJql7nX1MpMOG3pO9A-qTkpivzIT/view?usp=sharing) | [Slides](https://docs.google.com/presentation/d/1C99KT5wOR-Gq7lKXgD8MHDms4tmQH5nZIhOZbc4_5wg/edit?usp=sharing)

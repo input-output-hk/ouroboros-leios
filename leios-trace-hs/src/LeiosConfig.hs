@@ -172,7 +172,7 @@ instance Default Config where
       , leiosStageActiveVotingSlots = 1
       , leiosVoteSendRecvStages = False
       , leiosVariant = Short
-      , leiosLateIbInclusion = False
+      , leiosLateIbInclusion = True
       , leiosHeaderDiffusionTimeMs = 1000
       , praosChainQuality = 40
       , txGenerationDistribution = Exp{lambda = 0.85, scale = Just 1000}

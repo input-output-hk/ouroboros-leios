@@ -1,5 +1,157 @@
 # Leios logbook
 
+## 2025-07-02
+
+### Trace verifier performance
+
+#### GC parameters
+
+Running the `leios-trace-verifier` with a minimum heap size of 1G improves the performance by a factor 3
+
+```bash
+yves@nucli ~/code/ouroboros-leios (yveshauser/full-short-leios-trace-verifier)$ nix run .#leios-trace-verifier -- +RTS -H1G -s -RTS --trace-file sim-rs-late.out --config-file data/simulation/config.default.yaml --topology-file leios-trace-verifier/examples/topology.yaml --idSut 0
+Applying 25681 actions
+ 220,151,201,640 bytes allocated in the heap
+     853,676,864 bytes copied during GC
+     115,103,776 bytes maximum residency (6 sample(s))
+         595,936 bytes maximum slop
+            1054 MiB total memory in use (0 MiB lost due to fragmentation)
+
+                                     Tot time (elapsed)  Avg pause  Max pause
+  Gen  0       249 colls,     0 par    0.756s   0.757s     0.0030s    0.0256s
+  Gen  1         6 colls,     0 par    0.181s   0.182s     0.0303s    0.0863s
+
+  INIT    time    0.000s  (  0.000s elapsed)
+  MUT     time   40.668s  ( 40.676s elapsed)
+  GC      time    0.937s  (  0.939s elapsed)
+  EXIT    time    0.000s  (  0.000s elapsed)
+  Total   time   41.606s  ( 41.615s elapsed)
+
+  %GC     time       0.0%  (0.0% elapsed)
+
+  Alloc rate    5,413,366,479 bytes per MUT second
+
+  Productivity  97.7% of total user, 97.7% of total elapsed
+```
+Without the parameter specificing the minium heap size:
+```bash
+yves@nucli$ nix run .#leios-trace-verifier -- +RTS -s -RTS --trace-file sim-rs-late.out --config-file data/simulation/config.default.yaml --topology-file leios-trace-verifier/examples/topology.yaml --idSut 0
+Applying 25681 actions
+ 220,162,801,512 bytes allocated in the heap
+ 141,347,876,600 bytes copied during GC
+     128,132,840 bytes maximum residency (545 sample(s))
+       1,442,904 bytes maximum slop
+             378 MiB total memory in use (0 MiB lost due to fragmentation)
+
+                                     Tot time (elapsed)  Avg pause  Max pause
+  Gen  0     52944 colls,     0 par   47.181s  47.246s     0.0009s    0.0050s
+  Gen  1       545 colls,     0 par   41.029s  41.065s     0.0753s    0.0996s
+
+  INIT    time    0.000s  (  0.000s elapsed)
+  MUT     time   28.803s  ( 28.745s elapsed)
+  GC      time   88.210s  ( 88.311s elapsed)
+  EXIT    time    0.000s  (  0.000s elapsed)
+  Total   time  117.014s  (117.056s elapsed)
+
+  %GC     time       0.0%  (0.0% elapsed)
+
+  Alloc rate    7,643,769,348 bytes per MUT second
+
+  Productivity  24.6% of total user, 24.6% of total elapsed
+```
+#### Profiling
+In order to spot performance bottle-necks in the `leios-trace-verifier` executable, we can enable profiling as follows:
+
+- Uncomment the profiling parameters in [project.nix](nix/project.nix)
+- Run the `leios-trace-verifier` with the additional command line argument `-pj` to produce a profiling output file
+
+```bash
+yves@nucli ~/code/ouroboros-leios (yveshauser/full-short-leios-trace-verifier)$ nix run .#leios-trace-verifier -- +RTS -pj -H1G -s -RTS --trace-file sim-rs-late.out --config-file data/simulation/config.default.yaml --topology-file leios-trace-verifier/examples/topology.yaml --idSut 0
+Applying 25681 actions
+ 340,498,733,272 bytes allocated in the heap
+   1,762,895,112 bytes copied during GC
+     182,540,568 bytes maximum residency (6 sample(s))
+       1,505,000 bytes maximum slop
+            1235 MiB total memory in use (0 MiB lost due to fragmentation)
+
+                                     Tot time (elapsed)  Avg pause  Max pause
+  Gen  0       406 colls,     0 par    1.250s   1.252s     0.0031s    0.0200s
+  Gen  1         6 colls,     0 par    0.224s   0.224s     0.0374s    0.0975s
+
+  INIT    time    0.001s  (  0.001s elapsed)
+  MUT     time   87.775s  ( 87.512s elapsed)
+  GC      time    1.475s  (  1.476s elapsed)
+  RP      time    0.000s  (  0.000s elapsed)
+  PROF    time    0.000s  (  0.000s elapsed)
+  EXIT    time    0.000s  (  0.000s elapsed)
+  Total   time   89.251s  ( 88.989s elapsed)
+
+  %GC     time       0.0%  (0.0% elapsed)
+
+  Alloc rate    3,879,203,434 bytes per MUT second
+
+  Productivity  98.3% of total user, 98.3% of total elapsed
+```
+- Inspect the `leios-trace-verifier.prof` file in [speedscope](https://www.speedscope.app/)
+
+## 2025-06-30
+
+### Praos simulations
+
+The Jupyter notebook [analysis/sims/2025w26/analysis-praos.ipynb](analysis/sims/2025w26/analysis-praos.ipynb) contains Rust simulations on mini-mainnet for 50 and 100 TPS on Praos. These can serve as a reference when evaluationg Leios performance. Findings follow:
+
+- Praos *simulations* perform well at 50 TPS.
+- They exhibit congestion-induced forking at 100 TPS.
+- All transaction reach the ledger.
+- Bursty usage of network and CPU does not tax infrastructure resources.
+- Should we request cardano-node benchmark studies of large Praos blocks?
+
+## 2025-06-27
+
+### Simulation analysis of nine candidate variants of Leios
+
+This new set of simulations examined three basic variants and three sharding strategies.
+
+- Basic
+    - Full 
+    - Full without IBs
+    - Full with transaction references
+- Sharding
+    - Unsharded
+    - Sharded
+    - Overcollateralized 1x (i.e., each tx has a probability of being included in two shards instead of one)
+
+The network and CPU metrics for all of the variants were acceptable, but they had different spatial and temporal efficiencies.
+
+| Variant                 | Sharding              | Spatial Efficiency | Time to Ledger |
+|-------------------------|-----------------------|-------------------:|---------------:|
+| full                    | unsharded             |            52.307% |        64.404s |
+| full                    | sharded               |            92.043% |       137.362s | 
+| full                    | overcollateralized 1x |            89.097% |        94.155s |
+| full without IBs        | unsharded             |            79.050% |        43.057s |
+| full without IBs        | sharded               |            79.052% |        43.052s |
+| full without IBs        | overcollateralized 1x |            79.053% |        43.053s |
+| full with-tx references | unsharded             |            95.999% |        63.763s |
+| full with-tx references | sharded               |            96.466% |       137.324s |
+| full with-tx references | overcollateralized 1x |            96.413% |        94.112s |
+
+See [analysis/sims/2025w26/analysis-variants-sharding.ipynb](analysis/sims/2025w26/analysis-variants-sharding.ipynb) for full details.
+
+![Spatial efficiency of nine Leios variants](analysis/sims/2025w26/plots/vars/spatial-efficiency.svg)
+
+![Temporal efficiency of nine Leios variants](analysis/sims/2025w26/plots/vars/reach-rb-tx.svg)
+
+### Rust simulation
+
+Added support for IB equivocation (WIP, still evaluating impact)
+Minor usability improvements to the CLI tool
+Added sharding to the "full without IBs" variant of Leios.
+
+### Haskell simulation
+
+- Finished first milestone (approx. "Leios rules") of Haskell simulator high-level design document https://github.com/input-output-hk/ouroboros-leios/pull/417, https://github.com/input-output-hk/ouroboros-leios/pull/427
+- Defused floating point-based false alarm that the psuedo-mainnet scenario revealed in an assertion about time https://github.com/input-output-hk/ouroboros-leios/pull/433
+
 ## 2025-06-24
 
 ### Conflict experiment on simplest Leios variant

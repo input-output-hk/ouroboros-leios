@@ -39,16 +39,22 @@ export interface Config {
    * Only supported by Haskell simulation. */
   "leios-vote-send-recv-stages": boolean;
   /**
-   * Extends Leios so that EB producers include IBs directly from previous pipelines
-   * where no certified EB was observed.
-   * 
-   * Only supported by Rust simulation. */
+   * Extends Leios so that EB producers include IBs directly from previous pipelines.
+   * Due to casuality, the EB must always include them, even if those IBs end up being
+   * certified in their own pipeline.
+   */
   "leios-late-ib-inclusion": boolean;
   /**
    * The expected time it takes a header to fully diffuse across the network.
    * This is Δhdr from the Leios paper.
    * */
   "leios-header-diffusion-time-ms": number;
+  /**
+   * The expected time it takes a node to generate an IB.
+   * This is used as part of a validation rule to protect against equivocation attacks.
+   * In practice, it should probably always equal ib-generation-cpu-time-ms.
+   */
+  "leios-ib-generation-time-ms": number;
   /**
    * The strategy to use when selecting TXs from the Leios mempool.
    */
@@ -77,7 +83,8 @@ export interface Config {
   "tx-size-bytes-distribution": Distribution;
   /**
    * Distribution used to choose the "over-collateralization factor" for a transaction.
-   * 0 means the transaction is not over-collateralized, n means it has enough extra collateral to be included in n shards.
+   * An "overcollateralization factor" of n means the TX has enough collateral to be included in n+1 shards.
+   * A factor of 0 means the TX has enough collateral to be include in 1 shard; i.e. it is not over-collateralized.
    * Only supported by Rust simulation.  */
   "tx-overcollateralization-factor-distribution": Distribution;
   /** Only supported by Rust simulation. */

@@ -498,7 +498,7 @@ data SubmitPolicy = SubmitInOrder | SubmitAll
 
 data RelayConsumerConfig id header body m = RelayConsumerConfig
   { relay :: !RelayConfig
-  , shouldIgnore :: m (header -> Bool)
+  , shouldNotRequest :: m (header -> Bool)
   -- ^ headers to ignore, e.g. already received or coming too late.
   , validateHeaders :: [header] -> m ()
   , headerId :: !(header -> id)
@@ -761,7 +761,7 @@ relayConsumerPipelined config sst =
     if (min (Map.size lst0.available) (fromIntegral config.maxBodiesToRequest)) == 0
       then return (Left lst0)
       else return . Right . TS.Effect $ do
-        isIgnored <- config.shouldIgnore
+        isIgnored <- config.shouldNotRequest
         atomically $ do
           -- New headers are filtered before becoming available, but we have
           -- to filter `lst.available` again in the same STM tx that sets them as
@@ -987,7 +987,7 @@ relayConsumerPipelined config sst =
     m (RelayConsumerLocalState id header body n)
   acknowledgeIds lst idsSeq _ | Seq.null idsSeq = pure lst
   acknowledgeIds lst idsSeq idsMap = do
-    isIgnored <- config.shouldIgnore
+    isIgnored <- config.shouldNotRequest
     inFlight <- readTVarIO sst.inFlightVar
 
     let lst1 =

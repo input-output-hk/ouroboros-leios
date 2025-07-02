@@ -3,10 +3,9 @@
 
 set -e
 
-mkdir -p results/cxs
-
-for d in cxs
+for d in cxs vars praos
 do
+  mkdir -p results/$d
   for f in cpus lifecycle resources receipts
   do
     DIR=$(find $d -type f -name $f.csv.gz \( -not -empty \) -printf %h\\n -quit)

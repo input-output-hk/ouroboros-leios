@@ -17,8 +17,8 @@ use tracing::{info, trace};
 use crate::{
     clock::{ClockBarrier, FutureEvent, Timestamp},
     config::{
-        DiffusionStrategy, LeiosVariant, MempoolSamplingStrategy, NodeConfiguration, NodeId,
-        RelayStrategy, SimConfiguration, TransactionConfig,
+        DiffusionStrategy, LeiosVariant, MempoolSamplingStrategy, NodeBehaviours,
+        NodeConfiguration, NodeId, RelayStrategy, SimConfiguration, TransactionConfig,
     },
     events::EventTracker,
     model::{
@@ -132,6 +132,7 @@ pub struct Node {
     total_stake: u64,
     cpu: CpuTaskQueue<CpuTask>,
     consumers: Vec<NodeId>,
+    behaviours: NodeBehaviours,
     txs: HashMap<TransactionId, TransactionView>,
     ledger_states: BTreeMap<BlockId, Arc<LedgerState>>,
     praos: NodePraosState,
@@ -156,9 +157,10 @@ struct SeenTransaction {
 struct NodeLeiosState {
     mempool: BTreeMap<TransactionId, SeenTransaction>,
     input_ids_from_ibs: HashSet<u64>,
-    ibs_to_generate: BTreeMap<u64, Vec<InputBlockHeader>>,
+    ibs_to_generate: BTreeMap<u64, Vec<u64>>,
     ibs: BTreeMap<InputBlockId, InputBlockState>,
     ib_requests: BTreeMap<NodeId, PeerInputBlockRequests>,
+    ibs_by_vrf: BTreeMap<u64, Vec<InputBlockId>>,
     ibs_by_pipeline: BTreeMap<u64, Vec<InputBlockId>>,
     ebs: BTreeMap<EndorserBlockId, EndorserBlockState>,
     ebs_by_pipeline: BTreeMap<u64, Vec<EndorserBlockId>>,
@@ -170,17 +172,34 @@ struct NodeLeiosState {
 
 enum InputBlockState {
     HeaderPending,
-    Pending(InputBlockHeader),
-    Requested(InputBlockHeader),
-    Received(Arc<InputBlock>),
+    Pending {
+        header: InputBlockHeader,
+        header_seen: Timestamp,
+    },
+    Requested {
+        header: InputBlockHeader,
+        header_seen: Timestamp,
+    },
+    Received {
+        ib: Arc<InputBlock>,
+        header_seen: Timestamp,
+    },
 }
 impl InputBlockState {
     fn header(&self) -> Option<&InputBlockHeader> {
         match self {
             Self::HeaderPending => None,
-            Self::Pending(header) => Some(header),
-            Self::Requested(header) => Some(header),
-            Self::Received(ib) => Some(&ib.header),
+            Self::Pending { header, .. } => Some(header),
+            Self::Requested { header, .. } => Some(header),
+            Self::Received { ib, .. } => Some(&ib.header),
+        }
+    }
+    fn header_seen(&self) -> Option<Timestamp> {
+        match self {
+            Self::HeaderPending => None,
+            Self::Pending { header_seen, .. } => Some(*header_seen),
+            Self::Requested { header_seen, .. } => Some(*header_seen),
+            Self::Received { header_seen, .. } => Some(*header_seen),
         }
     }
 }
@@ -269,6 +288,7 @@ impl Node {
         let stake = config.stake;
         let cpu = CpuTaskQueue::new(config.cores, config.cpu_multiplier);
         let consumers = config.consumers.clone();
+        let behaviours = config.behaviours.clone();
         let mut events = BinaryHeap::new();
         events.push(FutureEvent(clock.now(), NodeEvent::NewSlot(0)));
 
@@ -288,6 +308,7 @@ impl Node {
             total_stake,
             cpu,
             consumers,
+            behaviours,
             txs: HashMap::new(),
             ledger_states: BTreeMap::new(),
             praos: NodePraosState::default(),
@@ -574,26 +595,16 @@ impl Node {
             }
         }
         for (slot, vrfs) in slot_vrfs {
-            let shards = self.find_available_ib_shards(slot);
-            assert!(!shards.is_empty());
-            let headers = vrfs
-                .into_iter()
-                .enumerate()
-                .map(|(index, vrf)| InputBlockHeader {
-                    id: InputBlockId {
-                        slot,
-                        pipeline: self.slot_to_pipeline(slot) + 4,
-                        producer: self.id,
-                        index: index as u64,
-                    },
-                    vrf,
-                    shard: shards[vrf as usize % shards.len()],
-                    timestamp: self.clock.now(),
-                    bytes: self.sim_config.sizes.ib_header,
-                })
-                .collect();
-            self.leios.ibs_to_generate.insert(slot, headers);
+            self.leios.ibs_to_generate.insert(slot, vrfs);
         }
+    }
+
+    fn find_available_eb_shards(&self, slot: u64) -> Vec<u64> {
+        if !matches!(self.sim_config.variant, LeiosVariant::FullWithoutIbs) {
+            // EBs only need shards if we don't have IBs.
+            return vec![0];
+        }
+        self.find_available_ib_shards(slot)
     }
 
     fn find_available_ib_shards(&self, slot: u64) -> Vec<u64> {
@@ -610,14 +621,16 @@ impl Node {
             // Don't generate EBs before that pipeline, because they would just be empty.
             return;
         }
+        let shards = self.find_available_eb_shards(slot);
         for next_p in vrf_probabilities(self.sim_config.eb_generation_probability) {
-            if self.run_vrf(next_p).is_some() {
+            if let Some(vrf) = self.run_vrf(next_p) {
                 self.tracker.track_eb_lottery_won(EndorserBlockId {
                     slot,
                     pipeline,
                     producer: self.id,
                 });
-                let txs = self.select_txs_for_eb(pipeline);
+                let shard = shards[vrf as usize % shards.len()];
+                let txs = self.select_txs_for_eb(shard, pipeline);
                 let ibs = self.select_ibs_for_eb(pipeline);
                 let ebs = self.select_ebs_for_eb(pipeline);
                 let bytes = self.sim_config.sizes.eb(txs.len(), ibs.len(), ebs.len());
@@ -625,6 +638,7 @@ impl Node {
                     slot,
                     pipeline,
                     producer: self.id,
+                    shard,
                     bytes,
                     txs,
                     ibs,
@@ -726,12 +740,56 @@ impl Node {
     }
 
     fn generate_input_blocks(&mut self, slot: u64) {
-        let Some(headers) = self.leios.ibs_to_generate.remove(&slot) else {
+        let pipeline = self.slot_to_pipeline(slot) + 4;
+        let Some(vrfs) = self.leios.ibs_to_generate.remove(&slot) else {
             if self.sim_config.emit_conformance_events {
                 self.tracker.track_no_ib_generated(self.id, slot);
             }
             return;
         };
+        let shards = self.find_available_ib_shards(slot);
+        assert!(!shards.is_empty());
+        let mut headers = vec![];
+        let mut index = 0;
+        for vrf in vrfs {
+            let id = InputBlockId {
+                slot,
+                pipeline,
+                producer: self.id,
+                index,
+            };
+            self.leios.ibs_by_vrf.entry(vrf).or_default().push(id);
+            self.tracker.track_ib_lottery_won(id);
+            index += 1;
+            headers.push(InputBlockHeader {
+                id,
+                vrf,
+                shard: shards[vrf as usize % shards.len()],
+                timestamp: self.clock.now(),
+                bytes: self.sim_config.sizes.ib_header,
+            });
+            if self.behaviours.ib_equivocation {
+                let equivocated_id = InputBlockId {
+                    slot,
+                    pipeline,
+                    producer: self.id,
+                    index,
+                };
+                self.leios
+                    .ibs_by_vrf
+                    .entry(vrf)
+                    .or_default()
+                    .push(equivocated_id);
+                index += 1;
+                headers.push(InputBlockHeader {
+                    id: equivocated_id,
+                    vrf,
+                    shard: shards[vrf as usize % shards.len()],
+                    timestamp: self.clock.now(),
+                    bytes: self.sim_config.sizes.ib_header,
+                });
+            }
+        }
         for header in headers {
             self.tracker.track_ib_lottery_won(header.id);
             let rb_ref = self.latest_rb_ref();
@@ -902,7 +960,7 @@ impl Node {
                 self.leios.mempool.remove(tx_id);
             }
             for ib_id in &eb.ibs {
-                let Some(InputBlockState::Received(ib)) = self.leios.ibs.get(ib_id) else {
+                let Some(InputBlockState::Received { ib, .. }) = self.leios.ibs.get(ib_id) else {
                     continue;
                 };
                 for tx in &ib.transactions {
@@ -927,10 +985,12 @@ impl Node {
         let Some(EndorserBlockState::Received { eb: eb_body, .. }) = self.leios.ebs.get(eb) else {
             return false;
         };
-        eb_body
-            .ibs
-            .iter()
-            .all(|ib| matches!(self.leios.ibs.get(ib), Some(InputBlockState::Received(_))))
+        eb_body.ibs.iter().all(|ib| {
+            matches!(
+                self.leios.ibs.get(ib),
+                Some(InputBlockState::Received { .. })
+            )
+        })
     }
 
     fn count_txs_in_eb(&self, eb_id: &EndorserBlockId) -> Option<usize> {
@@ -939,7 +999,7 @@ impl Node {
         };
         let mut tx_set = HashSet::new();
         for ib_id in &eb.ibs {
-            let InputBlockState::Received(ib) = self.leios.ibs.get(ib_id)? else {
+            let InputBlockState::Received { ib, .. } = self.leios.ibs.get(ib_id)? else {
                 return None;
             };
             for tx in &ib.transactions {
@@ -1118,7 +1178,7 @@ impl Node {
     fn receive_request_ib_header(&mut self, from: NodeId, id: InputBlockId) -> Result<()> {
         if let Some(ib) = self.leios.ibs.get(&id) {
             if let Some(header) = ib.header() {
-                let have_body = matches!(ib, InputBlockState::Received(_));
+                let have_body = matches!(ib, InputBlockState::Received { .. });
                 self.send_to(from, SimulationMessage::IBHeader(header.clone(), have_body))?;
             }
         }
@@ -1135,9 +1195,21 @@ impl Node {
         {
             return;
         }
-        self.leios
-            .ibs
-            .insert(id, InputBlockState::Pending(header.clone()));
+        let ibs_with_same_vrf = self.leios.ibs_by_vrf.entry(header.vrf).or_default();
+        ibs_with_same_vrf.push(id);
+        if !self.behaviours.ib_equivocation && ibs_with_same_vrf.len() > 2 {
+            // This is an equivocation, and we've already broadcasted a proof of equivocation (PoE).
+            // Note that if we've seen EXACTLY two ibs with the same VRF, we still validate/propagate the second,
+            // because the second header serves as a PoE to our peers.
+            return;
+        }
+        self.leios.ibs.insert(
+            id,
+            InputBlockState::Pending {
+                header: header.clone(),
+                header_seen: self.clock.now(),
+            },
+        );
         self.schedule_cpu_task(CpuTaskType::IBHeaderValidated(from, header, has_body));
     }
 
@@ -1155,7 +1227,7 @@ impl Node {
             }
             self.send_to(*peer, SimulationMessage::AnnounceIBHeader(id))?;
         }
-        if has_body {
+        if !self.ib_equivocation_detected(&header) && has_body {
             // Whoever sent us this IB header has also announced that they have the body.
             // If we still need it, download it from them.
             self.receive_announce_ib(from, id)?;
@@ -1164,15 +1236,24 @@ impl Node {
     }
 
     fn receive_announce_ib(&mut self, from: NodeId, id: InputBlockId) -> Result<()> {
-        let header = match self.leios.ibs.get(&id) {
-            Some(InputBlockState::Pending(header)) => header,
-            Some(InputBlockState::Requested(header))
-                if self.sim_config.relay_strategy == RelayStrategy::RequestFromAll =>
-            {
-                header
+        let (header, header_seen) = match self.leios.ibs.get(&id) {
+            Some(InputBlockState::Pending {
+                header,
+                header_seen,
+            }) => (header, *header_seen),
+            Some(InputBlockState::Requested {
+                header,
+                header_seen,
+            }) if self.sim_config.relay_strategy == RelayStrategy::RequestFromAll => {
+                (header, *header_seen)
             }
             _ => return Ok(()),
         };
+        if self.ib_equivocation_detected(header) {
+            // No reason to download the body of an equivocated IB
+            return Ok(());
+        }
+
         // Do we have capacity to request this block?
         let reqs = self
             .leios
@@ -1181,9 +1262,13 @@ impl Node {
             .or_insert(PeerInputBlockRequests::new(&self.sim_config));
         if reqs.active.len() < self.sim_config.max_ib_requests_per_peer {
             // If so, make the request
-            self.leios
-                .ibs
-                .insert(id, InputBlockState::Requested(header.clone()));
+            self.leios.ibs.insert(
+                id,
+                InputBlockState::Requested {
+                    header: header.clone(),
+                    header_seen,
+                },
+            );
             reqs.active.insert(id);
             self.send_to(from, SimulationMessage::RequestIB(id))?;
         } else {
@@ -1194,7 +1279,7 @@ impl Node {
     }
 
     fn receive_request_ib(&mut self, from: NodeId, id: InputBlockId) -> Result<()> {
-        if let Some(InputBlockState::Received(ib)) = self.leios.ibs.get(&id) {
+        if let Some(InputBlockState::Received { ib, .. }) = self.leios.ibs.get(&id) {
             self.tracker.track_ib_sent(ib, self.id, from);
             self.send_to(from, SimulationMessage::IB(ib.clone()))?;
         }
@@ -1203,6 +1288,19 @@ impl Node {
 
     fn receive_ib(&mut self, from: NodeId, ib: Arc<InputBlock>) {
         self.tracker.track_ib_received(ib.header.id, from, self.id);
+        // If we've already received this IB, don't waste CPU time validating it
+        if self
+            .leios
+            .ibs
+            .get(&ib.header.id)
+            .is_some_and(|ib| matches!(ib, InputBlockState::Received { .. }))
+        {
+            return;
+        }
+        // If we know that this is an equivocation, don't waste CPU time validating it either
+        if self.ib_equivocation_detected(&ib.header) {
+            return;
+        }
         self.schedule_cpu_task(CpuTaskType::IBBlockValidated(from, ib));
     }
 
@@ -1222,11 +1320,17 @@ impl Node {
                 .mempool
                 .retain(|_, seen| !self.leios.input_ids_from_ibs.contains(&seen.tx.input_id));
         }
+        let header_seen = self
+            .leios
+            .ibs
+            .get(&id)
+            .and_then(|state| state.header_seen())
+            .unwrap();
         if self
             .leios
             .ibs
-            .insert(id, InputBlockState::Received(ib))
-            .is_some_and(|ib| matches!(ib, InputBlockState::Received(_)))
+            .insert(id, InputBlockState::Received { ib, header_seen })
+            .is_some_and(|ib| matches!(ib, InputBlockState::Received { .. }))
         {
             return Ok(());
         }
@@ -1253,12 +1357,16 @@ impl Node {
 
         // We now have capacity to request one more IB from this peer
         while let Some(id) = reqs.next() {
-            let header = match self.leios.ibs.get(&id) {
-                Some(InputBlockState::Pending(header)) => header,
-                Some(InputBlockState::Requested(header))
-                    if self.sim_config.relay_strategy == RelayStrategy::RequestFromAll =>
-                {
-                    header
+            let (header, header_seen) = match self.leios.ibs.get(&id) {
+                Some(InputBlockState::Pending {
+                    header,
+                    header_seen,
+                }) => (header, *header_seen),
+                Some(InputBlockState::Requested {
+                    header,
+                    header_seen,
+                }) if self.sim_config.relay_strategy == RelayStrategy::RequestFromAll => {
+                    (header, *header_seen)
                 }
                 _ => {
                     // We fetched this IB from some other node already
@@ -1266,16 +1374,46 @@ impl Node {
                 }
             };
 
+            // NB: below logic is identical to ib_equivocation_detected.
+            // We can't call that method because `reqs` has a mutable borrow on our state :(
+            if !self.behaviours.ib_equivocation
+                && self
+                    .leios
+                    .ibs_by_vrf
+                    .get(&header.vrf)
+                    .is_some_and(|ids| ids.len() > 1)
+            {
+                // Don't bother fetching an equivocated IB
+                continue;
+            }
+
             // Make the request
-            self.leios
-                .ibs
-                .insert(id, InputBlockState::Requested(header.clone()));
+            self.leios.ibs.insert(
+                id,
+                InputBlockState::Requested {
+                    header: header.clone(),
+                    header_seen,
+                },
+            );
             reqs.active.insert(id);
             self.send_to(from, SimulationMessage::RequestIB(id))?;
             break;
         }
 
         Ok(())
+    }
+
+    fn ib_equivocation_detected(&self, header: &InputBlockHeader) -> bool {
+        if self.behaviours.ib_equivocation {
+            // If we WANT to equivocate IBs, we don't bother detecting equivocations either.
+            // This way, relays (which can't equivocate themselves) can still "play along"
+            // with a stake pool's equivocation attack.
+            return false;
+        }
+        self.leios
+            .ibs_by_vrf
+            .get(&header.vrf)
+            .is_some_and(|ids| ids.len() > 1)
     }
 
     fn receive_announce_eb(&mut self, from: NodeId, id: EndorserBlockId) -> Result<()> {
@@ -1407,27 +1545,15 @@ impl Node {
             vec![Arc::new(tx)]
         } else {
             let ledger_state = self.resolve_ledger_state(rb_ref);
-            let ib_shards = self.sim_config.ib_shards;
-            let tx_may_use_shard = |tx: &Transaction, ib_shard: u64| {
-                for shard in tx.shard..=tx.shard + tx.overcollateralization_factor {
-                    let shard = shard % ib_shards;
-                    if shard == ib_shard {
-                        return true;
-                    }
-                }
-                false
-            };
             self.select_txs(
-                |seen| {
-                    tx_may_use_shard(&seen.tx, shard)
-                        && !ledger_state.spent_inputs.contains(&seen.tx.input_id)
-                },
+                shard,
+                |seen| !ledger_state.spent_inputs.contains(&seen.tx.input_id),
                 self.sim_config.max_ib_size,
             )
         }
     }
 
-    fn select_txs_for_eb(&mut self, pipeline: u64) -> Vec<TransactionId> {
+    fn select_txs_for_eb(&mut self, shard: u64, pipeline: u64) -> Vec<TransactionId> {
         if self.sim_config.variant != LeiosVariant::FullWithoutIbs {
             return vec![];
         }
@@ -1440,6 +1566,7 @@ impl Node {
         let max_seen_at = Timestamp::from_secs(last_legal_slot);
 
         self.select_txs(
+            shard,
             |seen| seen.seen_at <= max_seen_at,
             self.sim_config.max_eb_size,
         )
@@ -1448,16 +1575,31 @@ impl Node {
         .collect()
     }
 
-    fn select_txs<C>(&mut self, condition: C, max_size: u64) -> Vec<Arc<Transaction>>
+    fn select_txs<C>(
+        &mut self,
+        container_shard: u64,
+        condition: C,
+        max_size: u64,
+    ) -> Vec<Arc<Transaction>>
     where
         C: Fn(&SeenTransaction) -> bool,
     {
+        let ib_shards = self.sim_config.ib_shards;
+        let tx_may_use_shard = |tx: &Transaction| {
+            for shard in tx.shard..=tx.shard + tx.overcollateralization_factor {
+                let shard = shard % ib_shards;
+                if shard == container_shard {
+                    return true;
+                }
+            }
+            false
+        };
         let mut candidate_txs: Vec<_> = self
             .leios
             .mempool
             .values()
             .filter_map(|seen| {
-                if condition(seen) {
+                if tx_may_use_shard(&seen.tx) && condition(seen) {
                     Some((seen.tx.id, seen.tx.bytes, seen.tx.input_id))
                 } else {
                     None
@@ -1540,7 +1682,8 @@ impl Node {
                     state.spent_inputs.insert(tx.input_id);
                 }
                 for ib_id in &eb.ibs {
-                    let Some(InputBlockState::Received(ib)) = self.leios.ibs.get(ib_id) else {
+                    let Some(InputBlockState::Received { ib, .. }) = self.leios.ibs.get(ib_id)
+                    else {
                         continue;
                     };
                     for tx in &ib.transactions {
@@ -1570,7 +1713,13 @@ impl Node {
             .entry(ib.header.id.pipeline)
             .or_default()
             .push(id);
-        self.leios.ibs.insert(id, InputBlockState::Received(ib));
+        self.leios.ibs.insert(
+            id,
+            InputBlockState::Received {
+                ib,
+                header_seen: self.clock.now(),
+            },
+        );
         for peer in &self.consumers {
             self.send_to(*peer, SimulationMessage::AnnounceIBHeader(id))?;
         }
@@ -1673,9 +1822,35 @@ impl Node {
         }
 
         for ib_id in &eb.ibs {
-            let Some(InputBlockState::Received(ib)) = self.leios.ibs.get(ib_id) else {
+            let Some(InputBlockState::Received { ib, header_seen }) = self.leios.ibs.get(ib_id)
+            else {
                 return Err(NoVoteReason::MissingIB);
             };
+            let equivocation_header_cutoff = Timestamp::from_secs(ib.header.id.slot)
+                + self.sim_config.header_diffusion_time * 4
+                + self.sim_config.ib_generation_time;
+            let equivocated_ib_ids = self.leios.ibs_by_vrf.get(&ib.header.vrf).unwrap();
+            if !self.behaviours.ib_equivocation {
+                for equivocated_ib_id in equivocated_ib_ids {
+                    if equivocated_ib_id == ib_id {
+                        continue;
+                    }
+                    let equivocated_ib = self.leios.ibs.get(equivocated_ib_id).unwrap();
+                    if equivocated_ib
+                        .header_seen()
+                        .is_some_and(|t| t < equivocation_header_cutoff)
+                    {
+                        return Err(NoVoteReason::EquivocatedIB);
+                    }
+                }
+            }
+
+            let header_cutoff = Timestamp::from_secs(ib.header.id.slot)
+                + self.sim_config.header_diffusion_time * 2
+                + self.sim_config.ib_generation_time;
+            if *header_seen > header_cutoff {
+                return Err(NoVoteReason::LateIBHeader);
+            }
             if !expected_ib_pipelines.contains(&ib_id.pipeline) {
                 return Err(NoVoteReason::InvalidSlot);
             }

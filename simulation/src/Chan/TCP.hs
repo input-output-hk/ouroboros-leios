@@ -143,15 +143,15 @@ transport tracer tcpprops sendbuf recvbuf = do
     -- if the connection was idle too long, reset the window size
     let tcpstate' :: TcpState
         tcpstate'
-          | now' `diffTime` now <= tcpIdleResetTime tcpprops =
-              tcpstate
-          | otherwise =
+          | tcpIdleResetTime tcpprops now <= now' =
               let allAcksArrived =
                     PQ.foldrWithKeyU
-                      (\t _ ok -> t < now' && ok)
+                      (\t _ ok -> t <= now' && ok)
                       True
                       (tcpAcknowledgements tcpstate)
                in assert allAcksArrived initTcpState
+          | otherwise =
+              tcpstate
 
     -- send it
     let msgsize = messageSizeBytes msg
@@ -178,8 +178,10 @@ transport tracer tcpprops sendbuf recvbuf = do
 -- We could do that, but the algorithm also uses a minimum of 1s, which appears
 -- to be the limit in practice. It converges to 1 RTT if there's not much
 -- jitter. So we just use the max of the RTT and 1s.
-tcpIdleResetTime :: TcpConnProps -> DiffTime
-tcpIdleResetTime TcpConnProps{tcpLatency} =
-  max 1 rtt
- where
-  rtt = tcpLatency * 2
+--
+-- The signature and order of operations is awkward here because it needs to
+-- exactly match an assertion near the use case, since these types are
+-- represented as 'Double's.
+tcpIdleResetTime :: TcpConnProps -> Time -> Time
+tcpIdleResetTime TcpConnProps{tcpLatency} t =
+  max (1 `addTime` t) (tcpLatency `addTime` (tcpLatency `addTime` t))

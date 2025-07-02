@@ -317,7 +317,7 @@ vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
   VizPraosP2P1{..} -> do
     let rng0 = Random.mkStdGen seed
     let (rng1, rng2) = Random.split rng0
-    p2pNetwork <- execTopologyOptions rng1 topologyOptions
+    p2pNetwork <- execTopologyOptions def rng1 topologyOptions
     cfg <- execConfigOptions configOptions
     pure $ VizPraosP2P.example1 rng2 cfg p2pNetwork
   VizPraosP2P2 -> pure VizPraosP2P.example2
@@ -328,7 +328,7 @@ vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
   VizShortLeiosP2P1{..} -> do
     let rng0 = Random.mkStdGen seed
     let (rng1, rng2) = Random.split rng0
-    p2pNetwork <- execTopologyOptions rng1 topologyOptions
+    p2pNetwork <- execTopologyOptions def rng1 topologyOptions
     cfg <- execConfigOptions configOptions
     pure $ VizShortLeiosP2P.example2 rng2 cfg p2pNetwork
 
@@ -361,6 +361,7 @@ data SimOptions = SimOptions
   { simCommand :: SimCommand
   , simOutputSeconds :: Time
   , simOutputFile :: FilePath
+  , simCheckTriangles :: WhetherToCheckTriangleInequality
   }
 
 runSimOptions :: SimOptions -> IO ()
@@ -369,14 +370,14 @@ runSimOptions SimOptions{..} = case simCommand of
     let rng0 = Random.mkStdGen seed
     let (rng1, rng2) = Random.split rng0
     config <- execConfigOptions configOptions
-    p2pNetwork <- execTopologyOptions rng1 topologyOptions
+    p2pNetwork <- execTopologyOptions def rng1 topologyOptions
     -- let bandwidth = 10 * 125_000_000 :: Bytes -- 10 Gbps TODO: set in config
     VizPraosP2P.example1000Diffusion rng2 config p2pNetwork simOutputSeconds simOutputFile
   SimShortLeios{..} -> do
     let rng0 = Random.mkStdGen seed
     let (rng1, rng2) = Random.split rng0
     config <- execConfigOptions configOptions
-    p2pNetwork <- execTopologyOptions rng1 topologyOptions
+    p2pNetwork <- execTopologyOptions def rng1 topologyOptions
     let outputCfg =
           DataShortLeiosP2P.SimOutputConfig
             { logFile = do
@@ -412,6 +413,10 @@ parserSimOptions =
       ( long "output-file"
           <> metavar "FILE"
           <> help "Output simulation data to file."
+      )
+    <*> (fmap (WhetherToCheckTriangleInequality . not) . switch)
+      ( long "skip-triangle-inequality-check"
+          <> help "Do not check the topology's latencies for the triangle inequality."
       )
 
 data SimCommand
@@ -552,7 +557,7 @@ runCliOptions = \case
   -- Generate a random topology using the topology characteristics
   CliGenerateTopology{..} -> do
     let rng = Random.mkStdGen seed
-    p2pNetwork@P2PNetwork{..} <- execTopologyGenerationOptions rng topologyGenerationOptions
+    p2pNetwork@P2PNetwork{..} <- execTopologyGenerationOptions def rng topologyGenerationOptions
     let totalStake = fromIntegral $ 100 * Map.size p2pNodes
     writeTopology outputTopologyFile $ p2pNetworkToSomeTopology totalStake p2pNetwork
   CliReportData{..} -> do
@@ -622,20 +627,21 @@ parserReportData =
 -- Parsing Topography Options
 --------------------------------------------------------------------------------
 
-execTopologyOptions :: Random.RandomGen g => g -> TopologyOptions -> IO P2PNetwork
-execTopologyOptions rng = \case
+execTopologyOptions :: Random.RandomGen g => WhetherToCheckTriangleInequality -> g -> TopologyOptions -> IO P2PNetwork
+execTopologyOptions skipTriangleInequalityCheck rng = \case
   TopologyFile simpleTopologyFile -> do
     -- TODO: infer world size from latencies
     let world = World (1200, 1000) Rectangle
-    validateP2PNetwork =<< readP2PTopographyFromSomeTopology defaultParams world simpleTopologyFile
-  TopologyGenerationOptions topologyGenerationOptions -> execTopologyGenerationOptions rng topologyGenerationOptions
+    applyValidateP2PNetwork skipTriangleInequalityCheck =<< readP2PTopographyFromSomeTopology defaultParams world simpleTopologyFile
+  TopologyGenerationOptions topologyGenerationOptions -> execTopologyGenerationOptions skipTriangleInequalityCheck rng topologyGenerationOptions
+ where
 
-execTopologyGenerationOptions :: Random.RandomGen g => g -> TopologyGenerationOptions -> IO P2PNetwork
-execTopologyGenerationOptions rng =
-  validateP2PNetwork <=< \case
+execTopologyGenerationOptions :: Random.RandomGen g => WhetherToCheckTriangleInequality -> g -> TopologyGenerationOptions -> IO P2PNetwork
+execTopologyGenerationOptions skipTriangleInequalityCheck rng =
+  applyValidateP2PNetwork skipTriangleInequalityCheck <=< \case
     TopologyGenerationStrategyFile topologyGenerationStrategyFile ->
       eitherDecodeFileStrict' topologyGenerationStrategyFile >>= \case
-        Right topologyGenerationStrategy -> execTopologyGenerationOptions rng (TopologyGenerationStrategy topologyGenerationStrategy)
+        Right topologyGenerationStrategy -> execTopologyGenerationOptions skipTriangleInequalityCheck rng (TopologyGenerationStrategy topologyGenerationStrategy)
         Left errorMessage -> fail $ "Could not decode P2PTopographyCharacteristics from '" <> topologyGenerationStrategyFile <> "':\n" <> errorMessage
     TopologyGenerationStrategy topologyGenerationStrategy -> generateTopology rng topologyGenerationStrategy
 
@@ -645,6 +651,17 @@ data TopologyOptions
 
 instance Default TopologyOptions where
   def = TopologyGenerationOptions def
+
+-- | The check scales very poorly and is not critical, so it's sometimes very
+-- useful to skip
+newtype WhetherToCheckTriangleInequality = WhetherToCheckTriangleInequality Bool
+
+instance Default WhetherToCheckTriangleInequality where
+  def = WhetherToCheckTriangleInequality True
+
+applyValidateP2PNetwork :: WhetherToCheckTriangleInequality -> P2PNetwork -> IO P2PNetwork
+applyValidateP2PNetwork (WhetherToCheckTriangleInequality flag) =
+  if flag then validateP2PNetwork else pure
 
 parserTopologyOptions :: Parser TopologyOptions
 parserTopologyOptions =
