@@ -1,5 +1,99 @@
 # Leios logbook
 
+## 2025-07-02
+
+### Trace verifier performance
+
+#### GC parameters
+
+Running the `leios-trace-verifier` with a minimum heap size of 1G improves the performance by a factor 3
+
+```bash
+yves@nucli ~/code/ouroboros-leios (yveshauser/full-short-leios-trace-verifier)$ nix run .#leios-trace-verifier -- +RTS -H1G -s -RTS --trace-file sim-rs-late.out --config-file data/simulation/config.default.yaml --topology-file leios-trace-verifier/examples/topology.yaml --idSut 0
+Applying 25681 actions
+ 220,151,201,640 bytes allocated in the heap
+     853,676,864 bytes copied during GC
+     115,103,776 bytes maximum residency (6 sample(s))
+         595,936 bytes maximum slop
+            1054 MiB total memory in use (0 MiB lost due to fragmentation)
+
+                                     Tot time (elapsed)  Avg pause  Max pause
+  Gen  0       249 colls,     0 par    0.756s   0.757s     0.0030s    0.0256s
+  Gen  1         6 colls,     0 par    0.181s   0.182s     0.0303s    0.0863s
+
+  INIT    time    0.000s  (  0.000s elapsed)
+  MUT     time   40.668s  ( 40.676s elapsed)
+  GC      time    0.937s  (  0.939s elapsed)
+  EXIT    time    0.000s  (  0.000s elapsed)
+  Total   time   41.606s  ( 41.615s elapsed)
+
+  %GC     time       0.0%  (0.0% elapsed)
+
+  Alloc rate    5,413,366,479 bytes per MUT second
+
+  Productivity  97.7% of total user, 97.7% of total elapsed
+```
+Without the parameter specificing the minium heap size:
+```bash
+yves@nucli$ nix run .#leios-trace-verifier -- +RTS -s -RTS --trace-file sim-rs-late.out --config-file data/simulation/config.default.yaml --topology-file leios-trace-verifier/examples/topology.yaml --idSut 0
+Applying 25681 actions
+ 220,162,801,512 bytes allocated in the heap
+ 141,347,876,600 bytes copied during GC
+     128,132,840 bytes maximum residency (545 sample(s))
+       1,442,904 bytes maximum slop
+             378 MiB total memory in use (0 MiB lost due to fragmentation)
+
+                                     Tot time (elapsed)  Avg pause  Max pause
+  Gen  0     52944 colls,     0 par   47.181s  47.246s     0.0009s    0.0050s
+  Gen  1       545 colls,     0 par   41.029s  41.065s     0.0753s    0.0996s
+
+  INIT    time    0.000s  (  0.000s elapsed)
+  MUT     time   28.803s  ( 28.745s elapsed)
+  GC      time   88.210s  ( 88.311s elapsed)
+  EXIT    time    0.000s  (  0.000s elapsed)
+  Total   time  117.014s  (117.056s elapsed)
+
+  %GC     time       0.0%  (0.0% elapsed)
+
+  Alloc rate    7,643,769,348 bytes per MUT second
+
+  Productivity  24.6% of total user, 24.6% of total elapsed
+```
+#### Profiling
+In order to spot performance bottle-necks in the `leios-trace-verifier` executable, we can enable profiling as follows:
+
+- Uncomment the profiling parameters in [project.nix](nix/project.nix)
+- Run the `leios-trace-verifier` with the additional command line argument `-pj` to produce a profiling output file
+
+```bash
+yves@nucli ~/code/ouroboros-leios (yveshauser/full-short-leios-trace-verifier)$ nix run .#leios-trace-verifier -- +RTS -pj -H1G -s -RTS --trace-file sim-rs-late.out --config-file data/simulation/config.default.yaml --topology-file leios-trace-verifier/examples/topology.yaml --idSut 0
+Applying 25681 actions
+ 340,498,733,272 bytes allocated in the heap
+   1,762,895,112 bytes copied during GC
+     182,540,568 bytes maximum residency (6 sample(s))
+       1,505,000 bytes maximum slop
+            1235 MiB total memory in use (0 MiB lost due to fragmentation)
+
+                                     Tot time (elapsed)  Avg pause  Max pause
+  Gen  0       406 colls,     0 par    1.250s   1.252s     0.0031s    0.0200s
+  Gen  1         6 colls,     0 par    0.224s   0.224s     0.0374s    0.0975s
+
+  INIT    time    0.001s  (  0.001s elapsed)
+  MUT     time   87.775s  ( 87.512s elapsed)
+  GC      time    1.475s  (  1.476s elapsed)
+  RP      time    0.000s  (  0.000s elapsed)
+  PROF    time    0.000s  (  0.000s elapsed)
+  EXIT    time    0.000s  (  0.000s elapsed)
+  Total   time   89.251s  ( 88.989s elapsed)
+
+  %GC     time       0.0%  (0.0% elapsed)
+
+  Alloc rate    3,879,203,434 bytes per MUT second
+
+  Productivity  98.3% of total user, 98.3% of total elapsed
+```
+- Inspect the `leios-trace-verifier.prof` file in [speedscope](https://www.speedscope.app/)
+
 ## 2025-06-30
 
 ### Praos simulations
