@@ -8,7 +8,7 @@ module Spec.Generated where
 import Control.Monad (join, liftM2, mzero, replicateM)
 import Data.List (inits)
 import Data.Text (Text)
-import LeiosConfig (leiosStageLengthSlots)
+import LeiosConfig
 import LeiosEvents
 import LeiosTopology (nodeInfo, nodes, stake, unNodeName)
 import Lib (verifyTrace)
@@ -28,8 +28,10 @@ verify =
     stakes = toInteger . stake . nodeInfo <$> (M.elems $ nodes Scenario.topology)
     stakeDistribution = zip nodeNames stakes
     stageLength' = toInteger $ leiosStageLengthSlots Scenario.config
+    ledgerQuality = ceiling (praosChainQuality Scenario.config) -- TODO: int in schema?
+    lateIBInclusion = leiosLateIbInclusion Scenario.config
    in
-    verifyTrace nrNodes Scenario.idSut stakeDistribution stageLength'
+    verifyTrace nrNodes Scenario.idSut stakeDistribution stageLength' ledgerQuality lateIBInclusion
 
 data Check
   = MustBeOkay

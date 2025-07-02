@@ -22,15 +22,22 @@ main :: IO ()
 main =
   do
     Command{..} <- execParser commandParser
+
+    -- Prameters from topology
     (top :: Topology COORD2D) <- decodeFileThrow topologyFile
-    (config :: Config) <- decodeFileThrow configFile
     let nrNodes = toInteger $ Prelude.length (elems $ nodes top)
     let nodeNames = Prelude.map unNodeName (keys $ nodes top)
     let stakes = Prelude.map (toInteger . stake . nodeInfo) (elems $ nodes top)
     let stakeDistribution = Prelude.zip nodeNames stakes
+
+    -- Parameters from config
+    (config :: Config) <- decodeFileThrow configFile
     let stageLength = toInteger (leiosStageLengthSlots config)
+    let ledgerQuality = ceiling (praosChainQuality config) -- TODO: int in schema?
+    let lateIBInclusion = leiosLateIbInclusion config
+
     result <-
-      verifyTrace nrNodes idSut stakeDistribution stageLength
+      verifyTrace nrNodes idSut stakeDistribution stageLength ledgerQuality lateIBInclusion
         . decodeJSONL
         <$> BSL.readFile logFile
     hPutStrLn stderr $ "Applying " <> show (fst result) <> " actions"

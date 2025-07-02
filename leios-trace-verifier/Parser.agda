@@ -75,8 +75,14 @@ record Endorsement : Type where
 
 postulate
   Nullable : Type → Type
+  unwrap : ∀ {a} → Nullable a → Maybe a
 
 {-# COMPILE GHC Nullable = type Nullable #-}
+{-# FOREIGN GHC
+  unwrap' :: () -> Nullable a -> Maybe a
+  unwrap' _ (Nullable x) = x
+#-}
+{-# COMPILE GHC unwrap = unwrap' #-}
 
 data Event : Type where
   Slot : String → SlotNo → Event
@@ -98,13 +104,20 @@ record TraceEvent : Type where
 
 {-# COMPILE GHC TraceEvent = data TraceEvent (TraceEvent) #-}
 
-module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String ℕ)) (sl : ℕ) where
+module _
+  (numberOfParties : ℕ)
+  (sutId : ℕ)
+  (stakeDistr : List (Pair String ℕ))
+  (stageLength : ℕ)
+  (ledgerQuality : ℕ)
+  (lateIBInclusion : Bool) -- TODO: Pass config and topology instead
+  where
 
   from-id : ℕ → Fin numberOfParties
   from-id n =
     case n <? numberOfParties of λ where
       (yes p) → #_ n {numberOfParties} {fromWitness p}
-      (no _) → error "Conversion to Fin not possible!"
+      (no _) → error $ "Conversion to Fin not possible! " ◇ show n ◇ " / " ◇ show numberOfParties
 
   nodePrefix : String
   nodePrefix = "node-"
@@ -113,10 +126,16 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
   SUT-id = from-id sutId
 
   instance
-    sl-NonZero : NonZero sl
-    sl-NonZero with sl ≟ 0
+    stageLength-NonZero : NonZero stageLength
+    stageLength-NonZero with stageLength ≟ 0
     ... | yes _ = error "Stage length is 0"
     ... | no ¬p = ≢-nonZero ¬p
+
+    numberOfParties-NonZero : NonZero numberOfParties
+    numberOfParties-NonZero with numberOfParties ≟ 0
+    ... | yes _ = error "Number of parties is 0"
+    ... | no ¬p = ≢-nonZero ¬p
+
 
   nodeId : String → Fin numberOfParties
   nodeId s with S.readMaybe 10 (S.fromList (drop (S.length nodePrefix) $ S.toList s))
@@ -125,8 +144,8 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
 
   open FunTot (completeFin numberOfParties) (maximalFin numberOfParties)
 
-  sd : TotalMap (Fin numberOfParties) ℕ
-  sd =
+  stakeDistribution : TotalMap (Fin numberOfParties) ℕ
+  stakeDistribution =
     let (r , l) = fromListᵐ (L.map (λ (x , y) → (nodeId x , y)) stakeDistr)
     in case (¿ total r ¿) of λ where
          (yes p) → record { rel = r ; left-unique-rel = l ; total-rel = p }
@@ -177,11 +196,16 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
     params : Params
     params =
       record
-        { numberOfParties   = numberOfParties
-        ; sutId             = SUT-id
-        ; stakeDistribution = sd
-        ; stageLength       = sl
-        ; winning-slots     = fromList (L.catMaybes $ L.map winningSlot l)
+        { networkParams =
+            record
+              { numberOfParties   = numberOfParties
+              ; ledgerQuality     = ledgerQuality
+              ; stakeDistribution = stakeDistribution
+              ; stageLength       = stageLength
+              ; lateIBInclusion   = lateIBInclusion
+              }
+        ; sutId         = SUT-id
+        ; winning-slots = fromList ∘ L.catMaybes $ L.map winningSlot l
         }
 
     open import Leios.Short.Trace.Verifier params renaming (verifyTrace to checkTrace)
@@ -190,13 +214,14 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
       IB-Blk : InputBlock → Blk
       EB-Blk : EndorserBlock → Blk
       VT-Blk : List Vote → Blk
+      RB-Blk : EndorserBlock → Blk
 
     record State : Type where
       field refs : AssocList String Blk
 
     instance
-      hhx : Hashable InputBlock (List ℕ)
-      hhx .hash record { header = h } = hash h
+      Hashable-InputBlock : Hashable InputBlock (List ℕ)
+      Hashable-InputBlock .hash record { header = h } = hash h
 
       _ = Show-List
       _ = Show-×
@@ -210,17 +235,12 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
     unquoteDecl Show-EndorserBlockOSig = derive-Show [ (quote EndorserBlockOSig , Show-EndorserBlockOSig) ]
     unquoteDecl Show-Blk = derive-Show [ (quote Blk , Show-Blk) ]
 
-    del : String
-    del = ", "
-
-    nl : String
-    nl = "\n"
-
     blockRefToNat : AssocList String Blk → String → IBRef
     blockRefToNat refs r with refs ⁉ r
     ... | just (IB-Blk ib) = hash ib
     ... | just (EB-Blk eb) = error $ "IB expected, got EB instead, " ◇ show eb
     ... | just (VT-Blk vt) = error $ "IB expected, got VT instead"
+    ... | just (RB-Blk eb) = error $ "IB expected, got RB instead"
     ... | nothing          = error $ "IB expected, got nothing (" ◇ r ◇ " / " ◇ show refs ◇ ")"
 
     open State
@@ -292,7 +312,7 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
       where
         actions : List (Action × LeiosInput ⊎ FFDUpdate)
         actions with p ≟ SUT
-        ... | yes _ = (inj₁ (EB-Role-Action (primWord64ToNat s) [] , SLOT)) ∷ []
+        ... | yes _ = (inj₁ (EB-Role-Action (primWord64ToNat s) [] [] , SLOT)) ∷ []
         ... | no _  = []
     traceEvent→action l record { message = VTBundleGenerated p i s _ _ vts } =
       let vt = map (const tt) (elems vts)
@@ -302,7 +322,13 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
         actions with p ≟ SUT
         ... | yes _ = (inj₁ (VT-Role-Action (primWord64ToNat s) , SLOT)) ∷ []
         ... | no _  = []
-    traceEvent→action l record { message = RBGenerated _ _ _ _ _ _ _ _ } = l , []
+    traceEvent→action l record { message = RBGenerated p i s _ eb _ _ _ }
+      with (unwrap eb)
+    ... | nothing = l , []
+    ... | just b
+      with refs l ⁉ BlockRef.id (Endorsement.eb b)
+    ... | nothing = l , []
+    ... | just e = record l { refs = (i , e) ∷ refs l } , []
 
     mapAccuml : {A B S : Set} → (S → A → S × B) → S → List A → S × List B
     mapAccuml f s []       = s , []
@@ -325,17 +351,17 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
       Show-FFDBuffers .show _ = "ffd buffers"
 
       Show-Action : Show Action
-      Show-Action .show (IB-Role-Action x)    = "IB-Role-Action " ◇ show x
-      Show-Action .show (EB-Role-Action x _)  = "EB-Role-Action " ◇ show x
-      Show-Action .show (VT-Role-Action x)    = "VT-Role-Action " ◇ show x
-      Show-Action .show (No-IB-Role-Action x) = "No-IB-Role-Action " ◇ show x
-      Show-Action .show (No-EB-Role-Action x) = "No-EB-Role-Action " ◇ show x
-      Show-Action .show (No-VT-Role-Action x) = "No-VT-Role-Action " ◇ show x
-      Show-Action .show (Ftch-Action x)       = "Ftch-Action " ◇ show x
-      Show-Action .show (Slot-Action x)       = "Slot-Action " ◇ show x
-      Show-Action .show (Base₁-Action x)      = "Base₁-Action " ◇ show x
-      Show-Action .show (Base₂a-Action x _)   = "Base₂a-Action " ◇ show x
-      Show-Action .show (Base₂b-Action x)     = "Base₂b-Action " ◇ show x
+      Show-Action .show (IB-Role-Action x)     = "IB-Role-Action " ◇ show x
+      Show-Action .show (EB-Role-Action x _ _) = "EB-Role-Action " ◇ show x
+      Show-Action .show (VT-Role-Action x)     = "VT-Role-Action " ◇ show x
+      Show-Action .show (No-IB-Role-Action x)  = "No-IB-Role-Action " ◇ show x
+      Show-Action .show (No-EB-Role-Action x)  = "No-EB-Role-Action " ◇ show x
+      Show-Action .show (No-VT-Role-Action x)  = "No-VT-Role-Action " ◇ show x
+      Show-Action .show (Ftch-Action x)        = "Ftch-Action " ◇ show x
+      Show-Action .show (Slot-Action x)        = "Slot-Action " ◇ show x
+      Show-Action .show (Base₁-Action x)       = "Base₁-Action " ◇ show x
+      Show-Action .show (Base₂a-Action x _)    = "Base₂a-Action " ◇ show x
+      Show-Action .show (Base₂b-Action x)      = "Base₂b-Action " ◇ show x
 
     instance
       Show-NonZero : ∀ {n : ℕ} → Show (NonZero n)
@@ -351,15 +377,16 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
       Show-⊎ .show (inj₁ x) = show x
       Show-⊎ .show (inj₂ y) = show y
 
-    unquoteDecl Show-FFDUpdate    = derive-Show [ (quote FFDUpdate , Show-FFDUpdate) ]
-    unquoteDecl Show-Params       = derive-Show [ (quote Params , Show-Params) ]
-    unquoteDecl Show-Upkeep       = derive-Show [ (quote SlotUpkeep , Show-Upkeep) ]
-    unquoteDecl Show-Upkeep-Stage = derive-Show [ (quote StageUpkeep , Show-Upkeep-Stage) ]
-    unquoteDecl Show-LeiosState   = derive-Show [ (quote LeiosState , Show-LeiosState) ]
-    unquoteDecl Show-LeiosInput   = derive-Show [ (quote LeiosInput , Show-LeiosInput) ]
+    unquoteDecl Show-FFDUpdate     = derive-Show [ (quote FFDUpdate , Show-FFDUpdate) ]
+    unquoteDecl Show-NetworkParams = derive-Show [ (quote NetworkParams , Show-NetworkParams) ]
+    unquoteDecl Show-Params        = derive-Show [ (quote Params , Show-Params) ]
+    unquoteDecl Show-Upkeep        = derive-Show [ (quote SlotUpkeep , Show-Upkeep) ]
+    unquoteDecl Show-Upkeep-Stage  = derive-Show [ (quote StageUpkeep , Show-Upkeep-Stage) ]
+    unquoteDecl Show-LeiosState    = derive-Show [ (quote LeiosState , Show-LeiosState) ]
+    unquoteDecl Show-LeiosInput    = derive-Show [ (quote LeiosInput , Show-LeiosInput) ]
 
     s₀ : LeiosState
-    s₀ = initLeiosState tt sd tt ((SUT-id , tt) ∷ [])
+    s₀ = initLeiosState tt stakeDistribution tt ((SUT-id , tt) ∷ [])
 
     format-Err-verifyAction :  ∀ {α i s} → Err-verifyAction α i s → Pair String String
     format-Err-verifyAction {α} {i} {s} (E-Err e) =
@@ -367,6 +394,9 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
         "Parameters: " ◇ show params ◇ nl ◇
         "Input: " ◇ show i ◇ nl ◇
         "LeiosState: " ◇ show s
+      where
+        nl : String
+        nl = "\n"
 
     format-Err-verifyUpdate : ∀ {μ s} → Err-verifyUpdate μ s → Pair String String
     format-Err-verifyUpdate {μ} (E-Err _) = "Invalid Update" , show μ
