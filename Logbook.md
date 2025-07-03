@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2025-07-03
+
+### Notes on analysis of attacks
+
+[PR #445](https://github.com/input-output-hk/ouroboros-leios/pull/445) adds to the second technical report a definition of terms related to the Leios attack surface, a taxonomy of potential impacts, and a description of several major categories of attack.
+
 ## 2025-07-02
 
 ### Trace verifier performance
