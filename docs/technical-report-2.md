@@ -15,6 +15,9 @@ Ouroboros Leios introduces new types of blocks with novel diffusion patterns and
 
 For background information on mini protocols see sections 3.1-3.4 of the *Ouroboros Network Specification*[^3], and rest of that chapter for the mini protocols already in use. Here we will present the additional node-to-node mini protocols needed for Leios.
 
+> [!NOTE]
+> Perhaps this mini-protocol section should be moved into the CIP?
+
 #### `Relay` mini-protocol
 
 The `Relay` protocol presented here is a generalization of the tx submission protocol used to transfer transactions between full nodes. We will use the term *datum* as a generic term for the payloads being diffused, which we expect to be generally small: transactions, input block headers, endorse block headers[^4], vote bundles for a single pipeline and voter.
@@ -532,6 +535,59 @@ The next figure shows same comparison but with 10 cpus per node. Diffusion for t
 | ![IB diffusion to 0.50 stake](technical-report-2/scenario6-10-cpus/IB-0.5-oldest-vs-freshest.svg)<br/>IB diffusion to 0.50 stake | ![IB diffusion to 0.60 stake](technical-report-2/scenario6-10-cpus/IB-0.6-oldest-vs-freshest.svg)<br/>IB diffusion to 0.60 stake |
 | ![IB diffusion to 0.70 stake](technical-report-2/scenario6-10-cpus/IB-0.7-oldest-vs-freshest.svg)<br/>IB diffusion to 0.70 stake | ![IB diffusion to 0.80 stake](technical-report-2/scenario6-10-cpus/IB-0.8-oldest-vs-freshest.svg)<br/>IB diffusion to 0.80 stake |
 | ![IB diffusion to 0.90 stake](technical-report-2/scenario6-10-cpus/IB-0.9-oldest-vs-freshest.svg)<br/>IB diffusion to 0.90 stake | ![IB diffusion to 0.98 stake](technical-report-2/scenario6-10-cpus/IB-0.98-oldest-vs-freshest.svg)<br/>IB diffusion to 0.98 stake |
+
+## Notes on the Leios attack surface
+
+This discussion extends the section [Threat Model](./technical-report-1.md#threat-model) of the [Leios Technical Report #1](./technical-report-1.md).
+
+### Terminology and notes
+
+- The *IB-concurrency period* is the time duration when nodes haven't seen newly created IBs from other honest nodes.
+- Two transactions are *in conflict* if they spend any UTxOs in common. Among a set of valid transactions that attempt to spend a particular UTxO, only one of them can be *successfully executed* and the remainder are *unexecuted*, though (depending upon the ledger rules of the particular Leios variant) their collateral may be consumed if they become referenced by the Praos ranking block. Unexecuted conflicts waste network resources, CPU, and memory of nodes. If they reach the ledger, they also waste permanent storage.
+- Leios variants may institute *tombstoning* of unexecuted transactions that must be stored permanently due to their presence in IBs that are indirectly referenced by RBs of the main chain. When stored permanently, a tombstoned transaction might not contain all of the data of the original full transaction: depending upon the Leios variant and the cryptographic scheme used, the tombstoned transaction might be a simple as just the hash of the original transaction or that hash and information about the collateral spent. Tombstoning of duplicate transactions is trivial, but tombstoning of unexecuted conflicting transactions requires cryptographic sophistication and/or voting.
+- A smart contract at times have either *open* or *closed* participation. When a contract is open more than one party might be eligible to submit a transactions, but when it is closed only a specific party can submit a transaction. Auctions, lotteries, and liquidity pools typically are open contracts. A zero-coupon bond or a European option might be a closed contract. Simple scripts could be open or closed. Transactions constructed by a single wallet and that do not spend from smart contracts could be considered closed because (presumably) only one party has the private keys necessary to spend the UTxOs. The distinction between open and closed UTxOs is important because the spender of a closed UTxO would typically have enough control of the situation that they could avoid creating a transaction that might conflict with others. Conversely, a spender of an open UTxO (in a script or smart contract) might not have sufficient information or control to avoid submitting a transaction that conflicts with transactions other users are submitting and which spend the same open UTxO.
+- *Equivocation* is when a block producer (IB, EB, or RB) or voter produces more than their entitled number of blocks or votes. For example, local sortition may entitle a node to produce one IB in a particular slot, but the node actually produces two different IBs in that slot and diffuses them to different downstream nodes: separately each IB is valid, but together they are not, so nodes will only adopt the IB that they receive first. The Leios protocol specifies that both the first block received and the first equivocation received both are diffused.
+- *Throughput loss* is when the overall capacity for non-conflicted transactions is reduced from the theoretical capability. Throughput is not considered lost if it is delayed and non-conflicted transactions originating from an adversary are not distinguished from those originating from honest parties.
+- *Latency loss* is when there is an increase in the the average time from a transaction's acceptance in the memory pool to it recording on the ledger.
+- *Front running* is when a transaction is submitted by a party after they party sees conflicting transactions in IBs or EBs, but the submitted transaction is successful and the previously seen transaction(s) are unsuccessful. This may give the submitted an opportunity to extract value from DEXes, liquidity pools, or oracle-sensitive dapps.
+- IB or EB *expiration* occurs when the block is not referenced by an EB or RB, respectively, before a timeout specified by the relevant Leios protocol parameter. Such expired blocks will never be included in the ledger.
+- *Grinding* occurs when an adversary attempts to manipulate VRF values in their favor using a trial-and-error process of crafting the entropy input into the VRF. See [CPS-21 "Ouroboros Randomness Manipulation"](https://cips.cardano.org/cps/CPS-0021) for details.
+
+### Taxonomy of negative impacts
+
+The security-related impacts of adversarial behavior upon Leios fall into three general categories. Note that quality of service (QoS) issues such as front-running are not considered to be attacks on the protocol itself and are not included in this section.
+
+- *Wasted of resources:* An attack may waste computation resources without impacting throughput or latency.
+	- *CPU:* Most attack involve extra computation in the form of validation of transactions, IB, EB, or certificates. Leios nodes would be sized for peak capacity, so this wasted CPU does not translate into extra cloud-hosting costs.
+	- *Memory:* Because of capacity limits in the protocol and backpressure in its implementation, attacks general would not impact memory usage in a significant manner. Leios nodes would be sized for peak capacity, so this wasted memory does not translate into extra cloud-hosting costs.
+	- *Disk:* Any conflicted transactions that reach the ledger will have to be stored permanently in persistent storage so that the blockchain can be replayed from genesis. Tombstoning and compression techniques might reduce the amount of storage relative to the original size of conflicted transactions. Persistent storage incurs significant cost in most cloud-pricing schemes.
+	- *Network:* Transmission of conflicted transactions or IBs containing such transactions increases network usage. At high throughput this can have significant cost in some cloud-pricing schemes.
+- *Lowered throughput:* In addition to wasting infrastructure resources, attacks that generate conflicts and duplicates lower overall Leios throughput.
+- *Increased latency:* Attacks that involve omissions or that cause voting failures generally do not decrease Leios throughput since Full Leios has "catch up" provisions for recovery. Those do, however, delay the arrival of transactions into the ledger.
+
+### Specific attacks
+
+*Memory pool attacks:* Just as in Praos, an adversary with sufficient network resources and high enough connectivity to other nodes can attempt to fragment the global memory pool by communicating different sets of transactions to different nodes. The extent to which they can accomplish this depends upon their resources (infrastructure and ada), the connectivity of the other nodes, and the sizes of their local memory pools. (Recall that local memory pools are of fixed size and nodes apply backpressure to clients when their local memory pool is full.) Unique to Leios is the situation where the local memory pools may contain mutually conflicting transactions, in which case there is a probability that honest nodes will create IBs with conflicting transactions during the IB-concurrency period.  An adversary could either craft their own mutually conflicting transactions or create transactions in conflict with honest ones in the memory pool if those honest transactions have open enough participation that third parties can create conflicting ones.
+
+*Equivocation attacks:* When block producers or voters produce equivocated blocks/votes, this creates extra network traffic within the network. Depending upon the proportions of equivocated blocks received by other nodes, at most one of the equivocated blocks could eventually be voted upon and there is a chance that neither would. The Leios protocol mitigates this attack so that slight waste of network resources and the chance of EB non-inclusion are the worst-case impacts.
+
+*IB conflict attacks:* An IB producer can craft the contents of their new IBs to contain transactions in conflict with other transactions that they know to be in the memory pool or that they have seen within other IBs in flight. The adversarial IB producer can delay their production of the IB for several slots (up to approximately one stage length), until they see IBs created by other nodes in subsequent slots: optimally, they would release their "back-dated" IB after they have seen transactions in the IBs for a few subsequent slots, given them information to retrospectively create conflicting transactions. (The conflicts could be against honest *open* transactions or against transactions submitted by the adversary.) The strength of this attack is proportional to the adversary's stake and generally requires expending some ada in the form of lost collateral. The attack has the same impact as the conflicting transactions resulting from the memory pool attack: bandwidth, CPU, and potentially disk.
+
+*Omission attacks:* Choosing not to build an IB, EB, or RB trivially increases the latency of Leios. Not voting trivially increases the probability of not being able to certify an EB for inclusion in an RB, similarly increasing latency. In these cases the strength of the adversary is proportional to their stake. If an omission attack is sustained so long that IBs and/or EBs expire, then a loss of throughput would also occur.
+
+*Front-running:* Regardless of the specific ordering of transactions required by the Ledger rules of the particular Leios variant, the overlap of pipelines and the potential opportunity to include transactions in RBs opens the possibility of front running transactions. Although front-running is primarily a quality of service (QoS) consideration, it can also be used to provoke conflicts that consume resources and lower throughput.
+
+*Denial of service on FA voting:* The Fait Accompli algorithm for voter sortition publicly reveals the high-stake nodes who will be voters in every election during an epoch. Traditional network denial of service attacks might be mounted against them if they IP addresses can be determined by an adversary. The success of such attacks depends upon the target node's network infrastructure and firewall defenses and could result the node not disseminating its vote in the time frame required by a protocol. If sufficient voting nodes were attacked, then no EB would be certified in the pipeline and a loss of latency would result.
+
+*Late release attacks:* If the Leios variant in question has sharp cutoff criteria for whether an IB or EB is received to late to be considered valid in the current pipeline, then an attacker (especially a block producer) could try to diffuse the block almost as late as possible, so that some nodes receive it before the cutoff and others receive it after the cutoff. This would create disagreement regarding what blocks are valid for the pipeline and could prevent a quorum of voters to agree on an EB to certify. Because the block could be included in a later pipeline, this attack would only result in a loss of latency.
+
+*Grinding attacks:* As in Praos, adversaries may attempt to manipulate the randomness of the VRF function used to determine who produces IBs, EBs, and/or votes.
+
+### Recommendations
+
+1. Perform theoretical analysis and simulation experiments to estimate how fragmented the global memory pool can become, as a function of adversarial resources.
+2. Perform simulation experiments to measure the resource and voting impact of equivocated IBs, EBs, and votes.
+3. Analytically compute probabilities of conflict attacks succeeding, as a function of adversarial stake, and compare to simulation results.
 
 ## Footnotes
 
