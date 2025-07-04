@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2025-07-04
+
+### 1000 TPS experiment
+
+A 1000 TPS experiment of basic transactions (300-byte non-Plutus transactions) was completed to demonstrate the viability of Leios at high throughput. See [analysis/sims/2025w27/analysis.ipynb](analysis/sims/2025w27/analysis.ipynb).
+
 ## 2025-07-03
 
 ### Notes on analysis of attacks
