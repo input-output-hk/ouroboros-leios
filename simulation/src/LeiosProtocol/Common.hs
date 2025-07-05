@@ -120,6 +120,7 @@ data InputBlockHeader = InputBlockHeader
   , rankingBlock :: !(ChainHash RankingBlock)
   -- ^ points to ledger state for validation.
   , size :: !Bytes
+  -- ^ size of this header, not the full block
   }
   deriving stock (Eq, Show)
 
