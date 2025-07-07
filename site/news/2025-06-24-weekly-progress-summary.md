@@ -5,16 +5,16 @@ authors:
 tags: [progress, update, weekly, simulation-analysis, variants, sharding, conflict-experiments, bandwidth, spatial-efficiency, temporal-efficiency]
 ---
 
-This week, the Leios team conducted comprehensive experiments examining protocol variants, conflict handling, and bandwidth requirements. The team completed analysis of nine candidate Leios variants with different sharding strategies, performed detailed conflict experiments at 100 TPS, and validated bandwidth requirements across multiple throughput scenarios.
+This week, the Leios team conducted comprehensive experiments examining protocol variants, conflict handling, and bandwidth requirements. The team also completed the analysis of nine candidate Leios variants with different sharding strategies, performed detailed conflict experiments at 100 TPS, and validated bandwidth requirements across multiple throughput scenarios.
 
 ## Simulation analysis of protocol variants
 
-- Completed comprehensive analysis of nine candidate variants of Leios examining three basic variants and three sharding strategies:
+- Completed a comprehensive analysis of nine candidate variants of Leios, examining three basic variants and three sharding strategies:
   - Basic variants: Full, Full without IBs, Full with transaction references
-  - Sharding strategies: Unsharded, Sharded, Overcollateralized 1x
+  - Sharding strategies: unsharded, sharded, overcollateralized 1x
 - Identified significant differences in spatial and temporal efficiencies across variants:
-  - Full with transaction references achieved highest spatial efficiency (95.999-96.466%)
-  - Full without IBs demonstrated fastest time to ledger (43.052-43.057s)
+  - Full with transaction references achieved the highest spatial efficiency (95.999-96.466%)
+  - Full without IBs demonstrated the fastest time to the ledger (43.052-43.057s)
   - Sharded variants generally showed improved spatial efficiency but increased latency
 - Documented detailed findings in the [analysis notebook](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w26/analysis-variants-sharding.ipynb).
 
@@ -27,11 +27,11 @@ This week, the Leios team conducted comprehensive experiments examining protocol
 - Conducted experiments exploring the effect of conflicting transactions at 100 TPS using the simplest Leios variant
 - Tested scenarios with 0%, 25%, and 50% of transactions conflicting with other transactions
 - Key findings from the [conflict analysis](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w26/analysis.ipynb):
-  - Spatial efficiency can be as low as 55% due to occasional IB production before previous reception
+  - Spatial efficiency can be as low as 55% due to occasional IB production before the previous reception
   - All non-conflicted transactions reach the ledger within 75 seconds
   - NIC bandwidth of 20 Mb/s is sufficient for protocol operation
   - Four vCPU cores provide adequate processing capacity
-  - Large IBs (up to 2 MB) diffuse globally within 5 seconds
+  - Large IBs (up to 2 MB) diffuse globally within five seconds
   - IB traffic does not interfere with other protocol message types.
 
 ![Mean nodal network ingress at 100 TPS](https://raw.githubusercontent.com/input-output-hk/ouroboros-leios/main/analysis/sims/2025w26/plots/cxs/ingress-average-area.png)
@@ -47,7 +47,7 @@ This week, the Leios team conducted comprehensive experiments examining protocol
   - All transactions reach the ledger within two minutes
   - 30 Mbps NIC bandwidth is sufficient for Leios node operation
   - Four-core vCPU provides adequate processing capacity
-  - Results insensitive to inter-nodal link bandwidths above 50 Mb/s
+  - Insensitive results to inter-nodal link bandwidths above 50 Mb/s
   - Even 10 Mb/s links show minimal impact on protocol performance.
 
 ![Diffusion of IBs at 300 TPS by link bandwidth](https://raw.githubusercontent.com/input-output-hk/ouroboros-leios/main/analysis/sims/2025w25/plots/bw-2IBps/elapsed-IB.png)
@@ -56,7 +56,7 @@ This week, the Leios team conducted comprehensive experiments examining protocol
 
 - Added support for IB equivocation (work in progress, evaluating impact)
 - Implemented minor usability improvements to the CLI tool
-- Added sharding support to the "full without IBs" variant of Leios.
+- Added sharding support to the 'full without IBs' variant of Leios.
 
 
 ## CDDL Version 1
