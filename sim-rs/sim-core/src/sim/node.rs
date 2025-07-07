@@ -156,7 +156,7 @@ struct SeenTransaction {
 #[derive(Default)]
 struct NodeLeiosState {
     mempool: BTreeMap<TransactionId, SeenTransaction>,
-    input_ids_from_ibs: HashSet<u64>,
+    input_ids_in_flight: HashSet<u64>,
     ibs_to_generate: BTreeMap<u64, Vec<u64>>,
     ibs: BTreeMap<InputBlockId, InputBlockState>,
     ib_requests: BTreeMap<NodeId, PeerInputBlockRequests>,
@@ -210,6 +210,14 @@ enum EndorserBlockState {
         eb: Arc<EndorserBlock>,
         finalized: bool,
     },
+}
+impl EndorserBlockState {
+    fn eb(&self) -> Option<&EndorserBlock> {
+        match self {
+            Self::Pending => None,
+            Self::Received { eb, .. } => Some(eb),
+        }
+    }
 }
 
 enum VoteBundleState {
@@ -1105,9 +1113,9 @@ impl Node {
             self.send_to(*peer, SimulationMessage::AnnounceTx(id))?;
         }
         if self.sim_config.mempool_aggressive_pruning
-            && self.leios.input_ids_from_ibs.contains(&tx.input_id)
+            && self.leios.input_ids_in_flight.contains(&tx.input_id)
         {
-            // Ignoring a TX which conflicts with TXs we've seen in input blocks.
+            // Ignoring a TX which conflicts with TXs we've seen in input or endorser blocks.
             // This only affects the Leios mempool; these TXs should still be able to reach the chain through Praos.
             return Ok(());
         }
@@ -1314,11 +1322,11 @@ impl Node {
         if self.sim_config.mempool_aggressive_pruning {
             // If we're using aggressive pruning, remove transactions from the mempool if they conflict with transactions in this IB
             self.leios
-                .input_ids_from_ibs
+                .input_ids_in_flight
                 .extend(ib.transactions.iter().map(|tx| tx.input_id));
             self.leios
                 .mempool
-                .retain(|_, seen| !self.leios.input_ids_from_ibs.contains(&seen.tx.input_id));
+                .retain(|_, seen| !self.leios.input_ids_in_flight.contains(&seen.tx.input_id));
         }
         let header_seen = self
             .leios
@@ -1442,13 +1450,11 @@ impl Node {
 
     fn finish_validating_eb(&mut self, from: NodeId, eb: Arc<EndorserBlock>) -> Result<()> {
         let id = eb.id();
-        match self.leios.ebs.entry(id) {
-            Entry::Vacant(e) => {
-                e.insert(EndorserBlockState::Received {
-                    eb,
-                    finalized: false,
-                });
-            }
+        let eb_state = match self.leios.ebs.entry(id) {
+            Entry::Vacant(e) => e.insert(EndorserBlockState::Received {
+                eb,
+                finalized: false,
+            }),
             Entry::Occupied(mut e) => {
                 if matches!(e.get(), EndorserBlockState::Received { .. }) {
                     return Ok(());
@@ -1457,7 +1463,23 @@ impl Node {
                     eb,
                     finalized: false,
                 });
+                e.into_mut()
             }
+        };
+        let eb = eb_state.eb().unwrap();
+        if self.sim_config.mempool_aggressive_pruning {
+            // If we're using aggressive pruning, remove transactions from the mempool if they conflict with transactions in this EB
+            self.leios
+                .input_ids_in_flight
+                .extend(eb.txs.iter().filter_map(|tx_id| {
+                    let Some(TransactionView::Received(tx)) = self.txs.get(tx_id) else {
+                        return None;
+                    };
+                    Some(tx.input_id)
+                }));
+            self.leios
+                .mempool
+                .retain(|_, seen| !self.leios.input_ids_in_flight.contains(&seen.tx.input_id));
         }
         self.leios
             .ebs_by_pipeline
