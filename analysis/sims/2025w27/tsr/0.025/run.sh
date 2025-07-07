@@ -7,7 +7,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 LABEL="$(basename "$PWD")"
 BW=50
 
-ulimit -S -m 64000000 -v 64000000
+ulimit -S -m 144000000 -v 144000000
 
 mkfifo sim.log
 
