@@ -17,7 +17,7 @@ multiplex-mini-protocols: true
 simulate-transactions: true
 treat-blocks-as-full: false
 cleanup-policies: ["cleanup-expired-vote"]
-timestamp-resolution-ms: 0.010
+timestamp-resolution-ms: 0.025
 
 ################################################################################
 # Leios Protocol Configuration
