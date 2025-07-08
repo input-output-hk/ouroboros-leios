@@ -1467,16 +1467,23 @@ impl Node {
             }
         };
         let eb = eb_state.eb().unwrap();
+        let txs: Vec<_> = eb
+            .txs
+            .iter()
+            .filter_map(|tx_id| match self.txs.get(tx_id) {
+                Some(TransactionView::Received(tx)) => Some(tx),
+                _ => None,
+            })
+            .collect();
+        for tx in &txs {
+            // Do not include transactions from this EB in any EBs we produce ourselves.
+            self.leios.mempool.remove(&tx.id);
+        }
         if self.sim_config.mempool_aggressive_pruning {
             // If we're using aggressive pruning, remove transactions from the mempool if they conflict with transactions in this EB
             self.leios
                 .input_ids_in_flight
-                .extend(eb.txs.iter().filter_map(|tx_id| {
-                    let Some(TransactionView::Received(tx)) = self.txs.get(tx_id) else {
-                        return None;
-                    };
-                    Some(tx.input_id)
-                }));
+                .extend(txs.iter().map(|tx| tx.input_id));
             self.leios
                 .mempool
                 .retain(|_, seen| !self.leios.input_ids_in_flight.contains(&seen.tx.input_id));
