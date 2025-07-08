@@ -2,11 +2,67 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
     <id>https://leios.cardano-scaling.org/news</id>
     <title>Ouroboros Leios Blog</title>
-    <updated>2025-06-24T00:00:00.000Z</updated>
+    <updated>2025-07-01T00:00:00.000Z</updated>
     <generator>https://github.com/jpmonette/feed</generator>
     <link rel="alternate" href="https://leios.cardano-scaling.org/news"/>
     <subtitle>Ouroboros Leios Blog</subtitle>
     <icon>https://leios.cardano-scaling.org/img/wave-logo.ico</icon>
+    <entry>
+        <title type="html"><![CDATA[Weekly Summary – July 1, 2025]]></title>
+        <id>https://leios.cardano-scaling.org/news/2025/07/01/weekly-progress-summary</id>
+        <link href="https://leios.cardano-scaling.org/news/2025/07/01/weekly-progress-summary"/>
+        <updated>2025-07-01T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[This week, the Leios team achieved a significant milestone by successfully demonstrating protocol viability at 1,000 TPS, completed comprehensive attack surface analysis, and made substantial improvements to simulation and verification tools.]]></summary>
+        <content type="html"><![CDATA[<p>This week, the Leios team achieved a significant milestone by successfully demonstrating protocol viability at 1,000 TPS, completed comprehensive attack surface analysis, and made substantial improvements to simulation and verification tools.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="high-throughput-demonstration">High-throughput demonstration<a class="hash-link" aria-label="Direct link to High-throughput demonstration" title="Direct link to High-throughput demonstration" href="https://leios.cardano-scaling.org/news/2025/07/01/weekly-progress-summary#high-throughput-demonstration">​</a></h2>
+<ul>
+<li>Successfully completed a 1,000 TPS experiment using basic 300-byte non-Plutus transactions</li>
+<li>Demonstrated the viability of Leios protocol operation at extremely high throughput levels</li>
+<li>Validated protocol performance under stress conditions significantly beyond current Cardano capacity</li>
+<li>Documented detailed findings in the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w27/analysis.ipynb" target="_blank" rel="noopener noreferrer">1000 TPS analysis</a>.</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="security-analysis">Security analysis<a class="hash-link" aria-label="Direct link to Security analysis" title="Direct link to Security analysis" href="https://leios.cardano-scaling.org/news/2025/07/01/weekly-progress-summary#security-analysis">​</a></h2>
+<ul>
+<li>Completed comprehensive attack surface analysis for the second technical report</li>
+<li>Defined terminology and taxonomy for potential Leios attack vectors</li>
+<li>Categorized major attack types and their potential impacts on protocol security</li>
+<li>Enhanced understanding of protocol vulnerabilities and mitigation strategies.</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation-enhancements">Rust simulation enhancements<a class="hash-link" aria-label="Direct link to Rust simulation enhancements" title="Direct link to Rust simulation enhancements" href="https://leios.cardano-scaling.org/news/2025/07/01/weekly-progress-summary#rust-simulation-enhancements">​</a></h2>
+<ul>
+<li>Finished implementing support for input block (IB) equivocations in the simulation</li>
+<li>Added capability to model and analyze protocol behavior under adversarial conditions</li>
+<li>Enhanced simulation fidelity for security-related protocol testing.</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="trace-verifier-performance-optimization">Trace verifier performance optimization<a class="hash-link" aria-label="Direct link to Trace verifier performance optimization" title="Direct link to Trace verifier performance optimization" href="https://leios.cardano-scaling.org/news/2025/07/01/weekly-progress-summary#trace-verifier-performance-optimization">​</a></h2>
+<ul>
+<li>Achieved 3x performance improvement by configuring minimum heap size to 1GB</li>
+<li>Reduced garbage collection overhead from 75% to 2% of execution time</li>
+<li>Enhanced profiling capabilities with detailed performance analysis tools</li>
+<li>Improved verification efficiency for large-scale simulation trace analysis.</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="protocol-convergence-for-cip">Protocol convergence for CIP<a class="hash-link" aria-label="Direct link to Protocol convergence for CIP" title="Direct link to Protocol convergence for CIP" href="https://leios.cardano-scaling.org/news/2025/07/01/weekly-progress-summary#protocol-convergence-for-cip">​</a></h2>
+<ul>
+<li>Intensified efforts to converge on a specific Leios variant for the Cardano Improvement Proposal (CIP)</li>
+<li>Applied systematic evaluation methodology to rank protocol candidates from multiple angles</li>
+<li>Evaluated efficiency metrics including temporal efficiency versus storage optimization trade-offs</li>
+<li>Assessed attack surface and security vectors across different protocol variants</li>
+<li>Analyzed utility factors including quality of service, developer friendliness, user experience, and downstream ecosystem impacts</li>
+<li>Focused on eliminating candidates through evidence-based assessment of valuable protocol characteristics.</li>
+</ul>]]></content>
+        <author>
+            <name>William Wolff</name>
+            <uri>https://github.com/will-break-it</uri>
+        </author>
+        <category label="progress" term="progress"/>
+        <category label="update" term="update"/>
+        <category label="weekly" term="weekly"/>
+        <category label="high-throughput" term="high-throughput"/>
+        <category label="attack-analysis" term="attack-analysis"/>
+        <category label="rust-simulation" term="rust-simulation"/>
+        <category label="trace-verification" term="trace-verification"/>
+        <category label="performance-optimization" term="performance-optimization"/>
+    </entry>
     <entry>
         <title type="html"><![CDATA[Weekly Summary – June 24, 2025]]></title>
         <id>https://leios.cardano-scaling.org/news/2025/06/24/weekly-progress-summary</id>
@@ -1413,121 +1469,5 @@
         <category label="infrastructure" term="infrastructure"/>
         <category label="throughput" term="throughput"/>
         <category label="congestion" term="congestion"/>
-    </entry>
-    <entry>
-        <title type="html"><![CDATA[Weekly Summary – February 10, 2025]]></title>
-        <id>https://leios.cardano-scaling.org/news/2025/02/10/weekly-progress-summary</id>
-        <link href="https://leios.cardano-scaling.org/news/2025/02/10/weekly-progress-summary"/>
-        <updated>2025-02-10T00:00:00.000Z</updated>
-        <summary type="html"><![CDATA[This week, the Leios team made significant progress across multiple areas. Major developments included detailed DeltaQ analysis of network topologies, extensive BLS cryptography benchmarking, and improvements to both simulations. The team also explored succinct schemes for BLS key registration and conducted a detailed certificate performance analysis. Both Haskell and Rust simulations received substantial updates to improve visualization and support more realistic testing conditions.]]></summary>
-        <content type="html"><![CDATA[<p>This week, the Leios team made significant progress across multiple areas. Major developments included detailed DeltaQ analysis of network topologies, extensive BLS cryptography benchmarking, and improvements to both simulations. The team also explored succinct schemes for BLS key registration and conducted a detailed certificate performance analysis. Both Haskell and Rust simulations received substantial updates to improve visualization and support more realistic testing conditions.</p>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="deltaq-analysis">DeltaQ analysis<a class="hash-link" aria-label="Direct link to DeltaQ analysis" title="Direct link to DeltaQ analysis" href="https://leios.cardano-scaling.org/news/2025/02/10/weekly-progress-summary#deltaq-analysis">​</a></h2>
-<ul>
-<li>Enhanced the <code>topology-checker</code> with ΔQSD analysis capabilities:<!-- -->
-<ul>
-<li>Extracts inter-node latencies from given topologies</li>
-<li>Classifies latencies into near/far components</li>
-<li>Builds parameterized ΔQ models</li>
-<li>Outputs fitted models in <code>delta_q</code> web app syntax</li>
-</ul>
-</li>
-<li>Key findings from topology analysis:<!-- -->
-<ul>
-<li>Clear distinction between near/far components in examined topologies</li>
-<li>Unexpectedly high hop counts in latency-weighted Dijkstra paths:<!-- -->
-<ul>
-<li>Min 4-5, max 8 for topology - 100</li>
-<li>Min 8, max 20 for 'realistic' topology</li>
-</ul>
-</li>
-<li>Model fitting achieved rough shape matching but showed significant deviations at low latencies</li>
-<li>Resource usage tracking goals remain unmet due to complexity in understanding load multiplication factors.</li>
-</ul>
-</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="bls-cryptography">BLS cryptography<a class="hash-link" aria-label="Direct link to BLS cryptography" title="Direct link to BLS cryptography" href="https://leios.cardano-scaling.org/news/2025/02/10/weekly-progress-summary#bls-cryptography">​</a></h2>
-<ul>
-<li>Completed comprehensive benchmarking of certificate operations:<!-- -->
-<ul>
-<li>Detailed performance analysis across committee sizes (500-1000 seats)</li>
-<li>Certificate generation: 63.4ms - 92.5ms</li>
-<li>Certificate verification: 104.8ms - 144.9ms</li>
-<li>Certificate weighing: ~12ms consistently</li>
-</ul>
-</li>
-<li>Explored succinct schemes for key registration:<!-- -->
-<ul>
-<li>Proposed 90-day key evolution with 124-byte KZG commitments</li>
-<li>Analyzed message sizes for key opening (316 bytes per pool)</li>
-<li>Investigated SNARK-based alternatives for proof of possession</li>
-</ul>
-</li>
-<li>Added BLS crypto to the CI pipeline with automated testing</li>
-<li>Documented parallelization strategies for certificate operations.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="formal-methods">Formal methods<a class="hash-link" aria-label="Direct link to Formal methods" title="Direct link to Formal methods" href="https://leios.cardano-scaling.org/news/2025/02/10/weekly-progress-summary#formal-methods">​</a></h2>
-<ul>
-<li>Added a conformance testing client for the executable Short Leios specification</li>
-<li>Successfully merged the executable specification for Simplified Leios into main.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="haskell-simulation">Haskell simulation<a class="hash-link" aria-label="Direct link to Haskell simulation" title="Direct link to Haskell simulation" href="https://leios.cardano-scaling.org/news/2025/02/10/weekly-progress-summary#haskell-simulation">​</a></h2>
-<ul>
-<li>Updated configuration defaults for block sizes and timings</li>
-<li>Added support for idealized simulation conditions:<!-- -->
-<ul>
-<li>Single-peer block body requests</li>
-<li>TCP congestion window modeling</li>
-<li>Mini-protocol multiplexing</li>
-<li>Unlimited bandwidth links support</li>
-</ul>
-</li>
-<li>Enhanced simulation output and analysis:<!-- -->
-<ul>
-<li>Added raw field for accumulated data</li>
-<li>Implemented block diffusion CDF extraction</li>
-<li>Created multi-CDF plotting capabilities.</li>
-</ul>
-</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation">Rust simulation<a class="hash-link" aria-label="Direct link to Rust simulation" title="Direct link to Rust simulation" href="https://leios.cardano-scaling.org/news/2025/02/10/weekly-progress-summary#rust-simulation">​</a></h2>
-<ul>
-<li>Enhanced visualization capabilities:<!-- -->
-<ul>
-<li>Added block size breakdown display</li>
-<li>Implemented total bytes sent/received tracking</li>
-<li>Added total TX count and CPU time metrics</li>
-</ul>
-</li>
-<li>Improved event handling:<!-- -->
-<ul>
-<li>Updated to standard timestamp format (seconds)</li>
-<li>Enhanced CPU task event structure</li>
-<li>Added CBOR output support</li>
-</ul>
-</li>
-<li>Added support for multiple strategies:<!-- -->
-<ul>
-<li>Implemented <code>ib-diffusion-strategy</code> (freshest-first, oldest-first, peer-order)</li>
-<li>Added <code>relay-strategy</code> affecting TXs, IBs, EBs, votes, and RBs</li>
-<li>Enabled unlimited EB and vote bundle downloads from peers.</li>
-</ul>
-</li>
-</ul>]]></content>
-        <author>
-            <name>William Wolff</name>
-            <uri>https://github.com/will-break-it</uri>
-        </author>
-        <category label="progress" term="progress"/>
-        <category label="update" term="update"/>
-        <category label="weekly" term="weekly"/>
-        <category label="deltaq" term="deltaq"/>
-        <category label="topology" term="topology"/>
-        <category label="analysis" term="analysis"/>
-        <category label="cryptography" term="cryptography"/>
-        <category label="bls" term="bls"/>
-        <category label="benchmarks" term="benchmarks"/>
-        <category label="formal-methods" term="formal-methods"/>
-        <category label="haskell-simulation" term="haskell-simulation"/>
-        <category label="rust-simulation" term="rust-simulation"/>
     </entry>
 </feed>
