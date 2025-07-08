@@ -1,5 +1,24 @@
 # Leios logbook
 
+## 2025-07-08
+
+### Small tx experiment
+
+Here are the findings from the completed small-transaction, high-throughput experiment.
+
+- 1000 tx/s with 300 B/tx is feasible in Leios variants
+- Time vs space tradeoff
+    - `full-with-ib-references` uses space more efficiently than `full-without-ibs`
+    - `full-without-ibs` has shorter transaction lifecycle than `full-with-ib-references`
+- `full-without-ib` loses some transactions, likely due to the aggressive pruning of the memory pool
+- 2 CPU cores are sufficient
+- Network usage is modest
+
+Supporting material:
+
+- Slides: [analysis/sims/2025w28/ReadMe.pdf](analysis/sims/2025w28/ReadMe.pdf)
+- Juypter notebook: [analysis/sims/2025w28/analysis.ipynb](analysis/sims/2025w28/analysis.ipynb)
+
 ## 2025-07-04
 
 ### 1000 TPS experiment
