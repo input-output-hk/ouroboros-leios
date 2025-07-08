@@ -13,18 +13,18 @@
             <link>https://leios.cardano-scaling.org/news/2025/07/01/weekly-progress-summary</link>
             <guid>https://leios.cardano-scaling.org/news/2025/07/01/weekly-progress-summary</guid>
             <pubDate>Tue, 01 Jul 2025 00:00:00 GMT</pubDate>
-            <description><![CDATA[This week, the Leios team achieved a significant milestone by successfully demonstrating protocol viability at 1,000 TPS, completed comprehensive attack surface analysis, and made substantial improvements to simulation and verification tools.]]></description>
-            <content:encoded><![CDATA[<p>This week, the Leios team achieved a significant milestone by successfully demonstrating protocol viability at 1,000 TPS, completed comprehensive attack surface analysis, and made substantial improvements to simulation and verification tools.</p>
+            <description><![CDATA[This week, the Leios team achieved a significant milestone by successfully demonstrating protocol viability at 1,000 TPS. They also completed a comprehensive attack surface analysis and made substantial improvements to simulation and verification tools.]]></description>
+            <content:encoded><![CDATA[<p>This week, the Leios team achieved a significant milestone by successfully demonstrating protocol viability at 1,000 TPS. They also completed a comprehensive attack surface analysis and made substantial improvements to simulation and verification tools.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="high-throughput-demonstration">High-throughput demonstration<a class="hash-link" aria-label="Direct link to High-throughput demonstration" title="Direct link to High-throughput demonstration" href="https://leios.cardano-scaling.org/news/2025/07/01/weekly-progress-summary#high-throughput-demonstration">​</a></h2>
 <ul>
 <li>Successfully completed a 1,000 TPS experiment using basic 300-byte non-Plutus transactions</li>
 <li>Demonstrated the viability of Leios protocol operation at extremely high throughput levels</li>
 <li>Validated protocol performance under stress conditions significantly beyond current Cardano capacity</li>
-<li>Documented detailed findings in the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w27/analysis.ipynb" target="_blank" rel="noopener noreferrer">1000 TPS analysis</a>.</li>
+<li>Documented detailed findings in the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w27/analysis.ipynb" target="_blank" rel="noopener noreferrer">1,000 TPS analysis</a>.</li>
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="security-analysis">Security analysis<a class="hash-link" aria-label="Direct link to Security analysis" title="Direct link to Security analysis" href="https://leios.cardano-scaling.org/news/2025/07/01/weekly-progress-summary#security-analysis">​</a></h2>
 <ul>
-<li>Completed comprehensive attack surface analysis for the second technical report</li>
+<li>Completed a comprehensive attack surface analysis for the second technical report</li>
 <li>Defined terminology and taxonomy for potential Leios attack vectors</li>
 <li>Categorized major attack types and their potential impacts on protocol security</li>
 <li>Enhanced understanding of protocol vulnerabilities and mitigation strategies.</li>
@@ -46,9 +46,9 @@
 <ul>
 <li>Intensified efforts to converge on a specific Leios variant for the Cardano Improvement Proposal (CIP)</li>
 <li>Applied systematic evaluation methodology to rank protocol candidates from multiple angles</li>
-<li>Evaluated efficiency metrics including temporal efficiency versus storage optimization trade-offs</li>
+<li>Evaluated efficiency metrics, including temporal efficiency versus storage optimization trade-offs</li>
 <li>Assessed attack surface and security vectors across different protocol variants</li>
-<li>Analyzed utility factors including quality of service, developer friendliness, user experience, and downstream ecosystem impacts</li>
+<li>Analyzed utility factors, including quality of service, developer friendliness, user experience, and downstream ecosystem impacts</li>
 <li>Focused on eliminating candidates through evidence-based assessment of valuable protocol characteristics.</li>
 </ul>]]></content:encoded>
             <category>progress</category>
