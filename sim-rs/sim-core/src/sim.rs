@@ -1,8 +1,7 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use netsim_async::HasBytesSize;
-use node::Node;
 use rand::RngCore;
 use rand_chacha::{ChaChaRng, rand_core::SeedableRng};
 use slot::SlotWitness;
@@ -12,26 +11,32 @@ use tx::TransactionProducer;
 
 use crate::{
     clock::ClockCoordinator,
-    config::SimConfiguration,
+    config::{CpuTimeConfig, NodeId, SimConfiguration},
     events::EventTracker,
     model::{
         Block, BlockId, EndorserBlock, EndorserBlockId, InputBlock, InputBlockHeader, InputBlockId,
         Transaction, TransactionId, VoteBundle, VoteBundleId,
     },
     network::Network,
+    sim::{driver::NodeDriver, leios::LeiosNode},
 };
 
 mod cpu;
-mod node;
+mod driver;
+mod leios;
 mod slot;
 mod tx;
+
+enum NodeList {
+    Leios(Vec<NodeDriver<LeiosNode>>),
+}
 
 pub struct Simulation {
     clock_coordinator: ClockCoordinator,
     network: Network<MiniProtocol, SimulationMessage>,
     tx_producer: TransactionProducer,
     slot_witness: SlotWitness,
-    nodes: Vec<Node>,
+    nodes: NodeList,
 }
 
 impl Simulation {
@@ -47,7 +52,6 @@ impl Simulation {
         let mut network = Network::new(clock.clone());
 
         let mut rng = ChaChaRng::seed_from_u64(config.seed);
-        let mut nodes = vec![];
         let mut node_tx_sinks = HashMap::new();
         for link_config in config.links.iter() {
             network.set_edge_policy(
@@ -57,24 +61,35 @@ impl Simulation {
                 link_config.bandwidth_bps,
             )?;
         }
-        for node_config in &config.nodes {
-            let id = node_config.id;
-            let (msg_sink, msg_source) = network.open(id).context("could not open socket")?;
-            let (tx_sink, tx_source) = mpsc::unbounded_channel();
-            node_tx_sinks.insert(id, tx_sink);
-            let node = Node::new(
-                node_config,
-                config.clone(),
-                total_stake,
-                msg_source,
-                msg_sink,
-                tx_source,
-                tracker.clone(),
-                ChaChaRng::seed_from_u64(rng.next_u64()),
-                clock.barrier(),
-            );
-            nodes.push(node);
-        }
+
+        // TODO: remove old impl completely
+        let nodes = {
+            let mut nodes = vec![];
+            for node_config in &config.nodes {
+                let id = node_config.id;
+                let (tx_sink, tx_source) = mpsc::unbounded_channel();
+                node_tx_sinks.insert(id, tx_sink);
+                let leios = LeiosNode::new(
+                    node_config,
+                    config.clone(),
+                    total_stake,
+                    tracker.clone(),
+                    ChaChaRng::seed_from_u64(rng.next_u64()),
+                    clock.clone(),
+                );
+                let driver = NodeDriver::new(
+                    leios,
+                    node_config,
+                    config.clone(),
+                    &mut network,
+                    tx_source,
+                    tracker.clone(),
+                    clock.barrier(),
+                );
+                nodes.push(driver);
+            }
+            NodeList::Leios(nodes)
+        };
         let tx_producer = TransactionProducer::new(
             ChaChaRng::seed_from_u64(rng.next_u64()),
             clock.barrier(),
@@ -97,8 +112,12 @@ impl Simulation {
     pub async fn run(&mut self, token: CancellationToken) -> Result<()> {
         let mut set = JoinSet::new();
 
-        for node in self.nodes.drain(..) {
-            set.spawn(node.run());
+        match &mut self.nodes {
+            NodeList::Leios(nodes) => {
+                for node in nodes.drain(..) {
+                    set.spawn(node.run());
+                }
+            }
         }
 
         select! {
@@ -220,4 +239,43 @@ pub enum MiniProtocol {
     IB,
     EB,
     Vote,
+}
+
+trait CpuTask {
+    fn name(&self) -> String;
+    fn extra(&self) -> String;
+    fn times(&self, config: &CpuTimeConfig) -> Vec<Duration>;
+}
+
+struct EventResult<Task: CpuTask> {
+    messages: Vec<(NodeId, SimulationMessage)>,
+    tasks: Vec<Task>,
+}
+
+impl<Task: CpuTask> Default for EventResult<Task> {
+    fn default() -> Self {
+        Self {
+            messages: vec![],
+            tasks: vec![],
+        }
+    }
+}
+
+impl<Task: CpuTask> EventResult<Task> {
+    pub fn send_to(&mut self, to: NodeId, msg: SimulationMessage) {
+        self.messages.push((to, msg));
+    }
+
+    pub fn schedule_cpu_task(&mut self, task: Task) {
+        self.tasks.push(task);
+    }
+}
+
+trait NodeImpl {
+    type Task: CpuTask;
+
+    fn handle_new_slot(&mut self, slot: u64) -> EventResult<Self::Task>;
+    fn handle_new_tx(&mut self, tx: Arc<Transaction>) -> EventResult<Self::Task>;
+    fn handle_message(&mut self, from: NodeId, msg: SimulationMessage) -> EventResult<Self::Task>;
+    fn handle_cpu_task(&mut self, task: Self::Task) -> EventResult<Self::Task>;
 }
