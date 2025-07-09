@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use netsim_async::HasBytesSize;
 use node::Node;
 use rand::RngCore;
-use rand_chacha::{rand_core::SeedableRng, ChaChaRng};
+use rand_chacha::{ChaChaRng, rand_core::SeedableRng};
 use slot::SlotWitness;
 use tokio::{select, sync::mpsc, task::JoinSet};
 use tokio_util::sync::CancellationToken;

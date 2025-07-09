@@ -1,6 +1,6 @@
 use std::{
     cmp::Reverse,
-    collections::{btree_map::Entry, BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque, btree_map::Entry},
     hash::Hash,
     sync::Arc,
     time::Duration,
@@ -9,7 +9,7 @@ use std::{
 use anyhow::Result;
 use netsim_async::HasBytesSize as _;
 use priority_queue::PriorityQueue;
-use rand::{seq::SliceRandom as _, Rng as _};
+use rand::{Rng as _, seq::SliceRandom as _};
 use rand_chacha::ChaChaRng;
 use tokio::{select, sync::mpsc};
 use tracing::{info, trace};
@@ -30,8 +30,8 @@ use crate::{
 };
 
 use super::{
-    cpu::{CpuTaskQueue, Subtask},
     MiniProtocol, SimulationMessage,
+    cpu::{CpuTaskQueue, Subtask},
 };
 
 enum TransactionView {

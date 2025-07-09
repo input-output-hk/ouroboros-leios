@@ -2,7 +2,7 @@ use std::{
     cmp::Reverse,
     future::Future,
     pin::Pin,
-    sync::{atomic::AtomicUsize, Arc},
+    sync::{Arc, atomic::AtomicUsize},
     task::{Context, Poll},
     time::Duration,
 };

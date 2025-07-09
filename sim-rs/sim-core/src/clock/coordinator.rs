@@ -1,15 +1,15 @@
 use std::{
     collections::BTreeMap,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     },
     time::Duration,
 };
 
 use tokio::sync::{mpsc, oneshot};
 
-use super::{timestamp::AtomicTimestamp, Clock, Timestamp};
+use super::{Clock, Timestamp, timestamp::AtomicTimestamp};
 
 pub struct ClockCoordinator {
     timestamp_resolution: Duration,
@@ -171,7 +171,7 @@ mod tests {
         {
             let wait1 = actor1.wait_until(t1);
             assert_eq!(poll!(wait1), Poll::Pending); // the wait is pending
-                                                     // and now it goes out of scope and gets dropped
+            // and now it goes out of scope and gets dropped
         }
         assert_eq!(poll!(&mut run_future), Poll::Pending); // try advancing time
         assert_eq!(poll!(&mut run_future), Poll::Pending); // try advancing time

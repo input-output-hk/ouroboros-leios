@@ -6,7 +6,7 @@ use async_compression::tokio::write::GzipEncoder;
 use average::Variance;
 use itertools::Itertools as _;
 use liveness::LivenessMonitor;
-use pretty_bytes_rust::{pretty_bytes, PrettyBytesOptions};
+use pretty_bytes_rust::{PrettyBytesOptions, pretty_bytes};
 use serde::Serialize;
 use sim_core::{
     clock::Timestamp,

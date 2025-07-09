@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-use netsim_core::geo::{latency_between_locations, Location};
+use netsim_core::geo::{Location, latency_between_locations};
 use rand::Rng;
 use sim_core::config::{RawLinkInfo, RawNode, RawNodeLocation, RawTopology};
 use statrs::distribution::{Beta, ContinuousCDF as _};

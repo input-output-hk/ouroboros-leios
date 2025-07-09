@@ -1,11 +1,11 @@
 use std::{
     collections::{BTreeMap, HashSet, VecDeque},
     fmt::Display,
-    sync::{atomic::AtomicU64, Arc},
+    sync::{Arc, atomic::AtomicU64},
     time::Duration,
 };
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
 use serde::{Deserialize, Serialize};
 
 use crate::{

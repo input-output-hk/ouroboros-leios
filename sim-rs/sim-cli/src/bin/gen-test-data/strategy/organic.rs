@@ -1,12 +1,12 @@
 use std::time::Duration;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Parser;
-use rand::{seq::SliceRandom, Rng};
+use rand::{Rng, seq::SliceRandom};
 
 use crate::strategy::utils::GraphBuilder;
 
-use super::utils::{distribute_stake, RawNodeConfig, Weight};
+use super::utils::{RawNodeConfig, Weight, distribute_stake};
 
 #[derive(Debug, Parser)]
 pub struct OrganicArgs {
@@ -160,7 +160,7 @@ fn nearby<R: Rng>(rng: &mut R, location: (f64, f64), dist: f64) -> (f64, f64) {
 mod tests {
     use sim_core::config::Topology;
 
-    use super::{organic, OrganicArgs};
+    use super::{OrganicArgs, organic};
 
     #[test]
     fn should_generate_valid_graph() {

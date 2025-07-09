@@ -360,7 +360,7 @@ impl EventTracker {
         duration: Duration,
     ) {
         let task = self.to_task(task_id);
-        let id = format!("{}-{}", task, subtask_id);
+        let id = format!("{task}-{subtask_id}");
         self.send(Event::Cpu {
             node: task.node.to_string(),
             task,

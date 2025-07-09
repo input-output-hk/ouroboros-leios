@@ -4,8 +4,8 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use sim_core::config::Topology;
 use strategy::{
-    globe, organic, random_graph, simplified, GlobeArgs, OrganicArgs, RandomGraphArgs,
-    SimplifiedArgs,
+    GlobeArgs, OrganicArgs, RandomGraphArgs, SimplifiedArgs, globe, organic, random_graph,
+    simplified,
 };
 
 mod strategy;

@@ -3,12 +3,12 @@ use std::{
     path::PathBuf,
 };
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Parser;
-use rand::{seq::IndexedRandom as _, Rng as _};
+use rand::{Rng as _, seq::IndexedRandom as _};
 use serde::Deserialize;
 
-use crate::strategy::utils::{distribute_stake, GraphBuilder, RawNodeConfig, Weight};
+use crate::strategy::utils::{GraphBuilder, RawNodeConfig, Weight, distribute_stake};
 
 #[derive(Debug, Parser)]
 pub struct GlobeArgs {
@@ -173,7 +173,7 @@ fn track_connections(connected: &mut BTreeSet<usize>, graph: &GraphBuilder, from
 mod tests {
     use sim_core::config::Topology;
 
-    use super::{globe, GlobeArgs};
+    use super::{GlobeArgs, globe};
 
     #[test]
     fn should_generate_valid_graph() {
