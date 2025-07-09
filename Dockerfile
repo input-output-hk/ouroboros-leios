@@ -20,7 +20,7 @@ COPY data/simulation/config.default.yaml /usr/local/share/leios/config.default.y
 COPY data/simulation/topo-default-100.yaml /usr/local/share/leios/topology.default.yaml
 
 # Build Rust simulation
-FROM rust:1.82-slim AS rs-builder
+FROM rust:1.88-slim AS rs-builder
 WORKDIR /usr/src/sim-rs
 COPY sim-rs/ .
 COPY /data/simulation/config.default.yaml parameters/
