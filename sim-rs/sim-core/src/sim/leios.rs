@@ -23,14 +23,98 @@ use crate::{
         Block, BlockId, Endorsement, EndorserBlock, EndorserBlockId, InputBlock, InputBlockHeader,
         InputBlockId, NoVoteReason, Transaction, TransactionId, VoteBundle, VoteBundleId,
     },
-    sim::{CpuTask, NodeImpl},
+    sim::{MiniProtocol, NodeImpl, SimCpuTask, SimMessage},
 };
-
-use super::SimulationMessage;
 
 enum TransactionView {
     Pending,
     Received(Arc<Transaction>),
+}
+
+#[derive(Clone, Debug)]
+pub enum SimulationMessage {
+    // tx "propagation"
+    AnnounceTx(TransactionId),
+    RequestTx(TransactionId),
+    Tx(Arc<Transaction>),
+    // praos block propagation
+    RollForward(BlockId),
+    RequestBlock(BlockId),
+    Block(Arc<Block>),
+    // IB header propagation
+    AnnounceIBHeader(InputBlockId),
+    RequestIBHeader(InputBlockId),
+    IBHeader(InputBlockHeader, bool /* has_body */),
+    // IB transmission
+    AnnounceIB(InputBlockId),
+    RequestIB(InputBlockId),
+    IB(Arc<InputBlock>),
+    // EB propagation
+    AnnounceEB(EndorserBlockId),
+    RequestEB(EndorserBlockId),
+    EB(Arc<EndorserBlock>),
+    // Get out the vote
+    AnnounceVotes(VoteBundleId),
+    RequestVotes(VoteBundleId),
+    Votes(Arc<VoteBundle>),
+}
+
+impl SimMessage for SimulationMessage {
+    fn protocol(&self) -> MiniProtocol {
+        match self {
+            Self::AnnounceTx(_) => MiniProtocol::Tx,
+            Self::RequestTx(_) => MiniProtocol::Tx,
+            Self::Tx(_) => MiniProtocol::Tx,
+
+            Self::RollForward(_) => MiniProtocol::Block,
+            Self::RequestBlock(_) => MiniProtocol::Block,
+            Self::Block(_) => MiniProtocol::Block,
+
+            Self::AnnounceIBHeader(_) => MiniProtocol::IB,
+            Self::RequestIBHeader(_) => MiniProtocol::IB,
+            Self::IBHeader(_, _) => MiniProtocol::IB,
+
+            Self::AnnounceIB(_) => MiniProtocol::IB,
+            Self::RequestIB(_) => MiniProtocol::IB,
+            Self::IB(_) => MiniProtocol::IB,
+
+            Self::AnnounceEB(_) => MiniProtocol::EB,
+            Self::RequestEB(_) => MiniProtocol::EB,
+            Self::EB(_) => MiniProtocol::EB,
+
+            Self::AnnounceVotes(_) => MiniProtocol::Vote,
+            Self::RequestVotes(_) => MiniProtocol::Vote,
+            Self::Votes(_) => MiniProtocol::Vote,
+        }
+    }
+
+    fn bytes_size(&self) -> u64 {
+        match self {
+            Self::AnnounceTx(_) => 8,
+            Self::RequestTx(_) => 8,
+            Self::Tx(tx) => tx.bytes,
+
+            Self::RollForward(_) => 8,
+            Self::RequestBlock(_) => 8,
+            Self::Block(block) => block.bytes(),
+
+            Self::AnnounceIBHeader(_) => 8,
+            Self::RequestIBHeader(_) => 8,
+            Self::IBHeader(header, _) => header.bytes,
+
+            Self::AnnounceIB(_) => 8,
+            Self::RequestIB(_) => 8,
+            Self::IB(ib) => ib.bytes(),
+
+            Self::AnnounceEB(_) => 8,
+            Self::RequestEB(_) => 8,
+            Self::EB(eb) => eb.bytes,
+
+            Self::AnnounceVotes(_) => 8,
+            Self::RequestVotes(_) => 8,
+            Self::Votes(v) => v.bytes,
+        }
+    }
 }
 
 pub enum Task {
@@ -56,7 +140,7 @@ pub enum Task {
     VTBundleValidated(NodeId, Arc<VoteBundle>),
 }
 
-impl CpuTask for Task {
+impl SimCpuTask for Task {
     fn name(&self) -> String {
         match self {
             Self::TransactionValidated(_, _) => "ValTX",
@@ -302,10 +386,11 @@ impl PeerInputBlockRequests {
     }
 }
 
-type EventResult = super::EventResult<Task>;
+type EventResult = super::EventResult<SimulationMessage, Task>;
 
 impl NodeImpl for LeiosNode {
     type Task = Task;
+    type Message = SimulationMessage;
 
     fn handle_new_slot(&mut self, slot: u64) -> EventResult {
         if slot % self.sim_config.stage_length == 0 {
@@ -338,11 +423,7 @@ impl NodeImpl for LeiosNode {
         std::mem::take(&mut self.queued)
     }
 
-    fn handle_message(
-        &mut self,
-        from: NodeId,
-        msg: SimulationMessage,
-    ) -> super::EventResult<Self::Task> {
+    fn handle_message(&mut self, from: NodeId, msg: SimulationMessage) -> EventResult {
         match msg {
             // TX propagation
             SimulationMessage::AnnounceTx(id) => {

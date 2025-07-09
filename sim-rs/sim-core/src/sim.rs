@@ -1,7 +1,6 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use anyhow::Result;
-use netsim_async::HasBytesSize;
 use rand::RngCore;
 use rand_chacha::{ChaChaRng, rand_core::SeedableRng};
 use slot::SlotWitness;
@@ -13,10 +12,7 @@ use crate::{
     clock::ClockCoordinator,
     config::{CpuTimeConfig, NodeId, SimConfiguration},
     events::EventTracker,
-    model::{
-        Block, BlockId, EndorserBlock, EndorserBlockId, InputBlock, InputBlockHeader, InputBlockId,
-        Transaction, TransactionId, VoteBundle, VoteBundleId,
-    },
+    model::Transaction,
     network::Network,
     sim::{driver::NodeDriver, leios::LeiosNode},
 };
@@ -27,16 +23,44 @@ mod leios;
 mod slot;
 mod tx;
 
-enum NodeList {
+enum NetworkWrapper {
+    Leios(Network<MiniProtocol, <LeiosNode as NodeImpl>::Message>),
+}
+impl NetworkWrapper {
+    async fn run(&mut self) -> Result<()> {
+        match self {
+            Self::Leios(network) => network.run().await,
+        }
+    }
+
+    fn shutdown(self) -> Result<()> {
+        match self {
+            Self::Leios(network) => network.shutdown(),
+        }
+    }
+}
+
+enum NodeListWrapper {
     Leios(Vec<NodeDriver<LeiosNode>>),
+}
+impl NodeListWrapper {
+    fn run_all(&mut self, set: &mut JoinSet<Result<()>>) {
+        match self {
+            Self::Leios(nodes) => {
+                for node in nodes.drain(..) {
+                    set.spawn(node.run());
+                }
+            }
+        }
+    }
 }
 
 pub struct Simulation {
     clock_coordinator: ClockCoordinator,
-    network: Network<MiniProtocol, SimulationMessage>,
+    network: NetworkWrapper,
     tx_producer: TransactionProducer,
     slot_witness: SlotWitness,
-    nodes: NodeList,
+    nodes: NodeListWrapper,
 }
 
 impl Simulation {
@@ -49,21 +73,20 @@ impl Simulation {
         let config = Arc::new(config);
         let total_stake = config.nodes.iter().map(|p| p.stake).sum();
 
-        let mut network = Network::new(clock.clone());
-
         let mut rng = ChaChaRng::seed_from_u64(config.seed);
         let mut node_tx_sinks = HashMap::new();
-        for link_config in config.links.iter() {
-            network.set_edge_policy(
-                link_config.nodes.0,
-                link_config.nodes.1,
-                link_config.latency,
-                link_config.bandwidth_bps,
-            )?;
-        }
-
         // TODO: remove old impl completely
-        let nodes = {
+        let (network, nodes) = {
+            let mut network = Network::new(clock.clone());
+
+            for link_config in config.links.iter() {
+                network.set_edge_policy(
+                    link_config.nodes.0,
+                    link_config.nodes.1,
+                    link_config.latency,
+                    link_config.bandwidth_bps,
+                )?;
+            }
             let mut nodes = vec![];
             for node_config in &config.nodes {
                 let id = node_config.id;
@@ -88,8 +111,12 @@ impl Simulation {
                 );
                 nodes.push(driver);
             }
-            NodeList::Leios(nodes)
+            (
+                NetworkWrapper::Leios(network),
+                NodeListWrapper::Leios(nodes),
+            )
         };
+
         let tx_producer = TransactionProducer::new(
             ChaChaRng::seed_from_u64(rng.next_u64()),
             clock.barrier(),
@@ -112,13 +139,7 @@ impl Simulation {
     pub async fn run(&mut self, token: CancellationToken) -> Result<()> {
         let mut set = JoinSet::new();
 
-        match &mut self.nodes {
-            NodeList::Leios(nodes) => {
-                for node in nodes.drain(..) {
-                    set.spawn(node.run());
-                }
-            }
-        }
+        self.nodes.run_all(&mut set);
 
         select! {
             biased;
@@ -144,92 +165,9 @@ impl Simulation {
     }
 }
 
-#[derive(Clone, Debug)]
-enum SimulationMessage {
-    // tx "propagation"
-    AnnounceTx(TransactionId),
-    RequestTx(TransactionId),
-    Tx(Arc<Transaction>),
-    // praos block propagation
-    RollForward(BlockId),
-    RequestBlock(BlockId),
-    Block(Arc<Block>),
-    // IB header propagation
-    AnnounceIBHeader(InputBlockId),
-    RequestIBHeader(InputBlockId),
-    IBHeader(InputBlockHeader, bool /* has_body */),
-    // IB transmission
-    AnnounceIB(InputBlockId),
-    RequestIB(InputBlockId),
-    IB(Arc<InputBlock>),
-    // EB propagation
-    AnnounceEB(EndorserBlockId),
-    RequestEB(EndorserBlockId),
-    EB(Arc<EndorserBlock>),
-    // Get out the vote
-    AnnounceVotes(VoteBundleId),
-    RequestVotes(VoteBundleId),
-    Votes(Arc<VoteBundle>),
-}
-
-impl HasBytesSize for SimulationMessage {
-    fn bytes_size(&self) -> u64 {
-        match self {
-            Self::AnnounceTx(_) => 8,
-            Self::RequestTx(_) => 8,
-            Self::Tx(tx) => tx.bytes,
-
-            Self::RollForward(_) => 8,
-            Self::RequestBlock(_) => 8,
-            Self::Block(block) => block.bytes(),
-
-            Self::AnnounceIBHeader(_) => 8,
-            Self::RequestIBHeader(_) => 8,
-            Self::IBHeader(header, _) => header.bytes,
-
-            Self::AnnounceIB(_) => 8,
-            Self::RequestIB(_) => 8,
-            Self::IB(ib) => ib.bytes(),
-
-            Self::AnnounceEB(_) => 8,
-            Self::RequestEB(_) => 8,
-            Self::EB(eb) => eb.bytes,
-
-            Self::AnnounceVotes(_) => 8,
-            Self::RequestVotes(_) => 8,
-            Self::Votes(v) => v.bytes,
-        }
-    }
-}
-
-impl SimulationMessage {
-    pub fn protocol(&self) -> MiniProtocol {
-        match self {
-            Self::AnnounceTx(_) => MiniProtocol::Tx,
-            Self::RequestTx(_) => MiniProtocol::Tx,
-            Self::Tx(_) => MiniProtocol::Tx,
-
-            Self::RollForward(_) => MiniProtocol::Block,
-            Self::RequestBlock(_) => MiniProtocol::Block,
-            Self::Block(_) => MiniProtocol::Block,
-
-            Self::AnnounceIBHeader(_) => MiniProtocol::IB,
-            Self::RequestIBHeader(_) => MiniProtocol::IB,
-            Self::IBHeader(_, _) => MiniProtocol::IB,
-
-            Self::AnnounceIB(_) => MiniProtocol::IB,
-            Self::RequestIB(_) => MiniProtocol::IB,
-            Self::IB(_) => MiniProtocol::IB,
-
-            Self::AnnounceEB(_) => MiniProtocol::EB,
-            Self::RequestEB(_) => MiniProtocol::EB,
-            Self::EB(_) => MiniProtocol::EB,
-
-            Self::AnnounceVotes(_) => MiniProtocol::Vote,
-            Self::RequestVotes(_) => MiniProtocol::Vote,
-            Self::Votes(_) => MiniProtocol::Vote,
-        }
-    }
+trait SimMessage: Clone + std::fmt::Debug {
+    fn protocol(&self) -> MiniProtocol;
+    fn bytes_size(&self) -> u64;
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -241,18 +179,18 @@ pub enum MiniProtocol {
     Vote,
 }
 
-trait CpuTask {
+trait SimCpuTask {
     fn name(&self) -> String;
     fn extra(&self) -> String;
     fn times(&self, config: &CpuTimeConfig) -> Vec<Duration>;
 }
 
-struct EventResult<Task: CpuTask> {
-    messages: Vec<(NodeId, SimulationMessage)>,
+struct EventResult<Message: SimMessage, Task: SimCpuTask> {
+    messages: Vec<(NodeId, Message)>,
     tasks: Vec<Task>,
 }
 
-impl<Task: CpuTask> Default for EventResult<Task> {
+impl<Message: SimMessage, Task: SimCpuTask> Default for EventResult<Message, Task> {
     fn default() -> Self {
         Self {
             messages: vec![],
@@ -261,8 +199,8 @@ impl<Task: CpuTask> Default for EventResult<Task> {
     }
 }
 
-impl<Task: CpuTask> EventResult<Task> {
-    pub fn send_to(&mut self, to: NodeId, msg: SimulationMessage) {
+impl<Message: SimMessage, Task: SimCpuTask> EventResult<Message, Task> {
+    pub fn send_to(&mut self, to: NodeId, msg: Message) {
         self.messages.push((to, msg));
     }
 
@@ -272,10 +210,15 @@ impl<Task: CpuTask> EventResult<Task> {
 }
 
 trait NodeImpl {
-    type Task: CpuTask;
+    type Message: SimMessage;
+    type Task: SimCpuTask;
 
-    fn handle_new_slot(&mut self, slot: u64) -> EventResult<Self::Task>;
-    fn handle_new_tx(&mut self, tx: Arc<Transaction>) -> EventResult<Self::Task>;
-    fn handle_message(&mut self, from: NodeId, msg: SimulationMessage) -> EventResult<Self::Task>;
-    fn handle_cpu_task(&mut self, task: Self::Task) -> EventResult<Self::Task>;
+    fn handle_new_slot(&mut self, slot: u64) -> EventResult<Self::Message, Self::Task>;
+    fn handle_new_tx(&mut self, tx: Arc<Transaction>) -> EventResult<Self::Message, Self::Task>;
+    fn handle_message(
+        &mut self,
+        from: NodeId,
+        msg: Self::Message,
+    ) -> EventResult<Self::Message, Self::Task>;
+    fn handle_cpu_task(&mut self, task: Self::Task) -> EventResult<Self::Message, Self::Task>;
 }

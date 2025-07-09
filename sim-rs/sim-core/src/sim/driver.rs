@@ -1,6 +1,5 @@
 use std::{collections::BinaryHeap, sync::Arc, time::Duration};
 
-use netsim_async::HasBytesSize as _;
 use tokio::{select, sync::mpsc};
 use tracing::trace;
 
@@ -11,12 +10,12 @@ use crate::{
     model::{CpuTaskId, Transaction},
     network::{Network, NetworkSink, NetworkSource},
     sim::{
-        CpuTask, EventResult, MiniProtocol, NodeImpl, SimulationMessage,
+        EventResult, MiniProtocol, NodeImpl, SimCpuTask, SimMessage as _,
         cpu::{CpuTaskQueue, Subtask},
     },
 };
 
-struct CpuTaskWrapper<Task: CpuTask> {
+struct CpuTaskWrapper<Task: SimCpuTask> {
     task_type: Task,
     start_time: Timestamp,
     cpu_time: Duration,
@@ -33,8 +32,8 @@ pub struct NodeDriver<N: NodeImpl> {
     name: String,
     trace: bool,
     sim_config: Arc<SimConfiguration>,
-    msg_source: NetworkSource<SimulationMessage>,
-    msg_sink: NetworkSink<MiniProtocol, SimulationMessage>,
+    msg_source: NetworkSource<N::Message>,
+    msg_sink: NetworkSink<MiniProtocol, N::Message>,
     tx_source: mpsc::UnboundedReceiver<Arc<Transaction>>,
     events: BinaryHeap<FutureEvent<NodeEvent>>,
     tracker: EventTracker,
@@ -47,7 +46,7 @@ impl<N: NodeImpl> NodeDriver<N> {
         node: N,
         config: &NodeConfiguration,
         sim_config: Arc<SimConfiguration>,
-        network: &mut Network<MiniProtocol, SimulationMessage>,
+        network: &mut Network<MiniProtocol, N::Message>,
         tx_source: mpsc::UnboundedReceiver<Arc<Transaction>>,
         tracker: EventTracker,
         clock: ClockBarrier,
@@ -121,7 +120,7 @@ impl<N: NodeImpl> NodeDriver<N> {
         }
     }
 
-    fn send_to(&self, to: NodeId, msg: SimulationMessage) -> anyhow::Result<()> {
+    fn send_to(&self, to: NodeId, msg: N::Message) -> anyhow::Result<()> {
         if self.trace {
             trace!(
                 "node {} sent msg of size {} to node {to}",
@@ -157,7 +156,10 @@ impl<N: NodeImpl> NodeDriver<N> {
         }
     }
 
-    fn handle_subtask_completed(&mut self, subtask: Subtask) -> Option<EventResult<N::Task>> {
+    fn handle_subtask_completed(
+        &mut self,
+        subtask: Subtask,
+    ) -> Option<EventResult<N::Message, N::Task>> {
         let task_id = CpuTaskId {
             node: self.id,
             index: subtask.task_id,
