@@ -23,7 +23,7 @@ use crate::{
         Block, BlockId, Endorsement, EndorserBlock, EndorserBlockId, InputBlock, InputBlockHeader,
         InputBlockId, NoVoteReason, Transaction, TransactionId, VoteBundle, VoteBundleId,
     },
-    sim::{MiniProtocol, NodeImpl, SimCpuTask, SimMessage},
+    sim::{MiniProtocol, NodeImpl, SimCpuTask, SimMessage, lottery},
 };
 
 enum TransactionView {
@@ -237,7 +237,6 @@ pub struct LeiosNode {
     rng: ChaChaRng,
     clock: Clock,
     stake: u64,
-    total_stake: u64,
     consumers: Vec<NodeId>,
     behaviours: NodeBehaviours,
     txs: HashMap<TransactionId, TransactionView>,
@@ -401,7 +400,6 @@ impl NodeImpl for LeiosNode {
     ) -> Self {
         let id = config.id;
         let stake = config.stake;
-        let total_stake = sim_config.total_stake;
         let consumers = config.consumers.clone();
         let behaviours = config.behaviours.clone();
 
@@ -415,7 +413,6 @@ impl NodeImpl for LeiosNode {
             rng,
             clock,
             stake,
-            total_stake,
             consumers,
             behaviours,
             txs: HashMap::new(),
@@ -557,9 +554,10 @@ impl LeiosNode {
         let mut slot_vrfs: BTreeMap<u64, Vec<u64>> = BTreeMap::new();
         // IBs are generated at the start of any slot within this stage
         for stage_slot in slot..slot + self.sim_config.stage_length {
-            let vrfs: Vec<u64> = vrf_probabilities(self.sim_config.ib_generation_probability)
-                .filter_map(|p| self.run_vrf(p))
-                .collect();
+            let vrfs: Vec<u64> =
+                lottery::vrf_probabilities(self.sim_config.ib_generation_probability)
+                    .filter_map(|p| self.run_vrf(p))
+                    .collect();
             if !vrfs.is_empty() {
                 slot_vrfs.insert(stage_slot, vrfs);
             }
@@ -592,7 +590,7 @@ impl LeiosNode {
             return;
         }
         let shards = self.find_available_eb_shards(slot);
-        for next_p in vrf_probabilities(self.sim_config.eb_generation_probability) {
+        for next_p in lottery::vrf_probabilities(self.sim_config.eb_generation_probability) {
             if let Some(vrf) = self.run_vrf(next_p) {
                 self.tracker.track_eb_lottery_won(EndorserBlockId {
                     slot,
@@ -631,7 +629,7 @@ impl LeiosNode {
             // Don't run the VT lottery before that pipeline, because there's nothing to vote on.
             return;
         }
-        let vrf_wins = vrf_probabilities(self.sim_config.vote_probability)
+        let vrf_wins = lottery::vrf_probabilities(self.sim_config.vote_probability)
             .filter_map(|f| self.run_vrf(f))
             .count();
         if vrf_wins == 0 {
@@ -1918,8 +1916,12 @@ impl LeiosNode {
 
     // Simulates the output of a VRF using this node's stake (if any).
     fn run_vrf(&mut self, success_rate: f64) -> Option<u64> {
-        let target_vrf_stake = compute_target_vrf_stake(self.stake, self.total_stake, success_rate);
-        let result = self.rng.random_range(0..self.total_stake);
+        let target_vrf_stake = lottery::compute_target_vrf_stake(
+            self.stake,
+            self.sim_config.total_stake,
+            success_rate,
+        );
+        let result = self.rng.random_range(0..self.sim_config.total_stake);
         if result < target_vrf_stake {
             Some(result)
         } else {
@@ -1930,14 +1932,4 @@ impl LeiosNode {
     fn slot_to_pipeline(&self, slot: u64) -> u64 {
         slot / self.sim_config.stage_length
     }
-}
-
-fn compute_target_vrf_stake(stake: u64, total_stake: u64, success_rate: f64) -> u64 {
-    let ratio = stake as f64 / total_stake as f64;
-    (total_stake as f64 * ratio * success_rate) as u64
-}
-
-fn vrf_probabilities(probability: f64) -> impl Iterator<Item = f64> {
-    let final_success_rate = Some(probability.fract()).filter(|f| *f > 0.0);
-    std::iter::repeat_n(1.0, probability.trunc() as usize).chain(final_success_rate)
 }

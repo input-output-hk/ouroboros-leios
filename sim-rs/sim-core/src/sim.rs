@@ -21,6 +21,7 @@ mod cpu;
 mod driver;
 mod leios;
 mod linear_leios;
+mod lottery;
 mod slot;
 mod tx;
 
