@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     sync::Arc,
     time::Duration,
 };
@@ -110,10 +110,17 @@ enum TransactionView {
 
 #[derive(Default)]
 struct NodePraosState {
+    mempool: BTreeMap<TransactionId, Arc<Transaction>>,
     peer_heads: BTreeMap<NodeId, u64>,
     blocks_seen: BTreeSet<BlockId>,
     blocks: BTreeMap<BlockId, Arc<Block>>,
     block_ids_by_slot: BTreeMap<u64, BlockId>,
+}
+
+#[derive(Clone, Default)]
+struct LedgerState {
+    spent_inputs: HashSet<u64>,
+    seen_blocks: HashSet<BlockId>,
 }
 
 pub struct LinearLeiosNode {
@@ -125,6 +132,7 @@ pub struct LinearLeiosNode {
     stake: u64,
     consumers: Vec<NodeId>,
     txs: HashMap<TransactionId, TransactionView>,
+    ledger_states: BTreeMap<BlockId, Arc<LedgerState>>,
     praos: NodePraosState,
 }
 
@@ -150,6 +158,7 @@ impl NodeImpl for LinearLeiosNode {
             stake: config.stake,
             consumers: config.consumers.clone(),
             txs: HashMap::new(),
+            ledger_states: BTreeMap::new(),
             praos: NodePraosState::default(),
         }
     }
@@ -230,7 +239,23 @@ impl LinearLeiosNode {
         {
             return;
         }
-        // TODO: mempools
+        let rb_ref = self.latest_rb_ref();
+        let ledger_state = self.resolve_ledger_state(rb_ref);
+        if ledger_state.spent_inputs.contains(&tx.input_id) {
+            // Ignoring a TX which conflicts with something already onchain
+            return;
+        }
+        if self
+            .praos
+            .mempool
+            .values()
+            .any(|mempool_tx| mempool_tx.input_id == tx.input_id)
+        {
+            // Ignoring a TX which conflicts with the current mempool contents.
+            return;
+        }
+        self.praos.mempool.insert(tx.id, tx.clone());
+
         // TODO: should send to producers instead (make configurable)
         for peer in &self.consumers {
             if *peer == from {
@@ -258,7 +283,16 @@ impl LinearLeiosNode {
                 self.tracker.track_transaction_generated(&tx, self.id);
                 transactions.push(Arc::new(tx));
             } else {
-                // TODO: fill transactions from mempool
+                let mut size = 0;
+                // Fill with as many pending transactions as can fit
+                while let Some((id, tx)) = self.praos.mempool.first_key_value() {
+                    if size + tx.bytes > self.sim_config.max_block_size {
+                        break;
+                    }
+                    size += tx.bytes;
+                    let id = *id;
+                    transactions.push(self.praos.mempool.remove(&id).unwrap());
+                }
             }
         }
 
@@ -286,7 +320,9 @@ impl LinearLeiosNode {
     }
 
     fn publish_block(&mut self, block: Arc<Block>) {
-        // TODO: remove transactions from mempool(s)
+        for tx in &block.transactions {
+            self.praos.mempool.remove(&tx.id);
+        }
         for peer in &self.consumers {
             if self
                 .praos
@@ -345,6 +381,46 @@ impl LinearLeiosNode {
 
     fn latest_rb_ref(&self) -> Option<BlockId> {
         self.praos.blocks.last_key_value().map(|(id, _)| *id)
+    }
+}
+
+// Ledger operations
+impl LinearLeiosNode {
+    fn resolve_ledger_state(&mut self, rb_ref: Option<BlockId>) -> Arc<LedgerState> {
+        let Some(block_id) = rb_ref else {
+            return Arc::new(LedgerState::default());
+        };
+        if let Some(state) = self.ledger_states.get(&block_id) {
+            return state.clone();
+        };
+
+        let mut state = self
+            .ledger_states
+            .last_key_value()
+            .map(|(_, v)| v.as_ref().clone())
+            .unwrap_or_default();
+
+        let mut block_queue = vec![block_id];
+        while let Some(block_id) = block_queue.pop() {
+            if !state.seen_blocks.insert(block_id) {
+                continue;
+            }
+            let Some(block) = self.praos.blocks.get(&block_id) else {
+                continue;
+            };
+            if let Some(parent) = block.parent {
+                block_queue.push(parent);
+            }
+            for tx in &block.transactions {
+                state.spent_inputs.insert(tx.input_id);
+            }
+
+            // TODO: account for endorser blocks
+        }
+
+        let state = Arc::new(state);
+        self.ledger_states.insert(block_id, state.clone());
+        state
     }
 }
 
