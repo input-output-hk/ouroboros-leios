@@ -1,4 +1,5 @@
-#!/usr/bin/env bash
+#!/usr/bin/env nix-shell
+#!nix-shell -i bash -p ansifilter gnugrep gnused gzip pigz
 
 set -e
 
@@ -51,3 +52,5 @@ zcat sim.log.gz \
 pigz -p 3 -9f {lifecycle,cpus,resources,receipts}.csv
 
 cat case.csv
+
+ansifilter stdout | grep -E '^ INFO (praos|leios|network): ' > summary.txt

@@ -24,7 +24,7 @@ timestamp-resolution-ms: 0.1
 ################################################################################
 
 leios-variant: full-without-ibs
-leios-stage-length-slots: 8
+leios-stage-length-slots: 5
 leios-stage-active-voting-slots: 1
 leios-vote-send-recv-stages: false
 leios-late-ib-inclusion: true
@@ -42,7 +42,7 @@ praos-fallback-enabled: false
 tx-generation-distribution:
   distribution: exp
   lambda: 0.85
-  scale: 120.000
+  scale: 1.200
 tx-size-bytes-distribution:
   distribution: log-normal
   mu: 6.833

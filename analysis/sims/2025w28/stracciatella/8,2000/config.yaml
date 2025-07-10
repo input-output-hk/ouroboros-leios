@@ -42,7 +42,7 @@ praos-fallback-enabled: false
 tx-generation-distribution:
   distribution: exp
   lambda: 0.85
-  scale: 120.000
+  scale: .600
 tx-size-bytes-distribution:
   distribution: log-normal
   mu: 6.833
