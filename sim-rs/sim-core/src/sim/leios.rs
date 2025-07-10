@@ -392,6 +392,39 @@ impl NodeImpl for LeiosNode {
     type Task = Task;
     type Message = SimulationMessage;
 
+    fn new(
+        config: &NodeConfiguration,
+        sim_config: Arc<SimConfiguration>,
+        tracker: EventTracker,
+        rng: ChaChaRng,
+        clock: Clock,
+    ) -> Self {
+        let id = config.id;
+        let stake = config.stake;
+        let total_stake = sim_config.total_stake;
+        let consumers = config.consumers.clone();
+        let behaviours = config.behaviours.clone();
+
+        Self {
+            id,
+            name: config.name.clone(),
+            trace: sim_config.trace_nodes.contains(&id),
+            sim_config,
+            queued: EventResult::default(),
+            tracker,
+            rng,
+            clock,
+            stake,
+            total_stake,
+            consumers,
+            behaviours,
+            txs: HashMap::new(),
+            ledger_states: BTreeMap::new(),
+            praos: NodePraosState::default(),
+            leios: NodeLeiosState::default(),
+        }
+    }
+
     fn handle_new_slot(&mut self, slot: u64) -> EventResult {
         if slot % self.sim_config.stage_length == 0 {
             // A new stage has begun.
@@ -516,39 +549,6 @@ impl NodeImpl for LeiosNode {
 }
 
 impl LeiosNode {
-    pub fn new(
-        config: &NodeConfiguration,
-        sim_config: Arc<SimConfiguration>,
-        total_stake: u64,
-        tracker: EventTracker,
-        rng: ChaChaRng,
-        clock: Clock,
-    ) -> Self {
-        let id = config.id;
-        let stake = config.stake;
-        let consumers = config.consumers.clone();
-        let behaviours = config.behaviours.clone();
-
-        Self {
-            id,
-            name: config.name.clone(),
-            trace: sim_config.trace_nodes.contains(&id),
-            sim_config,
-            queued: EventResult::default(),
-            tracker,
-            rng,
-            clock,
-            stake,
-            total_stake,
-            consumers,
-            behaviours,
-            txs: HashMap::new(),
-            ledger_states: BTreeMap::new(),
-            praos: NodePraosState::default(),
-            leios: NodeLeiosState::default(),
-        }
-    }
-
     fn schedule_input_block_generation(&mut self, slot: u64) {
         if self.sim_config.variant == LeiosVariant::FullWithoutIbs {
             // In this variant, IB generation is completely disabled
@@ -872,6 +872,7 @@ impl LeiosNode {
             | LeiosVariant::FullWithoutIbs
             | LeiosVariant::FullWithTxReferences => candidates
                 .max_by_key(|(eb, age, votes)| (Reverse(*age), self.count_txs_in_eb(eb), *votes))?,
+            LeiosVariant::Linear => unreachable!("wrong implementation"),
         };
 
         let votes = self.leios.votes_by_eb.get(&block)?.clone();

@@ -277,7 +277,9 @@ export enum LeiosVariant {
   /** Full Leios Without IBs: EBs reference TXs directly, as well as other EBs */
   FullWithoutIbs = "full-without-ibs",
   /** Full Leios With TX References: IBs only contain references to TXs instead of the whole body */
-  FullWithTXReferences = "full-with-tx-references"
+  FullWithTXReferences = "full-with-tx-references",
+  /** Linear Leios: Leios with as little concurrency as possible. */
+  Linear = "linear",
 }
 
 export enum MempoolSamplingStrategy {

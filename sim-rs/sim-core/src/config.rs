@@ -151,6 +151,7 @@ pub enum LeiosVariant {
     Full,
     FullWithoutIbs,
     FullWithTxReferences,
+    Linear,
 }
 
 #[derive(Debug, Copy, Clone, Deserialize, PartialEq, Eq)]
@@ -494,6 +495,7 @@ pub struct SimConfiguration {
     pub late_ib_inclusion: bool,
     pub variant: LeiosVariant,
     pub vote_threshold: u64,
+    pub(crate) total_stake: u64,
     pub(crate) praos_fallback: bool,
     pub(crate) header_diffusion_time: Duration,
     pub(crate) ib_generation_time: Duration,
@@ -539,6 +541,7 @@ impl SimConfiguration {
                 params.ib_shard_period_length_slots
             );
         }
+        let total_stake = topology.nodes.iter().map(|n| n.stake).sum();
         Ok(Self {
             seed: 0,
             timestamp_resolution: duration_ms(params.timestamp_resolution_ms),
@@ -552,6 +555,7 @@ impl SimConfiguration {
             max_eb_age: params.eb_max_age_slots,
             late_ib_inclusion: params.leios_late_ib_inclusion,
             variant: params.leios_variant,
+            total_stake,
             praos_fallback: params.praos_fallback_enabled,
             header_diffusion_time: duration_ms(params.leios_header_diffusion_time_ms),
             ib_generation_time: duration_ms(params.leios_ib_generation_time_ms),
