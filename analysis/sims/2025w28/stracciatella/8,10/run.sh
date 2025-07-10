@@ -36,8 +36,8 @@ grep -E -v '(Slot|No.*Generated|CpuTask|Lottery)' sim.log | pigz -p 3 -9c > sim.
 wait
 
 cat << EOI > case.csv
-Simulator,Stage length [s],TPS
-Rust,$STAGE_LENGTH,$TPS
+Simulator,Stage length,TPS
+Rust,$STAGE_LENGTH slot/stage,$TPS tx/s
 EOI
 
 zcat sim.log.gz \
