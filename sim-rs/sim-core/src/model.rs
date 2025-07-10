@@ -84,6 +84,26 @@ impl Block {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct LinearRankingBlockHeader {
+    pub id: BlockId,
+    pub vrf: u64,
+    pub parent: Option<BlockId>,
+    pub bytes: u64,
+}
+
+#[derive(Clone, Debug)]
+pub struct LinearRankingBlock {
+    pub header: LinearRankingBlockHeader,
+    pub transactions: Vec<Arc<Transaction>>,
+}
+
+impl LinearRankingBlock {
+    pub fn bytes(&self) -> u64 {
+        self.header.bytes + self.transactions.iter().map(|t| t.bytes).sum::<u64>()
+    }
+}
+
 id_wrapper!(TransactionId, u64);
 
 #[derive(Debug, Clone, PartialEq, Eq)]

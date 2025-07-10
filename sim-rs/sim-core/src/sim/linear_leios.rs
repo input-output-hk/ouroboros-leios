@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
     time::Duration,
 };
@@ -8,13 +8,16 @@ use rand::Rng as _;
 use rand_chacha::ChaChaRng;
 
 use crate::{
-    clock::Clock,
+    clock::{Clock, Timestamp},
     config::{
         CpuTimeConfig, NodeConfiguration, NodeId, RelayStrategy, SimConfiguration,
         TransactionConfig,
     },
     events::EventTracker,
-    model::{Block, BlockId, Transaction, TransactionId},
+    model::{
+        BlockId, LinearRankingBlock as RankingBlock,
+        LinearRankingBlockHeader as RankingBlockHeader, Transaction, TransactionId,
+    },
     sim::{MiniProtocol, NodeImpl, SimCpuTask, SimMessage, lottery},
 };
 
@@ -25,10 +28,15 @@ pub enum Message {
     RequestTx(TransactionId),
     Tx(Arc<Transaction>),
 
-    // RB propagation
-    AnnounceBlock(BlockId),
-    RequestBlock(BlockId),
-    Block(Arc<Block>),
+    // RB header propagation
+    AnnounceRBHeader(BlockId),
+    RequestRBHeader(BlockId),
+    RBHeader(RankingBlockHeader, bool /* has_body */),
+
+    // RB body propagation
+    AnnounceRB(BlockId),
+    RequestRB(BlockId),
+    RB(Arc<RankingBlock>),
 }
 
 impl SimMessage for Message {
@@ -38,9 +46,13 @@ impl SimMessage for Message {
             Self::RequestTx(_) => MiniProtocol::Tx,
             Self::Tx(_) => MiniProtocol::Tx,
 
-            Self::AnnounceBlock(_) => MiniProtocol::Block,
-            Self::RequestBlock(_) => MiniProtocol::Block,
-            Self::Block(_) => MiniProtocol::Block,
+            Self::AnnounceRBHeader(_) => MiniProtocol::Block,
+            Self::RequestRBHeader(_) => MiniProtocol::Block,
+            Self::RBHeader(_, _) => MiniProtocol::Block,
+
+            Self::AnnounceRB(_) => MiniProtocol::Block,
+            Self::RequestRB(_) => MiniProtocol::Block,
+            Self::RB(_) => MiniProtocol::Block,
         }
     }
 
@@ -50,9 +62,13 @@ impl SimMessage for Message {
             Self::RequestTx(_) => 8,
             Self::Tx(tx) => tx.bytes,
 
-            Self::AnnounceBlock(_) => 8,
-            Self::RequestBlock(_) => 8,
-            Self::Block(block) => block.bytes(),
+            Self::AnnounceRBHeader(_) => 8,
+            Self::RequestRBHeader(_) => 8,
+            Self::RBHeader(header, _) => header.bytes,
+
+            Self::AnnounceRB(_) => 8,
+            Self::RequestRB(_) => 8,
+            Self::RB(rb) => rb.bytes(),
         }
     }
 }
@@ -60,10 +76,12 @@ impl SimMessage for Message {
 pub enum CpuTask {
     /// A transaction has been received and validated, and is ready to propagate
     TransactionValidated(NodeId, Arc<Transaction>),
-    /// A Praos block has been generated and is ready to propagate
-    RBBlockGenerated(Block),
-    /// A Praos block has been received and validated, and is ready to propagate
-    RBBlockValidated(NodeId, Arc<Block>),
+    /// A ranking block has been generated and is ready to propagate
+    RBBlockGenerated(RankingBlock),
+    /// An RB header has been received and validated, and ready to propagate
+    RBHeaderValidated(NodeId, RankingBlockHeader, bool),
+    /// A ranking block has been received and validated, and is ready to propagate
+    RBBlockValidated(Arc<RankingBlock>),
 }
 
 impl SimCpuTask for CpuTask {
@@ -71,7 +89,8 @@ impl SimCpuTask for CpuTask {
         match self {
             Self::TransactionValidated(_, _) => "ValTX",
             Self::RBBlockGenerated(_) => "GenRB",
-            Self::RBBlockValidated(_, _) => "ValRB",
+            Self::RBHeaderValidated(_, _, _) => "ValRH",
+            Self::RBBlockValidated(_) => "ValRB",
         }
         .to_string()
     }
@@ -80,7 +99,8 @@ impl SimCpuTask for CpuTask {
         match self {
             Self::TransactionValidated(_, _) => "".to_string(),
             Self::RBBlockGenerated(_) => "".to_string(),
-            Self::RBBlockValidated(_, _) => "".to_string(),
+            Self::RBHeaderValidated(_, _, _) => "".to_string(),
+            Self::RBBlockValidated(_) => "".to_string(),
         }
     }
 
@@ -92,8 +112,9 @@ impl SimCpuTask for CpuTask {
                 // TODO: account for endorsement
                 vec![time]
             }
-            Self::RBBlockValidated(_, rb) => {
-                let mut time = config.rb_validation_constant;
+            Self::RBHeaderValidated(_, _, _) => vec![config.rb_head_validation],
+            Self::RBBlockValidated(rb) => {
+                let mut time = config.rb_body_validation_constant;
                 let bytes: u64 = rb.transactions.iter().map(|tx| tx.bytes).sum();
                 time += config.rb_validation_per_byte * (bytes as u32);
                 // TODO: account for endorsement
@@ -108,12 +129,45 @@ enum TransactionView {
     Received(Arc<Transaction>),
 }
 
+enum RankingBlockView {
+    HeaderPending,
+    Pending {
+        header: RankingBlockHeader,
+        header_seen: Timestamp,
+    },
+    Requested {
+        header: RankingBlockHeader,
+        header_seen: Timestamp,
+    },
+    Received {
+        rb: Arc<RankingBlock>,
+        header_seen: Timestamp,
+    },
+}
+impl RankingBlockView {
+    fn header(&self) -> Option<&RankingBlockHeader> {
+        match self {
+            Self::HeaderPending => None,
+            Self::Pending { header, .. } => Some(header),
+            Self::Requested { header, .. } => Some(header),
+            Self::Received { rb, .. } => Some(&rb.header),
+        }
+    }
+    fn header_seen(&self) -> Option<Timestamp> {
+        match self {
+            Self::HeaderPending => None,
+            Self::Pending { header_seen, .. } => Some(*header_seen),
+            Self::Requested { header_seen, .. } => Some(*header_seen),
+            Self::Received { header_seen, .. } => Some(*header_seen),
+        }
+    }
+}
+
 #[derive(Default)]
 struct NodePraosState {
     mempool: BTreeMap<TransactionId, Arc<Transaction>>,
     peer_heads: BTreeMap<NodeId, u64>,
-    blocks_seen: BTreeSet<BlockId>,
-    blocks: BTreeMap<BlockId, Arc<Block>>,
+    blocks: BTreeMap<BlockId, RankingBlockView>,
     block_ids_by_slot: BTreeMap<u64, BlockId>,
 }
 
@@ -129,6 +183,7 @@ pub struct LinearLeiosNode {
     queued: EventResult,
     tracker: EventTracker,
     rng: ChaChaRng,
+    clock: Clock,
     stake: u64,
     consumers: Vec<NodeId>,
     txs: HashMap<TransactionId, TransactionView>,
@@ -147,7 +202,7 @@ impl NodeImpl for LinearLeiosNode {
         sim_config: Arc<SimConfiguration>,
         tracker: EventTracker,
         rng: ChaChaRng,
-        _clock: Clock,
+        clock: Clock,
     ) -> Self {
         Self {
             id: config.id,
@@ -155,6 +210,7 @@ impl NodeImpl for LinearLeiosNode {
             queued: EventResult::default(),
             tracker,
             rng,
+            clock,
             stake: config.stake,
             consumers: config.consumers.clone(),
             txs: HashMap::new(),
@@ -164,7 +220,7 @@ impl NodeImpl for LinearLeiosNode {
     }
 
     fn handle_new_slot(&mut self, slot: u64) -> EventResult {
-        self.try_generate_block(slot);
+        self.try_generate_rb(slot);
 
         std::mem::take(&mut self.queued)
     }
@@ -181,10 +237,15 @@ impl NodeImpl for LinearLeiosNode {
             Message::RequestTx(id) => self.receive_request_tx(from, id),
             Message::Tx(tx) => self.receive_tx(from, tx),
 
-            // Block propagation
-            Message::AnnounceBlock(id) => self.receive_announce_block(from, id),
-            Message::RequestBlock(id) => self.receive_request_block(from, id),
-            Message::Block(block) => self.receive_block(from, block),
+            // RB header propagation
+            Message::AnnounceRBHeader(id) => self.receive_announce_rb_header(from, id),
+            Message::RequestRBHeader(id) => self.receive_request_rb_header(from, id),
+            Message::RBHeader(header, has_body) => self.receive_rb_header(from, header, has_body),
+
+            // RB body propagation
+            Message::AnnounceRB(id) => self.receive_announce_rb(from, id),
+            Message::RequestRB(id) => self.receive_request_rb(from, id),
+            Message::RB(rb) => self.receive_rb(from, rb),
         }
         std::mem::take(&mut self.queued)
     }
@@ -192,8 +253,11 @@ impl NodeImpl for LinearLeiosNode {
     fn handle_cpu_task(&mut self, task: Self::Task) -> EventResult {
         match task {
             CpuTask::TransactionValidated(from, tx) => self.propagate_tx(from, tx),
-            CpuTask::RBBlockGenerated(block) => self.finish_generating_block(block),
-            CpuTask::RBBlockValidated(from, block) => self.finish_validating_block(from, block),
+            CpuTask::RBBlockGenerated(rb) => self.finish_generating_rb(rb),
+            CpuTask::RBHeaderValidated(from, header, has_body) => {
+                self.finish_validating_rb_header(from, header, has_body)
+            }
+            CpuTask::RBBlockValidated(rb) => self.finish_validating_rb(rb),
         }
         std::mem::take(&mut self.queued)
     }
@@ -268,7 +332,7 @@ impl LinearLeiosNode {
 
 // Ranking block propagation
 impl LinearLeiosNode {
-    fn try_generate_block(&mut self, slot: u64) {
+    fn try_generate_rb(&mut self, slot: u64) {
         let Some(vrf) = self.run_vrf(self.sim_config.block_generation_probability) else {
             return;
         };
@@ -298,29 +362,29 @@ impl LinearLeiosNode {
 
         let parent = self.latest_rb_ref();
 
-        let block = Block {
-            id: BlockId {
-                slot,
-                producer: self.id,
+        let rb = RankingBlock {
+            header: RankingBlockHeader {
+                id: BlockId {
+                    slot,
+                    producer: self.id,
+                },
+                vrf,
+                parent,
+                bytes: self.sim_config.sizes.block_header,
             },
-            vrf,
-            parent,
-            header_bytes: self.sim_config.sizes.block_header,
-            endorsement: None,
             transactions,
         };
-        self.tracker.track_praos_block_lottery_won(&block);
-        self.queued
-            .schedule_cpu_task(CpuTask::RBBlockGenerated(block));
+        self.tracker.track_praos_block_lottery_won(rb.header.id);
+        self.queued.schedule_cpu_task(CpuTask::RBBlockGenerated(rb));
     }
 
-    fn finish_generating_block(&mut self, block: Block) {
-        self.tracker.track_praos_block_generated(&block);
-        self.publish_block(Arc::new(block));
+    fn finish_generating_rb(&mut self, rb: RankingBlock) {
+        self.tracker.track_linear_rb_generated(&rb);
+        self.publish_rb(Arc::new(rb), false);
     }
 
-    fn publish_block(&mut self, block: Arc<Block>) {
-        for tx in &block.transactions {
+    fn publish_rb(&mut self, rb: Arc<RankingBlock>, already_sent_header: bool) {
+        for tx in &rb.transactions {
             self.praos.mempool.remove(&tx.id);
         }
         for peer in &self.consumers {
@@ -328,55 +392,161 @@ impl LinearLeiosNode {
                 .praos
                 .peer_heads
                 .get(peer)
-                .is_none_or(|&s| s < block.id.slot)
+                .is_none_or(|&s| s < rb.header.id.slot)
             {
-                self.queued.send_to(*peer, Message::AnnounceBlock(block.id));
-                self.praos.peer_heads.insert(*peer, block.id.slot);
+                let message = if already_sent_header {
+                    Message::AnnounceRB(rb.header.id)
+                } else {
+                    Message::AnnounceRBHeader(rb.header.id)
+                };
+                self.queued.send_to(*peer, message);
+                println!("node {} announced RB", self.id);
+                self.praos.peer_heads.insert(*peer, rb.header.id.slot);
             }
         }
-        self.praos.block_ids_by_slot.insert(block.id.slot, block.id);
-        self.praos.blocks.insert(block.id, block);
+        let header_seen = self
+            .praos
+            .blocks
+            .get(&rb.header.id)
+            .and_then(|rb| rb.header_seen())
+            .unwrap_or(self.clock.now());
+        self.praos
+            .blocks
+            .insert(rb.header.id, RankingBlockView::Received { rb, header_seen });
     }
 
-    fn receive_announce_block(&mut self, from: NodeId, id: BlockId) {
-        if self.praos.blocks_seen.insert(id) {
-            self.queued.send_to(from, Message::RequestBlock(id));
+    fn receive_announce_rb_header(&mut self, from: NodeId, id: BlockId) {
+        let should_request = match self.praos.blocks.get(&id) {
+            None => true,
+            Some(RankingBlockView::HeaderPending) => {
+                self.sim_config.relay_strategy == RelayStrategy::RequestFromAll
+            }
+            _ => false,
+        };
+        if should_request {
+            self.praos
+                .blocks
+                .insert(id, RankingBlockView::HeaderPending);
+            self.queued.send_to(from, Message::RequestRBHeader(id));
         }
     }
 
-    fn receive_request_block(&mut self, from: NodeId, id: BlockId) {
-        if let Some(block) = self.praos.blocks.get(&id) {
-            self.tracker.track_praos_block_sent(block, self.id, from);
-            self.queued.send_to(from, Message::Block(block.clone()));
-        }
+    fn receive_request_rb_header(&mut self, from: NodeId, id: BlockId) {
+        if let Some(rb) = self.praos.blocks.get(&id) {
+            if let Some(header) = rb.header() {
+                let have_body = matches!(rb, RankingBlockView::Received { .. });
+                self.queued
+                    .send_to(from, Message::RBHeader(header.clone(), have_body));
+            };
+        };
     }
 
-    fn receive_block(&mut self, from: NodeId, block: Arc<Block>) {
-        self.tracker
-            .track_praos_block_received(&block, from, self.id);
+    fn receive_rb_header(&mut self, from: NodeId, header: RankingBlockHeader, has_body: bool) {
         self.queued
-            .schedule_cpu_task(CpuTask::RBBlockValidated(from, block));
+            .schedule_cpu_task(CpuTask::RBHeaderValidated(from, header, has_body));
     }
 
-    fn finish_validating_block(&mut self, from: NodeId, block: Arc<Block>) {
-        if let Some(old_block_id) = self.praos.block_ids_by_slot.get(&block.id.slot) {
+    fn finish_validating_rb_header(
+        &mut self,
+        from: NodeId,
+        header: RankingBlockHeader,
+        has_body: bool,
+    ) {
+        if let Some(old_block_id) = self.praos.block_ids_by_slot.get(&header.id.slot) {
             // SLOT BATTLE!!! lower VRF wins
-            if let Some(old_block) = self.praos.blocks.get(old_block_id) {
-                if old_block.vrf <= block.vrf {
+            if let Some(old_header) = self.praos.blocks.get(old_block_id).and_then(|b| b.header()) {
+                if old_header.vrf <= header.vrf {
                     // We like our block better than this new one.
                     return;
                 }
                 self.praos.blocks.remove(old_block_id);
             }
         }
-        self.praos.block_ids_by_slot.insert(block.id.slot, block.id);
-        self.praos.blocks.insert(block.id, block.clone());
+        self.praos
+            .block_ids_by_slot
+            .insert(header.id.slot, header.id);
+        self.praos.blocks.insert(
+            header.id,
+            RankingBlockView::Pending {
+                header: header.clone(),
+                header_seen: self.clock.now(),
+            },
+        );
 
         let head = self.praos.peer_heads.entry(from).or_default();
-        if *head < block.id.slot {
-            *head = block.id.slot
+        if *head < header.id.slot {
+            *head = header.id.slot
         }
-        self.publish_block(block);
+        for peer in &self.consumers {
+            if *peer == from {
+                continue;
+            }
+            self.queued
+                .send_to(*peer, Message::AnnounceRBHeader(header.id));
+        }
+        if has_body {
+            self.queued.send_to(from, Message::RequestRB(header.id));
+        }
+    }
+
+    fn receive_announce_rb(&mut self, from: NodeId, id: BlockId) {
+        let (header, header_seen) = match self.praos.blocks.get(&id) {
+            Some(RankingBlockView::Pending {
+                header,
+                header_seen,
+                ..
+            }) => (header.clone(), *header_seen),
+            Some(RankingBlockView::Requested {
+                header,
+                header_seen,
+            }) => {
+                if self.sim_config.relay_strategy == RelayStrategy::RequestFromAll {
+                    (header.clone(), *header_seen)
+                } else {
+                    return;
+                }
+            }
+            _ => return,
+        };
+
+        self.praos.blocks.insert(
+            id,
+            RankingBlockView::Requested {
+                header,
+                header_seen,
+            },
+        );
+        self.queued.send_to(from, Message::RequestRB(id));
+    }
+
+    fn receive_request_rb(&mut self, from: NodeId, id: BlockId) {
+        if let Some(RankingBlockView::Received { rb, .. }) = self.praos.blocks.get(&id) {
+            self.tracker.track_linear_rb_sent(rb, self.id, from);
+            self.queued.send_to(from, Message::RB(rb.clone()));
+        }
+    }
+
+    fn receive_rb(&mut self, from: NodeId, rb: Arc<RankingBlock>) {
+        self.tracker.track_linear_rb_received(&rb, from, self.id);
+        self.queued.schedule_cpu_task(CpuTask::RBBlockValidated(rb));
+    }
+
+    fn finish_validating_rb(&mut self, rb: Arc<RankingBlock>) {
+        let header_seen = self
+            .praos
+            .blocks
+            .get(&rb.header.id)
+            .and_then(|rb| rb.header_seen())
+            .unwrap_or(self.clock.now());
+        self.praos.blocks.insert(
+            rb.header.id,
+            RankingBlockView::Received {
+                rb: rb.clone(),
+                header_seen,
+            },
+        );
+
+        self.publish_rb(rb, true);
     }
 
     fn latest_rb_ref(&self) -> Option<BlockId> {
@@ -405,13 +575,14 @@ impl LinearLeiosNode {
             if !state.seen_blocks.insert(block_id) {
                 continue;
             }
-            let Some(block) = self.praos.blocks.get(&block_id) else {
+            let Some(RankingBlockView::Received { rb, .. }) = self.praos.blocks.get(&block_id)
+            else {
                 continue;
             };
-            if let Some(parent) = block.parent {
+            if let Some(parent) = rb.header.parent {
                 block_queue.push(parent);
             }
-            for tx in &block.transactions {
+            for tx in &rb.transactions {
                 state.spent_inputs.insert(tx.input_id);
             }
 

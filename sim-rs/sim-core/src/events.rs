@@ -8,8 +8,8 @@ use crate::{
     clock::{Clock, Timestamp},
     config::{NodeConfiguration, NodeId},
     model::{
-        Block, BlockId, CpuTaskId, EndorserBlockId, InputBlockId, NoVoteReason, Transaction,
-        TransactionId, TransactionLostReason, VoteBundle, VoteBundleId,
+        Block, BlockId, CpuTaskId, EndorserBlockId, InputBlockId, LinearRankingBlock, NoVoteReason,
+        Transaction, TransactionId, TransactionLostReason, VoteBundle, VoteBundleId,
     },
 };
 
@@ -371,11 +371,11 @@ impl EventTracker {
         });
     }
 
-    pub fn track_praos_block_lottery_won(&self, block: &Block) {
+    pub fn track_praos_block_lottery_won(&self, id: BlockId) {
         self.send(Event::RBLotteryWon {
-            id: self.to_block(block.id),
-            slot: block.id.slot,
-            producer: self.to_node(block.id.producer),
+            id: self.to_block(id),
+            slot: id.slot,
+            producer: self.to_node(id.producer),
         });
     }
 
@@ -405,6 +405,22 @@ impl EventTracker {
         });
     }
 
+    pub fn track_linear_rb_generated(&self, rb: &LinearRankingBlock) {
+        self.send(Event::RBGenerated {
+            id: self.to_block(rb.header.id),
+            slot: rb.header.id.slot,
+            producer: self.to_node(rb.header.id.producer),
+            vrf: rb.header.vrf,
+            parent: rb.header.parent.map(|id| BlockRef {
+                id: self.to_block(id),
+            }),
+            header_bytes: rb.header.bytes,
+            size_bytes: rb.bytes(),
+            endorsement: None,
+            transactions: rb.transactions.iter().map(|tx| tx.id).collect(),
+        });
+    }
+
     pub fn track_praos_block_sent(&self, block: &Block, sender: NodeId, recipient: NodeId) {
         self.send(Event::RBSent {
             id: self.to_block(block.id),
@@ -416,11 +432,37 @@ impl EventTracker {
         });
     }
 
+    pub fn track_linear_rb_sent(&self, rb: &LinearRankingBlock, sender: NodeId, recipient: NodeId) {
+        self.send(Event::RBSent {
+            id: self.to_block(rb.header.id),
+            slot: rb.header.id.slot,
+            producer: self.to_node(rb.header.id.producer),
+            sender: self.to_node(sender),
+            recipient: self.to_node(recipient),
+            msg_size_bytes: rb.bytes(),
+        });
+    }
+
     pub fn track_praos_block_received(&self, block: &Block, sender: NodeId, recipient: NodeId) {
         self.send(Event::RBReceived {
             id: self.to_block(block.id),
             slot: block.id.slot,
             producer: self.to_node(block.id.producer),
+            sender: self.to_node(sender),
+            recipient: self.to_node(recipient),
+        });
+    }
+
+    pub fn track_linear_rb_received(
+        &self,
+        rb: &LinearRankingBlock,
+        sender: NodeId,
+        recipient: NodeId,
+    ) {
+        self.send(Event::RBReceived {
+            id: self.to_block(rb.header.id),
+            slot: rb.header.id.slot,
+            producer: self.to_node(rb.header.id.producer),
             sender: self.to_node(sender),
             recipient: self.to_node(recipient),
         });

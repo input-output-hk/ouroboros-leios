@@ -185,7 +185,7 @@ impl SimCpuTask for Task {
                 vec![time]
             }
             Self::RBBlockValidated(_, rb) => {
-                let mut time = config.rb_validation_constant;
+                let mut time = config.rb_head_validation + config.rb_body_validation_constant;
                 let bytes: u64 = rb.transactions.iter().map(|tx| tx.bytes).sum();
                 time += config.rb_validation_per_byte * (bytes as u32);
                 if let Some(endorsement) = &rb.endorsement {
@@ -825,7 +825,7 @@ impl LeiosNode {
             endorsement,
             transactions,
         };
-        self.tracker.track_praos_block_lottery_won(&block);
+        self.tracker.track_praos_block_lottery_won(block.id);
         self.queued.schedule_cpu_task(Task::RBBlockGenerated(block));
     }
 

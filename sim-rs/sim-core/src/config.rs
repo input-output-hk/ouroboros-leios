@@ -316,7 +316,8 @@ impl From<RawTopology> for Topology {
 pub(crate) struct CpuTimeConfig {
     pub tx_validation: Duration,
     pub rb_generation: Duration,
-    pub rb_validation_constant: Duration,
+    pub rb_head_validation: Duration,
+    pub rb_body_validation_constant: Duration,
     pub rb_validation_per_byte: Duration,
     pub ib_generation: Duration,
     pub ib_head_validation: Duration,
@@ -337,9 +338,9 @@ impl CpuTimeConfig {
         Self {
             tx_validation: duration_ms(params.tx_validation_cpu_time_ms),
             rb_generation: duration_ms(params.rb_generation_cpu_time_ms),
-            rb_validation_constant: duration_ms(
-                params.rb_head_validation_cpu_time_ms
-                    + params.rb_body_legacy_praos_payload_validation_cpu_time_ms_constant,
+            rb_head_validation: duration_ms(params.rb_head_validation_cpu_time_ms),
+            rb_body_validation_constant: duration_ms(
+                params.rb_body_legacy_praos_payload_validation_cpu_time_ms_constant,
             ),
             rb_validation_per_byte: duration_ms(
                 params.rb_body_legacy_praos_payload_validation_cpu_time_ms_per_byte,
