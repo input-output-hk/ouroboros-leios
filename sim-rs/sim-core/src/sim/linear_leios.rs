@@ -519,16 +519,7 @@ impl LinearLeiosNode {
     }
 
     fn publish_rb(&mut self, rb: Arc<RankingBlock>, already_sent_header: bool) {
-        for tx in &rb.transactions {
-            self.praos.mempool.remove(&tx.id);
-        }
-        if let Some(endorsement) = &rb.endorsement {
-            if let Some(EndorserBlockView::Received { eb }) = self.leios.ebs.get(&endorsement.eb) {
-                for tx in &eb.txs {
-                    self.praos.mempool.remove(&tx.id);
-                }
-            }
-        }
+        self.remove_rb_txs_from_mempool(&rb);
         for peer in &self.consumers {
             if self
                 .praos
@@ -894,17 +885,36 @@ impl LinearLeiosNode {
                 // clear the EB's transactions from the mempool
                 // TODO: we're supposed to wait some time for this
                 if let Some(EndorserBlockView::Received { eb }) = self.leios.ebs.get(eb_id) {
-                    for tx in &eb.txs {
-                        self.praos.mempool.remove(&tx.id);
-                    }
+                    self.remove_eb_txs_from_mempool(&eb.clone());
                 }
             }
         }
     }
 }
 
-// Ledger operations
+// Ledger/mempool operations
 impl LinearLeiosNode {
+    fn remove_rb_txs_from_mempool(&mut self, rb: &RankingBlock) {
+        let mut txs = rb.transactions.clone();
+        if let Some(endorsement) = &rb.endorsement {
+            if let Some(EndorserBlockView::Received { eb }) = self.leios.ebs.get(&endorsement.eb) {
+                txs.extend(eb.txs.iter().cloned());
+            }
+        }
+        self.remove_txs_from_mempool(&txs);
+    }
+
+    fn remove_eb_txs_from_mempool(&mut self, eb: &EndorserBlock) {
+        self.remove_txs_from_mempool(&eb.txs);
+    }
+
+    fn remove_txs_from_mempool(&mut self, txs: &[Arc<Transaction>]) {
+        let inputs = txs.iter().map(|tx| tx.input_id).collect::<HashSet<_>>();
+        self.praos
+            .mempool
+            .retain(|_, tx| !inputs.contains(&tx.input_id));
+    }
+
     fn resolve_ledger_state(&mut self, rb_ref: Option<BlockId>) -> Arc<LedgerState> {
         let Some(block_id) = rb_ref else {
             return Arc::new(LedgerState::default());
