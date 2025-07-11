@@ -1,5 +1,17 @@
 # Leios logbook
 
+## 2025-07-11
+
+### Throughput efficiency of Linear Leios
+
+The Linear Leios variant's formulation is straightforward enough that its probability of including a certified EB on chain can be computed analytically.
+
+The plots below show the *throughput* (defined as the size of the RBs and of the RB-certified EBs) relative to Praos (left) and the *throughput efficiency* (defined as the size of the RBs and of the RB-certified EBs, divided by the size of all RBs and of all EBs). Recall that not all EBs have their certificates appear in Praos blocks. Any inefficiency affects throughput and network costs but not permanent-storage costs. These results show that Linear Leios could achieve approximately 500 times the throughput of Praos at an over 50% efficiency in use of network resources. (That 500 times the throughput of Praos would exceed 1000 historically typical transactions per second.)
+
+| Throughput                                                          | Throughput efficiency                                                          |
+|---------------------------------------------------------------------|--------------------------------------------------------------------------------|
+| ![Throughput of Linear Leios](analysis/linear-leios-throughput.svg) | ![Throughput efficiency of Linear Leios](analysis/linear-leios-efficiency.svg) |
+
 ## 2025-07-08
 
 ### Small tx experiment
