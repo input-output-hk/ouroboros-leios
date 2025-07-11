@@ -2,6 +2,19 @@
 
 ## 2025-07-11
 
+### Stracciatella experiment
+
+The Stracciatella variant of Leios (i.e., no IBs, tx refrences in EBs, and a two-stage pipeline) is analyzed in the Jupyter notebook [analysis/sims/2025w28/analysis-stracciatella.ipynb](analysis/sims/2025w28/analysis-stracciatella.ipynb). Findings follow:
+
+- 1000+ TPS is attainable.
+    - Congestion does appear at this throughput.
+- 5 slot/stage performs less well but appears to scale better than 8 slot/stage.
+- Spatial efficiency is better than 95%.
+- Time to ledger is better than two minutes (subject to RB randomness, of course).
+- Only the tiniest fraction of transactions don't reach the ledger, likely due to EBs expiring before the reach an RB.
+- Network usage is slightly heavy.
+- CPU usage seems suspiciously light.
+
 ### Throughput efficiency of Linear Leios
 
 The Linear Leios variant's formulation is straightforward enough that its probability of including a certified EB on chain can be computed analytically.
