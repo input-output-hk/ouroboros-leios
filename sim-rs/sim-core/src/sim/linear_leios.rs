@@ -4,14 +4,14 @@ use std::{
     time::Duration,
 };
 
-use rand::Rng as _;
+use rand::{Rng as _, seq::SliceRandom as _};
 use rand_chacha::ChaChaRng;
 
 use crate::{
     clock::{Clock, Timestamp},
     config::{
-        CpuTimeConfig, NodeConfiguration, NodeId, RelayStrategy, SimConfiguration,
-        TransactionConfig,
+        CpuTimeConfig, MempoolSamplingStrategy, NodeConfiguration, NodeId, RelayStrategy,
+        SimConfiguration, TransactionConfig,
     },
     events::EventTracker,
     model::{
@@ -434,16 +434,7 @@ impl LinearLeiosNode {
                 self.tracker.track_transaction_generated(&tx, self.id);
                 rb_transactions.push(Arc::new(tx));
             } else {
-                let mut size = 0;
-                // Fill with as many pending transactions as can fit
-                while let Some((id, tx)) = self.praos.mempool.first_key_value() {
-                    if size + tx.bytes > self.sim_config.max_block_size {
-                        break;
-                    }
-                    size += tx.bytes;
-                    let id = *id;
-                    rb_transactions.push(self.praos.mempool.remove(&id).unwrap());
-                }
+                self.sample_from_mempool(&mut rb_transactions, self.sim_config.max_block_size);
             }
         }
 
@@ -459,16 +450,7 @@ impl LinearLeiosNode {
             self.tracker.track_transaction_generated(&tx, self.id);
             eb_transactions.push(Arc::new(tx));
         } else {
-            let mut size = 0;
-            // Fill with as many pending transactions as can fit
-            while let Some((id, tx)) = self.praos.mempool.first_key_value() {
-                if size + tx.bytes > self.sim_config.max_eb_size {
-                    break;
-                }
-                size += tx.bytes;
-                let id = *id;
-                eb_transactions.push(self.praos.mempool.remove(&id).unwrap());
-            }
+            self.sample_from_mempool(&mut eb_transactions, self.sim_config.max_eb_size);
         }
 
         let parent = self.latest_rb_ref();
@@ -894,6 +876,29 @@ impl LinearLeiosNode {
 
 // Ledger/mempool operations
 impl LinearLeiosNode {
+    fn sample_from_mempool(&mut self, txs: &mut Vec<Arc<Transaction>>, max_size: u64) {
+        let mut size = 0;
+        let mut candidates: Vec<_> = self.praos.mempool.keys().copied().collect();
+        if matches!(
+            self.sim_config.mempool_strategy,
+            MempoolSamplingStrategy::Random
+        ) {
+            candidates.shuffle(&mut self.rng);
+        } else {
+            candidates.reverse();
+        }
+
+        // Fill with as many pending transactions as can fit
+        while let Some(id) = candidates.pop() {
+            let tx = self.praos.mempool.get(&id).unwrap();
+            if size + tx.bytes > max_size {
+                break;
+            }
+            size += tx.bytes;
+            txs.push(self.praos.mempool.remove(&id).unwrap());
+        }
+    }
+
     fn remove_rb_txs_from_mempool(&mut self, rb: &RankingBlock) {
         let mut txs = rb.transactions.clone();
         if let Some(endorsement) = &rb.endorsement {
