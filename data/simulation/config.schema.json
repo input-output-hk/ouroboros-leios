@@ -149,6 +149,11 @@
       "$ref": "#/definitions/CleanupPolicies",
       "description": "Only supported by Haskell simulation."
     },
+    "eb-body-avg-size-bytes": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "number"
+    },
     "eb-diffusion-max-bodies-to-request": {
       "additionalProperties": false,
       "description": "Only supported by Haskell simulation.",

@@ -8,8 +8,9 @@ use crate::{
     clock::{Clock, Timestamp},
     config::{NodeConfiguration, NodeId},
     model::{
-        Block, BlockId, CpuTaskId, EndorserBlockId, InputBlockId, LinearRankingBlock, NoVoteReason,
-        Transaction, TransactionId, TransactionLostReason, VoteBundle, VoteBundleId,
+        Block, BlockId, CpuTaskId, EndorserBlockId, InputBlockId, LinearEndorserBlock,
+        LinearRankingBlock, NoVoteReason, Transaction, TransactionId, TransactionLostReason,
+        VoteBundle, VoteBundleId,
     },
 };
 
@@ -405,7 +406,7 @@ impl EventTracker {
         });
     }
 
-    pub fn track_linear_rb_generated(&self, rb: &LinearRankingBlock) {
+    pub fn track_linear_rb_generated(&self, rb: &LinearRankingBlock, eb: &LinearEndorserBlock) {
         self.send(Event::RBGenerated {
             id: self.to_block(rb.header.id),
             slot: rb.header.id.slot,
@@ -418,6 +419,17 @@ impl EventTracker {
             size_bytes: rb.bytes(),
             endorsement: None,
             transactions: rb.transactions.iter().map(|tx| tx.id).collect(),
+        });
+        self.send(Event::EBGenerated {
+            id: self.to_endorser_block(eb.id()),
+            slot: eb.slot,
+            pipeline: 0,
+            producer: self.to_node(eb.producer),
+            shard: 0,
+            size_bytes: eb.bytes,
+            transactions: eb.txs.iter().map(|tx| BlockRef { id: tx.id }).collect(),
+            input_blocks: vec![],
+            endorser_blocks: vec![],
         });
     }
 
@@ -620,6 +632,23 @@ impl EventTracker {
             id: self.to_endorser_block(block.id()),
             slot: block.slot,
             pipeline: block.pipeline,
+            producer: self.to_node(block.producer),
+            sender: self.to_node(sender),
+            recipient: self.to_node(recipient),
+            msg_size_bytes: block.bytes,
+        });
+    }
+
+    pub fn track_linear_eb_sent(
+        &self,
+        block: &crate::model::LinearEndorserBlock,
+        sender: NodeId,
+        recipient: NodeId,
+    ) {
+        self.send(Event::EBSent {
+            id: self.to_endorser_block(block.id()),
+            slot: block.slot,
+            pipeline: 0,
             producer: self.to_node(block.producer),
             sender: self.to_node(sender),
             recipient: self.to_node(recipient),

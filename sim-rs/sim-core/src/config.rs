@@ -117,6 +117,7 @@ pub struct RawParameters {
     pub eb_size_bytes_per_ib: u64,
     pub eb_max_age_slots: u64,
     pub eb_referenced_txs_max_size_bytes: u64,
+    pub eb_body_avg_size_bytes: u64,
 
     // Vote configuration
     pub vote_generation_probability: f64,
@@ -409,6 +410,10 @@ impl BlockSizeConfig {
         self.eb_constant + self.eb_per_ib * (txs + ibs + ebs) as u64
     }
 
+    pub fn linear_eb(&self, txs: &[Arc<Transaction>]) -> u64 {
+        self.eb_constant + txs.iter().map(|tx| tx.bytes).sum::<u64>()
+    }
+
     pub fn vote_bundle(&self, ebs: usize) -> u64 {
         self.vote_constant + self.vote_per_eb * ebs as u64
     }
@@ -443,6 +448,7 @@ impl TransactionConfig {
                 next_id: Arc::new(AtomicU64::new(0)),
                 ib_size: params.ib_body_avg_size_bytes,
                 rb_size: params.rb_body_legacy_praos_payload_avg_size_bytes,
+                eb_size: params.eb_body_avg_size_bytes,
             })
         }
     }
@@ -464,6 +470,7 @@ pub(crate) struct MockTransactionConfig {
     next_id: Arc<AtomicU64>,
     pub ib_size: u64,
     pub rb_size: u64,
+    pub eb_size: u64,
 }
 
 impl MockTransactionConfig {

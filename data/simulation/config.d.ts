@@ -155,6 +155,7 @@ export interface Config {
   "eb-validation-cpu-time-ms": number;
   "eb-size-bytes-constant": bigint;
   "eb-size-bytes-per-ib": bigint;
+  "eb-body-avg-size-bytes": bigint;
   /** Only supported by Haskell simulation. */
   "eb-diffusion-strategy": DiffusionStrategy;
   /** Only supported by Haskell simulation. */

@@ -15,8 +15,9 @@ use crate::{
     },
     events::EventTracker,
     model::{
-        BlockId, LinearRankingBlock as RankingBlock,
-        LinearRankingBlockHeader as RankingBlockHeader, Transaction, TransactionId,
+        BlockId, EndorserBlockId, LinearEndorserBlock as EndorserBlock,
+        LinearRankingBlock as RankingBlock, LinearRankingBlockHeader as RankingBlockHeader,
+        Transaction, TransactionId,
     },
     sim::{MiniProtocol, NodeImpl, SimCpuTask, SimMessage, lottery},
 };
@@ -31,12 +32,21 @@ pub enum Message {
     // RB header propagation
     AnnounceRBHeader(BlockId),
     RequestRBHeader(BlockId),
-    RBHeader(RankingBlockHeader, bool /* has_body */),
+    RBHeader(
+        RankingBlockHeader,
+        bool, /* has_body */
+        bool, /* has_eb */
+    ),
 
     // RB body propagation
     AnnounceRB(BlockId),
     RequestRB(BlockId),
     RB(Arc<RankingBlock>),
+
+    // EB propagation
+    AnnounceEB(EndorserBlockId),
+    RequestEB(EndorserBlockId),
+    EB(Arc<EndorserBlock>),
 }
 
 impl SimMessage for Message {
@@ -48,11 +58,15 @@ impl SimMessage for Message {
 
             Self::AnnounceRBHeader(_) => MiniProtocol::Block,
             Self::RequestRBHeader(_) => MiniProtocol::Block,
-            Self::RBHeader(_, _) => MiniProtocol::Block,
+            Self::RBHeader(_, _, _) => MiniProtocol::Block,
 
             Self::AnnounceRB(_) => MiniProtocol::Block,
             Self::RequestRB(_) => MiniProtocol::Block,
             Self::RB(_) => MiniProtocol::Block,
+
+            Self::AnnounceEB(_) => MiniProtocol::EB,
+            Self::RequestEB(_) => MiniProtocol::EB,
+            Self::EB(_) => MiniProtocol::EB,
         }
     }
 
@@ -64,11 +78,15 @@ impl SimMessage for Message {
 
             Self::AnnounceRBHeader(_) => 8,
             Self::RequestRBHeader(_) => 8,
-            Self::RBHeader(header, _) => header.bytes,
+            Self::RBHeader(header, _, _) => header.bytes,
 
             Self::AnnounceRB(_) => 8,
             Self::RequestRB(_) => 8,
             Self::RB(rb) => rb.bytes(),
+
+            Self::AnnounceEB(_) => 8,
+            Self::RequestEB(_) => 8,
+            Self::EB(eb) => eb.bytes,
         }
     }
 }
@@ -77,20 +95,23 @@ pub enum CpuTask {
     /// A transaction has been received and validated, and is ready to propagate
     TransactionValidated(NodeId, Arc<Transaction>),
     /// A ranking block has been generated and is ready to propagate
-    RBBlockGenerated(RankingBlock),
+    RBBlockGenerated(RankingBlock, EndorserBlock),
     /// An RB header has been received and validated, and ready to propagate
-    RBHeaderValidated(NodeId, RankingBlockHeader, bool),
+    RBHeaderValidated(NodeId, RankingBlockHeader, bool, bool),
     /// A ranking block has been received and validated, and is ready to propagate
     RBBlockValidated(Arc<RankingBlock>),
+    /// An endorser block has been received and validated, and is ready to propagate
+    EBBlockValidated(NodeId, Arc<EndorserBlock>),
 }
 
 impl SimCpuTask for CpuTask {
     fn name(&self) -> String {
         match self {
             Self::TransactionValidated(_, _) => "ValTX",
-            Self::RBBlockGenerated(_) => "GenRB",
-            Self::RBHeaderValidated(_, _, _) => "ValRH",
+            Self::RBBlockGenerated(_, _) => "GenRB",
+            Self::RBHeaderValidated(_, _, _, _) => "ValRH",
             Self::RBBlockValidated(_) => "ValRB",
+            Self::EBBlockValidated(_, _) => "ValEB",
         }
         .to_string()
     }
@@ -98,26 +119,30 @@ impl SimCpuTask for CpuTask {
     fn extra(&self) -> String {
         match self {
             Self::TransactionValidated(_, _) => "".to_string(),
-            Self::RBBlockGenerated(_) => "".to_string(),
-            Self::RBHeaderValidated(_, _, _) => "".to_string(),
+            Self::RBBlockGenerated(_, _) => "".to_string(),
+            Self::RBHeaderValidated(_, _, _, _) => "".to_string(),
             Self::RBBlockValidated(_) => "".to_string(),
+            Self::EBBlockValidated(_, _) => "".to_string(),
         }
     }
 
     fn times(&self, config: &CpuTimeConfig) -> Vec<Duration> {
         match self {
             Self::TransactionValidated(_, _) => vec![config.tx_validation],
-            Self::RBBlockGenerated(_) => {
-                let time = config.rb_generation;
-                // TODO: account for endorsement
-                vec![time]
+            Self::RBBlockGenerated(_, _) => {
+                vec![config.rb_generation, config.eb_generation]
             }
-            Self::RBHeaderValidated(_, _, _) => vec![config.rb_head_validation],
+            Self::RBHeaderValidated(_, _, _, _) => vec![config.rb_head_validation],
             Self::RBBlockValidated(rb) => {
                 let mut time = config.rb_body_validation_constant;
                 let bytes: u64 = rb.transactions.iter().map(|tx| tx.bytes).sum();
                 time += config.rb_validation_per_byte * (bytes as u32);
-                // TODO: account for endorsement
+                vec![time]
+            }
+            Self::EBBlockValidated(_, eb) => {
+                let mut time = config.eb_validation;
+                let bytes: u64 = eb.txs.iter().map(|tx| tx.bytes).sum();
+                time += config.rb_validation_per_byte * (bytes as u32);
                 vec![time]
             }
         }
@@ -171,6 +196,17 @@ struct NodePraosState {
     block_ids_by_slot: BTreeMap<u64, BlockId>,
 }
 
+enum EndorserBlockView {
+    Pending,
+    Requested,
+    Received { eb: Arc<EndorserBlock> },
+}
+
+#[derive(Default)]
+struct NodeLeiosState {
+    ebs: HashMap<EndorserBlockId, EndorserBlockView>,
+}
+
 #[derive(Clone, Default)]
 struct LedgerState {
     spent_inputs: HashSet<u64>,
@@ -189,6 +225,7 @@ pub struct LinearLeiosNode {
     txs: HashMap<TransactionId, TransactionView>,
     ledger_states: BTreeMap<BlockId, Arc<LedgerState>>,
     praos: NodePraosState,
+    leios: NodeLeiosState,
 }
 
 type EventResult = super::EventResult<Message, CpuTask>;
@@ -216,6 +253,7 @@ impl NodeImpl for LinearLeiosNode {
             txs: HashMap::new(),
             ledger_states: BTreeMap::new(),
             praos: NodePraosState::default(),
+            leios: NodeLeiosState::default(),
         }
     }
 
@@ -240,12 +278,19 @@ impl NodeImpl for LinearLeiosNode {
             // RB header propagation
             Message::AnnounceRBHeader(id) => self.receive_announce_rb_header(from, id),
             Message::RequestRBHeader(id) => self.receive_request_rb_header(from, id),
-            Message::RBHeader(header, has_body) => self.receive_rb_header(from, header, has_body),
+            Message::RBHeader(header, has_body, has_eb) => {
+                self.receive_rb_header(from, header, has_body, has_eb)
+            }
 
             // RB body propagation
             Message::AnnounceRB(id) => self.receive_announce_rb(from, id),
             Message::RequestRB(id) => self.receive_request_rb(from, id),
             Message::RB(rb) => self.receive_rb(from, rb),
+
+            // EB body propagation
+            Message::AnnounceEB(id) => self.receive_announce_eb(from, id),
+            Message::RequestEB(id) => self.receive_request_eb(from, id),
+            Message::EB(rb) => self.receive_eb(from, rb),
         }
         std::mem::take(&mut self.queued)
     }
@@ -253,11 +298,12 @@ impl NodeImpl for LinearLeiosNode {
     fn handle_cpu_task(&mut self, task: Self::Task) -> EventResult {
         match task {
             CpuTask::TransactionValidated(from, tx) => self.propagate_tx(from, tx),
-            CpuTask::RBBlockGenerated(rb) => self.finish_generating_rb(rb),
-            CpuTask::RBHeaderValidated(from, header, has_body) => {
-                self.finish_validating_rb_header(from, header, has_body)
+            CpuTask::RBBlockGenerated(rb, eb) => self.finish_generating_rb(rb, eb),
+            CpuTask::RBHeaderValidated(from, header, has_body, has_eb) => {
+                self.finish_validating_rb_header(from, header, has_body, has_eb)
             }
             CpuTask::RBBlockValidated(rb) => self.finish_validating_rb(rb),
+            CpuTask::EBBlockValidated(from, eb) => self.finish_validating_eb(from, eb),
         }
         std::mem::take(&mut self.queued)
     }
@@ -337,15 +383,13 @@ impl LinearLeiosNode {
             return;
         };
 
-        // TODO: the actual linear leios bits
-
-        let mut transactions = vec![];
+        let mut rb_transactions = vec![];
         if self.sim_config.praos_fallback {
             if let TransactionConfig::Mock(config) = &self.sim_config.transactions {
                 // Add one transaction, the right size for the extra RB payload
                 let tx = config.mock_tx(config.rb_size);
                 self.tracker.track_transaction_generated(&tx, self.id);
-                transactions.push(Arc::new(tx));
+                rb_transactions.push(Arc::new(tx));
             } else {
                 let mut size = 0;
                 // Fill with as many pending transactions as can fit
@@ -355,8 +399,32 @@ impl LinearLeiosNode {
                     }
                     size += tx.bytes;
                     let id = *id;
-                    transactions.push(self.praos.mempool.remove(&id).unwrap());
+                    rb_transactions.push(self.praos.mempool.remove(&id).unwrap());
                 }
+            }
+        }
+
+        let eb_id = EndorserBlockId {
+            slot,
+            pipeline: 0,
+            producer: self.id,
+        };
+        let mut eb_transactions = vec![];
+        if let TransactionConfig::Mock(config) = &self.sim_config.transactions {
+            // Add one transaction, the right size for the extra RB payload
+            let tx = config.mock_tx(config.eb_size);
+            self.tracker.track_transaction_generated(&tx, self.id);
+            eb_transactions.push(Arc::new(tx));
+        } else {
+            let mut size = 0;
+            // Fill with as many pending transactions as can fit
+            while let Some((id, tx)) = self.praos.mempool.first_key_value() {
+                if size + tx.bytes > self.sim_config.max_eb_size {
+                    break;
+                }
+                size += tx.bytes;
+                let id = *id;
+                eb_transactions.push(self.praos.mempool.remove(&id).unwrap());
             }
         }
 
@@ -371,16 +439,26 @@ impl LinearLeiosNode {
                 vrf,
                 parent,
                 bytes: self.sim_config.sizes.block_header,
+                eb_announcement: eb_id,
             },
-            transactions,
+            transactions: rb_transactions,
+        };
+
+        let eb = EndorserBlock {
+            slot,
+            producer: self.id,
+            bytes: self.sim_config.sizes.linear_eb(&eb_transactions),
+            txs: eb_transactions,
         };
         self.tracker.track_praos_block_lottery_won(rb.header.id);
-        self.queued.schedule_cpu_task(CpuTask::RBBlockGenerated(rb));
+        self.queued
+            .schedule_cpu_task(CpuTask::RBBlockGenerated(rb, eb));
     }
 
-    fn finish_generating_rb(&mut self, rb: RankingBlock) {
-        self.tracker.track_linear_rb_generated(&rb);
+    fn finish_generating_rb(&mut self, rb: RankingBlock, eb: EndorserBlock) {
+        self.tracker.track_linear_rb_generated(&rb, &eb);
         self.publish_rb(Arc::new(rb), false);
+        self.finish_generating_eb(eb);
     }
 
     fn publish_rb(&mut self, rb: Arc<RankingBlock>, already_sent_header: bool) {
@@ -400,7 +478,6 @@ impl LinearLeiosNode {
                     Message::AnnounceRBHeader(rb.header.id)
                 };
                 self.queued.send_to(*peer, message);
-                println!("node {} announced RB", self.id);
                 self.praos.peer_heads.insert(*peer, rb.header.id.slot);
             }
         }
@@ -435,15 +512,25 @@ impl LinearLeiosNode {
         if let Some(rb) = self.praos.blocks.get(&id) {
             if let Some(header) = rb.header() {
                 let have_body = matches!(rb, RankingBlockView::Received { .. });
+                let have_eb = matches!(
+                    self.leios.ebs.get(&header.eb_announcement),
+                    Some(EndorserBlockView::Received { .. })
+                );
                 self.queued
-                    .send_to(from, Message::RBHeader(header.clone(), have_body));
+                    .send_to(from, Message::RBHeader(header.clone(), have_body, have_eb));
             };
         };
     }
 
-    fn receive_rb_header(&mut self, from: NodeId, header: RankingBlockHeader, has_body: bool) {
+    fn receive_rb_header(
+        &mut self,
+        from: NodeId,
+        header: RankingBlockHeader,
+        has_body: bool,
+        has_eb: bool,
+    ) {
         self.queued
-            .schedule_cpu_task(CpuTask::RBHeaderValidated(from, header, has_body));
+            .schedule_cpu_task(CpuTask::RBHeaderValidated(from, header, has_body, has_eb));
     }
 
     fn finish_validating_rb_header(
@@ -451,6 +538,7 @@ impl LinearLeiosNode {
         from: NodeId,
         header: RankingBlockHeader,
         has_body: bool,
+        has_eb: bool,
     ) {
         if let Some(old_block_id) = self.praos.block_ids_by_slot.get(&header.id.slot) {
             // SLOT BATTLE!!! lower VRF wins
@@ -486,6 +574,16 @@ impl LinearLeiosNode {
         }
         if has_body {
             self.queued.send_to(from, Message::RequestRB(header.id));
+        }
+
+        let eb_id = header.eb_announcement;
+
+        if has_eb {
+            // TODO: freshest first
+            self.queued.send_to(from, Message::RequestEB(eb_id));
+            self.leios.ebs.insert(eb_id, EndorserBlockView::Requested);
+        } else {
+            self.leios.ebs.insert(eb_id, EndorserBlockView::Pending);
         }
     }
 
@@ -551,6 +649,65 @@ impl LinearLeiosNode {
 
     fn latest_rb_ref(&self) -> Option<BlockId> {
         self.praos.blocks.last_key_value().map(|(id, _)| *id)
+    }
+}
+
+// EB operations
+impl LinearLeiosNode {
+    fn finish_generating_eb(&mut self, eb: EndorserBlock) {
+        let eb_id = eb.id();
+        self.leios
+            .ebs
+            .insert(eb_id, EndorserBlockView::Received { eb: Arc::new(eb) });
+        for peer in &self.consumers {
+            self.queued.send_to(*peer, Message::AnnounceEB(eb_id));
+        }
+    }
+    fn receive_announce_eb(&mut self, from: NodeId, id: EndorserBlockId) {
+        let should_request = match self.leios.ebs.get(&id) {
+            Some(EndorserBlockView::Pending) => true,
+            Some(EndorserBlockView::Requested) => {
+                self.sim_config.relay_strategy == RelayStrategy::RequestFromAll
+            }
+            _ => false,
+        };
+        if should_request {
+            // TODO: freshest first
+            self.leios.ebs.insert(id, EndorserBlockView::Requested);
+            self.queued.send_to(from, Message::RequestEB(id));
+        }
+    }
+
+    fn receive_request_eb(&mut self, from: NodeId, id: EndorserBlockId) {
+        if let Some(EndorserBlockView::Received { eb }) = self.leios.ebs.get(&id) {
+            self.tracker.track_linear_eb_sent(eb, self.id, from);
+            self.queued.send_to(from, Message::EB(eb.clone()));
+        }
+    }
+
+    fn receive_eb(&mut self, from: NodeId, eb: Arc<EndorserBlock>) {
+        self.tracker.track_eb_received(eb.id(), from, self.id);
+        self.queued
+            .schedule_cpu_task(CpuTask::EBBlockValidated(from, eb));
+    }
+
+    fn finish_validating_eb(&mut self, from: NodeId, eb: Arc<EndorserBlock>) {
+        if self
+            .leios
+            .ebs
+            .insert(eb.id(), EndorserBlockView::Received { eb: eb.clone() })
+            .is_some_and(|eb| matches!(eb, EndorserBlockView::Received { .. }))
+        {
+            return;
+        }
+
+        // TODO: sleep
+        for peer in &self.consumers {
+            if *peer == from {
+                continue;
+            }
+            self.queued.send_to(*peer, Message::AnnounceEB(eb.id()));
+        }
     }
 }
 

@@ -90,6 +90,7 @@ pub struct LinearRankingBlockHeader {
     pub vrf: u64,
     pub parent: Option<BlockId>,
     pub bytes: u64,
+    pub eb_announcement: EndorserBlockId,
 }
 
 #[derive(Clone, Debug)]
@@ -201,6 +202,23 @@ impl EndorserBlock {
         EndorserBlockId {
             slot: self.slot,
             pipeline: self.pipeline,
+            producer: self.producer,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct LinearEndorserBlock {
+    pub slot: u64,
+    pub producer: NodeId,
+    pub bytes: u64,
+    pub txs: Vec<Arc<Transaction>>,
+}
+impl LinearEndorserBlock {
+    pub fn id(&self) -> EndorserBlockId {
+        EndorserBlockId {
+            slot: self.slot,
+            pipeline: 0,
             producer: self.producer,
         }
     }
