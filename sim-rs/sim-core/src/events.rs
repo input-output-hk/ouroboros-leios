@@ -418,7 +418,17 @@ impl EventTracker {
             }),
             header_bytes: rb.header.bytes,
             size_bytes: rb.bytes(),
-            endorsement: None,
+            endorsement: rb.endorsement.as_ref().map(|e| Endorsement {
+                eb: BlockRef {
+                    id: self.to_endorser_block(e.eb),
+                },
+                size_bytes: e.size_bytes,
+                votes: e
+                    .votes
+                    .iter()
+                    .map(|(k, v)| (self.to_node(*k), *v))
+                    .collect(),
+            }),
             transactions: rb.transactions.iter().map(|tx| tx.id).collect(),
         });
         self.send(Event::EBGenerated {

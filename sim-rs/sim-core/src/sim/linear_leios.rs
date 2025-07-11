@@ -15,7 +15,7 @@ use crate::{
     },
     events::EventTracker,
     model::{
-        BlockId, EndorserBlockId, LinearEndorserBlock as EndorserBlock,
+        BlockId, Endorsement, EndorserBlockId, LinearEndorserBlock as EndorserBlock,
         LinearRankingBlock as RankingBlock, LinearRankingBlockHeader as RankingBlockHeader,
         Transaction, TransactionId, VoteBundle, VoteBundleId,
     },
@@ -236,8 +236,9 @@ enum VoteBundleView {
 #[derive(Default)]
 struct NodeLeiosState {
     ebs: HashMap<EndorserBlockId, EndorserBlockView>,
+    ebs_by_rb: HashMap<BlockId, EndorserBlockId>,
     votes: HashMap<VoteBundleId, VoteBundleView>,
-    votes_by_eb: HashMap<EndorserBlockId, HashMap<NodeId, usize>>,
+    votes_by_eb: HashMap<EndorserBlockId, BTreeMap<NodeId, usize>>,
 }
 
 #[derive(Clone, Default)]
@@ -471,6 +472,19 @@ impl LinearLeiosNode {
         }
 
         let parent = self.latest_rb_ref();
+        let endorsement = parent.and_then(|rb_id| {
+            let eb_id = self.leios.ebs_by_rb.get(&rb_id)?;
+            let votes = self.leios.votes_by_eb.get(eb_id)?;
+            let total_votes = votes.values().copied().sum::<usize>();
+            if (total_votes as u64) < self.sim_config.vote_threshold {
+                return None;
+            }
+            Some(Endorsement {
+                eb: *eb_id,
+                size_bytes: self.sim_config.sizes.cert(votes.len()),
+                votes: votes.clone(),
+            })
+        });
 
         let rb = RankingBlock {
             header: RankingBlockHeader {
@@ -484,6 +498,7 @@ impl LinearLeiosNode {
                 eb_announcement: eb_id,
             },
             transactions: rb_transactions,
+            endorsement,
         };
 
         let eb = EndorserBlock {
@@ -529,6 +544,9 @@ impl LinearLeiosNode {
             .get(&rb.header.id)
             .and_then(|rb| rb.header_seen())
             .unwrap_or(self.clock.now());
+        self.leios
+            .ebs_by_rb
+            .insert(rb.header.id, rb.header.eb_announcement);
         self.praos
             .blocks
             .insert(rb.header.id, RankingBlockView::Received { rb, header_seen });

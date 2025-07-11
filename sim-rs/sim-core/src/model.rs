@@ -97,6 +97,7 @@ pub struct LinearRankingBlockHeader {
 pub struct LinearRankingBlock {
     pub header: LinearRankingBlockHeader,
     pub transactions: Vec<Arc<Transaction>>,
+    pub endorsement: Option<Endorsement>,
 }
 
 impl LinearRankingBlock {
