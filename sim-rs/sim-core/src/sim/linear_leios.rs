@@ -522,6 +522,13 @@ impl LinearLeiosNode {
         for tx in &rb.transactions {
             self.praos.mempool.remove(&tx.id);
         }
+        if let Some(endorsement) = &rb.endorsement {
+            if let Some(EndorserBlockView::Received { eb }) = self.leios.ebs.get(&endorsement.eb) {
+                for tx in &eb.txs {
+                    self.praos.mempool.remove(&tx.id);
+                }
+            }
+        }
         for peer in &self.consumers {
             if self
                 .praos
@@ -813,17 +820,8 @@ impl LinearLeiosNode {
 
     fn finish_generating_vote_bundle(&mut self, votes: VoteBundle) {
         self.tracker.track_votes_generated(&votes);
+        self.count_votes(&votes);
         let id = votes.id;
-        for (eb, count) in &votes.ebs {
-            let eb_votes = self
-                .leios
-                .votes_by_eb
-                .entry(*eb)
-                .or_default()
-                .entry(votes.id.producer)
-                .or_default();
-            *eb_votes += count;
-        }
         let votes = Arc::new(votes);
         self.leios
             .votes
@@ -875,21 +873,32 @@ impl LinearLeiosNode {
         {
             return;
         }
-        for (eb, count) in votes.ebs.iter() {
-            let eb_votes = self
-                .leios
-                .votes_by_eb
-                .entry(*eb)
-                .or_default()
-                .entry(votes.id.producer)
-                .or_default();
-            *eb_votes += count;
-        }
+        self.count_votes(&votes);
         for peer in &self.consumers {
             if *peer == from {
                 continue;
             }
             self.queued.send_to(*peer, Message::AnnounceVotes(id));
+        }
+    }
+
+    fn count_votes(&mut self, votes: &VoteBundle) {
+        let vote_threshold = self.sim_config.vote_threshold as usize;
+        for (eb_id, count) in votes.ebs.iter() {
+            let all_eb_votes = self.leios.votes_by_eb.entry(*eb_id).or_default();
+            let total_votes_before = all_eb_votes.values().sum::<usize>();
+            *all_eb_votes.entry(votes.id.producer).or_default() += count;
+
+            let total_votes_after = total_votes_before + count;
+            if total_votes_before < vote_threshold && total_votes_after >= vote_threshold {
+                // clear the EB's transactions from the mempool
+                // TODO: we're supposed to wait some time for this
+                if let Some(EndorserBlockView::Received { eb }) = self.leios.ebs.get(eb_id) {
+                    for tx in &eb.txs {
+                        self.praos.mempool.remove(&tx.id);
+                    }
+                }
+            }
         }
     }
 }
@@ -926,7 +935,15 @@ impl LinearLeiosNode {
                 state.spent_inputs.insert(tx.input_id);
             }
 
-            // TODO: account for endorser blocks
+            if let Some(endorsement) = &rb.endorsement {
+                if let Some(EndorserBlockView::Received { eb }) =
+                    self.leios.ebs.get(&endorsement.eb)
+                {
+                    for tx in &eb.txs {
+                        state.spent_inputs.insert(tx.input_id);
+                    }
+                }
+            }
         }
 
         let state = Arc::new(state);
