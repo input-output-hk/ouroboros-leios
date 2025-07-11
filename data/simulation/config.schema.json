@@ -446,6 +446,9 @@
     "vote-generation-cpu-time-ms-per-ib": {
       "type": "number"
     },
+    "vote-generation-cpu-time-ms-per-tx": {
+      "type": "number"
+    },
     "vote-generation-probability": {
       "type": "number"
     },

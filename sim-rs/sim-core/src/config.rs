@@ -122,6 +122,7 @@ pub struct RawParameters {
     // Vote configuration
     pub vote_generation_probability: f64,
     pub vote_generation_cpu_time_ms_constant: f64,
+    pub vote_generation_cpu_time_ms_per_tx: f64,
     pub vote_generation_cpu_time_ms_per_ib: f64,
     pub vote_validation_cpu_time_ms: f64,
     pub vote_threshold: u64,
@@ -327,6 +328,7 @@ pub(crate) struct CpuTimeConfig {
     pub eb_generation: Duration,
     pub eb_validation: Duration,
     pub vote_generation_constant: Duration,
+    pub vote_generation_per_tx: Duration,
     pub vote_generation_per_ib: Duration,
     pub vote_validation: Duration,
     pub cert_generation_constant: Duration,
@@ -357,6 +359,7 @@ impl CpuTimeConfig {
             eb_generation: duration_ms(params.eb_generation_cpu_time_ms),
             eb_validation: duration_ms(params.eb_validation_cpu_time_ms),
             vote_generation_constant: duration_ms(params.vote_generation_cpu_time_ms_constant),
+            vote_generation_per_tx: duration_ms(params.vote_generation_cpu_time_ms_per_tx),
             vote_generation_per_ib: duration_ms(params.vote_generation_cpu_time_ms_per_ib),
             vote_validation: duration_ms(params.vote_validation_cpu_time_ms),
             cert_generation_constant: duration_ms(params.cert_generation_cpu_time_ms_constant),

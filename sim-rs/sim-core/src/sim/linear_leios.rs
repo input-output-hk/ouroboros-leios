@@ -17,7 +17,7 @@ use crate::{
     model::{
         BlockId, EndorserBlockId, LinearEndorserBlock as EndorserBlock,
         LinearRankingBlock as RankingBlock, LinearRankingBlockHeader as RankingBlockHeader,
-        Transaction, TransactionId,
+        Transaction, TransactionId, VoteBundle, VoteBundleId,
     },
     sim::{MiniProtocol, NodeImpl, SimCpuTask, SimMessage, lottery},
 };
@@ -47,6 +47,11 @@ pub enum Message {
     AnnounceEB(EndorserBlockId),
     RequestEB(EndorserBlockId),
     EB(Arc<EndorserBlock>),
+
+    // Vote propagation
+    AnnounceVotes(VoteBundleId),
+    RequestVotes(VoteBundleId),
+    Votes(Arc<VoteBundle>),
 }
 
 impl SimMessage for Message {
@@ -67,6 +72,10 @@ impl SimMessage for Message {
             Self::AnnounceEB(_) => MiniProtocol::EB,
             Self::RequestEB(_) => MiniProtocol::EB,
             Self::EB(_) => MiniProtocol::EB,
+
+            Self::AnnounceVotes(_) => MiniProtocol::Vote,
+            Self::RequestVotes(_) => MiniProtocol::Vote,
+            Self::Votes(_) => MiniProtocol::Vote,
         }
     }
 
@@ -87,6 +96,10 @@ impl SimMessage for Message {
             Self::AnnounceEB(_) => 8,
             Self::RequestEB(_) => 8,
             Self::EB(eb) => eb.bytes,
+
+            Self::AnnounceVotes(_) => 8,
+            Self::RequestVotes(_) => 8,
+            Self::Votes(v) => v.bytes,
         }
     }
 }
@@ -102,6 +115,10 @@ pub enum CpuTask {
     RBBlockValidated(Arc<RankingBlock>),
     /// An endorser block has been received and validated, and is ready to propagate
     EBBlockValidated(NodeId, Arc<EndorserBlock>),
+    /// A bundle of votes has been generated and is ready to propagate
+    VTBundleGenerated(VoteBundle, Arc<EndorserBlock>),
+    /// A bundle of votes has been received and validated, and is ready to propagate
+    VTBundleValidated(NodeId, Arc<VoteBundle>),
 }
 
 impl SimCpuTask for CpuTask {
@@ -112,6 +129,8 @@ impl SimCpuTask for CpuTask {
             Self::RBHeaderValidated(_, _, _, _) => "ValRH",
             Self::RBBlockValidated(_) => "ValRB",
             Self::EBBlockValidated(_, _) => "ValEB",
+            Self::VTBundleGenerated(_, _) => "GenVote",
+            Self::VTBundleValidated(_, _) => "ValVote",
         }
         .to_string()
     }
@@ -123,6 +142,8 @@ impl SimCpuTask for CpuTask {
             Self::RBHeaderValidated(_, _, _, _) => "".to_string(),
             Self::RBBlockValidated(_) => "".to_string(),
             Self::EBBlockValidated(_, _) => "".to_string(),
+            Self::VTBundleGenerated(_, _) => "".to_string(),
+            Self::VTBundleValidated(_, _) => "".to_string(),
         }
     }
 
@@ -145,6 +166,11 @@ impl SimCpuTask for CpuTask {
                 time += config.rb_validation_per_byte * (bytes as u32);
                 vec![time]
             }
+            Self::VTBundleGenerated(_, eb) => vec![
+                config.vote_generation_constant
+                    + (config.vote_generation_per_tx * eb.txs.len() as u32),
+            ],
+            Self::VTBundleValidated(_, _) => vec![config.vote_validation],
         }
     }
 }
@@ -202,9 +228,16 @@ enum EndorserBlockView {
     Received { eb: Arc<EndorserBlock> },
 }
 
+enum VoteBundleView {
+    Requested,
+    Received { votes: Arc<VoteBundle> },
+}
+
 #[derive(Default)]
 struct NodeLeiosState {
     ebs: HashMap<EndorserBlockId, EndorserBlockView>,
+    votes: HashMap<VoteBundleId, VoteBundleView>,
+    votes_by_eb: HashMap<EndorserBlockId, HashMap<NodeId, usize>>,
 }
 
 #[derive(Clone, Default)]
@@ -291,6 +324,11 @@ impl NodeImpl for LinearLeiosNode {
             Message::AnnounceEB(id) => self.receive_announce_eb(from, id),
             Message::RequestEB(id) => self.receive_request_eb(from, id),
             Message::EB(rb) => self.receive_eb(from, rb),
+
+            // Vote propagation
+            Message::AnnounceVotes(id) => self.receive_announce_votes(from, id),
+            Message::RequestVotes(id) => self.receive_request_votes(from, id),
+            Message::Votes(votes) => self.receive_votes(from, votes),
         }
         std::mem::take(&mut self.queued)
     }
@@ -304,6 +342,10 @@ impl NodeImpl for LinearLeiosNode {
             }
             CpuTask::RBBlockValidated(rb) => self.finish_validating_rb(rb),
             CpuTask::EBBlockValidated(from, eb) => self.finish_validating_eb(from, eb),
+            CpuTask::VTBundleGenerated(votes, _) => self.finish_generating_vote_bundle(votes),
+            CpuTask::VTBundleValidated(from, votes) => {
+                self.finish_validating_vote_bundle(from, votes)
+            }
         }
         std::mem::take(&mut self.queued)
     }
@@ -701,12 +743,135 @@ impl LinearLeiosNode {
             return;
         }
 
+        self.vote_for_endorser_block(&eb);
+
         // TODO: sleep
         for peer in &self.consumers {
             if *peer == from {
                 continue;
             }
             self.queued.send_to(*peer, Message::AnnounceEB(eb.id()));
+        }
+    }
+}
+
+// Voting
+impl LinearLeiosNode {
+    fn vote_for_endorser_block(&mut self, eb: &Arc<EndorserBlock>) {
+        if !self.try_vote_for_endorser_block(eb) && self.sim_config.emit_conformance_events {
+            self.tracker
+                .track_linear_no_vote_generated(self.id, eb.id());
+        }
+    }
+
+    fn try_vote_for_endorser_block(&mut self, eb: &Arc<EndorserBlock>) -> bool {
+        let vrf_wins = lottery::vrf_probabilities(self.sim_config.vote_probability)
+            .filter_map(|f| self.run_vrf(f))
+            .count();
+        if vrf_wins == 0 {
+            return false;
+        }
+
+        let id = VoteBundleId {
+            slot: eb.slot,
+            pipeline: 0,
+            producer: self.id,
+        };
+        self.tracker.track_vote_lottery_won(id);
+
+        // TODO: sometimes, don't vote
+
+        let mut ebs = BTreeMap::new();
+        ebs.insert(eb.id(), vrf_wins);
+        let votes = VoteBundle {
+            id,
+            bytes: self.sim_config.sizes.vote_bundle(1),
+            ebs,
+        };
+        self.queued
+            .schedule_cpu_task(CpuTask::VTBundleGenerated(votes, eb.clone()));
+        true
+    }
+
+    fn finish_generating_vote_bundle(&mut self, votes: VoteBundle) {
+        self.tracker.track_votes_generated(&votes);
+        let id = votes.id;
+        for (eb, count) in &votes.ebs {
+            let eb_votes = self
+                .leios
+                .votes_by_eb
+                .entry(*eb)
+                .or_default()
+                .entry(votes.id.producer)
+                .or_default();
+            *eb_votes += count;
+        }
+        let votes = Arc::new(votes);
+        self.leios
+            .votes
+            .insert(votes.id, VoteBundleView::Received { votes });
+        for peer in &self.consumers {
+            self.queued.send_to(*peer, Message::AnnounceVotes(id));
+        }
+    }
+
+    fn receive_announce_votes(&mut self, from: NodeId, id: VoteBundleId) {
+        let should_request = match self.leios.votes.get(&id) {
+            None => true,
+            Some(VoteBundleView::Received { .. }) => {
+                self.sim_config.relay_strategy == RelayStrategy::RequestFromAll
+            }
+            _ => false,
+        };
+        if should_request {
+            self.leios.votes.insert(id, VoteBundleView::Requested);
+            self.queued.send_to(from, Message::RequestVotes(id));
+        }
+    }
+
+    fn receive_request_votes(&mut self, from: NodeId, id: VoteBundleId) {
+        if let Some(VoteBundleView::Received { votes }) = self.leios.votes.get(&id) {
+            self.tracker.track_votes_sent(votes, self.id, from);
+            self.queued.send_to(from, Message::Votes(votes.clone()));
+        }
+    }
+
+    fn receive_votes(&mut self, from: NodeId, votes: Arc<VoteBundle>) {
+        self.tracker.track_votes_received(&votes, from, self.id);
+        self.queued
+            .schedule_cpu_task(CpuTask::VTBundleValidated(from, votes));
+    }
+
+    fn finish_validating_vote_bundle(&mut self, from: NodeId, votes: Arc<VoteBundle>) {
+        let id = votes.id;
+        if self
+            .leios
+            .votes
+            .insert(
+                id,
+                VoteBundleView::Received {
+                    votes: votes.clone(),
+                },
+            )
+            .is_some_and(|v| matches!(v, VoteBundleView::Received { .. }))
+        {
+            return;
+        }
+        for (eb, count) in votes.ebs.iter() {
+            let eb_votes = self
+                .leios
+                .votes_by_eb
+                .entry(*eb)
+                .or_default()
+                .entry(votes.id.producer)
+                .or_default();
+            *eb_votes += count;
+        }
+        for peer in &self.consumers {
+            if *peer == from {
+                continue;
+            }
+            self.queued.send_to(*peer, Message::AnnounceVotes(id));
         }
     }
 }

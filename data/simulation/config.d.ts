@@ -199,6 +199,7 @@ export interface Config {
   "vote-generation-probability": number;
   "vote-generation-cpu-time-ms-constant": number;
   "vote-generation-cpu-time-ms-per-ib": number;
+  "vote-generation-cpu-time-ms-per-tx": number;
   "vote-validation-cpu-time-ms": number;
   "vote-threshold": bigint;
   "vote-bundle-size-bytes-constant": bigint;

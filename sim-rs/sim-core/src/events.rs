@@ -252,6 +252,7 @@ pub enum Event {
     NoVTBundleGenerated {
         node: Node,
         slot: u64,
+        eb: Option<EndorserBlockId<Node>>,
     },
     VTBundleNotGenerated {
         slot: u64,
@@ -697,6 +698,15 @@ impl EventTracker {
         self.send(Event::NoVTBundleGenerated {
             node: self.to_node(node),
             slot,
+            eb: None,
+        });
+    }
+
+    pub fn track_linear_no_vote_generated(&self, node: NodeId, eb: EndorserBlockId) {
+        self.send(Event::NoVTBundleGenerated {
+            node: self.to_node(node),
+            slot: eb.slot,
+            eb: Some(self.to_endorser_block(eb)),
         });
     }
 

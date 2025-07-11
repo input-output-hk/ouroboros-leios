@@ -185,6 +185,8 @@ vote-threshold: 300
 vote-generation-cpu-time-ms-constant: 164e-3
 # No benchmark yet.
 vote-generation-cpu-time-ms-per-ib: 0
+# No benchmark yet.
+vote-generation-cpu-time-ms-per-tx: 0
 # vote-spec#"Verify vote" 0.8*670e-3 + 0.2*1.4
 vote-validation-cpu-time-ms: 816e-3
 # The `Vote` structure counted in the -per-eb already identifies slot
