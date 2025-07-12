@@ -25,6 +25,10 @@ The plots below show the *throughput* (defined as the size of the RBs and of the
 |---------------------------------------------------------------------|--------------------------------------------------------------------------------|
 | ![Throughput of Linear Leios](analysis/linear-leios-throughput.svg) | ![Throughput efficiency of Linear Leios](analysis/linear-leios-efficiency.svg) |
 
+### Rust simulation
+
+Implemented a first pass at Linear Leios.
+
 ## 2025-07-08
 
 ### Small tx experiment
