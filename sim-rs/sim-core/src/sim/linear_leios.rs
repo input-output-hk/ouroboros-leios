@@ -455,12 +455,27 @@ impl LinearLeiosNode {
 
         let parent = self.latest_rb_ref();
         let endorsement = parent.and_then(|rb_id| {
+            let Some(RankingBlockView::Received { rb, .. }) = self.praos.blocks.get(&rb_id) else {
+                return None;
+            };
+            if rb.header.id.slot
+                + self.sim_config.linear_vote_stage_length
+                + self.sim_config.linear_diffuse_stage_length
+                > slot
+            {
+                // This RB was generated too quickly after another; hasn't been time to gather all the votes.
+                // No endorsement.
+                return None;
+            }
+
             let eb_id = self.leios.ebs_by_rb.get(&rb_id)?;
             let votes = self.leios.votes_by_eb.get(eb_id)?;
             let total_votes = votes.values().copied().sum::<usize>();
             if (total_votes as u64) < self.sim_config.vote_threshold {
+                // Not enough votes. No endorsement.
                 return None;
             }
+
             Some(Endorsement {
                 eb: *eb_id,
                 size_bytes: self.sim_config.sizes.cert(votes.len()),

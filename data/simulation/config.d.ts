@@ -76,6 +76,21 @@ export interface Config {
    * If false, RBs will only contain a cert.
    */
   "praos-fallback-enabled": boolean;
+
+  // Linear Leios specific configuration
+  /**
+   * How long the EB voting stage is allowed to last.
+   * Should be more than 3x leios-header-diffusion-time-ms.
+   * Matches L_vote from the paper.
+   */
+  "linear-vote-stage-length-slots": bigint;
+
+  /**
+   * How long after the EB voting stage are votes allowed to diffuse.
+   * Matches L_diff from the paper.
+   */
+  "linear-diffuse-stage-length-slots": bigint;
+
   // Transaction Configuration
   /** Only supported by Rust simulation. */
   "tx-generation-distribution": Distribution;

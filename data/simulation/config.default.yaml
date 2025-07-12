@@ -36,6 +36,9 @@ leios-mempool-aggressive-pruning: false
 praos-chain-quality: 40
 praos-fallback-enabled: true
 
+linear-vote-stage-length-slots: 5
+linear-diffuse-stage-length-slots: 5
+
 ################################################################################
 # Transaction Configuration
 ################################################################################
