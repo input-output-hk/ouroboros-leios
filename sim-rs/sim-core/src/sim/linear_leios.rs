@@ -239,6 +239,7 @@ struct NodeLeiosState {
     ebs_by_rb: HashMap<BlockId, EndorserBlockId>,
     votes: HashMap<VoteBundleId, VoteBundleView>,
     votes_by_eb: HashMap<EndorserBlockId, BTreeMap<NodeId, usize>>,
+    certified_ebs: HashSet<EndorserBlockId>,
 }
 
 #[derive(Clone, Default)]
@@ -292,6 +293,7 @@ impl NodeImpl for LinearLeiosNode {
     }
 
     fn handle_new_slot(&mut self, slot: u64) -> EventResult {
+        self.process_certified_ebs(slot);
         self.try_generate_rb(slot);
 
         std::mem::take(&mut self.queued)
@@ -766,6 +768,35 @@ impl LinearLeiosNode {
             self.queued.send_to(*peer, Message::AnnounceEB(eb.id()));
         }
     }
+
+    fn process_certified_ebs(&mut self, slot: u64) {
+        let Some(eb_creation_slot) = slot.checked_sub(
+            self.sim_config.linear_vote_stage_length + self.sim_config.linear_diffuse_stage_length,
+        ) else {
+            return;
+        };
+
+        let Some(rb_head) = self.latest_rb_ref() else {
+            return;
+        };
+        let Some(RankingBlockView::Received { rb, .. }) = self.praos.blocks.get(&rb_head) else {
+            return;
+        };
+
+        if rb.header.id.slot != eb_creation_slot {
+            return;
+        }
+        // The EB on the head of the chain has had enough time to get certified.
+
+        let eb_id = rb.header.eb_announcement;
+        if self.leios.certified_ebs.contains(&eb_id) {
+            // This certified EB is eventually going on-chain.
+            // Get its contents out of the mempool.
+            if let Some(EndorserBlockView::Received { eb }) = self.leios.ebs.get(&eb_id) {
+                self.remove_eb_txs_from_mempool(&eb.clone());
+            };
+        }
+    }
 }
 
 // Voting
@@ -879,11 +910,8 @@ impl LinearLeiosNode {
 
             let total_votes_after = total_votes_before + count;
             if total_votes_before < vote_threshold && total_votes_after >= vote_threshold {
-                // clear the EB's transactions from the mempool
-                // TODO: we're supposed to wait some time for this
-                if let Some(EndorserBlockView::Received { eb }) = self.leios.ebs.get(eb_id) {
-                    self.remove_eb_txs_from_mempool(&eb.clone());
-                }
+                // this EB is officially certified
+                self.leios.certified_ebs.insert(*eb_id);
             }
         }
     }
