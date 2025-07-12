@@ -394,7 +394,7 @@ impl LinearLeiosNode {
         {
             return;
         }
-        let rb_ref = self.latest_rb_ref();
+        let rb_ref = self.latest_rb().map(|rb| rb.header.id);
         let ledger_state = self.resolve_ledger_state(rb_ref);
         if ledger_state.spent_inputs.contains(&tx.input_id) {
             // Ignoring a TX which conflicts with something already onchain
@@ -455,12 +455,9 @@ impl LinearLeiosNode {
             self.sample_from_mempool(&mut eb_transactions, self.sim_config.max_eb_size);
         }
 
-        let parent = self.latest_rb_ref();
+        let parent = self.latest_rb().map(|rb| rb.header.id);
         let endorsement = parent.and_then(|rb_id| {
-            let Some(RankingBlockView::Received { rb, .. }) = self.praos.blocks.get(&rb_id) else {
-                return None;
-            };
-            if rb.header.id.slot
+            if rb_id.slot
                 + self.sim_config.linear_vote_stage_length
                 + self.sim_config.linear_diffuse_stage_length
                 > slot
@@ -704,8 +701,14 @@ impl LinearLeiosNode {
         self.publish_rb(rb, true);
     }
 
-    fn latest_rb_ref(&self) -> Option<BlockId> {
-        self.praos.blocks.last_key_value().map(|(id, _)| *id)
+    fn latest_rb(&self) -> Option<&Arc<RankingBlock>> {
+        self.praos.blocks.iter().rev().find_map(|(_, rb)| {
+            if let RankingBlockView::Received { rb, .. } = rb {
+                Some(rb)
+            } else {
+                None
+            }
+        })
     }
 }
 
@@ -776,10 +779,7 @@ impl LinearLeiosNode {
             return;
         };
 
-        let Some(rb_head) = self.latest_rb_ref() else {
-            return;
-        };
-        let Some(RankingBlockView::Received { rb, .. }) = self.praos.blocks.get(&rb_head) else {
+        let Some(rb) = self.latest_rb() else {
             return;
         };
 
