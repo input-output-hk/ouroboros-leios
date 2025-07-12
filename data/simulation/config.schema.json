@@ -73,7 +73,13 @@
       "type": "object"
     },
     "LeiosVariant": {
-      "enum": ["short", "full", "full-without-ibs", "full-with-tx-references"],
+      "enum": [
+        "short",
+        "full",
+        "full-without-ibs",
+        "full-with-tx-references",
+        "linear"
+      ],
       "type": "string"
     },
     "LogNormalDistribution": {
@@ -142,6 +148,11 @@
     "cleanup-policies": {
       "$ref": "#/definitions/CleanupPolicies",
       "description": "Only supported by Haskell simulation."
+    },
+    "eb-body-avg-size-bytes": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "number"
     },
     "eb-diffusion-max-bodies-to-request": {
       "additionalProperties": false,
@@ -302,6 +313,18 @@
       "description": "Determines whether a Leios pipeline has separate Vote (Send) and Vote (Recv) stages.\nIf this is set to `true`, it is recommended to set `leios-stage-active-voting-slots`\nto be equal to `leios-stage-length-slots`.\n\nOnly supported by Haskell simulation.",
       "type": "boolean"
     },
+    "linear-diffuse-stage-length-slots": {
+      "additionalProperties": false,
+      "description": "How long after the EB voting stage are votes allowed to diffuse.\nMatches L_diff from the paper.",
+      "properties": {},
+      "type": "number"
+    },
+    "linear-vote-stage-length-slots": {
+      "additionalProperties": false,
+      "description": "How long the EB voting stage is allowed to last.\nShould be more than 3x leios-header-diffusion-time-ms.\nMatches L_vote from the paper.",
+      "properties": {},
+      "type": "number"
+    },
     "multiplex-mini-protocols": {
       "description": "Only supported by Haskell simulation.",
       "type": "boolean"
@@ -433,6 +456,9 @@
       "type": "number"
     },
     "vote-generation-cpu-time-ms-per-ib": {
+      "type": "number"
+    },
+    "vote-generation-cpu-time-ms-per-tx": {
       "type": "number"
     },
     "vote-generation-probability": {

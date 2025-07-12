@@ -36,6 +36,9 @@ leios-mempool-aggressive-pruning: false
 praos-chain-quality: 40
 praos-fallback-enabled: true
 
+linear-vote-stage-length-slots: 5
+linear-diffuse-stage-length-slots: 5
+
 ################################################################################
 # Transaction Configuration
 ################################################################################
@@ -132,6 +135,7 @@ eb-generation-probability: 1.5
 eb-size-bytes-constant: 240
 # IB hash
 eb-size-bytes-per-ib: 32
+eb-body-avg-size-bytes: 0
 # Collecting the IBs to reference and cryptography are the main tasks.
 # A comparable task is maybe mempool snapshotting.
 # Sec 2.3 Forging, of the benchmark cluster report, lists
@@ -184,6 +188,8 @@ vote-threshold: 300
 vote-generation-cpu-time-ms-constant: 164e-3
 # No benchmark yet.
 vote-generation-cpu-time-ms-per-ib: 0
+# No benchmark yet.
+vote-generation-cpu-time-ms-per-tx: 0
 # vote-spec#"Verify vote" 0.8*670e-3 + 0.2*1.4
 vote-validation-cpu-time-ms: 816e-3
 # The `Vote` structure counted in the -per-eb already identifies slot

@@ -76,6 +76,21 @@ export interface Config {
    * If false, RBs will only contain a cert.
    */
   "praos-fallback-enabled": boolean;
+
+  // Linear Leios specific configuration
+  /**
+   * How long the EB voting stage is allowed to last.
+   * Should be more than 3x leios-header-diffusion-time-ms.
+   * Matches L_vote from the paper.
+   */
+  "linear-vote-stage-length-slots": bigint;
+
+  /**
+   * How long after the EB voting stage are votes allowed to diffuse.
+   * Matches L_diff from the paper.
+   */
+  "linear-diffuse-stage-length-slots": bigint;
+
   // Transaction Configuration
   /** Only supported by Rust simulation. */
   "tx-generation-distribution": Distribution;
@@ -155,6 +170,7 @@ export interface Config {
   "eb-validation-cpu-time-ms": number;
   "eb-size-bytes-constant": bigint;
   "eb-size-bytes-per-ib": bigint;
+  "eb-body-avg-size-bytes": bigint;
   /** Only supported by Haskell simulation. */
   "eb-diffusion-strategy": DiffusionStrategy;
   /** Only supported by Haskell simulation. */
@@ -198,6 +214,7 @@ export interface Config {
   "vote-generation-probability": number;
   "vote-generation-cpu-time-ms-constant": number;
   "vote-generation-cpu-time-ms-per-ib": number;
+  "vote-generation-cpu-time-ms-per-tx": number;
   "vote-validation-cpu-time-ms": number;
   "vote-threshold": bigint;
   "vote-bundle-size-bytes-constant": bigint;
@@ -277,7 +294,9 @@ export enum LeiosVariant {
   /** Full Leios Without IBs: EBs reference TXs directly, as well as other EBs */
   FullWithoutIbs = "full-without-ibs",
   /** Full Leios With TX References: IBs only contain references to TXs instead of the whole body */
-  FullWithTXReferences = "full-with-tx-references"
+  FullWithTXReferences = "full-with-tx-references",
+  /** Linear Leios: Leios with as little concurrency as possible. */
+  Linear = "linear",
 }
 
 export enum MempoolSamplingStrategy {

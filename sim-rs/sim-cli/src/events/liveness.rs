@@ -93,7 +93,9 @@ impl LivenessMonitor {
             }
             Event::VTBundleGenerated { votes, .. } => {
                 for (eb_id, count) in &votes.0 {
-                    let eb = self.ebs.get_mut(eb_id).unwrap();
+                    let Some(eb) = self.ebs.get_mut(eb_id) else {
+                        continue;
+                    };
                     eb.votes += *count as u64;
                     if eb.votes >= self.vote_threshold {
                         for ib_id in &eb.ibs {

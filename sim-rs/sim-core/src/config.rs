@@ -72,6 +72,8 @@ pub struct RawParameters {
     pub leios_mempool_aggressive_pruning: bool,
     pub praos_chain_quality: u64,
     pub praos_fallback_enabled: bool,
+    pub linear_vote_stage_length_slots: u64,
+    pub linear_diffuse_stage_length_slots: u64,
 
     // Transaction configuration
     pub tx_generation_distribution: DistributionConfig,
@@ -117,10 +119,12 @@ pub struct RawParameters {
     pub eb_size_bytes_per_ib: u64,
     pub eb_max_age_slots: u64,
     pub eb_referenced_txs_max_size_bytes: u64,
+    pub eb_body_avg_size_bytes: u64,
 
     // Vote configuration
     pub vote_generation_probability: f64,
     pub vote_generation_cpu_time_ms_constant: f64,
+    pub vote_generation_cpu_time_ms_per_tx: f64,
     pub vote_generation_cpu_time_ms_per_ib: f64,
     pub vote_validation_cpu_time_ms: f64,
     pub vote_threshold: u64,
@@ -151,6 +155,7 @@ pub enum LeiosVariant {
     Full,
     FullWithoutIbs,
     FullWithTxReferences,
+    Linear,
 }
 
 #[derive(Debug, Copy, Clone, Deserialize, PartialEq, Eq)]
@@ -315,7 +320,8 @@ impl From<RawTopology> for Topology {
 pub(crate) struct CpuTimeConfig {
     pub tx_validation: Duration,
     pub rb_generation: Duration,
-    pub rb_validation_constant: Duration,
+    pub rb_head_validation: Duration,
+    pub rb_body_validation_constant: Duration,
     pub rb_validation_per_byte: Duration,
     pub ib_generation: Duration,
     pub ib_head_validation: Duration,
@@ -324,6 +330,7 @@ pub(crate) struct CpuTimeConfig {
     pub eb_generation: Duration,
     pub eb_validation: Duration,
     pub vote_generation_constant: Duration,
+    pub vote_generation_per_tx: Duration,
     pub vote_generation_per_ib: Duration,
     pub vote_validation: Duration,
     pub cert_generation_constant: Duration,
@@ -336,9 +343,9 @@ impl CpuTimeConfig {
         Self {
             tx_validation: duration_ms(params.tx_validation_cpu_time_ms),
             rb_generation: duration_ms(params.rb_generation_cpu_time_ms),
-            rb_validation_constant: duration_ms(
-                params.rb_head_validation_cpu_time_ms
-                    + params.rb_body_legacy_praos_payload_validation_cpu_time_ms_constant,
+            rb_head_validation: duration_ms(params.rb_head_validation_cpu_time_ms),
+            rb_body_validation_constant: duration_ms(
+                params.rb_body_legacy_praos_payload_validation_cpu_time_ms_constant,
             ),
             rb_validation_per_byte: duration_ms(
                 params.rb_body_legacy_praos_payload_validation_cpu_time_ms_per_byte,
@@ -354,6 +361,7 @@ impl CpuTimeConfig {
             eb_generation: duration_ms(params.eb_generation_cpu_time_ms),
             eb_validation: duration_ms(params.eb_validation_cpu_time_ms),
             vote_generation_constant: duration_ms(params.vote_generation_cpu_time_ms_constant),
+            vote_generation_per_tx: duration_ms(params.vote_generation_cpu_time_ms_per_tx),
             vote_generation_per_ib: duration_ms(params.vote_generation_cpu_time_ms_per_ib),
             vote_validation: duration_ms(params.vote_validation_cpu_time_ms),
             cert_generation_constant: duration_ms(params.cert_generation_cpu_time_ms_constant),
@@ -407,6 +415,10 @@ impl BlockSizeConfig {
         self.eb_constant + self.eb_per_ib * (txs + ibs + ebs) as u64
     }
 
+    pub fn linear_eb(&self, txs: &[Arc<Transaction>]) -> u64 {
+        self.eb_constant + txs.iter().map(|tx| tx.bytes).sum::<u64>()
+    }
+
     pub fn vote_bundle(&self, ebs: usize) -> u64 {
         self.vote_constant + self.vote_per_eb * ebs as u64
     }
@@ -441,6 +453,7 @@ impl TransactionConfig {
                 next_id: Arc::new(AtomicU64::new(0)),
                 ib_size: params.ib_body_avg_size_bytes,
                 rb_size: params.rb_body_legacy_praos_payload_avg_size_bytes,
+                eb_size: params.eb_body_avg_size_bytes,
             })
         }
     }
@@ -462,6 +475,7 @@ pub(crate) struct MockTransactionConfig {
     next_id: Arc<AtomicU64>,
     pub ib_size: u64,
     pub rb_size: u64,
+    pub eb_size: u64,
 }
 
 impl MockTransactionConfig {
@@ -494,6 +508,7 @@ pub struct SimConfiguration {
     pub late_ib_inclusion: bool,
     pub variant: LeiosVariant,
     pub vote_threshold: u64,
+    pub(crate) total_stake: u64,
     pub(crate) praos_fallback: bool,
     pub(crate) header_diffusion_time: Duration,
     pub(crate) ib_generation_time: Duration,
@@ -506,6 +521,8 @@ pub struct SimConfiguration {
     pub(crate) eb_generation_probability: f64,
     pub(crate) vote_probability: f64,
     pub(crate) vote_slot_length: u64,
+    pub(crate) linear_vote_stage_length: u64,
+    pub(crate) linear_diffuse_stage_length: u64,
     pub(crate) max_block_size: u64,
     pub(crate) max_ib_size: u64,
     pub(crate) max_eb_size: u64,
@@ -539,6 +556,7 @@ impl SimConfiguration {
                 params.ib_shard_period_length_slots
             );
         }
+        let total_stake = topology.nodes.iter().map(|n| n.stake).sum();
         Ok(Self {
             seed: 0,
             timestamp_resolution: duration_ms(params.timestamp_resolution_ms),
@@ -552,6 +570,7 @@ impl SimConfiguration {
             max_eb_age: params.eb_max_age_slots,
             late_ib_inclusion: params.leios_late_ib_inclusion,
             variant: params.leios_variant,
+            total_stake,
             praos_fallback: params.praos_fallback_enabled,
             header_diffusion_time: duration_ms(params.leios_header_diffusion_time_ms),
             ib_generation_time: duration_ms(params.leios_ib_generation_time_ms),
@@ -565,6 +584,8 @@ impl SimConfiguration {
             vote_probability: params.vote_generation_probability,
             vote_threshold: params.vote_threshold,
             vote_slot_length: params.leios_stage_active_voting_slots,
+            linear_vote_stage_length: params.linear_vote_stage_length_slots,
+            linear_diffuse_stage_length: params.linear_diffuse_stage_length_slots,
             max_block_size: params.rb_body_max_size_bytes,
             max_ib_size: params.ib_body_max_size_bytes,
             max_eb_size: params.eb_referenced_txs_max_size_bytes,
