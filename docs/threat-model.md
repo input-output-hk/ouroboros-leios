@@ -19,28 +19,27 @@ Leios is an overlay protocol on top of Ouroboros Praos that enhances transaction
 ### 1.2 Key Components
 
 #### Core Components
-- **Endorser Blocks (EBs)**: New block type that references transactions for inclusion, up to 640 kB (~20k transaction references)
-- **Ranking Blocks (RBs)**: Standard Praos blocks enhanced with EB certificates
-- **Vote Certificates**: Aggregated stake-weighted votes on EB validity and transaction availability
-- **VRF-based EB Eligibility**: Separate lottery system for EB creation rights
+- **Ranking Block (RB)**: Standard Praos block enhanced with a Leios certificate
+- **Endorser Block (EB)**: New block type that references transactions for inclusion. May be substantially bigger than Praos blocks (currently on mainnet ~88 kB) with sizes around ~640 kB for 20k transaction references
+- **Leios Certificate**: Cryptographic proof about aggregated stake-weighted votes on EB validity and transaction availability
+- **EB Lottery**: Separate (to Praos) VRF lottery for EB creation rights
 
 #### Network Protocols
-- **EB Announcement Protocol**: Gossip protocol for EB existence
+- **EB Announcement Protocol**: Gossip protocol about EB existence
 - **EB Fetch Protocol**: Pull-based protocol for retrieving EBs
+- **Transaction Fetch Protocol**: Pull-based protocol for retrieving endorsed transactions
 - **Vote Diffusion Protocol**: Pull-based protocol for vote propagation
-- **Transaction Fetch Protocol**: Enhanced protocol for retrieving endorsed transactions
 
 #### Participants
-- **Stake Pool Operators**: Enhanced with EB creation and voting responsibilities
-- **Top 500 Voting Nodes**: Subset of stake pools by stake size, responsible for voting on EBs
-- **Regular Nodes**: Participate in transaction and block propagation
-- **Clients**: Maintain backward compatibility, unaware of Leios mechanics
+- **Stake Pool Operators**: Produce blocks, now enhanced with EB creation and voting responsibilities
+- **Relay Nodes**: Participate in transaction and block diffusion
+- **Clients**: Submit transactions and observe the chain / ledger state evolving, ideally maintain backward compatibility and may largely unaware of Leios mechanics
 
 ### 1.3 System Flow
 1. Stake pools create EBs based on VRF eligibility (parameterizable stage length)
 2. EBs are announced and propagated through the network
-3. Top 500 nodes by stake vote on EB validity and transaction availability
-4. If 75% of voting stake approves, a certificate is created
+3. A committee of nodes (> 500 by stake) vote on EB validity and transaction availability
+4. If a quorum of voting stake (> 60%) approves, a certificate is created
 5. Certificates are included in the next available RB (every ~20 seconds)
 6. Missing transactions are fetched on-demand when EBs are processed
 
@@ -118,7 +117,7 @@ Notable threats to the system that could impact assets.
 **Prerequisites**:
 - Control over multiple network positions to segment the peer-to-peer network
 - Ability to create valid but conflicting transactions (same inputs, different outputs)
-- Knowledge of network topology and SPO peer relationships
+- Discovery of network topology and SPO peer relationships
 - Timing coordination to submit conflicts before natural mempool synchronization
 
 **Attack Vector**:
@@ -145,7 +144,7 @@ Notable threats to the system that could impact assets.
 
 **Prerequisites**:
 - Control over significant network infrastructure (BGP routes, ISPs, or direct node connections)
-- Knowledge of top 500 voting nodes' network addresses and topology
+- Knowledge of high-stake nodes' network addresses and topology
 - Sustained resources to maintain isolation over multiple voting periods
 - Timing coordination across multiple attack vectors
 
@@ -159,7 +158,7 @@ Notable threats to the system that could impact assets.
 **Cost**: VERY HIGH - Requires substantial network infrastructure control, ISP cooperation, or large-scale DDoS capabilities
 
 **Impact**:
-- **Vote Manipulation**: Limited impact due to 75% threshold - attacker needs to isolate significant voting stake
+- **Vote Manipulation**: Limited impact due to quorum threshold - attacker needs to isolate significant voting stake
 - **Throughput**: Reduction if enough voting nodes are offline, but system is resilient
 - **Detectability**: Attack is highly visible through network monitoring and vote pattern analysis
 - **Resource Cost**: High cost for attacker relative to limited impact on robust voting system
@@ -201,7 +200,7 @@ Notable threats to the system that could impact assets.
 - Economic incentive to withhold (e.g., competing EB producers, censorship goals)
 
 **Attack Vector**:
-1. Win EB creation eligibility through normal VRF process
+1. Win EB creation eligibility through normal VRF process or possibly enhanced by grinding
 2. Either create EB but not propagate it, or simply abstain from creation
 3. May selectively withhold EBs containing specific transactions (censorship)
 4. Could coordinate with other eligible pools to maximize impact
@@ -217,10 +216,10 @@ Notable threats to the system that could impact assets.
 **Assets Affected**: High Throughput, Decentralization Properties
 
 #### T5: Double Voting
-**Description**: Top 500 voting nodes vote on multiple conflicting EBs that reference the same transactions or create incompatible blockchain states.
+**Description**: Nodes with delegated stake votes on multiple EBs that reference conflicting sets of transactions.
 
 **Prerequisites**:
-- Membership in top 500 voting nodes by stake
+- Node is member on voting committee by stake
 - Access to multiple conflicting EBs in the same voting period
 - Malicious intent or compromised voting infrastructure
 
