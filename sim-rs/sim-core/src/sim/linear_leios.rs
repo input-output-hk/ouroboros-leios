@@ -716,12 +716,14 @@ impl LinearLeiosNode {
 impl LinearLeiosNode {
     fn finish_generating_eb(&mut self, eb: EndorserBlock) {
         let eb_id = eb.id();
+        let eb = Arc::new(eb);
         self.leios
             .ebs
-            .insert(eb_id, EndorserBlockView::Received { eb: Arc::new(eb) });
+            .insert(eb_id, EndorserBlockView::Received { eb: eb.clone() });
         for peer in &self.consumers {
             self.queued.send_to(*peer, Message::AnnounceEB(eb_id));
         }
+        self.vote_for_endorser_block(&eb);
     }
     fn receive_announce_eb(&mut self, from: NodeId, id: EndorserBlockId) {
         let should_request = match self.leios.ebs.get(&id) {
