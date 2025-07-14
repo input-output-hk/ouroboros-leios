@@ -237,6 +237,7 @@ enum VoteBundleView {
 struct NodeLeiosState {
     ebs: HashMap<EndorserBlockId, EndorserBlockView>,
     ebs_by_rb: HashMap<BlockId, EndorserBlockId>,
+    eb_peer_announcements: HashMap<EndorserBlockId, Vec<NodeId>>,
     votes: HashMap<VoteBundleId, VoteBundleView>,
     votes_by_eb: HashMap<EndorserBlockId, BTreeMap<NodeId, usize>>,
     certified_ebs: HashSet<EndorserBlockId>,
@@ -632,12 +633,30 @@ impl LinearLeiosNode {
 
         let eb_id = header.eb_announcement;
 
+        let eb_peer_announcements = self.leios.eb_peer_announcements.entry(eb_id).or_default();
         if has_eb {
-            // TODO: freshest first
-            self.queued.send_to(from, Message::RequestEB(eb_id));
-            self.leios.ebs.insert(eb_id, EndorserBlockView::Requested);
-        } else {
+            eb_peer_announcements.push(from);
+        }
+
+        // TODO: freshest first
+        let peers_to_request_from = match self.sim_config.relay_strategy {
+            RelayStrategy::RequestFromFirst => eb_peer_announcements
+                .first()
+                .iter()
+                .copied()
+                .copied()
+                .collect::<Vec<_>>(),
+            RelayStrategy::RequestFromAll => eb_peer_announcements.clone(),
+        };
+
+        if peers_to_request_from.is_empty() {
+            // nobody we know has this EB yet, wait for someone to announce it
             self.leios.ebs.insert(eb_id, EndorserBlockView::Pending);
+        } else {
+            for peer in peers_to_request_from {
+                self.queued.send_to(peer, Message::RequestEB(eb_id));
+            }
+            self.leios.ebs.insert(eb_id, EndorserBlockView::Requested);
         }
     }
 
@@ -726,6 +745,11 @@ impl LinearLeiosNode {
         self.vote_for_endorser_block(&eb);
     }
     fn receive_announce_eb(&mut self, from: NodeId, id: EndorserBlockId) {
+        self.leios
+            .eb_peer_announcements
+            .entry(id)
+            .or_default()
+            .push(from);
         let should_request = match self.leios.ebs.get(&id) {
             Some(EndorserBlockView::Pending) => true,
             Some(EndorserBlockView::Requested) => {
@@ -855,7 +879,7 @@ impl LinearLeiosNode {
     fn receive_announce_votes(&mut self, from: NodeId, id: VoteBundleId) {
         let should_request = match self.leios.votes.get(&id) {
             None => true,
-            Some(VoteBundleView::Received { .. }) => {
+            Some(VoteBundleView::Requested) => {
                 self.sim_config.relay_strategy == RelayStrategy::RequestFromAll
             }
             _ => false,
