@@ -4,10 +4,89 @@
         <title>Ouroboros Leios Blog</title>
         <link>https://leios.cardano-scaling.org/news</link>
         <description>Ouroboros Leios Blog</description>
-        <lastBuildDate>Tue, 01 Jul 2025 00:00:00 GMT</lastBuildDate>
+        <lastBuildDate>Mon, 07 Jul 2025 00:00:00 GMT</lastBuildDate>
         <docs>https://validator.w3.org/feed/docs/rss2.html</docs>
         <generator>https://github.com/jpmonette/feed</generator>
         <language>en</language>
+        <item>
+            <title><![CDATA[Weekly Summary – July 7, 2025]]></title>
+            <link>https://leios.cardano-scaling.org/news/2025/07/07/weekly-progress-summary</link>
+            <guid>https://leios.cardano-scaling.org/news/2025/07/07/weekly-progress-summary</guid>
+            <pubDate>Mon, 07 Jul 2025 00:00:00 GMT</pubDate>
+            <description><![CDATA[This week, the Leios team achieved significant milestones in protocol development and analysis, successfully demonstrating high-throughput capabilities and exploring new protocol variants. The team completed comprehensive experiments with the Stracciatella variant, conducted analytical analysis of Linear Leios throughput efficiency, and implemented new simulation capabilities.]]></description>
+            <content:encoded><![CDATA[<p>This week, the Leios team achieved significant milestones in protocol development and analysis, successfully demonstrating high-throughput capabilities and exploring new protocol variants. The team completed comprehensive experiments with the Stracciatella variant, conducted analytical analysis of Linear Leios throughput efficiency, and implemented new simulation capabilities.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="high-throughput-demonstration">HIGH-THROUGHPUT DEMONSTRATION<a class="hash-link" aria-label="Direct link to HIGH-THROUGHPUT DEMONSTRATION" title="Direct link to HIGH-THROUGHPUT DEMONSTRATION" href="https://leios.cardano-scaling.org/news/2025/07/07/weekly-progress-summary#high-throughput-demonstration">​</a></h2>
+<ul>
+<li>Successfully completed experiments demonstrating 1,000+ TPS capability with the Stracciatella variant of Leios.</li>
+<li>Achieved spatial efficiency better than 95% with transaction lifecycle times under two minutes.</li>
+<li>Validated protocol performance under extreme throughput conditions significantly beyond current Cardano capacity.</li>
+<li>Documented detailed findings in the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w28/analysis-stracciatella.ipynb" target="_blank" rel="noopener noreferrer">Stracciatella analysis notebook</a>.</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="protocol-variants-analysis">PROTOCOL VARIANTS ANALYSIS<a class="hash-link" aria-label="Direct link to PROTOCOL VARIANTS ANALYSIS" title="Direct link to PROTOCOL VARIANTS ANALYSIS" href="https://leios.cardano-scaling.org/news/2025/07/07/weekly-progress-summary#protocol-variants-analysis">​</a></h2>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="stracciatella-variant">Stracciatella Variant<a class="hash-link" aria-label="Direct link to Stracciatella Variant" title="Direct link to Stracciatella Variant" href="https://leios.cardano-scaling.org/news/2025/07/07/weekly-progress-summary#stracciatella-variant">​</a></h3>
+<ul>
+<li>Completed comprehensive analysis of the Stracciatella variant (no IBs, transaction references in EBs, two-stage pipeline).</li>
+<li>Key findings:<!-- -->
+<ul>
+<li>5 slot/stage performs less well but scales better than 8 slot/stage.</li>
+<li>Only minimal fraction of transactions fail to reach ledger, likely due to EB expiration.</li>
+<li>Network usage is slightly heavy while CPU usage appears suspiciously light.</li>
+<li>Congestion appears at 1,000+ TPS throughput levels.</li>
+</ul>
+</li>
+</ul>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="linear-leios-throughput-efficiency">Linear Leios Throughput Efficiency<a class="hash-link" aria-label="Direct link to Linear Leios Throughput Efficiency" title="Direct link to Linear Leios Throughput Efficiency" href="https://leios.cardano-scaling.org/news/2025/07/07/weekly-progress-summary#linear-leios-throughput-efficiency">​</a></h3>
+<ul>
+<li>Conducted analytical analysis of Linear Leios variant's probability of including certified EBs on-chain.</li>
+<li>Results show Linear Leios could achieve approximately 500 times the throughput of Praos at over 50% network resource efficiency.</li>
+<li>500 times Praos throughput would exceed 1,000 historically typical transactions per second.</li>
+<li>Generated comprehensive throughput and efficiency visualizations available in the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/" target="_blank" rel="noopener noreferrer">analysis repository</a>.</li>
+</ul>
+<p><img decoding="async" loading="lazy" src="https://raw.githubusercontent.com/input-output-hk/ouroboros-leios/main/analysis/linear-leios-throughput.svg" alt="Throughput of Linear Leios" class="img_ev3q"></p>
+<p><img decoding="async" loading="lazy" src="https://raw.githubusercontent.com/input-output-hk/ouroboros-leios/main/analysis/linear-leios-efficiency.svg" alt="Throughput efficiency of Linear Leios" class="img_ev3q"></p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="cddl-specifications">CDDL SPECIFICATIONS<a class="hash-link" aria-label="Direct link to CDDL SPECIFICATIONS" title="Direct link to CDDL SPECIFICATIONS" href="https://leios.cardano-scaling.org/news/2025/07/07/weekly-progress-summary#cddl-specifications">​</a></h2>
+<ul>
+<li>Added CDDL specifications for Linear and Stracciatella protocol variants.</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-improvements">SIMULATION IMPROVEMENTS<a class="hash-link" aria-label="Direct link to SIMULATION IMPROVEMENTS" title="Direct link to SIMULATION IMPROVEMENTS" href="https://leios.cardano-scaling.org/news/2025/07/07/weekly-progress-summary#simulation-improvements">​</a></h2>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation">Rust Simulation<a class="hash-link" aria-label="Direct link to Rust Simulation" title="Direct link to Rust Simulation" href="https://leios.cardano-scaling.org/news/2025/07/07/weekly-progress-summary#rust-simulation">​</a></h3>
+<ul>
+<li>Implemented first pass at Linear Leios variant in Rust simulation.</li>
+<li>Enhanced simulation capabilities for protocol variant testing and analysis.</li>
+<li>Continued optimization of simulation performance for high-throughput scenarios.</li>
+</ul>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="small-transaction-experiments">Small Transaction Experiments<a class="hash-link" aria-label="Direct link to Small Transaction Experiments" title="Direct link to Small Transaction Experiments" href="https://leios.cardano-scaling.org/news/2025/07/07/weekly-progress-summary#small-transaction-experiments">​</a></h3>
+<ul>
+<li>Completed analysis of small-transaction, high-throughput experiments with 300-byte non-Plutus transactions.</li>
+<li>Key findings:<!-- -->
+<ul>
+<li>1,000 tx/s with 300 B/tx is feasible in Leios variants.</li>
+<li>Clear time vs space tradeoff between variants.</li>
+<li><code>full-with-ib-references</code> uses space more efficiently than <code>full-without-ibs</code>.</li>
+<li><code>full-without-ibs</code> has shorter transaction lifecycle than <code>full-with-ib-references</code>.</li>
+<li>2 CPU cores are sufficient for high-throughput operation.</li>
+<li>Network usage remains modest under high load.</li>
+</ul>
+</li>
+<li>Supporting materials available in <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w28/ReadMe.pdf" target="_blank" rel="noopener noreferrer">analysis documentation</a> and <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w28/analysis.ipynb" target="_blank" rel="noopener noreferrer">analysis notebook</a>.</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="next-steps">NEXT STEPS<a class="hash-link" aria-label="Direct link to NEXT STEPS" title="Direct link to NEXT STEPS" href="https://leios.cardano-scaling.org/news/2025/07/07/weekly-progress-summary#next-steps">​</a></h2>
+<ul>
+<li>Continue investigation of protocol variants for CIP convergence.</li>
+<li>Expand simulation capabilities for additional protocol variants.</li>
+<li>Refine performance optimization strategies for high-throughput scenarios.</li>
+<li>Complete documentation of protocol variant comparisons and recommendations.</li>
+</ul>]]></content:encoded>
+            <category>progress</category>
+            <category>update</category>
+            <category>weekly</category>
+            <category>high-throughput</category>
+            <category>protocol-variants</category>
+            <category>stracciatella</category>
+            <category>linear-leios</category>
+            <category>simulation-analysis</category>
+            <category>cddl</category>
+        </item>
         <item>
             <title><![CDATA[Weekly Summary – July 1, 2025]]></title>
             <link>https://leios.cardano-scaling.org/news/2025/07/01/weekly-progress-summary</link>
@@ -1287,109 +1366,6 @@
             <category>trace-verification</category>
             <category>agda</category>
             <category>rust-simulation</category>
-        </item>
-        <item>
-            <title><![CDATA[Weekly Summary – February 17, 2025]]></title>
-            <link>https://leios.cardano-scaling.org/news/2025/02/17/weekly-progress-summary</link>
-            <guid>https://leios.cardano-scaling.org/news/2025/02/17/weekly-progress-summary</guid>
-            <pubDate>Mon, 17 Feb 2025 00:00:00 GMT</pubDate>
-            <description><![CDATA[This week in Leios development, CPS-0018 for transaction throughput was approved, along with improved Docker support for simulations and analysis of cross-simulation results. The team also examined input block (IB) production rates and their impact on network performance.]]></description>
-            <content:encoded><![CDATA[<p>This week in Leios development, <a href="https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md" target="_blank" rel="noopener noreferrer">CPS-0018</a> for transaction throughput was approved, along with improved Docker support for simulations and analysis of cross-simulation results. The team also examined input block (IB) production rates and their impact on network performance.</p>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="protocol-development">Protocol development<a class="hash-link" aria-label="Direct link to Protocol development" title="Direct link to Protocol development" href="https://leios.cardano-scaling.org/news/2025/02/17/weekly-progress-summary#protocol-development">​</a></h2>
-<ul>
-<li>CPS-0018 'Greater transaction throughput' officially approved:<!-- -->
-<ul>
-<li>Merged into Cardano Foundation's CIP/CPS repository</li>
-<li>Documents urgency of higher transaction throughput</li>
-<li>Defines goals for the Leios initiative</li>
-<li>Identifies key open questions and use cases.</li>
-</ul>
-</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="cross-simulation-analysis">Cross-simulation analysis<a class="hash-link" aria-label="Direct link to Cross-simulation analysis" title="Direct link to Cross-simulation analysis" href="https://leios.cardano-scaling.org/news/2025/02/17/weekly-progress-summary#cross-simulation-analysis">​</a></h2>
-<ul>
-<li>Conducted a comprehensive <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/Logbook.md#simulation-of-varied-ib-production-rate" target="_blank" rel="noopener noreferrer">analysis</a> of IB production rates ranging from 1 IB/s to 100 IB/s:<!-- -->
-<ul>
-<li>Developed an ELT workflow for data processing via MongoDB</li>
-<li>Created an R Jupyter notebook for analysis and visualization</li>
-<li>Identified and addressed three significant bugs (<a href="https://github.com/input-output-hk/ouroboros-leios/issues/207" target="_blank" rel="noopener noreferrer">#207</a>, <a href="https://github.com/input-output-hk/ouroboros-leios/issues/208" target="_blank" rel="noopener noreferrer">#208</a>, <a href="https://github.com/input-output-hk/ouroboros-leios/issues/209" target="_blank" rel="noopener noreferrer">#209</a>)</li>
-</ul>
-</li>
-<li>Key findings from the Haskell simulation:<!-- -->
-<ul>
-<li>Network congestion emerges at high IB production rates</li>
-<li>Both average propagation time and slow propagation tail increase</li>
-<li>A critical threshold of ~40 IBs/s was identified, beyond which network congestion severely impacts block reception</li>
-</ul>
-</li>
-<li>Comparison of PeerNet and Haskell simulations:<!-- -->
-<ul>
-<li>Both exhibit qualitatively similar block propagation distributions</li>
-<li>Both demonstrate protocol breakdown under high block production rates</li>
-<li>Differences in resolution and configuration prevent exact comparison.</li>
-</ul>
-</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="infrastructure-improvements">Infrastructure improvements<a class="hash-link" aria-label="Direct link to Infrastructure improvements" title="Direct link to Infrastructure improvements" href="https://leios.cardano-scaling.org/news/2025/02/17/weekly-progress-summary#infrastructure-improvements">​</a></h2>
-<ul>
-<li>Added comprehensive Docker support for both simulations:<!-- -->
-<ul>
-<li>Optimized multi-stage Docker files for Haskell and Rust</li>
-<li>Simplified deployment process</li>
-<li>Enabled easy configuration via volume mounts and parameters</li>
-<li>Documented usage in README.md.</li>
-</ul>
-</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation">Rust simulation<a class="hash-link" aria-label="Direct link to Rust simulation" title="Direct link to Rust simulation" href="https://leios.cardano-scaling.org/news/2025/02/17/weekly-progress-summary#rust-simulation">​</a></h2>
-<ul>
-<li>Enhanced Rust simulation capabilities:<!-- -->
-<ul>
-<li>Implemented bandwidth usage tracking</li>
-<li>Added configurable bandwidth limits per connection</li>
-<li>Fixed issues identified in cross-simulation comparisons</li>
-<li>Started updating visualizations for improved clarity.</li>
-</ul>
-</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="haskell-simulation">Haskell simulation<a class="hash-link" aria-label="Direct link to Haskell simulation" title="Direct link to Haskell simulation" href="https://leios.cardano-scaling.org/news/2025/02/17/weekly-progress-summary#haskell-simulation">​</a></h2>
-<ul>
-<li>Enhanced IB sortition handling for IB/slot &lt; 1</li>
-<li>Began integrating block expiration and diffusion-halt proposal</li>
-<li>Implemented ideal timing calculations for diffusion:<!-- -->
-<ul>
-<li>Added uniform block behavior configuration</li>
-<li>Identified relay mini-protocol complexities:<!-- -->
-<ul>
-<li>Variable latency (3-4) for block transfer</li>
-<li>Latency depends on traffic conditions and request handling.</li>
-</ul>
-</li>
-</ul>
-</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="formal-methods">Formal methods<a class="hash-link" aria-label="Direct link to Formal methods" title="Direct link to Formal methods" href="https://leios.cardano-scaling.org/news/2025/02/17/weekly-progress-summary#formal-methods">​</a></h2>
-<ul>
-<li>Moved formal specification to a <a href="https://github.com/input-output-hk/ouroboros-leios-formal-spec" target="_blank" rel="noopener noreferrer">dedicated repository</a></li>
-<li>Established a conformance testing framework:<!-- -->
-<ul>
-<li>Enabled testing between Short Leios implementations</li>
-<li>Documented the test suite execution process</li>
-</ul>
-</li>
-<li>Initiated a survey of network models across IO consensus projects.</li>
-</ul>]]></content:encoded>
-            <category>progress</category>
-            <category>update</category>
-            <category>weekly</category>
-            <category>cps-0018</category>
-            <category>protocol</category>
-            <category>cross-simulation</category>
-            <category>analysis</category>
-            <category>docker</category>
-            <category>infrastructure</category>
-            <category>throughput</category>
-            <category>congestion</category>
         </item>
     </channel>
 </rss>
