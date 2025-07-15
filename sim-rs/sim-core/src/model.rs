@@ -84,6 +84,28 @@ impl Block {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct LinearRankingBlockHeader {
+    pub id: BlockId,
+    pub vrf: u64,
+    pub parent: Option<BlockId>,
+    pub bytes: u64,
+    pub eb_announcement: EndorserBlockId,
+}
+
+#[derive(Clone, Debug)]
+pub struct LinearRankingBlock {
+    pub header: LinearRankingBlockHeader,
+    pub transactions: Vec<Arc<Transaction>>,
+    pub endorsement: Option<Endorsement>,
+}
+
+impl LinearRankingBlock {
+    pub fn bytes(&self) -> u64 {
+        self.header.bytes + self.transactions.iter().map(|t| t.bytes).sum::<u64>()
+    }
+}
+
 id_wrapper!(TransactionId, u64);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -181,6 +203,23 @@ impl EndorserBlock {
         EndorserBlockId {
             slot: self.slot,
             pipeline: self.pipeline,
+            producer: self.producer,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct LinearEndorserBlock {
+    pub slot: u64,
+    pub producer: NodeId,
+    pub bytes: u64,
+    pub txs: Vec<Arc<Transaction>>,
+}
+impl LinearEndorserBlock {
+    pub fn id(&self) -> EndorserBlockId {
+        EndorserBlockId {
+            slot: self.slot,
+            pipeline: 0,
             producer: self.producer,
         }
     }
