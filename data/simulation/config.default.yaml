@@ -144,6 +144,11 @@ eb-body-avg-size-bytes: 0
 eb-generation-cpu-time-ms: 75.0
 # Validating signature and vrf proof, as in other headers.
 eb-validation-cpu-time-ms: 1.0
+# For linear leios: "fast" incomplete validation of the EB
+eb-header-validation-cpu-time-ms: 50.0
+# For linear leios: complete validation of the EB
+eb-body-validation-cpu-time-ms-constant: 50.0
+eb-body-validation-cpu-time-ms-per-byte: 0.0005
 
 eb-diffusion-strategy: "peer-order"
 

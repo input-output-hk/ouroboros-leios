@@ -113,8 +113,10 @@ pub enum CpuTask {
     RBHeaderValidated(NodeId, RankingBlockHeader, bool, bool),
     /// A ranking block has been received and validated, and is ready to propagate
     RBBlockValidated(Arc<RankingBlock>),
+    /// An endorser block has been received, and its header has been validated. It is ready to propagate.
+    EBHeaderValidated(NodeId, Arc<EndorserBlock>),
     /// An endorser block has been received and validated, and is ready to propagate
-    EBBlockValidated(NodeId, Arc<EndorserBlock>),
+    EBBlockValidated(Arc<EndorserBlock>),
     /// A bundle of votes has been generated and is ready to propagate
     VTBundleGenerated(VoteBundle, Arc<EndorserBlock>),
     /// A bundle of votes has been received and validated, and is ready to propagate
@@ -128,7 +130,8 @@ impl SimCpuTask for CpuTask {
             Self::RBBlockGenerated(_, _) => "GenRB",
             Self::RBHeaderValidated(_, _, _, _) => "ValRH",
             Self::RBBlockValidated(_) => "ValRB",
-            Self::EBBlockValidated(_, _) => "ValEB",
+            Self::EBHeaderValidated(_, _) => "ValEH",
+            Self::EBBlockValidated(_) => "ValEB",
             Self::VTBundleGenerated(_, _) => "GenVote",
             Self::VTBundleValidated(_, _) => "ValVote",
         }
@@ -141,7 +144,8 @@ impl SimCpuTask for CpuTask {
             Self::RBBlockGenerated(_, _) => "".to_string(),
             Self::RBHeaderValidated(_, _, _, _) => "".to_string(),
             Self::RBBlockValidated(_) => "".to_string(),
-            Self::EBBlockValidated(_, _) => "".to_string(),
+            Self::EBHeaderValidated(_, _) => "".to_string(),
+            Self::EBBlockValidated(_) => "".to_string(),
             Self::VTBundleGenerated(_, _) => "".to_string(),
             Self::VTBundleValidated(_, _) => "".to_string(),
         }
@@ -160,10 +164,11 @@ impl SimCpuTask for CpuTask {
                 time += config.rb_validation_per_byte * (bytes as u32);
                 vec![time]
             }
-            Self::EBBlockValidated(_, eb) => {
-                let mut time = config.eb_validation;
+            Self::EBHeaderValidated(_, _) => vec![config.eb_header_validation],
+            Self::EBBlockValidated(eb) => {
+                let mut time = config.eb_body_validation_constant;
                 let bytes: u64 = eb.txs.iter().map(|tx| tx.bytes).sum();
-                time += config.rb_validation_per_byte * (bytes as u32);
+                time += config.eb_body_validation_per_byte * (bytes as u32);
                 vec![time]
             }
             Self::VTBundleGenerated(_, eb) => vec![
@@ -345,7 +350,8 @@ impl NodeImpl for LinearLeiosNode {
                 self.finish_validating_rb_header(from, header, has_body, has_eb)
             }
             CpuTask::RBBlockValidated(rb) => self.finish_validating_rb(rb),
-            CpuTask::EBBlockValidated(from, eb) => self.finish_validating_eb(from, eb),
+            CpuTask::EBHeaderValidated(from, eb) => self.finish_validating_eb_header(from, eb),
+            CpuTask::EBBlockValidated(eb) => self.finish_validating_eb(eb),
             CpuTask::VTBundleGenerated(votes, _) => self.finish_generating_vote_bundle(votes),
             CpuTask::VTBundleValidated(from, votes) => {
                 self.finish_validating_vote_bundle(from, votes)
@@ -774,10 +780,10 @@ impl LinearLeiosNode {
     fn receive_eb(&mut self, from: NodeId, eb: Arc<EndorserBlock>) {
         self.tracker.track_eb_received(eb.id(), from, self.id);
         self.queued
-            .schedule_cpu_task(CpuTask::EBBlockValidated(from, eb));
+            .schedule_cpu_task(CpuTask::EBHeaderValidated(from, eb));
     }
 
-    fn finish_validating_eb(&mut self, from: NodeId, eb: Arc<EndorserBlock>) {
+    fn finish_validating_eb_header(&mut self, from: NodeId, eb: Arc<EndorserBlock>) {
         if self
             .leios
             .ebs
@@ -787,8 +793,6 @@ impl LinearLeiosNode {
             return;
         }
 
-        self.vote_for_endorser_block(&eb);
-
         // TODO: sleep
         for peer in &self.consumers {
             if *peer == from {
@@ -796,6 +800,12 @@ impl LinearLeiosNode {
             }
             self.queued.send_to(*peer, Message::AnnounceEB(eb.id()));
         }
+
+        self.queued.schedule_cpu_task(CpuTask::EBBlockValidated(eb));
+    }
+
+    fn finish_validating_eb(&mut self, eb: Arc<EndorserBlock>) {
+        self.vote_for_endorser_block(&eb);
     }
 
     fn process_certified_ebs(&mut self, slot: u64) {

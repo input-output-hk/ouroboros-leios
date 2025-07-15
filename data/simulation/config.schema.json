@@ -154,6 +154,12 @@
       "properties": {},
       "type": "number"
     },
+    "eb-body-validation-cpu-time-ms-constant": {
+      "type": "number"
+    },
+    "eb-body-validation-cpu-time-ms-per-byte": {
+      "type": "number"
+    },
     "eb-diffusion-max-bodies-to-request": {
       "additionalProperties": false,
       "description": "Only supported by Haskell simulation.",
@@ -180,6 +186,9 @@
       "type": "number"
     },
     "eb-generation-probability": {
+      "type": "number"
+    },
+    "eb-header-validation-cpu-time-ms": {
       "type": "number"
     },
     "eb-max-age-for-relay-slots": {
