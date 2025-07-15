@@ -10,9 +10,9 @@ Whenever a node creates an RB, it also creates an EB. The RB header contains a r
 
 RB headers are diffused separately from bodies. When a node receives an RB header, it checks whether that RB should be the new head of its chain. If so, it will request the RB body and the referenced EB (from the first peer which announces them).
 
-When a node receives an RB body, it immediately removes all referenced/conflicting transactions from its mempool. If the RB has an EB certificate, it also removes that EB’s transactions from its mempool. 
+When a node receives an RB body, it immediately removes all referenced/conflicting transactions from its mempool. If the RB has an EB certificate, it also removes that EB’s transactions from its mempool (note that this should be redundant based on the procedure below).
 
-When a node receives an EB body, it immediately runs a VRF lottery, and if successful, transmits votes for that EB. If the EB has been certified after L_vote + L_diff slots have passed, the node removes all of its transactions from the mempool (under the assumption that the EB will make it on-chain).
+When a node receives an EB body, it immediately runs a VRF lottery to decide how many times it can vote for that EB; if it has any votes, it will transmit them to all peers. If the EB has been certified after L_vote + L_diff slots have passed, the node removes all of its transactions from the mempool (under the assumption that the EB will make it on-chain).
 
 ## New parameters
 
