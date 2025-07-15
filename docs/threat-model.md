@@ -10,15 +10,15 @@ A threat model for the Leios consensus change for Cardano. This was created by r
 
 See also [the threat model section in Leios Technical Report #1](./technical-report-1.md#threat-model) and more [comments on attack surface in Leios Technical Report #2](./technical-report-2.md#notes-on-the-leios-attack-surface).
 
-## 1. System Overview
+## System Overview
 
 > [!NOTE]
 > The described system here is the heavily simplified EB-only variant of Leios. Whenever we update this, reflect on existing assets, threats and mitigations, as well as add new ones accordingly.
 
-### 1.1 Description
+### Description
 Leios is an overlay protocol on top of Ouroboros Praos that enhances transaction throughput by introducing Endorser Blocks (EBs) alongside regular Praos blocks (Ranking Blocks - RBs). The system maintains backward compatibility at the client interface while introducing new responsibilities for stake pools.
 
-### 1.2 Key Components
+### Key Components
 
 #### Core Components
 - **Ranking Block (RB)**: Standard Praos block enhanced with a Leios certificate
@@ -37,7 +37,7 @@ Leios is an overlay protocol on top of Ouroboros Praos that enhances transaction
 - **Relay Nodes**: Participate in transaction and block diffusion
 - **Clients**: Submit transactions and observe the chain / ledger state evolving, ideally maintain backward compatibility and may largely unaware of Leios mechanics
 
-### 1.3 System Flow
+###3 System Flow
 1. Stake pools create EBs based on VRF eligibility (parameterizable stage length)
 2. EBs are announced and propagated through the network
 3. A committee of nodes (> 500 by stake) vote on EB validity and transaction availability
@@ -45,11 +45,11 @@ Leios is an overlay protocol on top of Ouroboros Praos that enhances transaction
 5. Certificates are included in the next available RB (every ~20 seconds)
 6. Missing transactions are fetched on-demand when EBs are processed
 
-## 2. Assets to Protect
+## Assets to Protect
 
 For each asset we define what could be impacted in respect to its Confidentiality, Integrity, Availability; i.e. the [CIA Triad](https://www.splunk.com/en_us/blog/learn/cia-triad-confidentiality-integrity-availability.html)
 
-### 2.1 Blockchain Safety
+### Blockchain Safety
 **Description**: The fundamental guarantee that all honest nodes agree on the blockchain history and no conflicting valid chains exist.
 
 **CIA Impact:**
@@ -59,7 +59,7 @@ For each asset we define what could be impacted in respect to its Confidentialit
 
 **Leios-Specific Considerations**: Vote certificates and EB validation must not create conflicting blockchain states or enable double-spending.
 
-### 2.2 Blockchain Liveness
+### Blockchain Liveness
 **Description**: The guarantee that the blockchain continues to make progress by producing new blocks and processing transactions within reasonable time bounds.
 
 **CIA Impact:**
@@ -69,7 +69,7 @@ For each asset we define what could be impacted in respect to its Confidentialit
 
 **Leios-Specific Considerations**: EB creation, voting, and certificate inclusion must not prevent regular block production or create bottlenecks.
 
-### 2.3 Transaction Validity, Availability, and Determinism
+### Transaction Validity, Availability, and Determinism
 **Description**: All transactions included in the blockchain must be cryptographically valid, available to all network participants for verification, and deterministic (transactions only consume fees if successfully included, a key Cardano property).
 
 **CIA Impact:**
@@ -79,7 +79,7 @@ For each asset we define what could be impacted in respect to its Confidentialit
 
 **Leios-Specific Considerations**: EBs reference transactions that must be available when the EB is processed; voting nodes must verify transaction availability before voting; deterministic behavior must be preserved across the EB endorsement and certification process.
 
-### 2.4 Operational Sustainability
+### Operational Sustainability
 **Description**: Computational and network resources consumed by Stake Pool Operators to participate in the protocol, including CPU, memory, storage, and bandwidth. Resource increases are acceptable as long as they are covered by corresponding incentives to maintain operational sustainability.
 
 **CIA Impact:**
@@ -89,7 +89,7 @@ For each asset we define what could be impacted in respect to its Confidentialit
 
 **Leios-Specific Considerations**: New responsibilities (EB creation, voting, additional network protocols) must not significantly increase SPO operational costs relative to incentives or create barriers to participation.
 
-### 2.5 Decentralization Properties
+### Decentralization Properties
 **Description**: The distribution of block production, voting power, and network participation across many independent operators.
 
 **CIA Impact:**
@@ -97,7 +97,7 @@ For each asset we define what could be impacted in respect to its Confidentialit
 - **Integrity**: HIGH - Centralization increases risk of coordinated attacks on consensus
 - **Availability**: HIGH - Centralized infrastructure creates single points of failure
 
-### 2.6 High Throughput
+### High Throughput
 **Description**: The enhanced transaction processing capacity that Leios provides beyond basic Praos liveness, enabling the network to handle significantly more transactions per unit time.
 
 **CIA Impact:**
@@ -107,11 +107,11 @@ For each asset we define what could be impacted in respect to its Confidentialit
 
 **Leios-Specific Considerations**: EB certification failures, voting delays, or resource exhaustion attacks directly impact the throughput gains Leios is designed to provide.
 
-## 3. Threats
+## Threats
 
 Notable threats to the system that could impact assets.
 
-### 3.1 Network-Level Threats
+### Network-Level Threats
 
 #### T1: Mempool Partitioning Attack
 **Description**: Attacker deliberately partitions the mempools of block producing nodes by submitting conflicting transactions (spending the same inputs) to different network segments, creating inconsistent views of valid transactions across the network.
@@ -141,7 +141,7 @@ Notable threats to the system that could impact assets.
 
 **Assets Affected**: High Throughput, Operational Sustainability, Blockchain Safety
 
-#### T2: Eclipse Attack on Voting Nodes
+#### Eclipse Attack on Voting Nodes
 **Description**: Attacker isolates top voting nodes to manipulate vote collection by controlling their network connections and information flow.
 
 **Prerequisites**:
@@ -167,7 +167,7 @@ Notable threats to the system that could impact assets.
 
 **Assets Affected**: Blockchain Safety, High Throughput
 
-#### T3: Vote Flooding Attack
+#### Vote Flooding Attack
 **Description**: Malicious nodes flood the network with invalid or duplicate votes to overwhelm voting infrastructure and waste network resources.
 
 **Prerequisites**:
@@ -192,7 +192,7 @@ Notable threats to the system that could impact assets.
 
 **Assets Affected**: Operational Sustainability, High Throughput
 
-### 3.2 Consensus-Level Threats
+### Consensus-Level Threats
 
 #### T4: EB Withholding Attack
 **Description**: Eligible stake pools deliberately withhold EBs they are entitled to create, reducing network throughput and potentially enabling censorship.
@@ -287,7 +287,7 @@ Notable threats to the system that could impact assets.
 
 **Assets Affected**: Decentralization Properties
 
-### 3.3 Transaction-Level Threats
+### Transaction-Level Threats
 
 #### T8: Transaction Availability Attack
 **Description**: Attacker creates EBs referencing unavailable transactions to waste network resources and disrupt certification.
@@ -312,7 +312,7 @@ Notable threats to the system that could impact assets.
 
 **Assets Affected**: High Throughput, Operational Sustainability
 
-#### T9: Transaction Front-Running
+#### Transaction Front-Running
 **Description**: EB producers observe profitable transactions and reorder or insert their own transactions to extract value before the original transaction executes.
 
 **Prerequisites**:
@@ -336,7 +336,7 @@ Notable threats to the system that could impact assets.
 
 **Assets Affected**: Transaction Validity/Availability/Determinism, Decentralization Properties
 
-### 3.4 Deployment-Level Threats
+### Deployment-Level Threats
 
 #### T10: Hard Fork Coordination Attack
 **Description**: Disruption during the hard fork transition period to split the network, cause instability, or prevent the hard fork from succeeding.
@@ -388,7 +388,7 @@ Notable threats to the system that could impact assets.
 
 **Assets Affected**: Operational Sustainability, High Throughput
 
-## 4. Risk Assessment Matrix
+## Risk Assessment Matrix
 
 | Threat                        | Impact | Likelihood | Risk Level | Priority |
 |-------------------------------|--------|------------|------------|----------|
@@ -404,9 +404,7 @@ Notable threats to the system that could impact assets.
 | T11: Backward Compatibility   | MEDIUM | MEDIUM     | MEDIUM     | P3       |
 | T7: Stake Grinding            | MEDIUM | LOW        | LOW        | P4       |
 
-## 5. Mitigation Strategies
-
-### 5.1 Network-Level Controls
+## Mitigation Strategies
 
 #### M1: Mempool Partitioning Defense
 **Decision**: MITIGATE + ACCEPT
@@ -481,8 +479,6 @@ Notable threats to the system that could impact assets.
 
 **Threats Addressed**: T8
 
-### 5.2 Consensus-Level Controls
-
 #### M5: EB Withholding Mitigation
 **Decision**: MITIGATE
 
@@ -530,8 +526,6 @@ Notable threats to the system that could impact assets.
 
 **Threats Addressed**: T6, T7
 
-### 5.3 Transaction-Level Controls
-
 #### M8: Front-Running Response
 **Decision**: ACCEPT + MITIGATE
 
@@ -550,8 +544,6 @@ Notable threats to the system that could impact assets.
 **Accepted Impact**: Front-running will occur but detection helps maintain transparency and potential future governance responses
 
 **Threats Addressed**: T9
-
-### 5.4 Deployment-Level Controls
 
 #### M9: Hard Fork Coordination Protection
 **Decision**: MITIGATE
@@ -589,7 +581,7 @@ Notable threats to the system that could impact assets.
 
 **Threats Addressed**: T11
 
-## 6. Review and Maintenance
+## Review and Maintenance
 
 This threat model should be reviewed and updated:
 - Before each major protocol upgrade
