@@ -20,30 +20,35 @@ Leios is an overlay protocol on top of Ouroboros Praos that enhances transaction
 
 ### Key Components
 
-#### Core Components
-- **Ranking Block (RB)**: Standard Praos block enhanced with a Leios certificate
+#### Entities
+- **Mempool**: List of valid, pending transactions that could be added to the chain. Limited in size
+- **Ranking Block (RB)**: Standard Praos block enhanced with a Leios certificate. Limited in size
 - **Endorser Block (EB)**: New block type that references transactions for inclusion. May be substantially bigger than Praos blocks (currently on mainnet ~88 kB) with sizes around ~640 kB for 20k transaction references
 - **Leios Certificate**: Cryptographic proof about aggregated stake-weighted votes on EB validity and transaction availability
 - **EB Lottery**: Separate (to Praos) VRF lottery for EB creation rights
 
 #### Network Protocols
-- **EB Announcement Protocol**: Gossip protocol about EB existence
-- **EB Fetch Protocol**: Pull-based protocol for retrieving EBs
-- **Transaction Fetch Protocol**: Pull-based protocol for retrieving endorsed transactions
-- **Vote Diffusion Protocol**: Pull-based protocol for vote propagation
+- **Transaction Submission Protocol**: Existing protocol to announce and fetch transactions, served upstream
+- **Chain Sync Protocol**: Existing protocol for tracking block headers of currently selected chain, served downstream
+- **Block Fetch Protocol**: Existing protocol for downloading blocks, served downstream
+- **EB Announcement Protocol**: New protocol to gossip EB existence, served downstream
+- **EB Fetch Protocol**: New protocol for retrieving EBs, served downstream
+- **Transaction Fetch Protocol**: New protocol for retrieving endorsed transactions, served downstream
+- **Vote Diffusion Protocol**: New protocol for propagating votes on EBs, served downstream
 
-#### Participants
-- **Stake Pool Operators**: Produce blocks, now enhanced with EB creation and voting responsibilities
-- **Relay Nodes**: Participate in transaction and block diffusion
+#### Roles
+- **Block Producers**: Produce blocks, now enhanced with EB creation and voting responsibilities
+- **Relays**: Participate in transaction and block diffusion
 - **Clients**: Submit transactions and observe the chain / ledger state evolving, ideally maintain backward compatibility and may largely unaware of Leios mechanics
 
 #### System Flow
+1. Clients submit transactions, which get added to the mempool and diffuse through the Cardano network
 1. Stake pools create EBs based on VRF eligibility (parameterizable stage length)
-2. EBs are announced and propagated through the network
-3. A committee of nodes (> 500 by stake) vote on EB validity and transaction availability
-4. If a quorum of voting stake (> 60%) approves, a certificate is created
-5. Certificates are included in the next available RB (every ~20 seconds)
-6. Missing transactions are fetched on-demand when EBs are processed
+1. EBs are announced and propagated through the network
+1. A committee of nodes (> 500 by stake) vote on EB validity and transaction availability
+1. If a quorum of voting stake (> 60%) approves, a certificate is created
+1. Certificates are included in the next available RB (every ~20 seconds)
+1. Missing transactions are fetched on-demand when EBs are processed
 
 ## Assets to Protect
 
@@ -412,7 +417,7 @@ Notable threats to the system that could impact assets.
 **Control type**: Preventive + Detective
 
 **Implementation**:
-- Redundant downstream peer connections and selection similar to upstream
+- Redundant downstream peer connections and selection similar to downstream
 - Peer connection churn for nodes serving non-chain transactions repeatedly
 - Fair transaction diffusion across peer connections
 - Strict limits on perpetual storage (no conflicting tx storage)
