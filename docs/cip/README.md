@@ -350,6 +350,9 @@ but not including any minor overhead arising from CBOR serialization. As noted p
 
 #### Ranking Block (RB) schema
 
+Leios' *Ranking blocks* are identical to Praos blocks, except for including two additions, a `leios_cert` and `announced_eb`. Both are optional.
+The certificates attest to the validity of an *Endorser block (EB)* through [BLS-based voting](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md) by a committee of stake pools. The `eb_reference` announces the Endorser block to be included in the following *Ranking block*.
+
 ```diff
  ranking_block =
    [ header                   : block_header
@@ -364,7 +367,7 @@ but not including any minor overhead arising from CBOR serialization. As noted p
 
 #### Votes and Certificates schema
 
-Leios certificates attest to the validity of Endorser Blocks through [BLS-based voting](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md) by a committee of stake pools.
+The certificate is serialized in the following CDDL. Votes are distinguished into persistent and non-persistent votes based on stake distribution using the [Fait Accompli scheme](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#sortition), where persistent voters are selected for the entire epoch and non-persistent voters are selected per pipeline. Vote bundles aggregate multiple votes from a single voter to reduce network overhead, while certificates collect sufficient votes to achieve a [quorum](#quorum) and attest to the validity of an [endorser block](#endorser-blocks-ebs). For detailed cryptographic specifications, see the [BLS certificate scheme documentation](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#bls-certificate-scheme). 
 
 ```cddl
  leios_certificate =
@@ -398,6 +401,8 @@ Leios certificates attest to the validity of Endorser Blocks through [BLS-based 
 
 #### Endorser Block (EB) schema
 
+Endorser blocks contain transaction references that extend the state of the ranking block that announced them, providing additional transaction capacity beyond what fits in the main chain. Each endorser block is produced by the same stake pool that created the ranking block that announces it, and is only included in the main chain if sufficient votes are collected within the voting period.
+
 ```cddl
  endorser_block =
    [ eb_header         : eb_header
@@ -422,6 +427,8 @@ Leios certificates attest to the validity of Endorser Blocks through [BLS-based 
 
 #### Supporting types
 
+Core data types used throughout the Leios protocol, including cryptographic signatures, identifiers, and references that enable secure communication and consensus between network participants. For detailed information on BLS signatures and cryptographic operations, see the [cryptographic benchmarks](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/ReadMe.md) and [BLS specification](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md).
+
 ```cddl
  eb_reference             = hash32
  tx_reference             = hash32
@@ -436,6 +443,19 @@ Leios certificates attest to the validity of Endorser Blocks through [BLS-based 
  kes_signature            = bytes
  slot_no                  = uint64
 ```
+
+- **`eb_reference`**: 32-byte hash identifying an endorser block, used to announce EBs in ranking blocks and reference them in certificates.
+- **`tx_reference`**: 32-byte hash of a transaction, used by EBs to reference transactions that extend the state of the announcing ranking block.
+- **`election_id`**: 8-byte identifier for a specific voting round, typically derived from the slot number and pipeline stage.
+- **`persistent_voter_id`**: 2-byte identifier for stake pools selected as persistent voters for the entire epoch using the [Fait Accompli scheme](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#sortition).
+- **`pool_id`**: 28-byte stake pool identifier, used for non-persistent voters and block producers.
+- **`hash32`**: Standard 32-byte cryptographic hash used throughout the protocol.
+- **`bls_signature`**: 48-byte compressed BLS12-381 signature used for voting and certificate aggregation.
+- **`vote_signature`**: BLS signature on an endorser block hash, proving a voter's approval.
+- **`eligibility_signature`**: BLS signature proving a non-persistent voter's eligibility for a specific election.
+- **`vrf_cert`**: Variable-length VRF certificate used for sortition in block production and voting selection.
+- **`kes_signature`**: Variable-length KES signature used to authenticate block headers.
+- **`slot_no`**: 64-bit slot number representing the current time in the protocol.
 
 ## Rationale: how does this CIP achieve its goals?
 
