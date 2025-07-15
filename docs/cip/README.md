@@ -348,29 +348,94 @@ but not including any minor overhead arising from CBOR serialization. As noted p
 
 ### CDDL schema for the ledger
 
-#### IB schema
+#### Ranking Block (RB) schema
 
-> [!IMPORTANT]
->
-> - [ ] Translate the Agda type for input blocks into CDDL.
+```diff
+ ranking_block =
+   [ header                   : block_header
+   , transaction_bodies       : [* transaction_body]
+   , transaction_witness_sets : [* transaction_witness_set]
+   , auxiliary_data_set       : {* transaction_index => auxiliary_data}
+   , invalid_transactions     : [* transaction_index]
++  , ? leios_cert             : leios_certificate
++  , ? announced_eb           : eb_reference
+   ]
+```
 
-#### EB schema
+#### Votes and Certificates schema
 
-> [!IMPORTANT]
->
-> - [ ] Translate the Agda type for endorser blocks into CDDL.
+Leios certificates attest to the validity of Endorser Blocks through [BLS-based voting](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md) by a committee of stake pools.
 
-#### Certificate schema
+```cddl
+ leios_certificate =
+   [ election_id            : election_id
+   , endorser_block_hash    : hash32
+   , persistent_voters      : [* persistent_voter_id]
+   , nonpersistent_voters   : {* pool_id => bls_signature}
+   , ? aggregate_elig_sig   : bls_signature
+   , aggregate_vote_sig     : bls_signature
+   ]
 
-> [!IMPORTANT]
->
-> - [ ] Translate the Agda type for certificates into CDDL.
+ leios_vote_bundle = persistent_vote_bundle / non_persistent_vote_bundle
 
-#### RB schema
+ persistent_vote_bundle =
+   [ 0
+   , election_id
+   , persistent_voter_id
+   , vote_entries
+   ]
 
-> [!IMPORTANT]
->
-> - [ ] Provide the diff for the CDDL for Praos blocks, so that Leios certificates are included.
+ non_persistent_vote_bundle =
+   [ 1
+   , election_id
+   , pool_id
+   , eligibility_signature
+   , vote_entries
+   ]
+
+ vote_entries = {* endorser_block_hash => vote_signature}
+```
+
+#### Endorser Block (EB) schema
+
+```cddl
+ endorser_block =
+   [ eb_header         : eb_header
+   , eb_body           : eb_body
+   ]
+
+ eb_header =
+   [ eb_header_body       : eb_header_body
+   , body_signature       : kes_signature
+   ]
+
+ eb_header_body =
+   [ slot                 : slot_no
+   , producer             : pool_id
+   , ? vrf_proof          : vrf_cert
+   ]
+
+ eb_body =
+   [ transaction_references: [* tx_reference]
+   ]
+```
+
+#### Supporting types
+
+```cddl
+ eb_reference             = hash32
+ tx_reference             = hash32
+ election_id              = bytes .size 8
+ persistent_voter_id      = uint .size 2
+ pool_id                  = bytes .size 28
+ hash32                   = bytes .size 32
+ bls_signature            = bytes .size 48
+ vote_signature           = bls_signature
+ eligibility_signature    = bls_signature
+ vrf_cert                 = bytes
+ kes_signature            = bytes
+ slot_no                  = uint64
+```
 
 ## Rationale: how does this CIP achieve its goals?
 
