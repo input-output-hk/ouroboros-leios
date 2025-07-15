@@ -113,7 +113,7 @@ Notable threats to the system that could impact assets.
 
 ### Network-Level Threats
 
-#### T1: Mempool Partitioning Attack
+#### T1: Mempool Partitioning
 **Description**: Attacker deliberately partitions the mempools of block producing nodes by submitting conflicting transactions (spending the same inputs) to different network segments, creating inconsistent views of valid transactions across the network.
 
 **Prerequisites**:
@@ -133,13 +133,11 @@ Notable threats to the system that could impact assets.
 **Cost**: MEDIUM-HIGH - Requires significant network infrastructure, multiple nodes, and sustained coordination
 
 **Impact**:
-- **Immediate**: Different SPOs create conflicting EBs, causing vote splits and potential certification failures
-- **Throughput**: Temporary reduction when EBs fail certification, though system recovers in subsequent stages
-- **Resource Waste**: Significant network bandwidth and compute resources wasted on processing, propagating, and voting on conflicting EBs that cannot both be certified
-- **Operational**: SPOs expend resources (CPU, bandwidth) on futile EB creation and voting processes
+- **Throughput**: Different SPOs create conflicting EBs, causing vote splits and potential certification failures. This leads to throughput reduction when EBs fail certification, though system recovers in subsequent stages
+- **Resources**: SPO's network bandwidth and compute resources wasted on processing, propagating, and voting on conflicting EBs that cannot all be certified
 - **Trust**: Demonstrates network manipulation capability, though doesn't break core transaction guarantees
 
-**Assets Affected**: High Throughput, Operational Sustainability, Blockchain Safety
+**Assets Affected**: High Throughput, Operational Sustainability
 
 #### T2: Eclipse Attack on Voting Nodes
 **Description**: Attacker isolates top voting nodes to manipulate vote collection by controlling their network connections and information flow.
@@ -414,11 +412,11 @@ Notable threats to the system that could impact assets.
 **Control type**: Preventive + Detective
 
 **Implementation**:
-- Fair transaction diffusion across peer connections
+- Redundant downstream peer connections and selection similar to upstream
 - Peer connection churn for nodes serving non-chain transactions repeatedly
-- Network topology monitoring for partition detection
-- Redundant peer connections for SPOs
+- Fair transaction diffusion across peer connections
 - Strict limits on perpetual storage (no conflicting tx storage)
+- Network topology monitoring for partition detection
 
 **Validation**: Simulation testing with network partitions
 
@@ -434,12 +432,10 @@ Notable threats to the system that could impact assets.
 **Control type**: Preventive + Detective
 
 **Implementation**:
-- Diversified peer connections for all nodes
-- Network monitoring and anomaly detection
-- BGP route monitoring for critical nodes
-- Automated peer rotation mechanisms
+- Redundant and tiered upstream peer connections
 - Detect and punish censoring across mini protocols
 - Apply protection to all critical path network protocols (vote diffusion, EB diffusion, block fetch)
+- Network monitoring and anomaly detection
 
 **Validation**: Penetration testing and network analysis
 
