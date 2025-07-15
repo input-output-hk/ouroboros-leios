@@ -122,14 +122,14 @@ $\Delta < L$ ensures sufficient time for voting
 
 ##### Quorum Requirement
 
-$\sum_{v \in \text{votes}} \text{stake}(v) \geq \tau \times \text{total\_stake}$
+$\sum_{v \in \text{votes}} \text{stake}(v) \geq \tau \times \text{stake}_{\text{total}}$
 
 * $\tau$: Quorum threshold fraction (typically 60% of total stake)
 * $\text{stake}(v)$: Stake weight of vote $v$
 
 ##### Throughput
 
-$\text{Throughput} = f_\text{RB} \times (\text{RB\_capacity} + \text{EB\_capacity} \times \text{EB\_inclusion\_rate})$
+$\text{Throughput} = f_{\text{RB}} \times (\text{capacity}_{\text{RB}} + \text{capacity}_{\text{EB}} \times \text{rate}_{\text{EB, inclusion}})$
 
 * $f_\text{RB}$: Praos block production rate (typically 0.05 blocks/slot)
 * $\text{RB\_capacity}$: Transaction capacity of standard Praos blocks
@@ -138,7 +138,7 @@ $\text{Throughput} = f_\text{RB} \times (\text{RB\_capacity} + \text{EB\_capacit
 
 ##### State Transition
 
-$\text{State}_{i+1} = \text{State}_i \oplus \text{RB\_transactions} \oplus \text{EB\_transactions}$
+$\text{State}_{i+1} = \text{State}_i \oplus \text{RB}_{\text{transactions}} \oplus \text{EB}_{\text{transactions}}$
 
 * $\oplus$: State transition function applying transactions to ledger state
 * RB transactions are applied before EB transactions
