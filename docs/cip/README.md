@@ -111,6 +111,38 @@ EBs in $\mathcal{A}$ expire quickly when forks are resolved and the longest chai
 3. **Certification**: EB certified if quorum $\tau$ of stake votes received
 4. **Finalization**: Certificate included in subsequent RB, EB transactions executed
 
+#### Key Constraints
+
+##### Network Timing
+
+$\Delta < L$ ensures sufficient time for voting
+
+* $\Delta$: Network diffusion time (maximum time for message propagation)
+* $L$: Voting period length in slots
+
+##### Quorum Requirement
+
+$\sum_{v \in \text{votes}} \text{stake}(v) \geq \tau \times \text{total\_stake}$
+
+* $\tau$: Quorum threshold fraction (typically 60% of total stake)
+* $\text{stake}(v)$: Stake weight of vote $v$
+
+##### Throughput
+
+$\text{Throughput} = f_\text{RB} \times (\text{RB\_capacity} + \text{EB\_capacity} \times \text{EB\_inclusion\_rate})$
+
+* $f_\text{RB}$: Praos block production rate (typically 0.05 blocks/slot)
+* $\text{RB\_capacity}$: Transaction capacity of standard Praos blocks
+* $\text{EB\_capacity}$: Transaction capacity of Endorser Blocks
+* $\text{EB\_inclusion\_rate}$: Fraction of announced EBs that receive certification
+
+##### State Transition
+
+$\text{State}_{i+1} = \text{State}_i \oplus \text{RB\_transactions} \oplus \text{EB\_transactions}$
+
+* $\oplus$: State transition function applying transactions to ledger state
+* RB transactions are applied before EB transactions
+
 ### Normative Leios specification in Agda
 
 TODO
