@@ -263,6 +263,8 @@ pub enum NoVoteReason {
     ExtraTX,
     MissingTX,
     UncertifiedEBReference,
+    LateEB,
+    WrongEB,
 }
 
 #[derive(Debug, Clone, Serialize)]

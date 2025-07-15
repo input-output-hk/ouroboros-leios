@@ -17,7 +17,7 @@ use crate::{
     model::{
         BlockId, Endorsement, EndorserBlockId, LinearEndorserBlock as EndorserBlock,
         LinearRankingBlock as RankingBlock, LinearRankingBlockHeader as RankingBlockHeader,
-        Transaction, TransactionId, VoteBundle, VoteBundleId,
+        NoVoteReason, Transaction, TransactionId, VoteBundle, VoteBundleId,
     },
     sim::{MiniProtocol, NodeImpl, SimCpuTask, SimMessage, lottery},
 };
@@ -116,7 +116,7 @@ pub enum CpuTask {
     /// An endorser block has been received, and its header has been validated. It is ready to propagate.
     EBHeaderValidated(NodeId, Arc<EndorserBlock>),
     /// An endorser block has been received and validated, and is ready to propagate
-    EBBlockValidated(Arc<EndorserBlock>),
+    EBBlockValidated(Arc<EndorserBlock>, Timestamp),
     /// A bundle of votes has been generated and is ready to propagate
     VTBundleGenerated(VoteBundle, Arc<EndorserBlock>),
     /// A bundle of votes has been received and validated, and is ready to propagate
@@ -131,7 +131,7 @@ impl SimCpuTask for CpuTask {
             Self::RBHeaderValidated(_, _, _, _) => "ValRH",
             Self::RBBlockValidated(_) => "ValRB",
             Self::EBHeaderValidated(_, _) => "ValEH",
-            Self::EBBlockValidated(_) => "ValEB",
+            Self::EBBlockValidated(_, _) => "ValEB",
             Self::VTBundleGenerated(_, _) => "GenVote",
             Self::VTBundleValidated(_, _) => "ValVote",
         }
@@ -145,7 +145,7 @@ impl SimCpuTask for CpuTask {
             Self::RBHeaderValidated(_, _, _, _) => "".to_string(),
             Self::RBBlockValidated(_) => "".to_string(),
             Self::EBHeaderValidated(_, _) => "".to_string(),
-            Self::EBBlockValidated(_) => "".to_string(),
+            Self::EBBlockValidated(_, _) => "".to_string(),
             Self::VTBundleGenerated(_, _) => "".to_string(),
             Self::VTBundleValidated(_, _) => "".to_string(),
         }
@@ -165,7 +165,7 @@ impl SimCpuTask for CpuTask {
                 vec![time]
             }
             Self::EBHeaderValidated(_, _) => vec![config.eb_header_validation],
-            Self::EBBlockValidated(eb) => {
+            Self::EBBlockValidated(eb, _) => {
                 let mut time = config.eb_body_validation_constant;
                 let bytes: u64 = eb.txs.iter().map(|tx| tx.bytes).sum();
                 time += config.eb_body_validation_per_byte * (bytes as u32);
@@ -351,7 +351,7 @@ impl NodeImpl for LinearLeiosNode {
             }
             CpuTask::RBBlockValidated(rb) => self.finish_validating_rb(rb),
             CpuTask::EBHeaderValidated(from, eb) => self.finish_validating_eb_header(from, eb),
-            CpuTask::EBBlockValidated(eb) => self.finish_validating_eb(eb),
+            CpuTask::EBBlockValidated(eb, seen) => self.finish_validating_eb(eb, seen),
             CpuTask::VTBundleGenerated(votes, _) => self.finish_generating_vote_bundle(votes),
             CpuTask::VTBundleValidated(from, votes) => {
                 self.finish_validating_vote_bundle(from, votes)
@@ -748,7 +748,7 @@ impl LinearLeiosNode {
         for peer in &self.consumers {
             self.queued.send_to(*peer, Message::AnnounceEB(eb_id));
         }
-        self.vote_for_endorser_block(&eb);
+        self.vote_for_endorser_block(&eb, self.clock.now());
     }
     fn receive_announce_eb(&mut self, from: NodeId, id: EndorserBlockId) {
         self.leios
@@ -801,11 +801,12 @@ impl LinearLeiosNode {
             self.queued.send_to(*peer, Message::AnnounceEB(eb.id()));
         }
 
-        self.queued.schedule_cpu_task(CpuTask::EBBlockValidated(eb));
+        self.queued
+            .schedule_cpu_task(CpuTask::EBBlockValidated(eb, self.clock.now()));
     }
 
-    fn finish_validating_eb(&mut self, eb: Arc<EndorserBlock>) {
-        self.vote_for_endorser_block(&eb);
+    fn finish_validating_eb(&mut self, eb: Arc<EndorserBlock>, seen: Timestamp) {
+        self.vote_for_endorser_block(&eb, seen);
     }
 
     fn process_certified_ebs(&mut self, slot: u64) {
@@ -837,14 +838,14 @@ impl LinearLeiosNode {
 
 // Voting
 impl LinearLeiosNode {
-    fn vote_for_endorser_block(&mut self, eb: &Arc<EndorserBlock>) {
-        if !self.try_vote_for_endorser_block(eb) && self.sim_config.emit_conformance_events {
+    fn vote_for_endorser_block(&mut self, eb: &Arc<EndorserBlock>, seen: Timestamp) {
+        if !self.try_vote_for_endorser_block(eb, seen) && self.sim_config.emit_conformance_events {
             self.tracker
                 .track_linear_no_vote_generated(self.id, eb.id());
         }
     }
 
-    fn try_vote_for_endorser_block(&mut self, eb: &Arc<EndorserBlock>) -> bool {
+    fn try_vote_for_endorser_block(&mut self, eb: &Arc<EndorserBlock>, seen: Timestamp) -> bool {
         let vrf_wins = lottery::vrf_probabilities(self.sim_config.vote_probability)
             .filter_map(|f| self.run_vrf(f))
             .count();
@@ -859,7 +860,11 @@ impl LinearLeiosNode {
         };
         self.tracker.track_vote_lottery_won(id);
 
-        // TODO: sometimes, don't vote
+        if let Err(reason) = self.should_vote_for(eb, seen) {
+            self.tracker
+                .track_no_vote(eb.slot, 0, self.id, eb.id(), reason);
+            return false;
+        }
 
         let mut ebs = BTreeMap::new();
         ebs.insert(eb.id(), vrf_wins);
@@ -871,6 +876,23 @@ impl LinearLeiosNode {
         self.queued
             .schedule_cpu_task(CpuTask::VTBundleGenerated(votes, eb.clone()));
         true
+    }
+
+    fn should_vote_for(&self, eb: &EndorserBlock, seen: Timestamp) -> Result<(), NoVoteReason> {
+        let must_be_received_by =
+            Timestamp::from_secs(eb.slot + self.sim_config.linear_vote_stage_length);
+        if seen > must_be_received_by {
+            // An EB must be received within L_vote slots of its creation.
+            return Err(NoVoteReason::LateEB);
+        }
+        if self
+            .latest_rb()
+            .is_none_or(|rb| rb.header.eb_announcement != eb.id())
+        {
+            // We only vote for whichever EB we was referenced by the head of the current chain.
+            return Err(NoVoteReason::WrongEB);
+        }
+        Ok(())
     }
 
     fn finish_generating_vote_bundle(&mut self, votes: VoteBundle) {
