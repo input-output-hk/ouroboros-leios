@@ -64,7 +64,56 @@ Ouroboros Praos cannot support the high transaction volume needed to generate th
 
 ### Non-normative overview of the Leios protocol
 
+Leios extends Ouroboros Praos by introducing Endorser Blocks (EBs) that provide additional transaction capacity through a voting-based certification mechanism. The protocol maintains the Praos consensus chain while adding EB production and voting.
+
+#### Protocol Components
+
+##### Ranking Blocks (RBs)
+
+Ranking Blocks are enhanced versions of Praos blocks that retain the standard capability of directly including transactions. In addition, RBs introduce support for referencing Endorser Blocks (EBs) and embedding EB certificates, enabling indirect transaction inclusion via voted-upon EBs.
+
+##### Endorser Blocks (EBs)
+
+These are block extensions containing transaction references. EBs are announced by RBs and must receive sufficient votes for certification.
+
+##### Voting Committee
+
+Stake pools selected to vote on EB validity using BLS-based aggregation.
+
+#### Protocol State
+
+The protocol maintains the following state variables:
+
+- $\mathcal{A}$: Set of announced EBs awaiting voting
+- $\mathcal{V}_e$: Vote collection for EB $e \in \mathcal{A}$
+- $\mathcal{C}$: Set of validated EB certificates ready for inclusion
+- $\mathcal{F}$: Set of finalized EBs that have been included in the ledger state through certificate inclusion in RBs
+
+##### Initialization:
+
+All sets are initialized empty at genesis. State variables are updated as follows:
+- $\mathcal{A}$: Updated when RBs announce new EBs (may contain EBs from competing forks)
+- $\mathcal{V}_e$: Accumulated during voting period $L$ for each announced EB (ephemeral, discarded after voting)
+- $\mathcal{C}$: Created when $\mathcal{V}_e$ reaches quorum threshold $\tau$
+- $\mathcal{F}$: Updated when certificates from $\mathcal{C}$ are included in RBs
+
+##### Cleanup:
+
+EBs in $\mathcal{A}$ expire quickly when forks are resolved and the longest chain becomes clear. Votes in $\mathcal{V}_e$ are ephemeral and discarded after the voting period concludes.
+
+> [!NOTE]
+> EBs must be remembered until the stability horizon (typically $k$ blocks) is reached, ensuring they are not discarded while the chain suffix remains unstable due to potential forks. This applies to all announced EBs, regardless of whether the node participated in voting for them.
+
+#### Protocol Flow
+
+1. **EB Announcement**: RB producer announces EB by reference
+2. **Voting**: Committee members vote on EB validity over period $L$
+3. **Certification**: EB certified if quorum $\tau$ of stake votes received
+4. **Finalization**: Certificate included in subsequent RB, EB transactions executed
+
 ### Normative Leios specification in Agda
+
+TODO
 
 ### Constraints on Leios protocol parameters
 
