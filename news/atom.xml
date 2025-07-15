@@ -14,15 +14,15 @@
         <updated>2025-07-07T00:00:00.000Z</updated>
         <summary type="html"><![CDATA[This week, the Leios team achieved significant milestones in protocol development and analysis, successfully demonstrating high-throughput capabilities and exploring new protocol variants. The team completed comprehensive experiments with the Stracciatella variant, conducted analytical analysis of Linear Leios throughput efficiency, and implemented new simulation capabilities.]]></summary>
         <content type="html"><![CDATA[<p>This week, the Leios team achieved significant milestones in protocol development and analysis, successfully demonstrating high-throughput capabilities and exploring new protocol variants. The team completed comprehensive experiments with the Stracciatella variant, conducted analytical analysis of Linear Leios throughput efficiency, and implemented new simulation capabilities.</p>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="high-throughput-demonstration">HIGH-THROUGHPUT DEMONSTRATION<a class="hash-link" aria-label="Direct link to HIGH-THROUGHPUT DEMONSTRATION" title="Direct link to HIGH-THROUGHPUT DEMONSTRATION" href="https://leios.cardano-scaling.org/news/2025/07/07/weekly-progress-summary#high-throughput-demonstration">​</a></h2>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="high-throughput-demonstration">High-throughput demonstration<a class="hash-link" aria-label="Direct link to High-throughput demonstration" title="Direct link to High-throughput demonstration" href="https://leios.cardano-scaling.org/news/2025/07/07/weekly-progress-summary#high-throughput-demonstration">​</a></h2>
 <ul>
 <li>Successfully completed experiments demonstrating 1,000+ TPS capability with the Stracciatella variant of Leios.</li>
 <li>Achieved spatial efficiency better than 95% with transaction lifecycle times under two minutes.</li>
 <li>Validated protocol performance under extreme throughput conditions significantly beyond current Cardano capacity.</li>
 <li>Documented detailed findings in the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w28/analysis-stracciatella.ipynb" target="_blank" rel="noopener noreferrer">Stracciatella analysis notebook</a>.</li>
 </ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="protocol-variants-analysis">PROTOCOL VARIANTS ANALYSIS<a class="hash-link" aria-label="Direct link to PROTOCOL VARIANTS ANALYSIS" title="Direct link to PROTOCOL VARIANTS ANALYSIS" href="https://leios.cardano-scaling.org/news/2025/07/07/weekly-progress-summary#protocol-variants-analysis">​</a></h2>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="stracciatella-variant">Stracciatella Variant<a class="hash-link" aria-label="Direct link to Stracciatella Variant" title="Direct link to Stracciatella Variant" href="https://leios.cardano-scaling.org/news/2025/07/07/weekly-progress-summary#stracciatella-variant">​</a></h3>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="protocol-variants-analysis">Protocol variants analysis<a class="hash-link" aria-label="Direct link to Protocol variants analysis" title="Direct link to Protocol variants analysis" href="https://leios.cardano-scaling.org/news/2025/07/07/weekly-progress-summary#protocol-variants-analysis">​</a></h2>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="stracciatella-variant">Stracciatella variant<a class="hash-link" aria-label="Direct link to Stracciatella variant" title="Direct link to Stracciatella variant" href="https://leios.cardano-scaling.org/news/2025/07/07/weekly-progress-summary#stracciatella-variant">​</a></h3>
 <ul>
 <li>Completed comprehensive analysis of the Stracciatella variant (no IBs, transaction references in EBs, two-stage pipeline).</li>
 <li>Key findings:<!-- -->
@@ -34,7 +34,7 @@
 </ul>
 </li>
 </ul>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="linear-leios-throughput-efficiency">Linear Leios Throughput Efficiency<a class="hash-link" aria-label="Direct link to Linear Leios Throughput Efficiency" title="Direct link to Linear Leios Throughput Efficiency" href="https://leios.cardano-scaling.org/news/2025/07/07/weekly-progress-summary#linear-leios-throughput-efficiency">​</a></h3>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="linear-leios-throughput-efficiency">Linear Leios throughput efficiency<a class="hash-link" aria-label="Direct link to Linear Leios throughput efficiency" title="Direct link to Linear Leios throughput efficiency" href="https://leios.cardano-scaling.org/news/2025/07/07/weekly-progress-summary#linear-leios-throughput-efficiency">​</a></h3>
 <ul>
 <li>Conducted analytical analysis of Linear Leios variant's probability of including certified EBs on-chain.</li>
 <li>Results show Linear Leios could achieve approximately 500 times the throughput of Praos at over 50% network resource efficiency.</li>
@@ -43,18 +43,18 @@
 </ul>
 <p><img decoding="async" loading="lazy" src="https://raw.githubusercontent.com/input-output-hk/ouroboros-leios/main/analysis/linear-leios-throughput.svg" alt="Throughput of Linear Leios" class="img_ev3q"></p>
 <p><img decoding="async" loading="lazy" src="https://raw.githubusercontent.com/input-output-hk/ouroboros-leios/main/analysis/linear-leios-efficiency.svg" alt="Throughput efficiency of Linear Leios" class="img_ev3q"></p>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="cddl-specifications">CDDL SPECIFICATIONS<a class="hash-link" aria-label="Direct link to CDDL SPECIFICATIONS" title="Direct link to CDDL SPECIFICATIONS" href="https://leios.cardano-scaling.org/news/2025/07/07/weekly-progress-summary#cddl-specifications">​</a></h2>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="cddl-specifications">CDDL specifications<a class="hash-link" aria-label="Direct link to CDDL specifications" title="Direct link to CDDL specifications" href="https://leios.cardano-scaling.org/news/2025/07/07/weekly-progress-summary#cddl-specifications">​</a></h2>
 <ul>
 <li>Added CDDL specifications for Linear and Stracciatella protocol variants.</li>
 </ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-improvements">SIMULATION IMPROVEMENTS<a class="hash-link" aria-label="Direct link to SIMULATION IMPROVEMENTS" title="Direct link to SIMULATION IMPROVEMENTS" href="https://leios.cardano-scaling.org/news/2025/07/07/weekly-progress-summary#simulation-improvements">​</a></h2>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation">Rust Simulation<a class="hash-link" aria-label="Direct link to Rust Simulation" title="Direct link to Rust Simulation" href="https://leios.cardano-scaling.org/news/2025/07/07/weekly-progress-summary#rust-simulation">​</a></h3>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-improvements">Simulation improvements<a class="hash-link" aria-label="Direct link to Simulation improvements" title="Direct link to Simulation improvements" href="https://leios.cardano-scaling.org/news/2025/07/07/weekly-progress-summary#simulation-improvements">​</a></h2>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation">Rust simulation<a class="hash-link" aria-label="Direct link to Rust simulation" title="Direct link to Rust simulation" href="https://leios.cardano-scaling.org/news/2025/07/07/weekly-progress-summary#rust-simulation">​</a></h3>
 <ul>
 <li>Implemented first pass at Linear Leios variant in Rust simulation.</li>
 <li>Enhanced simulation capabilities for protocol variant testing and analysis.</li>
 <li>Continued optimization of simulation performance for high-throughput scenarios.</li>
 </ul>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="small-transaction-experiments">Small Transaction Experiments<a class="hash-link" aria-label="Direct link to Small Transaction Experiments" title="Direct link to Small Transaction Experiments" href="https://leios.cardano-scaling.org/news/2025/07/07/weekly-progress-summary#small-transaction-experiments">​</a></h3>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="small-transaction-experiments">Small transaction experiments<a class="hash-link" aria-label="Direct link to Small transaction experiments" title="Direct link to Small transaction experiments" href="https://leios.cardano-scaling.org/news/2025/07/07/weekly-progress-summary#small-transaction-experiments">​</a></h3>
 <ul>
 <li>Completed analysis of small-transaction, high-throughput experiments with 300-byte non-Plutus transactions.</li>
 <li>Key findings:<!-- -->
@@ -69,7 +69,7 @@
 </li>
 <li>Supporting materials available in <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w28/ReadMe.pdf" target="_blank" rel="noopener noreferrer">analysis documentation</a> and <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w28/analysis.ipynb" target="_blank" rel="noopener noreferrer">analysis notebook</a>.</li>
 </ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="next-steps">NEXT STEPS<a class="hash-link" aria-label="Direct link to NEXT STEPS" title="Direct link to NEXT STEPS" href="https://leios.cardano-scaling.org/news/2025/07/07/weekly-progress-summary#next-steps">​</a></h2>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="next-steps">Next steps<a class="hash-link" aria-label="Direct link to Next steps" title="Direct link to Next steps" href="https://leios.cardano-scaling.org/news/2025/07/07/weekly-progress-summary#next-steps">​</a></h2>
 <ul>
 <li>Continue investigation of protocol variants for CIP convergence.</li>
 <li>Expand simulation capabilities for additional protocol variants.</li>
