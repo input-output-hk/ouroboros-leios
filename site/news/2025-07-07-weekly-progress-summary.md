@@ -7,16 +7,16 @@ tags: [progress, update, weekly, high-throughput, protocol-variants, stracciatel
 
 This week, the Leios team achieved significant milestones in protocol development and analysis, successfully demonstrating high-throughput capabilities and exploring new protocol variants. The team completed comprehensive experiments with the Stracciatella variant, conducted analytical analysis of Linear Leios throughput efficiency, and implemented new simulation capabilities.
 
-## HIGH-THROUGHPUT DEMONSTRATION
+## High-throughput demonstration
 
 - Successfully completed experiments demonstrating 1,000+ TPS capability with the Stracciatella variant of Leios.
 - Achieved spatial efficiency better than 95% with transaction lifecycle times under two minutes.
 - Validated protocol performance under extreme throughput conditions significantly beyond current Cardano capacity.
 - Documented detailed findings in the [Stracciatella analysis notebook](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w28/analysis-stracciatella.ipynb).
 
-## PROTOCOL VARIANTS ANALYSIS
+## Protocol variants analysis
 
-### Stracciatella Variant
+### Stracciatella variant
 
 - Completed comprehensive analysis of the Stracciatella variant (no IBs, transaction references in EBs, two-stage pipeline).
 - Key findings:
@@ -25,7 +25,7 @@ This week, the Leios team achieved significant milestones in protocol developmen
   - Network usage is slightly heavy while CPU usage appears suspiciously light.
   - Congestion appears at 1,000+ TPS throughput levels.
 
-### Linear Leios Throughput Efficiency
+### Linear Leios throughput efficiency
 
 - Conducted analytical analysis of Linear Leios variant's probability of including certified EBs on-chain.
 - Results show Linear Leios could achieve approximately 500 times the throughput of Praos at over 50% network resource efficiency.
@@ -36,19 +36,19 @@ This week, the Leios team achieved significant milestones in protocol developmen
 
 ![Throughput efficiency of Linear Leios](https://raw.githubusercontent.com/input-output-hk/ouroboros-leios/main/analysis/linear-leios-efficiency.svg)
 
-## CDDL SPECIFICATIONS
+## CDDL specifications
 
 - Added CDDL specifications for Linear and Stracciatella protocol variants.
 
-## SIMULATION IMPROVEMENTS
+## Simulation improvements
 
-### Rust Simulation
+### Rust simulation
 
 - Implemented first pass at Linear Leios variant in Rust simulation.
 - Enhanced simulation capabilities for protocol variant testing and analysis.
 - Continued optimization of simulation performance for high-throughput scenarios.
 
-### Small Transaction Experiments
+### Small transaction experiments
 
 - Completed analysis of small-transaction, high-throughput experiments with 300-byte non-Plutus transactions.
 - Key findings:
@@ -60,7 +60,7 @@ This week, the Leios team achieved significant milestones in protocol developmen
   - Network usage remains modest under high load.
 - Supporting materials available in [analysis documentation](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w28/ReadMe.pdf) and [analysis notebook](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w28/analysis.ipynb).
 
-## NEXT STEPS
+## Next steps
 
 - Continue investigation of protocol variants for CIP convergence.
 - Expand simulation capabilities for additional protocol variants.
