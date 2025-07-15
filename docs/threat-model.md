@@ -37,7 +37,7 @@ Leios is an overlay protocol on top of Ouroboros Praos that enhances transaction
 - **Relay Nodes**: Participate in transaction and block diffusion
 - **Clients**: Submit transactions and observe the chain / ledger state evolving, ideally maintain backward compatibility and may largely unaware of Leios mechanics
 
-###3 System Flow
+#### System Flow
 1. Stake pools create EBs based on VRF eligibility (parameterizable stage length)
 2. EBs are announced and propagated through the network
 3. A committee of nodes (> 500 by stake) vote on EB validity and transaction availability
@@ -49,7 +49,7 @@ Leios is an overlay protocol on top of Ouroboros Praos that enhances transaction
 
 For each asset we define what could be impacted in respect to its Confidentiality, Integrity, Availability; i.e. the [CIA Triad](https://www.splunk.com/en_us/blog/learn/cia-triad-confidentiality-integrity-availability.html)
 
-### Blockchain Safety
+### A1: Blockchain Safety
 **Description**: The fundamental guarantee that all honest nodes agree on the blockchain history and no conflicting valid chains exist.
 
 **CIA Impact:**
@@ -59,7 +59,7 @@ For each asset we define what could be impacted in respect to its Confidentialit
 
 **Leios-Specific Considerations**: Vote certificates and EB validation must not create conflicting blockchain states or enable double-spending.
 
-### Blockchain Liveness
+### A2: Blockchain Liveness
 **Description**: The guarantee that the blockchain continues to make progress by producing new blocks and processing transactions within reasonable time bounds.
 
 **CIA Impact:**
@@ -69,7 +69,7 @@ For each asset we define what could be impacted in respect to its Confidentialit
 
 **Leios-Specific Considerations**: EB creation, voting, and certificate inclusion must not prevent regular block production or create bottlenecks.
 
-### Transaction Validity, Availability, and Determinism
+### A3: Transaction Validity, Availability, and Determinism
 **Description**: All transactions included in the blockchain must be cryptographically valid, available to all network participants for verification, and deterministic (transactions only consume fees if successfully included, a key Cardano property).
 
 **CIA Impact:**
@@ -79,7 +79,7 @@ For each asset we define what could be impacted in respect to its Confidentialit
 
 **Leios-Specific Considerations**: EBs reference transactions that must be available when the EB is processed; voting nodes must verify transaction availability before voting; deterministic behavior must be preserved across the EB endorsement and certification process.
 
-### Operational Sustainability
+### A4: Operational Sustainability
 **Description**: Computational and network resources consumed by Stake Pool Operators to participate in the protocol, including CPU, memory, storage, and bandwidth. Resource increases are acceptable as long as they are covered by corresponding incentives to maintain operational sustainability.
 
 **CIA Impact:**
@@ -89,7 +89,7 @@ For each asset we define what could be impacted in respect to its Confidentialit
 
 **Leios-Specific Considerations**: New responsibilities (EB creation, voting, additional network protocols) must not significantly increase SPO operational costs relative to incentives or create barriers to participation.
 
-### Decentralization Properties
+### A5: Decentralization Properties
 **Description**: The distribution of block production, voting power, and network participation across many independent operators.
 
 **CIA Impact:**
@@ -97,7 +97,7 @@ For each asset we define what could be impacted in respect to its Confidentialit
 - **Integrity**: HIGH - Centralization increases risk of coordinated attacks on consensus
 - **Availability**: HIGH - Centralized infrastructure creates single points of failure
 
-### High Throughput
+### A6: High Throughput
 **Description**: The enhanced transaction processing capacity that Leios provides beyond basic Praos liveness, enabling the network to handle significantly more transactions per unit time.
 
 **CIA Impact:**
@@ -141,7 +141,7 @@ Notable threats to the system that could impact assets.
 
 **Assets Affected**: High Throughput, Operational Sustainability, Blockchain Safety
 
-#### Eclipse Attack on Voting Nodes
+#### T2: Eclipse Attack on Voting Nodes
 **Description**: Attacker isolates top voting nodes to manipulate vote collection by controlling their network connections and information flow.
 
 **Prerequisites**:
@@ -167,7 +167,7 @@ Notable threats to the system that could impact assets.
 
 **Assets Affected**: Blockchain Safety, High Throughput
 
-#### Vote Flooding Attack
+#### T3: Vote Flooding Attack
 **Description**: Malicious nodes flood the network with invalid or duplicate votes to overwhelm voting infrastructure and waste network resources.
 
 **Prerequisites**:
@@ -312,7 +312,7 @@ Notable threats to the system that could impact assets.
 
 **Assets Affected**: High Throughput, Operational Sustainability
 
-#### Transaction Front-Running
+#### T9: Transaction Front-Running
 **Description**: EB producers observe profitable transactions and reorder or insert their own transactions to extract value before the original transaction executes.
 
 **Prerequisites**:
@@ -407,9 +407,11 @@ Notable threats to the system that could impact assets.
 ## Mitigation Strategies
 
 #### M1: Mempool Partitioning Defense
+**Addressing threats**: T1
+
 **Decision**: MITIGATE + ACCEPT
 
-**Control Type**: Preventive + Detective
+**Control type**: Preventive + Detective
 
 **Implementation**:
 - Fair transaction diffusion across peer connections
@@ -424,12 +426,12 @@ Notable threats to the system that could impact assets.
 
 **Accepted Impact**: Temporary throughput reduction and resource waste from conflicting transactions, as long as perpetual storage costs are contained
 
-**Threats Addressed**: T1
-
 #### M2: Eclipse Attack Prevention
+**Addressing threats**: T2
+
 **Decision**: MITIGATE
 
-**Control Type**: Preventive + Detective
+**Control type**: Preventive + Detective
 
 **Implementation**:
 - Diversified peer connections for all nodes
@@ -443,12 +445,12 @@ Notable threats to the system that could impact assets.
 
 **Cost**: Medium - Monitoring infrastructure and operational procedures
 
-**Threats Addressed**: T2
-
 #### M3: Vote Flooding Protection
+**Addressing threats**: T3
+
 **Decision**: MITIGATE
 
-**Control Type**: Preventive
+**Control type**: Preventive
 
 **Implementation**:
 - Rate limiting on vote acceptance per node
@@ -460,12 +462,10 @@ Notable threats to the system that could impact assets.
 
 **Cost**: Low - Protocol design already provides protection
 
-**Threats Addressed**: T3
-
 #### M4: Transaction Availability Enforcement
 **Decision**: MITIGATE
 
-**Control Type**: Preventive + Corrective
+**Control type**: Preventive + Corrective
 
 **Implementation**:
 - Protocol violation when peer serving EB cannot provide endorsed transactions
@@ -477,12 +477,14 @@ Notable threats to the system that could impact assets.
 
 **Cost**: Low - Protocol enforcement mechanism
 
-**Threats Addressed**: T8
+**Addressing threats**: T8
 
-#### M5: EB Withholding Mitigation
+#### M5: Over-Parameterization
+**Addressing threats**: T4, T8
+
 **Decision**: MITIGATE
 
-**Control Type**: Preventive
+**Control type**: Preventive
 
 **Implementation**:
 - Parameterize EB opportunities and sizes for adversarial stake assumptions
@@ -494,12 +496,12 @@ Notable threats to the system that could impact assets.
 
 **Cost**: Low - Protocol parameterization only
 
-**Threats Addressed**: T4
-
 #### M6: Double Voting Response
+**Addressing threats**: T5
+
 **Decision**: ACCEPT
 
-**Control Type**: None
+**Control type**: None
 
 **Implementation**: None required
 
@@ -509,12 +511,12 @@ Notable threats to the system that could impact assets.
 
 **Accepted Impact**: Multiple certificates may exist but only RB inclusion affects chain selection, so no safety impact
 
-**Threats Addressed**: T5
-
 #### M7: VRF and Stake Manipulation Response
+**Addressing threats**: T6, T7
+
 **Decision**: ACCEPT
 
-**Control Type**: None
+**Control type**: None
 
 **Implementation**: None required
 
@@ -524,12 +526,12 @@ Notable threats to the system that could impact assets.
 
 **Accepted Impact**: Prerequisites too high (cryptographic breakthrough or massive capital) and likelihood too low to justify mitigation effort
 
-**Threats Addressed**: T6, T7
-
 #### M8: Front-Running Response
+**Addressing threats**: T9
+
 **Decision**: ACCEPT + MITIGATE
 
-**Control Type**: Detective
+**Control type**: Detective
 
 **Implementation**:
 - Monitor transaction ordering patterns in EBs and RBs
@@ -543,12 +545,12 @@ Notable threats to the system that could impact assets.
 
 **Accepted Impact**: Front-running will occur but detection helps maintain transparency and potential future governance responses
 
-**Threats Addressed**: T9
-
 #### M9: Hard Fork Coordination Protection
+**Addressing threats**: T10
+
 **Decision**: MITIGATE
 
-**Control Type**: Preventive
+**Control type**: Preventive
 
 **Implementation**:
 - Up-front communication, education and transparency throughout development
@@ -562,12 +564,12 @@ Notable threats to the system that could impact assets.
 
 **Cost**: Medium - Extensive coordination and communication effort
 
-**Threats Addressed**: T10
-
 #### M10: Backward Compatibility Protection
+**Addressing threats**: T11
+
 **Decision**: AVOID + MITIGATE
 
-**Control Type**: Preventive
+**Control type**: Preventive
 
 **Implementation**:
 - Avoid breaking changes in protocol design where possible
@@ -578,8 +580,6 @@ Notable threats to the system that could impact assets.
 **Validation**: Integration testing with various client versions and protocol combinations
 
 **Cost**: Medium - Testing infrastructure and compatibility analysis
-
-**Threats Addressed**: T11
 
 ## Review and Maintenance
 
