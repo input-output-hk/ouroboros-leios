@@ -8,6 +8,8 @@ Next Review: 2025-09-10
 
 A threat model for the Leios consensus change for Cardano. This was created by roughly following the [OWASP threat modeling process](https://owasp.org/www-community/Threat_Modeling_Process).
 
+See also [the threat model section in Leios Technical Report #1](./technical-report-1.md#threat-model) and more [comments on attack surface in Leios Technical Report #2](./technical-report-2.md#notes-on-the-leios-attack-surface).
+
 ## 1. System Overview
 
 > [!NOTE]
@@ -408,7 +410,9 @@ Notable threats to the system that could impact assets.
 
 #### M1: Mempool Partitioning Defense
 **Decision**: MITIGATE + ACCEPT
+
 **Control Type**: Preventive + Detective
+
 **Implementation**:
 - Fair transaction diffusion across peer connections
 - Peer connection churn for nodes serving non-chain transactions repeatedly
@@ -417,13 +421,18 @@ Notable threats to the system that could impact assets.
 - Strict limits on perpetual storage (no conflicting tx storage)
 
 **Validation**: Simulation testing with network partitions
+
 **Cost**: Medium - Protocol changes and monitoring infrastructure
+
 **Accepted Impact**: Temporary throughput reduction and resource waste from conflicting transactions, as long as perpetual storage costs are contained
+
 **Threats Addressed**: T1
 
 #### M2: Eclipse Attack Prevention
 **Decision**: MITIGATE
+
 **Control Type**: Preventive + Detective
+
 **Implementation**:
 - Diversified peer connections for all nodes
 - Network monitoring and anomaly detection
@@ -433,12 +442,16 @@ Notable threats to the system that could impact assets.
 - Apply protection to all critical path network protocols (vote diffusion, EB diffusion, block fetch)
 
 **Validation**: Penetration testing and network analysis
+
 **Cost**: Medium - Monitoring infrastructure and operational procedures
+
 **Threats Addressed**: T2
 
 #### M3: Vote Flooding Protection
 **Decision**: MITIGATE
+
 **Control Type**: Preventive
+
 **Implementation**:
 - Rate limiting on vote acceptance per node
 - Vote signature validation before propagation
@@ -446,12 +459,16 @@ Notable threats to the system that could impact assets.
 - Resource quotas for vote processing
 
 **Validation**: Load testing with malicious vote patterns
+
 **Cost**: Low - Protocol design already provides protection
+
 **Threats Addressed**: T3
 
 #### M4: Transaction Availability Enforcement
 **Decision**: MITIGATE
+
 **Control Type**: Preventive + Corrective
+
 **Implementation**:
 - Protocol violation when peer serving EB cannot provide endorsed transactions
 - Mandatory transaction fetch attempt from EB-serving peer
@@ -459,14 +476,18 @@ Notable threats to the system that could impact assets.
 - Multi-peer transaction sourcing as fallback
 
 **Validation**: Testing with unavailable transaction scenarios and peer timeouts
+
 **Cost**: Low - Protocol enforcement mechanism
+
 **Threats Addressed**: T8
 
 ### 5.2 Consensus-Level Controls
 
 #### M5: EB Withholding Mitigation
 **Decision**: MITIGATE
+
 **Control Type**: Preventive
+
 **Implementation**:
 - Parameterize EB opportunities and sizes for adversarial stake assumptions
 - Example: Assume 30% adversarial stake, produce 2 EBs per stage on average
@@ -474,34 +495,48 @@ Notable threats to the system that could impact assets.
 - Bound throughput loss to guaranteed capacity levels
 
 **Validation**: Game-theoretic analysis and simulation with various adversarial stake percentages
+
 **Cost**: Low - Protocol parameterization only
+
 **Threats Addressed**: T4
 
 #### M6: Double Voting Response
 **Decision**: ACCEPT
+
 **Control Type**: None
+
 **Implementation**: None required
 
 **Validation**: Not applicable
+
 **Cost**: None
+
 **Accepted Impact**: Multiple certificates may exist but only RB inclusion affects chain selection, so no safety impact
+
 **Threats Addressed**: T5
 
 #### M7: VRF and Stake Manipulation Response
 **Decision**: ACCEPT
+
 **Control Type**: None
+
 **Implementation**: None required
 
 **Validation**: Not applicable
+
 **Cost**: None
+
 **Accepted Impact**: Prerequisites too high (cryptographic breakthrough or massive capital) and likelihood too low to justify mitigation effort
+
 **Threats Addressed**: T6, T7
 
 ### 5.3 Transaction-Level Controls
 
 #### M8: Front-Running Response
 **Decision**: ACCEPT + MITIGATE
+
 **Control Type**: Detective
+
 **Implementation**:
 - Monitor transaction ordering patterns in EBs and RBs
 - Detect suspicious value extraction behaviors
@@ -509,15 +544,20 @@ Notable threats to the system that could impact assets.
 - Public reporting of detected MEV activity
 
 **Validation**: Pattern analysis on historical transaction data
+
 **Cost**: Low - Monitoring and analysis infrastructure
+
 **Accepted Impact**: Front-running will occur but detection helps maintain transparency and potential future governance responses
+
 **Threats Addressed**: T9
 
 ### 5.4 Deployment-Level Controls
 
 #### M9: Hard Fork Coordination Protection
 **Decision**: MITIGATE
+
 **Control Type**: Preventive
+
 **Implementation**:
 - Up-front communication, education and transparency throughout development
 - Cardano Improvement Proposal (CIP) publication
@@ -527,12 +567,16 @@ Notable threats to the system that could impact assets.
 - Hard fork coordination meetings via Intersect Technical Steering Committee (TSC)
 
 **Validation**: Stakeholder surveys, adoption metrics, testnet participation rates
+
 **Cost**: Medium - Extensive coordination and communication effort
+
 **Threats Addressed**: T10
 
 #### M10: Backward Compatibility Protection
 **Decision**: AVOID + MITIGATE
+
 **Control Type**: Preventive
+
 **Implementation**:
 - Avoid breaking changes in protocol design where possible
 - Comprehensive testing of old/new node behavior interactions
@@ -540,7 +584,9 @@ Notable threats to the system that could impact assets.
 - Mixed-version network testing on testnets
 
 **Validation**: Integration testing with various client versions and protocol combinations
+
 **Cost**: Medium - Testing infrastructure and compatibility analysis
+
 **Threats Addressed**: T11
 
 ## 6. Review and Maintenance
