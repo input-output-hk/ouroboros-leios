@@ -1,6 +1,7 @@
 # Linear Leios (rust simulation)
 
-To run it, set `leios-variant` to `linear`.
+To run Linear Leios with entire transactions stored in EBs, set `leios-variant` to `linear`.
+To run Linear Leios with transaction references stored in EBs, set `leios-variant` to `linear-with-tx-references`.
 
 The log file schema is currently identical to every other variant (though `pipeline` is always 0).
 
