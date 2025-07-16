@@ -194,7 +194,6 @@ pub struct EndorserBlock {
     pub producer: NodeId,
     pub shard: u64,
     pub bytes: u64,
-    pub txs: Vec<Arc<Transaction>>,
     pub ibs: Vec<InputBlockId>,
     pub ebs: Vec<EndorserBlockId>,
 }
