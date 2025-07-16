@@ -174,6 +174,9 @@ export interface Config {
   "eb-size-bytes-constant": bigint;
   "eb-size-bytes-per-ib": bigint;
   "eb-body-avg-size-bytes": bigint;
+  /** For stracciatella: when creating a new EB, have it reference transactions from a previous EB */
+  "eb-include-txs-from-previous-stage": boolean
+
   /** Only supported by Haskell simulation. */
   "eb-diffusion-strategy": DiffusionStrategy;
   /** Only supported by Haskell simulation. */

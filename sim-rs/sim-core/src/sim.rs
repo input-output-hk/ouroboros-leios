@@ -14,7 +14,10 @@ use crate::{
     events::EventTracker,
     model::Transaction,
     network::Network,
-    sim::{driver::NodeDriver, leios::LeiosNode, linear_leios::LinearLeiosNode},
+    sim::{
+        driver::NodeDriver, leios::LeiosNode, linear_leios::LinearLeiosNode,
+        stracciatella::StracciatellaLeiosNode,
+    },
 };
 
 mod cpu;
@@ -23,16 +26,19 @@ mod leios;
 mod linear_leios;
 mod lottery;
 mod slot;
+mod stracciatella;
 mod tx;
 
 enum NetworkWrapper {
     Leios(Network<MiniProtocol, <LeiosNode as NodeImpl>::Message>),
+    Stracciatella(Network<MiniProtocol, <StracciatellaLeiosNode as NodeImpl>::Message>),
     LinearLeios(Network<MiniProtocol, <LinearLeiosNode as NodeImpl>::Message>),
 }
 impl NetworkWrapper {
     async fn run(&mut self) -> Result<()> {
         match self {
             Self::Leios(network) => network.run().await,
+            Self::Stracciatella(network) => network.run().await,
             Self::LinearLeios(network) => network.run().await,
         }
     }
@@ -40,6 +46,7 @@ impl NetworkWrapper {
     fn shutdown(self) -> Result<()> {
         match self {
             Self::Leios(network) => network.shutdown(),
+            Self::Stracciatella(network) => network.shutdown(),
             Self::LinearLeios(network) => network.shutdown(),
         }
     }
@@ -47,12 +54,18 @@ impl NetworkWrapper {
 
 enum NodeListWrapper {
     Leios(Vec<NodeDriver<LeiosNode>>),
+    Stracciatella(Vec<NodeDriver<StracciatellaLeiosNode>>),
     LinearLeios(Vec<NodeDriver<LinearLeiosNode>>),
 }
 impl NodeListWrapper {
     fn run_all(&mut self, set: &mut JoinSet<Result<()>>) {
         match self {
             Self::Leios(nodes) => {
+                for node in nodes.drain(..) {
+                    set.spawn(node.run());
+                }
+            }
+            Self::Stracciatella(nodes) => {
                 for node in nodes.drain(..) {
                     set.spawn(node.run());
                 }
@@ -90,6 +103,13 @@ impl Simulation {
                 &clock,
                 NetworkWrapper::LinearLeios,
                 NodeListWrapper::LinearLeios,
+            )?,
+            LeiosVariant::FullWithoutIbs => Self::init(
+                &config,
+                &tracker,
+                &clock,
+                NetworkWrapper::Stracciatella,
+                NodeListWrapper::Stracciatella,
             )?,
             _ => Self::init(
                 &config,

@@ -123,6 +123,7 @@ pub struct RawParameters {
     pub eb_max_age_slots: u64,
     pub eb_referenced_txs_max_size_bytes: u64,
     pub eb_body_avg_size_bytes: u64,
+    pub eb_include_txs_from_previous_stage: bool,
 
     // Vote configuration
     pub vote_generation_probability: f64,
@@ -539,6 +540,7 @@ pub struct SimConfiguration {
     pub(crate) eb_generation_probability: f64,
     pub(crate) vote_probability: f64,
     pub(crate) vote_slot_length: u64,
+    pub(crate) eb_include_txs_from_previous_stage: bool,
     pub(crate) linear_vote_stage_length: u64,
     pub(crate) linear_diffuse_stage_length: u64,
     pub(crate) max_block_size: u64,
@@ -602,6 +604,7 @@ impl SimConfiguration {
             vote_probability: params.vote_generation_probability,
             vote_threshold: params.vote_threshold,
             vote_slot_length: params.leios_stage_active_voting_slots,
+            eb_include_txs_from_previous_stage: params.eb_include_txs_from_previous_stage,
             linear_vote_stage_length: params.linear_vote_stage_length_slots,
             linear_diffuse_stage_length: params.linear_diffuse_stage_length_slots,
             max_block_size: params.rb_body_max_size_bytes,

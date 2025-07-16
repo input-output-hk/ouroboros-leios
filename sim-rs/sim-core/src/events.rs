@@ -608,7 +608,7 @@ impl EventTracker {
             producer: self.to_node(block.producer),
             shard: block.shard,
             size_bytes: block.bytes,
-            transactions: block.txs.iter().map(|tx| BlockRef { id: tx.id }).collect(),
+            transactions: vec![],
             input_blocks: block
                 .ibs
                 .iter()
@@ -616,6 +616,29 @@ impl EventTracker {
                     id: self.to_input_block(*id),
                 })
                 .collect(),
+            endorser_blocks: block
+                .ebs
+                .iter()
+                .map(|id| BlockRef {
+                    id: self.to_endorser_block(*id),
+                })
+                .collect(),
+        });
+    }
+
+    pub fn track_stracciatella_eb_generated(
+        &self,
+        block: &crate::model::StracciatellaEndorserBlock,
+    ) {
+        self.send(Event::EBGenerated {
+            id: self.to_endorser_block(block.id()),
+            slot: block.slot,
+            pipeline: block.pipeline,
+            producer: self.to_node(block.producer),
+            shard: block.shard,
+            size_bytes: block.bytes,
+            transactions: block.txs.iter().map(|tx| BlockRef { id: tx.id }).collect(),
+            input_blocks: vec![],
             endorser_blocks: block
                 .ebs
                 .iter()
@@ -660,6 +683,23 @@ impl EventTracker {
             id: self.to_endorser_block(block.id()),
             slot: block.slot,
             pipeline: 0,
+            producer: self.to_node(block.producer),
+            sender: self.to_node(sender),
+            recipient: self.to_node(recipient),
+            msg_size_bytes: block.bytes,
+        });
+    }
+
+    pub fn track_stracciatella_eb_sent(
+        &self,
+        block: &crate::model::StracciatellaEndorserBlock,
+        sender: NodeId,
+        recipient: NodeId,
+    ) {
+        self.send(Event::EBSent {
+            id: self.to_endorser_block(block.id()),
+            slot: block.slot,
+            pipeline: block.pipeline,
             producer: self.to_node(block.producer),
             sender: self.to_node(sender),
             recipient: self.to_node(recipient),

@@ -194,11 +194,30 @@ pub struct EndorserBlock {
     pub producer: NodeId,
     pub shard: u64,
     pub bytes: u64,
-    pub txs: Vec<Arc<Transaction>>,
     pub ibs: Vec<InputBlockId>,
     pub ebs: Vec<EndorserBlockId>,
 }
 impl EndorserBlock {
+    pub fn id(&self) -> EndorserBlockId {
+        EndorserBlockId {
+            slot: self.slot,
+            pipeline: self.pipeline,
+            producer: self.producer,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct StracciatellaEndorserBlock {
+    pub slot: u64,
+    pub pipeline: u64,
+    pub producer: NodeId,
+    pub shard: u64,
+    pub bytes: u64,
+    pub txs: Vec<Arc<Transaction>>,
+    pub ebs: Vec<EndorserBlockId>,
+}
+impl StracciatellaEndorserBlock {
     pub fn id(&self) -> EndorserBlockId {
         EndorserBlockId {
             slot: self.slot,

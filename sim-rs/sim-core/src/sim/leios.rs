@@ -1,6 +1,6 @@
 use std::{
     cmp::Reverse,
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque, btree_map::Entry},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque},
     hash::Hash,
     sync::Arc,
     time::Duration,
@@ -205,18 +205,7 @@ impl SimCpuTask for Task {
                 ]
             }
             Self::EBBlockGenerated(_) => vec![config.eb_generation],
-            Self::EBBlockValidated(_, eb) => {
-                if eb.txs.is_empty() {
-                    // Variants where EBs do not contain/reference TXs use a flat validation time.
-                    vec![config.eb_validation]
-                } else {
-                    // When EBs contain or reference TXs, validating those TXs is part of the CPU cost
-                    let mut time = config.eb_body_validation_constant;
-                    let bytes: u64 = eb.txs.iter().map(|tx| tx.bytes).sum();
-                    time += config.eb_body_validation_per_byte * (bytes as u32);
-                    vec![time]
-                }
-            }
+            Self::EBBlockValidated(_, _) => vec![config.eb_validation],
             Self::VTBundleGenerated(_, ebs) => ebs
                 .iter()
                 .map(|eb| {
@@ -265,14 +254,9 @@ struct NodePraosState {
     block_ids_by_slot: BTreeMap<u64, BlockId>,
 }
 
-struct SeenTransaction {
-    tx: Arc<Transaction>,
-    seen_at: Timestamp,
-}
-
 #[derive(Default)]
 struct NodeLeiosState {
-    mempool: BTreeMap<TransactionId, SeenTransaction>,
+    mempool: BTreeMap<TransactionId, Arc<Transaction>>,
     input_ids_in_flight: HashSet<u64>,
     ibs_to_generate: BTreeMap<u64, Vec<u64>>,
     ibs: BTreeMap<InputBlockId, InputBlockState>,
@@ -327,14 +311,6 @@ enum EndorserBlockState {
         eb: Arc<EndorserBlock>,
         finalized: bool,
     },
-}
-impl EndorserBlockState {
-    fn eb(&self) -> Option<&EndorserBlock> {
-        match self {
-            Self::Pending => None,
-            Self::Received { eb, .. } => Some(eb),
-        }
-    }
 }
 
 enum VoteBundleState {
@@ -558,10 +534,6 @@ impl NodeImpl for LeiosNode {
 
 impl LeiosNode {
     fn schedule_input_block_generation(&mut self, slot: u64) {
-        if self.sim_config.variant == LeiosVariant::FullWithoutIbs {
-            // In this variant, IB generation is completely disabled
-            return;
-        }
         let mut slot_vrfs: BTreeMap<u64, Vec<u64>> = BTreeMap::new();
         // IBs are generated at the start of any slot within this stage
         for stage_slot in slot..slot + self.sim_config.stage_length {
@@ -578,14 +550,6 @@ impl LeiosNode {
         }
     }
 
-    fn find_available_eb_shards(&self, slot: u64) -> Vec<u64> {
-        if !matches!(self.sim_config.variant, LeiosVariant::FullWithoutIbs) {
-            // EBs only need shards if we don't have IBs.
-            return vec![0];
-        }
-        self.find_available_ib_shards(slot)
-    }
-
     fn find_available_ib_shards(&self, slot: u64) -> Vec<u64> {
         let period = slot / self.sim_config.ib_shard_period_slots;
         let group = period % self.sim_config.ib_shard_groups;
@@ -600,26 +564,22 @@ impl LeiosNode {
             // Don't generate EBs before that pipeline, because they would just be empty.
             return;
         }
-        let shards = self.find_available_eb_shards(slot);
         for next_p in lottery::vrf_probabilities(self.sim_config.eb_generation_probability) {
-            if let Some(vrf) = self.run_vrf(next_p) {
+            if self.run_vrf(next_p).is_some() {
                 self.tracker.track_eb_lottery_won(EndorserBlockId {
                     slot,
                     pipeline,
                     producer: self.id,
                 });
-                let shard = shards[vrf as usize % shards.len()];
-                let txs = self.select_txs_for_eb(shard, pipeline);
                 let ibs = self.select_ibs_for_eb(pipeline);
                 let ebs = self.select_ebs_for_eb(pipeline);
-                let bytes = self.sim_config.sizes.eb(txs.len(), ibs.len(), ebs.len());
+                let bytes = self.sim_config.sizes.eb(0, ibs.len(), ebs.len());
                 let eb = EndorserBlock {
                     slot,
                     pipeline,
                     producer: self.id,
-                    shard,
+                    shard: 0,
                     bytes,
-                    txs,
                     ibs,
                     ebs,
                 };
@@ -877,11 +837,11 @@ impl LeiosNode {
         let (&block, _, _) = match self.sim_config.variant {
             LeiosVariant::Short => candidates
                 .max_by_key(|(eb, age, votes)| (*age, self.count_txs_in_eb(eb), *votes))?,
-            LeiosVariant::Full
-            | LeiosVariant::FullWithoutIbs
-            | LeiosVariant::FullWithTxReferences => candidates
+            LeiosVariant::Full | LeiosVariant::FullWithTxReferences => candidates
                 .max_by_key(|(eb, age, votes)| (Reverse(*age), self.count_txs_in_eb(eb), *votes))?,
-            LeiosVariant::Linear | LeiosVariant::LinearWithTxReferences => {
+            LeiosVariant::FullWithoutIbs
+            | LeiosVariant::Linear
+            | LeiosVariant::LinearWithTxReferences => {
                 unreachable!("wrong implementation")
             }
         };
@@ -940,10 +900,6 @@ impl LeiosNode {
                 // TXs from finalized EBs have already been removed from the mempool
                 continue;
             };
-            for tx in &eb.txs {
-                self.praos.mempool.remove(&tx.id);
-                self.leios.mempool.remove(&tx.id);
-            }
             for ib_id in &eb.ibs {
                 let Some(InputBlockState::Received { ib, .. }) = self.leios.ibs.get(ib_id) else {
                     continue;
@@ -1096,13 +1052,7 @@ impl LeiosNode {
             // This only affects the Leios mempool; these TXs should still be able to reach the chain through Praos.
             return;
         }
-        self.leios.mempool.insert(
-            tx.id,
-            SeenTransaction {
-                seen_at: self.clock.now(),
-                tx,
-            },
-        );
+        self.leios.mempool.insert(tx.id, tx);
     }
 
     fn receive_roll_forward(&mut self, from: NodeId, id: BlockId) {
@@ -1302,7 +1252,7 @@ impl LeiosNode {
                 .extend(ib.transactions.iter().map(|tx| tx.input_id));
             self.leios
                 .mempool
-                .retain(|_, seen| !self.leios.input_ids_in_flight.contains(&seen.tx.input_id));
+                .retain(|_, tx| !self.leios.input_ids_in_flight.contains(&tx.input_id));
         }
         let header_seen = self
             .leios
@@ -1424,36 +1374,6 @@ impl LeiosNode {
 
     fn finish_validating_eb(&mut self, from: NodeId, eb: Arc<EndorserBlock>) {
         let id = eb.id();
-        let eb_state = match self.leios.ebs.entry(id) {
-            Entry::Vacant(e) => e.insert(EndorserBlockState::Received {
-                eb,
-                finalized: false,
-            }),
-            Entry::Occupied(mut e) => {
-                if matches!(e.get(), EndorserBlockState::Received { .. }) {
-                    return;
-                }
-                e.insert(EndorserBlockState::Received {
-                    eb,
-                    finalized: false,
-                });
-                e.into_mut()
-            }
-        };
-        let eb = eb_state.eb().unwrap();
-        for tx in &eb.txs {
-            // Do not include transactions from this EB in any EBs we produce ourselves.
-            self.leios.mempool.remove(&tx.id);
-        }
-        if self.sim_config.mempool_aggressive_pruning {
-            // If we're using aggressive pruning, remove transactions from the mempool if they conflict with transactions in this EB
-            self.leios
-                .input_ids_in_flight
-                .extend(eb.txs.iter().map(|tx| tx.input_id));
-            self.leios
-                .mempool
-                .retain(|_, seen| !self.leios.input_ids_in_flight.contains(&seen.tx.input_id));
-        }
         self.leios
             .ebs_by_pipeline
             .entry(id.pipeline)
@@ -1539,31 +1459,10 @@ impl LeiosNode {
             let ledger_state = self.resolve_ledger_state(rb_ref);
             self.select_txs(
                 shard,
-                |seen| !ledger_state.spent_inputs.contains(&seen.tx.input_id),
+                |tx| !ledger_state.spent_inputs.contains(&tx.input_id),
                 self.sim_config.max_ib_size,
             )
         }
-    }
-
-    fn select_txs_for_eb(&mut self, shard: u64, pipeline: u64) -> Vec<Arc<Transaction>> {
-        if self.sim_config.variant != LeiosVariant::FullWithoutIbs {
-            return vec![];
-        }
-
-        let Some(last_legal_slot) =
-            (pipeline * self.sim_config.stage_length).checked_sub(self.sim_config.stage_length)
-        else {
-            return vec![];
-        };
-        let max_seen_at = Timestamp::from_secs(last_legal_slot);
-
-        self.select_txs(
-            shard,
-            |seen| seen.seen_at <= max_seen_at,
-            self.sim_config.max_eb_size,
-        )
-        .into_iter()
-        .collect()
     }
 
     fn select_txs<C>(
@@ -1573,7 +1472,7 @@ impl LeiosNode {
         max_size: u64,
     ) -> Vec<Arc<Transaction>>
     where
-        C: Fn(&SeenTransaction) -> bool,
+        C: Fn(&Transaction) -> bool,
     {
         let ib_shards = self.sim_config.ib_shards;
         let tx_may_use_shard = |tx: &Transaction| {
@@ -1589,9 +1488,9 @@ impl LeiosNode {
             .leios
             .mempool
             .values()
-            .filter_map(|seen| {
-                if tx_may_use_shard(&seen.tx) && condition(seen) {
-                    Some((seen.tx.id, seen.tx.bytes, seen.tx.input_id))
+            .filter_map(|tx| {
+                if tx_may_use_shard(tx) && condition(tx) {
+                    Some((tx.id, tx.bytes, tx.input_id))
                 } else {
                     None
                 }
@@ -1614,7 +1513,7 @@ impl LeiosNode {
             if !spent_inputs.insert(input_id) {
                 continue;
             }
-            let tx = self.leios.mempool.remove(&id).unwrap().tx;
+            let tx = self.leios.mempool.remove(&id).unwrap();
             size += tx.bytes;
             txs.push(tx);
         }
@@ -1666,9 +1565,6 @@ impl LeiosNode {
                 else {
                     continue;
                 };
-                for tx in &eb.txs {
-                    state.spent_inputs.insert(tx.input_id);
-                }
                 for ib_id in &eb.ibs {
                     let Some(InputBlockState::Received { ib, .. }) = self.leios.ibs.get(ib_id)
                     else {
@@ -1802,12 +1698,6 @@ impl LeiosNode {
         let mut ib_set = HashSet::new();
         let expected_ib_pipelines: HashSet<u64> =
             self.pipelines_for_ib_references(eb.pipeline).collect();
-
-        for tx in &eb.txs {
-            if !matches!(self.txs.get(&tx.id), Some(TransactionView::Received(_))) {
-                return Err(NoVoteReason::ExtraTX);
-            }
-        }
 
         for ib_id in &eb.ibs {
             let Some(InputBlockState::Received { ib, header_seen }) = self.leios.ibs.get(ib_id)
