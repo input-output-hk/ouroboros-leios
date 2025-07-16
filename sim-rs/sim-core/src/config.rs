@@ -115,6 +115,9 @@ pub struct RawParameters {
     pub eb_generation_probability: f64,
     pub eb_generation_cpu_time_ms: f64,
     pub eb_validation_cpu_time_ms: f64,
+    pub eb_header_validation_cpu_time_ms: f64,
+    pub eb_body_validation_cpu_time_ms_constant: f64,
+    pub eb_body_validation_cpu_time_ms_per_byte: f64,
     pub eb_size_bytes_constant: u64,
     pub eb_size_bytes_per_ib: u64,
     pub eb_max_age_slots: u64,
@@ -156,6 +159,7 @@ pub enum LeiosVariant {
     FullWithoutIbs,
     FullWithTxReferences,
     Linear,
+    LinearWithTxReferences,
 }
 
 #[derive(Debug, Copy, Clone, Deserialize, PartialEq, Eq)]
@@ -329,6 +333,9 @@ pub(crate) struct CpuTimeConfig {
     pub ib_body_validation_per_byte: Duration,
     pub eb_generation: Duration,
     pub eb_validation: Duration,
+    pub eb_header_validation: Duration,
+    pub eb_body_validation_constant: Duration,
+    pub eb_body_validation_per_byte: Duration,
     pub vote_generation_constant: Duration,
     pub vote_generation_per_tx: Duration,
     pub vote_generation_per_ib: Duration,
@@ -360,6 +367,13 @@ impl CpuTimeConfig {
             ),
             eb_generation: duration_ms(params.eb_generation_cpu_time_ms),
             eb_validation: duration_ms(params.eb_validation_cpu_time_ms),
+            eb_header_validation: duration_ms(params.eb_header_validation_cpu_time_ms),
+            eb_body_validation_constant: duration_ms(
+                params.eb_body_validation_cpu_time_ms_constant,
+            ),
+            eb_body_validation_per_byte: duration_ms(
+                params.eb_body_validation_cpu_time_ms_per_byte,
+            ),
             vote_generation_constant: duration_ms(params.vote_generation_cpu_time_ms_constant),
             vote_generation_per_tx: duration_ms(params.vote_generation_cpu_time_ms_per_tx),
             vote_generation_per_ib: duration_ms(params.vote_generation_cpu_time_ms_per_ib),
@@ -416,7 +430,11 @@ impl BlockSizeConfig {
     }
 
     pub fn linear_eb(&self, txs: &[Arc<Transaction>]) -> u64 {
-        self.eb_constant + txs.iter().map(|tx| tx.bytes).sum::<u64>()
+        let body_size = match self.variant {
+            LeiosVariant::LinearWithTxReferences => txs.len() as u64 * self.eb_per_ib,
+            _ => txs.iter().map(|tx| tx.bytes).sum::<u64>(),
+        };
+        self.eb_constant + body_size
     }
 
     pub fn vote_bundle(&self, ebs: usize) -> u64 {

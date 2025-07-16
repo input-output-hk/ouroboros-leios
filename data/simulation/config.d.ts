@@ -168,6 +168,9 @@ export interface Config {
   "eb-generation-probability": number;
   "eb-generation-cpu-time-ms": number;
   "eb-validation-cpu-time-ms": number;
+  "eb-header-validation-cpu-time-ms": number;
+  "eb-body-validation-cpu-time-ms-constant": number;
+  "eb-body-validation-cpu-time-ms-per-byte": number;
   "eb-size-bytes-constant": bigint;
   "eb-size-bytes-per-ib": bigint;
   "eb-body-avg-size-bytes": bigint;
@@ -297,6 +300,8 @@ export enum LeiosVariant {
   FullWithTXReferences = "full-with-tx-references",
   /** Linear Leios: Leios with as little concurrency as possible. */
   Linear = "linear",
+  /** Linear Leios, but blocks include transaction references instead of full TXs */
+  LinearWithTxReferences = "linear-with-tx-references",
 }
 
 export enum MempoolSamplingStrategy {

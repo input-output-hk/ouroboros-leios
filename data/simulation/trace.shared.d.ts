@@ -31,7 +31,7 @@ interface NoBlockEvent {
     slot: number;
 }
 
-type CpuTaskType = "ValIB" | "ValEB" | "ValRB" | "ValIH" | "ValRH" | "ValVote" | "GenIB" | "GenEB" | "GenVote" | "GenRB" | "ValTX";
+type CpuTaskType = "ValIB" | "ValEB" | "ValRB" | "ValIH" | "ValEH" | "ValRH" | "ValVote" | "GenIB" | "GenEB" | "GenVote" | "GenRB" | "ValTX";
 type CpuEventType = "Cpu"
 interface CpuEvent {
     type: CpuEventType;
