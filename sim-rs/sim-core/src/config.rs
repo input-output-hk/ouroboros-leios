@@ -159,6 +159,7 @@ pub enum LeiosVariant {
     FullWithoutIbs,
     FullWithTxReferences,
     Linear,
+    LinearWithTxReferences,
 }
 
 #[derive(Debug, Copy, Clone, Deserialize, PartialEq, Eq)]
@@ -429,7 +430,11 @@ impl BlockSizeConfig {
     }
 
     pub fn linear_eb(&self, txs: &[Arc<Transaction>]) -> u64 {
-        self.eb_constant + txs.iter().map(|tx| tx.bytes).sum::<u64>()
+        let body_size = match self.variant {
+            LeiosVariant::LinearWithTxReferences => txs.len() as u64 * self.eb_per_ib,
+            _ => txs.iter().map(|tx| tx.bytes).sum::<u64>(),
+        };
+        self.eb_constant + body_size
     }
 
     pub fn vote_bundle(&self, ebs: usize) -> u64 {

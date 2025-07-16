@@ -10,8 +10,8 @@ use rand_chacha::ChaChaRng;
 use crate::{
     clock::{Clock, Timestamp},
     config::{
-        CpuTimeConfig, MempoolSamplingStrategy, NodeConfiguration, NodeId, RelayStrategy,
-        SimConfiguration, TransactionConfig,
+        CpuTimeConfig, LeiosVariant, MempoolSamplingStrategy, NodeConfiguration, NodeId,
+        RelayStrategy, SimConfiguration, TransactionConfig,
     },
     events::EventTracker,
     model::{
@@ -891,6 +891,15 @@ impl LinearLeiosNode {
         {
             // We only vote for whichever EB we was referenced by the head of the current chain.
             return Err(NoVoteReason::WrongEB);
+        }
+
+        if self.sim_config.variant == LeiosVariant::LinearWithTxReferences {
+            for tx in &eb.txs {
+                if !matches!(self.txs.get(&tx.id), Some(TransactionView::Received(_))) {
+                    // We won't vote for an EB if we don't have all the TXs it references
+                    return Err(NoVoteReason::MissingTX);
+                }
+            }
         }
         Ok(())
     }

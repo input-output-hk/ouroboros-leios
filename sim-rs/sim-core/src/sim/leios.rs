@@ -870,7 +870,9 @@ impl LeiosNode {
             | LeiosVariant::FullWithoutIbs
             | LeiosVariant::FullWithTxReferences => candidates
                 .max_by_key(|(eb, age, votes)| (Reverse(*age), self.count_txs_in_eb(eb), *votes))?,
-            LeiosVariant::Linear => unreachable!("wrong implementation"),
+            LeiosVariant::Linear | LeiosVariant::LinearWithTxReferences => {
+                unreachable!("wrong implementation")
+            }
         };
 
         let votes = self.leios.votes_by_eb.get(&block)?.clone();

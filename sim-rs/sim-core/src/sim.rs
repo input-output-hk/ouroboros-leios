@@ -84,7 +84,7 @@ impl Simulation {
         let clock = clock_coordinator.clock();
 
         let (network, nodes, tx_producer) = match config.variant {
-            LeiosVariant::Linear => Self::init(
+            LeiosVariant::Linear | LeiosVariant::LinearWithTxReferences => Self::init(
                 &config,
                 &tracker,
                 &clock,

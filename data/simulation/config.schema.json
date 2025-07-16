@@ -78,7 +78,8 @@
         "full",
         "full-without-ibs",
         "full-with-tx-references",
-        "linear"
+        "linear",
+        "linear-with-tx-references"
       ],
       "type": "string"
     },

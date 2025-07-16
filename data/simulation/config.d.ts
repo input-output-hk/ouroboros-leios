@@ -300,6 +300,8 @@ export enum LeiosVariant {
   FullWithTXReferences = "full-with-tx-references",
   /** Linear Leios: Leios with as little concurrency as possible. */
   Linear = "linear",
+  /** Linear Leios, but blocks include transaction references instead of full TXs */
+  LinearWithTxReferences = "linear-with-tx-references",
 }
 
 export enum MempoolSamplingStrategy {

@@ -38,6 +38,7 @@ praos-fallback-enabled: true
 
 linear-vote-stage-length-slots: 5
 linear-diffuse-stage-length-slots: 5
+store-txs-as-references: false
 
 ################################################################################
 # Transaction Configuration
