@@ -538,12 +538,6 @@ impl StracciatellaLeiosNode {
 impl StracciatellaLeiosNode {
     fn generate_endorser_blocks(&mut self, slot: u64) {
         let pipeline = self.slot_to_pipeline(slot) + 1;
-        if pipeline < 4 {
-            // The first pipeline with IBs in it is pipeline 4.
-            // Don't generate EBs before that pipeline, because they would just be empty.
-            // TODO: this is clearly wrong for this protocol, it has no IBs
-            return;
-        }
 
         let shards = self.find_available_shards(slot);
         for next_p in lottery::vrf_probabilities(self.sim_config.eb_generation_probability) {
@@ -603,10 +597,9 @@ impl StracciatellaLeiosNode {
         &self,
         pipeline: u64,
     ) -> Option<impl Iterator<Item = u64> + use<'_>> {
-        // The newest pipeline to include EBs from is i-3, where i is the current pipeline.
-        // TODO: this is waiting too long
-        let Some(newest_included_pipeline) = pipeline.checked_sub(3) else {
-            // If there haven't been 3 pipelines yet, just don't recurse.
+        // The newest pipeline to include EBs from is i-1, where i is the current pipeline.
+        let Some(newest_included_pipeline) = pipeline.checked_sub(1) else {
+            // If this is the first pipeline, just don't recurse.
             return None;
         };
 
@@ -704,12 +697,6 @@ impl StracciatellaLeiosNode {
 // vote/endorsement operations
 impl StracciatellaLeiosNode {
     fn schedule_endorser_block_votes(&mut self, slot: u64) {
-        let pipeline = self.slot_to_pipeline(slot);
-        if pipeline < 4 {
-            // The first pipeline with IBs in it is pipeline 4.
-            // Don't run the VT lottery before that pipeline, because there's nothing to vote on.
-            return;
-        }
         let vrf_wins = lottery::vrf_probabilities(self.sim_config.vote_probability)
             .filter_map(|f| self.run_vrf(f))
             .count();
@@ -1087,8 +1074,8 @@ impl StracciatellaLeiosNode {
     }
 
     fn remove_endorsed_txs_from_mempools(&mut self, endorsement: &Endorsement) {
-        // TODO: not handling conflicts right
         let mut eb_queue = vec![endorsement.eb];
+        let mut txs_to_remove = vec![];
         while let Some(eb_id) = eb_queue.pop() {
             let Some(eb) = self.leios.ebs.get(&eb_id) else {
                 continue;
@@ -1101,10 +1088,7 @@ impl StracciatellaLeiosNode {
                 // TXs from finalized EBs have already been removed from the mempool
                 continue;
             };
-            for tx in &eb.txs {
-                self.praos.mempool.remove(&tx.id);
-                self.leios.mempool.remove(&tx.id);
-            }
+            txs_to_remove.extend_from_slice(&eb.txs);
             for eb_id in &eb.ebs {
                 eb_queue.push(*eb_id);
             }
@@ -1116,6 +1100,7 @@ impl StracciatellaLeiosNode {
                 },
             );
         }
+        self.remove_txs_from_mempools(&txs_to_remove);
     }
 
     fn remove_eb_txs_from_mempools(&mut self, eb: &EndorserBlock) {
