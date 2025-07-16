@@ -205,7 +205,18 @@ impl SimCpuTask for Task {
                 ]
             }
             Self::EBBlockGenerated(_) => vec![config.eb_generation],
-            Self::EBBlockValidated(_, _) => vec![config.eb_validation],
+            Self::EBBlockValidated(_, eb) => {
+                if eb.txs.is_empty() {
+                    // Variants where EBs do not contain/reference TXs use a flat validation time.
+                    vec![config.eb_validation]
+                } else {
+                    // When EBs contain or reference TXs, validating those TXs is part of the CPU cost
+                    let mut time = config.eb_body_validation_constant;
+                    let bytes: u64 = eb.txs.iter().map(|tx| tx.bytes).sum();
+                    time += config.eb_body_validation_per_byte * (bytes as u32);
+                    vec![time]
+                }
+            }
             Self::VTBundleGenerated(_, ebs) => ebs
                 .iter()
                 .map(|eb| {
@@ -929,9 +940,9 @@ impl LeiosNode {
                 // TXs from finalized EBs have already been removed from the mempool
                 continue;
             };
-            for tx_id in &eb.txs {
-                self.praos.mempool.remove(tx_id);
-                self.leios.mempool.remove(tx_id);
+            for tx in &eb.txs {
+                self.praos.mempool.remove(&tx.id);
+                self.leios.mempool.remove(&tx.id);
             }
             for ib_id in &eb.ibs {
                 let Some(InputBlockState::Received { ib, .. }) = self.leios.ibs.get(ib_id) else {
@@ -1430,15 +1441,7 @@ impl LeiosNode {
             }
         };
         let eb = eb_state.eb().unwrap();
-        let txs: Vec<_> = eb
-            .txs
-            .iter()
-            .filter_map(|tx_id| match self.txs.get(tx_id) {
-                Some(TransactionView::Received(tx)) => Some(tx),
-                _ => None,
-            })
-            .collect();
-        for tx in &txs {
+        for tx in &eb.txs {
             // Do not include transactions from this EB in any EBs we produce ourselves.
             self.leios.mempool.remove(&tx.id);
         }
@@ -1446,7 +1449,7 @@ impl LeiosNode {
             // If we're using aggressive pruning, remove transactions from the mempool if they conflict with transactions in this EB
             self.leios
                 .input_ids_in_flight
-                .extend(txs.iter().map(|tx| tx.input_id));
+                .extend(eb.txs.iter().map(|tx| tx.input_id));
             self.leios
                 .mempool
                 .retain(|_, seen| !self.leios.input_ids_in_flight.contains(&seen.tx.input_id));
@@ -1542,7 +1545,7 @@ impl LeiosNode {
         }
     }
 
-    fn select_txs_for_eb(&mut self, shard: u64, pipeline: u64) -> Vec<TransactionId> {
+    fn select_txs_for_eb(&mut self, shard: u64, pipeline: u64) -> Vec<Arc<Transaction>> {
         if self.sim_config.variant != LeiosVariant::FullWithoutIbs {
             return vec![];
         }
@@ -1560,7 +1563,6 @@ impl LeiosNode {
             self.sim_config.max_eb_size,
         )
         .into_iter()
-        .map(|tx| tx.id)
         .collect()
     }
 
@@ -1664,10 +1666,7 @@ impl LeiosNode {
                 else {
                     continue;
                 };
-                for tx_id in &eb.txs {
-                    let Some(TransactionView::Received(tx)) = self.txs.get(tx_id) else {
-                        continue;
-                    };
+                for tx in &eb.txs {
                     state.spent_inputs.insert(tx.input_id);
                 }
                 for ib_id in &eb.ibs {
@@ -1805,7 +1804,7 @@ impl LeiosNode {
             self.pipelines_for_ib_references(eb.pipeline).collect();
 
         for tx in &eb.txs {
-            if !matches!(self.txs.get(tx), Some(TransactionView::Received(_))) {
+            if !matches!(self.txs.get(&tx.id), Some(TransactionView::Received(_))) {
                 return Err(NoVoteReason::ExtraTX);
             }
         }

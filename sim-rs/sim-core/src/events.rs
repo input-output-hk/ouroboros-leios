@@ -608,7 +608,7 @@ impl EventTracker {
             producer: self.to_node(block.producer),
             shard: block.shard,
             size_bytes: block.bytes,
-            transactions: block.txs.iter().map(|id| BlockRef { id: *id }).collect(),
+            transactions: block.txs.iter().map(|tx| BlockRef { id: tx.id }).collect(),
             input_blocks: block
                 .ibs
                 .iter()
