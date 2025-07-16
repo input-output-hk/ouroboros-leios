@@ -3,7 +3,7 @@
 
 set -e
 
-for d in txrefs linear notxs
+for d in stracciatella txrefs linear notxs
 do
   mkdir -p results/$d
   for f in lifecycle resources receipts cpus
