@@ -1,7 +1,8 @@
 ---
 Authors: Sebastian Nagel
-Document Version: 1.0
-Last Updated: 2025-07-10
+Status: Draft
+Version: 0.1
+Last Updated: 2025-07-17
 Next Review: 2025-09-10
 ---
 # Leios Consensus Upgrade - Threat Model
@@ -94,7 +95,7 @@ For each asset we define what could be impacted in respect to its Confidentialit
 
 **Leios-Specific Considerations**: New responsibilities (EB creation, voting, additional network protocols) must not significantly increase SPO operational costs relative to incentives or create barriers to participation.
 
-### A5: Decentralization Properties
+### A5: Decentralization
 **Description**: The distribution of block production, voting power, and network participation across many independent operators.
 
 **CIA Impact:**
@@ -218,7 +219,7 @@ Notable threats to the system that could impact assets.
 - **Temporary**: System recovers with next EB opportunity or alternative producers
 - **Limited**: Cannot permanently block transactions due to multiple eligibility opportunities
 
-**Assets Affected**: High Throughput, Decentralization Properties
+**Assets Affected**: High Throughput, Decentralization
 
 #### T5: Double Voting
 **Description**: Nodes with delegated stake votes on multiple EBs that reference conflicting sets of transactions.
@@ -265,7 +266,7 @@ Notable threats to the system that could impact assets.
 - **Centralization**: Could concentrate EB production in attacker's control
 - **Cryptographic Failure**: Indicates fundamental security breach requiring protocol changes
 
-**Assets Affected**: Blockchain Safety, Decentralization Properties
+**Assets Affected**: Blockchain Safety, Decentralization
 
 #### T7: Stake Grinding
 **Description**: Attacker manipulates stake distribution to influence voting power or EB eligibility through strategic delegation patterns.
@@ -288,7 +289,28 @@ Notable threats to the system that could impact assets.
 - **Eligibility Manipulation**: Increased EB creation opportunities
 - **Centralization**: Concentration of power despite appearing decentralized
 
-**Assets Affected**: Decentralization Properties
+**Assets Affected**: Decentralization
+
+#### T?: Delayed Praos Blocks
+
+> [!WARN]
+> Is this a threat or rather part of the Blockchain Safety asset?
+
+**Description**: Delaying praos blocks due to long ledger state building (too many txs), impacting liveness and safety.
+
+**Impact**:
+- **Chain Quality**: Increased likelihood of chain forks and lower chain quality
+
+**Assets Affected**: Blockchain Safety
+
+#### T?: Excessive Chain Growth
+
+> [!WARN]
+> TODO and how do we describe threats that are not attacks?
+
+**Description**: Chain growing too much due to honest demand and too high capacity parameterization (as a threat, not an attack). When SPOs cannot add as much storage as is needed, they cannot validate the chain and decentralization is impacted.
+
+**Assets Affected**: Operational Sustainability, Decentralization
 
 ### Transaction-Level Threats
 
@@ -337,7 +359,7 @@ Notable threats to the system that could impact assets.
 - **Detectable**: Transaction patterns can reveal front-running behavior
 - **Existing Issue**: Already present with RB producers, Leios increases frequency
 
-**Assets Affected**: Transaction Validity/Availability/Determinism, Decentralization Properties
+**Assets Affected**: Transaction Validity/Availability/Determinism, Decentralization
 
 ### Deployment-Level Threats
 
