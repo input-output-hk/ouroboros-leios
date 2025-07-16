@@ -548,8 +548,7 @@ impl StracciatellaLeiosNode {
                     producer: self.id,
                 });
                 let shard = shards[vrf as usize % shards.len()];
-                let mut txs = vec![];
-                self.sample_from_leios_mempool(&mut txs, shard, pipeline);
+                let txs = self.select_txs_for_eb(shard, pipeline);
                 let ebs = self.select_ebs_for_eb(pipeline);
                 let bytes = self.sim_config.sizes.eb(txs.len(), 0, ebs.len());
                 let eb = EndorserBlock {
@@ -576,6 +575,30 @@ impl StracciatellaLeiosNode {
         let group = period % self.sim_config.ib_shard_groups;
         let shards_per_group = self.sim_config.ib_shards / self.sim_config.ib_shard_groups;
         (group * shards_per_group..(group + 1) * shards_per_group).collect()
+    }
+
+    fn select_txs_for_eb(&mut self, shard: u64, pipeline: u64) -> Vec<Arc<Transaction>> {
+        let mut txs = vec![];
+        if self.sim_config.eb_include_txs_from_previous_stage {
+            if let Some(eb_from_last_pipeline) =
+                self.leios.ebs_by_pipeline.get(&pipeline).and_then(|ebs| {
+                    ebs.iter()
+                        .find_map(|eb_id| match self.leios.ebs.get(eb_id) {
+                            Some(EndorserBlockView::Received { eb, .. }) => Some(eb),
+                            _ => None,
+                        })
+                })
+            {
+                // include TXs from the first EB in the last pipeline
+                for tx in &eb_from_last_pipeline.txs {
+                    if matches!(self.txs.get(&tx.id), Some(TransactionView::Received(_))) {
+                        txs.push(tx.clone());
+                    }
+                }
+            }
+        }
+        self.sample_from_leios_mempool(&mut txs, shard, pipeline);
+        txs
     }
 
     fn select_ebs_for_eb(&self, pipeline: u64) -> Vec<EndorserBlockId> {
