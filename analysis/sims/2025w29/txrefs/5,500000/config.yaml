@@ -14,7 +14,7 @@
 relay-strategy: "request-from-first"
 tcp-congestion-control: true
 multiplex-mini-protocols: true
-simulate-transactions: false
+simulate-transactions: true
 treat-blocks-as-full: false
 cleanup-policies: ["cleanup-expired-vote"]
 timestamp-resolution-ms: 0.1
@@ -23,7 +23,7 @@ timestamp-resolution-ms: 0.1
 # Leios Protocol Configuration
 ################################################################################
 
-leios-variant: linear
+leios-variant: linear-with-tx-references
 linear-vote-stage-length-slots: 5
 linear-diffuse-stage-length-slots: 5
 leios-stage-length-slots: 5
@@ -44,7 +44,7 @@ praos-fallback-enabled: true
 tx-generation-distribution:
   distribution: exp
   lambda: 0.85
-  scale: 153.0
+  scale: 122.4
 tx-size-bytes-distribution:
   distribution: log-normal
   mu: 6.833
@@ -75,7 +75,7 @@ rb-generation-cpu-time-ms: 1.0
 rb-head-validation-cpu-time-ms: 1.0
 
 # On average, no Txs directly embedded in blocks.
-rb-body-legacy-praos-payload-avg-size-bytes: 90112
+rb-body-legacy-praos-payload-avg-size-bytes: 0
 rb-body-legacy-praos-payload-validation-cpu-time-ms-constant: 50.0
 # the -per-byte component is meant to be using size as a (bad)
 # proxy for the complexity of the Txs included.
@@ -166,8 +166,8 @@ eb-max-age-for-relay-slots: 40
 
 # The maximum size of transactions (in bytes) which an EB can reference.
 # Only relevant when running with the "full-without-ibs" variant.
-eb-referenced-txs-max-size-bytes: 200000
-eb-body-avg-size-bytes: 200000
+eb-referenced-txs-max-size-bytes: 500000
+eb-body-avg-size-bytes: 500000
 
 ################################################################################
 # Vote Configuration

@@ -3,7 +3,7 @@
 
 set -e
 
-for d in linear notxs
+for d in txrefs linear notxs
 do
   mkdir -p results/$d
   for f in lifecycle resources receipts cpus
@@ -33,12 +33,12 @@ do
         fi
       done
     ) | pigz -p 3 -9c > results/$d/$f.csv.gz
-R --vanilla << EOI > /dev/null
-require(data.table)
-sampleSize <- $FRACT
-print(sampleSize)
-$f <- fread("results/$d/$f.csv.gz", stringsAsFactors=TRUE)
-save($f, sampleSize, file="results/$d/$f.Rdata", compression_level=9)
-EOI
+####R --vanilla << EOI > /dev/null
+####require(data.table)
+####sampleSize <- $FRACT
+####print(sampleSize)
+####$f <- fread("results/$d/$f.csv.gz", stringsAsFactors=TRUE)
+####save($f, sampleSize, file="results/$d/$f.Rdata", compression_level=9)
+####EOI
   done
 done

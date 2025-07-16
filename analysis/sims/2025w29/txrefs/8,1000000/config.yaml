@@ -23,10 +23,10 @@ timestamp-resolution-ms: 0.1
 # Leios Protocol Configuration
 ################################################################################
 
-leios-variant: linear
-linear-vote-stage-length-slots: 5
-linear-diffuse-stage-length-slots: 5
-leios-stage-length-slots: 5
+leios-variant: linear-with-tx-references
+linear-vote-stage-length-slots: 8
+linear-diffuse-stage-length-slots: 8
+leios-stage-length-slots: 8
 leios-stage-active-voting-slots: 1
 leios-vote-send-recv-stages: false
 leios-late-ib-inclusion: true
@@ -44,7 +44,7 @@ praos-fallback-enabled: true
 tx-generation-distribution:
   distribution: exp
   lambda: 0.85
-  scale: 153.0
+  scale: 68.9
 tx-size-bytes-distribution:
   distribution: log-normal
   mu: 6.833
@@ -166,8 +166,8 @@ eb-max-age-for-relay-slots: 40
 
 # The maximum size of transactions (in bytes) which an EB can reference.
 # Only relevant when running with the "full-without-ibs" variant.
-eb-referenced-txs-max-size-bytes: 200000
-eb-body-avg-size-bytes: 200000
+eb-referenced-txs-max-size-bytes: 1000000
+eb-body-avg-size-bytes: 1000000
 
 ################################################################################
 # Vote Configuration

@@ -1,10 +1,8 @@
-linear/5,200000/run.sh
 linear/5,500000/run.sh
 linear/5,1000000/run.sh
 linear/5,2000000/run.sh
 linear/5,5000000/run.sh
-linear/8,200000/run.sh
-linear/8,5000000/run.sh
+linear/8,500000/run.sh
 linear/8,1000000/run.sh
 linear/8,2000000/run.sh
-linear/8,500000/run.sh
+linear/8,5000000/run.sh
