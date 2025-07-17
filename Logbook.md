@@ -1,5 +1,18 @@
 # Leios logbook
 
+## 2025-07-17
+
+### Linear Leios experiment
+
+A comprehensive set of simulations for the Linear Leios variant was completed, aiming to map out the protocol's performance under varies loads and comparing several versions of the variant to Stracciatella.
+
+- [Slides](analysis/sims/2025w29/summary.pdf)
+- Jupyter notebooks
+    - [Linear Leios with embedded transactions](analysis/sims/2025w29/linear.ipynb)
+    - [Linear Leios with transaction references](analysis/sims/2025w29/txrefs.ipynb)
+    - [Linear Leios without transactions](analysis/sims/2025w29/notxs.ipynb)
+    - [Stracciatella](analysis/sims/2025w29/stracciatella.ipynb)
+
 ## 2025-07-11
 
 ### Stracciatella experiment
