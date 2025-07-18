@@ -1,0 +1,2 @@
+Simulator,Variant,Stage length,Max EB size
+Rust,linear,8 slot/stage,20.0 MB/EB
