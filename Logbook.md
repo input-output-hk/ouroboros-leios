@@ -1,5 +1,13 @@
 # Leios logbook
 
+## 2025-07-18
+
+### Rust simulation
+
+Revised Linear Leios model in response to analysis: in particular we discovered that sufficient throughput depends on only partially validating EBs before propagating them to peers.
+
+Reimplemented Stracciatella as a separate simulation, as an exercise in finding deviations from the spec. Found and fixed several.
+
 ## 2025-07-17
 
 ### Linear Leios experiment
