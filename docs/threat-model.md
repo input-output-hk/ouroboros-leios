@@ -439,6 +439,10 @@ Notable threats to the system that could impact assets.
 
 ## Risk Assessment Matrix
 
+> [!WARN]
+> Incomplete and connection with threat content is vague. i.e. likelihood and
+> risk level are not directly related to anything.
+
 | Threat                        | Impact | Likelihood | Risk Level | Priority |
 |-------------------------------|--------|------------|------------|----------|
 | T1: Mempool Partitioning      | HIGH   | MEDIUM     | HIGH       | P1       |
