@@ -1,5 +1,33 @@
 # Leios logbook
 
+## 2025-07-19
+
+### 100 TPS experiment for Stracciatella and Linear Leios
+
+Experiments using the Rust simulation demonstrated the viability of Stracciatella and Linear Leios at 100 TPS if appropriate stage lengths and maximum EB sizes are chosen.
+
+- Variants
+    - Linear Leios, linear
+    - Linear Leios with tx references, linear-with-tx-references
+    - Stracciatella, full-without-ibs
+- 100 tx/s for first 900 seconds
+- 1400 B/tx
+
+Findings:
+
+1. 5 slot/stage is too short for Linear Leios at 100 tx/s.
+2. Including transactions in EBs (instead of references) results in congestion and delays at 100 tx/s.
+3. 10 MB/EB is sufficient for 100 tx/s but 5 MB/EB is not.
+4. EB-sortition unluckiness in Stracciatella can lengthen the transaction lifecycle, but this could be remedied by increasing the EB production rate.
+5. CPU and network usage peak high when transactions are included in EBs.
+6. Caveat: this conclusion may change when better transaction validation times are used in the simulator configuration.
+
+Artifacts:
+
+- [Slides](analysis/sims/2025w29b/ReadMe.pdf)
+- [Jupyter notebook](analysis/sims/2025w29b/analysis)
+- [Configurations](analysis/sims/2025w29b/)
+
 ## 2025-07-18
 
 ### Rust simulation
