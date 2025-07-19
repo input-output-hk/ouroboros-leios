@@ -279,9 +279,9 @@ of four main stages:
    meets or exceeds a threshold fraction $\tau$ (typically 60%) of the total
    stake, it is certified. In other words, certification requires:
 
-   $$
-   \sum_{v \in \text{votes}} \text{stake}(v) \geq \tau \times \text{stake}_{\text{total}}
-   $$
+  
+   ![equation](https://latex.codecogs.com/png.image?\dpi{120}\sum_{v\in\text{votes}}\text{stake}(v)\geq\tau\times\text{stake}_{\text{total}})
+
 
    (This is represented by the yellow pentagon labeled `C` in the [Figure 4](#protocol-flow-figure)
    below.)
