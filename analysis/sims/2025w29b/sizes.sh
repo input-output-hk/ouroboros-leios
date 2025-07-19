@@ -2,7 +2,7 @@
 
 echo 'Simulator,Variant,Stage length,Max EB size,Kind,Item,Generated [s],Transactions,Endorses' > sizes.csv
 
-for d in {linear,linear-with-tx-references}/*
+for d in {linear,linear-with-tx-references,full-without-ibs}/*
 do
   PREFIX=$(tail -n 1 $d/case.csv)
   zcat $d/sim.log.gz \
