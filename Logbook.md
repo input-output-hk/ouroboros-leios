@@ -2,6 +2,24 @@
 
 ## 2025-07-19
 
+### Preliminary analysis of block and transaction validation times
+
+We undertook basic preliminary analysis of block and transaction validation times for Cardano `mainnet` since Epoch 350.
+
+Findings:
+
+1. The `db-analyser` tool can be used to measure the Cardno block-application time, either including or not including verifying transaction signatures and running Plutus scripts.
+2. The output of this tool is quite noisy and does not include enough of the explanatory variable for predicting CPU times for transactions or blocks.
+3. The missing explanatory variables (size of UTxO set, number of inputs, number of outputs, etc.) can be extracted from the ledger or `cardano-db-sync`.
+4. For transaction signature verification and Plutus script execution, the median times are . . .
+    - 0.53 ms/tx
+    - 0.29 ms/kB
+    - Jointly via a linear model, 0.066 ms/tx plus 0.221 ms/kB.
+5. The noise in the data and the uncertainty in predictions make the above values unsuitable for estimating individual transactions but suitable for bulk estimates of many blocks.
+6. A more sophisticated double general linear model could be used to generate artificial transaction workloads.
+
+See [the Jupyter notebook](analysis/timings/preliminary.ipynb) for evidence and details.
+
 ### Study of timestep effects in simulators
 
 We compared the 1000 TPS Full Leios simulation results (Rust) at two time resolutions, 0.100 ms and 0.025 ms. No significant differences in results were found. This means that we can safely run simulations at the coarser time step; such enable greater parallelism in the simulator and shorter wallclock times. See [the Jupyter notebook](analysis/sims/2025w27/analysis.ipynb) for comparisons, evidence, and details.
