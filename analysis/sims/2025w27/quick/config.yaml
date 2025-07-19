@@ -17,13 +17,13 @@ multiplex-mini-protocols: true
 simulate-transactions: true
 treat-blocks-as-full: false
 cleanup-policies: ["cleanup-expired-vote"]
-timestamp-resolution-ms: 0.050
+timestamp-resolution-ms: 0.1
 
 ################################################################################
 # Leios Protocol Configuration
 ################################################################################
 
-leios-variant: full-with-tx-references
+leios-variant: full-without-ibs
 leios-stage-length-slots: 5
 leios-stage-active-voting-slots: 1
 leios-vote-send-recv-stages: false
@@ -53,7 +53,7 @@ tx-overcollateralization-factor-distribution:
 tx-validation-cpu-time-ms: 0.065
 tx-max-size-bytes: 16384
 tx-start-time: 60
-tx-stop-time: 660
+tx-stop-time: 360
 
 ################################################################################
 # Ranking Block Configuration
@@ -83,9 +83,9 @@ rb-body-legacy-praos-payload-validation-cpu-time-ms-per-byte: 0.0005
 ################################################################################
 
 ib-generation-probability: 2.0
-ib-shards: 80
+ib-shards: 1
 ib-shard-period-length-slots: 1
-ib-shard-group-count: 8
+ib-shard-group-count: 1
 
 # ProducerId  32
 # SlotNo      64
