@@ -1,2 +1,2 @@
 Simulator,timestamp-resolution-ms
-Rust,0.025
+Rust,dt = 0.025 ms

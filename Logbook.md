@@ -2,6 +2,12 @@
 
 ## 2025-07-19
 
+### Study of timestep effects in simulators
+
+We compared the 1000 TPS Full Leios simulation results (Rust) at two time resolutions, 0.100 ms and 0.025 ms. No significant differences in results were found. This means that we can safely run simulations at the coarser time step; such enable greater parallelism in the simulator and shorter wallclock times. See [the Jupyter notebook](analysis/sims/2025w27/analysis.ipynb) for comparisons, evidence, and details.
+
+## 2025-07-18
+
 ### 100 TPS experiment for Stracciatella and Linear Leios
 
 Experiments using the Rust simulation demonstrated the viability of Stracciatella and Linear Leios at 100 TPS if appropriate stage lengths and maximum EB sizes are chosen.
@@ -27,8 +33,6 @@ Artifacts:
 - [Slides](analysis/sims/2025w29b/ReadMe.pdf)
 - [Jupyter notebook](analysis/sims/2025w29b/analysis)
 - [Configurations](analysis/sims/2025w29b/)
-
-## 2025-07-18
 
 ### Rust simulation
 
