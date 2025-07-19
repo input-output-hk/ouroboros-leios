@@ -182,8 +182,7 @@ directly in the RB. When an Endorser Block is announced in an RB, a voting
 period begins as described in
 [Voting Committee and Certificates](#voting-committee-and-certificates). Only
 the immediately following RB is eligible to certify this announced Endorser
-Block by including a [certificate](#certificate). The Endorser Block is added to
-the main chain if it achieves the required quorum of votes within this period.
+Block by including a [certificate](#certificate).
 
 ###### CDDL
 
