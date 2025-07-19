@@ -279,8 +279,9 @@ of four main stages:
    meets or exceeds a threshold fraction $\tau$ (typically 60%) of the total
    stake, it is certified. In other words, certification requires:
 
-  
-   ![equation](https://latex.codecogs.com/png.image?\dpi{120}\sum_{v\in\text{votes}}\text{stake}(v)\geq\tau\times\text{stake}_{\text{total}})
+   <p align="center">
+     <img src="https://latex.codecogs.com/png.image?\dpi{120}\sum_{v\in\text{votes}}\text{stake}(v)\geq\tau\times\text{stake}_{\text{total}}" alt="equation">
+   </p>
 
 
    (This is represented by the yellow pentagon labeled `C` in the [Figure 4](#protocol-flow-figure)
@@ -303,9 +304,9 @@ In summary, Leios enables much higher throughput than Praos alone by allowing
 transactions to be included both in standard blocks and in certified Endorser
 Blocks. The effective transaction rate is:
 
-$$
-\text{Throughput} = f_{\text{RB}} \times \left( \text{capacity}_{\text{RB}} + \text{capacity}_{\text{EB}} \times \text{rate}_{\text{EB, inclusion}} \right)
-$$
+<p align="center">
+  <img src="https://latex.codecogs.com/png.image?\dpi{120}&space;\text{Throughput}&space;=&space;f_{\text{RB}}&space;\times&space;\left(&space;\text{capacity}_{\text{RB}}&space;+&space;\text{capacity}_{\text{EB}}&space;\times&space;\text{rate}_{\text{EB,&space;inclusion}}&space;\right)" alt="Throughput formula">
+</p>
 
 This formula captures the core benefit of Leios: scaling transaction capacity by
 leveraging both the main chain and additional certified blocks.
