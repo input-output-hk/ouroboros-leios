@@ -262,7 +262,7 @@ For further cryptographic details, refer to the
 
 #### Protocol Flow
 
-The protocol flow, as depicted in [Figure 1](#figure-1-protocol-flow), consists
+The protocol flow, as depicted in [Figure 4](#protocol-flow-figure), consists
 of four main stages:
 
 1. **EB Announcement:**  
@@ -283,7 +283,7 @@ of four main stages:
    \sum_{v \in \text{votes}} \text{stake}(v) \geq \tau \times \text{stake}_{\text{total}}
    $$
 
-   (This is represented by the yellow pentagon labeled `C` in the Figure 4
+   (This is represented by the yellow pentagon labeled `C` in the [Figure 4](#protocol-flow-figure)
    below.)
 
 4. **Finalization:**  
@@ -291,7 +291,7 @@ of four main stages:
    transactions from the certified EB are executed. The process may then repeat
    with the announcement of the next EB.
 
-<a name="figure-1-protocol-flow"></a>
+<a name="protocol-flow-figure"></a>
 
 ![Leios Protocol Flow](images/protocol-flow.png)
 
