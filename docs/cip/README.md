@@ -29,6 +29,10 @@ To address this challenge, we propose a transition to Ouroboros Leios — a nove
 
 Leios achieves its scalability through a decoupled block production and aggregation mechanism. This allows for a higher rate of input-block generation, followed by efficient endorsement and anchoring onto the main chain. This document formally specifies the Leios protocol using Agda and provides a detailed rationale and supporting evidence demonstrating its efficacy in overcoming the throughput limitations inherent in the current Ouroboros Praos protocol.
 
+> [!NOTE]
+>
+> For comprehensive research documentation, development history, and additional technical resources, visit the [Leios R&D website](https://leios.cardano-scaling.org/).
+
 <details>
   <summary><h2>Table of contents</h2></summary>
   <strong><font color="red">Create a table of contents with internal hyperlinks when the organization of the document is stable.</font></strong>
@@ -37,7 +41,7 @@ Leios achieves its scalability through a decoupled block production and aggregat
 ## Motivation: why is this CIP necessary?
 
 > [!NOTE]
-> 
+>
 > A clear explanation that introduces a proposal's purpose, use cases, and stakeholders. If the CIP changes an established design, it must outline design issues that motivate a rework. For complex proposals, authors must write a [Cardano Problem Statement (CPS) as defined in CIP-9999][CPS] and link to it as the `Motivation`.
 
 While Cardano's current transaction processing capabilities often meet the immediate demands of its user base, the underlying Ouroboros Praos consensus protocol inherently imposes limitations on scalability. The critical requirement for timely and reliable global propagation of newly generated blocks within a short time interval necessitates a careful balancing act. This constraint directly restricts the maximum size of individual blocks and the computational resources available for the validation of transactions and Plutus scripts, effectively establishing a ceiling on the network's transaction throughput that cannot be overcome through simple parameter adjustments alone.
@@ -48,7 +52,7 @@ The semi-sequential nature of block propagation in Ouroboros Praos, where blocks
 
 To transcend these inherent scaling barriers and unlock the latent capacity of the Cardano network, a fundamental evolution of the core consensus algorithm is imperative. Ouroboros Leios represents a departure from the sequential processing model of Praos, aiming to introduce mechanisms for parallel transaction processing and more efficient aggregation of transaction data. By reorganizing how transactions are proposed, validated, and ultimately recorded on the blockchain, this protocol upgrade seeks to achieve a substantial increase in the network's overall throughput, enabling it to handle a significantly greater volume of transactions within a given timeframe.
 
-The Cardano Problem Statement [CPS-18 Greater Transaction Throughput](https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md) further motivates the need for higher transaction throughput and marshals quantitative evidence of existing mainnet bottlenecks. Realizing higher transaction rates is also necessary for long-term Cardano techo-economic viability as rewards contributions from the Reserve pot diminish: fees from more transactions will be needed to make up that deficit and keep sound the finances of stakepool operations. (Currently, the Reserve contributes more than 85% of the reward of a typical epoch, with less than 15% of the reward coming from the collection of transaction fees. In five years, however, the Reserve contribution will be much diminished.) Because a major protocol upgrade like Leios will take significant time to implement, test, and audit, it is important to began implementation well before transaction demand on mainnet exceeds the capabilities of Ouroboros Praos. The plot below shows the historically diminishing rewards and a forecast of their continued reduction: the forecast is mildly uncertain because the future pattern of staking behavior, transaction fees, and node efficiency might vary considerably.
+The Cardano Problem Statement [CPS-18 Greater Transaction Throughput](https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md) further motivates the need for higher transaction throughput and marshals quantitative evidence of existing mainnet bottlenecks. Realizing higher transaction rates is also necessary for long-term Cardano techno-economic viability as rewards contributions from the Reserve pot diminish: fees from more transactions will be needed to make up that deficit and keep sound the finances of stakepool operations. (Currently, the Reserve contributes more than 85% of the reward of a typical epoch, with less than 15% of the reward coming from the collection of transaction fees. In five years, however, the Reserve contribution will be much diminished.) Because a major protocol upgrade like Leios will take significant time to implement, test, and audit, it is important to began implementation well before transaction demand on mainnet exceeds the capabilities of Ouroboros Praos. The plot below shows the historically diminishing rewards and a forecast of their continued reduction: the forecast is mildly uncertain because the future pattern of staking behavior, transaction fees, and node efficiency might vary considerably.
 
 ![Forecast of rewards on Cardano mainnet](images/reward-forecast-bau.svg)
 
@@ -58,35 +62,97 @@ Ouroboros Praos cannot support the high transaction volume needed to generate th
 
 ## Specification
 
+### Non-normative overview of the Leios protocol
+
+Leios extends Ouroboros Praos by introducing Endorser Blocks (EBs) that provide additional transaction capacity through a voting-based certification mechanism. The protocol maintains the Praos consensus chain while adding EB production and voting.
+
+#### Protocol Components
+
+##### Ranking Blocks (RBs)
+
+Ranking Blocks are enhanced versions of Praos blocks that retain the standard capability of directly including transactions. In addition, RBs introduce support for referencing Endorser Blocks (EBs) and embedding EB certificates, enabling indirect transaction inclusion via voted-upon EBs.
+
+##### Endorser Blocks (EBs)
+
+These are block extensions containing transaction references. EBs are announced by RBs and must receive sufficient votes for certification.
+
+##### Voting Committee
+
+Stake pools selected to vote on EB validity using BLS-based aggregation.
+
+#### Protocol State
+
+The protocol maintains the following state variables:
+
+- $\mathcal{A}$: Set of announced EBs awaiting voting
+- $\mathcal{V}_e$: Vote collection for EB $e \in \mathcal{A}$
+- $\mathcal{C}$: Set of validated EB certificates ready for inclusion
+- $\mathcal{F}$: Set of finalized EBs that have been included in the ledger state through certificate inclusion in RBs
+
+##### Initialization:
+
+All sets are initialized empty at genesis. State variables are updated as follows:
+- $\mathcal{A}$: Updated when RBs announce new EBs (may contain EBs from competing forks)
+- $\mathcal{V}_e$: Accumulated during voting period $L$ for each announced EB (ephemeral, discarded after voting)
+- $\mathcal{C}$: Created when $\mathcal{V}_e$ reaches quorum threshold $\tau$
+- $\mathcal{F}$: Updated when certificates from $\mathcal{C}$ are included in RBs
+
+##### Cleanup:
+
+EBs in $\mathcal{A}$ expire quickly when forks are resolved and the longest chain becomes clear. Votes in $\mathcal{V}_e$ are ephemeral and discarded after the voting period concludes.
+
 > [!NOTE]
-> 
-> The technical specification should describe the proposed improvement in sufficient technical detail. In particular, it should provide enough information that an implementation can be performed solely based on the design outlined in the CIP. A complete and unambiguous design is necessary to facilitate multiple interoperable implementations.
-> 
-> This section must address the [Versioning](#versioning) requirement unless this is addressed in an optional Versioning section.
-> 
-> If a proposal defines structure of on-chain data it must include a CDDL schema.
+> EBs must be remembered until the stability horizon (typically $k$ blocks) is reached, ensuring they are not discarded while the chain suffix remains unstable due to potential forks. This applies to all announced EBs, regardless of whether the node participated in voting for them.
 
-### Non-normative overview of Leios
+#### Protocol Flow
 
-> [!IMPORTANT]
-> 
-> - [ ] Write this section after the details of the recommended variant of Full Leios have been settled.
+1. **EB Announcement**: RB producer announces EB by reference
+2. **Voting**: Committee members vote on EB validity over period $L$
+3. **Certification**: EB certified if quorum $\tau$ of stake votes received
+4. **Finalization**: Certificate included in subsequent RB, EB transactions executed
+
+#### Key Constraints
+
+##### Network Timing
+
+$\Delta < L$ ensures sufficient time for voting
+
+* $\Delta$: Network diffusion time (maximum time for message propagation)
+* $L$: Voting period length in slots
+
+##### Quorum Requirement
+
+$\sum_{v \in \text{votes}} \text{stake}(v) \geq \tau \times \text{stake}_{\text{total}}$
+
+* $\tau$: Quorum threshold fraction (typically 60% of total stake)
+* $\text{stake}(v)$: Stake weight of vote $v$
+
+##### Throughput
+
+$\text{Throughput} = f_{\text{RB}} \times (\text{capacity}_{\text{RB}} + \text{capacity}_{\text{EB}} \times \text{rate}_{\text{EB, inclusion}})$
+
+* $f_\text{RB}$: Praos block production rate (typically 0.05 blocks/slot)
+* $\text{RB\_capacity}$: Transaction capacity of standard Praos blocks
+* $\text{EB\_capacity}$: Transaction capacity of Endorser Blocks
+* $\text{EB\_inclusion\_rate}$: Fraction of announced EBs that receive certification
+
+##### State Transition
+
+$\text{State}_{i+1} = \text{State}_i \oplus \text{RB}_{\text{transactions}} \oplus \text{EB}_{\text{transactions}}$
+
+* $\oplus$: State transition function applying transactions to ledger state
+* RB transactions are applied before EB transactions
 
 ### Normative Leios specification in Agda
 
-> [!IMPORTANT]
-> 
-> Work in progress: https://github.com/input-output-hk/ouroboros-leios-formal-spec/tree/main/formal-spec/Leios.
-> 
-> - [ ] Do we plan to embed the Agda in this document?
-> - [ ] If so, will all of the Agda be embedded, instead of just the core subset?
+TODO
 
 ### Constraints on Leios protocol parameters
 
 > [!WARNING]
-> 
+>
 > This is an incomplete work in progress.
-> 
+>
 > - [ ] Revise after protocol definition is complete.
 > - [ ] Add paragraphs explain the rationale in more detail.
 
@@ -106,17 +172,17 @@ Ouroboros Praos cannot support the high transaction volume needed to generate th
 
 ### Specification for votes and certificates
 
-The next section outlines the requirements for Leios sortition, voting, and certificates. Although these are stringent, several proposed schemes meet the criteria. Ideally, a common Cardano voting infrastructure would be used across Leios, Peras, Mithril, and partner chains. For concreteness, however, this section also documents a BLS approach that is feasible for Leios.
+The next section outlines the requirements for Leios [sortition](#sortition), voting, and [certificates](#certificate). Although these are stringent, several proposed schemes meet the criteria. Ideally, a common Cardano voting infrastructure would be used across Leios, Peras, Mithril, and partner chains. For concreteness, however, this section also documents a BLS approach that is feasible for Leios.
 
 #### Requirements
 
-Leios is flexible regarding the details of votes, certificates, and sortition. The key requirements in this regard follow.
+Leios is flexible regarding the details of [votes](#vote), certificates, and sortition. The key requirements in this regard follow.
 
 1. *Succinct registration of keys:* The registration of voting keys should not involve excessive data transfer or coordination between parties. Ideally, such registration would occur as part of the already existing operational certificates and not unduly increase their size.
 2. *Key rotation:* The cryptographic keys used to sign Leios votes and certificates *do not* need to be rotated periodically because the constraints on Leios voting rounds and the key rotation already present in Praos secure the protocol against attacks such as replay and key compromise.
-3. *Deterministic signatures:* Deterministic signatures can guard against attacks that weakening key security. 
+3. *Deterministic signatures:* Deterministic signatures can guard against attacks that weakening key security.
 4. *Local sortition:* Selection of the voting committee should not be so deterministic and public as to open attack avenues such as denial-of-service or subversion.
-5. *Liveness:* Adversaries with significant stake (e.g., more than 35%) should not be able to thwart a honest majority from reaching a quorum of votes for an EB.
+5. *Liveness:* Adversaries with significant stake (e.g., more than 35%) should not be able to thwart a honest majority from reaching a [quorum](#quorum) of votes for an EB.
 6. *Soundness:* Adversaries with near majority stake (e.g., 49%) should not be able to form an adversarial quorum that certifies the EB of their choice.
 7. *Small votes:* Because vote traffic is large and frequent in Leios, the votes themselves should be small. Note that the large size of Praos KES signatures precludes their use for signing Leios votes.
 8. *Small certificates:* Because Leios certificates are frequent and must fit inside Praos blocks, they should be small enough so there is plenty of room for other transactions in the Praos blocks. Note once again that certificates based on Praos KES signatures are too large for consideration in Leios.
@@ -150,7 +216,7 @@ Altogether, a key registration occupies $28 + 96 + 2 \times 48 + 448 = 668$ byte
 
 Figure 7 of the Fait Accompli paper[^1] provides the algorithm for determining which pools are persistent voters. The inequality for this determination can be computed exactly using rational arithmetic, so there is no danger of round-off errors. The input to the formula is the size of the committee and the distribution of stake among the pools.
 
-The non-persistent pools are subject to local sortition (LS) for each vote, based on an updated stake distribution where the persistent voters have been removed and where the distribution is normalized to unit probability. The VRF value for that sortition is the bytes of the SHA-256 hash of the BLS signature on the election identifier $eid$. The probability that a pool with fraction $\sigma$ of the stake is awarded $k$ votes of the committee of $n$ votes is 
+The non-persistent pools are subject to local sortition (LS) for each vote, based on an updated stake distribution where the persistent voters have been removed and where the distribution is normalized to unit probability. The VRF value for that sortition is the bytes of the SHA-256 hash of the BLS signature on the election identifier $eid$. The probability that a pool with fraction $\sigma$ of the stake is awarded $k$ votes of the committee of $n$ votes is
 
 $$
 \mathcal{P}(k) := \frac{(n \cdot \sigma)^k \cdot e^{- n \cdot \sigma}}{k!}
@@ -194,7 +260,7 @@ Consider the committee size $n$, which contains $m$ persistent voters. The certi
 - Aggregate signatures
     - *Signed message:* This aggregate BLS signature on the message is 48 bytes (compressed).
     - *Signed election proofs:* Perhaps not strictly necessary, but another 48 byte (compressed) BLS signature can attest to the proof of the eligibility, see **BLS.BSig** in the Leios paper[^2].
-    
+
 Thus the total certificate size is
 
 $$
@@ -207,36 +273,108 @@ but not including any minor overhead arising from CBOR serialization. As noted p
 
 ### CDDL schema for the ledger
 
-#### IB schema
+#### Ranking Block (RB) schema
 
-> [!IMPORTANT]
-> 
-> - [ ] Translate the Agda type for input blocks into CDDL.
+Leios' *Ranking blocks* are identical to Praos blocks, except for including two additions, a `leios_cert` and `announced_eb`. Both are optional.
+The certificates attest to the validity of an *Endorser block (EB)* through [BLS-based voting](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md) by a committee of stake pools. The `eb_reference` announces the Endorser block to be included in the following *Ranking block*.
 
-#### EB schema
+```diff
+ ranking_block =
+   [ header                   : block_header
+   , transaction_bodies       : [* transaction_body]
+   , transaction_witness_sets : [* transaction_witness_set]
+   , auxiliary_data_set       : {* transaction_index => auxiliary_data}
+   , invalid_transactions     : [* transaction_index]
++  , ? leios_cert             : leios_certificate
++  , ? announced_eb           : eb_reference
+   ]
+```
 
-> [!IMPORTANT]
-> 
-> - [ ] Translate the Agda type for endorser blocks into CDDL.
+#### Votes and Certificates schema
 
-#### Certificate schema
+The certificate is serialized in the following CDDL. Votes are distinguished into persistent and non-persistent votes based on stake distribution using the [Fait Accompli scheme](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#sortition), where persistent voters are selected for the entire epoch and non-persistent voters are selected per pipeline. Vote bundles aggregate multiple votes from a single voter to reduce network overhead, while certificates collect sufficient votes to achieve a [quorum](#quorum) and attest to the validity of an [endorser block](#endorser-blocks-ebs). For detailed cryptographic specifications, see the [BLS certificate scheme documentation](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#bls-certificate-scheme). 
 
-> [!IMPORTANT]
-> 
-> - [ ] Translate the Agda type for certificates into CDDL.
+```cddl
+ leios_certificate =
+   [ election_id            : election_id
+   , endorser_block_hash    : hash32
+   , persistent_voters      : [* persistent_voter_id]
+   , nonpersistent_voters   : {* pool_id => bls_signature}
+   , ? aggregate_elig_sig   : bls_signature
+   , aggregate_vote_sig     : bls_signature
+   ]
 
-#### RB schema
+ leios_vote_bundle = persistent_vote_bundle / non_persistent_vote_bundle
 
-> [!IMPORTANT]
-> 
-> - [ ] Provide the diff for the CDDL for Praos blocks, so that Leios certificates are included.
+ persistent_vote_bundle =
+   [ 0
+   , election_id
+   , persistent_voter_id
+   , vote_entries
+   ]
+
+ non_persistent_vote_bundle =
+   [ 1
+   , election_id
+   , pool_id
+   , eligibility_signature
+   , vote_entries
+   ]
+
+ vote_entries = {* endorser_block_hash => vote_signature}
+```
+
+#### Endorser Block (EB) schema
+
+Endorser blocks contain transaction references that extend the state of the ranking block that announced them, providing additional transaction capacity beyond what fits in the main chain. Each endorser block is produced by the same stake pool that created the ranking block that announces it, and is only included in the main chain if sufficient votes are collected within the voting period.
+
+```cddl
+ endorser_block =
+   [ eb_header         : eb_header
+   , eb_body           : eb_body
+   ]
+
+ eb_header =
+   [ eb_header_body       : eb_header_body
+   , body_signature       : kes_signature
+   ]
+
+ eb_header_body =
+   [ slot                 : slot_no
+   , producer             : pool_id
+   , ? vrf_proof          : vrf_cert
+   ]
+
+ eb_body =
+   [ transaction_references: [* tx_reference]
+   ]
+```
+
+#### Supporting types
+
+Core data types used throughout the Leios protocol, including cryptographic signatures, identifiers, and references that enable secure communication and consensus between network participants. For detailed information on BLS signatures and cryptographic operations, see the [cryptographic benchmarks](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/ReadMe.md) and [BLS specification](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md).
+
+```cddl
+ eb_reference             = hash32
+ tx_reference             = hash32
+ election_id              = bytes .size 8
+ persistent_voter_id      = uint .size 2
+ pool_id                  = bytes .size 28
+ hash32                   = bytes .size 32
+ bls_signature            = bytes .size 48
+ vote_signature           = bls_signature
+ eligibility_signature    = bls_signature
+ vrf_cert                 = bytes
+ kes_signature            = bytes
+ slot_no                  = uint64
+```
 
 ## Rationale: how does this CIP achieve its goals?
 
 > [!NOTE]
-> 
+>
 > The rationale fleshes out the specification by describing what motivated the design and what led to particular design decisions. It should describe alternate designs considered and related work. The rationale should provide evidence of consensus within the community and discuss significant objections or concerns raised during the discussion.
-> 
+>
 > It must also explain how the proposal affects the backward compatibility of existing solutions when applicable. If the proposal responds to a [CPS][], the 'Rationale' section should explain how it addresses the CPS and answer any questions that the CPS poses for potential solutions.
 
 ### How Leios increases throughput
@@ -346,9 +484,9 @@ $$`
 The Leios paper[^2] provides a rigorous theoretical analysis of the safety and throughput of the protocol. That has been reinforced and demonstrated by prototype simulations written in Haskell and Rust.
 
 > [!CAUTION]
-> 
+>
 > The plots below are placeholders. All of the simulations in this section need to be re-run:
-> 
+>
 > - [ ] Final version of the Leios protocol
 > - [ ] Realistic mainnet topology
 > - [ ] Protocol parameters close to the recommended value
@@ -379,7 +517,7 @@ Leios immediately enables use cases for high transaction volume and for more com
 
 #### High transaction volume
 
-Prototype simulations of the Leios protocol indicate that it can achieve at least 20 times the maximum throughput of the current Cardano mainnet. This amounts to approximately 2 MB/s or 1500 tx/s, assuming the current mean transaction size of 1400 bytes. The availability of Leios, however, would likely affect the characteristics of the mix of transactions, so the the maximum transaction rate could be higher or lower than this estimate. Whatever the specifics, Leios will enable transaction volumes that are orders of magnitude greater than Praos.
+Prototype simulations of the Leios protocol indicate that it can achieve at least 20 times the maximum throughput of the current Cardano mainnet. This amounts to approximately 2 MB/s or 1500 tx/s, assuming the current mean transaction size of 1400 bytes. The availability of Leios, however, would likely affect the characteristics of the mix of transactions, so the maximum transaction rate could be higher or lower than this estimate. Whatever the specifics, Leios will enable transaction volumes that are orders of magnitude greater than Praos.
 
 Aside from the general benefit of high capacity, several specific use cases could benefit.
 
@@ -419,7 +557,7 @@ Numerous emerging use cases on Cardano would benefit from larger Plutus executio
 Although the version of Leios proposed in this document does not support the particular use cases listed below, a minor variant or future version of Leios could.
 
 - *Priority pipelines:* Different Leios pipelines might have different stage lengths, throughput, fees, and/or Plutus execution limits, enabling applications to select their level of service.
-- *Externally batched input blocks:* Third parties could construction input blocks and provide them directly to the block producers, allowing a dapp or an exchange detailed control over sequencing of interdependent transactions within a block or even between blocks.
+- *Externally batched input blocks:* Third parties could construct input blocks and provide them directly to the block producers, allowing a dapp or an exchange detailed control over sequencing of interdependent transactions within a block or even between blocks.
 - *Nuanced roles for SPOs:* Leios opens the possibility of separating the protocol functions into separate processes that could be run independently but in coordination. For example, some SPOs (or parts of an SPO) might only create input blocks while others might only produce ranking blocks. In addition to enabling flexible configuration of Cardano worker services, this could encourage new operational models for SPO consortia.
 
 ### Feasible values for Leios protocol parameters
@@ -427,9 +565,9 @@ Although the version of Leios proposed in this document does not support the par
 The table below documents a set of Leios protocol parameters that provided high throughput and reasonably fast settlement in the prototype Haskell and Rust simulations of Leios. The exact choice of parameters that would be adopted on the Cardano mainnet must be subject to discussion and consideration of tradeoffs.
 
 > [!WARNING]
-> 
+>
 > This is an incomplete work in progress.
-> 
+>
 > - [ ] Revise after the protocol definition is complete.
 > - [ ] Each row should have a paragraph of justification.
 
@@ -485,9 +623,9 @@ Nearly all of these *hypothetical* threats are already mitigated by the protocol
 The resource requirements for operating Leios nodes have been estimated from benchmarking and simulation studies. The benchmark values for various Leios operations come either from measurements of the cryptography prototype[^3] or from the IOG benchmarking cluster for the Cardano node. These were input to the Haskell and Rust simulators for Leios to make holistic estimates of resource usage of operating nodes.
 
 > [!CAUTION]
-> 
+>
 > The plots below are placeholders. All of the simulations in this section need to be re-run:
-> 
+>
 > - [ ] Final version of the Leios protocol
 > - [ ] Realistic mainnet topology
 > - [ ] Protocol parameters close to the recommended value
@@ -553,7 +691,7 @@ Note that by 2029, to compensate for Reserve depletion, the network would need t
 ## Path to active
 
 > [!NOTE]
-> 
+>
 > Organised in two sub-sections:
 
 - [ ] Clear evidence of stakeholder use cases that require the high transaction throughput that Leios provides.
@@ -561,9 +699,9 @@ Note that by 2029, to compensate for Reserve depletion, the network would need t
 ### Acceptance criteria
 
 > [!NOTE]
-> 
+>
 > Describes what are the acceptance criteria whereby a proposal becomes _'Active'_.
-> 
+>
 > This sub-section must define a list of criteria by which the proposal can become active. Criteria must relate to observable metrics or deliverables and be reviewed by editors and project maintainers when applicable. For example: "The changes to the ledger rules are implemented and deployed on Cardano mainnet by a majority of the network", or "The following key projects have implemented support for this standard".
 
 - [ ] The revised `cardano-node` implementations pass the node-level conformance test suites.
@@ -575,9 +713,9 @@ Note that by 2029, to compensate for Reserve depletion, the network would need t
 
 > [!NOTE]
 > Either a plan to meet those criteria or `N/A` if not applicable.
-> 
+>
 > This sub-section should define the plan by which a proposal will meet its acceptance criteria, when applicable. More, proposals that require implementation work in a specific project may indicate one or more implementors. Implementors must sign off on the plan and be referenced in the document's preamble.
-> 
+>
 > In particular, an implementation that requires a hard-fork should explicitly mention it in its _'Implementation Plan'_.
 
 - [ ]  Detailed node-level (as opposed to this protocol-level) specification.
@@ -591,13 +729,13 @@ Note that by 2029, to compensate for Reserve depletion, the network would need t
 ## Versioning
 
 > [!NOTE]
-> 
+>
 > if Versioning is not addressed in Specification
-> 
+>
 > CIPs must indicate how the defined Specification is versioned.  **Note** this does not apply to the CIP text, for which annotated change logs are automatically generated and [available through the GitHub UI](https://docs.github.com/en/pull-requests/committing-changes-to-your-project/viewing-and-comparing-commits/differences-between-commit-views) as a history of CIP files and directories.
-> 
+>
 > Authors are free to describe any approach to versioning that allows versioned alterations to be added without author oversight.  Stipulating that the proposal must be superseded by another is also considered to be valid versioning.
-> 
+>
 > A single Versioning scheme can be placed either as a subsection of the Specification section or in an optional Versioning top-level section near the end.  If the Specification contains multiple specification subsections, each of these can have a Versioning subsection within it.
 
 Leios will be versioned via the major and minor version numbers of the Cardano protocol.
@@ -605,7 +743,7 @@ Leios will be versioned via the major and minor version numbers of the Cardano p
 ## References
 
 > [!NOTE]
-> 
+>
 > Optional
 
 - [CPS-18: Greater transaction throughput](https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md)
@@ -617,7 +755,7 @@ Leios will be versioned via the major and minor version numbers of the Cardano p
 ## Appendices
 
 > [!NOTE]
-> 
+>
 > Optional
 
 ### Cryptographic benchmarks
@@ -634,7 +772,7 @@ The following benchmarks for Leios cryptographic operations were computed with R
 | Non-persistent voters    | 230 µs        |
 
 > [!NOTE]
-> 
+>
 > Persistent voters are computed once per epoch, non-persistent voters once per pipeline.
 
 **Vote Benchmarks**
@@ -650,7 +788,7 @@ The following benchmarks for Leios cryptographic operations were computed with R
 **Certificate Benchmarks**
 
 > [!NOTE]
-> 
+>
 > For realistic number of pools, stake distribution, and committee size
 
 | Operation                              | Timing         |
@@ -696,12 +834,41 @@ The following plots show number of persistent votes and votes, along with certif
 | -------------------------------------------------------- | ---------------------------------------------------------------- |
 | ![Fait-accompli voters](images/fait-accompli-voters.svg) | ![Fait-accompli certificate size](images/fait-accompli-cert.svg) |
 
+### Glossary
+
+#### Certificate
+A cryptographic proof that attests to a quorum of votes for an endorser block, included in ranking blocks to finalize transaction settlement.
+
+#### Endorser Block (EB)
+A block that references multiple input blocks from the current pipeline, representing a consensus view of which IBs should be included in the permanent ledger.
+
+#### Input Block (IB)
+A block containing transactions, produced during the Propose stage of each pipeline by stake pools that win VRF-based sortition.
+
+#### Network Diffusion Time
+The maximum time required for a message (block, vote, or certificate) to propagate to all honest nodes in the network, typically ~5 seconds. This creates a concurrency window where blocks produced cannot coordinate to avoid conflicts.
+
+#### Pipeline
+A structured sequence of five stages (Propose, Deliver 1, Deliver 2, Endorse, Vote) that enables concurrent transaction processing while maintaining deterministic ordering.
+
+#### Quorum
+The minimum threshold of votes (typically 60% of committee votes) required to certify an endorser block and create a valid certificate.
+
+#### Ranking Block (RB)
+A Praos consensus chain block that contains at most one Leios certificate, anchoring Leios consensus into the established Praos security model.
+
+#### Sortition
+A VRF-based probabilistic method for selecting nodes to produce input blocks, endorser blocks, or cast votes, based on their delegated stake.
+
+#### Vote
+A cryptographically signed message from an eligible committee member attesting to the validity of an endorser block during the Vote stage.
+
 ## Copyright
 
 > [!NOTE]
-> 
+>
 > The CIP must be explicitly licensed under acceptable copyright terms (see below).
-> 
+>
 > CIPs are licensed in the public domain. More so, they must be licensed under one of the following licenses. Each new CIP must identify at least one acceptable license in its preamble. In addition, each license must be referenced by its respective abbreviation below in the _"Copyright"_ section.
 
 This CIP is licensed under [Apache-2.0](http://www.apache.org/licenses/LICENSE-2.0).
