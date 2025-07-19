@@ -139,17 +139,15 @@ augmenting the Treasury, and increasing SPO and delegator rewards.
 Leios enhances Ouroboros Praos by introducing a dual-block structure and a
 voting mechanism to increase transaction throughput while preserving core
 consensus properties. The protocol is built around three main components:
-[Ranking Blocks (RBs)](#ranking-blocks-rbs),
-[Endorser Blocks (EBs)](#endorser-blocks-ebs), and a
-[voting committee](#voting-committee) responsible for certifying EBs.
+**[Ranking Blocks (RBs)](#ranking-block-rb)**, **[Endorser Blocks (EBs)](#endorser-block-eb)**, and a
+**[voting committee](#endorser-block-eb)** responsible for certifying EBs.
 
 #### Protocol Components
 
 ##### Ranking Blocks (RBs)
 
-Ranking Blocks are Praos blocks extended to support Leios by optionally
-referencing [Endorser Blocks (EBs)](#endorser-blocks-ebs) and embedding their
-certificates. In addition to including transactions directly, RBs can also
+RBs are Praos blocks extended to support Leios by optionally
+referencing EBs and embedding their certificates. In addition to including transactions directly, RBs can also
 incorporate transactions from certified EBs. The two Leios-specific additions to
 the Praos block structure are the optional `leios_cert`, which contains the
 certificate attesting to the validity of an EB through
@@ -175,14 +173,14 @@ the EB proposed for inclusion in the next RB.
 
 ##### Endorser Blocks (EBs)
 
-Endorser Blocks are produced by the same stake pool that created the
-corresponding [Ranking Block (RB)](#ranking-blocks-rbs). They serve to reference
+EBs are produced by the same stake pool that created the
+corresponding RB. They serve to reference
 additional transactions, increasing throughput beyond what can be included
-directly in the RB. When an Endorser Block is announced in an RB, a voting
+directly in the RB. When an EB is announced in an RB, a voting
 period begins as described in
 [Voting Committee and Certificates](#voting-committee-and-certificates). Only
-the immediately following RB is eligible to certify this announced Endorser
-Block by including a [certificate](#certificate).
+the immediately following RB is eligible to certify this announced EB
+by including a [certificate](#certificate).
 
 ###### CDDL
 
@@ -213,10 +211,10 @@ Block by including a [certificate](#certificate).
 ##### Voting Committee and Certificates
 
 The voting committee is a group of stake pools selected to validate
-[Endorser Blocks (EBs)](#endorser-blocks-ebs) through
+EBs through
 [BLS-based vote aggregation](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md).
 Only EBs that achieve the required [quorum](#quorum) of votes are certified and
-eligible for inclusion in [Ranking Blocks (RBs)](#ranking-blocks-rbs).
+eligible for inclusion in RBs.
 
 Votes are categorized as either **persistent** (selected for the entire epoch)
 or **non-persistent** (selected per pipeline), following the
@@ -1267,7 +1265,7 @@ deterministic ordering.
 #### Quorum
 
 The minimum threshold of votes (typically 60% of committee votes) required to
-certify an endorser block and create a valid certificate.
+certify an EB and create a valid certificate.
 
 #### Ranking Block (RB)
 
