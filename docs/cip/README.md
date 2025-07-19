@@ -379,7 +379,7 @@ Leios immediately enables use cases for high transaction volume and for more com
 
 #### High transaction volume
 
-Prototype simulations of the Leios protocol indicate that it can achieve at least 20 times the maximum throughput of the current Cardano mainnet. This amounts to approximately 2 MB/s or 1500 tx/s, assuming the current mean transaction size of 1400 bytes. The availability of Leios, however, would likely affect the characteristics of the mix of transactions, so the the maximum transaction rate could be higher or lower than this estimate. Whatever the specifics, Leios will enable transaction volumes that are orders of magnitude greater than Praos.
+Prototype simulations of the Leios protocol indicate that it can achieve at least 20 times the maximum throughput of the current Cardano mainnet. This amounts to approximately 2 MB/s or 1500 tx/s, assuming the current mean transaction size of 1400 bytes. The availability of Leios, however, would likely affect the characteristics of the mix of transactions, so the maximum transaction rate could be higher or lower than this estimate. Whatever the specifics, Leios will enable transaction volumes that are orders of magnitude greater than Praos.
 
 Aside from the general benefit of high capacity, several specific use cases could benefit.
 
