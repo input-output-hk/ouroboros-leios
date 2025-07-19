@@ -294,7 +294,7 @@ of four main stages:
 
 <a name="protocol-flow-figure"></a>
 
-![Leios Protocol Flow](images/protocol-flow.png)
+![Leios Protocol Flow](images/protocol-flow-overview.png)
 
 <p align="center"><em>Figure 4: Ouroboros Leios Protocol Flow</em></p>
 
