@@ -266,7 +266,7 @@ The protocol flow, as depicted in [Figure 4](#protocol-flow-figure), consists
 of four main stages:
 
 1. **EB Announcement:**  
-   The RB producer references a new EB, signaling its proposal to the network.
+   The RB producer references a new EB, signaling its proposal to the network. The EB size is constrained by $S_\text{EB}$ to ensure it can be diffused within the stage length $L$.
 
 2. **Voting:**  
    Committee members first verify and vote on the proposed EB. After voting, there is a period for votes to propagate through the network. The total voting period, $L$, combines the time for voting and for vote diffusion ($L = L_\text{vote} + L_\text{diff}$), and is chosen so that all votes can be seen before proceeding. Specifically, $L$ is set to exceed the network diffusion time $\Delta$ (i.e., $\Delta < L$), ensuring sufficient time for both voting and message propagation.
@@ -297,24 +297,28 @@ of four main stages:
 
 ##### Bottom Line: What Throughput Does Leios Enable?
 
-In summary, Leios enables much higher throughput than Praos alone by allowing
-transactions to be included both in standard blocks and in certified Endorser
-Blocks. The effective transaction rate is:
+Leios increases throughput by combining the transaction capacity of regular blocks with that of certified EBs. The formula below expresses this: throughput equals the rate of regular block production times the sum of their capacity and the additional capacity from included Endorser Blocks.
 
 <p align="center">
-  <img src="https://latex.codecogs.com/png.image?\dpi{120}&space;\text{Throughput}&space;=&space;f_{\text{RB}}&space;\times&space;\left(&space;\text{capacity}_{\text{RB}}&space;+&space;\text{capacity}_{\text{EB}}&space;\times&space;\text{rate}_{\text{EB,&space;inclusion}}&space;\right)" alt="Throughput formula">
+  <img src="https://latex.codecogs.com/png.image?\dpi{120}&space;\text{Throughput}&space;=&space;f_{\text{RB}}&space;\times&space;\left(&space;S_\text{RB}&space;+&space;S_\text{EB}&space;\times&space;f_\text{EB}&space;\times&space;\text{rate}_{\text{EB,&space;inclusion}}&space;\right)" alt="Throughput formula">
 </p>
 
-This formula captures the core benefit of Leios: scaling transaction capacity by
-leveraging both the main chain and additional certified blocks.
+Where:
+- $f_{\text{RB}}$ — Rate of RB production
+- $S_\text{RB}$ — Maximum size of an RB
+- $S_\text{EB}$ — Maximum size of an EB
+- $f_\text{EB}$ — Rate of EB production
+- $\text{rate}_{\text{EB, inclusion}}$ — Fraction of EBs that are included (certified) in RBs
 
 ### Constraints on Leios protocol parameters
 
-The following table defines the key protocol parameters for Linear Leios, along with their constraints and rationale. These parameters control the timing, security, and performance characteristics of the protocol.
+The following table defines the key protocol parameters. These parameters control the timing, security, and performance characteristics of the protocol.
 
 | Parameter | Symbol | Units | Description | Constraints | Rationale |
 |---|---|---|---|---|---|
 | Stage length | $L$ | slot | Duration of the voting period for endorser blocks | $L \geq \Delta$ | Must allow sufficient time for EB diffusion and voting |
+| Ranking block max size | $S_\text{RB}$ | bytes | Maximum size of a ranking block | $S_\text{RB} > 0$ | Limits RB size to ensure timely diffusion within slot time |
+| Endorser-block max size | $S_\text{EB}$ | bytes | Maximum size of an endorser block | $S_\text{EB} > 0$ | Limits EB size to ensure timely diffusion within stage length |
 | Endorser-block production rate | $f_\text{EB}$ | 1/stage | Probability of producing an EB during a stage | $0 < f_\text{EB} \leq 1$ | EBs are produced by the same pool that creates the RB |
 | Mean committee size | $n$ | parties | Average number of stake pools selected for voting | $n > 0$ | Ensures sufficient decentralization and security |
 | Quorum size | $\tau$ | fraction | Minimum fraction of committee votes required for certification | $\tau > 0.5$ | Prevents adversarial control while ensuring liveness |
