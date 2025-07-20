@@ -147,6 +147,9 @@ inputBlockInvariant ib = ib.header.id == ib.body.id
 instance HasField "id" InputBlock InputBlockId where
   getField = (.id) . (.header)
 
+instance HasField "slot" InputBlock SlotNo where
+  getField = (.slot) . (.header)
+
 data EndorseBlockId = EndorseBlockId
   { node :: !NodeId
   , num :: !Int

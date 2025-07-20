@@ -31,7 +31,7 @@ import GHC.Records
 import qualified Graphics.Rendering.Cairo as Cairo
 import LeiosProtocol.Common hiding (Point)
 import LeiosProtocol.Relay (Message (MsgRespondBodies, MsgRespondHeaders), RelayMessage, RelayState, relayMessageLabel)
-import LeiosProtocol.Short.Node (BlockEvent (..), LeiosEventBlock (..), LeiosMessage (..), LeiosNodeEvent (..), RelayEBMessage, RelayIBMessage, RelayVoteMessage)
+import LeiosProtocol.Short.Node (BlockEvent (..), LeiosEventBlock (..), LeiosMessage (..), LeiosNodeEvent (..), RelayEBMessage, RelayIBMessage, RelayLinearEBMessage, RelayVoteMessage)
 import LeiosProtocol.Short.Sim (LeiosEvent (..), LeiosTrace, exampleTrace1)
 import ModelTCP
 import Network.TypedProtocol
@@ -72,12 +72,14 @@ examplesLeiosSimVizConfig = LeiosVizConfig{..}
   relayIBMessageColor = relayMessageColor $ \(InputBlockId x y) -> (x, y)
   relayEBMessageColor :: RelayEBMessage -> (Double, Double, Double)
   relayEBMessageColor = relayMessageColor $ \(EndorseBlockId x y) -> (x, y)
+  relayLinearEBMessageColor = relayMessageColor $ \(EndorseBlockId x y) -> (x, y)
   relayVoteMessageColor :: RelayVoteMessage -> (Double, Double, Double)
   relayVoteMessageColor = relayMessageColor $ \(VoteId x y) -> (x, y)
   relayIBMessageText :: RelayIBMessage -> Maybe String
   relayIBMessageText = relayMessageText "IB:"
   relayEBMessageText :: RelayEBMessage -> Maybe String
   relayEBMessageText = relayMessageText "EB:"
+  relayLinearEBMessageText = relayMessageText "EB:"
   relayVoteMessageText :: RelayVoteMessage -> Maybe String
   relayVoteMessageText = relayMessageText "Vote:"
   relayMessageText prefix (ProtocolMessage (SomeMessage msg)) = Just $ prefix ++ relayMessageLabel msg
@@ -349,6 +351,7 @@ leiosSimVizModel LeiosModelConfig{recentSpan} =
               _ -> vs.ibsInRBs
           , ebDiffusionLatency = accumDiffusionLatency' now nid event x.id x vs.ebDiffusionLatency
           }
+      EventLinearEB _x -> vs
       EventVote x ->
         vs
           { voteMsgs = adjustNumVotes event x $ accumLeiosMsgs now nid event x vs.voteMsgs
@@ -517,6 +520,7 @@ accumDataTransmitted msg TcpMsgForecast{..} DataTransmitted{..} =
     (payload, block) = case msg of
       RelayIB ibmsg -> (payloadIB ibmsg, blockRelay (Just . sum . map (.size)) ibmsg)
       RelayEB ebmsg -> (Nothing, blockRelay (const Nothing) ebmsg)
+      RelayLinearEB ebmsg -> (Nothing, blockRelay (const Nothing) ebmsg)
       RelayVote votemsg -> (Nothing, blockRelay (const Nothing) votemsg)
       PraosMsg (PraosMessage pmsg) -> case pmsg of
         (Left (ProtocolMessage (SomeMessage csmsg))) ->
@@ -672,6 +676,8 @@ data LeiosVizConfig
   , relayIBMessageText :: RelayIBMessage -> Maybe String
   , relayEBMessageColor :: RelayEBMessage -> (Double, Double, Double)
   , relayEBMessageText :: RelayEBMessage -> Maybe String
+  , relayLinearEBMessageColor :: RelayLinearEBMessage -> (Double, Double, Double)
+  , relayLinearEBMessageText :: RelayLinearEBMessage -> Maybe String
   , relayVoteMessageColor :: RelayVoteMessage -> (Double, Double, Double)
   , relayVoteMessageText :: RelayVoteMessage -> Maybe String
   }
@@ -681,6 +687,7 @@ leiosMessageColor LeiosVizConfig{..} msg =
   case msg of
     RelayIB x -> relayIBMessageColor x
     RelayEB x -> relayEBMessageColor x
+    RelayLinearEB x -> relayLinearEBMessageColor x
     RelayVote x -> relayVoteMessageColor x
     PraosMsg x -> praosMessageColor x
 
@@ -689,6 +696,7 @@ leiosMessageText LeiosVizConfig{..} msg =
   case msg of
     RelayIB x -> relayIBMessageText x
     RelayEB x -> relayEBMessageText x
+    RelayLinearEB x -> relayLinearEBMessageText x
     RelayVote x -> relayVoteMessageText x
     PraosMsg x -> praosMessageText x
 

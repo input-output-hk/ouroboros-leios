@@ -46,7 +46,7 @@ praosBlockGenerator ::
 praosBlockGenerator rng tracer praosConfig slotConfig prefix cpsVar addBlockSt queue = do
   sched <- mkScheduler rng (const $ pure [((), Just $ \p -> if p <= praosConfig.blockFrequencyPerSlot then 1 else 0)])
   blockGenerator
-    BlockGeneratorConfig{slotConfig, execute = execute sched}
+    BlockGeneratorConfig{slotConfig, execute = execute sched, initial = 0 :: Int}
  where
   execute sched sl = lift $ do
     wins <- sched sl
