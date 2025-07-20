@@ -359,10 +359,15 @@ A BLS-based certificate scheme that meets these requirements is documented in th
 
 ### Mini protocols
 
-> [!Note]
+> [!Warning]
 > Add detailed protocol diagrams, message formats, and state machine specifications for each Leios mini protocol (EB-Relay, Vote-Relay, EB-Fetch).
 
 ### Node changes
+
+> [!Warning]
+>
+> This section is work in progress.
+
 - New DB tables: EBs, votes, certificates
 - Chain state tracks:
     - $\mathcal{A}$: announced EBs (awaiting voting)
@@ -390,18 +395,22 @@ A BLS-based certificate scheme that meets these requirements is documented in th
 > This section is work in progress.
 
 - Mempool enlarged for both RB and EB txs.
-- On EB announcement, optionally optimistically include EB txs in mempool (pending certification).
+- On EB announcement, optimistically include EB txs in mempool (pending certification).
 - If EB not certified, revalidate/reinsert its txs.
 - Remove txs from mempool when included in RB or certified EB.
 - Validate txs against current ledger state before mempool admission.
 - RB producer resolves RB/EB tx conflicts at block production.
 - Mempool does not track conflicting indices; relies on ledger rules.
 
-### Incentives and block reward calculation
+### Incentives
 
-> [!NOTE]
+> [!Warning]
 >
-> This section will specify how rewards are distributed for Leios operations, including EB production, voting participation, and transaction fee allocation.
+> This section is work in progress.
+
+- Reward EB creation, even if some EBs are not included in the final chain
+- Motivate voter participation, while blocking system gaming
+- Distribute fees among EB producers, main block producers, and voters
 
 ## Rationale: how does this CIP achieve its goals?
 
