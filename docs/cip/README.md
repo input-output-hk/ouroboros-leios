@@ -217,7 +217,7 @@ Only EBs that achieve the required [quorum](#quorum) of votes are certified and
 eligible for inclusion in RBs.
 
 Votes are categorized as either **persistent** (selected for the entire epoch)
-or **non-persistent** (selected per pipeline), following the
+or **non-persistent** (selected per RB), following the
 [Fait Accompli scheme](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#sortition).
 To reduce network overhead, multiple votes from a single voter can be bundled
 together. Once enough votes are collected to meet the quorum, they are
