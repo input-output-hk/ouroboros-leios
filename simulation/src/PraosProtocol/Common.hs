@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -189,9 +190,10 @@ defaultPraosConfig =
 instance Default (PraosConfig body) where
   def = defaultPraosConfig
 
-data BlockGeneratorConfig m = BlockGeneratorConfig
+data BlockGeneratorConfig m = forall s. BlockGeneratorConfig
   { slotConfig :: SlotConfig
-  , execute :: SlotNo -> StateT Int m ()
+  , execute :: SlotNo -> StateT s m ()
+  , initial :: s
   }
 
 blockGenerator ::
@@ -199,12 +201,12 @@ blockGenerator ::
   (MonadSTM m, MonadDelay m, MonadTime m) =>
   BlockGeneratorConfig m ->
   m ()
-blockGenerator BlockGeneratorConfig{..} = go (0, 0)
+blockGenerator BlockGeneratorConfig{..} = go initial 0
  where
-  go (!blkId, !tgtSlot) = do
+  go !x !tgtSlot = do
     slot <- waitNextSlot slotConfig tgtSlot
-    blkId' <- execStateT (execute slot) blkId
-    go (blkId', slot + 1)
+    x' <- execStateT (execute slot) x
+    go x' (slot + 1)
 
 -- | @waitNextSlot cfg targetSlot@ waits until the beginning of
 -- @targetSlot@ if that's now or in the future, otherwise the closest slot.
