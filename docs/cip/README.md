@@ -269,7 +269,7 @@ of four main stages:
    The RB producer references a new EB, signaling its proposal to the network.
 
 2. **Voting:**  
-   Committee members first verify and vote on the proposed Endorser Block (EB). After voting, there is a period for votes to propagate through the network. The total voting period, $L$, combines the time for voting and for vote diffusion ($L = L_\text{vote} + L_\text{diff}$), and is chosen so that all votes can be seen before proceeding. Specifically, $L$ is set to exceed the network diffusion time $\Delta$ (i.e., $\Delta < L$), ensuring sufficient time for both voting and message propagation.
+   Committee members first verify and vote on the proposed EB. After voting, there is a period for votes to propagate through the network. The total voting period, $L$, combines the time for voting and for vote diffusion ($L = L_\text{vote} + L_\text{diff}$), and is chosen so that all votes can be seen before proceeding. Specifically, $L$ is set to exceed the network diffusion time $\Delta$ (i.e., $\Delta < L$), ensuring sufficient time for both voting and message propagation.
 
 3. **Certification:**  
    If the EB receives enough votes such that the total stake of all voting pools
