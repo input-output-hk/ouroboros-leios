@@ -164,8 +164,8 @@ the EB proposed for inclusion in the next RB.
    , transaction_witness_sets : [* transaction_witness_set]
    , auxiliary_data_set       : {* transaction_index => auxiliary_data}
    , invalid_transactions     : [* transaction_index]
-+  , ? leios_cert             : leios_certificate
-+  , ? announced_eb           : eb_reference
+  , ? leios_cert             : leios_certificate
+  , ? announced_eb           : eb_reference
    ]
 ```
 
@@ -281,11 +281,11 @@ of four main stages:
    </p>
 
 
-   (This is represented by the yellow pentagon labeled `C` in the [Figure 4](#protocol-flow-figure)
+   (This is represented by the yellow pentagon labeled $C$ in the [Figure 4](#protocol-flow-figure)
    below.)
 
 4. **Finalization:**  
-   The certificate is included in a subsequent RB, at which point the
+   The certificate, $C$, is included in a subsequent RB, at which point the
    transactions from the certified EB are executed. The process may then repeat
    with the announcement of the next EB.
 
@@ -312,7 +312,7 @@ Where:
 
 ### Constraints on Leios protocol parameters
 
-The following table defines the key protocol parameters. These parameters control the timing, security, and performance characteristics of the protocol.
+As briefly mentioned in the previous section, the following table formally defines key parameters, which control the timing, security, and performance characteristics of the protocol.
 
 | Parameter | Symbol | Units | Description | Constraints | Rationale |
 |---|---|---|---|---|---|
@@ -359,21 +359,43 @@ A BLS-based certificate scheme that meets these requirements is documented in th
 
 ### Mini protocols
 
-> [!NOTE]
->
-> This section will describe the new mini-protocols required for Leios operation, including EB diffusion, voting, and certificate aggregation protocols.
+> [!Note]
+> Add detailed protocol diagrams, message formats, and state machine specifications for each Leios mini protocol (EB-Relay, Vote-Relay, EB-Fetch).
 
 ### Node changes
+- New DB tables: EBs, votes, certificates
+- Chain state tracks:
+    - $\mathcal{A}$: announced EBs (awaiting voting)
+    - $\mathcal{V}_e$: votes for EB $e$ (ephemeral)
+    - $\mathcal{C}$: validated EB certificates (ready for inclusion)
+    - $\mathcal{F}$: finalized EBs (in ledger via RBs)
+- Block validation: handle EB certificates, transaction references
+- Chain selection: support EBs in fork resolution, switching
+- Block production: produce RBs and EBs, enforce timing
+- State transition:
 
-> [!NOTE]
->
-> This section will detail the required changes to the Cardano node implementation, including database schema modifications, state management updates, and network protocol enhancements.
+  $$
+  \text{State}_{i+1} = \text{State}_i \oplus \text{RB}_{\text{txs}} \oplus \text{EB}_{\text{txs}}
+  $$
+
+  (RB txs applied before EB txs)
+- Cleanup: EBs in $\mathcal{A}$ expire on fork resolution; votes in $\mathcal{V}_e$ discarded after voting
+- EBs retained until stability horizon ($k$ blocks) to handle chain suffix instability
+- Equivocation: see threat model section
 
 ### Mempool management
 
-> [!NOTE]
+> [!Warning]
 >
-> This section will describe the dual mempool system required for Linear Leios, including how transactions are managed for both EB-inclusive and EB-exclusive scenarios.
+> This section is work in progress.
+
+- Mempool enlarged for both RB and EB txs.
+- On EB announcement, optionally optimistically include EB txs in mempool (pending certification).
+- If EB not certified, revalidate/reinsert its txs.
+- Remove txs from mempool when included in RB or certified EB.
+- Validate txs against current ledger state before mempool admission.
+- RB producer resolves RB/EB tx conflicts at block production.
+- Mempool does not track conflicting indices; relies on ledger rules.
 
 ### Incentives and block reward calculation
 
