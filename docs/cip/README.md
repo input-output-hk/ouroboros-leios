@@ -186,23 +186,23 @@ by including a [certificate](#certificate).
 
 ```cddl
  endorser_block =
-   [ eb_header         : eb_header
-   , eb_body           : eb_body
+   [ eb_header                : eb_header
+   , eb_body                  : eb_body
    ]
 
  eb_header =
-   [ eb_header_body       : eb_header_body
-   , body_signature       : kes_signature
+   [ eb_header_body           : eb_header_body
+   , body_signature           : kes_signature
    ]
 
  eb_header_body =
-   [ slot                 : slot_no
-   , producer             : pool_id
-   , ? vrf_proof          : vrf_cert
+   [ slot                     : slot_no
+   , producer                 : pool_id
+   , ? vrf_proof              : vrf_cert
    ]
 
  eb_body =
-   [ transaction_references: [* tx_reference]
+   [ transaction_references   : [* tx_reference]
    ]
 ```
 
@@ -230,12 +230,12 @@ For further cryptographic details, refer to the
 
 ```cddl
  leios_certificate =
-   [ election_id            : election_id
-   , endorser_block_hash    : hash32
-   , persistent_voters      : [* persistent_voter_id]
-   , nonpersistent_voters   : {* pool_id => bls_signature}
-   , ? aggregate_elig_sig   : bls_signature
-   , aggregate_vote_sig     : bls_signature
+   [ election_id              : election_id
+   , endorser_block_hash      : hash32
+   , persistent_voters        : [* persistent_voter_id]
+   , nonpersistent_voters     : {* pool_id => bls_signature}
+   , ? aggregate_elig_sig     : bls_signature
+   , aggregate_vote_sig       : bls_signature
    ]
 
  leios_vote_bundle = persistent_vote_bundle / non_persistent_vote_bundle
