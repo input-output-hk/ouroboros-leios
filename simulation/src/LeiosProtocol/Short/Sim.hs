@@ -136,7 +136,7 @@ logLeiosEvent nodeNames loudness e = case e of
       | Generate <- blkE = case blk of
           EventIB ib ->
             mconcat
-              [ "slot" .= ib.header.slot
+              [ "slot" .= ib.slot
               , "payload_bytes" .= fromBytes ib.body.size
               , "size_bytes" .= fromBytes (messageSizeBytes ib)
               , "rb_ref" .= rbRef (ib.header.rankingBlock)
@@ -149,6 +149,11 @@ logLeiosEvent nodeNames loudness e = case e of
               [ "slot" .= eb.slot
               , "input_blocks" .= map mkStringId eb.inputBlocks
               , ebRefs
+              , "size_bytes" .= fromBytes (messageSizeBytes eb)
+              ]
+          EventLinearEB eb ->
+            mconcat
+              [ "slot" .= eb.slot
               , "size_bytes" .= fromBytes (messageSizeBytes eb)
               ]
           EventVote vt ->
@@ -167,6 +172,7 @@ logLeiosEvent nodeNames loudness e = case e of
     kindAndId = case blk of
       EventIB ib -> mconcat [ibKind, "id" .= ib.stringId]
       EventEB eb -> mconcat [ebKind, "id" .= eb.stringId]
+      EventLinearEB eb -> mconcat [ebKind, "id" .= eb.stringId]
       EventVote vt -> mconcat [vtKind, "id" .= vt.stringId]
   logNode _nid LeiosNodeEventConformance{} = Nothing
   logPraos nid (PraosNodeEventGenerate blk@(Block h b)) =
@@ -204,6 +210,7 @@ logLeiosEvent nodeNames loudness e = case e of
   logMsg :: LeiosMessage -> Maybe Series
   logMsg (RelayIB msg) = (ibKind <>) <$> logRelay (.id) msg
   logMsg (RelayEB msg) = (ebKind <>) <$> logRelay (.id) msg
+  logMsg (RelayLinearEB msg) = (ebKind <>) <$> logRelay (.id) msg
   logMsg (RelayVote msg) = (vtKind <>) <$> logRelay (.id) msg
   logMsg (PraosMsg (PraosMessage (Right (ProtocolMessage (SomeMessage (MsgBlock hash _body)))))) =
     Just $ rbKind <> "id" .= show (coerce @_ @Int hash)
@@ -253,9 +260,11 @@ sharedEvent leios nodeNames e = case e of
   nodeName nid = fromMaybe undefined $ Map.lookup nid nodeNames
   blkId (EventIB ib) = mkStringId ib.id
   blkId (EventEB eb) = mkStringId eb.id
+  blkId (EventLinearEB eb) = mkStringId eb.id
   blkId (EventVote vt) = mkStringId vt.id
-  blkSlot (EventIB ib) = fromIntegral . fromEnum $ ib.header.slot
+  blkSlot (EventIB ib) = fromIntegral . fromEnum $ ib.slot
   blkSlot (EventEB eb) = fromIntegral . fromEnum $ eb.slot
+  blkSlot (EventLinearEB eb) = fromIntegral . fromEnum $ eb.slot
   blkSlot (EventVote vt) = fromIntegral . fromEnum $ vt.slot
   splitTaskLabel lbl = case T.break (== ':') lbl of
     (tag, blkid) -> (tag, T.drop 2 blkid)
@@ -359,6 +368,14 @@ sharedEvent leios nodeNames e = case e of
           , pipeline = coerce $ endorseBlockPipeline leios eb
           , ..
           }
+      EventLinearEB eb ->
+        Shared.EBGenerated
+          { bytes = fromIntegral (messageSizeBytes eb)
+          , input_blocks = []
+          , endorser_blocks = []
+          , pipeline = 0
+          , ..
+          }
       EventVote vt ->
         Shared.VTBundleGenerated
           { bytes = fromIntegral (messageSizeBytes vt)
@@ -371,6 +388,7 @@ sharedEvent leios nodeNames e = case e of
     case blk of
       EventIB _ -> Shared.IBEnteredState{..}
       EventEB _ -> Shared.EBEnteredState{..}
+      EventLinearEB _ -> Shared.EBEnteredState{..}
       EventVote _ -> Shared.VTBundleEnteredState{..}
 
   sharedReceived :: T.Text -> String -> LeiosEventBlock -> Shared.Event
@@ -378,6 +396,7 @@ sharedEvent leios nodeNames e = case e of
     case blk of
       EventIB _ -> Shared.IBReceived{..}
       EventEB _ -> Shared.EBReceived{..}
+      EventLinearEB _ -> Shared.EBReceived{..}
       EventVote _ -> Shared.VTBundleReceived{..}
    where
     sender = Nothing
@@ -430,6 +449,8 @@ traceRelayLink1 connectionOptions =
               , lateIbInclusion = False
               , pipelinesToReferenceFromEB = 0
               , activeVotingStageLength = 1
+              , linearVoteStageLengthSlots = 8
+              , linearDiffuseStageLengthSlots = 5
               , pipeline = SingSingleVote
               , voteSendStage = Vote
               , votingFrequencyPerStage = 4
@@ -459,6 +480,7 @@ traceRelayLink1 connectionOptions =
                     , inputBlockGeneration = const 0
                     , endorseBlockGeneration = const 0
                     , voteMsgGeneration = const (const 0)
+                    , linearVoteMsgGeneration = const (const 0)
                     , certificateValidation = const 0
                     }
               , ibDiffusion = RelayDiffusionConfig FreshestFirst 100 100 1

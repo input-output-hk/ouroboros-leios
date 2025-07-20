@@ -636,7 +636,7 @@ setupValidatorThreads ::
   m ([m ()], Block BlockBody -> m () -> m ())
 setupValidatorThreads cfg st queue = do
   waitingVar <- newTVarIO Map.empty
-  let processWaitingThread = processWaiting' st.blocksVar waitingVar
+  let processWaitingThread = processWaiting' (readTVar st.blocksVar) waitingVar
 
   let waitForPrev block task = atomically $ case blockPrevHash block of
         GenesisHash -> queue task
@@ -650,17 +650,17 @@ setupValidatorThreads cfg st queue = do
   return ([processWaitingThread], add)
 
 processWaiting' ::
-  forall m a b.
-  (MonadSTM m, MonadDelay m) =>
-  TVar m (Map ConcreteHeaderHash a) ->
-  TVar m (Map ConcreteHeaderHash [STM m b]) ->
+  forall m k a b.
+  (Ord k, MonadSTM m, MonadDelay m) =>
+  STM m (Map k a) ->
+  TVar m (Map k [STM m b]) ->
   m ()
-processWaiting' blocksVar waitingVar = go
+processWaiting' getBlocks waitingVar = go
  where
   go = forever $ join $ atomically $ do
     waiting <- readTVar waitingVar
     when (Map.null waiting) retry
-    blocks <- readTVar blocksVar
+    blocks <- getBlocks
     let toValidate = Map.intersection waiting blocks
     when (Map.null toValidate) retry
     writeTVar waitingVar $! waiting Map.\\ toValidate

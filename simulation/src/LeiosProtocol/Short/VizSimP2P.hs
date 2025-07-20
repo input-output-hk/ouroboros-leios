@@ -668,6 +668,7 @@ isLeiosMessageControl msg0 =
         _ -> True
     RelayIB msg -> isRelayMessageControl msg
     RelayEB msg -> isRelayMessageControl msg
+    RelayLinearEB msg -> isRelayMessageControl msg
     RelayVote msg -> isRelayMessageControl msg
 
 isRelayMessageControl :: RelayMessage id header body -> Bool
@@ -700,9 +701,11 @@ defaultVizConfig voteSendStage stageLength numCores maxBandwidthPerNode =
           _ -> Nothing
       RelayIB msg -> (IB,) <$> relayMessageColor ibColor msg
       RelayEB msg -> (EB,) <$> relayMessageColor ebColor msg
+      RelayLinearEB msg -> (EB,) <$> relayMessageColor linearEbColor msg
       RelayVote msg -> (VT,) <$> relayMessageColor voteColor msg
   ibColor = pipelineColor Propose . (hash . (.id) &&& (.slot))
   ebColor = pipelineColor Endorse . (hash . (.id) &&& (.slot))
+  linearEbColor = pipelineColor Endorse . (hash . (.id) &&& (.slot))
   voteColor = pipelineColor voteSendStage . (hash . (.id) &&& (.slot))
   relayMessageColor :: (body -> Dia.Colour Double) -> RelayMessage id header body -> Maybe (Dia.Colour Double)
   relayMessageColor f (ProtocolMessage (SomeMessage msg)) = case msg of

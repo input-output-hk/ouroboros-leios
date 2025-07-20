@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE OverloadedRecordDot #-}
@@ -23,10 +24,17 @@ import Control.Monad (forever, guard, replicateM, unless, when)
 import Control.Monad.Class.MonadAsync
 import Control.Monad.Class.MonadFork
 import Control.Monad.Class.MonadThrow
+import Control.Monad.State (
+  MonadState (get, put),
+  MonadTrans (lift),
+  StateT,
+  execStateT,
+ )
 import Control.Tracer
 import Data.Bifunctor
 import Data.Coerce (coerce)
 import Data.Foldable (Foldable (foldl'), forM_, for_)
+import Data.Functor ((<&>))
 import Data.Ix (Ix)
 import Data.List (sortOn)
 import Data.Map (Map)
@@ -64,6 +72,7 @@ import System.Random
 data LeiosEventBlock
   = EventIB !InputBlock
   | EventEB !EndorseBlock
+  | EventLinearEB !InputBlock
   | EventVote !VoteMsg
   deriving (Show)
 
@@ -140,17 +149,38 @@ data LeiosNodeState m = LeiosNodeState
   --
   -- INVARIANT: @all (\k v -> all ((k ==) . pipelineOf cfg Propose) v)@.
   , relayEBState :: !(RelayEBState m)
+  , relayLinearEBState :: !(RelayLinearEBState m)
   , prunedUnadoptedEBStateToVar :: !(TVar m SlotNo)
   , prunedUncertifiedEBStateToVar :: !(TVar m SlotNo)
   , relayVoteState :: !(RelayVoteState m)
   , prunedVoteStateToVar :: !(TVar m SlotNo)
   -- ^ TODO: refactor into RelayState.
   , taskQueue :: !(TaskMultiQueue LeiosNodeTask m)
+  , waitingForTipVar :: !(TVar m (Map (HeaderHash RankingBlock) [STM m ()]))
+  -- ^ waiting for an RB to be selected
+  --
+  -- It's triggered by the 'preferredChain' that Praos maintains.
   , waitingForRBVar :: !(TVar m (Map (HeaderHash RankingBlock) [STM m ()]))
-  -- ^ waiting for RB block itself to be validated.
+  -- ^ waiting for RB to arrive
+  --
+  -- It's triggered by a variable Praos's BlockFetch maintains.
   , waitingForLedgerStateVar :: !(TVar m (Map (HeaderHash RankingBlock) [STM m ()]))
-  -- ^ waiting for ledger state of RB block to be validated.
+  -- ^ waiting for RB to be validated
   , ledgerStateVar :: !(TVar m (Map (HeaderHash RankingBlock) LedgerState))
+
+  , linearLedgerStateVar :: !(TVar m (Map EndorseBlockId LedgerState))
+  , waitingForLinearLedgerStateVar :: !(TVar m (Map EndorseBlockId [STM m ()]))
+  -- ^ waiting for a Linear EB to be validated
+  , waitingForWaitingForLinearLedgerStateVar :: !(TVar m (Map EndorseBlockId [STM m ()]))
+  -- ^ waiting for a Linear EB's ledger state to be demanded
+
+  , linearEbOfRb :: !(TVar m (Map (HeaderHash RankingBlock) EndorseBlockId))
+  -- ^ mapping from RB's to their linear EB that has already been validated
+  , linearEbsToVoteVar :: !(TVar m (Map SlotNo (Map InputBlockId InputBlock)))
+  -- ^ mapping from slot number to EBs that this node should vote for during
+  -- that slot; the key will be exactly @3*leios-header-diffusion-time-ms@
+  -- later than the slot of the EB; consumed by the 'mkLinearVoteGenerator'
+  -- thread
   , ibsNeededForEBVar :: !(TVar m (Map EndorseBlockId (Set InputBlockId)))
   , ibsValidationActionsVar :: !(TVar m (Map InputBlockId (STM m ())))
   , votesForEBVar :: !(TVar m (Map EndorseBlockId CertificateProgress))
@@ -193,6 +223,7 @@ data NodeRelayState id header body m = NodeRelayState
   }
 type RelayIBState = NodeRelayState InputBlockId InputBlockHeader InputBlockBody
 type RelayEBState = NodeRelayState EndorseBlockId (RelayHeader EndorseBlockId) EndorseBlock
+type RelayLinearEBState = NodeRelayState EndorseBlockId (RelayHeader EndorseBlockId) InputBlock
 type RelayVoteState = NodeRelayState VoteId (RelayHeader VoteId) VoteMsg
 
 data LedgerState = LedgerState
@@ -201,6 +232,8 @@ data ValidationRequest m
   = ValidateRB !RankingBlock !(m ())
   | ValidateIBs ![((InputBlockHeader, InputBlockBody), IbDeliveryStage)] !([(InputBlockHeader, InputBlockBody)] -> STM m ())
   | ValidateEBS ![EndorseBlock] !([EndorseBlock] -> STM m ())
+  | ValidateLinearEBs ![InputBlock] !([(EndorseBlockId, InputBlock)] -> STM m ())
+  | ReapplyLinearEB !InputBlock !(STM m ())
   | ValidateVotes ![VoteMsg] !UTCTime !([VoteMsg] -> STM m ())
 
 --------------------------------------------------------------
@@ -215,12 +248,14 @@ instance MessageSize id => MessageSize (RelayHeader id) where
 
 type RelayIBMessage = RelayMessage InputBlockId InputBlockHeader InputBlockBody
 type RelayEBMessage = RelayMessage EndorseBlockId (RelayHeader EndorseBlockId) EndorseBlock
+type RelayLinearEBMessage = RelayMessage EndorseBlockId (RelayHeader EndorseBlockId) InputBlock
 type RelayVoteMessage = RelayMessage VoteId (RelayHeader VoteId) VoteMsg
 type PraosMessage = PraosNode.PraosMessage RankingBlockBody
 
 data LeiosMessage
   = RelayIB {fromRelayIB :: !RelayIBMessage}
   | RelayEB {fromRelayEB :: !RelayEBMessage}
+  | RelayLinearEB {fromRelayLinearEB :: !RelayLinearEBMessage}
   | RelayVote {fromRelayVote :: !RelayVoteMessage}
   | PraosMsg {fromPraosMsg :: !PraosMessage}
   deriving (Show)
@@ -228,6 +263,7 @@ data LeiosMessage
 data Leios f = Leios
   { protocolIB :: f RelayIBMessage
   , protocolEB :: f RelayEBMessage
+  , protocolLinearEB :: f RelayLinearEBMessage
   , protocolVote :: f RelayVoteMessage
   , protocolPraos :: PraosNode.Praos RankingBlockBody f
   }
@@ -236,6 +272,7 @@ instance MessageSize LeiosMessage where
   messageSizeBytes lm = case lm of
     RelayIB m -> messageSizeBytes m
     RelayEB m -> messageSizeBytes m
+    RelayLinearEB m -> messageSizeBytes m
     RelayVote m -> messageSizeBytes m
     PraosMsg m -> messageSizeBytes m
 
@@ -246,6 +283,7 @@ instance ConnectionBundle Leios where
     Leios
       { protocolIB = ToFromBundleMsg RelayIB (.fromRelayIB)
       , protocolEB = ToFromBundleMsg RelayEB (.fromRelayEB)
+      , protocolLinearEB = ToFromBundleMsg RelayLinearEB (.fromRelayLinearEB)
       , protocolVote = ToFromBundleMsg RelayVote (.fromRelayVote)
       , protocolPraos = case toFromBundleMsgBundle @(PraosNode.Praos RankingBlockBody) of
           PraosNode.Praos a b -> PraosNode.Praos (p >>> a) (p >>> b)
@@ -253,7 +291,7 @@ instance ConnectionBundle Leios where
    where
     p = ToFromBundleMsg PraosMsg (.fromPraosMsg)
 
-  traverseConnectionBundle f (Leios a b c d) = Leios <$> f a <*> f b <*> f c <*> traverseConnectionBundle f d
+  traverseConnectionBundle f (Leios a b c d e) = Leios <$> f a <*> f b <*> f c <*> f d <*> traverseConnectionBundle f e
 
 --------------------------------------------------------------
 
@@ -356,6 +394,44 @@ relayEBConfig _tracer cfg@LeiosNodeConfig{leios = LeiosConfig{pipeline = (_ :: S
               ebTooOld1 || ebTooOld2 || ebAlreadyInBuffer
     }
 
+relayLinearEBConfig ::
+  (MonadTime m, MonadDelay m, MonadSTM m) =>
+  Tracer m LeiosNodeEvent ->
+  LeiosNodeConfig ->
+  SubmitBlocks m EndorseBlockId InputBlock ->
+  RelayLinearEBState m ->
+  RelayConsumerConfig EndorseBlockId (RelayHeader EndorseBlockId) InputBlock m
+relayLinearEBConfig _tracer cfg submitBlocks st =
+  RelayConsumerConfig
+    { relay = RelayConfig{maxWindowSize = coerce cfg.leios.ebDiffusion.maxWindowSize}
+    , headerId = (.id)
+    , validateHeaders = const $ return ()
+    , prioritize = prioritize cfg.leios.ebDiffusion.strategy (.slot)
+    , submitPolicy = SubmitAll
+    , maxHeadersToRequest = cfg.leios.ebDiffusion.maxHeadersToRequest
+    , maxBodiesToRequest = cfg.leios.ebDiffusion.maxBodiesToRequest
+    , submitBlocks = \hbs t k ->
+        submitBlocks
+          [ (rh.id, ib) | (rh, ib) <- hbs ]
+          t (k . map (\(ebId, ib) -> (RelayHeader ebId ib.slot, ib)))
+    , shouldNotRequest = do
+        -- We possibly prune certified EBs (not referenced in the
+        -- chain) after maxEndorseBlockAgeSlots, so we should not end
+        -- up asking for their bodies again, in the remote possibility
+        -- they get offered.
+        assert (cfg.leios.maxEndorseBlockAgeForRelaySlots <= cfg.leios.maxEndorseBlockAgeSlots) $ do
+          currSlot <- currentSlotNo cfg.slotConfig
+          let oldestEBToRelay = currSlot - fromIntegral cfg.leios.maxEndorseBlockAgeForRelaySlots
+          atomically $ do
+            ebBuffer <- readTVar st.relayBufferVar
+            pure $ \ebHeader -> do
+              -- Check whether or not the EB is older than "eb-max-age-for-relay-slots"
+              let ebTooOld = ebHeader.slot < oldestEBToRelay
+              -- Check whether or not the EB is already in the relay buffer
+              let ebAlreadyInBuffer = RB.member ebHeader.id ebBuffer
+              ebTooOld || ebAlreadyInBuffer
+    }
+
 relayVoteConfig ::
   (MonadDelay m, Monad (STM m), MonadSTM m, MonadTime m) =>
   Tracer m LeiosNodeEvent ->
@@ -404,18 +480,57 @@ newLeiosNodeState cfg = do
   relayIBState <- newRelayState
   iBsForEBsAndVotesVar <- newTVarIO Map.empty
   relayEBState <- newRelayState
+  relayLinearEBState <- newRelayState
   prunedUnadoptedEBStateToVar <- newTVarIO (toEnum 0)
   prunedUncertifiedEBStateToVar <- newTVarIO (toEnum 0)
   relayVoteState <- newRelayState
   prunedVoteStateToVar <- newTVarIO (toEnum 0)
   ibsNeededForEBVar <- newTVarIO Map.empty
+  waitingForWaitingForLinearLedgerStateVar <- newTVarIO Map.empty
+  waitingForLinearLedgerStateVar <- newTVarIO Map.empty
+  linearLedgerStateVar <- newTVarIO Map.empty
+  linearEbOfRb <- newTVarIO Map.empty
   ledgerStateVar <- newTVarIO Map.empty
   waitingForRBVar <- newTVarIO Map.empty
   waitingForLedgerStateVar <- newTVarIO Map.empty
+  waitingForTipVar <- newTVarIO Map.empty
   taskQueue <- atomically $ newTaskMultiQueue cfg.processingQueueBound
   votesForEBVar <- newTVarIO Map.empty
+  linearEbsToVoteVar <- newTVarIO Map.empty
   ibsValidationActionsVar <- newTVarIO Map.empty
   return $ LeiosNodeState{..}
+
+-- | PREREQUISITE: the parent RB has already been validated
+unblockRb ::
+  forall m.
+  ( MonadMVar m
+  , MonadFork m
+  , MonadAsync m
+  , MonadSTM m
+  , MonadTime m
+  , MonadDelay m
+  ) =>
+  Tracer m LeiosNodeEvent ->
+  LeiosNodeConfig ->
+  LeiosNodeState m ->
+  InputBlock ->
+  STM m ()
+unblockRb tracer cfg leiosState ib = do
+  let ebId = convertLinearId ib.id
+  -- If an RB is waiting for this Linear EB's ledger state, then this Linear EB
+  -- is certified and so we can @reapply@ this ledger state.
+  waitFor leiosState.waitingForWaitingForLinearLedgerStateVar $ (\m -> [(ebId, [m])]) $ do
+    linearLedgerState <- readTVar leiosState.linearLedgerStateVar
+    -- Be a no-op if the Linear EB was already validated (eg for the sake of
+    -- voting) before any RB demanded it; TODO short fork race condition
+    case Map.lookup ebId linearLedgerState of
+      Just LedgerState -> pure ()
+      Nothing -> do
+        dispatchValidationSTM tracer cfg leiosState $! ReapplyLinearEB ib $ do
+          modifyTVar' leiosState.linearLedgerStateVar $ Map.insert ebId LedgerState
+          case ib.header.rankingBlock of
+            GenesisHash -> error "invalid Linear EB"
+            BlockHash hdrHash -> modifyTVar' leiosState.linearEbOfRb $ Map.insert hdrHash ebId
 
 leiosNode ::
   forall m.
@@ -453,11 +568,32 @@ leiosNode tracer cfg followers peers = do
   let submitEB (map snd -> xs) _ completion = do
         traceReceived xs EventEB
         dispatch $! ValidateEBS xs $ completion . map (\eb -> (eb.id, eb))
+  let submitLinearEB (map snd -> xs) _deliveryTime completion = do
+        traceReceived xs EventLinearEB
+        unless (null xs) $ do
+          atomically $ forM_ xs $ \ib -> do
+            waitFor leiosState.waitingForLedgerStateVar
+              [ (rbHash, [unblockRb tracer cfg leiosState ib])
+              | BlockHash rbHash <- [ib.header.rankingBlock]
+              ]
+          dispatch $! ValidateLinearEBs xs completion
   let valHeaderIB =
         queueAndWait leiosState ValIH . map (cpuTask "ValIH" cfg.leios.delays.inputBlockHeaderValidation)
   let valHeaderRB h = do
         let !task = cpuTask "ValRH" cfg.leios.praos.headerValidationDelay h
         queueAndWait leiosState ValRH [task]
+
+  let unlessLinear :: m [a] -> m [a]
+      unlessLinear m = case cfg.leios.variant of
+        Linear -> pure []
+        Short -> m
+        Full -> m
+
+  let whenLinear :: m [a] -> m [a]
+      whenLinear m = case cfg.leios.variant of
+        Linear -> m
+        Short -> pure []
+        Full -> pure []
 
   praosThreads <-
     PraosNode.setupPraosThreads'
@@ -469,7 +605,7 @@ leiosNode tracer cfg followers peers = do
       (map (.protocolPraos) followers)
       (map (.protocolPraos) peers)
 
-  ibThreads <-
+  ibThreads <- unlessLinear $
     setupRelay
       cfg.leios
       (relayIBConfig tracer cfg valHeaderIB submitIB leiosState)
@@ -477,13 +613,23 @@ leiosNode tracer cfg followers peers = do
       (map (.protocolIB) followers)
       (map (.protocolIB) peers)
 
-  ebThreads <-
+  ebThreads1 <- unlessLinear $
     setupRelay
       cfg.leios
       (relayEBConfig tracer cfg submitEB relayEBState leiosState)
       relayEBState
       (map (.protocolEB) followers)
       (map (.protocolEB) peers)
+
+  ebThreads2 <- whenLinear $
+    setupRelay
+      cfg.leios
+      (relayLinearEBConfig tracer cfg submitLinearEB relayLinearEBState)
+      relayLinearEBState
+      (map (.protocolLinearEB) followers)
+      (map (.protocolLinearEB) peers)
+
+  let ebThreads = ebThreads1 ++ ebThreads2   -- only one is non-empty
 
   voteThreads <-
     setupRelay
@@ -495,23 +641,50 @@ leiosNode tracer cfg followers peers = do
 
   let processWaitingForRB =
         processWaiting'
-          praosState.blockFetchControllerState.blocksVar
+          (readTVar praosState.blockFetchControllerState.blocksVar)
           waitingForRBVar
 
   let processWaitingForLedgerState =
         processWaiting'
-          ledgerStateVar
+          (readTVar ledgerStateVar)
           waitingForLedgerStateVar
+
+  let processWaitingForLinearLedgerStateVar =
+        processWaiting'
+          (readTVar linearLedgerStateVar)
+          waitingForLinearLedgerStateVar
+
+  let processWaitingForWaitingForLinearLedgerStateVar =
+        processWaiting'
+          (readTVar waitingForLinearLedgerStateVar)
+          waitingForWaitingForLinearLedgerStateVar
+
+  let processWaitingForTip =
+        processWaiting'
+            (PraosNode.preferredChain leiosState.praosState <&> \case
+              Genesis -> Map.empty
+              _ :> b -> Map.singleton (blockHash b) ()
+            )
+          waitingForTipVar
 
   let processingThreads =
         [ processCPUTasks cfg.processingCores (contramap LeiosNodeEventCPU tracer) leiosState.taskQueue
-        , processWaitingForRB
         , processWaitingForLedgerState
         ]
+        ++ if cfg.leios.variant /= Linear then [processWaitingForRB] else
+          [ processWaitingForWaitingForLinearLedgerStateVar
+          , processWaitingForLinearLedgerStateVar
+          , processWaitingForTip
+          ]
 
-  let blockGenerationThreads = [generator tracer cfg leiosState]
+  blockGenerationThreads <-
+     if cfg.leios.variant /= Linear then pure [generator tracer cfg leiosState] else do
+       let (rng1, rng2) = split cfg.rng
+       x <- mkLinearVoteGenerator tracer cfg { rng = rng1 } leiosState
+       pure $ generator tracer cfg { rng = rng2 } leiosState : x
 
   let computeLedgerStateThreads =
+        if cfg.leios.variant == Linear then [] else
         [ computeLedgerStateThread tracer cfg leiosState
         -- , validateIBsOfCertifiedEBs tracer cfg leiosState
         ]
@@ -814,7 +987,7 @@ validateIBsOfCertifiedEBs _trace _cfg st = forever . atomically $ do
 -- An IB that arrived later than it should have will not even be validated.
 adoptIB :: MonadSTM m => LeiosConfig -> LeiosNodeState m -> InputBlock -> IbDeliveryStage -> STM m ()
 adoptIB cfg leiosState ib deliveryStage = do
-  let !ibSlot = ib.header.slot
+  let !ibSlot = ib.slot
       !p = case cfg of
         LeiosConfig{pipeline = _ :: SingPipeline p} ->
           pipelineOf @p cfg Short.Propose ibSlot
@@ -831,6 +1004,26 @@ adoptEB leiosState eb = do
   let ibsNeeded = Map.fromList [(eb.id, Set.fromList eb.inputBlocks Set.\\ ibs)]
   modifyTVar' leiosState.ibsNeededForEBVar (`Map.union` ibsNeeded)
 
+-- | Called after a Linear EB has been validated
+adoptLinearEB :: MonadSTM m => LeiosNodeConfig -> LeiosNodeState m -> InputBlock -> STM m ()
+adoptLinearEB cfg leiosState ib = do
+  let ebId = convertLinearId ib.id
+  case ib.header.rankingBlock of
+    GenesisHash -> error "invalid Linear EB"
+    BlockHash hdrHash -> modifyTVar' leiosState.linearEbOfRb $ Map.insert hdrHash ebId
+
+  votesForEB <- readTVar leiosState.votesForEBVar
+  let alreadyCertified = case Map.lookup ebId votesForEB of
+        Just Certified{} -> True
+        _ -> False
+  unless alreadyCertified $ do
+    let key = SlotNo $ unSlotNo ib.slot + toEnum (linearMinimumVoteDelaySlots cfg)
+    modifyTVar' leiosState.linearEbsToVoteVar $ Map.insertWith Map.union key (Map.singleton ib.id ib)
+
+linearMinimumVoteDelaySlots :: LeiosNodeConfig -> Int
+linearMinimumVoteDelaySlots cfg =
+  ceiling $ (3 * cfg.leios.headerDiffusionTime) / cfg.slotConfig.duration
+
 adoptVote :: MonadSTM m => LeiosConfig -> LeiosNodeState m -> VoteMsg -> UTCTime -> STM m ()
 adoptVote leios leiosState v deliveryTime = do
   -- We keep tally for each EB as votes arrive, so the relayVoteBuffer
@@ -846,9 +1039,21 @@ dispatchValidation ::
   ValidationRequest m ->
   m ()
 dispatchValidation tracer cfg leiosState req =
-  atomically $ queue =<< go req
+  atomically $ dispatchValidationSTM tracer cfg leiosState req
+
+dispatchValidationSTM ::
+  forall m.
+  (MonadMVar m, MonadFork m, MonadAsync m, MonadSTM m, MonadTime m, MonadDelay m) =>
+  Tracer m LeiosNodeEvent ->
+  LeiosNodeConfig ->
+  LeiosNodeState m ->
+  ValidationRequest m ->
+  STM m ()
+dispatchValidationSTM tracer cfg leiosState req =
+  queue =<< go req
  where
   queue = mapM_ (uncurry $ writeTMQueue leiosState.taskQueue)
+  labelTask :: (LeiosNodeTask, (String -> CPUTask, m ())) -> (LeiosNodeTask, (CPUTask, m ()))
   labelTask (tag, (f, m)) = let !task = f (show tag) in (tag, (task, m))
   valRB rb m = do
     let task prefix = cpuTask prefix cfg.leios.praos.blockValidationDelay rb
@@ -866,6 +1071,16 @@ dispatchValidation tracer cfg leiosState req =
       completion [eb]
       adoptEB leiosState eb
     traceEnterState [eb] EventEB
+  valLinearEB :: InputBlock -> Bool -> ([(EndorseBlockId, InputBlock)] -> STM m ()) -> (LeiosNodeTask, (CPUTask, m ()))
+  valLinearEB x alreadyCertified completion =
+    let
+      decimate = if alreadyCertified then (/ 10) else id   -- TODO better ratio
+      delay prefix = cpuTask prefix (decimate . cfg.leios.delays.inputBlockValidation) x
+      task = atomically $ do
+        completion [(convertLinearId x.id, x)]
+        adoptLinearEB cfg leiosState x
+     in
+      labelTask (ValEB, (delay, task >> traceEnterState [x] EventLinearEB))
   valVote v deliveryTime completion = labelTask . (ValVote,) . (\p -> cpuTask p cfg.leios.delays.voteMsgValidation v,) $ do
     atomically $ do
       completion [v]
@@ -876,18 +1091,31 @@ dispatchValidation tracer cfg leiosState req =
   go x = case x of
     ValidateRB rb completion -> do
       let task = valRB rb completion
+      let linearTask = valRB rb $ do
+            atomically $ modifyTVar' leiosState.ledgerStateVar (Map.insert (blockHash rb) LedgerState)
+            completion
       case blockPrevHash rb of
-        GenesisHash -> do
+        GenesisHash
+          | Linear <- cfg.leios.variant -> do
+          return [linearTask]
+          | otherwise -> do
           return [task]
-        BlockHash prev -> do
-          let var =
-                assert (rb.blockBody.payload >= 0) $
-                  if rb.blockBody.payload == 0
-                    then leiosState.waitingForRBVar
-                    -- TODO: assumes payload can be validated without content of EB, check with spec.
-                    else leiosState.waitingForLedgerStateVar
-          waitFor var [(prev, [queue [task]])]
-          return []
+        BlockHash prev
+          | Linear <- cfg.leios.variant -> do
+            case rb.blockBody.endorseBlocks of
+              [ (ebId, _cert) ] -> waitFor leiosState.waitingForLinearLedgerStateVar [(ebId, [queue [linearTask]])]
+              [] -> waitFor leiosState.waitingForLedgerStateVar [(prev, [queue [linearTask]])]
+              o -> error $ "too many certs in an RB: " <> show (length o)
+            pure []
+          | otherwise -> do
+            let var =
+                  assert (rb.blockBody.payload >= 0) $
+                    if rb.blockBody.payload == 0
+                      then leiosState.waitingForRBVar
+                      -- TODO: assumes payload can be validated without content of EB, check with spec.
+                      else leiosState.waitingForLedgerStateVar
+            waitFor var [(prev, [queue [task]])]
+            return []
     ValidateIBs ibs completion -> do
       -- NOTE: IBs with an RB reference have to wait for ledger state of that RB.
       --       However, if they get referenced by the chain they should be validated anyway.
@@ -920,43 +1148,65 @@ dispatchValidation tracer cfg leiosState req =
     ValidateEBS ebs completion -> do
       -- NOTE: block references are only inspected during voting.
       return [valEB eb completion | eb <- ebs]
+    ValidateLinearEBs ibs completion -> do
+      let ifNoCert :: InputBlockId -> STM m () -> STM m ()
+          ifNoCert ibId k = do
+            votesForEB <- readTVar leiosState.votesForEBVar
+            case Map.lookup (convertLinearId ibId) votesForEB of
+              Just Certified{} -> pure ()
+              _ -> k
+      waitFor
+        leiosState.waitingForTipVar
+        [ (rbHash, [ifNoCert ib.id $ queue [valLinearEB ib False (const (pure ()))]])
+        | ib <- ibs
+        , BlockHash rbHash <- [ib.header.rankingBlock]
+        ]
+      -- @complete@ the Linear EBs immediately, ie "EB Diffusion Pipelining"
+      completion [ (convertLinearId ib.id, ib) | ib <- ibs ]
+      pure []
+    ReapplyLinearEB ib completion -> pure [valLinearEB ib True (const completion)]
     ValidateVotes vs deliveryTime completion -> do
       return [valVote v deliveryTime completion | v <- vs]
   traceEnterState :: [a] -> (a -> LeiosEventBlock) -> m ()
   traceEnterState xs f = forM_ xs $ traceWith tracer . LeiosNodeEvent EnterState . f
 
-generator ::
+generatorSubmitter ::
   forall m.
   (MonadMVar m, MonadFork m, MonadAsync m, MonadSTM m, MonadTime m, MonadDelay m) =>
   Tracer m LeiosNodeEvent ->
   LeiosNodeConfig ->
   LeiosNodeState m ->
+  (DiffTime, SomeAction) ->
   m ()
-generator tracer cfg st = do
-  schedule <- mkSchedule tracer cfg
-  let buffers = mkBuffersView cfg st
-  let
+generatorSubmitter tracer cfg st =
+    submitOne
+  where
     withDelay d (lbl, m) = do
       -- cannot print id of generated RB until after it's generated,
       -- the id of the generated block can be found in the generated event emitted at the time the task ends.
       let !c = CPUTask d (T.pack $ show lbl)
       atomically $ writeTMQueue st.taskQueue lbl (c, m)
-  let
+
     submitOne :: (DiffTime, SomeAction) -> m ()
     submitOne (delay, x) = withDelay delay $
       case x of
-        SomeAction Generate.Base rb0 -> (GenRB,) $ do
-          (rb, newChain) <- atomically $ do
-            chain <- PraosNode.preferredChain st.praosState
-            let rb = fixSize cfg.leios $ fixupBlock (Chain.headAnchor chain) rb0
+        SomeAction Generate.Base (Left (chain, rb)) -> (GenRB,) $ do
+          atomically $ do
             addProducedBlock st.praosState.blockFetchControllerState rb
-            return (rb, chain :> rb)
+            modifyTVar' st.ledgerStateVar $ Map.insert (blockHash rb) LedgerState
           traceWith tracer (PraosNodeEvent (PraosNodeEventGenerate rb))
-          traceWith tracer (PraosNodeEvent (PraosNodeEventNewTip newChain))
+          traceWith tracer (PraosNodeEvent (PraosNodeEventNewTip $ chain :> rb))   -- TODO don't assume the new block is the best block?
+        SomeAction Generate.Base (Right ib) -> (GenEB,) $ do
+          let ebId = convertLinearId ib.id
+          atomically $ do
+            modifyTVar' st.relayLinearEBState.relayBufferVar (RB.snocIfNew ebId (RelayHeader ebId ib.slot, ib))
+            unblockRb tracer cfg st ib
+            adoptLinearEB cfg st ib
+          traceWith tracer (LeiosNodeEvent Generate (EventLinearEB ib))
         SomeAction Generate.Propose{} ib -> (GenIB,) $ do
           atomically $ do
             -- TODO should not be added to 'relayIBState' before it's validated
-            modifyTVar' st.relayIBState.relayBufferVar (RB.snocIfNew ib.header.id (ib.header, ib.body))
+            modifyTVar' st.relayIBState.relayBufferVar (RB.snocIfNew ib.id (ib.header, ib.body))
             adoptIB cfg.leios st ib IbDuringProposeOrDeliver1
           traceWith tracer (LeiosNodeEvent Generate (EventIB ib))
         SomeAction Generate.Endorse eb -> (GenEB,) $ do
@@ -972,13 +1222,113 @@ generator tracer cfg st = do
               (RB.snocIfNew v.id (RelayHeader v.id v.slot, v))
             adoptVote cfg.leios st v now
           traceWith tracer (LeiosNodeEvent Generate (EventVote v))
+
+generator ::
+  forall m.
+  (MonadMVar m, MonadFork m, MonadAsync m, MonadSTM m, MonadTime m, MonadDelay m) =>
+  Tracer m LeiosNodeEvent ->
+  LeiosNodeConfig ->
+  LeiosNodeState m ->
+  m ()
+generator tracer cfg st = do
+  schedule <- mkSchedule tracer cfg
+  let buffers = mkBuffersView cfg st
   let LeiosNodeConfig{..} = cfg
+  let submitOne = generatorSubmitter tracer cfg st
   leiosBlockGenerator $ LeiosGeneratorConfig{submit = mapM_ submitOne, ..}
+
+mkLinearVoteGenerator ::
+  forall m.
+  (MonadMVar m, MonadFork m, MonadAsync m, MonadSTM m, MonadTime m, MonadDelay m) =>
+  Tracer m LeiosNodeEvent ->
+  LeiosNodeConfig ->
+  LeiosNodeState m ->
+  m [m ()]
+mkLinearVoteGenerator tracer cfg leiosState = do
+    currSlotVar <- newTVarIO $ SlotNo 0
+    let ticker =
+          blockGenerator $
+            BlockGeneratorConfig
+              { execute = \slot -> lift $ atomically $ writeTVar currSlotVar slot
+              , slotConfig
+              , initial = ()
+              }
+    let go !prng !i = do
+          io <- atomically $ do
+            linearEbsToVote <- readTVar leiosState.linearEbsToVoteVar
+            check $ not $ Map.null linearEbsToVote
+            -- If there are no EBs to consider, we won't wake up on clock ticks.
+            currSlot <- readTVar currSlotVar
+            let (old, mbNow, tooYoung) = Map.splitLookup currSlot linearEbsToVote
+            check $ Map.size tooYoung /= Map.size linearEbsToVote
+            -- If we've reached this point, there will be actual progress.
+            writeTVar leiosState.linearEbsToVoteVar $! tooYoung
+            pure $ do
+              -- TODO do not vote for equivocated blocks
+              --
+              -- TODO don't vote if it's not announced by the /current/ tip of
+              -- our chain? That was true at some point, or else we wouldn't
+              -- have validated it, and so it wouldn't have ended up in
+              -- 'linearEbsToVoteVar'.
+              mapM_ (mapM_ (each currSlot)) old
+              mapM_ (mapM_ (each currSlot)) mbNow
+          (prng', i') <- execStateT io (prng, i)
+          go prng' i'
+    pure [ticker, go cfg.rng 1]
+  where
+    submitOne = generatorSubmitter tracer cfg leiosState
+
+    LeiosNodeConfig{..} = cfg
+
+    checkElection :: StateT (StdGen, Int) m (Maybe (VoteId, Word64))
+    checkElection = do
+      (prng, i) <- get
+      let (sample, prng') = uniformR (0, 1) prng
+      let wins = votingRatePerPipeline cfg.leios cfg.stake sample
+      if 0 == wins then Nothing <$ put (prng', i) else do
+        let !i' = i + 1
+        put (prng', i')
+        pure $ Just (VoteId nodeId (negate i), wins)
+
+    each :: SlotNo -> InputBlock -> StateT (StdGen, Int) m ()
+    each currSlot ib = unless (tooLate currSlot ib.slot) $ checkElection >>= \case
+      Nothing -> pure ()
+      Just (vbId, wins) -> do
+        let voteMsg = mkVoteMsg leios vbId ib.slot nodeId wins [convertLinearId ib.id]
+        let !task = leios.delays.linearVoteMsgGeneration voteMsg [ib]
+        lift $ submitOne (task, SomeAction Generate.Vote voteMsg)
+
+    tooLate currSlot ebSlot =
+      unSlotNo ebSlot + toEnum cfg.leios.linearVoteStageLengthSlots < unSlotNo currSlot
 
 mkBuffersView :: forall m. MonadSTM m => LeiosNodeConfig -> LeiosNodeState m -> BuffersView m
 mkBuffersView cfg st = BuffersView{..}
  where
-  newRBData = do
+  newRBData
+    | Linear <- cfg.leios.variant = do
+    -- This gets called pretty rarely, so doesn't seem worth caching,
+    -- though it's getting more expensive as we go.
+    chain <- PraosNode.preferredChain st.praosState
+    votesForEB <- readTVar st.votesForEBVar
+    linearEbOfRb <- readTVar st.linearEbOfRb
+    return $ \rbSlot ->
+      let prev = Chain.dropUntil (\rb -> blockSlot rb < rbSlot) $ chain
+          mbEbCert = do
+            -- INVARIANT the genesis block has no Linear EB, and so the first actual block has nothing to certify
+            Anchor prevSlot prevRbId _prevBlockNo <- pure $ Chain.headAnchor prev
+            -- Must be old enough.
+            guard $ unSlotNo prevSlot + toEnum (cfg.leios.linearVoteStageLengthSlots + cfg.leios.linearDiffuseStageLengthSlots) <= unSlotNo rbSlot
+            -- Must have already been validated (eg so that it has affected the mempool already)
+            ebId <- Map.lookup prevRbId linearEbOfRb
+            -- Must have already met quorum.
+            Certified{cert} <- Map.lookup ebId votesForEB
+            cert `seq` return (ebId, cert)
+          txsPayload = cfg.leios.sizes.rankingBlockLegacyPraosPayloadAvgSize - case mbEbCert of
+            Nothing -> 0
+            Just (_ebId, cert) -> cfg.leios.sizes.certificate cert
+      in
+      NewRankingBlockData { prevChain = prev, txsPayload, mbEbCert }
+    | otherwise = do
     -- This gets called pretty rarely, so doesn't seem worth caching,
     -- though it's getting more expensive as we go.
     chain <- PraosNode.preferredChain st.praosState
@@ -1001,7 +1351,11 @@ mkBuffersView cfg st = BuffersView{..}
     let orderEBs = case cfg.leios.variant of
           Short -> sortOn (\eb -> (eb.slot, Down $ length eb.inputBlocks))
           Full -> sortOn (\eb -> (Down eb.slot, Down $ length eb.inputBlocks))
-    let certifiedEBforRBAt rbSlot =
+          -- GHC sees that @Linear ->@ pattern would be redundant here.
+    return $ \rbSlot -> NewRankingBlockData
+      { prevChain = Chain.dropUntil (\rb -> blockSlot rb < rbSlot) $ chain
+      , txsPayload = cfg.leios.sizes.rankingBlockLegacyPraosPayloadAvgSize
+      , mbEbCert =
           listToMaybe
             . mapMaybe tryCertify
             . orderEBs
@@ -1010,11 +1364,7 @@ mkBuffersView cfg st = BuffersView{..}
             . RB.values
             -- TODO: start from votesForEB, would allow to drop EBs from relayBuffer as soon as Endorse ends.
             $ bufferEB
-    return $
-      NewRankingBlockData
-        { certifiedEBforRBAt
-        , txsPayload = cfg.leios.sizes.rankingBlockLegacyPraosPayloadAvgSize
-        }
+      }
   newIBData = do
     ledgerState <- readTVar st.ledgerStateVar
     referenceRankingBlock <-
@@ -1082,7 +1432,14 @@ mkSchedule tracer cfg = do
     [ (SomeRole Generate.Endorse, endorseBlockRate cfg.leios cfg.stake)
     , (SomeRole Generate.Base, const $ calcWins (NetworkRate cfg.leios.praos.blockFrequencyPerSlot))
     ]
-  rates votingSlots slot = do
+  rates votingSlots slot
+    | Linear <- cfg.leios.variant = do
+    -- Linear Leios has only RB and voting election, and the voting election
+    -- happens elsewhere, as an eventual consequence of the RB election.
+    pure $
+      [ (SomeRole Generate.Base, calcWins (NetworkRate cfg.leios.praos.blockFrequencyPerSlot))
+      ]
+    | otherwise = do
     when (cfg.conformanceEvents && (slot > 0)) $ traceWith tracer $ LeiosNodeEventConformance Slot{slot = slot - 1}
     vote <- atomically $ do
       vs <- readTVar votingSlots
@@ -1125,9 +1482,9 @@ partitionRBVar ::
 partitionRBVar var f = fmap RB.values . stateTVar' var $ RB.partition f
 
 waitFor ::
-  MonadSTM m =>
-  TVar m (Map RankingBlockId [STM m ()]) ->
-  [(RankingBlockId, [STM m ()])] ->
+  (Ord k, MonadSTM m) =>
+  TVar m (Map k [STM m ()]) ->
+  [(k, [STM m ()])] ->
   STM m ()
 waitFor var xs = do
   modifyTVar'

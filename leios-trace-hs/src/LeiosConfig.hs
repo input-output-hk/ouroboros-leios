@@ -85,7 +85,7 @@ instance Default CleanupPolicies where
 allCleanupPolicies :: CleanupPolicies
 allCleanupPolicies = CleanupPolicies $ Set.fromList [minBound .. maxBound]
 
-data LeiosVariant = Short | Full
+data LeiosVariant = Short | Full | Linear
   deriving (Show, Eq, Generic)
 
 data Config = Config
@@ -97,6 +97,8 @@ data Config = Config
   , simulateTransactions :: Bool
   , leiosStageLengthSlots :: Word
   , leiosStageActiveVotingSlots :: Word
+  , linearVoteStageLengthSlots :: Word
+  , linearDiffuseStageLengthSlots :: Word
   , leiosVoteSendRecvStages :: Bool
   , leiosVariant :: LeiosVariant
   , leiosLateIbInclusion :: Bool
@@ -141,6 +143,7 @@ data Config = Config
   , voteGenerationProbability :: Double
   , voteGenerationCpuTimeMsConstant :: DurationMs
   , voteGenerationCpuTimeMsPerIb :: DurationMs
+  , voteGenerationCpuTimeMsPerTx :: DurationMs
   , voteValidationCpuTimeMs :: DurationMs
   , voteThreshold :: Word
   , voteBundleSizeBytesConstant :: SizeBytes
@@ -170,6 +173,8 @@ instance Default Config where
       , simulateTransactions = True
       , leiosStageLengthSlots = 20
       , leiosStageActiveVotingSlots = 1
+      , linearVoteStageLengthSlots = 5
+      , linearDiffuseStageLengthSlots = 5
       , leiosVoteSendRecvStages = False
       , leiosVariant = Short
       , leiosLateIbInclusion = True
@@ -214,6 +219,7 @@ instance Default Config where
       , voteGenerationProbability = 500.0
       , voteGenerationCpuTimeMsConstant = 0.164
       , voteGenerationCpuTimeMsPerIb = 0.0
+      , voteGenerationCpuTimeMsPerTx = 0.0
       , voteValidationCpuTimeMs = 0.816
       , voteThreshold = 300
       , voteBundleSizeBytesConstant = 0
@@ -291,6 +297,7 @@ configToKVsWith getter cfg =
     , get @"voteGenerationProbability" getter cfg
     , get @"voteGenerationCpuTimeMsConstant" getter cfg
     , get @"voteGenerationCpuTimeMsPerIb" getter cfg
+    , get @"voteGenerationCpuTimeMsPerTx" getter cfg
     , get @"voteValidationCpuTimeMs" getter cfg
     , get @"voteThreshold" getter cfg
     , get @"voteBundleSizeBytesConstant" getter cfg
@@ -339,6 +346,8 @@ instance FromJSON Config where
     leiosStageLengthSlots <- parseFieldOrDefault @Config @"leiosStageLengthSlots" obj
     leiosStageActiveVotingSlots <- parseFieldOrDefault @Config @"leiosStageActiveVotingSlots" obj
     leiosVoteSendRecvStages <- parseFieldOrDefault @Config @"leiosVoteSendRecvStages" obj
+    linearVoteStageLengthSlots <- parseFieldOrDefault @Config @"linearVoteStageLengthSlots" obj
+    linearDiffuseStageLengthSlots <- parseFieldOrDefault @Config @"linearDiffuseStageLengthSlots" obj
     txGenerationDistribution <- parseFieldOrDefault @Config @"txGenerationDistribution" obj
     txSizeBytesDistribution <- parseFieldOrDefault @Config @"txSizeBytesDistribution" obj
     txValidationCpuTimeMs <- parseFieldOrDefault @Config @"txValidationCpuTimeMs" obj
@@ -378,6 +387,7 @@ instance FromJSON Config where
     voteGenerationProbability <- parseFieldOrDefault @Config @"voteGenerationProbability" obj
     voteGenerationCpuTimeMsConstant <- parseFieldOrDefault @Config @"voteGenerationCpuTimeMsConstant" obj
     voteGenerationCpuTimeMsPerIb <- parseFieldOrDefault @Config @"voteGenerationCpuTimeMsPerIb" obj
+    voteGenerationCpuTimeMsPerTx <- parseFieldOrDefault @Config @"voteGenerationCpuTimeMsPerTx" obj
     voteValidationCpuTimeMs <- parseFieldOrDefault @Config @"voteValidationCpuTimeMs" obj
     voteThreshold <- parseFieldOrDefault @Config @"voteThreshold" obj
     voteBundleSizeBytesConstant <- parseFieldOrDefault @Config @"voteBundleSizeBytesConstant" obj
