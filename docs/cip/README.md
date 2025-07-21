@@ -265,6 +265,12 @@ For further cryptographic details, refer to the
 The protocol flow, as depicted in [Figure 4](#protocol-flow-figure), consists
 of four main stages:
 
+<a name="protocol-flow-figure"></a>
+
+![Leios Protocol Flow](images/protocol-flow-overview.png)
+
+<p align="center"><em>Figure 4: Ouroboros Leios Protocol Flow</em></p>
+
 1. **EB Announcement:**  
    The RB producer references a new EB, signaling its proposal to the network. The EB size is constrained by $S_\text{EB}$ to ensure it can be diffused within the stage length $L$.
 
@@ -288,12 +294,6 @@ of four main stages:
    The certificate, $C$, is included in a subsequent RB, at which point the
    transactions from the certified EB are executed. The process may then repeat
    with the announcement of the next EB.
-
-<a name="protocol-flow-figure"></a>
-
-![Leios Protocol Flow](images/protocol-flow-overview.png)
-
-<p align="center"><em>Figure 4: Ouroboros Leios Protocol Flow</em></p>
 
 ##### Bottom Line: What Throughput Does Leios Enable?
 
