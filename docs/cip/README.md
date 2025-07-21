@@ -164,8 +164,8 @@ the EB proposed for inclusion in the next RB.
    , transaction_witness_sets : [* transaction_witness_set]
    , auxiliary_data_set       : {* transaction_index => auxiliary_data}
    , invalid_transactions     : [* transaction_index]
-  , ? leios_cert             : leios_certificate
-  , ? announced_eb           : eb_reference
++  , ? leios_cert             : leios_certificate
++  , ? announced_eb           : eb_reference
    ]
 ```
 
