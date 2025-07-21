@@ -155,6 +155,7 @@ logLeiosEvent nodeNames loudness e = case e of
             mconcat
               [ "slot" .= eb.slot
               , "size_bytes" .= fromBytes (messageSizeBytes eb)
+              , "rb_ref" .= rbRef (eb.header.rankingBlock)
               ]
           EventVote vt ->
             mconcat
@@ -380,7 +381,7 @@ sharedEvent leios nodeNames e = case e of
         Shared.VTBundleGenerated
           { bytes = fromIntegral (messageSizeBytes vt)
           , votes = Map.fromList $ map ((,vt.votes) . T.pack . mkStringId) vt.endorseBlocks
-          , pipeline = coerce $ voteMsgPipeline leios vt
+          , pipeline = if Linear == leios.variant then 0 else coerce $ voteMsgPipeline leios vt
           , ..
           }
   sharedEnterState :: T.Text -> String -> Word64 -> LeiosEventBlock -> Shared.Event
@@ -463,6 +464,7 @@ traceRelayLink1 connectionOptions =
                     { inputBlockHeader = kibibytes 1
                     , inputBlockBodyAvgSize = kibibytes 95
                     , inputBlockBodyMaxSize = kibibytes 100
+                    , endorseBlockBodyAvgSize = megabytes 5
                     , endorseBlock = \eb -> coerce (length eb.inputBlocks) * 32 + 32 + 128
                     , voteMsg = \v -> fromIntegral v.votes * 32 + 32 + 128
                     , certificate = const (50 * 1024)
