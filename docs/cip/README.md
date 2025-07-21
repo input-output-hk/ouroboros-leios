@@ -289,6 +289,11 @@ of four main stages:
      <img src="https://latex.codecogs.com/png.image?\dpi{120}\sum_{v\in\text{votes}}\text{stake}(v)\geq\tau\times\text{stake}_{\text{total}}" alt="equation">
    </p>
 
+$$
+\sum_{v \in \text{votes}} \text{stake}(v) \geq \tau \times \text{stake}_{\text{total}}
+$$
+
+
    (This is represented by the yellow pentagon labeled $C$ in the [Figure 4](#protocol-flow-figure)
    below.)
 
@@ -302,7 +307,11 @@ of four main stages:
 Leios increases throughput by combining the transaction capacity of regular blocks with that of certified EBs. The formula below expresses this: throughput equals the rate of regular block production times the sum of their capacity and the additional capacity from Endorser Blocks that are **included**.
 
 <p align="center">
-  <img src="https://latex.codecogs.com/png.image?\dpi{120}&space;\text{Throughput}&space;=&space;f_{\text{RB}}&space;\times&space;\left(&space;S_\text{RB}&space;+&space;S_\text{EB}&space;\times&space;f_\text{EB}&space;\right)" alt="Throughput formula">
+
+$$
+\text{Throughput} = f_{\text{RB}} \times \left( S_\text{RB} + S_\text{EB} \times f_\text{EB} \right)
+$$
+
 </p>
 
 Where:
