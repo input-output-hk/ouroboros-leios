@@ -825,6 +825,39 @@ courier (Praos chain), achieving significantly higher delivery volume through
 this structured validation approach.
 -->
 
+### Why not more concurrency
+
+The proposed protocol is a radically simplified version of what was published in
+the [Leios research paper][leios-paper]. The simplifcations were primarily made
+to reduce the concurrent processing of Cardano transactions as much as possible
+while still allowing roughly a 10x throughput increase.
+
+The protocol design as published is optimal in its usage of available network
+and compute resources, but comes at the cost of significantly increased
+inclusion latency (> 5x) and a high level of concurrency. Both of which are
+undesirable in a real-world deployment onto the Cardano mainnet and need to be
+carefully weighed against the throughput increase:
+
+- High latency
+  - straight-forward drawback
+  - initial deployment should not make the situation all too worse and a potential synergy with Peras (link CIP) can make higher latency pipeline designs feasible.
+
+- High concurrency
+  - more conflicting transactions possible
+  - For example: IB production = a lot more concurrency
+  - More throughput possible (= prepare more work)
+  - Adding stages results in longer latency
+  
+- Conflicting txs a.k.a congestion on Cardano
+  - Competing spending of UTxOs is to be expected
+  - Also a network-based attack possible (link threat model?)
+
+- Conflicting transactions can either be
+  - accepted = failing transactions vs. Cardano USP of only paying fees when included
+  - reduced -> sharding reduces (!not eliminates!) amount of potential conflict, but has lots of impact & complexity
+  - reconciled -> a certain number of conflicts can be dealt with; tombstoning to reduce storage waste
+- We chose the third option and hence only proposed no / a modest increase in concurrency
+
 ### Metrics
 
 > [!NOTE]
@@ -1237,10 +1270,9 @@ one production for each winning of the sortition lottery. (Note that they may
 win more than once in the same slot because a lottery takes place for each
 lovelace staked.) A malicious producer or voter might create two conflicting
 IBs, EBs, or votes and diffuse them to different downstream peers in an attempt
-to disrupt the Leios protocol. The
-[Leios paper](https://iohk.io/en/research/library/papers/high-throughput-blockchain-consensus-under-realistic-network-assumptions/)
-mitigates this situation explicitly by identifying nodes that misbehave in this
-manner and notifying downstream peers in a controlled manner.
+to disrupt the Leios protocol. The [Leios paper][leios-paper] mitigates this
+situation explicitly by identifying nodes that misbehave in this manner and
+notifying downstream peers in a controlled manner.
 
 _Inaction and nuisance:_ Producer nodes might also attempt to disrupt the
 protocol by failing to play their assigned role or by attempting to diffuse
@@ -1555,3 +1587,5 @@ protocol.
 
 This CIP is licensed under
 [Apache-2.0](http://www.apache.org/licenses/LICENSE-2.0).
+
+[leios-paper]: https://eprint.iacr.org/2025/1115.pdf
