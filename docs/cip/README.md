@@ -805,6 +805,7 @@ majority voting by this committee ensures consensus on the endorser block while
 inheriting and maintaining Praos's robust resistance to adversarial activity, as
 the final commitment is anchored in the secure Praos chain.
 
+<!--
 As a result of this decoupled approach, Leios can utilize nearly the full
 bandwidth available to the network of nodes without requiring unrealistically
 fast propagation of blocks: Leios employs a structured, multi-stage process
@@ -822,6 +823,7 @@ office where larger packages (endorser blocks) are prepared and then go through
 a quality inspection process (voting) before being dispatched by the main
 courier (Praos chain), achieving significantly higher delivery volume through
 this structured validation approach.
+-->
 
 ### Metrics
 
