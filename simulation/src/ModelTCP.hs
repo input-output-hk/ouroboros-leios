@@ -18,7 +18,8 @@ module ModelTCP (
   TcpEvent (..),
   traceTcpSend,
   mkTcpConnProps,
-  kilobytes,
+  kibibytes,
+  megabytes,
   segments,
   bytesToKb,
 ) where
@@ -45,7 +46,7 @@ data TcpConnProps = TcpConnProps
   -- links.
   , tcpBandwidth :: !Bytes
   -- ^ The sender serialisation bandwidth in bytes per sec. Typical values
-  -- would be a few hundred kilobytes per second, e.g. 100 kb\/s is
+  -- would be a few hundred kibibytes per second, e.g. 100 kb\/s is
   -- 0.8 MBit\/s, which is close to 1 MBit\/s once overheads are included.
   , tcpReceiverWindow :: !Bytes
   -- ^ The size of the receiver's window, which is an upper bound on the
@@ -75,8 +76,11 @@ mkTcpConnProps latency bandwidth =
   -- set it big enough to not constrain the bandwidth
   recvwnd = Bytes (ceiling (fromIntegral (fromBytes bandwidth) * latency * 2))
 
-kilobytes :: Int -> Bytes
-kilobytes kb = Bytes kb * 1024
+kibibytes :: Int -> Bytes
+kibibytes kb = Bytes kb * 1024
+
+megabytes :: Int -> Bytes
+megabytes mb = Bytes mb * 1000000
 
 segments :: Int -> Bytes
 segments s = Bytes s * segmentSize

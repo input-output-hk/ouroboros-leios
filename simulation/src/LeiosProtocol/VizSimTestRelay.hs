@@ -47,8 +47,8 @@ example1 =
    where
     trace =
       traceRelayLink1
-        (mkTcpConnProps 0.3 (kilobytes 1000))
-        (UniformGenerationPattern (kilobytes 100) 0.2 5.0)
+        (mkTcpConnProps 0.3 (kibibytes 1000))
+        (UniformGenerationPattern (kibibytes 100) 0.2 5.0)
 
 example2 :: Visualization
 example2 =
@@ -62,8 +62,8 @@ example2 =
    where
     trace =
       traceRelayLink4
-        (mkTcpConnProps 0.3 (kilobytes 1000))
-        (UniformGenerationPattern (kilobytes 100) 0.2 5.0)
+        (mkTcpConnProps 0.3 (kibibytes 1000))
+        (UniformGenerationPattern (kibibytes 100) 0.2 5.0)
 
 example3 :: Visualization
 example3 =
@@ -77,9 +77,9 @@ example3 =
    where
     trace =
       traceRelayLink4Asymmetric
-        (mkTcpConnProps 0.2 (kilobytes 1000))
-        (mkTcpConnProps 0.3 (kilobytes 1000))
-        (UniformGenerationPattern (kilobytes 100) 0.2 5.0)
+        (mkTcpConnProps 0.2 (kibibytes 1000))
+        (mkTcpConnProps 0.3 (kibibytes 1000))
+        (UniformGenerationPattern (kibibytes 100) 0.2 5.0)
 
 examplesRelaySimVizConfig :: RelaySimVizConfig
 examplesRelaySimVizConfig =

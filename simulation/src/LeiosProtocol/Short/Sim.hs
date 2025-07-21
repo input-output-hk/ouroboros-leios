@@ -460,9 +460,9 @@ traceRelayLink1 connectionOptions =
               , sizes -- TODO: realistic sizes
                 =
                   SizesConfig
-                    { inputBlockHeader = kilobytes 1
-                    , inputBlockBodyAvgSize = kilobytes 95
-                    , inputBlockBodyMaxSize = kilobytes 100
+                    { inputBlockHeader = kibibytes 1
+                    , inputBlockBodyAvgSize = kibibytes 95
+                    , inputBlockBodyMaxSize = kibibytes 100
                     , endorseBlock = \eb -> coerce (length eb.inputBlocks) * 32 + 32 + 128
                     , voteMsg = \v -> fromIntegral v.votes * 32 + 32 + 128
                     , certificate = const (50 * 1024)
