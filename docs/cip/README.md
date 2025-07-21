@@ -173,7 +173,7 @@ the EB proposed for inclusion in the next RB.
 
 ##### Endorser Blocks (EBs)
 
-EBs are produced by the same stake pool that created the
+EBs are optional attachments to RBs, produced by the same stake pool that created the
 corresponding RB. They serve to reference
 additional transactions, increasing throughput beyond what can be included
 directly in the RB. When an EB is announced in an RB, a voting
@@ -297,18 +297,17 @@ of four main stages:
 
 ##### Bottom Line: What Throughput Does Leios Enable?
 
-Leios increases throughput by combining the transaction capacity of regular blocks with that of certified EBs. The formula below expresses this: throughput equals the rate of regular block production times the sum of their capacity and the additional capacity from included Endorser Blocks.
+Leios increases throughput by combining the transaction capacity of regular blocks with that of certified EBs. The formula below expresses this: throughput equals the rate of regular block production times the sum of their capacity and the additional capacity from Endorser Blocks that are **included**.
 
 <p align="center">
-  <img src="https://latex.codecogs.com/png.image?\dpi{120}&space;\text{Throughput}&space;=&space;f_{\text{RB}}&space;\times&space;\left(&space;S_\text{RB}&space;+&space;S_\text{EB}&space;\times&space;f_\text{EB}&space;\times&space;\text{rate}_{\text{EB,&space;inclusion}}&space;\right)" alt="Throughput formula">
+  <img src="https://latex.codecogs.com/png.image?\dpi{120}&space;\text{Throughput}&space;=&space;f_{\text{RB}}&space;\times&space;\left(&space;S_\text{RB}&space;+&space;S_\text{EB}&space;\times&space;f_\text{EB}&space;\right)" alt="Throughput formula">
 </p>
 
 Where:
-- $f_{\text{RB}}$ — Rate of RB production
-- $S_\text{RB}$ — Maximum size of an RB
-- $S_\text{EB}$ — Maximum size of an EB
-- $f_\text{EB}$ — Rate of EB production
-- $\text{rate}_{\text{EB, inclusion}}$ — Fraction of EBs that are included (certified) in RBs
+- $f_{\text{RB}}$ — Rate of RB production (protocol parameter)
+- $S_\text{RB}$ — Maximum size of an RB (protocol parameter)
+- $S_\text{EB}$ — Maximum size of an EB (protocol parameter)
+- $f_\text{EB}$ — **Observed fraction of RBs that include an EB**
 
 ### Constraints on Leios protocol parameters
 
@@ -321,7 +320,6 @@ As briefly mentioned in the previous section, the following table formally defin
 | Ranking block max size | $S_\text{RB}$ | bytes | Maximum size of a ranking block | $S_\text{RB} > 0$ | Limits RB size to ensure timely diffusion within slot time |
 | Praos active slot coefficient | $f_\text{RB}$ | 1/slot | Probability that a party will be the slot leader for a particular slot | $0 < f_\text{RB} \leq \Delta^{-1}$ | Blocks should not be produced faster than network delay |
 | Endorser-block max size | $S_\text{EB}$ | bytes | Maximum size of an endorser block | $S_\text{EB} > 0$ | Limits EB size to ensure timely diffusion within stage length |
-| Endorser-block production rate | $f_\text{EB}$ | 1/stage | Probability of producing an EB during a stage | $0 < f_\text{EB} \leq 1$ | EBs are produced by the same pool that creates the RB |
 | Mean committee size | $n$ | parties | Average number of stake pools selected for voting | $n > 0$ | Ensures sufficient decentralization and security |
 | Quorum size | $\tau$ | fraction | Minimum fraction of committee votes required for certification | $\tau > 0.5$ | Prevents adversarial control while ensuring liveness |
 
@@ -831,14 +829,9 @@ tradeoffs.
 | Parameter                                  | Symbol           | Units    | Description                                                                 | Feasible value | Justification                                                                                                             |
 | ------------------------------------------ | ---------------- | -------- | --------------------------------------------------------------------------- | -------------: | ------------------------------------------------------------------------------------------------------------------------- |
 | Stage length                               | $L$              | slot     |                                                                             |             10 | Short stages increase settlement speed, but the stage length must be generously larger than the propagation time for IBs. |
-| Input-block production rate                | $f_\text{IB}$    | 1/slot   |                                                                             |                |                                                                                                                           |
-| Endorser-block production rate             | $f_\text{EB}$    | 1/stage  |                                                                             |                |                                                                                                                           |
-| Expiration of unreferenced input blocks    | $r_\text{IB}$    | slot     |                                                                             |                |                                                                                                                           |
 | Expiration of unreferenced endorser blocks | $r_\text{EB}$    | slot     |                                                                             |                |                                                                                                                           |
-| Number of shards                           | $k_\text{shard}$ | unitless |                                                                             |                |                                                                                                                           |
 | Mean committee size                        | $n$              | parties  |                                                                             |            500 | Probabilistic analyses of adversarial stake scenarios.                                                                    |
 | Quorum size                                | $\tau$           | fraction |                                                                             |            60% | Probabilistic analyses of adversarial stake scenarios.                                                                    |
-| . . .                                      |                  |          |                                                                             |                |                                                                                                                           |
 | Praos active slot coefficient              | $f_\text{RB}$    | 1/slot   | The probability that a party will be the slot leader for a particular slot. |           0.05 | This is the current value on mainnet, but it may become feasible to reduce it if Praos blocks are made smaller.           |
 
 The analysis
