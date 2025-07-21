@@ -134,6 +134,7 @@ data Config = Config
   , ebValidationCpuTimeMs :: DurationMs
   , ebSizeBytesConstant :: SizeBytes
   , ebSizeBytesPerIb :: SizeBytes
+  , ebBodyAvgSizeBytes :: SizeBytes
   , ebDiffusionStrategy :: DiffusionStrategy
   , ebDiffusionMaxWindowSize :: Word16
   , ebDiffusionMaxHeadersToRequest :: Word16
@@ -210,6 +211,7 @@ instance Default Config where
       , ebValidationCpuTimeMs = 1.0
       , ebSizeBytesConstant = 240
       , ebSizeBytesPerIb = 32
+      , ebBodyAvgSizeBytes = 5000000
       , ebDiffusionStrategy = PeerOrder
       , ebDiffusionMaxWindowSize = 100
       , ebDiffusionMaxHeadersToRequest = 100
@@ -288,6 +290,7 @@ configToKVsWith getter cfg =
     , get @"ebValidationCpuTimeMs" getter cfg
     , get @"ebSizeBytesConstant" getter cfg
     , get @"ebSizeBytesPerIb" getter cfg
+    , get @"ebBodyAvgSizeBytes" getter cfg
     , get @"ebDiffusionStrategy" getter cfg
     , get @"ebDiffusionMaxWindowSize" getter cfg
     , get @"ebDiffusionMaxHeadersToRequest" getter cfg
@@ -378,6 +381,7 @@ instance FromJSON Config where
     ebValidationCpuTimeMs <- parseFieldOrDefault @Config @"ebValidationCpuTimeMs" obj
     ebSizeBytesConstant <- parseFieldOrDefault @Config @"ebSizeBytesConstant" obj
     ebSizeBytesPerIb <- parseFieldOrDefault @Config @"ebSizeBytesPerIb" obj
+    ebBodyAvgSizeBytes <- parseFieldOrDefault @Config @"ebBodyAvgSizeBytes" obj
     ebDiffusionStrategy <- parseFieldOrDefault @Config @"ebDiffusionStrategy" obj
     ebDiffusionMaxWindowSize <- parseFieldOrDefault @Config @"ebDiffusionMaxWindowSize" obj
     ebDiffusionMaxHeadersToRequest <- parseFieldOrDefault @Config @"ebDiffusionMaxHeadersToRequest" obj
