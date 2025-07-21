@@ -1157,10 +1157,12 @@ dispatchValidationSTM tracer cfg leiosState req =
               _ -> k
       waitFor
         leiosState.waitingForTipVar
-        [ (rbHash, [ifNoCert ib.id $ queue [valLinearEB ib False completion]])
+        [ (rbHash, [ifNoCert ib.id $ queue [valLinearEB ib False (const (pure ()))]])
         | ib <- ibs
         , BlockHash rbHash <- [ib.header.rankingBlock]
         ]
+      -- @complete@ the Linear EBs immediately, ie "EB Diffusion Pipelining"
+      completion [ (convertLinearId ib.id, ib) | ib <- ibs ]
       pure []
     ReapplyLinearEB ib completion -> pure [valLinearEB ib True (const completion)]
     ValidateVotes vs deliveryTime completion -> do

@@ -408,6 +408,8 @@ The Linear Leios simulator adds the following new variables, some of which also 
 - `relayLinearEBState`.
   As a shortcut, the first Linear Leios simulator will instantiate `Relay` with `RelayHeader InputBlockId` and `InputBlock`.
   This is because the IB specified in Short Leios has just a few small fields more than the EB specified in Linear Leios.
+    - It is remarkable that the Linear EB is added to the Relay buffer immediately, before its validated.
+      This is "EB Diffusion Pipelining", as indicated in the Linear Leios specification.
 - `linearLedgerStateVar`, `waitingForLinearLedgerStateVar`, and `waitingForWaitingForLinearLedgerStateVar`.
   An RB that contains an EB cert canot be validated without the the certified EB's ledger state.
   However, that EB is necessarily certified, so its ledger state can be built comparatively cheaply now, but still not for free.
@@ -421,6 +423,6 @@ The Linear Leios simulator adds the following new variables, some of which also 
 - `linearEbOfRb`.
   A mapping from RB to its announced Linear EB _that has been validated_, which is needed when issuing an RB.
 
-TODO block diffusion pipelining for both RBs and EBs
+TODO RB Diffusion is not pipelined
 
 TODO RBs are so far only distributed by ChainSync and BlockFetch
