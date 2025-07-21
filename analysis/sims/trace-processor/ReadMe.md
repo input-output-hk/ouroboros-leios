@@ -39,3 +39,10 @@ EB,1020-node-90,1008,8,1020.075,NA,1080.075,1207.091,NA
 EB,1020-node-93,1008,5,1020.075,NA,1050.075,1084.091,NA
 EB,1040-node-19,944,28,1040.075,NA,1080.075,1104.091,NA
 ```
+
+
+## Generic analysis
+
+The R script [generic-analysis.R](generic-analysis.R) creates a generic set of plots from the `cpus.csv`, `lifecycle.csv`, `receipts.csv`, and `resources.csv` files output by `leios-trace-processor`.
+
+Under Nix, simply run `./generic-analysis.R`. Without Nix, run `R --vanilla < generic-analysis.R`.

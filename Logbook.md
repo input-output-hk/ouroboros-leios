@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2025-07-21
+
+### Generic analysis script for Leios simulator output
+
+See [analysis/trace-processor/ReadMe.md](analysis/trace-processor/ReadMe.md) for instructions on using the R script [analysis/trace-processor/generic-analysis.R](analysis/trace-processor/generic-analysis.R), which generates a set of diagnostic plots from the output of `leios-simulation-trace-processor`.
+
 ## 2025-07-19
 
 ### Preliminary analysis of block and transaction validation times
