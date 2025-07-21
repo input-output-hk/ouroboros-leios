@@ -357,19 +357,18 @@ A BLS-based certificate scheme that meets these requirements is documented in th
 - Efficient vote aggregation using the Fait Accompli sortition scheme
 - Performance benchmarks suitable for production deployment
 
-### Network
 
-#### Mini-protocols
+### Mini-protocols
 
 For background information on mini-protocols, see sections 3.1-3.4 of the **[Ouroboros Network Specification](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf#chapter.3)**. Here we present the additional node-to-node mini-protocols needed for Ouroboros Leios.
 
-##### Relay mini-protocol
+#### Relay mini-protocol
 
 The `Relay` protocol is a generalization of the transaction submission protocol used to transfer transactions between full nodes. We use the term *datum* as a generic term for the payloads being diffused, which are generally small: transactions, endorser block headers, and vote bundles.
 
 The protocol follows a pull-based strategy where the consumer asks for new ids/datums and the producer sends them back. It is designed to be suitable for a trustless setting where both sides need to guard against resource consumption attacks.
 
-###### Options and parameters
+**Parameters**
 
 A `Relay` instance is specified by these options and parameters:
 
@@ -383,7 +382,7 @@ A `Relay` instance is specified by these options and parameters:
 | `Ann. Condition`     | ("if" announcements): Condition for announcement.                                                |
 | `ann`                | ("if" announcements): Announcement representation.                                               |
 
-###### Instances
+**Instances**
 
 `Relay` protocol instances for Leios are listed in the table below. Tx-submission is further parameterized by the maximum window size allowed. EB-relay and Vote-relay are each parametrized by the maximum age beyond which a datum is no longer relayed. EB-relay relies on announcements to let consumers know when block bodies are available.
 
@@ -393,7 +392,7 @@ A `Relay` instance is specified by these options and parameters:
 | EB-relay      | No              | Yes             | hash | slot   | eb-header   | body available   | unit  |
 | Vote-relay    | No              | No              | hash | slot   | vote-bundle | N/A              | N/A   |
 
-###### State machine
+**State machine**
 
 The `Relay` mini-protocol operates through a series of states, with transitions determined by protocol messages exchanged between the *consumer* and *producer* roles. Each message includes parameters as shown in the table below, which maps the protocol's operation and message flows as depicted in [Figure 5](#figure-5):
 
@@ -420,23 +419,21 @@ The `Relay` mini-protocol operates through a series of states, with transitions 
 >
 > If Announcements is set, `MsgReplyIds` messages are replaced with `MsgReplyIdsAndAnns`.
 
-###### Producer and consumer implementation
+**Producer and consumer implementation**
 
 The Relay mini-protocol is designed to achieve both efficient datum diffusion and robust protection against asymmetric resource attacks from consumers. It employs a pull-based approach: consumers request IDs and then batch-fetch datums, allowing for flexible batching and request strategies.
 
 For comprehensive implementation guidance—including memory-efficient provider strategies, bounded window enforcement, and consumer heuristics—refer to both the [Producer and consumer implementation section](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-2.md#producer-and-consumer-implementation) in Technical Report 2 and the [Client and Server Implementation, Section 3.9.5](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf#page=34), which provides further details for both producer and consumer roles.
 
-###### Equivocation handling
+**Equivocation handling**
 
 EB-relay and Vote-relay must guard against the possibility of equivocations, i.e. the reuse of a generation opportunity for multiple different blocks. The *message identifier* of a header is the pair of its generating node id and the slot it was generated for. Two headers with the same message identifier constitute a *proof of equivocation*, and the first header received with a given message identifier is the *preferred header*. For headers with the same message identifier, only the first two should be relayed, furthermore only the body of the preferred header should be fetched.
 
-##### Fetch mini-protocol
+#### Fetch mini-protocol
 
 The `Fetch` mini protocol enables a node to download block bodies. It is a generalization of the `BlockFetch` mini protocol used for base blocks: EBs do not have a notion of range, so they are requested by individual identifiers.
 
 The protocol follows a request-response strategy where the consumer requests specific block bodies and the producer streams them back. It is designed to efficiently handle block body downloads while maintaining network efficiency.
-
-###### Parameters
 
 A `Fetch` instance is specified by these parameters:
 
@@ -445,7 +442,7 @@ A `Fetch` instance is specified by these parameters:
 | `request` | Request format for a sequence of blocks.                                                         |
 | `body`    | Block body itself.                                                                               |
 
-###### Instances
+**Instances**
 
 `Fetch` instances for Leios are listed in the table below. EB-fetch is used for downloading endorser block bodies, while BlockFetch handles RB (Praos) block bodies.
 
@@ -454,7 +451,7 @@ A `Fetch` instance is specified by these parameters:
 | EB-fetch     | `[point]`   | `EB body`              |
 | BlockFetch   | `range`     | `RB body`              |
 
-###### State machine
+**State machine**
 
 The `Fetch` mini-protocol operates through a series of states, with transitions determined by protocol messages exchanged between the *consumer* and *producer* roles. Each message includes parameters as shown in the table below, which maps the protocol's operation and message flows as depicted in [Figure 6](#fig-fetch-state-machine):
 
@@ -474,17 +471,17 @@ The `Fetch` mini-protocol operates through a series of states, with transitions 
 | **`StStreaming`**      | `MsgBody`                          | `body`: single block body                                                      | **`StStreaming`**      | Producer streams a single block's body.                                                                       |
 | **`StStreaming`**      | `MsgBatchDone`                     | —                                                                             | **`StIdle`**           | Producer completes block streaming.                                                                           |
 
-###### Implementation
+**Implementation**
 
 The high-level description of Leios specifies freshest-first delivery for EB bodies, to circumvent attacks where a large amount of old EBs gets released by an adversary. The mini protocol already takes a parameter that specifies which EBs are still new enough to be diffused, so older EBs are already deprioritized to only be accessible through the `Chain-Sync` protocol, and only if referenced by other blocks.
 
-##### Chain-Sync mini-protocol
+#### Chain-Sync mini-protocol
 
 The `Chain-Sync` mini protocol is used for synchronizing chain state between nodes, including handling chain forks, rollbacks, and maintaining chain state consistency. In the context of Leios, this protocol is extended to handle endorser blocks and certificates that are referenced by the chain but may not be available through the primary diffusion protocols.
 
 The protocol follows a request-response strategy where consumers request chain headers and associated data, with producers streaming the requested chain information. It is designed to efficiently synchronize chain state and handle historical data retrieval for ledger reconstruction.
 
-###### Parameters
+**Parameters**
 
 A `Chain-Sync` instance is specified by these parameters:
 
@@ -493,7 +490,7 @@ A `Chain-Sync` instance is specified by these parameters:
 | `request` | Request format for historical block data and certificates.                                       |
 | `body`    | Block body or certificate data.                                                                  |
 
-###### Instances
+**Instances**
 
 `Chain-Sync` instances for Leios extend the standard Ouroboros Chain-Sync protocol to handle historical data requests including EBs by RB range, certified EBs by slot range, and certificates by EB hash.
 
@@ -501,7 +498,7 @@ A `Chain-Sync` instance is specified by these parameters:
 | :----------- | :---------- | :--------------------- |
 | Chain-Sync   | `request_ChainSync` | `body_ChainSync`  |
 
-###### Request types
+**Request types**
 
 The `Chain-Sync` protocol supports the following request types for Leios:
 
@@ -511,7 +508,7 @@ The `Chain-Sync` protocol supports the following request types for Leios:
 | `ebs-by-slot-range(slot, slot)` | Request all certified EBs generated in the slot range, not yet referenced by RBs. |
 | `certificate-by-eb(hash)` | Request a certificate for a certified EB not referenced by the chain. |
 
-###### Body types
+**Body types**
 
 - *EBs by RB:* given an RB from its chain, the producer should reply with all EBs which are (i) transitively referenced by RBs in that range, (ii) not referenced by earlier RBs.
 - *Recent certified EBs by range:* given a slot range, the producer should reply with all certified EBs which are (i) generated in the slot range, (ii) not referenced by RBs. The start of the slot range should be no earlier than the oldest slot an EB could be generated in and still referenced in a future RB.
@@ -522,72 +519,21 @@ The `Chain-Sync` protocol supports the following request types for Leios:
 | `eb-block(eb-header, eb-body)` | Complete endorser block with header and body.                                                    |
 | `eb-certificate(certificate)` | Certificate attesting to the validity of an endorser block.                                     |
 
-###### State machine
+**State machine**
 
 The `Chain-Sync` mini-protocol operates as an extension of the standard Ouroboros Chain-Sync protocol, inheriting its state machine and message flow. The protocol follows the same request-response pattern as the base Chain-Sync protocol, with consumers requesting chain data and producers streaming the requested headers and associated information.
 
 For detailed state machine information, refer to the [Ouroboros Network Specification](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf#section.3.7).
 
-###### Implementation
+**Implementation**
 
 To fulfill the higher-level freshest-first delivery goal, producers should prioritize serving requests for the EB- and Vote-relay mini protocols over requests for `Chain-Sync`.
 
-#### Network diffusion characteristics
+Network diffusion characteristics
 
-Linear Leios network diffusion follows specific patterns to ensure efficient block propagation while maintaining security:
-
-##### EB diffusion strategy
-
-- **Freshest-first delivery**: EBs should be delivered in a freshest-first fashion to avoid attacks where a large amount of old EBs is diffused around the same time to delay fresh EB delivery.
-- **Universal reception**: All parties should receive all EBs (and not only those in their current chain), to ensure that switching on a fork does not take time proportional to the EBs included.
-- **Early forwarding**: EBs should be forwarded before doing the full validity/correctness checks. Only cheap checks should be performed first that ensure DoS attacks are mitigated (VRF check, block hash check, first header check).
-
-##### Equivocation protection
-
-Linear Leios implements equivocation detection to prevent attacks where an attacker tries to diffuse multiple EBs for the same RB winning opportunity:
-
-- Nodes only download the EB corresponding to the first EB announcement they saw in an RB for some RB creation opportunity.
-- EB voters only vote for a specific EB if:
-  - The related "announcing" RB header was received within Δ_hdr of the RB creation slot
-  - No other equivocating RB header was received within 3Δ_hdr of the RB creation slot
-- This ensures that the RB headers corresponding to all certified EBs were received first (compared to that of equivocated ones) by all nodes.
-- The above implies that: **L_vote > 3Δ_hdr**
-
-##### Network timing constraints
-
-The protocol enforces specific timing constraints to ensure proper block diffusion:
-
-- **Voting period**: L_vote must be sufficient for EB diffusion and voting across the network
-- **Diffusion period**: L_diff ensures the EB is available to all honest nodes with good probability before it can be referenced
-- **Header diffusion**: Δ_hdr represents the maximum time for RB headers to diffuse across the network
-
-#### Message formats
-
-##### EB-relay messages
-
-EB-relay uses the following message structure:
-
-- **Header**: Contains VRF proof, slot number, producer ID, and EB hash
-- **Body**: Contains transaction list and conflicting transaction indices
-- **Announcement**: Indicates when the full EB body is available for fetching
-
-##### Vote-relay messages
-
-Vote-relay bundles multiple votes from a single voter:
-
-- **Vote bundle**: Contains election ID, voter ID, and multiple vote signatures
-- **Vote entry**: Maps endorser block hash to vote signature
-- **Eligibility proof**: For non-persistent voters, includes eligibility signature
-
-##### Certificate messages
-
-Certificates are included in ranking blocks and contain:
-
-- **Election ID**: Identifies the voting round
-- **Endorser block hash**: The EB being certified
-- **Persistent voters**: List of persistent voter IDs
-- **Non-persistent voters**: Map of pool IDs to BLS signatures
-- **Aggregate signatures**: Combined vote and eligibility signatures
+> [!Warning]
+>
+> This section is work in progress.
 
 ### Node changes
 
