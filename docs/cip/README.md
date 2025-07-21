@@ -316,14 +316,14 @@ As briefly mentioned in the previous section, the following table formally defin
 
 | Parameter | Symbol | Units | Description | Constraints | Rationale |
 |---|---|---|---|---|---|
+| Network diffusion time | $\Delta$ | slot | Upper limit on the time needed to diffuse a message to all nodes | $\Delta > 0$ | Messages have a finite delay due to network topology |
 | Stage length | $L$ | slot | Duration of the voting period for endorser blocks | $L \geq \Delta$ | Must allow sufficient time for EB diffusion and voting |
 | Ranking block max size | $S_\text{RB}$ | bytes | Maximum size of a ranking block | $S_\text{RB} > 0$ | Limits RB size to ensure timely diffusion within slot time |
+| Praos active slot coefficient | $f_\text{RB}$ | 1/slot | Probability that a party will be the slot leader for a particular slot | $0 < f_\text{RB} \leq \Delta^{-1}$ | Blocks should not be produced faster than network delay |
 | Endorser-block max size | $S_\text{EB}$ | bytes | Maximum size of an endorser block | $S_\text{EB} > 0$ | Limits EB size to ensure timely diffusion within stage length |
 | Endorser-block production rate | $f_\text{EB}$ | 1/stage | Probability of producing an EB during a stage | $0 < f_\text{EB} \leq 1$ | EBs are produced by the same pool that creates the RB |
 | Mean committee size | $n$ | parties | Average number of stake pools selected for voting | $n > 0$ | Ensures sufficient decentralization and security |
 | Quorum size | $\tau$ | fraction | Minimum fraction of committee votes required for certification | $\tau > 0.5$ | Prevents adversarial control while ensuring liveness |
-| Network diffusion time | $\Delta$ | slot | Upper limit on the time needed to diffuse a message to all nodes | $\Delta > 0$ | Messages have a finite delay due to network topology |
-| Praos active slot coefficient | $f_\text{RB}$ | 1/slot | Probability that a party will be the slot leader for a particular slot | $0 < f_\text{RB} \leq \Delta^{-1}$ | Blocks should not be produced faster than network delay |
 
 ### Specification for votes and certificates
 
