@@ -366,7 +366,7 @@ A BLS-based certificate scheme that meets these requirements is documented in th
 
 For background information on mini-protocols, see sections 3.1-3.4 of the **[Ouroboros Network Specification](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf#chapter.3)**. Here we present the additional node-to-node mini-protocols needed for Ouroboros Leios.
 
-#### Relay mini-protocol
+#### Relay
 
 The `Relay` protocol is a generalization of the transaction submission protocol used to transfer transactions between full nodes. We use the term *datum* as a generic term for the payloads being diffused, which are generally small: transactions, endorser block headers, and vote bundles.
 
@@ -433,7 +433,7 @@ For comprehensive implementation guidance—including memory-efficient provider 
 
 EB-relay and Vote-relay must guard against the possibility of equivocations, i.e. the reuse of a generation opportunity for multiple different blocks. The *message identifier* of a header is the pair of its generating node id and the slot it was generated for. Two headers with the same message identifier constitute a *proof of equivocation*, and the first header received with a given message identifier is the *preferred header*. For headers with the same message identifier, only the first two should be relayed, furthermore only the body of the preferred header should be fetched.
 
-#### Fetch mini-protocol
+#### Fetch
 
 The `Fetch` mini protocol enables a node to download block bodies. It is a generalization of the `BlockFetch` mini protocol used for base blocks: EBs do not have a notion of range, so they are requested by individual identifiers.
 
@@ -479,64 +479,70 @@ The `Fetch` mini-protocol operates through a series of states, with transitions 
 
 The high-level description of Leios specifies freshest-first delivery for EB bodies, to circumvent attacks where a large amount of old EBs gets released by an adversary. The mini protocol already takes a parameter that specifies which EBs are still new enough to be diffused, so older EBs are already deprioritized to only be accessible through the `Chain-Sync` protocol, and only if referenced by other blocks.
 
-#### Chain-Sync mini-protocol
+#### Chain-Sync
 
-The `Chain-Sync` mini protocol is used for synchronizing chain state between nodes, including handling chain forks, rollbacks, and maintaining chain state consistency. In the context of Leios, this protocol is extended to handle endorser blocks and certificates that are referenced by the chain but may not be available through the primary diffusion protocols.
+The `Chain-Sync` mini protocol synchronizes chain state between nodes, handling forks, rollbacks, and maintaining consistency. In Leios, it is extended to support retrieval of EBs referenced by the RB chain that are typically too old to be diffused by the `Relay` and `Fetch` mini protocols, but are still relevant to reconstruct the ledger state. Additionally, it covers certified EBs not yet in the chain but which are still recent enough for inclusion in a future RB. Certificates are included as part of RB bodies when EBs are certified, so they don't require separate retrieval.
 
-The protocol follows a request-response strategy where consumers request chain headers and associated data, with producers streaming the requested chain information. It is designed to efficiently synchronize chain state and handle historical data retrieval for ledger reconstruction.
+This data, together with the base chain, is what is needed for a node to eventually participate in consensus.
+
+The protocol follows a request-response strategy where consumers request chain headers and associated data, with producers streaming the requested chain information and EB-specific content.
 
 **Parameters**
 
 A `Chain-Sync` instance is specified by these parameters:
 
-| Parameter | Description                                                                                      |
-|-----------|--------------------------------------------------------------------------------------------------|
-| `request` | Request format for historical block data and certificates.                                       |
-| `body`    | Block body or certificate data.                                                                  |
+| Parameter | Description |
+|-----------|-------------|
+| `request` | Request format for chain headers and historical EBs |
+| `body` | Block headers or EB bodies |
 
 **Instances**
 
-`Chain-Sync` instances for Leios extend the standard Ouroboros Chain-Sync protocol to handle historical data requests including EBs by RB range, certified EBs by slot range, and certificates by EB hash.
+`Chain-Sync` instances for Leios extend the standard Ouroboros Chain-Sync protocol to handle historical data requests. The instances below handle EBs by RB range and certified EBs by slot range.
 
-| `instance`   | `request`   | `body`                 |
-| :----------- | :---------- | :--------------------- |
-| Chain-Sync   | `request_ChainSync` | `body_ChainSync`  |
-
-**State machine**
-
-> [!Warning]
-> TODO: Missing state machine figure.
-
-**Request types**
-
-The `Chain-Sync` protocol supports the following request types for Leios:
-
-| Request Type | Description                                                                                      |
-|--------------|--------------------------------------------------------------------------------------------------|
-| `ebs-by-rb-range(range)` | Request all EBs transitively referenced by RBs in the specified range, not referenced by earlier RBs. |
-| `ebs-by-slot-range(slot, slot)` | Request all certified EBs generated in the slot range, not yet referenced by RBs. |
-| `certificate-by-eb(hash)` | Request a certificate for a certified EB not referenced by the chain. |
-
-**Body types**
-
-- *EBs by RB:* given an RB from its chain, the producer should reply with all EBs which are (i) transitively referenced by RBs in that range, (ii) not referenced by earlier RBs.
-- *Recent certified EBs by range:* given a slot range, the producer should reply with all certified EBs which are (i) generated in the slot range, (ii) not referenced by RBs. The start of the slot range should be no earlier than the oldest slot an EB could be generated in and still referenced in a future RB.
-- *Certificate by EB:* given the hash of a certified EB not referenced by the chain, the producer should reply with a certificate for it. Needed for inclusion of the EB into a future RB produced by the consumer.
-
-| Body Type | Description                                                                                      |
-|-----------|--------------------------------------------------------------------------------------------------|
-| `eb-block(eb-header, eb-body)` | Complete endorser block with header and body.                                                    |
-| `eb-certificate(certificate)` | Certificate attesting to the validity of an endorser block.                                     |
+| `instance` | `request` | `body` | `description` |
+| :--------- | :-------- | :----- | :------------ |
+| Chain-Sync | `ebs-by-rb-range(range)` | `eb-block(eb-header, eb-body)` | EBs transitively referenced by RBs in range, not referenced by earlier RBs |
+| Chain-Sync | `ebs-by-slot-range(slot, slot)` | `eb-block(eb-header, eb-body)` | Certified EBs generated in slot range, not yet referenced by RBs |
 
 **State machine**
 
-The `Chain-Sync` mini-protocol operates as an extension of the standard Ouroboros Chain-Sync protocol, inheriting its state machine and message flow. The protocol follows the same request-response pattern as the base Chain-Sync protocol, with consumers requesting chain data and producers streaming the requested headers and associated information.
+The `Chain-Sync` mini-protocol operates through a series of states, with transitions determined by protocol messages exchanged between the *consumer* and *producer* roles. The state machine follows the standard Ouroboros Chain-Sync protocol with five states: `StIdle`, `StCanAwait`, `StMustReply`, `StIntersect`, and terminal states. The consumer drives requests while the producer streams responses.
 
-For detailed state machine information, refer to the [Ouroboros Network Specification](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf#section.3.7).
+<p align="center">
+  <a id="fig-chain-sync-state-machine"></a>
+  <img src="images/chain-sync-mini-protocol-state-machine.svg" alt="State machine of the Chain-Sync mini-protocol" style="max-height: 900px; height: 100%; height: auto; display: block; margin-left: auto; margin-right: auto; aspect-ratio: 19/11; object-fit: contain;">
+  <br>
+  <em>Figure 7: Chain-Sync mini-protocol state machine</em>
+</p>
+
+The protocol maintains the same message types as Praos (`MsgRequestNext`, `MsgRollForward`, `MsgRollBackward`, `MsgFindIntersect`, etc.) but extends the body content to include EB-specific data.
+
+| **Current State**      | **Message**                        | **Parameters**                                                                 | **Next State**         | **Description / Transition**                                                                                  |
+|------------------------|------------------------------------|-------------------------------------------------------------------------------|------------------------|--------------------------------------------------------------------------------------------------------------|
+| **`StIdle`**           | `MsgRequestNext`                   | —                                                                             | **`StCanAwait`**       | Consumer requests the next chain update from the producer.                                                    |
+| **`StIdle`**           | `MsgFindIntersect`                 | `[point]`: list of chain points                                               | **`StIntersect`**      | Consumer asks producer to find intersection point between their chains.                                       |
+| **`StIdle`**           | `MsgDone`                          | —                                                                             | *Terminal*             | Consumer terminates the protocol.                                                                             |
+| **`StCanAwait`**       | `MsgAwaitReply`                    | —                                                                             | **`StMustReply`**      | Producer acknowledges request but requires consumer to wait for next update.                                  |
+| **`StCanAwait`**       | `MsgRollForward`                   | `header`: block header<br/>`tip`: chain tip                                   | **`StIdle`**           | Producer tells consumer to extend chain with given header.                                                    |
+| **`StCanAwait`**       | `MsgRollBackward`                  | `point`: rollback point<br/>`tip`: chain tip                                  | **`StIdle`**           | Producer tells consumer to roll back to given point on their chain.                                           |
+| **`StMustReply`**      | `MsgRollForward`                   | `header`: block header<br/>`tip`: chain tip                                   | **`StIdle`**           | Producer tells consumer to extend chain with given header.                                                    |
+| **`StMustReply`**      | `MsgRollBackward`                  | `point`: rollback point<br/>`tip`: chain tip                                  | **`StIdle`**           | Producer tells consumer to roll back to given point on their chain.                                           |
+| **`StIntersect`**      | `MsgIntersectFound`                 | `point`: intersection point<br/>`tip`: chain tip                              | **`StIdle`**           | Producer replies with first intersection point found on its current chain.                                    |
+| **`StIntersect`**      | `MsgIntersectNotFound`             | `tip`: chain tip                                                               | **`StIdle`**           | Producer replies that no intersection was found with any of the supplied points.                               |
 
 **Implementation**
 
-To fulfill the higher-level freshest-first delivery goal, producers should prioritize serving requests for the EB- and Vote-relay mini protocols over requests for `Chain-Sync`.
+The high-level description of Leios specifies freshest-first delivery for EBs, to circumvent attacks where a large amount of old EBs gets released by an adversary. The protocol addresses this through several mechanisms:
+
+- **Priority handling**: Producers prioritize serving requests for the EB-relay and Vote-relay mini protocols over requests for Chain-Sync to maintain freshest-first delivery
+- **Timing constraints**: For `ebs-by-slot-range` requests, the start of the slot range should be no earlier than the oldest slot an EB could be generated in and still referenced in a future RB
+- **Request partitioning**: Consumers can divide requests between different producers for efficient load distribution and fault tolerance
+- **Intersection finding**: Uses the same binary search mechanism as Praos for efficient chain intersection discovery  
+- **Fork handling**: Supports chain rollbacks and fork switching with EB state consistency
+- **Resource management**: Maintains constant memory per consumer connection to prevent resource exhaustion
+
+The protocol enables nodes to efficiently catch up on both the RB chain and associated EB data required for full ledger reconstruction in Linear Leios. Together with the base chain retrieved through other mini protocols, this provides all data needed for a node to participate in future pipelines.
 
 ### Node changes
 
