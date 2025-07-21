@@ -422,6 +422,8 @@ The Linear Leios simulator adds the following new variables, some of which also 
   A new custom thread monitors this variable in addition to the clock, so that it can avoid issugin a vote too early or too late.
 - `linearEbOfRb`.
   A mapping from RB to its announced Linear EB _that has been validated_, which is needed when issuing an RB.
+- `pruneExpiredLinearVotes`.
+  This thread prunes votes 30 seconds after the onset of their EB's slot.
 
 TODO RB Diffusion is not pipelined
 

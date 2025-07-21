@@ -20,7 +20,7 @@ import Control.Category ((>>>))
 import Control.Concurrent.Class.MonadMVar
 import Control.Concurrent.Class.MonadSTM.TSem
 import Control.Exception (assert)
-import Control.Monad (forever, guard, replicateM, unless, when)
+import Control.Monad (forever, guard, replicateM, unless, when, void)
 import Control.Monad.Class.MonadAsync
 import Control.Monad.Class.MonadFork
 import Control.Monad.Class.MonadThrow
@@ -692,7 +692,10 @@ leiosNode tracer cfg followers peers = do
   let pruningThreads =
         concat
           [ [ pruneExpiredVotes tracer cfg leiosState
-            | CleanupExpiredVote `isEnabledIn` cfg.leios.cleanupPolicies
+            | Linear /= cfg.leios.variant && CleanupExpiredVote `isEnabledIn` cfg.leios.cleanupPolicies
+            ]
+          , [ pruneExpiredLinearVotes tracer cfg leiosState
+            | Linear == cfg.leios.variant && CleanupExpiredVote `isEnabledIn` cfg.leios.cleanupPolicies
             ]
           , [ pruneExpiredUncertifiedEBs tracer cfg leiosState
             | CleanupExpiredUncertifiedEb `isEnabledIn` cfg.leios.cleanupPolicies
@@ -878,6 +881,28 @@ pruneExpiredVotes _tracer LeiosNodeConfig{leios = leios@LeiosConfig{pipeline = _
     -- for_ votesPruned $ \vt -> do
     --   traceWith tracer $! LeiosNodeEvent Pruned (EventVote $ snd vt)
     go (succ p)
+
+-- | Prune votes 30 seconds after the supported EB.   TODO magic number
+pruneExpiredLinearVotes ::
+  (Monad m, MonadDelay m, MonadTime m, MonadSTM m) =>
+  Tracer m LeiosNodeEvent ->
+  LeiosNodeConfig ->
+  LeiosNodeState m ->
+  m ()
+pruneExpiredLinearVotes _tracer cfg st = go (SlotNo 0)
+ where
+  go pruneTo = do
+    _ <- waitNextSlot cfg.slotConfig (SlotNo $ unSlotNo pruneTo + 30)   -- TODO magic number
+    _votesPruned <- atomically $ do
+      writeTVar st.prunedVoteStateToVar $! pruneTo
+      partitionRBVar st.relayVoteState.relayBufferVar $
+        \voteEntry ->
+          let voteSlot = (snd voteEntry.value).slot
+           in voteSlot < pruneTo
+    -- TODO: batch these, too many events.
+    -- for_ votesPruned $ \vt -> do
+    --   traceWith tracer $! LeiosNodeEvent Pruned (EventVote $ snd vt)
+    go (succ pruneTo)
 
 referencedEBs :: MonadSTM m => LeiosConfig -> LeiosNodeState m -> Set EndorseBlockId -> STM m [EndorseBlockId]
 referencedEBs cfg st ebIds0
@@ -1149,15 +1174,15 @@ dispatchValidationSTM tracer cfg leiosState req =
       -- NOTE: block references are only inspected during voting.
       return [valEB eb completion | eb <- ebs]
     ValidateLinearEBs ibs completion -> do
-      let ifNoCert :: InputBlockId -> STM m () -> STM m ()
+      let ifNoCert :: InputBlockId -> (Bool -> STM m a) -> STM m ()
           ifNoCert ibId k = do
             votesForEB <- readTVar leiosState.votesForEBVar
-            case Map.lookup (convertLinearId ibId) votesForEB of
-              Just Certified{} -> pure ()
-              _ -> k
+            void $ k $ case Map.lookup (convertLinearId ibId) votesForEB of
+              Just Certified{} -> True
+              _ -> False
       waitFor
         leiosState.waitingForTipVar
-        [ (rbHash, [ifNoCert ib.id $ queue [valLinearEB ib False (const (pure ()))]])
+        [ (rbHash, [ifNoCert ib.id $ \alreadyCertified -> queue [valLinearEB ib alreadyCertified (const (pure ()))]])
         | ib <- ibs
         , BlockHash rbHash <- [ib.header.rankingBlock]
         ]
@@ -1365,7 +1390,11 @@ mkBuffersView cfg st = BuffersView{..}
             -- TODO: start from votesForEB, would allow to drop EBs from relayBuffer as soon as Endorse ends.
             $ bufferEB
       }
-  newIBData = do
+  newIBData
+    | Linear <- cfg.leios.variant = do
+    let txsPayload = cfg.leios.sizes.endorseBlockBodyAvgSize
+    return $ NewInputBlockData{referenceRankingBlock = GenesisHash {- dummy value, ignored -}, txsPayload}
+    | otherwise = do
     ledgerState <- readTVar st.ledgerStateVar
     referenceRankingBlock <-
       Chain.headHash . Chain.dropUntil (flip Map.member ledgerState . blockHash)

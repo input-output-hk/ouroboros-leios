@@ -45,6 +45,8 @@ data SizesConfig = SizesConfig
   , inputBlockBodyAvgSize :: !Bytes
   -- ^ as we do not model transactions we just use a fixed size for bodies.
   , inputBlockBodyMaxSize :: !Bytes
+  , endorseBlockBodyAvgSize :: !Bytes
+  -- ^ unused by Short/Full Leios, used by Linear Leios eg
   , endorseBlock :: !(EndorseBlock -> Bytes)
   , voteMsg :: !(VoteMsg -> Bytes)
   , certificate :: !(Certificate -> Bytes)
@@ -232,6 +234,7 @@ convertConfig disk =
       { inputBlockHeader = fromIntegral disk.ibHeadSizeBytes
       , inputBlockBodyAvgSize = fromIntegral disk.ibBodyAvgSizeBytes
       , inputBlockBodyMaxSize = fromIntegral disk.ibBodyMaxSizeBytes
+      , endorseBlockBodyAvgSize = fromIntegral disk.ebBodyAvgSizeBytes
       , endorseBlock = \eb ->
           fromIntegral $
             disk.ebSizeBytesConstant
@@ -242,7 +245,10 @@ convertConfig disk =
           fromIntegral $
             disk.voteBundleSizeBytesConstant
               + disk.voteBundleSizeBytesPerEb `forEach` vt.endorseBlocks
-      , certificate = const $ error "certificate size config already included in PraosConfig{bodySize}"
+      , certificate = \_cert ->
+          fromIntegral $
+            assert (0 == disk.certSizeBytesPerNode) $   -- TODO
+              disk.certSizeBytesConstant
       , rankingBlockLegacyPraosPayloadAvgSize = fromIntegral disk.rbBodyLegacyPraosPayloadAvgSizeBytes
       }
   certificateGeneration (Certificate votesMap) =
@@ -357,6 +363,7 @@ delaysAndSizesAsFull cfg@LeiosConfig{pipeline, voteSendStage} =
       { inputBlockHeader = cfg.sizes.inputBlockHeader :: Bytes
       , inputBlockBodyAvgSize = cfg.sizes.inputBlockBodyAvgSize :: Bytes
       , inputBlockBodyMaxSize = cfg.sizes.inputBlockBodyMaxSize :: Bytes
+      , endorseBlockBodyAvgSize = cfg.sizes.endorseBlockBodyAvgSize :: Bytes
       , endorseBlock = const @Bytes $ cfg.sizes.endorseBlock $ mockFullEndorseBlock cfg
       , voteMsg = const @Bytes $ cfg.sizes.voteMsg $ mockFullVoteMsg cfg
       , certificate = const @Bytes $ cfg.sizes.certificate $ mockFullCertificate cfg
