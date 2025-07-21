@@ -502,6 +502,11 @@ A `Chain-Sync` instance is specified by these parameters:
 | :----------- | :---------- | :--------------------- |
 | Chain-Sync   | `request_ChainSync` | `body_ChainSync`  |
 
+**State machine**
+
+> [!Warning]
+> TODO: Missing state machine figure.
+
 **Request types**
 
 The `Chain-Sync` protocol supports the following request types for Leios:
@@ -532,63 +537,6 @@ For detailed state machine information, refer to the [Ouroboros Network Specific
 **Implementation**
 
 To fulfill the higher-level freshest-first delivery goal, producers should prioritize serving requests for the EB- and Vote-relay mini protocols over requests for `Chain-Sync`.
-
-Network diffusion characteristics
-
-Leios network diffusion follows specific patterns to ensure efficient block propagation while maintaining security:
-
-##### EB diffusion strategy
-
-- **Freshest-first delivery**: EBs should be delivered in a freshest-first fashion to avoid attacks where a large amount of old EBs is diffused around the same time to delay fresh EB delivery.
-- **Universal reception**: All parties should receive all EBs (and not only those in their current chain), to ensure that switching on a fork does not take time proportional to the EBs included.
-- **Early forwarding**: EBs should be forwarded before doing the full validity/correctness checks. Only cheap checks should be performed first that ensure DoS attacks are mitigated (VRF check, block hash check, first header check).
-
-##### Equivocation protection
-
-Linear Leios implements equivocation detection to prevent attacks where an attacker tries to diffuse multiple EBs for the same RB winning opportunity:
-
-- Nodes only download the EB corresponding to the first EB announcement they saw in an RB for some RB creation opportunity.
-- EB voters only vote for a specific EB if:
-  - The related "announcing" RB header was received within Δ_hdr of the RB creation slot
-  - No other equivocating RB header was received within 3Δ_hdr of the RB creation slot
-- This ensures that the RB headers corresponding to all certified EBs were received first (compared to that of equivocated ones) by all nodes.
-- The above implies that: **L_vote > 3Δ_hdr**
-
-##### Network timing constraints
-
-The protocol enforces specific timing constraints to ensure proper block diffusion:
-
-- **Voting period**: L_vote must be sufficient for EB diffusion and voting across the network
-- **Diffusion period**: L_diff ensures the EB is available to all honest nodes with good probability before it can be referenced
-- **Header diffusion**: Δ_hdr represents the maximum time for RB headers to diffuse across the network
-
-#### Message formats
-
-##### EB-relay messages
-
-EB-relay uses the following message structure:
-
-- **Header**: Contains VRF proof, slot number, producer ID, and EB hash
-- **Body**: Contains transaction list and conflicting transaction indices
-- **Announcement**: Indicates when the full EB body is available for fetching
-
-##### Vote-relay messages
-
-Vote-relay bundles multiple votes from a single voter:
-
-- **Vote bundle**: Contains election ID, voter ID, and multiple vote signatures
-- **Vote entry**: Maps endorser block hash to vote signature
-- **Eligibility proof**: For non-persistent voters, includes eligibility signature
-
-##### Certificate messages
-
-Certificates are included in ranking blocks and contain:
-
-- **Election ID**: Identifies the voting round
-- **Endorser block hash**: The EB being certified
-- **Persistent voters**: List of persistent voter IDs
-- **Non-persistent voters**: Map of pool IDs to BLS signatures
-- **Aggregate signatures**: Combined vote and eligibility signatures
 
 ### Node changes
 
