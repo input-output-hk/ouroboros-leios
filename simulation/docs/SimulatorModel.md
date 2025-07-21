@@ -403,19 +403,23 @@ However, in the absence of an attacker, the simulator can simply use the existin
 - Despite being unnecessary, having the RB header announce its second body EB would plausibly decrease the average latency of the EBs.
   But that decrease should be _very_ minor; with the current overly-coarse multiplexer logic (see [Issue 453](https://github.com/input-output-hk/ouroboros-leios/issues/453)), the EB's `RelayHeader` will arrive immediately after the ChainSync header (which are small), except perhaps during severe congestion.
 
-The Linear Leios simulator adds the following new variables, some of which also require some new threads.
+The Linear Leios simulator adds the following new variables, some of which also require new threads.
 
 - `relayLinearEBState`.
   As a shortcut, the first Linear Leios simulator will instantiate `Relay` with `RelayHeader InputBlockId` and `InputBlock`.
   This is because the IB specified in Short Leios has just a few small fields more than the EB specified in Linear Leios.
-- `waitingForLedgerStateAndLinearEbVar` and `ledgerStateAndLinearEbVar`.
-  An RB that contains an EB cert can be adopted before that EB has been validated.
-  TODO but it still needs to be applied, which is much cheaper but not free
+- `linearLedgerStateVar`, `waitingForLinearLedgerStateVar`, and `waitingForWaitingForLinearLedgerStateVar`.
+  An RB that contains an EB cert canot be validated without the the certified EB's ledger state.
+  However, that EB is necessarily certified, so its ledger state can be built comparatively cheaply now, but still not for free.
+    - The arrival of a Linear EB populates `waitingForWaitingForLinearLedgerStateVar` (and also `waitingForTipVar`; see below).
+    - The arrival of an RB populates `waitingForLinearLedgerStateVar`, which triggers the `waitingForWaitingForLinearLedgerStateVar` action to populate `linearLedgerStateVar` via the comparatively cheap `reapply` task.
 - `waitingForTipVar`.
-  The Linear EB should be validated the first time its arrived and its parent RB is the tip of the node's selection.
+  The Linear EB should be validated the first time that both it has arrived and its parent RB is the tip of the node's selection.
 - `linearEbsToVoteVar`.
   Once a Linear EB has been validated, it should be voted for.
   A new custom thread monitors this variable in addition to the clock, so that it can avoid issugin a vote too early or too late.
+- `linearEbOfRb`.
+  A mapping from RB to its announced Linear EB _that has been validated_, which is needed when issuing an RB.
 
 TODO block diffusion pipelining for both RBs and EBs
 
