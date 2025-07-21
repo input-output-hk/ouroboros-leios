@@ -134,17 +134,13 @@ augmenting the Treasury, and increasing SPO and delegator rewards.
 
 ## Specification
 
-### Overview of the Leios protocol
-
 Leios enhances Ouroboros Praos by introducing a dual-block structure and a
 voting mechanism to increase transaction throughput while preserving core
 consensus properties. The protocol is built around three main components:
 **[Ranking Blocks (RBs)](#ranking-block-rb)**, **[Endorser Blocks (EBs)](#endorser-block-eb)**, and a
 **[voting committee](#endorser-block-eb)** responsible for certifying EBs.
 
-#### Protocol Components
-
-##### Ranking Blocks (RBs)
+### Ranking Blocks (RBs)
 
 RBs are Praos blocks extended to support Leios by optionally
 referencing EBs and embedding their certificates. In addition to including transactions directly, RBs can also
@@ -155,7 +151,8 @@ certificate attesting to the validity of an EB through
 by a committee of stake pools, and the optional `announced_eb`, which references
 the EB proposed for inclusion in the next RB.
 
-###### CDDL
+<details>
+<summary>Ranking Block CDDL</summary>
 
 ```diff
  ranking_block =
@@ -170,8 +167,9 @@ the EB proposed for inclusion in the next RB.
 ```
 
 <p align="center"><em>Figure 1: Ranking Block CDDL</em></p>
+</details>
 
-##### Endorser Blocks (EBs)
+### Endorser Blocks (EBs)
 
 EBs are optional attachments to RBs, produced by the same stake pool that created the
 corresponding RB. They serve to reference
@@ -182,7 +180,9 @@ period begins as described in
 the immediately following RB is eligible to certify this announced EB
 by including a [certificate](#certificate).
 
-###### CDDL
+<details>
+<summary>Endorser Block CDDL</summary>
+
 
 ```cddl
  endorser_block =
@@ -207,8 +207,9 @@ by including a [certificate](#certificate).
 ```
 
 <p align="center"><em>Figure 2: Endorser Block CDDL</em></p>
+</details>
 
-##### Voting Committee and Certificates
+### Voting Committee and Certificates
 
 The voting committee is a group of stake pools selected to validate
 EBs through
@@ -226,7 +227,8 @@ aggregated into a certificate that attests to the validity of the EB.
 For further cryptographic details, refer to the
 [BLS certificate scheme documentation](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#bls-certificate-scheme).
 
-###### CDDL
+<details>
+<summary>Vote & Certificate CDDL</summary>
 
 ```cddl
  leios_certificate =
@@ -259,15 +261,16 @@ For further cryptographic details, refer to the
 ```
 
 <p align="center"><em>Figure 3: Votes & Certificate CDDL</em></p>
+</details>
 
-#### Protocol Flow
+### Protocol Flow
 
 The protocol flow, as depicted in [Figure 4](#protocol-flow-figure), consists
 of four main stages:
 
-<a name="protocol-flow-figure"></a>
-
-![Leios Protocol Flow](images/protocol-flow-overview.png)
+<p align="center" name="protocol-flow-figure">
+  <img src="images/protocol-flow-overview.png" alt="Leios Protocol Flow">
+</p>
 
 <p align="center"><em>Figure 4: Ouroboros Leios Protocol Flow</em></p>
 
@@ -286,7 +289,6 @@ of four main stages:
      <img src="https://latex.codecogs.com/png.image?\dpi{120}\sum_{v\in\text{votes}}\text{stake}(v)\geq\tau\times\text{stake}_{\text{total}}" alt="equation">
    </p>
 
-
    (This is represented by the yellow pentagon labeled $C$ in the [Figure 4](#protocol-flow-figure)
    below.)
 
@@ -295,7 +297,7 @@ of four main stages:
    transactions from the certified EB are executed. The process may then repeat
    with the announcement of the next EB.
 
-##### Bottom Line: What Throughput Does Leios Enable?
+### Bottom Line: What Throughput Does Leios Enable?
 
 Leios increases throughput by combining the transaction capacity of regular blocks with that of certified EBs. The formula below expresses this: throughput equals the rate of regular block production times the sum of their capacity and the additional capacity from Endorser Blocks that are **included**.
 
@@ -355,10 +357,237 @@ A BLS-based certificate scheme that meets these requirements is documented in th
 - Efficient vote aggregation using the Fait Accompli sortition scheme
 - Performance benchmarks suitable for production deployment
 
-### Mini protocols
+### Network
 
-> [!Warning]
-> Add detailed protocol diagrams, message formats, and state machine specifications for each Leios mini protocol (EB-Relay, Vote-Relay, EB-Fetch).
+#### Mini-protocols
+
+For background information on mini-protocols, see sections 3.1-3.4 of the **[Ouroboros Network Specification](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf#chapter.3)**. Here we present the additional node-to-node mini-protocols needed for Ouroboros Leios.
+
+##### Relay mini-protocol
+
+The `Relay` protocol is a generalization of the transaction submission protocol used to transfer transactions between full nodes. We use the term *datum* as a generic term for the payloads being diffused, which are generally small: transactions, endorser block headers, and vote bundles.
+
+The protocol follows a pull-based strategy where the consumer asks for new ids/datums and the producer sends them back. It is designed to be suitable for a trustless setting where both sides need to guard against resource consumption attacks.
+
+###### Options and parameters
+
+A `Relay` instance is specified by these options and parameters:
+
+| Option/ Parameter    | Description                                                                                      |
+|----------------------|--------------------------------------------------------------------------------------------------|
+| `BoundedWindow`      | The peers manage a bounded window (i.e. FIFO queue) of datums available to be requested. Useful for datums that are otherwise unbounded in number. |
+| `Announcements`      | Producers provide additional announcements about datums, when available.                         |
+| `id`                 | Identifier for a datum to be relayed, used when requesting the datum.                            |
+| `info`               | Extra information provided with a new `id`.                                                      |
+| `datum`              | The datum itself.                                                                                |
+| `Ann. Condition`     | ("if" announcements): Condition for announcement.                                                |
+| `ann`                | ("if" announcements): Announcement representation.                                               |
+
+###### Instances
+
+`Relay` protocol instances for Leios are listed in the table below. Tx-submission is further parameterized by the maximum window size allowed. EB-relay and Vote-relay are each parametrized by the maximum age beyond which a datum is no longer relayed. EB-relay relies on announcements to let consumers know when block bodies are available.
+
+| `instance`    | `BoundedWindow` | `Announcements` | `id` | `info` | `datum`     | `Ann. Condition` | `ann` |
+| ------------- | --------------- | --------------- | ---- | ------ | ----------- | ---------------- | ----- |
+| Tx-submission | Yes             | No              | txid | size   | tx          | N/A              | N/A   |
+| EB-relay      | No              | Yes             | hash | slot   | eb-header   | body available   | unit  |
+| Vote-relay    | No              | No              | hash | slot   | vote-bundle | N/A              | N/A   |
+
+###### State machine
+
+The `Relay` mini-protocol operates through a series of states, with transitions determined by protocol messages exchanged between the *consumer* and *producer* roles. Each message includes parameters as shown in the table below, which maps the protocol's operation and message flows as depicted in [Figure 5](#figure-5):
+
+<p align="center">
+  <a id="figure-5"></a>
+  <img src="images/relay-mini-protocol-state-machine.svg" alt="State machine of the Relay mini-protocol" style="width: 760px; max-width: 100%; height: auto;"/>
+</p>
+<p align="center"><em>Figure 5: Relay mini-protocol state machine</em></p>
+
+| **Current State**      | **Message**                        | **Parameters**                                                                 | **Next State**         | **Description / Transition**                                                                                  |
+|------------------------|------------------------------------|-------------------------------------------------------------------------------|------------------------|--------------------------------------------------------------------------------------------------------------|
+| **`StInit`**           | `MsgInit`                          | —                                                                             | **`StIdle`**           | Consumer initiates the protocol, entering the idle state.                                                    |
+| **`StIdle`**           | `MsgRequestIdsNonBlocking`         | `ack`: ids to acknowledge<br/>`req`: number of new ids requested              | **`StIdsNonBlocking`** | Consumer requests new ids (non-blocking); producer replies immediately (possibly with empty list).           |
+| **`StIdle`**           | `MsgRequestIdsBlocking`            | `ack`: ids to acknowledge<br/>`req`: number of new ids requested              | **`StIdsBlocking`**    | Consumer requests new ids (blocking); producer waits until new ids are available before replying.            |
+| **`StIdle`**           | `MsgRequestData`                   | `[id]`: list of datum ids                                                     | **`StData`**           | Consumer requests the actual data for a list of ids.                                                         |
+| **`StIdsNonBlocking`** | `MsgReplyIds`                      | `[(id, info)]`: list of datum ids and extra info                              | **`StIdle`**           | Producer replies with available ids and info, returning to idle.                                             |
+| **`StIdsNonBlocking`** | `MsgReplyIdsAndAnns`*               | `[(id, info)]`: ids and info<br/>`[(id, ann)]`: announcements                 | **`StIdle`**           | Producer replies with ids, info, and announcements (if supported), returning to idle.                        |
+| **`StIdsBlocking`**    | `MsgReplyIds`                      | `[(id, info)]`: list of datum ids and extra info                              | **`StIdle`**           | Producer replies with available ids and info, returning to idle.                                             |
+| **`StIdsBlocking`**    | `MsgReplyIdsAndAnns`*               | `[(id, info)]`: ids and info<br/>`[(id, ann)]`: announcements                 | **`StIdle`**           | Producer replies with ids, info, and announcements (if supported), returning to idle.                        |
+| **`StData`**           | `MsgReplyData`                     | `[datum]`: list of datums                                                     | **`StIdle`**           | Producer replies with the requested datums (some may be missing), returning to idle.                         |
+| *Any state*            | `MsgDone`                          | —                                                                             | *Terminal*             | Producer terminates the mini-protocol.                                                                       |
+
+> [!NOTE]
+>
+> If Announcements is set, `MsgReplyIds` messages are replaced with `MsgReplyIdsAndAnns`.
+
+###### Producer and consumer implementation
+
+The Relay mini-protocol is designed to achieve both efficient datum diffusion and robust protection against asymmetric resource attacks from consumers. It employs a pull-based approach: consumers request IDs and then batch-fetch datums, allowing for flexible batching and request strategies.
+
+For comprehensive implementation guidance—including memory-efficient provider strategies, bounded window enforcement, and consumer heuristics—refer to both the [Producer and consumer implementation section](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-2.md#producer-and-consumer-implementation) in Technical Report 2 and the [Client and Server Implementation, Section 3.9.5](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf#page=34), which provides further details for both producer and consumer roles.
+
+###### Equivocation handling
+
+EB-relay and Vote-relay must guard against the possibility of equivocations, i.e. the reuse of a generation opportunity for multiple different blocks. The *message identifier* of a header is the pair of its generating node id and the slot it was generated for. Two headers with the same message identifier constitute a *proof of equivocation*, and the first header received with a given message identifier is the *preferred header*. For headers with the same message identifier, only the first two should be relayed, furthermore only the body of the preferred header should be fetched.
+
+##### Fetch mini-protocol
+
+The `Fetch` mini protocol enables a node to download block bodies. It is a generalization of the `BlockFetch` mini protocol used for base blocks: EBs do not have a notion of range, so they are requested by individual identifiers.
+
+The protocol follows a request-response strategy where the consumer requests specific block bodies and the producer streams them back. It is designed to efficiently handle block body downloads while maintaining network efficiency.
+
+###### Parameters
+
+A `Fetch` instance is specified by these parameters:
+
+| Parameter | Description                                                                                      |
+|-----------|--------------------------------------------------------------------------------------------------|
+| `request` | Request format for a sequence of blocks.                                                         |
+| `body`    | Block body itself.                                                                               |
+
+###### Instances
+
+`Fetch` instances for Leios are listed in the table below. EB-fetch is used for downloading endorser block bodies, while BlockFetch handles RB (Praos) block bodies.
+
+| `instance`   | `request`   | `body`                 |
+| :----------- | :---------- | :--------------------- |
+| EB-fetch     | `[point]`   | `EB body`              |
+| BlockFetch   | `range`     | `RB body`              |
+
+###### State machine
+
+The `Fetch` mini-protocol operates through a series of states, with transitions determined by protocol messages exchanged between the *consumer* and *producer* roles. Each message includes parameters as shown in the table below, which maps the protocol's operation and message flows as depicted in [Figure 6](#fig-fetch-state-machine):
+
+<p align="center">
+  <a id="fig-fetch-state-machine"></a>
+  <img src="images/fetch-mini-protocol-state-machine.svg" alt="State machine of the Fetch mini-protocol" style="max-width: 760px; display: block; margin-left: auto; margin-right: auto; height: 300px;">
+  <br>
+  <em>Figure 6: Fetch mini-protocol state machine</em>
+</p>
+
+| **Current State**      | **Message**                        | **Parameters**                                                                 | **Next State**         | **Description / Transition**                                                                                  |
+|------------------------|------------------------------------|-------------------------------------------------------------------------------|------------------------|--------------------------------------------------------------------------------------------------------------|
+| **`StIdle`**           | `MsgRequestBodies`                 | `request`: sequence of block requests                                          | **`StBusy`**           | Consumer requests block bodies from the producer.                                                             |
+| **`StIdle`**           | `MsgConsumerDone`                  | —                                                                             | *Terminal*             | Consumer terminates the protocol.                                                                             |
+| **`StBusy`**           | `MsgNoBlocks`                      | —                                                                             | **`StIdle`**           | Producer indicates it does not have the requested blocks.                                                     |
+| **`StBusy`**           | `MsgStartBatch`                    | —                                                                             | **`StStreaming`**      | Producer begins streaming block bodies.                                                                       |
+| **`StStreaming`**      | `MsgBody`                          | `body`: single block body                                                      | **`StStreaming`**      | Producer streams a single block's body.                                                                       |
+| **`StStreaming`**      | `MsgBatchDone`                     | —                                                                             | **`StIdle`**           | Producer completes block streaming.                                                                           |
+
+###### Implementation
+
+The high-level description of Leios specifies freshest-first delivery for EB bodies, to circumvent attacks where a large amount of old EBs gets released by an adversary. The mini protocol already takes a parameter that specifies which EBs are still new enough to be diffused, so older EBs are already deprioritized to only be accessible through the `Chain-Sync` protocol, and only if referenced by other blocks.
+
+##### Chain-Sync mini-protocol
+
+The `Chain-Sync` mini protocol is used for synchronizing chain state between nodes, including handling chain forks, rollbacks, and maintaining chain state consistency. In the context of Leios, this protocol is extended to handle endorser blocks and certificates that are referenced by the chain but may not be available through the primary diffusion protocols.
+
+The protocol follows a request-response strategy where consumers request chain headers and associated data, with producers streaming the requested chain information. It is designed to efficiently synchronize chain state and handle historical data retrieval for ledger reconstruction.
+
+###### Parameters
+
+A `Chain-Sync` instance is specified by these parameters:
+
+| Parameter | Description                                                                                      |
+|-----------|--------------------------------------------------------------------------------------------------|
+| `request` | Request format for historical block data and certificates.                                       |
+| `body`    | Block body or certificate data.                                                                  |
+
+###### Instances
+
+`Chain-Sync` instances for Leios extend the standard Ouroboros Chain-Sync protocol to handle historical data requests including EBs by RB range, certified EBs by slot range, and certificates by EB hash.
+
+| `instance`   | `request`   | `body`                 |
+| :----------- | :---------- | :--------------------- |
+| Chain-Sync   | `request_ChainSync` | `body_ChainSync`  |
+
+###### Request types
+
+The `Chain-Sync` protocol supports the following request types for Leios:
+
+| Request Type | Description                                                                                      |
+|--------------|--------------------------------------------------------------------------------------------------|
+| `ebs-by-rb-range(range)` | Request all EBs transitively referenced by RBs in the specified range, not referenced by earlier RBs. |
+| `ebs-by-slot-range(slot, slot)` | Request all certified EBs generated in the slot range, not yet referenced by RBs. |
+| `certificate-by-eb(hash)` | Request a certificate for a certified EB not referenced by the chain. |
+
+###### Body types
+
+- *EBs by RB:* given an RB from its chain, the producer should reply with all EBs which are (i) transitively referenced by RBs in that range, (ii) not referenced by earlier RBs.
+- *Recent certified EBs by range:* given a slot range, the producer should reply with all certified EBs which are (i) generated in the slot range, (ii) not referenced by RBs. The start of the slot range should be no earlier than the oldest slot an EB could be generated in and still referenced in a future RB.
+- *Certificate by EB:* given the hash of a certified EB not referenced by the chain, the producer should reply with a certificate for it. Needed for inclusion of the EB into a future RB produced by the consumer.
+
+| Body Type | Description                                                                                      |
+|-----------|--------------------------------------------------------------------------------------------------|
+| `eb-block(eb-header, eb-body)` | Complete endorser block with header and body.                                                    |
+| `eb-certificate(certificate)` | Certificate attesting to the validity of an endorser block.                                     |
+
+###### State machine
+
+The `Chain-Sync` mini-protocol operates as an extension of the standard Ouroboros Chain-Sync protocol, inheriting its state machine and message flow. The protocol follows the same request-response pattern as the base Chain-Sync protocol, with consumers requesting chain data and producers streaming the requested headers and associated information.
+
+For detailed state machine information, refer to the [Ouroboros Network Specification](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf#section.3.7).
+
+###### Implementation
+
+To fulfill the higher-level freshest-first delivery goal, producers should prioritize serving requests for the EB- and Vote-relay mini protocols over requests for `Chain-Sync`.
+
+#### Network diffusion characteristics
+
+Linear Leios network diffusion follows specific patterns to ensure efficient block propagation while maintaining security:
+
+##### EB diffusion strategy
+
+- **Freshest-first delivery**: EBs should be delivered in a freshest-first fashion to avoid attacks where a large amount of old EBs is diffused around the same time to delay fresh EB delivery.
+- **Universal reception**: All parties should receive all EBs (and not only those in their current chain), to ensure that switching on a fork does not take time proportional to the EBs included.
+- **Early forwarding**: EBs should be forwarded before doing the full validity/correctness checks. Only cheap checks should be performed first that ensure DoS attacks are mitigated (VRF check, block hash check, first header check).
+
+##### Equivocation protection
+
+Linear Leios implements equivocation detection to prevent attacks where an attacker tries to diffuse multiple EBs for the same RB winning opportunity:
+
+- Nodes only download the EB corresponding to the first EB announcement they saw in an RB for some RB creation opportunity.
+- EB voters only vote for a specific EB if:
+  - The related "announcing" RB header was received within Δ_hdr of the RB creation slot
+  - No other equivocating RB header was received within 3Δ_hdr of the RB creation slot
+- This ensures that the RB headers corresponding to all certified EBs were received first (compared to that of equivocated ones) by all nodes.
+- The above implies that: **L_vote > 3Δ_hdr**
+
+##### Network timing constraints
+
+The protocol enforces specific timing constraints to ensure proper block diffusion:
+
+- **Voting period**: L_vote must be sufficient for EB diffusion and voting across the network
+- **Diffusion period**: L_diff ensures the EB is available to all honest nodes with good probability before it can be referenced
+- **Header diffusion**: Δ_hdr represents the maximum time for RB headers to diffuse across the network
+
+#### Message formats
+
+##### EB-relay messages
+
+EB-relay uses the following message structure:
+
+- **Header**: Contains VRF proof, slot number, producer ID, and EB hash
+- **Body**: Contains transaction list and conflicting transaction indices
+- **Announcement**: Indicates when the full EB body is available for fetching
+
+##### Vote-relay messages
+
+Vote-relay bundles multiple votes from a single voter:
+
+- **Vote bundle**: Contains election ID, voter ID, and multiple vote signatures
+- **Vote entry**: Maps endorser block hash to vote signature
+- **Eligibility proof**: For non-persistent voters, includes eligibility signature
+
+##### Certificate messages
+
+Certificates are included in ranking blocks and contain:
+
+- **Election ID**: Identifies the voting round
+- **Endorser block hash**: The EB being certified
+- **Persistent voters**: List of persistent voter IDs
+- **Non-persistent voters**: Map of pool IDs to BLS signatures
+- **Aggregate signatures**: Combined vote and eligibility signatures
 
 ### Node changes
 
