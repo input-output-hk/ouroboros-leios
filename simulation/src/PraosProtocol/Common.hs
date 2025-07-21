@@ -32,7 +32,7 @@ module PraosProtocol.Common (
   PraosNodeEvent (..),
   PraosConfig (..),
   MessageSize (..),
-  kilobytes,
+  kibibytes,
   module TimeCompat,
   defaultPraosConfig,
   CPUTask (..),
@@ -55,7 +55,7 @@ import qualified Data.Map.Strict as Map
 import Data.Word (Word8)
 import GHC.Word (Word64)
 import LeiosProtocol.Config (RelayStrategy (RequestFromFirst))
-import ModelTCP (kilobytes)
+import ModelTCP (kibibytes)
 import Ouroboros.Network.Mock.ProducerState as ProducerState
 import PraosProtocol.Common.AnchoredFragment (Anchor (..), AnchoredFragment)
 import PraosProtocol.Common.Chain (Chain (..), foldChain, pointOnChain)
@@ -180,9 +180,9 @@ defaultPraosConfig =
     , blockValidationDelay = const 0.1
     , headerValidationDelay = const 0.005
     , blockGenerationDelay = const 0
-    , headerSize = kilobytes 1
-    , bodySize = const $ kilobytes 95
-    , bodyMaxSize = kilobytes 96
+    , headerSize = kibibytes 1
+    , bodySize = const $ kibibytes 95
+    , bodyMaxSize = kibibytes 96
     , configureConnection = mkConnectionConfig True True
     , relayStrategy = RequestFromFirst
     }
