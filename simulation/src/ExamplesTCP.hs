@@ -39,8 +39,8 @@ example1 =
   model = tcpSimVizModel trace
    where
     trace = traceTcpLinks1 tcpprops trafficPattern
-  tcpprops = mkTcpConnProps 0.3 (kilobytes 1000)
-  trafficPattern = mkUniformTrafficPattern 20 (kilobytes 100) 0
+  tcpprops = mkTcpConnProps 0.3 (kibibytes 1000)
+  trafficPattern = mkUniformTrafficPattern 20 (kibibytes 100) 0
 
   title = "Sending 20x 100kb messages over TCP"
 
@@ -112,10 +112,10 @@ example2 =
     trace1 = traceTcpLinks4 tcpprops1 tcpprops1 tcpprops1 trafficPattern
     trace2 = traceTcpLinks4 tcpprops2 tcpprops2 tcpprops2 trafficPattern
 
-  tcpprops1 = mkTcpConnProps 0.3 (kilobytes 1000)
-  tcpprops2 = mkTcpConnProps 0.3 (kilobytes 10000)
+  tcpprops1 = mkTcpConnProps 0.3 (kibibytes 1000)
+  tcpprops2 = mkTcpConnProps 0.3 (kibibytes 10000)
 
-  trafficPattern = mkUniformTrafficPattern 15 (kilobytes 100) 0
+  trafficPattern = mkUniformTrafficPattern 15 (kibibytes 100) 0
 
 example3 :: Visualization
 example3 =
@@ -141,10 +141,10 @@ example3 =
     trace1 = traceTcpLinks4 tcpprops tcpprops tcpprops trafficPattern1
     trace2 = traceTcpLinks4 tcpprops tcpprops tcpprops trafficPattern2
 
-  tcpprops = mkTcpConnProps 0.3 (kilobytes 1000)
+  tcpprops = mkTcpConnProps 0.3 (kibibytes 1000)
 
-  trafficPattern1 = mkUniformTrafficPattern 15 (kilobytes 100) 1.2
-  trafficPattern2 = mkUniformTrafficPattern 30 (kilobytes 50) 0.6
+  trafficPattern1 = mkUniformTrafficPattern 15 (kibibytes 100) 1.2
+  trafficPattern2 = mkUniformTrafficPattern 30 (kibibytes 50) 0.6
 
 examplesTcpSimVizConfig :: TcpSimVizConfig TestMessage
 examplesTcpSimVizConfig =

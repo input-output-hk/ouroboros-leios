@@ -5,7 +5,7 @@ module ExamplesRelayP2P where
 import Data.Functor.Contravariant (Contravariant (contramap))
 import Data.Maybe (fromMaybe)
 import Data.Word (Word8)
-import ModelTCP (kilobytes, mkTcpConnProps)
+import ModelTCP (kibibytes, mkTcpConnProps)
 import P2P (P2PTopographyCharacteristics (..), genArbitraryP2PTopography)
 import RelayProtocol
 import SimRelay
@@ -63,7 +63,7 @@ example1 =
               { blockProcessingDelay = const (secondsToDiffTime 0.1) -- 100ms
               , blockGeneration =
                   PoissonGenerationPattern
-                    (kilobytes 96)
+                    (kibibytes 96)
                     rng
                     -- average seconds between blocks:
                     (0.2 * fromIntegral p2pNumNodes)
@@ -156,7 +156,7 @@ example2 =
               { blockProcessingDelay = const (secondsToDiffTime 0.1) -- 100ms
               , blockGeneration =
                   PoissonGenerationPattern
-                    (kilobytes 96)
+                    (kibibytes 96)
                     rng
                     -- average seconds between blocks:
                     (0.5 * fromIntegral p2pNumNodes)

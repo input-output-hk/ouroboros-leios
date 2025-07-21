@@ -66,7 +66,7 @@ import qualified Database.SQLite.Simple.ToField as SQLite (ToField)
 import GHC.Generics (Generic)
 import GHC.Records (HasField (..))
 import LeiosTopology
-import ModelTCP (Bytes, kilobytes)
+import ModelTCP (Bytes, kibibytes)
 import P2P (Latency, Link, Link' (..), P2PTopography (..), P2PTopographyCharacteristics (..), genArbitraryP2PTopography, pattern (:<-))
 import SimTypes (NodeId (..), NumCores (..), Path (..), Point (..), StakeFraction (StakeFraction), World (..), WorldDimensions)
 import System.Exit (exitFailure)
@@ -423,7 +423,7 @@ topologyToNetwork P2PTopography{..} = P2PNetwork{p2pLinks = fmap (,defaultBandwi
   p2pNodeStakes = Map.map (const $ StakeFraction $ 1 / numNodes) p2pNodes
   numNodes = fromIntegral $ Map.size p2pNodes
   -- TODO: unrestricted bandwidth is unsupported
-  defaultBandwidthBps = Just (kilobytes 1000)
+  defaultBandwidthBps = Just (kibibytes 1000)
   p2pAdversaries = Nothing
 
 overrideUnlimitedBandwidth :: Bytes -> P2PNetwork -> P2PNetwork
