@@ -137,8 +137,8 @@ augmenting the Treasury, and increasing SPO and delegator rewards.
 Leios enhances Ouroboros Praos by introducing a dual-block structure and a
 voting mechanism to increase transaction throughput while preserving core
 consensus properties. The protocol is built around three main components:
-**[Ranking Blocks (RBs)](#ranking-block-rb)**, **[Endorser Blocks (EBs)](#endorser-block-eb)**, and a
-**[voting committee](#endorser-block-eb)** responsible for certifying EBs.
+**[Ranking Blocks (RBs)](#ranking-blocks-rbs)**, **[Endorser Blocks (EBs)](#endorser-blocks-ebs)**, and a
+**[voting committee](#voting-committee-and-certificates)** responsible for certifying EBs.
 
 ### Ranking Blocks (RBs)
 
@@ -178,7 +178,7 @@ directly in the RB. When an EB is announced in an RB, a voting
 period begins as described in
 [Voting Committee and Certificates](#voting-committee-and-certificates). Only
 the immediately following RB is eligible to certify this announced EB
-by including a [certificate](#certificate).
+by including a certificate.
 
 <details>
 <summary>Endorser Block CDDL</summary>
@@ -285,14 +285,9 @@ of four main stages:
    meets or exceeds a threshold fraction $\tau$ (typically 60%) of the total
    stake, it is certified. In other words, certification requires:
 
-   <p align="center">
-     <img src="https://latex.codecogs.com/png.image?\dpi{120}\sum_{v\in\text{votes}}\text{stake}(v)\geq\tau\times\text{stake}_{\text{total}}" alt="equation">
-   </p>
-
 $$
 \sum_{v \in \text{votes}} \text{stake}(v) \geq \tau \times \text{stake}_{\text{total}}
 $$
-
 
    (This is represented by the yellow pentagon labeled $C$ in the [Figure 4](#protocol-flow-figure)
    below.)
@@ -306,13 +301,9 @@ $$
 
 Leios increases throughput by combining the transaction capacity of regular blocks with that of certified EBs. The formula below expresses this: throughput equals the rate of regular block production times the sum of their capacity and the additional capacity from Endorser Blocks that are **included**.
 
-<p align="center">
-
 $$
 \text{Throughput} = f_{\text{RB}} \times \left( S_\text{RB} + S_\text{EB} \times f_\text{EB} \right)
 $$
-
-</p>
 
 Where:
 - $f_{\text{RB}}$ — Rate of RB production (protocol parameter)
@@ -1496,56 +1487,6 @@ votes in excess of a quorum.
 | Persistent voters                                        | Certificate size                                                 |
 | -------------------------------------------------------- | ---------------------------------------------------------------- |
 | ![Fait-accompli voters](images/fait-accompli-voters.svg) | ![Fait-accompli certificate size](images/fait-accompli-cert.svg) |
-
-### Glossary
-
-#### Certificate
-
-A cryptographic proof that attests to a quorum of votes for an endorser block,
-included in ranking blocks to finalize transaction settlement.
-
-#### Endorser Block (EB)
-
-A block that references multiple input blocks from the current pipeline,
-representing a consensus view of which IBs should be included in the permanent
-ledger.
-
-#### Input Block (IB)
-
-A block containing transactions, produced during the Propose stage of each
-pipeline by stake pools that win VRF-based sortition.
-
-#### Network Diffusion Time
-
-The maximum time required for a message (block, vote, or certificate) to
-propagate to all honest nodes in the network, typically ~5 seconds. This creates
-a concurrency window where blocks produced cannot coordinate to avoid conflicts.
-
-#### Pipeline
-
-A structured sequence of five stages (Propose, Deliver 1, Deliver 2, Endorse,
-Vote) that enables concurrent transaction processing while maintaining
-deterministic ordering.
-
-#### Quorum
-
-The minimum threshold of votes (typically 60% of committee votes) required to
-certify an EB and create a valid certificate.
-
-#### Ranking Block (RB)
-
-A Praos consensus chain block that contains at most one Leios certificate,
-anchoring Leios consensus into the established Praos security model.
-
-#### Sortition
-
-A VRF-based probabilistic method for selecting nodes to produce input blocks,
-endorser blocks, or cast votes, based on their delegated stake.
-
-#### Vote
-
-A cryptographically signed message from an eligible committee member attesting
-to the validity of an endorser block during the Vote stage.
 
 ## Copyright
 
