@@ -804,6 +804,18 @@ majority voting by this committee ensures consensus on the endorser block while
 inheriting and maintaining Praos's robust resistance to adversarial activity, as
 the final commitment is anchored in the secure Praos chain.
 
+> [!WARNING]
+> TODO:
+> - Improve answer on how leios is solving [CPS-18][cps-18]
+>   - why proposed protocol results in more throughput
+>   - how increase in plutus budget is possible now (only if we have a concrete proposal in specification)
+>
+> - Incorporate why 10x throughput is enough / link back to economic sustainability from motivation
+>
+> - Incorporate argument of doing one order of magnitude change at a time
+>
+> - Re-add or drop analogies?
+
 <!--
 As a result of this decoupled approach, Leios can utilize nearly the full
 bandwidth available to the network of nodes without requiring unrealistically
@@ -842,7 +854,8 @@ Where:
 - $f_{\text{RB}}$ — Rate of RB production (protocol parameter)
 - $S_\text{RB}$ — Maximum size of an RB (protocol parameter)
 - $S_\text{EB}$ — Maximum size of an EB (protocol parameter)
-- $f_\text{EB}$ — Fraction of RBs that include an EB as observed under realistic network conditions and timing constraints.
+- $f_\text{EB}$ — Fraction of RBs that include an EB as observed under realistic
+  network conditions and timing constraints.
 
 While even higher throughput may be possible, and should be explored during
 implementation to validate mainnet compatible parameters, increasing the
@@ -893,18 +906,52 @@ designs often result in higher latency due to more rounds, concurrency in itself
 gives rise to the dedicated problem of _conflicting transactions_.
 
 > [!WARNING]
-> TODO
-
-- Conflicting txs a.k.a congestion on Cardano
-  - Competing spending of UTxOs is to be expected
-  - Also a network-based attack possible (link threat model?)
-
-- Conflicting transactions can either be
-  - accepted = failing transactions vs. Cardano USP of only paying fees when included
-  - reduced -> sharding reduces (!not eliminates!) amount of potential conflict, but has lots of impact & complexity
-  - reconciled -> a certain number of conflicts can be dealt with; tombstoning to reduce storage waste
-
-- We chose the third option and hence only proposed no / a modest increase in concurrency
+> TODO:
+> - Conflicting txs a.k.a UTxO congestion on Cardano
+>   - Competing spending of UTxOs is to be expected
+>   - Also a network-based attack possible (link threat model?)
+>
+> - Conflicting transactions can either be
+>   - accepted = failing transactions vs. Cardano USP of only paying fees when included
+>   - reduced -> sharding reduces (!not eliminates!) amount of potential conflict, but has lots of impact & complexity
+>   - reconciled -> a certain number of conflicts can be dealt with; tombstoning to reduce storage waste
+>
+> - We chose the third option and hence only proposed no / a modest increase in concurrency
+>
+> - Incorporate:
+>
+> This Linear Leios variant was chosen over the full Leios protocol described in
+> the research paper for several practical deployment considerations:
+>
+> **Simplified Architecture**: By removing input blocks and reducing concurrency,
+> Linear Leios significantly simplifies the implementation while still achieving
+> substantial throughput improvements over Ouroboros Praos.
+>
+> **Reduced Attack Surface**: The elimination of concurrent input block production
+> removes complex equivocation handling and transaction conflict resolution that
+> would be required in full Leios.
+>
+> **Incremental Deployment**: Linear Leios provides a more manageable upgrade path
+> from Praos, allowing the ecosystem to gain experience with EB voting and
+> certification before considering more complex variants.
+>
+> **Conservative Risk Profile**: The simplified model reduces implementation risk
+> while still delivering significant throughput benefits, making it suitable for
+> a production blockchain with significant economic value.
+>
+> ### Design trade-offs and simplifications
+>
+> **Concurrency Model**: Linear Leios trades some potential throughput for
+> simplicity by allowing only one EB per RB producer, eliminating the need for
+> complex transaction sharding and conflict resolution mechanisms.
+>
+> **Implementation Complexity**: The removal of input blocks significantly reduces
+> the complexity of ledger state management, mempool handling, and network protocols
+> while still enabling substantial throughput improvements.
+>
+> **Throughput vs. Safety**: This variant prioritizes safety and implementability
+> over maximum theoretical throughput, providing a solid foundation for future
+> protocol enhancements.
 
 ### Why Leios is practical to implement
 
@@ -932,7 +979,9 @@ The [Resource requirements](#resource-requirements), discussed below, modestly
 increase the requirements for running a Cardano node but not beyond commonly
 available commodity hardware.
 
-### Metrics
+### Evidence and simulation analysis
+
+#### Metrics
 
 > [!NOTE]
 >
@@ -1086,7 +1135,7 @@ $$
 `
 $$
 
-### Evidence that Leios provides high throughput
+### Simulation results
 
 The Leios paper[^2] provides a rigorous theoretical analysis of the safety and
 throughput of the protocol. That has been reinforced and demonstrated by
@@ -1126,7 +1175,249 @@ close to 100 seconds.
 
 ![Simulation of transaction lifecycle](images/lifecycle-histogram.png)
 
+### Feasible protocol parameters
+
+The table below documents a set of Leios protocol parameters that provided high
+throughput and reasonably fast settlement in the prototype Haskell and Rust
+simulations of Leios. The exact choice of parameters that would be adopted on
+the Cardano mainnet must be subject to discussion and consideration of
+tradeoffs.
+
+> [!WARNING]
+>
+> This is an incomplete work in progress.
+>
+> - [ ] Revise after the protocol definition is complete.
+> - [ ] Each row should have a paragraph of justification.
+
+| Parameter                                  | Symbol        | Units    | Description                                                                 | Feasible value | Justification                                                                                                             |
+| ------------------------------------------ | ------------- | -------- | --------------------------------------------------------------------------- | -------------: | ------------------------------------------------------------------------------------------------------------------------- |
+| Stage length                               | $L$           | slot     |                                                                             |             10 | Short stages increase settlement speed, but the stage length must be generously larger than the propagation time for IBs. |
+| Expiration of unreferenced endorser blocks | $r_\text{EB}$ | slot     |                                                                             |                |                                                                                                                           |
+| Mean committee size                        | $n$           | parties  |                                                                             |            500 | Probabilistic analyses of adversarial stake scenarios.                                                                    |
+| Quorum size                                | $\tau$        | fraction |                                                                             |            60% | Probabilistic analyses of adversarial stake scenarios.                                                                    |
+| Praos active slot coefficient              | $f_\text{RB}$ | 1/slot   | The probability that a party will be the slot leader for a particular slot. |           0.05 | This is the current value on mainnet, but it may become feasible to reduce it if Praos blocks are made smaller.           |
+
+The analysis
+[Committee size and quorum requirement](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-1.md#committee-size-and-quorum-requirement)
+in the first Leios Technical Report indicates that the Leios committee size
+should be no smaller than 500 votes and the quorum should be at least 60% of
+those votes. However, the proposed Fait Accompli[^1] scheme wFA<sup>LS</sup>
+achieves compact certificates that do not become larger as the number of voters
+increases, so larger committee sizes might be permitted for broader SPO
+participation and higher security. The committee size should be large enough
+that fluctuations in committee membership do not create an appreciable
+probability of an adversarial quorum when the adversarial stake is just under
+50%. The quorum size should be kept large enough above 50% so that those same
+fluctuations do not prevent an honest quorum. Larger committees require more
+network traffic, of course.
+
+### Resource requirements
+
+> [!WARNING]
+> TODO
+> - Introduce how these values have been found
+> - Summarize and evidence of increased network, compute and storage demands during max load
+> - Recommended hardware requirements (any change to [these](https://developers.cardano.org/docs/operate-a-stake-pool/hardware-requirements/))
+
+The resource requirements for operating Leios nodes have been estimated from
+benchmarking and simulation studies. The benchmark values for various Leios
+operations come either from measurements of the cryptography prototype[^3] or
+from the IOG benchmarking cluster for the Cardano node. These were input to the
+Haskell and Rust simulators for Leios to make holistic estimates of resource
+usage of operating nodes.
+
+> [!CAUTION]
+>
+> The plots below are placeholders. All of the simulations in this section need
+> to be re-run:
+>
+> - [ ] Final version of the Leios protocol
+> - [ ] Realistic mainnet topology
+> - [ ] Protocol parameters close to the recommended value
+> - [ ] CPU
+>   - [ ] Unlimited?
+>   - [ ] Six cores?
+> - [ ] Strip the major titles from the diagrams
+> - [ ] Use SVG format
+
+At high throughput, network egress can become a significant cost for nodes
+hosted on some cloud-computing providers. The violin plots below indicate that
+at the higher throughput that Leios can support, network egress can reach nearly
+2 MB/s.
+
+![Simulation of Leios network egress](images/network.png)
+
+Disk usage is correlated with network usage, as most of the blocks moving over
+the network also need to be persisted permanently; only the votes do not require
+disk storage. The plots below demonstrate that disk usage scales directly as the
+product of the IB rate and the IB size.
+
+![Simulation of Leios disk usage](images/disk.png)
+
+Both the average CPU usage and the peak CPU usage are relevant for deciding how
+to provision hardware for Leios nodes. The following plots indicate that two
+CPUs are sufficient for sustained and for peak Leios operation at high
+throughput. Real deployments should over-provision CPU, of course, in order to
+handle rare extraordinary peak conditions and to speed syncing from genesis.
+
+![Simulation of average CPU usage for Leios](images/cpu-mean.png)
+
+![Simulation of peak CPU usage for Leios](images/cpu-peak.png)
+
+Overall the most significant Leios hardware requirement changes compared to
+Praos are the higher levels of network egress and the rapidly growing disk space
+to store the Leios blocks. CPU requirements are quite similar to existing Praos
+deployments.
+
+### Operating costs
+
+A detailed cost analysis of Leios deployment is documented in
+[Leios node operating costs](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/cost-estimate/README.md)
+in the github repository for the Leios R&D effort. The major conclusion of that
+report is the following table that relates IB production rate, assuming IBs are
+the maximum size of existing Praos blocks, to the cost per node and the total
+cost of all nodes.
+
+| IB/s Rate | Cost per Node (Avg) | Network Cost (10,000 nodes) |
+| --------: | ------------------: | --------------------------: |
+|      0.05 |       $80 USD/month |          $800,000 USD/month |
+|         1 |      $200 USD/month |        $2,000,000 USD/month |
+|         5 |      $700 USD/month |        $7,000,000 USD/month |
+|        10 |    $1,300 USD/month |       $13,000,000 USD/month |
+|        20 |    $2,500 USD/month |       $25,000,000 USD/month |
+|        30 |    $3,600 USD/month |       $36,000,000 USD/month |
+
+_Required TPS for Infrastructure Cost Coverage:_ Using average transaction sizes
+and fees, we can calculate the required TPS to generate enough fees to cover
+infrastructure costs.
+
+| Infrastructure Cost (USD/month) | Required ADA (at $0.45/ADA) | TPS (Avg Tx) | TPS (Min Tx) | Equivalent IB/s |
+| ------------------------------: | --------------------------: | -----------: | -----------: | --------------: |
+|                        $800,000 |                   1,777,778 |         0.31 |         0.40 |           0.004 |
+|                      $2,000,000 |                   4,444,444 |         0.78 |         1.00 |           0.011 |
+|                      $7,000,000 |                  15,555,556 |         2.72 |         3.49 |           0.039 |
+|                     $13,000,000 |                  28,888,889 |         5.05 |         6.48 |           0.072 |
+|                     $25,000,000 |                  55,555,556 |         9.71 |        12.47 |           0.139 |
+|                     $36,000,000 |                  80,000,000 |        13.99 |        17.96 |           0.200 |
+
+_Required TPS for Current Reward Maintenance:_ To maintain current reward levels
+(~48 million ADA monthly) through transaction fees as the Reserve depletes.
+
+| Year | Reserve Depletion | Rewards from Fees (ADA) | Required TPS (Avg Tx) | Required IB/s |
+| ---: | ----------------: | ----------------------: | --------------------: | ------------: |
+| 2025 |               ~0% |                       0 |                     0 |             0 |
+| 2026 |              ~13% |               6,240,000 |                  10.9 |          0.16 |
+| 2027 |              ~24% |              11,520,000 |                  20.1 |          0.29 |
+| 2028 |              ~34% |              16,320,000 |                  28.5 |          0.41 |
+| 2029 |              ~43% |              20,640,000 |                  36.1 |          0.52 |
+| 2030 |              ~50% |              24,000,000 |                  41.9 |          0.60 |
+
+Note that by 2029, to compensate for Reserve depletion, the network would need
+to process approximately 36 TPS with average-sized transactions, requiring an
+Input Block rate of around 0.52 IB/s, roughly 10 times the current mainnet
+throughput. Leios's design would comfortably support this increased throughput
+while maintaining decentralization.
+
+### Threat model
+
+> [!WARNING]
+> TODO:
+> - A short overview of the threat model
+> - Highlight key 2-3 threats and mitigations
+> - Link the [dedicated threat model](https://github.com/input-output-hk/ouroboros-leios/pull/452) once merged?
+> - Link [threat model in report #1](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-1.md#threat-model), [comments in report #2](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-2.md#notes-on-the-leios-attack-surface)?
+
+The Leios protocol may have to mitigate the following categories of threats.
+
+- Grinding the VRF to obtain an advantage in Leios sortition
+- Equivocating IBs, EBs, or RBs
+- Declining to create IBs, EBs, or votes
+- Manipulating the content of IBs or EBs
+- Sending invalid txs, IBs, EBs, or certificates
+- Abusing the sync protocol
+- Delaying diffusion of IBs, EBs, or votes
+- Submitting invalid, conflicting, or duplicate transactions
+
+Nearly all of these _hypothetical_ threats are already mitigated by the protocol
+design, the incentive structure, or the cost of the resources needed to execute
+the threat. The
+[Threat model](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-1.md#threat-model)
+section of the first Leios Technical report contains a detailed taxonomy that we
+summarize here. The general impact of such attacks varies:
+
+- Resource burden on nodes
+- Lowered throughput
+- Increased latency
+- Manipulation of dapps or oracles
+
+_Grinding and other threats to Praos:_ Threats to the ranking blocks used by
+Leios are already mitigated by Ouroboros Praos and Genesis. Nevertheless, the
+possibility of _grinding attacks_, as discussed in
+[CPS-0017](https://github.com/cardano-scaling/CIPs/blob/settlement-cps/CPS-0017/README.md),
+will always exist, albeit at low probability of success. Such an attack, which
+requires some stake, involves using CPU resources to try to manipulate the epoch
+nonce to a value which will result in higher probability of being select as an
+RB, IB, or EB producer or as a voter in a subsequent epoch. This presumes that
+the Praos VRF will be used for the sortition in Leios. Currently, large and
+expensive amounts of CPU power would be required to successfully conduct a grind
+attack on Praos. Nevertheless, additional research and development are underway
+to further harden Praos.
+
+_Equivocation:_ In Leios, an IB producer, EB producers, or voter is only allowed
+one production for each winning of the sortition lottery. (Note that they may
+win more than once in the same slot because a lottery takes place for each
+lovelace staked.) A malicious producer or voter might create two conflicting
+IBs, EBs, or votes and diffuse them to different downstream peers in an attempt
+to disrupt the Leios protocol. The [Leios paper][leios-paper] mitigates this
+situation explicitly by identifying nodes that misbehave in this manner and
+notifying downstream peers in a controlled manner.
+
+_Inaction and nuisance:_ Producer nodes might also attempt to disrupt the
+protocol by failing to play their assigned role or by attempting to diffuse
+invalid information. Failing to produce a block (RB, IB, or EB) or to vote when
+entitled will result in the attacker receiving fewer rewards for their Leios
+work. Similarly for creating invalid blocks or votes. Very little advantage
+would be gained by such attacks because they really only reduce throughput or
+create a minor annoyance to their first downstream nodes by burdening them with
+useless verification work. Presumably, the loss of rewards would not compensate
+for the small disruption they create. The cryptographic aspects of Leios quickly
+catch invalid blocks or votes, of course.
+
+_Omission and manipulation:_ In Praos, omitting transactions from a block being
+forged does not directly affect the producer's rewards, but it may reduce the
+overall size of the rewards pot for the whole epoch. However, a malicious
+producer has little leverage by such omissions because of the very high
+probability that the omitted transactions reside elsewhere in the memory pool
+and will soon be included in subsequent honest blocks. Reordering IBs when an EB
+is created is not an option for an attacker because the Leios paper specifies a
+fixed ordering.
+
+_Network interference:_ Malicious network activity such as violating the sync
+protocol or delaying diffusion of block or votes creates a minor annoyance that
+the node's sync protocol will quickly avoid by preferring efficient and honest
+nodes. Large numbers of malicious relays would be needed to impinge on
+efficiency even in a small degree.
+
+_Denial of service:_ Transaction-based denial of service attacks on Leios would
+involve submitting numerous invalid, duplicate, or conflicting transactions to
+different nodes so that they would all make their way into the memory pool and
+then to IBs, only to be invalidated when transaction reconciliation occurs after
+those IBs are indirectly referenced by a certificate on a Praos ranking block.
+Such a denial of service would result in extra computation by the nodes and
+wasted permanent storage in the IBs. (Plutus transactions may be especially
+burdensome in this respect.) Ongoing research will mitigate such denial of
+service via sharding techniques and Leios's fee structure. Sharding will prevent
+duplicate transactions from reaching IBs and the fee structure will enforce
+payment for intentionally conflicted transactions, even though only one of the
+transactions would make it onto the ledger.
+
 ### Use cases
+
+> [!WARNING]
+> TODO:
+> - Refer back to [CPS-18][cps-18] use cases and explain how proposed protocol improves them
+> - Review and only mention use cases we have evidence for
 
 Leios immediately enables use cases for high transaction volume and for more
 computationally intensive Plutus scripts, but future minor modifications of the
@@ -1243,296 +1534,12 @@ could.
   production. In addition to enabling flexible configuration of Cardano worker
   services, this could encourage new operational models for SPO consortia.
 
-### Feasible values for Leios protocol parameters
-
-The table below documents a set of Leios protocol parameters that provided high
-throughput and reasonably fast settlement in the prototype Haskell and Rust
-simulations of Leios. The exact choice of parameters that would be adopted on
-the Cardano mainnet must be subject to discussion and consideration of
-tradeoffs.
+### Beyond this proposal & next steps
 
 > [!WARNING]
->
-> This is an incomplete work in progress.
->
-> - [ ] Revise after the protocol definition is complete.
-> - [ ] Each row should have a paragraph of justification.
-
-| Parameter                                  | Symbol        | Units    | Description                                                                 | Feasible value | Justification                                                                                                             |
-| ------------------------------------------ | ------------- | -------- | --------------------------------------------------------------------------- | -------------: | ------------------------------------------------------------------------------------------------------------------------- |
-| Stage length                               | $L$           | slot     |                                                                             |             10 | Short stages increase settlement speed, but the stage length must be generously larger than the propagation time for IBs. |
-| Expiration of unreferenced endorser blocks | $r_\text{EB}$ | slot     |                                                                             |                |                                                                                                                           |
-| Mean committee size                        | $n$           | parties  |                                                                             |            500 | Probabilistic analyses of adversarial stake scenarios.                                                                    |
-| Quorum size                                | $\tau$        | fraction |                                                                             |            60% | Probabilistic analyses of adversarial stake scenarios.                                                                    |
-| Praos active slot coefficient              | $f_\text{RB}$ | 1/slot   | The probability that a party will be the slot leader for a particular slot. |           0.05 | This is the current value on mainnet, but it may become feasible to reduce it if Praos blocks are made smaller.           |
-
-The analysis
-[Committee size and quorum requirement](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-1.md#committee-size-and-quorum-requirement)
-in the first Leios Technical Report indicates that the Leios committee size
-should be no smaller than 500 votes and the quorum should be at least 60% of
-those votes. However, the proposed Fait Accompli[^1] scheme wFA<sup>LS</sup>
-achieves compact certificates that do not become larger as the number of voters
-increases, so larger committee sizes might be permitted for broader SPO
-participation and higher security. The committee size should be large enough
-that fluctuations in committee membership do not create an appreciable
-probability of an adversarial quorum when the adversarial stake is just under
-50%. The quorum size should be kept large enough above 50% so that those same
-fluctuations do not prevent an honest quorum. Larger committees require more
-network traffic, of course.
-
-### Attack and mitigation
-
-The Leios protocol may have to mitigate the following categories of threats.
-
-- Grinding the VRF to obtain an advantage in Leios sortition
-- Equivocating IBs, EBs, or RBs
-- Declining to create IBs, EBs, or votes
-- Manipulating the content of IBs or EBs
-- Sending invalid txs, IBs, EBs, or certificates
-- Abusing the sync protocol
-- Delaying diffusion of IBs, EBs, or votes
-- Submitting invalid, conflicting, or duplicate transactions
-
-Nearly all of these _hypothetical_ threats are already mitigated by the protocol
-design, the incentive structure, or the cost of the resources needed to execute
-the threat. The
-[Threat model](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-1.md#threat-model)
-section of the first Leios Technical report contains a detailed taxonomy that we
-summarize here. The general impact of such attacks varies:
-
-- Resource burden on nodes
-- Lowered throughput
-- Increased latency
-- Manipulation of dapps or oracles
-
-_Grinding and other threats to Praos:_ Threats to the ranking blocks used by
-Leios are already mitigated by Ouroboros Praos and Genesis. Nevertheless, the
-possibility of _grinding attacks_, as discussed in
-[CPS-0017](https://github.com/cardano-scaling/CIPs/blob/settlement-cps/CPS-0017/README.md),
-will always exist, albeit at low probability of success. Such an attack, which
-requires some stake, involves using CPU resources to try to manipulate the epoch
-nonce to a value which will result in higher probability of being select as an
-RB, IB, or EB producer or as a voter in a subsequent epoch. This presumes that
-the Praos VRF will be used for the sortition in Leios. Currently, large and
-expensive amounts of CPU power would be required to successfully conduct a grind
-attack on Praos. Nevertheless, additional research and development are underway
-to further harden Praos.
-
-_Equivocation:_ In Leios, an IB producer, EB producers, or voter is only allowed
-one production for each winning of the sortition lottery. (Note that they may
-win more than once in the same slot because a lottery takes place for each
-lovelace staked.) A malicious producer or voter might create two conflicting
-IBs, EBs, or votes and diffuse them to different downstream peers in an attempt
-to disrupt the Leios protocol. The [Leios paper][leios-paper] mitigates this
-situation explicitly by identifying nodes that misbehave in this manner and
-notifying downstream peers in a controlled manner.
-
-_Inaction and nuisance:_ Producer nodes might also attempt to disrupt the
-protocol by failing to play their assigned role or by attempting to diffuse
-invalid information. Failing to produce a block (RB, IB, or EB) or to vote when
-entitled will result in the attacker receiving fewer rewards for their Leios
-work. Similarly for creating invalid blocks or votes. Very little advantage
-would be gained by such attacks because they really only reduce throughput or
-create a minor annoyance to their first downstream nodes by burdening them with
-useless verification work. Presumably, the loss of rewards would not compensate
-for the small disruption they create. The cryptographic aspects of Leios quickly
-catch invalid blocks or votes, of course.
-
-_Omission and manipulation:_ In Praos, omitting transactions from a block being
-forged does not directly affect the producer's rewards, but it may reduce the
-overall size of the rewards pot for the whole epoch. However, a malicious
-producer has little leverage by such omissions because of the very high
-probability that the omitted transactions reside elsewhere in the memory pool
-and will soon be included in subsequent honest blocks. Reordering IBs when an EB
-is created is not an option for an attacker because the Leios paper specifies a
-fixed ordering.
-
-_Network interference:_ Malicious network activity such as violating the sync
-protocol or delaying diffusion of block or votes creates a minor annoyance that
-the node's sync protocol will quickly avoid by preferring efficient and honest
-nodes. Large numbers of malicious relays would be needed to impinge on
-efficiency even in a small degree.
-
-_Denial of service:_ Transaction-based denial of service attacks on Leios would
-involve submitting numerous invalid, duplicate, or conflicting transactions to
-different nodes so that they would all make their way into the memory pool and
-then to IBs, only to be invalidated when transaction reconciliation occurs after
-those IBs are indirectly referenced by a certificate on a Praos ranking block.
-Such a denial of service would result in extra computation by the nodes and
-wasted permanent storage in the IBs. (Plutus transactions may be especially
-burdensome in this respect.) Ongoing research will mitigate such denial of
-service via sharding techniques and Leios's fee structure. Sharding will prevent
-duplicate transactions from reaching IBs and the fee structure will enforce
-payment for intentionally conflicted transactions, even though only one of the
-transactions would make it onto the ledger.
-
-### Resource requirements
-
-The resource requirements for operating Leios nodes have been estimated from
-benchmarking and simulation studies. The benchmark values for various Leios
-operations come either from measurements of the cryptography prototype[^3] or
-from the IOG benchmarking cluster for the Cardano node. These were input to the
-Haskell and Rust simulators for Leios to make holistic estimates of resource
-usage of operating nodes.
-
-> [!CAUTION]
->
-> The plots below are placeholders. All of the simulations in this section need
-> to be re-run:
->
-> - [ ] Final version of the Leios protocol
-> - [ ] Realistic mainnet topology
-> - [ ] Protocol parameters close to the recommended value
-> - [ ] CPU
->   - [ ] Unlimited?
->   - [ ] Six cores?
-> - [ ] Strip the major titles from the diagrams
-> - [ ] Use SVG format
-
-At high throughput, network egress can become a significant cost for nodes
-hosted on some cloud-computing providers. The violin plots below indicate that
-at the higher throughput that Leios can support, network egress can reach nearly
-2 MB/s.
-
-![Simulation of Leios network egress](images/network.png)
-
-Disk usage is correlated with network usage, as most of the blocks moving over
-the network also need to be persisted permanently; only the votes do not require
-disk storage. The plots below demonstrate that disk usage scales directly as the
-product of the IB rate and the IB size.
-
-![Simulation of Leios disk usage](images/disk.png)
-
-Both the average CPU usage and the peak CPU usage are relevant for deciding how
-to provision hardware for Leios nodes. The following plots indicate that two
-CPUs are sufficient for sustained and for peak Leios operation at high
-throughput. Real deployments should over-provision CPU, of course, in order to
-handle rare extraordinary peak conditions and to speed syncing from genesis.
-
-![Simulation of average CPU usage for Leios](images/cpu-mean.png)
-
-![Simulation of peak CPU usage for Leios](images/cpu-peak.png)
-
-Overall the most significant Leios hardware requirement changes compared to
-Praos are the higher levels of network egress and the rapidly growing disk space
-to store the Leios blocks. CPU requirements are quite similar to existing Praos
-deployments.
-
-### Operating costs
-
-A detailed cost analysis of Leios deployment is documented in
-[Leios node operating costs](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/cost-estimate/README.md)
-in the github repository for the Leios R&D effort. The major conclusion of that
-report is the following table that relates IB production rate, assuming IBs are
-the maximum size of existing Praos blocks, to the cost per node and the total
-cost of all nodes.
-
-| EB/s Rate | Cost per Node (Avg) | Network Cost (10,000 nodes) |
-| --------: | ------------------: | --------------------------: |
-|      0.05 |       $80 USD/month |          $800,000 USD/month |
-|         1 |      $200 USD/month |        $2,000,000 USD/month |
-|         5 |      $700 USD/month |        $7,000,000 USD/month |
-|        10 |    $1,300 USD/month |       $13,000,000 USD/month |
-|        20 |    $2,500 USD/month |       $25,000,000 USD/month |
-|        30 |    $3,600 USD/month |       $36,000,000 USD/month |
-
-_Required TPS for Infrastructure Cost Coverage:_ Using average transaction sizes
-and fees, we can calculate the required TPS to generate enough fees to cover
-infrastructure costs.
-
-| Infrastructure Cost (USD/month) | Required ADA (at $0.45/ADA) | TPS (Avg Tx) | TPS (Min Tx) | Equivalent EB/s |
-| ------------------------------: | --------------------------: | -----------: | -----------: | --------------: |
-|                        $800,000 |                   1,777,778 |         0.31 |         0.40 |           0.004 |
-|                      $2,000,000 |                   4,444,444 |         0.78 |         1.00 |           0.011 |
-|                      $7,000,000 |                  15,555,556 |         2.72 |         3.49 |           0.039 |
-|                     $13,000,000 |                  28,888,889 |         5.05 |         6.48 |           0.072 |
-|                     $25,000,000 |                  55,555,556 |         9.71 |        12.47 |           0.139 |
-|                     $36,000,000 |                  80,000,000 |        13.99 |        17.96 |           0.200 |
-
-_Required TPS for Current Reward Maintenance:_ To maintain current reward levels
-(~48 million ADA monthly) through transaction fees as the Reserve depletes.
-
-| Year | Reserve Depletion | Rewards from Fees (ADA) | Required TPS (Avg Tx) | Required EB/s |
-| ---: | ----------------: | ----------------------: | --------------------: | ------------: |
-| 2025 |               ~0% |                       0 |                     0 |             0 |
-| 2026 |              ~13% |               6,240,000 |                  10.9 |          0.16 |
-| 2027 |              ~24% |              11,520,000 |                  20.1 |          0.29 |
-| 2028 |              ~34% |              16,320,000 |                  28.5 |          0.41 |
-| 2029 |              ~43% |              20,640,000 |                  36.1 |          0.52 |
-| 2030 |              ~50% |              24,000,000 |                  41.9 |          0.60 |
-
-Note that by 2029, to compensate for Reserve depletion, the network would need
-to process approximately 36 TPS with average-sized transactions, requiring an
-endorser block rate of around 0.52 EB/s, roughly 10 times the current mainnet
-throughput. Leios's design would comfortably support this increased throughput
-while maintaining decentralization.
-
-### Why this variant over full Leios
-
-This Linear Leios variant was chosen over the full Leios protocol described in
-the research paper for several practical deployment considerations:
-
-**Simplified Architecture**: By removing input blocks and reducing concurrency,
-Linear Leios significantly simplifies the implementation while still achieving
-substantial throughput improvements over Ouroboros Praos.
-
-**Reduced Attack Surface**: The elimination of concurrent input block production
-removes complex equivocation handling and transaction conflict resolution that
-would be required in full Leios.
-
-**Incremental Deployment**: Linear Leios provides a more manageable upgrade path
-from Praos, allowing the ecosystem to gain experience with EB voting and
-certification before considering more complex variants.
-
-**Conservative Risk Profile**: The simplified model reduces implementation risk
-while still delivering significant throughput benefits, making it suitable for a
-production blockchain with significant economic value.
-
-### Design trade-offs and simplifications
-
-**Concurrency Model**: Linear Leios trades some potential throughput for
-simplicity by allowing only one EB per RB producer, eliminating the need for
-complex transaction sharding and conflict resolution mechanisms.
-
-**Implementation Complexity**: The removal of input blocks significantly reduces
-the complexity of ledger state management, mempool handling, and network
-protocols while still enabling substantial throughput improvements.
-
-**Throughput vs. Safety**: This variant prioritizes safety and implementability
-over maximum theoretical throughput, providing a solid foundation for future
-protocol enhancements.
-
-### Evidence and simulation analysis
-
-> [!NOTE]
->
-> This section will present simulation results and performance analysis
-> demonstrating this variant's effectiveness, including throughput measurements,
-> latency analysis, and resource utilization data.
-
-### Feasible protocol parameters
-
-> [!NOTE]
->
-> This section will provide detailed rationale for the selected protocol
-> parameters, including security analysis, performance optimization, and
-> practical deployment considerations.
-
-### Threat model
-
-> [!NOTE]
->
-> This section will define the security threat model for this variant, including
-> attack vectors, adversary capabilities, and security guarantees provided by
-> the protocol.
-
-### Resource requirements
-
-> [!NOTE]
->
-> This section will detail the hardware and operational requirements for running
-> nodes with this variant, including CPU, memory, storage, and network bandwidth
-> needs.
+> TODO:
+> - alternatives / future work / extensions of proposed design
+> - venn diagram of solution space?
 
 ## Path to active
 
