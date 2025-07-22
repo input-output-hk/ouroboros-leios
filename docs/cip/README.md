@@ -871,33 +871,40 @@ inclusion latency (> 5x) and a high level of concurrency. Both of which are
 undesirable in a real-world deployment onto the Cardano mainnet and need to be
 carefully weighed against the throughput increase:
 
-**High latency** of transactions reaching the ledger (a.k.a settlement time) is
-a straight-forward drawback and will impact both, applications built on Cardano
-and end user experience. As also stated in the goals of [CPS-18][cps-18], an
-deployment of Leios should not result in unreasonable increases of settlement
-time. In the mid-term potential synergies with
-[Peras](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0140) could
-make higher latency pipeline designs feasible again.
+**Higher latency** of transactions reaching the ledger (a.k.a settlement time)
+allows for higher throughput because work can be performed for a longer time.
+This is particularly evident with protocol designs that have many rounds and
+consequently many network roundtrips. For example, preparing input blocks as
+described in the paper is an additional round of validation and communication.
+High latency is however a straight-forward drawback and will impact both,
+applications built on Cardano and end user experience. As also stated in the
+goals of [CPS-18][cps-18], a deployment of Leios should not result in
+unreasonable increases of settlement time. In the mid-term potential synergies
+with [Peras](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0140)
+could make higher latency pipeline designs feasible again.
+
+**Higher concurrency** allows for higher throughput by doing more transaction
+processing at the same time. In the published design and otherwise discussed
+variants concurrency is introduced by allowing agreement on sequences of
+transactions independently of the Proas block production. This is the case for
+when endorser blocks would be announced separately from Praos blocks or input
+blocks be produced on a completely separate schedule. While such protocol
+designs often result in higher latency due to more rounds, concurrency in itself
+gives rise to the dedicated problem of _conflicting transactions_.
 
 > [!WARNING]
 > TODO
->
-> - High concurrency
->   - more conflicting transactions possible
->   - For example: IB production = a lot more concurrency
->   - More throughput possible (= prepare more work)
->   - Adding stages results in longer latency
->
-> - Conflicting txs a.k.a congestion on Cardano
->   - Competing spending of UTxOs is to be expected
->   - Also a network-based attack possible (link threat model?)
->
-> - Conflicting transactions can either be
->   - accepted = failing transactions vs. Cardano USP of only paying fees when included
->   - reduced -> sharding reduces (!not eliminates!) amount of potential conflict, but has lots of impact & complexity
->   - reconciled -> a certain number of conflicts can be dealt with; tombstoning to reduce storage waste
->
-> - We chose the third option and hence only proposed no / a modest increase in concurrency
+
+- Conflicting txs a.k.a congestion on Cardano
+  - Competing spending of UTxOs is to be expected
+  - Also a network-based attack possible (link threat model?)
+
+- Conflicting transactions can either be
+  - accepted = failing transactions vs. Cardano USP of only paying fees when included
+  - reduced -> sharding reduces (!not eliminates!) amount of potential conflict, but has lots of impact & complexity
+  - reconciled -> a certain number of conflicts can be dealt with; tombstoning to reduce storage waste
+
+- We chose the third option and hence only proposed no / a modest increase in concurrency
 
 ### Why Leios is practical to implement
 
