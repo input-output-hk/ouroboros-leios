@@ -825,7 +825,7 @@ courier (Praos chain), achieving significantly higher delivery volume through
 this structured validation approach.
 -->
 
-### Why not more concurrency
+### Why this protocol variant
 
 The proposed protocol is a radically simplified version of what was published in
 the [Leios research paper][leios-paper]. The simplifcations were primarily made
@@ -857,6 +857,32 @@ carefully weighed against the throughput increase:
   - reduced -> sharding reduces (!not eliminates!) amount of potential conflict, but has lots of impact & complexity
   - reconciled -> a certain number of conflicts can be dealt with; tombstoning to reduce storage waste
 - We chose the third option and hence only proposed no / a modest increase in concurrency
+
+### Why Leios is practical to implement
+
+Leios is designed as an overlay protocol to Praos and consequently changes to
+Cardano node infrastructure are often extensional. The existing network
+protocols do not need to change, while the new mini-protocols for diffusion of
+EBs and votes are to defined using the existing network protocol framework.
+
+Besides storing ranking blocks, consensus nodes will be required to store and
+serve EBs and the mempool requires a size increase, optimistic adoption of EBs
+and generally less aggressive pruning of transactions. Leios adds complexity to
+chain selection and adopting blocks as ledger state construction needs to be
+deferred to not impact (ranking) block diffusion. Adjustments to the rewards
+model will also be required.
+
+The required cryptographic primitives are already used in production in various
+parts of the Cardano and blockchain ecosystems. The performance of the
+cryptographic operations required for Leios is demonstrated by a prototype
+implementation[^3] and the benchmarks in the Appendix [Cryptographic
+benchmarks](#cryptographic-benchmarks). The small size (less than 9 kB) of Leios
+certificates is documented in the Appendix [Certificate size for realistic stake
+distributions](#certificate-size-for-realistic-stake-distributions).
+
+The [Resource requirements](#resource-requirements), discussed below, modestly
+increase the requirements for running a Cardano node but not beyond commonly
+available commodity hardware.
 
 ### Metrics
 
@@ -1051,27 +1077,6 @@ for the to become referenced by an EB. Referencing by an RB takes longer, often
 close to 100 seconds.
 
 ![Simulation of transaction lifecycle](images/lifecycle-histogram.png)
-
-### Why Leios is practical to implement
-
-A Leios implementation would build upon the well-proven design of the existing
-Cardano node by adding several new mini-protocols for the diffusion of IBs, EBs,
-and votes. The additional cryptography used by Leios is also quite similar to
-that already in production in various parts of the Cardano and blockchain
-ecosystems. Leios adds complexity to the process of updating the ledger because
-conflicting or duplicate transactions in IBs need reconciliation when the UTXO
-set is recomputed. The sharding of transactions in Leios will complicate the
-management of the memory pool and the structure of UTXOs themselves. Adjustments
-to the rewards model will also be required.
-
-The performance of the cryptographic operations required for Leios is
-demonstrated by a prototype implementation[^3] and the benchmarks in the
-Appendix [Cryptographic benchmarks](#cryptographic-benchmarks). The small size
-(less than 9 kB) of Leios certificates is documented in the Appendix
-[Certificate size for realistic stake distributions](#certificate-size-for-realistic-stake-distributions).
-The [Resource requirements](#resource-requirements), discussed below, modestly
-increase the requirements for running a Cardano node but not beyond commonly
-available commodity hardware.
 
 ### Use cases
 
