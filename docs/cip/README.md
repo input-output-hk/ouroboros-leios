@@ -104,8 +104,7 @@ on the blockchain, this protocol upgrade seeks to achieve a substantial increase
 in the network's overall throughput, enabling it to handle a significantly
 greater volume of transactions within a given timeframe.
 
-The Cardano Problem Statement
-[CPS-18 Greater Transaction Throughput](https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md)
+The Cardano Problem Statement [CPS-18 Greater Transaction Throughput][cps-18]
 further motivates the need for higher transaction throughput and marshals
 quantitative evidence of existing mainnet bottlenecks. Realizing higher
 transaction rates is also necessary for long-term Cardano techno-economic
@@ -872,12 +871,16 @@ inclusion latency (> 5x) and a high level of concurrency. Both of which are
 undesirable in a real-world deployment onto the Cardano mainnet and need to be
 carefully weighed against the throughput increase:
 
+**High latency** of transactions reaching the ledger (a.k.a settlement time) is
+a straight-forward drawback and will impact both, applications built on Cardano
+and end user experience. As also stated in the goals of [CPS-18][cps-18], an
+deployment of Leios should not result in unreasonable increases of settlement
+time. In the mid-term potential synergies with
+[Peras](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0140) could
+make higher latency pipeline designs feasible again.
+
 > [!WARNING]
 > TODO
->
-> - High latency
->   - straight-forward drawback
->   - initial deployment should not make the situation all too worse and a potential synergy with Peras (link CIP) can make higher latency pipeline designs feasible.
 >
 > - High concurrency
 >   - more conflicting transactions possible
@@ -1608,7 +1611,7 @@ protocol.
 >
 > Optional
 
-- [CPS-18: Greater transaction throughput](https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md)
+- [CPS-18: Greater transaction throughput][cps-18]
 - [Leios R&D web site](https://leios.cardano-scaling.org/)
 - [Leios channel on IOG Discord](https://discord.com/channels/826816523368005654/1247688618621927505)
 - [Github repository for Leios R&D](https://github.com/input-output-hk/ouroboros-leios)
@@ -1632,3 +1635,4 @@ This CIP is licensed under
 [Apache-2.0](http://www.apache.org/licenses/LICENSE-2.0).
 
 [leios-paper]: https://eprint.iacr.org/2025/1115.pdf
+[cps-18]: https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md
