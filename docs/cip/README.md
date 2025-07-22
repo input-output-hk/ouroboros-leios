@@ -137,16 +137,18 @@ augmenting the Treasury, and increasing SPO and delegator rewards.
 Leios enhances Ouroboros Praos by introducing a dual-block structure and a
 voting mechanism to increase transaction throughput while preserving core
 consensus properties. The protocol is built around three main components:
-**[Ranking Blocks (RBs)](#ranking-blocks-rbs)**, **[Endorser Blocks (EBs)](#endorser-blocks-ebs)**, and a
-**[voting committee](#voting-committee-and-certificates)** responsible for certifying EBs.
+**[Ranking Blocks (RBs)](#ranking-blocks-rbs)**,
+**[Endorser Blocks (EBs)](#endorser-blocks-ebs)**, and a
+**[voting committee](#voting-committee-and-certificates)** responsible for
+certifying EBs.
 
 ### Ranking Blocks (RBs)
 
-RBs are Praos blocks extended to support Leios by optionally
-referencing EBs and embedding their certificates. In addition to including transactions directly, RBs can also
-incorporate transactions from certified EBs. The two Leios-specific additions to
-the Praos block structure are the optional `leios_cert`, which contains the
-certificate attesting to the validity of an EB through
+RBs are Praos blocks extended to support Leios by optionally referencing EBs and
+embedding their certificates. In addition to including transactions directly,
+RBs can also incorporate transactions from certified EBs. The two Leios-specific
+additions to the Praos block structure are the optional `leios_cert`, which
+contains the certificate attesting to the validity of an EB through
 [BLS-based voting](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md)
 by a committee of stake pools, and the optional `announced_eb`, which references
 the EB proposed for inclusion in the next RB.
@@ -171,18 +173,16 @@ the EB proposed for inclusion in the next RB.
 
 ### Endorser Blocks (EBs)
 
-EBs are optional attachments to RBs, produced by the same stake pool that created the
-corresponding RB. They serve to reference
-additional transactions, increasing throughput beyond what can be included
-directly in the RB. When an EB is announced in an RB, a voting
-period begins as described in
+EBs are optional attachments to RBs, produced by the same stake pool that
+created the corresponding RB. They serve to reference additional transactions,
+increasing throughput beyond what can be included directly in the RB. When an EB
+is announced in an RB, a voting period begins as described in
 [Voting Committee and Certificates](#voting-committee-and-certificates). Only
-the immediately following RB is eligible to certify this announced EB
-by including a certificate.
+the immediately following RB is eligible to certify this announced EB by
+including a certificate.
 
 <details>
 <summary>Endorser Block CDDL</summary>
-
 
 ```cddl
  endorser_block =
@@ -211,8 +211,7 @@ by including a certificate.
 
 ### Voting Committee and Certificates
 
-The voting committee is a group of stake pools selected to validate
-EBs through
+The voting committee is a group of stake pools selected to validate EBs through
 [BLS-based vote aggregation](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md).
 Only EBs that achieve the required [quorum](#quorum) of votes are certified and
 eligible for inclusion in RBs.
@@ -265,8 +264,8 @@ For further cryptographic details, refer to the
 
 ### Protocol Flow
 
-The protocol flow, as depicted in [Figure 4](#protocol-flow-figure), consists
-of four main stages:
+The protocol flow, as depicted in [Figure 4](#protocol-flow-figure), consists of
+four main stages:
 
 <p align="center" name="protocol-flow-figure">
   <img src="images/protocol-flow-overview.png" alt="Leios Protocol Flow">
@@ -275,10 +274,18 @@ of four main stages:
 <p align="center"><em>Figure 4: Ouroboros Leios Protocol Flow</em></p>
 
 1. **EB Announcement:**  
-   The RB producer references a new EB, signaling its proposal to the network. The EB size is constrained by $S_\text{EB}$ to ensure it can be diffused within the stage length $L$.
+   The RB producer references a new EB, signaling its proposal to the network.
+   The EB size is constrained by $S_\text{EB}$ to ensure it can be diffused
+   within the stage length $L$.
 
 2. **Voting:**  
-   Committee members first verify and vote on the proposed EB. After voting, there is a period for votes to propagate through the network. The total voting period, $L$, combines the time for voting and for vote diffusion ($L = L_\text{vote} + L_\text{diff}$), and is chosen so that all votes can be seen before proceeding. Specifically, $L$ is set to exceed the network diffusion time $\Delta$ (i.e., $\Delta < L$), ensuring sufficient time for both voting and message propagation.
+   Committee members first verify and vote on the proposed EB. After voting,
+   there is a period for votes to propagate through the network. The total
+   voting period, $L$, combines the time for voting and for vote diffusion
+   ($L = L_\text{vote} + L_\text{diff}$), and is chosen so that all votes can be
+   seen before proceeding. Specifically, $L$ is set to exceed the network
+   diffusion time $\Delta$ (i.e., $\Delta < L$), ensuring sufficient time for
+   both voting and message propagation.
 
 3. **Certification:**  
    If the EB receives enough votes such that the total stake of all voting pools
@@ -289,8 +296,8 @@ $$
 \sum_{v \in \text{votes}} \text{stake}(v) \geq \tau \times \text{stake}_{\text{total}}
 $$
 
-   (This is represented by the yellow pentagon labeled $C$ in the [Figure 4](#protocol-flow-figure)
-   below.)
+(This is represented by the yellow pentagon labeled $C$ in the
+[Figure 4](#protocol-flow-figure) below.)
 
 4. **Finalization:**  
    The certificate, $C$, is included in a subsequent RB, at which point the
@@ -299,13 +306,17 @@ $$
 
 ### Bottom Line: What Throughput Does Leios Enable?
 
-Leios increases throughput by combining the transaction capacity of regular blocks with that of certified EBs. The formula below expresses this: throughput equals the rate of regular block production times the sum of their capacity and the additional capacity from Endorser Blocks that are **included**.
+Leios increases throughput by combining the transaction capacity of regular
+blocks with that of certified EBs. The formula below expresses this: throughput
+equals the rate of regular block production times the sum of their capacity and
+the additional capacity from Endorser Blocks that are **included**.
 
 $$
 \text{Throughput} = f_{\text{RB}} \times \left( S_\text{RB} + S_\text{EB} \times f_\text{EB} \right)
 $$
 
 Where:
+
 - $f_{\text{RB}}$ — Rate of RB production (protocol parameter)
 - $S_\text{RB}$ — Maximum size of an RB (protocol parameter)
 - $S_\text{EB}$ — Maximum size of an EB (protocol parameter)
@@ -313,82 +324,121 @@ Where:
 
 > [!NOTE]
 >
-> The parameter $f_\text{EB}$ is an **observed fraction**, not a protocol parameter. It accounts for the fact that not every EB gets certified under realistic network conditions or timing constraints.
+> The parameter $f_\text{EB}$ is an **observed fraction**, not a protocol
+> parameter. It accounts for the fact that not every EB gets certified under
+> realistic network conditions or timing constraints.
 
 ### Constraints on Leios protocol parameters
 
-As briefly mentioned in the previous section, the following table formally defines key parameters, which control the timing, security, and performance characteristics of the protocol.
+As briefly mentioned in the previous section, the following table formally
+defines key parameters, which control the timing, security, and performance
+characteristics of the protocol.
 
-| Parameter | Symbol | Units | Description | Constraints | Rationale |
-|---|---|---|---|---|---|
-| Network diffusion time | $\Delta$ | slot | Upper limit on the time needed to diffuse a message to all nodes | $\Delta > 0$ | Messages have a finite delay due to network topology |
-| Stage length | $L$ | slot | Duration of the voting period for endorser blocks | $L \geq \Delta$ | Must allow sufficient time for EB diffusion and voting |
-| Ranking block max size | $S_\text{RB}$ | bytes | Maximum size of a ranking block | $S_\text{RB} > 0$ | Limits RB size to ensure timely diffusion within slot time |
-| Praos active slot coefficient | $f_\text{RB}$ | 1/slot | Probability that a party will be the slot leader for a particular slot | $0 < f_\text{RB} \leq \Delta^{-1}$ | Blocks should not be produced faster than network delay |
-| Endorser-block max size | $S_\text{EB}$ | bytes | Maximum size of an endorser block | $S_\text{EB} > 0$ | Limits EB size to ensure timely diffusion within stage length |
-| Mean committee size | $n$ | parties | Average number of stake pools selected for voting | $n > 0$ | Ensures sufficient decentralization and security |
-| Quorum size | $\tau$ | fraction | Minimum fraction of committee votes required for certification | $\tau > 0.5$ | Prevents adversarial control while ensuring liveness |
+| Parameter                     | Symbol        | Units    | Description                                                            | Constraints                        | Rationale                                                     |
+| ----------------------------- | ------------- | -------- | ---------------------------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------- |
+| Network diffusion time        | $\Delta$      | slot     | Upper limit on the time needed to diffuse a message to all nodes       | $\Delta > 0$                       | Messages have a finite delay due to network topology          |
+| Stage length                  | $L$           | slot     | Duration of the voting period for endorser blocks                      | $L \geq \Delta$                    | Must allow sufficient time for EB diffusion and voting        |
+| Ranking block max size        | $S_\text{RB}$ | bytes    | Maximum size of a ranking block                                        | $S_\text{RB} > 0$                  | Limits RB size to ensure timely diffusion within slot time    |
+| Praos active slot coefficient | $f_\text{RB}$ | 1/slot   | Probability that a party will be the slot leader for a particular slot | $0 < f_\text{RB} \leq \Delta^{-1}$ | Blocks should not be produced faster than network delay       |
+| Endorser-block max size       | $S_\text{EB}$ | bytes    | Maximum size of an endorser block                                      | $S_\text{EB} > 0$                  | Limits EB size to ensure timely diffusion within stage length |
+| Mean committee size           | $n$           | parties  | Average number of stake pools selected for voting                      | $n > 0$                            | Ensures sufficient decentralization and security              |
+| Quorum size                   | $\tau$        | fraction | Minimum fraction of committee votes required for certification         | $\tau > 0.5$                       | Prevents adversarial control while ensuring liveness          |
 
 ### Specification for votes and certificates
 
-Leios requires a voting and certificate scheme to validate endorser blocks. The protocol is flexible regarding the specific cryptographic implementation, but any scheme must meet the following requirements:
+Leios requires a voting and certificate scheme to validate endorser blocks. The
+protocol is flexible regarding the specific cryptographic implementation, but
+any scheme must meet the following requirements:
 
 #### Requirements
 
-1. _Succinct registration of keys:_ The registration of voting keys should not involve excessive data transfer or coordination between parties. Ideally, such registration would occur as part of the already existing operational certificates.
+1. _Succinct registration of keys:_ The registration of voting keys should not
+   involve excessive data transfer or coordination between parties. Ideally,
+   such registration would occur as part of the already existing operational
+   certificates.
 
-2. _Key rotation:_ The cryptographic keys used to sign Leios votes and certificates _do not_ need to be rotated periodically because the constraints on Leios voting rounds and the key rotation already present in Praos secure the protocol against attacks such as replay and key compromise.
+2. _Key rotation:_ The cryptographic keys used to sign Leios votes and
+   certificates _do not_ need to be rotated periodically because the constraints
+   on Leios voting rounds and the key rotation already present in Praos secure
+   the protocol against attacks such as replay and key compromise.
 
-3. _Deterministic signatures:_ Deterministic signatures can guard against attacks that weaken key security.
+3. _Deterministic signatures:_ Deterministic signatures can guard against
+   attacks that weaken key security.
 
-4. _Local sortition:_ Selection of the voting committee should not be so deterministic and public as to open attack avenues such as denial-of-service or subversion.
+4. _Local sortition:_ Selection of the voting committee should not be so
+   deterministic and public as to open attack avenues such as denial-of-service
+   or subversion.
 
-5. _Liveness:_ Adversaries with significant stake (e.g., more than 35%) should not be able to thwart an honest majority from reaching a [quorum](#quorum) of votes for an EB.
+5. _Liveness:_ Adversaries with significant stake (e.g., more than 35%) should
+   not be able to thwart an honest majority from reaching a [quorum](#quorum) of
+   votes for an EB.
 
-6. _Soundness:_ Adversaries with near majority stake (e.g., 49%) should not be able to form an adversarial quorum that certifies the EB of their choice.
+6. _Soundness:_ Adversaries with near majority stake (e.g., 49%) should not be
+   able to form an adversarial quorum that certifies the EB of their choice.
 
-7. _Small votes:_ Because vote traffic is large and frequent in Leios, the votes themselves should be small. Note that the large size of Praos KES signatures precludes their use for signing Leios votes.
+7. _Small votes:_ Because vote traffic is large and frequent in Leios, the votes
+   themselves should be small. Note that the large size of Praos KES signatures
+   precludes their use for signing Leios votes.
 
-8. _Small certificates:_ Because Leios certificates are frequent and must fit inside Praos blocks, they should be small enough so there is plenty of room for other transactions in the Praos blocks.
+8. _Small certificates:_ Because Leios certificates are frequent and must fit
+   inside Praos blocks, they should be small enough so there is plenty of room
+   for other transactions in the Praos blocks.
 
-9. _Fast cryptography:_ The computational burden of creating and verifying voting eligibility, the votes themselves, and the resulting certificate must be small enough to fit within the CPU budget for Leios stages.
+9. _Fast cryptography:_ The computational burden of creating and verifying
+   voting eligibility, the votes themselves, and the resulting certificate must
+   be small enough to fit within the CPU budget for Leios stages.
 
 #### Implementation
 
-A BLS-based certificate scheme that meets these requirements is documented in the [BLS certificates specification](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md). This implementation provides:
+A BLS-based certificate scheme that meets these requirements is documented in
+the
+[BLS certificates specification](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md).
+This implementation provides:
 
 - Certificate sizes under 10 kB for realistic stake distributions
 - Efficient vote aggregation using the Fait Accompli sortition scheme
 - Performance benchmarks suitable for production deployment
 
-
 ### Mini-protocols
 
-For background information on mini-protocols, see sections 3.1-3.4 of the **[Ouroboros Network Specification](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf#chapter.3)**. Here we present the additional node-to-node mini-protocols needed for Ouroboros Leios.
+For background information on mini-protocols, see sections 3.1-3.4 of the
+**[Ouroboros Network Specification](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf#chapter.3)**.
+Here we present the additional node-to-node mini-protocols needed for Ouroboros
+Leios.
 
 #### Relay
 
-The `Relay` protocol is a generalization of the transaction submission protocol used to transfer transactions between full nodes. We use the term *datum* as a generic term for the payloads being diffused, which are generally small: transactions, endorser block headers, and vote bundles.
+The `Relay` protocol is a generalization of the transaction submission protocol
+used to transfer transactions between full nodes. We use the term _datum_ as a
+generic term for the payloads being diffused, which are generally small:
+transactions, endorser block headers, and vote bundles.
 
-The protocol follows a pull-based strategy where the consumer asks for new ids/datums and the producer sends them back. It is designed to be suitable for a trustless setting where both sides need to guard against resource consumption attacks.
+The protocol follows a pull-based strategy where the consumer asks for new
+ids/datums and the producer sends them back. It is designed to be suitable for a
+trustless setting where both sides need to guard against resource consumption
+attacks.
 
 **Parameters**
 
 A `Relay` instance is specified by these options and parameters:
 
-| Option/ Parameter    | Description                                                                                      |
-|----------------------|--------------------------------------------------------------------------------------------------|
-| `BoundedWindow`      | The peers manage a bounded window (i.e. FIFO queue) of datums available to be requested. Useful for datums that are otherwise unbounded in number. |
-| `Announcements`      | Producers provide additional announcements about datums, when available.                         |
-| `id`                 | Identifier for a datum to be relayed, used when requesting the datum.                            |
-| `info`               | Extra information provided with a new `id`.                                                      |
-| `datum`              | The datum itself.                                                                                |
-| `Ann. Condition`     | ("if" announcements): Condition for announcement.                                                |
-| `ann`                | ("if" announcements): Announcement representation.                                               |
+| Option/ Parameter | Description                                                                                                                                        |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BoundedWindow`   | The peers manage a bounded window (i.e. FIFO queue) of datums available to be requested. Useful for datums that are otherwise unbounded in number. |
+| `Announcements`   | Producers provide additional announcements about datums, when available.                                                                           |
+| `id`              | Identifier for a datum to be relayed, used when requesting the datum.                                                                              |
+| `info`            | Extra information provided with a new `id`.                                                                                                        |
+| `datum`           | The datum itself.                                                                                                                                  |
+| `Ann. Condition`  | ("if" announcements): Condition for announcement.                                                                                                  |
+| `ann`             | ("if" announcements): Announcement representation.                                                                                                 |
 
 **Instances**
 
-`Relay` protocol instances for Leios are listed in the table below. Tx-submission is further parameterized by the maximum window size allowed. EB-relay and Vote-relay are each parametrized by the maximum age beyond which a datum is no longer relayed. EB-relay relies on announcements to let consumers know when block bodies are available.
+`Relay` protocol instances for Leios are listed in the table below.
+Tx-submission is further parameterized by the maximum window size allowed.
+EB-relay and Vote-relay are each parametrized by the maximum age beyond which a
+datum is no longer relayed. EB-relay relies on announcements to let consumers
+know when block bodies are available.
 
 | `instance`    | `BoundedWindow` | `Announcements` | `id` | `info` | `datum`     | `Ann. Condition` | `ann` |
 | ------------- | --------------- | --------------- | ---- | ------ | ----------- | ---------------- | ----- |
@@ -398,7 +448,10 @@ A `Relay` instance is specified by these options and parameters:
 
 **State machine**
 
-The `Relay` mini-protocol operates through a series of states, with transitions determined by protocol messages exchanged between the *consumer* and *producer* roles. Each message includes parameters as shown in the table below, which maps the protocol's operation and message flows as depicted in [Figure 5](#figure-5):
+The `Relay` mini-protocol operates through a series of states, with transitions
+determined by protocol messages exchanged between the _consumer_ and _producer_
+roles. Each message includes parameters as shown in the table below, which maps
+the protocol's operation and message flows as depicted in [Figure 5](#figure-5):
 
 <p align="center">
   <a id="figure-5"></a>
@@ -406,58 +459,68 @@ The `Relay` mini-protocol operates through a series of states, with transitions 
 </p>
 <p align="center"><em>Figure 5: Relay mini-protocol state machine</em></p>
 
-| **Current State**      | **Message**                        | **Parameters**                                                                 | **Next State**         | **Description / Transition**                                                                                  |
-|------------------------|------------------------------------|-------------------------------------------------------------------------------|------------------------|--------------------------------------------------------------------------------------------------------------|
-| **`StInit`**           | `MsgInit`                          | —                                                                             | **`StIdle`**           | Consumer initiates the protocol, entering the idle state.                                                    |
-| **`StIdle`**           | `MsgRequestIdsNonBlocking`         | `ack`: ids to acknowledge<br/>`req`: number of new ids requested              | **`StIdsNonBlocking`** | Consumer requests new ids (non-blocking); producer replies immediately (possibly with empty list).           |
-| **`StIdle`**           | `MsgRequestIdsBlocking`            | `ack`: ids to acknowledge<br/>`req`: number of new ids requested              | **`StIdsBlocking`**    | Consumer requests new ids (blocking); producer waits until new ids are available before replying.            |
-| **`StIdle`**           | `MsgRequestData`                   | `[id]`: list of datum ids                                                     | **`StData`**           | Consumer requests the actual data for a list of ids.                                                         |
-| **`StIdsNonBlocking`** | `MsgReplyIds`                      | `[(id, info)]`: list of datum ids and extra info                              | **`StIdle`**           | Producer replies with available ids and info, returning to idle.                                             |
-| **`StIdsNonBlocking`** | `MsgReplyIdsAndAnns`*               | `[(id, info)]`: ids and info<br/>`[(id, ann)]`: announcements                 | **`StIdle`**           | Producer replies with ids, info, and announcements (if supported), returning to idle.                        |
-| **`StIdsBlocking`**    | `MsgReplyIds`                      | `[(id, info)]`: list of datum ids and extra info                              | **`StIdle`**           | Producer replies with available ids and info, returning to idle.                                             |
-| **`StIdsBlocking`**    | `MsgReplyIdsAndAnns`*               | `[(id, info)]`: ids and info<br/>`[(id, ann)]`: announcements                 | **`StIdle`**           | Producer replies with ids, info, and announcements (if supported), returning to idle.                        |
-| **`StData`**           | `MsgReplyData`                     | `[datum]`: list of datums                                                     | **`StIdle`**           | Producer replies with the requested datums (some may be missing), returning to idle.                         |
-| *Any state*            | `MsgDone`                          | —                                                                             | *Terminal*             | Producer terminates the mini-protocol.                                                                       |
+| **Current State**      | **Message**                | **Parameters**                                                   | **Next State**         | **Description / Transition**                                                                       |
+| ---------------------- | -------------------------- | ---------------------------------------------------------------- | ---------------------- | -------------------------------------------------------------------------------------------------- |
+| **`StInit`**           | `MsgInit`                  | —                                                                | **`StIdle`**           | Consumer initiates the protocol, entering the idle state.                                          |
+| **`StIdle`**           | `MsgRequestIdsNonBlocking` | `ack`: ids to acknowledge<br/>`req`: number of new ids requested | **`StIdsNonBlocking`** | Consumer requests new ids (non-blocking); producer replies immediately (possibly with empty list). |
+| **`StIdle`**           | `MsgRequestIdsBlocking`    | `ack`: ids to acknowledge<br/>`req`: number of new ids requested | **`StIdsBlocking`**    | Consumer requests new ids (blocking); producer waits until new ids are available before replying.  |
+| **`StIdle`**           | `MsgRequestData`           | `[id]`: list of datum ids                                        | **`StData`**           | Consumer requests the actual data for a list of ids.                                               |
+| **`StIdsNonBlocking`** | `MsgReplyIds`              | `[(id, info)]`: list of datum ids and extra info                 | **`StIdle`**           | Producer replies with available ids and info, returning to idle.                                   |
+| **`StIdsNonBlocking`** | `MsgReplyIdsAndAnns`\*     | `[(id, info)]`: ids and info<br/>`[(id, ann)]`: announcements    | **`StIdle`**           | Producer replies with ids, info, and announcements (if supported), returning to idle.              |
+| **`StIdsBlocking`**    | `MsgReplyIds`              | `[(id, info)]`: list of datum ids and extra info                 | **`StIdle`**           | Producer replies with available ids and info, returning to idle.                                   |
+| **`StIdsBlocking`**    | `MsgReplyIdsAndAnns`\*     | `[(id, info)]`: ids and info<br/>`[(id, ann)]`: announcements    | **`StIdle`**           | Producer replies with ids, info, and announcements (if supported), returning to idle.              |
+| **`StData`**           | `MsgReplyData`             | `[datum]`: list of datums                                        | **`StIdle`**           | Producer replies with the requested datums (some may be missing), returning to idle.               |
+| _Any state_            | `MsgDone`                  | —                                                                | _Terminal_             | Producer terminates the mini-protocol.                                                             |
 
 > [!NOTE]
 >
-> If Announcements is set, `MsgReplyIds` messages are replaced with `MsgReplyIdsAndAnns`.
+> If Announcements is set, `MsgReplyIds` messages are replaced with
+> `MsgReplyIdsAndAnns`.
 
-**Producer and consumer implementation**
+**Implementation**
 
-The Relay mini-protocol is designed to achieve both efficient datum diffusion and robust protection against asymmetric resource attacks from consumers. It employs a pull-based approach: consumers request IDs and then batch-fetch datums, allowing for flexible batching and request strategies.
-
-For comprehensive implementation guidance—including memory-efficient provider strategies, bounded window enforcement, and consumer heuristics—refer to both the [Producer and consumer implementation section](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-2.md#producer-and-consumer-implementation) in Technical Report 2 and the [Client and Server Implementation, Section 3.9.5](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf#page=34), which provides further details for both producer and consumer roles.
+The Relay mini-protocol achieves efficient datum diffusion while protecting against resource attacks through pull-based batching. For detailed implementation guidance including memory-efficient strategies and consumer heuristics, see [Technical Report 2](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-2.md#producer-and-consumer-implementation) and [Ouroboros Network Specification Section 3.9.5](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf#page=34).
 
 **Equivocation handling**
 
-EB-relay and Vote-relay must guard against the possibility of equivocations, i.e. the reuse of a generation opportunity for multiple different blocks. The *message identifier* of a header is the pair of its generating node id and the slot it was generated for. Two headers with the same message identifier constitute a *proof of equivocation*, and the first header received with a given message identifier is the *preferred header*. For headers with the same message identifier, only the first two should be relayed, furthermore only the body of the preferred header should be fetched.
+EB-relay and Vote-relay must guard against the possibility of equivocations,
+i.e. the reuse of a generation opportunity for multiple different blocks. The
+_message identifier_ of a header is the pair of its generating node id and the
+slot it was generated for. Two headers with the same message identifier
+constitute a _proof of equivocation_, and the first header received with a given
+message identifier is the _preferred header_. For headers with the same message
+identifier, only the first two should be relayed, furthermore only the body of
+the preferred header should be fetched.
 
 #### Fetch
 
-The `Fetch` mini protocol enables a node to download block bodies. It is a generalization of the `BlockFetch` mini protocol used for base blocks: EBs do not have a notion of range, so they are requested by individual identifiers.
-
-The protocol follows a request-response strategy where the consumer requests specific block bodies and the producer streams them back. It is designed to efficiently handle block body downloads while maintaining network efficiency.
+The `Fetch` mini protocol enables nodes to download block bodies. It generalizes the `BlockFetch` mini protocol: EBs are requested by individual identifiers rather than ranges. The consumer requests specific block bodies and the producer streams them back efficiently.
 
 A `Fetch` instance is specified by these parameters:
 
-| Parameter | Description                                                                                      |
-|-----------|--------------------------------------------------------------------------------------------------|
-| `request` | Request format for a sequence of blocks.                                                         |
-| `body`    | Block body itself.                                                                               |
+| Parameter | Description                              |
+| --------- | ---------------------------------------- |
+| `request` | Request format for a sequence of blocks. |
+| `body`    | Block body itself.                       |
 
 **Instances**
 
-`Fetch` instances for Leios are listed in the table below. EB-fetch is used for downloading endorser block bodies, while BlockFetch handles RB (Praos) block bodies.
+`Fetch` instances for Leios are listed in the table below. EB-fetch is used for
+downloading endorser block bodies, while BlockFetch handles RB (Praos) block
+bodies.
 
-| `instance`   | `request`   | `body`                 |
-| :----------- | :---------- | :--------------------- |
-| EB-fetch     | `[point]`   | `EB body`              |
-| BlockFetch   | `range`     | `RB body`              |
+| `instance` | `request` | `body`    |
+| :--------- | :-------- | :-------- |
+| EB-fetch   | `[point]` | `EB body` |
+| BlockFetch | `range`   | `RB body` |
 
 **State machine**
 
-The `Fetch` mini-protocol operates through a series of states, with transitions determined by protocol messages exchanged between the *consumer* and *producer* roles. Each message includes parameters as shown in the table below, which maps the protocol's operation and message flows as depicted in [Figure 6](#fig-fetch-state-machine):
+The `Fetch` mini-protocol operates through a series of states, with transitions
+determined by protocol messages exchanged between the _consumer_ and _producer_
+roles. Each message includes parameters as shown in the table below, which maps
+the protocol's operation and message flows as depicted in
+[Figure 6](#fig-fetch-state-machine):
 
 <p align="center">
   <a id="fig-fetch-state-machine"></a>
@@ -466,48 +529,61 @@ The `Fetch` mini-protocol operates through a series of states, with transitions 
   <em>Figure 6: Fetch mini-protocol state machine</em>
 </p>
 
-| **Current State**      | **Message**                        | **Parameters**                                                                 | **Next State**         | **Description / Transition**                                                                                  |
-|------------------------|------------------------------------|-------------------------------------------------------------------------------|------------------------|--------------------------------------------------------------------------------------------------------------|
-| **`StIdle`**           | `MsgRequestBodies`                 | `request`: sequence of block requests                                          | **`StBusy`**           | Consumer requests block bodies from the producer.                                                             |
-| **`StIdle`**           | `MsgConsumerDone`                  | —                                                                             | *Terminal*             | Consumer terminates the protocol.                                                                             |
-| **`StBusy`**           | `MsgNoBlocks`                      | —                                                                             | **`StIdle`**           | Producer indicates it does not have the requested blocks.                                                     |
-| **`StBusy`**           | `MsgStartBatch`                    | —                                                                             | **`StStreaming`**      | Producer begins streaming block bodies.                                                                       |
-| **`StStreaming`**      | `MsgBody`                          | `body`: single block body                                                      | **`StStreaming`**      | Producer streams a single block's body.                                                                       |
-| **`StStreaming`**      | `MsgBatchDone`                     | —                                                                             | **`StIdle`**           | Producer completes block streaming.                                                                           |
+| **Current State** | **Message**        | **Parameters**                        | **Next State**    | **Description / Transition**                              |
+| ----------------- | ------------------ | ------------------------------------- | ----------------- | --------------------------------------------------------- |
+| **`StIdle`**      | `MsgRequestBodies` | `request`: sequence of block requests | **`StBusy`**      | Consumer requests block bodies from the producer.         |
+| **`StIdle`**      | `MsgConsumerDone`  | —                                     | _Terminal_        | Consumer terminates the protocol.                         |
+| **`StBusy`**      | `MsgNoBlocks`      | —                                     | **`StIdle`**      | Producer indicates it does not have the requested blocks. |
+| **`StBusy`**      | `MsgStartBatch`    | —                                     | **`StStreaming`** | Producer begins streaming block bodies.                   |
+| **`StStreaming`** | `MsgBody`          | `body`: single block body             | **`StStreaming`** | Producer streams a single block's body.                   |
+| **`StStreaming`** | `MsgBatchDone`     | —                                     | **`StIdle`**      | Producer completes block streaming.                       |
 
 **Implementation**
 
-The high-level description of Leios specifies freshest-first delivery for EB bodies, to circumvent attacks where a large amount of old EBs gets released by an adversary. The mini protocol already takes a parameter that specifies which EBs are still new enough to be diffused, so older EBs are already deprioritized to only be accessible through the `Chain-Sync` protocol, and only if referenced by other blocks.
+The high-level description of Leios specifies freshest-first delivery for EB
+bodies, to circumvent attacks where a large amount of old EBs gets released by
+an adversary. The mini protocol already takes a parameter that specifies which
+EBs are still new enough to be diffused, so older EBs are already deprioritized
+to only be accessible through the `Chain-Sync` protocol, and only if referenced
+by other blocks.
 
 #### Chain-Sync
 
-The `Chain-Sync` mini protocol synchronizes chain state between nodes, handling forks, rollbacks, and maintaining consistency. In Leios, it is extended to support retrieval of EBs referenced by the RB chain that are typically too old to be diffused by the `Relay` and `Fetch` mini protocols, but are still relevant to reconstruct the ledger state. Additionally, it covers certified EBs not yet in the chain but which are still recent enough for inclusion in a future RB. Certificates are included as part of RB bodies when EBs are certified, so they don't require separate retrieval.
+The `Chain-Sync` mini protocol synchronizes chain state between nodes, handling forks, rollbacks, and maintaining consistency. In Leios, it is extended to retrieve:
 
-This data, together with the base chain, is what is needed for a node to eventually participate in consensus.
+- EBs referenced by the RB chain that are too old for `Relay` and `Fetch` protocols
+- Certified EBs not yet in the chain but recent enough for future RB inclusion
 
-The protocol follows a request-response strategy where consumers request chain headers and associated data, with producers streaming the requested chain information and EB-specific content.
+Certificates are included in RB bodies, so no separate retrieval is needed. This data, together with the base chain, enables full consensus participation.
 
 **Parameters**
 
 A `Chain-Sync` instance is specified by these parameters:
 
-| Parameter | Description |
-|-----------|-------------|
+| Parameter | Description                                         |
+| --------- | --------------------------------------------------- |
 | `request` | Request format for chain headers and historical EBs |
-| `body` | Block headers or EB bodies |
+| `body`    | Block headers or EB bodies                          |
 
 **Instances**
 
-`Chain-Sync` instances for Leios extend the standard Ouroboros Chain-Sync protocol to handle historical data requests. The instances below handle EBs by RB range and certified EBs by slot range.
+`Chain-Sync` instances for Leios extend the standard Ouroboros Chain-Sync
+protocol to handle historical data requests. The instances below handle EBs by
+RB range and certified EBs by slot range.
 
-| `instance` | `request` | `body` | `description` |
-| :--------- | :-------- | :----- | :------------ |
-| Chain-Sync | `ebs-by-rb-range(range)` | `eb-block(eb-header, eb-body)` | EBs transitively referenced by RBs in range, not referenced by earlier RBs |
-| Chain-Sync | `ebs-by-slot-range(slot, slot)` | `eb-block(eb-header, eb-body)` | Certified EBs generated in slot range, not yet referenced by RBs |
+| `instance` | `request`                       | `body`                         | `description`                                                              |
+| :--------- | :------------------------------ | :----------------------------- | :------------------------------------------------------------------------- |
+| Chain-Sync | `ebs-by-rb-range(range)`        | `eb-block(eb-header, eb-body)` | EBs transitively referenced by RBs in range, not referenced by earlier RBs |
+| Chain-Sync | `ebs-by-slot-range(slot, slot)` | `eb-block(eb-header, eb-body)` | Certified EBs generated in slot range, not yet referenced by RBs           |
 
 **State machine**
 
-The `Chain-Sync` mini-protocol operates through a series of states, with transitions determined by protocol messages exchanged between the *consumer* and *producer* roles. The state machine follows the standard Ouroboros Chain-Sync protocol with five states: `StIdle`, `StCanAwait`, `StMustReply`, `StIntersect`, and terminal states. The consumer drives requests while the producer streams responses.
+The `Chain-Sync` mini-protocol operates through a series of states, with
+transitions determined by protocol messages exchanged between the _consumer_ and
+_producer_ roles. The state machine follows the standard Ouroboros Chain-Sync
+protocol with five states: `StIdle`, `StCanAwait`, `StMustReply`, `StIntersect`,
+and terminal states. The consumer drives requests while the producer streams
+responses.
 
 <p align="center">
   <a id="fig-chain-sync-state-machine"></a>
@@ -516,33 +592,48 @@ The `Chain-Sync` mini-protocol operates through a series of states, with transit
   <em>Figure 7: Chain-Sync mini-protocol state machine</em>
 </p>
 
-The protocol maintains the same message types as Praos (`MsgRequestNext`, `MsgRollForward`, `MsgRollBackward`, `MsgFindIntersect`, etc.) but extends the body content to include EB-specific data.
+The protocol maintains the same message types as Praos (`MsgRequestNext`,
+`MsgRollForward`, `MsgRollBackward`, `MsgFindIntersect`, etc.) but extends the
+body content to include EB-specific data.
 
-| **Current State**      | **Message**                        | **Parameters**                                                                 | **Next State**         | **Description / Transition**                                                                                  |
-|------------------------|------------------------------------|-------------------------------------------------------------------------------|------------------------|--------------------------------------------------------------------------------------------------------------|
-| **`StIdle`**           | `MsgRequestNext`                   | —                                                                             | **`StCanAwait`**       | Consumer requests the next chain update from the producer.                                                    |
-| **`StIdle`**           | `MsgFindIntersect`                 | `[point]`: list of chain points                                               | **`StIntersect`**      | Consumer asks producer to find intersection point between their chains.                                       |
-| **`StIdle`**           | `MsgDone`                          | —                                                                             | *Terminal*             | Consumer terminates the protocol.                                                                             |
-| **`StCanAwait`**       | `MsgAwaitReply`                    | —                                                                             | **`StMustReply`**      | Producer acknowledges request but requires consumer to wait for next update.                                  |
-| **`StCanAwait`**       | `MsgRollForward`                   | `header`: block header<br/>`tip`: chain tip                                   | **`StIdle`**           | Producer tells consumer to extend chain with given header.                                                    |
-| **`StCanAwait`**       | `MsgRollBackward`                  | `point`: rollback point<br/>`tip`: chain tip                                  | **`StIdle`**           | Producer tells consumer to roll back to given point on their chain.                                           |
-| **`StMustReply`**      | `MsgRollForward`                   | `header`: block header<br/>`tip`: chain tip                                   | **`StIdle`**           | Producer tells consumer to extend chain with given header.                                                    |
-| **`StMustReply`**      | `MsgRollBackward`                  | `point`: rollback point<br/>`tip`: chain tip                                  | **`StIdle`**           | Producer tells consumer to roll back to given point on their chain.                                           |
-| **`StIntersect`**      | `MsgIntersectFound`                 | `point`: intersection point<br/>`tip`: chain tip                              | **`StIdle`**           | Producer replies with first intersection point found on its current chain.                                    |
-| **`StIntersect`**      | `MsgIntersectNotFound`             | `tip`: chain tip                                                               | **`StIdle`**           | Producer replies that no intersection was found with any of the supplied points.                               |
+| **Current State** | **Message**            | **Parameters**                                   | **Next State**    | **Description / Transition**                                                     |
+| ----------------- | ---------------------- | ------------------------------------------------ | ----------------- | -------------------------------------------------------------------------------- |
+| **`StIdle`**      | `MsgRequestNext`       | —                                                | **`StCanAwait`**  | Consumer requests the next chain update from the producer.                       |
+| **`StIdle`**      | `MsgFindIntersect`     | `[point]`: list of chain points                  | **`StIntersect`** | Consumer asks producer to find intersection point between their chains.          |
+| **`StIdle`**      | `MsgDone`              | —                                                | _Terminal_        | Consumer terminates the protocol.                                                |
+| **`StCanAwait`**  | `MsgAwaitReply`        | —                                                | **`StMustReply`** | Producer acknowledges request but requires consumer to wait for next update.     |
+| **`StCanAwait`**  | `MsgRollForward`       | `header`: block header<br/>`tip`: chain tip      | **`StIdle`**      | Producer tells consumer to extend chain with given header.                       |
+| **`StCanAwait`**  | `MsgRollBackward`      | `point`: rollback point<br/>`tip`: chain tip     | **`StIdle`**      | Producer tells consumer to roll back to given point on their chain.              |
+| **`StMustReply`** | `MsgRollForward`       | `header`: block header<br/>`tip`: chain tip      | **`StIdle`**      | Producer tells consumer to extend chain with given header.                       |
+| **`StMustReply`** | `MsgRollBackward`      | `point`: rollback point<br/>`tip`: chain tip     | **`StIdle`**      | Producer tells consumer to roll back to given point on their chain.              |
+| **`StIntersect`** | `MsgIntersectFound`    | `point`: intersection point<br/>`tip`: chain tip | **`StIdle`**      | Producer replies with first intersection point found on its current chain.       |
+| **`StIntersect`** | `MsgIntersectNotFound` | `tip`: chain tip                                 | **`StIdle`**      | Producer replies that no intersection was found with any of the supplied points. |
 
 **Implementation**
 
-The high-level description of Leios specifies freshest-first delivery for EBs, to circumvent attacks where a large amount of old EBs gets released by an adversary. The protocol addresses this through several mechanisms:
+The high-level description of Leios specifies freshest-first delivery for EBs,
+to circumvent attacks where a large amount of old EBs gets released by an
+adversary. The protocol addresses this through several mechanisms:
 
-- **Priority handling**: Producers prioritize serving requests for the EB-relay and Vote-relay mini protocols over requests for Chain-Sync to maintain freshest-first delivery
-- **Timing constraints**: For `ebs-by-slot-range` requests, the start of the slot range should be no earlier than the oldest slot an EB could be generated in and still referenced in a future RB
-- **Request partitioning**: Consumers can divide requests between different producers for efficient load distribution and fault tolerance
-- **Intersection finding**: Uses the same binary search mechanism as Praos for efficient chain intersection discovery  
-- **Fork handling**: Supports chain rollbacks and fork switching with EB state consistency
-- **Resource management**: Maintains constant memory per consumer connection to prevent resource exhaustion
+- **Priority handling**: Producers prioritize serving requests for the EB-relay
+  and Vote-relay mini protocols over requests for Chain-Sync to maintain
+  freshest-first delivery
+- **Timing constraints**: For `ebs-by-slot-range` requests, the start of the
+  slot range should be no earlier than the oldest slot an EB could be generated
+  in and still referenced in a future RB
+- **Request partitioning**: Consumers can divide requests between different
+  producers for efficient load distribution and fault tolerance
+- **Intersection finding**: Uses the same binary search mechanism as Praos for
+  efficient chain intersection discovery
+- **Fork handling**: Supports chain rollbacks and fork switching with EB state
+  consistency
+- **Resource management**: Maintains constant memory per consumer connection to
+  prevent resource exhaustion
 
-The protocol enables nodes to efficiently catch up on both the RB chain and associated EB data required for full ledger reconstruction in Linear Leios. Together with the base chain retrieved through other mini protocols, this provides all data needed for a node to participate in future pipelines.
+The protocol enables nodes to efficiently catch up on both the RB chain and
+associated EB data required for full ledger reconstruction in Linear Leios.
+Together with the base chain retrieved through other mini protocols, this
+provides all data needed for a node to participate in future pipelines.
 
 ### Node changes
 
@@ -552,10 +643,10 @@ The protocol enables nodes to efficiently catch up on both the RB chain and asso
 
 - New DB tables: EBs, votes, certificates
 - Chain state tracks:
-    - $\mathcal{A}$: announced EBs (awaiting voting)
-    - $\mathcal{V}_e$: votes for EB $e$ (ephemeral)
-    - $\mathcal{C}$: validated EB certificates (ready for inclusion)
-    - $\mathcal{F}$: finalized EBs (in ledger via RBs)
+  - $\mathcal{A}$: announced EBs (awaiting voting)
+  - $\mathcal{V}_e$: votes for EB $e$ (ephemeral)
+  - $\mathcal{C}$: validated EB certificates (ready for inclusion)
+  - $\mathcal{F}$: finalized EBs (in ledger via RBs)
 - Block validation: handle EB certificates, transaction references
 - Chain selection: support EBs in fork resolution, switching
 - Block production: produce RBs and EBs, enforce timing
@@ -566,8 +657,11 @@ The protocol enables nodes to efficiently catch up on both the RB chain and asso
   $$
 
   (RB txs applied before EB txs)
-- Cleanup: EBs in $\mathcal{A}$ expire on fork resolution; votes in $\mathcal{V}_e$ discarded after voting
-- EBs retained until stability horizon ($k$ blocks) to handle chain suffix instability
+
+- Cleanup: EBs in $\mathcal{A}$ expire on fork resolution; votes in
+  $\mathcal{V}_e$ discarded after voting
+- EBs retained until stability horizon ($k$ blocks) to handle chain suffix
+  instability
 - Equivocation: see threat model section
 
 ### Mempool management
@@ -577,7 +671,8 @@ The protocol enables nodes to efficiently catch up on both the RB chain and asso
 > This section is work in progress.
 
 - Mempool enlarged for both RB and EB txs.
-- On EB announcement, optimistically include EB txs in mempool (pending certification).
+- On EB announcement, optimistically include EB txs in mempool (pending
+  certification).
 - If EB not certified, revalidate/reinsert its txs.
 - Remove txs from mempool when included in RB or certified EB.
 - Validate txs against current ledger state before mempool admission.
@@ -1010,13 +1105,13 @@ tradeoffs.
 > - [ ] Revise after the protocol definition is complete.
 > - [ ] Each row should have a paragraph of justification.
 
-| Parameter                                  | Symbol           | Units    | Description                                                                 | Feasible value | Justification                                                                                                             |
-| ------------------------------------------ | ---------------- | -------- | --------------------------------------------------------------------------- | -------------: | ------------------------------------------------------------------------------------------------------------------------- |
-| Stage length                               | $L$              | slot     |                                                                             |             10 | Short stages increase settlement speed, but the stage length must be generously larger than the propagation time for IBs. |
-| Expiration of unreferenced endorser blocks | $r_\text{EB}$    | slot     |                                                                             |                |                                                                                                                           |
-| Mean committee size                        | $n$              | parties  |                                                                             |            500 | Probabilistic analyses of adversarial stake scenarios.                                                                    |
-| Quorum size                                | $\tau$           | fraction |                                                                             |            60% | Probabilistic analyses of adversarial stake scenarios.                                                                    |
-| Praos active slot coefficient              | $f_\text{RB}$    | 1/slot   | The probability that a party will be the slot leader for a particular slot. |           0.05 | This is the current value on mainnet, but it may become feasible to reduce it if Praos blocks are made smaller.           |
+| Parameter                                  | Symbol        | Units    | Description                                                                 | Feasible value | Justification                                                                                                             |
+| ------------------------------------------ | ------------- | -------- | --------------------------------------------------------------------------- | -------------: | ------------------------------------------------------------------------------------------------------------------------- |
+| Stage length                               | $L$           | slot     |                                                                             |             10 | Short stages increase settlement speed, but the stage length must be generously larger than the propagation time for IBs. |
+| Expiration of unreferenced endorser blocks | $r_\text{EB}$ | slot     |                                                                             |                |                                                                                                                           |
+| Mean committee size                        | $n$           | parties  |                                                                             |            500 | Probabilistic analyses of adversarial stake scenarios.                                                                    |
+| Quorum size                                | $\tau$        | fraction |                                                                             |            60% | Probabilistic analyses of adversarial stake scenarios.                                                                    |
+| Praos active slot coefficient              | $f_\text{RB}$ | 1/slot   | The probability that a party will be the slot leader for a particular slot. |           0.05 | This is the current value on mainnet, but it may become feasible to reduce it if Praos blocks are made smaller.           |
 
 The analysis
 [Committee size and quorum requirement](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-1.md#committee-size-and-quorum-requirement)
@@ -1224,37 +1319,49 @@ while maintaining decentralization.
 
 > [!NOTE]
 >
-> This section will explain why this simplified variant was chosen over the full Leios described in the research paper, including implementation complexity, risk assessment, and practical deployment considerations.
+> This section will explain why this simplified variant was chosen over the full
+> Leios described in the research paper, including implementation complexity,
+> risk assessment, and practical deployment considerations.
 
 ### Design trade-offs and simplifications
 
 > [!NOTE]
 >
-> This section will analyze the trade-offs made in this variant's design, including the removal of input blocks, simplified concurrency model, and the balance between implementation complexity and throughput improvements.
+> This section will analyze the trade-offs made in this variant's design,
+> including the removal of input blocks, simplified concurrency model, and the
+> balance between implementation complexity and throughput improvements.
 
 ### Evidence and simulation analysis
 
 > [!NOTE]
 >
-> This section will present simulation results and performance analysis demonstrating this variant's effectiveness, including throughput measurements, latency analysis, and resource utilization data.
+> This section will present simulation results and performance analysis
+> demonstrating this variant's effectiveness, including throughput measurements,
+> latency analysis, and resource utilization data.
 
 ### Feasible protocol parameters
 
 > [!NOTE]
 >
-> This section will provide detailed rationale for the selected protocol parameters, including security analysis, performance optimization, and practical deployment considerations.
+> This section will provide detailed rationale for the selected protocol
+> parameters, including security analysis, performance optimization, and
+> practical deployment considerations.
 
 ### Threat model
 
 > [!NOTE]
 >
-> This section will define the security threat model for this variant, including attack vectors, adversary capabilities, and security guarantees provided by the protocol.
+> This section will define the security threat model for this variant, including
+> attack vectors, adversary capabilities, and security guarantees provided by
+> the protocol.
 
 ### Resource requirements
 
 > [!NOTE]
 >
-> This section will detail the hardware and operational requirements for running nodes with this variant, including CPU, memory, storage, and network bandwidth needs.
+> This section will detail the hardware and operational requirements for running
+> nodes with this variant, including CPU, memory, storage, and network bandwidth
+> needs.
 
 ## Path to active
 
