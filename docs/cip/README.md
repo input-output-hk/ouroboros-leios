@@ -188,7 +188,11 @@ block_header =
    ]
 ```
 
-<p align="center"><em>Figure 1: Ranking Block CDDL</em></p>
+<div align="center">
+<a name="figure-1"></a>
+
+*Figure 1: Ranking Block CDDL*
+</div>
 </details>
 
 ### Endorser Blocks (EBs)
@@ -217,7 +221,11 @@ announced EB by including a certificate.
  transaction_index = uint
 ```
 
-<p align="center"><em>Figure 2: Endorser Block CDDL</em></p>
+<div align="center">
+<a name="figure-2"></a>
+
+*Figure 2: Endorser Block CDDL*
+</div>
 </details>
 
 ### Voting Committee and Certificates
@@ -270,7 +278,11 @@ For further cryptographic details, refer to the
  vote_entries = {* endorser_block_hash => vote_signature}
 ```
 
-<p align="center"><em>Figure 3: Votes & Certificate CDDL</em></p>
+<div align="center">
+<a name="figure-3"></a>
+
+*Figure 3: Votes & Certificate CDDL*
+</div>
 </details>
 
 ### Protocol Flow
@@ -278,11 +290,14 @@ For further cryptographic details, refer to the
 The protocol flow, as depicted in [Figure 4](#protocol-flow-figure), consists of
 five main steps:
 
-<p align="center" name="protocol-flow-figure">
+<div align="center">
+<a name="figure-4"></a>
+<p name="protocol-flow-figure">
   <img src="images/protocol-flow-overview.png" alt="Leios Protocol Flow">
 </p>
 
-<p align="center"><em>Figure 4: Ouroboros Leios Protocol Flow</em></p>
+*Figure 4: Ouroboros Leios Protocol Flow*
+</div>
 
 1. **EB Announcement:**  
    The RB producer embeds an EB announcement in the RB header via the 
@@ -348,8 +363,11 @@ As briefly mentioned in the previous section, the following table formally
 defines key parameters, which control the timing, security, and performance
 characteristics of the protocol.
 
+<div align="center">
+<a name="table-1"></a>
+
 | Parameter                     | Symbol        | Units    | Description                                                            | Constraints                        | Rationale                                                     |
-| ----------------------------- | ------------- | -------- | ---------------------------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------- |
+| ----------------------------- |:-------------:|:--------:| ---------------------------------------------------------------------- |:----------------------------------:| ------------------------------------------------------------- |
 | Network diffusion time        | $\Delta$      | slot     | Upper limit on the time needed to diffuse a message to all nodes       | $\Delta > 0$                       | Messages have a finite delay due to network topology          |
 | Stage length                  | $L$           | slot     | Duration of the voting period for endorser blocks                      | $L \geq \Delta$                    | Must allow sufficient time for EB diffusion and voting        |
 | Ranking block max size        | $S_\text{RB}$ | bytes    | Maximum size of a ranking block                                        | $S_\text{RB} > 0$                  | Limits RB size to ensure timely diffusion within slot time    |
@@ -357,6 +375,9 @@ characteristics of the protocol.
 | Endorser-block max size       | $S_\text{EB}$ | bytes    | Maximum size of an endorser block                                      | $S_\text{EB} > 0$                  | Limits EB size to ensure timely diffusion within stage length |
 | Mean committee size           | $n$           | parties  | Average number of stake pools selected for voting                      | $n > 0$                            | Ensures sufficient decentralization and security              |
 | Quorum size                   | $\tau$        | fraction | Minimum fraction of committee votes required for certification         | $\tau > 0.5$                       | Prevents adversarial control while ensuring liveness          |
+
+*Table 1: Leios Protocol Parameters*
+</div>
 
 ### Specification for votes and certificates
 
@@ -415,28 +436,202 @@ This implementation provides:
 
 ### Network
 
-Linear Leios adds three mini-protocols to existing Cardano infrastructure. EB announcements use standard RB diffusion.
+With the introduction of EBs, syncing an RB chain alone is insufficient for consensus participation. Nodes need EB contents and certification state to reconstruct ledger state. This requires fetching EB bodies (announced via RB headers), accessing vote bundles for certification determination, and retrieving transaction bodies referenced by EBs.
+
+Leios addresses these requirements by adding three mini-protocols to existing Cardano infrastructure while preserving standard RB diffusion for EB announcements.
+
+<div align="center">
+<a name="table-2"></a>
+
+| **Protocol**   | **Purpose**                 | **Trigger**                                 |
+|:--------------:|-----------------------------|---------------------------------------------|
+| **EB-Fetch**   | Download EB content         | `announced_eb` field in RB header           |
+| **Tx-Fetch**   | Retrieve transactions       | EB references unknown transactions          |
+| **Vote-Relay** | Diffuse votes/ vote bundles | EB validated                                |
+
+*Table 2: Leios Mini-Protocols for EB and Vote Handling*
+</div>
 
 > [!NOTE]
 >
-> **Existing Protocols**: Chain-Sync, Block-Fetch, and Tx-Submission operate unchanged. RB headers extended with EB announcement fields, but diffusion mechanics remain identical to Praos.
+> **Existing Protocols**, such as Chain-Sync, Block-Fetch, and Tx-Submission operate unchanged. RB headers extended with EB announcement fields, but diffusion mechanics remain identical to Praos.
 
-**Additional Mini-Protocols**
+#### EB-Fetch Mini-Protocol
 
-| **Protocol** | **Purpose** | **Trigger** |
-|-------------|------------|-------------|
-| **EB-Fetch** | Download EB content | `announced_eb` field in RB header |
-| **Vote-Relay** | Diffuse votes/ vote bundles | EB validated |
-| **Tx-Fetch** | Retrieve transactions | EB references unknown transactions |
+Instance of the Fetch protocol for downloading EB content using announced hashes.
 
-**Protocol Flow**
+<div align="center">
+<a name="table-3"></a>
 
-1. **RB announces EB** via `announced_eb` header field (standard block diffusion)
-2. **EB-Fetch** downloads EB content using announced hash
-3. **Tx-Fetch** retrieves missing transactions referenced by EB
-4. **Vote-Relay** diffuses votes during voting period
-5. **Certification** included in subsequent RB (standard block diffusion)
+| **Parameter**    | **Value**                                              |
+|------------------|--------------------------------------------------------|
+| Request Format   | [hash32] (EB hash from `announced_eb` field)           |
+| Response Format  | endorser_block                                         |
+| Direction        | Downstream (consumer fetches from producer)            |
+| Timeout          | Configurable, with peer fallback                       |
 
+*Table 3: EB-Fetch Parameters*
+</div>
+
+**State Machine**
+
+<!-- <div align="center">
+<a name="figure-6"></a>
+<img src="images/eb-fetch-state-machine.svg" alt="EB-Fetch State Machine" width="400">
+
+*Figure 6: EB-Fetch State Machine*
+</div> -->
+
+<div align="center">
+<a name="table-4"></a>
+
+| **State** | **Agency** | **Description** |
+|-----------|:----------:|-----------------|
+| StIdle | Consumer | Initial state, consumer can request EBs |
+| StBusy | Producer | Processing EB request |
+| StStreaming | Producer | Streaming EB content |
+| StDone | - | Terminal state |
+
+*Table 4: EB-Fetch States*
+</div>
+
+**Message Transitions**
+
+<div align="center">
+<a name="table-5"></a>
+
+| **From State** | **Message** | **Parameters** | **To State** |
+|----------------|:-----------:|:--------------:|:------------:|
+| StIdle | MsgRequestBodies | `[hash32]` | StBusy |
+| StBusy | MsgNoBlocks |  | StIdle |
+| StBusy | MsgStartBatch |  | StStreaming |
+| StStreaming | MsgBody | `endorser_block` | StStreaming |
+| StStreaming | MsgBatchDone |  | StIdle |
+| StIdle | MsgConsumerDone |  | StDone |
+
+*Table 5: EB-Fetch Message Transitions*
+</div>
+
+#### Vote-Relay Mini-Protocol  
+
+Instance of the Relay protocol for diffusing vote bundles during the voting period.
+
+<div align="center">
+<a name="table-6"></a>
+
+| **Parameter** | **Value** |
+|---------------|-----------|
+| ID Format | `hash32` (vote bundle hash) |
+| Info Format | `slot` (slot number for filtering) |
+| Datum Format | `vote_bundle` |
+| Direction | Push-based (producer to consumer) |
+| BoundedWindow | No |
+| Announcements | No |
+
+*Table 6: Vote-Relay Parameters*
+</div>
+
+**State Machine**
+
+<!-- <div align="center">
+<a name="figure-7"></a>
+<img src="images/vote-relay-state-machine.svg" alt="Vote-Relay State Machine" width="400">
+
+*Figure 7: Vote-Relay State Machine*
+</div> -->
+
+<div align="center">
+<a name="table-6"></a>
+
+| **State** | **Agency** | **Description** |
+|-----------|:----------:|-----------------|
+| StInit | Producer | Initial state |
+| StIdle | Consumer | Consumer can request vote IDs or data |
+| StIdsBlocking | Producer | Processing blocking ID request |
+| StIdsNonBlocking | Producer | Processing non-blocking ID request |
+| StData | Producer | Transferring vote bundles |
+| StDone | - | Terminal state |
+
+*Table 6: Vote-Relay States*
+</div>
+
+**Message Transitions**
+
+<div align="center">
+<a name="table-7"></a>
+
+| **From State** | **Message** | **Parameters** | **To State** |
+|----------------|:-----------:|:--------------:|:------------:|
+| StInit | MsgInit |  | StIdle |
+| StIdle | MsgRequestIdsBlocking | `ack, req` | StIdsBlocking |
+| StIdsBlocking | MsgReplyIds | `⟨(id, info)⟩` | StIdle |
+| StIdle | MsgRequestIdsNonBlocking | `ack, req` | StIdsNonBlocking |
+| StIdsNonBlocking | MsgReplyIds | `⟨(id, info)⟩` | StIdle |
+| StIdle | MsgRequestData | `⟨id⟩` | StData |
+| StData | MsgReplyData | `⟨vote_bundle⟩` | StIdle |
+| StIdsBlocking | MsgDone |  | StDone |
+
+*Table 7: Vote-Relay Message Transitions*
+</div>
+
+#### Tx-Fetch Mini-Protocol
+
+Instance of the Fetch protocol for retrieving transaction bodies referenced by EBs.
+
+<div align="center">
+<a name="table-8"></a>
+
+| **Parameter** | **Value** |
+|---------------|-----------|
+| Request Format | `[hash32]` (list of transaction hashes) |
+| Response Format | `[transaction]` (corresponding transaction bodies) |
+| Direction | Downstream (consumer fetches from producer) |
+| Batch Support | Yes (multiple transactions per request) |
+
+*Table 8: Tx-Fetch Parameters*
+</div>
+
+**State Machine**
+
+> [!Note]
+> ToDo State Machine diagram
+
+<!-- <div align="center">
+<a name="figure-8"></a>
+<img src="images/tx-fetch-state-machine.svg" alt="Tx-Fetch State Machine" width="400">
+
+*Figure 8: Tx-Fetch State Machine*
+</div> -->
+
+<div align="center">
+<a name="table-9"></a>
+
+| **State** | **Agency** | **Description** |
+|-----------|:----------:|-----------------|
+| StIdle | Consumer | Initial state, consumer can request transactions |
+| StBusy | Producer | Processing transaction request |
+| StStreaming | Producer | Streaming transaction bodies |
+| StDone | - | Terminal state |
+
+*Table 9: Tx-Fetch Protocol States*
+</div>
+
+**Message Transitions**
+
+<div align="center">
+<a name="table-10"></a>
+
+| **From State** | **Message** | **Parameters** | **To State** |
+|----------------|:-----------:|:--------------:|:------------:|
+| StIdle | MsgRequestBodies | `[hash32]` | StBusy |
+| StBusy | MsgNoBlocks |  | StIdle |
+| StBusy | MsgStartBatch |  | StStreaming |
+| StStreaming | MsgBody | `transaction` | StStreaming |
+| StStreaming | MsgBatchDone |  | StIdle |
+| StIdle | MsgConsumerDone |  | StDone |
+
+*Table 10: Tx-Fetch Message Transitions*
+</div>
 
 ### Node changes
 
