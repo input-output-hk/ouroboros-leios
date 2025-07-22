@@ -825,6 +825,40 @@ courier (Praos chain), achieving significantly higher delivery volume through
 this structured validation approach.
 -->
 
+Concretely, the [specified protocol and parameterization](#specification)
+results in roughly a **10x** throughput increase by combining the transaction
+capacity of regular blocks with that of certified EBs. The formula below
+expresses this: throughput equals the rate of regular block production times the
+sum of their capacity and the additional capacity from Endorser Blocks that are
+certified.
+
+> [!WARNING]
+> What about the maximum number / size of referenced transactions?
+
+$$
+\text{Throughput} = f_{\text{RB}} \times \left( S_\text{RB} + S_\text{EB} \times f_\text{EB} \right)
+$$
+
+Where:
+- $f_{\text{RB}}$ — Rate of RB production (protocol parameter)
+- $S_\text{RB}$ — Maximum size of an RB (protocol parameter)
+- $S_\text{EB}$ — Maximum size of an EB (protocol parameter)
+- $f_\text{EB}$ — Fraction of RBs that include an EB as observed under realistic network conditions and timing constraints.
+
+While even higher throughput may be possible, and should be explored during
+implementation to validate mainnet compatible parameters, increasing the
+capacity of Cardano further is likely blocked by the **significantly increased**
+potential chain growth. _Assuming sustained demand_ of `100 tx/s` of [current
+average
+sized](https://github.com/input-output-hk/ouroboros-leios/tree/main/docs/cost-estimate#cost-revenue-analysis)
+transactions of `~1400 Bytes`, the chain would grow `~11 GBytes` per day or
+`~337 GBytes` per month. Pushing this even higher did not sound reasonable and
+would require a solution to the **chain growth problem**, which is out of scope
+of this CIP and may even demand a dedicated CPS.
+
+See also [evidence section](#evidence-that-leios-provides-high-throughput)
+for empirical studies on possible throughput.
+
 ### Why this protocol variant
 
 The proposed protocol is a radically simplified version of what was published in
@@ -838,25 +872,29 @@ inclusion latency (> 5x) and a high level of concurrency. Both of which are
 undesirable in a real-world deployment onto the Cardano mainnet and need to be
 carefully weighed against the throughput increase:
 
-- High latency
-  - straight-forward drawback
-  - initial deployment should not make the situation all too worse and a potential synergy with Peras (link CIP) can make higher latency pipeline designs feasible.
-
-- High concurrency
-  - more conflicting transactions possible
-  - For example: IB production = a lot more concurrency
-  - More throughput possible (= prepare more work)
-  - Adding stages results in longer latency
-  
-- Conflicting txs a.k.a congestion on Cardano
-  - Competing spending of UTxOs is to be expected
-  - Also a network-based attack possible (link threat model?)
-
-- Conflicting transactions can either be
-  - accepted = failing transactions vs. Cardano USP of only paying fees when included
-  - reduced -> sharding reduces (!not eliminates!) amount of potential conflict, but has lots of impact & complexity
-  - reconciled -> a certain number of conflicts can be dealt with; tombstoning to reduce storage waste
-- We chose the third option and hence only proposed no / a modest increase in concurrency
+> [!WARNING]
+> TODO
+>
+> - High latency
+>   - straight-forward drawback
+>   - initial deployment should not make the situation all too worse and a potential synergy with Peras (link CIP) can make higher latency pipeline designs feasible.
+>
+> - High concurrency
+>   - more conflicting transactions possible
+>   - For example: IB production = a lot more concurrency
+>   - More throughput possible (= prepare more work)
+>   - Adding stages results in longer latency
+>
+> - Conflicting txs a.k.a congestion on Cardano
+>   - Competing spending of UTxOs is to be expected
+>   - Also a network-based attack possible (link threat model?)
+>
+> - Conflicting transactions can either be
+>   - accepted = failing transactions vs. Cardano USP of only paying fees when included
+>   - reduced -> sharding reduces (!not eliminates!) amount of potential conflict, but has lots of impact & complexity
+>   - reconciled -> a certain number of conflicts can be dealt with; tombstoning to reduce storage waste
+>
+> - We chose the third option and hence only proposed no / a modest increase in concurrency
 
 ### Why Leios is practical to implement
 
