@@ -373,9 +373,6 @@ These are observed properties of the network topology and node capabilities:
 | ------------------------- | :-----------------: | :---: | ----------------------------------------------------------- | :-----------------------------: | -------------------------------------------------- |
 | Network diffusion time    |      $\Delta$       | slot  | Observed upper bound for message diffusion to all nodes     |            2-6 slots            | Depends on network topology and conditions         |
 | RB header diffusion time  | $\Delta_\text{hdr}$ | slot  | Observed time for RB headers to reach nodes                 |          $\leq \Delta$          | Usually faster than full block diffusion           |
-| EB content diffusion time |    $L_\text{eb}$    | slot  | Observed time to fetch EB content after header announcement |    Variable (size-dependent)    | Increases with EB size and network congestion      |
-| Transaction fetch time    | $L_\text{txfetch}$  | slot  | Time to retrieve unknown transactions when TxsByRef enabled |  Variable (mempool-dependent)   | Depends on transaction availability across network |
-| EB validation time        |   $L_\text{val}$    | slot  | Computational time to validate EB content                   | Variable (complexity-dependent) | Depends on EB size and node computational capacity |
 
 _Table 1: Network Characteristics_
 
