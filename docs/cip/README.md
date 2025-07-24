@@ -156,7 +156,7 @@ _Figure 4: Ouroboros Leios Protocol Flow_
 Leios works through a five-step process that introduces new block types and
 validation mechanisms:
 
-#### Step 1: Block Production
+**Step 1: Block Production**
 
 When a stake pool wins block leadership, they **simultaneously** create two
 things:
@@ -168,7 +168,7 @@ things:
 The RB header includes an `announced_eb` field containing the EB's hash,
 signaling its availability to the network through standard block diffusion.
 
-#### Step 2: EB Distribution
+**Step 2: EB Distribution**
 
 Nodes receiving the RB header discover the announced EB and fetch its content
 using a dedicated EB-Fetch protocol. The EB contains either:
@@ -176,7 +176,7 @@ using a dedicated EB-Fetch protocol. The EB contains either:
 - Transaction data directly, or
 - References to transactions (depending on configuration)
 
-#### Step 3: Committee Validation
+**Step 3: Committee Validation**
 
 A **voting committee** of stake pools validates the EB within a time window
 called the **stage length** ($L$):
@@ -187,7 +187,7 @@ called the **stage length** ($L$):
 - The stage has two phases: voting period ($L_\text{vote}$) + vote diffusion
   period ($L_\text{diff}$)
 
-#### Step 4: Certification
+**Step 4: Certification**
 
 If enough committee votes are collected such that the total stake exceeds a
 threshold (typically 60% of total stake), the EB becomes **certified**:
@@ -198,7 +198,7 @@ $$
 
 This creates a compact **certificate** proving the EB's validity.
 
-#### Step 5: Chain Inclusion
+**Step 5: Chain Inclusion**
 
 The next RB producer can include the certificate in their block **only if** all
 conditions are met:
