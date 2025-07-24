@@ -209,11 +209,11 @@ higher throughput when network timing permits. When included:
 - If timing is insufficient, only the standard RB is included (maintaining Praos
   baseline)
 
-### Protocol Components
+### Protocol Component Details
 
 The protocol extends Praos with three main elements:
 
-### Ranking Blocks (RBs)
+#### Ranking Blocks (RBs)
 
 RBs are Praos blocks extended to support Leios by optionally announcing EBs in
 their headers and embedding EB certificates in their bodies. In addition to
@@ -267,7 +267,7 @@ _Figure 1: Ranking Block CDDL_
 </div>
 </details>
 
-### Endorser Blocks (EBs)
+#### Endorser Blocks (EBs)
 
 EBs are produced by the same stake pool that created the corresponding
 announcing RB. They serve to reference additional transactions, increasing
@@ -301,7 +301,7 @@ _Figure 2: Endorser Block CDDL_
 </div>
 </details>
 
-### Voting Committee and Certificates
+#### Voting Committee and Certificates
 
 The voting committee is a group of stake pools selected to validate EBs through
 BLS-based vote aggregation. Only EBs that achieve the required quorum of votes
@@ -355,33 +355,6 @@ _Figure 3: Votes & Certificate CDDL_
 
 </div>
 </details>
-
-### Bottom Line: What Throughput Does Leios Enable?
-
-Leios increases throughput by combining the transaction capacity of regular
-blocks with that of certified EBs. The formula below expresses this: throughput
-equals the rate of regular block production times the sum of their capacity and
-the additional capacity from Endorser Blocks that are **included**.
-
-$$
-\text{Throughput} = f_{\text{RB}} \times \left( S_\text{RB} + S_\text{EB} \times f_\text{EB} \right)
-$$
-
-Where:
-
-- $f_{\text{RB}}$ — Rate of RB production (protocol parameter)
-- $S_\text{RB}$ — Maximum size of an RB (protocol parameter)
-- $S_\text{EB}$ — Maximum size of an EB (protocol parameter)
-- $f_\text{EB}$ — **Observed fraction of RBs that include an EB**
-
-> [!NOTE]
->
-> The parameter $f_\text{EB}$ is an **observed fraction**, not a protocol
-> parameter. It accounts for the fact that not every EB gets certified under
-> realistic network conditions or timing constraints. The value of $f_\text{EB}$
-> depends on factors such as inter-block gaps, network latency, EB sizes, and
-> transaction availability as detailed in
-> [Factors Affecting EB Inclusion](#factors-affecting-eb-inclusion).
 
 ### Protocol Parameters and Network Characteristics
 
