@@ -956,6 +956,15 @@ gives rise to the dedicated problem of _conflicting transactions_.
 
 ### Why Leios is practical to implement
 
+> [!WARNING]
+> TODO:
+>
+> - Shorten?
+> - Incorporate: it's rather simple - offers minimal changes to existing implementation
+> - Could also mention here:
+>   - meets most urgent need - the economic sustainable threshold (from motivation)
+>   - allows for progressive updates of infrastructure (node operators)
+
 Leios is designed as an overlay protocol to Praos and consequently changes to
 Cardano node infrastructure are often extensional. The existing network
 protocols do not need to change, while the new mini-protocols for diffusion of
