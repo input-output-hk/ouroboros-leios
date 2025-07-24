@@ -362,7 +362,7 @@ The following sections distinguish between tunable **protocol parameters**
 (which can be adjusted via governance) and observed **network characteristics**
 (which depend on topology and node capabilities).
 
-#### **Network Characteristics**
+**Network Characteristics**
 
 These are observed properties of the network topology and node capabilities:
 
@@ -381,7 +381,7 @@ _Table 1: Network Characteristics_
 
 </div>
 
-#### **Protocol Parameters**
+**Protocol Parameters**
 
 These parameters are configurable and subject to governance decisions,
 constrained by the network characteristics above:
