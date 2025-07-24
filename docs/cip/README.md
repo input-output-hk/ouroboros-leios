@@ -165,16 +165,10 @@ things:
   announce the second block
 - **Endorser Block (EB)**: A larger block containing additional transactions
 
-The RB header includes an `announced_eb` field containing the EB's hash,
-signaling its availability to the network through standard block diffusion.
-
 **Step 2: EB Distribution**
 
-Nodes receiving the RB header discover the announced EB and fetch its content
-using a dedicated EB-Fetch protocol. The EB contains either:
-
-- Transaction data directly, or
-- References to transactions (depending on configuration)
+Nodes receiving the RB header discover the announced EB and fetch its content.
+The EB contains eferences to transactions.
 
 **Step 3: Committee Validation**
 
