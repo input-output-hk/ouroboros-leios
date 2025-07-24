@@ -134,13 +134,63 @@ augmenting the Treasury, and increasing SPO and delegator rewards.
 
 ## Specification
 
-Leios enhances Ouroboros Praos by introducing a dual-block structure and a
-voting mechanism to increase transaction throughput while preserving core
-consensus properties. The protocol is built around three main components:
-**[Ranking Blocks (RBs)](#ranking-blocks-rbs)**,
-**[Endorser Blocks (EBs)](#endorser-blocks-ebs)**, and a
-**[voting committee](#voting-committee-and-certificates)** responsible for
-certifying EBs.
+Leios extends Ouroboros Praos by enabling block producers to create an optional second, larger block body called an [Endorser Block (EB)](#endorser-blocks-ebs) alongside each standard [Praos block (Ranking Block or RB)](#ranking-blocks-rbs). EBs undergo validation by a dynamically selected committee of stake pools before inclusion in the ledger.
+
+### Protocol Overview
+
+<div align="center">
+<a name="figure-4"></a>
+<p name="protocol-flow-figure">
+  <img src="images/protocol-flow-overview.png" alt="Leios Protocol Flow">
+</p>
+
+*Figure 4: Ouroboros Leios Protocol Flow*
+</div>
+
+Leios works through a five-step process that introduces new block types and validation mechanisms:
+
+#### Step 1: Block Production
+When a stake pool wins block leadership, they **simultaneously** create two things:
+- **Ranking Block (RB)**: A standard Praos block with extended header fields to announce the second block
+- **Endorser Block (EB)**: A larger block containing additional transactions
+
+The RB header includes an `announced_eb` field containing the EB's hash, signaling its availability to the network through standard block diffusion.
+
+#### Step 2: EB Distribution  
+Nodes receiving the RB header discover the announced EB and fetch its content using a dedicated EB-Fetch protocol. The EB contains either:
+- Transaction data directly, or  
+- References to transactions (depending on configuration)
+
+#### Step 3: Committee Validation
+A **voting committee** of stake pools validates the EB within a time window called the **stage length** ($L$):
+- Committee members are selected via sortition (lottery based on stake)
+- Validators check the EB's transaction validity 
+- Valid EBs receive votes from committee members
+- The stage has two phases: voting period ($L_\text{vote}$) + vote diffusion period ($L_\text{diff}$)
+
+#### Step 4: Certification
+If enough committee votes are collected such that the total stake exceeds a threshold (typically 60% of total stake), the EB becomes **certified**:
+
+$$
+\sum_{v \in \text{votes}} \text{stake}(v) \geq \tau \times \text{stake}_{\text{total}}
+$$
+
+This creates a compact **certificate** proving the EB's validity.
+
+#### Step 5: Chain Inclusion
+The next RB producer can include the certificate in their block **only if** all conditions are met:
+- A voting committee validated the EB within the stage duration $L$
+- The next RB appears with sufficient delay to allow voting completion  
+- The subsequent RB producer includes the EB's certificate
+
+This **conditional inclusion** maintains Praos safety guarantees while achieving higher throughput when network timing permits. When included:
+- The certified EB's transactions become part of the permanent ledger
+- Throughput increases significantly for that segment of the chain
+- If timing is insufficient, only the standard RB is included (maintaining Praos baseline)
+
+### Protocol Components
+
+The protocol extends Praos with three main elements:
 
 ### Ranking Blocks (RBs)
 
@@ -199,8 +249,7 @@ block_header =
 
 EBs are produced by the same stake pool that created the corresponding 
 announcing RB. They serve to reference additional transactions, increasing 
-throughput beyond what can be included directly in the RB. EBs also track 
-conflicting transactions from previous RBs to maintain ledger consistency. 
+throughput beyond what can be included directly in the RB.
 When an EB is announced in an RB header via the `announced_eb` field, a voting 
 period begins as described in [Voting Committee and Certificates](#voting-committee-and-certificates). 
 Only RBs that directly extend the announcing RB are eligible to certify the 
@@ -285,54 +334,6 @@ For further cryptographic details, refer to the
 </div>
 </details>
 
-### Protocol Flow
-
-The protocol flow, as depicted in [Figure 4](#protocol-flow-figure), consists of
-five main steps:
-
-<div align="center">
-<a name="figure-4"></a>
-<p name="protocol-flow-figure">
-  <img src="images/protocol-flow-overview.png" alt="Leios Protocol Flow">
-</p>
-
-*Figure 4: Ouroboros Leios Protocol Flow*
-</div>
-
-1. **EB Announcement:**  
-   The RB producer embeds an EB announcement in the RB header via the 
-   `announced_eb` field, signaling the EB's proposal to the network through 
-   standard Praos block diffusion. The EB size is constrained by $S_\text{EB}$ 
-   to ensure it can be diffused within the stage length $L$.
-
-2. **EB Diffusion:**
-   Upon receiving an RB with an EB announcement, nodes fetch the corresponding 
-   EB body using the EB-Fetch mini-protocol. The EB contains transaction 
-   references and conflicting transaction information.
-
-3. **Voting:**  
-   Committee members verify the EB and vote on its validity. After voting,
-   there is a period for votes to propagate through the network. The total
-   voting period, $L$, combines the time for voting and for vote diffusion
-   ($L = L_\text{vote} + L_\text{diff}$), and is chosen so that all votes can be
-   seen before proceeding. Specifically, $L$ is set to exceed the network
-   diffusion time $\Delta$ (i.e., $\Delta < L$), ensuring sufficient time for
-   both voting and message propagation.
-
-4. **Certification:**  
-   If the EB receives enough votes such that the total stake of all voting pools
-   meets or exceeds a threshold fraction $\tau$ (typically 60%) of the total
-   stake, it is certified. In other words, certification requires:
-
-$$
-\sum_{v \in \text{votes}} \text{stake}(v) \geq \tau \times \text{stake}_{\text{total}}
-$$
-
-5. **Finalization:**  
-   The certificate, $C$, is included in a subsequent RB that directly extends 
-   the announcing RB, at which point the transactions from the certified EB 
-   are executed. The process may then repeat with the announcement of the next EB.
-
 ### Bottom Line: What Throughput Does Leios Enable?
 
 Leios increases throughput by combining the transaction capacity of regular
@@ -355,28 +356,49 @@ Where:
 >
 > The parameter $f_\text{EB}$ is an **observed fraction**, not a protocol
 > parameter. It accounts for the fact that not every EB gets certified under
-> realistic network conditions or timing constraints.
+> realistic network conditions or timing constraints. The value of $f_\text{EB}$
+> depends on factors such as inter-block gaps, network latency, EB sizes, and
+> transaction availability as detailed in [Factors Affecting EB Inclusion](#factors-affecting-eb-inclusion).
 
-### Constraints on Leios protocol parameters
+### Protocol Parameters and Network Characteristics
 
-As briefly mentioned in the previous section, the following table formally
-defines key parameters, which control the timing, security, and performance
-characteristics of the protocol.
+The following sections distinguish between tunable **protocol parameters** (which can be adjusted via governance) and observed **network characteristics** (which depend on topology and node capabilities).
+
+#### **Network Characteristics**
+
+These are observed properties of the network topology and node capabilities:
 
 <div align="center">
 <a name="table-1"></a>
 
-| Parameter                     | Symbol        | Units    | Description                                                            | Constraints                        | Rationale                                                     |
-| ----------------------------- |:-------------:|:--------:| ---------------------------------------------------------------------- |:----------------------------------:| ------------------------------------------------------------- |
-| Network diffusion time        | $\Delta$      | slot     | Upper limit on the time needed to diffuse a message to all nodes       | $\Delta > 0$                       | Messages have a finite delay due to network topology          |
-| Stage length                  | $L$           | slot     | Duration of the voting period for endorser blocks                      | $L \geq \Delta$                    | Must allow sufficient time for EB diffusion and voting        |
-| Ranking block max size        | $S_\text{RB}$ | bytes    | Maximum size of a ranking block                                        | $S_\text{RB} > 0$                  | Limits RB size to ensure timely diffusion within slot time    |
-| Praos active slot coefficient | $f_\text{RB}$ | 1/slot   | Probability that a party will be the slot leader for a particular slot | $0 < f_\text{RB} \leq \Delta^{-1}$ | Blocks should not be produced faster than network delay       |
-| Endorser-block max size       | $S_\text{EB}$ | bytes    | Maximum size of an endorser block                                      | $S_\text{EB} > 0$                  | Limits EB size to ensure timely diffusion within stage length |
-| Mean committee size           | $n$           | parties  | Average number of stake pools selected for voting                      | $n > 0$                            | Ensures sufficient decentralization and security              |
-| Quorum size                   | $\tau$        | fraction | Minimum fraction of committee votes required for certification         | $\tau > 0.5$                       | Prevents adversarial control while ensuring liveness          |
+| Characteristic                | Symbol            | Units    | Description                                                            | Typical Range                      | Notes                                                         |
+| ----------------------------- |:-----------------:|:--------:| ---------------------------------------------------------------------- |:----------------------------------:| ------------------------------------------------------------- |
+| Network diffusion time        | $\Delta$          | slot     | Observed upper bound for message diffusion to all nodes               | 2-6 slots                          | Depends on network topology and conditions                    |
+| RB header diffusion time      | $\Delta_\text{hdr}$ | slot   | Observed time for RB headers to reach nodes                           | $\leq \Delta$                      | Usually faster than full block diffusion                     |
+| EB content diffusion time     | $L_\text{eb}$     | slot     | Observed time to fetch EB content after header announcement           | Variable (size-dependent)          | Increases with EB size and network congestion                |
+| Transaction fetch time        | $L_\text{txfetch}$ | slot    | Time to retrieve unknown transactions when TxsByRef enabled           | Variable (mempool-dependent)       | Depends on transaction availability across network           |
+| EB validation time            | $L_\text{val}$    | slot     | Computational time to validate EB content                             | Variable (complexity-dependent)    | Depends on EB size and node computational capacity          |
 
-*Table 1: Leios Protocol Parameters*
+*Table 1: Network Characteristics*
+</div>
+
+#### **Protocol Parameters**
+
+These parameters are configurable and subject to governance decisions, constrained by the network characteristics above:
+
+<div align="center">
+<a name="table-2"></a>
+
+| Parameter                     | Symbol            | Units    | Description                                                            | Constraints                        | Rationale                                                     |
+| ----------------------------- |:-----------------:|:--------:| ---------------------------------------------------------------------- |:----------------------------------:| ------------------------------------------------------------- |
+| Stage length                  | $L$               | slot     | Duration of the voting period for endorser blocks                     | $L \geq \Delta$ and $L \geq 3\Delta_\text{hdr}$ | Must allow EB diffusion, voting, and vote propagation |
+| Ranking block max size        | $S_\text{RB}$     | bytes    | Maximum size of a ranking block                                        | $S_\text{RB} > 0$                  | Limits RB size to ensure timely diffusion                    |
+| Endorser-block max size       | $S_\text{EB}$     | bytes    | Maximum size of an endorser block                                      | $S_\text{EB} > 0$                  | Limits EB size to ensure timely diffusion within stage length |
+| Praos active slot coefficient | $f_\text{RB}$     | 1/slot   | Probability that a party will be the slot leader for a particular slot | $0 < f_\text{RB} \leq \Delta^{-1}$ | Blocks should not be produced faster than network delay       |
+| Mean committee size           | $n$               | parties  | Average number of stake pools selected for voting                      | $n > 0$                            | Ensures sufficient decentralization and security              |
+| Quorum size                   | $\tau$            | fraction | Minimum fraction of committee votes required for certification         | $\tau > 0.5$                       | Prevents adversarial control while ensuring liveness          |
+
+*Table 2: Leios Protocol Parameters*
 </div>
 
 ### Specification for votes and certificates
@@ -463,24 +485,22 @@ Instance of the Fetch protocol for downloading EB content using announced hashes
 <div align="center">
 <a name="table-3"></a>
 
-| **Parameter**    | **Value**                                              |
-|------------------|--------------------------------------------------------|
-| Request Format   | [hash32] (EB hash from `announced_eb` field)           |
-| Response Format  | endorser_block                                         |
-| Direction        | Downstream (consumer fetches from producer)            |
-| Timeout          | Configurable, with peer fallback                       |
+| **Parameter** | **Value** |
+|---------------|-----------|
+| Request | `[hash32]` |
+| Body | `endorser_block` |
 
 *Table 3: EB-Fetch Parameters*
 </div>
 
 **State Machine**
 
-<!-- <div align="center">
+<div align="center">
 <a name="figure-6"></a>
-<img src="images/eb-fetch-state-machine.svg" alt="EB-Fetch State Machine" width="400">
+<img src="images/eb-fetch-state-machine.svg" alt="EB-Fetch State Machine" width="700">
 
 *Figure 6: EB-Fetch State Machine*
-</div> -->
+</div>
 
 <div align="center">
 <a name="table-4"></a>
@@ -521,24 +541,23 @@ Instance of the Relay protocol for diffusing vote bundles during the voting peri
 
 | **Parameter** | **Value** |
 |---------------|-----------|
-| ID Format | `hash32` (vote bundle hash) |
-| Info Format | `slot` (slot number for filtering) |
-| Datum Format | `vote_bundle` |
-| Direction | Push-based (producer to consumer) |
 | BoundedWindow | No |
 | Announcements | No |
+| id | `hash32` |
+| info | `slot` |
+| datum | `vote_bundle` |
 
 *Table 6: Vote-Relay Parameters*
 </div>
 
 **State Machine**
 
-<!-- <div align="center">
+<div align="center">
 <a name="figure-7"></a>
-<img src="images/vote-relay-state-machine.svg" alt="Vote-Relay State Machine" width="400">
+<img src="images/vote-relay-state-machine.svg" alt="Vote-Relay State Machine" width="700">
 
 *Figure 7: Vote-Relay State Machine*
-</div> -->
+</div>
 
 <div align="center">
 <a name="table-6"></a>
@@ -583,25 +602,20 @@ Instance of the Fetch protocol for retrieving transaction bodies referenced by E
 
 | **Parameter** | **Value** |
 |---------------|-----------|
-| Request Format | `[hash32]` (list of transaction hashes) |
-| Response Format | `[transaction]` (corresponding transaction bodies) |
-| Direction | Downstream (consumer fetches from producer) |
-| Batch Support | Yes (multiple transactions per request) |
+| Request | `[hash32]` |
+| Body | `[transaction]` |
 
 *Table 8: Tx-Fetch Parameters*
 </div>
 
 **State Machine**
 
-> [!Note]
-> ToDo State Machine diagram
-
-<!-- <div align="center">
+<div align="center">
 <a name="figure-8"></a>
 <img src="images/tx-fetch-state-machine.svg" alt="Tx-Fetch State Machine" width="400">
 
 *Figure 8: Tx-Fetch State Machine*
-</div> -->
+</div>
 
 <div align="center">
 <a name="table-9"></a>
@@ -808,7 +822,7 @@ $$
 `
 $$
 
-**_TX inclusion:_** In Linear Leios, it is possible that a transaction might have 
+**_TX inclusion:_** In Leios, it is possible that a transaction might have 
 to wait for multiple EB production opportunities before being included in an EB. 
 The characteristic time for such inclusion in an EB depends on the EB production 
 rate and mempool management. This is correlated with how long the transaction 
@@ -874,7 +888,7 @@ $$
 `
 $$
 
-**_Fees:_** Fee metrics relate to consumption of collateral. Linear Leios
+**_Fees:_** Fee metrics relate to consumption of collateral. Leios
 may consume collateral for transactions that conflict when EBs are processed.
 
 $$
