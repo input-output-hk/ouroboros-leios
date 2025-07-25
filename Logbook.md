@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2025-07-25
+
+### Linear Leios at 1000 TPS
+
+The Jupyter notebook [analysis/sims/2025w30/analysis.ipynb](analysis/sims/2025w30/analysis.ipynb) provides evidence that Linear Leios with transaction references and Stracciatella can support throughputs of 1000 tx/s at 300 B/tx. Linear Leios with transactions embedded in the EBs cannot support such throughput.
+
 ## 2025-07-21
 
 ### Generic analysis script for Leios simulator output
