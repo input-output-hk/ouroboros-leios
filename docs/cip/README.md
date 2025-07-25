@@ -515,7 +515,9 @@ _Certificate size scaling with committee size for realistic stake distribution_
 </div>
 
 
-> [!NOTE] Voting Implementation
+> [!NOTE]
+> **Voting Implementation**
+> 
 > The detailed BLS-based voting and certificate scheme, including key registration, Fait Accompli sortition, and local sortition algorithms, is specified in the [BLS certificates specification](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md) and includes a [reference implementation](https://github.com/input-output-hk/ouroboros-leios/tree/main/crypto-benchmarks.rs).
 
 ### Node Behavior
@@ -985,7 +987,8 @@ _Table 6: Leios Mini-Protocols_
 
 </div>
 
-> [!Warning] TODO Mini-protocol specification
+> [!Warning]
+> **TODO Mini-protocol specification**
 >
 > For each mini-protocol specify: purpose, message types, state machine, key parameters, and security notes.
 
