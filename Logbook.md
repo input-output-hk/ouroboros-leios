@@ -25,7 +25,27 @@ I want to propose a change in our terminology:
 
 - One caveat is that the EB only variants work / not work also based on the number of transactions per second because of limited number of references in a bounded EB size, but that is more as a protocol variant detail.
 
-## 2025-07-25
+### Revised analysis of block and transaction validation times
+
+We completed the basic analysis of block and transaction validation times for Cardano `mainnet` since Epoch 350. Results differ significantly from the preliminary results because it was discovered that `db-analyser` output is not reliable when it is run on a machine that has other CPU load: the new analysis is based on a clean dataset that was run on an otherwise idle machine.
+
+Findings:
+
+1. The `db-analyser` tool can be used to measure the Cardno block-application time, either including or not including verifying transaction signatures and running Plutus scripts.
+2. Ideally, `db-analyser` could be modified to report CPU times for phase 1 and phase 2 validation on a per-transaction basis.
+3. The output of this tool is quite noisy and does not include enough of the explanatory variable for predicting CPU times for transactions or blocks.
+4. The missing explanatory variables (size of UTxO set, number of inputs, number of outputs, etc.) can be extracted from the ledger or `cardano-db-sync`.
+5. For transaction signature verification and Plutus script execution, the median times for blocks are . . .
+    - 428.4 μs/tx
+    - 211.5 μs/kB
+    - Jointly via a linear model, 148.1 μs/tx plus 114.1 μs/kB.
+    - Jointly via a linear model, 137.5 μs/tx plus 60.2 μs/kB plus 585.2 μs/Gstep, with a Lapace-distributed error having location 0 μs and scale 1250 μs.
+6. The results above are not very good fits and are quite sensitive to the cutoff for discarding outliers.
+7. The noise in the data and the uncertainty in predictions make the above values unsuitable for estimating individual transactions but suitable for bulk estimates of many blocks.
+8. A more sophisticated double general linear model could be used to generate artificial transaction workloads.
+9. The CPU-timing parameters in the default configuration for Leios simulations could be reduced based on this work.
+
+See [the Jupyter notebook](analysis/timings/ReadMe.ipynb) for evidence and details.
 
 ### Linear Leios at 1000 TPS
 
