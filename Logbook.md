@@ -2,6 +2,31 @@
 
 ## 2025-07-25
 
+### SN on throughput metrics
+
+I want to propose a change in our terminology:
+- Only use transactions per second (`Tx/s`) in introductory or conclusive statements, ideally always with a notion of transaction size; e.g. "throughput of `100 Tx/s` with `1400 B` transactions"
+- Otherwise use transaction bytes per second `TxB/s` and correspondingly `TxkB/s` or `TxMB/s` (or `TxkiB/s` or `TMiB/s` if we prefer that?)
+
+- Examples:
+  - Our simulations of `100 Tx/s` with `1400 B` txs would then be: `140 TxkB/s`
+  - The simulation brian did just above with `1000 Tx/s` and `300 B` txs would then be: `300 TxkB/s`
+  - The estimated break-even figure of `36 Tx/s` of average sized txs would be: `50.4 TxkB/s`
+  
+- This will greatly improve comparability: the two simulations are only a 3x difference in throughput demand and the break even is not a fixed transaction number, but could also be met with more small or less big transactions.
+
+- This will make nominal (irrespective of protocol variant; without overhead) storage demands and network demands very clear:
+  - Storage nominal:
+    - `140 TxkB/s * 1 day ~ 12 GB/day`
+    - `1.4 TxMB/s * 1 day ~ 120 GB/day`
+  - Network nominal / worst case (send everything always to 10 peers):
+    - `140 TxKB/s * 10 hot peers = 11.2 Mb/s`
+    - `1.4 TxMB/s * 10 hot peers = 112 Mb/s`
+
+- One caveat is that the EB only variants work / not work also based on the number of transactions per second because of limited number of references in a bounded EB size, but that is more as a protocol variant detail.
+
+## 2025-07-25
+
 ### Linear Leios at 1000 TPS
 
 The Jupyter notebook [analysis/sims/2025w30/analysis.ipynb](analysis/sims/2025w30/analysis.ipynb) provides evidence that Linear Leios with transaction references and Stracciatella can support throughputs of 1000 tx/s at 300 B/tx. Linear Leios with transactions embedded in the EBs cannot support such throughput.
