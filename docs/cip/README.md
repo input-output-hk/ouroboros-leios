@@ -184,7 +184,7 @@ called the **stage length** ($L$):
 **Step 4: Certification**
 
 If enough committee votes are collected such that the total stake exceeds a
-threshold (typically 60% of total stake), the EB becomes **certified**:
+**threshold** ($\tau$) (typically 60% of total stake), the EB becomes **certified**:
 
 $$
 \sum_{v \in \text{votes}} \text{stake}(v) \geq \tau \times \text{stake}_{\text{total}}
