@@ -304,7 +304,7 @@ _Figure 3: Endorser Block CDDL_
 #### Voting Committee and Certificates
 
 The voting committee is a group of stake pools selected to validate EBs through
-BLS-based vote aggregation. Only EBs that achieve the required quorum of votes
+BLS-based vote aggregation. Only EBs that achieve the required quorum ($\tau$) of votes
 are certified and eligible for inclusion in RBs.
 
 Votes are categorized as either **persistent** (selected for the entire epoch)
@@ -522,8 +522,10 @@ _Certificate size scaling with committee size for realistic stake distribution_
 
 After the high-level protocol overview, this section details the concrete algorithmic procedures required for a node to participate in Leios, with a focus new state, its management and routines.
 
-> [!Caution] Protocol Incompleteness  
-> **Critical design issue**: RB header diffusion mechanics are undefined ([issue #470](https://github.com/input-output-hk/ouroboros-leios/issues/470)). This affects equivocation detection and voting timing throughout the protocol. The specification cannot be considered implementation-ready until this fundamental issue is resolved.
+> [!CAUTION] 
+> **Protocol Incompleteness**
+> 
+> RB header diffusion mechanics are undefined ([issue #470](https://github.com/input-output-hk/ouroboros-leios/issues/470)). This affects equivocation detection and voting timing throughout the protocol. The specification cannot be considered implementation-ready until this fundamental issue is resolved.
 
 #### State Variables
 
