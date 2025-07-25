@@ -548,7 +548,9 @@ _Table 5: Additional state variables maintained by nodes in Leios_
 
 </div>
 
-> [!Warning] TODO - Link Formal Specification
+> [!Warning]
+> **TODO - Link Formal Specification**
+> 
 > The formal specification [`LeiosState` record](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Protocol.agda) defines the complete state for Leios.
 
 #### Protocol Routines
