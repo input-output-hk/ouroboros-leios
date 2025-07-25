@@ -23,6 +23,7 @@
       R_utils
       stringr
       svglite
+      VGAM
     ];
   };
 }
