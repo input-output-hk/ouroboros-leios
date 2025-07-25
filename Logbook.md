@@ -1,28 +1,5 @@
 # Leios logbook
 
-## 2025-07-24
-
-### Revised analysis of block and transaction validation times
-
-We completed the basic analysis of block and transaction validation times for Cardano `mainnet` since Epoch 350. Results differ significantly from the preliminary results because it was discovered that `db-analyser` output is not reliable when it is run on a machine that has other CPU load: the new analysis is based on a clean dataset that was run on an otherwise idle machine.
-
-Findings:
-
-1. The `db-analyser` tool can be used to measure the Cardno block-application time, either including or not including verifying transaction signatures and running Plutus scripts.
-2. Ideally, `db-analyser` could be modified to report CPU times for phase 1 and phase 2 validation on a per-transaction basis.
-3. The output of this tool is quite noisy and does not include enough of the explanatory variable for predicting CPU times for transactions or blocks.
-4. The missing explanatory variables (size of UTxO set, number of inputs, number of outputs, etc.) can be extracted from the ledger or `cardano-db-sync`.
-5. For transaction signature verification and Plutus script execution, the median times are . . .
-    - 3.675 μs/tx
-    - 1.946 μs/kB
-    - Jointly via a linear model, 7.353 μs/tx plus 1.474 μs/kB.
-    - Jointly via a linear model, 7.271 μs/tx plus 0.938 μs/kB plus 5.463 μs/Gstep, with a Lapace-distributed error having location 0 μs and scale 145 μs.
-6. The noise in the data and the uncertainty in predictions make the above values unsuitable for estimating individual transactions but suitable for bulk estimates of many blocks.
-7. A more sophisticated double general linear model could be used to generate artificial transaction workloads.
-8. The CPU-timing parameters in the default configuration for Leios simulations could be reduced based on this work.
-
-See [the Jupyter notebook](analysis/timings/ReadMe.ipynb) for evidence and details.
-
 ## 2025-07-21
 
 ### Generic analysis script for Leios simulator output
