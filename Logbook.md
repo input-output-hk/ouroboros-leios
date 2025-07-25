@@ -51,6 +51,10 @@ See [the Jupyter notebook](analysis/timings/ReadMe.ipynb) for evidence and detai
 
 The Jupyter notebook [analysis/sims/2025w30/analysis.ipynb](analysis/sims/2025w30/analysis.ipynb) provides evidence that Linear Leios with transaction references and Stracciatella can support throughputs of 1000 tx/s at 300 B/tx. Linear Leios with transactions embedded in the EBs cannot support such throughput.
 
+## Rust simulation
+
+Documentation of current implementation and variants
+
 ## 2025-07-21
 
 ### Generic analysis script for Leios simulator output
