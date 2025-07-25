@@ -2,6 +2,8 @@
 
 This directory contains a (very heavily WIP) simulation of the Leios protocol. It produces a stream of events which can be used to visualize or analyze the behavior of Simplified Leios.
 
+For more information about the simulation, see [./IMPLEMENTATION.md](./IMPLEMENTATION.md).
+
 ## Running the project
 
 ```sh
