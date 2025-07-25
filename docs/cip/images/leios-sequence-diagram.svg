@@ -58,7 +58,7 @@
 
   <!-- Step 2c: EB content responses -->
   <line x1="125" y1="372" x2="425" y2="372" class="interaction" stroke="#4dabf7" stroke-dasharray="5,5" marker-end="url(#arrow-ebrelay)" />
-  <text x="275" y="342" class="label">
+  <text x="275" y="348" class="label">
     <tspan x="275" dy="0">2c: EB content</tspan>
     <tspan x="275" dy="15">(OnEBContentReceived)</tspan>
   </text>
@@ -67,7 +67,7 @@
 
   <!-- Step 3a: Transaction fetch request -->
   <line x1="425" y1="428" x2="125" y2="428" class="interaction" stroke="#51cf66" marker-end="url(#arrow-txfetch)" />
-  <text x="275" y="398" class="label">
+  <text x="275" y="404" class="label">
     <tspan x="275" dy="0">3a: TxFetch</tspan>
     <tspan x="275" dy="15">(request missing txs - if needed)</tspan>
   </text>
