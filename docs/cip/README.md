@@ -144,12 +144,12 @@ ledger.
 ### Protocol Overview
 
 <div align="center">
-<a name="figure-4"></a>
+<a name="figure-1"></a>
 <p name="protocol-flow-figure">
   <img src="images/protocol-flow-overview.png" alt="Leios Protocol Flow">
 </p>
 
-_Figure 4: Ouroboros Leios Protocol Flow_
+_Figure 1: Ouroboros Leios Protocol Flow_
 
 </div>
 
@@ -163,12 +163,12 @@ things:
 
 - **Ranking Block (RB)**: A standard Praos block with extended header fields to
   announce the second block
-- **Endorser Block (EB)**: A larger block containing additional transactions
+- **Endorser Block (EB)**: A larger block containing additional transaction references
 
 **Step 2: EB Distribution**
 
 Nodes receiving the RB header discover the announced EB and fetch its content.
-The EB contains eferences to transactions.
+The EB contains references to transactions.
 
 **Step 3: Committee Validation**
 
@@ -260,9 +260,9 @@ block_header =
 ```
 
 <div align="center">
-<a name="figure-1"></a>
+<a name="figure-2"></a>
 
-_Figure 1: Ranking Block CDDL_
+_Figure 2: Ranking Block CDDL_
 
 </div>
 </details>
@@ -294,9 +294,9 @@ EB by including a certificate.
 ```
 
 <div align="center">
-<a name="figure-2"></a>
+<a name="figure-3"></a>
 
-_Figure 2: Endorser Block CDDL_
+_Figure 3: Endorser Block CDDL_
 
 </div>
 </details>
@@ -349,9 +349,9 @@ The complete technical specification is detailed in
 ```
 
 <div align="center">
-<a name="figure-3"></a>
+<a name="figure-4"></a>
 
-_Figure 3: Votes & Certificate CDDL_
+_Figure 4: Votes & Certificate CDDL_
 
 </div>
 </details>
@@ -477,16 +477,27 @@ distributions (assuming 80% persistent, 20% non-persistent voters).
 
 #### Performance Requirements
 
-**Generation Times**:
+<div align="center">
+<a name="table-3"></a>
 
-- Vote creation: 135 μs (persistent) / 280 μs (non-persistent)
-- Certificate generation: ~90 ms
-- Certificate verification: ~130 ms
+| **Operation Type**      | **Persistent Vote** | **Non-persistent Vote** |
+|------------------------ |:------------------:|:----------------------:|
+| Generation              | 135 μs             | 280 μs                 |
+| Verification            | 670 μs             | 1.4 ms                 |
 
-**Vote Verification**:
+_Table 3: Vote operation times for persistent and non-persistent voters_
+</div>
 
-- Persistent: 670 μs per vote
-- Non-persistent: 1.4 ms per vote
+<div align="center">
+<a name="table-4"></a>
+
+| **Operation Type**      | **Certificate** |
+|------------------------ |:--------------:|
+| Generation              | ~90 ms         |
+| Verification            | ~130 ms        |
+
+_Table 4: Certificate operation times_
+</div>
 
 #### Certificate Size Analysis
 
@@ -503,252 +514,476 @@ _Certificate size scaling with committee size for realistic stake distribution_
 
 </div>
 
-For detailed algorithms and implementation specifics, refer to the
-[BLS certificates specification](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md).
 
-### Network
+> [!NOTE] Voting Implementation
+> The detailed BLS-based voting and certificate scheme, including key registration, Fait Accompli sortition, and local sortition algorithms, is specified in the [BLS certificates specification](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md) and includes a [reference implementation](https://github.com/input-output-hk/ouroboros-leios/tree/main/crypto-benchmarks.rs).
 
-With the introduction of EBs, syncing an RB chain alone is insufficient for
-consensus participation. Nodes need EB contents and certification state to
-reconstruct ledger state. This requires fetching EB bodies (announced via RB
-headers), accessing vote bundles for certification determination, and retrieving
-transaction bodies referenced by EBs.
+### Node Behavior
 
-Leios addresses these requirements by adding three mini-protocols to existing
-Cardano infrastructure while preserving standard RB diffusion for EB
-announcements.
+After the high-level protocol overview, this section details the concrete algorithmic procedures required for a node to participate in Leios, with a focus new state, its management and routines.
 
-<div align="center">
-<a name="table-3"></a>
+> [!Caution] Protocol Incompleteness  
+> **Critical design issue**: RB header diffusion mechanics are undefined ([issue #470](https://github.com/input-output-hk/ouroboros-leios/issues/470)). This affects equivocation detection and voting timing throughout the protocol. The specification cannot be considered implementation-ready until this fundamental issue is resolved.
 
-|  **Protocol**  | **Purpose**                 | **Trigger**                        |
-| :------------: | --------------------------- | ---------------------------------- |
-|  **EB-Fetch**  | Download EB content         | `announced_eb` field in RB header  |
-|  **Tx-Fetch**  | Retrieve transactions       | EB references unknown transactions |
-| **Vote-Relay** | Diffuse votes/ vote bundles | EB validated                       |
+#### State Variables
 
-_Table 3: Leios Mini-Protocols for EB and Vote Handling_
-
-</div>
-
-> [!NOTE]
->
-> **Existing Protocols**, such as Chain-Sync, Block-Fetch, and Tx-Submission
-> operate unchanged. RB headers extended with EB announcement fields, but
-> diffusion mechanics remain identical to Praos.
-
-#### EB-Fetch Mini-Protocol
-
-Instance of the Fetch protocol for downloading EB content using announced
-hashes.
-
-<div align="center">
-<a name="table-4"></a>
-
-| **Parameter** | **Value**        |
-| ------------- | ---------------- |
-| Request       | `[hash32]`       |
-| Body          | `endorser_block` |
-
-_Table 4: EB-Fetch Parameters_
-
-</div>
-
-**State Machine**
-
-<div align="center">
-<a name="figure-5"></a>
-<img src="images/eb-fetch-state-machine.svg" alt="EB-Fetch State Machine" width="700">
-
-_Figure 5: EB-Fetch State Machine_
-
-</div>
+Nodes maintain the following additional state beyond standard Praos:
 
 <div align="center">
 <a name="table-5"></a>
 
-| **State**   | **Agency** | **Description**                         |
-| ----------- | :--------: | --------------------------------------- |
-| StIdle      |  Consumer  | Initial state, consumer can request EBs |
-| StBusy      |  Producer  | Processing EB request                   |
-| StStreaming |  Producer  | Streaming EB content                    |
-| StDone      |     -      | Terminal state                          |
+| **Variable**   | **Description**                        |
+|----------------|----------------------------------------|
+| **EBcerts**    | List of EB certificates seen           |
+| **EBvotes**    | List of votes seen                     |
+| **EBs**        | List of EBs seen                       |
+| **RBheaders**  | List of RB headers seen                |
+| **C**          | Current blockchain adopted             |
+| **State(C)**   | Ledger state implied by C              |
+| **M**          | Transaction mempool                    |
 
-_Table 5: EB-Fetch States_
+_Table 5: Additional state variables maintained by nodes in Leios_
 
 </div>
 
-**Message Transitions**
+> [!Warning] TODO - Link Formal Specification
+> The formal specification [`LeiosState` record](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Protocol.agda) defines the complete state for Leios.
+
+#### Protocol Routines
+
+The following sequence covers both the new node routines and the mini-protocol messages exchanged between nodes. The diagram below shows how these internal and network interactions unfold over time.
+
+<div align="center">
+<a name="figure-5"></a>
+<img src="images/leios-sequence-diagram.svg" alt="Leios Protocol Sequence Diagram" width="800">
+
+_Figure 5: Leios Protocol Sequence Diagram - Temporal Flow of Mini-Protocol Interactions_
+</div>
+
+The protocol follows this temporal sequence:
+- **1a**: Block creation
+- **1b**: Header diffusion via RbHeaderRelay to all peers
+- **2a**: Header processing and equivocation detection
+- **2b**: EB content requests via EbRelay/EbFetch
+- **2c**: EB content delivery to requesting nodes
+- **3a→3b**: Missing transaction fetching via TxFetch (if needed)
+- **4a**: EB validation and vote decision
+- **4b**: Vote diffusion via VoteRelay to committee
+- **5**: Vote aggregation and certificate creation
+- **6a**: Next block creation with certificate
+- **6b**: New certified block diffusion via ChainSync
+- **7**: Peer-to-peer header relaying (cycle repeats)
+
+**OnRBCreate(chain C)** *(Steps 1a & 6a)*
+
+This routine handles block production when the node wins leadership (Step 1a) and certificate inclusion when available (Step 6a). It simultaneously creates both an RB and EB, checks for any available certificates to include, fills both blocks with transactions, establishes cross-references, and initiates diffusion via RbHeaderRelay.
+
+<details>
+<summary>OnRBCreate pseudocode</summary>
+
+```pseudocode
+// Create new RB extending current chain
+RB = create_empty_rb(C)
+EB = create_empty_eb()
+
+// Check for certificate to include
+if exists cert in EBcerts where cert.target == tail(C) and
+   (timestamp(RB) - timestamp(cert.RBannounced) > L_vote + L_diff):
+    
+    RB.EBcertificate = cert
+    
+    if exists EB in EBs where cert.Target == hash(EB):
+        state_prime = State(C).extend(EB.Body)
+        M = M.tryToExtend(state_prime, M)  // Remove included transactions
+else:
+    // No EB certificate is included in this RB (⊥ denotes 'none')
+    RB.EBcertificate = ⊥
+
+// Fill blocks with transactions
+RB.Body = select_transactions(M, RB_size_limit)
+EB.Body = select_transactions(M \ RB.Body, EB_size_limit)
+M.remove(RB.Body + EB.Body)
+
+// Set reference hashes
+EB.RBannounced = hash(RB)
+RB.EBannounced = hash(EB)
+
+// Adopt new chain and initiate diffusion sequence
+C = C || RB
+diffuse_chain(C):
+  // Step 1b: First diffuse RB header via RbHeaderRelay → triggers OnRBHeaderReceived (Step 2a)
+  rbHeaderRelay.diffuse(RB.header, RB.opportunity)
+  
+  // EB content diffusion happens via EbRelay when peers request it
+  // after receiving the header → triggers OnEBContentReceived (Step 2c)
+  
+  // TODO: Exact diffusion timing and coordination undefined (issue #470)
+  // Full RB body diffused via existing ChainSync/BlockFetch protocols
+  chainSync.diffuse(RB)
+```
+
+</details><br />
+
+> [!NOTE]  
+> The network protocols referenced in these routines are detailed in the [Network](#network) section. Note that **RbHeaderRelay**, **EbRelay**, and **EquivRelay** protocols are not yet fully specified, which impacts the completeness of these behavioral descriptions.
+
+**OnRBHeaderReceived(RB header h, opportunity op)** *(Step 2a)*
+
+This routine handles incoming RB headers via RbHeaderRelay, detecting equivocation and triggering EB content fetching.
+
+<details>
+<summary>OnRBHeaderReceived pseudocode</summary>
+
+```pseudocode
+// Verify basic VRF proof and signatures
+if verify_basic_vrf_proof(h, op):
+    
+    // Check for equivocation: same issuer and slot, different header
+    existing_headers = RBheaders.get_by_issuer_slot(h.issuer, h.slot)
+    
+    if existing_headers.count() == 0:
+        // First header for this issuer/slot
+        RBheaders.add(h, op)
+        continue_diffusing_header(h, op)  // Relay to other peers
+        
+        // Trigger EB content fetch if announced
+        if h.announced_eb != ⊥:
+            fetch_eb_content(h.announced_eb, h.issuer, h.slot)
+        
+    elif existing_headers.count() == 1:
+        existing_h = existing_headers[0]
+        if existing_h != h:
+            // Equivocation detected! Create and diffuse proof
+            equiv_proof = (existing_h, h)
+            EquivProofs.add(equiv_proof)
+            diffuse_equivocation_proof(equiv_proof)
+            RBheaders.add(h, op)  // Store second header as proof
+            continue_diffusing_header(h, op)  // Diffuse evidence
+            // Do NOT fetch EB from equivocating producer
+            return
+        // else: duplicate header, ignore
+        return
+    else:
+        // Already have equivocation proof for this issuer/slot
+        // Ignore any further headers from this equivocating producer
+        return
+```
+
+</details><br />
+
+**OnEBContentReceived(EB, slot, issuer)** *(Step 2c)*
+
+This routine handles EB content received via EbRelay or EbFetch, checks for missing transactions, and prepares for validation.
+
+<details>
+<summary>OnEBContentReceived pseudocode</summary>
+
+```pseudocode
+// Verify this EB was announced by corresponding RB header
+corresponding_header = RBheaders.get_by_issuer_slot(issuer, slot)
+if corresponding_header == ⊥ or corresponding_header.announced_eb != hash(EB):
+    // Unsolicited or mismatched EB, ignore
+    return
+
+// Don't process EBs from equivocating producers  
+if has_equivocation_proof(issuer, slot):
+    return
+
+// Store EB content
+EBs.add(EB)
+continue_diffusing_eb(EB)  // Relay to other peers
+
+// Check if we have all referenced transactions
+missing_txs = []
+for tx_ref in EB.transaction_references:
+    if not have_transaction(tx_ref):
+        missing_txs.append(tx_ref)
+
+// Fetch missing transactions if needed
+if missing_txs.length > 0:
+    fetch_missing_transactions(missing_txs, EB)
+else:
+    // All transactions available, proceed to validation
+    trigger_eb_validation(EB, corresponding_header)
+```
+
+</details><br />
+
+**OnMissingTxsReceived(txs, EB)** *(Step 3b)*
+
+This routine handles missing transactions received via TxFetch and triggers EB validation once all required transactions are available.
+
+<details>
+<summary>OnMissingTxsReceived pseudocode</summary>
+
+```pseudocode
+// Add transactions to local storage
+for tx in txs:
+    add_transaction(tx)
+
+// Check if we now have all transactions for this EB
+if have_all_transactions_for_eb(EB):
+    corresponding_header = get_header_for_eb(EB)
+    trigger_eb_validation(EB, corresponding_header)
+```
+
+</details><br />
+
+**OnEBValidationComplete(EB, corresponding_header, is_valid)** *(Step 4a)*
+
+This routine handles completed EB validation and determines whether to vote.
+
+<details>
+<summary>OnEBValidationComplete pseudocode</summary>
+
+```pseudocode
+if not is_valid:
+    return  // Invalid EB, don't vote
+
+h = corresponding_header
+
+// Check timing constraints
+if (current_time - timestamp(h) >= L_vote):
+    return  // Voting period expired
+
+// Wait for equivocation check period (must wait 3Δ_hdr)
+if (current_time - timestamp(h) <= 3*Δ_hdr):
+    schedule_voting_check(EB, h, current_time + 3*Δ_hdr - timestamp(h))
+    return
+
+// Final equivocation check before voting
+if has_equivocation_proof(h.issuer, h.slot):
+    return
+
+// Check voting eligibility
+eligible = false
+
+// Check if persistent voter (eligible for all elections this epoch)
+if is_persistent_voter(node.pool_id, current_epoch.stake_distribution):
+    eligible = true
+else:
+    // Check non-persistent voter eligibility via local sortition
+    election_id = hash(h.slot, h.opportunity)
+    eligible = local_sortition_check(election_id, node.stake_fraction, committee_size)
+
+// Vote if eligible
+if eligible:
+    vote = create_vote(EB, h)
+    diffuse_vote(vote)  // Send via VoteRelay
+
+// Update mempool optimistically
+temp = M
+M = EB.Body  // Add EB transactions first
+M.tryToExtend(State(C), temp)
+```
+
+</details><br />
+
+**OnVoteReceived(Vote v)** *(Step 5)*
+
+This routine processes incoming votes by validating and storing them, then checking if enough votes have been collected to create a certificate. Once a certificate is created and the voting period ends, the node optimistically adds the certified EB's transactions to its mempool.
+
+<details>
+<summary>OnVoteReceived pseudocode</summary>
+
+```pseudocode
+if validate_vote(v):
+    EBvotes.add(v)
+    diffuse_vote(v)
+    
+    if enough_votes_gathered(v.Target):
+        cert = createCert(v.Target, EBvotes)
+        EBcerts.add(cert)
+        
+        // Update mempool when certificate ready
+        wait_until(current_time > L_vote + L_diff)
+        if tail(C).EBannounced == cert.Target:
+            temp = M
+            M = EB.Body  // Add certified EB transactions
+            M.tryToExtend(State(C), temp)
+```
+
+</details><br />
+
+**OnTxReceived(tx)**
+
+This routine processes newly received transactions by attempting to add them to the mempool if they are valid against the current ledger state.
+
+<details>
+<summary>OnTxReceived pseudocode</summary>
+
+```pseudocode
+M = M.tryToExtend(State(C), tx)
+```
+
+</details><br />
+
+**OnEquivocationProofReceived(proof)** *(Network Event)*
+
+This routine processes incoming equivocation proofs from other nodes. An equivocation proof consists of two conflicting RB headers from the same issuer and slot with different block hashes, proving that the producer violated the protocol.
+
+<details>
+<summary>OnEquivocationProofReceived pseudocode</summary>
+
+```pseudocode
+// Verify proof structure: two different headers, same issuer/slot
+if proof.header1.issuer == proof.header2.issuer and
+   proof.header1.slot == proof.header2.slot and
+   proof.header1 != proof.header2:
+    
+    // Verify both headers are cryptographically valid
+    if verify_vrf_proof(proof.header1, proof.op1) and verify_signatures(proof.header1) and
+       verify_vrf_proof(proof.header2, proof.op2) and verify_signatures(proof.header2):
+        
+        // Store equivocation proof
+        EquivProofs.add(proof)
+        
+        // Continue diffusing proof to other nodes
+        diffuse_equivocation_proof(proof)
+        
+        // Mark this issuer/slot as equivocating for future EB/voting decisions
+        mark_as_equivocating(proof.header1.issuer, proof.header1.slot)
+```
+
+</details><br />
+
+**isValidRB(RB)** *(Step 6b)*
+
+This validation routine ensures RBs received via ChainSync meet all Leios requirements: valid Praos header and VRF proof, and if present, a valid certificate that properly references the previously announced EB with sufficient timing delay.
+
+<details>
+<summary>isValidRB pseudocode</summary>
+
+```pseudocode
+if not validate_header(RB) or not verify_vrf(RB):
+    return false
+
+if RB.EBcertificate != ⊥:
+    if not validate_certificate(RB.EBcertificate):
+        return false
+    if RB.EBcertificate.target != previous_block(RB).EBannounced:
+        return false
+    if (timestamp(RB) - timestamp(RB.EBcertificate.RBannounced)) <= L_vote + L_diff:
+        return false
+
+return true
+```
+</details>
+
+#### Auxiliary Functions
+
+**State S.extend(Transaction List Txs)**
+
+This function attempts to apply a list of transactions sequentially to a ledger state, returning the resulting state or ⊥ if any transaction fails validation.
+
+<details>
+<summary>State.extend pseudocode</summary>
+
+```pseudocode
+// Apply transactions sequentially to state
+for each tx in Txs:
+    if not validate_transaction(tx, current_state):
+        return ⊥
+    current_state = apply_transaction(tx, current_state)
+return current_state
+```
+
+</details><br />
+
+**Mempool M.tryToExtend(State S, Transaction List Txs)**
+
+This function attempts to add new transactions to the mempool by testing each transaction's validity against the current ledger state extended with existing mempool transactions.
+
+<details>
+<summary>Mempool.tryToExtend pseudocode</summary>
+
+```pseudocode
+A = S.extend(M)
+M_prime = M
+
+for each tx in Txs:
+    A_prime = A.extend(tx)
+    if A_prime != ⊥:
+        A = A_prime
+        M_prime.add(tx)
+
+return M_prime
+```
+
+</details><br />
+
+**is_persistent_voter(pool_id, stake_distribution)**
+
+This function determines if a pool is a persistent voter for the current epoch using the Fait Accompli scheme. Implementation may cache this result for efficiency.
+
+**local_sortition_check(election_id, stake_fraction, committee_size)**
+
+This function determines if a non-persistent voter is eligible based on local sortition using Poisson distribution as specified in the BLS certificate scheme.
+
+**has_equivocation_proof(issuer, slot)**
+
+This function checks if the node has received an equivocation proof for a specific issuer and slot, indicating that the producer should be ignored for voting and EB processing.
+
+**diffuse_equivocation_proof(proof)**
+
+This function diffuses an equivocation proof to the network so other nodes can become aware of the misbehaving producer and ignore their EBs/votes accordingly.
+
+**fetch_eb_content(eb_hash)**
+
+This function initiates fetching of EB content. For fresh EBs announced in recent RB headers, this uses **EbRelay** for immediate diffusion to enable voting. For historical EBs during chain sync or when reconstructing ledger state, this uses **EbFetch** to request specific EBs by hash.
+
+**fetch_missing_transactions(tx_refs, EB)**
+
+This function fetches missing transactions referenced by an EB via TxFetch.  
+Instead of using transaction hashes, an efficient optimization is to request missing transactions by their index in the EB body.
+
+**continue_diffusing_eb(EB)**
+
+This function continues diffusing EB content to other peers via EbRelay.
+
+**trigger_eb_validation(EB, header)**
+
+This function initiates asynchronous validation of an EB's transactions.
+
+**have_all_transactions_for_eb(EB)**
+
+This function checks if all transactions referenced by an EB are locally available.
+
+**get_header_for_eb(EB)**
+
+This function retrieves the RB header that announced a given EB.
+
+### Network
+
+As outlined above, Leios splits transactions between RBs and EBs, with EB inclusion dependent on committee voting and certification. Unlike Ouroboros Praos where the RB chain contains all necessary data, Leios nodes require additional message types to:
+
+- **Reconstruct ledger state**: EBs containing certified transactions
+- **Participate in consensus**: Vote on EBs and construct certificates  
+- **Detect equivocation**: RB headers from competing forks
+
+#### Message Types and Mini-Protocols
+
+Leios introduces **six new mini-protocols** to handle the additional message types:
 
 <div align="center">
 <a name="table-6"></a>
 
-| **From State** |   **Message**    |  **Parameters**  | **To State** |
-| -------------- | :--------------: | :--------------: | :----------: |
-| StIdle         | MsgRequestBodies |    `[hash32]`    |    StBusy    |
-| StBusy         |   MsgNoBlocks    |                  |    StIdle    |
-| StBusy         |  MsgStartBatch   |                  | StStreaming  |
-| StStreaming    |     MsgBody      | `endorser_block` | StStreaming  |
-| StStreaming    |   MsgBatchDone   |                  |    StIdle    |
-| StIdle         | MsgConsumerDone  |                  |    StDone    |
+| **Message Type** | **Purpose** | **Mini-Protocol** | **Structure** |
+| :--------------: | ----------- | :---------------: | --------------- |
+| RB Headers | Detect equivocation for voting decisions | **RbHeaderRelay** | (slot, issuer) pairs |
+| Fresh EBs | Enable committee validation and voting | **EbRelay** | (issuer, slot, size) triplets |  
+| Committee Votes | Construct certificates for EB inclusion | **VoteRelay** | (EB slot, vote issuer) pairs |
+| Equivocation Proofs | Notify network of misbehaving producers | **EquivRelay** | pairs of conflicting RB headers |
+| Historical EBs | Reconstruct ledger from certified EBs | **EbFetch** | slot and hash |
+| Transaction Bodies | Resolve EB transaction references (when TxsByRef) | **TxFetch** | tx position within EB |
 
-_Table 6: EB-Fetch Message Transitions_
-
-</div>
-
-#### Vote-Relay Mini-Protocol
-
-Instance of the Relay protocol for diffusing vote bundles during the voting
-period.
-
-<div align="center">
-<a name="table-7"></a>
-
-| **Parameter** | **Value**     |
-| ------------- | ------------- |
-| BoundedWindow | No            |
-| Announcements | No            |
-| id            | `hash32`      |
-| info          | `slot`        |
-| datum         | `vote_bundle` |
-
-_Table 7: Vote-Relay Parameters_
+_Table 6: Leios Mini-Protocols_
 
 </div>
 
-**State Machine**
-
-<div align="center">
-<a name="figure-6"></a>
-<img src="images/vote-relay-state-machine.svg" alt="Vote-Relay State Machine" width="700">
-
-_Figure 6: Vote-Relay State Machine_
-
-</div>
-
-<div align="center">
-<a name="table-8"></a>
-
-| **State**        | **Agency** | **Description**                       |
-| ---------------- | :--------: | ------------------------------------- |
-| StInit           |  Producer  | Initial state                         |
-| StIdle           |  Consumer  | Consumer can request vote IDs or data |
-| StIdsBlocking    |  Producer  | Processing blocking ID request        |
-| StIdsNonBlocking |  Producer  | Processing non-blocking ID request    |
-| StData           |  Producer  | Transferring vote bundles             |
-| StDone           |     -      | Terminal state                        |
-
-_Table 8: Vote-Relay States_
-
-</div>
-
-**Message Transitions**
-
-<div align="center">
-<a name="table-9"></a>
-
-| **From State**   |       **Message**        | **Parameters**  |   **To State**   |
-| ---------------- | :----------------------: | :-------------: | :--------------: |
-| StInit           |         MsgInit          |                 |      StIdle      |
-| StIdle           |  MsgRequestIdsBlocking   |   `ack, req`    |  StIdsBlocking   |
-| StIdsBlocking    |       MsgReplyIds        | `⟨(id, info)⟩`  |      StIdle      |
-| StIdle           | MsgRequestIdsNonBlocking |   `ack, req`    | StIdsNonBlocking |
-| StIdsNonBlocking |       MsgReplyIds        | `⟨(id, info)⟩`  |      StIdle      |
-| StIdle           |      MsgRequestData      |     `⟨id⟩`      |      StData      |
-| StData           |       MsgReplyData       | `⟨vote_bundle⟩` |      StIdle      |
-| StIdsBlocking    |         MsgDone          |                 |      StDone      |
-
-_Table 9: Vote-Relay Message Transitions_
-
-</div>
-
-#### Tx-Fetch Mini-Protocol
-
-Instance of the Fetch protocol for retrieving transaction bodies referenced by
-EBs.
-
-<div align="center">
-<a name="table-10"></a>
-
-| **Parameter** | **Value**       |
-| ------------- | --------------- |
-| Request       | `[hash32]`      |
-| Body          | `[transaction]` |
-
-_Table 10: Tx-Fetch Parameters_
-
-</div>
-
-**State Machine**
-
-<div align="center">
-<a name="figure-7"></a>
-<img src="images/tx-fetch-state-machine.svg" alt="Tx-Fetch State Machine" width="400">
-
-_Figure 7: Tx-Fetch State Machine_
-
-</div>
-
-<div align="center">
-<a name="table-11"></a>
-
-| **State**   | **Agency** | **Description**                                  |
-| ----------- | :--------: | ------------------------------------------------ |
-| StIdle      |  Consumer  | Initial state, consumer can request transactions |
-| StBusy      |  Producer  | Processing transaction request                   |
-| StStreaming |  Producer  | Streaming transaction bodies                     |
-| StDone      |     -      | Terminal state                                   |
-
-_Table 11: Tx-Fetch Protocol States_
-
-</div>
-
-**Message Transitions**
-
-<div align="center">
-<a name="table-12"></a>
-
-| **From State** |   **Message**    | **Parameters** | **To State** |
-| -------------- | :--------------: | :------------: | :----------: |
-| StIdle         | MsgRequestBodies |   `[hash32]`   |    StBusy    |
-| StBusy         |   MsgNoBlocks    |                |    StIdle    |
-| StBusy         |  MsgStartBatch   |                | StStreaming  |
-| StStreaming    |     MsgBody      | `transaction`  | StStreaming  |
-| StStreaming    |   MsgBatchDone   |                |    StIdle    |
-| StIdle         | MsgConsumerDone  |                |    StDone    |
-
-_Table 12: Tx-Fetch Message Transitions_
-
-</div>
-
-### Node changes
-
-> [!Warning]
+> [!Warning] TODO Mini-protocol specification
 >
-> This section is work in progress.
-
-- New DB tables: EBs, votes, certificates
-- Chain state tracks:
-  - $\mathcal{A}$: announced EBs (awaiting voting)
-  - $\mathcal{V}_e$: votes for EB $e$ (ephemeral)
-  - $\mathcal{C}$: validated EB certificates (ready for inclusion)
-  - $\mathcal{F}$: finalized EBs (in ledger via RBs)
-- Block validation: handle EB certificates, transaction references
-- Chain selection: support EBs in fork resolution, switching
-- Block production: produce RBs and EBs, enforce timing
-- State transition:
-
-  $$
-  \text{State}_{i+1} = \text{State}_i \oplus \text{RB}_{\text{txs}} \oplus \text{EB}_{\text{txs}}
-  $$
-
-  (RB txs applied before EB txs)
-
-- Cleanup: EBs in $\mathcal{A}$ expire on fork resolution; votes in
-  $\mathcal{V}_e$ discarded after voting
-- EBs retained until stability horizon ($k$ blocks) to handle chain suffix
-  instability
-- Equivocation: see threat model section
+> For each mini-protocol specify: purpose, message types, state machine, key parameters, and security notes.
 
 ### Mempool management
 
