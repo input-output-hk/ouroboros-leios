@@ -561,7 +561,7 @@ The following sequence covers both the new node routines and the mini-protocol m
 
 <div align="center">
 <a name="figure-5"></a>
-<img src="images/leios-sequence-diagram.svg" alt="Leios Protocol Sequence Diagram" width="800">
+<img src="images/leios-sequence-diagram.svg" alt="Leios Protocol Sequence Diagram" width="900">
 
 _Figure 5: Leios Protocol Sequence Diagram - Temporal Flow of Mini-Protocol Interactions_
 </div>
