@@ -55,7 +55,7 @@ tx-overcollateralization-factor-distribution:
 tx-validation-cpu-time-ms: 0.065
 tx-max-size-bytes: 16384
 tx-start-time: 0
-tx-stop-time: 300
+tx-stop-time: 450
 
 ################################################################################
 # Ranking Block Configuration

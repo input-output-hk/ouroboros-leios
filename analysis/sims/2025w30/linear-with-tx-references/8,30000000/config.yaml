@@ -55,7 +55,7 @@ tx-overcollateralization-factor-distribution:
 tx-validation-cpu-time-ms: 0.065
 tx-max-size-bytes: 16384
 tx-start-time: 0
-tx-stop-time: 300
+tx-stop-time: 450
 
 ################################################################################
 # Ranking Block Configuration
@@ -165,8 +165,8 @@ eb-max-age-for-relay-slots: 40
 
 # The maximum size of transactions (in bytes) which an EB can reference.
 # Only relevant when running with the "full-without-ibs" variant.
-eb-referenced-txs-max-size-bytes: 20000000
-eb-body-avg-size-bytes: 20000000
+eb-referenced-txs-max-size-bytes: 30000000
+eb-body-avg-size-bytes: 30000000
 
 ################################################################################
 # Vote Configuration

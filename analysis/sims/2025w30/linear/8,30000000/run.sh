@@ -25,7 +25,7 @@ sed -e '/^leios-variant:/s/:.*$/: '"$VARIANT"'/' \
     -e '/^leios-stage-length-slots:/s/:.*$/: '"$STAGE_LENGTH"'/' \
     -e '/^eb-referenced-txs-max-size-bytes:/s/:.*$/: '"$BLOCK_SIZE"'/' \
     -e '/^eb-body-avg-size-bytes:/s/:.*$/: '"$BLOCK_SIZE"'/' \
-    ../../linear/8,20000000/config.template.yaml \
+    ../../linear/8,30000000/config.template.yaml \
 > config.yaml
 
 function cleanup() {
@@ -36,7 +36,7 @@ trap cleanup EXIT
 
 grep -E -v '(Slot|No.*Generated|CpuTask|Lottery)' sim.log | pigz -p 3 -9c > sim.log.gz &
 
-../../sim-cli --parameters config.yaml network.yaml --slots 600 --conformance-events sim.log > stdout 2> stderr
+../../sim-cli --parameters config.yaml network.yaml --slots 750 --conformance-events sim.log > stdout 2> stderr
 
 wait
 
