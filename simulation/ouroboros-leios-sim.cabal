@@ -142,6 +142,7 @@ library
     , leios-trace-hs
     , linear
     , mtl
+    , multiset
     , nothunks
     , ouroboros-network-api
     , ouroboros-network-mock
