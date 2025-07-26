@@ -1,0 +1,35 @@
+ INFO praos: sim_cli::events: 0 transactions(s) were generated in total.
+ INFO praos: sim_cli::events: 0 naive praos block(s) were published.
+ INFO praos: sim_cli::events: 0 slot(s) had no naive praos blocks.
+ INFO praos: sim_cli::events: 0 transaction(s) (0 B) finalized in a naive praos block.
+ INFO praos: sim_cli::events: 0 transaction(s) (0 B) did not reach a naive praos block.
+ INFO leios: sim_cli::events: 0 IB(s) were generated, on average NaN IB(s) per slot.
+ INFO leios: sim_cli::events: 0 out of 0 transaction(s) were included in at least one IB.
+ INFO leios: sim_cli::events: The average age of the pending transactions is NaNs (stddev NaN).
+ INFO leios: sim_cli::events: Each transaction was included in an average of NaN IB(s) (stddev NaN).
+ INFO leios: sim_cli::events: Each IB contained an average of NaN transaction(s) (stddev NaN) and an average of 0 B (stddev 0 B). 0 IB(s) were empty.
+ INFO leios: sim_cli::events: Each node received an average of 0.000 IB(s) (stddev 0.000).
+ INFO leios: sim_cli::events: 0 EB(s) were generated; on average there were NaN EB(s) per slot.
+ INFO leios: sim_cli::events: Each EB contained an average of NaN transaction(s) (stddev NaN). 0 EB(s) were empty.
+ INFO leios: sim_cli::events: Each EB contained an average of NaN IB(s) (stddev NaN). 0 EB(s) were empty.
+ INFO leios: sim_cli::events: Each IB was included in an average of NaN EB(s) (stddev NaN).
+ INFO leios: sim_cli::events: 0 out of 0 IBs were included in at least one EB.
+ INFO leios: sim_cli::events: 0 out of 0 IBs expired before they reached an EB.
+ INFO leios: sim_cli::events: 0 out of 0 EBs expired before an EB from their stage reached an RB.
+ INFO leios: sim_cli::events: 0 out of 0 transaction(s) were included in at least one EB.
+ INFO leios: sim_cli::events: 0 total votes were generated.
+ INFO leios: sim_cli::events: Each stake pool produced an average of 0.000 vote(s) (stddev 0.000).
+ INFO leios: sim_cli::events: Each EB received an average of NaN vote(s) (stddev NaN).
+ INFO leios: sim_cli::events: There were 0 bundle(s) of votes. Each bundle contained NaN vote(s) (stddev NaN).
+ INFO leios: sim_cli::events: 0 L1 block(s) had a Leios endorsement.
+ INFO leios: sim_cli::events: 0 tx(s) (0 B) were referenced by a Leios endorsement.
+ INFO leios: sim_cli::events: 0 tx(s) (0 B) were included directly in a Praos block.
+ INFO leios: sim_cli::events: Spatial efficiency: 0 B/0 B (NaN%) of Leios bytes were unique transactions.
+ INFO leios: sim_cli::events: 0 tx(s) (NaN%) referenced by a Leios endorsement were redundant.
+ INFO leios: sim_cli::events: Each transaction took an average of NaNs (stddev NaN) to be included in an IB.
+ INFO leios: sim_cli::events: Each transaction took an average of NaNs (stddev NaN) to be included in an EB.
+ INFO leios: sim_cli::events: Each transaction took an average of NaNs (stddev NaN) to be included in a block.
+ INFO network: sim_cli::events: 0 TX message(s) were sent. 0 of them were received (NaN%).
+ INFO network: sim_cli::events: 0 IB message(s) were sent. 0 of them were received (NaN%).
+ INFO network: sim_cli::events: 0 EB message(s) were sent. 0 of them were received (NaN%).
+ INFO network: sim_cli::events: 0 Vote message(s) were sent. 0 of them were received (NaN%).

@@ -1,0 +1,3 @@
+linear-with-tx-references/8,10000000/run.sh
+full-without-ibs/8,10000000/run.sh
+linear/8,10000000/run.sh
