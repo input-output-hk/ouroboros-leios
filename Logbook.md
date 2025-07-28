@@ -1,8 +1,14 @@
 # Leios logbook
 
+## 2025-07-28
+
+### Experiments on effect of network topology
+
+We compared Linear Leios simulation results on the 750-node mini-mainnet vs the 10,000-node pseudo-mainnet networks in the Rust simulator. Results indicate that the smaller network is slightly more stressful to the protocol than the larger network, but in general there are no substantial differences between simulation results for the two networks. The same findings and conclusions would result from using either network. See [ouroboros-leios/analysis/sims/2025w30b/analysis.ipynb](ouroboros-leios/analysis/sims/2025w30b/analysis.ipynb) for more details.
+
 ## 2025-07-25
 
-## CIP
+### CIP
 
 - completed review of protocol overview, components flow and parameters
 - completed integration of votes and certificates specification
