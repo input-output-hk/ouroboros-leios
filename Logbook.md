@@ -2,6 +2,12 @@
 
 ## 2025-07-25
 
+## CIP
+
+- completed review of protocol overview, components flow and parameters
+- completed integration of votes and certificates specification
+- drafted node behehavior & network (mini protocols)
+
 ### SN on throughput metrics
 
 I want to propose a change in our terminology:
