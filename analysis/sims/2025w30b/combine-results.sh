@@ -6,7 +6,7 @@ set -e
 mkdir -p results/$d
 for f in lifecycle resources receipts cpus
 do
-  DIR=$(find linear linear-with-tx-references full-without-ibs -type f -name $f.csv.gz \( -not -empty \) -printf %h\\n -quit)
+  DIR=$(find linear-with-tx-references -type f -name $f.csv.gz \( -not -empty \) -printf %h\\n -quit)
   HL=$(sed -n -e '1p' "$DIR/case.csv")
   HR=$(zcat "$DIR/$f.csv.gz" | sed -n -e '1p')
   if [[ "$f" == "lifecycle" || "$f" == "resources" ]]
@@ -17,7 +17,7 @@ do
   fi
   (
     echo "$HL,$HR"
-    for g in $(find linear linear-with-tx-references full-without-ibs -type f -name $f.csv.gz \( -not -empty \) -printf %h\\n)
+    for g in $(find linear-with-tx-references -type f -name $f.csv.gz \( -not -empty \) -printf %h\\n)
     do
       if [ ! -e "$g/stderr" ]
       then
