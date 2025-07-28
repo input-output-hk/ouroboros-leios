@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-echo 'Simulator,Variant,Stage length,Max EB size,Kind,Item,Generated [s],Transactions,Endorses' > sizes.csv
+echo 'Simulator,Variant,Stage length,Max EB size,Network,Kind,Item,Generated [s],Transactions,Endorses' > sizes.csv
 
-for d in {linear,linear-with-tx-references,full-without-ibs}/*
+for d in linear-with-tx-references/*
 do
   PREFIX=$(tail -n 1 $d/case.csv)
   zcat $d/sim.log.gz \
