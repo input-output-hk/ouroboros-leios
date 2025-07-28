@@ -12,27 +12,27 @@
         <id>https://leios.cardano-scaling.org/news/2025/07/21/weekly-progress-summary</id>
         <link href="https://leios.cardano-scaling.org/news/2025/07/21/weekly-progress-summary"/>
         <updated>2025-07-21T00:00:00.000Z</updated>
-        <summary type="html"><![CDATA[This week, the Leios team made significant progress on CIP development, refined validation timing analysis with improved methodologies, and achieved high-throughput validation milestones. The team completed major CIP specification components, proposed improved throughput metrics for better comparability, and demonstrated 1000 TPS capability with specific protocol variants.]]></summary>
-        <content type="html"><![CDATA[<p>This week, the Leios team made significant progress on CIP development, refined validation timing analysis with improved methodologies, and achieved high-throughput validation milestones. The team completed major CIP specification components, proposed improved throughput metrics for better comparability, and demonstrated 1000 TPS capability with specific protocol variants.</p>
+        <summary type="html"><![CDATA[This week, the Leios team made significant progress on CIP development, refined validation timing analysis with improved methodologies, and achieved high-throughput validation milestones. The team completed major components of the CIP specification, proposed improved throughput metrics for better comparability, and demonstrated a 1,000 TPS capability with specific protocol variants.]]></summary>
+        <content type="html"><![CDATA[<p>This week, the Leios team made significant progress on CIP development, refined validation timing analysis with improved methodologies, and achieved high-throughput validation milestones. The team completed major components of the CIP specification, proposed improved throughput metrics for better comparability, and demonstrated a 1,000 TPS capability with specific protocol variants.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="cip-development-progress">CIP development progress<a class="hash-link" aria-label="Direct link to CIP development progress" title="Direct link to CIP development progress" href="https://leios.cardano-scaling.org/news/2025/07/21/weekly-progress-summary#cip-development-progress">​</a></h2>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="protocol-specification-completion">Protocol specification completion<a class="hash-link" aria-label="Direct link to Protocol specification completion" title="Direct link to Protocol specification completion" href="https://leios.cardano-scaling.org/news/2025/07/21/weekly-progress-summary#protocol-specification-completion">​</a></h3>
 <ul>
-<li>Completed comprehensive review of protocol overview, components flow, and parameters</li>
-<li>Integrated votes and certificates specification into the CIP documentation</li>
+<li>Completed a comprehensive review of the protocol overview, component flow, and parameters</li>
+<li>Integrated vote and certificate specifications into the CIP documentation</li>
 <li>Drafted node behavior and network specifications, including mini-protocol definitions</li>
-<li>Advanced CIP towards completion with core protocol components fully specified.</li>
+<li>Progressed the CIP towards completion, with all core protocol components now fully specified.</li>
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="throughput-metrics-standardization">Throughput metrics standardization<a class="hash-link" aria-label="Direct link to Throughput metrics standardization" title="Direct link to Throughput metrics standardization" href="https://leios.cardano-scaling.org/news/2025/07/21/weekly-progress-summary#throughput-metrics-standardization">​</a></h2>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="improved-measurement-methodology">Improved measurement methodology<a class="hash-link" aria-label="Direct link to Improved measurement methodology" title="Direct link to Improved measurement methodology" href="https://leios.cardano-scaling.org/news/2025/07/21/weekly-progress-summary#improved-measurement-methodology">​</a></h3>
 <ul>
 <li>Proposed transition from transaction-per-second (Tx/s) to transaction-bytes-per-second (TxB/s) metrics for enhanced comparability</li>
-<li>Recommended using Tx/s only in introductory statements with transaction size context (e.g., "100 Tx/s with 1400 B transactions")</li>
+<li>Recommended using Tx/s only in introductory statements with transaction size context (eg, '100 Tx/s with 1,400 B transactions')</li>
 <li>Established TxkB/s and TxMB/s as primary throughput metrics for analysis</li>
 <li>Benefits include:<!-- -->
 <ul>
 <li>Direct comparability across different transaction sizes</li>
 <li>Clear nominal storage and network demand calculations</li>
-<li>Example: 100 Tx/s with 1400 B transactions = 140 TxkB/s = ~12 GB/day storage</li>
+<li>Example: 100 Tx/s with 1,400 B transactions = 140 TxkB/s = ~12 GB/day storage</li>
 <li>Network overhead calculation: 140 TxkB/s × 10 peers = 11.2 Mb/s.</li>
 </ul>
 </li>
@@ -40,7 +40,7 @@
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="enhanced-validation-analysis">Enhanced validation analysis<a class="hash-link" aria-label="Direct link to Enhanced validation analysis" title="Direct link to Enhanced validation analysis" href="https://leios.cardano-scaling.org/news/2025/07/21/weekly-progress-summary#enhanced-validation-analysis">​</a></h2>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="revised-cardano-validation-timing-study">Revised Cardano validation timing study<a class="hash-link" aria-label="Direct link to Revised Cardano validation timing study" title="Direct link to Revised Cardano validation timing study" href="https://leios.cardano-scaling.org/news/2025/07/21/weekly-progress-summary#revised-cardano-validation-timing-study">​</a></h3>
 <ul>
-<li>Completed refined analysis of Cardano mainnet validation times using clean dataset on idle machine</li>
+<li>Completed a refined analysis of Cardano mainnet validation times using a clean dataset on an idle machine</li>
 <li>Significantly improved accuracy over preliminary results by eliminating CPU contention effects</li>
 <li>Updated findings for transaction signature verification and Plutus script execution:<!-- -->
 <ul>
@@ -49,25 +49,25 @@
 <li>Enhanced model: 137.5 μs/tx plus 60.2 μs/kB plus 585.2 μs/Gstep with Laplace error distribution</li>
 </ul>
 </li>
-<li>Results suitable for bulk block estimates despite individual transaction prediction limitations</li>
+<li>Results are suitable for bulk block estimates despite individual transaction prediction limitations</li>
 <li>Findings support reducing CPU-timing parameters in default Leios simulation configurations</li>
-<li>Comprehensive analysis available in the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/timings/ReadMe.ipynb" target="_blank" rel="noopener noreferrer">validation timing documentation</a>.</li>
+<li>A comprehensive analysis is available in the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/timings/ReadMe.ipynb" target="_blank" rel="noopener noreferrer">validation timing documentation</a>.</li>
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="high-throughput-protocol-validation">High-throughput protocol validation<a class="hash-link" aria-label="Direct link to High-throughput protocol validation" title="Direct link to High-throughput protocol validation" href="https://leios.cardano-scaling.org/news/2025/07/21/weekly-progress-summary#high-throughput-protocol-validation">​</a></h2>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="1000-tps-linear-leios-demonstration">1000 TPS Linear Leios demonstration<a class="hash-link" aria-label="Direct link to 1000 TPS Linear Leios demonstration" title="Direct link to 1000 TPS Linear Leios demonstration" href="https://leios.cardano-scaling.org/news/2025/07/21/weekly-progress-summary#1000-tps-linear-leios-demonstration">​</a></h3>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="1000-tps-linear-leios-demonstration">1,000 TPS Linear Leios demonstration<a class="hash-link" aria-label="Direct link to 1,000 TPS Linear Leios demonstration" title="Direct link to 1,000 TPS Linear Leios demonstration" href="https://leios.cardano-scaling.org/news/2025/07/21/weekly-progress-summary#1000-tps-linear-leios-demonstration">​</a></h3>
 <ul>
-<li>Successfully demonstrated Linear Leios with transaction references supporting 1000 tx/s at 300 B/tx</li>
-<li>Validated Stracciatella variant capability at 1000 TPS throughput levels</li>
+<li>Successfully demonstrated Linear Leios with transaction references supporting 1,000 tx/s at 300 B/tx</li>
+<li>Validated Stracciatella variant capability at 1,000 TPS throughput levels</li>
 <li>Confirmed that Linear Leios with embedded transactions cannot sustain such throughput</li>
 <li>Results provide clear protocol variant performance boundaries for high-throughput scenarios</li>
-<li>Detailed evidence and analysis in the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w30/analysis.ipynb" target="_blank" rel="noopener noreferrer">1000 TPS study notebook</a>.</li>
+<li>Detailed evidence and analysis are available in the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w30/analysis.ipynb" target="_blank" rel="noopener noreferrer">1,000 TPS study notebook</a>.</li>
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-infrastructure-improvements">Simulation infrastructure improvements<a class="hash-link" aria-label="Direct link to Simulation infrastructure improvements" title="Direct link to Simulation infrastructure improvements" href="https://leios.cardano-scaling.org/news/2025/07/21/weekly-progress-summary#simulation-infrastructure-improvements">​</a></h2>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation-documentation">Rust simulation documentation<a class="hash-link" aria-label="Direct link to Rust simulation documentation" title="Direct link to Rust simulation documentation" href="https://leios.cardano-scaling.org/news/2025/07/21/weekly-progress-summary#rust-simulation-documentation">​</a></h3>
 <ul>
-<li>Enhanced documentation of current Rust simulation implementation</li>
+<li>Enhanced the documentation of the current Rust simulation implementation</li>
 <li>Documented available protocol variants and their implementation status</li>
-<li>Improved accessibility and usability of simulation framework for protocol development.</li>
+<li>Improved accessibility and usability of the simulation framework for protocol development.</li>
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="next-steps">Next steps<a class="hash-link" aria-label="Direct link to Next steps" title="Direct link to Next steps" href="https://leios.cardano-scaling.org/news/2025/07/21/weekly-progress-summary#next-steps">​</a></h2>
 <ul>
@@ -94,21 +94,21 @@
         <id>https://leios.cardano-scaling.org/news/2025/07/14/weekly-progress-summary</id>
         <link href="https://leios.cardano-scaling.org/news/2025/07/14/weekly-progress-summary"/>
         <updated>2025-07-14T00:00:00.000Z</updated>
-        <summary type="html"><![CDATA[This week, the Leios team focused on simulation analysis improvements, validation time studies, and comprehensive protocol variant experiments. The team developed new analysis tools, conducted fundamental performance studies of Cardano validation times, and completed extensive mapping of Linear Leios protocol performance under various conditions.]]></summary>
-        <content type="html"><![CDATA[<p>This week, the Leios team focused on simulation analysis improvements, validation time studies, and comprehensive protocol variant experiments. The team developed new analysis tools, conducted fundamental performance studies of Cardano validation times, and completed extensive mapping of Linear Leios protocol performance under various conditions.</p>
+        <summary type="html"><![CDATA[This week, the Leios team focused on improving simulation analysis, conducting validation time studies, and working on comprehensive protocol variant experiments. The team developed new analysis tools, conducted fundamental performance studies of Cardano validation times, and completed extensive mapping of Linear Leios protocol performance under various conditions.]]></summary>
+        <content type="html"><![CDATA[<p>This week, the Leios team focused on improving simulation analysis, conducting validation time studies, and working on comprehensive protocol variant experiments. The team developed new analysis tools, conducted fundamental performance studies of Cardano validation times, and completed extensive mapping of Linear Leios protocol performance under various conditions.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="analysis-tools-and-infrastructure">Analysis tools and infrastructure<a class="hash-link" aria-label="Direct link to Analysis tools and infrastructure" title="Direct link to Analysis tools and infrastructure" href="https://leios.cardano-scaling.org/news/2025/07/14/weekly-progress-summary#analysis-tools-and-infrastructure">​</a></h2>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="generic-trace-analysis-framework">Generic trace analysis framework<a class="hash-link" aria-label="Direct link to Generic trace analysis framework" title="Direct link to Generic trace analysis framework" href="https://leios.cardano-scaling.org/news/2025/07/14/weekly-progress-summary#generic-trace-analysis-framework">​</a></h3>
 <ul>
 <li>Developed a generic analysis script for processing Leios simulator output</li>
-<li>Created comprehensive R-based analysis pipeline generating diagnostic plots from <code>leios-simulation-trace-processor</code> output</li>
+<li>Created a comprehensive R-based analysis pipeline generating diagnostic plots from <code>leios-simulation-trace-processor</code> output</li>
 <li>Enhanced analysis capabilities for systematic evaluation of simulation results</li>
-<li>Documentation and usage instructions available in the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/trace-processor/ReadMe.md" target="_blank" rel="noopener noreferrer">trace processor README</a>.</li>
+<li>Documentation and usage instructions are available in the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/trace-processor/ReadMe.md" target="_blank" rel="noopener noreferrer">trace processor README</a>.</li>
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="validation-performance-analysis">Validation performance analysis<a class="hash-link" aria-label="Direct link to Validation performance analysis" title="Direct link to Validation performance analysis" href="https://leios.cardano-scaling.org/news/2025/07/14/weekly-progress-summary#validation-performance-analysis">​</a></h2>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="cardano-mainnet-validation-timing-study">Cardano mainnet validation timing study<a class="hash-link" aria-label="Direct link to Cardano mainnet validation timing study" title="Direct link to Cardano mainnet validation timing study" href="https://leios.cardano-scaling.org/news/2025/07/14/weekly-progress-summary#cardano-mainnet-validation-timing-study">​</a></h3>
 <ul>
-<li>Completed preliminary analysis of block and transaction validation times for Cardano mainnet since Epoch 350</li>
-<li>Key findings using <code>db-analyser</code> tool:<!-- -->
+<li>Completed a preliminary analysis of block and transaction validation times for Cardano mainnet since epoch 350</li>
+<li>Key findings using the <code>db-analyser</code> tool include:<!-- -->
 <ul>
 <li>Median transaction signature verification: 0.53 ms/tx</li>
 <li>Median validation time per kilobyte: 0.29 ms/kB</li>
@@ -116,39 +116,39 @@
 <li>Data suitable for bulk estimates but too noisy for individual transaction predictions</li>
 </ul>
 </li>
-<li>Identified missing explanatory variables (UTxO set size, input/output counts) extractable from ledger or <code>cardano-db-sync</code></li>
-<li>Results provide foundation for more accurate simulator validation time modeling</li>
-<li>Detailed analysis available in the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/timings/preliminary.ipynb" target="_blank" rel="noopener noreferrer">validation timing notebook</a>.</li>
+<li>Identified missing explanatory variables (UTXO set size, input/output counts) extractable from the ledger or <code>cardano-db-sync</code></li>
+<li>Results provide a foundation for more accurate simulator validation time modeling</li>
+<li>Detailed analysis is available in the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/timings/preliminary.ipynb" target="_blank" rel="noopener noreferrer">validation timing notebook</a>.</li>
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-optimization-studies">Simulation optimization studies<a class="hash-link" aria-label="Direct link to Simulation optimization studies" title="Direct link to Simulation optimization studies" href="https://leios.cardano-scaling.org/news/2025/07/14/weekly-progress-summary#simulation-optimization-studies">​</a></h2>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="timestep-resolution-analysis">Timestep resolution analysis<a class="hash-link" aria-label="Direct link to Timestep resolution analysis" title="Direct link to Timestep resolution analysis" href="https://leios.cardano-scaling.org/news/2025/07/14/weekly-progress-summary#timestep-resolution-analysis">​</a></h3>
 <ul>
-<li>Conducted comparative study of simulation timestep effects at 1000 TPS Full Leios scenarios</li>
+<li>Conducted a comparative study of simulation timestep effects at 1,000 TPS Full Leios scenarios</li>
 <li>Compared 0.100 ms and 0.025 ms time resolutions with no significant differences in results</li>
-<li>Validated use of coarser timesteps for improved parallelism and reduced simulation runtime</li>
-<li>Supporting analysis and evidence in the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w27/analysis.ipynb" target="_blank" rel="noopener noreferrer">timestep study notebook</a>.</li>
+<li>Validated the use of coarser timesteps for improved parallelism and reduced simulation runtime</li>
+<li>Supporting analysis and evidence are available in the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w27/analysis.ipynb" target="_blank" rel="noopener noreferrer">timestep study notebook</a>.</li>
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="protocol-variant-experiments">Protocol variant experiments<a class="hash-link" aria-label="Direct link to Protocol variant experiments" title="Direct link to Protocol variant experiments" href="https://leios.cardano-scaling.org/news/2025/07/14/weekly-progress-summary#protocol-variant-experiments">​</a></h2>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="mid-throughput-protocol-validation">Mid-throughput protocol validation<a class="hash-link" aria-label="Direct link to Mid-throughput protocol validation" title="Direct link to Mid-throughput protocol validation" href="https://leios.cardano-scaling.org/news/2025/07/14/weekly-progress-summary#mid-throughput-protocol-validation">​</a></h3>
 <ul>
-<li>Completed 100 TPS experiments for Stracciatella and Linear Leios variants using 1400 B/tx over 900 seconds</li>
-<li>Key findings:<!-- -->
+<li>Completed 100 TPS experiments for Stracciatella and Linear Leios variants using 1,400 B/tx over 900 seconds</li>
+<li>Key findings include:<!-- -->
 <ul>
-<li>5 slot/stage insufficient for Linear Leios at 100 tx/s</li>
+<li>5 slots/stages are insufficient for Linear Leios at 100 tx/s</li>
 <li>Including transactions in EBs causes congestion compared to transaction references</li>
-<li>10 MB/EB required for 100 tx/s performance (5 MB/EB insufficient)</li>
-<li>EB-sortition unluckiness in Stracciatella extends transaction lifecycle but can be mitigated</li>
+<li>10 MB/EB is required for 100 tx/s performance (5 MB/EB is insufficient)</li>
+<li>EB-sortition unluckiness in Stracciatella extends the transaction lifecycle but can be mitigated</li>
 <li>CPU and network peaks occur when transactions are embedded in EBs</li>
 </ul>
 </li>
-<li>Analysis artifacts available in <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w29b/ReadMe.pdf" target="_blank" rel="noopener noreferrer">100 TPS experiment documentation</a> and <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w29b/analysis.ipynb" target="_blank" rel="noopener noreferrer">analysis notebook</a>.</li>
+<li>Analysis artifacts are available in <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w29b/ReadMe.pdf" target="_blank" rel="noopener noreferrer">100 TPS experiment documentation</a> and the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w29b/analysis.ipynb" target="_blank" rel="noopener noreferrer">analysis notebook</a>.</li>
 </ul>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="comprehensive-linear-leios-performance-mapping">Comprehensive Linear Leios performance mapping<a class="hash-link" aria-label="Direct link to Comprehensive Linear Leios performance mapping" title="Direct link to Comprehensive Linear Leios performance mapping" href="https://leios.cardano-scaling.org/news/2025/07/14/weekly-progress-summary#comprehensive-linear-leios-performance-mapping">​</a></h3>
 <ul>
-<li>Completed extensive simulation study mapping Linear Leios performance under various loads and configurations</li>
-<li>Compared multiple Linear Leios variants against Stracciatella baseline</li>
+<li>Completed an extensive simulation study mapping Linear Leios performance under various loads and configurations</li>
+<li>Compared multiple Linear Leios variants against the Stracciatella baseline</li>
 <li>Generated comprehensive performance characterizations across different throughput scenarios</li>
-<li>Results documented in <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w29/summary.pdf" target="_blank" rel="noopener noreferrer">Linear Leios summary</a> with variant-specific analysis:<!-- -->
+<li>Results are documented in the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w29/summary.pdf" target="_blank" rel="noopener noreferrer">Linear Leios summary</a> with variant-specific analysis:<!-- -->
 <ul>
 <li><a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w29/linear.ipynb" target="_blank" rel="noopener noreferrer">Linear Leios with embedded transactions</a></li>
 <li><a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w29/txrefs.ipynb" target="_blank" rel="noopener noreferrer">Linear Leios with transaction references</a></li>
@@ -159,13 +159,13 @@
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-model-refinements">Simulation model refinements<a class="hash-link" aria-label="Direct link to Simulation model refinements" title="Direct link to Simulation model refinements" href="https://leios.cardano-scaling.org/news/2025/07/14/weekly-progress-summary#simulation-model-refinements">​</a></h2>
 <ul>
-<li>Revised Linear Leios model based on analysis findings, particularly regarding partial EB validation before peer propagation</li>
-<li>Reimplemented Stracciatella as separate simulation to identify specification deviations</li>
-<li>Identified and resolved multiple implementation inconsistencies during specification verification process.</li>
+<li>Revised the Linear Leios model based on analysis findings, particularly regarding partial EB validation before peer propagation</li>
+<li>Reimplemented Stracciatella as a separate simulation to identify specification deviations</li>
+<li>Identified and resolved multiple implementation inconsistencies during the specification verification process.</li>
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="next-steps">Next steps<a class="hash-link" aria-label="Direct link to Next steps" title="Direct link to Next steps" href="https://leios.cardano-scaling.org/news/2025/07/14/weekly-progress-summary#next-steps">​</a></h2>
 <ul>
-<li>Continue development of analysis infrastructure for systematic protocol evaluation</li>
+<li>Continue developing analysis infrastructure for systematic protocol evaluation</li>
 <li>Integrate improved validation timing models into simulation configurations</li>
 <li>Expand protocol variant testing based on performance mapping results</li>
 <li>Refine simulation models for enhanced accuracy and specification compliance.</li>
