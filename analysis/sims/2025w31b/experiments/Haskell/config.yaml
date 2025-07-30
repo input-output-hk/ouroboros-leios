@@ -22,11 +22,11 @@
   "praos-fallback-enabled": true,
   "tx-generation-distribution": {
     "distribution": "constant",
-    "value": 10
+    "value": 0
   },
   "tx-size-bytes-distribution": {
     "distribution": "constant",
-    "value": 1500
+    "value": 0
   },
   "tx-conflict-fraction": 0,
   "tx-overcollateralization-factor-distribution": {
@@ -36,7 +36,7 @@
   "tx-validation-cpu-time-ms": 0.065,
   "tx-max-size-bytes": 16384,
   "tx-start-time": 0,
-  "tx-stop-time": 900,
+  "tx-stop-time": 1200,
   "rb-generation-probability": 0.05,
   "rb-head-size-bytes": 1024,
   "rb-body-max-size-bytes": 90112,

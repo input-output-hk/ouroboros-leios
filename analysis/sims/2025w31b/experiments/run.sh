@@ -5,9 +5,9 @@ set -eo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
-TX_SIZE=1500
+TX_SIZE=0
 TX_START=0
-TX_STOP=900
+TX_STOP=1200
 SIM_STOP=1200
 BW=50
 EB_RATE=2.5

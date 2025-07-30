@@ -1,2 +1,2 @@
 Simulator,Variant,Network,Bandwidth,Stage length,EB rate,Max EB size,Tx size,Throughput,Tx start [s],Tx stop [s],Sim stop [s]
-Haskell,linear,topo-default-100,50 Mb/s,8 slot/stage,2.5 EB/stage,10 MB/EB,1500 B/Tx,0.150 TxMB/s,0,900,1200
+Haskell,linear,topo-default-100,50 Mb/s,8 slot/stage,2.5 EB/stage,10 MB/EB,0 B/Tx,0.150 TxMB/s,0,1200,1200
