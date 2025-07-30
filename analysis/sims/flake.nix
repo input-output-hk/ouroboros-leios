@@ -11,7 +11,7 @@
   inputs.flake-compat.url = "github:edolstra/flake-compat";
   inputs.flake-compat.flake = false;
   inputs.flake-utils.url = "github:numtide/flake-utils";
-  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-25.05";
   inputs.jupyenv.url = "github:tweag/jupyenv";
 
   outputs = {
@@ -31,7 +31,7 @@
         inherit (jupyenv.lib.${system}) mkJupyterlabNew;
         jupyterlab = mkJupyterlabNew ({...}: {
           nixpkgs = inputs.nixpkgs;
-          imports = [(import ./kernels.nix)];
+          imports = [(import ./kernels.nix {pkgs = nixpkgs;})];
         });
       in rec {
         packages = {inherit jupyterlab;};
