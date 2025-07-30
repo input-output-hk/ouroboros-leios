@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2025-07-30
+
+### Experiment varying stage length in "No IBs" Leios
+
+We varied the stage-length protocol parameter of "No IBs" Leios from 5 to 12 slots/stage in the experiment [analysis/sims/2025w31/analysis.ipynb](analysis/sims/2025w31/analysis.ipynb). Results indicate that the settlement time is not strongly affected by this parameter within this rage of values. Note that larger stage lengths result in less frequent voting.
+
 ## 2025-07-28
 
 ### Experiments on effect of network topology
