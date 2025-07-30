@@ -18,7 +18,7 @@ STAGE_LENGTH=$(echo $LABEL | sed -e 's/^\(.*\),\(.*\),\(.*\),\(.*\)$/\2/')
 BLOCK_SIZE=$(echo $LABEL | sed -e 's/^\(.*\),\(.*\),\(.*\),\(.*\)$/\3/')
 THROUGHPUT=$(echo $LABEL | sed -e 's/^\(.*\),\(.*\),\(.*\),\(.*\)$/\4/')
 
-ulimit -S -m 40000000 -v 40000000
+ulimit -S -m 48000000 -v 48000000
 
 if [[ -e sim.log ]]
 then
@@ -74,16 +74,18 @@ zcat sim.log.gz \
   --resource-file resources.csv \
   --receipt-file receipts.csv
 
-zcat sim.log.gz \
-| grep -E '(EB|RB)Generated' \
-| jq -r '
-  .message.type[0:2]
-  + "," + .message.id
-  + "," + (.time_s | tostring)
-  + "," + (.message.transactions | length | tostring)
-  + "," + (if .message.endorsement then .message.endorsement.eb.id else "NA" end)
-' \
-> sizes.csv
+(
+  echo 'Kind,Item,Generated [s],Transactions,Endorses'
+  zcat sim.log.gz \
+  | grep -E '(EB|RB)Generated' \
+  | jq -r '
+    .message.type[0:2]
+    + "," + .message.id
+    + "," + (.time_s | tostring)
+    + "," + (.message.transactions | length | tostring)
+    + "," + (if .message.endorsement then .message.endorsement.eb.id else "NA" end)
+  '
+) > sizes.csv
   
 pigz -p 3 -9f {cpus,lifecycle,receipts,resources,sizes}.csv
 
