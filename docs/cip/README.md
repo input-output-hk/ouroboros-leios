@@ -7,6 +7,8 @@ Authors:
   - William Wolff <william.wolff@iohk.io>
   - Brian W Bush <brian.bush@iohk.io>
   - Sebastian Nagel <sebastian.nagel@iohk.io>
+  - Nicolas Frisby <nick.frisby@iohk.io>
+  - Giorgos Panagiotakos <giorgos.panagiotakos@iohk.io>
   - PLEASE ADD YOUR NAME IF YOU CONTRIBUTE TEXT TO THIS DOCUMENT
 Implementors:
   - Intersect
