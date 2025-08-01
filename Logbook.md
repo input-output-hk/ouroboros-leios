@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2025-08-01
+
+### Comparison of Haskell and Rust simulations of Linear Leios
+
+The Juypter notebook [analysis/sims/2025w31b/analysis.ipynb](analysis/sims/2025w31b/analysis.ipynb) compares the early draft of the Haskell simulator for Linear Leios to the more mature Rust simulator. Discrepancies related to CPU usage, network usage, and vote diffusion [are being investigated](https://github.com/input-output-hk/ouroboros-leios/pull/466).
+
 ## 2025-07-30
 
 ### Experiment varying stage length in "No IBs" Leios
