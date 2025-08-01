@@ -1,5 +1,6 @@
 use std::{collections::BinaryHeap, sync::Arc, time::Duration};
 
+use futures::future::OptionFuture;
 use tokio::{select, sync::mpsc};
 use tracing::trace;
 
@@ -73,6 +74,8 @@ impl<N: NodeImpl> NodeDriver<N> {
     }
 
     pub async fn run(mut self) -> anyhow::Result<()> {
+        let mut custom_event_source = self.node.custom_event_source();
+        let has_custom_event_source = custom_event_source.is_some();
         loop {
             let next_event_at = self.events.peek().map(|e| e.0).expect("no events");
             let (result, finish_task) = select! {
@@ -89,6 +92,13 @@ impl<N: NodeImpl> NodeDriver<N> {
                         return Ok(());
                     };
                     (self.node.handle_new_tx(tx), false)
+                }
+                maybe_custom_event = OptionFuture::from(custom_event_source.as_mut().map(|s| s.recv())), if has_custom_event_source => {
+                    let Some(Some(event)) = maybe_custom_event else {
+                        // sim has stopped running
+                        return Ok(());
+                    };
+                    (self.node.handle_custom_event(event), true)
                 }
                 () = self.clock.wait_until(next_event_at) => {
                     let event = self.events.pop().unwrap().1;

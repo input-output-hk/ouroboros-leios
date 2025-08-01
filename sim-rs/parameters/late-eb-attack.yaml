@@ -1,0 +1,5 @@
+late-eb-attack:
+  attacker-nodes:
+    - node-95
+    - node-94
+  propagation-delay-ms: 4500.0

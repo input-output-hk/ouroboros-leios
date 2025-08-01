@@ -72,6 +72,23 @@
       },
       "type": "object"
     },
+    "LateEBAttackConfig": {
+      "description": "Configuration for a \"late EB\" attack,\nwhere nodes deliberately withhold EBs until near the end of the voting phase.",
+      "properties": {
+        "attacker-nodes": {
+          "description": "The set of stake pools which are participating in the attack.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "propagation-delay-ms": {
+          "description": "How long the attackers will wait before diffusing their EBs",
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
     "LeiosVariant": {
       "enum": [
         "short",
@@ -289,6 +306,10 @@
     "ib-shards": {
       "description": "The total number of shards available for IBs.\nMust be divisible by ib_shard_group_count.\n\nOnly supported by Rust simulation.",
       "type": "number"
+    },
+    "late-eb-attack": {
+      "$ref": "#/definitions/LateEBAttackConfig",
+      "description": "Configuration for a \"late EB\" attack,\nwhere nodes deliberately withhold EBs until near the end of the voting phase."
     },
     "leios-header-diffusion-time-ms": {
       "description": "The expected time it takes a header to fully diffuse across the network.\nThis is Δhdr from the Leios paper.",

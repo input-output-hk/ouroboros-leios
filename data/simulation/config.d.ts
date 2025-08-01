@@ -241,6 +241,13 @@ export interface Config {
   "cert-validation-cpu-time-ms-per-node": number;
   "cert-size-bytes-constant": bigint;
   "cert-size-bytes-per-node": bigint;
+
+  // Attacks
+  /**
+   * Configuration for a "late EB" attack,
+   * where nodes deliberately withhold EBs until near the end of the voting phase.
+   */
+  "late-eb-attack"?: LateEBAttackConfig | null;
 }
 
 export type CleanupPolicies = "all" | CleanupPolicy[];
@@ -312,4 +319,15 @@ export enum MempoolSamplingStrategy {
   OrderedById = "ordered-by-id",
   /** Include transactions in random order. */
   Random = "random",
+}
+
+/**
+ * Configuration for a "late EB" attack,
+ * where nodes deliberately withhold EBs until near the end of the voting phase.
+ */
+export interface LateEBAttackConfig {
+  /** The set of stake pools which are participating in the attack. */
+  "attacker-nodes": string[],
+  /** How long the attackers will wait before diffusing their EBs */
+  "propagation-delay-ms": number,
 }

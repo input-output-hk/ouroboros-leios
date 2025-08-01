@@ -252,6 +252,7 @@ impl NodeImpl for StracciatellaLeiosNode {
     type Message = Message;
     type Task = CpuTask;
     type TimedEvent = ();
+    type CustomEvent = ();
 
     fn new(
         config: &NodeConfiguration,

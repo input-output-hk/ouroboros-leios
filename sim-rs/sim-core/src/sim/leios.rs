@@ -378,6 +378,7 @@ impl NodeImpl for LeiosNode {
     type Task = Task;
     type Message = SimulationMessage;
     type TimedEvent = ();
+    type CustomEvent = ();
 
     fn new(
         config: &NodeConfiguration,

@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use anyhow::Result;
+use futures::future::BoxFuture;
 use rand::RngCore;
 use rand_chacha::{ChaChaRng, rand_core::SeedableRng};
 use slot::SlotWitness;
@@ -79,12 +80,28 @@ impl NodeListWrapper {
     }
 }
 
+trait Actor {
+    fn run(self: Box<Self>) -> BoxFuture<'static, Result<()>>;
+}
+
+struct ActorInitArgs<'a, N: NodeImpl> {
+    pub config: Arc<SimConfiguration>,
+    pub clock: Clock,
+    pub tracker: EventTracker,
+    pub nodes: &'a mut [N],
+}
+
+fn no_additional_actors<N: NodeImpl>(_args: ActorInitArgs<N>) -> Vec<Box<dyn Actor>> {
+    vec![]
+}
+
 pub struct Simulation {
     clock_coordinator: ClockCoordinator,
     network: NetworkWrapper,
     tx_producer: TransactionProducer,
     slot_witness: SlotWitness,
     nodes: NodeListWrapper,
+    actors: Vec<Box<dyn Actor>>,
 }
 
 impl Simulation {
@@ -96,13 +113,14 @@ impl Simulation {
         let config = Arc::new(config);
         let clock = clock_coordinator.clock();
 
-        let (network, nodes, tx_producer) = match config.variant {
+        let (network, nodes, actors, tx_producer) = match config.variant {
             LeiosVariant::Linear | LeiosVariant::LinearWithTxReferences => Self::init(
                 &config,
                 &tracker,
                 &clock,
                 NetworkWrapper::LinearLeios,
                 NodeListWrapper::LinearLeios,
+                linear_leios::register_actors,
             )?,
             LeiosVariant::FullWithoutIbs => Self::init(
                 &config,
@@ -110,6 +128,7 @@ impl Simulation {
                 &clock,
                 NetworkWrapper::Stracciatella,
                 NodeListWrapper::Stracciatella,
+                no_additional_actors,
             )?,
             _ => Self::init(
                 &config,
@@ -117,6 +136,7 @@ impl Simulation {
                 &clock,
                 NetworkWrapper::Leios,
                 NodeListWrapper::Leios,
+                no_additional_actors,
             )?,
         };
 
@@ -128,20 +148,29 @@ impl Simulation {
             tx_producer,
             slot_witness,
             nodes,
+            actors,
         })
     }
 
-    fn init<N, NF, NLF>(
+    #[allow(clippy::type_complexity)]
+    fn init<N, NF, NLF, AAF>(
         config: &Arc<SimConfiguration>,
         tracker: &EventTracker,
         clock: &Clock,
         network_wrapper_fn: NF,
         node_list_wrapper_fn: NLF,
-    ) -> Result<(NetworkWrapper, NodeListWrapper, TransactionProducer)>
+        additional_actors_fn: AAF,
+    ) -> Result<(
+        NetworkWrapper,
+        NodeListWrapper,
+        Vec<Box<dyn Actor>>,
+        TransactionProducer,
+    )>
     where
         N: NodeImpl,
         NF: FnOnce(Network<MiniProtocol, N::Message>) -> NetworkWrapper,
         NLF: FnOnce(Vec<NodeDriver<N>>) -> NodeListWrapper,
+        AAF: FnOnce(ActorInitArgs<N>) -> Vec<Box<dyn Actor>>,
     {
         let mut rng = ChaChaRng::seed_from_u64(config.seed);
         let mut node_tx_sinks = HashMap::new();
@@ -155,20 +184,32 @@ impl Simulation {
                 link_config.bandwidth_bps,
             )?;
         }
-        let mut nodes = vec![];
+        let mut node_impls = vec![];
         for node_config in &config.nodes {
-            let id = node_config.id;
-            let (tx_sink, tx_source) = mpsc::unbounded_channel();
-            node_tx_sinks.insert(id, tx_sink);
-            let leios = N::new(
+            node_impls.push(N::new(
                 node_config,
                 config.clone(),
                 tracker.clone(),
                 ChaChaRng::seed_from_u64(rng.next_u64()),
                 clock.clone(),
-            );
+            ));
+        }
+
+        let actor_args = ActorInitArgs {
+            config: config.clone(),
+            clock: clock.clone(),
+            tracker: tracker.clone(),
+            nodes: &mut node_impls,
+        };
+        let actors = additional_actors_fn(actor_args);
+
+        let mut nodes = vec![];
+        for (node_config, node) in config.nodes.iter().zip(node_impls) {
+            let id = node_config.id;
+            let (tx_sink, tx_source) = mpsc::unbounded_channel();
+            node_tx_sinks.insert(id, tx_sink);
             let driver = NodeDriver::new(
-                leios,
+                node,
                 node_config,
                 config.clone(),
                 &mut network,
@@ -188,6 +229,7 @@ impl Simulation {
         Ok((
             network_wrapper_fn(network),
             node_list_wrapper_fn(nodes),
+            actors,
             tx_producer,
         ))
     }
@@ -197,6 +239,9 @@ impl Simulation {
         let mut set = JoinSet::new();
 
         self.nodes.run_all(&mut set);
+        for actor in self.actors.drain(..) {
+            set.spawn(actor.run());
+        }
 
         select! {
             biased;
@@ -276,6 +321,7 @@ trait NodeImpl: Sized {
     type Message: SimMessage;
     type Task: SimCpuTask;
     type TimedEvent;
+    type CustomEvent;
 
     fn new(
         config: &NodeConfiguration,
@@ -285,11 +331,19 @@ trait NodeImpl: Sized {
         clock: Clock,
     ) -> Self;
 
+    fn custom_event_source(&mut self) -> Option<mpsc::UnboundedReceiver<Self::CustomEvent>> {
+        None
+    }
+
     fn handle_new_slot(&mut self, slot: u64) -> EventResult<Self>;
     fn handle_new_tx(&mut self, tx: Arc<Transaction>) -> EventResult<Self>;
     fn handle_message(&mut self, from: NodeId, msg: Self::Message) -> EventResult<Self>;
     fn handle_cpu_task(&mut self, task: Self::Task) -> EventResult<Self>;
     fn handle_timed_event(&mut self, event: Self::TimedEvent) -> EventResult<Self> {
+        let _ = event;
+        EventResult::default()
+    }
+    fn handle_custom_event(&mut self, event: Self::CustomEvent) -> EventResult<Self> {
         let _ = event;
         EventResult::default()
     }

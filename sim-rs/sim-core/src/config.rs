@@ -142,6 +142,9 @@ pub struct RawParameters {
     pub cert_validation_cpu_time_ms_per_node: f64,
     pub cert_size_bytes_constant: u64,
     pub cert_size_bytes_per_node: u64,
+
+    // attacks,
+    pub late_eb_attack: Option<RawLateEBAttackConfig>,
 }
 
 #[derive(Debug, Copy, Clone, Deserialize, PartialEq, Eq)]
@@ -175,6 +178,13 @@ pub enum RelayStrategy {
 pub enum MempoolSamplingStrategy {
     OrderedById,
     Random,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct RawLateEBAttackConfig {
+    pub attacker_nodes: Vec<String>,
+    pub propagation_delay_ms: f64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -513,6 +523,48 @@ impl MockTransactionConfig {
 }
 
 #[derive(Debug, Clone)]
+pub(crate) struct AttackConfig {
+    pub(crate) late_eb: Option<LateEBAttackConfig>,
+}
+impl AttackConfig {
+    fn build(params: &RawParameters, topology: &Topology) -> Self {
+        Self {
+            late_eb: params
+                .late_eb_attack
+                .as_ref()
+                .map(|raw| LateEBAttackConfig::build(raw, topology)),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct LateEBAttackConfig {
+    pub(crate) attackers: HashSet<NodeId>,
+    pub(crate) propagation_delay: Duration,
+}
+
+impl LateEBAttackConfig {
+    fn build(raw: &RawLateEBAttackConfig, topology: &Topology) -> Self {
+        let attacker_names = raw.attacker_nodes.iter().collect::<HashSet<_>>();
+        let attackers = topology
+            .nodes
+            .iter()
+            .filter_map(|node| {
+                if attacker_names.contains(&node.name) {
+                    Some(node.id)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        Self {
+            attackers,
+            propagation_delay: duration_ms(raw.propagation_delay_ms),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct SimConfiguration {
     pub seed: u64,
     pub timestamp_resolution: Duration,
@@ -554,6 +606,7 @@ pub struct SimConfiguration {
     pub(crate) cpu_times: CpuTimeConfig,
     pub(crate) sizes: BlockSizeConfig,
     pub(crate) transactions: TransactionConfig,
+    pub(crate) attacks: AttackConfig,
 }
 
 impl SimConfiguration {
@@ -577,6 +630,7 @@ impl SimConfiguration {
             );
         }
         let total_stake = topology.nodes.iter().map(|n| n.stake).sum();
+        let attacks = AttackConfig::build(&params, &topology);
         Ok(Self {
             seed: 0,
             timestamp_resolution: duration_ms(params.timestamp_resolution_ms),
@@ -618,6 +672,7 @@ impl SimConfiguration {
             cpu_times: CpuTimeConfig::new(&params),
             sizes: BlockSizeConfig::new(&params),
             transactions: TransactionConfig::new(&params),
+            attacks,
         })
     }
 }

@@ -1,3 +1,7 @@
+mod attackers;
+pub use attackers::register_actors;
+use tokio::sync::mpsc;
+
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
@@ -19,7 +23,11 @@ use crate::{
         LinearRankingBlock as RankingBlock, LinearRankingBlockHeader as RankingBlockHeader,
         NoVoteReason, Transaction, TransactionId, VoteBundle, VoteBundleId,
     },
-    sim::{MiniProtocol, NodeImpl, SimCpuTask, SimMessage, lottery},
+    sim::{
+        MiniProtocol, NodeImpl, SimCpuTask, SimMessage,
+        linear_leios::attackers::{EBWithholdingEvent, EBWithholdingSender},
+        lottery,
+    },
 };
 
 #[derive(Clone, Debug)]
@@ -271,6 +279,9 @@ pub struct LinearLeiosNode {
     ledger_states: BTreeMap<BlockId, Arc<LedgerState>>,
     praos: NodePraosState,
     leios: NodeLeiosState,
+
+    eb_withholding_sender: Option<EBWithholdingSender>,
+    eb_withholding_event_source: Option<mpsc::UnboundedReceiver<EBWithholdingEvent>>,
 }
 
 type EventResult = super::EventResult<LinearLeiosNode>;
@@ -279,6 +290,7 @@ impl NodeImpl for LinearLeiosNode {
     type Message = Message;
     type Task = CpuTask;
     type TimedEvent = TimedEvent;
+    type CustomEvent = EBWithholdingEvent;
 
     fn new(
         config: &NodeConfiguration,
@@ -300,7 +312,13 @@ impl NodeImpl for LinearLeiosNode {
             ledger_states: BTreeMap::new(),
             praos: NodePraosState::default(),
             leios: NodeLeiosState::default(),
+            eb_withholding_sender: None,
+            eb_withholding_event_source: None,
         }
+    }
+
+    fn custom_event_source(&mut self) -> Option<mpsc::UnboundedReceiver<Self::CustomEvent>> {
+        self.eb_withholding_event_source.take()
     }
 
     fn handle_new_slot(&mut self, slot: u64) -> EventResult {
@@ -368,6 +386,14 @@ impl NodeImpl for LinearLeiosNode {
     fn handle_timed_event(&mut self, event: Self::TimedEvent) -> EventResult {
         match event {
             TimedEvent::TryVote(eb, seen) => self.vote_for_endorser_block(&eb, seen),
+        }
+        std::mem::take(&mut self.queued)
+    }
+
+    fn handle_custom_event(&mut self, event: Self::CustomEvent) -> EventResult {
+        match event {
+            EBWithholdingEvent::NewEB(eb) => self.receive_withheld_eb(eb),
+            EBWithholdingEvent::DisseminateEB(eb_id) => self.disseminate_withheld_eb(eb_id),
         }
         std::mem::take(&mut self.queued)
     }
@@ -584,11 +610,16 @@ impl LinearLeiosNode {
     fn receive_request_rb_header(&mut self, from: NodeId, id: BlockId) {
         if let Some(rb) = self.praos.blocks.get(&id) {
             if let Some(header) = rb.header() {
+                // If we already have this RB's body,
+                // let the requester know that it's ready to fetch.
                 let have_body = matches!(rb, RankingBlockView::Received { .. });
+                // If we already have the EB announced by this RB,
+                // let the requester know that they can fetch it.
+                // But if we are maliciously withholding the EB, do not let them know.
                 let have_eb = matches!(
                     self.leios.ebs.get(&header.eb_announcement),
                     Some(EndorserBlockView::Received { .. })
-                );
+                ) && !self.should_withhold_ebs();
                 self.queued
                     .send_to(from, Message::RBHeader(header.clone(), have_body, have_eb));
             };
@@ -757,8 +788,16 @@ impl LinearLeiosNode {
         self.leios
             .ebs
             .insert(eb_id, EndorserBlockView::Received { eb: eb.clone() });
-        for peer in &self.consumers {
-            self.queued.send_to(*peer, Message::AnnounceEB(eb_id));
+
+        if self.should_withhold_ebs() {
+            // We're an evil attacker, holding onto this EB until just long enough to collect votes.
+            // Send it out-of-band to our evil buddies.
+            self.share_new_withheld_eb(&eb);
+        } else {
+            // We're a well-behaved node who will tell all our peers about this EB immediately.
+            for peer in &self.consumers {
+                self.queued.send_to(*peer, Message::AnnounceEB(eb_id));
+            }
         }
         self.vote_for_endorser_block(&eb, self.clock.now());
     }
@@ -844,6 +883,51 @@ impl LinearLeiosNode {
             if let Some(EndorserBlockView::Received { eb }) = self.leios.ebs.get(&eb_id) {
                 self.remove_eb_txs_from_mempool(&eb.clone());
             };
+        }
+    }
+}
+
+// EB withholding:
+// an attack on Linear Leios where one or more stake pools deliberately wait to
+// propagate an EB until there is just barely enough time for honest nodes to vote on it.
+// This increases the odds that an honest RB producer won't have the parent RB's EB yet,
+// meaning they will need to publish a completely empty RB.
+impl LinearLeiosNode {
+    // This is called during simulation setup.
+    // It tells this node that it should withhold EBs,
+    // and sets up a side channel with all other nodes performing the same attack.
+    pub fn register_as_eb_withholder(
+        &mut self,
+        sender: EBWithholdingSender,
+    ) -> mpsc::UnboundedSender<EBWithholdingEvent> {
+        self.eb_withholding_sender = Some(sender);
+        let (sink, source) = mpsc::unbounded_channel();
+        self.eb_withholding_event_source = Some(source);
+        sink
+    }
+
+    fn should_withhold_ebs(&self) -> bool {
+        self.eb_withholding_sender.is_some()
+    }
+
+    fn share_new_withheld_eb(&mut self, eb: &Arc<EndorserBlock>) {
+        let sender = self.eb_withholding_sender.as_ref().unwrap();
+        sender.send(eb.clone());
+    }
+
+    fn receive_withheld_eb(&mut self, eb: Arc<EndorserBlock>) {
+        self.leios
+            .ebs
+            .insert(eb.id(), EndorserBlockView::Received { eb: eb.clone() });
+        // If an attacker receives an EB over a side channel,
+        // it will skip validation and will not disseminate it to peers.
+        // It will, however, try to vote for the EB immediately.
+        self.vote_for_endorser_block(&eb, self.clock.now());
+    }
+
+    fn disseminate_withheld_eb(&mut self, eb_id: EndorserBlockId) {
+        for peer in &self.consumers {
+            self.queued.send_to(*peer, Message::AnnounceEB(eb_id));
         }
     }
 }

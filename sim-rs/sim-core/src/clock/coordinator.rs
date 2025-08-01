@@ -9,6 +9,8 @@ use std::{
 
 use tokio::sync::{mpsc, oneshot};
 
+use crate::clock::TaskInitiator;
+
 use super::{Clock, Timestamp, timestamp::AtomicTimestamp};
 
 pub struct ClockCoordinator {
@@ -41,7 +43,7 @@ impl ClockCoordinator {
             self.timestamp_resolution,
             self.time.clone(),
             self.waiter_count.clone(),
-            self.tasks.clone(),
+            TaskInitiator::new(self.tasks.clone()),
             self.tx.clone(),
         )
     }
@@ -61,7 +63,7 @@ impl ClockCoordinator {
                     if waiters[actor].replace(Waiter { until, done }).is_some() {
                         panic!("An actor has somehow managed to wait twice");
                     }
-                    running -= 1;
+                    running = running.checked_sub(1).unwrap();
                     if let Some(timestamp) = until {
                         queue.entry(timestamp).or_default().push(actor);
                     }
@@ -89,7 +91,8 @@ impl ClockCoordinator {
                     }
                 }
                 ClockEvent::FinishTask => {
-                    self.tasks.fetch_sub(1, Ordering::AcqRel);
+                    let prev_tasks = self.tasks.fetch_sub(1, Ordering::AcqRel);
+                    assert!(prev_tasks != 0, "Finished a task that was never started");
                     assert!(
                         running != 0,
                         "All tasks were completed while there were no actors to complete them"
