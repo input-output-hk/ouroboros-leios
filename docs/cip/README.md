@@ -1089,6 +1089,33 @@ prototype simulations written in Haskell and Rust.
 > - [ ] Strip the major titles from the diagrams
 > - [ ] Use SVG format
 
+The simulation results use a mainnet-like topology[^mnrm] that accurately
+reflects the characteristics of the Cardano mainnet. This includes a realistic
+distribution of stake and a representative number of stake pools. The network
+is designed with a total of 10,000 nodes (`pseudo-mainnet`)[^pseudo] or 750
+nodes (`mini-mainnet`)[^mini], where each block producer is connected
+exclusively to two dedicated relays. Furthermore, the topology incorporates
+realistic latencies based on the [RIPE Atlas](https://atlas.ripe.net/) ping dataset
+and bandwidth that aligns with the lower end of what is typically found in
+cloud data centers. The node connectivity and geographic distribution (across
+various countries and autonomous systems) are also consistent with
+measurements provided by the [Cardano
+Foundation](https://cardanofoundation.org/). A simulation study [^mncp] has
+demonstrated that analysis conclusions deriving from the `mini-mainnet`
+topology are also valid for the `pseudo-mainnet` topology; the advantage of
+using the former is that simulations run much more quickly. Simulated RB
+diffusion is consistent with the Praos performance model.[^praosp]
+
+[^mnrm]: https://github.com/input-output-hk/ouroboros-leios/blob/6d8619c53cc619a25b52eac184e7f1ff3c31b597/data/simulation/pseudo-mainnet/ReadMe.md
+
+[^pseudo]: https://github.com/input-output-hk/ouroboros-leios/blob/6d8619c53cc619a25b52eac184e7f1ff3c31b597/data/simulation/pseudo-mainnet/topology-v1.md
+
+[^mini]: https://github.com/input-output-hk/ouroboros-leios/blob/6d8619c53cc619a25b52eac184e7f1ff3c31b597/data/simulation/pseudo-mainnet/topology-v2.md
+
+[^mncp]: https://github.com/input-output-hk/ouroboros-leios/blob/6d8619c53cc619a25b52eac184e7f1ff3c31b597/analysis/sims/2025w30b/analysis.ipynb
+
+[^praosp]: https://github.com/IntersectMBO/cardano-formal-specifications/blob/6d4e5cfc224a24972162e39a6017c273cea45321/src/performance/README.md
+
 The simulations demonstrate that bandwidth is partitioned between IBs, EBs,
 votes, and RBs so that congestion in one message type does not spill over into
 congestion for other message types. Because IBs are the largest messages, these
