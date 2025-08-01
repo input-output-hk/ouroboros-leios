@@ -392,7 +392,7 @@ constrained by the network characteristics above:
 | ----------------------------- | :-----------: | :------: | ---------------------------------------------------------------------- | :---------------------------------------------: | ------------------------------------------------------------- |
 | Stage length                  |      $L$      |   slot   | Duration of the voting period for endorser blocks                      | $L \geq \Delta$ and $L \geq 3\Delta_\text{hdr}$ | Must allow EB diffusion, voting, and vote propagation         |
 | Ranking block max size        | $S_\text{RB}$ |  bytes   | Maximum size of a ranking block                                        |                $S_\text{RB} > 0$                | Limits RB size to ensure timely diffusion                     |
-| Endorser-block max size       | $S_\text{EB}$ |  bytes   | Maximum size of an endorser block                                      |                $S_\text{EB} > 0$                | Limits EB size to ensure timely diffusion within stage length |
+| Endorser-block referenceable transaction size | $S_\text{EB}$ |  bytes   | Maximum total size of transactions that can be referenced by an endorser block |                $S_\text{EB} > 0$                | Limits total transaction payload to ensure timely diffusion within stage length |
 | Praos active slot coefficient | $f_\text{RB}$ |  1/slot  | Probability that a party will be the slot leader for a particular slot |       $0 < f_\text{RB} \leq \Delta^{-1}$        | Blocks should not be produced faster than network delay       |
 | Mean committee size           |      $n$      | parties  | Average number of stake pools selected for voting                      |                     $n > 0$                     | Ensures sufficient decentralization and security              |
 | Quorum size                   |    $\tau$     | fraction | Minimum fraction of committee votes required for certification         |                  $\tau > 0.5$                   | Prevents adversarial control while ensuring liveness          |
@@ -524,442 +524,116 @@ _Certificate size scaling with committee size for realistic stake distribution_
 
 ### Node Behavior
 
-After the high-level protocol overview, this section details the concrete algorithmic procedures required for a node to participate in Leios, with a focus new state, its management and routines.
+The Leios protocol introduces new node responsibilities and message flows beyond those in Praos, reflecting the additional steps of EB creation and announcement, committee voting, and certificate aggregation. The following sequence diagram outlines the interactions that nodes perform as they participate in block production, transaction propagation, validation, and certification in a simplified way.
 
-> [!CAUTION] 
-> **Protocol Incompleteness**
-> 
-> RB header diffusion mechanics are undefined ([issue #470](https://github.com/input-output-hk/ouroboros-leios/issues/470)). This affects equivocation detection and voting timing throughout the protocol. The specification cannot be considered implementation-ready until this fundamental issue is resolved.
-
-#### State Variables
-
-Nodes maintain the following additional state beyond standard Praos:
+> [!Note]
+> The following interactions would actually be interleaved below, due to mini protocol pipelining. Details on mini-protocols follow this section.
 
 <div align="center">
-<a name="table-5"></a>
+<a name="figure-2"></a>
 
-| **Variable**   | **Description**                        |
-|----------------|----------------------------------------|
-| **EBcerts**    | List of EB certificates seen           |
-| **EBvotes**    | List of votes seen                     |
-| **EBs**        | List of EBs seen                       |
-| **RBheaders**  | List of RB headers seen                |
-| **C**          | Current blockchain adopted             |
-| **State(C)**   | Ledger state implied by C              |
-| **M**          | Transaction mempool                    |
+```mermaid
+sequenceDiagram
+    participant U as Upstream<br/>previous block (RB) producer
+    participant BP as Block Producer<br/>current node  
+    participant D as Downstream<br/>subsequent node(s)
 
-_Table 5: Additional state variables maintained by nodes in Leios_
+    Note over U,D: Transaction Propagation
+    D->>BP: Diffuse Transaction
+    Note over BP: Add to Mempool
+    BP->>U: Diffuse Transaction
+    Note over U: Add to Mempool
+
+    Note over U,D: Block Production
+
+    Note over U: 1. Create RB<br/>announce EB &<br />include EB Cert
+
+    U->>BP: 2. Sync RB Headers
+    BP->>D: 2.a Sync RB Headers  
+    U->>BP: 3. Fetch RB Body
+
+    Note over BP: 4. Validate RB & EB Cert<br/>adopt Block
+    BP->>D: 5. Serve RB
+
+    Note over BP: 6. Check Tx Availability<br/>in mempool
+    U->>BP: 7. Fetch missing<br />transactions of EB
+    
+    Note over BP: 8. Validate EB
+    BP->>D: 9. Serve EB
+    Note over BP: 10. Vote on EB<br />(if eligible)
+    U->>BP: 11. Sync Votes
+    BP->>D: 11.a Serve Votes (+ own vote)
+    
+    Note over BP: 14. Aggregate certificate<br/>from votes  
+    Note over BP: 15. Create next RB<br />include EB certificate &<br />announce next EB
+```
+
+_Figure 2: Up- and downstream interactions of a node (simplified)_
 
 </div>
+
+#### What remains unchanged from Praos
+
+Most core Praos functionality continues to operate unchanged in Leios. **Transaction propagation** uses the identical TxSubmission mini-protocol, with transactions flowing from downstream to upstream nodes and being added to local mempools.
+
+**RB chain synchronization** (Steps 3, 5) employs the same ChainSync and BlockFetch protocols for RB propagation as in Praos.
+
+**Chain selection** follows the same longest-chain rule, treating EBs as auxiliary data that doesn't affect chain validity.
+
+**Ledger state management** continues to use Praos transaction validation and ledger update rules, with EBs adding transactions only when certified.
+
+**Key infrastructure change**: Mempool capacity must increase to accommodate both RB and EB transactions (limited by [protocol parameter $S_\text{EB}$](#protocol-parameters-and-network-characteristics)).
+
+#### Novel Requirements: EB Handling and Attack Prevention
+
+The sequence diagram illustrates Leios's novel responsibilities around endorser block handling, which introduces critical attack prevention mechanisms not present in Praos:
+
+**Freshest-First EB Delivery**
+
+EBs must be delivered in **freshest-first order** to prevent timing attacks where adversaries flood the network with large, old EBs to delay fresh EB delivery. This freshest-first policy ensures that recent EBs (which can still be voted on) receive priority over historical EBs, preventing large batches of old EBs from congesting the network and blocking new EB propagation. 
+
+Most critically, this prioritization guarantees that committee members receive fresh EBs within the voting window $L_\text{vote}$, maintaining the protocol's liveness properties under adversarial conditions.
+
+**Universal EB Availability Across Forks**
+
+Unlike RBs where nodes only need blocks in their current chain, **all nodes must receive all EBs** regardless of which fork announced them. This universal availability requirement prevents sophisticated withholding attacks where an adversary deliberately conceals EBs from one fork until after the voting period expires, forcing honest nodes to make chain selection decisions without complete information. 
+
+Without this requirement, honest nodes switching to a longer fork might discover they lack EBs that were certified on that fork, making fork switches expensive with time complexity proportional to the number of missing EBs that must be fetched and validated retroactively.
+
+**Forward-Before-Validate Strategy (Steps 8-9)**
+
+To maintain freshest-first delivery while preventing DoS attacks, nodes must **forward EBs before performing full validation**. This requires a two-stage validation approach that carefully balances efficiency with security. 
+
+*Stage 1 - Cheap Verification (Pre-forwarding)* consists of VRF proof verification to confirm the legitimacy of the block producer, hash consistency checks to ensure the EB hash matches the RB header announcement from Step 2, basic header validation covering slot, issuer, and signatures, and equivocation detection to reject EBs from known equivocating producers. 
+
+*Stage 2 - Full Validation (Post-forwarding, Step 8)* then performs the computationally expensive operations including transaction availability and validity checking, ledger state consistency verification, conflict detection with RB transactions, and size limit verification against $S_\text{EB}$. This approach limits DoS exposure since each producer can create at most one EB per slot, so forwarding based on cheap checks bounds the work required even under adversarial conditions.
+
+**Equivocation Detection and Defense (Steps 2, 2a)**
+
+RB headers must be diffused rapidly (faster than EBs) to enable equivocation detection. Headers propagate in $≤ \Delta_\text{hdr}$ time via **RbHeaderRelay**, while nodes track multiple headers per (issuer, slot) pair to detect conflicts.
+
+Upon detecting conflicting headers from the same producer in the same slot, nodes create and diffuse equivocation proofs throughout the network. To ensure all honest nodes have sufficient time to receive and process these proofs, voting is delayed by $3\Delta_\text{hdr}$ from the EB announcement (Step 10).
+
+Once an equivocation proof is established, EBs from the offending producer are completely ignored—neither voted on nor forwarded—effectively isolating the malicious actor from the consensus process. However, an honest node should still forward the equivocated RB header downstream to ensure all peers can detect the equivocation.
+
+**Timing-Critical Voting Windows (Steps 10, 11, 11a)**
+
+Committee members must respect strict timing constraints that govern the entire voting and certification process. The **voting period** of $L_\text{vote}$ slots from EB announcement provides the window during which committee members can cast their votes. An **equivocation grace period** requires waiting $3\Delta_\text{hdr}$ before voting to allow equivocation detection to complete. 
+
+The **vote diffusion period** of $L_\text{diff}$ additional slots enables vote propagation (Step 11a) throughout the network. Finally, the **certificate inclusion constraint** ensures that RBs can only include certificates after the complete $L_\text{vote} + L_\text{diff}$ period expires (Step 15). 
+
+These carefully orchestrated constraints ensure that honest EBs receive priority over equivocated ones, that all honest nodes have sufficient opportunity to detect equivocation before voting, and that adequate time exists for vote aggregation and certificate creation (Step 14).
+
+#### Attack Mitigation Summary
+
+The novel node behaviors directly address specific attack vectors through a comprehensive defense strategy. **Timing attacks** are mitigated by freshest-first EB delivery, preventing adversaries from flooding the network with stale blocks to delay fresh content. **Withholding attacks** are countered by universal EB propagation across all forks, ensuring that fork switches cannot be exploited by selectively concealing critical data. 
+
+**DoS attacks** are limited through the forward-before-validate strategy with cheap pre-checks (Step 8), bounding computational exposure while maintaining network responsiveness. **Equivocation attacks** are detected and neutralized via rapid header diffusion and delayed voting (Steps 2, 2a, 10), giving honest nodes time to coordinate their response to malicious behavior. 
+
+**Fork manipulation** attempts are thwarted by pre-emptive EB distribution independent of the current chain, preventing adversaries from using chain reorganizations as attack vectors. These coordinated requirements fundamentally transform Leios nodes from simple chain followers into active participants in a distributed validation network, where attack resistance depends on synchronized defensive behaviors across all honest nodes.
 
 > [!Warning]
-> **TODO - Link Formal Specification**
-> 
-> The formal specification [`LeiosState` record](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Protocol.agda) defines the complete state for Leios.
-
-#### Protocol Routines
-
-The following sequence covers both the new node routines and the mini-protocol messages exchanged between nodes. The diagram below shows how these internal and network interactions unfold over time.
-
-<div align="center">
-<a name="figure-5"></a>
-<img src="images/leios-sequence-diagram.svg" alt="Leios Protocol Sequence Diagram" width="900">
-
-_Figure 5: Leios Protocol Sequence Diagram - Temporal Flow of Mini-Protocol Interactions_
-</div>
-
-The protocol follows this temporal sequence:
-- **1a**: Block creation
-- **1b**: Header diffusion via RbHeaderRelay to all peers
-- **2a**: Header processing and equivocation detection
-- **2b**: EB content requests via EbRelay/EbFetch
-- **2c**: EB content delivery to requesting nodes
-- **3a→3b**: Missing transaction fetching via TxFetch (if needed)
-- **4a**: EB validation and vote decision
-- **4b**: Vote diffusion via VoteRelay to committee
-- **5**: Vote aggregation and certificate creation
-- **6a**: Next block creation with certificate
-- **6b**: New certified block diffusion via ChainSync
-- **7**: Peer-to-peer header relaying (cycle repeats)
-
-**OnRBCreate(chain C)** *(Steps 1a & 6a)*
-
-This routine handles block production when the node wins leadership (Step 1a) and certificate inclusion when available (Step 6a). It simultaneously creates both an RB and EB, checks for any available certificates to include, fills both blocks with transactions, establishes cross-references, and initiates diffusion via RbHeaderRelay.
-
-<details>
-<summary>OnRBCreate pseudocode</summary>
-
-```pseudocode
-// Create new RB extending current chain
-RB = create_empty_rb(C)
-EB = create_empty_eb()
-
-// Check for certificate to include
-if exists cert in EBcerts where cert.target == tail(C) and
-   (timestamp(RB) - timestamp(cert.RBannounced) > L_vote + L_diff):
-    
-    RB.EBcertificate = cert
-    
-    if exists EB in EBs where cert.Target == hash(EB):
-        state_prime = State(C).extend(EB.Body)
-        M = M.tryToExtend(state_prime, M)  // Remove included transactions
-else:
-    // No EB certificate is included in this RB (⊥ denotes 'none')
-    RB.EBcertificate = ⊥
-
-// Fill blocks with transactions
-RB.Body = select_transactions(M, RB_size_limit)
-EB.Body = select_transactions(M \ RB.Body, EB_size_limit)
-M.remove(RB.Body + EB.Body)
-
-// Set reference hashes
-EB.RBannounced = hash(RB)
-RB.EBannounced = hash(EB)
-
-// Adopt new chain and initiate diffusion sequence
-C = C || RB
-diffuse_chain(C):
-  // Step 1b: First diffuse RB header via RbHeaderRelay → triggers OnRBHeaderReceived (Step 2a)
-  rbHeaderRelay.diffuse(RB.header, RB.opportunity)
-  
-  // EB content diffusion happens via EbRelay when peers request it
-  // after receiving the header → triggers OnEBContentReceived (Step 2c)
-  
-  // TODO: Exact diffusion timing and coordination undefined (issue #470)
-  // Full RB body diffused via existing ChainSync/BlockFetch protocols
-  chainSync.diffuse(RB)
-```
-
-</details><br />
-
-> [!NOTE]  
-> The network protocols referenced in these routines are detailed in the [Network](#network) section. Note that **RbHeaderRelay**, **EbRelay**, and **EquivRelay** protocols are not yet fully specified, which impacts the completeness of these behavioral descriptions.
-
-**OnRBHeaderReceived(RB header h, opportunity op)** *(Step 2a)*
-
-This routine handles incoming RB headers via RbHeaderRelay, detecting equivocation and triggering EB content fetching.
-
-<details>
-<summary>OnRBHeaderReceived pseudocode</summary>
-
-```pseudocode
-// Verify basic VRF proof and signatures
-if verify_basic_vrf_proof(h, op):
-    
-    // Check for equivocation: same issuer and slot, different header
-    existing_headers = RBheaders.get_by_issuer_slot(h.issuer, h.slot)
-    
-    if existing_headers.count() == 0:
-        // First header for this issuer/slot
-        RBheaders.add(h, op)
-        continue_diffusing_header(h, op)  // Relay to other peers
-        
-        // Trigger EB content fetch if announced
-        if h.announced_eb != ⊥:
-            fetch_eb_content(h.announced_eb, h.issuer, h.slot)
-        
-    elif existing_headers.count() == 1:
-        existing_h = existing_headers[0]
-        if existing_h != h:
-            // Equivocation detected! Create and diffuse proof
-            equiv_proof = (existing_h, h)
-            EquivProofs.add(equiv_proof)
-            diffuse_equivocation_proof(equiv_proof)
-            RBheaders.add(h, op)  // Store second header as proof
-            continue_diffusing_header(h, op)  // Diffuse evidence
-            // Do NOT fetch EB from equivocating producer
-            return
-        // else: duplicate header, ignore
-        return
-    else:
-        // Already have equivocation proof for this issuer/slot
-        // Ignore any further headers from this equivocating producer
-        return
-```
-
-</details><br />
-
-**OnEBContentReceived(EB, slot, issuer)** *(Step 2c)*
-
-This routine handles EB content received via EbRelay or EbFetch, checks for missing transactions, and prepares for validation.
-
-<details>
-<summary>OnEBContentReceived pseudocode</summary>
-
-```pseudocode
-// Verify this EB was announced by corresponding RB header
-corresponding_header = RBheaders.get_by_issuer_slot(issuer, slot)
-if corresponding_header == ⊥ or corresponding_header.announced_eb != hash(EB):
-    // Unsolicited or mismatched EB, ignore
-    return
-
-// Don't process EBs from equivocating producers  
-if has_equivocation_proof(issuer, slot):
-    return
-
-// Store EB content
-EBs.add(EB)
-continue_diffusing_eb(EB)  // Relay to other peers
-
-// Check if we have all referenced transactions
-missing_txs = []
-for tx_ref in EB.transaction_references:
-    if not have_transaction(tx_ref):
-        missing_txs.append(tx_ref)
-
-// Fetch missing transactions if needed
-if missing_txs.length > 0:
-    fetch_missing_transactions(missing_txs, EB)
-else:
-    // All transactions available, proceed to validation
-    trigger_eb_validation(EB, corresponding_header)
-```
-
-</details><br />
-
-**OnMissingTxsReceived(txs, EB)** *(Step 3b)*
-
-This routine handles missing transactions received via TxFetch and triggers EB validation once all required transactions are available.
-
-<details>
-<summary>OnMissingTxsReceived pseudocode</summary>
-
-```pseudocode
-// Add transactions to local storage
-for tx in txs:
-    add_transaction(tx)
-
-// Check if we now have all transactions for this EB
-if have_all_transactions_for_eb(EB):
-    corresponding_header = get_header_for_eb(EB)
-    trigger_eb_validation(EB, corresponding_header)
-```
-
-</details><br />
-
-**OnEBValidationComplete(EB, corresponding_header, is_valid)** *(Step 4a)*
-
-This routine handles completed EB validation and determines whether to vote.
-
-<details>
-<summary>OnEBValidationComplete pseudocode</summary>
-
-```pseudocode
-if not is_valid:
-    return  // Invalid EB, don't vote
-
-h = corresponding_header
-
-// Check timing constraints
-if (current_time - timestamp(h) >= L_vote):
-    return  // Voting period expired
-
-// Wait for equivocation check period (must wait 3Δ_hdr)
-if (current_time - timestamp(h) <= 3*Δ_hdr):
-    schedule_voting_check(EB, h, current_time + 3*Δ_hdr - timestamp(h))
-    return
-
-// Final equivocation check before voting
-if has_equivocation_proof(h.issuer, h.slot):
-    return
-
-// Check voting eligibility
-eligible = false
-
-// Check if persistent voter (eligible for all elections this epoch)
-if is_persistent_voter(node.pool_id, current_epoch.stake_distribution):
-    eligible = true
-else:
-    // Check non-persistent voter eligibility via local sortition
-    election_id = hash(h.slot, h.opportunity)
-    eligible = local_sortition_check(election_id, node.stake_fraction, committee_size)
-
-// Vote if eligible
-if eligible:
-    vote = create_vote(EB, h)
-    diffuse_vote(vote)  // Send via VoteRelay
-
-// Update mempool optimistically
-temp = M
-M = EB.Body  // Add EB transactions first
-M.tryToExtend(State(C), temp)
-```
-
-</details><br />
-
-**OnVoteReceived(Vote v)** *(Step 5)*
-
-This routine processes incoming votes by validating and storing them, then checking if enough votes have been collected to create a certificate. Once a certificate is created and the voting period ends, the node optimistically adds the certified EB's transactions to its mempool.
-
-<details>
-<summary>OnVoteReceived pseudocode</summary>
-
-```pseudocode
-if validate_vote(v):
-    EBvotes.add(v)
-    diffuse_vote(v)
-    
-    if enough_votes_gathered(v.Target):
-        cert = createCert(v.Target, EBvotes)
-        EBcerts.add(cert)
-        
-        // Update mempool when certificate ready
-        wait_until(current_time > L_vote + L_diff)
-        if tail(C).EBannounced == cert.Target:
-            temp = M
-            M = EB.Body  // Add certified EB transactions
-            M.tryToExtend(State(C), temp)
-```
-
-</details><br />
-
-**OnTxReceived(tx)**
-
-This routine processes newly received transactions by attempting to add them to the mempool if they are valid against the current ledger state.
-
-<details>
-<summary>OnTxReceived pseudocode</summary>
-
-```pseudocode
-M = M.tryToExtend(State(C), tx)
-```
-
-</details><br />
-
-**OnEquivocationProofReceived(proof)** *(Network Event)*
-
-This routine processes incoming equivocation proofs from other nodes. An equivocation proof consists of two conflicting RB headers from the same issuer and slot with different block hashes, proving that the producer violated the protocol.
-
-<details>
-<summary>OnEquivocationProofReceived pseudocode</summary>
-
-```pseudocode
-// Verify proof structure: two different headers, same issuer/slot
-if proof.header1.issuer == proof.header2.issuer and
-   proof.header1.slot == proof.header2.slot and
-   proof.header1 != proof.header2:
-    
-    // Verify both headers are cryptographically valid
-    if verify_vrf_proof(proof.header1, proof.op1) and verify_signatures(proof.header1) and
-       verify_vrf_proof(proof.header2, proof.op2) and verify_signatures(proof.header2):
-        
-        // Store equivocation proof
-        EquivProofs.add(proof)
-        
-        // Continue diffusing proof to other nodes
-        diffuse_equivocation_proof(proof)
-        
-        // Mark this issuer/slot as equivocating for future EB/voting decisions
-        mark_as_equivocating(proof.header1.issuer, proof.header1.slot)
-```
-
-</details><br />
-
-**isValidRB(RB)** *(Step 6b)*
-
-This validation routine ensures RBs received via ChainSync meet all Leios requirements: valid Praos header and VRF proof, and if present, a valid certificate that properly references the previously announced EB with sufficient timing delay.
-
-<details>
-<summary>isValidRB pseudocode</summary>
-
-```pseudocode
-if not validate_header(RB) or not verify_vrf(RB):
-    return false
-
-if RB.EBcertificate != ⊥:
-    if not validate_certificate(RB.EBcertificate):
-        return false
-    if RB.EBcertificate.target != previous_block(RB).EBannounced:
-        return false
-    if (timestamp(RB) - timestamp(RB.EBcertificate.RBannounced)) <= L_vote + L_diff:
-        return false
-
-return true
-```
-</details>
-
-#### Auxiliary Functions
-
-**State S.extend(Transaction List Txs)**
-
-This function attempts to apply a list of transactions sequentially to a ledger state, returning the resulting state or ⊥ if any transaction fails validation.
-
-<details>
-<summary>State.extend pseudocode</summary>
-
-```pseudocode
-// Apply transactions sequentially to state
-for each tx in Txs:
-    if not validate_transaction(tx, current_state):
-        return ⊥
-    current_state = apply_transaction(tx, current_state)
-return current_state
-```
-
-</details><br />
-
-**Mempool M.tryToExtend(State S, Transaction List Txs)**
-
-This function attempts to add new transactions to the mempool by testing each transaction's validity against the current ledger state extended with existing mempool transactions.
-
-<details>
-<summary>Mempool.tryToExtend pseudocode</summary>
-
-```pseudocode
-A = S.extend(M)
-M_prime = M
-
-for each tx in Txs:
-    A_prime = A.extend(tx)
-    if A_prime != ⊥:
-        A = A_prime
-        M_prime.add(tx)
-
-return M_prime
-```
-
-</details><br />
-
-**is_persistent_voter(pool_id, stake_distribution)**
-
-This function determines if a pool is a persistent voter for the current epoch using the Fait Accompli scheme. Implementation may cache this result for efficiency.
-
-**local_sortition_check(election_id, stake_fraction, committee_size)**
-
-This function determines if a non-persistent voter is eligible based on local sortition using Poisson distribution as specified in the BLS certificate scheme.
-
-**has_equivocation_proof(issuer, slot)**
-
-This function checks if the node has received an equivocation proof for a specific issuer and slot, indicating that the producer should be ignored for voting and EB processing.
-
-**diffuse_equivocation_proof(proof)**
-
-This function diffuses an equivocation proof to the network so other nodes can become aware of the misbehaving producer and ignore their EBs/votes accordingly.
-
-**fetch_eb_content(eb_hash)**
-
-This function initiates fetching of EB content. For fresh EBs announced in recent RB headers, this uses **EbRelay** for immediate diffusion to enable voting. For historical EBs during chain sync or when reconstructing ledger state, this uses **EbFetch** to request specific EBs by hash.
-
-**fetch_missing_transactions(tx_refs, EB)**
-
-This function fetches missing transactions referenced by an EB via TxFetch.  
-Instead of using transaction hashes, an efficient optimization is to request missing transactions by their index in the EB body.
-
-**continue_diffusing_eb(EB)**
-
-This function continues diffusing EB content to other peers via EbRelay.
-
-**trigger_eb_validation(EB, header)**
-
-This function initiates asynchronous validation of an EB's transactions.
-
-**have_all_transactions_for_eb(EB)**
-
-This function checks if all transactions referenced by an EB are locally available.
-
-**get_header_for_eb(EB)**
-
-This function retrieves the RB header that announced a given EB.
+> Work in progress...
 
 ### Network
 
