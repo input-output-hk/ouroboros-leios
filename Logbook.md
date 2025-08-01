@@ -6,6 +6,12 @@
 
 The Juypter notebook [analysis/sims/2025w31b/analysis.ipynb](analysis/sims/2025w31b/analysis.ipynb) compares the early draft of the Haskell simulator for Linear Leios to the more mature Rust simulator. Discrepancies related to CPU usage, network usage, and vote diffusion [are being investigated](https://github.com/input-output-hk/ouroboros-leios/pull/466).
 
+### Rust simulation
+
+Added equivocation voting delay to Linear Leios 
+
+Implementation of an attack on Linear Leios, where EB diffusion is delayed until the last mometn
+
 ## 2025-07-30
 
 ### Experiment varying stage length in "No IBs" Leios
