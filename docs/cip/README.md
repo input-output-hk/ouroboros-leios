@@ -566,6 +566,8 @@ sequenceDiagram
     U->>BP: 11. Sync Votes
     BP->>D: 11.a Serve Votes (+ own vote)
     
+    Note over BP: 12. Collect votes<br/>from other voters
+    Note over BP: 13. Verify vote<br/>signatures & eligibility
     Note over BP: 14. Aggregate certificate<br/>from votes  
     Note over BP: 15. Create next RB<br />include EB certificate &<br />announce next EB
 ```
@@ -573,6 +575,8 @@ sequenceDiagram
 _Figure 2: Up- and downstream interactions of a node (simplified)_
 
 </div>
+
+The diagram above illustrates in a simplified manner the complete Leios workflow, numbered to show the sequence of interactions. While many steps introduce new behaviors, several core Praos mechanisms remain unchanged:
 
 #### What remains unchanged from Praos
 
@@ -588,11 +592,11 @@ Most core Praos functionality continues to operate unchanged in Leios. **Transac
 
 #### Novel Requirements: EB Handling and Attack Prevention
 
-The sequence diagram illustrates Leios's novel responsibilities around endorser block handling, which introduces critical attack prevention mechanisms not present in Praos:
+Beyond the familiar Praos mechanisms, the sequence diagram reveals several entirely new node behaviors required for EB handling (Steps 6-14). These introduce critical attack prevention mechanisms not present in Praos:
 
 **Freshest-First EB Delivery**
 
-EBs must be delivered in **freshest-first order** to prevent timing attacks where adversaries flood the network with large, old EBs to delay fresh EB delivery. This freshest-first policy ensures that recent EBs (which can still be voted on) receive priority over historical EBs, preventing large batches of old EBs from congesting the network and blocking new EB propagation. 
+EBs must be delivered in **freshest-first delivery** to prevent timing attacks where adversaries flood the network with large, old EBs to delay fresh EB delivery. This freshest-first policy ensures that recent EBs (which can still be voted on) receive priority over historical EBs, preventing large batches of old EBs from congesting the network and blocking new EB propagation. 
 
 Most critically, this prioritization guarantees that committee members receive fresh EBs within the voting window $L_\text{vote}$, maintaining the protocol's liveness properties under adversarial conditions.
 
@@ -608,11 +612,11 @@ While nodes must receive all EBs from all forks for security reasons, committee 
 
 **Forward-Before-Validate Strategy (Steps 8-9)**
 
-To maintain freshest-first delivery while preventing DoS attacks, nodes must **forward EBs before performing full validation**. This requires a two-stage validation approach that carefully balances efficiency with security. 
+To maintain freshest-first delivery while preventing DoS attacks, nodes must **forward EBs before performing full validation**. This creates a two-stage process: Stage 1 occurs before Step 9 (Serve EB), while Stage 2 happens during Step 8 (Validate EB). 
 
-*Stage 1 - Cheap Verification (Pre-forwarding)* consists of VRF proof verification to confirm the legitimacy of the block producer, hash consistency checks to ensure the EB hash matches the RB header announcement from Step 2, basic header validation covering slot, issuer, and signatures, and equivocation detection to reject EBs from known equivocating producers. 
+*Stage 1 - Pre-forwarding Verification* performs only the checks required to ensure DoS attacks are mitigated: VRF proof verification to confirm the legitimacy of the block producer, block hash verification to ensure the EB hash matches the RB header announcement from Step 2, basic header validation covering slot, issuer, and signatures, and equivocation detection to reject EBs from known equivocating producers. 
 
-*Stage 2 - Full Validation (Post-forwarding, Step 8)* then performs the computationally expensive operations including transaction availability and validity checking, ledger state consistency verification, conflict detection with RB transactions, and size limit verification against $S_\text{EB}$. This approach limits DoS exposure since each producer can create at most one EB per slot, so forwarding based on cheap checks bounds the work required even under adversarial conditions.
+*Stage 2 - Full Validation (Step 8)* then performs the computationally expensive operations including transaction availability and validity checking, ledger state consistency verification, conflict detection with RB transactions, and size limit verification against $S_\text{EB}$. This approach limits DoS exposure since each producer can create at most one EB per slot, bounding the pre-forwarding verification work to at most one EB per slot per producer even under adversarial conditions.
 
 **Equivocation Detection and Defense (Steps 2, 2a)**
 
@@ -628,15 +632,15 @@ Committee members must respect strict timing constraints that govern the entire 
 
 The **vote diffusion period** of $L_\text{diff}$ additional slots enables vote propagation (Step 11a) throughout the network. Finally, the **certificate inclusion constraint** ensures that RBs can only include certificates after the complete $L_\text{vote} + L_\text{diff}$ period expires (Step 15). 
 
-These carefully orchestrated constraints ensure that honest EBs receive priority over equivocated ones, that all honest nodes have sufficient opportunity to detect equivocation before voting, and that adequate time exists for vote aggregation and certificate creation (Step 14).
+These timing constraints ensure that honest EBs receive priority over equivocated ones, that all honest nodes have sufficient opportunity to detect equivocation before voting (through the $3\Delta_\text{hdr}$ delay), and that the vote diffusion period $L_\text{diff}$ provides sufficient time for vote aggregation and certificate creation (Step 14).
 
 #### Attack Mitigation Summary
 
-The novel node behaviors directly address specific attack vectors through a comprehensive defense strategy. **Timing attacks** are mitigated by freshest-first EB delivery, preventing adversaries from flooding the network with stale blocks to delay fresh content. **Withholding attacks** are countered by universal EB propagation across all forks, ensuring that fork switches cannot be exploited by selectively concealing critical data. 
+The novel node behaviors described above work together to defend against specific attack vectors through coordinated mechanisms. **Timing attacks** are mitigated by the freshest-first EB delivery requirement, preventing adversaries from flooding the network with stale blocks to delay fresh content. **Withholding attacks** are countered by the universal EB propagation requirement across all forks, ensuring that fork switches cannot be exploited by selectively concealing critical data. 
 
-**DoS attacks** are limited through the forward-before-validate strategy with cheap pre-checks (Step 8), bounding computational exposure while maintaining network responsiveness. **Equivocation attacks** are detected and neutralized via rapid header diffusion and delayed voting (Steps 2, 2a, 10), giving honest nodes time to coordinate their response to malicious behavior. 
+**DoS attacks** are limited through the forward-before-validate strategy with pre-forwarding verification (Step 8), bounding computational exposure while maintaining network responsiveness. **Equivocation attacks** are detected and neutralized via rapid header diffusion and delayed voting (Steps 2, 2a, 10), giving honest nodes time to coordinate their response to malicious behavior. 
 
-**Fork manipulation** attempts are thwarted by pre-emptive EB distribution independent of the current chain, preventing adversaries from using chain reorganizations as attack vectors. These coordinated requirements fundamentally transform Leios nodes from simple chain followers into active participants in a distributed validation network, where attack resistance depends on synchronized defensive behaviors across all honest nodes.
+**Fork manipulation** attempts are thwarted by pre-emptive EB distribution independent of the current chain, preventing adversaries from using chain reorganizations as attack vectors. These coordinated requirements fundamentally transform Leios nodes from simple chain followers into active participants in a distributed validation network, where attack resistance depends on adherence to the protocol timing constraints ($L_\text{vote}$, $L_\text{diff}$, $3\Delta_\text{hdr}$) across all honest nodes.
 
 > [!Warning]
 > Work in progress...
