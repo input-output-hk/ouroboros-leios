@@ -167,10 +167,11 @@ things:
   announce the second block
 - **Endorser Block (EB)**: A larger block containing additional transaction references
 
+The RB chain continues to be distributed exactly as in Praos, while Leios introduces a separate header distribution mechanism for rapid EB discovery and equivocation detection.
+
 **Step 2: EB Distribution**
 
-Nodes receiving the RB header discover the announced EB and fetch its content.
-The EB contains references to transactions.
+Nodes receiving the RB header discover the announced EB and fetch its content. The EB contains references to transactions. If a node does not already possess a transaction referenced in the EB, it explicitly requests that transaction from peers.
 
 **Step 3: Committee Validation**
 
@@ -178,10 +179,11 @@ A **voting committee** of stake pools validates the EB within a time window
 called the **stage length** ($L$):
 
 - Committee members are selected via sortition (lottery based on stake)
-- Validators check the EB's transaction validity
-- Valid EBs receive votes from committee members
-- The stage has two phases: voting period ($L_\text{vote}$) + vote diffusion
-  period ($L_\text{diff}$)
+- A committee member votes positively for an EB only if:
+  - It has received the EB within $L_\text{vote}$ slots from its creation,
+  - The EB corresponds to the EB announced in the latest block in the chain maintained by the party,
+  - The transactions in the EB are a valid extension of the RB (and the corresponding chain) that announced it.
+- The stage has two phases: voting period ($L_\text{vote}$) + vote diffusion period ($L_\text{diff}$)
 
 **Step 4: Certification**
 
@@ -196,12 +198,11 @@ This creates a compact **certificate** proving the EB's validity.
 
 **Step 5: Chain Inclusion**
 
-The next RB producer can include the certificate in their block **only if** all
+The certificate for an EB announced by RB may only be included in another RB' **if** all
 conditions are met:
 
-- A voting committee validated the EB within the stage duration $L$
-- The next RB appears with sufficient delay to allow voting completion
-- The subsequent RB producer includes the EB's certificate
+- RB' directly extends the target RB in the blockchain, and
+- The creation slot of RB' and the end of the voting phase (RB creation timestamp + $L_\text{vote}$) differ by at least $L_\text{diff}$ slots. This ensures the EB is available to all honest nodes with good probability.
 
 This **conditional inclusion** maintains Praos safety guarantees while achieving
 higher throughput when network timing permits. When included:
@@ -373,7 +374,7 @@ These are observed properties of the network topology and node capabilities:
 
 | Characteristic            |       Symbol        | Units | Description                                                 |          Typical Range          | Notes                                              |
 | ------------------------- | :-----------------: | :---: | ----------------------------------------------------------- | :-----------------------------: | -------------------------------------------------- |
-| Network diffusion time    |      $\Delta$       | slot  | Observed upper bound for message diffusion to all nodes     |            2-6 slots            | Depends on network topology and conditions         |
+| RB diffusion time         |      $\Delta$       | slot  | Observed upper bound for ranking block (RB) diffusion to all nodes     |            2-6 slots            | Depends on network topology and conditions         |
 | RB header diffusion time  | $\Delta_\text{hdr}$ | slot  | Observed time for RB headers to reach nodes                 |          $\leq \Delta$          | Usually faster than full block diffusion           |
 
 _Table 1: Network Characteristics_
@@ -390,7 +391,8 @@ constrained by the network characteristics above:
 
 | Parameter                     |    Symbol     |  Units   | Description                                                            |                   Constraints                   | Rationale                                                     |
 | ----------------------------- | :-----------: | :------: | ---------------------------------------------------------------------- | :---------------------------------------------: | ------------------------------------------------------------- |
-| Stage length                  |      $L$      |   slot   | Duration of the voting period for endorser blocks                      | $L \geq \Delta$ and $L \geq 3\Delta_\text{hdr}$ | Must allow EB diffusion, voting, and vote propagation         |
+| Voting period length          | $L_\text{vote}$ |   slot   | Duration during which committee members can vote on endorser blocks    | $L_\text{vote} \geq 3\Delta_\text{hdr}$ | Must allow EB diffusion and equivocation detection before voting |
+| Vote diffusion period length | $L_\text{diff}$ |   slot   | Duration for vote propagation after voting period ends                | $L_\text{diff} \geq \Delta_\text{hdr}$ | Must allow votes to propagate before certificate inclusion   |
 | Ranking block max size        | $S_\text{RB}$ |  bytes   | Maximum size of a ranking block                                        |                $S_\text{RB} > 0$                | Limits RB size to ensure timely diffusion                     |
 | Endorser-block referenceable transaction size | $S_\text{EB}$ |  bytes   | Maximum total size of transactions that can be referenced by an endorser block |                $S_\text{EB} > 0$                | Limits total transaction payload to ensure timely diffusion within stage length |
 | Praos active slot coefficient | $f_\text{RB}$ |  1/slot  | Probability that a party will be the slot leader for a particular slot |       $0 < f_\text{RB} \leq \Delta^{-1}$        | Blocks should not be produced faster than network delay       |
