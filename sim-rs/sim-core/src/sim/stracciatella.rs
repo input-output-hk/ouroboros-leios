@@ -246,11 +246,12 @@ pub struct StracciatellaLeiosNode {
     leios: NodeLeiosState,
 }
 
-type EventResult = super::EventResult<Message, CpuTask>;
+type EventResult = super::EventResult<StracciatellaLeiosNode>;
 
 impl NodeImpl for StracciatellaLeiosNode {
     type Message = Message;
     type Task = CpuTask;
+    type TimedEvent = ();
 
     fn new(
         config: &NodeConfiguration,

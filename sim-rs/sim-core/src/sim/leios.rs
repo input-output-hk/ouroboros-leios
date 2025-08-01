@@ -372,11 +372,12 @@ impl PeerInputBlockRequests {
     }
 }
 
-type EventResult = super::EventResult<SimulationMessage, Task>;
+type EventResult = super::EventResult<LeiosNode>;
 
 impl NodeImpl for LeiosNode {
     type Task = Task;
     type Message = SimulationMessage;
+    type TimedEvent = ();
 
     fn new(
         config: &NodeConfiguration,

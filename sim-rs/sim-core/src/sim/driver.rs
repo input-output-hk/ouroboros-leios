@@ -21,9 +21,10 @@ struct CpuTaskWrapper<Task: SimCpuTask> {
     cpu_time: Duration,
 }
 
-enum NodeEvent {
+enum NodeEvent<T> {
     NewSlot(u64),
     CpuSubtaskCompleted(Subtask),
+    Other(T),
 }
 
 pub struct NodeDriver<N: NodeImpl> {
@@ -35,7 +36,7 @@ pub struct NodeDriver<N: NodeImpl> {
     msg_source: NetworkSource<N::Message>,
     msg_sink: NetworkSink<MiniProtocol, N::Message>,
     tx_source: mpsc::UnboundedReceiver<Arc<Transaction>>,
-    events: BinaryHeap<FutureEvent<NodeEvent>>,
+    events: BinaryHeap<FutureEvent<NodeEvent<N::TimedEvent>>>,
     tracker: EventTracker,
     clock: ClockBarrier,
     cpu: CpuTaskQueue<CpuTaskWrapper<N::Task>>,
@@ -105,6 +106,9 @@ impl<N: NodeImpl> NodeDriver<N> {
                             };
                             (result, false)
                         }
+                        NodeEvent::Other(event) => {
+                            (self.node.handle_timed_event(event), false)
+                        }
                     }
                 }
             };
@@ -113,6 +117,9 @@ impl<N: NodeImpl> NodeDriver<N> {
             }
             for task in result.tasks {
                 self.schedule_cpu_task(task);
+            }
+            for (time, event) in result.timed_events {
+                self.events.push(FutureEvent(time, NodeEvent::Other(event)));
             }
             if finish_task {
                 self.clock.finish_task();
@@ -156,10 +163,7 @@ impl<N: NodeImpl> NodeDriver<N> {
         }
     }
 
-    fn handle_subtask_completed(
-        &mut self,
-        subtask: Subtask,
-    ) -> Option<EventResult<N::Message, N::Task>> {
+    fn handle_subtask_completed(&mut self, subtask: Subtask) -> Option<EventResult<N>> {
         let task_id = CpuTaskId {
             node: self.id,
             index: subtask.task_id,

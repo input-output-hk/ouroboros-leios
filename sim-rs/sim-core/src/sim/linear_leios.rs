@@ -180,6 +180,10 @@ impl SimCpuTask for CpuTask {
     }
 }
 
+pub enum TimedEvent {
+    TryVote(Arc<EndorserBlock>, Timestamp),
+}
+
 enum TransactionView {
     Pending,
     Received(Arc<Transaction>),
@@ -269,11 +273,12 @@ pub struct LinearLeiosNode {
     leios: NodeLeiosState,
 }
 
-type EventResult = super::EventResult<Message, CpuTask>;
+type EventResult = super::EventResult<LinearLeiosNode>;
 
 impl NodeImpl for LinearLeiosNode {
     type Message = Message;
     type Task = CpuTask;
+    type TimedEvent = TimedEvent;
 
     fn new(
         config: &NodeConfiguration,
@@ -356,6 +361,13 @@ impl NodeImpl for LinearLeiosNode {
             CpuTask::VTBundleValidated(from, votes) => {
                 self.finish_validating_vote_bundle(from, votes)
             }
+        }
+        std::mem::take(&mut self.queued)
+    }
+
+    fn handle_timed_event(&mut self, event: Self::TimedEvent) -> EventResult {
+        match event {
+            TimedEvent::TryVote(eb, seen) => self.vote_for_endorser_block(&eb, seen),
         }
         std::mem::take(&mut self.queued)
     }
@@ -839,6 +851,17 @@ impl LinearLeiosNode {
 // Voting
 impl LinearLeiosNode {
     fn vote_for_endorser_block(&mut self, eb: &Arc<EndorserBlock>, seen: Timestamp) {
+        let equivocation_cutoff_time =
+            Timestamp::from_secs(eb.slot) + (self.sim_config.header_diffusion_time * 3);
+        if eb.producer != self.id && self.clock.now() < equivocation_cutoff_time {
+            // If we haven't waited long enough to detect equivocations,
+            // schedule voting later.
+            self.queued.schedule_event(
+                equivocation_cutoff_time,
+                TimedEvent::TryVote(eb.clone(), seen),
+            );
+            return;
+        }
         if !self.try_vote_for_endorser_block(eb, seen) && self.sim_config.emit_conformance_events {
             self.tracker
                 .track_linear_no_vote_generated(self.id, eb.id());

@@ -9,7 +9,7 @@ use tokio_util::sync::CancellationToken;
 use tx::TransactionProducer;
 
 use crate::{
-    clock::{Clock, ClockCoordinator},
+    clock::{Clock, ClockCoordinator, Timestamp},
     config::{CpuTimeConfig, LeiosVariant, NodeConfiguration, NodeId, SimConfiguration},
     events::EventTracker,
     model::Transaction,
@@ -242,33 +242,40 @@ trait SimCpuTask {
     fn times(&self, config: &CpuTimeConfig) -> Vec<Duration>;
 }
 
-struct EventResult<Message: SimMessage, Task: SimCpuTask> {
-    messages: Vec<(NodeId, Message)>,
-    tasks: Vec<Task>,
+struct EventResult<N: NodeImpl> {
+    messages: Vec<(NodeId, N::Message)>,
+    tasks: Vec<N::Task>,
+    timed_events: Vec<(Timestamp, N::TimedEvent)>,
 }
 
-impl<Message: SimMessage, Task: SimCpuTask> Default for EventResult<Message, Task> {
+impl<N: NodeImpl> Default for EventResult<N> {
     fn default() -> Self {
         Self {
             messages: vec![],
             tasks: vec![],
+            timed_events: vec![],
         }
     }
 }
 
-impl<Message: SimMessage, Task: SimCpuTask> EventResult<Message, Task> {
-    pub fn send_to(&mut self, to: NodeId, msg: Message) {
+impl<N: NodeImpl> EventResult<N> {
+    pub fn send_to(&mut self, to: NodeId, msg: N::Message) {
         self.messages.push((to, msg));
     }
 
-    pub fn schedule_cpu_task(&mut self, task: Task) {
+    pub fn schedule_cpu_task(&mut self, task: N::Task) {
         self.tasks.push(task);
+    }
+
+    pub fn schedule_event(&mut self, time: Timestamp, event: N::TimedEvent) {
+        self.timed_events.push((time, event));
     }
 }
 
-trait NodeImpl {
+trait NodeImpl: Sized {
     type Message: SimMessage;
     type Task: SimCpuTask;
+    type TimedEvent;
 
     fn new(
         config: &NodeConfiguration,
@@ -278,12 +285,12 @@ trait NodeImpl {
         clock: Clock,
     ) -> Self;
 
-    fn handle_new_slot(&mut self, slot: u64) -> EventResult<Self::Message, Self::Task>;
-    fn handle_new_tx(&mut self, tx: Arc<Transaction>) -> EventResult<Self::Message, Self::Task>;
-    fn handle_message(
-        &mut self,
-        from: NodeId,
-        msg: Self::Message,
-    ) -> EventResult<Self::Message, Self::Task>;
-    fn handle_cpu_task(&mut self, task: Self::Task) -> EventResult<Self::Message, Self::Task>;
+    fn handle_new_slot(&mut self, slot: u64) -> EventResult<Self>;
+    fn handle_new_tx(&mut self, tx: Arc<Transaction>) -> EventResult<Self>;
+    fn handle_message(&mut self, from: NodeId, msg: Self::Message) -> EventResult<Self>;
+    fn handle_cpu_task(&mut self, task: Self::Task) -> EventResult<Self>;
+    fn handle_timed_event(&mut self, event: Self::TimedEvent) -> EventResult<Self> {
+        let _ = event;
+        EventResult::default()
+    }
 }

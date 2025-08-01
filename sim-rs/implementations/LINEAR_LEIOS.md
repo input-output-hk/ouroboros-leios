@@ -15,6 +15,8 @@ When a node receives an RB body, it immediately removes all referenced/conflicti
 
 When a node receives an EB body, it runs lightweight validation and then propagates the body to peers. After this lightweight validation, it runs more expensive complete validation (presumably at the TX level) before voting.
 
+To detect equivocation, a node will wait until at least `3 * Δhdr` after an EB was generated before voting for it.
+
 When voting, a node runs a VRF lottery to decide how many times it can vote for that EB; if it has any votes, it will transmit them to all peers. If the EB has been certified after `L_vote` + `L_diff` slots have passed, the node removes all of its transactions from the mempool (under the assumption that the EB will make it on-chain).
 
 ## New parameters
@@ -43,5 +45,4 @@ When voting, a node runs a VRF lottery to decide how many times it can vote for 
 
 ## Not yet implemented
 - Freshest first delivery is not implemented for EBs, though EBs are created infrequently enough that this likely doesn't matter.
-- We are not yet accounting for equivocation.
-- Nodes are supposed to wait until the diffuse stage to vote for an EB, they are currently voting as soon as they can.
+- We are not yet simulating equivocation.
