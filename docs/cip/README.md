@@ -600,6 +600,10 @@ Unlike RBs where nodes only need blocks in their current chain, **all nodes must
 
 Without this requirement, honest nodes switching to a longer fork might discover they lack EBs that were certified on that fork, making fork switches expensive with time complexity proportional to the number of missing EBs that must be fetched and validated retroactively.
 
+**Single EB Voting Constraint**
+
+While nodes must receive all EBs from all forks for security reasons, committee members may only vote on **one EB per slot**, even when multiple EBs are available due to fork competition. This voting constraint ensures that votes do not dilute across competing forks and maintains the integrity of the certification process.
+
 **Forward-Before-Validate Strategy (Steps 8-9)**
 
 To maintain freshest-first delivery while preventing DoS attacks, nodes must **forward EBs before performing full validation**. This requires a two-stage validation approach that carefully balances efficiency with security. 
