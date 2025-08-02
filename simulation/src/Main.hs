@@ -24,7 +24,7 @@ import qualified LeiosProtocol.Short.DataSimP2P as DataShortLeiosP2P
 import qualified LeiosProtocol.Short.VizSim as VizShortLeios
 import qualified LeiosProtocol.Short.VizSimP2P as VizShortLeiosP2P
 import qualified LeiosProtocol.VizSimTestRelay as VizSimTestRelay
-import ModelTCP (kilobytes)
+import ModelTCP (kibibytes)
 import Options.Applicative (
   Alternative ((<|>)),
   HasValue,
@@ -523,7 +523,7 @@ parserOverrideUnlimited =
       ( long "override-unlimited-bandwidth"
           <> metavar "BYTESPERSEC"
           <> help "Values to use for link bandwidth instead of unlimited (which is not supported yet)."
-          <> shownDefValue (fromBytes $ kilobytes 1000)
+          <> shownDefValue (fromBytes $ kibibytes 1000)
       )
 
 --------------------------------------------------------------------------------

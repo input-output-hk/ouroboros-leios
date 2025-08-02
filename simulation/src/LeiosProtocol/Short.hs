@@ -45,6 +45,8 @@ data SizesConfig = SizesConfig
   , inputBlockBodyAvgSize :: !Bytes
   -- ^ as we do not model transactions we just use a fixed size for bodies.
   , inputBlockBodyMaxSize :: !Bytes
+  , endorseBlockBodyAvgSize :: !Bytes
+  -- ^ unused by Short/Full Leios, used by Linear Leios eg
   , endorseBlock :: !(EndorseBlock -> Bytes)
   , voteMsg :: !(VoteMsg -> Bytes)
   , certificate :: !(Certificate -> Bytes)
@@ -63,6 +65,7 @@ data LeiosDelays = LeiosDelays
   , endorseBlockGeneration :: !(EndorseBlock -> DiffTime)
   , endorseBlockValidation :: !(EndorseBlock -> DiffTime)
   , voteMsgGeneration :: !(VoteMsg -> [EndorseBlock] -> DiffTime)
+  , linearVoteMsgGeneration :: !(VoteMsg -> [InputBlock] -> DiffTime)
   , voteMsgValidation :: !(VoteMsg -> DiffTime)
   , certificateGeneration :: !(Certificate -> DiffTime)
   , certificateValidation :: !(Certificate -> DiffTime)
@@ -122,6 +125,8 @@ data LeiosConfig = forall p. IsPipeline p => LeiosConfig
   , votesForCertificate :: Int
   , sizes :: SizesConfig
   , delays :: LeiosDelays
+  , linearVoteStageLengthSlots :: Int
+  , linearDiffuseStageLengthSlots :: Int
   , ibDiffusion :: RelayDiffusionConfig
   , ebDiffusion :: RelayDiffusionConfig
   , voteDiffusion :: RelayDiffusionConfig
@@ -153,11 +158,13 @@ convertConfig disk =
           , headerDiffusionTime = realToFrac $ durationMsToDiffTime disk.leiosHeaderDiffusionTimeMs
           , lateIbInclusion = disk.leiosLateIbInclusion
           , pipelinesToReferenceFromEB =
-              if disk.leiosVariant == Full
-                then
-                  ceiling ((3 * disk.praosChainQuality) / fromIntegral sliceLength) - 2
-                else 0
+              case disk.leiosVariant of
+                Full -> ceiling ((3 * disk.praosChainQuality) / fromIntegral sliceLength) - 2
+                Short -> 0
+                Linear -> 0
           , activeVotingStageLength = fromIntegral disk.leiosStageActiveVotingSlots
+          , linearVoteStageLengthSlots = fromIntegral disk.linearVoteStageLengthSlots
+          , linearDiffuseStageLengthSlots = fromIntegral disk.linearDiffuseStageLengthSlots
           , votingFrequencyPerStage = disk.voteGenerationProbability
           , votesForCertificate = fromIntegral disk.voteThreshold
           , sizes
@@ -227,6 +234,7 @@ convertConfig disk =
       { inputBlockHeader = fromIntegral disk.ibHeadSizeBytes
       , inputBlockBodyAvgSize = fromIntegral disk.ibBodyAvgSizeBytes
       , inputBlockBodyMaxSize = fromIntegral disk.ibBodyMaxSizeBytes
+      , endorseBlockBodyAvgSize = fromIntegral disk.ebBodyAvgSizeBytes
       , endorseBlock = \eb ->
           fromIntegral $
             disk.ebSizeBytesConstant
@@ -237,7 +245,10 @@ convertConfig disk =
           fromIntegral $
             disk.voteBundleSizeBytesConstant
               + disk.voteBundleSizeBytesPerEb `forEach` vt.endorseBlocks
-      , certificate = const $ error "certificate size config already included in PraosConfig{bodySize}"
+      , certificate = \_cert ->
+          fromIntegral $
+            assert (0 == disk.certSizeBytesPerNode) $   -- TODO
+              disk.certSizeBytesConstant
       , rankingBlockLegacyPraosPayloadAvgSize = fromIntegral disk.rbBodyLegacyPraosPayloadAvgSizeBytes
       }
   certificateGeneration (Certificate votesMap) =
@@ -267,12 +278,24 @@ convertConfig disk =
                   + disk.voteGenerationCpuTimeMsPerIb `forEach` eb.inputBlocks
                 | eb <- ebs
                 ]
+      , linearVoteMsgGeneration = \vm ibs ->
+          assert (1 == length vm.endorseBlocks) $
+            assert (vm.endorseBlocks == map (convertLinearId . (.id)) ibs) $
+              assert (0 == disk.voteGenerationCpuTimeMsPerTx) $   -- TODO
+                durationMsToDiffTime $
+                  disk.voteGenerationCpuTimeMsConstant `forEach` ibs
       , voteMsgValidation = \vm ->
           durationMsToDiffTime $
             disk.voteValidationCpuTimeMs `forEach` vm.endorseBlocks
       , certificateGeneration = const $ error "certificateGeneration delay included in RB generation"
       , certificateValidation = const $ error "certificateValidation delay included in RB validation"
       }
+
+convertLinearId :: InputBlockId -> EndorseBlockId
+convertLinearId (InputBlockId x y) = EndorseBlockId x y
+
+unconvertLinearId :: EndorseBlockId -> InputBlockId
+unconvertLinearId (EndorseBlockId x y) = InputBlockId x y
 
 delaysAndSizesAsFull :: LeiosConfig -> LeiosConfig
 delaysAndSizesAsFull cfg@LeiosConfig{pipeline, voteSendStage} =
@@ -293,6 +316,8 @@ delaysAndSizesAsFull cfg@LeiosConfig{pipeline, voteSendStage} =
     , lateIbInclusion = cfg.lateIbInclusion
     , pipelinesToReferenceFromEB = cfg.pipelinesToReferenceFromEB
     , activeVotingStageLength = cfg.activeVotingStageLength
+    , linearVoteStageLengthSlots = cfg.linearVoteStageLengthSlots
+    , linearDiffuseStageLengthSlots = cfg.linearDiffuseStageLengthSlots
     , votingFrequencyPerStage = cfg.votingFrequencyPerStage
     , voteSendStage = voteSendStage
     , votesForCertificate = cfg.votesForCertificate
@@ -309,6 +334,15 @@ delaysAndSizesAsFull cfg@LeiosConfig{pipeline, voteSendStage} =
     [ EndorseBlock{id = id', ..}
     | id' <- fullVT.endorseBlocks
     , let EndorseBlock{..} = fullEB
+    ]
+  fullLinearEBsVotedFor =
+    [ InputBlock {
+        body = fullIB.body
+        , header =
+          let InputBlockHeader{..} = fullIB.header
+          in InputBlockHeader {id = unconvertLinearId id', ..}
+        }
+    | id' <- fullVT.endorseBlocks
     ]
   fullRB = mockFullRankingBlock cfg
   fullCert = mockFullCertificate cfg
@@ -329,6 +363,7 @@ delaysAndSizesAsFull cfg@LeiosConfig{pipeline, voteSendStage} =
       { inputBlockHeader = cfg.sizes.inputBlockHeader :: Bytes
       , inputBlockBodyAvgSize = cfg.sizes.inputBlockBodyAvgSize :: Bytes
       , inputBlockBodyMaxSize = cfg.sizes.inputBlockBodyMaxSize :: Bytes
+      , endorseBlockBodyAvgSize = cfg.sizes.endorseBlockBodyAvgSize :: Bytes
       , endorseBlock = const @Bytes $ cfg.sizes.endorseBlock $ mockFullEndorseBlock cfg
       , voteMsg = const @Bytes $ cfg.sizes.voteMsg $ mockFullVoteMsg cfg
       , certificate = const @Bytes $ cfg.sizes.certificate $ mockFullCertificate cfg
@@ -347,6 +382,12 @@ delaysAndSizesAsFull cfg@LeiosConfig{pipeline, voteSendStage} =
               cfg.delays.voteMsgGeneration
                 fullVT
                 fullEBsVotedFor
+      , linearVoteMsgGeneration =
+          const $
+            const @DiffTime $
+              cfg.delays.linearVoteMsgGeneration
+                fullVT
+                fullLinearEBsVotedFor
       , voteMsgValidation = const @DiffTime $ cfg.delays.voteMsgValidation fullVT
       , certificateGeneration = const @DiffTime $ cfg.delays.certificateGeneration fullCert
       , certificateValidation = const @DiffTime $ cfg.delays.certificateValidation fullCert
@@ -661,7 +702,8 @@ mockFullCertificate cfg = mockCertificate cfg cfg.votesForCertificate
 -- Buffers views, divided to avoid reading unneeded buffers.
 
 data NewRankingBlockData = NewRankingBlockData
-  { certifiedEBforRBAt :: SlotNo -> Maybe (EndorseBlockId, Certificate)
+  { prevChain :: Chain RankingBlock
+  , mbEbCert :: Maybe (EndorseBlockId, Certificate)
   , txsPayload :: Bytes
   }
 
@@ -758,13 +800,14 @@ endorseBlocksToReference ::
   EndorseBlocksSnapshot ->
   (PipelineNo -> UTCTime -> Bool) ->
   [(PipelineNo, [EndorseBlock])]
-endorseBlocksToReference LeiosConfig{variant = Short} _ _ _ = []
-endorseBlocksToReference cfg@LeiosConfig{variant = Full} pl EndorseBlocksSnapshot{..} checkDeliveryTime =
-  assert
-    ( all (\(p, ebs) -> all (\eb -> p == endorseBlockPipeline cfg eb) ebs && succ (succ p) <= pl) result
-        && (\ps -> sort ps == ps) (map fst result)
-    )
-    result
+endorseBlocksToReference cfg pl EndorseBlocksSnapshot{..} checkDeliveryTime
+  | Full <- cfg.variant =
+      assert
+        ( all (\(p, ebs) -> all (\eb -> p == endorseBlockPipeline cfg eb) ebs && succ (succ p) <= pl) result
+            && (\ps -> sort ps == ps) (map fst result)
+        )
+        result
+  | otherwise = []
  where
   result =
     [ (p, [eb | (eb, _, _) <- es])

@@ -33,7 +33,7 @@ import Control.Monad.Class.MonadFork (MonadFork)
 import Control.Tracer (Contravariant (contramap), Tracer)
 import Data.Maybe (fromMaybe)
 import GHC.Generics
-import ModelTCP (kilobytes, mkTcpConnProps)
+import ModelTCP (kibibytes, mkTcpConnProps)
 import TimeCompat (DiffTime, MonadDelay, MonadMonotonicTimeNSec, MonadTime)
 
 data ConnectionConfig = ConnectionConfig
@@ -47,7 +47,7 @@ mkConnectionConfig tcp mux tcpLatency maybeTcpBandwidth = ConnectionConfig{..}
   transportConfig
     | tcp = TransportTcp (mkTcpConnProps tcpLatency (fromMaybe defaultTcpBandwidth maybeTcpBandwidth))
     | otherwise = TransportSimple (SimpleConnProps tcpLatency maybeTcpBandwidth)
-  defaultTcpBandwidth = (kilobytes 1000)
+  defaultTcpBandwidth = (kibibytes 1000)
 
 data TransportConfig
   = TransportSimple !SimpleConnProps
