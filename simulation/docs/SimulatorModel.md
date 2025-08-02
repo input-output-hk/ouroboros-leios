@@ -182,29 +182,68 @@ IBs, VBs, and EBs are each diffused via a corresponding instance of the Relay mi
 This is a generalization of the TxSubmission mini protocol and the Mempool in `ouroboros-network` and `ouroboros-consensus`.
 
 Each Relay instance involves one thread per inbound connection (aka "peers") and one thread per outbound connection (aka "followers").
-For an inbound connection, the node is (aggressively/rapidly) pulling IB headers (ie merely IDs for VBs and EBs paired with a slot) and then selectively pulling the IB body (ie VBs and EBs) it wants in a configurable order/prioritization, which is usually FreshestFirst.
-It is also configurable which of the peers offering the same body the node fetches it from, which is either just the first or all---all can sometimes reduce latency.
-(TODO the real node will likely request from the second peer if the first hasn't yet replied but not the third.)
-For an outbound connection, the roles are switched.
+For an inbound connection, the node is (aggressively/rapidly) pulling IB headers (ie merely IDs paired with a slot for VBs and EBs) and then selectively pulling the IB body (ie VBs and EBs) it wants in a configurable order/prioritization, which is usually FreshestFirst.
+For an outbound connection, the roles are simply switched.
 
 *Remark*.
 The reason RBs do not diffuse via Relay is because they form a chain, so one block can't be validated without its predecessors: an otherwise-valid block is invalid if it extends an invalid block.
 
-TODO discuss the other Relay parameters, backpressure, pipelining, etc?
-
 When an IB header arrives, its validation task is enqueued on the model CPU---for VBs and EBs it's just an ID, not a header, so there's no validation.
-Once that finishes, the Relay logic will decide whether it needs to fetch the body.
+Once that finishes, the Relay logic will decide whether it needs to request the body.
 
-- An IB body is not fetched if it exists earlier than it should, it's being offered later than it should be, or if it's already in the buffer.
-- An EB is not fetched if it's older than the slot to which the buffer has already been pruned, it's too old to be included by an RB (see `maxEndorseBlockAgeSlots`), or if it's already in the buffer.
-- A VB is not fetched if it's older than the slot to which the buffer has already been pruned or if it's already in the buffer.
+- An IB body is not requested if it exists earlier than it should, it's being offered later than it should be, or if it's already in the buffer.
+- An EB is not requested if it's older than the slot to which the buffer has already been pruned, it's too old to be included by an RB (see `maxEndorseBlockAgeSlots`), or if it's already in the buffer.
+- A VB is not requested if it's older than the slot to which the buffer has already been pruned or if it's already in the buffer.
+- If `relayStrategy` is set to `maxPeersPerBody` for the IB/EB/VB relay, then such an object that has not yet arrived is not requested _yet_ if it's already been requested from another peer.
 
-Different objects are handled differently when the arrived.
+Different objects are handled differently when they arrive.
 
 - When an IB that extends the genesis block arrives, its validate-and-adopt task is enqueued on the model CPU.
 - When an IB that extends a non-genesis RB arrives, its validate-and-adopt task is added to `waitingForLedgerStateVar`.
 - When an EB arrives, its validate-and-adopt task is enqueued on the model CPU.
 - When a VB arrives, its validate-and-adopt task is enqueued on the model CPU.
+
+Relay includes some-but-not-all of the parameters of the TxSubmission mini protocol in the `ouroboros-network` library.
+TxSubmission has the following parameters (TODO well, these will be true when that repo's imminent PR merges).
+
+- `maxWindowSize`, a strict inclusive upper bound on how many more headers the node has requested from a peer than it has acknowledged to that peer; the node will not request the next body if doing so would exceed this bound.
+- `maxHeadersPerMsg`, strict inclusive upper bound on how many headers the node will request with a single message.
+- `maxBodiesPerMsg`, strict inclusive upper bound on how many bodies the node will request with a single message.
+- `maxBytesInFlightPerPeer`, a lax inclusive upper bound on how many more bytes the node has requested from a peer than it has received corresponding replies for from that peer; the node will not send request while this bound has been exceeded---ie the node will exceed the bound by at most _one_ request.
+    - If the received body has a different number of bytes than requested, the node disconnects from the peer.
+    - This were instead a strict upper bound, peers sending many small bodies might starve a peer that needs to send a large body.
+    - The mux layer maintains a receive buffer for each peer, which resizes to accomodate the possibility that all of the expected responses will arrive before the consumer logic dequeues the first.
+      The buffer size will never exceed this bound by more than one body.
+- `maxBytesInFlightAllPeers`, a lax inclusive upper bound on how many more bytes the node has requested from all peers than it has received correspond replies for from those peers.
+  The sum of the peers' buffers' sizes will never exceed this bound by more than one body.
+    - If the node disconnects from a peer, its requested bytes are removed from this limit.
+    - Since each peer's buffer resizes dynamically, this puts a bound on how much memory the node reserves for all such buffers.
+    - If this bound were `N*B` where `B` is the per-peer buffer limit and `N` is the total number of peers that could submit bodies, then this parameter would be redundant.
+      However, the node operator might want to allow any `M < N` peers to have maximally-sized buffers simultaneously but not `M + 1 ≤ N`.
+- `maxBytesPerBody`, a strict inclusive upper bound on the size of a single body.
+- `maxPeersPerBody`, a strict inclusive upper bound on the number of peers that will deliver the (correct) body for a specific header in the window; the node will not request that body from an additional peer if receiving the body from that peer could exceed this bound.
+    - It is crucial that the real node will not acknowledge the corresponding header to this peer until it acquires the body (even from a different peer), despite not (yet) requesting it from this peer.
+- `timeouts`, timeouts for each response from the peer.
+
+The simulator's Relay mini protocol currently only includes the following subset of those parameters.
+
+- `maxWindowSize` is configurable.
+- `maxHeadersPerMsg` (aka `maxHeadersToRequest`) and `maxBodiesPerMsg` (aka `maxBodiesToRequest`) are configurable.
+- `maxPeersPerBody` is either `RequestFromFirst` or `RequestFromAll`.
+  Currently, the only way a peer in the simulator would omit a requested body is if it expired before the request arrived, which will be rare in most simulations.
+  So `RequestFromFirst` is almost always equivalent to "request from exactly one", which is too optimistic for a robust node in the real world.
+  TODO Other small values would be more robust, especially _two_ or maybe even _three_.
+    - Unlike the real node, the simulated node instead immediately acknowledges a header whose body has already been requested from another peer.
+      TODO that's a risk even without adversaries: no peer will intentionally omit a block, but it _is_ possible that the block will expire before the request arrives!
+
+All of the excluded parameters are effectively unbounded.
+
+- Unbounded `maxBytesInFlightPerPeer` and `maxBytesInFlightAllPeers` are unrealistic and might cause the simulator's throughput/latency to be overly-optimistic when a swell of data converges on a node.
+  TODO add these and also characterize their reasonable values
+- An unbounded `maxBytesPerBody` is probably harmless, as long as the vast majority of the simulator's txs are reasonably sized.
+- An unbounded `timeouts` is reasonable until the simulator involves adversarial peers that stall their replies.
+  Before then, realistic values would be great enough no simulated peer would timeout anyway.
+  This is especially true when `maxPeersPerBody` is `RequestFromAll`.
 
 ## Praos diffusion threads
 
