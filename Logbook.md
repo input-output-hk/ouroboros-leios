@@ -1,5 +1,20 @@
 # Leios logbook
 
+## 2025-08-04
+
+### Experiment varying Plutus validation time
+
+
+The Jupyter notebook [analysis/sims/2025w31c/analysis.ipynb](analysis/sims/2025w31c/analysis.ipynb) varies the CPU time used by Plutus phase 2 validation in Linear Leios at 100 TPS for a 6-vCPU node.
+
+- Simulation with 6-vCPU nodes supported doubling the Plutus per-transaction budget on Linear Leios.
+- Simulations at a sixfold increase in the Plutus per-transaction budget failed: nodes bogged down validating transactions and cannot put them in new EBs.
+- EB could likely handle 5000 Gstep of Plutus computation in Linear Leios, which is 250x the Praos per-block budget.
+    - This could support a handful of Plutus transactions with a 20x greater Plutus budget.
+    - Alternatively every Plutus transaction could have its budget increased by 50%.
+    - However, intentionally late diffusion of Plutus-heavy transactions could interfere with EB adoption.
+- These results are uncertain due to the variability in measured Plutus CPU costs: there is quite a bit of variability in the CPU time actually used by a Plutus script given its execution steps.
+
 ## 2025-08-01
 
 ### Comparison of Haskell and Rust simulations of Linear Leios

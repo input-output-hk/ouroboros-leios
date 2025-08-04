@@ -1,0 +1,8 @@
+experiments/0.030/run.sh
+experiments/0.100/run.sh
+experiments/0.300/run.sh
+experiments/1.000/run.sh
+experiments/3.000/run.sh
+experiments/10.000/run.sh
+experiments/30.000/run.sh
+experiments/100.000/run.sh
