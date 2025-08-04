@@ -639,7 +639,7 @@ As outlined above, Leios splits transactions between RBs and EBs, with EB inclus
 
 #### Unchanged Praos Mini-Protocols
 
-As described in [Node Behavior](#node-behavior), existing Praos protocols (ChainSync, BlockFetch, TxSubmission, LocalTxSubmission, LocalStateQuery) continue to operate with only minor modifications: RB headers gain optional fields for EB announcements, some RBs carry certificates, and mempools expand to approximately $2 \times S_\text{RB} + S_\text{EB}$.
+As described in [Node Behavior](#node-behavior), existing Praos protocols (ChainSync, BlockFetch, TxSubmission) continue to operate with only minor modifications: RB headers gain optional fields for EB announcements, some RBs carry certificates, and mempools expand to approximately $2 \times S_\text{RB} + S_\text{EB}$.
 
 #### Leios Mini-Protocols
 
