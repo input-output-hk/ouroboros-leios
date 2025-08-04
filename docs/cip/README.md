@@ -220,8 +220,7 @@ The protocol extends Praos with three main elements:
 
 RBs are Praos blocks extended to support Leios by optionally announcing EBs in
 their headers and embedding EB certificates in their bodies. In addition to
-including transactions directly, RBs can also incorporate transactions from
-certified EBs. The Leios-specific additions are: the optional `announced_eb`
+including transactions directly, transactions from certified EBs should be considered a logical part of RB. The Leios-specific additions are: the optional `announced_eb`
 field in the block header which announces a new EB by hash, the optional
 `certified_eb` field in the header which references the EB being certified, and
 the optional `eb_certificate` in the block body which contains the certificate
@@ -238,7 +237,7 @@ by a committee of stake pools.
 2. **Body additions**:
    - `eb_certificate` (optional): BLS aggregate certificate proving EB validity
 
-These fields enable RBs to announce new EBs and include certificates for previously announced EBs, maintaining the conditional inclusion property that ensures safety.
+When an RB includes a `certified_eb` field, it must also include the corresponding `eb_certificate` in its body. Conversely, an `eb_certificate` can only be included when there is a `certified_eb` field referencing the EB being certified. These fields enable RBs to announce new EBs and include certificates for previously announced EBs, maintaining the conditional inclusion property that ensures safety.
 
 The complete wire format showing these extensions is specified in [Appendix B.1](#b1-core-data-structures).
 
