@@ -19,7 +19,7 @@ BLOCK_SIZE=10
 THROUGHPUT=0.150
 TX_VAL_TIME=$LABEL
 
-ulimit -S -m 48000000 -v 48000000
+ulimit -S -m 24000000 -v 24000000
 
 if [[ -e sim.log ]]
 then
