@@ -335,24 +335,24 @@ The complete technical specification is detailed in
    , aggregate_vote_sig       : bls_signature
    ]
 
- leios_vote_bundle = persistent_vote_bundle / non_persistent_vote_bundle
+ leios_vote = persistent_vote / non_persistent_vote
 
- persistent_vote_bundle =
+ persistent_vote =
    [ 0
    , election_id
    , persistent_voter_id
-   , vote_entries
+   , endorser_block_hash
+   , vote_signature
    ]
 
- non_persistent_vote_bundle =
+ non_persistent_vote =
    [ 1
    , election_id
    , pool_id
    , eligibility_signature
-   , vote_entries
+   , endorser_block_hash
+   , vote_signature
    ]
-
- vote_entries = {* endorser_block_hash => vote_signature}
 ```
 
 <div align="center">
@@ -460,7 +460,7 @@ periodic rotation.
 - Eligibility signature: 48 bytes
 - Vote signature: 48 bytes
 
-Multiple votes from the same issuer can be bundled to reduce network overhead.
+Each vote is submitted individually for a specific endorser block.
 
 #### Certificate Structure
 
