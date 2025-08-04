@@ -176,7 +176,7 @@ Nodes receiving the RB header discover the announced EB and fetch its content. T
 **Step 3: Committee Validation**
 
 A **voting committee** of stake pools validates the EB within a time window
-called the **stage length** ($L$):
+called $L$:
 
 - Committee members are selected via sortition (lottery based on stake)
 - A committee member votes positively for an EB only if:
@@ -312,11 +312,15 @@ are certified and eligible for inclusion in RBs.
 
 Votes are categorized as either **persistent** (selected for the entire epoch)
 or **non-persistent** (selected per EB), following the Fait Accompli sortition
-scheme. Multiple votes from a single voter can be bundled together to reduce
-network overhead.
+scheme.
 
 The complete technical specification is detailed in
 [Specification for votes and certificates](#specification-for-votes-and-certificates).
+
+> [!NOTE]
+> **Vote Bundling**
+> 
+> The linked BLS specification mentions vote bundling as an optimization. However, this only applies when EB production is decoupled from RBs, which is not the case in this specification where each EB is announced by an RB.
 
 <details>
 <summary>Vote & Certificate CDDL</summary>
