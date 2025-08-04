@@ -483,16 +483,17 @@ sequenceDiagram
     BP->>D: 5. Serve RB
     U->>BP: 6. Fetch EB
 
-    BP->>D: 7. Serve EB
+    Note over BP: 7. Check Tx Availability<br/>in mempool
     U->>BP: 8. Fetch missing<br />transactions of EB
     
     Note over BP: 9. Validate EB
-    Note over BP: 10. Vote on EB<br />(if eligible)
-    U->>BP: 11. Sync Votes
-    BP->>D: 11.a Serve Votes (+ own vote)
+    BP->>D: 10. Serve EB
+    Note over BP: 11. Vote on EB<br />(if eligible)
+    U->>BP: 12. Sync Votes
+    BP->>D: 12.a Serve Votes (+ own vote)
     
-    Note over BP: 12. Aggregate certificate<br/>from verified, valid votes  
-    Note over BP: 13. Create next RB<br />include EB certificate &<br />announce next EB
+    Note over BP: 13. Aggregate certificate<br/>from verified, valid votes  
+    Note over BP: 14. Create next RB<br />include EB certificate &<br />announce next EB
 ```
 
 _Figure 2: Up- and downstream interactions of a node (simplified)_
@@ -545,27 +546,30 @@ Upon receipt, nodes validate the RB and any included EB certificate, adopting th
 The node serves the validated RB to downstream peers. This follows standard Praos mechanisms for block distribution.
 
 **Step 6: EB Fetching**  
-When an RB announces an EB, nodes discover the announced EB and fetch its content. The EB contains references to transactions. If a node does not already possess a transaction referenced in the EB, it explicitly requests that transaction from peers.
+When an RB announces an EB, nodes discover the announced EB and fetch its content. The EB contains references to transactions. Nodes do not serve the EB to peers until they have all referenced transactions and can validate the EB.
 
-**Step 7: EB Serving**  
-Valid EBs are served to downstream peers via [EbRelay mini-protocol](#ebrelay-mini-protocol) using **freshest-first delivery**. This policy prevents timing attacks by prioritizing recent EBs over historical ones. All nodes must receive all EBs regardless of fork to prevent withholding attacks.
+**Step 7: Transaction Availability Check**  
+Before serving an EB to peers, nodes check which transactions referenced in the EB are available in their mempool. This ensures that when a node tells peers it has an EB, the peers know the node already has all the EB's transactions. This is critical because peers need to know who is offering which transactions so they can choose who to request them from.
 
 **Step 8: Missing Transaction Fetching**  
-If a node does not already possess a transaction referenced in the EB, it explicitly requests that transaction from peers via [TxFetch mini-protocol](#txfetch-mini-protocol). This ensures nodes have all transaction data before attempting EB validation.
+If a node does not already possess a transaction referenced in the EB, it explicitly requests that transaction from peers via [TxFetch mini-protocol](#txfetch-mini-protocol). This ensures nodes have all transaction data before attempting EB validation. Only after acquiring all missing transactions does the node proceed to validation and serving.
 
 **Step 9: EB Validation**  
 Nodes validate the complete EB including all transactions against the appropriate ledger state. To limit DoS exposure, nodes employ a two-stage approach: lightweight pre-forwarding checks (VRF proof, hash matching) before propagation, followed by full transaction validation. The validation ensures that the transactions in the EB are a valid extension of the RB that announced it. This includes verifying that all referenced transactions exist in the mempool, checking transaction validity against the ledger state at the RB's slot, and ensuring the EB's size constraints are met.
 
-**Step 10: Voting on EBs**  
+**Step 10: EB Serving**  
+Only after completing validation and ensuring all transactions are available does the node serve the EB to downstream peers via [EbRelay mini-protocol](#ebrelay-mini-protocol) using **freshest-first delivery**. This policy prevents timing attacks by prioritizing recent EBs over historical ones. All nodes must receive all EBs regardless of fork to prevent withholding attacks. The key principle is that when a node tells peers it has an EB, those peers know the node already has all the EB's transactions.
+
+**Step 11: Voting on EBs**  
 Committee members selected via sortition vote on valid EBs within the $L_\text{vote}$ window. A committee member votes positively for an EB only if: (1) it has received the EB within $L_\text{vote}$ slots from its creation, (2) the EB corresponds to the EB announced in the latest block in the chain maintained by the party, and (3) the transactions in the EB are a valid extension of the RB that announced it. Votes issue after the RB is $3\Delta_\text{hdr}$ old to ensure equivocation detection. The voting process uses BLS signatures with deterministic nonces to prevent replay attacks and ensure vote authenticity.
 
-**Step 11: Vote Synchronization**  
+**Step 12: Vote Synchronization**  
 Votes propagate via [VoteRelay mini-protocol](#voterelay-mini-protocol), with nodes forwarding at most one vote per (slot, committee member) pair. Nodes collect votes from the network, maintaining a running tally for each EB to track progress toward the quorum threshold.
 
-**Step 12: Certificate Aggregation**  
+**Step 13: Certificate Aggregation**  
 Nodes verify vote signatures and committee eligibility proofs. When total voting stake reaches the threshold $\tau$, nodes aggregate valid votes into a compact BLS certificate. This creates a compact certificate proving the EB's validity. The aggregation process combines persistent and non-persistent votes, with persistent votes represented as a bitset and non-persistent votes including individual eligibility proofs. See [Specification for votes and certificates](#specification-for-votes-and-certificates) for detailed validation procedures.
 
-**Step 13: Next Block Production**  
+**Step 14: Next Block Production**  
 Block producers creating new RBs include certificates for EBs that meet timing constraints: the new RB's slot must exceed the certified EB's creation time by at least $L_\text{vote} + L_\text{diff}$ slots. This ensures network-wide EB availability. The producer may also announce a new EB extending their RB. This conditional inclusion maintains Praos safety guarantees while achieving higher throughput when network timing permits. When an EB certificate is included, the referenced EB's transactions become part of the permanent ledger state, increasing the effective throughput for that chain segment.
 
 #### Implementation Considerations
