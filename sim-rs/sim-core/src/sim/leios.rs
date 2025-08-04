@@ -1666,9 +1666,7 @@ impl LeiosNode {
         // η is the "quality parameter" (expected block rate), and L is stage length.
         let old_pipelines =
             (3 * self.sim_config.praos_chain_quality).div_ceil(self.sim_config.stage_length);
-        let oldest_included_pipeline = pipeline
-            .checked_sub(old_pipelines)
-            .unwrap_or(newest_included_pipeline);
+        let oldest_included_pipeline = pipeline.checked_sub(old_pipelines).unwrap_or_default();
 
         Some(oldest_included_pipeline..=newest_included_pipeline)
     }
