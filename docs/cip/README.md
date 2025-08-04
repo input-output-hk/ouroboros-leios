@@ -365,9 +365,9 @@ _Figure 4: Votes & Certificate CDDL_
 
 ### Protocol Parameters and Network Characteristics
 
-The following sections distinguish between tunable **protocol parameters**
-(which can be adjusted via governance) and observed **network characteristics**
-(which depend on topology and node capabilities).
+The following sections distinguish between observed **network characteristics**
+(which depend on topology and node capabilities) and tunable **protocol parameters**
+(which can be adjusted via governance).
 
 **Network Characteristics**
 
@@ -378,8 +378,9 @@ These are observed properties of the network topology and node capabilities:
 
 | Characteristic            |       Symbol        | Units | Description                                                 |          Typical Range          | Notes                                              |
 | ------------------------- | :-----------------: | :---: | ----------------------------------------------------------- | :-----------------------------: | -------------------------------------------------- |
-| RB diffusion time         |      $\Delta$       | slot  | Observed upper bound for ranking block (RB) diffusion to all nodes     |            2-6 slots            | Depends on network topology and conditions         |
-| RB header diffusion time  | $\Delta_\text{hdr}$ | slot  | Observed time for RB headers to reach nodes                 |          $\leq \Delta$          | Usually faster than full block diffusion           |
+| RB diffusion time         | $\Delta_\text{RB}$  | slot  | Observed upper bound for ranking block (RB) diffusion to all nodes     |            2-6 slots            | Depends on network topology and conditions         |
+| RB header diffusion time  | $\Delta_\text{hdr}$ | slot  | Observed time for RB headers to reach nodes                 |     $\leq \Delta_\text{RB}$     | Usually faster than full block diffusion           |
+| EB diffusion time         | $\Delta_\text{EB}$  | slot  | Observed upper bound for endorser block (EB) diffusion to all nodes    |            2-8 slots            | May be slower than RBs due to larger size          |
 
 _Table 1: Network Characteristics_
 
@@ -399,7 +400,7 @@ constrained by the network characteristics above:
 | Vote diffusion period length | $L_\text{diff}$ |   slot   | Duration for vote propagation after voting period ends                | $L_\text{diff} \geq \Delta_\text{hdr}$ | Must allow votes to propagate before certificate inclusion   |
 | Ranking block max size        | $S_\text{RB}$ |  bytes   | Maximum size of a ranking block                                        |                $S_\text{RB} > 0$                | Limits RB size to ensure timely diffusion                     |
 | Endorser-block referenceable transaction size | $S_\text{EB}$ |  bytes   | Maximum total size of transactions that can be referenced by an endorser block |                $S_\text{EB} > 0$                | Limits total transaction payload to ensure timely diffusion within stage length |
-| Praos active slot coefficient | $f_\text{RB}$ |  1/slot  | Probability that a party will be the slot leader for a particular slot |       $0 < f_\text{RB} \leq \Delta^{-1}$        | Blocks should not be produced faster than network delay       |
+| Praos active slot coefficient | $f_\text{RB}$ |  1/slot  | Probability that a party will be the slot leader for a particular slot |       $0 < f_\text{RB} \leq \Delta_\text{RB}^{-1}$        | Blocks should not be produced faster than network delay       |
 | Mean committee size           |      $n$      | parties  | Average number of stake pools selected for voting                      |                     $n > 0$                     | Ensures sufficient decentralization and security              |
 | Quorum size                   |    $\tau$     | fraction | Minimum fraction of committee votes required for certification         |                  $\tau > 0.5$                   | Prevents adversarial control while ensuring liveness          |
 
@@ -582,72 +583,51 @@ _Figure 2: Up- and downstream interactions of a node (simplified)_
 
 The diagram above illustrates in a simplified manner the complete Leios workflow, numbered to show the sequence of interactions. While many steps introduce new behaviors, several core Praos mechanisms remain unchanged:
 
-#### What remains unchanged from Praos
+**Transaction propagation** uses the TxSubmission mini-protocol exactly as implemented in Praos. Transactions flow from downstream to upstream nodes through diffusion, where they are validated against the current ledger state before being added to local mempools. The protocol maintains the same FIFO ordering and duplicate detection mechanisms.
 
-Most core Praos functionality continues to operate unchanged in Leios. **Transaction propagation** uses the identical TxSubmission mini-protocol, with transactions flowing from downstream to upstream nodes and being added to local mempools.
+**RB body synchronization** (Step 5) employs ChainSync and BlockFetch protocols without modification for fetching complete ranking blocks after headers are received. The pipelining and batching optimizations for block body transfer remain unchanged from Praos.
 
-**RB chain synchronization** (Steps 3, 5) employs the same ChainSync and BlockFetch protocols for RB propagation as in Praos.
+**Chain selection** follows the longest-chain rule exactly as in Praos. EBs are treated as auxiliary data that do not affect chain validity or selection decisions. Fork choice depends solely on RB chain length, with EB certificates serving only as inclusion proofs for transaction content. This design ensures the protocol maintains liveness - the RB chain can continue growing even if some EBs fail to achieve certification, with RBs simply excluding uncertified EBs and validating transactions against the predecessor RB's ledger state.
 
-**Chain selection** follows the same longest-chain rule, treating EBs as auxiliary data that doesn't affect chain validity.
+**Ledger state management** continues using Praos transaction validation rules and UTxO ledger updates. The same phase-1 and phase-2 validation applies, with EBs adding transactions to the ledger only when properly certified and included via RB references.
 
-**Ledger state management** continues to use Praos transaction validation and ledger update rules, with EBs adding transactions only when certified.
+#### New Requirements
 
-**Key infrastructure change**: Mempool capacity must increase to accommodate both RB and EB transactions (limited by [protocol parameter $S_\text{EB}$](#protocol-parameters-and-network-characteristics)).
+Leios introduces new node behaviors aligned with the protocol workflow:
 
-#### Novel Requirements: EB Handling and Attack Prevention
+**Step 2: RB Header Synchronization**  
+RB headers diffuse via the new RbHeaderRelay mini-protocol independently of standard ChainSync. This separate mechanism enables rapid EB discovery within the strict timing bound $\Delta_\text{hdr}$. Nodes propagate at most two headers per (slot, issuer) pair to detect equivocation. The header contains the EB hash when the block producer created an EB, allowing peers to discover and fetch the corresponding EB.
 
-Beyond the familiar Praos mechanisms, the sequence diagram reveals several entirely new node behaviors required for EB handling (Steps 6-14). These introduce critical attack prevention mechanisms not present in Praos:
+**Steps 3-5: RB Body Handling**  
+After receiving headers, nodes fetch RB bodies via standard BlockFetch protocol (Step 3). Upon receipt, nodes validate the RB and any included EB certificate (Step 4), adopting the block if valid. The node then serves the validated RB to downstream peers (Step 5). This follows standard Praos mechanisms with the addition of certificate validation.
 
-**Freshest-First EB Delivery**
+**Steps 6-7: Transaction Availability**  
+When an RB announces an EB, nodes check their mempool for all referenced transactions (Step 6). Missing transactions trigger fetches from peers via TxFetch mini-protocol (Step 7). This ensures nodes have all transaction data before attempting EB validation.
 
-EBs must be delivered in **freshest-first delivery** to prevent timing attacks where adversaries flood the network with large, old EBs to delay fresh EB delivery. This freshest-first policy ensures that recent EBs (which can still be voted on) receive priority over historical EBs, preventing large batches of old EBs from congesting the network and blocking new EB propagation. 
+**Steps 8-9: EB Validation and Distribution**  
+Nodes validate the complete EB including all transactions against the appropriate ledger state (Step 8). To limit DoS exposure, nodes employ a two-stage approach: lightweight pre-forwarding checks (VRF proof, hash matching) before propagation, followed by full transaction validation. Valid EBs are served to downstream peers via EbRelay mini-protocol using **freshest-first delivery** (Step 9). This policy prevents timing attacks by prioritizing recent EBs over historical ones. All nodes must receive all EBs regardless of fork to prevent withholding attacks.
 
-Most critically, this prioritization guarantees that committee members receive fresh EBs within the voting window $L_\text{vote}$, maintaining the protocol's liveness properties under adversarial conditions.
+**Step 10: Voting on EBs**  
+Committee members selected via sortition vote on valid EBs within the $L_\text{vote}$ window. Voting occurs only if: (1) the EB corresponds to the node's chain tip, (2) no equivocation exists for that slot, (3) the node is elected to the committee, and (4) the EB age is under $L_\text{vote}$ slots. Votes issue after the RB is $3\Delta_\text{hdr}$ old to ensure equivocation detection.
 
-**Universal EB Availability Across Forks**
+**Steps 11-12: Vote Collection**  
+Votes propagate via VoteRelay mini-protocol (Step 11), with nodes forwarding at most one vote per (slot, committee member) pair. Nodes collect votes from the network (Step 12), maintaining a running tally for each EB to track progress toward the quorum threshold.
 
-Unlike RBs where nodes only need blocks in their current chain, **all nodes must receive all EBs** regardless of which fork announced them. This universal availability requirement prevents sophisticated withholding attacks where an adversary deliberately conceals EBs from one fork until after the voting period expires, forcing honest nodes to make chain selection decisions without complete information. 
+**Steps 13-14: Certificate Aggregation**  
+Nodes verify vote signatures and committee eligibility proofs (Step 13). When total voting stake reaches the threshold $\tau$, nodes aggregate valid votes into a compact BLS certificate (Step 14). See [Specification for votes and certificates](#specification-for-votes-and-certificates) for detailed validation procedures.
 
-Without this requirement, honest nodes switching to a longer fork might discover they lack EBs that were certified on that fork, making fork switches expensive with time complexity proportional to the number of missing EBs that must be fetched and validated retroactively.
+**Step 15: Next Block Production**  
+Block producers creating new RBs include certificates for EBs that meet timing constraints: the new RB's slot must exceed the certified EB's creation time by at least $L_\text{vote} + L_\text{diff}$ slots. This ensures network-wide EB availability. The producer may also announce a new EB extending their RB.
 
-**Single EB Voting Constraint**
+> [!Important]
+> **Validation Dependencies** 
+> 
+> Including an EB certificate creates a dependency - downstream nodes cannot validate the RB until they receive the referenced EB. This could delay RB propagation beyond Praos timing assumptions ($\Delta_\text{RB}$) if EB propagation is slow. Protocol parameters must ensure $L_\text{diff} > \Delta_\text{EB}$ to prevent this timing violation.
 
-While nodes must receive all EBs from all forks for security reasons, committee members may only vote on **one EB per slot**, even when multiple EBs are available due to fork competition. This voting constraint ensures that votes do not dilute across competing forks and maintains the integrity of the certification process.
+**Mempool Requirements**  
+Mempool capacity must accommodate expanded transaction volume: $\text{Mempool} \geq 2 \times S_\text{RB} + S_\text{EB}$. Nodes optimistically include EB transactions upon announcement, revalidating if certification fails.
 
-**Forward-Before-Validate Strategy (Steps 8-9)**
 
-To maintain freshest-first delivery while preventing DoS attacks, nodes must **forward EBs before performing full validation**. This creates a two-stage process: Stage 1 occurs before Step 9 (Serve EB), while Stage 2 happens during Step 8 (Validate EB). 
-
-*Stage 1 - Pre-forwarding Verification* performs only the checks required to ensure DoS attacks are mitigated: VRF proof verification to confirm the legitimacy of the block producer, block hash verification to ensure the EB hash matches the RB header announcement from Step 2, basic header validation covering slot, issuer, and signatures, and equivocation detection to reject EBs from known equivocating producers. 
-
-*Stage 2 - Full Validation (Step 8)* then performs the computationally expensive operations including transaction availability and validity checking, ledger state consistency verification, conflict detection with RB transactions, and size limit verification against $S_\text{EB}$. This approach limits DoS exposure since each producer can create at most one EB per slot, bounding the pre-forwarding verification work to at most one EB per slot per producer even under adversarial conditions.
-
-**Equivocation Detection and Defense (Steps 2, 2a)**
-
-RB headers must be diffused rapidly (faster than EBs) to enable equivocation detection. Headers propagate in $≤ \Delta_\text{hdr}$ time via **RbHeaderRelay**, while nodes track multiple headers per (issuer, slot) pair to detect conflicts.
-
-Upon detecting conflicting headers from the same producer in the same slot, nodes create and diffuse equivocation proofs throughout the network. To ensure all honest nodes have sufficient time to receive and process these proofs, voting is delayed by $3\Delta_\text{hdr}$ from the EB announcement (Step 10).
-
-Once an equivocation proof is established, EBs from the offending producer are completely ignored—neither voted on nor forwarded—effectively isolating the malicious actor from the consensus process. However, an honest node should still forward the equivocated RB header downstream to ensure all peers can detect the equivocation.
-
-**Timing-Critical Voting Windows (Steps 10, 11, 11a)**
-
-Committee members must respect strict timing constraints that govern the entire voting and certification process. The **voting period** of $L_\text{vote}$ slots from EB announcement provides the window during which committee members can cast their votes. An **equivocation grace period** requires waiting $3\Delta_\text{hdr}$ before voting to allow equivocation detection to complete. 
-
-The **vote diffusion period** of $L_\text{diff}$ additional slots enables vote propagation (Step 11a) throughout the network. Finally, the **certificate inclusion constraint** ensures that RBs can only include certificates after the complete $L_\text{vote} + L_\text{diff}$ period expires (Step 15). 
-
-These timing constraints ensure that honest EBs receive priority over equivocated ones, that all honest nodes have sufficient opportunity to detect equivocation before voting (through the $3\Delta_\text{hdr}$ delay), and that the vote diffusion period $L_\text{diff}$ provides sufficient time for vote aggregation and certificate creation (Step 14).
-
-#### Attack Mitigation Summary
-
-The novel node behaviors described above work together to defend against specific attack vectors through coordinated mechanisms. **Timing attacks** are mitigated by the freshest-first EB delivery requirement, preventing adversaries from flooding the network with stale blocks to delay fresh content. **Withholding attacks** are countered by the universal EB propagation requirement across all forks, ensuring that fork switches cannot be exploited by selectively concealing critical data. 
-
-**DoS attacks** are limited through the forward-before-validate strategy with pre-forwarding verification (Step 8), bounding computational exposure while maintaining network responsiveness. **Equivocation attacks** are detected and neutralized via rapid header diffusion and delayed voting (Steps 2, 2a, 10), giving honest nodes time to coordinate their response to malicious behavior. 
-
-**Fork manipulation** attempts are thwarted by pre-emptive EB distribution independent of the current chain, preventing adversaries from using chain reorganizations as attack vectors. These coordinated requirements fundamentally transform Leios nodes from simple chain followers into active participants in a distributed validation network, where attack resistance depends on adherence to the protocol timing constraints ($L_\text{vote}$, $L_\text{diff}$, $3\Delta_\text{hdr}$) across all honest nodes.
-
-> [!Warning]
-> Work in progress...
 
 ### Network
 
@@ -682,20 +662,6 @@ _Table 6: Leios Mini-Protocols_
 >
 > For each mini-protocol specify: purpose, message types, state machine, key parameters, and security notes.
 
-### Mempool management
-
-> [!Warning]
->
-> This section is work in progress.
-
-- Mempool enlarged for both RB and EB txs.
-- On EB announcement, optimistically include EB txs in mempool (pending
-  certification).
-- If EB not certified, revalidate/reinsert its txs.
-- Remove txs from mempool when included in RB or certified EB.
-- Validate txs against current ledger state before mempool admission.
-- RB producer resolves RB/EB tx conflicts at block production.
-- Mempool does not track conflicting indices; relies on ledger rules.
 
 ### Incentives
 
