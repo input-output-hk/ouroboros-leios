@@ -585,7 +585,7 @@ The diagram above illustrates in a simplified manner the complete Leios workflow
 
 **Transaction propagation** uses the TxSubmission mini-protocol exactly as implemented in Praos. Transactions flow from downstream to upstream nodes through diffusion, where they are validated against the current ledger state before being added to local mempools. The protocol maintains the same FIFO ordering and duplicate detection mechanisms.
 
-**RB body synchronization** (Step 5) employs ChainSync and BlockFetch protocols without modification for fetching complete ranking blocks after headers are received. The pipelining and batching optimizations for block body transfer remain unchanged from Praos.
+**RB body synchronization** (Steps 3 and 5) employs ChainSync and BlockFetch protocols without modification for fetching complete ranking blocks after headers are received. The pipelining and batching optimizations for block body transfer remain unchanged from Praos.
 
 **Chain selection** follows the longest-chain rule exactly as in Praos. EBs are treated as auxiliary data that do not affect chain validity or selection decisions. Fork choice depends solely on RB chain length, with EB certificates serving only as inclusion proofs for transaction content. This design ensures the protocol maintains liveness - the RB chain can continue growing even if some EBs fail to achieve certification, with RBs simply excluding uncertified EBs and validating transactions against the predecessor RB's ledger state.
 
@@ -635,32 +635,57 @@ As outlined above, Leios splits transactions between RBs and EBs, with EB inclus
 
 - **Reconstruct ledger state**: EBs containing certified transactions
 - **Participate in consensus**: Vote on EBs and construct certificates  
-- **Detect equivocation**: RB headers from competing forks
+- **Detect equivocation**: RB headers from competing forks (handled within RbHeaderRelay)
 
-#### Message Types and Mini-Protocols
+#### Unchanged Praos Mini-Protocols
 
-Leios introduces **six new mini-protocols** to handle the additional message types:
+As described in [Node Behavior](#node-behavior), existing Praos protocols (ChainSync, BlockFetch, TxSubmission, LocalTxSubmission, LocalStateQuery) continue to operate with only minor modifications: RB headers gain optional fields for EB announcements, some RBs carry certificates, and mempools expand to approximately $2 \times S_\text{RB} + S_\text{EB}$.
+
+#### Leios Mini-Protocols
+
+Leios introduces **five new mini-protocols** to handle the additional message types required for EB distribution, voting, and certificate construction. These protocols fall into two categories:
 
 <div align="center">
 <a name="table-6"></a>
 
-| **Message Type** | **Purpose** | **Mini-Protocol** | **Structure** |
-| :--------------: | ----------- | :---------------: | --------------- |
-| RB Headers | Detect equivocation for voting decisions | **RbHeaderRelay** | (slot, issuer) pairs |
-| Fresh EBs | Enable committee validation and voting | **EbRelay** | (issuer, slot, size) triplets |  
-| Committee Votes | Construct certificates for EB inclusion | **VoteRelay** | (EB slot, vote issuer) pairs |
-| Equivocation Proofs | Notify network of misbehaving producers | **EquivRelay** | pairs of conflicting RB headers |
-| Historical EBs | Reconstruct ledger from certified EBs | **EbFetch** | slot and hash |
-| Transaction Bodies | Resolve EB transaction references (when TxsByRef) | **TxFetch** | tx position within EB |
+| **Protocol** | **Category** | **Purpose** | **Timing Constraint** |
+| :----------: | :----------: | ----------- | --------------------- |
+| **RbHeaderRelay** | Relay | Diffuse RB headers for equivocation detection | Must achieve $\Delta_\text{hdr}$ diffusion |
+| **EbRelay** | Relay | Diffuse fresh EBs to enable timely validation | Must reach voters within $L_\text{vote}$ |  
+| **VoteRelay** | Relay | Diffuse valid votes for certificate aggregation | Must diffuse within $L_\text{diff}$ |
+| **EbFetch** | Fetch | Retrieve certified EBs for chain reconstruction | On-demand after certificate inclusion |
+| **TxFetch** | Fetch | Retrieve referenced transactions for EB validation | Before EB validation completes |
 
 _Table 6: Leios Mini-Protocols_
 
 </div>
 
+These protocols share design principles that enable Leios to achieve its performance goals while maintaining security. The relay protocols implement freshness-first delivery to maximize the probability of timely certification within the stage windows. EbRelay specifically employs optimistic forwarding — diffusing EBs before completing full transaction validation — to minimize latency at the cost of potentially forwarding some invalid blocks. To prevent spam from equivocating producers, RbHeaderRelay propagates at most two headers per (slot, issuer) pair, which suffices to prove misbehavior. All protocols incorporate lightweight pre-validation checks before forwarding to mitigate DoS attacks, with VoteRelay going further by only forwarding cryptographically valid votes. Finally, nodes must receive all EBs regardless of which fork they follow, preventing adversaries from selectively withholding blocks to manipulate voting outcomes.
+
+#### RbHeaderRelay Mini-Protocol
+
 > [!Warning]
-> **TODO Mini-protocol specification**
->
-> For each mini-protocol specify: purpose, message types, state machine, key parameters, and security notes.
+> **TODO**: Protocol specification
+
+#### EbRelay Mini-Protocol  
+
+> [!Warning]
+> **TODO**: Protocol specification
+
+#### VoteRelay Mini-Protocol
+
+> [!Warning]
+> **TODO**: Protocol specification
+
+#### EbFetch Mini-Protocol
+
+> [!Warning]
+> **TODO**: Protocol specification
+
+#### TxFetch Mini-Protocol
+
+> [!Warning]
+> **TODO**: Protocol specification
 
 
 ### Incentives
