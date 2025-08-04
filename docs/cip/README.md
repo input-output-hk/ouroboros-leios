@@ -229,46 +229,18 @@ attesting to the validity of an EB through
 [BLS-based voting](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md)
 by a committee of stake pools.
 
-<details>
-<summary>Ranking Block CDDL</summary>
+**Leios Extensions to RB Structure**:
 
-```diff
- ranking_block =
-   [ header                   : block_header
-   , transaction_bodies       : [* transaction_body]
-   , transaction_witness_sets : [* transaction_witness_set]
-   , auxiliary_data_set       : {* transaction_index => auxiliary_data}
-   , invalid_transactions     : [* transaction_index]
-+  , ? eb_certificate         : leios_certificate
-   ]
+1. **Header additions**:
+   - `announced_eb` (optional): Hash of the EB created by this block producer
+   - `certified_eb` (optional): Hash of the EB being certified by this RB
 
-block_header =
-   [
-     header_body              : block_header_body
-   , body_signature           : kes_signature
-   ]
+2. **Body additions**:
+   - `eb_certificate` (optional): BLS aggregate certificate proving EB validity
 
- block_header_body =
-   [ block_number             : uint
-   , slot                     : slot_no
-   , prev_hash                : hash32
-   , issuer_vkey              : vkey
-   , vrf_vkey                 : vrf_vkey
-   , vrf_result               : vrf_cert
-   , block_body_size          : uint
-   , block_body_hash          : hash32
-+  , ? announced_eb           : hash32
-+  , ? certified_eb           : hash32
-   ]
-```
+These fields enable RBs to announce new EBs and include certificates for previously announced EBs, maintaining the conditional inclusion property that ensures safety.
 
-<div align="center">
-<a name="figure-2"></a>
-
-_Figure 2: Ranking Block CDDL_
-
-</div>
-</details>
+The complete wire format showing these extensions is specified in [Appendix B.1](#b1-core-data-structures).
 
 #### Endorser Blocks (EBs)
 
@@ -281,28 +253,7 @@ as described in
 RBs that directly extend the announcing RB are eligible to certify the announced
 EB by including a certificate.
 
-<details>
-<summary>Endorser Block CDDL</summary>
-
-```cddl
- endorser_block =
-   [ rb_announced             : hash32
-   , conflicting_txs          : [* transaction_index]
-   , transaction_references   : [* tx_reference]
-   ]
-
- ; Reference structures
- tx_reference = hash32
- transaction_index = uint
-```
-
-<div align="center">
-<a name="figure-3"></a>
-
-_Figure 3: Endorser Block CDDL_
-
-</div>
-</details>
+The wire format for endorser blocks is specified in [Appendix B.1](#b1-core-data-structures).
 
 #### Voting Committee and Certificates
 
@@ -322,46 +273,7 @@ The complete technical specification is detailed in
 > 
 > The linked BLS specification mentions vote bundling as an optimization. However, this only applies when EB production is decoupled from RBs, which is not the case in this specification where each EB is announced by an RB.
 
-<details>
-<summary>Vote & Certificate CDDL</summary>
-
-```cddl
- leios_certificate =
-   [ election_id              : election_id
-   , endorser_block_hash      : hash32
-   , persistent_voters        : [* persistent_voter_id]
-   , nonpersistent_voters     : {* pool_id => bls_signature}
-   , ? aggregate_elig_sig     : bls_signature
-   , aggregate_vote_sig       : bls_signature
-   ]
-
- leios_vote = persistent_vote / non_persistent_vote
-
- persistent_vote =
-   [ 0
-   , election_id
-   , persistent_voter_id
-   , endorser_block_hash
-   , vote_signature
-   ]
-
- non_persistent_vote =
-   [ 1
-   , election_id
-   , pool_id
-   , eligibility_signature
-   , endorser_block_hash
-   , vote_signature
-   ]
-```
-
-<div align="center">
-<a name="figure-4"></a>
-
-_Figure 4: Votes & Certificate CDDL_
-
-</div>
-</details>
+The wire format for votes and certificates is specified in [Appendix B.1](#b1-core-data-structures).
 
 ### Protocol Parameters and Network Characteristics
 
@@ -424,7 +336,7 @@ Leios requires a voting and certificate scheme to validate endorser blocks. This
 specification defines a BLS-based implementation that meets the protocol
 requirements with concrete performance characteristics. The detailed requirements
 for the voting and certificate scheme are specified in
-[Appendix: Requirements for votes and certificates](#appendix-requirements-for-votes-and-certificates).
+[Appendix A: Requirements for votes and certificates](#appendix-a-requirements-for-votes-and-certificates).
 
 #### Committee Selection
 
@@ -647,15 +559,15 @@ As outlined above, Leios splits transactions between RBs and EBs, with EB inclus
 
 - **Reconstruct ledger state**: EBs containing certified transactions
 - **Participate in consensus**: Vote on EBs and construct certificates  
-- **Detect equivocation**: RB headers from competing forks (handled within RbHeaderRelay)
+- **Detect equivocation**: RB headers from competing forks
 
 #### Unchanged Praos Mini-Protocols
 
-As described in [Node Behavior](#node-behavior), existing Praos protocols (ChainSync, BlockFetch, TxSubmission) continue to operate with only minor modifications: RB headers gain optional fields for EB announcements, some RBs carry certificates, and mempools expand to approximately $2 \times S_\text{RB} + S_\text{EB-tx}$.
+As described in [Node Behavior](#node-behavior), existing Praos mini-protocols continue to operate with only minor modifications to support Leios. ChainSync exchanges RB headers that now include optional fields for EB announcements (`announced_eb`) and certifications (`certified_eb`). BlockFetch retrieves RB bodies that may contain BLS aggregate certificates (`eb_certificate`) alongside standard transactions. TxSubmission remains unchanged except for expanded mempool capacity to approximately $2 \times S_\text{RB} + S_\text{EB-tx}$ to support both RB and EB transaction pools.
 
 #### Leios Mini-Protocols
 
-Leios introduces **five new mini-protocols** to handle the additional message types required for EB distribution, voting, and certificate construction. These protocols fall into two categories:
+Leios introduces **five new mini-protocols** to handle the additional message types required for EB distribution, voting, and certificate construction. These protocols fall into two categories, relay and fetch as follows:
 
 <div align="center">
 <a name="table-6"></a>
@@ -672,12 +584,257 @@ _Table 6: Leios Mini-Protocols_
 
 </div>
 
-These protocols share design principles that enable Leios to achieve its performance goals while maintaining security. The relay protocols implement freshness-first delivery to maximize the probability of timely certification within the stage windows. EbRelay specifically employs optimistic forwarding — diffusing EBs before completing full transaction validation — to minimize latency at the cost of potentially forwarding some invalid blocks. To prevent spam from equivocating producers, RbHeaderRelay propagates at most two headers per (slot, issuer) pair, which suffices to prove misbehavior. All protocols incorporate lightweight pre-validation checks before forwarding to mitigate DoS attacks, with VoteRelay going further by only forwarding cryptographically valid votes. Finally, nodes must receive all EBs regardless of which fork they follow, preventing adversaries from selectively withholding blocks to manipulate voting outcomes.
+These protocols share design principles that enable Leios to achieve its performance goals while maintaining security. The relay protocols implement freshest-first delivery to maximize the probability of certification within the voting period windows. EbRelay specifically employs optimistic forwarding — diffusing EBs before completing full transaction validation — to minimize latency at the cost of potentially forwarding some invalid blocks. To prevent spam from equivocating producers, RbHeaderRelay propagates at most two headers per (slot, issuer) pair, which suffices to prove misbehavior. All protocols incorporate cryptographic signature validation before forwarding to mitigate DoS attacks, with VoteRelay going further by only forwarding cryptographically valid votes. Finally, nodes must receive all EBs regardless of which fork they follow, preventing adversaries from selectively withholding blocks to manipulate voting outcomes.
 
 #### RbHeaderRelay Mini-Protocol
 
-> [!Warning]
-> **TODO**: Protocol specification
+This protocol diffuses RB headers across the network within $\Delta_\text{hdr}$ slots to enable equivocation detection, distributing only headers (not full blocks) to meet this timing bound. By avoiding full block validation, it ensures that all nodes receive RB headers before voting begins, maintaining awareness of all competing chains and equivocations across the network.
+
+##### Protocol Overview
+
+RbHeaderRelay is a **pull-based relay protocol** that enables nodes to request and receive RB headers from peers. It implements the Relay mini-protocol pattern used in Ouroboros networks for transaction submission, extended with equivocation-aware rules to ensure all nodes can detect competing chains.
+
+**Key Properties**:
+- **Pull-based design**: Nodes request headers from peers, preventing DoS attacks
+- **Freshest-first delivery**: Prioritizes recent headers over historical ones
+- **Equivocation handling**: Serves at most two headers per (slot, issuer) pair
+- **Cryptographic validation**: Signature and VRF verification before serving
+- **Universal availability**: Headers served regardless of fork preference
+
+##### Parameters
+
+The protocol parameters follow the Relay pattern described in the [Ouroboros Network Specification](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf#section.3.9):
+
+<div align="center">
+<a name="table-7"></a>
+
+| Parameter | Type | Description |
+| --------- | ---- | ----------- |
+| `maxAge` | `SlotNo` | Maximum age for header relay ($2 \times \Delta_\text{hdr}$) |
+| `id` | `HeaderHash` | Blake2b-256 hash of the RB header |
+| `info` | `(SlotNo, NodeId)` | Slot and issuer for equivocation detection |
+| `datum` | `RbHeader` | The RB header including optional EB announcement |
+
+_Table 7: RbHeaderRelay Protocol Parameters_
+
+</div>
+
+##### Message Flow
+
+The following sequence diagram shows how RB headers propagate through the network via pull-based requests. This example demonstrates the non-blocking variant used for continuous header discovery:
+
+<p align="center">
+<a name="figure-7"></a>
+
+```mermaid
+sequenceDiagram
+    participant U as Upstream<br/>(has RB x)
+    participant N as Node<br/>(current)
+    participant D as Downstream
+    
+    Note over U,D: Node actively requests headers from peers
+    
+    N->>U: MsgRequestIdsNonBlocking
+    D->>N: MsgRequestIdsNonBlocking
+    
+    U->>N: MsgReplyIds<br/>[(hash(x), (slot, issuer))]
+    N->>U: MsgRequestData<br/>[hash(x)]
+    U->>N: MsgReplyData<br/>[RbHeader(x)]
+    
+    Note over N: Validates header x
+    
+    N->>D: MsgReplyIds<br/>[(hash(x), (slot, issuer))]
+    D->>N: MsgRequestData<br/>[hash(x)]
+    N->>D: MsgReplyData<br/>[RbHeader(x)]
+    
+    Note over U,D: MsgRequestIdsBlocking would wait<br/>for new headers if none available
+```
+
+</p>
+<p align="center"><em>Figure 7: RbHeaderRelay Message Flow</em></p>
+
+##### Protocol Messages
+
+<div align="center">
+<a name="table-8"></a>
+
+| Message                    | Description                                                      |
+|:-------------------------- |:-----------------------------------------------------------------|
+| **MsgInit**                | Initial handshake message to start the protocol                  |
+| **MsgRequestIdsBlocking**  | Request header IDs, blocking until new ones available            |
+| **MsgRequestIdsNonBlocking** | Request header IDs, returning immediately (possibly empty)     |
+| **MsgReplyIds**            | Reply with list of available header IDs and metadata             |
+| **MsgRequestData**         | Request specific headers by their IDs                            |
+| **MsgReplyData**           | Reply with requested header data                                 |
+| **MsgDone**                | Graceful termination when peer is in blocking state              |
+
+_Table 8: RbHeaderRelay Protocol Messages_
+
+</div>
+
+##### State Machine
+
+The protocol follows the standard Relay state machine with states for requesting and serving headers:
+
+<p align="center">
+<a name="figure-8"></a>
+
+```mermaid
+stateDiagram-v2
+    [*] --> StInit
+    StInit --> StIdle: MsgInit
+    
+    StIdle --> StIdsBlocking: MsgRequestIdsBlocking
+    StIdle --> StIdsNonBlocking: MsgRequestIdsNonBlocking
+    StIdle --> StData: MsgRequestData
+    
+    StIdsBlocking --> StIdle: MsgReplyIds
+    StIdsNonBlocking --> StIdle: MsgReplyIds
+    StData --> StIdle: MsgReplyData
+    
+    StIdsBlocking --> StDone: MsgDone
+    StDone --> [*]
+    
+    classDef producer fill:#fff4e6,stroke:#ff6f00,stroke-width:2px
+    classDef consumer fill:#e8f5e9,stroke:#4caf50,stroke-width:2px
+    classDef init fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef done fill:#efebe9,stroke:#5d4037,stroke-width:2px
+    
+    class StInit init
+    class StIdle consumer
+    class StIdsBlocking,StIdsNonBlocking,StData producer
+    class StDone done
+```
+
+</p>
+<p align="center"><em>Figure 8: RbHeaderRelay State Machine</em></p>
+
+<div align="center">
+<a name="table-9"></a>
+
+| **Current State** | **Message** | **Parameters** | **Next State** | **Description** |
+| ----------------- | ----------- | -------------- | -------------- | --------------- |
+| **`StInit`** | `MsgInit` | — | **`StIdle`** | Initialize protocol |
+| **`StIdle`** | `MsgRequestIdsBlocking` | `req: count` | **`StIdsBlocking`** | Request new headers (blocking), where `count` is the number of new header IDs requested |
+| **`StIdle`** | `MsgRequestIdsNonBlocking` | `req: count` | **`StIdsNonBlocking`** | Request new headers (non-blocking), where `count` is the number of new header IDs requested |
+| **`StIdle`** | `MsgRequestData` | `[HeaderHash]` | **`StData`** | Request specific headers |
+| **`StIdsBlocking`** | `MsgReplyIds` | `[(hash, (slot, issuer))]` | **`StIdle`** | Reply with available header IDs (blocks until at least one available) |
+| **`StIdsNonBlocking`** | `MsgReplyIds` | `[(hash, (slot, issuer))]` | **`StIdle`** | Reply with available header IDs (may be empty if none available) |
+| **`StData`** | `MsgReplyData` | `[RbHeader]` | **`StIdle`** | Reply with requested headers |
+| **`StIdsBlocking`** | `MsgDone` | — | **`StDone`** | Terminate protocol |
+
+_Table 9: RbHeaderRelay State Transitions_
+
+</div>
+
+##### State Agencies
+
+The following table shows which party has agency (i.e., can send messages) in each state:
+
+<div align="center">
+<a name="table-10"></a>
+
+| **State** | **Agency** |
+| --------- |:----------:|
+| **`StInit`** | Client |
+| **`StIdle`** | Server |
+| **`StIdsBlocking`** | Client |
+| **`StIdsNonBlocking`** | Client |
+| **`StData`** | Client |
+| **`StDone`** | None |
+
+_Table 10: RbHeaderRelay State Agencies_
+
+</div>
+
+##### Size Limits
+
+To prevent resource exhaustion attacks, the protocol enforces the following message size limits:
+
+<div align="center">
+<a name="table-11"></a>
+
+| **State** | **Size Limit (bytes)** |
+| --------- | ---------------------:|
+| **`StInit`** | 5,760 |
+| **`StIdle`** | 5,760 |
+| **`StIdsBlocking`** | 32,768 |
+| **`StIdsNonBlocking`** | 32,768 |
+| **`StData`** | 2,097,152 |
+
+_Table 11: RbHeaderRelay Size Limits per State_
+
+</div>
+
+##### Timeouts
+
+The protocol enforces timeouts to ensure liveness and prevent indefinite blocking:
+
+<div align="center">
+<a name="table-12"></a>
+
+| **State** | **Timeout** | **Description** |
+| --------- | ----------- | --------------- |
+| **`StInit`** | 10s | Initial handshake |
+| **`StIdle`** | — | No timeout (waiting for requests) |
+| **`StIdsBlocking`** | — | No timeout (blocking operation) |
+| **`StIdsNonBlocking`** | 5s | Must respond promptly |
+| **`StData`** | 30s | Allow for header retrieval |
+
+_Table 12: RbHeaderRelay Timeouts per State_
+
+</div>
+
+##### Validation Rules
+
+Headers undergo two stages of validation:
+
+**Pre-serving checks** (before responding):
+1. **Signature verification**: Valid issuer signature
+2. **VRF verification**: Valid slot leader proof  
+3. **Freshest-first check**: Header age < `maxAge`
+4. **Equivocation limit**: At most 2 headers per (slot, issuer)
+
+**Post-receipt validation** (by requester):
+1. **Parent existence**: Parent block available locally
+2. **Chain extension**: Properly extends a known chain
+3. **Protocol compliance**: Follows Praos chain extension rules
+
+##### Wire Format
+
+The complete CDDL specification for RbHeaderRelay messages is provided in [Appendix B.2](#b2-mini-protocol-messages).
+
+##### Implementation Considerations
+
+**Equivocation Detection**:
+```
+For each (slot, issuer) pair:
+- Serve first header immediately after pre-validation
+- Serve second header (if different) as equivocation proof
+- Reject requests for additional headers for same (slot, issuer)
+```
+
+**Request Management**:
+- Nodes continuously request headers from peers using the non-blocking variant
+- The protocol supports both blocking (wait for headers) and non-blocking (immediate response) request modes
+
+**Memory Management**:
+- Maintain sliding window of headers based on `maxAge` parameter
+- Index by (slot, issuer) for equivocation detection
+- Prune headers older than `maxAge`
+
+**Timing Requirements**:
+- Network propagation target: Headers must diffuse within $\Delta_\text{hdr}$ slots
+- Pre-serving validation must be fast enough to not delay propagation
+
+##### Security Considerations
+
+The protocol includes the following security measures:
+
+1. **DoS Protection**: Rate limiting of requests per peer
+2. **Spam Prevention**: Cryptographic validation before serving headers  
+3. **Eclipse Attack Mitigation**: Maintain connections to diverse peers
+4. **Withholding Detection**: Monitor header arrival times relative to $\Delta_\text{hdr}$
 
 #### EbRelay Mini-Protocol  
 
@@ -1604,7 +1761,7 @@ protocol.
 - [Github repository for Leios formal specification](https://github.com/input-output-hk/ouroboros-leios-formal-spec)
 
 
-## Appendix: Requirements for votes and certificates
+## Appendix A: Requirements for votes and certificates
 
 The voting and certificate scheme for Leios must satisfy the following requirements to ensure security, efficiency, and practical deployability:
 
@@ -1628,6 +1785,138 @@ The voting and certificate scheme for Leios must satisfy the following requireme
 
 The BLS-based implementation specified in this document satisfies all these requirements, as evidenced by the performance characteristics and certificate sizes documented in the [Specification for votes and certificates](#specification-for-votes-and-certificates) section.
 
+
+## Appendix B: Wire Format Specifications (CDDL)
+
+This appendix contains the complete CDDL specifications for all Leios protocol messages and data structures. These definitions specify the exact wire format for network communication.
+
+### B.1 Core Data Structures
+
+#### Ranking Block
+```diff
+ ranking_block =
+   [ header                   : block_header
+   , transaction_bodies       : [* transaction_body]
+   , transaction_witness_sets : [* transaction_witness_set]
+   , auxiliary_data_set       : {* transaction_index => auxiliary_data}
+   , invalid_transactions     : [* transaction_index]
++  , ? eb_certificate         : leios_certificate
+   ]
+
+block_header =
+   [
+     header_body              : block_header_body
+   , body_signature           : kes_signature
+   ]
+
+ block_header_body =
+   [ block_number             : uint
+   , slot                     : slot_no
+   , prev_hash                : hash32
+   , issuer_vkey              : vkey
+   , vrf_vkey                 : vrf_vkey
+   , vrf_result               : vrf_cert
+   , block_body_size          : uint
+   , block_body_hash          : hash32
++  , ? announced_eb           : hash32
++  , ? certified_eb           : hash32
+   ]
+```
+
+#### Endorser Block
+```cddl
+endorser_block =
+  [ rb_announced             : hash32
+  , conflicting_txs          : [* transaction_index]
+  , transaction_references   : [* tx_reference]
+  ]
+
+; Reference structures
+tx_reference = hash32
+transaction_index = uint
+```
+
+#### Votes and Certificates
+```cddl
+leios_certificate =
+  [ election_id              : election_id
+  , endorser_block_hash      : hash32
+  , persistent_voters        : [* persistent_voter_id]
+  , nonpersistent_voters     : {* pool_id => bls_signature}
+  , ? aggregate_elig_sig     : bls_signature
+  , aggregate_vote_sig       : bls_signature
+  ]
+
+leios_vote = persistent_vote / non_persistent_vote
+
+persistent_vote =
+  [ 0
+  , election_id
+  , persistent_voter_id
+  , endorser_block_hash
+  , vote_signature
+  ]
+
+non_persistent_vote =
+  [ 1
+  , election_id
+  , pool_id
+  , eligibility_signature
+  , endorser_block_hash
+  , vote_signature
+  ]
+```
+
+### B.2 Mini-Protocol Messages
+
+#### RbHeaderRelay
+```cddl
+; RbHeaderRelay Messages
+rbHeaderRelayMessage = 
+  msgInit
+  / msgRequestIdsBlocking
+  / msgRequestIdsNonBlocking
+  / msgReplyIds
+  / msgRequestData
+  / msgReplyData
+  / msgDone
+
+msgInit = [0]
+msgRequestIdsBlocking = [1, req_count]
+msgRequestIdsNonBlocking = [2, req_count]  
+msgReplyIds = [3, [* [header_hash, header_info]]]
+msgRequestData = [4, [* header_hash]]
+msgReplyData = [5, [* rb_header]]
+msgDone = [6]
+
+; Types
+req_count = uint32
+header_hash = hash32
+header_info = [slot_no, node_id]
+slot_no = uint64
+node_id = hash28
+rb_header = bytes  ; Full RB header including optional EB announcement
+```
+
+#### EbRelay
+```cddl
+; To be specified - follows same Relay pattern as RbHeaderRelay
+```
+
+#### VoteRelay
+```cddl
+; To be specified - follows same Relay pattern with vote-specific constraints
+```
+
+#### EbFetch
+```cddl
+; To be specified - follows Fetch pattern for retrieving EB bodies
+```
+
+#### TxFetch
+```cddl
+; To be specified - follows Fetch pattern for retrieving transactions
+```
 
 ## Copyright
 
