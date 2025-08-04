@@ -164,7 +164,7 @@ When a stake pool wins block leadership, they **simultaneously** create two
 things:
 
 - **Ranking Block (RB)**: A standard Praos block with extended header fields to
-  announce the second block
+  certify one EB and announce another EB
 - **Endorser Block (EB)**: A larger block containing additional transaction references
 
 The RB chain continues to be distributed exactly as in Praos, while Leios introduces a separate header distribution mechanism for rapid EB discovery and equivocation detection.
