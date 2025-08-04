@@ -187,7 +187,7 @@ called $L$:
 
 **Step 4: Certification**
 
-If enough committee votes are collected such that the total stake exceeds a
+If enough committee votes are collected such that the total active stake exceeds a
 **threshold** ($\tau$) (typically 60% of total stake), the EB becomes **certified**:
 
 $$
@@ -399,7 +399,8 @@ constrained by the network characteristics above:
 | Voting period length          | $L_\text{vote}$ |   slot   | Duration during which committee members can vote on endorser blocks    | $L_\text{vote} \geq 3\Delta_\text{hdr}$ | Must allow EB diffusion and equivocation detection before voting |
 | Vote diffusion period length | $L_\text{diff}$ |   slot   | Duration for vote propagation after voting period ends                | $L_\text{diff} \geq \Delta_\text{hdr}$ | Must allow votes to propagate before certificate inclusion   |
 | Ranking block max size        | $S_\text{RB}$ |  bytes   | Maximum size of a ranking block                                        |                $S_\text{RB} > 0$                | Limits RB size to ensure timely diffusion                     |
-| Endorser-block referenceable transaction size | $S_\text{EB}$ |  bytes   | Maximum total size of transactions that can be referenced by an endorser block |                $S_\text{EB} > 0$                | Limits total transaction payload to ensure timely diffusion within stage length |
+| Endorser-block referenceable transaction size | $S_\text{EB-tx}$ |  bytes   | Maximum total size of transactions that can be referenced by an endorser block |                $S_\text{EB-tx} > 0$                | Limits total transaction payload to ensure timely diffusion within stage length |
+| Endorser block max size       | $S_\text{EB}$ |  bytes   | Maximum size of an endorser block itself                               |                $S_\text{EB} > 0$                | Limits EB size to ensure timely diffusion; prevents issues with many small transactions |
 | Praos active slot coefficient | $f_\text{RB}$ |  1/slot  | Probability that a party will be the slot leader for a particular slot |       $0 < f_\text{RB} \leq \Delta_\text{RB}^{-1}$        | Blocks should not be produced faster than network delay       |
 | Mean committee size           |      $n$      | parties  | Average number of stake pools selected for voting                      |                     $n > 0$                     | Ensures sufficient decentralization and security              |
 | Quorum size                   |    $\tau$     | fraction | Minimum fraction of committee votes required for certification         |                  $\tau > 0.5$                   | Prevents adversarial control while ensuring liveness          |
@@ -408,11 +409,22 @@ _Table 2: Leios Protocol Parameters_
 
 </div>
 
+> [!NOTE]
+> **EB Size Constraints**
+> 
+> Two separate parameters control EB sizes:
+> - $S_\text{EB}$ limits the size of the EB data structure itself, preventing issues when many small transactions create large numbers of transaction references (32 bytes each)
+> - $S_\text{EB-tx}$ limits the total size of transactions that can be referenced, controlling the actual transaction payload
+> 
+> For example, an EB referencing 10,000 transactions of 100 bytes each would have $S_\text{EB-tx} = 1$ MB but the EB itself would be at least 320 KB just for the transaction hashes.
+
 ### Specification for votes and certificates
 
 Leios requires a voting and certificate scheme to validate endorser blocks. This
 specification defines a BLS-based implementation that meets the protocol
-requirements with concrete performance characteristics.
+requirements with concrete performance characteristics. The detailed requirements
+for the voting and certificate scheme are specified in
+[Appendix: Requirements for votes and certificates](#appendix-requirements-for-votes-and-certificates).
 
 #### Committee Selection
 
@@ -625,7 +637,7 @@ Block producers creating new RBs include certificates for EBs that meet timing c
 > Including an EB certificate creates a dependency - downstream nodes cannot validate the RB until they receive the referenced EB. This could delay RB propagation beyond Praos timing assumptions ($\Delta_\text{RB}$) if EB propagation is slow. Protocol parameters must ensure $L_\text{diff} > \Delta_\text{EB}$ to prevent this timing violation.
 
 **Mempool Requirements**  
-Mempool capacity must accommodate expanded transaction volume: $\text{Mempool} \geq 2 \times S_\text{RB} + S_\text{EB}$. Nodes optimistically include EB transactions upon announcement, revalidating if certification fails.
+Mempool capacity must accommodate expanded transaction volume: $\text{Mempool} \geq 2 \times S_\text{RB} + S_\text{EB-tx}$. Nodes optimistically include EB transactions upon announcement, revalidating if certification fails.
 
 
 
@@ -639,7 +651,7 @@ As outlined above, Leios splits transactions between RBs and EBs, with EB inclus
 
 #### Unchanged Praos Mini-Protocols
 
-As described in [Node Behavior](#node-behavior), existing Praos protocols (ChainSync, BlockFetch, TxSubmission) continue to operate with only minor modifications: RB headers gain optional fields for EB announcements, some RBs carry certificates, and mempools expand to approximately $2 \times S_\text{RB} + S_\text{EB}$.
+As described in [Node Behavior](#node-behavior), existing Praos protocols (ChainSync, BlockFetch, TxSubmission) continue to operate with only minor modifications: RB headers gain optional fields for EB announcements, some RBs carry certificates, and mempools expand to approximately $2 \times S_\text{RB} + S_\text{EB-tx}$.
 
 #### Leios Mini-Protocols
 
@@ -771,13 +783,13 @@ certified.
 > What about the maximum number / size of referenced transactions?
 
 $$
-\text{Throughput} = f_{\text{RB}} \times \left( S_\text{RB} + S_\text{EB} \times f_\text{EB} \right)
+\text{Throughput} = f_{\text{RB}} \times \left( S_\text{RB} + S_\text{EB-tx} \times f_\text{EB} \right)
 $$
 
 Where:
 - $f_{\text{RB}}$ — Rate of RB production (protocol parameter)
 - $S_\text{RB}$ — Maximum size of an RB (protocol parameter)
-- $S_\text{EB}$ — Maximum size of an EB (protocol parameter)
+- $S_\text{EB-tx}$ — Maximum total size of transactions that can be referenced by an EB (protocol parameter)
 - $f_\text{EB}$ — Fraction of RBs that include an EB as observed under realistic
   network conditions and timing constraints.
 
@@ -1591,6 +1603,30 @@ protocol.
 - [Github repository for Leios R&D](https://github.com/input-output-hk/ouroboros-leios)
 - [Github repository for Leios formal specification](https://github.com/input-output-hk/ouroboros-leios-formal-spec)
 
+
+## Appendix: Requirements for votes and certificates
+
+The voting and certificate scheme for Leios must satisfy the following requirements to ensure security, efficiency, and practical deployability:
+
+1. **Succinct registration of keys:** The registration of voting keys should not involve excessive data transfer or coordination between parties. Ideally, such registration would occur as part of the already existing operational certificates and not unduly increase their size.
+
+2. **Key rotation:** The cryptographic keys used to sign Leios votes and certificates *do not* need to be rotated periodically because the constraints on Leios voting rounds and the key rotation already present in Praos secure the protocol against attacks such as replay and key compromise.
+
+3. **Deterministic signatures:** Deterministic signatures can guard against attacks that weaken key security.
+
+4. **Local sortition:** Selection of the voting committee should not be so deterministic and public as to open attack avenues such as denial-of-service or subversion.
+
+5. **Liveness:** Adversaries with significant stake (e.g., more than 35%) should not be able to thwart an honest majority from reaching a quorum of votes for an EB.
+
+6. **Soundness:** Adversaries with near majority stake (e.g., 49%) should not be able to form an adversarial quorum that certifies the EB of their choice.
+
+7. **Small votes:** Because vote traffic is large and frequent in Leios, the votes themselves should be small. Note that the large size of Praos KES signatures precludes their use for signing Leios votes.
+
+8. **Small certificates:** Because Leios certificates are frequent and must fit inside Praos blocks, they should be small enough so there is plenty of room for other transactions in the Praos blocks. Note once again that certificates based on Praos KES signatures are too large for consideration in Leios.
+
+9. **Fast cryptography:** The computational burden of creating and verifying voting eligibility, the votes themselves, and the resulting certificate must be small enough to fit within the CPU budget for Leios stages.
+
+The BLS-based implementation specified in this document satisfies all these requirements, as evidenced by the performance characteristics and certificate sizes documented in the [Specification for votes and certificates](#specification-for-votes-and-certificates) section.
 
 
 ## Copyright
