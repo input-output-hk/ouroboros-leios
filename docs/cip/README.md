@@ -1511,7 +1511,7 @@ The BLS-based implementation specified in this document satisfies all these requ
 
 This appendix contains the complete CDDL specifications for all Leios protocol messages and data structures. These definitions specify the exact wire format for network communication.
 
-<h4 id="ranking-block-cddl">Ranking Block CDDL</h4>
+<h4 id="ranking-block-cddl">Ranking Block</h4>
 
 ```diff
  ranking_block =
@@ -1543,7 +1543,7 @@ block_header =
    ]
 ```
 
-<h4 id="endorser-block-cddl">Endorser Block CDDL</h4>
+<h4 id="endorser-block-cddl">Endorser Block</h4>
 
 ```cddl
 endorser_block =
@@ -1557,7 +1557,7 @@ tx_reference = hash32
 transaction_index = uint
 ```
 
-<h4 id="votes-certificates-cddl">Votes and Certificates CDDL</h4>
+<h4 id="votes-certificates-cddl">Votes and Certificates</h4>
 
 ```cddl
 leios_certificate =
