@@ -498,17 +498,16 @@ sequenceDiagram
     BP->>D: 5. Serve RB
     U->>BP: 6. Fetch EB
 
-    Note over BP: 7. Check Tx Availability<br/>in mempool
-    U->>BP: 8. Fetch missing<br />transactions of EB
+    Note over BP: 7. Check Tx Availability<br/>& validate EB
+    U->>BP: 7.a Fetch missing<br />transactions (if needed)
     
-    Note over BP: 9. Validate EB
-    BP->>D: 10. Serve EB
-    Note over BP: 11. Vote on EB<br />(if eligible)
-    U->>BP: 12. Sync Votes
-    BP->>D: 12.a Serve Votes (+ own vote)
+    BP->>D: 8. Serve EB
+    Note over BP: 9. Vote on EB<br />(if eligible)
+    U->>BP: 10. Sync Votes
+    BP->>D: 10.a Serve Votes (+ own vote)
     
-    Note over BP: 13. Aggregate certificate<br/>from votes  
-    Note over BP: 14. Create next RB<br />include EB certificate &<br />announce next EB
+    Note over BP: 11. Aggregate certificate<br/>from votes  
+    Note over BP: 12. Create next RB<br />include EB certificate &<br />announce next EB
 ```
 
 _Figure 2: Up- and downstream interactions of a node (simplified)_
@@ -563,28 +562,22 @@ The node serves the validated RB to downstream peers using standard Praos block 
 **Step 6: EB Fetching**  
 When an RB announces an EB, nodes discover and fetch the EB content. Only the EB body corresponding to the first EB announcement/RB header received for a given RB creation opportunity is requested, with requests made in freshest-first fashion. The EB contains references to transactions. Nodes do not serve the EB to peers until they have all referenced transactions and can validate the EB.
 
-**Step 7: Transaction Availability Check**  
-Before serving an EB to peers, nodes check which transactions referenced in the EB are already available in their mempool. This ensures that when a node tells peers it has an EB, those peers know the node already has all the EB's transactions. This is critical for efficient transaction request routing.
+**Step 7: Transaction Fetching and Validation**  
+Nodes check transaction availability for the EB and fetch any missing transactions from peers. Once all transactions are available, nodes validate the complete EB against the appropriate ledger state, ensuring the transactions form a valid extension of the announcing RB and meet size constraints.
 
-**Step 8: Missing Transaction Fetching**  
-If a node is missing any transactions referenced in the EB, it requests them from peers. Only after acquiring all missing transactions does the node proceed to validation and serving. This ensures complete transaction availability before EB processing.
+**Step 8: EB Serving**  
+After completing validation and confirming all referenced transactions are available, nodes serve the EB to downstream peers. This guarantees that when a node announces it has an EB, peers can trust that the node possesses all the EB's transactions.
 
-**Step 9: EB Validation**  
-Nodes validate the complete EB including all transactions against the appropriate ledger state. The validation ensures that the transactions in the EB are a valid extension of the RB that announced it, checking transaction validity and size constraints.
-
-**Step 10: EB Serving**  
-Only after completing validation and ensuring all transactions are available does the node serve the EB to downstream peers. The key principle is that when a node tells peers it has an EB, those peers know the node already has all the EB's transactions.
-
-**Step 11: Voting on EBs**  
+**Step 9: Voting on EBs**  
 Committee members selected through a lottery process (see [Committee Selection](#committee-selection)) vote on valid EBs within a specific time window. A committee member votes positively for an EB only if: (1) the related announcing RB header was received within $\Delta_\text{hdr}$ of the RB creation slot, (2) no other equivocating RB header was received within $3\Delta_\text{hdr}$ of the RB creation slot, (3) it received the EB within the voting window $L_\text{vote}$, (4) the EB matches what was announced in the latest block, and (5) the EB's transactions are valid. This ensures that RB headers corresponding to all certified EBs were received first compared to equivocated ones by all nodes.
 
-**Step 12: Vote Synchronization**  
+**Step 10: Vote Synchronization**  
 Votes propagate through the network, with nodes forwarding at most one vote per committee member per slot. Nodes receive votes from upstream peers, maintaining a running tally for each EB to track progress toward the quorum threshold.
 
-**Step 13: Certificate Aggregation**  
+**Step 11: Certificate Aggregation**  
 When enough committee votes are collected (reaching the quorum threshold), nodes aggregate the valid votes into a compact certificate. This creates a cryptographic proof that the EB is valid and has received sufficient committee approval.
 
-**Step 14: Next Block Production**  
+**Step 12: Next Block Production**  
 Block producers creating new RBs include certificates for EBs that meet timing constraints. The producer may also announce a new EB extending their RB. When an EB certificate is included, the referenced EB's transactions become part of the permanent ledger state, increasing the effective throughput for that chain segment.
 
 #### Epoch Boundary Behavior
