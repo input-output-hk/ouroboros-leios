@@ -1480,8 +1480,9 @@ protocol.
 - [Github repository for Leios R&D](https://github.com/input-output-hk/ouroboros-leios)
 - [Github repository for Leios formal specification](https://github.com/input-output-hk/ouroboros-leios-formal-spec)
 
+## Appendix
 
-<h2 id="appendix-a-requirements">Appendix A: Requirements for votes and certificates</h2>
+<h3 id="appendix-a-requirements">Appendix A: Requirements for votes and certificates</h2>
 
 The voting and certificate scheme for Leios must satisfy the following requirements to ensure security, efficiency, and practical deployability:
 
@@ -1506,7 +1507,7 @@ The voting and certificate scheme for Leios must satisfy the following requireme
 The BLS-based implementation specified in this document satisfies all these requirements, as evidenced by the performance characteristics and certificate sizes documented in the [Specification for votes and certificates](#specification-for-votes-and-certificates) section.
 
 
-<h2 id="appendix-b-cddl">Appendix B: Wire Format Specifications (CDDL)</h2>
+<h3 id="appendix-b-cddl">Appendix B: Wire Format Specifications (CDDL)</h2>
 
 This appendix contains the complete CDDL specifications for all Leios protocol messages and data structures. These definitions specify the exact wire format for network communication.
 
