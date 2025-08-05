@@ -562,7 +562,7 @@ Nodes validate the RB and any included EB certificate before adopting the block.
 The node serves the validated RB to downstream peers using standard Praos block distribution mechanisms.
 
 **Step 6: EB Fetching**  
-When an RB announces an EB, nodes must promptly discover and fetch the EB content to enable voting within the $L_\text{vote}$ window. Only the EB body corresponding to the first EB announcement/RB header received for a given RB creation opportunity is requested, with requests made in freshest-first fashion. The EB contains references to transactions. Nodes do not serve the EB to peers until they have all referenced transactions and can validate the EB.
+When an RB announces an EB, nodes must promptly discover and fetch the EB content to enable voting within the $L_\text{vote}$ window. Only the EB body corresponding to the first EB announcement/RB header received for a given RB creation opportunity is requested, with requests made in freshest-first fashion. The EB contains references to transactions. Nodes do not serve the EB to peers until they have all referenced transactions.
 
 **Step 7: Transaction Fetching and Validation**  
 Nodes check transaction availability for the EB and fetch any missing transactions from peers. Once all transactions are available, nodes validate the complete EB against the appropriate ledger state, ensuring the transactions form a valid extension of the announcing RB and meet size constraints.
