@@ -45,7 +45,12 @@
           buildInputs = [
             pkgs.remarshal # yaml2json
             pkgs.jq
+            pkgs.ansifilter
+            pkgs.gnugrep
+            pkgs.gnused
+            pkgs.gzip
             pkgs.pigz
+            pkgs.bc
           ];
         };
         devShells.default = devShells.sims;
