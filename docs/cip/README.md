@@ -264,7 +264,7 @@ Leios employs a BLS-based voting and certificate scheme where committee members 
 
 The implementation meets the [requirements for votes and certificates](#appendix-a-requirements-for-votes-and-certificates) specified in Appendix A. Alternative schemes satisfying these requirements could be substituted, enabling unified voting infrastructure across Ouroboros Leios, Ouroboros Peras, and other protocols.
 
-To participate in the Leios protocols as voting member/ block producing node, stake pool operators must register one additional BLS12-381 key alongside their existing VRF and KES keys.
+To participate in the Leios protocol as voting member/ block producing node, stake pool operators must register one additional BLS12-381 key alongside their existing VRF and KES keys.
 
 **Committee Structure**: Two types of voters validate EBs, balancing security, decentralization, and efficiency:
 - **Persistent Voters**: Selected once per epoch using Fait Accompli sortition, vote in every election, identified by compact identifiers
