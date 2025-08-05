@@ -575,7 +575,7 @@ Committee members selected through a lottery process (see [Committee Selection](
 Votes propagate through the network, with nodes forwarding at most one vote per committee member per slot. Nodes receive votes from upstream peers, maintaining a running tally for each EB to track progress toward the quorum threshold.
 
 **Step 11: Certificate Aggregation**  
-When enough committee votes are collected (reaching the quorum threshold), nodes aggregate the valid votes into a compact certificate. This creates a cryptographic proof that the EB is valid and has received sufficient committee approval.
+When enough votes are collected (reaching the quorum threshold), nodes aggregate them into a compact certificate. This creates a cryptographic proof that the EB is valid and has received sufficient committee approval.
 
 **Step 12: Next Block Production**  
 Block producers creating new RBs include certificates for EBs that meet timing constraints. The producer may also announce a new EB extending their RB. When an EB certificate is included, the referenced EB's transactions become part of the permanent ledger state, increasing the effective throughput for that chain segment.
