@@ -587,7 +587,7 @@ Block producers creating new RBs include certificates for EBs where the full sta
 > [!Important]
 > **Validation Dependencies** 
 > 
-> Including an EB certificate creates a dependency - downstream nodes cannot validate the RB until they receive the referenced EB. This could delay RB propagation beyond Praos timing assumptions ($\Delta_\text{RB}$) if EB propagation is slow. Protocol parameters must ensure $L_\text{diff} > \Delta_\text{EB}$ to prevent this timing violation.
+> Including an EB certificate creates a dependency - downstream nodes cannot validate the RB until they receive the referenced EB. This could delay RB propagation beyond Praos timing assumptions ($\Delta_\text{RB}$) if EB propagation is slow. Protocol parameters must ensure that by the time certificate inclusion is allowed, the EB is already available to all honest nodes. Specifically, $L_\text{diff} > \Delta_\text{EB}$ ensures EBs reach all nodes before certificate inclusion, preventing RB validation delays that could violate the $\Delta_\text{RB}$ bound.
 
 **Ledger Formation**  
 Transactions in RBs and EBs within a chain are required to be non-conflicting, following the same ledger design as Praos with the addition of certificate handling and EB attachment references. In case of a chain switch due to a fork, nodes can skip verifying smart contracts included in certified EBs to accelerate chain adoption while maintaining security guarantees.
