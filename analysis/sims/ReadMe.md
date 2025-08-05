@@ -8,36 +8,37 @@ These instructions are valid for the folders `2025w25/` and onwards.
 ### Running the simulation
 
 1. Navigate to the folder for the study, for example `2025w31c/`.
-2. Copy or link the Rust simulator `sim-cli` executable to that folder.
+2. Make sure to have the following tools installed: `yaml2json`, `jq` and `pigz`
+    - *Nix:* use the default dev shell of the `sims/` flake `nix develop ..`
+3. Copy or link the Rust simulator `sim-cli` executable to that folder.
     - If you want to reproduce the study, check out the git commit listed in the `sim-cli.hash` file.
-    - Otherwise, run `cargo build --release` in the [sim-rs](../../sim-rs/) folder.
-3. Copy of link the Haskell `leios-trace-processor` executable to that folder.
+    - Build with `cargo build --release` in the [sim-rs](../../sim-rs/) folder.
+    - Link with `ln -s ../../../sim-rs/target/release/sim-cli` from the study folder.
+4. Copy of link the Haskell `leios-trace-processor` executable to that folder.
     - *Cabal:* compile using `cabal build all`.
-    - *Nix:* compile using `nix build #leios-trace-processor`.
-4. You can execute individual scenarios by executing the `run.sh` script in the relevant folder.
+    - *Nix:* compile using `nix build ../..#leios-trace-processor && ln -s result/bin/leios-trace-processor`.
+5. You can execute individual scenarios by executing the `run.sh` script in the relevant folder.
     - *Nix:* run `./run.sh`, which will automatically fetch the package dependencies.
     - *Without Nix:* run `bash run.sh`, but make sure you have the dependent tools already installled, which are listed in the first lines of `run.sh`.
-5. The results folder will contain results:
+6. The results folder will contain results:
     - `sim.log.gz`: the simulation log file, but with a few of the minor message types discarded.
     - `lifecycle.csv.gz`: transaction lifecycle results.
     - `resoruces.csv.gz`: resource usage results.
     - `receipts.csv.gz`: message diffusion results.
     - `cpus.csv.gz`: CPU usage results.
     - `sizes.csv.gz`: BLock size results.
-6. You can also run several simulations at once using the `parallel` command-line tool.
-
+7. You can also run several simulations at once using the `parallel` command-line tool.
 
 ### Combining the results
 
-7. Execute the `combine-results.sh` script to bundle the results from multiple runs into the `results/` folder.
+8. Execute the `combine-results.sh` script to bundle the results from multiple runs into the `results/` folder.
     - *Nix:* run `./combine-results.sh`.
     - *Without nix:* run `bash combine-results.sh` after installing the required dependencies.
-
   
 ### Plot the results in Jupyter
 
-8. Start a Jupter notebook server using the command `nix run #../sims/`.
-9. In the web browser, navigate to the relevant experiment folder and open any `.ipynb` files of interest.
+9. Start a Jupter notebook server using the command `nix run #../sims/`.
+10. In the web browser, navigate to the relevant experiment folder and open any `.ipynb` files of interest.
 
 
 ## Data dictionary

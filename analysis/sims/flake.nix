@@ -1,5 +1,5 @@
 {
-  description = "Your jupyenv project";
+  description = "Flake for simulations and analysis";
 
   nixConfig.extra-substituters = [
     "https://tweag-jupyter.cachix.org"
@@ -14,30 +14,45 @@
   inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-25.05";
   inputs.jupyenv.url = "github:tweag/jupyenv";
 
-  outputs = {
-    self,
-    flake-compat,
-    flake-utils,
-    nixpkgs,
-    jupyenv,
-    ...
-  } @ inputs:
-    flake-utils.lib.eachSystem
-    [
+  outputs =
+    { self
+    , flake-compat
+    , flake-utils
+    , nixpkgs
+    , jupyenv
+    , ...
+    } @ inputs:
+    flake-utils.lib.eachSystem [
       flake-utils.lib.system.x86_64-linux
     ]
-    (
-      system: let
+      (system:
+      let
         inherit (jupyenv.lib.${system}) mkJupyterlabNew;
-        jupyterlab = mkJupyterlabNew ({...}: {
+        jupyterlab = mkJupyterlabNew ({ ... }: {
           nixpkgs = inputs.nixpkgs;
-          imports = [(import ./kernels.nix {pkgs = nixpkgs;})];
+          imports = [ (import ./kernels.nix { pkgs = nixpkgs; }) ];
         });
-      in rec {
-        packages = {inherit jupyterlab;};
+        pkgs = import nixpkgs { inherit system; };
+      in
+      rec {
+        packages = { inherit jupyterlab; };
         packages.default = jupyterlab;
+
         apps.default.program = "${jupyterlab}/bin/jupyter-lab";
         apps.default.type = "app";
-      }
-    );
+
+        devShells.sims = pkgs.mkShell {
+          buildInputs = [
+            pkgs.remarshal # yaml2json
+            pkgs.jq
+            pkgs.ansifilter
+            pkgs.gnugrep
+            pkgs.gnused
+            pkgs.gzip
+            pkgs.pigz
+            pkgs.bc
+          ];
+        };
+        devShells.default = devShells.sims;
+      });
 }
