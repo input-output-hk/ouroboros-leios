@@ -270,7 +270,7 @@ To participate in the Leios protocols as voting member/ block producing node, st
 - **Persistent Voters**: Selected once per epoch using Fait Accompli sortition, vote in every election, identified by compact identifiers
 - **Non-persistent Voters**: Selected per EB via local sortition with Poisson-distributed stake-weighted probability
 
-This dual approach prevents linear certificate size growth by leveraging stake distribution characteristics, enabling faster certificate diffusion while maintaining broad participation.
+This dual approach prevents linear certificate size growth by leveraging non-uniform stake distribution, enabling faster certificate diffusion while maintaining broad participation.
 
 **Vote Structure**: All votes include the `endorser_block_hash` field that uniquely identifies the target EB:
 - **Persistent votes**:
@@ -301,8 +301,6 @@ Detailed specifications, performance, and benchmarks are available in the [BLS c
 > **Vote Bundling**
 > 
 > The linked BLS specification mentions vote bundling as an optimization. However, this only applies when EB production is decoupled from RBs, which is not the case in this specification where each EB is announced by an RB.
-
-The wire format for votes and certificates is specified in [Appendix B.1](#b1-core-data-structures).
 
 ### Network Characteristics and Protocol Parameters
 
