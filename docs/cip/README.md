@@ -262,7 +262,7 @@ The hash referenced in RB headers (`announced_eb` and `certified_eb` fields) is 
 
 Leios employs a BLS-based voting and certificate scheme where committee members cast votes that reference specific EBs, which are then aggregated into compact certificates for inclusion in RBs.
 
-The implementation meets the [requirements for votes and certificates](#appendix-a-requirements-for-votes-and-certificates) specified in Appendix A. Alternative schemes satisfying these requirements could be substituted, enabling unified voting infrastructure across Ouroboros Leios, Ouroboros Peras, and other protocols.
+The implementation meets the <a href="#appendix-a-requirements">requirements for votes and certificates</a> specified in Appendix A. Alternative schemes satisfying these requirements could be substituted, enabling unified voting infrastructure across Ouroboros Leios, Ouroboros Peras, and other protocols.
 
 To participate in the Leios protocol as voting member/ block producing node, stake pool operators must register one additional BLS12-381 key alongside their existing VRF and KES keys.
 
@@ -287,7 +287,7 @@ This dual approach prevents linear certificate size growth by leveraging non-uni
 
 <a id="certificate-validation" href="#certificate-validation">**Certificate Validation**</a>: When an RB includes an EB certificate, nodes must validate the following before accepting the block:
 
-1. **CDDL Format Compliance**: Certificate structure matches the specification format defined in [Appendix B.1](#b1-core-data-structures)
+1. **CDDL Format Compliance**: Certificate structure matches the specification format defined in <a href="#votes-certificates-cddl">Appendix B: Votes and Certificates CDDL</a>
 2. **Cryptographic Signatures**: All BLS signatures are valid
 3. **Voter Eligibility**: 
    - Persistent voters must have been selected as such by the Fait Accompli scheme for the current epoch
@@ -1481,7 +1481,7 @@ protocol.
 - [Github repository for Leios formal specification](https://github.com/input-output-hk/ouroboros-leios-formal-spec)
 
 
-## Appendix A: Requirements for votes and certificates
+<h2 id="appendix-a-requirements">Appendix A: Requirements for votes and certificates</h2>
 
 The voting and certificate scheme for Leios must satisfy the following requirements to ensure security, efficiency, and practical deployability:
 
@@ -1506,13 +1506,12 @@ The voting and certificate scheme for Leios must satisfy the following requireme
 The BLS-based implementation specified in this document satisfies all these requirements, as evidenced by the performance characteristics and certificate sizes documented in the [Specification for votes and certificates](#specification-for-votes-and-certificates) section.
 
 
-## Appendix B: Wire Format Specifications (CDDL)
+<h2 id="appendix-b-cddl">Appendix B: Wire Format Specifications (CDDL)</h2>
 
 This appendix contains the complete CDDL specifications for all Leios protocol messages and data structures. These definitions specify the exact wire format for network communication.
 
-### B.1 Core Data Structures
+<h4 id="ranking-block-cddl">Ranking Block CDDL</h4>
 
-#### Ranking Block
 ```diff
  ranking_block =
    [ header                   : block_header
@@ -1543,7 +1542,8 @@ block_header =
    ]
 ```
 
-#### Endorser Block
+<h4 id="endorser-block-cddl">Endorser Block CDDL</h4>
+
 ```cddl
 endorser_block =
   [ rb_announced             : hash32
@@ -1556,7 +1556,8 @@ tx_reference = hash32
 transaction_index = uint
 ```
 
-#### Votes and Certificates
+<h4 id="votes-certificates-cddl">Votes and Certificates CDDL</h4>
+
 ```cddl
 leios_certificate =
   [ election_id              : election_id
@@ -1585,57 +1586,6 @@ non_persistent_vote =
   , endorser_block_hash
   , vote_signature
   ]
-```
-
-### B.2 Mini-Protocol Messages
-
-#### RbHeaderRelay
-```cddl
-; RbHeaderRelay Messages
-rbHeaderRelayMessage = 
-  msgInit
-  / msgRequestIdsBlocking
-  / msgRequestIdsNonBlocking
-  / msgReplyIds
-  / msgRequestData
-  / msgReplyData
-  / msgDone
-
-msgInit = [0]
-msgRequestIdsBlocking = [1, req_count]
-msgRequestIdsNonBlocking = [2, req_count]  
-msgReplyIds = [3, [* [header_hash, header_info]]]
-msgRequestData = [4, [* header_hash]]
-msgReplyData = [5, [* rb_header]]
-msgDone = [6]
-
-; Types
-req_count = uint32
-header_hash = hash32
-header_info = [slot_no, node_id]
-slot_no = uint64
-node_id = hash28
-rb_header = bytes  ; Full RB header including optional EB announcement
-```
-
-#### EbRelay
-```cddl
-; To be specified - follows same Relay pattern as RbHeaderRelay
-```
-
-#### VoteRelay
-```cddl
-; To be specified - follows same Relay pattern with vote-specific constraints
-```
-
-#### EbFetch
-```cddl
-; To be specified - follows Fetch pattern for retrieving EB bodies
-```
-
-#### TxFetch
-```cddl
-; To be specified - follows Fetch pattern for retrieving transactions
 ```
 
 ## Copyright
