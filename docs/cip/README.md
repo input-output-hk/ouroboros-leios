@@ -492,7 +492,7 @@ sequenceDiagram
     U->>BP: 12. Sync Votes
     BP->>D: 12.a Serve Votes (+ own vote)
     
-    Note over BP: 13. Aggregate certificate<br/>from verified, valid votes  
+    Note over BP: 13. Aggregate certificate<br/>from votes  
     Note over BP: 14. Create next RB<br />include EB certificate &<br />announce next EB
 ```
 
@@ -530,47 +530,47 @@ The diagram above illustrates the Leios protocol in a simplified sequential orde
 
 Leios introduces new node behaviors:
 
-**Step 1: Block Production**  
-When a stake pool wins block leadership, they simultaneously create two things: a Ranking Block (RB) and an Endorser Block (EB). The RB is a standard Praos block with extended header fields to certify one EB and announce another EB. The EB is a larger block containing additional transaction references. The RB chain continues to be distributed exactly as in Praos, while Leios introduces a separate header distribution mechanism for rapid EB discovery and equivocation detection.
+**Step 1: Block Production**
+When a stake pool wins block leadership, they simultaneously create two things: a RB and an EB. The RB is a standard Praos block with extended header fields to certify one EB and announce another EB. The EB is a larger block containing additional transaction references. The RB chain continues to be distributed exactly as in Praos, while Leios introduces a separate header distribution mechanism for rapid EB discovery and equivocation detection.
 
-**Step 2: RB Header Synchronization**  
+**Step 2: RB Header Synchronization**
 RB headers diffuse via the new [RbHeaderRelay mini-protocol](#rbheaderrelay-mini-protocol) independently of standard ChainSync. This separate mechanism enables rapid EB discovery within the strict timing bound $\Delta_\text{hdr}$. Nodes propagate at most two headers per (slot, issuer) pair to detect equivocation. The header contains the EB hash when the block producer created an EB, allowing peers to discover and fetch the corresponding EB.
 
-**Step 3: RB Body Fetching**  
+**Step 3: RB Body Fetching**
 After receiving headers, nodes fetch RB bodies via standard BlockFetch protocol. This follows standard Praos mechanisms for retrieving complete ranking blocks after headers are received.
 
-**Step 4: RB and EB Certificate Validation**  
-Upon receipt, nodes validate the RB and any included EB certificate, adopting the block if valid. This follows standard Praos mechanisms with the addition of certificate validation. The node validates that any included EB certificate corresponds to an EB that was properly announced and meets the timing constraints for inclusion. The validation includes verifying the BLS aggregate signature, checking committee member eligibility proofs, and ensuring the certificate's election ID matches the EB's creation slot.
+**Step 4: RB and EB Certificate Validation**
+Nodes validate the RB and any included EB certificate before adopting the block. This includes checking that any EB certificate corresponds to a properly announced EB and meets timing requirements. The validation verifies cryptographic signatures and ensures the certificate is linked to the correct voting round.
 
 **Step 5: RB Serving**  
-The node serves the validated RB to downstream peers. This follows standard Praos mechanisms for block distribution.
+The node serves the validated RB to downstream peers using standard Praos block distribution mechanisms.
 
 **Step 6: EB Fetching**  
-When an RB announces an EB, nodes discover the announced EB and fetch its content. The EB contains references to transactions. Nodes do not serve the EB to peers until they have all referenced transactions and can validate the EB.
+When an RB announces an EB, nodes discover and fetch the EB content. The EB contains references to transactions rather than the full transaction data. Nodes do not serve the EB to peers until they have all referenced transactions and can validate the EB.
 
 **Step 7: Transaction Availability Check**  
-Before serving an EB to peers, nodes check which transactions referenced in the EB are available in their mempool. This ensures that when a node tells peers it has an EB, the peers know the node already has all the EB's transactions. This is critical because peers need to know who is offering which transactions so they can choose who to request them from.
+Before serving an EB to peers, nodes check which transactions referenced in the EB are already available in their mempool. This ensures that when a node tells peers it has an EB, those peers know the node already has all the EB's transactions. This is critical for efficient transaction request routing.
 
 **Step 8: Missing Transaction Fetching**  
-If a node does not already possess a transaction referenced in the EB, it explicitly requests that transaction from peers via [TxFetch mini-protocol](#txfetch-mini-protocol). This ensures nodes have all transaction data before attempting EB validation. Only after acquiring all missing transactions does the node proceed to validation and serving.
+If a node is missing any transactions referenced in the EB, it requests them from peers. Only after acquiring all missing transactions does the node proceed to validation and serving. This ensures complete transaction availability before EB processing.
 
 **Step 9: EB Validation**  
-Nodes validate the complete EB including all transactions against the appropriate ledger state. To limit DoS exposure, nodes employ a two-stage approach: lightweight pre-forwarding checks (VRF proof, hash matching) before propagation, followed by full transaction validation. The validation ensures that the transactions in the EB are a valid extension of the RB that announced it. This includes verifying that all referenced transactions exist in the mempool, checking transaction validity against the ledger state at the RB's slot, and ensuring the EB's size constraints are met.
+Nodes validate the complete EB including all transactions against the appropriate ledger state. The validation ensures that the transactions in the EB are a valid extension of the RB that announced it, checking transaction validity and size constraints.
 
 **Step 10: EB Serving**  
-Only after completing validation and ensuring all transactions are available does the node serve the EB to downstream peers via [EbRelay mini-protocol](#ebrelay-mini-protocol) using **freshest-first delivery**. This policy prevents timing attacks by prioritizing recent EBs over historical ones. All nodes must receive all EBs regardless of fork to prevent withholding attacks. The key principle is that when a node tells peers it has an EB, those peers know the node already has all the EB's transactions.
+Only after completing validation and ensuring all transactions are available does the node serve the EB to downstream peers. The key principle is that when a node tells peers it has an EB, those peers know the node already has all the EB's transactions.
 
 **Step 11: Voting on EBs**  
-Committee members selected via sortition vote on valid EBs within the $L_\text{vote}$ window. A committee member votes positively for an EB only if: (1) it has received the EB within $L_\text{vote}$ slots from its creation, (2) the EB corresponds to the EB announced in the latest block in the chain maintained by the party, and (3) the transactions in the EB are a valid extension of the RB that announced it. Votes issue after the RB is $3\Delta_\text{hdr}$ old to ensure equivocation detection. The voting process uses BLS signatures with deterministic nonces to prevent replay attacks and ensure vote authenticity.
+Committee members selected through a lottery process (see [Committee Selection](#committee-selection)) vote on valid EBs within a specific time window. A committee member votes positively for an EB only if: (1) it received the EB within the voting window, (2) the EB matches what was announced in the latest block, and (3) the EB's transactions are valid. Votes are issued after a delay to ensure equivocation detection.
 
 **Step 12: Vote Synchronization**  
-Votes propagate via [VoteRelay mini-protocol](#voterelay-mini-protocol), with nodes forwarding at most one vote per (slot, committee member) pair. Nodes collect votes from the network, maintaining a running tally for each EB to track progress toward the quorum threshold.
+Votes propagate through the network, with nodes forwarding at most one vote per committee member per slot. Nodes receive votes from upstream peers, maintaining a running tally for each EB to track progress toward the quorum threshold.
 
 **Step 13: Certificate Aggregation**  
-Nodes verify vote signatures and committee eligibility proofs. When total voting stake reaches the threshold $\tau$, nodes aggregate valid votes into a compact BLS certificate. This creates a compact certificate proving the EB's validity. The aggregation process combines persistent and non-persistent votes, with persistent votes represented as a bitset and non-persistent votes including individual eligibility proofs. See [Specification for votes and certificates](#specification-for-votes-and-certificates) for detailed validation procedures.
+When enough committee votes are collected (reaching the quorum threshold), nodes aggregate the valid votes into a compact certificate. This creates a cryptographic proof that the EB is valid and has received sufficient committee approval.
 
 **Step 14: Next Block Production**  
-Block producers creating new RBs include certificates for EBs that meet timing constraints: the new RB's slot must exceed the certified EB's creation time by at least $L_\text{vote} + L_\text{diff}$ slots. This ensures network-wide EB availability. The producer may also announce a new EB extending their RB. This conditional inclusion maintains Praos safety guarantees while achieving higher throughput when network timing permits. When an EB certificate is included, the referenced EB's transactions become part of the permanent ledger state, increasing the effective throughput for that chain segment.
+Block producers creating new RBs include certificates for EBs that meet timing constraints. The producer may also announce a new EB extending their RB. When an EB certificate is included, the referenced EB's transactions become part of the permanent ledger state, increasing the effective throughput for that chain segment.
 
 #### Implementation Considerations
 
@@ -581,8 +581,6 @@ Block producers creating new RBs include certificates for EBs that meet timing c
 
 **Mempool Requirements**  
 Mempool capacity must accommodate expanded transaction volume: $\text{Mempool} \geq 2 \times S_\text{RB} + S_\text{EB-tx}$. Nodes optimistically include EB transactions upon announcement, revalidating if certification fails.
-
-
 
 ### Network
 
@@ -617,11 +615,11 @@ _Table 6: Leios Mini-Protocols_
 
 These protocols share design principles that enable Leios to achieve its performance goals while maintaining security. The relay protocols implement freshest-first delivery to maximize the probability of certification within the voting period windows. EbRelay specifically employs optimistic forwarding — diffusing EBs before completing full transaction validation — to minimize latency at the cost of potentially forwarding some invalid blocks. To prevent spam from equivocating producers, RbHeaderRelay propagates at most two headers per (slot, issuer) pair, which suffices to prove misbehavior. All protocols incorporate cryptographic signature validation before forwarding to mitigate DoS attacks, with VoteRelay going further by only forwarding cryptographically valid votes. Finally, nodes must receive all EBs regardless of which fork they follow, preventing adversaries from selectively withholding blocks to manipulate voting outcomes.
 
-#### RbHeaderRelay Mini-Protocol
+##### RbHeaderRelay Mini-Protocol
 
 This protocol diffuses RB headers across the network within $\Delta_\text{hdr}$ slots to enable equivocation detection, distributing only headers (not full blocks) to meet this timing bound. By avoiding full block validation, it ensures that all nodes receive RB headers before voting begins, maintaining awareness of all competing chains and equivocations across the network.
 
-##### Protocol Overview
+**Mini-Protocol Overview**
 
 RbHeaderRelay is a **pull-based relay protocol** that enables nodes to request and receive RB headers from peers. It implements the Relay mini-protocol pattern used in Ouroboros networks for transaction submission, extended with equivocation-aware rules to ensure all nodes can detect competing chains.
 
@@ -632,7 +630,7 @@ RbHeaderRelay is a **pull-based relay protocol** that enables nodes to request a
 - **Cryptographic validation**: Signature and VRF verification before serving
 - **Universal availability**: Headers served regardless of fork preference
 
-##### Parameters
+**Parameters**
 
 The protocol parameters follow the Relay pattern described in the [Ouroboros Network Specification](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf#section.3.9):
 
@@ -650,7 +648,7 @@ _Table 7: RbHeaderRelay Protocol Parameters_
 
 </div>
 
-##### Message Flow
+**Message Flow**
 
 The following sequence diagram shows how RB headers propagate through the network via pull-based requests. This example demonstrates the non-blocking variant used for continuous header discovery:
 
@@ -684,7 +682,7 @@ sequenceDiagram
 </p>
 <p align="center"><em>Figure 7: RbHeaderRelay Message Flow</em></p>
 
-##### Protocol Messages
+**Protocol Messages**
 
 <div align="center">
 <a name="table-8"></a>
@@ -703,7 +701,7 @@ _Table 8: RbHeaderRelay Protocol Messages_
 
 </div>
 
-##### State Machine
+**State Machine**
 
 The protocol follows the standard Relay state machine with states for requesting and serving headers:
 
@@ -758,7 +756,7 @@ _Table 9: RbHeaderRelay State Transitions_
 
 </div>
 
-##### State Agencies
+**State Agencies**
 
 The following table shows which party has agency (i.e., can send messages) in each state:
 
@@ -778,7 +776,7 @@ _Table 10: RbHeaderRelay State Agencies_
 
 </div>
 
-##### Size Limits
+**Size Limits**
 
 To prevent resource exhaustion attacks, the protocol enforces the following message size limits:
 
@@ -797,7 +795,7 @@ _Table 11: RbHeaderRelay Size Limits per State_
 
 </div>
 
-##### Timeouts
+**Timeouts**
 
 The protocol enforces timeouts to ensure liveness and prevent indefinite blocking:
 
@@ -816,7 +814,7 @@ _Table 12: RbHeaderRelay Timeouts per State_
 
 </div>
 
-##### Validation Rules
+**Validation Rules**
 
 Headers undergo two stages of validation:
 
@@ -831,58 +829,26 @@ Headers undergo two stages of validation:
 2. **Chain extension**: Properly extends a known chain
 3. **Protocol compliance**: Follows Praos chain extension rules
 
-##### Wire Format
+**Wire Format**
 
 The complete CDDL specification for RbHeaderRelay messages is provided in [Appendix B.2](#b2-mini-protocol-messages).
 
-##### Implementation Considerations
-
-**Equivocation Detection**:
-```
-For each (slot, issuer) pair:
-- Serve first header immediately after pre-validation
-- Serve second header (if different) as equivocation proof
-- Reject requests for additional headers for same (slot, issuer)
-```
-
-**Request Management**:
-- Nodes continuously request headers from peers using the non-blocking variant
-- The protocol supports both blocking (wait for headers) and non-blocking (immediate response) request modes
-
-**Memory Management**:
-- Maintain sliding window of headers based on `maxAge` parameter
-- Index by (slot, issuer) for equivocation detection
-- Prune headers older than `maxAge`
-
-**Timing Requirements**:
-- Network propagation target: Headers must diffuse within $\Delta_\text{hdr}$ slots
-- Pre-serving validation must be fast enough to not delay propagation
-
-##### Security Considerations
-
-The protocol includes the following security measures:
-
-1. **DoS Protection**: Rate limiting of requests per peer
-2. **Spam Prevention**: Cryptographic validation before serving headers  
-3. **Eclipse Attack Mitigation**: Maintain connections to diverse peers
-4. **Withholding Detection**: Monitor header arrival times relative to $\Delta_\text{hdr}$
-
-#### EbRelay Mini-Protocol  
+##### EbRelay Mini-Protocol  
 
 > [!Warning]
 > **TODO**: Protocol specification
 
-#### VoteRelay Mini-Protocol
+##### VoteRelay Mini-Protocol
 
 > [!Warning]
 > **TODO**: Protocol specification
 
-#### EbFetch Mini-Protocol
+##### EbFetch Mini-Protocol
 
 > [!Warning]
 > **TODO**: Protocol specification
 
-#### TxFetch Mini-Protocol
+##### TxFetch Mini-Protocol
 
 > [!Warning]
 > **TODO**: Protocol specification
