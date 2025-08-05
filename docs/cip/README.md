@@ -180,9 +180,11 @@ called $L$:
 
 - Committee members are selected via sortition (lottery based on stake)
 - A committee member votes positively for an EB only if:
+  - The related announcing RB header was received within $\Delta_\text{hdr}$ of the RB creation slot,
+  - No other equivocating RB header was received within $3\Delta_\text{hdr}$ of the RB creation slot,
   - It has received the EB within $L_\text{vote}$ slots from its creation,
-  - The EB corresponds to the EB announced in the latest block in the chain maintained by the party,
-  - The transactions in the EB are a valid extension of the RB (and the corresponding chain) that announced it.
+  - The EB is the one announced by the latest RB in the voter's current chain,
+  - The EB's transactions form a valid extension of the RB that announced it.
 - The stage has two phases: voting period ($L_\text{vote}$) + vote diffusion period ($L_\text{diff}$)
 
 **Step 4: Certification**
