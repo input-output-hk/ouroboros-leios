@@ -560,7 +560,7 @@ Nodes validate the RB and any included EB certificate before adopting the block.
 The node serves the validated RB to downstream peers using standard Praos block distribution mechanisms.
 
 **Step 6: EB Fetching**  
-When an RB announces an EB, nodes discover and fetch the EB content. Only the EB body corresponding to the first EB announcement/RB header received for a given RB creation opportunity is requested, with requests made in freshest-first fashion. The EB contains references to transactions. Nodes do not serve the EB to peers until they have all referenced transactions and can validate the EB.
+When an RB announces an EB, nodes must promptly discover and fetch the EB content to enable voting within the $L_\text{vote}$ window. Only the EB body corresponding to the first EB announcement/RB header received for a given RB creation opportunity is requested, with requests made in freshest-first fashion. The EB contains references to transactions. Nodes do not serve the EB to peers until they have all referenced transactions and can validate the EB.
 
 **Step 7: Transaction Fetching and Validation**  
 Nodes check transaction availability for the EB and fetch any missing transactions from peers. Once all transactions are available, nodes validate the complete EB against the appropriate ledger state, ensuring the transactions form a valid extension of the announcing RB and meet size constraints.
@@ -569,20 +569,16 @@ Nodes check transaction availability for the EB and fetch any missing transactio
 After completing validation and confirming all referenced transactions are available, nodes serve the EB to downstream peers. This guarantees that when a node announces it has an EB, peers can trust that the node possesses all the EB's transactions.
 
 **Step 9: Voting on EBs**  
-Committee members selected through a lottery process (see [Committee Selection](#committee-selection)) vote on valid EBs within a specific time window. A committee member votes positively for an EB only if: (1) the related announcing RB header was received within $\Delta_\text{hdr}$ of the RB creation slot, (2) no other equivocating RB header was received within $3\Delta_\text{hdr}$ of the RB creation slot, (3) it received the EB within the voting window $L_\text{vote}$, (4) the EB matches what was announced in the latest block, and (5) the EB's transactions are valid. This ensures that RB headers corresponding to all certified EBs were received first compared to equivocated ones by all nodes.
+Committee members selected through a lottery process (see [Committee Selection](#committee-selection)) vote on valid EBs within the voting window of $L_\text{vote}$ slots from EB creation. A committee member votes positively for an EB only if: (1) the related announcing RB header was received within $\Delta_\text{hdr}$ of the RB creation slot, (2) no other equivocating RB header was received within $3\Delta_\text{hdr}$ of the RB creation slot, (3) it received the EB within the voting window $L_\text{vote}$, (4) the EB matches what was announced in the latest block, and (5) the EB's transactions form a valid extension of the RB that announced it. This ensures that RB headers corresponding to all certified EBs were received first compared to equivocated ones by all nodes.
 
 **Step 10: Vote Synchronization**  
-Votes propagate through the network, with nodes forwarding at most one vote per committee member per slot. Nodes receive votes from upstream peers, maintaining a running tally for each EB to track progress toward the quorum threshold.
+Votes propagate through the network during the vote diffusion period ($L_\text{diff}$ slots), with nodes forwarding at most one vote per committee member per slot. Nodes receive votes from upstream peers, maintaining a running tally for each EB to track progress toward the quorum threshold.
 
 **Step 11: Certificate Aggregation**  
-When enough votes are collected (reaching the quorum threshold), nodes aggregate them into a compact certificate. This creates a cryptographic proof that the EB is valid and has received sufficient committee approval.
+When enough votes are collected (reaching the quorum threshold) during the vote diffusion period, nodes aggregate them into a compact certificate. This creates a cryptographic proof that the EB is valid and has received sufficient committee approval.
 
 **Step 12: Next Block Production**  
-Block producers creating new RBs include certificates for EBs that meet timing constraints. The producer may also announce a new EB extending their RB. When an EB certificate is included, the referenced EB's transactions become part of the permanent ledger state, increasing the effective throughput for that chain segment.
-
-#### Epoch Boundary Behavior
-
-**Persistent Voter Computation**: At epoch boundaries, nodes must compute the set of persistent voters for the next epoch using the Fait Accompli scheme. This computation uses the stake distribution fixed at the epoch boundary and represents a minimal computational overhead based on current [BLS certificates benchmarks](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#benchmarks-in-rust). The computation must be completed before the next epoch begins to enable voting participation. This represents the primary additional computational requirement for Leios at epoch boundaries.
+Block producers creating new RBs include certificates for EBs where the full stage duration ($L_\text{vote} + L_\text{diff}$ slots) has elapsed since the EB's creation. The producer may also announce a new EB extending their RB. When an EB certificate is included, the referenced EB's transactions become part of the permanent ledger state, increasing the effective throughput for that chain segment.
 
 #### Implementation Considerations
 
@@ -604,6 +600,10 @@ $\text{Mempool} \geq 2 \times S_\text{RB} + S_\text{EB-tx}$
 </div>
 
 When the EB announced by the latest block in the current main chain is received and validated (within $L_\text{vote}$) or when the EB is certified, the EB's transaction contents are added to the beginning of the mempool and the mempool is revalidated. This ensures that EB transactions are not lost if no EB certificate is included in the next RB. When a new RB is created, nodes check if the announced EB is included and remove it from the mempool accordingly. Nodes optimistically include EB transactions upon announcement, revalidating if certification fails.
+
+#### Epoch Boundary Behavior
+
+**Persistent Voter Computation**: At epoch boundaries, nodes must compute the set of persistent voters for the next epoch using the Fait Accompli scheme. This computation uses the stake distribution fixed at the epoch boundary and represents a minimal computational overhead based on current [BLS certificates benchmarks](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#benchmarks-in-rust). The computation must be completed before the next epoch begins to enable voting participation. This represents the primary additional computational requirement for Leios at epoch boundaries.
 
 ### Network
 
