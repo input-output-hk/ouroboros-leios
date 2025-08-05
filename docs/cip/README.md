@@ -546,7 +546,7 @@ Nodes validate the RB and any included EB certificate before adopting the block.
 The node serves the validated RB to downstream peers using standard Praos block distribution mechanisms.
 
 **Step 6: EB Fetching**  
-When an RB announces an EB, nodes discover and fetch the EB content, applying equivocation defense measures. Only the EB body corresponding to the first EB announcement/RB header received for a given RB creation opportunity is requested, with requests made in freshest-first fashion. The EB contains references to transactions rather than the full transaction data. Nodes do not serve the EB to peers until they have all referenced transactions and can validate the EB.
+When an RB announces an EB, nodes discover and fetch the EB content. Only the EB body corresponding to the first EB announcement/RB header received for a given RB creation opportunity is requested, with requests made in freshest-first fashion. The EB contains references to transactions. Nodes do not serve the EB to peers until they have all referenced transactions and can validate the EB.
 
 **Step 7: Transaction Availability Check**  
 Before serving an EB to peers, nodes check which transactions referenced in the EB are already available in their mempool. This ensures that when a node tells peers it has an EB, those peers know the node already has all the EB's transactions. This is critical for efficient transaction request routing.
