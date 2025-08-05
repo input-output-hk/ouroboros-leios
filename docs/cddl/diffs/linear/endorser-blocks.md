@@ -34,8 +34,7 @@ Linear Leios completely replaces the common endorser block structure:
 -   ]
 
 + endorser_block =
-+   [ rb_announced             : hash32                              ; Hash of RB that announced this EB  
-+   , conflicting_txs          : [* transaction_index]              ; Indices of conflicting txs in previous RBs
++   [ conflicting_txs          : [* transaction_index]              ; Indices of conflicting txs in previous RBs
 +   , transaction_references   : [* tx_reference]                   ; Transaction references
 +   ]
 ```

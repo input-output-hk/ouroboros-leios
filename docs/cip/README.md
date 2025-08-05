@@ -1547,8 +1547,7 @@ block_header =
 
 ```cddl
 endorser_block =
-  [ rb_announced             : hash32
-  , conflicting_txs          : [* transaction_index]
+  [ conflicting_txs          : [* transaction_index]
   , transaction_references   : [* tx_reference]
   ]
 
