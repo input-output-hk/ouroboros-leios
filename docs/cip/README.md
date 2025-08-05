@@ -260,7 +260,7 @@ The voting committee is a group of stake pools selected to validate EBs through
 BLS-based vote aggregation. Only EBs that achieve the required quorum ($\tau$) of votes
 are certified and eligible for inclusion in RBs.
 
-Votes are categorized as either **persistent** (selected for the entire epoch)
+Voters are categorized as either **persistent** (selected for the entire epoch)
 or **non-persistent** (selected per EB), following the Fait Accompli sortition
 scheme.
 
@@ -305,8 +305,8 @@ constrained by the network characteristics above:
 
 | Parameter                     |    Symbol     |  Units   | Description                                                            |                   Constraints                   | Rationale                                                     |
 | ----------------------------- | :-----------: | :------: | ---------------------------------------------------------------------- | :---------------------------------------------: | ------------------------------------------------------------- |
-| Voting period length          | $L_\text{vote}$ |   slot   | Duration during which committee members can vote on endorser blocks    | $L_\text{vote} \geq 3\Delta_\text{hdr}$ | Must allow EB diffusion and equivocation detection before voting |
-| Vote diffusion period length | $L_\text{diff}$ |   slot   | Duration for vote propagation after voting period ends                | $L_\text{diff} \geq \Delta_\text{hdr}$ | Must allow votes to propagate before certificate inclusion   |
+| Voting period length          | $L_\text{vote}$ |   slot   | Duration during which committee members can vote on endorser blocks    | $L_\text{vote} > 3\Delta_\text{hdr}$ | Must allow EB diffusion and equivocation detection before voting; should ensure most honest parties receive and process EBs with high probability |
+| Vote diffusion period length | $L_\text{diff}$ |   slot   | Duration for vote propagation after voting period ends                | $L_\text{diff} > \Delta_\text{EB}$ | Must ensure most honest parties receive EBs diffused near end of $L_\text{vote}$ before certificate inclusion |
 | Ranking block max size        | $S_\text{RB}$ |  bytes   | Maximum size of a ranking block                                        |                $S_\text{RB} > 0$                | Limits RB size to ensure timely diffusion                     |
 | Endorser-block referenceable transaction size | $S_\text{EB-tx}$ |  bytes   | Maximum total size of transactions that can be referenced by an endorser block |                $S_\text{EB-tx} > 0$                | Limits total transaction payload to ensure timely diffusion within stage length |
 | Endorser block max size       | $S_\text{EB}$ |  bytes   | Maximum size of an endorser block itself                               |                $S_\text{EB} > 0$                | Limits EB size to ensure timely diffusion; prevents issues with many small transactions |
@@ -327,7 +327,7 @@ _Table 2: Leios Protocol Parameters_
 > 
 > For example, an EB referencing 10,000 transactions of 100 bytes each would have $S_\text{EB-tx} = 1$ MB but the EB itself would be at least 320 KB just for the transaction hashes.
 
-The relationship between the timing parameters is critical for security. In particular, $L_\text{diff}$ must be greater than $\Delta_\text{EB}$ to ensure that endorser blocks are available before certificate inclusion. Additionally, the sum $L_\text{vote} + L_\text{diff}$ must exceed $\Delta_\text{EB}$ to guarantee that EBs are available for both voting and certification.
+The relationship between the timing parameters is critical for security and equivocation defense. In particular, $L_\text{vote} > 3\Delta_\text{hdr}$ ensures proper equivocation detection before voting begins, while $L_\text{diff} > \Delta_\text{EB}$ guarantees that EBs diffused near the end of the voting period reach all honest parties before certificate inclusion. Parameter selection should ensure that if an EB is diffused on time, most honest parties will receive and process it before the end of $L_\text{vote}$, accounting for EB size and worst-case processing time.
 
 ### Specification for votes and certificates
 
@@ -534,7 +534,7 @@ Leios introduces new node behaviors:
 When a stake pool wins block leadership, they simultaneously create two things: a RB and an EB. The RB is a standard Praos block with extended header fields to certify one EB and announce another EB. The EB is a larger block containing additional transaction references. The RB chain continues to be distributed exactly as in Praos, while Leios introduces a separate header distribution mechanism for rapid EB discovery and equivocation detection.
 
 **Step 2: RB Header Synchronization**
-RB headers diffuse via the new [RbHeaderRelay mini-protocol](#rbheaderrelay-mini-protocol) independently of standard ChainSync. This separate mechanism enables rapid EB discovery within the strict timing bound $\Delta_\text{hdr}$. Nodes propagate at most two headers per (slot, issuer) pair to detect equivocation. The header contains the EB hash when the block producer created an EB, allowing peers to discover and fetch the corresponding EB.
+RB headers diffuse via the new [RbHeaderRelay mini-protocol](#rbheaderrelay-mini-protocol) independently of standard ChainSync. This separate mechanism enables rapid EB discovery within the strict timing bound $\Delta_\text{hdr}$ and implements equivocation defense. Headers are diffused freshest-first to facilitate timely EB delivery. Nodes propagate at most two headers per (slot, issuer) pair to detect equivocation while limiting network overhead. The header contains the EB hash when the block producer created an EB, allowing peers to discover and fetch the corresponding EB.
 
 **Step 3: RB Body Fetching**
 After receiving headers, nodes fetch RB bodies via standard BlockFetch protocol. This follows standard Praos mechanisms for retrieving complete ranking blocks after headers are received.
@@ -546,7 +546,7 @@ Nodes validate the RB and any included EB certificate before adopting the block.
 The node serves the validated RB to downstream peers using standard Praos block distribution mechanisms.
 
 **Step 6: EB Fetching**  
-When an RB announces an EB, nodes discover and fetch the EB content. The EB contains references to transactions rather than the full transaction data. Nodes do not serve the EB to peers until they have all referenced transactions and can validate the EB.
+When an RB announces an EB, nodes discover and fetch the EB content, applying equivocation defense measures. Only the EB body corresponding to the first EB announcement/RB header received for a given RB creation opportunity is requested, with requests made in freshest-first fashion. The EB contains references to transactions rather than the full transaction data. Nodes do not serve the EB to peers until they have all referenced transactions and can validate the EB.
 
 **Step 7: Transaction Availability Check**  
 Before serving an EB to peers, nodes check which transactions referenced in the EB are already available in their mempool. This ensures that when a node tells peers it has an EB, those peers know the node already has all the EB's transactions. This is critical for efficient transaction request routing.
@@ -561,7 +561,7 @@ Nodes validate the complete EB including all transactions against the appropriat
 Only after completing validation and ensuring all transactions are available does the node serve the EB to downstream peers. The key principle is that when a node tells peers it has an EB, those peers know the node already has all the EB's transactions.
 
 **Step 11: Voting on EBs**  
-Committee members selected through a lottery process (see [Committee Selection](#committee-selection)) vote on valid EBs within a specific time window. A committee member votes positively for an EB only if: (1) it received the EB within the voting window, (2) the EB matches what was announced in the latest block, and (3) the EB's transactions are valid. Votes are issued after a delay to ensure equivocation detection.
+Committee members selected through a lottery process (see [Committee Selection](#committee-selection)) vote on valid EBs within a specific time window. A committee member votes positively for an EB only if: (1) the related announcing RB header was received within $\Delta_\text{hdr}$ of the RB creation slot, (2) no other equivocating RB header was received within $3\Delta_\text{hdr}$ of the RB creation slot, (3) it received the EB within the voting window $L_\text{vote}$, (4) the EB matches what was announced in the latest block, and (5) the EB's transactions are valid. This ensures that RB headers corresponding to all certified EBs were received first compared to equivocated ones by all nodes.
 
 **Step 12: Vote Synchronization**  
 Votes propagate through the network, with nodes forwarding at most one vote per committee member per slot. Nodes receive votes from upstream peers, maintaining a running tally for each EB to track progress toward the quorum threshold.
@@ -579,8 +579,19 @@ Block producers creating new RBs include certificates for EBs that meet timing c
 > 
 > Including an EB certificate creates a dependency - downstream nodes cannot validate the RB until they receive the referenced EB. This could delay RB propagation beyond Praos timing assumptions ($\Delta_\text{RB}$) if EB propagation is slow. Protocol parameters must ensure $L_\text{diff} > \Delta_\text{EB}$ to prevent this timing violation.
 
-**Mempool Requirements**  
-Mempool capacity must accommodate expanded transaction volume: $\text{Mempool} \geq 2 \times S_\text{RB} + S_\text{EB-tx}$. Nodes optimistically include EB transactions upon announcement, revalidating if certification fails.
+**Ledger Formation**  
+Transactions in RBs and EBs within a chain are required to be non-conflicting, following the same ledger design as Praos with the addition of certificate handling and EB attachment references. In case of a chain switch due to a fork, nodes can skip verifying smart contracts included in certified EBs to accelerate chain adoption while maintaining security guarantees.
+
+**Mempool Design**  
+The mempool follows the same design as current Praos deployment with increased capacity to support both RB and EB production. Mempool capacity must accommodate expanded transaction volume:
+
+<div align="center">
+
+$\text{Mempool} \geq 2 \times S_\text{RB} + S_\text{EB-tx}$
+
+</div>
+
+When the EB announced by the latest block in the current main chain is received and validated (within $L_\text{vote}$) or when the EB is certified, the EB's transaction contents are added to the beginning of the mempool and the mempool is revalidated. This ensures that EB transactions are not lost if no EB certificate is included in the next RB. When a new RB is created, nodes check if the announced EB is included and remove it from the mempool accordingly. Nodes optimistically include EB transactions upon announcement, revalidating if certification fails.
 
 ### Network
 
