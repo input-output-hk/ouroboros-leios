@@ -1,0 +1,2 @@
+Simulator,Variant,Network,Bandwidth,Stage length,EB rate,Max EB size,Tx size,Throughput,Tx start [s],Tx stop [s],Sim stop [s],Tx validation
+Rust,linear-with-tx-references,topology-v2,50 Mb/s,10 slot/stage,2.5 EB/stage,10 MB/EB,1500 B/Tx,0.200 TxMB/s,60,960,1200,15 ms/Tx

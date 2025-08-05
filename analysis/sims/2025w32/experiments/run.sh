@@ -91,6 +91,6 @@ zcat sim.log.gz \
   
 pigz -p 3 -9f {cpus,lifecycle,receipts,resources,sizes}.csv
 
-cat case.csv
-
 ansifilter stdout | grep -E '^ INFO (praos|leios|network): ' > summary.txt
+
+cat case.csv
