@@ -203,6 +203,7 @@ conditions are met:
 
 - RB' directly extends the target RB in the blockchain, and
 - The creation slot of RB' and the end of the voting phase (RB creation timestamp + $L_\text{vote}$) differ by at least $L_\text{diff}$ slots. This ensures the EB is available to all honest nodes with good probability.
+- The certificate passes all validation checks detailed in [Certificate Validation](#certificate-validation).
 
 This **conditional inclusion** maintains Praos safety guarantees while achieving
 higher throughput when network timing permits. When included:
@@ -407,6 +408,20 @@ Where m = persistent voters, n = total committee size.
 **Size Characteristics**: Under 10 kB for realistic Cardano mainnet stake
 distributions (assuming 80% persistent, 20% non-persistent voters).
 
+#### Certificate Validation
+
+When an RB includes an EB certificate, nodes must perform the following validation steps before accepting the block.
+
+**CDDL Format Compliance**: The certificate must conform to the `leios_certificate` CDDL format specified in [Appendix B.1](#b1-core-data-structures). All field types, sizes, and structural requirements defined in the CDDL specification must be satisfied, including proper encoding of the election identifier, endorser block hash, voter collections, and signature components.
+
+**Cryptographic Validation**: The `aggregate_vote_sig` must be a valid BLS12-381 G1 signature on the `endorser_block_hash`. When present, the optional `aggregate_elig_sig` must correctly aggregate eligibility proofs for non-persistent voters. Each eligibility signature in the `nonpersistent_voters` map must prove sortition eligibility for its corresponding pool. All BLS operations must use BLS12-381 curve parameters as specified in the [BLS certificates specification](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#bls-certificate-scheme).
+
+**Stake and Eligibility Verification**: Persistent voters must have valid stake in the current epoch via the Fait Accompli scheme, while non-persistent voters must pass local sortition tests using the election identifier as randomness. The total stake weight must be calculated using formulas from the [BLS certificates specification](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#stake-aggregation), and the aggregate stake must exceed the quorum threshold of at least 60% of total eligible stake.
+
+**EB Consistency Checks**: The certificate's `endorser_block_hash` must match the EB content hash announced in the predecessor RB, and the certificate must correspond to an EB announced by an RB in the current chain. When TxsByRef is enabled, all transactions referenced in the EB must be available for validation.
+
+Validation failure at any step must result in RB rejection.
+
 #### Performance Requirements
 
 <div align="center">
@@ -540,7 +555,7 @@ RB headers diffuse via the new [RbHeaderRelay mini-protocol](#rbheaderrelay-mini
 After receiving headers, nodes fetch RB bodies via standard BlockFetch protocol. This follows standard Praos mechanisms for retrieving complete ranking blocks after headers are received.
 
 **Step 4: RB and EB Certificate Validation**
-Nodes validate the RB and any included EB certificate before adopting the block. This includes checking that any EB certificate corresponds to a properly announced EB and meets timing requirements. The validation verifies cryptographic signatures and ensures the certificate is linked to the correct voting round.
+Nodes validate the RB and any included EB certificate before adopting the block. This includes cryptographic verification of certificates and ensuring they correspond to properly announced EBs. The complete validation procedure is detailed in [Certificate Validation](#certificate-validation).
 
 **Step 5: RB Serving**  
 The node serves the validated RB to downstream peers using standard Praos block distribution mechanisms.
@@ -571,6 +586,10 @@ When enough committee votes are collected (reaching the quorum threshold), nodes
 
 **Step 14: Next Block Production**  
 Block producers creating new RBs include certificates for EBs that meet timing constraints. The producer may also announce a new EB extending their RB. When an EB certificate is included, the referenced EB's transactions become part of the permanent ledger state, increasing the effective throughput for that chain segment.
+
+#### Epoch Boundary Behavior
+
+**Persistent Voter Computation**: At epoch boundaries, nodes must compute the set of persistent voters for the next epoch using the Fait Accompli scheme. This computation uses the stake distribution fixed at the epoch boundary and represents a minimal computational overhead based on current [BLS certificates benchmarks](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#benchmarks-in-rust). The computation must be completed before the next epoch begins to enable voting participation. This represents the primary additional computational requirement for Leios at epoch boundaries.
 
 #### Implementation Considerations
 
