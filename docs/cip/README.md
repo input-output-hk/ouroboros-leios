@@ -1524,8 +1524,7 @@ This appendix contains the complete CDDL specifications for all Leios protocol m
    ]
 
 block_header =
-   [
-     header_body              : block_header_body
+   [ header_body              : block_header_body
    , body_signature           : kes_signature
    ]
 
