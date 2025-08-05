@@ -194,7 +194,7 @@ A voting committee of stake pools validates the EB. Committee members are [selec
   3. The EB is the one announced by the latest RB in the voter's current chain,
   4. The EB's transactions form a **valid** extension of the RB that announced it.
 
-where $L_\text{vote}$ is a protocol parameter of number of slots.
+where $L_\text{vote}$ is a protocol parameter represented by a number of slots.
 
 #### Step 4: Certification
 
@@ -214,10 +214,11 @@ The certificate for an EB may be included in the body of a new ranking block `RB
   1. The certificate is valid as defined in [Certificate Validation](#certificate-validation).
   1. The creation slot of `RB'` is at least $L_\text{vote} + L_\text{diff}$ after creation slot of RB.
   
-where $L_\text{diff}$ is a protocol parameter of number of slots.
+where $L_\text{diff}$ is a protocol parameter represented by a number of slots.
 
 > [!WARNING]
 > TBD: Validity rule with mutual exclusiveness of certificate and transactions in RB?
+> 
 > 4. No transactions are embedded in the RB body
 
 This **conditional inclusion** ensures transaction availability to honest nodes with good probability while achieving higher throughput, but also maintains Praos safety guarantees network timing does not permit inclusion. When included:
@@ -233,7 +234,7 @@ The protocol extends Praos with three main elements:
 
 #### Ranking Blocks (RBs)
 
-RBs are Praos blocks extended to support Leios by optionally announcing EBs in their headers and embedding EB certificates in their bodies:
+RBs are Praos blocks extended to support Leios by optionally announcing EBs in their headers and embedding EB certificates in their bodies.
 
 1. **Header additions**:
    - `announced_eb` (optional): Hash of the EB created by this block producer
@@ -242,33 +243,59 @@ RBs are Praos blocks extended to support Leios by optionally announcing EBs in t
 2. **Body additions**:
    - `eb_certificate` (optional): certificate proving EB availability & validity
 
-When an RB header includes a `certified_eb` field, the corresponding body must also include a matching `eb_certificate`. Conversely, an `eb_certificate` can only be included when there is a `certified_eb` field referencing the EB being certified. These fields enable RBs to announce new EBs and include certificates for previously announced EBs, maintaining the conditional inclusion property that ensures safety.
+**Inclusion Rules**: When an RB header includes a `certified_eb` field, the corresponding body must include a matching `eb_certificate`. Conversely, an `eb_certificate` can only be included when a `certified_eb` field references the EB being certified.
 
-In addition to including transactions directly, transactions from certified EBs should be considered a logical part of RB.
+Transactions from certified EBs are included in the ledger alongside direct RB transactions.
 
 #### Endorser Blocks (EBs)
 
-> [!WARNING]
-> What is an EB hash? what is getting hashed? What is an EB?
-> 
-> EB: (no header/body separation. The hash of the EB should match the one in EBannounced)
->  - RBannounced: hash
->  - ConflictingTxs: list // a list of the indices of conflicting txs in previous RBs 
->  - Body: tx list
+EBs are produced by the same stake pool that created the corresponding announcing RB and reference additional transactions to increase throughput beyond what can be included directly in the RB.
 
+**EB Structure**: EBs have a simplified structure without header/body separation:
+- `transaction_references`: List of transaction references (hashes)
 
-EBs are produced by the same stake pool that created the corresponding announcing RB. They serve to reference additional transactions, increasing throughput beyond what can be included directly in the RB. When an EB is announced in an RB header via the `announced_eb` field, a voting period begins as described in [Voting Committee and Certificates](#voting-committee-and-certificates). Only RBs that directly extend the announcing RB are eligible to certify the announced EB by including a certificate.
+When an EB is announced in an RB header via the `announced_eb` field, a voting period begins as described in [Votes and Certificates](#votes-and-certificates). Only RBs that directly extend the announcing RB are eligible to certify the announced EB by including a certificate.
 
-The wire format for endorser blocks is specified in [Appendix B.1](#b1-core-data-structures).
+The hash referenced in RB headers (`announced_eb` and `certified_eb` fields) is computed from the complete EB structure and serves as the unique identifier for the EB.
 
-#### Voting Committee and Certificates
+#### Votes and Certificates
 
-The voting committee is a group of stake pools selected to validate EBs through BLS-based vote aggregation. Only EBs that achieve the required quorum ($\tau$) of votes are certified and eligible for inclusion in RBs.  Voters are categorized as either **persistent** (selected for the entire epoch) or **non-persistent** (selected per EB), following the Fait Accompli sortition scheme.
+Leios employs a BLS-based voting and certificate scheme where committee members cast votes that reference specific EBs, which are then aggregated into compact certificates for inclusion in RBs.
 
-The complete technical specification is detailed in [Specification for votes and certificates](#specification-for-votes-and-certificates).
+The implementation meets the [requirements for votes and certificates](#appendix-a-requirements-for-votes-and-certificates) specified in Appendix A. Alternative schemes satisfying these requirements could be substituted, enabling unified voting infrastructure across Ouroboros Leios, Ouroboros Peras, and other protocols.
 
-> [!WARNING]
-> What are we voting on? what is a vote referencing?
+To run Leios-enabled nodes that can vote on EBs and produce both RBs and EBs, stake pool operators must register one additional BLS12-381 key alongside their existing VRF and KES keys. This single BLS key is included in the operational certificate and serves all Leios voting functions.
+
+**Committee Structure**: Two types of voters validate EBs, balancing security, decentralization, and efficiency:
+- **Persistent Voters**: Selected once per epoch using Fait Accompli sortition, vote in every election, identified by compact identifiers
+- **Non-persistent Voters**: Selected per EB via local sortition with Poisson-distributed stake-weighted probability
+
+This dual approach prevents linear certificate size growth by leveraging stake distribution characteristics, enabling faster certificate diffusion while maintaining broad participation.
+
+**Vote Structure**: All votes include the `endorser_block_hash` field that uniquely identifies the target EB:
+- **Persistent votes**:
+  - `election_id`: Identifier for the voting round
+  - `persistent_voter_id`: Epoch-specific pool identifier
+  - `endorser_block_hash`: Hash of the target EB
+  - `vote_signature`: BLS signature
+- **Non-persistent votes**:
+  - `election_id`: Identifier for the voting round
+  - `pool_id`: Pool identifier
+  - `eligibility_signature`: BLS proof of sortition eligibility
+  - `endorser_block_hash`: Hash of the target EB
+  - `vote_signature`: BLS signature
+
+<a id="certificate-validation" href="#certificate-validation">**Certificate Validation**</a>: When an RB includes an EB certificate, nodes must validate the following before accepting the block:
+
+1. **CDDL Format Compliance**: Certificate structure matches the specification format defined in [Appendix B.1](#b1-core-data-structures)
+2. **Cryptographic Signatures**: All BLS signatures are valid
+3. **Voter Eligibility**: 
+   - Persistent voters must have been selected as such by the Fait Accompli scheme for the current epoch
+   - Non-persistent voters must provide valid sortition proofs
+4. **Stake Verification**: Total voting stake meets the required quorum threshold
+5. **EB Consistency**: Certificate references the correct EB hash announced in the preceding RB
+
+Detailed specifications, performance, and benchmarks are available in the [BLS certificates specification](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md).
 
 > [!NOTE]
 > **Vote Bundling**
@@ -290,9 +317,9 @@ These are observed properties of the network topology and node capabilities:
 
 | Characteristic            |       Symbol        | Units | Description                                                 |          Typical Range          | Notes                                              |
 | ------------------------- | :-----------------: | :---: | ----------------------------------------------------------- | :-----------------------------: | -------------------------------------------------- |
-| RB diffusion time         | $\Delta_\text{RB}$  | slot  | Observed upper bound for ranking block (RB) diffusion and adoption to all nodes     |            2-6 slots            | Depends on network topology and conditions         |
+| RB diffusion time         | $\Delta_\text{RB}$  | slot  | Observed upper bound for RB diffusion and adoption to all nodes     |            2-6 slots            | Depends on network topology and conditions         |
 | RB header diffusion time  | $\Delta_\text{hdr}$ | slot  | Observed time for RB headers to reach all nodes                 |     $\leq \Delta_\text{RB}$     | Usually faster than full block diffusion           |
-| EB diffusion time         | $\Delta_\text{EB}$  | slot  | Observed upper bound for endorser block (EB) diffusion and adoption to all nodes    |            $\geq \Delta_\text{RB}$            | Slower than RBs due to potentially larger size          |
+| EB diffusion time         | $\Delta_\text{EB}$  | slot  | Observed upper bound for EB diffusion, transaction retrieval, and ledger state building at all nodes    |            $\geq \Delta_\text{RB}$            | Slower than RBs due to larger size and additional processing requirements          |
 
 _Table 1: Network Characteristics_
 
@@ -330,152 +357,20 @@ _Table 2: Leios Protocol Parameters_
 > 
 > For example, an EB referencing 10,000 transactions of 100 bytes each would have $S_\text{EB-tx} = 1$ MB but the EB itself would be at least 320 KB just for the transaction hashes.
 
-The relationship between the timing parameters is critical for security and equivocation defense. In particular, $L_\text{vote} > 3\Delta_\text{hdr}$ ensures proper equivocation detection before voting begins, while $L_\text{diff} > \Delta_\text{EB}$ guarantees that EBs diffused near the end of the voting period reach all honest parties before certificate inclusion. Parameter selection should ensure that if an EB is diffused on time, most honest parties will receive and process it before the end of $L_\text{vote}$, accounting for EB size and worst-case processing time.
     
-> [!WARNING]
-> Is $L_\text{diff} > \Delta_\text{EB}$ realistic and not over-constrained? Full propagation of EBs would include having all referenced txs and built a ledger state (such that we could build on top of it analogous to $\Delta_\text{RB}$). This, however, would very likely be quite long and not feasible within $L_\text{diff}$! Maybe requiring EB propagation with L_vote + L_diff + Delta_RB is enough?
-
-### Specification for votes and certificates
-
-Leios requires a voting and certificate scheme to validate endorser blocks. This
-specification defines a BLS-based implementation that meets the protocol
-requirements with concrete performance characteristics. The detailed requirements
-for the voting and certificate scheme are specified in
-[Appendix A: Requirements for votes and certificates](#appendix-a-requirements-for-votes-and-certificates).
-
-> Scheme -> Requirements -> SPO registration -> Validation
-    
-#### Committee Selection
-
-**Persistent Voters**: Selected once per epoch using the
-[Fait Accompli scheme](https://iohk.io/en/research/library/papers/fait-accompli-committee-selection-improving-the-size-security-tradeoff-of-stake-based-committees/).
-These pools vote in every election during the epoch.
-
-**Non-persistent Voters**: Selected per EB via local sortition based on the
-election identifier. The probability that a pool with stake fraction $σ$
-receives $k$ votes follows:
-
-$$
-\mathcal{P}(k) := \frac{(n \cdot \sigma)^k \cdot e^{- n \cdot \sigma}}{k!}
-$$
-
-**Committee Size**: Minimum 500 voters required for security, with quorum
-threshold of at least 60% of total stake.
-
-#### Key Registration
-
-Stake pools register BLS keys with proof-of-possession:
-
-- **Public Key**: 96 bytes (BLS12-381 with compression)
-- **Proof of Possession**: 96 bytes
-- **Pool ID**: 28 bytes
-- **KES Signature**: 448 bytes
-- **Total Registration Size**: 668 bytes
-
-Keys are registered as part of operational certificates and do not require
-periodic rotation.
-    
-> [!Warning]
-> TODO: SPOs have to register new key for becoming voter    
-
-#### Vote Structure
-
-**Persistent Votes** (90 bytes):
-
-- Election ID: 8 bytes
-- EB hash: 32 bytes
-- Pool identifier: 2 bytes
-- Vote signature: 48 bytes
-
-**Non-persistent Votes** (164 bytes):
-
-- Election ID: 8 bytes
-- EB hash: 32 bytes
-- Pool ID: 28 bytes
-- Eligibility signature: 48 bytes
-- Vote signature: 48 bytes
-
-Each vote is submitted individually for a specific endorser block.
-
-#### Certificate Structure
-
-Certificates aggregate votes into compact proofs, with size formula:
-
-$$
-\text{certificate bytes} = 136 + \left\lceil \frac{m}{8} \right\rceil + 76 \times (n - m)
-$$
-
-Where m = persistent voters, n = total committee size.
-
-**Components**:
-
-- Election ID and EB hash: 40 bytes
-- Persistent voter bitset: ⌈m/8⌉ bytes
-- Non-persistent voter IDs: 28×(n-m) bytes
-- Eligibility proofs: 48×(n-m) bytes
-- Aggregate signatures: 96 bytes
-
-**Size Characteristics**: Under 10 kB for realistic Cardano mainnet stake
-distributions (assuming 80% persistent, 20% non-persistent voters).
-
-#### Certificate Validation
-
-When an RB includes an EB certificate, nodes must perform the following validation steps before accepting the block.
-
-**CDDL Format Compliance**: The certificate must conform to the `leios_certificate` CDDL format specified in [Appendix B.1](#b1-core-data-structures). All field types, sizes, and structural requirements defined in the CDDL specification must be satisfied, including proper encoding of the election identifier, endorser block hash, voter collections, and signature components.
-
-**Cryptographic Validation**: The `aggregate_vote_sig` must be a valid BLS12-381 G1 signature on the `endorser_block_hash`. When present, the optional `aggregate_elig_sig` must correctly aggregate eligibility proofs for non-persistent voters. Each eligibility signature in the `nonpersistent_voters` map must prove sortition eligibility for its corresponding pool. All BLS operations must use BLS12-381 curve parameters as specified in the [BLS certificates specification](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#bls-certificate-scheme).
-
-**Stake and Eligibility Verification**: Persistent voters must have valid stake in the current epoch via the Fait Accompli scheme, while non-persistent voters must pass local sortition tests using the election identifier as randomness. The total stake weight must be calculated using formulas from the [BLS certificates specification](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#stake-aggregation), and the aggregate stake must exceed the quorum threshold of at least 60% of total eligible stake.
-
-**EB Consistency Checks**: The certificate's `endorser_block_hash` must match the EB content hash announced in the predecessor RB, and the certificate must correspond to an EB announced by an RB in the current chain.
-
-Validation failure at any step must result in RB rejection.
-
-#### Performance Requirements
-
-<div align="center">
-<a name="table-3"></a>
-
-| **Operation Type**      | **Persistent Vote** | **Non-persistent Vote** |
-|------------------------ |:------------------:|:----------------------:|
-| Generation              | 135 μs             | 280 μs                 |
-| Verification            | 670 μs             | 1.4 ms                 |
-
-_Table 3: Vote operation times for persistent and non-persistent voters_
-</div>
-
-<div align="center">
-<a name="table-4"></a>
-
-| **Operation Type**      | **Certificate** |
-|------------------------ |:--------------:|
-| Generation              | ~90 ms         |
-| Verification            | ~130 ms        |
-
-_Table 4: Certificate operation times_
-</div>
-
-#### Certificate Size Analysis
-
-The following shows certificate characteristics for Cardano mainnet Epoch 535
-stake distribution:
-
-<div align="center">
-
-| **Persistent Voters**                                    | **Certificate Size**                                             |
-| -------------------------------------------------------- | ---------------------------------------------------------------- |
-| ![Fait-accompli voters](images/fait-accompli-voters.svg) | ![Fait-accompli certificate size](images/fait-accompli-cert.svg) |
-
-_Certificate size scaling with committee size for realistic stake distribution_
-
-</div>
-
-
-> [!NOTE]
-> **Voting Implementation**
+> [!CAUTION]
+> **EB Propagation Timing Constraint**
 > 
-> The detailed BLS-based voting and certificate scheme, including key registration, Fait Accompli sortition, and local sortition algorithms, is specified in the [BLS certificates specification](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md) and includes a [reference implementation](https://github.com/input-output-hk/ouroboros-leios/tree/main/crypto-benchmarks.rs).
+> The constraint $L_\text{diff} > \Delta_\text{EB}$ may be challenging to satisfy in practice. As defined, $\Delta_\text{EB}$ represents the time for complete EB diffusion and adoption, which includes:
+> - Receiving the EB structure itself
+> - Obtaining all referenced transactions
+> - Building the updated ledger state
+> 
+> This full propagation process is analogous to $\Delta_\text{RB}$ and may require significantly more time than $L_\text{diff}$ allows. If this constraint cannot be met, nodes may receive ranking blocks with EB certificates before they have the necessary EB data to validate those blocks, potentially disrupting the Praos security assumptions about block propagation timing.
+> 
+> The feasibility of this constraint depends on EB sizes, network topology, and the specific requirements for what constitutes "EB adoption" in the security argument.
+
+
 
 ### Node Behavior
 
