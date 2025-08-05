@@ -1,55 +1,54 @@
 ---
 Authors: Sebastian Nagel
 Status: Draft
-Version: 0.1
-Last Updated: 2025-07-17
-Next Review: 2025-09-10
+Version: 0.2
+Last Updated: 2025-08-05
+Next Review: 2025-10-05
 ---
+
 # Leios Consensus Upgrade - Threat Model
 
-A threat model for the Leios consensus change for Cardano. This was created by roughly following the [OWASP threat modeling process](https://owasp.org/www-community/Threat_Modeling_Process).
+A threat model for the Linear Leios consensus change for Cardano. This reflects the simplified "Linear Leios" variant described in the CIP draft, which eliminates Input Blocks (IBs) and produces Endorser Blocks (EBs) alongside Ranking Blocks (RBs) by the same block producer.
 
 See also [the threat model section in Leios Technical Report #1](./technical-report-1.md#threat-model) and more [comments on attack surface in Leios Technical Report #2](./technical-report-2.md#notes-on-the-leios-attack-surface).
 
 ## System Overview
 
-> [!NOTE]
-> The described system here is the heavily simplified EB-only variant of Leios. Whenever we update this, reflect on existing assets, threats and mitigations, as well as add new ones accordingly.
-
 ### Description
-Leios is an overlay protocol on top of Ouroboros Praos that enhances transaction throughput by introducing Endorser Blocks (EBs) alongside regular Praos blocks (Ranking Blocks - RBs). The system maintains backward compatibility at the client interface while introducing new responsibilities for stake pools.
+
+Leios is an overlay protocol on top of Ouroboros Praos that enhances transaction throughput by allowing block producers to create larger Endorser Blocks (EBs) alongside standard Praos blocks (enhanced as Ranking Blocks - RBs). The system maintains backward compatibility while introducing new responsibilities for stake pools.
 
 ### Key Components
 
 #### Entities
-- **Mempool**: List of valid, pending transactions that could be added to the chain. Limited in size
-- **Ranking Block (RB)**: Standard Praos block enhanced with a Leios certificate. Limited in size
-- **Endorser Block (EB)**: New block type that references transactions for inclusion. May be substantially bigger than Praos blocks (currently on mainnet ~88 kB) with sizes around ~640 kB for 20k transaction references
+
+- **Mempool**: List of valid, pending transactions that could be added to the chain. Expanded capacity to support both RB and EB production
+- **Ranking Block (RB)**: Standard Praos block enhanced with Leios certificate and EB announcement fields. Limited to current mainnet size (~88 kB)
+- **Endorser Block (EB)**: New block type that references transactions for inclusion. May be substantially larger (~640 kB for 20k transaction references)
 - **Leios Certificate**: Cryptographic proof about aggregated stake-weighted votes on EB validity and transaction availability
-- **EB Lottery**: Separate (to Praos) VRF lottery for EB creation rights
 
 #### Network Protocols
-- **Transaction Submission Protocol**: Existing protocol to announce and fetch transactions, served upstream
+- **Transaction Submission Protocol**: Existing protocol, unchanged except for expanded mempool capacity, served upstream
 - **Chain Sync Protocol**: Existing protocol for tracking block headers of currently selected chain, served downstream
 - **Block Fetch Protocol**: Existing protocol for downloading blocks, served downstream
 - **EB Announcement Protocol**: New protocol to gossip EB existence, served downstream
-- **EB Fetch Protocol**: New protocol for retrieving EBs, served downstream
-- **Transaction Fetch Protocol**: New protocol for retrieving endorsed transactions, served downstream
+- **EB Fetch Protocol**: New protocol for retrieving EBs on-demand, served downstream
+- **Transaction Fetch Protocol**: New protocol for retrieving transactions referenced by EBs, served downstream
 - **Vote Diffusion Protocol**: New protocol for propagating votes on EBs, served downstream
 
 #### Roles
-- **Block Producers**: Produce blocks, now enhanced with EB creation and voting responsibilities
-- **Relays**: Participate in transaction and block diffusion
-- **Clients**: Submit transactions and observe the chain / ledger state evolving, ideally maintain backward compatibility and may largely unaware of Leios mechanics
+- **Block Producers**: Produce RBs and simultaneously create EBs, participate in voting
+- **Relays**: Participate in transaction, block, and vote diffusion
+- **Clients**: Submit transactions and observe ledger state, maintain backward compatibility
 
 #### System Flow
-1. Clients submit transactions, which get added to the mempool and diffuse through the Cardano network
-1. Stake pools create EBs based on VRF eligibility (parameterizable stage length)
-1. EBs are announced and propagated through the network
-1. A committee of nodes (> 500 by stake) vote on EB validity and transaction availability
-1. If a quorum of voting stake (> 60%) approves, a certificate is created
-1. Certificates are included in the next available RB (every ~20 seconds)
-1. Missing transactions are fetched on-demand when EBs are processed
+1. **Block Production**: When eligible, stake pools simultaneously create an RB (announcing an EB) and the corresponding EB
+2. **EB Distribution**: EBs are discovered via RB headers and fetched by nodes
+3. **Committee Validation**: Selected voting committee validates EBs
+4. **Certification**: EBs achieving quorum (>60% voting stake) become certified
+5. **Chain Inclusion**: Certificates are included in subsequent RBs, making referenced transactions part of the ledger
+
+See also the [CIP draft](https://github.com/input-output-hk/ouroboros-leios/pull/396) for a more detailed specification.
 
 ## Assets to Protect
 
