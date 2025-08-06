@@ -8,7 +8,7 @@ Next Review: 2025-10-05
 
 # Leios Consensus Upgrade - Threat Model
 
-A threat model for the Linear Leios consensus change for Cardano. This reflects the simplified "Linear Leios" variant described in the CIP draft, which eliminates Input Blocks (IBs) and produces Endorser Blocks (EBs) alongside Ranking Blocks (RBs) by the same block producer.
+A threat model for the Leios consensus change for Cardano. This reflects the simplified "Linear Leios" variant described in the CIP draft, which eliminates Input Blocks (IBs) and produces Endorser Blocks (EBs) alongside Ranking Blocks (RBs) by the same block producer.
 
 See also [the threat model section in Leios Technical Report #1](./technical-report-1.md#threat-model) and more [comments on attack surface in Leios Technical Report #2](./technical-report-2.md#notes-on-the-leios-attack-surface).
 
@@ -138,7 +138,7 @@ Notable threats to the system that could impact assets.
 **Likelihood**: LOW - Reduced attack surface due to coupled RB/EB production model, though possible when there are multiple eligible producers (slot / height battles).
 
 **Impact**:
-- **Throughput**: Different SPOs create conflicting EBs, causing vote splits and potential certification failures. This leads to throughput reduction when EBs fail certification, though system recovers in subsequent stages. This can occur both from deliberate mempool partitioning, but also naturally with "short forks" in the praos chain where nodes select different chains.
+- **Throughput**: Different SPOs create conflicting EBs, causing vote splits and potential certification failures. This leads to throughput reduction when EBs fail certification, though system recovers in subsequent stages. This can occur both from deliberate mempool partitioning, but also naturally with "short forks" in the Praos chain where nodes select different chains.
 - **Resources**: SPO's network bandwidth and compute resources wasted on processing, propagating, and voting on conflicting EBs that cannot all be certified
 - **Trust**: Demonstrates network manipulation capability, though doesn't break core transaction guarantees
 
@@ -406,7 +406,7 @@ Notable threats to the system that could impact assets.
 **Impact**:
 - **Resource Waste**: Network processes all conflicting transactions trying to spend the honey pot output, but only one pays fees at a time. Highest costs are from perpetual storage when conflicting transactions are submitted concurrently.
 - **Throughput**: Reduces available throughput by amount of transactions attracted by the honey pot.
-- **Artifical traffic / low tps**: While this artifical traffic will account into the systems throughput, typically measured in transactions per second (tps), the attacker could require these transactions to be big and computationally costly, resulting in a relatively low tps addition.
+- **Artificial traffic / low tps**: While this artificial traffic will account into the systems throughput, typically measured in transactions per second (tps), the attacker could require these transactions to be big and computationally costly, resulting in a relatively low tps addition.
 
 **Assets Affected**: High Throughput, Operational Sustainability
 
@@ -415,7 +415,7 @@ Notable threats to the system that could impact assets.
 > [!WARN]
 > Is this a threat or rather part of the Blockchain Safety asset?
 
-**Description**: Delaying praos blocks due to long ledger state building (too many txs), impacting liveness and safety.
+**Description**: Delaying Praos blocks due to long ledger state building (too many txs), impacting liveness and safety.
 
 **Impact**:
 - **Chain Quality**: Increased likelihood of chain forks and lower chain quality
