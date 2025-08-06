@@ -196,27 +196,25 @@ Notable threats to the system that could impact assets.
 **Assets Affected**: Operational Sustainability, High Throughput
 
 #### T4: EB Withholding
-**Description**: Eligible stake pools deliberately  they are entitled to create, reducing network throughput and potentially enabling censorship.
+**Description**: Eligible stake pools deliberately not announce or certify EBs when producing RBs they are entitled to create reducing network throughput.
 
 **Prerequisites**:
-- Stake pool eligibility for EB creation (via VRF lottery)
-- Economic incentive to withhold (e.g., competing EB producers, censorship goals)
+- Stake pool eligibility for block production
+- Economic incentive to withhold (e.g. censorship goals, reduced operational costs)
 
 **Attack Vector**:
-1. Win EB creation eligibility through normal VRF process or possibly enhanced by grinding
-2. Either create EB but not propagate it, or simply abstain from creation
-3. May selectively withhold EBs containing specific transactions (censorship)
-4. Could coordinate with other eligible pools to maximize impact
+1. Win EB creation eligibility through normal VRF process, possibly enhanced by grinding
+2. Create RB that does not announce an EB or don't include an already certified EB
 
-**Cost**: LOW - Opportunity cost of foregone rewards from EB creation
+**Cost**: LOW - No additional cost other than being a block producer, indirect opportunity cost of not included transaction fees
+
+**Likelihood**: HIGH - Every block producer gets two opportunities to ignore EBs
 
 **Impact**:
-- **Throughput**: Reduced transaction processing capacity when EBs are withheld
-- **Censorship**: Potential to delay specific transactions if coordinated
-- **Temporary**: System recovers with next EB opportunity or alternative producers
-- **Limited**: Cannot permanently block transactions due to multiple eligibility opportunities
+- **Throughput**: Reduced transaction processing capacity for this and next block opportunity. However, system may recover with next block production opportunity.
+- **Resources**: Bandwidth and compute spent on voting wasted and needs to be redone.
 
-**Assets Affected**: High Throughput, Decentralization
+**Assets Affected**: High Throughput
 
 #### T5: Double Voting
 **Description**: Nodes with delegated stake votes on multiple EBs that reference conflicting sets of transactions.
@@ -333,26 +331,27 @@ Notable threats to the system that could impact assets.
 
 **Assets Affected**: Operational Sustainability, Decentralization
 
-#### T8: Transaction Availability Attack
-**Description**: Attacker creates EBs referencing unavailable transactions to waste network resources and disrupt certification.
+#### T8: Transaction Withholding
+**Description**: Attacker creates EBs referencing non-existing transactions to waste network resources and disrupt certification.
 
 **Prerequisites**:
-- EB creation eligibility (via VRF)
-- Control over transaction propagation to specific network segments
-- Coordination between transaction submission and EB creation
+- Block production eligibility (RB + EB creation)
+- Ability to generate valid, but non-existing transaction references
 
 **Attack Vector**:
-1. Submit transactions to limited network segments
-2. Create EB referencing these transactions before full propagation
-3. Voting nodes cannot verify transaction availability, preventing certification
-4. Forces futile transaction fetching attempts across network
+1. Win EB creation eligibility through normal VRF process, possibly enhanced by grinding
+1. Create valid but non-existent transaction references
+1. Create EB referencing these unavailable transactions and announce it in RB
+1. Voting nodes cannot verify transaction availability, preventing certification
 
-**Cost**: LOW - Minimal beyond normal EB creation costs
+**Cost**: LOW - No additional cost other than being a block producer, indirect opportunity cost of not included transaction fees
+
+**Likelihood**: MEDIUM - Requires block production eligibility but straightforward to execute
 
 **Impact**:
-- **Resource Waste**: Network bandwidth consumed fetching unavailable transactions
-- **Throughput**: Temporary reduction when EBs fail certification
-- **Operational**: SPO resources wasted on failed validation attempts
+- **Resource Waste**: Network bandwidth consumed attempting to fetch non-existent transactions
+- **Throughput**: Temporary reduction when EBs fail certification due to unavailable transactions
+- **Operational**: SPO resources wasted on failed validation and fetching attempts
 
 **Assets Affected**: High Throughput, Operational Sustainability
 
@@ -440,7 +439,7 @@ Notable threats to the system that could impact assets.
 |-------------------------------|--------|------------|------------|----------|
 | T1: Mempool Partitioning      | HIGH   | LOW        | HIGH       | P1       |
 | T2: Eclipse Attack            | HIGH   | MEDIUM     | HIGH       | P1       |
-| T8: Transaction Availability  | HIGH   | MEDIUM     | HIGH       | P1       |
+| T8: Transaction Withholding   | HIGH   | MEDIUM     | HIGH       | P1       |
 | T10: Hard Fork Coordination   | HIGH   | MEDIUM     | HIGH       | P1       |
 | T3: Vote Flooding             | MEDIUM | HIGH       | MEDIUM     | P2       |
 | T5: Double Voting             | LOW    | LOW        | LOW        | P4       |
