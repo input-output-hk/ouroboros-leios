@@ -138,7 +138,7 @@ Notable threats to the system that could impact assets.
 **Likelihood**: LOW - Reduced attack surface due to coupled RB/EB production model, though possible when there are multiple eligible producers (slot / height battles).
 
 **Impact**:
-- **Throughput**: Different SPOs create conflicting EBs, causing vote splits and potential certification failures. This leads to throughput reduction when EBs fail certification, though system recovers in subsequent stages
+- **Throughput**: Different SPOs create conflicting EBs, causing vote splits and potential certification failures. This leads to throughput reduction when EBs fail certification, though system recovers in subsequent stages. This can occur both from deliberate mempool partitioning, but also naturally with "short forks" in the praos chain where nodes select different chains.
 - **Resources**: SPO's network bandwidth and compute resources wasted on processing, propagating, and voting on conflicting EBs that cannot all be certified
 - **Trust**: Demonstrates network manipulation capability, though doesn't break core transaction guarantees
 
@@ -631,6 +631,24 @@ Notable threats to the system that could impact assets.
 **Validation**: Integration testing with various client versions and protocol combinations
 
 **Cost**: MEDIUM - Testing infrastructure and compatibility analysis
+
+### M11: No Conflicting Transactions
+**Addressing threats**: T1, T12
+
+**Decision**: MITIGATE
+
+**Control type**: By design
+
+**Implementation**:
+- Protocol design inherently prevents conflicting transactions from reaching the chain
+- No permanent storage of conflicting transactions unlike concurrent variants
+- Ledger detects conflicts within an EB before voting
+- Endorsed transactions are used to update the mempool view
+- Data diffusion limits the number of conflicting transactions and does not amplify deliberately conflicting transaction propagation
+
+**Validation**: Ensure mempool and data diffusion behavior; integration tests using conflicting transactions confirm bounded load on network and compute
+
+**Cost**: NONE - Built into protocol design
 
 ## Review and Maintenance
 
