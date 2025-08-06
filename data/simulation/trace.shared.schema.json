@@ -48,6 +48,7 @@
         "GenRB",
         "GenVote",
         "ValEB",
+        "ValEH",
         "ValIB",
         "ValIH",
         "ValRB",
@@ -99,16 +100,16 @@
     },
     "GeneratedEndorserBlock": {
       "properties": {
-        "id": {
-          "type": "string"
-        },
-        "input_blocks": {
+        "endorser_blocks": {
           "items": {
             "$ref": "#/definitions/BlockRef"
           },
           "type": "array"
         },
-        "endorser_blocks": {
+        "id": {
+          "type": "string"
+        },
+        "input_blocks": {
           "items": {
             "$ref": "#/definitions/BlockRef"
           },
@@ -131,9 +132,9 @@
         }
       },
       "required": [
+        "endorser_blocks",
         "id",
         "input_blocks",
-        "endorser_blocks",
         "pipeline",
         "producer",
         "size_bytes",

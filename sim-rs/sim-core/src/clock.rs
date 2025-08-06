@@ -2,7 +2,7 @@ use std::{
     cmp::Reverse,
     future::Future,
     pin::Pin,
-    sync::{atomic::AtomicUsize, Arc},
+    sync::{Arc, atomic::AtomicUsize},
     task::{Context, Poll},
     time::Duration,
 };
@@ -52,7 +52,7 @@ pub struct Clock {
     timestamp_resolution: Duration,
     time: Arc<AtomicTimestamp>,
     waiters: Arc<AtomicUsize>,
-    tasks: Arc<AtomicUsize>,
+    tasks: TaskInitiator,
     tx: mpsc::UnboundedSender<ClockEvent>,
 }
 
@@ -61,7 +61,7 @@ impl Clock {
         timestamp_resolution: Duration,
         time: Arc<AtomicTimestamp>,
         waiters: Arc<AtomicUsize>,
-        tasks: Arc<AtomicUsize>,
+        tasks: TaskInitiator,
         tx: mpsc::UnboundedSender<ClockEvent>,
     ) -> Self {
         Self {
@@ -95,7 +95,7 @@ pub struct ClockBarrier {
     id: usize,
     timestamp_resolution: Duration,
     time: Arc<AtomicTimestamp>,
-    tasks: Arc<AtomicUsize>,
+    tasks: TaskInitiator,
     tx: mpsc::UnboundedSender<ClockEvent>,
 }
 
@@ -105,11 +105,15 @@ impl ClockBarrier {
     }
 
     pub fn start_task(&self) {
-        self.tasks.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+        self.tasks.start_task();
     }
 
     pub fn finish_task(&self) {
         let _ = self.tx.send(ClockEvent::FinishTask);
+    }
+
+    pub fn task_initiator(&self) -> TaskInitiator {
+        self.tasks.clone()
     }
 
     pub fn wait_until(&mut self, timestamp: Timestamp) -> Waiter {
@@ -138,6 +142,20 @@ impl ClockBarrier {
             rx,
             done,
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct TaskInitiator {
+    tasks: Arc<AtomicUsize>,
+}
+
+impl TaskInitiator {
+    pub fn new(tasks: Arc<AtomicUsize>) -> Self {
+        Self { tasks }
+    }
+    pub fn start_task(&self) {
+        self.tasks.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
     }
 }
 

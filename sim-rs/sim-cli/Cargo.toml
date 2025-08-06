@@ -1,9 +1,9 @@
 [package]
 name = "sim-cli"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 default-run = "sim-cli"
-rust-version = "1.82"
+rust-version = "1.88"
 
 [dependencies]
 anyhow = "1"

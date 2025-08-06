@@ -2,9 +2,9 @@ use std::time::Duration;
 
 use anyhow::Result;
 use clap::Parser;
-use rand::{rngs::ThreadRng, Rng};
+use rand::{Rng, rngs::ThreadRng};
 
-use super::utils::{distribute_stake, GraphBuilder, RawNodeConfig};
+use super::utils::{GraphBuilder, RawNodeConfig, distribute_stake};
 
 #[derive(Debug, Parser)]
 pub struct SimplifiedArgs {
@@ -129,7 +129,7 @@ pub fn simplified(args: &SimplifiedArgs) -> Result<GraphBuilder> {
 mod tests {
     use sim_core::config::Topology;
 
-    use super::{simplified, SimplifiedArgs};
+    use super::{SimplifiedArgs, simplified};
 
     #[test]
     fn should_generate_valid_graph() {

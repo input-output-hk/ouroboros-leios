@@ -4,8 +4,8 @@ use anyhow::Result;
 use clap::Parser;
 use events::EventMonitor;
 use figment::{
-    providers::{Format as _, Yaml},
     Figment,
+    providers::{Format as _, Yaml},
 };
 use sim_core::{
     clock::ClockCoordinator,
@@ -19,7 +19,7 @@ use tokio::{
 };
 use tokio_util::sync::CancellationToken;
 use tracing::{level_filters::LevelFilter, warn};
-use tracing_subscriber::{layer::SubscriberExt as _, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::{EnvFilter, layer::SubscriberExt as _, util::SubscriberInitExt};
 
 mod events;
 
@@ -126,11 +126,14 @@ async fn main() -> Result<()> {
     let ctrlc_token = token.clone();
     ctrlc::set_handler(move || {
         ctrlc_token.cancel();
-        if let Some(sink) = ctrlc_sink.take() {
-            let _ = sink.send(());
-        } else {
-            warn!("force quitting");
-            process::exit(0);
+        match ctrlc_sink.take() {
+            Some(sink) => {
+                let _ = sink.send(());
+            }
+            _ => {
+                warn!("force quitting");
+                process::exit(0);
+            }
         }
     })?;
 
@@ -162,7 +165,7 @@ mod tests {
     use anyhow::Result;
     use std::fs;
 
-    use crate::{read_config, Args};
+    use crate::{Args, read_config};
 
     #[test]
     fn should_parse_topologies() -> Result<()> {

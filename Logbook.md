@@ -1,5 +1,211 @@
 # Leios logbook
 
+## 2025-08-04
+
+### Experiment varying Plutus validation time
+
+
+The Jupyter notebook [analysis/sims/2025w31c/analysis.ipynb](analysis/sims/2025w31c/analysis.ipynb) varies the CPU time used by Plutus phase 2 validation in Linear Leios at 100 TPS for a 6-vCPU node.
+
+- Simulation with 6-vCPU nodes supported doubling the Plutus per-transaction budget on Linear Leios.
+- Simulations at a sixfold increase in the Plutus per-transaction budget failed: nodes bogged down validating transactions and cannot put them in new EBs.
+- EB could likely handle 5000 Gstep of Plutus computation in Linear Leios, which is 250x the Praos per-block budget.
+    - This could support a handful of Plutus transactions with a 20x greater Plutus budget.
+    - Alternatively every Plutus transaction could have its budget increased by 50%.
+    - However, intentionally late diffusion of Plutus-heavy transactions could interfere with EB adoption.
+- These results are uncertain due to the variability in measured Plutus CPU costs: there is quite a bit of variability in the CPU time actually used by a Plutus script given its execution steps.
+
+## 2025-08-01
+
+### Comparison of Haskell and Rust simulations of Linear Leios
+
+The Juypter notebook [analysis/sims/2025w31b/analysis.ipynb](analysis/sims/2025w31b/analysis.ipynb) compares the early draft of the Haskell simulator for Linear Leios to the more mature Rust simulator. Discrepancies related to CPU usage, network usage, and vote diffusion [are being investigated](https://github.com/input-output-hk/ouroboros-leios/pull/466).
+
+### Rust simulation
+
+Added equivocation voting delay to Linear Leios 
+
+Implementation of an attack on Linear Leios, where EB diffusion is delayed until the last mometn
+
+## 2025-07-30
+
+### Experiment varying stage length in "No IBs" Leios
+
+We varied the stage-length protocol parameter of "No IBs" Leios from 5 to 12 slots/stage in the experiment [analysis/sims/2025w31/analysis.ipynb](analysis/sims/2025w31/analysis.ipynb). Results indicate that the settlement time is not strongly affected by this parameter within this rage of values. Note that larger stage lengths result in less frequent voting.
+
+## 2025-07-28
+
+### Experiments on effect of network topology
+
+We compared Linear Leios simulation results on the 750-node mini-mainnet vs the 10,000-node pseudo-mainnet networks in the Rust simulator. Results indicate that the smaller network is slightly more stressful to the protocol than the larger network, but in general there are no substantial differences between simulation results for the two networks. The same findings and conclusions would result from using either network. See [ouroboros-leios/analysis/sims/2025w30b/analysis.ipynb](ouroboros-leios/analysis/sims/2025w30b/analysis.ipynb) for more details.
+
+## 2025-07-25
+
+### CIP
+
+- completed review of protocol overview, components flow and parameters
+- completed integration of votes and certificates specification
+- drafted node behehavior & network (mini protocols)
+
+### SN on throughput metrics
+
+I want to propose a change in our terminology:
+- Only use transactions per second (`Tx/s`) in introductory or conclusive statements, ideally always with a notion of transaction size; e.g. "throughput of `100 Tx/s` with `1400 B` transactions"
+- Otherwise use transaction bytes per second `TxB/s` and correspondingly `TxkB/s` or `TxMB/s` (or `TxkiB/s` or `TMiB/s` if we prefer that?)
+
+- Examples:
+  - Our simulations of `100 Tx/s` with `1400 B` txs would then be: `140 TxkB/s`
+  - The simulation brian did just above with `1000 Tx/s` and `300 B` txs would then be: `300 TxkB/s`
+  - The estimated break-even figure of `36 Tx/s` of average sized txs would be: `50.4 TxkB/s`
+  
+- This will greatly improve comparability: the two simulations are only a 3x difference in throughput demand and the break even is not a fixed transaction number, but could also be met with more small or less big transactions.
+
+- This will make nominal (irrespective of protocol variant; without overhead) storage demands and network demands very clear:
+  - Storage nominal:
+    - `140 TxkB/s * 1 day ~ 12 GB/day`
+    - `1.4 TxMB/s * 1 day ~ 120 GB/day`
+  - Network nominal / worst case (send everything always to 10 peers):
+    - `140 TxKB/s * 10 hot peers = 11.2 Mb/s`
+    - `1.4 TxMB/s * 10 hot peers = 112 Mb/s`
+
+- One caveat is that the EB only variants work / not work also based on the number of transactions per second because of limited number of references in a bounded EB size, but that is more as a protocol variant detail.
+
+### Revised analysis of block and transaction validation times
+
+We completed the basic analysis of block and transaction validation times for Cardano `mainnet` since Epoch 350. Results differ significantly from the preliminary results because it was discovered that `db-analyser` output is not reliable when it is run on a machine that has other CPU load: the new analysis is based on a clean dataset that was run on an otherwise idle machine.
+
+Findings:
+
+1. The `db-analyser` tool can be used to measure the Cardno block-application time, either including or not including verifying transaction signatures and running Plutus scripts.
+2. Ideally, `db-analyser` could be modified to report CPU times for phase 1 and phase 2 validation on a per-transaction basis.
+3. The output of this tool is quite noisy and does not include enough of the explanatory variable for predicting CPU times for transactions or blocks.
+4. The missing explanatory variables (size of UTxO set, number of inputs, number of outputs, etc.) can be extracted from the ledger or `cardano-db-sync`.
+5. For transaction signature verification and Plutus script execution, the median times for blocks are . . .
+    - 428.4 μs/tx
+    - 211.5 μs/kB
+    - Jointly via a linear model, 148.1 μs/tx plus 114.1 μs/kB.
+    - Jointly via a linear model, 137.5 μs/tx plus 60.2 μs/kB plus 585.2 μs/Gstep, with a Lapace-distributed error having location 0 μs and scale 1250 μs.
+6. The results above are not very good fits and are quite sensitive to the cutoff for discarding outliers.
+7. The noise in the data and the uncertainty in predictions make the above values unsuitable for estimating individual transactions but suitable for bulk estimates of many blocks.
+8. A more sophisticated double general linear model could be used to generate artificial transaction workloads.
+9. The CPU-timing parameters in the default configuration for Leios simulations could be reduced based on this work.
+
+See [the Jupyter notebook](analysis/timings/ReadMe.ipynb) for evidence and details.
+
+### Linear Leios at 1000 TPS
+
+The Jupyter notebook [analysis/sims/2025w30/analysis.ipynb](analysis/sims/2025w30/analysis.ipynb) provides evidence that Linear Leios with transaction references and Stracciatella can support throughputs of 1000 tx/s at 300 B/tx. Linear Leios with transactions embedded in the EBs cannot support such throughput.
+
+## Rust simulation
+
+Documentation of current implementation and variants
+
+## 2025-07-21
+
+### Generic analysis script for Leios simulator output
+
+See [analysis/trace-processor/ReadMe.md](analysis/trace-processor/ReadMe.md) for instructions on using the R script [analysis/trace-processor/generic-analysis.R](analysis/trace-processor/generic-analysis.R), which generates a set of diagnostic plots from the output of `leios-simulation-trace-processor`.
+
+## 2025-07-19
+
+### Preliminary analysis of block and transaction validation times
+
+We undertook basic preliminary analysis of block and transaction validation times for Cardano `mainnet` since Epoch 350.
+
+Findings:
+
+1. The `db-analyser` tool can be used to measure the Cardno block-application time, either including or not including verifying transaction signatures and running Plutus scripts.
+2. The output of this tool is quite noisy and does not include enough of the explanatory variable for predicting CPU times for transactions or blocks.
+3. The missing explanatory variables (size of UTxO set, number of inputs, number of outputs, etc.) can be extracted from the ledger or `cardano-db-sync`.
+4. For transaction signature verification and Plutus script execution, the median times are . . .
+    - 0.53 ms/tx
+    - 0.29 ms/kB
+    - Jointly via a linear model, 0.066 ms/tx plus 0.221 ms/kB.
+5. The noise in the data and the uncertainty in predictions make the above values unsuitable for estimating individual transactions but suitable for bulk estimates of many blocks.
+6. A more sophisticated double general linear model could be used to generate artificial transaction workloads.
+
+See [the Jupyter notebook](analysis/timings/preliminary.ipynb) for evidence and details.
+
+### Study of timestep effects in simulators
+
+We compared the 1000 TPS Full Leios simulation results (Rust) at two time resolutions, 0.100 ms and 0.025 ms. No significant differences in results were found. This means that we can safely run simulations at the coarser time step; such enable greater parallelism in the simulator and shorter wallclock times. See [the Jupyter notebook](analysis/sims/2025w27/analysis.ipynb) for comparisons, evidence, and details.
+
+## 2025-07-18
+
+### 100 TPS experiment for Stracciatella and Linear Leios
+
+Experiments using the Rust simulation demonstrated the viability of Stracciatella and Linear Leios at 100 TPS if appropriate stage lengths and maximum EB sizes are chosen.
+
+- Variants
+    - Linear Leios, linear
+    - Linear Leios with tx references, linear-with-tx-references
+    - Stracciatella, full-without-ibs
+- 100 tx/s for first 900 seconds
+- 1400 B/tx
+
+Findings:
+
+1. 5 slot/stage is too short for Linear Leios at 100 tx/s.
+2. Including transactions in EBs (instead of references) results in congestion and delays at 100 tx/s.
+3. 10 MB/EB is sufficient for 100 tx/s but 5 MB/EB is not.
+4. EB-sortition unluckiness in Stracciatella can lengthen the transaction lifecycle, but this could be remedied by increasing the EB production rate.
+5. CPU and network usage peak high when transactions are included in EBs.
+6. Caveat: this conclusion may change when better transaction validation times are used in the simulator configuration.
+
+Artifacts:
+
+- [Slides](analysis/sims/2025w29b/ReadMe.pdf)
+- [Jupyter notebook](analysis/sims/2025w29b/analysis)
+- [Configurations](analysis/sims/2025w29b/)
+
+### Rust simulation
+
+Revised Linear Leios model in response to analysis: in particular we discovered that sufficient throughput depends on only partially validating EBs before propagating them to peers.
+
+Reimplemented Stracciatella as a separate simulation, as an exercise in finding deviations from the spec. Found and fixed several.
+
+## 2025-07-17
+
+### Linear Leios experiment
+
+A comprehensive set of simulations for the Linear Leios variant was completed, aiming to map out the protocol's performance under varies loads and comparing several versions of the variant to Stracciatella.
+
+- [Slides](analysis/sims/2025w29/summary.pdf)
+- Jupyter notebooks
+    - [Linear Leios with embedded transactions](analysis/sims/2025w29/linear.ipynb)
+    - [Linear Leios with transaction references](analysis/sims/2025w29/txrefs.ipynb)
+    - [Linear Leios without transactions](analysis/sims/2025w29/notxs.ipynb)
+    - [Stracciatella](analysis/sims/2025w29/stracciatella.ipynb)
+
+## 2025-07-11
+
+### Stracciatella experiment
+
+The Stracciatella variant of Leios (i.e., no IBs, tx refrences in EBs, and a two-stage pipeline) is analyzed in the Jupyter notebook [analysis/sims/2025w28/analysis-stracciatella.ipynb](analysis/sims/2025w28/analysis-stracciatella.ipynb). Findings follow:
+
+- 1000+ TPS is attainable.
+    - Congestion does appear at this throughput.
+- 5 slot/stage performs less well but appears to scale better than 8 slot/stage.
+- Spatial efficiency is better than 95%.
+- Time to ledger is better than two minutes (subject to RB randomness, of course).
+- Only the tiniest fraction of transactions don't reach the ledger, likely due to EBs expiring before the reach an RB.
+- Network usage is slightly heavy.
+- CPU usage seems suspiciously light.
+
+### Throughput efficiency of Linear Leios
+
+The Linear Leios variant's formulation is straightforward enough that its probability of including a certified EB on chain can be computed analytically.
+
+The plots below show the *throughput* (defined as the size of the RBs and of the RB-certified EBs) relative to Praos (left) and the *throughput efficiency* (defined as the size of the RBs and of the RB-certified EBs, divided by the size of all RBs and of all EBs). Recall that not all EBs have their certificates appear in Praos blocks. Any inefficiency affects throughput and network costs but not permanent-storage costs. These results show that Linear Leios could achieve approximately 500 times the throughput of Praos at an over 50% efficiency in use of network resources. (That 500 times the throughput of Praos would exceed 1000 historically typical transactions per second.)
+
+| Throughput                                                          | Throughput efficiency                                                          |
+|---------------------------------------------------------------------|--------------------------------------------------------------------------------|
+| ![Throughput of Linear Leios](analysis/linear-leios-throughput.svg) | ![Throughput efficiency of Linear Leios](analysis/linear-leios-efficiency.svg) |
+
+### Rust simulation
+
+Implemented a first pass at Linear Leios.
+
 ## 2025-07-10
 
 ### Trace verifier performance
@@ -31,6 +237,40 @@ Applying 25681 actions
 
   Productivity  98.1% of total user, 98.1% of total elapsed
 ```
+## 2025-07-08
+
+### Small tx experiment
+
+Here are the findings from the completed small-transaction, high-throughput experiment.
+
+- 1000 tx/s with 300 B/tx is feasible in Leios variants
+- Time vs space tradeoff
+    - `full-with-ib-references` uses space more efficiently than `full-without-ibs`
+    - `full-without-ibs` has shorter transaction lifecycle than `full-with-ib-references`
+- `full-without-ib` loses some transactions, likely due to the aggressive pruning of the memory pool
+- 2 CPU cores are sufficient
+- Network usage is modest
+
+Supporting material:
+
+- Slides: [analysis/sims/2025w28/ReadMe.pdf](analysis/sims/2025w28/ReadMe.pdf)
+- Juypter notebook: [analysis/sims/2025w28/analysis.ipynb](analysis/sims/2025w28/analysis.ipynb)
+
+## 2025-07-04
+
+### 1000 TPS experiment
+
+A 1000 TPS experiment of basic transactions (300-byte non-Plutus transactions) was completed to demonstrate the viability of Leios at high throughput. See [analysis/sims/2025w27/analysis.ipynb](analysis/sims/2025w27/analysis.ipynb).
+
+## 2025-07-03
+
+### Notes on analysis of attacks
+
+[PR #445](https://github.com/input-output-hk/ouroboros-leios/pull/445) adds to the second technical report a definition of terms related to the Leios attack surface, a taxonomy of potential impacts, and a description of several major categories of attack.
+
+## Rust simulation
+
+Finished adding support for IB equivocations.
 
 ## 2025-07-02
 
@@ -65,7 +305,7 @@ Applying 25681 actions
 
   Productivity  97.7% of total user, 97.7% of total elapsed
 ```
-Without the parameter specificing the minium heap size:
+Without the parameter specifying the minimum heap size:
 ```bash
 yves@nucli$ nix run .#leios-trace-verifier -- +RTS -s -RTS --trace-file sim-rs-late.out --config-file data/simulation/config.default.yaml --topology-file leios-trace-verifier/examples/topology.yaml --idSut 0
 Applying 25681 actions

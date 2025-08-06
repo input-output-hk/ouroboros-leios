@@ -76,6 +76,21 @@ export interface Config {
    * If false, RBs will only contain a cert.
    */
   "praos-fallback-enabled": boolean;
+
+  // Linear Leios specific configuration
+  /**
+   * How long the EB voting stage is allowed to last.
+   * Should be more than 3x leios-header-diffusion-time-ms.
+   * Matches L_vote from the paper.
+   */
+  "linear-vote-stage-length-slots": bigint;
+
+  /**
+   * How long after the EB voting stage are votes allowed to diffuse.
+   * Matches L_diff from the paper.
+   */
+  "linear-diffuse-stage-length-slots": bigint;
+
   // Transaction Configuration
   /** Only supported by Rust simulation. */
   "tx-generation-distribution": Distribution;
@@ -153,8 +168,15 @@ export interface Config {
   "eb-generation-probability": number;
   "eb-generation-cpu-time-ms": number;
   "eb-validation-cpu-time-ms": number;
+  "eb-header-validation-cpu-time-ms": number;
+  "eb-body-validation-cpu-time-ms-constant": number;
+  "eb-body-validation-cpu-time-ms-per-byte": number;
   "eb-size-bytes-constant": bigint;
   "eb-size-bytes-per-ib": bigint;
+  "eb-body-avg-size-bytes": bigint;
+  /** For stracciatella: when creating a new EB, have it reference transactions from a previous EB */
+  "eb-include-txs-from-previous-stage": boolean
+
   /** Only supported by Haskell simulation. */
   "eb-diffusion-strategy": DiffusionStrategy;
   /** Only supported by Haskell simulation. */
@@ -198,6 +220,7 @@ export interface Config {
   "vote-generation-probability": number;
   "vote-generation-cpu-time-ms-constant": number;
   "vote-generation-cpu-time-ms-per-ib": number;
+  "vote-generation-cpu-time-ms-per-tx": number;
   "vote-validation-cpu-time-ms": number;
   "vote-threshold": bigint;
   "vote-bundle-size-bytes-constant": bigint;
@@ -218,6 +241,13 @@ export interface Config {
   "cert-validation-cpu-time-ms-per-node": number;
   "cert-size-bytes-constant": bigint;
   "cert-size-bytes-per-node": bigint;
+
+  // Attacks
+  /**
+   * Configuration for a "late EB" attack,
+   * where nodes deliberately withhold EBs until near the end of the voting phase.
+   */
+  "late-eb-attack"?: LateEBAttackConfig | null;
 }
 
 export type CleanupPolicies = "all" | CleanupPolicy[];
@@ -277,7 +307,11 @@ export enum LeiosVariant {
   /** Full Leios Without IBs: EBs reference TXs directly, as well as other EBs */
   FullWithoutIbs = "full-without-ibs",
   /** Full Leios With TX References: IBs only contain references to TXs instead of the whole body */
-  FullWithTXReferences = "full-with-tx-references"
+  FullWithTXReferences = "full-with-tx-references",
+  /** Linear Leios: Leios with as little concurrency as possible. */
+  Linear = "linear",
+  /** Linear Leios, but blocks include transaction references instead of full TXs */
+  LinearWithTxReferences = "linear-with-tx-references",
 }
 
 export enum MempoolSamplingStrategy {
@@ -285,4 +319,15 @@ export enum MempoolSamplingStrategy {
   OrderedById = "ordered-by-id",
   /** Include transactions in random order. */
   Random = "random",
+}
+
+/**
+ * Configuration for a "late EB" attack,
+ * where nodes deliberately withhold EBs until near the end of the voting phase.
+ */
+export interface LateEBAttackConfig {
+  /** The set of stake pools which are participating in the attack. */
+  "attacker-nodes": string[],
+  /** How long the attackers will wait before diffusing their EBs */
+  "propagation-delay-ms": number,
 }

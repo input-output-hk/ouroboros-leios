@@ -1,10 +1,10 @@
 use std::collections::BTreeSet;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Parser;
-use rand::{seq::IndexedRandom as _, Rng as _};
+use rand::{Rng as _, seq::IndexedRandom as _};
 
-use crate::strategy::utils::{distribute_stake, GraphBuilder, RawNodeConfig, Weight};
+use crate::strategy::utils::{GraphBuilder, RawNodeConfig, Weight, distribute_stake};
 
 #[derive(Debug, Parser)]
 pub struct RandomGraphArgs {
@@ -100,7 +100,7 @@ fn track_connections(connected: &mut BTreeSet<usize>, graph: &GraphBuilder, from
 mod tests {
     use sim_core::config::Topology;
 
-    use super::{random_graph, RandomGraphArgs};
+    use super::{RandomGraphArgs, random_graph};
 
     #[test]
     fn should_generate_valid_graph() {

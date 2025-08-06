@@ -1,15 +1,17 @@
 use std::{
     collections::BTreeMap,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     },
     time::Duration,
 };
 
 use tokio::sync::{mpsc, oneshot};
 
-use super::{timestamp::AtomicTimestamp, Clock, Timestamp};
+use crate::clock::TaskInitiator;
+
+use super::{Clock, Timestamp, timestamp::AtomicTimestamp};
 
 pub struct ClockCoordinator {
     timestamp_resolution: Duration,
@@ -41,7 +43,7 @@ impl ClockCoordinator {
             self.timestamp_resolution,
             self.time.clone(),
             self.waiter_count.clone(),
-            self.tasks.clone(),
+            TaskInitiator::new(self.tasks.clone()),
             self.tx.clone(),
         )
     }
@@ -61,7 +63,7 @@ impl ClockCoordinator {
                     if waiters[actor].replace(Waiter { until, done }).is_some() {
                         panic!("An actor has somehow managed to wait twice");
                     }
-                    running -= 1;
+                    running = running.checked_sub(1).unwrap();
                     if let Some(timestamp) = until {
                         queue.entry(timestamp).or_default().push(actor);
                     }
@@ -89,7 +91,8 @@ impl ClockCoordinator {
                     }
                 }
                 ClockEvent::FinishTask => {
-                    self.tasks.fetch_sub(1, Ordering::AcqRel);
+                    let prev_tasks = self.tasks.fetch_sub(1, Ordering::AcqRel);
+                    assert!(prev_tasks != 0, "Finished a task that was never started");
                     assert!(
                         running != 0,
                         "All tasks were completed while there were no actors to complete them"
@@ -171,7 +174,7 @@ mod tests {
         {
             let wait1 = actor1.wait_until(t1);
             assert_eq!(poll!(wait1), Poll::Pending); // the wait is pending
-                                                     // and now it goes out of scope and gets dropped
+            // and now it goes out of scope and gets dropped
         }
         assert_eq!(poll!(&mut run_future), Poll::Pending); // try advancing time
         assert_eq!(poll!(&mut run_future), Poll::Pending); // try advancing time

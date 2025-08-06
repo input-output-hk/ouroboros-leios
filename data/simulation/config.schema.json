@@ -72,8 +72,32 @@
       },
       "type": "object"
     },
+    "LateEBAttackConfig": {
+      "description": "Configuration for a \"late EB\" attack,\nwhere nodes deliberately withhold EBs until near the end of the voting phase.",
+      "properties": {
+        "attacker-nodes": {
+          "description": "The set of stake pools which are participating in the attack.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "propagation-delay-ms": {
+          "description": "How long the attackers will wait before diffusing their EBs",
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
     "LeiosVariant": {
-      "enum": ["short", "full", "full-without-ibs", "full-with-tx-references"],
+      "enum": [
+        "short",
+        "full",
+        "full-without-ibs",
+        "full-with-tx-references",
+        "linear",
+        "linear-with-tx-references"
+      ],
       "type": "string"
     },
     "LogNormalDistribution": {
@@ -143,6 +167,17 @@
       "$ref": "#/definitions/CleanupPolicies",
       "description": "Only supported by Haskell simulation."
     },
+    "eb-body-avg-size-bytes": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "number"
+    },
+    "eb-body-validation-cpu-time-ms-constant": {
+      "type": "number"
+    },
+    "eb-body-validation-cpu-time-ms-per-byte": {
+      "type": "number"
+    },
     "eb-diffusion-max-bodies-to-request": {
       "additionalProperties": false,
       "description": "Only supported by Haskell simulation.",
@@ -170,6 +205,13 @@
     },
     "eb-generation-probability": {
       "type": "number"
+    },
+    "eb-header-validation-cpu-time-ms": {
+      "type": "number"
+    },
+    "eb-include-txs-from-previous-stage": {
+      "description": "For stracciatella: when creating a new EB, have it reference transactions from a previous EB",
+      "type": "boolean"
     },
     "eb-max-age-for-relay-slots": {
       "additionalProperties": false,
@@ -265,6 +307,10 @@
       "description": "The total number of shards available for IBs.\nMust be divisible by ib_shard_group_count.\n\nOnly supported by Rust simulation.",
       "type": "number"
     },
+    "late-eb-attack": {
+      "$ref": "#/definitions/LateEBAttackConfig",
+      "description": "Configuration for a \"late EB\" attack,\nwhere nodes deliberately withhold EBs until near the end of the voting phase."
+    },
     "leios-header-diffusion-time-ms": {
       "description": "The expected time it takes a header to fully diffuse across the network.\nThis is Δhdr from the Leios paper.",
       "type": "number"
@@ -301,6 +347,18 @@
     "leios-vote-send-recv-stages": {
       "description": "Determines whether a Leios pipeline has separate Vote (Send) and Vote (Recv) stages.\nIf this is set to `true`, it is recommended to set `leios-stage-active-voting-slots`\nto be equal to `leios-stage-length-slots`.\n\nOnly supported by Haskell simulation.",
       "type": "boolean"
+    },
+    "linear-diffuse-stage-length-slots": {
+      "additionalProperties": false,
+      "description": "How long after the EB voting stage are votes allowed to diffuse.\nMatches L_diff from the paper.",
+      "properties": {},
+      "type": "number"
+    },
+    "linear-vote-stage-length-slots": {
+      "additionalProperties": false,
+      "description": "How long the EB voting stage is allowed to last.\nShould be more than 3x leios-header-diffusion-time-ms.\nMatches L_vote from the paper.",
+      "properties": {},
+      "type": "number"
     },
     "multiplex-mini-protocols": {
       "description": "Only supported by Haskell simulation.",
@@ -433,6 +491,9 @@
       "type": "number"
     },
     "vote-generation-cpu-time-ms-per-ib": {
+      "type": "number"
+    },
+    "vote-generation-cpu-time-ms-per-tx": {
       "type": "number"
     },
     "vote-generation-probability": {

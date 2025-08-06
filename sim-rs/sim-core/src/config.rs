@@ -1,11 +1,11 @@
 use std::{
     collections::{BTreeMap, HashSet, VecDeque},
     fmt::Display,
-    sync::{atomic::AtomicU64, Arc},
+    sync::{Arc, atomic::AtomicU64},
     time::Duration,
 };
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -72,6 +72,8 @@ pub struct RawParameters {
     pub leios_mempool_aggressive_pruning: bool,
     pub praos_chain_quality: u64,
     pub praos_fallback_enabled: bool,
+    pub linear_vote_stage_length_slots: u64,
+    pub linear_diffuse_stage_length_slots: u64,
 
     // Transaction configuration
     pub tx_generation_distribution: DistributionConfig,
@@ -113,14 +115,20 @@ pub struct RawParameters {
     pub eb_generation_probability: f64,
     pub eb_generation_cpu_time_ms: f64,
     pub eb_validation_cpu_time_ms: f64,
+    pub eb_header_validation_cpu_time_ms: f64,
+    pub eb_body_validation_cpu_time_ms_constant: f64,
+    pub eb_body_validation_cpu_time_ms_per_byte: f64,
     pub eb_size_bytes_constant: u64,
     pub eb_size_bytes_per_ib: u64,
     pub eb_max_age_slots: u64,
     pub eb_referenced_txs_max_size_bytes: u64,
+    pub eb_body_avg_size_bytes: u64,
+    pub eb_include_txs_from_previous_stage: bool,
 
     // Vote configuration
     pub vote_generation_probability: f64,
     pub vote_generation_cpu_time_ms_constant: f64,
+    pub vote_generation_cpu_time_ms_per_tx: f64,
     pub vote_generation_cpu_time_ms_per_ib: f64,
     pub vote_validation_cpu_time_ms: f64,
     pub vote_threshold: u64,
@@ -134,6 +142,9 @@ pub struct RawParameters {
     pub cert_validation_cpu_time_ms_per_node: f64,
     pub cert_size_bytes_constant: u64,
     pub cert_size_bytes_per_node: u64,
+
+    // attacks,
+    pub late_eb_attack: Option<RawLateEBAttackConfig>,
 }
 
 #[derive(Debug, Copy, Clone, Deserialize, PartialEq, Eq)]
@@ -151,6 +162,8 @@ pub enum LeiosVariant {
     Full,
     FullWithoutIbs,
     FullWithTxReferences,
+    Linear,
+    LinearWithTxReferences,
 }
 
 #[derive(Debug, Copy, Clone, Deserialize, PartialEq, Eq)]
@@ -165,6 +178,13 @@ pub enum RelayStrategy {
 pub enum MempoolSamplingStrategy {
     OrderedById,
     Random,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct RawLateEBAttackConfig {
+    pub attacker_nodes: Vec<String>,
+    pub propagation_delay_ms: f64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -315,7 +335,8 @@ impl From<RawTopology> for Topology {
 pub(crate) struct CpuTimeConfig {
     pub tx_validation: Duration,
     pub rb_generation: Duration,
-    pub rb_validation_constant: Duration,
+    pub rb_head_validation: Duration,
+    pub rb_body_validation_constant: Duration,
     pub rb_validation_per_byte: Duration,
     pub ib_generation: Duration,
     pub ib_head_validation: Duration,
@@ -323,7 +344,11 @@ pub(crate) struct CpuTimeConfig {
     pub ib_body_validation_per_byte: Duration,
     pub eb_generation: Duration,
     pub eb_validation: Duration,
+    pub eb_header_validation: Duration,
+    pub eb_body_validation_constant: Duration,
+    pub eb_body_validation_per_byte: Duration,
     pub vote_generation_constant: Duration,
+    pub vote_generation_per_tx: Duration,
     pub vote_generation_per_ib: Duration,
     pub vote_validation: Duration,
     pub cert_generation_constant: Duration,
@@ -336,9 +361,9 @@ impl CpuTimeConfig {
         Self {
             tx_validation: duration_ms(params.tx_validation_cpu_time_ms),
             rb_generation: duration_ms(params.rb_generation_cpu_time_ms),
-            rb_validation_constant: duration_ms(
-                params.rb_head_validation_cpu_time_ms
-                    + params.rb_body_legacy_praos_payload_validation_cpu_time_ms_constant,
+            rb_head_validation: duration_ms(params.rb_head_validation_cpu_time_ms),
+            rb_body_validation_constant: duration_ms(
+                params.rb_body_legacy_praos_payload_validation_cpu_time_ms_constant,
             ),
             rb_validation_per_byte: duration_ms(
                 params.rb_body_legacy_praos_payload_validation_cpu_time_ms_per_byte,
@@ -353,7 +378,15 @@ impl CpuTimeConfig {
             ),
             eb_generation: duration_ms(params.eb_generation_cpu_time_ms),
             eb_validation: duration_ms(params.eb_validation_cpu_time_ms),
+            eb_header_validation: duration_ms(params.eb_header_validation_cpu_time_ms),
+            eb_body_validation_constant: duration_ms(
+                params.eb_body_validation_cpu_time_ms_constant,
+            ),
+            eb_body_validation_per_byte: duration_ms(
+                params.eb_body_validation_cpu_time_ms_per_byte,
+            ),
             vote_generation_constant: duration_ms(params.vote_generation_cpu_time_ms_constant),
+            vote_generation_per_tx: duration_ms(params.vote_generation_cpu_time_ms_per_tx),
             vote_generation_per_ib: duration_ms(params.vote_generation_cpu_time_ms_per_ib),
             vote_validation: duration_ms(params.vote_validation_cpu_time_ms),
             cert_generation_constant: duration_ms(params.cert_generation_cpu_time_ms_constant),
@@ -407,6 +440,14 @@ impl BlockSizeConfig {
         self.eb_constant + self.eb_per_ib * (txs + ibs + ebs) as u64
     }
 
+    pub fn linear_eb(&self, txs: &[Arc<Transaction>]) -> u64 {
+        let body_size = match self.variant {
+            LeiosVariant::LinearWithTxReferences => txs.len() as u64 * self.eb_per_ib,
+            _ => txs.iter().map(|tx| tx.bytes).sum::<u64>(),
+        };
+        self.eb_constant + body_size
+    }
+
     pub fn vote_bundle(&self, ebs: usize) -> u64 {
         self.vote_constant + self.vote_per_eb * ebs as u64
     }
@@ -441,6 +482,7 @@ impl TransactionConfig {
                 next_id: Arc::new(AtomicU64::new(0)),
                 ib_size: params.ib_body_avg_size_bytes,
                 rb_size: params.rb_body_legacy_praos_payload_avg_size_bytes,
+                eb_size: params.eb_body_avg_size_bytes,
             })
         }
     }
@@ -462,6 +504,7 @@ pub(crate) struct MockTransactionConfig {
     next_id: Arc<AtomicU64>,
     pub ib_size: u64,
     pub rb_size: u64,
+    pub eb_size: u64,
 }
 
 impl MockTransactionConfig {
@@ -475,6 +518,48 @@ impl MockTransactionConfig {
             bytes,
             input_id: id,
             overcollateralization_factor: 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct AttackConfig {
+    pub(crate) late_eb: Option<LateEBAttackConfig>,
+}
+impl AttackConfig {
+    fn build(params: &RawParameters, topology: &Topology) -> Self {
+        Self {
+            late_eb: params
+                .late_eb_attack
+                .as_ref()
+                .map(|raw| LateEBAttackConfig::build(raw, topology)),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct LateEBAttackConfig {
+    pub(crate) attackers: HashSet<NodeId>,
+    pub(crate) propagation_delay: Duration,
+}
+
+impl LateEBAttackConfig {
+    fn build(raw: &RawLateEBAttackConfig, topology: &Topology) -> Self {
+        let attacker_names = raw.attacker_nodes.iter().collect::<HashSet<_>>();
+        let attackers = topology
+            .nodes
+            .iter()
+            .filter_map(|node| {
+                if attacker_names.contains(&node.name) {
+                    Some(node.id)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        Self {
+            attackers,
+            propagation_delay: duration_ms(raw.propagation_delay_ms),
         }
     }
 }
@@ -494,6 +579,7 @@ pub struct SimConfiguration {
     pub late_ib_inclusion: bool,
     pub variant: LeiosVariant,
     pub vote_threshold: u64,
+    pub(crate) total_stake: u64,
     pub(crate) praos_fallback: bool,
     pub(crate) header_diffusion_time: Duration,
     pub(crate) ib_generation_time: Duration,
@@ -506,6 +592,9 @@ pub struct SimConfiguration {
     pub(crate) eb_generation_probability: f64,
     pub(crate) vote_probability: f64,
     pub(crate) vote_slot_length: u64,
+    pub(crate) eb_include_txs_from_previous_stage: bool,
+    pub(crate) linear_vote_stage_length: u64,
+    pub(crate) linear_diffuse_stage_length: u64,
     pub(crate) max_block_size: u64,
     pub(crate) max_ib_size: u64,
     pub(crate) max_eb_size: u64,
@@ -517,6 +606,7 @@ pub struct SimConfiguration {
     pub(crate) cpu_times: CpuTimeConfig,
     pub(crate) sizes: BlockSizeConfig,
     pub(crate) transactions: TransactionConfig,
+    pub(crate) attacks: AttackConfig,
 }
 
 impl SimConfiguration {
@@ -539,6 +629,8 @@ impl SimConfiguration {
                 params.ib_shard_period_length_slots
             );
         }
+        let total_stake = topology.nodes.iter().map(|n| n.stake).sum();
+        let attacks = AttackConfig::build(&params, &topology);
         Ok(Self {
             seed: 0,
             timestamp_resolution: duration_ms(params.timestamp_resolution_ms),
@@ -552,6 +644,7 @@ impl SimConfiguration {
             max_eb_age: params.eb_max_age_slots,
             late_ib_inclusion: params.leios_late_ib_inclusion,
             variant: params.leios_variant,
+            total_stake,
             praos_fallback: params.praos_fallback_enabled,
             header_diffusion_time: duration_ms(params.leios_header_diffusion_time_ms),
             ib_generation_time: duration_ms(params.leios_ib_generation_time_ms),
@@ -565,6 +658,9 @@ impl SimConfiguration {
             vote_probability: params.vote_generation_probability,
             vote_threshold: params.vote_threshold,
             vote_slot_length: params.leios_stage_active_voting_slots,
+            eb_include_txs_from_previous_stage: params.eb_include_txs_from_previous_stage,
+            linear_vote_stage_length: params.linear_vote_stage_length_slots,
+            linear_diffuse_stage_length: params.linear_diffuse_stage_length_slots,
             max_block_size: params.rb_body_max_size_bytes,
             max_ib_size: params.ib_body_max_size_bytes,
             max_eb_size: params.eb_referenced_txs_max_size_bytes,
@@ -576,6 +672,7 @@ impl SimConfiguration {
             cpu_times: CpuTimeConfig::new(&params),
             sizes: BlockSizeConfig::new(&params),
             transactions: TransactionConfig::new(&params),
+            attacks,
         })
     }
 }

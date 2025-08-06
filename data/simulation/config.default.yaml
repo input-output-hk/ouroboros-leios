@@ -36,6 +36,10 @@ leios-mempool-aggressive-pruning: false
 praos-chain-quality: 40
 praos-fallback-enabled: true
 
+linear-vote-stage-length-slots: 5
+linear-diffuse-stage-length-slots: 5
+store-txs-as-references: false
+
 ################################################################################
 # Transaction Configuration
 ################################################################################
@@ -132,6 +136,7 @@ eb-generation-probability: 1.5
 eb-size-bytes-constant: 240
 # IB hash
 eb-size-bytes-per-ib: 32
+eb-body-avg-size-bytes: 0
 # Collecting the IBs to reference and cryptography are the main tasks.
 # A comparable task is maybe mempool snapshotting.
 # Sec 2.3 Forging, of the benchmark cluster report, lists
@@ -140,6 +145,13 @@ eb-size-bytes-per-ib: 32
 eb-generation-cpu-time-ms: 75.0
 # Validating signature and vrf proof, as in other headers.
 eb-validation-cpu-time-ms: 1.0
+# For linear leios: "fast" incomplete validation of the EB
+eb-header-validation-cpu-time-ms: 50.0
+# For linear leios: complete validation of the EB
+eb-body-validation-cpu-time-ms-constant: 50.0
+eb-body-validation-cpu-time-ms-per-byte: 0.0005
+# For stracciatella: when creating a new EB, have it reference transactions from a previous EB
+eb-include-txs-from-previous-stage: false
 
 eb-diffusion-strategy: "peer-order"
 
@@ -184,6 +196,8 @@ vote-threshold: 300
 vote-generation-cpu-time-ms-constant: 164e-3
 # No benchmark yet.
 vote-generation-cpu-time-ms-per-ib: 0
+# No benchmark yet.
+vote-generation-cpu-time-ms-per-tx: 0
 # vote-spec#"Verify vote" 0.8*670e-3 + 0.2*1.4
 vote-validation-cpu-time-ms: 816e-3
 # The `Vote` structure counted in the -per-eb already identifies slot

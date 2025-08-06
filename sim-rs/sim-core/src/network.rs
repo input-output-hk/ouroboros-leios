@@ -1,6 +1,6 @@
 use std::{fmt::Debug, hash::Hash, time::Duration};
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use coordinator::{EdgeConfig, Message, NetworkCoordinator};
 use tokio::sync::mpsc;
 
