@@ -525,6 +525,10 @@ Notable threats to the system that could impact assets.
 **Addressing threats**: T8
 
 #### M5: Over-Parameterization
+
+> [!CAUTION]
+> This is not available anymore with Linear Leios.
+
 **Addressing threats**: T4, T8, T9
 
 **Decision**: MITIGATE
