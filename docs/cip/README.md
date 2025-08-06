@@ -496,7 +496,7 @@ Whenever an EB is announced through an RB header, nodes must fetch the EB conten
 
 <a id="mempool-capacity" href="#mempool-capacity">**Mempool Capacity Requirements**</a>: The mempool must accommodate both RB and EB transaction production. The capacity requirements are significantly increased compared to Praos to handle the additional transaction volume expected from EB production. When an EB is received and validated, its transactions should be added optimistically to the beginning of the mempool to ensure they are not lost if the EB fails to achieve certification.
 
-#### Epoch Boundary Behavior
+#### Epoch Boundary
 
 <a id="persistent-voter-computation" href="#persistent-voter-computation">**Persistent Voter Computation**</a>: At epoch boundaries, nodes must compute the set of persistent voters for the next epoch using the [Fait Accompli scheme][fait-accompli-sortition]. This computation uses the stake distribution fixed at the epoch boundary and represents a minimal computational overhead based on current [BLS certificates benchmarks](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#benchmarks-in-rust). The computation must be completed before the next epoch begins to enable voting participation.
 
