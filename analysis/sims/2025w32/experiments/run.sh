@@ -15,7 +15,7 @@ NETWORK=topology-v2
 LABEL=$(basename "$PWD")
 VARIANT=linear-with-tx-references
 STAGE_LENGTH=10
-BLOCK_SIZE=25
+BLOCK_SIZE=15
 THROUGHPUT="$LABEL"
 
 ulimit -S -m 48000000 -v 48000000
