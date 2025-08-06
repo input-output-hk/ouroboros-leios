@@ -221,7 +221,7 @@ where $L_\text{diff}$ is a protocol parameter represented by a number of slots.
 > 
 > 4. No transactions are embedded in the RB body
 
-This **conditional inclusion** ensures transaction availability to honest nodes with good probability while achieving higher throughput, but also maintains Praos safety guarantees network timing does not permit inclusion. When included:
+This **conditional inclusion** ensures transaction availability to honest nodes with good probability while achieving higher throughput, but also maintains Praos safety guarantees when network timing does not permit inclusion. When included:
 
 - The certified EB's transactions become part of the permanent ledger
 - Throughput increases significantly for that segment of the chain
