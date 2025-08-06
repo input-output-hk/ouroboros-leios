@@ -431,25 +431,6 @@ Notable threats to the system that could impact assets.
 
 **Assets Affected**: Operational Sustainability, Decentralization
 
-## Risk Assessment Matrix
-
-> [!WARN]
-> Incomplete and connection with threat content is vague. i.e. likelihood and
-> risk level are not directly related to anything.
-
-| Threat                        | Impact | Likelihood | Risk Level | Priority |
-|-------------------------------|--------|------------|------------|----------|
-| T1: Mempool Partitioning      | HIGH   | LOW        | HIGH       | P1       |
-| T2: Eclipse Attack            | HIGH   | MEDIUM     | HIGH       | P1       |
-| T8: Transaction Withholding   | HIGH   | MEDIUM     | HIGH       | P1       |
-| T10: Hard Fork Coordination   | HIGH   | MEDIUM     | HIGH       | P1       |
-| T3: Vote Flooding             | MEDIUM | HIGH       | MEDIUM     | P2       |
-| T5: Double Voting             | LOW    | LOW        | LOW        | P4       |
-| T6: VRF Manipulation          | HIGH   | LOW        | MEDIUM     | P2       |
-| T4: EB Withholding            | MEDIUM | MEDIUM     | MEDIUM     | P3       |
-| T9: Transaction Front-Running | MEDIUM | MEDIUM     | MEDIUM     | P3       |
-| T11: Backward Compatibility   | MEDIUM | MEDIUM     | MEDIUM     | P3       |
-| T7: Stake Grinding            | MEDIUM | LOW        | LOW        | P4       |
 
 ## Mitigation Strategies
 
