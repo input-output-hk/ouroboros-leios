@@ -386,7 +386,7 @@ Notable threats to the system that could impact assets.
 
 **Assets Affected**: Operational Sustainability, High Throughput
 
-#### T?: Honey Pot Contract
+#### T12: Honey Pot Contract
 
 **Description**: An attacker deliberately makes ADA available on-chain so anyone races to claim it with the goal of producing many conflicting transactions. This is very similar to T1, but uses cryptocurrency instead of network resources.
 
@@ -410,7 +410,7 @@ Notable threats to the system that could impact assets.
 
 **Assets Affected**: High Throughput, Operational Sustainability
 
-#### T?: Delayed Praos Blocks
+#### T13: Delayed Praos Blocks
 
 > [!WARN]
 > Is this a threat or rather part of the Blockchain Safety asset?
@@ -422,7 +422,7 @@ Notable threats to the system that could impact assets.
 
 **Assets Affected**: Blockchain Safety
 
-#### T?: Excessive Chain Growth
+#### T14: Excessive Chain Growth
 
 > [!WARN]
 > TODO and how do we describe threats that are not attacks?
