@@ -310,27 +310,29 @@ Notable threats to the system that could impact assets.
 
 **Assets Affected**: High Throughput, Operational Sustainability
 
-#### T9: Transaction Front-Running
-**Description**: EB producers observe profitable transactions and reorder or insert their own transactions to extract value before the original transaction executes.
+#### T9: Front-Running
+**Description**: Block producers observe profitable transactions and reorder or insert their own transactions to extract value before the original transaction executes.
 
 **Prerequisites**:
-- EB creation eligibility
+- Block production eligibility (RB + EB creation)
 - MEV (Maximal Extractable Value) opportunities in transaction sets
 - Knowledge of transaction dependencies and profitable patterns
 
 **Attack Vector**:
 1. Monitor mempool for profitable transaction patterns
-2. Create competing or parasitic transactions
-3. Include both in EB with favorable ordering for attacker
+2. Create front-running transactions
+3. Replace target transactions with front-running transactions in EB
 4. Extract value through arbitrage, sandwich attacks, or liquidations
 
-**Cost**: LOW - Opportunity cost only, plus normal EB creation requirements
+**Cost**: LOW - Opportunity cost only, since already producing the block
+
+**Likelihood**: MEDIUM-HIGH - Every RB producer gets EB opportunity with larger transaction capacity, creating more MEV opportunities, especially with lucky leader schedules
 
 **Impact**:
 - **Value Extraction**: Users receive worse execution prices
-- **Market Inefficiency**: Creates unfair advantages for EB producers
+- **Market Inefficiency**: Creates unfair advantages for block producers
+- **Increased Opportunity**: Larger EBs and frequent production create more MEV extraction opportunities (than with Praos already)
 - **Detectable**: Transaction patterns can reveal front-running behavior
-- **Existing Issue**: Already present with RB producers, Leios increases frequency
 
 **Assets Affected**: Transaction Validity/Availability/Determinism, Decentralization
 
@@ -467,7 +469,7 @@ Notable threats to the system that could impact assets.
 
 **Validation**: Simulation testing with network partitions
 
-**Cost**: Medium - Protocol changes and monitoring infrastructure
+**Cost**: MEDIUM - Protocol changes and monitoring infrastructure
 
 **Accepted Impact**: Temporary throughput reduction and resource waste from conflicting transactions, as long as perpetual storage costs are contained
 
@@ -486,7 +488,7 @@ Notable threats to the system that could impact assets.
 
 **Validation**: Penetration testing and network analysis
 
-**Cost**: Medium - Monitoring infrastructure and operational procedures
+**Cost**: MEDIUM - Monitoring infrastructure and operational procedures
 
 #### M3: Vote Flooding Protection
 **Addressing threats**: T3
@@ -503,7 +505,7 @@ Notable threats to the system that could impact assets.
 
 **Validation**: Load testing with malicious vote patterns
 
-**Cost**: Low - Protocol design already provides protection
+**Cost**: LOW - Protocol design already provides protection
 
 #### M4: Transaction Availability Enforcement
 **Decision**: MITIGATE
@@ -518,12 +520,12 @@ Notable threats to the system that could impact assets.
 
 **Validation**: Testing with unavailable transaction scenarios and peer timeouts
 
-**Cost**: Low - Protocol enforcement mechanism
+**Cost**: LOW - Protocol enforcement mechanism
 
 **Addressing threats**: T8
 
 #### M5: Over-Parameterization
-**Addressing threats**: T4, T8
+**Addressing threats**: T4, T8, T9
 
 **Decision**: MITIGATE
 
@@ -532,12 +534,12 @@ Notable threats to the system that could impact assets.
 **Implementation**:
 - Parameterize EB opportunities and sizes for adversarial stake assumptions
 - Example: Assume 30% adversarial stake, produce 2 EBs per stage on average
-- Size EBs 15% larger to compensate for potential withholding
+- Size EBs 15% larger to compensate for potential withholding or front-running
 - Bound throughput loss to guaranteed capacity levels
 
 **Validation**: Game-theoretic analysis and simulation with various adversarial stake percentages
 
-**Cost**: Low - Protocol parameterization only
+**Cost**: LOW - Protocol parameterization only
 
 #### M6: Double Voting Response
 **Addressing threats**: T5
@@ -569,10 +571,10 @@ Notable threats to the system that could impact assets.
 
 **Accepted Impact**: Prerequisites too high (cryptographic breakthrough or massive capital) and likelihood too low to justify mitigation effort
 
-#### M8: Front-Running Response
+#### M8: Front-Running Monitoring
 **Addressing threats**: T9
 
-**Decision**: ACCEPT + MITIGATE
+**Decision**: ACCEPT
 
 **Control type**: Detective
 
@@ -584,9 +586,11 @@ Notable threats to the system that could impact assets.
 
 **Validation**: Pattern analysis on historical transaction data
 
-**Cost**: Low - Monitoring and analysis infrastructure
+**Cost**: MEDIUM - Monitoring and analysis infrastructure
 
-**Accepted Impact**: Front-running will occur but detection helps maintain transparency and potential future governance responses
+**Accepted Impact**:
+  - Front-running will occur but detection helps maintain transparency and potential future governance responses
+  - Cannot mitigate because EB opportunities are tied to RB opportunities and cannot be parameterized separately
 
 #### M9: Hard Fork Coordination Protection
 **Addressing threats**: T10
@@ -605,7 +609,7 @@ Notable threats to the system that could impact assets.
 
 **Validation**: Stakeholder surveys, adoption metrics, testnet participation rates
 
-**Cost**: Medium - Extensive coordination and communication effort
+**Cost**: MEDIUM - Extensive coordination and communication effort
 
 #### M10: Backward Compatibility Protection
 **Addressing threats**: T11
@@ -622,7 +626,7 @@ Notable threats to the system that could impact assets.
 
 **Validation**: Integration testing with various client versions and protocol combinations
 
-**Cost**: Medium - Testing infrastructure and compatibility analysis
+**Cost**: MEDIUM - Testing infrastructure and compatibility analysis
 
 ## Review and Maintenance
 
