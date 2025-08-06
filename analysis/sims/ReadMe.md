@@ -37,9 +37,9 @@ These instructions are valid for the folders `2025w25/` and onwards.
   
 ### Plot the results in Jupyter
 
-9. Start a Jupter notebook server using the command `nix run #../sims/`.
-10. In the web browser, navigate to the relevant experiment folder and open any `.ipynb` files of interest.
-
+9. Start a Jupter notebook server using the command `nix run ..`.
+10. In the web browser, navigate to the relevant experiment folder and open any `.ipynb` files of interest
+    - You might want to create the `plots/` folder if you want to save plots from running a notebook.
 
 ## Data dictionary
 
