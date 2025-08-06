@@ -267,7 +267,7 @@ The implementation meets the <a href="#appendix-a-requirements">requirements for
 To participate in the Leios protocol as voting member/ block producing node, stake pool operators must register one additional BLS12-381 key alongside their existing VRF and KES keys.
 
 <a id="committee-structure" href="#committee-structure">**Committee Structure**</a>: Two types of voters validate EBs, balancing security, decentralization, and efficiency:
-- **Persistent Voters**: Selected once per epoch using Fait Accompli sortition, vote in every election, identified by compact identifiers
+- **Persistent Voters**: Selected once per epoch using [Fait Accompli sortition][fait-accompli-sortition], vote in every election, identified by compact identifiers
 - **Non-persistent Voters**: Selected per EB via local sortition with Poisson-distributed stake-weighted probability
 
 This dual approach prevents linear certificate size growth by leveraging non-uniform stake distribution, enabling faster certificate diffusion while maintaining broad participation.
@@ -290,7 +290,7 @@ This dual approach prevents linear certificate size growth by leveraging non-uni
 1. **CDDL Format Compliance**: Certificate structure matches the specification format defined in <a href="#votes-certificates-cddl">Appendix B: Votes and Certificates CDDL</a>
 2. **Cryptographic Signatures**: All BLS signatures are valid
 3. **Voter Eligibility**: 
-   - Persistent voters must have been selected as such by the Fait Accompli scheme for the current epoch
+   - Persistent voters must have been selected as such by the [Fait Accompli scheme][fait-accompli-sortition] for the current epoch
    - Non-persistent voters must provide valid sortition proofs
 4. **Stake Verification**: Total voting stake meets the required quorum threshold
 5. **EB Consistency**: Certificate references the correct EB hash announced in the preceding RB
@@ -498,7 +498,7 @@ Whenever an EB is announced through an RB header, nodes must fetch the EB conten
 
 #### Epoch Boundary Behavior
 
-<a id="persistent-voter-computation" href="#persistent-voter-computation">**Persistent Voter Computation**</a>: At epoch boundaries, nodes must compute the set of persistent voters for the next epoch using the Fait Accompli scheme. This computation uses the stake distribution fixed at the epoch boundary and represents a minimal computational overhead based on current [BLS certificates benchmarks](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#benchmarks-in-rust). The computation must be completed before the next epoch begins to enable voting participation.
+<a id="persistent-voter-computation" href="#persistent-voter-computation">**Persistent Voter Computation**</a>: At epoch boundaries, nodes must compute the set of persistent voters for the next epoch using the [Fait Accompli scheme][fait-accompli-sortition]. This computation uses the stake distribution fixed at the epoch boundary and represents a minimal computational overhead based on current [BLS certificates benchmarks](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#benchmarks-in-rust). The computation must be completed before the next epoch begins to enable voting participation.
 
 ### Network
 
@@ -1043,7 +1043,7 @@ The analysis
 [Committee size and quorum requirement](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-1.md#committee-size-and-quorum-requirement)
 in the first Leios Technical Report indicates that the Leios committee size
 should be no smaller than 500 votes and the quorum should be at least 60% of
-those votes. However, the proposed Fait Accompli[^1] scheme wFA<sup>LS</sup>
+those votes. However, the proposed [Fait Accompli][fait-accompli-sortition][^1] scheme wFA<sup>LS</sup>
 achieves compact certificates that do not become larger as the number of voters
 increases, so larger committee sizes might be permitted for broader SPO
 participation and higher security. The committee size should be large enough
@@ -1471,6 +1471,7 @@ protocol.
 - [Leios channel on IOG Discord](https://discord.com/channels/826816523368005654/1247688618621927505)
 - [Github repository for Leios R&D](https://github.com/input-output-hk/ouroboros-leios)
 - [Github repository for Leios formal specification](https://github.com/input-output-hk/ouroboros-leios-formal-spec)
+- [Fait Accompli sortition specification](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#sortition)
 
 ## Appendix
 
