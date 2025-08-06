@@ -15,9 +15,8 @@ NETWORK=topology-v2
 LABEL=$(basename "$PWD")
 VARIANT=linear-with-tx-references
 STAGE_LENGTH=10
-BLOCK_SIZE=10
+BLOCK_SIZE=25
 THROUGHPUT="$LABEL"
-TX_VAL_TIME=15
 
 ulimit -S -m 48000000 -v 48000000
 
@@ -46,7 +45,6 @@ yaml2json ../config.yaml \
 , "tx-generation-distribution": {distribution: "constant", value: ('"$TX_SIZE"' / '"$THROUGHPUT"' / 1000)}
 , "tx-start-time": '"$TX_START"'
 , "tx-stop-time": '"$TX_STOP"'
-, "tx-validation-cpu-time-ms": '"$TX_VAL_TIME"'
 }
 ' > config.yaml
 
@@ -63,8 +61,8 @@ grep -E -v '(Slot|No.*Generated|CpuTask|Lottery)' sim.log | pigz -p 3 -9c > sim.
 wait
 
 cat << EOI > case.csv
-Simulator,Variant,Network,Bandwidth,Stage length,EB rate,Max EB size,Tx size,Throughput,Tx start [s],Tx stop [s],Sim stop [s],Tx validation
-Rust,$VARIANT,$NETWORK,$BW Mb/s,$STAGE_LENGTH slot/stage,$EB_RATE EB/stage,$BLOCK_SIZE MB/EB,$TX_SIZE B/Tx,$THROUGHPUT TxMB/s,$TX_START,$TX_STOP,$SIM_STOP,$TX_VAL_TIME ms/Tx
+Simulator,Variant,Network,Bandwidth,Stage length,EB rate,Max EB size,Tx size,Throughput,Tx start [s],Tx stop [s],Sim stop [s]
+Rust,$VARIANT,$NETWORK,$BW Mb/s,$STAGE_LENGTH slot/stage,$EB_RATE EB/stage,$BLOCK_SIZE MB/EB,$TX_SIZE B/Tx,$THROUGHPUT TxMB/s,$TX_START,$TX_STOP,$SIM_STOP
 EOI
 
 zcat sim.log.gz \
