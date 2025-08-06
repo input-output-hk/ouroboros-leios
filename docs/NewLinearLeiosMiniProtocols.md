@@ -52,7 +52,7 @@ In all of the new mini protocols, the payload travels the same direction as in B
 | Unchanged mini protocol | Comparable schema | Payload | Payload semantics |
 | - | - | - | - |
 | ChainSync | Light | an RB header | the valid RB body is available for download from this upstream peer (under limited circumstances, Block Diffusion Pipelining via Deferred Validation permits the block to instead be invalid) |
-| BlockFetch | Heavy | an RB | one of the RBs that EbRelayHeader indicated |
+| BlockFetch | Heavy | an RB | one of the RBs that ChainSync indicated |
 | TxSubmission | Light and Heavy | set of tx identifiers OR set of txs | some identified txs that are available from this upstream peer OR one of those txs |
 
 | New mini protocol | Schema | Identifier | Payload | Payload semantics |
