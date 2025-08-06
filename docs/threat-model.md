@@ -116,8 +116,6 @@ For each asset we define what could be impacted in respect to its Confidentialit
 
 Notable threats to the system that could impact assets.
 
-### Network-Level Threats
-
 #### T1: Mempool Partitioning
 **Description**: Attacker deliberately partitions the mempools of block producing nodes by submitting conflicting transactions (spending the same inputs) to different network segments, creating inconsistent views of valid transactions across the network.
 
@@ -132,10 +130,12 @@ Notable threats to the system that could impact assets.
 2. Creates conflicting transaction pairs spending identical UTXOs
 3. Submits Transaction A to Network Segment 1, Transaction B to Network Segment 2
 4. Uses network position control (BGP, routing, eclipse techniques) to prevent cross-segment propagation
-5. SPOs in different segments create EBs endorsing different conflicting transactions
+5. Slot/height battling SPOs from different segments create RBs endorsing different, conflicting transactions
 6. Voting nodes must choose between conflicting EBs, potentially causing certification failures
 
-**Cost**: MEDIUM-HIGH - Requires significant network infrastructure, multiple nodes, and sustained coordination
+**Cost**: HIGH - Requires significant network infrastructure, multiple nodes, and sustained coordination
+
+**Likelihood**: LOW - Reduced attack surface due to coupled RB/EB production model, though possible when there are multiple eligible producers (slot / height battles).
 
 **Impact**:
 - **Throughput**: Different SPOs create conflicting EBs, causing vote splits and potential certification failures. This leads to throughput reduction when EBs fail certification, though system recovers in subsequent stages
@@ -170,7 +170,7 @@ Notable threats to the system that could impact assets.
 
 **Assets Affected**: Blockchain Safety, High Throughput
 
-#### T3: Vote Flooding Attack
+#### T3: Vote Flooding
 **Description**: Malicious nodes flood the network with invalid or duplicate votes to overwhelm voting infrastructure and waste network resources.
 
 **Prerequisites**:
@@ -195,10 +195,8 @@ Notable threats to the system that could impact assets.
 
 **Assets Affected**: Operational Sustainability, High Throughput
 
-### Consensus-Level Threats
-
-#### T4: EB Withholding Attack
-**Description**: Eligible stake pools deliberately withhold EBs they are entitled to create, reducing network throughput and potentially enabling censorship.
+#### T4: EB Withholding
+**Description**: Eligible stake pools deliberately  they are entitled to create, reducing network throughput and potentially enabling censorship.
 
 **Prerequisites**:
 - Stake pool eligibility for EB creation (via VRF lottery)
@@ -335,8 +333,6 @@ Notable threats to the system that could impact assets.
 
 **Assets Affected**: Operational Sustainability, Decentralization
 
-### Transaction-Level Threats
-
 #### T8: Transaction Availability Attack
 **Description**: Attacker creates EBs referencing unavailable transactions to waste network resources and disrupt certification.
 
@@ -383,8 +379,6 @@ Notable threats to the system that could impact assets.
 - **Existing Issue**: Already present with RB producers, Leios increases frequency
 
 **Assets Affected**: Transaction Validity/Availability/Determinism, Decentralization
-
-### Deployment-Level Threats
 
 #### T10: Hard Fork Coordination Attack
 **Description**: Disruption during the hard fork transition period to split the network, cause instability, or prevent the hard fork from succeeding.
@@ -444,7 +438,7 @@ Notable threats to the system that could impact assets.
 
 | Threat                        | Impact | Likelihood | Risk Level | Priority |
 |-------------------------------|--------|------------|------------|----------|
-| T1: Mempool Partitioning      | HIGH   | MEDIUM     | HIGH       | P1       |
+| T1: Mempool Partitioning      | HIGH   | LOW        | HIGH       | P1       |
 | T2: Eclipse Attack            | HIGH   | MEDIUM     | HIGH       | P1       |
 | T8: Transaction Availability  | HIGH   | MEDIUM     | HIGH       | P1       |
 | T10: Hard Fork Coordination   | HIGH   | MEDIUM     | HIGH       | P1       |
