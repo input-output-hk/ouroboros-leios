@@ -286,51 +286,6 @@ Notable threats to the system that could impact assets.
 
 **Assets Affected**: Decentralization
 
-#### T?: Honey Pot Contract
-
-**Description**: An attacker deliberately makes ADA available on-chain so anyone races to claim it with the goal of producing many conflicting transactions. This is very similar to T1, but uses cryptocurrency instead of network resources.
-
-**Prerequisites**:
-- Knowledge of building a Cardano smart contract
-- Enough ADA to appeal to enough users
-
-**Attack Vector**:
-1. Lock a lot of ADA into a script that allows anyone to take `amount` while the remainder must be kept in the script.
-2. Advertise the honey pot and that `amount` of ADA is available for free.
-3. Race with everyone in claiming the output.
-    a. If attacker is successful, only transaction fees were spent and `amount` can go back into the honey pot.
-4. Continue until funds run out.
-
-**Cost**: HIGH - Enough ADA to appeal many concurrent users and keep the attack going. 
-
-**Impact**:
-- **Resource Waste**: Network processes all conflicting transactions trying to spend the honey pot output, but only one pays fees at a time. Highest costs are from perpetual storage when conflicting transactions are submitted concurrently.
-- **Throughput**: Reduces available throughput by amount of transactions attracted by the honey pot.
-- **Artifical traffic / low tps**: While this artifical traffic will account into the systems throughput, typically measured in transactions per second (tps), the attacker could require these transactions to be big and computationally costly, resulting in a relatively low tps addition.
-
-**Assets Affected**: High Throughput, Operational Sustainability
-
-#### T?: Delayed Praos Blocks
-
-> [!WARN]
-> Is this a threat or rather part of the Blockchain Safety asset?
-
-**Description**: Delaying praos blocks due to long ledger state building (too many txs), impacting liveness and safety.
-
-**Impact**:
-- **Chain Quality**: Increased likelihood of chain forks and lower chain quality
-
-**Assets Affected**: Blockchain Safety
-
-#### T?: Excessive Chain Growth
-
-> [!WARN]
-> TODO and how do we describe threats that are not attacks?
-
-**Description**: Chain growing too much due to honest demand and too high capacity parameterization (as a threat, not an attack). When SPOs cannot add as much storage as is needed, they cannot validate the chain and decentralization is impacted.
-
-**Assets Affected**: Operational Sustainability, Decentralization
-
 #### T8: Transaction Withholding
 **Description**: Attacker creates EBs referencing non-existing transactions to waste network resources and disrupt certification.
 
@@ -428,6 +383,51 @@ Notable threats to the system that could impact assets.
 - **Operational**: May force emergency patches or version rollbacks
 
 **Assets Affected**: Operational Sustainability, High Throughput
+
+#### T?: Honey Pot Contract
+
+**Description**: An attacker deliberately makes ADA available on-chain so anyone races to claim it with the goal of producing many conflicting transactions. This is very similar to T1, but uses cryptocurrency instead of network resources.
+
+**Prerequisites**:
+- Knowledge of building a Cardano smart contract
+- Enough ADA to appeal to enough users
+
+**Attack Vector**:
+1. Lock a lot of ADA into a script that allows anyone to take `amount` while the remainder must be kept in the script.
+2. Advertise the honey pot and that `amount` of ADA is available for free.
+3. Race with everyone in claiming the output.
+    a. If attacker is successful, only transaction fees were spent and `amount` can go back into the honey pot.
+4. Continue until funds run out.
+
+**Cost**: HIGH - Enough ADA to appeal many concurrent users and keep the attack going. 
+
+**Impact**:
+- **Resource Waste**: Network processes all conflicting transactions trying to spend the honey pot output, but only one pays fees at a time. Highest costs are from perpetual storage when conflicting transactions are submitted concurrently.
+- **Throughput**: Reduces available throughput by amount of transactions attracted by the honey pot.
+- **Artifical traffic / low tps**: While this artifical traffic will account into the systems throughput, typically measured in transactions per second (tps), the attacker could require these transactions to be big and computationally costly, resulting in a relatively low tps addition.
+
+**Assets Affected**: High Throughput, Operational Sustainability
+
+#### T?: Delayed Praos Blocks
+
+> [!WARN]
+> Is this a threat or rather part of the Blockchain Safety asset?
+
+**Description**: Delaying praos blocks due to long ledger state building (too many txs), impacting liveness and safety.
+
+**Impact**:
+- **Chain Quality**: Increased likelihood of chain forks and lower chain quality
+
+**Assets Affected**: Blockchain Safety
+
+#### T?: Excessive Chain Growth
+
+> [!WARN]
+> TODO and how do we describe threats that are not attacks?
+
+**Description**: Chain growing too much due to honest demand and too high capacity parameterization (as a threat, not an attack). When SPOs cannot add as much storage as is needed, they cannot validate the chain and decentralization is impacted.
+
+**Assets Affected**: Operational Sustainability, Decentralization
 
 ## Risk Assessment Matrix
 
