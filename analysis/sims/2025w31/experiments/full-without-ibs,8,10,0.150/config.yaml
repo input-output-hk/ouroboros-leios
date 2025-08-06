@@ -7,7 +7,7 @@
   "cleanup-policies": [
     "cleanup-expired-vote"
   ],
-  "timestamp-resolution-ms": 0.1,
+  "timestamp-resolution-ms": 10,
   "leios-variant": "full-without-ibs",
   "linear-vote-stage-length-slots": 8,
   "linear-diffuse-stage-length-slots": 8,
@@ -36,7 +36,7 @@
   "tx-validation-cpu-time-ms": 0.065,
   "tx-max-size-bytes": 16384,
   "tx-start-time": 0,
-  "tx-stop-time": 600,
+  "tx-stop-time": 400,
   "rb-generation-probability": 0.05,
   "rb-head-size-bytes": 1024,
   "rb-body-max-size-bytes": 90112,

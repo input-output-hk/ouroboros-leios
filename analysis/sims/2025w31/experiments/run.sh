@@ -1,5 +1,5 @@
 #!/usr/bin/env nix-shell
-#!nix-shell -i bash -p ansifilter gnugrep gnused gzip pigz bc
+#!nix-shell -i bash -p ansifilter gnugrep gnused gzip pigz bc remarshal
 
 set -eo pipefail
 
@@ -7,8 +7,8 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 
 TX_SIZE=1500
 TX_START=0
-TX_STOP=600
-SIM_STOP=900
+TX_STOP=400
+SIM_STOP=400
 BW=50
 EB_RATE=2.5
 NETWORK=topology-v2
