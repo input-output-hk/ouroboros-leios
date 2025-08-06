@@ -8,8 +8,9 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 TX_SIZE=1500
 TX_START=60
 TX_STOP=960
-SIM_STOP=1200
-BW=50
+SIM_STOP=1500
+BW=10
+CPU_COUNT=4
 EB_RATE=2.5
 NETWORK=topology-v2
 LABEL=$(basename "$PWD")
@@ -27,7 +28,8 @@ fi
 
 mkfifo sim.log
 
-sed -e 's/"bandwidth-bytes-per-second":125000000/"bandwidth-bytes-per-second":'"$((125000 * BW))"'/g' \
+sed -e 's/"bandwidth-bytes-per-second":125000000,/"bandwidth-bytes-per-second":'"$((125000 * BW))"',/g' \
+    -e 's/"cpu-core-count":6,/"cpu-core-count":'"$CPU_COUNT"',/g' \
   "../../../../../data/simulation/pseudo-mainnet/$NETWORK.yaml" \
   > network.yaml
 
@@ -61,8 +63,8 @@ grep -E -v '(Slot|No.*Generated|CpuTask|Lottery)' sim.log | pigz -p 3 -9c > sim.
 wait
 
 cat << EOI > case.csv
-Simulator,Variant,Network,Bandwidth,Stage length,EB rate,Max EB size,Tx size,Throughput,Tx start [s],Tx stop [s],Sim stop [s]
-Rust,$VARIANT,$NETWORK,$BW Mb/s,$STAGE_LENGTH slot/stage,$EB_RATE EB/stage,$BLOCK_SIZE MB/EB,$TX_SIZE B/Tx,$THROUGHPUT TxMB/s,$TX_START,$TX_STOP,$SIM_STOP
+Simulator,Variant,Network,Bandwidth,CPU,Stage length,EB rate,Max EB size,Tx size,Throughput,Tx start [s],Tx stop [s],Sim stop [s]
+Rust,$VARIANT,$NETWORK,$BW Mb/s,$CPU_COUNT vCPU/node,$STAGE_LENGTH slot/stage,$EB_RATE EB/stage,$BLOCK_SIZE MB/EB,$TX_SIZE B/Tx,$THROUGHPUT TxMB/s,$TX_START,$TX_STOP,$SIM_STOP
 EOI
 
 zcat sim.log.gz \
