@@ -586,7 +586,9 @@ RbHeaderRelay is a **pull-based relay protocol** that enables nodes to request a
 
 ### How Leios addresses CPS-18 and increases throughput
 
-Ouroboros Leios directly addresses key challenges outlined in [CPS-18 Greater Transaction Throughput][cps-18] through four strategic design priorities that balance throughput improvements with practical deployment considerations. These priorities are:
+The [Leios research paper][leios-paper] describes a highly concurrent protocol with three block types—Input Blocks (IBs), Endorser Blocks (EBs), and Ranking Blocks (RBs)—produced independently across decoupled, pipelined stages. This specification simplifies that design by eliminating IBs and coupling EB production with RB production, reducing complexity while preserving substantial throughput gains.
+
+Ouroboros Leios directly addresses key challenges outlined in [CPS-18 Greater Transaction Throughput][cps-18] through four strategic design priorities that guided this simplification. These priorities are:
 
 1. [Economic sustainability](#economic-sustainability)
 2. [Reasonable time to market](#time-to-market)
@@ -597,19 +599,19 @@ Ouroboros Leios directly addresses key challenges outlined in [CPS-18 Greater Tr
 
 A central challenge identified in CPS-18 is economic sustainability. As the Cardano Reserve diminishes, transaction fees must replace rewards to maintain network security and SPO profitability. Currently, the Reserve contributes more than 85% of epoch rewards, with less than 15% coming from transaction fees. By 2029, to compensate for Reserve depletion, the network requires approximately 36-50 TPS with average-sized transactions—roughly 10 times current mainnet throughput.
 
-**Measuring usable throughput**: To properly assess economic breakeven points, we use **Transaction Bytes per second (TxB/s)** rather than **Transactions per second (TPS)**. TPS doesn't account for transaction size or computational complexity, making systems with smaller transactions appear "faster" while providing less utility. Current Cardano mainnet provides **4,500 TxB/s**, while this specification targets **140,000-300,000 TxB/s** (140-300 TxkB/s, equivalent to roughly 100-200 TPS)—a **30-65x increase** sufficient for economic sustainability while remaining conservative enough to avoid chain growth and other high-throughput scaling challenges that would require dedicated research beyond this CIP's scope.
+**Measuring usable throughput**: To properly assess economic breakeven points, we use **Transaction Bytes per second (TxB/s)** rather than **Transactions per second (TPS)**. TPS doesn't account for transaction size or computational complexity, making systems with smaller transactions appear "faster" while providing less utility. Current Cardano mainnet provides **4,500 TxB/s**, while this specification targets **140,000-300,000 TxB/s** (140-300 TxkB/s, equivalent to roughly 100-200 TPS)—a **30-65x increase** sufficient for economic sustainability.
 
-Achieving this capacity increase requires strategic trade-offs in how we adapt the research paper design for practical deployment.
+**Capacity vs. utilization balance**: Beyond meeting economic thresholds, this approach avoids the risk of over-engineering massive throughput capacity without proven demand. Creating fundamental system changes to support multiple orders of magnitude more throughput—when actual utilization may not materialize—represents unnecessary complexity and ecosystem disruption. A rational scaling approach proceeds incrementally, validating demand at each step before pursuing the next capacity step up.
+
+Achieving this capacity increase requires trade-offs, as detailed below.
 
 <a name="time-to-market"></a>**Reasonable time to market: Complexity trade-offs**
 
-The [specified protocol](#specification) deliberately **linearizes** the [research paper's design][leios-paper] to prioritize deployment speed over the research paper's higher-concurrency approaches. This linearization through [coupled block production](#protocol-overview) achieves **two critical trade-offs**:
+This linearization approach (detailed in the [Protocol Overview](#protocol-overview)) achieves **two critical trade-offs**:
 
 **Reduced complexity**: Eliminates complex distributed systems problems around transaction sharding, conflict resolution, and sophisticated mempool coordination that could delay deployment by years.
 
 **Preserved compatibility**: Maintains familiar transaction semantics, deterministic ordering, and predictable finality patterns that existing dApps and infrastructure depend on.
-
-This compatibility focus extends beyond transaction behavior to operational deployment patterns.
 
 <a name="downstream-impact"></a>**Minimal downstream impact: Ecosystem preservation**
 
@@ -617,23 +619,23 @@ Beyond preserving transaction behavior, the protocol design minimizes infrastruc
 
 **Progressive deployment**: Functions as an **overlay protocol** extending Praos with [additive network extensions](#network) and [node behavior changes](#node-behavior). SPOs can upgrade progressively without coordinated migrations.
 
-**Alternative analysis**: Simply increasing Praos block sizes could improve throughput but fails due to proportionally longer propagation times that violate Praos timing assumptions and lack sufficient scalability ceiling for long-term viability.
+**Naive alternative**: Simply increasing Praos block sizes could improve throughput but fails due to proportionally longer propagation times that violate Praos timing assumptions and lack sufficient scalability ceiling for long-term viability.
 
 Having prioritized near-term deployability and ecosystem compatibility, the final consideration is maintaining competitive positioning for future development.
 
-<a name="competitiveness"></a>**Competitiveness: Solution space positioning**
+<a name="competitiveness"></a>**Competitiveness: Positioning**
 
 While the linearized design prioritizes practical deployment, it preserves pathways to higher performance:
 
-**Extensibility**: The [coupled block production](#protocol-overview) foundation can be extended toward higher concurrency models once operational experience validates timing assumptions and parameter choices. [Simulation results](#roadmap-and-future-directions) demonstrate the performance potential of these more concurrent protocol versions.
+**Extensibility**: The [coupled block production](#protocol-overview) design can be extended towards higher concurrency models. [Simulation results](#roadmap-and-future-directions) demonstrate the performance potential of these more concurrent protocol versions.
 
 **Future compatibility**: Maintains compatibility with more aggressive scaling approaches including full Leios variants, EB and IB (input block) decoupling, and sharding extensions, ensuring current throughput gains don't preclude 100x+ improvements when chain growth solutions mature.
 
-<a name="optimal-tradeoffs"></a>**Proposed trade-offs**
+<a name="optimal-tradeoffs"></a>**Conclusion**
 
-This linearization strategy represents the optimal balance across all four priorities, recognizing that a delivered 30-65x improvement provides substantially more value than the research paper's higher-concurrency variants, which would impose non-trivial costs on existing dApps, wallets, and infrastructure while taking significantly longer to build due to introducing many new protocol elements.
+This linearization strategy represents the balance across all four priorities, recognizing that a delivered 30-65x improvement provides substantially more value than the research paper's higher-concurrency variants, which would impose non-trivial costs on existing dApps, wallets, and infrastructure while taking significantly longer to build due to introducing many new protocol elements.
 
-The following evidence section provides quantitative support for these trade-offs and validates the protocol's performance characteristics under realistic network conditions.
+The following evidence section shall provide quantitative support for these trade-offs and validate the protocol's performance under realistic network conditions.
 
 ### Evidence
 
