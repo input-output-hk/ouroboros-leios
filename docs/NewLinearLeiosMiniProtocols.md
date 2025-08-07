@@ -204,5 +204,34 @@ This specification maximally separates the new mini protocols for two reasons.
 Due to their simplicity, it seems more plausible than ever that some existing pub/sub protocol might be suitable for implementing these.
 On the other hand, any framework that can already express the more sophisticated ChainSync, BlockFetch, and TxSubmission ought to easily accommodate Light and Heavy.
 
-Just as for the initial Peras developemnts, it's plausible that pairs of protocols such as VoteRelayId and VoteRelayBody could be initially implemented as a copy of TxSubmission with additional hooks to enforce the age limits.
+Just as for the initial Peras developments, it's plausible that pairs of protocols such as VoteRelayId and VoteRelayBody could be initially implemented as a copy of TxSubmission with additional hooks to enforce the age limits.
 That'd be a plausible first iteration, though it does inherit some complexity and coupling that is unnecessary in the particular case of Linear Leios objects.
+
+# Possible Extensions
+
+## Avoid Redundant RB Headers
+
+Under normal circumstances, the mini protocols would send each RB header four times, and three of those would be very much redundant.
+A simple extension of EbPublicize could eliminate the need for the redundant headers, in the absence of equivocation---ie for honest EBs.
+
+EbPublicize will be the first to convey an RB header to the downstream peer, under normal circumstances.
+Thus if the downstream peer could somehow acknowledge receipt of that RB header, then the other three mini protocols would never need to send a header for that same EB opportunity.
+Thus the extended Light schema---let's call it LightWithAck---would permit the client to send acknowledgments for each received header.
+
+```mermaid
+graph TD
+    D(StDone)
+    I(StIdle); style I color:cyan
+    X(StRequested); style X color:gold
+
+    I -->|MsgDone| D --- I
+    linkStyle 1 stroke-width:0
+
+    I -->|MsgRequestNextLight| X -->|"MsgReplyLight<br>payload"| I
+    I -->|MsgAcknowledgeLight| I
+```
+
+The server should disconnect if the client acknowledges more headers than the server has sent.
+
+The Heavy protocol could now send the merely the EB's hash instead of the corresponding RB header if the client has acknowledge the receipt of that RB header via EbPublicize.
+If for whatever reason they have not yet received that acknowledgement, then they could send the RB header, as in the base proposal.
