@@ -1137,7 +1137,7 @@ Leios immediately enables use cases for high transaction volume and for more
 computationally intensive Plutus scripts, but future minor modifications of the
 protocol can open additional novel and custom transaction workflows.
 
-#### High transaction volume
+<a id="high-transaction-volume" href="#high-transaction-volume">**High transaction volume**</a>
 
 Prototype simulations of the Leios protocol indicate that it can achieve at
 least 20 times the maximum throughput of the current Cardano mainnet. This
@@ -1174,7 +1174,7 @@ could benefit.
   participate. This is particularly important if the number of dreps increases
   and Cardano moves towards a "direct democracy" style of voting.
 
-#### Improved cost structure
+<a id="improved-cost-structure" href="#improved-cost-structure">**Improved cost structure**</a>
 
 Techno-economic analyses indicate that at a sustained transaction volume of 50
 tx/s or greater the profitability profile of Cardano will improve in several
@@ -1203,7 +1203,7 @@ of network egress and storage of the ledger.
 
 ![SPO profitability under Leios.](images/leios-forecast-sqrt-fill.svg)
 
-#### Intensive Plutus execution
+<a id="intensive-plutus-execution" href="#intensive-plutus-execution">**Intensive Plutus execution**</a>
 
 Because there typically is a time window of several seconds from the time a
 Leios endorser block can be created to when voting must complete, there is also
@@ -1228,7 +1228,7 @@ effort, the complexity, and the attack surface of the scripts involved.
   a Plutus script. Execution limits currently restrict the complexity of the DSL
   expressions that can be evaluated in a single transaction.
 
-#### Novel use cases
+<a id="novel-user-cases" href="#novel-user-cases">**Novel use cases**</a>
 
 Although the version of Leios proposed in this document does not support the
 particular use cases listed below, a minor variant or future version of Leios
