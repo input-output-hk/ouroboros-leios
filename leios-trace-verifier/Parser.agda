@@ -388,21 +388,20 @@ module _
     unquoteDecl Show-Upkeep        = derive-Show [ (quote SlotUpkeep , Show-Upkeep) ]
     unquoteDecl Show-Upkeep-Stage  = derive-Show [ (quote StageUpkeep , Show-Upkeep-Stage) ]
     unquoteDecl Show-LeiosState    = derive-Show [ (quote LeiosState , Show-LeiosState) ]
-    -- unquoteDecl Show-LeiosInput    = derive-Show [ (quote LeiosInput , Show-LeiosInput) ]
+
+    instance
+      Show-FFDT-Out : Show (FFDT Out)
+      Show-FFDT-Out .show (FFDT.FFD-OUT l) = "FFD-OUT, length " ◇ show (length l)
+      Show-FFDT-Out .show FFDT.SLOT        = "SLOT"
+      Show-FFDT-Out .show FFDT.FTCH        = "FTCH"
 
     s₀ : LeiosState
     s₀ = initLeiosState tt stakeDistribution ((SUT-id , tt) ∷ [])
 
     format-Err-verifyAction :  ∀ {α i s} → Err-verifyAction α i s → Pair String String
-    format-Err-verifyAction {α} {i} {s} e =
-        "Invalid Action: Slot " ◇ show α ,
-        "Parameters: " ◇ show params ◇ nl ◇
-        -- "Input: " ◇ show i ◇ nl ◇
-        "LeiosState: " ◇ show s -- ◇ nl ◇
-        -- "Error: " ◇ show e
-      where
-        nl : String
-        nl = "\n"
+    format-Err-verifyAction {α} {i} {s} (E-Err-Slot _)         = "Invalid Slot", "Parameters: " ◇ show params ◇ "Input: " ◇ show i ◇ "LeiosState: " ◇ show s
+    format-Err-verifyAction {α} {i} {s} (E-Err-CanProduceIB _) = "Can not produce IB", "Parameters: " ◇ show params ◇ "Input: " ◇ show i ◇ "LeiosState: " ◇ show s
+    format-Err-verifyAction {α} {i} {s} dummyErr               = "Error", "Parameters: " ◇ show params ◇ "Input: " ◇ show i ◇ "LeiosState: " ◇ show s
 
     format-error : ∀ {αs s} → Err-verifyTrace αs s → Pair String String
     format-error {(α , i) ∷ []} {s} (Err-StepOk x) = "Error step" , show α
