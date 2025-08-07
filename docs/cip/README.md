@@ -588,12 +588,12 @@ RbHeaderRelay is a **pull-based relay protocol** that enables nodes to request a
 
 Ouroboros Leios directly addresses key challenges outlined in [CPS-18 Greater Transaction Throughput][cps-18] through four strategic design priorities that balance throughput improvements with practical deployment considerations. These priorities are:
 
-1. Economic sustainability
-2. Reasonable time to market
-3. Minimal downstream impact
-4. Competitive positioning
+1. [Economic sustainability](#economic-sustainability)
+2. [Reasonable time to market](#time-to-market)
+3. [Minimal downstream impact](#downstream-impact)
+4. [Competitive positioning](#competitiveness)
 
-#### Economic sustainability: Capacity without utilization risk
+<a name="economic-sustainability"></a>**Economic sustainability: Capacity without utilization risk**
 
 A central challenge identified in CPS-18 is economic sustainability. As the Cardano Reserve diminishes, transaction fees must replace rewards to maintain network security and SPO profitability. Currently, the Reserve contributes more than 85% of epoch rewards, with less than 15% coming from transaction fees. By 2029, to compensate for Reserve depletion, the network requires approximately 36-50 TPS with average-sized transactions—roughly 10 times current mainnet throughput.
 
@@ -605,7 +605,7 @@ The [economic analysis](#operating-costs) demonstrates that 100 TxB/s provides s
 
 However, delivering this capacity increase within practical timeframes requires careful trade-offs in protocol complexity and implementation scope.
 
-#### Reasonable time to market: Complexity trade-offs
+<a name="time-to-market"></a>**Reasonable time to market: Complexity trade-offs**
 
 CPS-18 emphasizes that throughput solutions must be deployable within reasonable timeframes. This requirement forced critical trade-offs between theoretical optimality and practical implementation speed.
 
@@ -617,7 +617,7 @@ CPS-18 emphasizes that throughput solutions must be deployable within reasonable
 
 Beyond implementation speed, successful protocol deployment requires minimizing disruption to existing ecosystem participants.
 
-#### Minimal downstream impact: Ecosystem preservation
+<a name="downstream-impact"></a>**Minimal downstream impact: Ecosystem preservation**
 
 The third priority addresses ecosystem disruption, recognizing that protocol changes affecting dApps, wallets, and node operators create adoption barriers that could delay or prevent deployment.
 
@@ -631,7 +631,7 @@ The third priority addresses ecosystem disruption, recognizing that protocol cha
 
 While addressing immediate economic needs and deployment constraints, the protocol design must also position Cardano competitively for future scaling demands.
 
-#### Competitiveness: Solution space positioning
+<a name="competitiveness"></a>**Competitiveness: Solution space positioning**
 
 The fourth priority recognizes that while 10-20x throughput addresses immediate economic sustainability, Cardano must maintain a pathway to higher throughput levels to remain competitive with alternative blockchain architectures.
 
@@ -641,17 +641,19 @@ The fourth priority recognizes that while 10-20x throughput addresses immediate 
 
 **Market positioning**: While competitors achieve higher theoretical throughput through different architectural approaches, the [specified Leios protocol](#specification) provides sufficient capacity for near-term demand while preserving Cardano's unique value propositions around security, determinism, and economic sustainability that differentiate it in the market.
 
-#### Optimal trade-off conclusion
+<a name="optimal-tradeoffs"></a>**Optimal trade-off conclusion**
 
 The [specified Leios protocol](#specification) represents the optimal balance across these four priorities for Cardano's current position. It provides sufficient throughput to address economic sustainability requirements while remaining deployable within practical timeframes, minimizing ecosystem disruption, and preserving future competitive options.
 
 The design deliberately sacrifices theoretical maximum throughput to optimize for practical deployment success, recognizing that a delivered 10-20x improvement provides substantially more value than a theoretical 100x improvement that remains undeployed. This approach directly addresses CPS-18's core challenge while establishing a foundation for future enhancements as ecosystem maturity and infrastructure capabilities evolve.
 
-These design decisions require empirical validation to demonstrate their effectiveness in practice. The following [performance validation and empirical evidence](#performance-validation-and-empirical-evidence) provides quantitative support for these trade-offs and validates the protocol's performance characteristics under realistic network conditions.
+These design decisions require empirical validation to demonstrate their effectiveness in practice. The following evidence section provides quantitative support for these trade-offs and validates the protocol's performance characteristics under realistic network conditions.
 
-### Performance validation and empirical evidence
+## Evidence
 
-#### Metrics
+This section provides protocol simulation results, feasible protocol parameters with justifications, node-level simulation results, and operating cost analysis that support the design decisions outlined in the rationale.
+
+<a name="performance-metrics"></a>**Performance metrics**
 
 > [!NOTE]
 >
@@ -805,7 +807,7 @@ $$
 `
 $$
 
-### Simulation results
+<a name="simulation-results"></a>**Simulation results**
 
 The Leios paper[^2] provides a rigorous theoretical analysis of the safety and
 throughput of the protocol. That has been reinforced and demonstrated by
@@ -872,7 +874,7 @@ close to 100 seconds.
 
 ![Simulation of transaction lifecycle](images/lifecycle-histogram.png)
 
-### Feasible protocol parameters
+<a name="feasible-parameters"></a>**Feasible protocol parameters**
 
 The table below documents a set of Leios protocol parameters that provided high
 throughput and reasonably fast settlement in the prototype Haskell and Rust
@@ -909,7 +911,7 @@ probability of an adversarial quorum when the adversarial stake is just under
 fluctuations do not prevent an honest quorum. Larger committees require more
 network traffic, of course.
 
-### Resource requirements
+<a name="resource-requirements"></a>**Resource requirements**
 
 > [!WARNING]
 > TODO
@@ -967,7 +969,7 @@ Praos are the higher levels of network egress and the rapidly growing disk space
 to store the Leios blocks. CPU requirements are quite similar to existing Praos
 deployments.
 
-### Operating costs
+<a name="operating-costs"></a>**Operating costs**
 
 A detailed cost analysis of Leios deployment is documented in
 [Leios node operating costs](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/cost-estimate/README.md)
@@ -1016,9 +1018,13 @@ Input Block rate of around 0.52 IB/s, roughly 10 times the current mainnet
 throughput. Leios's design would comfortably support this increased throughput
 while maintaining decentralization.
 
-While the empirical evidence demonstrates Leios's performance capabilities, any protocol modification introduces new attack vectors and operational constraints that must be carefully assessed. The following [threat model and design limitations](#threat-model-and-design-limitations) examines potential security risks and practical constraints that inform deployment considerations.
+While the empirical evidence demonstrates Leios's performance capabilities, any protocol modification introduces new attack vectors and operational constraints that must be carefully assessed. The following section examines potential security risks and practical constraints that inform deployment considerations.
 
-### Threat model and design limitations
+## Trade-offs & Limitations
+
+This section examines the key threats, limitations, and trade-offs inherent in the Leios design, along with their mitigations and consequences for practical deployment.
+
+<a name="solution-space"></a>**Solution space analysis**
 
 > [!WARNING]
 > TODO:
@@ -1111,7 +1117,16 @@ duplicate transactions from reaching IBs and the fee structure will enforce
 payment for intentionally conflicted transactions, even though only one of the
 transactions would make it onto the ledger.
 
-### Use cases
+<a name="key-limitations"></a>**Key limitations**
+
+> [!WARNING]
+> TODO:
+> - ΔEB timing constraints and consequences
+> - High-throughput liveness analysis
+> - Praos safety argument impacts
+> - Increased latency trade-offs
+
+<a name="ecosystem-impact"></a>**Impact onto ecosystem**
 
 > [!WARNING]
 > TODO:
@@ -1233,14 +1248,32 @@ could.
   production. In addition to enabling flexible configuration of Cardano worker
   services, this could encourage new operational models for SPO consortia.
 
-The current specification delivers immediate throughput benefits while preserving pathways to these enhanced capabilities. The following [roadmap and future directions](#roadmap-and-future-directions) outlines how this foundation can evolve toward even higher performance and expanded functionality as the ecosystem matures.
+The current specification delivers immediate throughput benefits while preserving pathways to these enhanced capabilities. The following section outlines how this foundation can evolve toward even higher performance and expanded functionality as the ecosystem matures.
 
-### Roadmap and future directions
+## Roadmap & Next Steps
+
+This section outlines alternative approaches, future work, and extensions that build upon the specified Leios protocol to achieve even higher performance and expanded functionality.
+
+<a name="alternatives"></a>**Alternative approaches**
 
 > [!WARNING]
 > TODO:
-> - alternatives / future work / extensions of proposed design
-> - venn diagram of solution space?
+> - alternatives analysis (e.g., Praos big blocks)
+> - solution space positioning
+
+<a name="next-steps"></a>**Next steps**
+
+> [!WARNING]
+> TODO:
+> - immediate next steps for development
+> - future work and extensions of proposed design
+
+<a name="roadmap"></a>**Long-term roadmap**
+
+> [!WARNING]
+> TODO:
+> - pathway to higher throughput variants
+> - integration with other scaling solutions
 
 ## Path to active
 
