@@ -206,6 +206,37 @@ The plots below show the *throughput* (defined as the size of the RBs and of the
 
 Implemented a first pass at Linear Leios.
 
+## 2025-07-10
+
+### Trace verifier performance
+
+With the performance improvements in https://github.com/agda/agda-stdlib-meta/pull/34 the Leios trace verifier performance increased by about 35%
+
+```bash
+yves@nucli ~/code/ouroboros-leios (yveshauser/full-short-leios-trace-verifier)$ nix run .#leios-trace-verifier -- +RTS -H1G -s -RTS --trace-file sim-rs-late.out --config-file data/simulation/config.default.yaml --topology-file leios-trace-verifier/examples/topology.yaml --idSut 0
+Applying 25681 actions
+ 139,181,011,496 bytes allocated in the heap
+     430,474,440 bytes copied during GC
+     111,762,504 bytes maximum residency (6 sample(s))
+         816,056 bytes maximum slop
+            1054 MiB total memory in use (0 MiB lost due to fragmentation)
+
+                                     Tot time (elapsed)  Avg pause  Max pause
+  Gen  0       160 colls,     0 par    0.329s   0.330s     0.0021s    0.0263s
+  Gen  1         6 colls,     0 par    0.177s   0.177s     0.0295s    0.0807s
+
+  INIT    time    0.000s  (  0.000s elapsed)
+  MUT     time   26.016s  ( 26.028s elapsed)
+  GC      time    0.506s  (  0.506s elapsed)
+  EXIT    time    0.000s  (  0.000s elapsed)
+  Total   time   26.522s  ( 26.535s elapsed)
+
+  %GC     time       0.0%  (0.0% elapsed)
+
+  Alloc rate    5,349,901,546 bytes per MUT second
+
+  Productivity  98.1% of total user, 98.1% of total elapsed
+```
 ## 2025-07-08
 
 ### Small tx experiment

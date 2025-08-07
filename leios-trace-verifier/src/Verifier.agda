@@ -1,4 +1,5 @@
 open import Prelude.AssocList
+open import Prelude.Result
 
 open import Leios.Config
 open import Leios.Prelude hiding (id)
@@ -13,98 +14,9 @@ open import Foreign.Haskell.Pair
 open import Tactic.Defaults
 open import Tactic.Derive.Show
 
-module Parser where
+open import Parser
 
-{-# FOREIGN GHC
-  {-# LANGUAGE OverloadedStrings #-}
-#-}
-
-postulate
-  Int   : Set
-  Micro : Set
-  Map   : Set → Set → Set
-  elems : ∀ {k v} → Map k v → List v
-  trunc : Micro → ℕ
-
-{-# FOREIGN GHC
-  import Data.Word
-  import Data.Fixed
-  import qualified Data.Map as M
-  import qualified Data.ByteString.Lazy.Char8 as BSL8
-  import LeiosEvents
-
-  elems' :: () -> () -> M.Map k v -> [v]
-  elems' _ _ = M.elems
-
-  trunc' :: Micro -> Integer
-  trunc' = floor
-#-}
-
-{-# COMPILE GHC Micro = type Data.Fixed.Micro #-}
-{-# COMPILE GHC Map   = type M.Map #-}
-{-# COMPILE GHC Int   = type Int #-}
-{-# COMPILE GHC elems = elems' #-}
-{-# COMPILE GHC trunc = trunc' #-}
-
-Bytes      = Word64
-SlotNo     = Word64
-PipelineNo = Word64
-Time       = Micro
-
-data NetworkAction : Type where
-  Sent Received : NetworkAction
-
-{-# COMPILE GHC NetworkAction = data NetworkAction (Sent | Received) #-}
-
-data BlockKind : Type where
-  IB EB VT RB : BlockKind
-
-{-# COMPILE GHC BlockKind = data BlockKind (IB | EB | VT | RB) #-}
-
-Node = String
-
-record BlockRef : Type where
-  field id : String
-
-{-# COMPILE GHC BlockRef = data BlockRef (BlockRef) #-}
-
-record Endorsement : Type where
-  field eb : BlockRef
-
-{-# COMPILE GHC Endorsement = data Endorsement (Endorsement) #-}
-
-postulate
-  Nullable : Type → Type
-  unwrap : ∀ {a} → Nullable a → Maybe a
-
-{-# COMPILE GHC Nullable = type Nullable #-}
-{-# FOREIGN GHC
-  unwrap' :: () -> Nullable a -> Maybe a
-  unwrap' _ (Nullable x) = x
-#-}
-{-# COMPILE GHC unwrap = unwrap' #-}
-
-data Event : Type where
-  Slot : String → SlotNo → Event
-  Cpu : String → Time → String → String → Event
-  NoIBGenerated NoEBGenerated NoVTBundleGenerated : String → SlotNo → Event
-  IBSent EBSent VTBundleSent RBSent IBReceived EBReceived VTBundleReceived : Maybe Node → Node → Maybe Bytes → Maybe Time → String → Maybe (List String) → Event
-  RBReceived : Maybe Node → Node → Maybe Bytes → Maybe Time → String → Maybe (List String) → Event
-  IBEnteredState EBEnteredState VTBundleEnteredState RBEnteredState : String → String → Word64 → Event
-  IBGenerated : String → String → SlotNo → PipelineNo → Bytes → Bytes → Maybe String → Event
-  EBGenerated : String → String → Word64 → PipelineNo → Word64 → List BlockRef → List BlockRef → Event
-  RBGenerated : String → String → Word64 → Word64 → Nullable Endorsement → Maybe (List Endorsement) → Word64 → Nullable BlockRef → Event
-  VTBundleGenerated : String → String → Word64 → PipelineNo → Word64 → Map String Word64 → Event
-
-{-# COMPILE GHC Event = data Event (Slot | Cpu | NoIBGenerated | NoEBGenerated | NoVTBundleGenerated | IBSent | EBSent | VTBundleSent | RBSent | IBReceived | EBReceived | VTBundleReceived | RBReceived | IBEnteredState | EBEnteredState | VTBundleEnteredState | RBEnteredState | IBGenerated | EBGenerated | RBGenerated | VTBundleGenerated) #-}
-
-record TraceEvent : Type where
-  field time_s : Time
-        message : Event
-
-{-# COMPILE GHC TraceEvent = data TraceEvent (TraceEvent) #-}
-
-module _
+module Verifier
   (numberOfParties : ℕ)
   (sutId : ℕ)
   (stakeDistr : List (Pair String ℕ))
@@ -218,6 +130,7 @@ module _
 
     record State : Type where
       field refs : AssocList String Blk
+            blks : List Blk
 
     instance
       Hashable-InputBlock : Hashable InputBlock (List ℕ)
@@ -244,24 +157,33 @@ module _
     ... | nothing          = error $ "IB expected, got nothing (" ◇ r ◇ " / " ◇ show refs ◇ ")"
 
     open State
+    open Types params
+    open import CategoricalCrypto hiding (_∘_)
 
-    traceEvent→action : State → TraceEvent → State × List ((Action × LeiosInput) ⊎ FFDUpdate)
+    blksToHeaderAndBodyList : List Blk → List (FFDA.Header ⊎ FFDA.Body)
+    blksToHeaderAndBodyList [] = []
+    blksToHeaderAndBodyList (IB-Blk ib ∷ l) = inj₁ (GenFFD.ibHeader (InputBlock.header ib)) ∷ inj₂ (GenFFD.ibBody (InputBlock.body ib)) ∷ blksToHeaderAndBodyList l
+    blksToHeaderAndBodyList (EB-Blk eb ∷ l) = inj₁ (GenFFD.ebHeader eb) ∷ blksToHeaderAndBodyList l
+    blksToHeaderAndBodyList (VT-Blk vt ∷ l) = inj₁ (GenFFD.vtHeader vt) ∷ blksToHeaderAndBodyList l
+    blksToHeaderAndBodyList (RB-Blk vt ∷ l) = blksToHeaderAndBodyList l
+
+    traceEvent→action : State → TraceEvent → State × List (Action × FFDT Out)
     traceEvent→action l record { message = Slot p s }
       with p ≟ SUT
-    ... | yes _ = l , (inj₁ (Base₂b-Action (primWord64ToNat s) , SLOT)) ∷ (inj₁ (Slot-Action (primWord64ToNat s) , SLOT)) ∷ []
+    ... | yes _ = record l { blks = [] } , (Base₂b-Action (primWord64ToNat s) , FFDT.SLOT) ∷ (Slot-Action (primWord64ToNat s) , FFDT.FFD-OUT (blksToHeaderAndBodyList (blks l))) ∷ []
     ... | no _  = l , []
     traceEvent→action l record { message = Cpu _ _ _ _ } = l , []
     traceEvent→action l record { message = NoIBGenerated p s }
       with p ≟ SUT
-    ... | yes _ = l , (inj₁ (No-IB-Role-Action (primWord64ToNat s), SLOT) ∷ [])
+    ... | yes _ = l , (No-IB-Role-Action (primWord64ToNat s), FFDT.SLOT) ∷ []
     ... | no _  = l , []
     traceEvent→action l record { message = NoEBGenerated p s }
       with p ≟ SUT
-    ... | yes _ = l , (inj₁ (No-EB-Role-Action (primWord64ToNat s), SLOT) ∷ [])
+    ... | yes _ = l , (No-EB-Role-Action (primWord64ToNat s), FFDT.SLOT) ∷ []
     ... | no _  = l , []
     traceEvent→action l record { message = NoVTBundleGenerated p s }
       with p ≟ SUT
-    ... | yes _ = l , (inj₁ (No-VT-Role-Action (primWord64ToNat s), SLOT) ∷ [])
+    ... | yes _ = l , (No-VT-Role-Action (primWord64ToNat s), FFDT.SLOT) ∷ []
     ... | no _  = l , []
     traceEvent→action l record { message = IBSent _ _ _ _ _ _ } = l , []
     traceEvent→action l record { message = EBSent _ _ _ _ _ _ } = l , []
@@ -269,15 +191,15 @@ module _
     traceEvent→action l record { message = RBSent _ _ _ _ _ _ } = l , []
     traceEvent→action l record { message = IBReceived _ p _ _ i _ }
       with p ≟ SUT | refs l ⁉ i
-    ... | yes _ | just (IB-Blk ib) = l , inj₂ (IB-Recv-Update ib) ∷ []
+    ... | yes _ | just ib = record l { blks = ib ∷ blks l } , []
     ... | _ | _ = l , []
     traceEvent→action l record { message = EBReceived _ p _ _ i _ }
       with p ≟ SUT | refs l ⁉ i
-    ... | yes _ | just (EB-Blk eb) = l , inj₂ (EB-Recv-Update eb) ∷ []
+    ... | yes _ | just eb = record l { blks = eb ∷ blks l } , []
     ... | _ | _ = l , []
     traceEvent→action l record { message = VTBundleReceived _ p _ _ i _ }
       with p ≟ SUT | refs l ⁉ i
-    ... | yes _ | just (VT-Blk vt) = l , inj₂ (VT-Recv-Update vt) ∷ []
+    ... | yes _ | just vt = record l { blks = vt ∷ blks l } , []
     ... | _ | _ = l , []
     traceEvent→action l record { message = RBReceived _ _ _ _ _ _ } = l , []
     traceEvent→action l record { message = IBEnteredState _ _ _ } = l , []
@@ -295,9 +217,9 @@ module _
                       ; body = record { txs = [] } } -- TODO: add transactions
       in record l { refs = (i , IB-Blk ib) ∷ refs l } , actions
       where
-        actions : List (Action × LeiosInput ⊎ FFDUpdate)
+        actions : List (Action × FFDT Out)
         actions with p ≟ SUT
-        ... | yes _ = (inj₁ (IB-Role-Action (primWord64ToNat s) , SLOT)) ∷ []
+        ... | yes _ = (IB-Role-Action (primWord64ToNat s) , FFDT.SLOT) ∷ []
         ... | no _ = []
     traceEvent→action l record { message = EBGenerated p i s _ _ ibs ebs } =
       let eb = record
@@ -310,17 +232,17 @@ module _
                  }
       in record l { refs = (i , EB-Blk eb) ∷ refs l } , actions
       where
-        actions : List (Action × LeiosInput ⊎ FFDUpdate)
+        actions : List (Action × FFDT Out)
         actions with p ≟ SUT
-        ... | yes _ = (inj₁ (EB-Role-Action (primWord64ToNat s) [] [] , SLOT)) ∷ []
+        ... | yes _ = (EB-Role-Action (primWord64ToNat s) [] [] , FFDT.SLOT) ∷ []
         ... | no _  = []
     traceEvent→action l record { message = VTBundleGenerated p i s _ _ vts } =
       let vt = map (const tt) (elems vts)
       in record l { refs = (i , VT-Blk vt) ∷ refs l } , actions
       where
-        actions : List (Action × LeiosInput ⊎ FFDUpdate)
+        actions : List (Action × FFDT Out)
         actions with p ≟ SUT
-        ... | yes _ = (inj₁ (VT-Role-Action (primWord64ToNat s) , SLOT)) ∷ []
+        ... | yes _ = (VT-Role-Action (primWord64ToNat s) , FFDT.SLOT) ∷ []
         ... | no _  = []
     traceEvent→action l record { message = RBGenerated p i s _ eb _ _ _ }
       with (unwrap eb)
@@ -340,11 +262,6 @@ module _
     result : ∀ {E A S : Type} → (f : A → S) → (g : E → S) → Result E A → S
     result f g (Ok x) = f x
     result f g (Err x) = g x
-
-{-
-    unquoteDecl Show-FFDBuffers = derive-Show [ (quote FFDBuffers , Show-FFDBuffers) ]
-    unquoteDecl Show-Action = derive-Show [ (quote Action , Show-Action) ]
--}
 
     instance
       Show-FFDBuffers : Show FFDBuffers
@@ -377,46 +294,38 @@ module _
       Show-⊎ .show (inj₁ x) = show x
       Show-⊎ .show (inj₂ y) = show y
 
-    unquoteDecl Show-FFDUpdate     = derive-Show [ (quote FFDUpdate , Show-FFDUpdate) ]
     unquoteDecl Show-NetworkParams = derive-Show [ (quote NetworkParams , Show-NetworkParams) ]
     unquoteDecl Show-Params        = derive-Show [ (quote Params , Show-Params) ]
     unquoteDecl Show-Upkeep        = derive-Show [ (quote SlotUpkeep , Show-Upkeep) ]
     unquoteDecl Show-Upkeep-Stage  = derive-Show [ (quote StageUpkeep , Show-Upkeep-Stage) ]
     unquoteDecl Show-LeiosState    = derive-Show [ (quote LeiosState , Show-LeiosState) ]
-    unquoteDecl Show-LeiosInput    = derive-Show [ (quote LeiosInput , Show-LeiosInput) ]
+
+    instance
+      Show-FFDT-Out : Show (FFDT Out)
+      Show-FFDT-Out .show (FFDT.FFD-OUT l) = "FFD-OUT, length " ◇ show (length l)
+      Show-FFDT-Out .show FFDT.SLOT        = "SLOT"
+      Show-FFDT-Out .show FFDT.FTCH        = "FTCH"
 
     s₀ : LeiosState
-    s₀ = initLeiosState tt stakeDistribution tt ((SUT-id , tt) ∷ [])
+    s₀ = initLeiosState tt stakeDistribution ((SUT-id , tt) ∷ [])
 
     format-Err-verifyAction :  ∀ {α i s} → Err-verifyAction α i s → Pair String String
-    format-Err-verifyAction {α} {i} {s} (E-Err e) =
-        "Invalid Action: Slot " ◇ show α ,
-        "Parameters: " ◇ show params ◇ nl ◇
-        "Input: " ◇ show i ◇ nl ◇
-        "LeiosState: " ◇ show s
-      where
-        nl : String
-        nl = "\n"
-
-    format-Err-verifyUpdate : ∀ {μ s} → Err-verifyUpdate μ s → Pair String String
-    format-Err-verifyUpdate {μ} (E-Err _) = "Invalid Update" , show μ
+    format-Err-verifyAction {α} {i} {s} (E-Err-Slot _)         = "Invalid Slot", "Parameters: " ◇ show params ◇ " Input: " ◇ show i ◇ " LeiosState: " ◇ show s
+    format-Err-verifyAction {α} {i} {s} (E-Err-CanProduceIB _) = "Can not produce IB", "Parameters: " ◇ show params ◇ " Input: " ◇ show i ◇ " LeiosState: " ◇ show s
+    format-Err-verifyAction {α} {i} {s} dummyErr               = "Transition Error", "Action: " ◇ show α ◇ " Parameters: " ◇ show params ◇ " Input: " ◇ show i ◇ " LeiosState: " ◇ show s
 
     format-error : ∀ {αs s} → Err-verifyTrace αs s → Pair String String
-    format-error {inj₁ (α , i) ∷ []} {s} (Err-StepOk x) = "Error step" , show α
-    format-error {inj₁ (α , i) ∷ αs} {s} (Err-StepOk x) = format-error x
-    format-error {inj₂ μ ∷ []} {s} (Err-UpdateOk x)     = "Error update" , show μ
-    format-error {inj₂ μ ∷ αs} {s} (Err-UpdateOk x)     = format-error x
-    format-error {inj₁ (α , i) ∷ []} {s} (Err-Action x) = format-Err-verifyAction x
-    format-error {inj₁ (α , i) ∷ αs} {s} (Err-Action x) = format-Err-verifyAction x
-    format-error {inj₂ μ ∷ []} {s} (Err-Update x)       = format-Err-verifyUpdate x
-    format-error {inj₂ μ ∷ αs} {s} (Err-Update x)       = format-Err-verifyUpdate x
+    format-error {(α , i) ∷ []} {s} (Err-StepOk x) = "Error step" , show α
+    format-error {(α , i) ∷ αs} {s} (Err-StepOk x) = format-error x
+    format-error {(α , i) ∷ []} {s} (Err-Action x) = format-Err-verifyAction x
+    format-error {(α , i) ∷ αs} {s} (Err-Action x) = format-Err-verifyAction x
 
     opaque
       unfolding List-Model
 
       verifyTrace' : LeiosState → Pair ℕ (Pair String String)
       verifyTrace' s =
-        let n₀ = record { refs = [] }
+        let n₀ = record { refs = [] ; blks = [] }
             l' = proj₂ $ mapAccuml traceEvent→action n₀ l
             αs = L.reverse (L.concat l')
             tr = checkTrace αs s

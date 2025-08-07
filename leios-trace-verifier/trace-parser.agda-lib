@@ -7,4 +7,4 @@ depend:
   iog-prelude
   leios-spec
 include:
-  .
+  src

@@ -29,5 +29,5 @@ all: $(HS_LEIOS)
 clean:
 	rm -rf _build dist dist-newstyle
 
-$(HS_LEIOS): trace-parser.agda
+$(HS_LEIOS): src/trace-parser.agda
 	$(call agdaToHs,trace-parser)
