@@ -16,6 +16,7 @@ module ModelTCP (
   TcpMsgForecast (..),
   forecastTcpMsgSend,
   TcpEvent (..),
+  lensTcpEvent,
   traceTcpSend,
   mkTcpConnProps,
   kibibytes,
@@ -365,6 +366,9 @@ data TcpEvent msg
       TcpMsgForecast -- overall
       [TcpMsgForecast] -- tcp internal activity
   deriving (Show, Functor)
+
+lensTcpEvent :: Functor f => (a -> f b) -> TcpEvent a -> f (TcpEvent b)
+lensTcpEvent f (TcpSendMsg x y z) = (\x' -> TcpSendMsg x' y z) <$> f x
 
 traceTcpSend ::
   TcpConnProps ->
