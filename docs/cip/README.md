@@ -649,7 +649,7 @@ The design deliberately sacrifices theoretical maximum throughput to optimize fo
 
 These design decisions require empirical validation to demonstrate their effectiveness in practice. The following evidence section provides quantitative support for these trade-offs and validates the protocol's performance characteristics under realistic network conditions.
 
-## Evidence
+### Evidence
 
 This section provides protocol simulation results, feasible protocol parameters with justifications, node-level simulation results, and operating cost analysis that support the design decisions outlined in the rationale.
 
@@ -1020,7 +1020,7 @@ while maintaining decentralization.
 
 While the empirical evidence demonstrates Leios's performance capabilities, any protocol modification introduces new attack vectors and operational constraints that must be carefully assessed. The following section examines potential security risks and practical constraints that inform deployment considerations.
 
-## Trade-offs & Limitations
+### Trade-offs & Limitations
 
 This section examines the key threats, limitations, and trade-offs inherent in the Leios design, along with their mitigations and consequences for practical deployment.
 
@@ -1250,7 +1250,7 @@ could.
 
 The current specification delivers immediate throughput benefits while preserving pathways to these enhanced capabilities. The following section outlines how this foundation can evolve toward even higher performance and expanded functionality as the ecosystem matures.
 
-## Roadmap & Next Steps
+### Roadmap & Next Steps
 
 This section outlines alternative approaches, future work, and extensions that build upon the specified Leios protocol to achieve even higher performance and expanded functionality.
 
