@@ -248,6 +248,11 @@ export interface Config {
    * where nodes deliberately withhold EBs until near the end of the voting phase.
    */
   "late-eb-attack"?: LateEBAttackConfig | null;
+  /**
+   * Configuration for a "late TX" attack,
+   * where EB producers create TXs which they do not disseminate until also disseminating the EB.
+   */
+  "late-tx-attack"?: LateTXAttackConfig | null;
 }
 
 export type CleanupPolicies = "all" | CleanupPolicy[];
@@ -327,7 +332,25 @@ export enum MempoolSamplingStrategy {
  */
 export interface LateEBAttackConfig {
   /** The set of stake pools which are participating in the attack. */
-  "attacker-nodes": string[],
+  "attackers": NodeSelection,
   /** How long the attackers will wait before diffusing their EBs */
   "propagation-delay-ms": number,
+}
+
+/**
+ * Configuration for a "late TX" attack,
+ * where EB producers create TXs which they do not disseminate until also disseminating the EB.
+ */
+export interface LateTXAttackConfig {
+  /** The set of stake pools which are participating in the attack. */
+  attackers: NodeSelection,
+  /** How often does one of these nodes perform this attack when they get the chance? */
+  "attack-probability": number,
+  /** How many transactions are generated as part of the attack? */
+  "tx-generation-distribution": Distribution,
+}
+
+export type NodeSelection = NodesNodeSelection;
+export interface NodesNodeSelection {
+  "nodes": string[];
 }
