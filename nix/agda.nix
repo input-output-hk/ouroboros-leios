@@ -30,7 +30,7 @@ let
     src = ../leios-trace-verifier;
     meta = { };
     libraryFile = "trace-parser.agda-lib";
-    everythingFile = "trace-parser.agda";
+    everythingFile = "src/trace-parser.agda";
     buildInputs = deps;
   };
   hsTraceParser = pkgs.agdaPackages.mkDerivation {
@@ -40,10 +40,10 @@ let
     src = ../leios-trace-verifier;
     meta = { };
     libraryFile = "trace-parser.agda-lib";
-    everythingFile = "trace-parser.agda";
+    everythingFile = "src/trace-parser.agda";
     buildInputs = deps;
     buildPhase = ''
-      agda --transliterate trace-parser.agda -c --ghc-dont-call-ghc --compile-dir hs-src/src
+      agda --transliterate src/trace-parser.agda -c --ghc-dont-call-ghc --compile-dir hs-src/src
     '';
     installPhase = ''
       mkdir -p $out

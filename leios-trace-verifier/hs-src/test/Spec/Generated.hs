@@ -229,10 +229,10 @@ generated =
         check mzero MustBeOkay <$> transitions actions
     describe "Negative cases" $ do
       single "No actions" $
-        check mzero (MustBe "Invalid Action: Slot Slot-Action 1")
+        check mzero (MustBe "Transition Error")
           <$> transitions [SkipIB, NextSlot, NextSlot]
       single "Start after genesis" $
-        check mzero (MustBe "Invalid Action: Slot Base\8322b-Action 1")
+        check mzero (MustBe "Invalid Slot")
           <$> transitions [SkipSlot, NextSlot]
       {- TODO: equivocation not prohibited in the formal spec
       single "Generate equivocated IBs" $
@@ -240,7 +240,7 @@ generated =
           <$> transitions [GenerateIB, GenerateIB, NextSlot]
       -}
       single "Failure to generate IB" $
-        check mzero (MustBe "Invalid Action: Slot Slot-Action 1")
+        check mzero (MustBe "Transition Error")
           <$> transitions [SkipIB, NextSlot, NextSlot]
       {- TODO: equivocation not prohibited in the formal spec
       single "Generate equivocated EBs" $
@@ -248,7 +248,7 @@ generated =
           <$> transitions [SkipIB, NextSlot, SkipIB, SkipVT, NextSlot, GenerateEB, GenerateEB]
       -}
       single "Failure to generate EB" $
-        check mzero (MustBe "Invalid Action: Slot Slot-Action 6")
+        check mzero (MustBe "Transition Error")
           <$> transitions [SkipIB, NextSlot, SkipIB, NextSlot, SkipIB, NextSlot, SkipIB, NextSlot, SkipIB, NextSlot, SkipIB, NextSlot, SkipIB, NextSlot]
       {- TODO: equivocation not prohibited in the formal spec
       single "Generate equivocated VTs" $
@@ -256,7 +256,7 @@ generated =
           <$> transitions [SkipIB, NextSlot, SkipIB, NextSlot, SkipIB, NextSlot, SkipIB, NextSlot, SkipIB, NextSlot, SkipIB, NextSlot, SkipIB, SkipEB, NextSlot, SkipIB, NextSlot, SkipIB, SkipEB, GenerateVT, NextSlot, SkipIB, GenerateVT, NextSlot]
       -}
       single "Failure to generate VT" $
-        check mzero (MustBe "Invalid Action: Slot Slot-Action 9")
+        check mzero (MustBe "Transition Error")
           <$> transitions [SkipIB, NextSlot, SkipIB, NextSlot, SkipIB, NextSlot, SkipIB, NextSlot, SkipIB, NextSlot, SkipIB, NextSlot, SkipIB, SkipEB, NextSlot, SkipIB, NextSlot, SkipIB, SkipEB, NextSlot, SkipIB, NextSlot]
 
 {- TODO: equivocation not prohibited in the formal spec
