@@ -8,7 +8,7 @@ use tokio::sync::mpsc;
 use crate::{
     clock::{ClockBarrier, Timestamp},
     config::{NodeId, RealTransactionConfig, SimConfiguration, TransactionConfig},
-    model::{Transaction, TransactionId},
+    model::Transaction,
 };
 
 struct NodeState {
@@ -21,7 +21,6 @@ pub struct TransactionProducer {
     rng: ChaChaRng,
     clock: ClockBarrier,
     nodes: HashMap<NodeId, NodeState>,
-    ib_shards: u64,
     config: Option<RealTransactionConfig>,
 }
 
@@ -52,7 +51,6 @@ impl TransactionProducer {
             rng,
             clock,
             nodes,
-            ib_shards: config.ib_shards,
             config: match &config.transactions {
                 TransactionConfig::Real(config) => Some(config.clone()),
                 _ => None,
@@ -65,9 +63,7 @@ impl TransactionProducer {
             self.clock.wait_forever().await;
             return Ok(());
         };
-        let mut next_tx_id = 0;
         let mut next_tx_at = Timestamp::zero();
-        let mut next_input_id = 0;
         let mut rng = &mut self.rng;
 
         if let Some(start) = config.start_time {
@@ -85,34 +81,10 @@ impl TransactionProducer {
             let node_id = node_lookup.sample(rng).unwrap();
             let node = self.nodes.get(node_id).unwrap();
 
-            let conflict_fraction = node
-                .tx_conflict_fraction
-                .unwrap_or(config.conflict_fraction);
-
-            let id = TransactionId::new(next_tx_id);
-            let shard = rng.random_range(0..self.ib_shards);
-            let bytes = (config.size_bytes.sample(&mut rng) as u64).min(config.max_size);
-            let input_id = if next_input_id > 0 && rng.random_bool(conflict_fraction) {
-                next_input_id - 1
-            } else {
-                let id = next_input_id;
-                next_input_id += 1;
-                id
-            };
-            let overcollateralization_factor =
-                config.overcollateralization_factor.sample(&mut rng) as u64;
-
-            let tx = Transaction {
-                id,
-                shard,
-                bytes,
-                input_id,
-                overcollateralization_factor,
-            };
+            let tx = config.new_tx(rng, node.tx_conflict_fraction);
 
             node.sink.send(Arc::new(tx))?;
 
-            next_tx_id += 1;
             let millis_until_tx = config.frequency_ms.sample(&mut rng) as u64;
             next_tx_at += Duration::from_millis(millis_until_tx);
 

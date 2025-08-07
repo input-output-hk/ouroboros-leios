@@ -1,5 +1,6 @@
 mod attackers;
 pub use attackers::register_actors;
+use rand_distr::Distribution;
 use tokio::sync::mpsc;
 
 use std::{
@@ -14,8 +15,8 @@ use rand_chacha::ChaChaRng;
 use crate::{
     clock::{Clock, Timestamp},
     config::{
-        CpuTimeConfig, LeiosVariant, MempoolSamplingStrategy, NodeConfiguration, NodeId,
-        RelayStrategy, SimConfiguration, TransactionConfig,
+        CpuTimeConfig, LeiosVariant, MempoolSamplingStrategy, NodeBehaviours, NodeConfiguration,
+        NodeId, RelayStrategy, SimConfiguration, TransactionConfig,
     },
     events::EventTracker,
     model::{
@@ -116,7 +117,7 @@ pub enum CpuTask {
     /// A transaction has been received and validated, and is ready to propagate
     TransactionValidated(NodeId, Arc<Transaction>),
     /// A ranking block has been generated and is ready to propagate
-    RBBlockGenerated(RankingBlock, EndorserBlock),
+    RBBlockGenerated(RankingBlock, EndorserBlock, Vec<Arc<Transaction>>),
     /// An RB header has been received and validated, and ready to propagate
     RBHeaderValidated(NodeId, RankingBlockHeader, bool, bool),
     /// A ranking block has been received and validated, and is ready to propagate
@@ -135,7 +136,7 @@ impl SimCpuTask for CpuTask {
     fn name(&self) -> String {
         match self {
             Self::TransactionValidated(_, _) => "ValTX",
-            Self::RBBlockGenerated(_, _) => "GenRB",
+            Self::RBBlockGenerated(_, _, _) => "GenRB",
             Self::RBHeaderValidated(_, _, _, _) => "ValRH",
             Self::RBBlockValidated(_) => "ValRB",
             Self::EBHeaderValidated(_, _) => "ValEH",
@@ -149,7 +150,7 @@ impl SimCpuTask for CpuTask {
     fn extra(&self) -> String {
         match self {
             Self::TransactionValidated(_, _) => "".to_string(),
-            Self::RBBlockGenerated(_, _) => "".to_string(),
+            Self::RBBlockGenerated(_, _, _) => "".to_string(),
             Self::RBHeaderValidated(_, _, _, _) => "".to_string(),
             Self::RBBlockValidated(_) => "".to_string(),
             Self::EBHeaderValidated(_, _) => "".to_string(),
@@ -162,7 +163,7 @@ impl SimCpuTask for CpuTask {
     fn times(&self, config: &CpuTimeConfig) -> Vec<Duration> {
         match self {
             Self::TransactionValidated(_, _) => vec![config.tx_validation],
-            Self::RBBlockGenerated(_, _) => {
+            Self::RBBlockGenerated(_, _, _) => {
                 vec![config.rb_generation, config.eb_generation]
             }
             Self::RBHeaderValidated(_, _, _, _) => vec![config.rb_head_validation],
@@ -279,6 +280,7 @@ pub struct LinearLeiosNode {
     ledger_states: BTreeMap<BlockId, Arc<LedgerState>>,
     praos: NodePraosState,
     leios: NodeLeiosState,
+    behaviours: NodeBehaviours,
 
     eb_withholding_sender: Option<EBWithholdingSender>,
     eb_withholding_event_source: Option<mpsc::UnboundedReceiver<EBWithholdingEvent>>,
@@ -312,6 +314,7 @@ impl NodeImpl for LinearLeiosNode {
             ledger_states: BTreeMap::new(),
             praos: NodePraosState::default(),
             leios: NodeLeiosState::default(),
+            behaviours: config.behaviours.clone(),
             eb_withholding_sender: None,
             eb_withholding_event_source: None,
         }
@@ -368,7 +371,9 @@ impl NodeImpl for LinearLeiosNode {
     fn handle_cpu_task(&mut self, task: Self::Task) -> EventResult {
         match task {
             CpuTask::TransactionValidated(from, tx) => self.propagate_tx(from, tx),
-            CpuTask::RBBlockGenerated(rb, eb) => self.finish_generating_rb(rb, eb),
+            CpuTask::RBBlockGenerated(rb, eb, withheld_txs) => {
+                self.finish_generating_rb(rb, eb, withheld_txs)
+            }
             CpuTask::RBHeaderValidated(from, header, has_body, has_eb) => {
                 self.finish_validating_rb_header(from, header, has_body, has_eb)
             }
@@ -392,8 +397,12 @@ impl NodeImpl for LinearLeiosNode {
 
     fn handle_custom_event(&mut self, event: Self::CustomEvent) -> EventResult {
         match event {
-            EBWithholdingEvent::NewEB(eb) => self.receive_withheld_eb(eb),
-            EBWithholdingEvent::DisseminateEB(eb_id) => self.disseminate_withheld_eb(eb_id),
+            EBWithholdingEvent::NewEB(eb, withheld_txs) => {
+                self.receive_withheld_eb(eb, withheld_txs)
+            }
+            EBWithholdingEvent::DisseminateEB(eb, withheld_txs) => {
+                self.disseminate_withheld_eb(eb, withheld_txs)
+            }
         }
         std::mem::take(&mut self.queued)
     }
@@ -490,12 +499,22 @@ impl LinearLeiosNode {
             pipeline: 0,
             producer: self.id,
         };
+
         let mut eb_transactions = vec![];
+
+        // If we are performing a "withheld TX" attack, we will include a bunch of brand-new TXs in this EB.
+        // They will get disseminated through the network at the same time as the EB.
+        let withheld_txs = self.generate_withheld_txs();
+        eb_transactions.extend(withheld_txs.iter().cloned());
+
         if let TransactionConfig::Mock(config) = &self.sim_config.transactions {
             // Add one transaction, the right size for the extra RB payload
-            let tx = config.mock_tx(config.eb_size);
-            self.tracker.track_transaction_generated(&tx, self.id);
-            eb_transactions.push(Arc::new(tx));
+            let extra_size = config.eb_size - withheld_txs.iter().map(|tx| tx.bytes).sum::<u64>();
+            if extra_size > 0 {
+                let tx = config.mock_tx(extra_size);
+                self.tracker.track_transaction_generated(&tx, self.id);
+                eb_transactions.push(Arc::new(tx));
+            }
         } else {
             self.sample_from_mempool(&mut eb_transactions, self.sim_config.max_eb_size);
         }
@@ -550,13 +569,18 @@ impl LinearLeiosNode {
         };
         self.tracker.track_praos_block_lottery_won(rb.header.id);
         self.queued
-            .schedule_cpu_task(CpuTask::RBBlockGenerated(rb, eb));
+            .schedule_cpu_task(CpuTask::RBBlockGenerated(rb, eb, withheld_txs));
     }
 
-    fn finish_generating_rb(&mut self, rb: RankingBlock, eb: EndorserBlock) {
+    fn finish_generating_rb(
+        &mut self,
+        rb: RankingBlock,
+        eb: EndorserBlock,
+        withheld_txs: Vec<Arc<Transaction>>,
+    ) {
         self.tracker.track_linear_rb_generated(&rb, &eb);
         self.publish_rb(Arc::new(rb), false);
-        self.finish_generating_eb(eb);
+        self.finish_generating_eb(eb, withheld_txs);
     }
 
     fn publish_rb(&mut self, rb: Arc<RankingBlock>, already_sent_header: bool) {
@@ -782,7 +806,7 @@ impl LinearLeiosNode {
 
 // EB operations
 impl LinearLeiosNode {
-    fn finish_generating_eb(&mut self, eb: EndorserBlock) {
+    fn finish_generating_eb(&mut self, eb: EndorserBlock, withheld_txs: Vec<Arc<Transaction>>) {
         let eb_id = eb.id();
         let eb = Arc::new(eb);
         self.leios
@@ -792,11 +816,15 @@ impl LinearLeiosNode {
         if self.should_withhold_ebs() {
             // We're an evil attacker, holding onto this EB until just long enough to collect votes.
             // Send it out-of-band to our evil buddies.
-            self.share_new_withheld_eb(&eb);
+            self.share_new_withheld_eb(&eb, withheld_txs);
         } else {
-            // We're a well-behaved node who will tell all our peers about this EB immediately.
+            // We're a "well-behaved" node who will tell all our peers about this EB immediately.
             for peer in &self.consumers {
                 self.queued.send_to(*peer, Message::AnnounceEB(eb_id));
+                // If we were withholding some of the EB's transactions, start disseminating them now.
+                for tx in &withheld_txs {
+                    self.queued.send_to(*peer, Message::AnnounceTx(tx.id));
+                }
             }
         }
         self.vote_for_endorser_block(&eb, self.clock.now());
@@ -910,25 +938,72 @@ impl LinearLeiosNode {
         self.eb_withholding_sender.is_some()
     }
 
-    fn share_new_withheld_eb(&mut self, eb: &Arc<EndorserBlock>) {
+    fn share_new_withheld_eb(
+        &mut self,
+        eb: &Arc<EndorserBlock>,
+        withheld_txs: Vec<Arc<Transaction>>,
+    ) {
         let sender = self.eb_withholding_sender.as_ref().unwrap();
-        sender.send(eb.clone());
+        sender.send(eb.clone(), withheld_txs);
     }
 
-    fn receive_withheld_eb(&mut self, eb: Arc<EndorserBlock>) {
+    fn receive_withheld_eb(&mut self, eb: Arc<EndorserBlock>, withheld_txs: Vec<Arc<Transaction>>) {
         self.leios
             .ebs
             .insert(eb.id(), EndorserBlockView::Received { eb: eb.clone() });
+        for tx in withheld_txs {
+            // Add the peer's withheld TXs to the list we know of,
+            // but not to our mempools
+            self.txs.insert(tx.id, TransactionView::Received(tx));
+        }
         // If an attacker receives an EB over a side channel,
         // it will skip validation and will not disseminate it to peers.
         // It will, however, try to vote for the EB immediately.
         self.vote_for_endorser_block(&eb, self.clock.now());
     }
 
-    fn disseminate_withheld_eb(&mut self, eb_id: EndorserBlockId) {
+    fn disseminate_withheld_eb(
+        &mut self,
+        eb_id: EndorserBlockId,
+        withheld_txs: Vec<TransactionId>,
+    ) {
         for peer in &self.consumers {
             self.queued.send_to(*peer, Message::AnnounceEB(eb_id));
+            for tx_id in &withheld_txs {
+                self.queued.send_to(*peer, Message::AnnounceTx(*tx_id));
+            }
         }
+    }
+}
+
+// TX withholding:
+// an attack where a stake pool generates EBs with previously unknown
+// transactions, so that they cannot propagate in advance.
+// We implement this by generating the transactions at the same time as the EB itself.
+impl LinearLeiosNode {
+    fn generate_withheld_txs(&mut self) -> Vec<Arc<Transaction>> {
+        if !self.behaviours.withhold_txs {
+            return vec![];
+        }
+        let withhold_tx_config = self.sim_config.attacks.late_tx.as_ref().unwrap();
+        if !self.rng.random_bool(withhold_tx_config.probability) {
+            return vec![];
+        }
+
+        let txs_to_generate = withhold_tx_config.txs_to_generate.sample(&mut self.rng) as u64;
+        let mut txs = vec![];
+        for _ in 0..txs_to_generate {
+            let tx = match &self.sim_config.transactions {
+                TransactionConfig::Real(cfg) => cfg.new_tx(&mut self.rng, None),
+                TransactionConfig::Mock(cfg) => cfg.mock_tx(cfg.eb_size / txs_to_generate),
+            };
+            self.tracker.track_transaction_generated(&tx, self.id);
+            let tx = Arc::new(tx);
+            self.txs
+                .insert(tx.id, TransactionView::Received(tx.clone()));
+            txs.push(tx);
+        }
+        txs
     }
 }
 
@@ -1094,7 +1169,7 @@ impl LinearLeiosNode {
 // Ledger/mempool operations
 impl LinearLeiosNode {
     fn sample_from_mempool(&mut self, txs: &mut Vec<Arc<Transaction>>, max_size: u64) {
-        let mut size = 0;
+        let mut size = txs.iter().map(|tx| tx.bytes).sum::<u64>();
         let mut candidates: Vec<_> = self.praos.mempool.keys().copied().collect();
         if matches!(
             self.sim_config.mempool_strategy,

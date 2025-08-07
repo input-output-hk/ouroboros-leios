@@ -6,6 +6,9 @@ use std::{
 };
 
 use anyhow::{Result, anyhow, bail};
+use rand::Rng;
+use rand_chacha::ChaCha20Rng;
+use rand_distr::Distribution;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -145,6 +148,7 @@ pub struct RawParameters {
 
     // attacks,
     pub late_eb_attack: Option<RawLateEBAttackConfig>,
+    pub late_tx_attack: Option<RawLateTXAttackConfig>,
 }
 
 #[derive(Debug, Copy, Clone, Deserialize, PartialEq, Eq)]
@@ -183,8 +187,22 @@ pub enum MempoolSamplingStrategy {
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct RawLateEBAttackConfig {
-    pub attacker_nodes: Vec<String>,
+    pub attackers: NodeSelection,
     pub propagation_delay_ms: f64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct RawLateTXAttackConfig {
+    pub attackers: NodeSelection,
+    pub attack_probability: f64,
+    pub tx_generation_distribution: DistributionConfig,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum NodeSelection {
+    Nodes(HashSet<String>),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -275,6 +293,23 @@ impl Topology {
         }
         Ok(())
     }
+
+    pub fn select(
+        &mut self,
+        selection: &NodeSelection,
+    ) -> impl Iterator<Item = &mut NodeConfiguration> {
+        let mut nodes = vec![];
+        match selection {
+            NodeSelection::Nodes(names) => {
+                nodes.extend(
+                    self.nodes
+                        .iter_mut()
+                        .filter(|node| names.contains(&node.name)),
+                );
+            }
+        }
+        nodes.into_iter()
+    }
 }
 
 impl From<RawTopology> for Topology {
@@ -284,7 +319,8 @@ impl From<RawTopology> for Topology {
         for (index, (name, node)) in value.nodes.iter().enumerate() {
             let id = NodeId::new(index);
             node_ids.insert(name.clone(), id);
-            let behaviours = NodeBehaviours::parse(&node.adversarial, &node.behaviours);
+            let mut behaviours = NodeBehaviours::parse(&node.adversarial, &node.behaviours);
+            behaviours.generate_conflicts = node.tx_conflict_fraction;
             nodes.insert(
                 id,
                 NodeConfiguration {
@@ -463,6 +499,9 @@ impl TransactionConfig {
     fn new(params: &RawParameters) -> Self {
         if params.simulate_transactions {
             Self::Real(RealTransactionConfig {
+                next_id: Arc::new(AtomicU64::new(0)),
+                input_id: Arc::new(AtomicU64::new(0)),
+                ib_shards: params.ib_shards,
                 max_size: params.tx_max_size_bytes,
                 frequency_ms: params.tx_generation_distribution.into(),
                 size_bytes: params.tx_size_bytes_distribution.into(),
@@ -490,6 +529,9 @@ impl TransactionConfig {
 
 #[derive(Debug, Clone)]
 pub(crate) struct RealTransactionConfig {
+    next_id: Arc<AtomicU64>,
+    input_id: Arc<AtomicU64>,
+    ib_shards: u64,
     pub max_size: u64,
     pub frequency_ms: FloatDistribution,
     pub size_bytes: FloatDistribution,
@@ -497,6 +539,30 @@ pub(crate) struct RealTransactionConfig {
     pub conflict_fraction: f64,
     pub start_time: Option<Timestamp>,
     pub stop_time: Option<Timestamp>,
+}
+
+impl RealTransactionConfig {
+    pub fn new_tx(&self, rng: &mut ChaCha20Rng, conflict_fraction: Option<f64>) -> Transaction {
+        use std::sync::atomic::Ordering::Relaxed;
+        let id = TransactionId::new(self.next_id.fetch_add(1, Relaxed));
+        let shard = rng.random_range(0..self.ib_shards);
+        let bytes = (self.size_bytes.sample(rng) as u64).min(self.max_size);
+        let input_id = if rng.random_bool(conflict_fraction.unwrap_or(self.conflict_fraction)) {
+            // conflict, use id from before
+            self.input_id.load(Relaxed)
+        } else {
+            // no conflict, use new id
+            self.input_id.fetch_add(1, Relaxed) + 1
+        };
+        let overcollateralization_factor = self.overcollateralization_factor.sample(rng) as u64;
+        Transaction {
+            id,
+            shard,
+            bytes,
+            input_id,
+            overcollateralization_factor,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -525,14 +591,24 @@ impl MockTransactionConfig {
 #[derive(Debug, Clone)]
 pub(crate) struct AttackConfig {
     pub(crate) late_eb: Option<LateEBAttackConfig>,
+    pub(crate) late_tx: Option<LateTXAttackConfig>,
 }
 impl AttackConfig {
-    fn build(params: &RawParameters, topology: &Topology) -> Self {
+    fn build(params: &RawParameters, topology: &mut Topology) -> Self {
+        if let Some(late_tx) = &params.late_tx_attack {
+            for attacker in topology.select(&late_tx.attackers) {
+                attacker.behaviours.withhold_txs = true;
+            }
+        }
         Self {
             late_eb: params
                 .late_eb_attack
                 .as_ref()
                 .map(|raw| LateEBAttackConfig::build(raw, topology)),
+            late_tx: params
+                .late_tx_attack
+                .as_ref()
+                .map(|raw| LateTXAttackConfig::build(raw, topology)),
         }
     }
 }
@@ -544,22 +620,32 @@ pub(crate) struct LateEBAttackConfig {
 }
 
 impl LateEBAttackConfig {
-    fn build(raw: &RawLateEBAttackConfig, topology: &Topology) -> Self {
-        let attacker_names = raw.attacker_nodes.iter().collect::<HashSet<_>>();
+    fn build(raw: &RawLateEBAttackConfig, topology: &mut Topology) -> Self {
         let attackers = topology
-            .nodes
-            .iter()
-            .filter_map(|node| {
-                if attacker_names.contains(&node.name) {
-                    Some(node.id)
-                } else {
-                    None
-                }
-            })
+            .select(&raw.attackers)
+            .map(|node| node.id)
             .collect();
         Self {
             attackers,
             propagation_delay: duration_ms(raw.propagation_delay_ms),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct LateTXAttackConfig {
+    pub(crate) probability: f64,
+    pub(crate) txs_to_generate: FloatDistribution,
+}
+
+impl LateTXAttackConfig {
+    fn build(raw: &RawLateTXAttackConfig, topology: &mut Topology) -> Self {
+        for attacker in topology.select(&raw.attackers) {
+            attacker.behaviours.withhold_txs = true;
+        }
+        Self {
+            probability: raw.attack_probability,
+            txs_to_generate: raw.tx_generation_distribution.into(),
         }
     }
 }
@@ -610,7 +696,7 @@ pub struct SimConfiguration {
 }
 
 impl SimConfiguration {
-    pub fn build(params: RawParameters, topology: Topology) -> Result<Self> {
+    pub fn build(params: RawParameters, mut topology: Topology) -> Result<Self> {
         if params.ib_shards % params.ib_shard_group_count != 0 {
             bail!(
                 "ib-shards ({}) is not divisible by ib-shard-group-count ({})",
@@ -630,7 +716,7 @@ impl SimConfiguration {
             );
         }
         let total_stake = topology.nodes.iter().map(|n| n.stake).sum();
-        let attacks = AttackConfig::build(&params, &topology);
+        let attacks = AttackConfig::build(&params, &mut topology);
         Ok(Self {
             seed: 0,
             timestamp_resolution: duration_ms(params.timestamp_resolution_ms),
@@ -704,6 +790,8 @@ pub struct LinkConfiguration {
 #[derive(Debug, Clone, Default)]
 pub struct NodeBehaviours {
     pub ib_equivocation: bool,
+    pub withhold_txs: bool,
+    pub generate_conflicts: Option<f64>,
 }
 
 impl NodeBehaviours {

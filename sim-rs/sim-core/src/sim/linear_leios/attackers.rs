@@ -1,42 +1,46 @@
-use std::{cmp::Reverse, sync::Arc, time::Duration};
+use std::{collections::BinaryHeap, sync::Arc, time::Duration};
 
 use futures::{FutureExt, future::BoxFuture};
-use priority_queue::PriorityQueue;
 use tokio::{select, sync::mpsc};
 
 use super::LinearLeiosNode;
 use crate::{
-    clock::{ClockBarrier, TaskInitiator, Timestamp},
+    clock::{ClockBarrier, FutureEvent, TaskInitiator},
     config::NodeId,
     events::EventTracker,
-    model::{EndorserBlockId, LinearEndorserBlock as EndorserBlock},
+    model::{EndorserBlockId, LinearEndorserBlock as EndorserBlock, Transaction, TransactionId},
     sim::{Actor, ActorInitArgs},
 };
 
 #[derive(Clone)]
 pub struct EBWithholdingSender {
-    sender: mpsc::UnboundedSender<Arc<EndorserBlock>>,
+    sender: mpsc::UnboundedSender<(Arc<EndorserBlock>, Vec<Arc<Transaction>>)>,
     tasks: TaskInitiator,
 }
 impl EBWithholdingSender {
-    pub fn send(&self, message: Arc<EndorserBlock>) {
+    pub fn send(&self, eb: Arc<EndorserBlock>, withheld_txs: Vec<Arc<Transaction>>) {
         self.tasks.start_task();
-        let _ = self.sender.send(message);
+        let _ = self.sender.send((eb, withheld_txs));
     }
 }
 
 pub enum EBWithholdingEvent {
-    NewEB(Arc<EndorserBlock>),
-    DisseminateEB(EndorserBlockId),
+    NewEB(Arc<EndorserBlock>, Vec<Arc<Transaction>>),
+    DisseminateEB(EndorserBlockId, Vec<TransactionId>),
+}
+
+struct DisseminateEBAnnouncement {
+    eb_id: EndorserBlockId,
+    withheld_txs: Vec<TransactionId>,
 }
 
 struct EBWithholdingAttacker {
     tracker: EventTracker,
     clock: ClockBarrier,
     propagation_delay: Duration,
-    receiver: mpsc::UnboundedReceiver<Arc<EndorserBlock>>,
+    receiver: mpsc::UnboundedReceiver<(Arc<EndorserBlock>, Vec<Arc<Transaction>>)>,
     channels: Vec<(NodeId, mpsc::UnboundedSender<EBWithholdingEvent>)>,
-    announcements: PriorityQueue<EndorserBlockId, Reverse<Timestamp>>,
+    announcements: BinaryHeap<FutureEvent<DisseminateEBAnnouncement>>,
 }
 
 impl Actor for EBWithholdingAttacker {
@@ -50,7 +54,7 @@ impl EBWithholdingAttacker {
         tracker: EventTracker,
         clock: ClockBarrier,
         propagation_delay: Duration,
-        receiver: mpsc::UnboundedReceiver<Arc<EndorserBlock>>,
+        receiver: mpsc::UnboundedReceiver<(Arc<EndorserBlock>, Vec<Arc<Transaction>>)>,
         channels: Vec<(NodeId, mpsc::UnboundedSender<EBWithholdingEvent>)>,
     ) -> Self {
         Self {
@@ -59,36 +63,36 @@ impl EBWithholdingAttacker {
             propagation_delay,
             receiver,
             channels,
-            announcements: PriorityQueue::new(),
+            announcements: BinaryHeap::new(),
         }
     }
 
     async fn do_run(mut self) -> anyhow::Result<()> {
         loop {
             let waiter = match self.announcements.peek() {
-                Some((_, Reverse(timestamp))) => self.clock.wait_until(*timestamp),
+                Some(FutureEvent(timestamp, _)) => self.clock.wait_until(*timestamp),
                 None => self.clock.wait_forever(),
             };
             select! {
                 () = waiter => {
-                    let Some((eb_id, Reverse(timestamp))) = self.announcements.pop() else {
+                    let Some(FutureEvent(timestamp, announcement)) = self.announcements.pop() else {
                         return Ok(());
                     };
                     assert!(self.clock.now() >= timestamp);
                     for (_, channel) in &mut self.channels {
-                        let _ = channel.send(EBWithholdingEvent::DisseminateEB(eb_id));
+                        let _ = channel.send(EBWithholdingEvent::DisseminateEB(announcement.eb_id, announcement.withheld_txs.clone()));
                         self.clock.start_task();
                     }
                 },
-                Some(eb) = self.receiver.recv() => {
-                    self.share_eb(eb);
+                Some((eb, withheld_txs)) = self.receiver.recv() => {
+                    self.share_eb(eb, withheld_txs);
                     self.clock.finish_task();
                 }
             }
         }
     }
 
-    fn share_eb(&mut self, eb: Arc<EndorserBlock>) {
+    fn share_eb(&mut self, eb: Arc<EndorserBlock>, withheld_txs: Vec<Arc<Transaction>>) {
         // Send this EB to all of the attacker nodes.
         // They should vote on it immediately, to get as many votes as possible
         // without sharing it with the victims.
@@ -107,13 +111,27 @@ impl EBWithholdingAttacker {
             self.tracker
                 .track_eb_received(eb.id(), eb.producer, *node_id);
 
-            let _ = channel.send(EBWithholdingEvent::NewEB(eb.clone()));
+            // Same with any withheld TXs which are coming along for the ride
+            for tx in &withheld_txs {
+                self.tracker
+                    .track_transaction_sent(tx, eb.producer, *node_id);
+                self.tracker
+                    .track_transaction_received(tx.id, eb.producer, *node_id);
+            }
+
+            let _ = channel.send(EBWithholdingEvent::NewEB(eb.clone(), withheld_txs.clone()));
             self.clock.start_task();
         }
 
         // These nefarious nodes will announce the EB to the rest of the world after some delay.
-        self.announcements
-            .push(eb.id(), Reverse(self.clock.now() + self.propagation_delay));
+        let announcement = DisseminateEBAnnouncement {
+            eb_id: eb.id(),
+            withheld_txs: withheld_txs.into_iter().map(|tx| tx.id).collect(),
+        };
+        self.announcements.push(FutureEvent(
+            self.clock.now() + self.propagation_delay,
+            announcement,
+        ));
     }
 }
 
