@@ -597,57 +597,43 @@ Ouroboros Leios directly addresses key challenges outlined in [CPS-18 Greater Tr
 
 A central challenge identified in CPS-18 is economic sustainability. As the Cardano Reserve diminishes, transaction fees must replace rewards to maintain network security and SPO profitability. Currently, the Reserve contributes more than 85% of epoch rewards, with less than 15% coming from transaction fees. By 2029, to compensate for Reserve depletion, the network requires approximately 36-50 TPS with average-sized transactions—roughly 10 times current mainnet throughput.
 
-Leios addresses this by providing sufficient **capacity increase** while recognizing that capacity does not guarantee **utilization increase**. The [specified protocol](#specification) achieves roughly a **10-20x throughput increase** by allowing additional transaction capacity through a committee-validated endorsement mechanism. While this approach introduces new timing considerations around EB availability that must preserve Praos security guarantees, it enables significantly higher throughput than single-block propagation constraints would otherwise permit.
+**Measuring usable throughput**: To properly assess economic breakeven points, we use **Transaction Bytes per second (TxB/s)** rather than **Transactions per second (TPS)**. TPS doesn't account for transaction size or computational complexity, making systems with smaller transactions appear "faster" while providing less utility. Current Cardano mainnet provides **4,500 TxB/s**, while this specification targets **140,000-300,000 TxB/s** (140-300 TxkB/s, equivalent to roughly 100-200 TPS)—a **30-65x increase** sufficient for economic sustainability while remaining conservative enough to avoid chain growth and other high-throughput scaling challenges that would require dedicated research beyond this CIP's scope.
 
-This approach adopts a philosophy of **one order of magnitude change at a time**. While the [Leios research paper][leios-paper] demonstrates potential for higher throughput, pushing capacity beyond 100 TxB/s encounters the **chain growth problem**—sustained demand at that level would generate ~11 GBytes per day or ~337 GBytes per month. Solving chain growth requires further dedicated research beyond this CIP's scope.
-
-The [economic analysis](#operating-costs) demonstrates that 100 TxB/s provides sufficient capacity to reach the economic sustainability breakeven point while maintaining reasonable infrastructure costs. Node operating costs scale predictably with throughput, and the required TPS for infrastructure cost coverage remains well within Leios's capabilities.
-
-However, delivering this capacity increase within practical timeframes requires careful trade-offs in protocol complexity and implementation scope.
+Achieving this capacity increase requires strategic trade-offs in how we adapt the research paper design for practical deployment.
 
 <a name="time-to-market"></a>**Reasonable time to market: Complexity trade-offs**
 
-CPS-18 emphasizes that throughput solutions must be deployable within reasonable timeframes. This requirement forced critical trade-offs between theoretical optimality and practical implementation speed.
+The [specified protocol](#specification) deliberately **linearizes** the [research paper's design][leios-paper] to prioritize deployment speed over the research paper's higher-concurrency approaches. This linearization through [coupled block production](#protocol-overview) achieves **two critical trade-offs**:
 
-**Trade-off: Latency for deployability**: The [published Leios design][leios-paper] achieves maximum theoretical throughput through multiple concurrent pipelines but increases inclusion latency by >5x. This simplified variant trades some potential throughput for faster deployment by [coupling EB production with RB creation](#protocol-overview), maintaining settlement times closer to current Praos levels while avoiding complex coordination phases that would require extensive additional research and testing.
+**Reduced complexity**: Eliminates complex distributed systems problems around transaction sharding, conflict resolution, and sophisticated mempool coordination that could delay deployment by years.
 
-**Trade-off: Concurrency for simplicity**: Full Leios enables independent transaction sequence agreement across multiple pipelines but introduces challenging conflicting transaction problems requiring transaction sharding, conflict resolution, and sophisticated mempool coordination. The above [specified Leios](#specification) deliberately reduces concurrency through [coupled block production](#protocol-overview), trading maximum throughput potential for implementation simplicity that can be delivered within a shorter timeframe.
+**Preserved compatibility**: Maintains familiar transaction semantics, deterministic ordering, and predictable finality patterns that existing dApps and infrastructure depend on.
 
-**Implementation impact**: These trade-offs eliminate the need to solve complex distributed systems problems around transaction ordering, conflict detection, and state reconciliation—each of which could delay deployment by years while maintaining sufficient throughput for economic sustainability requirements.
-
-Beyond implementation speed, successful protocol deployment requires minimizing disruption to existing ecosystem participants.
+This compatibility focus extends beyond transaction behavior to operational deployment patterns.
 
 <a name="downstream-impact"></a>**Minimal downstream impact: Ecosystem preservation**
 
-The third priority addresses ecosystem disruption, recognizing that protocol changes affecting dApps, wallets, and node operators create adoption barriers that could delay or prevent deployment.
+Beyond preserving transaction behavior, the protocol design minimizes infrastructure and operational disruption:
 
-**Infrastructure impact**: Rather than requiring fundamental architectural changes, Leios continous to function as an **overlay protocol** extending Praos as described in the research paper. The [network protocol extensions](#network) utilize existing frameworks, while [node behavior changes](#node-behavior) are largely additive. SPOs can upgrade infrastructure progressively without coordinated network-wide migrations, reducing deployment risk and cost.
+**Progressive deployment**: Functions as an **overlay protocol** extending Praos with [additive network extensions](#network) and [node behavior changes](#node-behavior). SPOs can upgrade progressively without coordinated migrations.
 
-**dApp developer impact**: The above [Leios specification](#specification) preserves existing transaction semantics and timing characteristics that dApps rely on today. Unlike highly concurrent alternatives that would require dApps to handle complex transaction conflict scenarios or potentially break backwards compatibility, Leios maintains familiar patterns around transaction finality, ordering, and validation that minimize required application changes.
+**Alternative analysis**: Simply increasing Praos block sizes could improve throughput but fails due to proportionally longer propagation times that violate Praos timing assumptions and lack sufficient scalability ceiling for long-term viability.
 
-**Alternative rejected**: Simply increasing Praos block sizes could theoretically improve throughput but fails due to proportionally longer global propagation times that eventually violate Praos timing assumptions and compromise security. This approach would also require coordinated hard forks and careful parameter tuning without providing the scalability ceiling needed for long-term viability.
-
-**User experience preservation**: High-concurrency systems introduce complex UX challenges around transaction conflicts, delayed finality confirmation, and potential failed transaction fees. Leios avoids these UX degradations that could harm adoption while still providing the necessary capacity increases.
-
-While addressing immediate economic needs and deployment constraints, the protocol design must also position Cardano competitively for future scaling demands.
+Having prioritized near-term deployability and ecosystem compatibility, the final consideration is maintaining competitive positioning for future development.
 
 <a name="competitiveness"></a>**Competitiveness: Solution space positioning**
 
-The fourth priority recognizes that while 10-20x throughput addresses immediate economic sustainability, Cardano must maintain a pathway to higher throughput levels to remain competitive with alternative blockchain architectures.
+While the linearized design prioritizes practical deployment, it preserves pathways to higher performance:
 
-**Incremental scaling philosophy**: Rather than attempting to solve all scalability challenges simultaneously, the above specified Leios protocol establishes a proven foundation for iterative improvements. The [coupled block production](#protocol-overview) architecture can evolve toward higher concurrency models once operational experience validates timing assumptions and parameter choices.
+**Extensibility**: The [coupled block production](#protocol-overview) foundation can be extended toward higher concurrency models once operational experience validates timing assumptions and parameter choices. [Simulation results](#roadmap-and-future-directions) demonstrate the performance potential of these more concurrent protocol versions.
 
-**Future pathway preservation**: The [protocol design](#specification) maintains compatibility with more aggressive scaling approaches including full Leios variants, input block decoupling, and sharding extensions. This ensures that achieving 10-20x throughput now doesn't preclude reaching 100x+ throughput in subsequent upgrades when chain growth solutions and ecosystem maturity support such increases.
+**Future compatibility**: Maintains compatibility with more aggressive scaling approaches including full Leios variants, EB and IB (input block) decoupling, and sharding extensions, ensuring current throughput gains don't preclude 100x+ improvements when chain growth solutions mature.
 
-**Market positioning**: While competitors achieve higher theoretical throughput through different architectural approaches, the [specified Leios protocol](#specification) provides sufficient capacity for near-term demand while preserving Cardano's unique value propositions around security, determinism, and economic sustainability that differentiate it in the market.
+<a name="optimal-tradeoffs"></a>**Proposed trade-offs**
 
-<a name="optimal-tradeoffs"></a>**Optimal trade-off conclusion**
+This linearization strategy represents the optimal balance across all four priorities, recognizing that a delivered 30-65x improvement provides substantially more value than the research paper's higher-concurrency variants, which would impose non-trivial costs on existing dApps, wallets, and infrastructure while taking significantly longer to build due to introducing many new protocol elements.
 
-The [specified Leios protocol](#specification) represents the optimal balance across these four priorities for Cardano's current position. It provides sufficient throughput to address economic sustainability requirements while remaining deployable within practical timeframes, minimizing ecosystem disruption, and preserving future competitive options.
-
-The design deliberately sacrifices theoretical maximum throughput to optimize for practical deployment success, recognizing that a delivered 10-20x improvement provides substantially more value than a theoretical 100x improvement that remains undeployed. This approach directly addresses CPS-18's core challenge while establishing a foundation for future enhancements as ecosystem maturity and infrastructure capabilities evolve.
-
-These design decisions require empirical validation to demonstrate their effectiveness in practice. The following evidence section provides quantitative support for these trade-offs and validates the protocol's performance characteristics under realistic network conditions.
+The following evidence section provides quantitative support for these trade-offs and validates the protocol's performance characteristics under realistic network conditions.
 
 ### Evidence
 
@@ -1053,7 +1039,7 @@ summarize here. The general impact of such attacks varies:
 
 - Resource burden on nodes
 - Lowered throughput
-- Increased latency
+- Increased transaction delay
 - Manipulation of dapps or oracles
 
 _Grinding and other threats to Praos:_ Threats to the ranking blocks used by
@@ -1124,7 +1110,7 @@ transactions would make it onto the ledger.
 > - ΔEB timing constraints and consequences
 > - High-throughput liveness analysis
 > - Praos safety argument impacts
-> - Increased latency trade-offs
+> - Increased inclusion delay trade-offs
 
 <a name="ecosystem-impact"></a>**Impact onto ecosystem**
 
