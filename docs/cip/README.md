@@ -9,6 +9,9 @@ Authors:
   - Sebastian Nagel <sebastian.nagel@iohk.io>
   - Nicolas Frisby <nick.frisby@iohk.io>
   - Giorgos Panagiotakos <giorgos.panagiotakos@iohk.io>
+  - Yuriy Syrovetskiy <yuriy.syrovetskiy@iohk.io>
+  - Andre Knipsel <andre.knispel@iohk.io>
+  - Yves Hauser <yves.hauser@iohk.io>
   - PLEASE ADD YOUR NAME IF YOU CONTRIBUTE TEXT TO THIS DOCUMENT
 Implementors:
   - Intersect
