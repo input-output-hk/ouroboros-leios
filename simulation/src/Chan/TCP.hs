@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -34,6 +35,11 @@ import TimeCompat
 -- can be maped to a wider scope peer identity via contra-trace.
 data LabelTcpDir e = DirClientToServer e | DirServerToClient e
   deriving (Eq, Ord, Show, Functor)
+
+lensLabelTcpDir :: Functor f => (a -> f b) -> LabelTcpDir a -> f (LabelTcpDir b)
+lensLabelTcpDir f = \case
+    DirClientToServer x -> DirClientToServer <$> f x
+    DirServerToClient x -> DirServerToClient <$> f x
 
 -- | Class for messages to be sent over a simulated TCP connection.
 -- To correctly model the timing of the messages sent over the connection we
