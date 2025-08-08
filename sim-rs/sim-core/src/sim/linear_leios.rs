@@ -325,7 +325,6 @@ impl NodeImpl for LinearLeiosNode {
     }
 
     fn handle_new_slot(&mut self, slot: u64) -> EventResult {
-        self.process_certified_ebs(slot);
         self.try_generate_rb(slot);
 
         std::mem::take(&mut self.queued)
@@ -482,6 +481,41 @@ impl LinearLeiosNode {
             return;
         };
 
+        let parent = self.latest_rb().map(|rb| rb.header.id);
+        let endorsement = parent.and_then(|rb_id| {
+            if rb_id.slot
+                + self.sim_config.linear_vote_stage_length
+                + self.sim_config.linear_diffuse_stage_length
+                > slot
+            {
+                // This RB was generated too quickly after another; hasn't been time to gather all the votes.
+                // No endorsement.
+                return None;
+            }
+
+            let eb_id = self.leios.ebs_by_rb.get(&rb_id)?;
+            let votes = self.leios.votes_by_eb.get(eb_id)?;
+            let total_votes = votes.values().copied().sum::<usize>();
+            if (total_votes as u64) < self.sim_config.vote_threshold {
+                // Not enough votes. No endorsement.
+                return None;
+            }
+
+            let endorsement = Endorsement {
+                eb: *eb_id,
+                size_bytes: self.sim_config.sizes.cert(votes.len()),
+                votes: votes.clone(),
+            };
+
+            // We're endorsing this EB, so consider all of its transactions part of the ledger state
+            let Some(EndorserBlockView::Received { eb }) = self.leios.ebs.get(eb_id) else {
+                return None;
+            };
+            self.remove_eb_txs_from_mempool(&eb.clone());
+
+            Some(endorsement)
+        });
+
         let mut rb_transactions = vec![];
         if self.sim_config.praos_fallback {
             if let TransactionConfig::Mock(config) = &self.sim_config.transactions {
@@ -490,7 +524,11 @@ impl LinearLeiosNode {
                 self.tracker.track_transaction_generated(&tx, self.id);
                 rb_transactions.push(Arc::new(tx));
             } else {
-                self.sample_from_mempool(&mut rb_transactions, self.sim_config.max_block_size);
+                self.sample_from_mempool(
+                    &mut rb_transactions,
+                    self.sim_config.max_block_size,
+                    true,
+                );
             }
         }
 
@@ -516,35 +554,8 @@ impl LinearLeiosNode {
                 eb_transactions.push(Arc::new(tx));
             }
         } else {
-            self.sample_from_mempool(&mut eb_transactions, self.sim_config.max_eb_size);
+            self.sample_from_mempool(&mut eb_transactions, self.sim_config.max_eb_size, false);
         }
-
-        let parent = self.latest_rb().map(|rb| rb.header.id);
-        let endorsement = parent.and_then(|rb_id| {
-            if rb_id.slot
-                + self.sim_config.linear_vote_stage_length
-                + self.sim_config.linear_diffuse_stage_length
-                > slot
-            {
-                // This RB was generated too quickly after another; hasn't been time to gather all the votes.
-                // No endorsement.
-                return None;
-            }
-
-            let eb_id = self.leios.ebs_by_rb.get(&rb_id)?;
-            let votes = self.leios.votes_by_eb.get(eb_id)?;
-            let total_votes = votes.values().copied().sum::<usize>();
-            if (total_votes as u64) < self.sim_config.vote_threshold {
-                // Not enough votes. No endorsement.
-                return None;
-            }
-
-            Some(Endorsement {
-                eb: *eb_id,
-                size_bytes: self.sim_config.sizes.cert(votes.len()),
-                votes: votes.clone(),
-            })
-        });
 
         let rb = RankingBlock {
             header: RankingBlockHeader {
@@ -887,32 +898,6 @@ impl LinearLeiosNode {
     fn finish_validating_eb(&mut self, eb: Arc<EndorserBlock>, seen: Timestamp) {
         self.vote_for_endorser_block(&eb, seen);
     }
-
-    fn process_certified_ebs(&mut self, slot: u64) {
-        let Some(eb_creation_slot) = slot.checked_sub(
-            self.sim_config.linear_vote_stage_length + self.sim_config.linear_diffuse_stage_length,
-        ) else {
-            return;
-        };
-
-        let Some(rb) = self.latest_rb() else {
-            return;
-        };
-
-        if rb.header.id.slot != eb_creation_slot {
-            return;
-        }
-        // The EB on the head of the chain has had enough time to get certified.
-
-        let eb_id = rb.header.eb_announcement;
-        if self.leios.certified_ebs.contains(&eb_id) {
-            // This certified EB is eventually going on-chain.
-            // Get its contents out of the mempool.
-            if let Some(EndorserBlockView::Received { eb }) = self.leios.ebs.get(&eb_id) {
-                self.remove_eb_txs_from_mempool(&eb.clone());
-            };
-        }
-    }
 }
 
 // EB withholding:
@@ -1168,7 +1153,12 @@ impl LinearLeiosNode {
 
 // Ledger/mempool operations
 impl LinearLeiosNode {
-    fn sample_from_mempool(&mut self, txs: &mut Vec<Arc<Transaction>>, max_size: u64) {
+    fn sample_from_mempool(
+        &mut self,
+        txs: &mut Vec<Arc<Transaction>>,
+        max_size: u64,
+        remove: bool,
+    ) {
         let mut size = txs.iter().map(|tx| tx.bytes).sum::<u64>();
         let mut candidates: Vec<_> = self.praos.mempool.keys().copied().collect();
         if matches!(
@@ -1187,7 +1177,11 @@ impl LinearLeiosNode {
                 break;
             }
             size += tx.bytes;
-            txs.push(self.praos.mempool.remove(&id).unwrap());
+            if remove {
+                txs.push(self.praos.mempool.remove(&id).unwrap());
+            } else {
+                txs.push(tx.clone());
+            }
         }
     }
 
