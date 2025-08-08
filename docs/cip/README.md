@@ -830,6 +830,67 @@ diffusion is consistent with the Praos performance model.[^praosp]
 
 [^praosp]: https://github.com/IntersectMBO/cardano-formal-specifications/blob/6d4e5cfc224a24972162e39a6017c273cea45321/src/performance/README.md
 
+|Throughput|Time to reach ledger [s]|
+|---|---|
+|0.100 TxMB/s|60.79247|
+|0.150 TxMB/s|63.78032|
+|0.200 TxMB/s|71.66897|
+|0.250 TxMB/s|84.23859|
+|0.300 TxMB/s|125.83688|
+
+|Throughput|Time to reach EB [s]|
+|---|---|
+|<fct>|<dbl>|
+|---|---|
+|0.100 TxMB/s|19.28722|
+|0.150 TxMB/s|20.81224|
+|0.200 TxMB/s|28.92780|
+|0.250 TxMB/s|42.05979|
+|0.300 TxMB/s|83.52171|
+
+|Throughput|Space efficiency [%]|
+|---|---|
+|<fct>|<dbl>|
+|---|---|
+|0.100 TxMB/s|92.22120|
+|0.150 TxMB/s|94.08732|
+|0.200 TxMB/s|94.69080|
+|0.250 TxMB/s|94.92100|
+|0.300 TxMB/s|94.99451|
+
+|Simulator|Variant|Network|Bandwidth|CPU|Stage length|EB rate|Max EB size|Tx size|Throughput|Demand [tx/s]|
+|---|---|---|---|---|---|---|---|---|---|---|
+|<fct>|<fct>|<fct>|<fct>|<fct>|<fct>|<fct>|<fct>|<fct>|<fct>|<dbl>|
+|---|---|---|---|---|---|---|---|---|---|---|
+|Rust|linear-with-tx-references|topology-v2|10 Mb/s|4 vCPU/node|7 slot/stage|2.5 EB/stage|12 MB/EB|1500 B/Tx|0.100 TxMB/s|66.66778|
+|Rust|linear-with-tx-references|topology-v2|10 Mb/s|4 vCPU/node|7 slot/stage|2.5 EB/stage|12 MB/EB|1500 B/Tx|0.150 TxMB/s|100.00111|
+|Rust|linear-with-tx-references|topology-v2|10 Mb/s|4 vCPU/node|7 slot/stage|2.5 EB/stage|12 MB/EB|1500 B/Tx|0.200 TxMB/s|142.85778|
+|Rust|linear-with-tx-references|topology-v2|10 Mb/s|4 vCPU/node|7 slot/stage|2.5 EB/stage|12 MB/EB|1500 B/Tx|0.250 TxMB/s|166.66778|
+|Rust|linear-with-tx-references|topology-v2|10 Mb/s|4 vCPU/node|7 slot/stage|2.5 EB/stage|12 MB/EB|1500 B/Tx|0.300 TxMB/s|200.00000|
+
+
+
+![Time for transaction to reach the ledger](images/reach-rb-tx.svg)
+
+![Transactions reaching the ledger](images/temporal-efficiency-bar.svg)
+
+![Number of TX references](images/references-tx.svg)
+
+|    |    |
+|---|---|
+| ![Arrival delay for TXs](images/elapsed-TX.svg) | ![Arrival delay for RBs](images/elapsed-RB.svg) |
+| ![Arrival delay for VTs](images/elapsed-VT.svg) | ![Arrival delay for EBs](images/elapsed-EB.svg) |
+
+| Network | CPU |
+|---|---|
+| ![Mean nodal ingress](images/ingress-average-area.svg) | ![Mean CPU load among all nodes](images/cpu-peak-timeseries.svg) |
+
+![Mean CPU load among all nodes](images/cpu-mean-histogram.svg)
+
+![Size of transactions referenced by EBs](images/contents-ebs-size.svg)
+
+![Disposition of transactions in blocks](images/disposition-size-timeseries.svg)
+
 The simulations demonstrate that bandwidth is partitioned between IBs, EBs,
 votes, and RBs so that congestion in one message type does not spill over into
 congestion for other message types. Because IBs are the largest messages, these
@@ -840,14 +901,11 @@ at this high throughput, IBs arrive at all nodes in the network with 100%
 success and mostly within five seconds. This implies that the stage length could
 be as short a five seconds per stage.
 
-![Simulated time in flight for IBs](images/elapsed-IB.png)
 
 In terms of the transaction lifecycle, transaction typically reach IBs rapidly
 for high-throughput settings of Leios parameters, but it takes tens of seconds
 for the to become referenced by an EB. Referencing by an RB takes longer, often
 close to 100 seconds.
-
-![Simulation of transaction lifecycle](images/lifecycle-histogram.png)
 
 <a name="feasible-parameters"></a>**Feasible protocol parameters**
 
