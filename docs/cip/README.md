@@ -610,7 +610,7 @@ The linearization approach eliminates complex distributed systems problems aroun
 
 <a name="downstream-impact"></a>**3. Minimal downstream impact: Ecosystem preservation**
 
-Beyond preserving transaction behavior, the design minimizes infrastructure and operational disruption for the existing ecosystem. The protocol functions as an overlay extending Praos, allowing SPOs to upgrade progressively without coordinated migrations. Simply increasing Praos block sizes would create proportionally longer propagation times that violate Praos timing assumptions and lack sufficient scalability for long-term viability.
+Beyond preserving transaction behavior, the design minimizes infrastructure and operational disruption for the existing ecosystem. The proposed protocol still functions as an overlay extending Praos - just like the research paper version, allowing SPOs to upgrade progressively without coordinated migrations. Simply increasing Praos block sizes would create proportionally longer propagation times that violate Praos timing assumptions and lack sufficient scalability for long-term viability.
 
 <a name="competitiveness"></a>**4. Competitive positioning**
 
