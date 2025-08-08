@@ -35,41 +35,29 @@ simultaneously create both a standard Praos block and a larger secondary block
 containing additional transactions. Secondary blocks undergo committee
 validation before ledger inclusion, enabling significantly higher throughput.
 
-This specification presents a simplified variant prioritizing practical
-deployment over the fully concurrent research design, balancing substantial
-throughput gains with implementation feasibility and minimal ecosystem
-disruption.
+This specification presents the first version in the Ouroboros Leios protocol
+family, designed to deliver substantial throughput improvements while
+maintaining ecosystem compatibility and deployment feasibility.
 
 > [!NOTE]
 >
 > For comprehensive research documentation, development history, and additional
 > technical resources, visit the
-> [Leios R&D website](https://leios.cardano-scaling.org/).
+> Leios Innovation R&D site at [leios.cardano-scaling.org](https://leios.cardano-scaling.org/).
 
 <details>
   <summary><h2>Table of contents</h2></summary>
   <strong><font color="red">Create a table of contents with internal hyperlinks when the organization of the document is stable.</font></strong>
 </details>
 
-## Motivation: why is this CIP necessary?
+<details>
+  <summary><h2>Table of figures and tables</h2></summary>
+  <strong><font color="red">Create a table of figures and tables with internal hyperlinks when the document includes such content and its organization is stable.</font></strong>
+</details>
 
-> [!NOTE]
->
-> A clear explanation that introduces a proposal's purpose, use cases, and
-> stakeholders. If the CIP changes an established design, it must outline design
-> issues that motivate a rework. For complex proposals, authors must write a
-> [Cardano Problem Statement (CPS) as defined in CIP-9999][CPS] and link to it
-> as the `Motivation`.
+## Motivation
 
-While Cardano's current transaction processing capabilities often meet the
-immediate demands of its user base, the underlying Ouroboros Praos consensus
-protocol inherently imposes limitations on scalability. The critical requirement
-for timely and reliable global propagation of newly generated blocks within a
-short time interval necessitates a careful balancing act. This constraint
-directly restricts the maximum size of individual blocks and the computational
-resources available for the validation of transactions and Plutus scripts,
-effectively establishing a ceiling on the network's transaction throughput that
-cannot be overcome through simple parameter adjustments alone.
+Cardano's current transaction processing capabilities generally satisfy the immediate needs of its users. However, the Ouroboros Praos consensus protocol imposes inherent scalability limitations. To ensure timely and reliable global propagation of new blocks, the protocol requires that blocks be distributed across the network within a short time frame. This requirement forces a careful balance, restricting both the maximum size of individual blocks and the computational resources available for validating transactions and Plutus scripts. As a result, there is a fixed ceiling on the network's transaction throughput that cannot be raised by simply adjusting protocol parameters.
 
 However, the dynamic growth of the Cardano ecosystem is increasingly revealing
 the practical consequences of these inherent limitations. The Cardano mainnet
@@ -94,14 +82,13 @@ and bandwidth resources of individual nodes often remain significantly
 underutilized.
 
 To transcend these inherent scaling barriers and unlock the latent capacity of
-the Cardano network, a fundamental evolution of the core consensus algorithm is
-imperative. Ouroboros Leios represents a departure from the sequential
-processing model of Praos, aiming to introduce mechanisms for parallel
-transaction processing and more efficient aggregation of transaction data. By
-reorganizing how transactions are proposed, validated, and ultimately recorded
-on the blockchain, this protocol upgrade seeks to achieve a substantial increase
-in the network's overall throughput, enabling it to handle a significantly
-greater volume of transactions within a given timeframe.
+the Cardano network, a measured evolution of the core consensus algorithm is
+required. This specification presents the first version of the Ouroboros Leios
+protocol family - a stepping stone toward higher throughput while preserving the
+proven security and stability characteristics of Praos. This initial protocol
+version extends Praos with optional secondary blocks and committee validation
+to achieve significant increases in transaction processing capacity while
+maintaining familiar transaction semantics.
 
 The Cardano Problem Statement [CPS-18 Greater Transaction Throughput][cps-18]
 further motivates the need for higher transaction throughput and marshals
@@ -109,10 +96,9 @@ quantitative evidence of existing mainnet bottlenecks. Realizing higher
 transaction rates is also necessary for long-term Cardano techno-economic
 viability as rewards contributions from the Reserve pot diminish: fees from more
 transactions will be needed to make up that deficit and keep sound the finances
-of stakepool operations. (Currently, the Reserve contributes more than 85% of
-the reward of a typical epoch, with less than 15% of the reward coming from the
-collection of transaction fees. In five years, however, the Reserve contribution
-will be much diminished.) Because a major protocol upgrade like Leios will take
+of stakepool operations.
+
+A major protocol upgrade like Leios will take
 significant time to implement, test, and audit, it is important to began
 implementation well before transaction demand on mainnet exceeds the
 capabilities of Ouroboros Praos. The plot below shows the historically
@@ -129,6 +115,12 @@ per second, there is more opportunity for simultaneously reducing fees,
 augmenting the Treasury, and increasing SPO and delegator rewards.
 
 ![SPO profitability under Praos, as a function of transaction volume](images/spo-profitability.svg)
+
+This first version of the Leios protocol family represents a balance
+between immediate scalability needs and long-term protocol evolution. The
+approach prioritizes practical deployment and ecosystem compatibility while
+establishing the foundation for subsequent Leios protocol versions with higher
+throughput capacity.
 
 ## Specification
 
