@@ -11,11 +11,23 @@ Whenever a node creates an RB, it also creates an EB. The RB header contains a r
 
 RB headers are diffused separately from bodies. When a node receives an RB header, it checks whether that RB should be the new head of its chain. If so, it will request the RB body and the referenced EB (from the first peer which announces them).
 
-When a node receives an EB body, it runs lightweight validation and then propagates the body to peers. After this lightweight validation, it runs more expensive complete validation (presumably at the TX level) before voting.
-
 To detect equivocation, a node will wait until at least `3 * Δhdr` after an EB was generated before voting for it.
 
 When voting, a node runs a VRF lottery to decide how many times it can vote for that EB; if it has any votes, it will transmit them to all peers.
+
+## EB validation
+
+An EB has three levels of validation:
+1. The EB has been received, and lightweight validation has been run (we refer to this as "header validation").
+2. All transactions in the EB have been received.
+3. The EB has been fully validated.
+
+The sim can be configured to propagate EBs after validation at any of these levels, with these respective settings:
+1. `linear-eb-propagation-criteria: eb-received`
+2. `linear-eb-propagation-criteria: txs-received`
+3. `linear-eb-propagation-criteria: fully-valid`
+
+Nodes will only vote for an EB after it has been fully validated.
 
 ## Mempool behavior
 
@@ -52,6 +64,57 @@ When a node receives an RB body, it immediately removes all referenced/conflicti
 |`ValEB`|`EBBlockValidated`|After an EB's body has been validated.|If eligible, the node will vote for that EB.|`eb-body-validation-cpu-time-ms-constant` + `eb-body-validation-cpu-time-ms-per-byte` for each byte of TX|
 |`GenVote`|`VTBundleGenerated`|After a vote bundle has been generated.|That vote bundle is announced to peers.|`vote-generation-cpu-time-ms-constant` + `vote-generation-cpu-time-ms-per-tx` for each TX in the EB|
 |`ValVote`|`VTBundleValidated`|After a vote bundle has been received from a peer.|The votes in that bundle are stored, and the bundle is propagated to peers.|`vote-validation-cpu-time-ms`|
+
+## Attacks
+
+### EB Withholding
+
+A set of nodes can be configured to collude with each other, to distribute an EB close to the end of L_diff.
+
+Example config:
+```yaml
+late-eb-attack:
+  attackers:
+    nodes:
+      - node-99
+      - node-98
+      - node-97
+      - node-96
+      - node-95
+      - node-94
+  propagation-delay-ms: 4500.0
+```
+
+The `attackers` list controls which nodes are participating in the attack. (I will get around to letting you just choose a `stake` sometime soon). These nodes can communicate out of band, without taking latency or bandwidth into account.
+
+When one of the attackers generates an EB, it will instantly and instantaneously send that EB to all other attackers. The attackers will all wait for `propagation-delay-ms` to elapse, and _then_ announce the EB to all peers.
+
+### TX Withholding
+
+A set of nodes can be configured to "withhold" some number of TXs until the moment they generate an EB.
+
+Example config:
+```yaml
+late-tx-attack:
+  attackers:
+    nodes:
+      - node-99
+      - node-98
+      - node-97
+      - node-96
+      - node-95
+      - node-94
+  attack-probability: 1.0
+  tx-generation-distribution:
+    distribution: constant
+    value: 3
+```
+
+The `attackers` list controls which nodes are participating in the attack. (I will get around to letting you just choose a `stake` sometime soon).
+
+When an attacker generates an EB, with probability `attack-probability` they will also generate `tx-generation-distribution` brand-new transactions. Both the EB and the transactions will be immediately announced to peers as normal.
+
+If a node is configured to perform both EB withholding and TX withholding simultaneously, the TXs will not be immediately announced to peers; instead, they will be instantaneously sent to all attackers, and announced to peers alongside the EB.
 
 ## Not yet implemented
 - Freshest first delivery is not implemented for EBs, though EBs are created infrequently enough that this likely doesn't matter.
