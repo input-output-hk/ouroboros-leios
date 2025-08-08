@@ -594,7 +594,7 @@ This simplification avoids the complexity and ecosystem disruption of implementi
 3. [Minimal downstream impact](#downstream-impact)
 4. [Competitive positioning](#competitiveness)
 
-<a name="economic-sustainability"></a>**Economic sustainability: Capacity without utilization risk**
+<a name="economic-sustainability"></a>**1. Economic sustainability: Capacity without utilization risk**
 
 A central challenge identified in CPS-18 is economic sustainability. As the Cardano Reserve diminishes, transaction fees must replace rewards to maintain network security and SPO profitability. Currently, the Reserve contributes more than 85% of epoch rewards, with less than 15% coming from transaction fees. By 2029, to compensate for Reserve depletion, the network requires approximately 36-50 TPS with average-sized transactions—roughly 10 times current mainnet throughput.
 
@@ -604,7 +604,7 @@ A central challenge identified in CPS-18 is economic sustainability. As the Card
 
 Achieving this capacity increase requires trade-offs, as detailed below.
 
-<a name="time-to-market"></a>**Reasonable time to market: Complexity trade-offs**
+<a name="time-to-market"></a>**2. Reasonable time to market: Complexity trade-offs**
 
 This linearization approach (detailed in the [Protocol Overview](#protocol-overview)) achieves **two critical trade-offs**:
 
@@ -612,7 +612,7 @@ This linearization approach (detailed in the [Protocol Overview](#protocol-overv
 
 **Preserved compatibility**: Maintains familiar transaction semantics, deterministic ordering, and predictable finality patterns that existing dApps and infrastructure depend on.
 
-<a name="downstream-impact"></a>**Minimal downstream impact: Ecosystem preservation**
+<a name="downstream-impact"></a>**3. Minimal downstream impact: Ecosystem preservation**
 
 Beyond preserving transaction behavior, the protocol design minimizes infrastructure and operational disruption:
 
@@ -622,7 +622,7 @@ Beyond preserving transaction behavior, the protocol design minimizes infrastruc
 
 Having prioritized near-term deployability and ecosystem compatibility, the final consideration is maintaining competitive positioning for future development.
 
-<a name="competitiveness"></a>**Competitiveness: Positioning**
+<a name="competitiveness"></a>**4. Competitive positioning**
 
 While the linearized design prioritizes practical deployment, it preserves pathways to higher performance:
 
