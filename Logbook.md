@@ -2,6 +2,10 @@
 
 ## 2025-08-08
 
+### Another Haskell vs Rust comparison
+
+The experiment [analysis/sims/202532b](analysis/sims/202532b) compares Haskell vs Rust simulation output at newer commits. Results indicate that a previous discrepancy in vote diffusion has been resolved.
+
 ### Experiment for draft figures for CIP
 
 The experiment [analysis/sims/2025w32/](analysis/sims/2025w32/) proposes a set of protocol parameters and throughputs for inclusions in the Evidence section of the draft CIP.
