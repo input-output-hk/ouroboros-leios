@@ -34,6 +34,18 @@ Artifacts:
 - [Slides](analysis/sims/2025w32/ReadMe.pdf)
 - [Jupyter notebook](analysis/sims/2025w32/analysis.ipynb)
 
+### Haskell Simulator
+
+- The comparison at [analysis/sims/202532b](analysis/sims/202532b) revealed an issue with Linear Leios in the Haskell simulator.
+  Scrutinizing the logs suggested that the simulator's mini protocol mux needs to avoid head-of-line blocking for Linear Leios.
+  Therefore a rudimentary version of the real implementation's mux's message slicing was added to PR https://github.com/input-output-hk/ouroboros-leios/pull/466.
+  A subsequent run of Brian's comparison confirmed that eliminated the unexpected delay in vote diffusion.
+  The PR will merge soon, once it's fixed to use some more correct parameter names in the configuration file.
+  There will remain some other discrepancies versus the Rust simulator, though, especially around CPU utilization.
+- In order to increase the fidelity of the Linear Leios simulation and flesh out the draft CIP, PR https://github.com/input-output-hk/ouroboros-leios/pull/484 proposes a set of new mini protocols.
+  Initial reviews were displeased with the granularity of the proposed mini protocols; why can't they be combined into slightly more sophisticiated mini protocols?
+  Attempts to elaborate the justification for some of the granularity revealed a miscalculation.
+  The work next week will involve combining a some-but-not-all of the maximally granular mini protocols.
 
 ## 2025-08-04
 
