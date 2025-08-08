@@ -442,7 +442,7 @@ $\text{Mempool} \geq 2 \times S_\text{RB} + S_\text{EB-tx}$
     
 When a stake pool wins block leadership (step 1), they simultaneously create two things: a RB and an EB. The RB is a standard Praos block with extended header fields to certify one EB and announce another EB. The EB is a larger block containing additional transaction references. The RB chain continues to be distributed exactly as in Praos, while Leios introduces a separate header distribution mechanism for rapid EB discovery and equivocation detection.
 
-<a id="rb-header-diffusion" href="#rb-header-diffusion">**RB Header Diffusion**</a>: RB headers diffuse via a new [RbHeaderRelay mini-protocol](#rbheaderrelay-mini-protocol) independently of standard ChainSync (steps 2a and 2b). This separate mechanism enables rapid EB discovery within the strict timing bound $\Delta_\text{hdr}$. Headers are diffused freshest-first to facilitate timely EB delivery, with nodes propagating at most two headers per (slot, issuer) pair to detect equivocation—where an attacker creates multiple EBs for the same block generation opportunity—while limiting network overhead. The header contains the EB hash when the block producer created an EB, allowing peers to discover and fetch the corresponding EB.
+<a id="rb-header-diffusion" href="#rb-header-diffusion">**RB Header Diffusion**</a>: RB headers diffuse via a new [RbHeaderRelay mini-protocol](#rbheaderrelay-mini-protocol) independently of standard ChainSync (steps 2a and 2b). This separate mechanism enables rapid EB discovery within the strict timing bound $\Delta_\text{hdr}$. Headers are diffused freshest-first to facilitate timely EB delivery, with nodes propagating at most two headers per (slot, issuer) pair to detect equivocation-where an attacker creates multiple EBs for the same block generation opportunity while limiting network overhead. The header contains the EB hash when the block producer created an EB, allowing peers to discover and fetch the corresponding EB.
 
 <a id="rb-body-diffusion" href="#rb-body-diffusion">**RB Body Diffusion**</a>: After receiving headers, nodes fetch RB bodies via standard BlockFetch protocol (step 3). This employs ChainSync and BlockFetch protocols without modification for fetching complete ranking blocks after headers are received. The pipelining and batching optimizations for block body transfer remain unchanged from Praos.
 
@@ -585,7 +585,7 @@ RbHeaderRelay is a **pull-based relay protocol** that enables nodes to request a
 
 ### How Leios addresses CPS-18 and increases throughput
 
-The [Leios research paper][leios-paper] describes a highly concurrent protocol with three block types—Input Blocks (IBs), Endorser Blocks (EBs), and Ranking Blocks (RBs)—produced independently across decoupled, pipelined stages. This specification simplifies that design by eliminating IBs and coupling EB production with RB production, reducing complexity while preserving substantial throughput gains.
+The [Leios research paper][leios-paper] describes a highly concurrent protocol with three block types - Input Blocks (IBs), Endorser Blocks (EBs), and Ranking Blocks (RBs)-produced independently across decoupled, pipelined stages. This specification simplifies that design by eliminating IBs and coupling EB production with RB production, reducing complexity while preserving substantial throughput gains.
 
 This simplification avoids the complexity and ecosystem disruption of implementing massive throughput increases immediately, while still delivering substantial gains to address [CPS-18 Greater Transaction Throughput][cps-18] challenges. Four strategic design priorities guided this approach:
 
@@ -596,11 +596,11 @@ This simplification avoids the complexity and ecosystem disruption of implementi
 
 <a name="economic-sustainability"></a>**1. Economic sustainability: Capacity without utilization risk**
 
-As the Cardano Reserve diminishes, transaction fees must replace rewards to maintain network security and SPO profitability. Currently, the Reserve contributes more than 85% of epoch rewards, with less than 15% coming from transaction fees. By 2029, to compensate for Reserve depletion, the network requires approximately 36-50 TPS with average-sized transactions—roughly 10 times current mainnet throughput.
+On one hand, this approach avoids over-engineering massive throughput capacity without proven demand. Creating fundamental system changes to support multiple orders of magnitude more throughput adds to the cost of running a more expensive, more capable system that doesn't pay for itself until utilization increases.
 
-To properly assess economic breakeven points, we measure throughput in Transaction Bytes per second (TxB/s) rather than Transactions per second (TPS). TPS doesn't account for transaction size or computational complexity, making systems with smaller transactions appear "faster" while providing less utility. Current Cardano mainnet provides 4,500 TxB/s, while this specification targets 140,000-300,000 TxB/s (equivalent to roughly 100-200 TPS)—a 30-65x increase sufficient for economic sustainability.
+On the other hand, the minimum economic requirement establishes the lower bound. As the Cardano Reserve diminishes, transaction fees must replace rewards to maintain network security and SPO profitability. Currently, the Reserve contributes more than 85% of epoch rewards, with less than 15% coming from transaction fees. By 2029, to compensate for Reserve depletion, the network requires approximately 36-50 TPS with average-sized transactions - roughly 10 times current mainnet throughput. This conservative lower bound represents the breakeven point for running the protocol sustainably.
 
-This approach also avoids over-engineering massive throughput capacity without proven demand. Creating fundamental system changes to support multiple orders of magnitude more throughput—when actual utilization may not materialize—represents unnecessary complexity and ecosystem disruption. Scaling incrementally allows us to validate demand at each step.
+However, TPS isn't a good metric for defining these bounds. To properly assess economic breakeven points, we measure throughput in Transaction Bytes per second (TxB/s) rather than Transactions per second (TPS). TPS doesn't account for transaction size or computational complexity, making systems with smaller transactions appear "faster" while providing less utility. Current Cardano mainnet provides 4,500 TxB/s, while this specification targets 140,000-300,000 TxB/s (equivalent to roughly 100-200 TPS) - a 30-65x increase sufficient for economic sustainability.
 
 Achieving this capacity increase requires trade-offs, as detailed below.
 
@@ -610,7 +610,7 @@ The linearization approach eliminates complex distributed systems problems aroun
 
 <a name="downstream-impact"></a>**3. Minimal downstream impact: Ecosystem preservation**
 
-The protocol functions as an overlay extending Praos with additive network extensions and node behavior changes. SPOs can upgrade progressively without coordinated migrations. Simply increasing Praos block sizes would create proportionally longer propagation times that violate Praos timing assumptions and lack sufficient scalability for long-term viability.
+Beyond preserving transaction behavior, the design minimizes infrastructure and operational disruption for the existing ecosystem. The protocol functions as an overlay extending Praos, allowing SPOs to upgrade progressively without coordinated migrations. Simply increasing Praos block sizes would create proportionally longer propagation times that violate Praos timing assumptions and lack sufficient scalability for long-term viability.
 
 <a name="competitiveness"></a>**4. Competitive positioning**
 
@@ -618,7 +618,7 @@ The coupled block production design can be extended towards higher concurrency m
 
 <a name="optimal-tradeoffs"></a>**Conclusion**
 
-This linearization strategy balances all four priorities. A delivered 30-65x improvement provides substantially more value than the research paper's higher-concurrency variants, which would impose costs on existing dApps, wallets, and infrastructure while taking significantly longer to build.
+This linearization proposal balances all four priorities. A delivered 30-65x improvement provides substantially more value than the research paper's higher-concurrency variants, which would impose costs on existing dApps, wallets, and infrastructure while taking significantly longer to build.
 
 The following evidence section shall provide quantitative support for these trade-offs and validate the protocol's performance under realistic network conditions.
 
