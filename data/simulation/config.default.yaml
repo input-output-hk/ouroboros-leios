@@ -38,6 +38,11 @@ praos-fallback-enabled: true
 
 linear-vote-stage-length-slots: 5
 linear-diffuse-stage-length-slots: 5
+# Which conditions must be met before a node will send an EB to peers?
+# - "eb-received": the EB must only go through basic validation
+# - "txs-received": all TXs in the EB must have been received
+# - "fully-valid": the EB must be fully validated
+linear-eb-propagation-criteria: eb-received
 store-txs-as-references: false
 
 ################################################################################

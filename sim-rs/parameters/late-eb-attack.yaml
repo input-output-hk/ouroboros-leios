@@ -21,3 +21,4 @@ late-tx-attack:
   tx-generation-distribution:
     distribution: constant
     value: 3
+linear-eb-propagation-criteria: fully-valid

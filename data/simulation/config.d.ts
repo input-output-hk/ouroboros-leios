@@ -91,6 +91,14 @@ export interface Config {
    */
   "linear-diffuse-stage-length-slots": bigint;
 
+  /**
+   * Which conditions must be met before a node will send an EB to peers?
+   *  - "eb-received": the EB must only go through basic validation
+   *  - "txs-received": all TXs in the EB must have been received
+   *  - "fully-valid": the EB must be fully validated
+   */
+  "linear-eb-propagation-criteria": EBPropagationCriteria;
+
   // Transaction Configuration
   /** Only supported by Rust simulation. */
   "tx-generation-distribution": Distribution;
@@ -324,6 +332,15 @@ export enum MempoolSamplingStrategy {
   OrderedById = "ordered-by-id",
   /** Include transactions in random order. */
   Random = "random",
+}
+
+export enum EBPropagationCriteria {
+  /** the EB must only go through basic validation */
+  EBReceived = "eb-received",
+  /** all TXs in the EB must have been received */
+  TXsReceived = "txs-received",
+  /** the EB must be fully validated */
+  FullyValid = "fully-valid",
 }
 
 /**

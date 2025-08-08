@@ -57,6 +57,10 @@
         }
       ]
     },
+    "EBPropagationCriteria": {
+      "enum": ["eb-received", "txs-received", "fully-valid"],
+      "type": "string"
+    },
     "ExpDistribution": {
       "properties": {
         "distribution": {
@@ -383,6 +387,10 @@
       "description": "How long after the EB voting stage are votes allowed to diffuse.\nMatches L_diff from the paper.",
       "properties": {},
       "type": "number"
+    },
+    "linear-eb-propagation-criteria": {
+      "$ref": "#/definitions/EBPropagationCriteria",
+      "description": "Which conditions must be met before a node will send an EB to peers?\n - \"eb-received\": the EB must only go through basic validation\n - \"txs-received\": all TXs in the EB must have been received\n - \"fully-valid\": the EB must be fully validated"
     },
     "linear-vote-stage-length-slots": {
       "additionalProperties": false,

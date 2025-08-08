@@ -15,8 +15,9 @@ use rand_chacha::ChaChaRng;
 use crate::{
     clock::{Clock, Timestamp},
     config::{
-        CpuTimeConfig, LeiosVariant, MempoolSamplingStrategy, NodeBehaviours, NodeConfiguration,
-        NodeId, RelayStrategy, SimConfiguration, TransactionConfig,
+        CpuTimeConfig, EBPropagationCriteria, LeiosVariant, MempoolSamplingStrategy,
+        NodeBehaviours, NodeConfiguration, NodeId, RelayStrategy, SimConfiguration,
+        TransactionConfig,
     },
     events::EventTracker,
     model::{
@@ -243,7 +244,12 @@ struct NodePraosState {
 enum EndorserBlockView {
     Pending,
     Requested,
-    Received { eb: Arc<EndorserBlock> },
+    Received {
+        eb: Arc<EndorserBlock>,
+        seen: Timestamp,
+        all_txs_seen: bool,
+        validated: bool,
+    },
 }
 
 enum VoteBundleView {
@@ -260,7 +266,7 @@ struct NodeLeiosState {
     votes_by_eb: HashMap<EndorserBlockId, BTreeMap<NodeId, usize>>,
     certified_ebs: HashSet<EndorserBlockId>,
     incomplete_onchain_ebs: HashSet<EndorserBlockId>,
-    missing_onchain_txs: HashMap<TransactionId, Vec<EndorserBlockId>>,
+    missing_txs: HashMap<TransactionId, Vec<EndorserBlockId>>,
 }
 
 #[derive(Clone, Default)]
@@ -449,8 +455,8 @@ impl LinearLeiosNode {
         {
             return;
         }
-        let was_already_endorsed = self.acknowledge_endorsed_tx(&tx);
-        if !was_already_endorsed {
+        let referenced_by_eb = self.acknowledge_tx(&tx);
+        if !referenced_by_eb {
             let rb_ref = self.latest_rb().map(|rb| rb.header.id);
             let ledger_state = self.resolve_ledger_state(rb_ref);
             if ledger_state.is_some_and(|ls| ls.spent_inputs.contains(&tx.input_id)) {
@@ -476,6 +482,20 @@ impl LinearLeiosNode {
             }
             self.queued.send_to(*peer, Message::AnnounceTx(id));
         }
+    }
+
+    fn has_tx(&self, tx_id: TransactionId) -> bool {
+        matches!(self.txs.get(&tx_id), Some(TransactionView::Received(_)))
+    }
+
+    fn acknowledge_tx(&mut self, tx: &Transaction) -> bool {
+        let Some(eb_ids) = self.leios.missing_txs.remove(&tx.id) else {
+            return false;
+        };
+        for eb_id in eb_ids {
+            self.try_validating_eb(eb_id);
+        }
+        true
     }
 }
 
@@ -506,22 +526,20 @@ impl LinearLeiosNode {
                 return None;
             }
 
-            let endorsement = Endorsement {
+            // We haven't necessarily finished validating this EB, or even received it and its contents.
+            // That won't stop us from generating the endorsement, though it'll make us produce an empty block.
+            if !self.is_eb_validated(*eb_id) {
+                self.leios.incomplete_onchain_ebs.insert(*eb_id);
+            }
+
+            Some(Endorsement {
                 eb: *eb_id,
                 size_bytes: self.sim_config.sizes.cert(votes.len()),
                 votes: votes.clone(),
-            };
-
-            // We're endorsing this EB, so consider all of its transactions part of the ledger state
-            let Some(EndorserBlockView::Received { eb }) = self.leios.ebs.get(eb_id) else {
-                return None;
-            };
-            self.remove_eb_txs_from_mempool(&eb.clone());
-
-            Some(endorsement)
+            })
         });
 
-        // If we are missing any EBs from the current chain, we have no way to tell whether
+        // If we haven't validated any EBs from the current chain, we have no way to tell whether
         // including a TX would introduce conflicts. So, don't include ANY TXs, just to be safe.
         let produce_empty_block = !self.leios.incomplete_onchain_ebs.is_empty();
 
@@ -821,7 +839,9 @@ impl LinearLeiosNode {
             },
         );
         if let Some(endorsement) = &rb.endorsement {
-            self.expect_eb_from_endorsement(endorsement.eb);
+            if !self.is_eb_validated(endorsement.eb) {
+                self.leios.incomplete_onchain_ebs.insert(endorsement.eb);
+            }
         }
 
         self.publish_rb(rb, true);
@@ -843,9 +863,15 @@ impl LinearLeiosNode {
     fn finish_generating_eb(&mut self, eb: EndorserBlock, withheld_txs: Vec<Arc<Transaction>>) {
         let eb_id = eb.id();
         let eb = Arc::new(eb);
-        self.leios
-            .ebs
-            .insert(eb_id, EndorserBlockView::Received { eb: eb.clone() });
+        self.leios.ebs.insert(
+            eb_id,
+            EndorserBlockView::Received {
+                eb: eb.clone(),
+                seen: self.clock.now(),
+                all_txs_seen: true,
+                validated: true,
+            },
+        );
 
         if self.should_withhold_ebs() {
             // We're an evil attacker, holding onto this EB until just long enough to collect votes.
@@ -863,6 +889,7 @@ impl LinearLeiosNode {
         }
         self.vote_for_endorser_block(&eb, self.clock.now());
     }
+
     fn receive_announce_eb(&mut self, from: NodeId, id: EndorserBlockId) {
         self.leios
             .eb_peer_announcements
@@ -884,7 +911,7 @@ impl LinearLeiosNode {
     }
 
     fn receive_request_eb(&mut self, from: NodeId, id: EndorserBlockId) {
-        if let Some(EndorserBlockView::Received { eb }) = self.leios.ebs.get(&id) {
+        if let Some(EndorserBlockView::Received { eb, .. }) = self.leios.ebs.get(&id) {
             self.tracker.track_linear_eb_sent(eb, self.id, from);
             self.queued.send_to(from, Message::EB(eb.clone()));
         }
@@ -897,100 +924,126 @@ impl LinearLeiosNode {
     }
 
     fn finish_validating_eb_header(&mut self, from: NodeId, eb: Arc<EndorserBlock>) {
-        if self
-            .leios
-            .ebs
-            .insert(eb.id(), EndorserBlockView::Received { eb: eb.clone() })
-            .is_some_and(|eb| matches!(eb, EndorserBlockView::Received { .. }))
-        {
+        if let Some(EndorserBlockView::Received { .. }) = self.leios.ebs.get(&eb.id()) {
+            // already received this EB
             return;
         }
-
-        self.acknowledge_endorsed_eb(&eb);
-
-        // TODO: sleep
-        for peer in &self.consumers {
-            if *peer == from {
-                continue;
-            }
-            self.queued.send_to(*peer, Message::AnnounceEB(eb.id()));
-        }
-
-        self.queued
-            .schedule_cpu_task(CpuTask::EBBlockValidated(eb, self.clock.now()));
-    }
-
-    fn finish_validating_eb(&mut self, eb: Arc<EndorserBlock>, seen: Timestamp) {
-        self.vote_for_endorser_block(&eb, seen);
-    }
-
-    // Check if we have seen this EB, and all of its TXs.
-    // If we haven't, we will need to produce empty blocks until we see it.
-    fn expect_eb_from_endorsement(&mut self, eb_id: EndorserBlockId) {
-        let eb = self.leios.ebs.get(&eb_id);
-        let Some(EndorserBlockView::Received { eb }) = eb else {
-            self.leios.incomplete_onchain_ebs.insert(eb_id);
-            return;
+        let seen = self.clock.now();
+        let missing_txs = if matches!(self.sim_config.variant, LeiosVariant::Linear) {
+            vec![]
+        } else {
+            eb.txs
+                .iter()
+                .map(|tx| tx.id)
+                .filter(|id| !self.has_tx(*id))
+                .collect()
         };
+        self.leios.ebs.insert(
+            eb.id(),
+            EndorserBlockView::Received {
+                eb: eb.clone(),
+                seen,
+                all_txs_seen: missing_txs.is_empty(),
+                validated: false,
+            },
+        );
 
-        let some_tx_is_missing = self.expect_txs_from_endorsement(&eb.clone());
-        if some_tx_is_missing {
-            self.leios.incomplete_onchain_ebs.insert(eb_id);
+        let should_propagate_now = match self.sim_config.linear_eb_propagation_criteria {
+            EBPropagationCriteria::EbReceived => true,
+            EBPropagationCriteria::TxsReceived => missing_txs.is_empty(),
+            EBPropagationCriteria::FullyValid => false,
+        };
+        if should_propagate_now {
+            for peer in &self.consumers {
+                if *peer == from {
+                    continue;
+                }
+                self.queued.send_to(*peer, Message::AnnounceEB(eb.id()));
+            }
         }
-    }
 
-    // If this EB has been endorsed, track that it has been received.
-    fn acknowledge_endorsed_eb(&mut self, eb: &EndorserBlock) {
-        let eb_id = eb.id();
-        if !self.leios.incomplete_onchain_ebs.contains(&eb_id) {
-            return;
-        }
-        let some_tx_is_missing = self.expect_txs_from_endorsement(eb);
-        if !some_tx_is_missing {
-            self.leios.incomplete_onchain_ebs.remove(&eb_id);
-            self.remove_eb_txs_from_mempool(eb);
-        }
-    }
-
-    fn expect_txs_from_endorsement(&mut self, eb: &EndorserBlock) -> bool {
-        if matches!(self.sim_config.variant, LeiosVariant::Linear) {
-            // EBs contain TX bodies, so there's no concept of a "missing" TX
-            return false;
-        }
-        let mut some_tx_is_missing = false;
-        for tx in &eb.txs {
-            let tx_id = tx.id;
-            if !matches!(self.txs.get(&tx_id), Some(TransactionView::Received(_))) {
+        if missing_txs.is_empty() {
+            self.queued
+                .schedule_cpu_task(CpuTask::EBBlockValidated(eb, seen));
+        } else {
+            for tx_id in missing_txs {
                 self.leios
-                    .missing_onchain_txs
+                    .missing_txs
                     .entry(tx_id)
                     .or_default()
                     .push(eb.id());
-                some_tx_is_missing = true;
             }
         }
-        some_tx_is_missing
     }
 
-    // If any endorsed EBs referenced this transaction, track that it has been received.
-    fn acknowledge_endorsed_tx(&mut self, tx: &Transaction) -> bool {
-        let Some(eb_ids) = self.leios.missing_onchain_txs.remove(&tx.id) else {
-            return false;
+    fn try_validating_eb(&mut self, eb_id: EndorserBlockId) {
+        let Some(EndorserBlockView::Received {
+            eb,
+            seen,
+            all_txs_seen: false,
+            validated: false,
+        }) = self.leios.ebs.get(&eb_id)
+        else {
+            return;
         };
-        for eb_id in eb_ids {
-            let Some(EndorserBlockView::Received { eb }) = self.leios.ebs.get(&eb_id) else {
-                unreachable!("how did we know this EB needed a TX if we never saw the EB?");
-            };
-            if !eb
-                .txs
-                .iter()
-                .any(|tx| matches!(self.txs.get(&tx.id), Some(TransactionView::Received(_))))
-            {
-                // we have received all missing TXs for this EB, so now we have a complete view of it!
-                self.leios.incomplete_onchain_ebs.remove(&eb_id);
+        let all_seen = eb.txs.iter().all(|tx| self.has_tx(tx.id));
+        if all_seen {
+            let eb = eb.clone();
+            let seen = *seen;
+            self.leios.ebs.insert(
+                eb_id,
+                EndorserBlockView::Received {
+                    eb: eb.clone(),
+                    seen,
+                    all_txs_seen: true,
+                    validated: false,
+                },
+            );
+            if matches!(
+                self.sim_config.linear_eb_propagation_criteria,
+                EBPropagationCriteria::TxsReceived
+            ) {
+                // We have received all transactions, but haven't validated the entirety of the EB yet.
+                // Propagate it now anyway.
+                for peer in &self.consumers {
+                    self.queued.send_to(*peer, Message::AnnounceEB(eb_id));
+                }
+            }
+            self.queued
+                .schedule_cpu_task(CpuTask::EBBlockValidated(eb, seen));
+        }
+    }
+
+    fn finish_validating_eb(&mut self, eb: Arc<EndorserBlock>, seen: Timestamp) {
+        if self.leios.incomplete_onchain_ebs.remove(&eb.id()) {
+            self.remove_eb_txs_from_mempool(&eb);
+        }
+        let Some(EndorserBlockView::Received { validated, .. }) = self.leios.ebs.get_mut(&eb.id())
+        else {
+            panic!("how did we validate this EB without ever seeing it?");
+        };
+        *validated = true;
+        if matches!(
+            self.sim_config.linear_eb_propagation_criteria,
+            EBPropagationCriteria::FullyValid
+        ) {
+            // We have received all transactions, but haven't validated the entirety of the EB yet.
+            // Propagate it now anyway.
+            for peer in &self.consumers {
+                self.queued.send_to(*peer, Message::AnnounceEB(eb.id()));
             }
         }
-        true
+        self.vote_for_endorser_block(&eb, seen);
+    }
+
+    fn is_eb_validated(&self, eb_id: EndorserBlockId) -> bool {
+        matches!(
+            self.leios.ebs.get(&eb_id),
+            Some(EndorserBlockView::Received {
+                validated: true,
+                ..
+            })
+        )
     }
 }
 
@@ -1027,9 +1080,15 @@ impl LinearLeiosNode {
     }
 
     fn receive_withheld_eb(&mut self, eb: Arc<EndorserBlock>, withheld_txs: Vec<Arc<Transaction>>) {
-        self.leios
-            .ebs
-            .insert(eb.id(), EndorserBlockView::Received { eb: eb.clone() });
+        self.leios.ebs.insert(
+            eb.id(),
+            EndorserBlockView::Received {
+                eb: eb.clone(),
+                seen: self.clock.now(),
+                all_txs_seen: true,
+                validated: true,
+            },
+        );
         for tx in withheld_txs {
             // Add the peer's withheld TXs to the list we know of,
             // but not to our mempools
@@ -1156,8 +1215,9 @@ impl LinearLeiosNode {
 
         if self.sim_config.variant == LeiosVariant::LinearWithTxReferences {
             for tx in &eb.txs {
-                if !matches!(self.txs.get(&tx.id), Some(TransactionView::Received(_))) {
+                if !self.has_tx(tx.id) {
                     // We won't vote for an EB if we don't have all the TXs it references
+                    // NB: this should be redundant; in this variant, we wait for TXs before validating
                     return Err(NoVoteReason::MissingTX);
                 }
             }
@@ -1282,7 +1342,9 @@ impl LinearLeiosNode {
     fn remove_rb_txs_from_mempool(&mut self, rb: &RankingBlock) {
         let mut txs = rb.transactions.clone();
         if let Some(endorsement) = &rb.endorsement {
-            if let Some(EndorserBlockView::Received { eb }) = self.leios.ebs.get(&endorsement.eb) {
+            if let Some(EndorserBlockView::Received { eb, .. }) =
+                self.leios.ebs.get(&endorsement.eb)
+            {
                 txs.extend(eb.txs.iter().cloned());
             }
         }
@@ -1331,9 +1393,13 @@ impl LinearLeiosNode {
             }
 
             if let Some(endorsement) = &rb.endorsement {
-                let Some(EndorserBlockView::Received { eb }) = self.leios.ebs.get(&endorsement.eb)
+                let Some(EndorserBlockView::Received {
+                    eb,
+                    validated: true,
+                    ..
+                }) = self.leios.ebs.get(&endorsement.eb)
                 else {
-                    // We don't have the EB yet, so we don't know the current ledger state.
+                    // We haven't validated the EB yet, so we don't know the ledger state
                     return None;
                 };
                 for tx in &eb.txs {

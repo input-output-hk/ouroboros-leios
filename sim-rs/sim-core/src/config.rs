@@ -77,6 +77,7 @@ pub struct RawParameters {
     pub praos_fallback_enabled: bool,
     pub linear_vote_stage_length_slots: u64,
     pub linear_diffuse_stage_length_slots: u64,
+    pub linear_eb_propagation_criteria: EBPropagationCriteria,
 
     // Transaction configuration
     pub tx_generation_distribution: DistributionConfig,
@@ -182,6 +183,14 @@ pub enum RelayStrategy {
 pub enum MempoolSamplingStrategy {
     OrderedById,
     Random,
+}
+
+#[derive(Debug, Copy, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum EBPropagationCriteria {
+    EbReceived,
+    TxsReceived,
+    FullyValid,
 }
 
 #[derive(Deserialize)]
@@ -681,6 +690,7 @@ pub struct SimConfiguration {
     pub(crate) eb_include_txs_from_previous_stage: bool,
     pub(crate) linear_vote_stage_length: u64,
     pub(crate) linear_diffuse_stage_length: u64,
+    pub(crate) linear_eb_propagation_criteria: EBPropagationCriteria,
     pub(crate) max_block_size: u64,
     pub(crate) max_ib_size: u64,
     pub(crate) max_eb_size: u64,
@@ -747,6 +757,7 @@ impl SimConfiguration {
             eb_include_txs_from_previous_stage: params.eb_include_txs_from_previous_stage,
             linear_vote_stage_length: params.linear_vote_stage_length_slots,
             linear_diffuse_stage_length: params.linear_diffuse_stage_length_slots,
+            linear_eb_propagation_criteria: params.linear_eb_propagation_criteria,
             max_block_size: params.rb_body_max_size_bytes,
             max_ib_size: params.ib_body_max_size_bytes,
             max_eb_size: params.eb_referenced_txs_max_size_bytes,
