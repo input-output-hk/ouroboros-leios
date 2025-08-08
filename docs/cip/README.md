@@ -587,7 +587,7 @@ RbHeaderRelay is a **pull-based relay protocol** that enables nodes to request a
 
 The [Leios research paper][leios-paper] describes a highly concurrent protocol with three block types—Input Blocks (IBs), Endorser Blocks (EBs), and Ranking Blocks (RBs)—produced independently across decoupled, pipelined stages. This specification simplifies that design by eliminating IBs and coupling EB production with RB production, reducing complexity while preserving substantial throughput gains.
 
-Ouroboros Leios directly addresses key challenges outlined in [CPS-18 Greater Transaction Throughput][cps-18] through four strategic design priorities that guided this simplification. These priorities are:
+This simplification avoids the complexity and ecosystem disruption of implementing massive throughput increases immediately, while still delivering substantial gains to address [CPS-18 Greater Transaction Throughput][cps-18] challenges. Four strategic design priorities guided this approach:
 
 1. [Economic sustainability](#economic-sustainability)
 2. [Reasonable time to market](#time-to-market)
