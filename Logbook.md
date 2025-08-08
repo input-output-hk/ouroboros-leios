@@ -47,6 +47,12 @@ Artifacts:
   Attempts to elaborate the justification for some of the granularity revealed a miscalculation.
   The work next week will involve combining a some-but-not-all of the maximally granular mini protocols.
 
+### Rust simulation
+
+Implemented a transaction withholding attack for Linear Leios, where EB producers wait until the moment they publish an EB to also publish some transactions it references.
+
+Updated how the Linear Leios simulation handles late TXs, EBs, and RBs.
+
 ## 2025-08-04
 
 ### Experiment varying Plutus validation time
