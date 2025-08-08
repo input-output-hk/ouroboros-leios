@@ -153,6 +153,11 @@ accumLeiosSimState _cfg now (LeiosEventNode (LabelNode nid (LeiosNodeEvent event
         { ebDiffusionLatency = accumDiffusionLatency' now nid event x.id x ebDiffusionLatency
         , ..
         }
+    EventLinearEB x ->
+      LeiosSimState
+        { ibDiffusionLatency = accumDiffusionLatency' now nid event x.id x.header ibDiffusionLatency
+        , ..
+        }
     EventVote x ->
       LeiosSimState
         { voteDiffusionLatency = accumDiffusionLatency' now nid event x.id x voteDiffusionLatency
