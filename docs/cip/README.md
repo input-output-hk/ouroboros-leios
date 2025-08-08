@@ -596,43 +596,29 @@ This simplification avoids the complexity and ecosystem disruption of implementi
 
 <a name="economic-sustainability"></a>**1. Economic sustainability: Capacity without utilization risk**
 
-A central challenge identified in CPS-18 is economic sustainability. As the Cardano Reserve diminishes, transaction fees must replace rewards to maintain network security and SPO profitability. Currently, the Reserve contributes more than 85% of epoch rewards, with less than 15% coming from transaction fees. By 2029, to compensate for Reserve depletion, the network requires approximately 36-50 TPS with average-sized transactions—roughly 10 times current mainnet throughput.
+As the Cardano Reserve diminishes, transaction fees must replace rewards to maintain network security and SPO profitability. Currently, the Reserve contributes more than 85% of epoch rewards, with less than 15% coming from transaction fees. By 2029, to compensate for Reserve depletion, the network requires approximately 36-50 TPS with average-sized transactions—roughly 10 times current mainnet throughput.
 
-**Measuring usable throughput**: To properly assess economic breakeven points, we use **Transaction Bytes per second (TxB/s)** rather than **Transactions per second (TPS)**. TPS doesn't account for transaction size or computational complexity, making systems with smaller transactions appear "faster" while providing less utility. Current Cardano mainnet provides **4,500 TxB/s**, while this specification targets **140,000-300,000 TxB/s** (140-300 TxkB/s, equivalent to roughly 100-200 TPS)—a **30-65x increase** sufficient for economic sustainability.
+To properly assess economic breakeven points, we measure throughput in Transaction Bytes per second (TxB/s) rather than Transactions per second (TPS). TPS doesn't account for transaction size or computational complexity, making systems with smaller transactions appear "faster" while providing less utility. Current Cardano mainnet provides 4,500 TxB/s, while this specification targets 140,000-300,000 TxB/s (equivalent to roughly 100-200 TPS)—a 30-65x increase sufficient for economic sustainability.
 
-**Capacity vs. utilization balance**: Beyond meeting economic thresholds, this approach avoids the risk of over-engineering massive throughput capacity without proven demand. Creating fundamental system changes to support multiple orders of magnitude more throughput—when actual utilization may not materialize—represents unnecessary complexity and ecosystem disruption. A rational scaling approach proceeds incrementally, validating demand at each step before pursuing the next capacity step up.
+This approach also avoids over-engineering massive throughput capacity without proven demand. Creating fundamental system changes to support multiple orders of magnitude more throughput—when actual utilization may not materialize—represents unnecessary complexity and ecosystem disruption. Scaling incrementally allows us to validate demand at each step.
 
 Achieving this capacity increase requires trade-offs, as detailed below.
 
 <a name="time-to-market"></a>**2. Reasonable time to market: Complexity trade-offs**
 
-This linearization approach (detailed in the [Protocol Overview](#protocol-overview)) achieves **two critical trade-offs**:
-
-**Reduced complexity**: Eliminates complex distributed systems problems around transaction sharding, conflict resolution, and sophisticated mempool coordination that could delay deployment by years.
-
-**Preserved compatibility**: Maintains familiar transaction semantics, deterministic ordering, and predictable finality patterns that existing dApps and infrastructure depend on.
+The linearization approach eliminates complex distributed systems problems around transaction sharding, conflict resolution, and sophisticated mempool coordination that could delay deployment by years. It also maintains familiar transaction semantics, deterministic ordering, and predictable finality patterns that existing dApps and infrastructure depend on today.
 
 <a name="downstream-impact"></a>**3. Minimal downstream impact: Ecosystem preservation**
 
-Beyond preserving transaction behavior, the protocol design minimizes infrastructure and operational disruption:
-
-**Progressive deployment**: Functions as an **overlay protocol** extending Praos with [additive network extensions](#network) and [node behavior changes](#node-behavior). SPOs can upgrade progressively without coordinated migrations.
-
-**Naive alternative**: Simply increasing Praos block sizes could improve throughput but fails due to proportionally longer propagation times that violate Praos timing assumptions and lack sufficient scalability ceiling for long-term viability.
-
-Having prioritized near-term deployability and ecosystem compatibility, the final consideration is maintaining competitive positioning for future development.
+The protocol functions as an overlay extending Praos with additive network extensions and node behavior changes. SPOs can upgrade progressively without coordinated migrations. Simply increasing Praos block sizes would create proportionally longer propagation times that violate Praos timing assumptions and lack sufficient scalability for long-term viability.
 
 <a name="competitiveness"></a>**4. Competitive positioning**
 
-While the linearized design prioritizes practical deployment, it preserves pathways to higher performance:
-
-**Extensibility**: The [coupled block production](#protocol-overview) design can be extended towards higher concurrency models. [Simulation results](#roadmap-and-future-directions) demonstrate the performance potential of these more concurrent protocol versions.
-
-**Future compatibility**: Maintains compatibility with more aggressive scaling approaches including full Leios variants, EB and IB (input block) decoupling, and sharding extensions, ensuring current throughput gains don't preclude 100x+ improvements when chain growth solutions mature.
+The coupled block production design can be extended towards higher concurrency models, as demonstrated in simulation results. It maintains compatibility with more aggressive scaling approaches including full Leios variants, EB and IB (input block) decoupling, and sharding extensions, ensuring current throughput gains don't preclude 100x+ improvements when chain growth solutions mature.
 
 <a name="optimal-tradeoffs"></a>**Conclusion**
 
-This linearization strategy represents the balance across all four priorities, recognizing that a delivered 30-65x improvement provides substantially more value than the research paper's higher-concurrency variants, which would impose non-trivial costs on existing dApps, wallets, and infrastructure while taking significantly longer to build due to introducing many new protocol elements.
+This linearization strategy balances all four priorities. A delivered 30-65x improvement provides substantially more value than the research paper's higher-concurrency variants, which would impose costs on existing dApps, wallets, and infrastructure while taking significantly longer to build.
 
 The following evidence section shall provide quantitative support for these trade-offs and validate the protocol's performance under realistic network conditions.
 
