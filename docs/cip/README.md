@@ -106,7 +106,14 @@ diminishing rewards and a forecast of their continued reduction: the forecast is
 mildly uncertain because the future pattern of staking behavior, transaction
 fees, and node efficiency might vary considerably.
 
-![Forecast of rewards on Cardano mainnet](images/reward-forecast-bau.svg)
+<div align="center">
+<p>
+  <img src="images/reward-forecast-bau.svg" alt="Forecast of rewards on Cardano mainnet">
+</p>
+
+_Figure 1: Forecast of rewards on Cardano mainnet_
+
+</div>
 
 Ouroboros Praos cannot support the high transaction volume needed to generate
 the fees that will eventually be needed to offset the diminishing rewards.
@@ -114,7 +121,14 @@ However, as sustained throughput of transactions grows beyond 50 transactions
 per second, there is more opportunity for simultaneously reducing fees,
 augmenting the Treasury, and increasing SPO and delegator rewards.
 
-![SPO profitability under Praos, as a function of transaction volume](images/spo-profitability.svg)
+<div align="center">
+<p>
+  <img src="images/spo-profitability.svg" alt="SPO profitability under Praos, as a function of transaction volume">
+</p>
+
+_Figure 2: SPO profitability under Praos, as a function of transaction volume_
+
+</div>
 
 This first version of the Leios protocol family represents a balance
 between immediate scalability needs and long-term protocol evolution. The
@@ -138,7 +152,7 @@ committee of stake pools before inclusion in the ledger.
   <img src="images/protocol-flow-overview.png" alt="Leios Protocol Flow">
 </p>
 
-_Figure 1: Ouroboros Leios Protocol Flow_
+_Figure 3: Ouroboros Leios Protocol Flow_
 
 </div>
 
@@ -404,7 +418,7 @@ sequenceDiagram
     Note over BP: 13. Create next RB<br />certifying EB &<br />announcing next EB
 ```
 
-_Figure 2: Up- and downstream interactions of a node (simplified)_
+_Figure 4: Up- and downstream interactions of a node (simplified)_
 
 </div>
 
