@@ -259,6 +259,8 @@ struct NodeLeiosState {
     votes: HashMap<VoteBundleId, VoteBundleView>,
     votes_by_eb: HashMap<EndorserBlockId, BTreeMap<NodeId, usize>>,
     certified_ebs: HashSet<EndorserBlockId>,
+    incomplete_onchain_ebs: HashSet<EndorserBlockId>,
+    missing_onchain_txs: HashMap<TransactionId, Vec<EndorserBlockId>>,
 }
 
 #[derive(Clone, Default)]
@@ -447,22 +449,25 @@ impl LinearLeiosNode {
         {
             return;
         }
-        let rb_ref = self.latest_rb().map(|rb| rb.header.id);
-        let ledger_state = self.resolve_ledger_state(rb_ref);
-        if ledger_state.spent_inputs.contains(&tx.input_id) {
-            // Ignoring a TX which conflicts with something already onchain
-            return;
+        let was_already_endorsed = self.acknowledge_endorsed_tx(&tx);
+        if !was_already_endorsed {
+            let rb_ref = self.latest_rb().map(|rb| rb.header.id);
+            let ledger_state = self.resolve_ledger_state(rb_ref);
+            if ledger_state.is_some_and(|ls| ls.spent_inputs.contains(&tx.input_id)) {
+                // Ignoring a TX which conflicts with something already onchain
+                return;
+            }
+            if self
+                .praos
+                .mempool
+                .values()
+                .any(|mempool_tx| mempool_tx.input_id == tx.input_id)
+            {
+                // Ignoring a TX which conflicts with the current mempool contents.
+                return;
+            }
+            self.praos.mempool.insert(tx.id, tx.clone());
         }
-        if self
-            .praos
-            .mempool
-            .values()
-            .any(|mempool_tx| mempool_tx.input_id == tx.input_id)
-        {
-            // Ignoring a TX which conflicts with the current mempool contents.
-            return;
-        }
-        self.praos.mempool.insert(tx.id, tx.clone());
 
         // TODO: should send to producers instead (make configurable)
         for peer in &self.consumers {
@@ -516,8 +521,12 @@ impl LinearLeiosNode {
             Some(endorsement)
         });
 
+        // If we are missing any EBs from the current chain, we have no way to tell whether
+        // including a TX would introduce conflicts. So, don't include ANY TXs, just to be safe.
+        let produce_empty_block = !self.leios.incomplete_onchain_ebs.is_empty();
+
         let mut rb_transactions = vec![];
-        if self.sim_config.praos_fallback {
+        if !produce_empty_block && self.sim_config.praos_fallback {
             if let TransactionConfig::Mock(config) = &self.sim_config.transactions {
                 // Add one transaction, the right size for the extra RB payload
                 let tx = config.mock_tx(config.rb_size);
@@ -539,22 +548,25 @@ impl LinearLeiosNode {
         };
 
         let mut eb_transactions = vec![];
+        let mut withheld_txs = vec![];
+        if !produce_empty_block {
+            // If we are performing a "withheld TX" attack, we will include a bunch of brand-new TXs in this EB.
+            // They will get disseminated through the network at the same time as the EB.
+            withheld_txs = self.generate_withheld_txs();
+            eb_transactions.extend(withheld_txs.iter().cloned());
 
-        // If we are performing a "withheld TX" attack, we will include a bunch of brand-new TXs in this EB.
-        // They will get disseminated through the network at the same time as the EB.
-        let withheld_txs = self.generate_withheld_txs();
-        eb_transactions.extend(withheld_txs.iter().cloned());
-
-        if let TransactionConfig::Mock(config) = &self.sim_config.transactions {
-            // Add one transaction, the right size for the extra RB payload
-            let extra_size = config.eb_size - withheld_txs.iter().map(|tx| tx.bytes).sum::<u64>();
-            if extra_size > 0 {
-                let tx = config.mock_tx(extra_size);
-                self.tracker.track_transaction_generated(&tx, self.id);
-                eb_transactions.push(Arc::new(tx));
+            if let TransactionConfig::Mock(config) = &self.sim_config.transactions {
+                // Add one transaction, the right size for the extra RB payload
+                let extra_size =
+                    config.eb_size - withheld_txs.iter().map(|tx| tx.bytes).sum::<u64>();
+                if extra_size > 0 {
+                    let tx = config.mock_tx(extra_size);
+                    self.tracker.track_transaction_generated(&tx, self.id);
+                    eb_transactions.push(Arc::new(tx));
+                }
+            } else {
+                self.sample_from_mempool(&mut eb_transactions, self.sim_config.max_eb_size, false);
             }
-        } else {
-            self.sample_from_mempool(&mut eb_transactions, self.sim_config.max_eb_size, false);
         }
 
         let rb = RankingBlock {
@@ -686,7 +698,15 @@ impl LinearLeiosNode {
                     // We like our block better than this new one.
                     return;
                 }
-                self.praos.blocks.remove(old_block_id);
+
+                // Forget we ever saw that other block
+                if let Some(RankingBlockView::Received { rb, .. }) =
+                    self.praos.blocks.remove(old_block_id)
+                {
+                    if let Some(endorsement) = &rb.endorsement {
+                        self.leios.incomplete_onchain_ebs.remove(&endorsement.eb);
+                    }
+                }
             }
         }
         self.praos
@@ -800,6 +820,9 @@ impl LinearLeiosNode {
                 header_seen,
             },
         );
+        if let Some(endorsement) = &rb.endorsement {
+            self.expect_eb_from_endorsement(endorsement.eb);
+        }
 
         self.publish_rb(rb, true);
     }
@@ -883,6 +906,8 @@ impl LinearLeiosNode {
             return;
         }
 
+        self.acknowledge_endorsed_eb(&eb);
+
         // TODO: sleep
         for peer in &self.consumers {
             if *peer == from {
@@ -897,6 +922,75 @@ impl LinearLeiosNode {
 
     fn finish_validating_eb(&mut self, eb: Arc<EndorserBlock>, seen: Timestamp) {
         self.vote_for_endorser_block(&eb, seen);
+    }
+
+    // Check if we have seen this EB, and all of its TXs.
+    // If we haven't, we will need to produce empty blocks until we see it.
+    fn expect_eb_from_endorsement(&mut self, eb_id: EndorserBlockId) {
+        let eb = self.leios.ebs.get(&eb_id);
+        let Some(EndorserBlockView::Received { eb }) = eb else {
+            self.leios.incomplete_onchain_ebs.insert(eb_id);
+            return;
+        };
+
+        let some_tx_is_missing = self.expect_txs_from_endorsement(&eb.clone());
+        if some_tx_is_missing {
+            self.leios.incomplete_onchain_ebs.insert(eb_id);
+        }
+    }
+
+    // If this EB has been endorsed, track that it has been received.
+    fn acknowledge_endorsed_eb(&mut self, eb: &EndorserBlock) {
+        let eb_id = eb.id();
+        if !self.leios.incomplete_onchain_ebs.contains(&eb_id) {
+            return;
+        }
+        let some_tx_is_missing = self.expect_txs_from_endorsement(eb);
+        if !some_tx_is_missing {
+            self.leios.incomplete_onchain_ebs.remove(&eb_id);
+            self.remove_eb_txs_from_mempool(eb);
+        }
+    }
+
+    fn expect_txs_from_endorsement(&mut self, eb: &EndorserBlock) -> bool {
+        if matches!(self.sim_config.variant, LeiosVariant::Linear) {
+            // EBs contain TX bodies, so there's no concept of a "missing" TX
+            return false;
+        }
+        let mut some_tx_is_missing = false;
+        for tx in &eb.txs {
+            let tx_id = tx.id;
+            if !matches!(self.txs.get(&tx_id), Some(TransactionView::Received(_))) {
+                self.leios
+                    .missing_onchain_txs
+                    .entry(tx_id)
+                    .or_default()
+                    .push(eb.id());
+                some_tx_is_missing = true;
+            }
+        }
+        some_tx_is_missing
+    }
+
+    // If any endorsed EBs referenced this transaction, track that it has been received.
+    fn acknowledge_endorsed_tx(&mut self, tx: &Transaction) -> bool {
+        let Some(eb_ids) = self.leios.missing_onchain_txs.remove(&tx.id) else {
+            return false;
+        };
+        for eb_id in eb_ids {
+            let Some(EndorserBlockView::Received { eb }) = self.leios.ebs.get(&eb_id) else {
+                unreachable!("how did we know this EB needed a TX if we never saw the EB?");
+            };
+            if !eb
+                .txs
+                .iter()
+                .any(|tx| matches!(self.txs.get(&tx.id), Some(TransactionView::Received(_))))
+            {
+                // we have received all missing TXs for this EB, so now we have a complete view of it!
+                self.leios.incomplete_onchain_ebs.remove(&eb_id);
+            }
+        }
+        true
     }
 }
 
@@ -1206,12 +1300,12 @@ impl LinearLeiosNode {
             .retain(|_, tx| !inputs.contains(&tx.input_id));
     }
 
-    fn resolve_ledger_state(&mut self, rb_ref: Option<BlockId>) -> Arc<LedgerState> {
+    fn resolve_ledger_state(&mut self, rb_ref: Option<BlockId>) -> Option<Arc<LedgerState>> {
         let Some(block_id) = rb_ref else {
-            return Arc::new(LedgerState::default());
+            return Some(Arc::new(LedgerState::default()));
         };
         if let Some(state) = self.ledger_states.get(&block_id) {
-            return state.clone();
+            return Some(state.clone());
         };
 
         let mut state = self
@@ -1237,19 +1331,20 @@ impl LinearLeiosNode {
             }
 
             if let Some(endorsement) = &rb.endorsement {
-                if let Some(EndorserBlockView::Received { eb }) =
-                    self.leios.ebs.get(&endorsement.eb)
-                {
-                    for tx in &eb.txs {
-                        state.spent_inputs.insert(tx.input_id);
-                    }
+                let Some(EndorserBlockView::Received { eb }) = self.leios.ebs.get(&endorsement.eb)
+                else {
+                    // We don't have the EB yet, so we don't know the current ledger state.
+                    return None;
+                };
+                for tx in &eb.txs {
+                    state.spent_inputs.insert(tx.input_id);
                 }
             }
         }
 
         let state = Arc::new(state);
         self.ledger_states.insert(block_id, state.clone());
-        state
+        Some(state)
     }
 }
 

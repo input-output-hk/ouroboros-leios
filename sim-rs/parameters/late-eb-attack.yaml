@@ -1,12 +1,20 @@
 late-eb-attack:
   attackers:
     nodes:
+      - node-99
+      - node-98
+      - node-97
+      - node-96
       - node-95
       - node-94
   propagation-delay-ms: 4500.0
 late-tx-attack:
   attackers:
     nodes:
+      - node-99
+      - node-98
+      - node-97
+      - node-96
       - node-95
       - node-94
   attack-probability: 1.0

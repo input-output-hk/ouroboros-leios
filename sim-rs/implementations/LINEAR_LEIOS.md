@@ -20,12 +20,14 @@ When voting, a node runs a VRF lottery to decide how many times it can vote for 
 ## Mempool behavior
 
 When a node creates an RB, it will follow these steps in order:
- 1. Try to produce a cert for the parent RB's EB.
-   1. If this succeeds, remove all of this EB's transactions from its mempool.
- 2. Fill the RB body with transactions from its mempool
- 3. Create a new EB, filled with transactions from its mempool WITHOUT removing those transactions from the mempool.
+1. Try to produce a cert for the parent RB's EB.
+    1. If this succeeds, remove all of this EB's transactions from its mempool.
+2. Create an empty RB and empty EB.
+3. If we have received and fully validated the RB, along with all referenced transactions,
+    1. Fill the RB body with transactions from our mempool
+    2. Fill the EB with transactions from our mempool WITHOUT removing those transactions from the mempool.
 
-When a node receives an RB body, it immediately removes all referenced/conflicting transactions from its mempool. If the RB has an EB certificate, it also removes that EB’s transactions from its mempool.
+When a node receives an RB body, it immediately removes all referenced/conflicting transactions from its mempool. If the RB has an EB certificate, it also removes that EB’s transactions from its mempool. If the certified EB arrives after the RB body, we remove its TXs from the mempool once it arrives.
 
 ## New parameters
 
