@@ -1,9 +1,39 @@
 # Leios logbook
 
+## 2025-08-08
+
+### Experiment for draft figures for CIP
+
+The experiment [analysis/sims/2025w32/](analysis/sims/2025w32/) proposes a set of protocol parameters and throughputs for inclusions in the Evidence section of the draft CIP.
+
+- Linear Leios
+- Conservative allocation of resources
+    - 4 vCPU/node
+    - 10 Mb/s bandwidth
+- 7 slot/stage, each for Lvote and Ldiff
+- Maximum of 12 MB of transaction references per EB
+- 1500 B/Tx
+- Normal frequency of Plutus
+
+Findings:
+
+- Modest resources (4 vCPU/node, 10 Mb/s bandwidth) are adequate up to at least 0.3 TxMB/s.
+    - It wasn’t studied here, but it is likely that Plutus-heavy workloads could also be supported.
+- Stage length of 7 slots allows for diffusion while having a low probability of discarding an EB.
+- Maximum of 12 MB of transactions in an EB allows for occasional fully utilized EBs to “catch up” on throughput when sortition is unlucky.
+    - At lower TPS, most of these blocks are small.
+    - Maximum block size could be reduced at the expense of longer waits when sortition is unlucky.
+- This experiment raised questions about whether the mempool rules are adequate.
+
+Artifacts:
+
+- [Slides](analysis/sims/2025w32/ReadMe.pdf)
+- [Jupyter notebook](analysis/sims/2025w32/analysis.ipynb)
+
+
 ## 2025-08-04
 
 ### Experiment varying Plutus validation time
-
 
 The Jupyter notebook [analysis/sims/2025w31c/analysis.ipynb](analysis/sims/2025w31c/analysis.ipynb) varies the CPU time used by Plutus phase 2 validation in Linear Leios at 100 TPS for a 6-vCPU node.
 
