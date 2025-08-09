@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -207,11 +208,16 @@ data ValidationRequest m
 --- Messages
 --------------------------------------------------------------
 
-data RelayHeader id = RelayHeader {id :: !id, slot :: !SlotNo}
+data RelayHeader id = RelayHeader
+  {id :: !id,
+   slot :: !SlotNo,
+   size :: !Bytes
+    -- ^ size of the body, not the size of this header
+  }
   deriving (Show)
 
 instance MessageSize id => MessageSize (RelayHeader id) where
-  messageSizeBytes (RelayHeader x y) = messageSizeBytes x + messageSizeBytes y
+  messageSizeBytes (RelayHeader x y z) = messageSizeBytes x + messageSizeBytes y + const 4 z {- size -}
 
 type RelayIBMessage = RelayMessage InputBlockId InputBlockHeader InputBlockBody
 type RelayEBMessage = RelayMessage EndorseBlockId (RelayHeader EndorseBlockId) EndorseBlock
@@ -274,13 +280,23 @@ setupRelay ::
   m [m ()]
 setupRelay leiosConfig cfg st followers peers = do
   let producerSST = RelayProducerSharedState{relayBufferVar = asReadOnly st.relayBufferVar}
+  let n = length peers
+  sharedInFlightVar <- newTVarIO 0
+  inFlightVars <- replicateM n $ newTVarIO 0
   ssts <- do
     case leiosConfig.relayStrategy of
       RequestFromFirst -> do
-        inFlightVar <- newTVarIO Set.empty
-        return $ repeat $ RelayConsumerSharedState{relayBufferVar = st.relayBufferVar, inFlightVar}
+        doNotRequestVar <- newTVarIO Set.empty -- shared by all the peers
+        return $
+            (\inFlightVar -> RelayConsumerSharedState{relayBufferVar = st.relayBufferVar, sharedInFlightVar, inFlightVar, doNotRequestVar})
+              `map` inFlightVars
       RequestFromAll -> do
-        (fmap . fmap) (RelayConsumerSharedState st.relayBufferVar) . replicateM (length peers) $ newTVarIO Set.empty
+        let zap = zipWith ($)
+        doNotRequestVars <- replicateM n $ newTVarIO Set.empty
+        return $
+          (\inFlightVar doNotRequestVar -> RelayConsumerSharedState{relayBufferVar = st.relayBufferVar, sharedInFlightVar, inFlightVar, doNotRequestVar})
+            `map` inFlightVars
+            `zap` doNotRequestVars
   let consumers = map (uncurry $ runRelayConsumer cfg) (zip ssts peers)
   let producers = map (runRelayProducer cfg.relay producerSST) followers
   return $ consumers ++ producers
@@ -301,9 +317,15 @@ relayIBConfig ::
   RelayConsumerConfig InputBlockId InputBlockHeader InputBlockBody m
 relayIBConfig _tracer cfg validateHeaders submitBlocks st =
   RelayConsumerConfig
-    { relay = RelayConfig{maxWindowSize = coerce cfg.leios.ibDiffusion.maxWindowSize}
+    { relay = RelayConfig
+      {maxWindowSize = coerce cfg.leios.ibDiffusion.maxWindowSize,
+       maxInFlightPerPeer = 0, -- TODO
+       maxInFlightAllPeers = 0 -- TODO
+      }
     , headerId = (.id)
     , validateHeaders
+    , bodySizeHeader = const 0 -- TODO
+    , bodySize = const 0 -- TODO
     , prioritize = prioritize cfg.leios.ibDiffusion.strategy (.slot)
     , submitPolicy = SubmitAll
     , maxHeadersToRequest = cfg.leios.ibDiffusion.maxHeadersToRequest
@@ -325,15 +347,21 @@ relayEBConfig ::
   RelayConsumerConfig EndorseBlockId (RelayHeader EndorseBlockId) EndorseBlock m
 relayEBConfig _tracer cfg@LeiosNodeConfig{leios = LeiosConfig{pipeline = (_ :: SingPipeline p)}} submitBlocks st leiosState =
   RelayConsumerConfig
-    { relay = RelayConfig{maxWindowSize = coerce cfg.leios.ebDiffusion.maxWindowSize}
+    { relay = RelayConfig
+      {maxWindowSize = coerce cfg.leios.ebDiffusion.maxWindowSize,
+       maxInFlightPerPeer = 1_000_000, -- TODO
+       maxInFlightAllPeers = 10_000_000 -- TODO
+       }
     , headerId = (.id)
     , validateHeaders = const $ return ()
+    , bodySizeHeader = (.size)
+    , bodySize = (.size)
     , prioritize = prioritize cfg.leios.ebDiffusion.strategy (.slot)
     , submitPolicy = SubmitAll
     , maxHeadersToRequest = cfg.leios.ebDiffusion.maxHeadersToRequest
     , maxBodiesToRequest = cfg.leios.ebDiffusion.maxBodiesToRequest
     , submitBlocks = \hbs t k ->
-        submitBlocks (map (first (.id)) hbs) t (k . map (\(i, b) -> (RelayHeader i b.slot, b)))
+        submitBlocks (map (first (.id)) hbs) t (k . map (\(i, b) -> (RelayHeader i b.slot b.size, b)))
     , shouldNotRequest = do
         -- We possibly prune certified EBs (not referenced in the
         -- chain) after maxEndorseBlockAgeSlots, so we should not end
@@ -366,15 +394,21 @@ relayVoteConfig ::
   RelayConsumerConfig VoteId (RelayHeader VoteId) VoteMsg m
 relayVoteConfig _tracer cfg submitBlocks _ leiosState =
   RelayConsumerConfig
-    { relay = RelayConfig{maxWindowSize = coerce cfg.leios.voteDiffusion.maxWindowSize}
+    { relay = RelayConfig
+      { maxWindowSize = coerce cfg.leios.voteDiffusion.maxWindowSize,
+       maxInFlightPerPeer = 1_000_000, -- TODO
+       maxInFlightAllPeers = 10_000_000 -- TODO
+      }
     , headerId = (.id)
     , validateHeaders = const $ return ()
+    , bodySizeHeader = (.size)
+    , bodySize = (.size)
     , prioritize = prioritize cfg.leios.voteDiffusion.strategy (.slot)
     , submitPolicy = SubmitAll
     , maxHeadersToRequest = cfg.leios.voteDiffusion.maxHeadersToRequest
     , maxBodiesToRequest = cfg.leios.voteDiffusion.maxBodiesToRequest
     , submitBlocks = \hbs t k ->
-        submitBlocks (map (first (.id)) hbs) t (k . map (\(i, b) -> (RelayHeader i b.slot, b)))
+        submitBlocks (map (first (.id)) hbs) t (k . map (\(i, b) -> (RelayHeader i b.slot b.size, b)))
     , shouldNotRequest = atomically $ do
         buffer <- readTVar leiosState.relayVoteState.relayBufferVar
         prunedTo <- readTVar leiosState.prunedVoteStateToVar
@@ -821,21 +855,29 @@ adoptIB cfg leiosState ib deliveryStage = do
   modifyTVar'
     leiosState.iBsForEBsAndVotesVar
     (Map.insertWith (Map.unionWith min) p $ Map.singleton ib.id deliveryStage)
-
   -- TODO: likely needs optimization, although EBs also grow slowly.
   modifyTVar' leiosState.ibsNeededForEBVar (Map.map (Set.delete ib.id))
+  modifyTVar'
+    leiosState.relayIBState.relayBufferVar
+    (RB.snocIfNew ib.header.id (ib.header, ib.body))
 
 adoptEB :: MonadSTM m => LeiosNodeState m -> EndorseBlock -> STM m ()
 adoptEB leiosState eb = do
   ibs <- Set.unions . Map.map Map.keysSet <$> readTVar leiosState.iBsForEBsAndVotesVar
   let ibsNeeded = Map.fromList [(eb.id, Set.fromList eb.inputBlocks Set.\\ ibs)]
   modifyTVar' leiosState.ibsNeededForEBVar (`Map.union` ibsNeeded)
+  modifyTVar'
+    leiosState.relayEBState.relayBufferVar
+    (RB.snocIfNew eb.id (RelayHeader eb.id eb.slot eb.size, eb))
 
 adoptVote :: MonadSTM m => LeiosConfig -> LeiosNodeState m -> VoteMsg -> UTCTime -> STM m ()
 adoptVote leios leiosState v deliveryTime = do
   -- We keep tally for each EB as votes arrive, so the relayVoteBuffer
   -- can be pruned without effects on EB certification.
   modifyTVar' leiosState.votesForEBVar $ addVote leios v deliveryTime
+  modifyTVar'
+    leiosState.relayVoteState.relayBufferVar
+    (RB.snocIfNew v.id (RelayHeader v.id v.slot v.size, v))
 
 dispatchValidation ::
   forall m.
@@ -954,23 +996,14 @@ generator tracer cfg st = do
           traceWith tracer (PraosNodeEvent (PraosNodeEventGenerate rb))
           traceWith tracer (PraosNodeEvent (PraosNodeEventNewTip newChain))
         SomeAction Generate.Propose{} ib -> (GenIB,) $ do
-          atomically $ do
-            -- TODO should not be added to 'relayIBState' before it's validated
-            modifyTVar' st.relayIBState.relayBufferVar (RB.snocIfNew ib.header.id (ib.header, ib.body))
-            adoptIB cfg.leios st ib IbDuringProposeOrDeliver1
+          atomically $ adoptIB cfg.leios st ib IbDuringProposeOrDeliver1
           traceWith tracer (LeiosNodeEvent Generate (EventIB ib))
         SomeAction Generate.Endorse eb -> (GenEB,) $ do
-          atomically $ do
-            modifyTVar' st.relayEBState.relayBufferVar (RB.snocIfNew eb.id (RelayHeader eb.id eb.slot, eb))
-            adoptEB st eb
+          atomically $ adoptEB st eb
           traceWith tracer (LeiosNodeEvent Generate (EventEB eb))
         SomeAction Generate.Vote v -> (GenVote,) $ do
           now <- getCurrentTime
-          atomically $ do
-            modifyTVar'
-              st.relayVoteState.relayBufferVar
-              (RB.snocIfNew v.id (RelayHeader v.id v.slot, v))
-            adoptVote cfg.leios st v now
+          atomically $ adoptVote cfg.leios st v now
           traceWith tracer (LeiosNodeEvent Generate (EventVote v))
   let LeiosNodeConfig{..} = cfg
   leiosBlockGenerator $ LeiosGeneratorConfig{submit = mapM_ submitOne, ..}
