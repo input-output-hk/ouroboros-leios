@@ -1100,7 +1100,7 @@ dispatchValidationSTM tracer cfg leiosState req =
   valLinearEB x alreadyCertified completion =
     let
       decimate = if alreadyCertified then (/ 10) else id   -- TODO better ratio
-      delay prefix = cpuTask prefix (decimate . cfg.leios.delays.inputBlockValidation) x
+      delay prefix = cpuTask prefix (decimate . cfg.leios.delays.linearEndorseBlockValidation) x
       task = atomically $ do
         completion [(convertLinearId x.id, x)]
         adoptLinearEB cfg leiosState x
