@@ -4,33 +4,33 @@ The goal of conformance testing is to check that an implementation of a protocol
 
 ## Formal specification
 
-The formal specification of [Ouroboros Leios](https://github.com/input-output-hk/ouroboros-leios-formal-spec) is implemented in Agda as a relation specification. Different variants of the Leios protocol have been explored in the formal specification, with a focus on Short-Leios.
+The formal specification of [Ouroboros Leios](https://github.com/input-output-hk/ouroboros-leios-formal-spec) is implemented in Agda as a relational specification. Different variants of the Leios protocol have been explored in the formal specification, with a focus on Short-Leios.
 A common code base for the variants is used in order to share data types, like the block types for example.
 The functionalities (FFD, VRF, Base ledger, etc.) are abstract data types with defining properties.
 
 ### Categorical crypto framework
 
-Motivated by the need for better runtime performance of the trace verifier, the Categorical Crypto Framework developed by André Knispel has been introduced in the project. The framework facilitates the composition of the different components and we no longer have to manage the state for the functionalities explicitly (previously state of the functionalities was also put into the `LeiosState`).
+Motivated by the need for better runtime performance of the trace verifier, the Categorical Crypto Framework developed by André Knispel has been introduced in the project. The framework facilitates the composition of the different components and we no longer have to manage the state of the functionalities explicitly (previously state of the functionalities was also put into the `LeiosState` for convenience).
 
 ### Single node view
 
-The formal spec describes the evolution of a single, honest node running the Leios protocol, i.e., it describes all the possible changes of the `LeiosState` for given pre-conditions.
-This is different to the formal specifications of [Ouroboros Peras](https://github.com/input-output-hk/peras-design/blob/main/src/Peras/SmallStep.lagda.md) or [Ouroboros Praos](https://github.com/input-output-hk/ouroboros-praos-formal-spec/blob/main/src/Protocol/Semantics.agda), where in both cases all nodes of the distributed system, including adversarial nodes, are modelled and the relation in the formal specification describes the possible evolution of the "world".
+The formal spec describes the evolution of a single, honest node running the Leios protocol, i.e., it describes all the possible changes of the `LeiosState` with given pre-conditions.
+This is different to the formal specifications of [Ouroboros Peras](https://github.com/input-output-hk/peras-design/blob/main/src/Peras/SmallStep.lagda.md) or [Ouroboros Praos](https://github.com/input-output-hk/ouroboros-praos-formal-spec/blob/main/src/Protocol/Semantics.agda), where in both cases all nodes of the distributed system, including adversarial nodes, are modelled and the relation in the formal specification describes the possible evolution of the distributed system as a whole.
 
 ### State transitions in Leios
 
-The Short-Leios relation does state transition steps upon
+The Short-Leios relation does the following state transition steps:
 
 * Creating an InputBlock
 * Creating an EndorserBlock
 * Voting
-* Can not create an InputBlock
-* Can not create an EndorserBlock
-* Can not vote
+* Not elected to create an InputBlock
+* Not elected to create an EndorserBlock
+* Not elected to vote
 * Transitioning to the next slot
 * Interaction with Base Ledger
 
-Upkeep
+A state transition step usually has pre-conditions that need to be fulfilled. For details, see [(Full-)Short Leios transitions](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Short.lagda.md#full-short-leios-transitions) in the formal specification.
 
 ## Trace verification
 
