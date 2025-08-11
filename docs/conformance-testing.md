@@ -4,8 +4,9 @@ The goal of conformance testing is to check that an implementation of a protocol
 
 ## Formal specification
 
-The formal specification is implemented in Agda as a relation specification. Different variants of the Leios protocol have been explored in the formal specification, with a focus on Short-Leios.
-A common code base for the variants is used in order to share data types, like the block types for example. In addition the functionalities (FFD, VRF, Base ledger, etc.) are abstract data types with defining properties.
+The formal specification of [Ouroboros Leios](https://github.com/input-output-hk/ouroboros-leios-formal-spec) is implemented in Agda as a relation specification. Different variants of the Leios protocol have been explored in the formal specification, with a focus on Short-Leios.
+A common code base for the variants is used in order to share data types, like the block types for example.
+The functionalities (FFD, VRF, Base ledger, etc.) are abstract data types with defining properties.
 
 ### Categorical crypto framework
 
@@ -13,8 +14,8 @@ Motivated by the need for better runtime performance of the trace verifier, the 
 
 ### Single node view
 
-The formal spec describes the evolution of a single, honest node running the Leios protocol, i.e., it describes all the possible changes of the `LeiosState` for some given pre-conditions.
-This is different to the formal specification of [Ouroboros Peras](https://github.com/input-output-hk/peras-design/blob/main/src/Peras/SmallStep.lagda.md) or [Ouroboros Praos](https://github.com/input-output-hk/ouroboros-praos-formal-spec/blob/main/src/Protocol/Semantics.agda), where in both cases all nodes of the distributed system (including adversary nodes) are modelled, and the relation in the formal specification describes the possible evolution of the "world".
+The formal spec describes the evolution of a single, honest node running the Leios protocol, i.e., it describes all the possible changes of the `LeiosState` for given pre-conditions.
+This is different to the formal specifications of [Ouroboros Peras](https://github.com/input-output-hk/peras-design/blob/main/src/Peras/SmallStep.lagda.md) or [Ouroboros Praos](https://github.com/input-output-hk/ouroboros-praos-formal-spec/blob/main/src/Protocol/Semantics.agda), where in both cases all nodes of the distributed system, including adversarial nodes, are modelled and the relation in the formal specification describes the possible evolution of the "world".
 
 ### State transitions in Leios
 
@@ -37,7 +38,7 @@ Trace verification checks, if an execution trace of the Leios protocol is correc
 
 Trace verification in the Leios project is currently implemented for Short-Leios.
 
-Events from the trace log are mapped to actions. 
+Events from the trace log are mapped to actions.
 Actions
 
 ### Formal spec repo
