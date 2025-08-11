@@ -206,6 +206,8 @@ pub struct RawLateTXAttackConfig {
     pub attackers: NodeSelection,
     pub attack_probability: f64,
     pub tx_generation_distribution: DistributionConfig,
+    pub tx_start_time: Option<f64>,
+    pub tx_stop_time: Option<f64>,
 }
 
 #[derive(Deserialize)]
@@ -617,7 +619,7 @@ impl AttackConfig {
             late_tx: params
                 .late_tx_attack
                 .as_ref()
-                .map(|raw| LateTXAttackConfig::build(raw, topology)),
+                .map(|raw| LateTXAttackConfig::build(raw, topology, params)),
         }
     }
 }
@@ -645,16 +647,26 @@ impl LateEBAttackConfig {
 pub(crate) struct LateTXAttackConfig {
     pub(crate) probability: f64,
     pub(crate) txs_to_generate: FloatDistribution,
+    pub(crate) start_time: Option<Timestamp>,
+    pub(crate) stop_time: Option<Timestamp>,
 }
 
 impl LateTXAttackConfig {
-    fn build(raw: &RawLateTXAttackConfig, topology: &mut Topology) -> Self {
+    fn build(raw: &RawLateTXAttackConfig, topology: &mut Topology, params: &RawParameters) -> Self {
         for attacker in topology.select(&raw.attackers) {
             attacker.behaviours.withhold_txs = true;
         }
         Self {
             probability: raw.attack_probability,
             txs_to_generate: raw.tx_generation_distribution.into(),
+            start_time: raw
+                .tx_start_time
+                .or(params.tx_start_time)
+                .map(|t| Timestamp::zero() + Duration::from_secs_f64(t)),
+            stop_time: raw
+                .tx_stop_time
+                .or(params.tx_stop_time)
+                .map(|t| Timestamp::zero() + Duration::from_secs_f64(t)),
         }
     }
 }

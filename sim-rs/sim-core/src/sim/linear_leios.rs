@@ -571,7 +571,7 @@ impl LinearLeiosNode {
         if !produce_empty_block {
             // If we are performing a "withheld TX" attack, we will include a bunch of brand-new TXs in this EB.
             // They will get disseminated through the network at the same time as the EB.
-            withheld_txs = self.generate_withheld_txs();
+            withheld_txs = self.generate_withheld_txs(slot);
             eb_transactions.extend(withheld_txs.iter().cloned());
 
             if let TransactionConfig::Mock(config) = &self.sim_config.transactions {
@@ -1127,11 +1127,18 @@ impl LinearLeiosNode {
 // transactions, so that they cannot propagate in advance.
 // We implement this by generating the transactions at the same time as the EB itself.
 impl LinearLeiosNode {
-    fn generate_withheld_txs(&mut self) -> Vec<Arc<Transaction>> {
+    fn generate_withheld_txs(&mut self, slot: u64) -> Vec<Arc<Transaction>> {
         if !self.behaviours.withhold_txs {
             return vec![];
         }
         let withhold_tx_config = self.sim_config.attacks.late_tx.as_ref().unwrap();
+        let slot_ts = Timestamp::from_secs(slot);
+        if withhold_tx_config.start_time.is_some_and(|s| slot_ts < s) {
+            return vec![];
+        }
+        if withhold_tx_config.stop_time.is_some_and(|s| slot_ts > s) {
+            return vec![];
+        }
         if !self.rng.random_bool(withhold_tx_config.probability) {
             return vec![];
         }
