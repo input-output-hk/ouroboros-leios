@@ -1,0 +1,379 @@
+# yaml-language-server: $schema=./config.schema.json
+
+################################################################################
+# Simulation Configuration File
+################################################################################
+#
+# This file contains the default configuration for running Leios simulations in
+# the Haskell simulation (`simulation/`) and the Rust simulation (`sim-rs/`).
+#
+################################################################################
+# Simulation Configuration
+################################################################################
+
+relay-strategy: "request-from-first"
+tcp-congestion-control: true
+multiplex-mini-protocols: true
+simulate-transactions: true
+treat-blocks-as-full: false
+cleanup-policies: ["cleanup-expired-vote"]
+timestamp-resolution-ms: 0.1
+
+################################################################################
+# Leios Protocol Configuration
+################################################################################
+
+leios-variant: linear-with-tx-references
+leios-stage-length-slots: 7
+leios-stage-active-voting-slots: 1
+leios-vote-send-recv-stages: false
+leios-late-ib-inclusion: true
+leios-header-diffusion-time-ms: 1000.0
+leios-ib-generation-time-ms: 130.0
+leios-mempool-sampling-strategy: ordered-by-id
+leios-mempool-aggressive-pruning: true
+# TODO: revise default
+praos-chain-quality: 100
+praos-fallback-enabled: true
+
+linear-vote-stage-length-slots: 7
+linear-diffuse-stage-length-slots: 7
+# Which conditions must be met before a node will send an EB to peers?
+# - "eb-received": the EB must only go through basic validation
+# - "txs-received": all TXs in the EB must have been received
+# - "fully-valid": the EB must be fully validated
+linear-eb-propagation-criteria: eb-received
+
+
+# LIKELY OBSOLETTE
+store-txs-as-references: false
+
+################################################################################
+# Transaction Configuration
+################################################################################
+
+tx-generation-distribution:
+  distribution: constant
+  value: 10
+tx-size-bytes-distribution:
+  distribution: constant
+  value: 1500
+tx-overcollateralization-factor-distribution:
+  distribution: constant
+  value: 0
+tx-validation-cpu-time-ms: 0.4284
+tx-max-size-bytes: 16384
+tx-conflict-fraction: 0
+tx-start-time: 0
+tx-stop-time: 60
+
+################################################################################
+# Ranking Block Configuration
+################################################################################
+
+# 1/leios-stage-length-slots, targeting one RB per pipeline.
+# Also 20s is current rate of praos blocks.
+rb-generation-probability: 5.0e-2
+# Eng. team targets 1kB as worst case upper bound.
+# Actual size fairly close.
+rb-head-size-bytes: 1024
+rb-body-max-size-bytes: 90112
+# Note: certificate generation/validation is not included in the
+# timings here, see cert-* fields.
+rb-generation-cpu-time-ms: 1.0
+rb-head-validation-cpu-time-ms: 1.0
+
+# On average, no Txs directly embedded in blocks.
+rb-body-legacy-praos-payload-avg-size-bytes: 0
+rb-body-legacy-praos-payload-validation-cpu-time-ms-constant: 0.1481
+# the -per-byte component is meant to be using size as a (bad)
+# proxy for the complexity of the Txs included.
+rb-body-legacy-praos-payload-validation-cpu-time-ms-per-byte: 0.0001141
+
+################################################################################
+# Input Block Configuration
+################################################################################
+
+ib-generation-probability: 2.0
+ib-shards: 1
+ib-shard-period-length-slots: 1
+ib-shard-group-count: 1
+
+# ProducerId  32
+# SlotNo      64
+# VRF proof   80
+# Body hash   32
+# RB Ref      32
+# Signature   64
+# Total       304
+#
+# NOTE: using a KES Signature (like for Praos headers)
+#       would instead more than double the total to 668.
+#       And even 828 including Op Cert.
+ib-head-size-bytes: 304
+# 98KB to optimize for 3 TCP round trips
+ib-body-avg-size-bytes: 98304
+ib-body-max-size-bytes: 262144
+# Here we also use praos blocks as ballpark estimate.
+# Sec 2.3 Forging, of the benchmark cluster report, lists
+#   * Slot start to announced: 0.12975s
+ib-generation-cpu-time-ms: 130.0
+ib-head-validation-cpu-time-ms: 1.0
+ib-body-validation-cpu-time-ms-constant: 0.1481
+ib-body-validation-cpu-time-ms-per-byte: 0.0001141
+ib-diffusion-strategy: "freshest-first"
+
+# Haskell prototype relay mini-protocol parameters.
+ib-diffusion-max-bodies-to-request: 1
+ib-diffusion-max-headers-to-request: 100
+ib-diffusion-max-window-size: 100
+
+################################################################################
+# Endorsement Block Configuration
+################################################################################
+
+# We want one per pipeline, but not too many.
+eb-generation-probability: 2.5
+# ProducerId  32
+# SlotNo      64
+# VRF proof   80
+# Signature   64
+# Total       240
+#
+# See Note about signatures on ib-head-size-bytes.
+eb-size-bytes-constant: 240
+# IB hash
+eb-size-bytes-per-ib: 32
+# Collecting the IBs to reference and cryptography are the main tasks.
+# A comparable task is maybe mempool snapshotting.
+# Sec 2.3 Forging, of the benchmark cluster report, lists
+#   * Mempool snapshotting: 0.07252s
+# 75ms then seems a generous estimate for eb generation.
+eb-generation-cpu-time-ms: 75.0
+# Validating signature and vrf proof, as in other headers.
+eb-validation-cpu-time-ms: 1.0
+# For linear leios: "fast" incomplete validation of the EB
+eb-header-validation-cpu-time-ms: 50.0
+# For linear leios: complete validation of the EB
+eb-body-validation-cpu-time-ms-constant: 0.1481
+eb-body-validation-cpu-time-ms-per-byte: 0.0001141
+# For stracciatella: when creating a new EB, have it reference transactions from a previous EB
+eb-include-txs-from-previous-stage: false
+
+eb-diffusion-strategy: "peer-order"
+
+# Haskell prototype relay mini-protocol parameters.
+eb-diffusion-max-bodies-to-request: 1
+eb-diffusion-max-headers-to-request: 100
+eb-diffusion-max-window-size: 100
+
+# The maximum age of EBs included in RBs.
+# A an EB from slot `s` can only be included in RBs
+# up to slot `s+eb-max-age-slots`.
+# In short leios we expect votes to diffuse within 3 stages lengths of
+# EB generation, we allow for 2 more stage lengths to account for
+# variance in the interval within RBs.
+eb-max-age-slots: 240
+
+# The maximum age of EBs to be relayed.
+# An EB from slot `s` will only be relayed
+# up to slot `s+eb-max-age-for-relay-slots`.
+eb-max-age-for-relay-slots: 40
+
+# The maximum size of transactions (in bytes) which an EB can reference.
+# Only relevant when running with the "full-without-ibs" variant.
+eb-referenced-txs-max-size-bytes: 12000000
+eb-body-avg-size-bytes: 12000000
+
+################################################################################
+# Vote Configuration
+################################################################################
+
+# Cryptography related values taken from [vote-spec](crypto-benchmarks.rs/Specification.md)
+# using weighted averages of 80% persistent and 20% non-persistent.
+
+# vote-spec#Committe and quorum size
+#
+# Note: this is used as the expected amount of total weight of
+# generated votes in the sims.
+vote-generation-probability: 500.0
+# vote-spec#"Committe and quorum size"
+# 60% of `vote-generation-probability`
+vote-threshold: 300
+# vote-spec#"Generate vote" 0.8*135e-3 + 0.2*280e-3
+vote-generation-cpu-time-ms-constant: 164.0e-3
+# No benchmark yet.
+vote-generation-cpu-time-ms-per-ib: 0
+# No benchmark yet.
+vote-generation-cpu-time-ms-per-tx: 0
+# vote-spec#"Verify vote" 0.8*670e-3 + 0.2*1.4
+vote-validation-cpu-time-ms: 816.0e-3
+# The `Vote` structure counted in the -per-eb already identifies slot
+# (in Eid) and voter. We can assume a vote bundle is all for the same
+# voter and slot, so for non-persistent voters we could factor their
+# PoolKeyHash (28bytes) here, but that is for 20% of cases.
+# More relevant if EB generation is very high.
+vote-bundle-size-bytes-constant: 0
+# vote-spec#Votes 0.8*90 + 0.2*164
+vote-bundle-size-bytes-per-eb: 105
+
+vote-diffusion-strategy: "peer-order"
+
+# Haskell prototype relay mini-protocol parameters.
+vote-diffusion-max-bodies-to-request: 1
+vote-diffusion-max-headers-to-request: 100
+vote-diffusion-max-window-size: 100
+
+################################################################################
+# Certificate Configuration
+################################################################################
+
+# vote-spec - certificate size plot.
+# Realistic stake distributions need about 7 kilobytes for the certificate.
+cert-size-bytes-constant: 7168
+cert-size-bytes-per-node: 0
+
+# For certificate timings we have bulk figures for realistic scenarios,
+# so we do not attempt to give -per-node (i.e. per-voter) timings.
+#
+# vote-spec#"Generate certificate"
+cert-generation-cpu-time-ms-constant: 90.0
+cert-generation-cpu-time-ms-per-node: 0
+# vote-spec#"Verify certificate"
+cert-validation-cpu-time-ms-constant: 130.0
+cert-validation-cpu-time-ms-per-node: 0
+
+################################################################################
+# Attack
+################################################################################
+
+# NB: The adversarial nodes are the largest with total of 1/3 of the stake.
+late-eb-attack:
+  attackers:
+    nodes:
+      - node-48
+      - node-49
+      - node-50
+      - node-531
+      - node-486
+      - node-529
+      - node-525
+      - node-526
+      - node-487
+      - node-475
+      - node-476
+      - node-98
+      - node-519
+      - node-520
+      - node-485
+      - node-12
+      - node-18
+      - node-497
+      - node-498
+      - node-527
+      - node-528
+      - node-414
+      - node-415
+      - node-60
+      - node-61
+      - node-91
+      - node-92
+      - node-93
+      - node-94
+      - node-95
+      - node-96
+      - node-97
+      - node-57
+      - node-58
+      - node-59
+      - node-215
+      - node-599
+      - node-604
+      - node-99
+      - node-100
+      - node-582
+      - node-583
+      - node-584
+      - node-585
+      - node-530
+      - node-532
+      - node-416
+      - node-499
+      - node-500
+      - node-566
+      - node-567
+      - node-568
+      - node-101
+      - node-569
+      - node-570
+      - node-571
+      - node-572
+      - node-573
+      - node-13
+  propagation-delay-ms: 0
+late-tx-attack:
+  attackers:
+    nodes:
+      - node-48
+      - node-49
+      - node-50
+      - node-531
+      - node-486
+      - node-529
+      - node-525
+      - node-526
+      - node-487
+      - node-475
+      - node-476
+      - node-98
+      - node-519
+      - node-520
+      - node-485
+      - node-12
+      - node-18
+      - node-497
+      - node-498
+      - node-527
+      - node-528
+      - node-414
+      - node-415
+      - node-60
+      - node-61
+      - node-91
+      - node-92
+      - node-93
+      - node-94
+      - node-95
+      - node-96
+      - node-97
+      - node-57
+      - node-58
+      - node-59
+      - node-215
+      - node-599
+      - node-604
+      - node-99
+      - node-100
+      - node-582
+      - node-583
+      - node-584
+      - node-585
+      - node-530
+      - node-532
+      - node-416
+      - node-499
+      - node-500
+      - node-566
+      - node-567
+      - node-568
+      - node-101
+      - node-569
+      - node-570
+      - node-571
+      - node-572
+      - node-573
+      - node-13
+  attack-probability: 0.0
+  tx-generation-distribution:
+    distribution: constant
+    value: 3
