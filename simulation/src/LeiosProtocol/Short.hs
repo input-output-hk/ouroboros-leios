@@ -64,6 +64,8 @@ data LeiosDelays = LeiosDelays
   -- ^ hash matching and payload validation (incl. tx scripts)
   , endorseBlockGeneration :: !(EndorseBlock -> DiffTime)
   , endorseBlockValidation :: !(EndorseBlock -> DiffTime)
+  , linearEndorseBlockGeneration :: !(InputBlock -> DiffTime)
+  , linearEndorseBlockValidation :: !(InputBlock -> DiffTime)
   , voteMsgGeneration :: !(VoteMsg -> [EndorseBlock] -> DiffTime)
   , linearVoteMsgGeneration :: !(VoteMsg -> [InputBlock] -> DiffTime)
   , voteMsgValidation :: !(VoteMsg -> DiffTime)
@@ -269,6 +271,11 @@ convertConfig disk =
               + disk.ibBodyValidationCpuTimeMsPerByte * fromIntegral ib.body.size
       , endorseBlockGeneration = const $ durationMsToDiffTime disk.ebGenerationCpuTimeMs
       , endorseBlockValidation = const $ durationMsToDiffTime disk.ebValidationCpuTimeMs
+      , linearEndorseBlockGeneration = const $ durationMsToDiffTime disk.ebGenerationCpuTimeMs
+      , linearEndorseBlockValidation = \ib ->
+          durationMsToDiffTime $
+            disk.ebBodyValidationCpuTimeMsConstant
+              + disk.ebBodyValidationCpuTimeMsPerByte * fromIntegral ib.body.size
       , -- TODO: can parallelize?
         voteMsgGeneration = \vm ebs ->
           assert (vm.endorseBlocks == map (.id) ebs) $
@@ -376,6 +383,8 @@ delaysAndSizesAsFull cfg@LeiosConfig{pipeline, voteSendStage} =
       , inputBlockValidation = const @DiffTime $ cfg.delays.inputBlockValidation fullIB
       , endorseBlockGeneration = const @DiffTime $ cfg.delays.endorseBlockGeneration fullEB
       , endorseBlockValidation = const @DiffTime $ cfg.delays.endorseBlockValidation fullEB
+      , linearEndorseBlockGeneration = const @DiffTime $ cfg.delays.linearEndorseBlockGeneration fullIB
+      , linearEndorseBlockValidation = const @DiffTime $ cfg.delays.linearEndorseBlockValidation fullIB
       , voteMsgGeneration =
           const $
             const @DiffTime $

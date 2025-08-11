@@ -92,7 +92,7 @@ leiosBlockGenerator LeiosGeneratorConfig{..} =
         i <- nextBlkId InputBlockId
         let header = mkInputBlockHeader leios i slot (SubSlotNo 0) nodeId (BlockHash $ blockHash rb)
         let !ib = mkInputBlock leios header ibData.txsPayload
-        let !task2 = leios.delays.inputBlockGeneration ib
+        let !task2 = leios.delays.linearEndorseBlockGeneration ib
         return [(task, Left (rbData.prevChain, rb)), (task2, Right ib)]
   execute' slot Propose{ibSlot, delay} wins = do
     ibData <- lift $ atomically buffers.newIBData

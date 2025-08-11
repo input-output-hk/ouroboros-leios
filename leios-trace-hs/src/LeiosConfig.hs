@@ -135,6 +135,8 @@ data Config = Config
   , ebSizeBytesConstant :: SizeBytes
   , ebSizeBytesPerIb :: SizeBytes
   , ebBodyAvgSizeBytes :: SizeBytes
+  , ebBodyValidationCpuTimeMsConstant :: DurationMs
+  , ebBodyValidationCpuTimeMsPerByte :: DurationMs
   , ebDiffusionStrategy :: DiffusionStrategy
   , ebDiffusionMaxWindowSize :: Word16
   , ebDiffusionMaxHeadersToRequest :: Word16
@@ -211,7 +213,9 @@ instance Default Config where
       , ebValidationCpuTimeMs = 1.0
       , ebSizeBytesConstant = 240
       , ebSizeBytesPerIb = 32
-      , ebBodyAvgSizeBytes = 5000000
+      , ebBodyAvgSizeBytes = 2500000
+      , ebBodyValidationCpuTimeMsConstant = 50.0
+      , ebBodyValidationCpuTimeMsPerByte = 0.0005
       , ebDiffusionStrategy = PeerOrder
       , ebDiffusionMaxWindowSize = 100
       , ebDiffusionMaxHeadersToRequest = 100
@@ -291,6 +295,8 @@ configToKVsWith getter cfg =
     , get @"ebSizeBytesConstant" getter cfg
     , get @"ebSizeBytesPerIb" getter cfg
     , get @"ebBodyAvgSizeBytes" getter cfg
+    , get @"ebBodyValidationCpuTimeMsConstant" getter cfg
+    , get @"ebBodyValidationCpuTimeMsPerByte" getter cfg
     , get @"ebDiffusionStrategy" getter cfg
     , get @"ebDiffusionMaxWindowSize" getter cfg
     , get @"ebDiffusionMaxHeadersToRequest" getter cfg
@@ -382,6 +388,8 @@ instance FromJSON Config where
     ebSizeBytesConstant <- parseFieldOrDefault @Config @"ebSizeBytesConstant" obj
     ebSizeBytesPerIb <- parseFieldOrDefault @Config @"ebSizeBytesPerIb" obj
     ebBodyAvgSizeBytes <- parseFieldOrDefault @Config @"ebBodyAvgSizeBytes" obj
+    ebBodyValidationCpuTimeMsConstant <- parseFieldOrDefault @Config @"ebBodyValidationCpuTimeMsConstant" obj
+    ebBodyValidationCpuTimeMsPerByte <- parseFieldOrDefault @Config @"ebBodyValidationCpuTimeMsPerByte" obj
     ebDiffusionStrategy <- parseFieldOrDefault @Config @"ebDiffusionStrategy" obj
     ebDiffusionMaxWindowSize <- parseFieldOrDefault @Config @"ebDiffusionMaxWindowSize" obj
     ebDiffusionMaxHeadersToRequest <- parseFieldOrDefault @Config @"ebDiffusionMaxHeadersToRequest" obj

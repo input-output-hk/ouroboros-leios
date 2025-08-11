@@ -477,10 +477,13 @@ traceRelayLink1 connectionOptions =
                       inputBlockValidation = const 0.1
                     , -- \^ hash matching and payload validation (incl. tx scripts)
                       endorseBlockValidation = const 0.005
-                    , voteMsgValidation = const 0.005
+                    , linearEndorseBlockValidation = const 1
+                    , -- \^ hash matching and payload validation (incl. tx scripts)
+                      voteMsgValidation = const 0.005
                     , certificateGeneration = const 0.050
                     , inputBlockGeneration = const 0
                     , endorseBlockGeneration = const 0
+                    , linearEndorseBlockGeneration = const 0
                     , voteMsgGeneration = const (const 0)
                     , linearVoteMsgGeneration = const (const 0)
                     , certificateValidation = const 0
