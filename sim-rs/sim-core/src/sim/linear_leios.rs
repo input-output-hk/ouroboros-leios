@@ -241,6 +241,7 @@ struct NodePraosState {
     block_ids_by_slot: BTreeMap<u64, BlockId>,
 }
 
+#[derive(Debug)]
 enum EndorserBlockView {
     Pending,
     Requested,
@@ -753,7 +754,14 @@ impl LinearLeiosNode {
             self.queued.send_to(from, Message::RequestRB(header.id));
         }
 
+        // Get ready to fetch the announced EB (if we don't have it already)
         let eb_id = header.eb_announcement;
+        if matches!(
+            self.leios.ebs.get(&eb_id),
+            Some(EndorserBlockView::Received { .. })
+        ) {
+            return;
+        }
 
         let eb_peer_announcements = self.leios.eb_peer_announcements.entry(eb_id).or_default();
         if has_eb {
