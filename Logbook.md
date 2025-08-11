@@ -2,6 +2,12 @@
 
 ## 2025-08-08
 
+## CIP Progress
+
+- The draft of the specification section is now complete, except for the network and incentives components.
+- The motivation and abstract have been refined for clarity.
+- The first of the four main rationale subsections has been fully drafted.
+
 ### Another Haskell vs Rust comparison
 
 The experiment [analysis/sims/202532b](analysis/sims/202532b) compares Haskell vs Rust simulation output at newer commits. Results indicate that a previous discrepancy in vote diffusion has been resolved.
