@@ -35,9 +35,9 @@ simultaneously create both a standard Praos block and a larger secondary block
 containing additional transactions. Secondary blocks undergo committee
 validation before ledger inclusion, enabling significantly higher throughput.
 
-This specification presents the first version in the Ouroboros Leios protocol
-family, designed to deliver substantial throughput improvements while
-maintaining ecosystem compatibility and deployment feasibility.
+This specification presents the first version of the Ouroboros Leios protocol
+family, designed to deliver substantial throughput improvements with
+economic sustainability and reduced complexity through fewer new protocol elements.
 
 > [!NOTE]
 >
