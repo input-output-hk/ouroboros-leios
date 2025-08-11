@@ -43,7 +43,7 @@ economic sustainability and reduced complexity through fewer new protocol elemen
 >
 > For comprehensive research documentation, development history, and additional
 > technical resources, visit the
-> Leios Innovation R&D site at [leios.cardano-scaling.org](https://leios.cardano-scaling.org/).
+> Leios Innovation R&D site at [leios.cardano-scaling.org][leios-website].
 
 <details>
   <summary><h2>Table of contents</h2></summary>
@@ -57,7 +57,7 @@ economic sustainability and reduced complexity through fewer new protocol elemen
 
 ## Motivation
 
-Cardano's current transaction processing capabilities generally satisfy the immediate needs of its users. However, the Ouroboros Praos consensus protocol imposes inherent scalability limitations. To ensure timely and reliable global propagation of new blocks, the protocol requires that blocks be distributed across the network within a short time frame. This requirement forces a careful balance, restricting both the maximum size of individual blocks and the computational resources available for validating transactions and Plutus scripts. As a result, there is a fixed ceiling on the network's transaction throughput that cannot be raised by simply adjusting protocol parameters.
+Cardano's current throughput generally satisfies the immediate needs of its users. However, the Ouroboros Praos consensus protocol imposes inherent scalability limitations. To ensure timely and reliable global propagation of new blocks, the protocol requires that blocks be distributed across the network within a short time frame. This requirement forces a careful balance, restricting both the maximum size of individual blocks and the computational resources available for validating transactions and Plutus scripts. As a result, there is a fixed ceiling on the network's transaction throughput that cannot be raised by simply adjusting protocol parameters.
 
 However, the dynamic growth of the Cardano ecosystem is increasingly revealing
 the practical consequences of these inherent limitations. The Cardano mainnet
@@ -87,7 +87,7 @@ required. This specification presents the first version of the Ouroboros Leios
 protocol family - a stepping stone toward higher throughput while preserving the
 proven security and stability characteristics of Praos. This initial protocol
 version extends Praos with optional secondary blocks and committee validation
-to achieve significant increases in transaction processing capacity while
+to achieve significant increases in throughput while
 maintaining familiar transaction semantics.
 
 The Cardano Problem Statement [CPS-18 Greater Transaction Throughput][cps-18]
@@ -130,10 +130,10 @@ _Figure 2: SPO profitability under Praos, as a function of transaction volume_
 
 </div>
 
-This first version of the Leios protocol family represents a balance
+The Leios protocol specified in this document represents a balance
 between immediate scalability needs and long-term protocol evolution. The
 approach prioritizes practical deployment and ecosystem compatibility while
-establishing the foundation for subsequent Leios protocol versions with higher
+establishing the foundation for subsequent protocol versions with higher
 throughput capacity.
 
 ## Specification
@@ -297,7 +297,7 @@ This dual approach prevents linear certificate size growth by leveraging non-uni
 4. **Stake Verification**: Total voting stake meets the required quorum threshold
 5. **EB Consistency**: Certificate references the correct EB hash announced in the preceding RB
 
-Detailed specifications, performance, and benchmarks are available in the [BLS certificates specification](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md).
+Detailed specifications, performance, and benchmarks are available in the [BLS certificates specification][bls-spec].
 
 > [!NOTE]
 > **Vote Bundling**
@@ -500,7 +500,7 @@ Whenever an EB is announced through an RB header, nodes must fetch the EB conten
 
 #### Epoch Boundary
 
-<a id="persistent-voter-computation" href="#persistent-voter-computation">**Persistent Voter Computation**</a>: At epoch boundaries, nodes must compute the set of persistent voters for the next epoch using the [Fait Accompli scheme][fait-accompli-sortition]. This computation uses the stake distribution fixed at the epoch boundary and represents a minimal computational overhead based on current [BLS certificates benchmarks](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#benchmarks-in-rust). The computation must be completed before the next epoch begins to enable voting participation.
+<a id="persistent-voter-computation" href="#persistent-voter-computation">**Persistent Voter Computation**</a>: At epoch boundaries, nodes must compute the set of persistent voters for the next epoch using the [Fait Accompli scheme][fait-accompli-sortition]. This computation uses the stake distribution fixed at the epoch boundary and represents a minimal computational overhead based on current [BLS certificates benchmarks][bls-benchmarks]. The computation must be completed before the next epoch begins to enable voting participation.
 
 ### Network
 
@@ -784,7 +784,7 @@ $$
 
 <a name="simulation-results"></a>**Simulation results**
 
-The Leios paper[^2] provides a rigorous theoretical analysis of the safety and
+The [Leios paper][leios-paper] provides a rigorous theoretical analysis of the safety and
 throughput of the protocol. That has been reinforced and demonstrated by
 prototype simulations written in Haskell and Rust.
 
@@ -809,12 +809,11 @@ distribution of stake and a representative number of stake pools. The network
 is designed with a total of 10,000 nodes (`pseudo-mainnet`)[^pseudo] or 750
 nodes (`mini-mainnet`)[^mini], where each block producer is connected
 exclusively to two dedicated relays. Furthermore, the topology incorporates
-realistic latencies based on the [RIPE Atlas](https://atlas.ripe.net/) ping dataset
+realistic latencies based on the [RIPE Atlas][ripe-atlas] ping dataset
 and bandwidth that aligns with the lower end of what is typically found in
 cloud data centers. The node connectivity and geographic distribution (across
 various countries and autonomous systems) are also consistent with
-measurements provided by the [Cardano
-Foundation](https://cardanofoundation.org/). A simulation study [^mncp] has
+measurements provided by the [Cardano Foundation][cardano-foundation]. A simulation study[^mncp] has
 demonstrated that analysis conclusions deriving from the `mini-mainnet`
 topology are also valid for the `pseudo-mainnet` topology; the advantage of
 using the former is that simulations run much more quickly. Simulated RB
@@ -873,7 +872,7 @@ tradeoffs.
 | Praos active slot coefficient              | $f_\text{RB}$ | 1/slot   | The probability that a party will be the slot leader for a particular slot. |           0.05 | This is the current value on mainnet, but it may become feasible to reduce it if Praos blocks are made smaller.           |
 
 The analysis
-[Committee size and quorum requirement](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-1.md#committee-size-and-quorum-requirement)
+[Committee size and quorum requirement][committee-size-analysis]
 in the first Leios Technical Report indicates that the Leios committee size
 should be no smaller than 500 votes and the quorum should be at least 60% of
 those votes. However, the proposed [Fait Accompli][fait-accompli-sortition][^1] scheme wFA<sup>LS</sup>
@@ -947,7 +946,7 @@ deployments.
 <a name="operating-costs"></a>**Operating costs**
 
 A detailed cost analysis of Leios deployment is documented in
-[Leios node operating costs](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/cost-estimate/README.md)
+[Leios node operating costs][cost-estimate]
 in the github repository for the Leios R&D effort. The major conclusion of that
 report is the following table that relates IB production rate, assuming IBs are
 the maximum size of existing Praos blocks, to the cost per node and the total
@@ -1006,7 +1005,7 @@ This section examines the key threats, limitations, and trade-offs inherent in t
 > - A short overview of the threat model
 > - Highlight key 2-3 threats and mitigations
 > - Link the [dedicated threat model](https://github.com/input-output-hk/ouroboros-leios/pull/452) once merged?
-> - Link [threat model in report #1](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-1.md#threat-model), [comments in report #2](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-2.md#notes-on-the-leios-attack-surface)?
+> - Link [threat model in report #1][threat-model], [comments in report #2][threat-model-report2]?
 
 The Leios protocol may have to mitigate the following categories of threats.
 
@@ -1022,7 +1021,7 @@ The Leios protocol may have to mitigate the following categories of threats.
 Nearly all of these _hypothetical_ threats are already mitigated by the protocol
 design, the incentive structure, or the cost of the resources needed to execute
 the threat. The
-[Threat model](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-1.md#threat-model)
+[Threat model][threat-model]
 section of the first Leios Technical report contains a detailed taxonomy that we
 summarize here. The general impact of such attacks varies:
 
@@ -1034,7 +1033,7 @@ summarize here. The general impact of such attacks varies:
 _Grinding and other threats to Praos:_ Threats to the ranking blocks used by
 Leios are already mitigated by Ouroboros Praos and Genesis. Nevertheless, the
 possibility of _grinding attacks_, as discussed in
-[CPS-0017](https://github.com/cardano-scaling/CIPs/blob/settlement-cps/CPS-0017/README.md),
+[CPS-0017][cps-17],
 will always exist, albeit at low probability of success. Such an attack, which
 requires some stake, involves using CPU resources to try to manipulate the epoch
 nonce to a value which will result in higher probability of being select as an
@@ -1330,16 +1329,90 @@ protocol.
 
 ## References
 
-> [!NOTE]
->
-> Optional
+### Primary Documents
 
-- [CPS-18: Greater transaction throughput][cps-18]
-- [Leios R&D web site](https://leios.cardano-scaling.org/)
-- [Leios channel on IOG Discord](https://discord.com/channels/826816523368005654/1247688618621927505)
-- [Github repository for Leios R&D](https://github.com/input-output-hk/ouroboros-leios)
-- [Github repository for Leios formal specification](https://github.com/input-output-hk/ouroboros-leios-formal-spec)
-- [Fait Accompli sortition specification](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#sortition)
+- **CPS-18: Greater transaction throughput** - [CPS-0018][cps-18]
+- **Ouroboros Leios: Design Goals and Concepts** - [Research Paper][leios-paper]
+
+### Leios Resources
+
+- **Leios R&D website** - [leios.cardano-scaling.org][leios-website]
+- **Leios Discord channel** - [IOG Discord][leios-discord]
+- **Leios R&D repository** - [GitHub][leios-github]
+- **Leios formal specification** - [GitHub][leios-formal-spec]
+
+### Technical Specifications
+
+- **BLS certificates specification** - [Specification][bls-spec]
+- **BLS certificates benchmarks** - [Benchmarks][bls-benchmarks]
+- **Fait Accompli sortition** - [Specification][fait-accompli-sortition]
+
+### Technical Reports
+
+- **Committee size and quorum requirement** - [Analysis][committee-size-analysis]
+- **Threat model** - [Report #1][threat-model]
+- **Leios attack surface** - [Report #2][threat-model-report2]
+- **Node operating costs** - [Cost estimate][cost-estimate]
+
+### Related
+
+- **CPS-0017** - [Settlement layer CPS][cps-17]
+- **Praos performance model** - [Specification][praos-performance]
+
+### Simulation Resources
+
+*See footnotes in the Simulation Results section for detailed topology documentation*
+
+### External
+
+- **RIPE Atlas** - [Network measurements][ripe-atlas]
+- **Cardano Foundation** - [Official site][cardano-foundation]
+
+<!-- Reference Index - DO NOT REMOVE -->
+<!-- The following reference definitions enable consistent linking throughout the document -->
+
+<!-- Primary references -->
+[cps-18]: https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md "CPS-18: Greater transaction throughput"
+[leios-paper]: https://eprint.iacr.org/2025/1115.pdf "Ouroboros Leios: Design Goals and Concepts"
+[fait-accompli-sortition]: https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#sortition "Fait Accompli sortition specification"
+
+<!-- Project resources -->
+[leios-website]: https://leios.cardano-scaling.org/ "Leios R&D web site"
+[leios-discord]: https://discord.com/channels/826816523368005654/1247688618621927505 "Leios channel on IOG Discord"
+[leios-github]: https://github.com/input-output-hk/ouroboros-leios "Github repository for Leios R&D"
+[leios-formal-spec]: https://github.com/input-output-hk/ouroboros-leios-formal-spec "Github repository for Leios formal specification"
+
+<!-- Technical specifications and benchmarks -->
+[bls-spec]: https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md "BLS certificates specification"
+[bls-benchmarks]: https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#benchmarks-in-rust "BLS certificates benchmarks"
+
+<!-- Technical reports and documentation -->
+[committee-size-analysis]: https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-1.md#committee-size-and-quorum-requirement "Committee size and quorum requirement"
+[threat-model]: https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-1.md#threat-model "Threat model"
+[threat-model-report2]: https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-2.md#notes-on-the-leios-attack-surface "Comments on Leios attack surface"
+[cost-estimate]: https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/cost-estimate/README.md "Leios node operating costs"
+
+<!-- Other protocol references -->
+[cps-17]: https://github.com/cardano-scaling/CIPs/blob/settlement-cps/CPS-0017/README.md "CPS-0017"
+[praos-performance]: https://github.com/IntersectMBO/cardano-formal-specifications/blob/6d4e5cfc224a24972162e39a6017c273cea45321/src/performance/README.md "Praos performance model"
+
+<!-- Simulation topology references -->
+[mainnet-topology]: https://github.com/input-output-hk/ouroboros-leios/blob/6d8619c53cc619a25b52eac184e7f1ff3c31b597/data/simulation/pseudo-mainnet/ReadMe.md "Mainnet-like topology documentation"
+[pseudo-mainnet]: https://github.com/input-output-hk/ouroboros-leios/blob/6d8619c53cc619a25b52eac184e7f1ff3c31b597/data/simulation/pseudo-mainnet/topology-v1.md "Pseudo-mainnet topology"
+[mini-mainnet]: https://github.com/input-output-hk/ouroboros-leios/blob/6d8619c53cc619a25b52eac184e7f1ff3c31b597/data/simulation/pseudo-mainnet/topology-v2.md "Mini-mainnet topology"
+[topology-comparison]: https://github.com/input-output-hk/ouroboros-leios/blob/6d8619c53cc619a25b52eac184e7f1ff3c31b597/analysis/sims/2025w30b/analysis.ipynb "Topology comparison study"
+
+<!-- External resources -->
+[ripe-atlas]: https://atlas.ripe.net/ "RIPE Atlas"
+[cardano-foundation]: https://cardanofoundation.org/ "Cardano Foundation"
+
+<!-- License -->
+[apache-2.0]: http://www.apache.org/licenses/LICENSE-2.0 "Apache License 2.0"
+
+<!-- Footnotes -->
+[^1]: The Fait Accompli sortition scheme
+[^2]: Leios: Dynamic Availability for Blockchain Sharding (2025)
+[^3]: Leios cryptography prototype implementation
 
 ## Appendix
 
@@ -1461,7 +1534,4 @@ non_persistent_vote =
 > referenced by its respective abbreviation below in the _"Copyright"_ section.
 
 This CIP is licensed under
-[Apache-2.0](http://www.apache.org/licenses/LICENSE-2.0).
-
-[leios-paper]: https://eprint.iacr.org/2025/1115.pdf
-[cps-18]: https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md
+[Apache-2.0][apache-2.0].
