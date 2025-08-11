@@ -231,8 +231,7 @@ blockFetchProducer st = idle
 --- BlockFetch Client
 --------------------------------
 
-newtype BlockRequest
-  = BlockRequest {blockRequestFragments :: [AnchoredFragment BlockHeader]}
+newtype BlockRequest = BlockRequest {blockRequestFragments :: [AnchoredFragment BlockHeader]}
   deriving (Show)
   deriving newtype (Semigroup) -- TODO: we could merge the fragments.
 

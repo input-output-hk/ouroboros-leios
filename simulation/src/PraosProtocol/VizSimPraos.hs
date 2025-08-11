@@ -84,8 +84,7 @@ type PraosSimVizModel =
     PraosSimVizState
 
 -- | The vizualisation state within the data model for the relay simulation
-data PraosSimVizState
-  = PraosSimVizState
+data PraosSimVizState = PraosSimVizState
   { vizWorld :: !World
   , vizNodePos :: !(Map NodeId Point)
   , vizNodeLinks :: !(Map Link LinkPoints)
@@ -357,8 +356,7 @@ recentPrune now (RecentRate pq) =
 -- The vizualisation rendering
 --
 type PraosVizConfig = PraosVizConfig' BlockBody
-data PraosVizConfig' body
-  = PraosVizConfig
+data PraosVizConfig' body = PraosVizConfig
   { chainSyncMessageColor :: ChainSyncMessage -> (Double, Double, Double)
   , chainSyncMessageText :: ChainSyncMessage -> Maybe String
   , blockFetchMessageColor :: BlockFetchMessage body -> (Double, Double, Double)

@@ -480,8 +480,7 @@ newtype RegionName = RegionName {unRegionName :: Text}
   deriving stock (Show, Eq, Ord)
   deriving newtype (FromJSON, ToJSON)
 
-data BenchTopologyNode
-  = BenchTopologyNode
+data BenchTopologyNode = BenchTopologyNode
   { name :: !NodeName
   , nodeId :: !NodeId
   , org :: !(Maybe OrgName)

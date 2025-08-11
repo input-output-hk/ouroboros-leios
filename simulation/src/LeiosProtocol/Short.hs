@@ -96,7 +96,10 @@ data RelayDiffusionConfig = RelayDiffusionConfig
   , maxBodiesToRequest :: !Word16
   }
 
-data LeiosConfig = forall p. IsPipeline p => LeiosConfig
+data LeiosConfig
+  = forall p.
+  IsPipeline p =>
+  LeiosConfig
   { praos :: PraosConfig RankingBlockBody
   , pipeline :: SingPipeline p
   , sliceLength :: Int
@@ -230,7 +233,8 @@ convertConfig disk =
   certificateSize (Certificate votesMap) =
     fromIntegral $
       disk.certSizeBytesConstant
-        + disk.certSizeBytesPerNode `forEachKey` votesMap
+        + disk.certSizeBytesPerNode
+          `forEachKey` votesMap
   sizes =
     SizesConfig
       { inputBlockHeader = fromIntegral disk.ibHeadSizeBytes
@@ -240,27 +244,32 @@ convertConfig disk =
       , endorseBlock = \eb ->
           fromIntegral $
             disk.ebSizeBytesConstant
-              + disk.ebSizeBytesPerIb `forEach` eb.inputBlocks
+              + disk.ebSizeBytesPerIb
+                `forEach` eb.inputBlocks
               -- TODO: make it a per-ref field.
-              + disk.ebSizeBytesPerIb `forEach` eb.endorseBlocksEarlierPipeline
+              + disk.ebSizeBytesPerIb
+                `forEach` eb.endorseBlocksEarlierPipeline
       , voteMsg = \vt ->
           fromIntegral $
             disk.voteBundleSizeBytesConstant
-              + disk.voteBundleSizeBytesPerEb `forEach` vt.endorseBlocks
+              + disk.voteBundleSizeBytesPerEb
+                `forEach` vt.endorseBlocks
       , certificate = \_cert ->
           fromIntegral $
-            assert (0 == disk.certSizeBytesPerNode) $   -- TODO
+            assert (0 == disk.certSizeBytesPerNode) $ -- TODO
               disk.certSizeBytesConstant
       , rankingBlockLegacyPraosPayloadAvgSize = fromIntegral disk.rbBodyLegacyPraosPayloadAvgSizeBytes
       }
   certificateGeneration (Certificate votesMap) =
     durationMsToDiffTime $
       disk.certGenerationCpuTimeMsConstant
-        + disk.certGenerationCpuTimeMsPerNode `forEachKey` votesMap
+        + disk.certGenerationCpuTimeMsPerNode
+          `forEachKey` votesMap
   certificateValidation (Certificate votesMap) =
     durationMsToDiffTime $
       disk.certValidationCpuTimeMsConstant
-        + disk.certValidationCpuTimeMsPerNode `forEachKey` votesMap
+        + disk.certValidationCpuTimeMsPerNode
+          `forEachKey` votesMap
   delays =
     LeiosDelays
       { inputBlockGeneration = const $ durationMsToDiffTime disk.ibGenerationCpuTimeMs
@@ -282,13 +291,14 @@ convertConfig disk =
             durationMsToDiffTime $
               sum
                 [ disk.voteGenerationCpuTimeMsConstant
-                  + disk.voteGenerationCpuTimeMsPerIb `forEach` eb.inputBlocks
+                  + disk.voteGenerationCpuTimeMsPerIb
+                    `forEach` eb.inputBlocks
                 | eb <- ebs
                 ]
       , linearVoteMsgGeneration = \vm ibs ->
           assert (1 == length vm.endorseBlocks) $
             assert (vm.endorseBlocks == map (convertLinearId . (.id)) ibs) $
-              assert (0 == disk.voteGenerationCpuTimeMsPerTx) $   -- TODO
+              assert (0 == disk.voteGenerationCpuTimeMsPerTx) $ -- TODO
                 durationMsToDiffTime $
                   disk.voteGenerationCpuTimeMsConstant `forEach` ibs
       , voteMsgValidation = \vm ->
@@ -343,12 +353,12 @@ delaysAndSizesAsFull cfg@LeiosConfig{pipeline, voteSendStage} =
     , let EndorseBlock{..} = fullEB
     ]
   fullLinearEBsVotedFor =
-    [ InputBlock {
-        body = fullIB.body
-        , header =
+    [ InputBlock
+      { body = fullIB.body
+      , header =
           let InputBlockHeader{..} = fullIB.header
-          in InputBlockHeader {id = unconvertLinearId id', ..}
-        }
+           in InputBlockHeader{id = unconvertLinearId id', ..}
+      }
     | id' <- fullVT.endorseBlocks
     ]
   fullRB = mockFullRankingBlock cfg
