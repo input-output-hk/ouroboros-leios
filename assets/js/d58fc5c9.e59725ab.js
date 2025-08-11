@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunksite=self.webpackChunksite||[]).push([[1364],{8676:s=>{s.exports=JSON.parse('{"tag":{"label":"plutus","permalink":"/news/tags/plutus","allTagsPath":"/news/tags","count":1,"unlisted":false},"listMetadata":{"permalink":"/news/tags/plutus","page":1,"postsPerPage":10,"totalPages":1,"totalCount":1,"blogDescription":"Blog","blogTitle":"News"}}')}}]);
