@@ -99,8 +99,7 @@ type LeiosSimVizModel =
     LeiosSimVizState
 
 -- | The vizualisation state within the data model for the relay simulation
-data LeiosSimVizState
-  = LeiosSimVizState
+data LeiosSimVizState = LeiosSimVizState
   { vizWorld :: !World
   , vizNodePos :: !(Map NodeId Point)
   , vizNodeStakes :: !(Map NodeId StakeFraction)
@@ -668,8 +667,7 @@ recentPrune now (RecentRate pq) =
 -- The vizualisation rendering
 --
 
-data LeiosVizConfig
-  = LeiosVizConfig
+data LeiosVizConfig = LeiosVizConfig
   { praosMessageColor :: PraosMessage RankingBlockBody -> (Double, Double, Double)
   , praosMessageText :: PraosMessage RankingBlockBody -> Maybe String
   , relayIBMessageColor :: RelayIBMessage -> (Double, Double, Double)
@@ -767,8 +765,7 @@ leiosSimVizRenderModel
           Cairo.newPath
           -- draw all the messages within the clipping region of the link
           renderMessagesInFlight
-            ( TcpSimVizConfig $ leiosMessageColor cfg
-            )
+            (TcpSimVizConfig $ leiosMessageColor cfg)
             now
             fromPos
             toPos

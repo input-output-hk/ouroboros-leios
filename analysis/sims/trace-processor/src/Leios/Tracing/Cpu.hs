@@ -21,8 +21,7 @@ import System.IO (IOMode (WriteMode), hClose, hPutStrLn, openFile)
 
 import qualified Data.Text as T (unpack)
 
-data ItemKey
-  = ItemKey
+data ItemKey = ItemKey
   { slot :: Int
   , node :: Text
   , task :: Text

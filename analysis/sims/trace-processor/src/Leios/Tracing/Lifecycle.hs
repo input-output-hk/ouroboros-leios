@@ -28,15 +28,13 @@ import qualified Data.Map.Strict as M (elems, fromList, insertWith, restrictKeys
 import qualified Data.Set as S (map, singleton)
 import qualified Data.Text as T (unpack)
 
-data ItemKey
-  = ItemKey
+data ItemKey = ItemKey
   { kind :: Text
   , item :: Text
   }
   deriving (Eq, Ord, Show)
 
-data ItemInfo
-  = ItemInfo
+data ItemInfo = ItemInfo
   { size :: Minimum Int
   , references :: Sum Int
   , created :: Minimum Double

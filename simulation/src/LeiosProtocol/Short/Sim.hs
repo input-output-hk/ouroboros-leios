@@ -86,18 +86,26 @@ logLeiosEvent nodeNames loudness e = case e of
     ps <- logMsg msg
     pure $
       pairs $
-        "tag" .= asString "Sent"
-          <> "sender" .= from
-          <> "receipient" .= to
+        "tag"
+          .= asString "Sent"
+          <> "sender"
+            .= from
+          <> "receipient"
+            .= to
           <> mconcat
-            [ "fragments" .= length fcs
-              <> "forecast" .= forecast
+            [ "fragments"
+              .= length fcs
+              <> "forecast"
+                .= forecast
             | emitDebug
             ]
           <> mconcat ["forecasts" .= fcs | emitControl]
-          <> "msg_size_bytes" .= fromBytes (messageSizeBytes msg)
-          <> "time_to_received_s" .= (coerce forecast.msgRecvTrailingEdge - coerce forecast.msgSendLeadingEdge :: DiffTime)
-          <> "sending_s" .= (coerce forecast.msgSendTrailingEdge - coerce forecast.msgSendLeadingEdge :: DiffTime)
+          <> "msg_size_bytes"
+            .= fromBytes (messageSizeBytes msg)
+          <> "time_to_received_s"
+            .= (coerce forecast.msgRecvTrailingEdge - coerce forecast.msgSendLeadingEdge :: DiffTime)
+          <> "sending_s"
+            .= (coerce forecast.msgSendTrailingEdge - coerce forecast.msgSendLeadingEdge :: DiffTime)
           <> ps
  where
   emitControl = loudness >= 3
@@ -221,29 +229,40 @@ logLeiosEvent nodeNames loudness e = case e of
   logRelay :: (HasField "node" id NodeId, HasField "num" id Int) => (h -> id) -> RelayMessage id h b -> Maybe Series
   logRelay _getId (ProtocolMessage (SomeMessage msg@(MsgRespondBodies xs))) =
     Just $
-      "ids" .= map (mkStringId . fst) xs
-        <> "msg_label" .= relayMessageLabel msg
+      "ids"
+        .= map (mkStringId . fst) xs
+        <> "msg_label"
+          .= relayMessageLabel msg
   logRelay _getId (ProtocolMessage (SomeMessage msg@(MsgRequestBodies xs)))
     | emitDebug =
         Just $
-          "ids" .= map mkStringId xs
-            <> "msg_label" .= relayMessageLabel msg
+          "ids"
+            .= map mkStringId xs
+            <> "msg_label"
+              .= relayMessageLabel msg
   logRelay getId (ProtocolMessage (SomeMessage msg@(MsgRespondHeaders xs)))
     | emitDebug =
         Just $
-          "ids" .= map (mkStringId . getId) (toList xs)
-            <> "msg_label" .= relayMessageLabel msg
+          "ids"
+            .= map (mkStringId . getId) (toList xs)
+            <> "msg_label"
+              .= relayMessageLabel msg
   logRelay _getId (ProtocolMessage (SomeMessage msg@(MsgRequestHeaders _ ws we)))
     | emitDebug =
         Just $
-          "shrink" .= ws.value
-            <> "expand" .= we.value
-            <> "msg_label" .= relayMessageLabel msg
+          "shrink"
+            .= ws.value
+            <> "expand"
+              .= we.value
+            <> "msg_label"
+              .= relayMessageLabel msg
   logRelay _ (ProtocolMessage (SomeMessage msg))
     | emitControl =
         Just $
-          "id" .= asString "control"
-            <> "msg_label" .= relayMessageLabel msg
+          "id"
+            .= asString "control"
+            <> "msg_label"
+              .= relayMessageLabel msg
     | otherwise = Nothing
   asString x = x :: String
 

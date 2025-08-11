@@ -25,15 +25,13 @@ import Leios.Tracing.Util (Maximum (..))
 import qualified Data.Map.Strict as M (insertWith, map, mapKeysWith, toList)
 import qualified Data.Text as T (unpack)
 
-data ItemKey'
-  = ItemKey'
+data ItemKey' = ItemKey'
   { slot' :: Int
   , node' :: Text
   }
   deriving (Eq, Ord, Show)
 
-data ItemInfo'
-  = ItemInfo'
+data ItemInfo' = ItemInfo'
   { egress' :: Sum Double
   , disk' :: Sum Double
   , cpu' :: Sum Double
@@ -58,14 +56,12 @@ instance Monoid ItemInfo' where
 
 type Index' = Map ItemKey' ItemInfo'
 
-newtype ItemKey
-  = ItemKey
+newtype ItemKey = ItemKey
   { node :: Text
   }
   deriving (Eq, Ord, Show)
 
-data ItemInfo
-  = ItemInfo
+data ItemInfo = ItemInfo
   { egress :: Sum Double
   , disk :: Sum Double
   , totalCpu :: Sum Double

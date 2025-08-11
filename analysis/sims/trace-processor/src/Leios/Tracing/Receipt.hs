@@ -26,15 +26,13 @@ import System.IO (IOMode (WriteMode), hClose, hPutStrLn, openFile)
 import qualified Data.Map.Strict as M (insertWith, (!))
 import qualified Data.Text as T (unpack)
 
-data ItemKey
-  = ItemKey
+data ItemKey = ItemKey
   { kind :: Text
   , item :: Text
   }
   deriving (Eq, Ord, Show)
 
-data ItemInfo
-  = ItemInfo
+data ItemInfo = ItemInfo
   { producer :: Text
   , sent :: Minimum Double
   , size :: Maximum Double

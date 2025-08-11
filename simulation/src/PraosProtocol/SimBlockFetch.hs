@@ -93,8 +93,7 @@ traceRelayLink1 tcpprops =
     concurrently_ processingThread $
       concurrently_ (mapConcurrently_ id ts) $
         concurrently_
-          ( blockFetchController nullTracer praosConfig st
-          )
+          (blockFetchController nullTracer praosConfig st)
           ( runBlockFetchConsumer nullTracer praosConfig chan $
               initBlockFetchConsumerStateForPeerId nullTracer peerId st submitFetchedBlock
           )

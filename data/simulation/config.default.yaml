@@ -182,6 +182,9 @@ eb-max-age-for-relay-slots: 40
 # Only relevant when running with the "full-without-ibs" variant.
 eb-referenced-txs-max-size-bytes: 16384000
 
+# For Linear Leios
+eb-body-avg-size-bytes: 2500000
+
 ################################################################################
 # Vote Configuration
 ################################################################################

@@ -77,8 +77,7 @@ type BlockFetchVizModel =
     BlockFetchVizState
 
 -- | The vizualisation state within the data model for the relay simulation
-data BlockFetchVizState
-  = BlockFetchVizState
+data BlockFetchVizState = BlockFetchVizState
   { vizWorld :: !World
   , vizNodePos :: !(Map NodeId Point)
   , vizNodeLinks :: !(Map Link LinkPoints)
@@ -262,8 +261,7 @@ recentPrune now (RecentRate pq) =
 -- The vizualisation rendering
 --
 
-data BlockFetchVizConfig
-  = BlockFetchVizConfig
+data BlockFetchVizConfig = BlockFetchVizConfig
   { ptclMessageColor :: BlockFetchMessage BlockBody -> (Double, Double, Double)
   , ptclMessageText :: BlockFetchMessage BlockBody -> Maybe String
   }

@@ -190,7 +190,9 @@ defaultPraosConfig =
 instance Default (PraosConfig body) where
   def = defaultPraosConfig
 
-data BlockGeneratorConfig m = forall s. BlockGeneratorConfig
+data BlockGeneratorConfig m
+  = forall s.
+  BlockGeneratorConfig
   { slotConfig :: SlotConfig
   , execute :: SlotNo -> StateT s m ()
   , initial :: s

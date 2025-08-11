@@ -38,10 +38,11 @@ data BuffersView m = BuffersView
   }
 
 data Role :: Type -> Type where
-  Base :: Role (Either (Chain RankingBlock, RankingBlock) InputBlock)
-  -- ^ For Linear Leios, we have two 'Base' roles: one for 'Left' and one for 'Right'.
-  --
-  -- In Short or Full Leios, it's only the 'Left' role.
+  Base ::
+    -- | For Linear Leios, we have two 'Base' roles: one for 'Left' and one for 'Right'.
+    --
+    -- In Short or Full Leios, it's only the 'Left' role.
+    Role (Either (Chain RankingBlock, RankingBlock) InputBlock)
   Propose :: {ibSlot :: Maybe SlotNo, delay :: Maybe DiffTime} -> Role InputBlock
   Endorse :: Role EndorseBlock
   Vote :: Role VoteMsg

@@ -119,8 +119,7 @@ messageLegend =
 data MsgTag = RB | IB | EB | VT
   deriving (Show, Enum, Bounded)
 
-data LeiosP2PSimVizConfig
-  = LeiosP2PSimVizConfig
+data LeiosP2PSimVizConfig = LeiosP2PSimVizConfig
   { nodeMessageColor :: RankingBlockHeader -> (Double, Double, Double)
   , ibColor :: InputBlockHeader -> (Double, Double, Double)
   , ebColor :: EndorseBlock -> (Double, Double, Double)

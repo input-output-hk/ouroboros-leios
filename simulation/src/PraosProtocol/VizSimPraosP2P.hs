@@ -38,8 +38,7 @@ import VizUtils
 -- The vizualisation rendering
 --
 
-data PraosP2PSimVizConfig
-  = PraosP2PSimVizConfig
+data PraosP2PSimVizConfig = PraosP2PSimVizConfig
   { nodeMessageColor :: BlockHeader -> (Double, Double, Double)
   , ptclMessageColor :: PraosMessage BlockBody -> Maybe (Double, Double, Double)
   }

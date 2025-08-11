@@ -28,9 +28,9 @@ import Control.Monad (forM_, forever)
 import Control.Monad.Class.MonadFork (MonadFork (forkIO))
 import Control.Tracer (Tracer (Tracer), traceWith)
 import Data.Array (Array, listArray, (!))
-import Data.Kind
 import Data.Foldable (traverse_)
 import Data.Functor.Const (Const (Const), getConst)
+import Data.Kind
 import STMCompat
 
 class ConnectionBundle bundle where
@@ -48,8 +48,7 @@ class ConnectionBundle bundle where
 -- 'toBundleMsg'. For example, a valid implementation would be:
 --
 -- > ToFromBundleMsg toDynamic (fromJust . fromDynamic)
-data ToFromBundleMsg mm a
-  = ToFromBundleMsg
+data ToFromBundleMsg mm a = ToFromBundleMsg
   { toBundleMsg :: a -> mm
   , fromBundleMsg :: mm -> a
   }
@@ -68,9 +67,10 @@ data BorneMsg a = BorneMsg !Int a
 -- The mini protocols never see this, so this type is not exported. It does
 -- occur in the argument types of some exported functions, but the caller
 -- should be using parametric functions to generate those arguments.
-data BearerMsg a = BearerMsg !Bytes [BorneMsg a]
-  -- ^ the cumulative size of the slices the borne messages whose /final/ slice
-  -- is in this message
+data BearerMsg a
+  = -- | the cumulative size of the slices the borne messages whose /final/ slice
+    -- is in this message
+    BearerMsg !Bytes [BorneMsg a]
 
 instance MessageSize (BearerMsg a) where
   messageSizeBytes (BearerMsg sz _) = 1 + sz
@@ -140,7 +140,7 @@ newMuxChanSingle
             takeMVar sendLock
             atomically $
               writeTQueue sendQueue $
-              (sendLock, messageSizeBytes bundleMsg, muxmsg)
+                (sendLock, messageSizeBytes bundleMsg, muxmsg)
         }
 
 data RecvQueue m mm where
@@ -167,20 +167,20 @@ muxer ::
   TQueue m (MVar m (), Bytes, BorneMsg (BundleMsg bundle)) ->
   m ()
 muxer bearer sendQueue =
-    forever $ do
-      x <- atomically (readTQueue sendQueue)
-      (muxmsg, locks) <- go 0 [] [] x
-      mapM_ (flip putMVar ()) locks
-      writeChan bearer muxmsg
-  where
-    --- from ouroboros-network's @Network.Mux.Bearer.makeSocketBearer'@
-    sliceBytes = 12288
-    loafBytes = 131072
+  forever $ do
+    x <- atomically (readTQueue sendQueue)
+    (muxmsg, locks) <- go 0 [] [] x
+    mapM_ (flip putMVar ()) locks
+    writeChan bearer muxmsg
+ where
+  --- from ouroboros-network's @Network.Mux.Bearer.makeSocketBearer'@
+  sliceBytes = 12288
+  loafBytes = 131072
 
-    go !accBytes acc locks (lock, bytes, msg) = do
-      let !accBytes' = accBytes + min sliceBytes bytes
-      (acc', locks') <-
-        if bytes <= sliceBytes
+  go !accBytes acc locks (lock, bytes, msg) = do
+    let !accBytes' = accBytes + min sliceBytes bytes
+    (acc', locks') <-
+      if bytes <= sliceBytes
         then do
           -- We do not release the lock before finalizing the loaf because a
           -- single loaf should include slices from at most one borne message
@@ -192,8 +192,10 @@ muxer bearer sendQueue =
           atomically $ writeTQueue sendQueue (lock, bytes', msg)
           pure (acc, locks)
 
-      let result = (BearerMsg accBytes' acc', locks')
-      if accBytes' >= loafBytes then pure result else do
+    let result = (BearerMsg accBytes' acc', locks')
+    if accBytes' >= loafBytes
+      then pure result
+      else do
         atomically (tryReadTQueue sendQueue) >>= \case
           Nothing -> pure result
           Just x -> go accBytes' acc' locks' x

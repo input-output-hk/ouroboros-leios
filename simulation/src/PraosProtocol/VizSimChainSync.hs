@@ -83,8 +83,7 @@ type ChainSyncVizModel =
     ChainSyncVizState
 
 -- | The vizualisation state within the data model for the relay simulation
-data ChainSyncVizState
-  = ChainSyncVizState
+data ChainSyncVizState = ChainSyncVizState
   { vizWorld :: !World
   , vizNodePos :: !(Map NodeId Point)
   , vizNodeLinks :: !(Map Link LinkPoints)
@@ -336,8 +335,7 @@ recentPrune now (RecentRate pq) =
 -- The vizualisation rendering
 --
 
-data ChainSyncVizConfig
-  = ChainSyncVizConfig
+data ChainSyncVizConfig = ChainSyncVizConfig
   { nodeMessageColor :: BlockHeader -> (Double, Double, Double)
   , ptclMessageColor :: ChainSyncMessage -> (Double, Double, Double)
   , nodeMessageText :: BlockHeader -> Maybe String

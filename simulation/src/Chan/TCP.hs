@@ -38,8 +38,8 @@ data LabelTcpDir e = DirClientToServer e | DirServerToClient e
 
 lensLabelTcpDir :: Functor f => (a -> f b) -> LabelTcpDir a -> f (LabelTcpDir b)
 lensLabelTcpDir f = \case
-    DirClientToServer x -> DirClientToServer <$> f x
-    DirServerToClient x -> DirServerToClient <$> f x
+  DirClientToServer x -> DirClientToServer <$> f x
+  DirServerToClient x -> DirServerToClient <$> f x
 
 -- | Class for messages to be sent over a simulated TCP connection.
 -- To correctly model the timing of the messages sent over the connection we

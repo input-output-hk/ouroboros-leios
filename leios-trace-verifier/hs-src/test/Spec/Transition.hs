@@ -23,8 +23,7 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Spec.Scenario as Scenario (config, idOther, idSut)
 
-data TracingContext
-  = TracingContext
+data TracingContext = TracingContext
   { _clock :: Time
   , _slotNo :: SlotNo
   , _rbs :: Map Text Text

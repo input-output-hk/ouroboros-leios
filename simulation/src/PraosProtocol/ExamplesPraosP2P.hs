@@ -171,8 +171,7 @@ diffusionSampleModel p2pTopography fp = SampleModel initState accum render
         timesDiff _ _ = undefined
     let durations =
           Map.intersectionWith
-            ( Map.intersectionWith timesDiff
-            )
+            (Map.intersectionWith timesDiff)
             fetchRequests
             receivedBodies
     let average_block_fetch_duration =
