@@ -13,7 +13,7 @@ do
   then
     FRACT=1.00
   else
-    FRACT=1.00
+    FRACT=0.15
   fi
   (
     echo "$HL,$HR"
