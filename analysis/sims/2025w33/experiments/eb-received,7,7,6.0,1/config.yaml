@@ -20,7 +20,7 @@
   "praos-chain-quality": 100,
   "praos-fallback-enabled": true,
   "linear-vote-stage-length-slots": 7,
-  "linear-diffuse-stage-length-slots": 0,
+  "linear-diffuse-stage-length-slots": 7,
   "linear-eb-propagation-criteria": "eb-received",
   "store-txs-as-references": false,
   "tx-generation-distribution": {

@@ -20,12 +20,12 @@
   "praos-chain-quality": 100,
   "praos-fallback-enabled": true,
   "linear-vote-stage-length-slots": 7,
-  "linear-diffuse-stage-length-slots": 0,
-  "linear-eb-propagation-criteria": "eb-received",
+  "linear-diffuse-stage-length-slots": 7,
+  "linear-eb-propagation-criteria": "txs-received",
   "store-txs-as-references": false,
   "tx-generation-distribution": {
     "distribution": "constant",
-    "value": 14.992
+    "value": 10.000
   },
   "tx-size-bytes-distribution": {
     "distribution": "constant",
@@ -166,72 +166,12 @@
   },
   "late-tx-attack": {
     "attackers": {
-      "nodes": [
-        "node-48",
-        "node-49",
-        "node-50",
-        "node-531",
-        "node-486",
-        "node-529",
-        "node-525",
-        "node-526",
-        "node-487",
-        "node-475",
-        "node-476",
-        "node-98",
-        "node-519",
-        "node-520",
-        "node-485",
-        "node-12",
-        "node-18",
-        "node-497",
-        "node-498",
-        "node-527",
-        "node-528",
-        "node-414",
-        "node-415",
-        "node-60",
-        "node-61",
-        "node-91",
-        "node-92",
-        "node-93",
-        "node-94",
-        "node-95",
-        "node-96",
-        "node-97",
-        "node-57",
-        "node-58",
-        "node-59",
-        "node-215",
-        "node-599",
-        "node-604",
-        "node-99",
-        "node-100",
-        "node-582",
-        "node-583",
-        "node-584",
-        "node-585",
-        "node-530",
-        "node-532",
-        "node-416",
-        "node-499",
-        "node-500",
-        "node-566",
-        "node-567",
-        "node-568",
-        "node-101",
-        "node-569",
-        "node-570",
-        "node-571",
-        "node-572",
-        "node-573",
-        "node-13"
-      ]
+      "nodes": []
     },
-    "attack-probability": 1,
+    "attack-probability": 0,
     "tx-generation-distribution": {
       "distribution": "constant",
-      "value": 2702.702
+      "value": 0
     }
   }
 }
