@@ -232,7 +232,7 @@ The protocol manages transitions between Praos and Leios modes through simple, d
 
 **Praos → Leios Transition**: The protocol enters Leios mode when a RB includes a valid certificate for an EB. This certificate serves as proof that the network successfully validated additional transaction capacity. As shown in Figure 3 below, the transition to Leios mode occurs when RB<sub>3</sub> includes the certificate, even though the EB announcement may have occurred while still in Praos mode - RB<sub>2</sub> announcing EB<sub>1</sub>.
 
-**Leios → Praos Transition**: The protocol returns to Praos mode if no certificate has been included for $L_\text{recover}$ consecutive slots since the last certificate was included in an RB. This recovery period ensures that all nodes have sufficient time to synchronize any delayed EBs. The countdown resets each time a new certificate is included.
+**Leios → Praos Transition**: The protocol returns to Praos mode if no certificate has been included for $L$<sub>recover</sub> consecutive slots since the last certificate was included in an RB. This recovery period ensures that all nodes have sufficient time to synchronize any delayed EBs. The countdown resets each time a new certificate is included.
 
 <div align="center">
 <a name="figure-2"></a>
