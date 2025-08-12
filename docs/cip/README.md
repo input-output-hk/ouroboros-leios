@@ -171,7 +171,7 @@ This adaptive behavior ensures that the protocol never performs worse than stand
   <em>Figure 2: Leios Protocol Flow</em>
 </div>
 
-When operating in Leios mode, the protocol works through a five-step process that introduces new block types and validation mechanisms to achieve its enhanced throughput:
+The protocol operates through a five-step process that introduces new block types and validation mechanisms to achieve enhanced throughput. As illustrated in Figure 2, these steps can begin in either Praos or Leios mode, with the key distinction being how transactions are validated.
 
 #### Step 1: Block Production
 
@@ -179,11 +179,11 @@ When a stake pool wins block leadership, it **simultaneously** may create two
 things:
 
 1. **[Ranking Block (RB)](#ranking-blocks-rbs)**
-A standard Praos block with extended header fields to optionally certify one previously announced EB and optionally announce one EB.
+A standard Praos block with extended header fields to optionally certify one previously announced EB and optionally announce one EB for the next subsequent RB to certify.
 1. **[Endorser Block (EB)](#endorser-blocks-ebs)**
 A larger block containing additional transaction references. There are no other ways to create EBs.
 
-The RB chain continues to be distributed exactly as in Praos, while Leios introduces a separate header distribution mechanism for rapid EB discovery and equivocation detection.
+As shown in Figure 2, EBs may be announced in either Praos or Leios mode - the protocol does not require being in Leios mode to announce an EB. The RB chain continues to be distributed exactly as in Praos, while Leios introduces a separate header distribution mechanism for rapid EB discovery and equivocation detection.
 
 Due to the voting overhead per EB, nodes announce an EB only when the RB is full, they do not announce empty EBs.
 
@@ -193,7 +193,7 @@ Nodes receiving the RB header discover the announced EB and fetch its content. T
 
 #### Step 3: Committee Validation
 
-A voting committee of stake pools validates the EB. Committee members are [selected via sortition](#committee-structure) (lottery based on stake). A committee member votes for an EB only if:
+A voting committee of stake pools validates the EB. As depicted in Figure 2, votes are collected during the $L_\text{vote}$ period following the EB announcement. Committee members are [selected via sortition](#committee-structure) (lottery based on stake). A committee member votes for an EB only if:
 
   1. It has received the EB within $L_\text{vote}$ slots from its creation,
   2. It has **not** received an equivocated RB header for this EB within $L_\text{vote}$ slots,
@@ -216,7 +216,7 @@ This creates a compact **certificate** proving the EB's validity.
 #### Step 5: Chain Inclusion
 
 The certificate for an EB may be included in the body of a new ranking block `RB'` only if all of the following conditions hold:
-  1. `RB'` directly extends the RB which announced this EB.
+  1. `RB'` directly extends the RB which announced this EB (as illustrated in Figure 2 where `RB'` contains the certificate for the EB announced by the preceding RB).
   2. The certificate is valid as defined in [Certificate Validation](#certificate-validation).
   3. If the EB contains `tx_corrections`, these corrections must be applied to identify invalid transactions from previous RBs (see [correction mechanisms](#transaction-validation) for details).
 
@@ -230,9 +230,9 @@ This **conditional inclusion** ensures transaction availability to honest nodes 
 
 The protocol manages transitions between Praos and Leios modes through simple, deterministic rules:
 
-**Praos → Leios Transition**: The protocol enters Leios mode when a RB includes a valid certificate for an EB. This certificate serves as proof that the network successfully validated additional transaction capacity.
+**Praos → Leios Transition**: The protocol enters Leios mode when a RB includes a valid certificate for an EB. This certificate serves as proof that the network successfully validated additional transaction capacity. As shown in Figure 3 below, the transition to Leios mode occurs when RB<sub>3</sub> includes the certificate, even though the EB announcement may have occurred while still in Praos mode - RB<sub>2</sub> announcing EB<sub>1</sub>.
 
-**Leios → Praos Transition**: The protocol returns to Praos mode after $L_\text{recover}$ slots have passed since the last certificate was included in a RB. This recovery period ensures that all nodes have sufficient time to synchronize any delayed EBs.
+**Leios → Praos Transition**: The protocol returns to Praos mode if no certificate has been included for $L_\text{recover}$ consecutive slots since the last certificate was included in an RB. This recovery period ensures that all nodes have sufficient time to synchronize any delayed EBs. The countdown resets each time a new certificate is included.
 
 <div align="center">
 <a name="figure-2"></a>
@@ -244,17 +244,17 @@ _Figure 3: Detailed protocol flow showing mode transitions and correction mechan
 
 </div>
 
-As illustrated in Figure 3, these transitions are clearly marked in the timeline: the protocol switches from Praos to Leios mode when RB3 includes a certificate for EB<sub>1</sub>, and returns to Praos mode after L<sub>recover</sub> slots have elapsed since the last certificate (included in RB5).
+As illustrated in Figure 3, these transitions are clearly marked in the timeline: the protocol switches from Praos to Leios mode when RB<sub>3</sub> includes a certificate for EB<sub>1</sub>, and returns to Praos mode after $L$<sub>recover</sub> consecutive slots without any certificate since the last certificate (included in RB<sub>5</sub>), with the countdown resetting on each new certificate.
 
 <a id="transaction-validation" href="#transaction-validation"></a>**Transaction Validation**
 
-The dual-mode design introduces a fundamental difference in transaction validation requirements:
+The dual-mode design introduces a fundamental difference for transaction validation:
 
 **In Praos mode**: Block producers always have access to the complete ledger state and must validate all transactions before including them in blocks. RBs containing invalid transactions are rejected by honest nodes, maintaining the standard Praos validation guarantees.
 
 **In Leios mode**: Block producers may need to create RBs before receiving all previously certified EBs due to network delays. Without these EBs, they cannot construct the complete ledger state or determine which transactions in their mempool are valid. This creates a dilemma: wait (potentially violating Praos timing constraints) or proceed with potentially invalid transactions.
 
-Leios resolves this by allowing RBs in Leios mode to temporarily include <a name="unvalidated-transactions"></a>**unvalidated transactions** - transactions whose validity cannot be confirmed due to incomplete ledger state. This ensures honest block producers can always fulfill their duties without violating protocol timing requirements. As shown in Figure 3, all RBs produced during Leios mode (RB<sub>3</sub> through RB<sub>7</sub>, marked with red dashed borders) may contain such unvalidated transactions.
+Leios resolves this by allowing RBs in Leios mode to temporarily include <a name="unvalidated-transactions"></a>**unvalidated transactions** - transactions whose validity cannot be confirmed due to incomplete ledger state. This ensures honest block producers can always fulfill their duties without violating protocol timing requirements. As shown in Figure 3, all RBs produced during Leios period (RB<sub>3</sub> through RB<sub>7</sub>, marked with red dashed borders) may contain such unvalidated transactions.
 
 As a direct consequence of allowing unvalidated transactions, the protocol must implement **correction mechanisms** to identify and exclude any transactions that later prove to be invalid. Figure 3 illustrates two types of these corrections:
 
@@ -263,7 +263,7 @@ As a direct consequence of allowing unvalidated transactions, the protocol must 
 
 The timing constraints that enable these correction mechanisms are also shown in Figure 3:
 - **$L_\text{vote}$ periods** (timing brackets under each EB): Define when committee members can vote on EBs, ensuring sufficient time for EB diffusion and validation before certification (see [Protocol Parameters](#protocol-parameters) for constraints)
-- **$L_\text{recover}$ period** (longer bracket after the last certificate): Ensures all nodes have time to receive certified EBs before returning to Praos mode, making the edge case of missing EBs exponentially unlikely
+- **$L_\text{recover}$ period** (rolling countdown from the latest certificate): Ensures all nodes have time to receive certified EBs before returning to Praos mode; the countdown resets whenever a new certificate is included. Only after $L_\text{recover}$ consecutive slots without any certificate does the protocol return to Praos mode. This makes the edge case of missing EBs exponentially unlikely.
 
 These parameters are critical for protocol safety and their constraints are defined in the [Protocol Parameters](#protocol-parameters) section and feasible values discussed in TODO - rationale feasiable protocol parameters.
 
@@ -290,18 +290,10 @@ RBs are Praos blocks extended to support Leios by optionally announcing EBs in t
 
 <a id="rb-inclusion-rules" href="#rb-inclusion-rules"></a>**Inclusion Rules**: When an RB header includes a `certified_eb` field, the corresponding body must include a matching `eb_certificate`. Conversely, an `eb_certificate` can only be included when a `certified_eb` field references the EB being certified.
 
-<a id="rb-corrections" href="#rb-corrections"></a>**Mode Transition Corrections**: The `tx_corrections` field in RBs serves a special purpose when transitioning from Leios to Praos mode. The first RB produced after $L_\text{recover}$ slots without any certificate must include corrections for all invalid transactions from the Leios period that weren't already identified in RB including certificates. This provides a final reconciliation point, ensuring the ledger state is fully validated before resuming normal Praos operation.
+<a id="rb-corrections" href="#rb-corrections"></a>**Mode Transition Corrections**: When transitioning from Leios to Praos mode, the `tx_corrections` field in the first RB after $L$<sub>recover</sub> slots without a certificate must list all remaining invalid transactions from the Leios period not already corrected by certificates. This ensures the ledger is fully validated before Praos resumes.
 
-<!-- > [!NOTE]
-> **Transaction Confirmation Levels**
-> 
-> The correction mechanisms create four distinct confirmation levels for transactions in RBs:
-> 1. **Submitted**: Transaction reaches the network's mempool
-> 2. **Included**: Transaction appears in an RB on-chain (but execution is not guaranteed in Leios mode)
-> 3. **Pending execution**: Transaction will be executed if no fork occurs (awaiting correction information)
-> 4. **Executed**: Transaction is confirmed as valid and executed (no correction lists it as invalid)
-> 
-> This nuanced approach allows applications to make informed decisions about transaction finality based on their security requirements. -->
+> [!WARNING]
+> **TODO:** Add transaction confirmation levels and their implications for applications
 
 Transactions from certified EBs are included in the ledger alongside direct RB transactions.
 
