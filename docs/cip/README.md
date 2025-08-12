@@ -262,8 +262,8 @@ As a direct consequence of allowing unvalidated transactions, the protocol must 
 - **Mode transition corrections**: RB<sub>8</sub> (the first RB after returning to Praos mode) includes a `[TxIdx]` field listing all invalid transactions from the Leios period that were not already corrected by EB certificates (see RB<sub>8</sub> transaction correction list spanning RB<sub>5-7</sub>). More details follow in the <a href="#rb-corrections">RB corrections</a>.
 
 The timing constraints that enable these correction mechanisms are also shown in Figure 3:
-- **$L_\text{vote}$ periods** (timing brackets under each EB): Define when committee members can vote on EBs, ensuring sufficient time for EB diffusion and validation before certification (see [Protocol Parameters](#protocol-parameters) for constraints)
-- **$L_\text{recover}$ period** (rolling countdown from the latest certificate): Ensures all nodes have time to receive certified EBs before returning to Praos mode; the countdown resets whenever a new certificate is included. Only after $L_\text{recover}$ consecutive slots without any certificate does the protocol return to Praos mode. This makes the edge case of missing EBs exponentially unlikely.
+- <a id="l-vote" href="#l-vote"></a>**$L_\text{vote}$ periods** (timing brackets under each EB): Define when committee members can vote on EBs, ensuring sufficient time for EB diffusion and validation before certification (see [Protocol Parameters](#protocol-parameters) for constraints)
+- <a id="l-recover" href="#l-recover"></a>**$L_\text{recover}$ period** (rolling countdown from the latest certificate): Ensures all nodes have time to receive certified EBs before returning to Praos mode; the countdown resets whenever a new certificate is included. Only after $L_\text{recover}$ consecutive slots without any certificate does the protocol return to Praos mode. This makes the edge case of missing EBs exponentially unlikely.
 
 These parameters are critical for protocol safety and their constraints are defined in the [Protocol Parameters](#protocol-parameters) section and feasible values discussed in TODO - rationale feasiable protocol parameters.
 
