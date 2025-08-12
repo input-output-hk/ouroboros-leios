@@ -52,7 +52,27 @@ economic sustainability and reduced complexity through fewer new protocol elemen
 
 <details>
   <summary><h2>Table of figures and tables</h2></summary>
-  <strong><font color="red">Create a table of figures and tables with internal hyperlinks when the document includes such content and its organization is stable.</font></strong>
+
+### Figures
+
+- [Figure 1: Forecast of rewards on Cardano mainnet](#figure-1)
+- [Figure 2: SPO profitability under Praos, as a function of transaction volume](#figure-2)
+- [Figure 3: Ouroboros Leios Dual-Mode Operation](#figure-3)
+- [Figure 4: Leios Protocol Flow](#figure-4)
+- [Figure 5: Detailed protocol flow showing mode transitions and correction mechanisms](#figure-5)
+- [Figure 6: Up- and downstream interactions of a node (simplified)](#figure-6)
+
+### Tables
+
+- [Table 1: Network Characteristics](#table-1)
+- [Table 2: Leios Protocol Parameters](#table-2)
+- [Table 3: Performance Metrics](#table-3)
+- [Table 4: Feasible Protocol Parameters](#table-4)
+- [Table 5: Operating Costs by IB Production Rate](#table-5)
+- [Table 6: Required TPS for Infrastructure Cost Coverage](#table-6)
+- [Table 7: Required TPS for Current Reward Maintenance](#table-7)
+- [Table 8: Leios Mini-Protocols](#table-8)
+
 </details>
 
 ## Motivation
@@ -107,6 +127,7 @@ mildly uncertain because the future pattern of staking behavior, transaction
 fees, and node efficiency might vary considerably.
 
 <div align="center">
+<a name="figure-1" id="figure-1"></a>
 <p>
   <img src="images/reward-forecast-bau.svg" alt="Forecast of rewards on Cardano mainnet">
 </p>
@@ -122,6 +143,7 @@ per second, there is more opportunity for simultaneously reducing fees,
 augmenting the Treasury, and increasing SPO and delegator rewards.
 
 <div align="center">
+<a name="figure-2" id="figure-2"></a>
 <p>
   <img src="images/spo-profitability.svg" alt="SPO profitability under Praos, as a function of transaction volume">
 </p>
@@ -141,12 +163,12 @@ throughput capacity.
 Leios extends Ouroboros Praos by introducing an adaptive dual-mode protocol that automatically adjusts between two operating modes based on network conditions and certificate inclusion in blocks. This design allows the protocol to maintain baseline Praos security guarantees while opportunistically achieving higher throughput when conditions permit.
 
 <div align="center">
-  <a name="figure-1"></a>
+  <a name="figure-3" id="figure-3"></a>
   <p name="dual-mode-figure">
     <img src="images/dual-mode-simplified.svg" alt="Dual-Mode Operation">
   </p>
 
-  <em>Figure 1: Ouroboros Leios Dual-Mode Operation</em>
+  <em>Figure 3: Ouroboros Leios Dual-Mode Operation</em>
 </div>
 
 The protocol operates in two distinct modes:
@@ -162,15 +184,15 @@ This adaptive behavior ensures that the protocol never performs worse than stand
 ### Leios Protocol Flow
 
 <div align="center">
-  <a name="figure-2"></a>
+  <a name="figure-4" id="figure-4"></a>
   <p name="protocol-flow-figure">
     <img src="images/protocol-flow-overview.svg" alt="Leios Protocol Flow">
   </p>
 
-  <em>Figure 2: Leios Protocol Flow</em>
+  <em>Figure 4: Leios Protocol Flow</em>
 </div>
 
-The protocol operates through a five-step process that introduces new block types and validation mechanisms to achieve enhanced throughput. As illustrated in Figure 2, these steps can begin in either Praos or Leios mode, with the key distinction being how transactions are validated.
+The protocol operates through a five-step process that introduces new block types and validation mechanisms to achieve enhanced throughput. As illustrated in Figure 4, these steps can begin in either Praos or Leios mode, with the key distinction being how transactions are validated.
 
 #### Step 1: Block Production
 
@@ -182,7 +204,7 @@ A standard Praos block with extended header fields to optionally certify one pre
 1. **[Endorser Block (EB)](#endorser-blocks-ebs)**
 A larger block containing additional transaction references. There are no other ways to create EBs.
 
-As shown in Figure 2, EBs may be announced in either Praos or Leios mode - the protocol does not require being in Leios mode to announce an EB. The RB chain continues to be distributed exactly as in Praos, while Leios introduces a separate header distribution mechanism for rapid EB discovery and equivocation detection.
+As shown in Figure 4, EBs may be announced in either Praos or Leios mode - the protocol does not require being in Leios mode to announce an EB. The RB chain continues to be distributed exactly as in Praos, while Leios introduces a separate header distribution mechanism for rapid EB discovery and equivocation detection.
 
 Due to the voting overhead per EB, nodes announce an EB only when the RB is full, they do not announce empty EBs.
 
@@ -192,7 +214,7 @@ Nodes receiving the RB header discover the announced EB and fetch its content. T
 
 #### Step 3: Committee Validation
 
-A voting committee of stake pools validates the EB. As depicted in Figure 2, votes are collected during the $L_\text{vote}$ period following the EB announcement. Committee members are [selected via sortition](#committee-structure) (lottery based on stake). A committee member votes for an EB only if:
+A voting committee of stake pools validates the EB. As depicted in Figure 4, votes are collected during the $L_\text{vote}$ period following the EB announcement. Committee members are [selected via sortition](#committee-structure) (lottery based on stake). A committee member votes for an EB only if:
 
   1. It has received the EB within $L_\text{vote}$ slots from its creation,
   2. It has **not** received an equivocated RB header for this EB within $L_\text{vote}$ slots,
@@ -215,7 +237,7 @@ This creates a compact **certificate** proving the EB's validity.
 #### Step 5: Chain Inclusion
 
 The certificate for an EB may be included in the body of a new ranking block `RB'` only if all of the following conditions hold:
-  1. `RB'` directly extends the RB which announced this EB (as illustrated in Figure 2 where `RB'` contains the certificate for the EB announced by the preceding RB).
+  1. `RB'` directly extends the RB which announced this EB (as illustrated in Figure 4 where `RB'` contains the certificate for the EB announced by the preceding RB).
   2. The certificate is valid as defined in [Certificate Validation](#certificate-validation).
   3. If the EB contains `tx_corrections`, these corrections must be applied to identify invalid transactions from previous RBs (see [correction mechanisms](#transaction-validation) for details).
 
@@ -229,21 +251,21 @@ This **conditional inclusion** ensures transaction availability to honest nodes 
 
 The protocol manages transitions between Praos and Leios modes through simple, deterministic rules:
 
-**Praos → Leios Transition**: The protocol enters Leios mode when a RB includes a valid certificate for an EB. This certificate serves as proof that the network successfully validated additional transaction capacity. As shown in Figure 3 below, the transition to Leios mode occurs when RB<sub>3</sub> includes the certificate, even though the EB announcement may have occurred while still in Praos mode - RB<sub>2</sub> announcing EB<sub>1</sub>.
+**Praos → Leios Transition**: The protocol enters Leios mode when a RB includes a valid certificate for an EB. This certificate serves as proof that the network successfully validated additional transaction capacity. As shown in Figure 5 below, the transition to Leios mode occurs when RB<sub>3</sub> includes the certificate, even though the EB announcement may have occurred while still in Praos mode - RB<sub>2</sub> announcing EB<sub>1</sub>.
 
 **Leios → Praos Transition**: The protocol returns to Praos mode if no certificate has been included for $L$<sub>recover</sub> consecutive slots since the last certificate was included in an RB. This recovery period ensures that all nodes have sufficient time to synchronize any delayed EBs. The countdown resets each time a new certificate is included.
 
 <div align="center">
-<a name="figure-2"></a>
+<a name="figure-5" id="figure-5"></a>
 <p name="mode-transitions-figure">
   <img src="images/protocol-flow-detail.svg" alt="Mode Transitions Timeline">
 </p>
 
-_Figure 3: Detailed protocol flow showing mode transitions and correction mechanisms_
+_Figure 5: Detailed protocol flow showing mode transitions and correction mechanisms_
 
 </div>
 
-As illustrated in Figure 3, these transitions are clearly marked in the timeline: the protocol switches from Praos to Leios mode when RB<sub>3</sub> includes a certificate for EB<sub>1</sub>, and returns to Praos mode after $L$<sub>recover</sub> consecutive slots without any certificate since the last certificate (included in RB<sub>5</sub>), with the countdown resetting on each new certificate.
+As illustrated in Figure 5, these transitions are clearly marked in the timeline: the protocol switches from Praos to Leios mode when RB<sub>3</sub> includes a certificate for EB<sub>1</sub>, and returns to Praos mode after $L$<sub>recover</sub> consecutive slots without any certificate since the last certificate (included in RB<sub>5</sub>), with the countdown resetting on each new certificate.
 
 <a id="transaction-validation" href="#transaction-validation"></a>**Transaction Validation**
 
@@ -253,14 +275,14 @@ The dual-mode design introduces a fundamental difference for transaction validat
 
 **In Leios mode**: Block producers may need to create RBs before receiving all previously certified EBs due to network delays. Without these EBs, they cannot construct the complete ledger state or determine which transactions in their mempool are valid. This creates a dilemma: wait (potentially violating Praos timing constraints) or proceed with potentially invalid transactions.
 
-Leios resolves this by allowing RBs in Leios mode to temporarily include <a name="unvalidated-transactions"></a>**unvalidated transactions** - transactions whose validity cannot be confirmed due to incomplete ledger state. This ensures honest block producers can always fulfill their duties without violating protocol timing requirements. As shown in Figure 3, all RBs produced during Leios period (RB<sub>3</sub> through RB<sub>7</sub>, marked with red dashed borders) may contain such unvalidated transactions.
+Leios resolves this by allowing RBs in Leios mode to temporarily include <a name="unvalidated-transactions"></a>**unvalidated transactions** - transactions whose validity cannot be confirmed due to incomplete ledger state. This ensures honest block producers can always fulfill their duties without violating protocol timing requirements. As shown in Figure 5, all RBs produced during Leios period (RB<sub>3</sub> through RB<sub>7</sub>, marked with red dashed borders) may contain such unvalidated transactions.
 
-As a direct consequence of allowing unvalidated transactions, the protocol must implement **correction mechanisms** to identify and exclude any transactions that later prove to be invalid. Figure 3 illustrates two types of these corrections:
+As a direct consequence of allowing unvalidated transactions, the protocol must implement **correction mechanisms** to identify and exclude any transactions that later prove to be invalid. Figure 5 illustrates two types of these corrections:
 
 - **EB corrections**: EB<sub>2</sub> includes a `[TxIdx]` field (shown in red) that identifies invalid transactions from previous RBs that should not be executed. These also get referenced in the subsequent following RB (see RB<sub>5</sub> referencing the transaction corrections from EB<sub>2</sub>) - more on that later in <a href="#eb-corrections">EB corrections</a>.
 - **Mode transition corrections**: RB<sub>8</sub> (the first RB after returning to Praos mode) includes a `[TxIdx]` field listing all invalid transactions from the Leios period that were not already corrected by EB certificates (see RB<sub>8</sub> transaction correction list spanning RB<sub>5-7</sub>). More details follow in the <a href="#rb-corrections">RB corrections</a>.
 
-The timing constraints that enable these correction mechanisms are also shown in Figure 3:
+The timing constraints that enable these correction mechanisms are also shown in Figure 5:
 - <a id="l-vote" href="#l-vote"></a>**$L_\text{vote}$ periods** (timing brackets under each EB): Define when committee members can vote on EBs, ensuring sufficient time for EB diffusion and validation before certification (see [Protocol Parameters](#protocol-parameters) for constraints)
 - <a id="l-recover" href="#l-recover"></a>**$L_\text{recover}$ period** (rolling countdown from the latest certificate): Ensures all nodes have time to receive certified EBs before returning to Praos mode; the countdown resets whenever a new certificate is included. Only after $L_\text{recover}$ consecutive slots without any certificate does the protocol return to Praos mode. This makes the edge case of missing EBs exponentially unlikely.
 
@@ -367,7 +389,7 @@ The following sections distinguish between observed **network characteristics** 
 These are observed properties of the network topology and node capabilities:
 
 <div align="center">
-<a name="table-1"></a>
+<a name="table-1" id="table-1"></a>
 
 | Characteristic            |       Symbol        | Units | Description                                                 |          Typical Range          | Notes                                              |
 | ------------------------- | :-----------------: | :---: | ----------------------------------------------------------- | :-----------------------------: | -------------------------------------------------- |
@@ -385,7 +407,7 @@ These parameters are configurable and subject to governance decisions,
 constrained by the network characteristics above:
 
 <div align="center">
-<a name="table-2"></a>
+<a name="table-2" id="table-2"></a>
 
 | Parameter                     |    Symbol     |  Units   | Description                                                            |                   Constraints                   | Rationale                                                     |
 | ----------------------------- | :-----------: | :------: | ---------------------------------------------------------------------- | :---------------------------------------------: | ------------------------------------------------------------- |
@@ -416,7 +438,7 @@ _Table 2: Leios Protocol Parameters_
 The Leios protocol introduces new node responsibilities and message flows beyond those in Praos, reflecting the additional steps of EB creation and announcement, committee voting, and certificate aggregation. The following sections detail the specific behaviors that nodes must implement.
 
 <div align="center">
-<a name="figure-3"></a>
+<a name="figure-6" id="figure-6"></a>
 
 ```mermaid
 sequenceDiagram
@@ -457,7 +479,7 @@ sequenceDiagram
     Note over BP: 13. Create next RB<br />certifying EB &<br />announcing next EB
 ```
 
-_Figure 4: Up- and downstream interactions of a node (simplified)_
+_Figure 6: Up- and downstream interactions of a node (simplified)_
 
 </div>
 
@@ -558,7 +580,7 @@ As described in [Node Behavior](#node-behavior), existing Praos mini-protocols c
 Leios introduces **five new mini-protocols** to handle the additional message types required for EB distribution, voting, and certificate construction.
 
 <div align="center">
-<a name="table-6"></a>
+<a name="table-8" id="table-8"></a>
 
 | **Protocol** | **Purpose** | **Timing Constraint** |
 | :----------: | ----------- | --------------------- |
@@ -568,7 +590,7 @@ Leios introduces **five new mini-protocols** to handle the additional message ty
 | **EbFetch** | Retrieve certified EBs for chain reconstruction | On-demand after certificate inclusion |
 | **TxFetch** | Retrieve referenced transactions for EB validation | Before EB validation completes |
 
-_Table 6: Leios Mini-Protocols_
+_Table 8: Leios Mini-Protocols_
 
 </div>
 
@@ -682,6 +704,9 @@ protocol parameters, the network topology, and the submission of transactions.
 The table below summarizes key metrics for evaluating Leios as a protocol and
 individual scenarios (parameters, network, and load).
 
+<div align="center">
+<a name="table-3" id="table-3"></a>
+
 | Category   | Metric                                                    | Measurement                                                                                                     |
 | ---------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | Efficiency | Spatial efficiency, $`\epsilon_\text{spatial}`$           | Ratio of total transactions size to persistent storage                                                          |
@@ -698,6 +723,10 @@ individual scenarios (parameters, network, and load).
 |            | Adversarial stake, $`\eta_\text{adversary}(s)`$           | Fractional loss in throughput due to adversial stake of $`s`$                                                   |
 | Fees       | Collateral paid for success, $`\kappa_\text{success}(c)`$ | Average collateral paid for a successful transaction when it conflicts with a fraction $`c`$ of the memory pool |
 |            | Collateral paid for failure, $`\kappa_\text{failure}(c)`$ | Average collateral paid for a failed transaction when it conflicts with a fraction $`c`$ of the memory pool     |
+
+_Table 3: Performance Metrics_
+
+</div>
 
 **_Spatial efficiency:_** Leios necessarily imposes some disk overhead beyond
 the raw bytes needed to store transactions themselves. This overhead includes
@@ -902,6 +931,9 @@ tradeoffs.
 > - [ ] Revise after the protocol definition is complete.
 > - [ ] Each row should have a paragraph of justification.
 
+<div align="center">
+<a name="table-4" id="table-4"></a>
+
 | Parameter                                  | Symbol        | Units    | Description                                                                 | Feasible value | Justification                                                                                                             |
 | ------------------------------------------ | ------------- | -------- | --------------------------------------------------------------------------- | -------------: | ------------------------------------------------------------------------------------------------------------------------- |
 | Stage length                               | $L$           | slot     |                                                                             |             10 | Short stages increase settlement speed, but the stage length must be generously larger than the propagation time for IBs. |
@@ -909,6 +941,10 @@ tradeoffs.
 | Mean committee size                        | $n$           | parties  |                                                                             |            500 | Probabilistic analyses of adversarial stake scenarios.                                                                    |
 | Quorum size                                | $\tau$        | fraction |                                                                             |            60% | Probabilistic analyses of adversarial stake scenarios.                                                                    |
 | Praos active slot coefficient              | $f_\text{RB}$ | 1/slot   | The probability that a party will be the slot leader for a particular slot. |           0.05 | This is the current value on mainnet, but it may become feasible to reduce it if Praos blocks are made smaller.           |
+
+_Table 4: Feasible Protocol Parameters_
+
+</div>
 
 The analysis
 [Committee size and quorum requirement][committee-size-analysis]
@@ -991,6 +1027,9 @@ report is the following table that relates IB production rate, assuming IBs are
 the maximum size of existing Praos blocks, to the cost per node and the total
 cost of all nodes.
 
+<div align="center">
+<a name="table-5" id="table-5"></a>
+
 | IB/s Rate | Cost per Node (Avg) | Network Cost (10,000 nodes) |
 | --------: | ------------------: | --------------------------: |
 |      0.05 |       $80 USD/month |          $800,000 USD/month |
@@ -1000,9 +1039,16 @@ cost of all nodes.
 |        20 |    $2,500 USD/month |       $25,000,000 USD/month |
 |        30 |    $3,600 USD/month |       $36,000,000 USD/month |
 
+_Table 5: Operating Costs by IB Production Rate_
+
+</div>
+
 _Required TPS for Infrastructure Cost Coverage:_ Using average transaction sizes
 and fees, we can calculate the required TPS to generate enough fees to cover
 infrastructure costs.
+
+<div align="center">
+<a name="table-6" id="table-6"></a>
 
 | Infrastructure Cost (USD/month) | Required ADA (at $0.45/ADA) | TPS (Avg Tx) | TPS (Min Tx) | Equivalent IB/s |
 | ------------------------------: | --------------------------: | -----------: | -----------: | --------------: |
@@ -1013,8 +1059,15 @@ infrastructure costs.
 |                     $25,000,000 |                  55,555,556 |         9.71 |        12.47 |           0.139 |
 |                     $36,000,000 |                  80,000,000 |        13.99 |        17.96 |           0.200 |
 
+_Table 6: Required TPS for Infrastructure Cost Coverage_
+
+</div>
+
 _Required TPS for Current Reward Maintenance:_ To maintain current reward levels
 (~48 million ADA monthly) through transaction fees as the Reserve depletes.
+
+<div align="center">
+<a name="table-7" id="table-7"></a>
 
 | Year | Reserve Depletion | Rewards from Fees (ADA) | Required TPS (Avg Tx) | Required IB/s |
 | ---: | ----------------: | ----------------------: | --------------------: | ------------: |
@@ -1024,6 +1077,10 @@ _Required TPS for Current Reward Maintenance:_ To maintain current reward levels
 | 2028 |              ~34% |              16,320,000 |                  28.5 |          0.41 |
 | 2029 |              ~43% |              20,640,000 |                  36.1 |          0.52 |
 | 2030 |              ~50% |              24,000,000 |                  41.9 |          0.60 |
+
+_Table 7: Required TPS for Current Reward Maintenance_
+
+</div>
 
 Note that by 2029, to compensate for Reserve depletion, the network would need
 to process approximately 36 TPS with average-sized transactions, requiring an
