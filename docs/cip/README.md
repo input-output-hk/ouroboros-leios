@@ -212,17 +212,18 @@ This creates a compact **certificate** proving the EB's validity.
 
 #### Step 5: Chain Inclusion
 
-The certificate for an EB may be included in the body of a new ranking block `RB'` only if:
-  1. `RB'` directly extends the RB which announced this EB
-  1. The certificate is valid as defined in [Certificate Validation](#certificate-validation).
-  1. The creation slot of `RB'` is at least $L_\text{vote} + L_\text{diff}$ after creation slot of RB.
-  
-where $L_\text{diff}$ is a protocol parameter represented by a number of slots.
+The certificate for an EB may be included in the body of a new ranking block `RB'` only if all of the following conditions hold:
+  1. `RB'` directly extends the RB which announced this EB.
+  2. The certificate is valid as defined in [Certificate Validation](#certificate-validation).
+  3. The creation slot of `RB'` is at least $L_\text{vote} + L_\text{diff}$ after the creation slot of the announcing RB.
+  4. The EB being certified is not empty (i.e., it contains at least one transaction reference).
+
+Here, $L_\text{diff}$ is a protocol parameter represented by a number of slots.
 
 > [!WARNING]
 > TBD: Validity rule with mutual exclusiveness of certificate and transactions in RB?
 > 
-> 4. No transactions are embedded in the RB body
+> 5. No transactions are embedded in the RB body
 
 This **conditional inclusion** ensures transaction availability to honest nodes with good probability while achieving higher throughput, but also maintains Praos safety guarantees when network timing does not permit inclusion. When included:
 
@@ -320,7 +321,7 @@ These are observed properties of the network topology and node capabilities:
 | ------------------------- | :-----------------: | :---: | ----------------------------------------------------------- | :-----------------------------: | -------------------------------------------------- |
 | RB diffusion time         | $\Delta_\text{RB}$  | slot  | Observed upper bound for RB diffusion and adoption to all nodes     |            2-6 slots            | Depends on network topology and conditions         |
 | RB header diffusion time  | $\Delta_\text{hdr}$ | slot  | Observed time for RB headers to reach all nodes                 |     $\leq \Delta_\text{RB}$     | Usually faster than full block diffusion           |
-| EB diffusion time         | $\Delta_\text{EB}$  | slot  | Observed upper bound for EB diffusion, transaction retrieval, and ledger state building at all nodes    |            $\geq \Delta_\text{RB}$            | Slower than RBs due to larger size and additional processing requirements          |
+| EB diffusion time         | $\Delta_\text{EB}$  | slot  | Observed upper bound for EB diffusion, transaction retrieval, and ledger state building at all nodes when no competing or fresher blocks exist    |            $\geq \Delta_\text{RB}$            | Slower than RBs due to larger size and additional processing requirements          |
 
 _Table 1: Network Characteristics_
 
