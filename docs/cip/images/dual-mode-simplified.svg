@@ -11,6 +11,20 @@
       <rect width="20" height="20" fill="#f0f8e8"/>
       <line x1="0" y1="20" x2="20" y2="0" stroke="#d4edda" stroke-width="0.5"/>
     </pattern>
+    
+    <!-- Hover effects for interactive links -->
+    <style>
+      .mode-link {
+        cursor: pointer;
+      }
+      .mode-link:hover rect {
+        fill-opacity: 0.9;
+        stroke-width: 1.5;
+      }
+      .mode-link:hover text {
+        font-weight: bold;
+      }
+    </style>
   </defs>
   
   <!-- Background -->
@@ -19,24 +33,34 @@
   <!-- Mode Timeline (spanning most of width) -->
   <g id="mode-timeline">
     <!-- Praos Mode 1 -->
-    <rect x="50" y="60" width="180" height="40" fill="url(#praosPattern)" fill-opacity="0.6" stroke="#783f04" stroke-width="0.5" stroke-opacity="0.3"/>
-    <text x="140" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#783f04">Praos</text>
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#praos-mode" class="mode-link">
+      <rect x="50" y="60" width="180" height="40" fill="url(#praosPattern)" fill-opacity="0.6" stroke="#783f04" stroke-width="0.5" stroke-opacity="0.3"/>
+      <text x="140" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#783f04">Praos</text>
+    </a>
     
     <!-- Leios Mode 1 -->
-    <rect x="230" y="60" width="320" height="40" fill="url(#leiosPattern)" stroke="#7cb342" stroke-width="0.5" stroke-opacity="0.3"/>
-    <text x="390" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#5a8030">Leios</text>
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#leios-mode" class="mode-link">
+      <rect x="230" y="60" width="320" height="40" fill="url(#leiosPattern)" stroke="#7cb342" stroke-width="0.5" stroke-opacity="0.3"/>
+      <text x="390" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#5a8030">Leios</text>
+    </a>
     
     <!-- Praos Mode 2 -->
-    <rect x="550" y="60" width="140" height="40" fill="url(#praosPattern)" fill-opacity="0.6" stroke="#783f04" stroke-width="0.5" stroke-opacity="0.3"/>
-    <text x="620" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#783f04">Praos</text>
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#praos-mode" class="mode-link">
+      <rect x="550" y="60" width="140" height="40" fill="url(#praosPattern)" fill-opacity="0.6" stroke="#783f04" stroke-width="0.5" stroke-opacity="0.3"/>
+      <text x="620" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#783f04">Praos</text>
+    </a>
     
     <!-- Leios Mode 2 -->
-    <rect x="690" y="60" width="260" height="40" fill="url(#leiosPattern)" stroke="#7cb342" stroke-width="0.5" stroke-opacity="0.3"/>
-    <text x="820" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#5a8030">Leios</text>
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#leios-mode" class="mode-link">
+      <rect x="690" y="60" width="260" height="40" fill="url(#leiosPattern)" stroke="#7cb342" stroke-width="0.5" stroke-opacity="0.3"/>
+      <text x="820" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#5a8030">Leios</text>
+    </a>
     
     <!-- Praos Mode 3 -->
-    <rect x="950" y="60" width="150" height="40" fill="url(#praosPattern)" fill-opacity="0.6" stroke="#783f04" stroke-width="0.5" stroke-opacity="0.3"/>
-    <text x="1025" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#783f04">Praos</text>
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#praos-mode" class="mode-link">
+      <rect x="950" y="60" width="150" height="40" fill="url(#praosPattern)" fill-opacity="0.6" stroke="#783f04" stroke-width="0.5" stroke-opacity="0.3"/>
+      <text x="1025" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#783f04">Praos</text>
+    </a>
     
     <!-- ... continuation dots -->
     <text x="1130" y="80" font-family="Arial, sans-serif" font-size="20" fill="#666" text-anchor="middle">...</text>
