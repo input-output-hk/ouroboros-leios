@@ -40,6 +40,8 @@ import Data.Map (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (isJust, isNothing, mapMaybe)
 import Data.Monoid (Sum (..))
+import Data.MultiSet (MultiSet)
+import qualified Data.MultiSet as MultiSet
 import Data.Sequence.Strict (StrictSeq)
 import qualified Data.Sequence.Strict as Seq
 import Data.Set (Set)
@@ -211,6 +213,7 @@ data RelayProtocolError
   | RequestedUnknownId
   | IdsNotRequested
   | BodiesNotRequested
+  | WrongSizeBody
   deriving (Show)
 
 instance Exception RelayProtocolError
@@ -243,37 +246,37 @@ instance Protocol (RelayState id header body) where
   data Message (RelayState id header body) from to where
     MsgInit ::
       Message (RelayState id header body) StInit StIdle
-    -- \| Request a non-empty list of block identifiers from the client,
-    -- and confirm a number of outstanding block identifiers.
+    -- \| Request a block identifiers from the client, and confirm a number of
+    -- outstanding block identifiers.
     --
-    -- With 'TokBlocking' this is a a blocking operation: the response will
-    -- always have at least one block identifier, and it does not expect
-    -- a prompt response: there is no timeout. This covers the case when there
-    -- is nothing else to do but wait. For example this covers leaf nodes that
+    -- With 'TokBlocking' this is a a blocking operation; the response will
+    -- always have at least one block identifier, and it does not expect a
+    -- prompt response: there is no timeout. This covers the case when there is
+    -- nothing else to do but wait. For example this covers leaf nodes that
     -- rarely, if ever, create and submit a block.
     --
-    -- With 'TokNonBlocking' this is a non-blocking operation: the response
-    -- may be an empty list and this does expect a prompt response. This
-    -- covers high throughput use cases where we wish to pipeline, by
-    -- interleaving requests for additional block identifiers with
-    -- requests for blocks, which requires these requests not block.
+    -- With 'TokNonBlocking' this is a non-blocking operation: the response may
+    -- be an empty list and this does expect a prompt response. This covers
+    -- high throughput use cases where we wish to pipeline, by interleaving
+    -- requests for additional block identifiers with requests for blocks,
+    -- which requires these requests not block.
     --
-    -- The request gives the maximum number of block identifiers that
-    -- can be accepted in the response. This must be greater than zero in the
-    -- 'TokBlocking' case. In the 'TokNonBlocking' case either the numbers
+    -- The 'WindowShrink' argument is the number of outstanding block
+    -- identifiers that are acknowledged by this message. Which specific
+    -- identifiers are being acknowledged is known to the peer based on the
+    -- FIFO order in which the peer provided them.
+    --
+    -- The 'WindowExpand' argument is the maximum number of block identifiers
+    -- that can be accepted in the response. This must be greater than zero in
+    -- the 'TokBlocking' case. In the 'TokNonBlocking' case either the numbers
     -- acknowledged or the number requested must be non-zero. In either case,
     -- the number requested must not put the total outstanding over the fixed
     -- protocol limit.
     --
-    -- The request also gives the number of outstanding block
-    -- identifiers that can now be acknowledged. The actual blocks
-    -- to acknowledge are known to the peer based on the FIFO order in which
-    -- they were provided.
-    --
     -- There is no choice about when to use the blocking case versus the
-    -- non-blocking case, it depends on whether there are any remaining
-    -- unacknowledged blocks (after taking into account the ones
-    -- acknowledged in this message):
+    -- non-blocking case, it is determined by whether there are any remaining
+    -- unacknowledged blocks (after taking into account the ones acknowledged
+    -- in this message):
     --
     -- \* The blocking case must be used when there are zero remaining
     --   unacknowledged blocks.
@@ -288,7 +291,7 @@ instance Protocol (RelayState id header body) where
     -- \| Reply with a list of block identifiers for available
     -- blocks, along with metadata for each block.
     --
-    -- The list must not be longer than the maximum number requested.
+    -- The list must not be longer than the request's 'WindowExpand' argument.
     --
     -- In the 'StBlkIds' 'Blocking' state the list must be non-empty while
     -- in the 'StBlkIds' 'NonBlocking' state the list may be empty.
@@ -319,14 +322,11 @@ instance Protocol (RelayState id header body) where
       Message (RelayState id header body) StIdle StBodies
     -- \| Reply with the requested blocks, or implicitly discard.
     --
-    -- Blocks can become invalid between the time the block
-    -- identifier was sent and the block being requested. Invalid
-    -- (including committed) blocks do not need to be sent.
-    --
-    -- Any block identifiers requested but not provided in this reply
-    -- should be considered as if this peer had never announced them. (Note
-    -- that this is no guarantee that the block is invalid, it may still
-    -- be valid and available from another peer).
+    -- Blocks can become invalid between the time the block identifier was sent
+    -- and the block was requested. Therefore, any block identifiers requested
+    -- but not provided in this reply should be considered as if this peer had
+    -- never announced them. Note that this is no guarantee that the block is
+    -- invalid, it may still be valid and available from another peer.
     MsgRespondBodies ::
       [(id, body)] ->
       Message (RelayState id header body) StBodies StIdle
@@ -385,8 +385,16 @@ newtype WindowSize = WindowSize {value :: Word16}
   deriving (Monoid) via (Sum Word16)
   deriving (Show) via (Quiet WindowSize)
 
-newtype RelayConfig = RelayConfig
+-- | Configuration parameters for an instance of the Relay mini protocol
+--
+-- Both of the in-flight byte limits ought to be significantly larger than the
+-- greatest acceptable size of a body, as enforced by 'shouldNotRequest',
+-- otherwise the consumer thread for a peer that's serving a maximum sized body
+-- might get stuck via starvation.
+data RelayConfig = RelayConfig
   { maxWindowSize :: WindowSize
+  , maxInFlightPerPeer :: Bytes
+  , maxInFlightAllPeers :: Bytes
   }
 
 --------------------------------
@@ -406,13 +414,15 @@ runRelayProducer ::
 runRelayProducer config sst chan =
   void $ runPeerWithDriver (chanDriver decideRelayState chan) (relayProducer config sst)
 
+-- | The heap footprint is bounded by `maxWindowSize`
 data RelayProducerLocalState id = RelayProducerLocalState
   { window :: !(StrictSeq (id, RB.Ticket))
+  , windowCounts :: !(MultiSet id)
   , lastTicket :: !RB.Ticket
   }
 
 initRelayProducerLocalState :: RelayProducerLocalState id
-initRelayProducerLocalState = RelayProducerLocalState Seq.empty minBound
+initRelayProducerLocalState = RelayProducerLocalState Seq.empty MultiSet.empty minBound
 
 type RelayProducer id header body st m a = TC.Client (RelayState id header body) 'NonPipelined st m a
 
@@ -430,7 +440,7 @@ relayProducer config sst = TC.Yield MsgInit $ idle initRelayProducerLocalState
       -- Validate the request:
       -- 1. shrink <= windowSize
       let windowSize = fromIntegral (Seq.length lst.window)
-      when @m (shrink.value > windowSize.value) $ do
+      when (shrink.value > windowSize.value) $ do
         throw $ ShrankTooMuch windowSize shrink
       -- 2. windowSize - shrink + expand <= maxWindowSize
       let newWindowSize = WindowSize $ windowSize.value - shrink.value + expand.value
@@ -445,22 +455,26 @@ relayProducer config sst = TC.Yield MsgInit $ idle initRelayProducerLocalState
       -- Find the new entries:
       newEntries <- readNewEntries sst blocking expand lst.lastTicket
       -- Expand the window:
-      let newValues = Seq.fromList [(key, ticket) | RB.EntryWithTicket{..} <- Foldable.toList newEntries]
+      let newEntriesList = [(key, ticket) | RB.EntryWithTicket{..} <- Foldable.toList newEntries]
+      let newValues = Seq.fromList newEntriesList
       let window' = keptValues <> newValues
+      let windowCounts' = lst.windowCounts MultiSet.\\ MultiSet.fromList (map fst newEntriesList)
       let lastTicket' = case newValues of
             Seq.Empty -> lst.lastTicket
             _ Seq.:|> (_, ticket) -> ticket
-      let !lst' = lst{window = window', lastTicket = lastTicket'}
+      let !lst' = RelayProducerLocalState {
+            window = window',
+            windowCounts = windowCounts',
+            lastTicket = lastTicket'
+            }
       let responseList = fmap (fst . (.value)) newEntries
       -- Yield the new entries:
       withSingIBlockingStyle blocking $ do
         return $ TC.Yield (MsgRespondHeaders responseList) (idle lst')
     MsgRequestBodies ids -> TC.Effect $ do
       -- Check that all ids are in the window:
-      -- NOTE: This is O(n^2) which is acceptable only if maxWindowSize is small.
-      -- TODO: Andrea: is a maxWindowSize of 10 large enough for freshest first?
       forM_ ids $ \id' -> do
-        when (isNothing (Seq.findIndexL ((== id') . fst) lst.window)) $ do
+        when (not $ MultiSet.member id' lst.windowCounts) $ do
           throw RequestedUnknownId
       -- Read the bodies from the RelayBuffer:
       relayBuffer <- atomically $ readReadOnlyTVar sst.relayBufferVar
@@ -501,38 +515,72 @@ data RelayConsumerConfig id header body m = RelayConsumerConfig
   , shouldNotRequest :: m (header -> Bool)
   -- ^ headers to ignore, e.g. already received or coming too late.
   , validateHeaders :: [header] -> m ()
+  , bodySizeHeader :: !(header -> Bytes)
+    -- ^ the size of the body according to the header
+  , bodySize :: !(body -> Bytes)
   , headerId :: !(header -> id)
   , prioritize :: !(Map id header -> [header] -> [header])
   -- ^ returns a subset of headers, in order of what should be fetched first.
   --   Note: `prioritize` is given the map of ids in the `window` but
   --   not in-flight or fetched yet (the `available` field of the shared state).
   --
-  --   TODO: For policies like `freshest first` we might need to
-  --   expand of the `window` more aggressively, to make sufficiently
-  --   fresh ids available.
+  --   TODO: For policies like `freshest first` we might need to expand the
+  --   window more aggressively, to make sufficiently many fresh ids available.
   , submitBlocks :: !([(header, body)] -> UTCTime -> ([(header, body)] -> STM m ()) -> m ())
-  -- ^ sends blocks to be validated/added to the buffer. Allowed to be
-  -- blocking, but relayConsumer does not assume the blocks made it
-  -- into the relayBuffer. Also takes a delivery time (relevant for
-  -- e.g. IB endorsement) and a callback that expects a subset of
-  -- validated blocks. Callback might be called more than once, with
-  -- different subsets.
+  -- ^ relayConsumer applies this function to bodies when they arrive
+  --
+  -- The relayConsumer will not be able to process additional replies from this
+  -- peer until this function returns.
+  --
+  -- The actual arguments also include the bodies' delivery time (relevant for
+  -- e.g. IB endorsement) and a callback that should be called once the
+  -- processing of a body is complete, ie when the relayConsumer can forget
+  -- that it has already requested this body from this peer (eg once the body's
+  -- validation terminates, regardless of success). The "completion" callback
+  -- can be called more than once, with different subsets.
   , submitPolicy :: !SubmitPolicy
   , maxHeadersToRequest :: !Word16
+  -- ^ limit for each 'MsgRequestHeaders'
   , maxBodiesToRequest :: !Word16
+  -- ^ limit for each 'MsgRequestBodies'
   }
 
 data RelayConsumerSharedState id header body m = RelayConsumerSharedState
   { relayBufferVar :: TVar m (RelayBuffer id (header, body))
-  , inFlightVar :: TVar m (Set id)
-  -- ^ Set of ids for which a consumer requested bodies, until they are validated and added to the buffer.
-  --   Ids are also removed if the bodies are not included in the reply or do not validate.
+  , inFlightVar :: TVar m Bytes
+  -- ^ how many bytes of body have been requested but not yet received from this peer
   --
-  -- Current handling not fault tolerant:
-  --   * other consumers will ignore those ids and push them out of
-  --     their window, so they might not be asked for again.
-  --   * if a consumer exits with an exception between requesting bodies and the correponding
-  --     submitBlocks those ids will not be cleared from the in-flight set.
+  -- The real implementation doesn't even use this value, though it should:
+  -- <https://github.com/IntersectMBO/ouroboros-network/issues/1656>. TODO I'm
+  -- guessing it'll be easier to leverage in this simulator, since eg the
+  -- latency and bandwidth are static.
+  , sharedInFlightVar :: TVar m Bytes
+  -- ^ the sum of all peers' 'inFlightVar's
+  , doNotRequestVar :: TVar m (Set id)
+  -- ^ IDs whose bodies the consumer has requested but not yet finished
+  --   processing. The processing of a body finishes immediately if the peer's
+  --   reply skipped it or else when its validation finishes (whether
+  --   successful or not). It's consider in-flight while validating so that
+  --   it's not redundantly fetched again if another peer offers it while it's
+  --   being validated. If it's valid, the common outcome is that it'll be
+  --   added to the relayBuffer and so that'll continue preventing it from
+  --   being fetched again from any peer even after the node is done processing
+  --   it. TODO should also remember which bodies that were already fetched and
+  --   found to be invalid, but there's currently no need since every block in
+  --   the simulator is valid.
+  --
+  -- TODO The maintenacne of this variable is currently not fault tolerant.
+  --
+  --   * Other consumers will ignore those ids and push them out of their
+  --     window, so they might not be asked for again. This can "lose" a body
+  --     if, eg, the eventual reply skips the body but other peers'
+  --     hypothetical replies wouldn't have. TODO: How does the real
+  --     TxSubmission handle this?
+  --
+  --   * If a consumer exits with an exception between requesting bodies and
+  --     the correponding submitBlocks those ids will not be cleared from the
+  --     in-flight set. Crucially, this variable is sometimes shared by many
+  --     threads.
   }
 
 runRelayConsumer ::
@@ -669,8 +717,8 @@ relayConsumerPipelined config sst =
     RelayConsumer id header body n 'StIdle m ()
   idle = TS.Effect . idleM . return
 
-  -- \| Takes an STM action for the updated local state, so that
-  -- requestBodies can update inFlightVar in the same STM tx.
+  -- \| Takes an STM action for the updated local state, so that requestBodies
+  -- can update 'inFlightVar' and 'doNotRequestVar' the same STM tx.
   idleM ::
     m (RelayConsumerLocalState id header body n) ->
     m (RelayConsumer id header body n 'StIdle m ())
@@ -765,16 +813,20 @@ relayConsumerPipelined config sst =
         atomically $ do
           -- New headers are filtered before becoming available, but we have
           -- to filter `lst.available` again in the same STM tx that sets them as
-          -- `inFlight`.
+          -- `doNotRequest`.
+          doNotRequest <- readTVar sst.doNotRequestVar
           inFlight <- readTVar sst.inFlightVar
+          sharedInFlight <- readTVar sst.sharedInFlightVar
           let !lst =
                 dropFromLST
                   ( \k hd ->
-                      k `Set.member` inFlight
+                      k `Set.member` doNotRequest
                         || isIgnored hd
                   )
                   lst0
-          let hdrsToRequest =
+          let (inFlightSummand, hdrsToRequest)  =
+                takeSize
+                  ((config.relay.maxInFlightPerPeer - inFlight) `min` (config.relay.maxInFlightAllPeers - sharedInFlight)) $
                 take (fromIntegral config.maxBodiesToRequest) $
                   config.prioritize lst.available (mapMaybe (`Map.lookup` lst.available) $ Foldable.toList $ lst.window)
           let idsToRequest = map config.headerId hdrsToRequest
@@ -783,7 +835,9 @@ relayConsumerPipelined config sst =
             then return (idle lst)
             else do
               let available2 = Map.withoutKeys lst.available idsToRequestSet
-              modifyTVar' sst.inFlightVar $ Set.union idsToRequestSet
+              modifyTVar' sst.inFlightVar (+ inFlightSummand)
+              modifyTVar' sst.sharedInFlightVar (+ inFlightSummand)
+              modifyTVar' sst.doNotRequestVar $ Set.union idsToRequestSet
               let !lst2 = lst{pendingRequests = Succ $! lst.pendingRequests, available = available2}
               return $
                 TS.YieldPipelined
@@ -793,6 +847,20 @@ relayConsumerPipelined config sst =
                         TS.ReceiverDone (CollectBodies hdrsToRequest bodies)
                   )
                   (requestHeadersNonBlocking lst2)
+
+  -- INVARIANT: @fst@ will less than the given limit
+  --
+  -- INVARIANT: @snd@ will be a prefix of the given headers
+  --
+  -- INVARIANT: @fst@ will be the sum of @map 'bodySizeHeader' . snd@
+  takeSize :: Bytes -> [header] -> (Bytes, [header])
+  takeSize limit = go 0 id
+    where
+      go !acc1 acc2 = \case
+        h:hs | let sz = config.bodySizeHeader h
+             , sz <= limit - acc1
+               -> go (acc1 + sz) (acc2 . (h:)) hs
+        _ -> (acc1, acc2 [])
 
   windowAdjust ::
     forall (n :: N).
@@ -885,12 +953,19 @@ relayConsumerPipelined config sst =
           idsReceived = Map.keysSet bodiesMap
           idsRequested = Map.keysSet requestedMap
 
+      atomically $ do
+        let expectedBytes = sum $ fmap config.bodySizeHeader hdrs
+        modifyTVar' sst.inFlightVar (\x -> x - expectedBytes)
+        modifyTVar' sst.sharedInFlightVar (\x -> x - expectedBytes)
+        let notReceived = idsRequested `Set.difference` idsReceived
+        unless (null notReceived) $ do
+          modifyTVar' sst.doNotRequestVar (`Set.difference` notReceived)
+
+      unless (and $ Map.intersectionWith (\h b -> config.bodySizeHeader h == config.bodySize b) requestedMap bodiesMap) $
+        throw WrongSizeBody
+
       unless (idsReceived `Set.isSubsetOf` idsRequested) $
         throw BodiesNotRequested
-
-      let notReceived = idsRequested `Set.difference` idsReceived
-      unless (Set.null notReceived) $ do
-        atomically $ modifyTVar' sst.inFlightVar (`Set.difference` notReceived)
 
       -- We can match up all the txids we requested, with those we
       -- received.
@@ -960,14 +1035,12 @@ relayConsumerPipelined config sst =
       -- if lst.window has duplicated ids, we might submit duplicated blocks.
       unless (null bodiesToSubmit) $ do
         now <- getCurrentTime
-        config.submitBlocks bodiesToSubmit now $ \validated -> do
+        config.submitBlocks bodiesToSubmit now $ \completed -> do
           -- Note: here we could set a flag to drop this producer if not
           -- all blocks validated.
-          -- TODO: the validation logic should be the one inserting into relayBuffer.
-          modifyTVar' sst.relayBufferVar $
-            flip (Foldable.foldl' (\buf blk@(h, _) -> RB.snocIfNew (config.headerId h) blk buf)) validated
-          -- TODO: won't remove from inFlight blocks not validated.
-          modifyTVar' sst.inFlightVar (`Set.difference` Set.fromList (map (config.headerId . fst) validated))
+          modifyTVar'
+            sst.doNotRequestVar
+            (`Set.difference` Set.fromList (map (config.headerId . fst) completed))
 
       return $
         idle
@@ -988,7 +1061,7 @@ relayConsumerPipelined config sst =
   acknowledgeIds lst idsSeq _ | Seq.null idsSeq = pure lst
   acknowledgeIds lst idsSeq idsMap = do
     isIgnored <- config.shouldNotRequest
-    inFlight <- readTVarIO sst.inFlightVar
+    doNotRequest <- readTVarIO sst.doNotRequestVar
 
     let lst1 =
           assertRelayConsumerLocalStateInvariant $
@@ -996,7 +1069,7 @@ relayConsumerPipelined config sst =
               { window = lst.window <> idsSeq
               , available = lst.available <> idsMap
               }
-    let lst' = dropFromLST (\id' hd -> isIgnored hd || id' `Set.member` inFlight) lst1
+    let lst' = dropFromLST (\id' hd -> isIgnored hd || id' `Set.member` doNotRequest) lst1
 
     -- Return the next local state
     return lst'
