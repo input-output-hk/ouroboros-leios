@@ -138,50 +138,53 @@ throughput capacity.
 
 ## Specification
 
-Leios extends Ouroboros Praos by enabling block producers to create an optional
-second, larger block body called an [Endorser Block (EB)](#endorser-blocks-ebs)
-alongside each standard [Praos block (Ranking Block or
-RB)](#ranking-blocks-rbs). EBs undergo validation by a dynamically selected
-committee of stake pools before inclusion in the ledger.
-
-### Protocol Overview
+Leios extends Ouroboros Praos by introducing an adaptive dual-mode protocol that automatically adjusts between two operating modes based on network conditions and certificate inclusion in blocks. This design allows the protocol to maintain baseline Praos security guarantees while opportunistically achieving higher throughput when conditions permit.
 
 <div align="center">
-<a name="figure-1"></a>
-<p name="protocol-flow-figure">
-  <img src="images/protocol-flow-overview.png" alt="Leios Protocol Flow">
-</p>
+  <a name="figure-1"></a>
+  <p name="dual-mode-figure">
+    <img src="images/dual-mode-simplified.svg" alt="Dual-Mode Operation">
+  </p>
 
-_Figure 3: Ouroboros Leios Protocol Flow_
-
+  <em>Figure 1: Ouroboros Leios Dual-Mode Operation</em>
 </div>
 
-Leios works through a five-step process that introduces new block types and
-validation mechanisms:
+The protocol operates in two distinct modes:
 
-> [!Warning]
-> 
-> Several critical design decisions remain unresolved:
-> 
-> **1. Transaction Inclusion with Certificates**
-> - Whether RBs should be allowed to include both EB certificates and their own transactions
-> 
-> **2. EB Availability and Praos Security**
-> - Risk that missing EBs could violate Praos delta assumptions
-> 
-> **3. Invalid Transaction Handling**
-> - Whether to allow invalid transactions in blocks with punishment mechanisms
-> 
+<a name="praos-mode"></a>**Praos Mode** represents the conservative baseline operation, maintaining all standard Ouroboros Praos properties. In this mode, the protocol ensures that every transaction included in blocks is fully validated before inclusion, providing the same security guarantees as the current Cardano protocol.
+
+<a name="leios-mode"></a>**Leios Mode** represents the enhanced throughput period, activated when the network successfully certifies additional transaction capacity. This mode allows for higher transaction throughput while maintaining consensus security, with transaction processing and block inclusion criteria that will be described in more detail below.
+
+The protocol automatically transitions between these modes based on the inclusion of certificates. When network conditions support the distribution and validation of larger transaction volumes, the protocol enters Leios mode. When these conditions are not met, it conservatively remains in or returns to Praos mode.
+
+This adaptive behavior ensures that the protocol never performs worse than standard Praos while providing significant throughput improvements when network conditions allow. The transitions are managed automatically by the protocol rules (detailed in the [Mode Transition Rules](#mode-transition-rules) section), requiring no manual intervention or coordination among stake pool operators.
+
+### Leios Protocol Flow
+
+<div align="center">
+  <a name="figure-2"></a>
+  <p name="protocol-flow-figure">
+    <img src="images/protocol-flow-overview.svg" alt="Leios Protocol Flow">
+  </p>
+
+  <em>Figure 2: Leios Protocol Flow</em>
+</div>
+
+The protocol operates through a five-step process that introduces new block types and validation mechanisms to achieve enhanced throughput. As illustrated in Figure 2, these steps can begin in either Praos or Leios mode, with the key distinction being how transactions are validated.
 
 #### Step 1: Block Production
 
-When a stake pool wins block leadership, they **simultaneously** create two
+When a stake pool wins block leadership, it **simultaneously** may create two
 things:
 
-- **Ranking Block (RB)**: A standard Praos block with extended header fields to optionally certify one EB and optionally announce one EB
-- **Endorser Block (EB)**: A larger block containing additional transaction references
+1. **[Ranking Block (RB)](#ranking-blocks-rbs)**
+A standard Praos block with extended header fields to optionally certify one previously announced EB and optionally announce one EB for the next subsequent RB to certify.
+1. **[Endorser Block (EB)](#endorser-blocks-ebs)**
+A larger block containing additional transaction references. There are no other ways to create EBs.
 
-The RB chain continues to be distributed exactly as in Praos, while Leios introduces a separate header distribution mechanism for rapid EB discovery and equivocation detection.
+As shown in Figure 2, EBs may be announced in either Praos or Leios mode - the protocol does not require being in Leios mode to announce an EB. The RB chain continues to be distributed exactly as in Praos, while Leios introduces a separate header distribution mechanism for rapid EB discovery and equivocation detection.
+
+Due to the voting overhead per EB, nodes announce an EB only when the RB is full, they do not announce empty EBs.
 
 #### Step 2: EB Distribution
 
@@ -189,7 +192,7 @@ Nodes receiving the RB header discover the announced EB and fetch its content. T
 
 #### Step 3: Committee Validation
 
-A voting committee of stake pools validates the EB. Committee members are [selected via sortition](#committee-structure) (lottery based on stake). A committee member votes for an EB only if:
+A voting committee of stake pools validates the EB. As depicted in Figure 2, votes are collected during the $L_\text{vote}$ period following the EB announcement. Committee members are [selected via sortition](#committee-structure) (lottery based on stake). A committee member votes for an EB only if:
 
   1. It has received the EB within $L_\text{vote}$ slots from its creation,
   2. It has **not** received an equivocated RB header for this EB within $L_\text{vote}$ slots,
@@ -211,24 +214,62 @@ This creates a compact **certificate** proving the EB's validity.
 
 #### Step 5: Chain Inclusion
 
-The certificate for an EB may be included in the body of a new ranking block `RB'` only if:
-  1. `RB'` directly extends the RB which announced this EB
-  1. The certificate is valid as defined in [Certificate Validation](#certificate-validation).
-  1. The creation slot of `RB'` is at least $L_\text{vote} + L_\text{diff}$ after creation slot of RB.
-  
-where $L_\text{diff}$ is a protocol parameter represented by a number of slots.
+The certificate for an EB may be included in the body of a new ranking block `RB'` only if all of the following conditions hold:
+  1. `RB'` directly extends the RB which announced this EB (as illustrated in Figure 2 where `RB'` contains the certificate for the EB announced by the preceding RB).
+  2. The certificate is valid as defined in [Certificate Validation](#certificate-validation).
+  3. If the EB contains `tx_corrections`, these corrections must be applied to identify invalid transactions from previous RBs (see [correction mechanisms](#transaction-validation) for details).
 
-> [!WARNING]
-> TBD: Validity rule with mutual exclusiveness of certificate and transactions in RB?
-> 
-> 4. No transactions are embedded in the RB body
-
-This **conditional inclusion** ensures transaction availability to honest nodes with good probability while achieving higher throughput, but also maintains Praos safety guarantees when network timing does not permit inclusion. When included:
+This **conditional inclusion** ensures transaction availability to honest nodes with good probability while achieving higher throughput. When included:
 
 - The certified EB's transactions become part of the permanent ledger
 - Throughput increases significantly for that segment of the chain
-- If timing is insufficient, only the standard RB is included (maintaining Praos
-  baseline)
+- If timing is insufficient, only the standard RB is included (maintaining Praos baseline)
+
+#### Mode Transition Rules
+
+The protocol manages transitions between Praos and Leios modes through simple, deterministic rules:
+
+**Praos → Leios Transition**: The protocol enters Leios mode when a RB includes a valid certificate for an EB. This certificate serves as proof that the network successfully validated additional transaction capacity. As shown in Figure 3 below, the transition to Leios mode occurs when RB<sub>3</sub> includes the certificate, even though the EB announcement may have occurred while still in Praos mode - RB<sub>2</sub> announcing EB<sub>1</sub>.
+
+**Leios → Praos Transition**: The protocol returns to Praos mode if no certificate has been included for $L$<sub>recover</sub> consecutive slots since the last certificate was included in an RB. This recovery period ensures that all nodes have sufficient time to synchronize any delayed EBs. The countdown resets each time a new certificate is included.
+
+<div align="center">
+<a name="figure-2"></a>
+<p name="mode-transitions-figure">
+  <img src="images/protocol-flow-detail.svg" alt="Mode Transitions Timeline">
+</p>
+
+_Figure 3: Detailed protocol flow showing mode transitions and correction mechanisms_
+
+</div>
+
+As illustrated in Figure 3, these transitions are clearly marked in the timeline: the protocol switches from Praos to Leios mode when RB<sub>3</sub> includes a certificate for EB<sub>1</sub>, and returns to Praos mode after $L$<sub>recover</sub> consecutive slots without any certificate since the last certificate (included in RB<sub>5</sub>), with the countdown resetting on each new certificate.
+
+<a id="transaction-validation" href="#transaction-validation"></a>**Transaction Validation**
+
+The dual-mode design introduces a fundamental difference for transaction validation:
+
+**In Praos mode**: Block producers always have access to the complete ledger state and must validate all transactions before including them in blocks. RBs containing invalid transactions are rejected by honest nodes, maintaining the standard Praos validation guarantees.
+
+**In Leios mode**: Block producers may need to create RBs before receiving all previously certified EBs due to network delays. Without these EBs, they cannot construct the complete ledger state or determine which transactions in their mempool are valid. This creates a dilemma: wait (potentially violating Praos timing constraints) or proceed with potentially invalid transactions.
+
+Leios resolves this by allowing RBs in Leios mode to temporarily include <a name="unvalidated-transactions"></a>**unvalidated transactions** - transactions whose validity cannot be confirmed due to incomplete ledger state. This ensures honest block producers can always fulfill their duties without violating protocol timing requirements. As shown in Figure 3, all RBs produced during Leios period (RB<sub>3</sub> through RB<sub>7</sub>, marked with red dashed borders) may contain such unvalidated transactions.
+
+As a direct consequence of allowing unvalidated transactions, the protocol must implement **correction mechanisms** to identify and exclude any transactions that later prove to be invalid. Figure 3 illustrates two types of these corrections:
+
+- **EB corrections**: EB<sub>2</sub> includes a `[TxIdx]` field (shown in red) that identifies invalid transactions from previous RBs that should not be executed. These also get referenced in the subsequent following RB (see RB<sub>5</sub> referencing the transaction corrections from EB<sub>2</sub>) - more on that later in <a href="#eb-corrections">EB corrections</a>.
+- **Mode transition corrections**: RB<sub>8</sub> (the first RB after returning to Praos mode) includes a `[TxIdx]` field listing all invalid transactions from the Leios period that were not already corrected by EB certificates (see RB<sub>8</sub> transaction correction list spanning RB<sub>5-7</sub>). More details follow in the <a href="#rb-corrections">RB corrections</a>.
+
+The timing constraints that enable these correction mechanisms are also shown in Figure 3:
+- <a id="l-vote" href="#l-vote"></a>**$L_\text{vote}$ periods** (timing brackets under each EB): Define when committee members can vote on EBs, ensuring sufficient time for EB diffusion and validation before certification (see [Protocol Parameters](#protocol-parameters) for constraints)
+- <a id="l-recover" href="#l-recover"></a>**$L_\text{recover}$ period** (rolling countdown from the latest certificate): Ensures all nodes have time to receive certified EBs before returning to Praos mode; the countdown resets whenever a new certificate is included. Only after $L_\text{recover}$ consecutive slots without any certificate does the protocol return to Praos mode. This makes the edge case of missing EBs exponentially unlikely.
+
+These parameters are critical for protocol safety and their constraints are defined in the [Protocol Parameters](#protocol-parameters) section and feasible values discussed in TODO - rationale feasiable protocol parameters.
+
+> [!NOTE]
+> **Edge Case: Delayed EB Synchronization**
+> 
+> When a node transitions from Leios to Praos mode but has not yet received all certified EBs, it must wait to synchronize before producing new blocks or adopting longer chains. This ensures that upon returning to Praos mode, all nodes can fully validate the chain state. The protocol parameter $L_\text{recover}$ is chosen to make this edge case exponentially unlikely.
 
 ### Protocol Component Details
 
@@ -244,8 +285,14 @@ RBs are Praos blocks extended to support Leios by optionally announcing EBs in t
 
 2. **Body additions**:
    - `eb_certificate` (optional): certificate proving EB availability & validity
+   - `tx_corrections` (optional): list of transaction indices that failed validation
 
-<a id="rb-inclusion-rules" href="#rb-inclusion-rules">**Inclusion Rules**</a>: When an RB header includes a `certified_eb` field, the corresponding body must include a matching `eb_certificate`. Conversely, an `eb_certificate` can only be included when a `certified_eb` field references the EB being certified.
+<a id="rb-inclusion-rules" href="#rb-inclusion-rules"></a>**Inclusion Rules**: When an RB header includes a `certified_eb` field, the corresponding body must include a matching `eb_certificate`. Conversely, an `eb_certificate` can only be included when a `certified_eb` field references the EB being certified.
+
+<a id="rb-corrections" href="#rb-corrections"></a>**Mode Transition Corrections**: When transitioning from Leios to Praos mode, the `tx_corrections` field in the first RB after $L$<sub>recover</sub> slots without a certificate must list all remaining invalid transactions from the Leios period not already corrected by certificates. This ensures the ledger is fully validated before Praos resumes.
+
+> [!WARNING]
+> **TODO:** Add transaction confirmation levels and their implications for applications
 
 Transactions from certified EBs are included in the ledger alongside direct RB transactions.
 
@@ -253,8 +300,14 @@ Transactions from certified EBs are included in the ledger alongside direct RB t
 
 EBs are produced by the same stake pool that created the corresponding announcing RB and reference additional transactions to increase throughput beyond what can be included directly in the RB.
 
-<a id="eb-structure" href="#eb-structure">**EB Structure**</a>: EBs have a simplified structure without header/body separation:
+<a id="eb-structure" href="#eb-structure"></a>**EB Structure**: EBs have a simplified structure without header/body separation:
 - `transaction_references`: List of transaction references (hashes)
+- `tx_corrections`: List of transaction indices from RBs that failed validation
+
+<a id="eb-corrections" href="#eb-corrections"></a>**EB Correction Mechanism**: The `tx_corrections` field serves a critical role in maintaining ledger integrity during Leios mode. When validators create an EB certificate, they verify which transactions from recent RBs are valid given the complete ledger state. Any invalid transactions are identified by their indices and included in both the EB and its certificate. This ensures that:
+- Invalid transactions are continuously tracked as long as EBs are certified
+- Light nodes can determine transaction execution status without downloading full EBs
+- The ledger state remains consistent despite temporary inclusion of unvalidated transactions
 
 When an EB is announced in an RB header via the `announced_eb` field, a voting period begins as described in [Votes and Certificates](#votes-and-certificates). Only RBs that directly extend the announcing RB are eligible to certify the announced EB by including a certificate.
 
@@ -268,13 +321,13 @@ The implementation meets the <a href="#appendix-a-requirements">requirements for
 
 To participate in the Leios protocol as voting member/ block producing node, stake pool operators must register one additional BLS12-381 key alongside their existing VRF and KES keys.
 
-<a id="committee-structure" href="#committee-structure">**Committee Structure**</a>: Two types of voters validate EBs, balancing security, decentralization, and efficiency:
+<a id="committee-structure" href="#committee-structure"></a>**Committee Structure**: Two types of voters validate EBs, balancing security, decentralization, and efficiency:
 - **Persistent Voters**: Selected once per epoch using [Fait Accompli sortition][fait-accompli-sortition], vote in every election, identified by compact identifiers
 - **Non-persistent Voters**: Selected per EB via local sortition with Poisson-distributed stake-weighted probability
 
 This dual approach prevents linear certificate size growth by leveraging non-uniform stake distribution, enabling faster certificate diffusion while maintaining broad participation.
 
-<a id="vote-structure" href="#vote-structure">**Vote Structure**</a>: All votes include the `endorser_block_hash` field that uniquely identifies the target EB:
+<a id="vote-structure" href="#vote-structure"></a>**Vote Structure**: All votes include the `endorser_block_hash` field that uniquely identifies the target EB:
 - **Persistent votes**:
   - `election_id`: Identifier for the voting round
   - `persistent_voter_id`: Epoch-specific pool identifier
@@ -287,10 +340,11 @@ This dual approach prevents linear certificate size growth by leveraging non-uni
   - `endorser_block_hash`: Hash of the target EB
   - `vote_signature`: BLS signature
 
-<a id="certificate-validation" href="#certificate-validation">**Certificate Validation**</a>: When an RB includes an EB certificate, nodes must validate the following before accepting the block:
+<a id="certificate-validation" href="#certificate-validation"></a>**Certificate Validation**: When an RB includes an EB certificate, nodes must validate the following before accepting the block:
 
 1. **CDDL Format Compliance**: Certificate structure matches the specification format defined in <a href="#votes-certificates-cddl">Appendix B: Votes and Certificates CDDL</a>
-2. **Cryptographic Signatures**: All BLS signatures are valid
+2. **Cryptographic Signatures**: All BLS signatures are validGiven the voting overhead per EB, EBs should only be announced if the base RB is full. In other words, empty EBs should not be announced in the network as they induce a non-zero cost.
+
 3. **Voter Eligibility**: 
    - Persistent voters must have been selected as such by the [Fait Accompli scheme][fait-accompli-sortition] for the current epoch
    - Non-persistent voters must provide valid sortition proofs
@@ -308,7 +362,7 @@ Detailed specifications, performance, and benchmarks are available in the [BLS c
 
 The following sections distinguish between observed **network characteristics** (which depend on topology and node capabilities) and tunable **protocol parameters** (which can be adjusted via governance).
 
-<a id="network-characteristics" href="#network-characteristics">**Network Characteristics**</a>
+<a id="network-characteristics" href="#network-characteristics"></a>**Network Characteristics**
 
 These are observed properties of the network topology and node capabilities:
 
@@ -319,13 +373,13 @@ These are observed properties of the network topology and node capabilities:
 | ------------------------- | :-----------------: | :---: | ----------------------------------------------------------- | :-----------------------------: | -------------------------------------------------- |
 | RB diffusion time         | $\Delta_\text{RB}$  | slot  | Observed upper bound for RB diffusion and adoption to all nodes     |            2-6 slots            | Depends on network topology and conditions         |
 | RB header diffusion time  | $\Delta_\text{hdr}$ | slot  | Observed time for RB headers to reach all nodes                 |     $\leq \Delta_\text{RB}$     | Usually faster than full block diffusion           |
-| EB diffusion time         | $\Delta_\text{EB}$  | slot  | Observed upper bound for EB diffusion, transaction retrieval, and ledger state building at all nodes    |            $\geq \Delta_\text{RB}$            | Slower than RBs due to larger size and additional processing requirements          |
+| EB diffusion time         | $\Delta_\text{EB}$  | slot  | Observed upper bound for EB diffusion, transaction retrieval, and ledger state building at all nodes when no competing or fresher blocks exist    |            $\geq \Delta_\text{RB}$            | Slower than RBs due to larger size and additional processing requirements          |
 
 _Table 1: Network Characteristics_
 
 </div>
 
-<a id="protocol-parameters" href="#protocol-parameters">**Protocol Parameters**</a>
+<a id="protocol-parameters" href="#protocol-parameters"></a>**Protocol Parameters**
 
 These parameters are configurable and subject to governance decisions,
 constrained by the network characteristics above:
@@ -335,7 +389,7 @@ constrained by the network characteristics above:
 
 | Parameter                     |    Symbol     |  Units   | Description                                                            |                   Constraints                   | Rationale                                                     |
 | ----------------------------- | :-----------: | :------: | ---------------------------------------------------------------------- | :---------------------------------------------: | ------------------------------------------------------------- |
-| Voting period length          | $L_\text{vote}$ |   slot   | Duration during which committee members can vote on endorser blocks    | $L_\text{vote} > 3\Delta_\text{hdr}$ | Must allow EB diffusion and equivocation detection before voting; the constraint ensures sufficient time for header propagation and equivocation detection before voting begins |
+| Voting period length          | $L_\text{vote}$ |   slot   | Duration during which committee members can vote on endorser blocks    | $L_\text{vote} > 3\Delta_\text{hdr}$ | Must allow EB diffusion and equivocation detection before voting; the constraint ensures sufficient time for header propagation and equivocation detection before voting begins. <br /><br />**Liveness**: To ensure that honest EBs are certified most of the time, $L_\text{vote}$ should be set so that there is enough time for an honestly produced EB to be diffused and processed by a large fraction of the network, assuming no other "fresher" RB is produced in the same period |
 | Vote diffusion period length | $L_\text{diff}$ |   slot   | Duration for vote propagation after voting period ends                | $L_\text{diff} > \Delta_\text{EB}$ | Must ensure most honest parties receive EBs diffused near end of $L_\text{vote}$ before certificate inclusion |
 | Ranking block max size        | $S_\text{RB}$ |  bytes   | Maximum size of a ranking block                                        |                $S_\text{RB} > 0$                | Limits RB size to ensure timely diffusion                     |
 | Endorser-block referenceable transaction size | $S_\text{EB-tx}$ |  bytes   | Maximum total size of transactions that can be referenced by an endorser block |                $S_\text{EB-tx} > 0$                | Limits total transaction payload to ensure timely diffusion within stage length |
@@ -357,27 +411,12 @@ _Table 2: Leios Protocol Parameters_
 > 
 > For example, an EB referencing 10,000 transactions of 100 bytes each would have $S_\text{EB-tx} = 1$ MB but the EB itself would be at least 320 KB just for the transaction hashes.
 
-    
-> [!CAUTION]
-> **EB Propagation Timing Constraint**
-> 
-> The constraint $L_\text{diff} > \Delta_\text{EB}$ may be challenging to satisfy in practice. As defined, $\Delta_\text{EB}$ represents the time for complete EB diffusion and adoption, which includes:
-> - Receiving the EB structure itself
-> - Obtaining all referenced transactions
-> - Building the updated ledger state
-> 
-> This full propagation process is analogous to $\Delta_\text{RB}$ and may require significantly more time than $L_\text{diff}$ allows. If this constraint cannot be met, nodes may receive ranking blocks with EB certificates before they have the necessary EB data to validate those blocks, potentially disrupting the Praos security assumptions about block propagation timing.
-> 
-> The feasibility of this constraint depends on EB sizes, network topology, and the specific requirements for what constitutes "EB adoption" in the security argument.
-
-
-
 ### Node Behavior
 
 The Leios protocol introduces new node responsibilities and message flows beyond those in Praos, reflecting the additional steps of EB creation and announcement, committee voting, and certificate aggregation. The following sections detail the specific behaviors that nodes must implement.
 
 <div align="center">
-<a name="figure-2"></a>
+<a name="figure-3"></a>
 
 ```mermaid
 sequenceDiagram
@@ -428,9 +467,9 @@ The diagram above illustrates the Leios protocol in a simplified sequential orde
 
 #### Transaction Diffusion
     
-<a id="transaction-propagation" href="#transaction-propagation">**Transaction Propagation**</a>: Uses the TxSubmission mini-protocol exactly as implemented in Praos. Transactions flow from downstream to upstream nodes through diffusion, where they are validated against the current ledger state before being added to local mempools. The protocol maintains the same FIFO ordering and duplicate detection mechanisms.
+<a id="transaction-propagation" href="#transaction-propagation"></a>**Transaction Propagation**: Uses the TxSubmission mini-protocol exactly as implemented in Praos. Transactions flow from downstream to upstream nodes through diffusion, where they are validated against the current ledger state before being added to local mempools. The protocol maintains the same FIFO ordering and duplicate detection mechanisms.
 
-<a id="mempool-design" href="#mempool-design">**Mempool Design**</a>: The mempool follows the same design as current Praos deployment with increased capacity to support both RB and EB production. Mempool capacity must accommodate expanded transaction volume:
+<a id="mempool-design" href="#mempool-design"></a>**Mempool Design**: The mempool follows the same design as current Praos deployment with increased capacity to support both RB and EB production. Mempool capacity must accommodate expanded transaction volume:
 
 <div align="center">
 
@@ -442,26 +481,26 @@ $\text{Mempool} \geq 2 \times S_\text{RB} + S_\text{EB-tx}$
     
 When a stake pool wins block leadership (step 1), they simultaneously create two things: a RB and an EB. The RB is a standard Praos block with extended header fields to certify one EB and announce another EB. The EB is a larger block containing additional transaction references. The RB chain continues to be distributed exactly as in Praos, while Leios introduces a separate header distribution mechanism for rapid EB discovery and equivocation detection.
 
-<a id="rb-header-diffusion" href="#rb-header-diffusion">**RB Header Diffusion**</a>: RB headers diffuse via a new [RbHeaderRelay mini-protocol](#rbheaderrelay-mini-protocol) independently of standard ChainSync (steps 2a and 2b). This separate mechanism enables rapid EB discovery within the strict timing bound $\Delta_\text{hdr}$. Headers are diffused freshest-first to facilitate timely EB delivery, with nodes propagating at most two headers per (slot, issuer) pair to detect equivocation-where an attacker creates multiple EBs for the same block generation opportunity while limiting network overhead. The header contains the EB hash when the block producer created an EB, allowing peers to discover and fetch the corresponding EB.
+<a id="rb-header-diffusion" href="#rb-header-diffusion"></a>**RB Header Diffusion**: RB headers diffuse via a new [RbHeaderRelay mini-protocol](#rbheaderrelay-mini-protocol) independently of standard ChainSync (steps 2a and 2b). This separate mechanism enables rapid EB discovery within the strict timing bound $\Delta_\text{hdr}$. Headers are diffused freshest-first to facilitate timely EB delivery, with nodes propagating at most two headers per (slot, issuer) pair to detect equivocation—where an attacker creates multiple EBs for the same block generation opportunity—while limiting network overhead. The header contains the EB hash when the block producer created an EB, allowing peers to discover and fetch the corresponding EB.
 
-<a id="rb-body-diffusion" href="#rb-body-diffusion">**RB Body Diffusion**</a>: After receiving headers, nodes fetch RB bodies via standard BlockFetch protocol (step 3). This employs ChainSync and BlockFetch protocols without modification for fetching complete ranking blocks after headers are received. The pipelining and batching optimizations for block body transfer remain unchanged from Praos.
+<a id="rb-body-diffusion" href="#rb-body-diffusion"></a>**RB Body Diffusion**: After receiving headers, nodes fetch RB bodies via standard BlockFetch protocol (step 3). This employs ChainSync and BlockFetch protocols without modification for fetching complete ranking blocks after headers are received. The pipelining and batching optimizations for block body transfer remain unchanged from Praos.
 
-<a id="rb-validation-adoption" href="#rb-validation-adoption">**Validation and Adoption**</a>: Nodes validate the RB and any included EB certificate before adopting the block (step 4). This includes cryptographic verification of certificates and ensuring they correspond to properly announced EBs. The complete validation procedure is detailed in [certificate validation](#certificate-validation). Once adopted, the node serves validated RBs to downstream peers using standard Praos block distribution mechanisms (step 5).
+<a id="rb-validation-adoption" href="#rb-validation-adoption"></a>**Validation and Adoption**: Nodes validate the RB and any included EB certificate before adopting the block (step 4). This includes cryptographic verification of certificates and ensuring they correspond to properly announced EBs. The complete validation procedure is detailed in [certificate validation](#certificate-validation). Once adopted, the node serves validated RBs to downstream peers using standard Praos block distribution mechanisms (step 5).
     
 #### EB Diffusion
 
 Whenever an EB is announced through an RB header, nodes must fetch the EB content promptly (step 6), such that they receive it within $L_\text{vote}$ and consequently enables them to vote. Only the EB body corresponding to the first EB announcement/RB header received for a given RB creation opportunity should be downloaded (freshest-first diffusion). The EB contains references to transactions, and nodes do not serve the EB to peers until they have all referenced transactions.
 
-<a id="eb-chain-selection" href="#eb-chain-selection">**EB Propagation for Chain Selection**</a>: To support efficient chain selection, nodes must receive **all EBs from competing forks**, not only those in their current preferred chain. This ensures that when a node switches to a different fork due to the longest-chain rule, it can immediately validate the new chain without additional EB propagation delays. EBs are forwarded before complete validity checks when full ledger state validation is impossible, with only lightweight verification (VRF checks, hash consistency, basic structure validation) performed initially to prevent DoS attacks.
+<a id="eb-chain-selection" href="#eb-chain-selection"></a>**EB Propagation for Chain Selection**: To support efficient chain selection, nodes must receive **all EBs from competing forks**, not only those in their current preferred chain. This ensures that when a node switches to a different fork due to the longest-chain rule, it can immediately validate the new chain without additional EB propagation delays. EBs are forwarded before complete validity checks when full ledger state validation is impossible, with only lightweight verification (VRF checks, hash consistency, basic structure validation) performed initially to prevent DoS attacks.
 
 > [!Warning]
 > 
 > **TODO**
 > Clarify if this is optimistic enough, or whether nodes should announce EBs before having all transactions available or make use of optimization by offering "chunks" of the transaction reference list.
 
-<a id="transaction-retrieval" href="#transaction-retrieval">**Transaction Retrieval**</a>: Nodes check transaction availability for the EB and fetch any missing transactions from peers (steps 6a and 7a). Once all transactions are available, nodes can serve EBs to downstream peers (step 7). This guarantees that when a node announces an EB its downstream peers can trust it has all EB transactions available.
+<a id="transaction-retrieval" href="#transaction-retrieval"></a>**Transaction Retrieval**: Nodes check transaction availability for the EB and fetch any missing transactions from peers (steps 6a and 7a). Once all transactions are available, nodes can serve EBs to downstream peers (step 7). This guarantees that when a node announces an EB its downstream peers can trust it has all EB transactions available.
     
-<a id="eb-transaction-validation" href="#eb-transaction-validation">**Transaction Validation**</a>: With all transactions available, nodes validate the endorsed transaction sequence against the appropriate ledger state (step 8), ensuring the transactions form a valid extension of the announcing RB and meet size constraints. All endorsed transactions are also added _optimistically_ to the beginning of the mempool and the mempool is revalidated. This ensures that EB transactions are not lost should the EB not get certified.
+<a id="eb-transaction-validation" href="#eb-transaction-validation"></a>**Transaction Validation**: With all transactions available, nodes validate the endorsed transaction sequence against the appropriate ledger state (step 8), ensuring the transactions form a valid extension of the announcing RB and meet size constraints. All endorsed transactions are also added _optimistically_ to the beginning of the mempool and the mempool is revalidated. This ensures that EB transactions are not lost should the EB not get certified.
     
 > [!WARNING]
 > - Why do we need to add transactions to the mempool? If we get to endorse txs next, our mempool is already fine as is?
@@ -469,19 +508,19 @@ Whenever an EB is announced through an RB header, nodes must fetch the EB conten
 
 #### Voting & Certification
 
-<a id="VotingEB" href="#VotingEB">**Voting Process**</a>: Committee members [selected through a lottery process](#votes-and-certificates) vote on EBs as soon as vote requirements are met according to protocol (step 10). An honest node casts only one vote for the EB extending its current longest chain.
+<a id="VotingEB" href="#VotingEB"></a>**Voting Process**: Committee members [selected through a lottery process](#votes-and-certificates) vote on EBs as soon as vote requirements are met according to protocol (step 10). An honest node casts only one vote for the EB extending its current longest chain.
     
-<a id="VoteDiffusion" href="#VoteDiffusion">**Vote Propagation**</a>: Votes propagate through the network during the vote diffusion period ($L_\text{diff}$ slots) (steps 11 and 11a). While nodes forward votes on EBs across all candidate chains, they only forward at most one vote per committee member per slot.
+<a id="VoteDiffusion" href="#VoteDiffusion"></a>**Vote Propagation**: Votes propagate through the network during the vote diffusion period ($L_\text{diff}$ slots) (steps 11 and 11a). While nodes forward votes on EBs across all candidate chains, they only forward at most one vote per committee member per slot.
     
 > [!WARNING]
 > - How long should votes be propagated? Only between (EB_slot + L_vote) and (EB_slot + L_vote + L_diff)?
 > - Request and handle receival of votes for an EB which is not fully validated?
 
-<a id="CertificateAggregation" href="#CertificateAggregation">**Certificate Construction**</a>: Nodes receive votes from upstream peers, maintaining a running tally for each EB to track progress toward the quorum threshold (step 12). When enough votes are collected during the vote diffusion period, nodes aggregate them into a compact certificate. This creates a cryptographic proof that the EB is valid and has received sufficient committee approval.
+<a id="CertificateAggregation" href="#CertificateAggregation"></a>**Certificate Construction**: Nodes receive votes from upstream peers, maintaining a running tally for each EB to track progress toward the quorum threshold (step 12). When enough votes are collected during the vote diffusion period, nodes aggregate them into a compact certificate. This creates a cryptographic proof that the EB is valid and has received sufficient committee approval.
     
 #### Next Block Production
 
-<a id="certificate-inclusion" href="#certificate-inclusion">**Certificate Inclusion**</a>: Block producers creating new RBs include certificates for EBs where the full stage duration ($L_\text{vote} + L_\text{diff}$ slots) has elapsed since the EB's creation (step 13). The producer may also announce a new EB extending their RB. When an EB certificate is included, the referenced EB's transactions become part of the permanent ledger state and are removed from the mempool accordingly. 
+<a id="certificate-inclusion" href="#certificate-inclusion"></a>**Certificate Inclusion**: Block producers creating new RBs include certificates for EBs where the full stage duration ($L_\text{vote} + L_\text{diff}$ slots) has elapsed since the EB's creation (step 13). The producer may also announce a new EB extending their RB. When an EB certificate is included, the referenced EB's transactions become part of the permanent ledger state and are removed from the mempool accordingly. 
     
 > [!Important]
 > **Validation Dependencies** 
@@ -490,17 +529,17 @@ Whenever an EB is announced through an RB header, nodes must fetch the EB conten
 
 #### Ledger Management
 
-<a id="ledger-formation" href="#ledger-formation">**Ledger Formation**</a>: Transactions in RBs and EBs within a chain are required to be non-conflicting, following the same ledger design as Praos with the addition of certificate handling and EB attachment references. The ledger state is updated according to the same validation rules used in Praos, with phase-1 and phase-2 validation applying equally to both RB and EB transactions.
+<a id="ledger-formation" href="#ledger-formation"></a>**Ledger Formation**: Transactions in RBs and EBs within a chain are required to be non-conflicting, following the same ledger design as Praos with the addition of certificate handling and EB attachment references. The ledger state is updated according to the same validation rules used in Praos, with phase-1 and phase-2 validation applying equally to both RB and EB transactions.
 
-<a id="ledger-state-transitions" href="#ledger-state-transitions">**State Transitions**</a>: EBs add transactions to the ledger only when properly certified and included via RB references. RBs can include both certificates and their own transactions. The ledger state for validating RB transactions is constructed based on either the predecessor RB (when no EB certificate is included) or the certified EB (when a valid certificate is present).
+<a id="ledger-state-transitions" href="#ledger-state-transitions"</a>**State Transitions**: EBs add transactions to the ledger only when properly certified and included via RB references. RBs can include both certificates and their own transactions. The ledger state for validating RB transactions is constructed based on either the predecessor RB (when no EB certificate is included) or the certified EB (when a valid certificate is present).
 
-<a id="chain-selection" href="#chain-selection">**Chain Selection**</a>: In case of a chain switch due to a fork, nodes can skip verifying smart contracts included in certified EBs to accelerate chain adoption while maintaining security guarantees. This optimization allows for faster synchronization without compromising the security properties inherited from the certificate validation process. The [EB propagation for chain selection](#eb-chain-selection) requirement ensures that nodes already possess all necessary EBs from alternative forks, eliminating additional propagation delays during fork switches.
+<a id="chain-selection" href="#chain-selection"></a>**Chain Selection**: In case of a chain switch due to a fork, nodes can skip verifying smart contracts included in certified EBs to accelerate chain adoption while maintaining security guarantees. This optimization allows for faster synchronization without compromising the security properties inherited from the certificate validation process. The [EB propagation for chain selection](#eb-chain-selection) requirement ensures that nodes already possess all necessary EBs from alternative forks, eliminating additional propagation delays during fork switches.
 
-<a id="mempool-capacity" href="#mempool-capacity">**Mempool Capacity Requirements**</a>: The mempool must accommodate both RB and EB transaction production. The capacity requirements are significantly increased compared to Praos to handle the additional transaction volume expected from EB production. When an EB is received and validated, its transactions should be added optimistically to the beginning of the mempool to ensure they are not lost if the EB fails to achieve certification.
+<a id="mempool-capacity" href="#mempool-capacity"></a>**Mempool Capacity Requirements**: The mempool must accommodate both RB and EB transaction production. The capacity requirements are significantly increased compared to Praos to handle the additional transaction volume expected from EB production. When an EB is received and validated, its transactions should be added optimistically to the beginning of the mempool to ensure they are not lost if the EB fails to achieve certification.
 
 #### Epoch Boundary
 
-<a id="persistent-voter-computation" href="#persistent-voter-computation">**Persistent Voter Computation**</a>: At epoch boundaries, nodes must compute the set of persistent voters for the next epoch using the [Fait Accompli scheme][fait-accompli-sortition]. This computation uses the stake distribution fixed at the epoch boundary and represents a minimal computational overhead based on current [BLS certificates benchmarks][bls-benchmarks]. The computation must be completed before the next epoch begins to enable voting participation.
+<a id="persistent-voter-computation" href="#persistent-voter-computation"></a>**Persistent Voter Computation**: At epoch boundaries, nodes must compute the set of persistent voters for the next epoch using the [Fait Accompli scheme][fait-accompli-sortition]. This computation uses the stake distribution fixed at the epoch boundary and represents a minimal computational overhead based on current [BLS certificates benchmarks](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#benchmarks-in-rust). The computation must be completed before the next epoch begins to enable voting participation.
 
 ### Network
 
@@ -1453,7 +1492,7 @@ This appendix contains the complete CDDL specifications for all Leios protocol m
    , transaction_bodies       : [* transaction_body]
    , transaction_witness_sets : [* transaction_witness_set]
    , auxiliary_data_set       : {* transaction_index => auxiliary_data}
-   , invalid_transactions     : [* transaction_index]
++  , tx_corrections           : [* transaction_index]
 +  , ? eb_certificate         : leios_certificate
    ]
 
@@ -1480,7 +1519,7 @@ block_header =
 
 ```cddl
 endorser_block =
-  [ conflicting_txs          : [* transaction_index]
+  [ tx_corrections           : [* transaction_index]
   , transaction_references   : [* tx_reference]
   ]
 
