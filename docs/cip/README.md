@@ -239,7 +239,7 @@ This creates a compact **certificate** proving the EB's validity.
 The certificate for an EB may be included in the body of a new ranking block `RB'` only if all of the following conditions hold:
   1. `RB'` directly extends the RB which announced this EB (as illustrated in Figure 4 where `RB'` contains the certificate for the EB announced by the preceding RB).
   2. The certificate is valid as defined in [Certificate Validation](#certificate-validation).
-  3. If the EB contains `tx_corrections`, these corrections must be applied to identify invalid transactions from previous RBs (correction mechanisms are detailed in the following [Transaction Validation](#transaction-validation) section).
+  3. If the EB contains an `execution_bitmap`, this bitmap must be applied to determine which transactions from previous RBs back to the last RB that included a certificate were successfully executed (correction mechanisms are detailed in the following [Transaction Validation](#transaction-validation) section).
 
 This **conditional inclusion** ensures transaction availability to honest nodes with good probability while achieving higher throughput. When included:
 
@@ -261,7 +261,7 @@ The protocol manages transitions between CM and HTM through simple, deterministi
   <img src="images/protocol-flow-detail.svg" alt="Mode Transitions Timeline">
 </p>
 
-_Figure 5: Detailed protocol flow showing mode transitions and correction mechanisms_
+_Figure 5: Detailed protocol flow showing mode transitions and transaction execution tracking_
 
 </div>
 
@@ -275,10 +275,11 @@ The dual-mode design introduces a fundamental difference for transaction validat
 
 Leios resolves this by allowing RBs in HTM to temporarily include <a name="unvalidated-transactions"></a>**unvalidated transactions** - transactions whose validity cannot be confirmed due to incomplete ledger state. This ensures honest block producers can always fulfill their duties without violating protocol timing requirements. As shown in Figure 5, all RBs produced during HTM period (RB<sub>3</sub> through RB<sub>7</sub>, marked with red dashed borders) may contain such unvalidated transactions.
 
-As a direct consequence of allowing unvalidated transactions, the protocol must implement **correction mechanisms** to identify and exclude any transactions that later prove to be invalid. Figure 5 illustrates two types of these corrections:
+As a direct consequence of allowing unvalidated transactions, the protocol must implement **correction mechanisms** to track which transactions were executed. Transaction corrections follow exactly **two rules** based on timing:
 
-- **EB corrections**: EB<sub>2</sub> includes a `[TxIdx]` field (shown in red) that identifies invalid transactions from previous RBs that should not be executed. These also get referenced in the subsequent following RB (see RB<sub>5</sub> referencing the transaction corrections from EB<sub>2</sub>) - more on that later in <a href="#eb-corrections">EB corrections</a>.
-- **Mode transition corrections**: RB<sub>8</sub> (the first RB after returning to CM) includes a `[TxIdx]` field listing all invalid transactions from the HTM period that were not already corrected by EB certificates (see RB<sub>8</sub> transaction correction list spanning RB<sub>5-7</sub>). More details follow in the <a href="#rb-corrections">RB corrections</a>.
+**Rule 1 - EB Corrections (Last cert ≤ $L_\text{recover}$)**: When an EB certificate is produced within $L_\text{recover}$ slots of the latest certificate in the chain, the certified EB must include an `execution_bitmap` field (labeled as `<TxBitMap>` in figures) indicating the execution status of transactions in RBs between this certificate and the previous EB certificate. As shown in Figure 5, EB<sub>2</sub> includes such corrections.
+
+**Rule 2 - RB Corrections (Last cert > $L_\text{recover}$)**: When the first RB is generated more than $L_\text{recover}$ slots after the latest EB certificate in the chain, this RB must include an `execution_bitmap` field (labeled as `<TxBitMap>` in figures) indicating the execution status of transactions in RBs between this RB and that EB certificate. As shown in Figure 5, RB<sub>8</sub> includes corrections spanning the range between RB<sub>5</sub> (which included the last certificate) and RB<sub>7</sub>.
 
 The timing constraints that enable these correction mechanisms are also shown in Figure 5:
 - <a id="l-vote" href="#l-vote"></a>**$L_\text{vote}$ periods** (timing brackets under each EB): Define when committee members can vote on EBs, ensuring sufficient time for EB diffusion and validation before certification (see [Protocol Parameters](#protocol-parameters) for constraints)
@@ -305,11 +306,11 @@ RBs are Praos blocks extended to support Leios by optionally announcing EBs in t
 
 2. **Body additions**:
    - `eb_certificate` (optional): certificate proving EB availability & validity
-   - `tx_corrections` (optional): list of transaction indices that failed validation
+   - `execution_bitmap` (optional): bitmap tracking transaction execution status
 
 <a id="rb-inclusion-rules" href="#rb-inclusion-rules"></a>**Inclusion Rules**: When an RB header includes a `certified_eb` field, the corresponding body must include a matching `eb_certificate`. Conversely, an `eb_certificate` can only be included when a `certified_eb` field references the EB being certified.
 
-<a id="rb-corrections" href="#rb-corrections"></a>**Mode Transition Corrections**: When transitioning from HTM to CM, the `tx_corrections` field in the first RB after $L$<sub>recover</sub> slots without a certificate must list all remaining invalid transactions from the HTM period not already corrected by certificates. This ensures the ledger is fully validated before CM resumes.
+<a id="rb-corrections" href="#rb-corrections"></a>**RB Corrections**: Following **Rule 2**, when the first RB is generated more than $L$<sub>recover</sub> slots after the latest EB certificate, the `execution_bitmap` field must indicate the execution status of transactions in RBs between this RB and that EB certificate. The bitmap provides a unified encoding where each bit indicates whether a transaction was executed or not, enabling nodes to construct the complete ledger state for the entire HTM period. This ensures the ledger state is fully determined before CM resumes.
 
 > [!WARNING]
 > **TODO:** Add transaction confirmation levels and their implications for applications
@@ -322,12 +323,15 @@ EBs are produced by the same stake pool that created the corresponding announcin
 
 <a id="eb-structure" href="#eb-structure"></a>**EB Structure**: EBs have a simplified structure without header/body separation:
 - `transaction_references`: List of transaction references (transaction ids)
-- `tx_corrections`: List of transaction indices from RBs that failed validation
+- `execution_bitmap`: Bitmap tracking execution status of transactions from previous RBs
 
-<a id="eb-corrections" href="#eb-corrections"></a>**EB Correction Mechanism**: The `tx_corrections` field serves a critical role in maintaining ledger integrity during HTM. When validators create an EB certificate, they verify which transactions from recent RBs are valid given the complete ledger state. Any invalid transactions are identified by their indices and included in both the EB and its certificate. This ensures that:
-- Invalid transactions are continuously tracked as long as EBs are certified
-- Light nodes can determine transaction execution status without downloading full EBs
+<a id="eb-corrections" href="#eb-corrections"></a>**EB Corrections**: The `execution_bitmap` field serves a critical role in maintaining ledger integrity during HTM. Following **Rule 1**, when validators create an EB certificate within $L_\text{recover}$ slots of the latest certificate, they determine the execution status of transactions in RBs within the specified range. The bitmap provides a unified encoding where each bit indicates whether a transaction was executed or not, enabling nodes to construct the complete ledger state. This bitmap is included in the EB and ensures that:
+- Transaction execution status is continuously tracked during HTM as EBs are certified
 - The ledger state remains consistent despite temporary inclusion of unvalidated transactions
+- Constant-size encoding regardless of the number of invalid transactions
+
+> [!NOTE]
+> **Light Node Optimization**: As a future optimization, execution bitmaps could also be included in EB certificates to allow light nodes to determine transaction execution status without downloading full EBs.
 
 When an EB is announced in an RB header via the `announced_eb` field, a voting period begins as described in [Votes and Certificates](#votes-and-certificates). Only RBs that directly extend the announcing RB are eligible to certify the announced EB by including a certificate.
 
@@ -1547,7 +1551,7 @@ This appendix contains the complete CDDL specifications for all Leios protocol m
    , transaction_bodies       : [* transaction_body]
    , transaction_witness_sets : [* transaction_witness_set]
    , auxiliary_data_set       : {* transaction_index => auxiliary_data}
-+  , tx_corrections           : [* transaction_index]
++  , ? execution_bitmap       : bytes
 +  , ? eb_certificate         : leios_certificate
    ]
 
@@ -1574,13 +1578,12 @@ block_header =
 
 ```cddl
 endorser_block =
-  [ tx_corrections           : [* transaction_index]
+  [ execution_bitmap         : bytes
   , transaction_references   : [* tx_reference]
   ]
 
 ; Reference structures
 tx_reference = hash32
-transaction_index = uint
 ```
 
 <h4 id="votes-certificates-cddl">Votes and Certificates</h4>

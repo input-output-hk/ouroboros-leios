@@ -135,7 +135,7 @@
     </a>
     
     <!-- Certificate symbol with simplified label -->
-    <g transform="translate(360, 265)">
+    <g transform="translate(360, 250)">
       <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="block-link">
         <polygon points="0,-25 25,-12.5 25,12.5 0,25 -25,12.5 -25,-12.5" fill="#fff2cc" stroke="#f9a825" stroke-width="2"/>
         <text x="0" y="5" font-size="12" font-weight="bold" text-anchor="middle" fill="#7f6000"><tspan font-family="serif" font-style="italic" font-size="16">C</tspan><tspan font-family="Arial, sans-serif" font-size="10" font-style="normal" baseline-shift="sub">EB1</tspan></text>
@@ -143,7 +143,7 @@
     </g>
     
     <!-- Arrow from certificate back to EB1 -->
-    <path d="M 360 290 Q 360 340 300 340" stroke="#f9a825" stroke-width="2" stroke-dasharray="2,2" fill="none" marker-end="url(#votearrowhead)"/>
+    <path d="M 360 275 Q 360 340 300 340" stroke="#f9a825" stroke-width="2" stroke-dasharray="2,2" fill="none" marker-end="url(#votearrowhead)"/>
     
     <!-- RB4 announces EB2 -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
@@ -172,10 +172,10 @@
       <text x="480" y="370" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#274e13">[TxRefs]</text>
     </a>
     
-    <!-- TxIdx indicator for EB2 -->
+    <!-- Transaction execution bitmap indicator for EB2 -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#eb-corrections" class="block-link">
-      <rect x="445" y="338" width="70" height="18" fill="#ffcccc" stroke="#cc0000" stroke-width="1" rx="4"/>
-      <text x="480" y="347" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#cc0000">[TxIdx]<tspan font-size="8" baseline-shift="sub">RB3</tspan></text>
+      <rect x="435" y="338" width="90" height="18" fill="#ffcccc" stroke="#cc0000" stroke-width="1" rx="4"/>
+      <text x="480" y="347" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#cc0000">&lt;TxBitMap&gt;<tspan font-size="8" baseline-shift="sub">RB3</tspan></text>
     </a>
     
     <!-- RB5 with certificate for EB2 -->
@@ -185,14 +185,10 @@
       <text x="600" y="208" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#783f04">[Txs]</text>
     </a>
     
-    <!-- TxIdx indicator for RB5 -->
-    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#rb-corrections" class="block-link">
-      <rect x="570" y="215" width="60" height="18" fill="#ffcccc" stroke="#cc0000" stroke-width="1" rx="4"/>
-      <text x="600" y="224" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#cc0000">[TxIdx]<tspan font-size="8" baseline-shift="sub">RB3</tspan></text>
-    </a>
+
     
     <!-- Certificate symbol -->
-    <g transform="translate(600, 265)">
+    <g transform="translate(600, 250)">
       <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="block-link">
         <polygon points="0,-25 25,-12.5 25,12.5 0,25 -25,12.5 -25,-12.5" fill="#fff2cc" stroke="#f9a825" stroke-width="2"/>
         <text x="0" y="5" font-size="12" font-weight="bold" text-anchor="middle" fill="#7f6000"><tspan font-family="serif" font-style="italic" font-size="16">C</tspan><tspan font-family="Arial, sans-serif" font-size="10" font-style="normal" baseline-shift="sub">EB2</tspan></text>
@@ -200,7 +196,7 @@
     </g>
     
     <!-- Arrow from certificate to EB2 -->
-    <path d="M 600 290 Q 600 340 540 340" stroke="#f9a825" stroke-width="2" stroke-dasharray="2,2" fill="none" marker-end="url(#votearrowhead)"/>
+    <path d="M 600 275 Q 600 340 540 340" stroke="#f9a825" stroke-width="2" stroke-dasharray="2,2" fill="none" marker-end="url(#votearrowhead)"/>
     
     <!-- Arrow from RB5 to RB4 (RB5 references RB4) -->
     <path d="M 560 200 L 520 200" stroke="#783f04" stroke-width="2" marker-end="url(#arrowhead)"/>
@@ -234,10 +230,10 @@
       <text x="960" y="208" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#783f04">[Txs]</text>
     </a>
     
-    <!-- TxIdx indicator for RB8 -->
+    <!-- Transaction execution bitmap indicator for RB8 -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#rb-corrections" class="block-link">
-      <rect x="925" y="215" width="70" height="18" fill="#ffcccc" stroke="#cc0000" stroke-width="1" rx="4"/>
-      <text x="960" y="224" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#cc0000">[TxIdx]<tspan font-size="8" baseline-shift="sub">RB5-7</tspan></text>
+      <rect x="915" y="215" width="90" height="18" fill="#ffcccc" stroke="#cc0000" stroke-width="1" rx="4"/>
+      <text x="960" y="224" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#cc0000">&lt;TxBitMap&gt;<tspan font-size="8" baseline-shift="sub">RB5-7</tspan></text>
     </a>
     
     <!-- Arrow from RB9 to RB8 (RB9 references RB8) -->
@@ -341,11 +337,11 @@
     </a>
     <text x="60" y="70" font-family="Arial, sans-serif" font-size="12" fill="#333333">RBs in HTM may contain invalid Txs</text>
 
-    <!-- TxIdx corrections indicator -->
+    <!-- Transaction execution bitmap indicator -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#rb-corrections" class="block-link">
       <rect x="10" y="80" width="40" height="18" fill="#ffcccc" stroke="#cc0000" stroke-width="1" rx="4"/>
     </a>
-    <text x="60" y="93" font-family="Arial, sans-serif" font-size="12" fill="#333333">Transaction corrections</text>
+    <text x="60" y="93" font-family="Arial, sans-serif" font-size="12" fill="#333333">Bitmap of transaction execution</text>
 
     <!-- Certificate -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="block-link">
