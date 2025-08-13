@@ -309,7 +309,7 @@ RBs are Praos blocks extended to support Leios by optionally announcing EBs in t
 
 <a id="rb-inclusion-rules" href="#rb-inclusion-rules"></a>**Inclusion Rules**: When an RB header includes a `certified_eb` field, the corresponding body must include a matching `eb_certificate`. Conversely, an `eb_certificate` can only be included when a `certified_eb` field references the EB being certified.
 
-<a id="rb-corrections" href="#rb-corrections"></a>**Mode Transition Corrections**: When transitioning from High-Throughput to Conservative mode, the `tx_corrections` field in the first RB after $L$<sub>recover</sub> slots without a certificate must list all remaining invalid transactions from the High-Throughput period not already corrected by certificates. This ensures the ledger is fully validated before Conservative mode resumes.
+<a id="rb-corrections" href="#rb-corrections"></a>**Mode Transition Corrections**: When transitioning from HTM to CM, the `tx_corrections` field in the first RB after $L$<sub>recover</sub> slots without a certificate must list all remaining invalid transactions from the HTM period not already corrected by certificates. This ensures the ledger is fully validated before CM resumes.
 
 > [!WARNING]
 > **TODO:** Add transaction confirmation levels and their implications for applications
