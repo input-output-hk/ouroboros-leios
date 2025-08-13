@@ -326,7 +326,7 @@
   </g>
   
   <!-- Legend -->
-  <g id="legend" transform="translate(900, 380)">
+  <g id="legend" transform="translate(900, 320)">
     <text x="10" y="20" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#333333">Legend</text>
     
     <!-- Regular Praos RB example -->
@@ -346,5 +346,17 @@
       <rect x="10" y="80" width="40" height="18" fill="#ffcccc" stroke="#cc0000" stroke-width="1" rx="4"/>
     </a>
     <text x="60" y="93" font-family="Arial, sans-serif" font-size="12" fill="#333333">Transaction corrections</text>
+
+    <!-- Certificate -->
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="block-link">
+      <polygon points="30,108 40,114 40,126 30,132 20,126 20,114" fill="#fff2cc" stroke="#f9a825" stroke-width="1"/>
+    </a>
+    <text x="60" y="123" font-family="Arial, sans-serif" font-size="12" fill="#333333">Certificate</text>
+    
+    <!-- Vote -->
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="vote-link">
+      <rect x="26" y="142" width="8" height="8" fill="#f9a825" transform="rotate(45 30 146)"/>
+    </a>
+    <text x="60" y="148" font-family="Arial, sans-serif" font-size="12" fill="#333333">Vote</text>
   </g>
 </svg>

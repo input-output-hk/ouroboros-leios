@@ -249,14 +249,14 @@
     
     <!-- EB (with more spacing) -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#endorser-blocks-ebs" class="block-link">
-      <rect x="940" y="18" width="20" height="15" fill="#d9ead3" stroke="#274e13" stroke-width="1" rx="2"/>
+      <rect x="920" y="18" width="20" height="15" fill="#d9ead3" stroke="#274e13" stroke-width="1" rx="2"/>
     </a>
-    <text x="965" y="28" font-family="Arial, sans-serif" font-size="11" fill="#333">Endorser Block (EB)</text>
+    <text x="945" y="28" font-family="Arial, sans-serif" font-size="11" fill="#333">Endorser Block (EB)</text>
     
     <!-- Certificate (vertically centered with label) -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="block-link">
-      <polygon points="1090,15 1098,20 1098,28 1090,33 1082,28 1082,20" fill="#fff2cc" stroke="#f9a825" stroke-width="1"/>
+      <polygon points="1070,15 1078,20 1078,28 1070,33 1062,28 1062,20" fill="#fff2cc" stroke="#f9a825" stroke-width="1"/>
     </a>
-    <text x="1103" y="28" font-family="Arial, sans-serif" font-size="11" fill="#333">Certificate</text>
+    <text x="1083" y="28" font-family="Arial, sans-serif" font-size="11" fill="#333">Certificate</text>
   </g>
 </svg>
