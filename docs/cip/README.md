@@ -859,19 +859,11 @@ throughput of the protocol. That has been reinforced and demonstrated by
 prototype simulations written in Haskell and Rust.
 
 > [!CAUTION]
->
-> The plots below are placeholders. All of the simulations in this section need
-> to be re-run:
->
-> - [ ] Final version of the Leios protocol
-> - [ ] Realistic mainnet topology
-> - [ ] Protocol parameters close to the recommended value
-> - [ ] CPU
->   - [ ] Unlimited?
->   - [ ] Six cores?
-> - [ ] Decide which plots best illustrate throughput
-> - [ ] Strip the major titles from the diagrams
-> - [ ] Use SVG format
+> 
+> The plots below are proposals using the Rust simulation as of August 8. All
+> of the simulations in this section will be re-run when the protocol is stable
+> and the simulator as been tagged for this CIP. The titles/subtitles, font,
+> aspect ratio, and labels will be revised in the final versions.
 
 The simulation results use a mainnet-like topology[^mnrm] that accurately
 reflects the characteristics of the Cardano mainnet. This includes a realistic
@@ -879,11 +871,12 @@ distribution of stake and a representative number of stake pools. The network
 is designed with a total of 10,000 nodes (`pseudo-mainnet`)[^pseudo] or 750
 nodes (`mini-mainnet`)[^mini], where each block producer is connected
 exclusively to two dedicated relays. Furthermore, the topology incorporates
-realistic latencies based on the [RIPE Atlas][ripe-atlas] ping dataset
+realistic latencies based on the [RIPE Atlas](https://atlas.ripe.net/) ping dataset
 and bandwidth that aligns with the lower end of what is typically found in
 cloud data centers. The node connectivity and geographic distribution (across
 various countries and autonomous systems) are also consistent with
-measurements provided by the [Cardano Foundation][cardano-foundation]. A simulation study[^mncp] has
+measurements provided by the [Cardano
+Foundation](https://cardanofoundation.org/). A simulation study [^mncp] has
 demonstrated that analysis conclusions deriving from the `mini-mainnet`
 topology are also valid for the `pseudo-mainnet` topology; the advantage of
 using the former is that simulations run much more quickly. Simulated RB
@@ -899,24 +892,69 @@ diffusion is consistent with the Praos performance model.[^praosp]
 
 [^praosp]: https://github.com/IntersectMBO/cardano-formal-specifications/blob/6d4e5cfc224a24972162e39a6017c273cea45321/src/performance/README.md
 
-The simulations demonstrate that bandwidth is partitioned between IBs, EBs,
-votes, and RBs so that congestion in one message type does not spill over into
-congestion for other message types. Because IBs are the largest messages, these
-are the ones first subject to congestion. The plot below shows the appearance of
-congestion effects in the Haskell simulation at 8 IB/s for 98 kB IBs. (Note that
-the Haskell simulation represents TCP more faithfully than the Rust one.) Even
-at this high throughput, IBs arrive at all nodes in the network with 100%
-success and mostly within five seconds. This implies that the stage length could
-be as short a five seconds per stage.
+The simulation results in the remainder of this section use the Rust simulator with a set of protocol parameters suitable for running Linear Leios at 200 kB/s of transactions, which corresponds to approximately 150 tx/s of transactions of sizes typical on the Cardano mainnet. The maximum size of transactions referenced by an EB is 12 MB and the stage length is $`L_\text{diff} = L_\text{vote} = 7 \text{ slots}`$. In order to illustrate the minimal infrastructure resources used by Leios at these throughputs, we have limited nodes to 4 virtual CPUs each and limited inter-node bandwidth to 10 Mb/s. We vary the throughput to illustrate the protocol's behavior in light vs congested transaction loads, and inject transaction from the 60th through 960th slots of the simulation; the simulation continues until the 1500th slot, so that the effects of clearing the memory pool are apparent. The table below summarizes the results of the simulation experiment. We see that a transaction at the front of the memory pool can become referenced by an EB in as few as 20 seconds when the system is lightly or moderately loaded and that it can reach certification on the ledger in about one minute. These times can double under congested conditions. In all cases there is little overhead, relative to the total bytes of transactions, in data that must be stored permanently as the ledger history.
 
-![Simulated time in flight for IBs](images/elapsed-IB.png)
+| Throughput [TxMB/s] | TPS at 1500 B/tx | Conditions      | Mempool to EB [s] | Mempool to ledger [s] | Space efficiency [%] |
+|--------------------:|-----------------:|-----------------|------------------:|----------------------:|---------------------:|
+|               0.100 |             66.7 | light load      |              19.3 |                  60.8 |                92.22 |
+|               0.150 |            100.0 | moderate load   |              20.8 |                  63.8 |                94.08 |
+|               0.200 |            142.9 | heavy load      |              28.9 |                  71.7 |                94.79 |
+|               0.250 |            166.7 | some congestion |              42.1 |                  84.3 |                94.92 |
+|               0.300 |            200.0 | much congestion |              83.5 |                 125.8 |                95.09 |
 
-In terms of the transaction lifecycle, transaction typically reach IBs rapidly
-for high-throughput settings of Leios parameters, but it takes tens of seconds
-for the to become referenced by an EB. Referencing by an RB takes longer, often
-close to 100 seconds.
+> [!WARNING]
+>
+> We may not need five cases to illustrate the points in this section, but it seems useful to include them at this stage of drafting the CIP. The number of cases can be pruned and the parameters adjusted for the final figures.
 
-![Simulation of transaction lifecycle](images/lifecycle-histogram.png)
+The first plot below demonstrates that most transactions reach the ledger in under two minutes in these simulations when the system is not congested. This transaction lifecycle time lengthens as congestion increases. The plot colors transactions by the minute when they were submitted so that one can see that the distribution of delays is independent of the submission time in the uncongested cases, but that there are "lucky" or "unlucky" periods in the congested cases. The variability arises from the randomness of the RB production scheduled. First, a transaction may has to wait for an RB to be forged; second, a transaction referenced by an EB has to wait for the following RB to be forged. The EB is discarded, however, if the second RB is produced in  fewer that $`L_\text{diff} + L_\text{vote}`$ after the first RB. Thus, both the time to the next RB and the RB following that introduce unpredictability in a transaction reaching the ledger under even lightly loaded conditions. When the sortition happens to produce RBs too close together, transactions will accumulate in the memory pool, awaiting favorable sortition conditions. If too many accumulate, there is not room for all of them to be included in the next EB. The second plot below illustrates that all transactions eventually do arrive on the ledger, but that they may have to wait long during congestion. During light load a transaction takes one or two minutes to reach the ledger, but in heavier load it might take three minutes or even longer. The capacity parameter $`S_\text{EB-tx}`$ (12 MB/EB in these simulations) fundamentally limits the amortized maximum throughput of Linear Leios: furthermore, it affects how long it takes transactions to reach the ledger as the throughput approaches the capacity.
+
+> [!WARNING]
+>
+> Would it be appropriate to include these equations and/or figures at this point?
+>
+> - [ ] Throughput as a function of the capacity parameter and the active slot coefficient.
+> - [ ] Time-to-ledger as a function of the capacity parameter and the active slot coefficient.
+
+![Time for transaction to reach the ledger](images/reach-rb-tx.svg)
+
+![Transactions reaching the ledger](images/temporal-efficiency-bar.svg)
+
+The effect of EBs being discarded when RBs are too close together is evidenced in the following plot. A transaction referenced only once by an EB is one that reaches the ledger on the first attempt. If a transaction is referenced more than one EB, it means that several attempts were made to before a relevant EB's certificate was included in an RB. The subsequent plot shows Leios's irregular rhythm of forging, sometimes discarding, and certifying EB. (Note that RBs are so small relative to most EBs that they are difficult to see in the histogram.) The diagram also provides a sense of the intermittency of successful certification and the presence of periods of unfavorable sortition where RBs are not produced or are produced too close together. The same phenomenon occurs in Praos, but Linear Leios amplifies the intermittency.
+
+![Number of TX references](images/references-tx.svg)
+
+![Disposition of transactions in blocks](images/disposition-size-timeseries.svg)
+
+When demand is not high relative to capacity, the total size of transactions referenced by an EB varies randomly and rarely reaches the maximum size of 12 MB/EB: see the following figure. One can see that at higher demands, fully utilized blocks predominate. The presence of those full blocks means that other transactions are waiting in the memory pool for referencing by a subsequent EB. Thus the capacity parameter provides a natural form of backpressure that limits the potential EB-related work a node must do when demand is high.
+
+![Size of transactions referenced by EBs](images/contents-ebs-size.svg)
+
+> [!WARNING]
+>
+> - [ ] Remove empty EBs (created at the start or end of the simulation) from the plot above.
+
+Because of the aforementioned backpressure, diffusion occurs in Leios in an orderly manner even when demand is high. The following set of plots show histograms of diffusion time (i.e., the time from a transaction's, RB's, EB's, or vote's creation to its reaching the nodes in the network). Transactions and votes typically diffuse rapidly throughout the whole network in fractions of a second, due to their small sizes, often small enough to fit in a single TCP transmission unit. RBs diffuse in less one second, with the empty RBs at the start and end of the simulation diffusing fastest. Similarly, EBs diffuse fast when empty or when demand is low, but once full EBs are diffusing, it can take up to two seconds for them to diffuse. All of the distribution have long tails where messages arrive much later for nodes with unfavorably topological locations. The Leios protocol possesses the important property that traffic in transactions, RBs, votes, and EBs do not interfere with one another: for example, delays in EBs and high throughput do not also delay RBs in those cases.
+
+|                                                 |                                                 |
+| ----------------------------------------------- | ----------------------------------------------- |
+| ![Arrival delay for TXs](images/elapsed-TX.svg) | ![Arrival delay for RBs](images/elapsed-RB.svg) |
+| ![Arrival delay for VTs](images/elapsed-VT.svg) | ![Arrival delay for EBs](images/elapsed-EB.svg) |
+
+In terms of resource usage, the throughputs in these simulations do no stress the four virtual CPUs of each node or saturate the 10 Mb/s available bandwidth between nodes. The figures below show that bandwidth usage does not exceed 4 Mb/s and that most of that is consumed by diffusion of transactions among the nodes. Furthermore, vCPU usage stays below 200% (i.e., the equivalent of two vCPUs operating fully), though it is very bursty because of the uneven workload of cryptographic and ledger operations. The last figure quantifies how transaction and EB body validation dominate CPU usage. Averaged over time, CPU usage is low: there may be opportunities in the implementation of the Leios node for lazy computations, caching, etc. that will spread out the occasional spikes in CPU usage over time.
+
+| Network                                                | CPU                                                              |
+| ------------------------------------------------------ | ---------------------------------------------------------------- |
+| ![Mean nodal ingress](images/ingress-average-area.svg) | ![Mean CPU load among all nodes](images/cpu-mean-timeseries.svg) |
+
+![Mean CPU load among all nodes](images/cpu-mean-histogram.svg)
+
+Note that the transaction workload in the simulations above was modeled upon the *average* amount of Plutus computation typical of the Cardano mainnet. The low time-averaged CPU usage in the simulations (i.e., less than 15% of a vCPU) suggests that the per-transaction and/or per-block Plutus budget could be significantly increased under Leios: either every transaction could have a modestly higher budget, or some transactions could use an order of magnitude more Plutus execution units.
+
+> [!WARNING]
+>
+> - [ ] For these same protocol parameters, run an experiment to demonstrate that more intense Plutus fits within the CPU budget.
+> - [ ] Discuss that Plutus budget needs to be set carefully in Leios in order to avoid expanding the attack surface of expensive Plutus scripts.
+
 
 <a name="feasible-parameters"></a>**Feasible protocol parameters**
 
