@@ -321,10 +321,10 @@ Transactions from certified EBs are included in the ledger alongside direct RB t
 EBs are produced by the same stake pool that created the corresponding announcing RB and reference additional transactions to increase throughput beyond what can be included directly in the RB.
 
 <a id="eb-structure" href="#eb-structure"></a>**EB Structure**: EBs have a simplified structure without header/body separation:
-- `transaction_references`: List of transaction references (hashes)
+- `transaction_references`: List of transaction references (transaction ids)
 - `tx_corrections`: List of transaction indices from RBs that failed validation
 
-<a id="eb-corrections" href="#eb-corrections"></a>**EB Correction Mechanism**: The `tx_corrections` field serves a critical role in maintaining ledger integrity during High-Throughput mode. When validators create an EB certificate, they verify which transactions from recent RBs are valid given the complete ledger state. Any invalid transactions are identified by their indices and included in both the EB and its certificate. This ensures that:
+<a id="eb-corrections" href="#eb-corrections"></a>**EB Correction Mechanism**: The `tx_corrections` field serves a critical role in maintaining ledger integrity during HTM. When validators create an EB certificate, they verify which transactions from recent RBs are valid given the complete ledger state. Any invalid transactions are identified by their indices and included in both the EB and its certificate. This ensures that:
 - Invalid transactions are continuously tracked as long as EBs are certified
 - Light nodes can determine transaction execution status without downloading full EBs
 - The ledger state remains consistent despite temporary inclusion of unvalidated transactions
