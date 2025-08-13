@@ -1,5 +1,15 @@
 # Leios logbook
 
+## 2025-08-12
+
+### First simulation experiment for attacks
+
+An experiment invovling late EB and/or late transaction diffusion was run, where $L_\text{diff}$ and the EB propagation scheme were also varied. The attack successfully thwarts Leios throughput under some conditions.
+
+- [Slides](analysis/sims/2025w33/ReadMe.pdf)
+- [Notebook](analysis/sims/2025w33/analysis.ipynb)
+- [Configurations](analysis/sims/2025w33/experiments/)
+
 ## 2025-08-08
 
 ## CIP Progress
