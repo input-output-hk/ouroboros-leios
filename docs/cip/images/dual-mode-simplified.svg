@@ -47,33 +47,33 @@
   <!-- Mode Timeline (spanning most of width) -->
   <g id="mode-timeline">
     <!-- Praos Mode 1 -->
-    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#praos-mode" class="mode-link">
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#conservative-mode" class="mode-link">
       <rect x="50" y="60" width="180" height="40" fill="url(#praosPattern)" fill-opacity="0.6" stroke="#783f04" stroke-width="0.5" stroke-opacity="0.3"/>
-      <text x="140" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#783f04">Praos</text>
+      <text x="140" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#783f04">CM</text>
     </a>
     
     <!-- Leios Mode 1 -->
-    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#leios-mode" class="mode-link">
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#high-throughput-mode" class="mode-link">
       <rect x="230" y="60" width="320" height="40" fill="url(#leiosPattern)" stroke="#7cb342" stroke-width="0.5" stroke-opacity="0.3"/>
-      <text x="390" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#5a8030">Leios</text>
+      <text x="390" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#5a8030">HTM</text>
     </a>
     
     <!-- Praos Mode 2 -->
-    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#praos-mode" class="mode-link">
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#conservative-mode" class="mode-link">
       <rect x="550" y="60" width="140" height="40" fill="url(#praosPattern)" fill-opacity="0.6" stroke="#783f04" stroke-width="0.5" stroke-opacity="0.3"/>
-      <text x="620" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#783f04">Praos</text>
+      <text x="620" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#783f04">CM</text>
     </a>
     
     <!-- Leios Mode 2 -->
-    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#leios-mode" class="mode-link">
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#high-throughput-mode" class="mode-link">
       <rect x="690" y="60" width="260" height="40" fill="url(#leiosPattern)" stroke="#7cb342" stroke-width="0.5" stroke-opacity="0.3"/>
-      <text x="820" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#5a8030">Leios</text>
+      <text x="820" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#5a8030">HTM</text>
     </a>
     
     <!-- Praos Mode 3 -->
-    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#praos-mode" class="mode-link">
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#conservative-mode" class="mode-link">
       <rect x="950" y="60" width="150" height="40" fill="url(#praosPattern)" fill-opacity="0.6" stroke="#783f04" stroke-width="0.5" stroke-opacity="0.3"/>
-      <text x="1025" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#783f04">Praos</text>
+      <text x="1025" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#783f04">CM</text>
     </a>
     
     <!-- ... continuation dots -->

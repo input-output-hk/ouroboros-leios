@@ -12,6 +12,53 @@
       <line x1="0" y1="20" x2="20" y2="0" stroke="#d4edda" stroke-width="0.5"/>
     </pattern>
     
+    <!-- Gradient for CM to HTM transition -->
+    <linearGradient id="cmToHtmGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#fce5cd;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#f0f8e8;stop-opacity:1"/>
+    </linearGradient>
+    
+    <!-- Pattern with gradient background and diagonal texture -->
+    <pattern id="cmToHtmPattern" x="50" y="40" width="650" height="40" patternUnits="userSpaceOnUse">
+      <rect width="650" height="40" fill="url(#cmToHtmGradient)"/>
+      <!-- Create diagonal lines across the entire pattern -->
+      <g stroke="#b8a877" stroke-width="0.5" opacity="0.3">
+        <line x1="0" y1="40" x2="40" y2="0"/>
+        <line x1="20" y1="40" x2="60" y2="0"/>
+        <line x1="40" y1="40" x2="80" y2="0"/>
+        <line x1="60" y1="40" x2="100" y2="0"/>
+        <line x1="80" y1="40" x2="120" y2="0"/>
+        <line x1="100" y1="40" x2="140" y2="0"/>
+        <line x1="120" y1="40" x2="160" y2="0"/>
+        <line x1="140" y1="40" x2="180" y2="0"/>
+        <line x1="160" y1="40" x2="200" y2="0"/>
+        <line x1="180" y1="40" x2="220" y2="0"/>
+        <line x1="200" y1="40" x2="240" y2="0"/>
+        <line x1="220" y1="40" x2="260" y2="0"/>
+        <line x1="240" y1="40" x2="280" y2="0"/>
+        <line x1="260" y1="40" x2="300" y2="0"/>
+        <line x1="280" y1="40" x2="320" y2="0"/>
+        <line x1="300" y1="40" x2="340" y2="0"/>
+        <line x1="320" y1="40" x2="360" y2="0"/>
+        <line x1="340" y1="40" x2="380" y2="0"/>
+        <line x1="360" y1="40" x2="400" y2="0"/>
+        <line x1="380" y1="40" x2="420" y2="0"/>
+        <line x1="400" y1="40" x2="440" y2="0"/>
+        <line x1="420" y1="40" x2="460" y2="0"/>
+        <line x1="440" y1="40" x2="480" y2="0"/>
+        <line x1="460" y1="40" x2="500" y2="0"/>
+        <line x1="480" y1="40" x2="520" y2="0"/>
+        <line x1="500" y1="40" x2="540" y2="0"/>
+        <line x1="520" y1="40" x2="560" y2="0"/>
+        <line x1="540" y1="40" x2="580" y2="0"/>
+        <line x1="560" y1="40" x2="600" y2="0"/>
+        <line x1="580" y1="40" x2="620" y2="0"/>
+        <line x1="600" y1="40" x2="640" y2="0"/>
+        <line x1="620" y1="40" x2="660" y2="0"/>
+        <line x1="640" y1="40" x2="680" y2="0"/>
+      </g>
+    </pattern>
+    
     <!-- Arrow markers -->
     <marker id="arrowhead" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto">
       <polygon points="0 0, 6 2, 0 4" fill="#595959"/>
@@ -65,21 +112,20 @@
   <!-- Background -->
   <rect width="1200" height="500" fill="#ffffff"/>
   
-  <!-- Mode Timeline (Top) - showing transition into Leios mode -->
+  <!-- Mode Timeline (Top) - showing transition into HTM -->
   <g id="mode-timeline">
-    <!-- Praos or Leios Mode (mixed) for announcement -->
-    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#praos-mode" class="mode-link">
-      <rect x="50" y="40" width="650" height="40" fill="url(#praosPattern)" fill-opacity="0.6" stroke="#783f04" stroke-width="0.5" stroke-opacity="0.3"/>
-    </a>
-    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#leios-mode" class="mode-link">
-      <rect x="50" y="40" width="650" height="40" fill="url(#leiosPattern)" fill-opacity="0.3" stroke="#7cb342" stroke-width="0.5" stroke-opacity="0.3"/>
-      <text x="375" y="60" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="18" font-weight="bold" text-anchor="middle" fill="#666">Praos / Leios</text>
-    </a>
+          <!-- Conservative or High-Throughput Mode -->
+      <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#conservative-mode" class="mode-link">
+        <rect x="50" y="40" width="650" height="40" fill="url(#cmToHtmPattern)" stroke="#969966" stroke-width="0.5" stroke-opacity="0.5"/>
+        <text x="375" y="60" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="18" font-weight="bold" text-anchor="middle">
+          <tspan fill="#783f04">CM</tspan><tspan fill="#555"> / </tspan><tspan fill="#5a8030">HTM</tspan>
+        </text>
+      </a>
     
-    <!-- Leios Mode starts just before certificate -->
-    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#leios-mode" class="mode-link">
+    <!-- High-Throughput Mode starts just before certificate -->
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#high-throughput-mode" class="mode-link">
       <rect x="700" y="40" width="450" height="40" fill="url(#leiosPattern)" stroke="#7cb342" stroke-width="0.5" stroke-opacity="0.3"/>
-      <text x="925" y="60" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" text-anchor="middle" fill="#5a8030">Leios</text>
+      <text x="925" y="60" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" text-anchor="middle" fill="#5a8030">HTM</text>
     </a>
   </g>
   
