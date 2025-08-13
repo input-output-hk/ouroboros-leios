@@ -61,17 +61,28 @@ economic sustainability and reduced complexity through fewer new protocol elemen
 - [Figure 4: Leios Protocol Flow](#figure-4)
 - [Figure 5: Detailed protocol flow showing mode transitions and correction mechanisms](#figure-5)
 - [Figure 6: Up- and downstream interactions of a node (simplified)](#figure-6)
+- [Figure 7: Time for transaction to reach the ledger](#figure-7)
+- [Figure 8: Transactions reaching the ledger](#figure-8)
+- [Figure 9: Number of TX references](#figure-9)
+- [Figure 10: Disposition of transactions in blocks](#figure-10)
+- [Figure 11: Size of transactions referenced by EBs](#figure-11)
+- [Figure 12: Arrival delays for transactions, ranking blocks, votes, and endorser blocks](#figure-12)
+- [Figure 13: Mean nodal ingress (left) and Mean CPU load among all nodes (right)](#figure-13)
+- [Figure 14: Mean CPU load among all nodes](#figure-14)
+- [Figure 15: Fate of Plutus-heavy transactions in Leios](#figure-15)
+- [Figure 16: CPU usage in Plutus-heavy workloads for Leios](#figure-16)
 
 ### Tables
 
 - [Table 1: Network Characteristics](#table-1)
 - [Table 2: Leios Protocol Parameters](#table-2)
 - [Table 3: Performance Metrics](#table-3)
-- [Table 4: Feasible Protocol Parameters](#table-4)
-- [Table 5: Operating Costs by IB Production Rate](#table-5)
-- [Table 6: Required TPS for Infrastructure Cost Coverage](#table-6)
-- [Table 7: Required TPS for Current Reward Maintenance](#table-7)
-- [Table 8: Leios Mini-Protocols](#table-8)
+- [Table 4: Leios effficiency at different throughputs](#table-4)
+- [Table 5: Feasible Protocol Parameters](#table-5)
+- [Table 6: Operating Costs by IB Production Rate](#table-6)
+- [Table 7: Required TPS for Infrastructure Cost Coverage](#table-7)
+- [Table 8: Required TPS for Current Reward Maintenance](#table-8)
+- [Table 9: Leios Mini-Protocols](#table-9)
 
 </details>
 
@@ -582,7 +593,7 @@ As described in [Node Behavior](#node-behavior), existing Praos mini-protocols c
 Leios introduces **five new mini-protocols** to handle the additional message types required for EB distribution, voting, and certificate construction.
 
 <div align="center">
-<a name="table-8" id="table-8"></a>
+<a name="table-9" id="table-9"></a>
 
 | **Protocol** | **Purpose** | **Timing Constraint** |
 | :----------: | ----------- | --------------------- |
@@ -592,7 +603,7 @@ Leios introduces **five new mini-protocols** to handle the additional message ty
 | **EbFetch** | Retrieve certified EBs for chain reconstruction | On-demand after certificate inclusion |
 | **TxFetch** | Retrieve referenced transactions for EB validation | Before EB validation completes |
 
-_Table 8: Leios Mini-Protocols_
+_Table 9: Leios Mini-Protocols_
 
 </div>
 
@@ -823,6 +834,7 @@ prototype simulations written in Haskell and Rust.
 > - [ ] In next set of re-runs . . .
 >     - [ ] In the CPU plot, expand the abbrevations into phrases.
 >     - [ ] In the EB-size plot, remove empty EBs (created at the start or end of the simulation).
+> - [ ] Review and possibly elaborate the figure and table captions.
 > - [ ] In the final version . . .
 >    - [ ] Remove title and subtitle.
 
@@ -911,6 +923,7 @@ The effect of EBs being discarded when RBs are too close together is evidenced i
 ![Number of TX references](images/references-tx.svg)
 
 _Figure 9. Number of TX references._
+
 </div>
 
 <div align="center">
@@ -966,6 +979,7 @@ In terms of resource usage, the throughputs in these simulations do no stress th
 | ![Mean nodal ingress](images/ingress-average-area.svg) | ![Mean CPU load among all nodes](images/cpu-mean-timeseries.svg) |
 
 _Figure 13. Mean nodal ingress (left) and Mean CPU load among all nodes (right)._
+
 </div>
 
 <div align="center">
@@ -974,6 +988,7 @@ _Figure 13. Mean nodal ingress (left) and Mean CPU load among all nodes (right).
 ![Mean CPU load among all nodes](images/cpu-mean-histogram.svg)
 
 _Figure 14. Mean CPU load among all nodes._
+
 </div>
 
 Note that the transaction workload in the simulations above was modeled upon the *average* amount of Plutus computation typical of the Cardano mainnet. The low time-averaged CPU usage in the simulations (i.e., less than 15% of a vCPU) suggests that the per-transaction and/or per-block Plutus budget could be significantly increased under Leios: either every transaction could have a modestly higher budget, or some transactions could use an order of magnitude more Plutus execution units. Statistical analysis of CPU usage in ledger operations[^timings] using the `db-analyser` tool[^dbanalyser] on Cardano mainnet from epoch 350 through 573 yields the following simple models of the CPU cost of validating signatures and executing Plutus in the transactions of a block. Because of the noisiness in the raw mainnet data, these estimates are uncertain.
@@ -1000,6 +1015,7 @@ The Leios simulators use the value `0.4284 ms` as the validation time for each t
 >     - [ ] Align with the base case of the previous section.
 >     - [ ] In the transaction plot, switch to the minute-based ledged.
 >     - [ ] In the CPU plot, expand the abbrevations into phrases.
+> - [ ] Review and possibly elaborate the figure and table captions.
 > - [ ] In the final version . . .
 >    - [ ] Remove title and subtitle.
 
@@ -1097,7 +1113,7 @@ the maximum size of existing Praos blocks, to the cost per node and the total
 cost of all nodes.
 
 <div align="center">
-<a name="table-7" id="table-7"></a>
+<a name="table-6" id="table-6"></a>
 
 | IB/s Rate | Cost per Node (Avg) | Network Cost (10,000 nodes) |
 | --------: | ------------------: | --------------------------: |
@@ -1108,7 +1124,7 @@ cost of all nodes.
 |        20 |    $2,500 USD/month |       $25,000,000 USD/month |
 |        30 |    $3,600 USD/month |       $36,000,000 USD/month |
 
-_Table 7: Operating Costs by IB Production Rate_
+_Table 6: Operating Costs by IB Production Rate_
 
 </div>
 
@@ -1117,7 +1133,7 @@ and fees, we can calculate the required TPS to generate enough fees to cover
 infrastructure costs.
 
 <div align="center">
-<a name="table-8" id="table-8"></a>
+<a name="table-7" id="table-7"></a>
 
 | Infrastructure Cost (USD/month) | Required ADA (at $0.45/ADA) | TPS (Avg Tx) | TPS (Min Tx) | Equivalent IB/s |
 | ------------------------------: | --------------------------: | -----------: | -----------: | --------------: |
@@ -1128,7 +1144,7 @@ infrastructure costs.
 |                     $25,000,000 |                  55,555,556 |         9.71 |        12.47 |           0.139 |
 |                     $36,000,000 |                  80,000,000 |        13.99 |        17.96 |           0.200 |
 
-_Table 8: Required TPS for Infrastructure Cost Coverage_
+_Table 7: Required TPS for Infrastructure Cost Coverage_
 
 </div>
 
@@ -1136,7 +1152,7 @@ _Required TPS for Current Reward Maintenance:_ To maintain current reward levels
 (~48 million ADA monthly) through transaction fees as the Reserve depletes.
 
 <div align="center">
-<a name="table-9" id="table-9"></a>
+<a name="table-8" id="table-8"></a>
 
 | Year | Reserve Depletion | Rewards from Fees (ADA) | Required TPS (Avg Tx) | Required IB/s |
 | ---: | ----------------: | ----------------------: | --------------------: | ------------: |
@@ -1147,7 +1163,7 @@ _Required TPS for Current Reward Maintenance:_ To maintain current reward levels
 | 2029 |              ~43% |              20,640,000 |                  36.1 |          0.52 |
 | 2030 |              ~50% |              24,000,000 |                  41.9 |          0.60 |
 
-_Table 9: Required TPS for Current Reward Maintenance_
+_Table 8: Required TPS for Current Reward Maintenance_
 
 </div>
 
