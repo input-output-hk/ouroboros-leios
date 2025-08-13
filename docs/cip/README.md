@@ -708,17 +708,17 @@ implementations of Leios can be assessed in these terms.
 
 | Category   | Metric                                                    | Measurement                                                                                                     |
 | ---------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Efficiency | Spatial efficiency, $`\epsilon_\text{spatial}`$           | Ratio of total transactions size to persistent storage                                                          |
-|            | Temporal efficiency, $`\epsilon_\text{temporal}(s)`$      | Time to include transaction on ledger                                                                           |
-|            | Network efficiency, $`\epsilon_\text{network}`$           | Ratio of total transaction size to node-averaged network usage                                                  |
-| Protocol   | TX inclusion, $`\tau_\text{inclusion}`$                   | Mean number of slots for a transaction being included in any EB                                                 |
-|            | Voting failure, $`p_\text{noquorum}`$                     | Probability of sortition failure to elect sufficient voters for a quorum                                        |
-| Resource   | Network egress, $`q_\text{egress}`$                       | Rate of bytes transmitted by a node                                                                             |
-|            | Disk usage, $`q_\text{disk}`$                             | Rate of persistent bytes stored by a node                                                                       |
-|            | I/O operations, $`\bar{q}_\text{iops}(b)`$                | Mean number of I/O operations per second, where each operation writes a filesystem block of $`b`$ bytes         |
-|            | Mean CPU usage, $`\bar{q}_\text{vcpu}`$                   | Mean virtual CPU cores used by a node                                                                           |
-|            | Peak CPU usage, $`\hat{q}_\text{vcpu}`$                   | Maximum virtual CPU cores used by a node over a one-slot window                                                 |
-| Resilience | Adversarial stake, $`\eta_\text{adversary}(s)`$           | Fractional loss in throughput due to adversial stake of $`s`$                                                   |
+| Efficiency | Spatial efficiency, $\epsilon_\text{spatial}$             | Ratio of total transactions size to persistent storage                                                          |
+|            | Temporal efficiency, $\epsilon_\text{temporal}(s)$        | Time to include transaction on ledger                                                                           |
+|            | Network efficiency, $\epsilon_\text{network}$             | Ratio of total transaction size to node-averaged network usage                                                  |
+| Protocol   | TX inclusion, $\tau_\text{inclusion}$                     | Mean number of slots for a transaction being included in any EB                                                 |
+|            | Voting failure, $p_\text{noquorum}$                       | Probability of sortition failure to elect sufficient voters for a quorum                                        |
+| Resource   | Network egress, $q_\text{egress}$                         | Rate of bytes transmitted by a node                                                                             |
+|            | Disk usage, $q_\text{disk}$                               | Rate of persistent bytes stored by a node                                                                       |
+|            | I/O operations, $\bar{q}_\text{iops}(b)$                  | Mean number of I/O operations per second, where each operation writes a filesystem block of $b$ bytes           |
+|            | Mean CPU usage, $\bar{q}_\text{vcpu}$                     | Mean virtual CPU cores used by a node                                                                           |
+|            | Peak CPU usage, $\hat{q}_\text{vcpu}$                     | Maximum virtual CPU cores used by a node over a one-slot window                                                 |
+| Resilience | Adversarial stake, $\eta_\text{adversary}(s)$             | Fractional loss in throughput due to adversial stake of $s$                                                     |
 
 _Table 3: Performance Metrics_
 
@@ -731,9 +731,7 @@ metric is defined as the ratio of the total bytes of transactions included in
 the ledger to the total persistent storage required by the protocol.
 
 $$
-`
 \epsilon_\text{spatial} = \frac{\text{total bytes of transactions included in the ledger}}{\text{total bytes of EBs and RBs}}
-`
 $$
 
 **_Temporal efficiency:_** As is true for Praos, there is a delay between
@@ -745,13 +743,11 @@ the local memory pool of the node where it was submitted to the time when it is
 included in the ledger, via a Praos block. The same metric applies both to Praos
 and to Leios. In aggregate, we measure the temporal efficiency as the fraction
 of transactions that reach the ledger, as function of the number of slots
-elapsed. The quantity $`\epsilon_\text{temporal}(\infty)`$ is the fraction of
+elapsed. The quantity $\epsilon_\text{temporal}(\infty)$ is the fraction of
 submitted transactions that ever reach the ledger.
 
 $$
-`
 \epsilon_\text{temporal}(s) = \text{fraction of transactions included in the ledger within } s \text{ slots of their inclusion in a local memory pool}
-`
 $$
 
 **_Network efficiency:_** Effective utilization of the network can be
@@ -760,9 +756,7 @@ average network traffic per node. (This could also be computed individually for
 each node and used as a local metric.)
 
 $$
-`
 \epsilon_\text{network} = \frac{(\text{bytes of valid transactions reaching the ledger}) \cdot (\text{number of nodes in the network})}{\text{total bytes of network traffic}}
-`
 $$
 
 **_TX inclusion:_** In Leios, it is possible that a transaction might have to
@@ -772,9 +766,7 @@ rate and mempool management. This is correlated with how long the transaction
 waits in the memory pool before being selected for inclusion.
 
 $$
-`
 \tau_\text{inclusion} = \text{mean number of slots for a transaction to be included in any EB}
-`
 $$
 
 **_Voting failure:_** An unlucky set of VRF evaluations might result in
@@ -782,43 +774,39 @@ insufficient voters being selected in a given pipeline, thus making it
 impossible to certify an EB in that pipeline.
 
 $$
-`
 p_\text{noquorum} = \text{probability of sufficient voters to achieve a quorum in a given pipeline}
-`
 $$
 
 **_Network egress:_** Cloud service providers typically charge for network
-egress rather than for network ingress. The quantity $`q_\text{egress}`$ is
+egress rather than for network ingress. The quantity $q_\text{egress}$ is
 simply the number of bytes sent from a node per unit time.
 
 **_Disk usage:_** Leios requires that EBs and RBs be stored permanently; votes
-need not be stored permanently, however. The quantity $`q_\text{disk}`$ is the
+need not be stored permanently, however. The quantity $q_\text{disk}$ is the
 total number of EB and RB bytes generated per unit time.
 
 **_I/O operations:_** Some cloud service providers limit or bill input/output
 operations on a per-second capacity basis. The number of I/O operations depends
-upon the filesystem's block size $`b`$, not on the logical number of writes to
+upon the filesystem's block size $b$, not on the logical number of writes to
 disk by the protocol: e.g., writing an EB of 32,768 bytes might consist of 64
 I/O operations on a filesystem having a 512-byte block size. We assume that disk
 caching and delayed writes smooth out the unevenness in I/O operations, so that
-the mean $`\bar{q}_\text{iops}`$ is the best metric here.
+the mean $\bar{q}_\text{iops}$ is the best metric here.
 
 **_Mean CPU usage:_** Computation resources consumed by the number are
-quantified as $`\bar{q}_\text{vcpu}`$, which is the mean number of virtual CPU
+quantified as $\bar{q}_\text{vcpu}$, which is the mean number of virtual CPU
 cores utilized by the protocol.
 
 **_Peak CPU usage:_** Because CPU usage varies depending upon the node's
 activity, the maximum number of virtual CPU cores utilized by the protocol
-during any slot, $`\hat{q}_\text{vcpu}`$, provides a useful indication of
+during any slot, $\hat{q}_\text{vcpu}$, provides a useful indication of
 computational burstiness and of how a virtual machine should be sized for Leios.
 
 **_Adversarial stake:_** Similarly, when adversarial stake is appreciable and
 active, the throughput of Leios might be drop.
 
 $$
-`
 \eta_\text{adversary}(s) = \frac{\text{bytes of transactions reaching the ledger without adversarial activity}}{\text{bytes of transactions reaching the ledger with adversarial activity given fraction } s \text{ of the total stake}}
-`
 $$
 
 <a name="simulation-results"></a>**Simulation results**
@@ -869,7 +857,7 @@ diffusion is consistent with the Praos performance model.[^praosp]
 
 [^praosp]: https://github.com/IntersectMBO/cardano-formal-specifications/blob/6d4e5cfc224a24972162e39a6017c273cea45321/src/performance/README.md
 
-The simulation results in the remainder of this section use the Rust simulator with a set of protocol parameters suitable for running Linear Leios at 200 kB/s of transactions, which corresponds to approximately 150 tx/s of transactions of sizes typical on the Cardano mainnet. The maximum size of transactions referenced by an EB is 12 MB and the stage length is $`L_\text{diff} = L_\text{vote} = 7 \text{ slots}`$. In order to illustrate the minimal infrastructure resources used by Leios at these throughputs, we have limited nodes to 4 virtual CPUs each and limited inter-node bandwidth to 10 Mb/s. We vary the throughput to illustrate the protocol's behavior in light vs congested transaction loads, and inject transaction from the 60th through 960th slots of the simulation; the simulation continues until the 1500th slot, so that the effects of clearing the memory pool are apparent. The table below summarizes the results of the simulation experiment. We see that a transaction at the front of the memory pool can become referenced by an EB in as few as 20 seconds when the system is lightly or moderately loaded and that it can reach certification on the ledger in about one minute. These times can double under congested conditions. In all cases there is little overhead, relative to the total bytes of transactions, in data that must be stored permanently as the ledger history.
+The simulation results in the remainder of this section use the Rust simulator with a set of protocol parameters suitable for running Linear Leios at 200 kB/s of transactions, which corresponds to approximately 150 tx/s of transactions of sizes typical on the Cardano mainnet. The maximum size of transactions referenced by an EB is 12 MB and the stage length is $L_\text{diff} = L_\text{vote} = 7 \text{ slots}$. In order to illustrate the minimal infrastructure resources used by Leios at these throughputs, we have limited nodes to 4 virtual CPUs each and limited inter-node bandwidth to 10 Mb/s. We vary the throughput to illustrate the protocol's behavior in light vs congested transaction loads, and inject transaction from the 60th through 960th slots of the simulation; the simulation continues until the 1500th slot, so that the effects of clearing the memory pool are apparent. The table below summarizes the results of the simulation experiment. We see that a transaction at the front of the memory pool can become referenced by an EB in as few as 20 seconds when the system is lightly or moderately loaded and that it can reach certification on the ledger in about one minute. These times can double under congested conditions. In all cases there is little overhead, relative to the total bytes of transactions, in data that must be stored permanently as the ledger history.
 
 <div align="center">
 <a name="table-4" id="table-4"></a>
@@ -886,7 +874,7 @@ _Table 4. Leios effficiency at different throughputs._
 
 </div>
 
-The first plot below demonstrates that most transactions reach the ledger in under two minutes in these simulations when the system is not congested. This transaction lifecycle time lengthens as congestion increases. The plot colors transactions by the minute when they were submitted so that one can see that the distribution of delays is independent of the submission time in the uncongested cases, but that there are "lucky" or "unlucky" periods in the congested cases. The variability arises from the randomness of the RB production scheduled. First, a transaction may has to wait for an RB to be forged; second, a transaction referenced by an EB has to wait for the following RB to be forged. The EB is discarded, however, if the second RB is produced in  fewer that $`L_\text{diff} + L_\text{vote}`$ after the first RB. Thus, both the time to the next RB and the RB following that introduce unpredictability in a transaction reaching the ledger under even lightly loaded conditions. When the sortition happens to produce RBs too close together, transactions will accumulate in the memory pool, awaiting favorable sortition conditions. If too many accumulate, there is not room for all of them to be included in the next EB. The second plot below illustrates that all transactions eventually do arrive on the ledger, but that they may have to wait long during congestion. During light load a transaction takes one or two minutes to reach the ledger, but in heavier load it might take three minutes or even longer. The capacity parameter $`S_\text{EB-tx}`$ (12 MB/EB in these simulations) fundamentally limits the amortized maximum throughput of Linear Leios: furthermore, it affects how long it takes transactions to reach the ledger as the throughput approaches the capacity.
+The first plot below demonstrates that most transactions reach the ledger in under two minutes in these simulations when the system is not congested. This transaction lifecycle time lengthens as congestion increases. The plot colors transactions by the minute when they were submitted so that one can see that the distribution of delays is independent of the submission time in the uncongested cases, but that there are "lucky" or "unlucky" periods in the congested cases. The variability arises from the randomness of the RB production scheduled. First, a transaction may has to wait for an RB to be forged; second, a transaction referenced by an EB has to wait for the following RB to be forged. The EB is discarded, however, if the second RB is produced in  fewer that $L_\text{diff} + L_\text{vote}$ after the first RB. Thus, both the time to the next RB and the RB following that introduce unpredictability in a transaction reaching the ledger under even lightly loaded conditions. When the sortition happens to produce RBs too close together, transactions will accumulate in the memory pool, awaiting favorable sortition conditions. If too many accumulate, there is not room for all of them to be included in the next EB. The second plot below illustrates that all transactions eventually do arrive on the ledger, but that they may have to wait long during congestion. During light load a transaction takes one or two minutes to reach the ledger, but in heavier load it might take three minutes or even longer. The capacity parameter $S_\text{EB-tx}$ (12 MB/EB in these simulations) fundamentally limits the amortized maximum throughput of Linear Leios: furthermore, it affects how long it takes transactions to reach the ledger as the throughput approaches the capacity.
 
 > [!IMPORTANT]
 >
