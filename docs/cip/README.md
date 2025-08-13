@@ -253,7 +253,7 @@ The protocol manages transitions between CM and HTM through simple, deterministi
 
 **CM → HTM Transition**: The protocol enters HTM when a RB includes a valid certificate for an EB. This certificate serves as proof that the network successfully validated additional transaction capacity. As shown in Figure 5 below, the transition to HTM occurs when RB<sub>3</sub> includes the certificate, even though the EB announcement may have occurred while still in CM - RB<sub>2</sub> announcing EB<sub>1</sub>.
 
-**HTM → CM Transition**: The protocol returns to CM if no certificate has been included for $L$<sub>recover</sub> consecutive slots since the last certificate was included in an RB. This recovery period ensures that all nodes have sufficient time to synchronize any delayed EBs. The countdown resets each time a new certificate is included.
+**HTM → CM Transition**: The protocol returns to CM if no certificate has been included for $L$<sub>recover</sub> consecutive slots since the last certificate was included in an RB. This recovery period ensures that all nodes have sufficient time to synchronize any delayed EBs. The countdown resets each time a new certificate is included. As shown in Figure 5 below, this occurs after $L$<sub>recover</sub> slots following the last certificate in RB<sub>5</sub>.
 
 <div align="center">
 <a name="figure-5" id="figure-5"></a>
@@ -264,8 +264,6 @@ The protocol manages transitions between CM and HTM through simple, deterministi
 _Figure 5: Detailed protocol flow showing mode transitions and correction mechanisms_
 
 </div>
-
-As illustrated in Figure 5, these transitions are clearly marked in the timeline: the protocol switches from CM to HTM when RB<sub>3</sub> includes a certificate for EB<sub>1</sub>, and returns to CM after $L$<sub>recover</sub> consecutive slots without any certificate since the last certificate (included in RB<sub>5</sub>), with the countdown resetting on each new certificate.
 
 <a id="transaction-validation" href="#transaction-validation"></a>**Transaction Validation**
 
