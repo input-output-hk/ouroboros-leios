@@ -181,7 +181,7 @@ The protocol switches between modes automatically based on certificate inclusion
 
 This design ensures the protocol never performs worse than today's Cardano protocol while delivering higher throughput when network conditions allow. The mode switches happen automatically according to protocol rules (detailed in the [Mode Transition Rules](#mode-transition-rules) section) without requiring any manual coordination from stake pool operators.
 
-### Leios Protocol Flow
+### HTM Protocol Flow
 
 <div align="center">
   <a name="figure-4" id="figure-4"></a>
@@ -239,7 +239,7 @@ This creates a compact **certificate** proving the EB's validity.
 The certificate for an EB may be included in the body of a new ranking block `RB'` only if all of the following conditions hold:
   1. `RB'` directly extends the RB which announced this EB (as illustrated in Figure 4 where `RB'` contains the certificate for the EB announced by the preceding RB).
   2. The certificate is valid as defined in [Certificate Validation](#certificate-validation).
-  3. If the EB contains `tx_corrections`, these corrections must be applied to identify invalid transactions from previous RBs (see [correction mechanisms](#transaction-validation) for details).
+  3. If the EB contains `tx_corrections`, these corrections must be applied to identify invalid transactions from previous RBs (correction mechanisms are detailed in the following [Transaction Validation](#transaction-validation) section).
 
 This **conditional inclusion** ensures transaction availability to honest nodes with good probability while achieving higher throughput. When included:
 
