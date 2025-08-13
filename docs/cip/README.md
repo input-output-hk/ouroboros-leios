@@ -289,7 +289,7 @@ These parameters are critical for protocol safety and their constraints are defi
 > [!NOTE]
 > **Edge Case: Delayed EB Synchronization**
 > 
-> When a node transitions from [High-Throughput mode (HTM)](#high-throughput-mode) to [Conservative mode (CM)](#conservative-mode) but has not yet received all certified EBs, it must wait to synchronize before producing new blocks or adopting longer chains. This ensures that upon returning to Conservative mode, all nodes can fully validate the chain state. The protocol parameter $L_\text{recover}$ is chosen to make this edge case exponentially unlikely.
+> When a node transitions from [High-Throughput mode (HTM)](#high-throughput-mode) to [Conservative mode (CM)](#conservative-mode) but has not yet received all certified EBs, it must wait to synchronize before producing new blocks or adopting longer chains. Without the complete ledger state from all certified EBs, the node cannot identify which transactions from the HTM period were invalid and thus cannot create the necessary corrections in its first CM block. The protocol parameter $L_\text{recover}$ is designed to prevent this scenario.
 
 ### Protocol Component Details
 
