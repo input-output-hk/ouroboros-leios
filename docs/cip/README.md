@@ -693,18 +693,15 @@ This section provides protocol simulation results, feasible protocol parameters 
 
 <a name="performance-metrics"></a>**Performance metrics**
 
-> [!NOTE]
->
-> This is a preliminary set of metrics that will be finalized when the Leios
-> protocol variants are finalized and the simulation studies are complete.
-
 The performance of a protocol like Leios can be characterized in terms of its
 efficient use of resources, its total use of resources, the probabilities of
 negative outcomes due to the protocol's design, and the resilience to adverse
 conditions. Metrics measuring such performance depend upon the selection of
 protocol parameters, the network topology, and the submission of transactions.
 The table below summarizes key metrics for evaluating Leios as a protocol and
-individual scenarios (parameters, network, and load).
+individual scenarios (parameters, network, and load). Estimates for many of these
+appear in the following section on Simulation Results. Additionally, future
+implementations of Leios can be assessed in these terms.
 
 <div align="center">
 <a name="table-3" id="table-3"></a>
@@ -721,10 +718,7 @@ individual scenarios (parameters, network, and load).
 |            | I/O operations, $`\bar{q}_\text{iops}(b)`$                | Mean number of I/O operations per second, where each operation writes a filesystem block of $`b`$ bytes         |
 |            | Mean CPU usage, $`\bar{q}_\text{vcpu}`$                   | Mean virtual CPU cores used by a node                                                                           |
 |            | Peak CPU usage, $`\hat{q}_\text{vcpu}`$                   | Maximum virtual CPU cores used by a node over a one-slot window                                                 |
-| Resilience | Bandwidth, $`\eta_\text{bandwidth}(b)`$                   | Fractional loss in throughput at finite bandwidth $`b`$                                                         |
-|            | Adversarial stake, $`\eta_\text{adversary}(s)`$           | Fractional loss in throughput due to adversial stake of $`s`$                                                   |
-| Fees       | Collateral paid for success, $`\kappa_\text{success}(c)`$ | Average collateral paid for a successful transaction when it conflicts with a fraction $`c`$ of the memory pool |
-|            | Collateral paid for failure, $`\kappa_\text{failure}(c)`$ | Average collateral paid for a failed transaction when it conflicts with a fraction $`c`$ of the memory pool     |
+| Resilience | Adversarial stake, $`\eta_\text{adversary}(s)`$           | Fractional loss in throughput due to adversial stake of $`s`$                                                   |
 
 _Table 3: Performance Metrics_
 
@@ -818,16 +812,6 @@ activity, the maximum number of virtual CPU cores utilized by the protocol
 during any slot, $`\hat{q}_\text{vcpu}`$, provides a useful indication of
 computational burstiness and of how a virtual machine should be sized for Leios.
 
-**_Bandwidth:_** If the bandwidth for inter-node communication drops below a
-given value, then the throughput of Leios (at a given level of demand) will be
-drop, as network congesting occurs.
-
-$$
-`
-\eta_\text{bandwidth}(b) = \frac{\text{bytes of transactions reaching the ledger if links have bandwidth } b}{\text{bytes of transactions reaching the ledger if bandwidth were infinite}}
-`
-$$
-
 **_Adversarial stake:_** Similarly, when adversarial stake is appreciable and
 active, the throughput of Leios might be drop.
 
@@ -837,33 +821,22 @@ $$
 `
 $$
 
-**_Fees:_** Fee metrics relate to consumption of collateral. Leios may consume
-collateral for transactions that conflict when EBs are processed.
-
-$$
-`
-\kappa_\text{success}(c) = \text{average collateral paid for a successful transaction when it conflicts with a fraction } c \text{ of the memory pool}
-`
-$$
-
-$$
-`
-\kappa_\text{failure}(c) = \text{average collateral paid for a failed transaction when it conflicts with a fraction } c \text{ of the memory pool}
-`
-$$
-
 <a name="simulation-results"></a>**Simulation results**
 
 The [Leios paper][leios-paper] provides a rigorous theoretical analysis of the safety and
 throughput of the protocol. That has been reinforced and demonstrated by
 prototype simulations written in Haskell and Rust.
 
-> [!CAUTION]
-> 
-> The plots below are proposals using the Rust simulation as of August 8. All
-> of the simulations in this section will be re-run when the protocol is stable
-> and the simulator as been tagged for this CIP. The titles/subtitles, font,
-> aspect ratio, and labels will be revised in the final versions.
+> [!IMPORTANT]
+>
+> TODO: **@bwbush**
+> - [ ] Regenerate the plots below each time the version of `sim-cli` is bumped.
+> - [ ] Discuss only displaying three or four cases, instead of the five.
+> - [ ] In next set of re-runs . . .
+>     - [ ] In the CPU plot, expand the abbrevations into phrases.
+>     - [ ] In the EB-size plot, remove empty EBs (created at the start or end of the simulation).
+> - [ ] In the final version . . .
+>    - [ ] Remove title and subtitle.
 
 The simulation results use a mainnet-like topology[^mnrm] that accurately
 reflects the characteristics of the Cardano mainnet. This includes a realistic
@@ -871,28 +844,35 @@ distribution of stake and a representative number of stake pools. The network
 is designed with a total of 10,000 nodes (`pseudo-mainnet`)[^pseudo] or 750
 nodes (`mini-mainnet`)[^mini], where each block producer is connected
 exclusively to two dedicated relays. Furthermore, the topology incorporates
-realistic latencies based on the [RIPE Atlas](https://atlas.ripe.net/) ping dataset
+realistic latencies based on the RIPE Atlas[^ripe] ping dataset
 and bandwidth that aligns with the lower end of what is typically found in
 cloud data centers. The node connectivity and geographic distribution (across
 various countries and autonomous systems) are also consistent with
-measurements provided by the [Cardano
-Foundation](https://cardanofoundation.org/). A simulation study [^mncp] has
+measurements provided by the Cardano
+Foundation.[^cf] A simulation study [^mncp] has
 demonstrated that analysis conclusions deriving from the `mini-mainnet`
 topology are also valid for the `pseudo-mainnet` topology; the advantage of
 using the former is that simulations run much more quickly. Simulated RB
 diffusion is consistent with the Praos performance model.[^praosp]
 
-[^mnrm]: https://github.com/input-output-hk/ouroboros-leios/blob/6d8619c53cc619a25b52eac184e7f1ff3c31b597/data/simulation/pseudo-mainnet/ReadMe.md
+[^mnrm]: [Mainnet-like topologies for Leios](https://github.com/input-output-hk/ouroboros-leios/blob/6d8619c53cc619a25b52eac184e7f1ff3c31b597/data/simulation/pseudo-mainnet/ReadMe.md)
 
-[^pseudo]: https://github.com/input-output-hk/ouroboros-leios/blob/6d8619c53cc619a25b52eac184e7f1ff3c31b597/data/simulation/pseudo-mainnet/topology-v1.md
+[^pseudo]: [Leios pseudo-mainnet topology](https://github.com/input-output-hk/ouroboros-leios/blob/6d8619c53cc619a25b52eac184e7f1ff3c31b597/data/simulation/pseudo-mainnet/topology-v1.md)
 
-[^mini]: https://github.com/input-output-hk/ouroboros-leios/blob/6d8619c53cc619a25b52eac184e7f1ff3c31b597/data/simulation/pseudo-mainnet/topology-v2.md
+[^mini]: [Leios mini-mainnet topology](https://github.com/input-output-hk/ouroboros-leios/blob/6d8619c53cc619a25b52eac184e7f1ff3c31b597/data/simulation/pseudo-mainnet/topology-v2.md)
+
+[^ripe]: [RIPE Atlas](https://atlas.ripe.net/)
+
+[^cf]: [Cardano Foundation](https://cardanofoundation.org/)
 
 [^mncp]: https://github.com/input-output-hk/ouroboros-leios/blob/6d8619c53cc619a25b52eac184e7f1ff3c31b597/analysis/sims/2025w30b/analysis.ipynb
 
 [^praosp]: https://github.com/IntersectMBO/cardano-formal-specifications/blob/6d4e5cfc224a24972162e39a6017c273cea45321/src/performance/README.md
 
 The simulation results in the remainder of this section use the Rust simulator with a set of protocol parameters suitable for running Linear Leios at 200 kB/s of transactions, which corresponds to approximately 150 tx/s of transactions of sizes typical on the Cardano mainnet. The maximum size of transactions referenced by an EB is 12 MB and the stage length is $`L_\text{diff} = L_\text{vote} = 7 \text{ slots}`$. In order to illustrate the minimal infrastructure resources used by Leios at these throughputs, we have limited nodes to 4 virtual CPUs each and limited inter-node bandwidth to 10 Mb/s. We vary the throughput to illustrate the protocol's behavior in light vs congested transaction loads, and inject transaction from the 60th through 960th slots of the simulation; the simulation continues until the 1500th slot, so that the effects of clearing the memory pool are apparent. The table below summarizes the results of the simulation experiment. We see that a transaction at the front of the memory pool can become referenced by an EB in as few as 20 seconds when the system is lightly or moderately loaded and that it can reach certification on the ledger in about one minute. These times can double under congested conditions. In all cases there is little overhead, relative to the total bytes of transactions, in data that must be stored permanently as the ledger history.
+
+<div align="center">
+<a name="table-4" id="table-4"></a>
 
 | Throughput [TxMB/s] | TPS at 1500 B/tx | Conditions      | Mempool to EB [s] | Mempool to ledger [s] | Space efficiency [%] |
 |--------------------:|-----------------:|-----------------|------------------:|----------------------:|---------------------:|
@@ -902,59 +882,162 @@ The simulation results in the remainder of this section use the Rust simulator w
 |               0.250 |            166.7 | some congestion |              42.1 |                  84.3 |                94.92 |
 |               0.300 |            200.0 | much congestion |              83.5 |                 125.8 |                95.09 |
 
-> [!WARNING]
->
-> We may not need five cases to illustrate the points in this section, but it seems useful to include them at this stage of drafting the CIP. The number of cases can be pruned and the parameters adjusted for the final figures.
+_Table 4. Leios effficiency at different throughputs._
+
+</div>
 
 The first plot below demonstrates that most transactions reach the ledger in under two minutes in these simulations when the system is not congested. This transaction lifecycle time lengthens as congestion increases. The plot colors transactions by the minute when they were submitted so that one can see that the distribution of delays is independent of the submission time in the uncongested cases, but that there are "lucky" or "unlucky" periods in the congested cases. The variability arises from the randomness of the RB production scheduled. First, a transaction may has to wait for an RB to be forged; second, a transaction referenced by an EB has to wait for the following RB to be forged. The EB is discarded, however, if the second RB is produced in  fewer that $`L_\text{diff} + L_\text{vote}`$ after the first RB. Thus, both the time to the next RB and the RB following that introduce unpredictability in a transaction reaching the ledger under even lightly loaded conditions. When the sortition happens to produce RBs too close together, transactions will accumulate in the memory pool, awaiting favorable sortition conditions. If too many accumulate, there is not room for all of them to be included in the next EB. The second plot below illustrates that all transactions eventually do arrive on the ledger, but that they may have to wait long during congestion. During light load a transaction takes one or two minutes to reach the ledger, but in heavier load it might take three minutes or even longer. The capacity parameter $`S_\text{EB-tx}`$ (12 MB/EB in these simulations) fundamentally limits the amortized maximum throughput of Linear Leios: furthermore, it affects how long it takes transactions to reach the ledger as the throughput approaches the capacity.
 
-> [!WARNING]
+> [!IMPORTANT]
+>
+> TODO: **@bwbush**
 >
 > Would it be appropriate to include these equations and/or figures at this point?
 >
 > - [ ] Throughput as a function of the capacity parameter and the active slot coefficient.
 > - [ ] Time-to-ledger as a function of the capacity parameter and the active slot coefficient.
 
+<div align="center">
+<a name="figure-7" id="figure-7"></a>
+
 ![Time for transaction to reach the ledger](images/reach-rb-tx.svg)
+
+_Figure 7. Time for transaction to reach the ledger._
+
+</div>
+
+<div align="center">
+<a name="figure-8" id="figure-8"></a>
 
 ![Transactions reaching the ledger](images/temporal-efficiency-bar.svg)
 
+_Figure 8. Transactions reaching the ledger._
+
+</div>
+
 The effect of EBs being discarded when RBs are too close together is evidenced in the following plot. A transaction referenced only once by an EB is one that reaches the ledger on the first attempt. If a transaction is referenced more than one EB, it means that several attempts were made to before a relevant EB's certificate was included in an RB. The subsequent plot shows Leios's irregular rhythm of forging, sometimes discarding, and certifying EB. (Note that RBs are so small relative to most EBs that they are difficult to see in the histogram.) The diagram also provides a sense of the intermittency of successful certification and the presence of periods of unfavorable sortition where RBs are not produced or are produced too close together. The same phenomenon occurs in Praos, but Linear Leios amplifies the intermittency.
+
+<div align="center">
+<a name="figure-9" id="figure-9"></a>
 
 ![Number of TX references](images/references-tx.svg)
 
+_Figure 9. Number of TX references._
+</div>
+
+<div align="center">
+<a name="figure-9" id="figure-9"></a>
+
 ![Disposition of transactions in blocks](images/disposition-size-timeseries.svg)
+
+_Figure 10. Disposition of transactions in blocks._
+
+</div>
 
 When demand is not high relative to capacity, the total size of transactions referenced by an EB varies randomly and rarely reaches the maximum size of 12 MB/EB: see the following figure. One can see that at higher demands, fully utilized blocks predominate. The presence of those full blocks means that other transactions are waiting in the memory pool for referencing by a subsequent EB. Thus the capacity parameter provides a natural form of backpressure that limits the potential EB-related work a node must do when demand is high.
 
+<div align="center">
+<a name="figure-11" id="figure-11"></a>
+
 ![Size of transactions referenced by EBs](images/contents-ebs-size.svg)
 
-> [!WARNING]
->
-> - [ ] Remove empty EBs (created at the start or end of the simulation) from the plot above.
+_Figure 11. Size of transactions referenced by EBs._
+
+</div>
 
 Because of the aforementioned backpressure, diffusion occurs in Leios in an orderly manner even when demand is high. The following set of plots show histograms of diffusion time (i.e., the time from a transaction's, RB's, EB's, or vote's creation to its reaching the nodes in the network). Transactions and votes typically diffuse rapidly throughout the whole network in fractions of a second, due to their small sizes, often small enough to fit in a single TCP transmission unit. RBs diffuse in less one second, with the empty RBs at the start and end of the simulation diffusing fastest. Similarly, EBs diffuse fast when empty or when demand is low, but once full EBs are diffusing, it can take up to two seconds for them to diffuse. All of the distribution have long tails where messages arrive much later for nodes with unfavorably topological locations. The Leios protocol possesses the important property that traffic in transactions, RBs, votes, and EBs do not interfere with one another: for example, delays in EBs and high throughput do not also delay RBs in those cases.
+
+<div align="center">
+<a name="figure-12" id="figure-12"></a>
 
 |                                                 |                                                 |
 | ----------------------------------------------- | ----------------------------------------------- |
 | ![Arrival delay for TXs](images/elapsed-TX.svg) | ![Arrival delay for RBs](images/elapsed-RB.svg) |
 | ![Arrival delay for VTs](images/elapsed-VT.svg) | ![Arrival delay for EBs](images/elapsed-EB.svg) |
 
+_Figure 12. Arrival delays for transactions, ranking blocks, votes, and endorser blocks._
+
+</div>
+
+<a name="resource-requirements"></a>**Resource requirements**
+
+The resource requirements for operating Leios nodes have been estimated from
+benchmarking and simulation studies. The assumed values for various Leios
+operations come either from measurements of the cryptography prototype[^leioscrypto],
+from the IOG benchmarking cluster for the Cardano node, or analysis of the Cardano mainnet ledger using the `db-analyser` tool. These were input to the
+Haskell and Rust simulators for Leios to make holistic estimates of resource
+usage of operating nodes.
+
 In terms of resource usage, the throughputs in these simulations do no stress the four virtual CPUs of each node or saturate the 10 Mb/s available bandwidth between nodes. The figures below show that bandwidth usage does not exceed 4 Mb/s and that most of that is consumed by diffusion of transactions among the nodes. Furthermore, vCPU usage stays below 200% (i.e., the equivalent of two vCPUs operating fully), though it is very bursty because of the uneven workload of cryptographic and ledger operations. The last figure quantifies how transaction and EB body validation dominate CPU usage. Averaged over time, CPU usage is low: there may be opportunities in the implementation of the Leios node for lazy computations, caching, etc. that will spread out the occasional spikes in CPU usage over time.
 
-| Network                                                | CPU                                                              |
+<div align="center">
+<a name="figure-13" id="figure-13"></a>
+
+|                                                        |                                                                  |
 | ------------------------------------------------------ | ---------------------------------------------------------------- |
 | ![Mean nodal ingress](images/ingress-average-area.svg) | ![Mean CPU load among all nodes](images/cpu-mean-timeseries.svg) |
 
+_Figure 13. Mean nodal ingress (left) and Mean CPU load among all nodes (right)._
+</div>
+
+<div align="center">
+<a name="figure-14" id="figure-14"></a>
+
 ![Mean CPU load among all nodes](images/cpu-mean-histogram.svg)
 
-Note that the transaction workload in the simulations above was modeled upon the *average* amount of Plutus computation typical of the Cardano mainnet. The low time-averaged CPU usage in the simulations (i.e., less than 15% of a vCPU) suggests that the per-transaction and/or per-block Plutus budget could be significantly increased under Leios: either every transaction could have a modestly higher budget, or some transactions could use an order of magnitude more Plutus execution units.
+_Figure 14. Mean CPU load among all nodes._
+</div>
 
-> [!WARNING]
+Note that the transaction workload in the simulations above was modeled upon the *average* amount of Plutus computation typical of the Cardano mainnet. The low time-averaged CPU usage in the simulations (i.e., less than 15% of a vCPU) suggests that the per-transaction and/or per-block Plutus budget could be significantly increased under Leios: either every transaction could have a modestly higher budget, or some transactions could use an order of magnitude more Plutus execution units. Statistical analysis of CPU usage in ledger operations[^timings] using the `db-analyser` tool[^dbanalyser] on Cardano mainnet from epoch 350 through 573 yields the following simple models of the CPU cost of validating signatures and executing Plutus in the transactions of a block. Because of the noisiness in the raw mainnet data, these estimates are uncertain.
+
+[^timings]: [Analysis of mainnet transaction validation times](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/timings/ReadMe.ipynb)
+
+[^dbanalyser]: [Cardano instantiation of the Consensus Layer: db-analyser](https://github.com/IntersectMBO/ouroboros-consensus/blob/main/ouroboros-consensus-cardano/README.md#db-analyser)
+
+- CPU per transaction in a block: `428.4 μs/tx`.
+- CPU per byte of a block: `211.5 μs/kB`.
+- Linear models for signature verification and Plutus execution:
+    - `(148.1 μs/tx) * (number of transactions) + (114.1 μs/kB) * (number of bytes)`.
+    - `(137.5 μs/tx) * (number of transactions) + (60.2 μs/kB) * (number of bytes) + (585.2 μs/Gstep) * (billions of Plutus execution steps)`, with a Lapace-distributed error having scale `1250 μs`.
+
+The Leios simulators use the value `0.4284 ms` as the validation time for each transaction. A more nuanced model of CPU usage in the simulators would account for Plutus execution. In order to estimate the effect of Plutus-heavy workloads, one can vary that per-transaction time to higher values. Very approximately, validation times of `1 ms/tx`, `10 ms/tx`, or `100 ms/tx` correspond to 2, 20, or 200 billion Plutus steps per transaction, respectively. The following plot of simulation results limit each node to 6 vCPU cores and suggest that the `100 ms/tx` workload is untenable. The subsequent plot shows the 6 vCPUs becoming saturated with Plutus execution, so much so that EBs fail to be created. These results indicate that Leios's *block-level* Plutus budget can safely be 2000 billion steps, or 100 times the Plutus budget of Praos.
+
+> [!IMPORTANT]
 >
-> - [ ] For these same protocol parameters, run an experiment to demonstrate that more intense Plutus fits within the CPU budget.
-> - [ ] Discuss that Plutus budget needs to be set carefully in Leios in order to avoid expanding the attack surface of expensive Plutus scripts.
+> TODO: **@bwbush**
+>
+> - [ ] Regenerate the plots below each time the version of `sim-cli` is bumped.
+> - [ ] In next set of re-runs . . .
+>     - [ ] Use SVG format.
+>     - [ ] Align with the base case of the previous section.
+>     - [ ] In the transaction plot, switch to the minute-based ledged.
+>     - [ ] In the CPU plot, expand the abbrevations into phrases.
+> - [ ] In the final version . . .
+>    - [ ] Remove title and subtitle.
 
+<div align="center">
+<a name="figure-15" id="figure-15"></a>
+
+![Fate of Plutus-heavy transactions in Leios](images/plutus-temporal-efficiency-bar.png)
+
+_Figure 15. Fate of Plutus-heavy transactions in Leios._
+
+</div>
+
+<div align="center">
+<a name="figure-16" id="figure-16"></a>
+
+![CPU usage in Plutus-heavy workloads for Leios](images/plutus-cpu-mean-histogram.png)
+
+_Figure 16. CPU usage in Plutus-heavy workloads for Leios._
+
+</div>
+
+In summary, Leios will require a modest increase of the recommended hardware requirements[^spohw]: a four-core machine will be required, but a network upgrade will not be needed, as 10 Mb/s is well below the bandwidth of standard network connections. At throughput much higher than 200 kB/s, network egress can become a significant cost for nodes hosted on some cloud-computing providers. The Leios simulations do not model memory or disk. With the advent of UTxO-HD[^utxohd], 16 GB of memory will remain be sufficient for Leios if the `OnDisk` option is used for the UTxO set. Disk requirements depend upon the growth of the ledger, but a sustained 0.150 MB/s throughput amounts to ledger size increasing by 4.7 TB each year: see the section below on Operating Costs for further discussion.
+
+[^spohw]: [Minimum hardware requirements to run a stake pool](https://developers.cardano.org/docs/operate-a-stake-pool/hardware-requirements/)
+
+[^utxohd]: [Cardano Node 10.5.1 release notes](https://github.com/IntersectMBO/cardano-node/releases/tag/10.5.1)
 
 <a name="feasible-parameters"></a>**Feasible protocol parameters**
 
@@ -964,33 +1047,49 @@ simulations of Leios. The exact choice of parameters that would be adopted on
 the Cardano mainnet must be subject to discussion and consideration of
 tradeoffs.
 
-> [!WARNING]
->
-> This is an incomplete work in progress.
->
-> - [ ] Revise after the protocol definition is complete.
-> - [ ] Each row should have a paragraph of justification.
-
 <div align="center">
-<a name="table-4" id="table-4"></a>
+<a name="table-5" id="table-5"></a>
 
-| Parameter                                  | Symbol        | Units    | Description                                                                 | Feasible value | Justification                                                                                                             |
-| ------------------------------------------ | ------------- | -------- | --------------------------------------------------------------------------- | -------------: | ------------------------------------------------------------------------------------------------------------------------- |
-| Stage length                               | $L$           | slot     |                                                                             |             10 | Short stages increase settlement speed, but the stage length must be generously larger than the propagation time for IBs. |
-| Expiration of unreferenced endorser blocks | $r_\text{EB}$ | slot     |                                                                             |                |                                                                                                                           |
-| Mean committee size                        | $n$           | parties  |                                                                             |            500 | Probabilistic analyses of adversarial stake scenarios.                                                                    |
-| Quorum size                                | $\tau$        | fraction |                                                                             |            60% | Probabilistic analyses of adversarial stake scenarios.                                                                    |
-| Praos active slot coefficient              | $f_\text{RB}$ | 1/slot   | The probability that a party will be the slot leader for a particular slot. |           0.05 | This is the current value on mainnet, but it may become feasible to reduce it if Praos blocks are made smaller.           |
+| Parameter                                     |    Symbol          |  Feasible value    | Justification
+| --------------------------------------------- | :----------------: | :----------------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Voting period length                          | $L_\text{vote}$    | 7 slots            | Short stages increase settlement speed, but the stage length must be generously larger than the propagation time for EBs.                                                                   |
+| Recovery period length                        | $L_\text{recover}$ | ?? slots           | ???                                                                                                                                                                                         |
+| Endorser-block referenceable transaction size | $S_\text{EB-tx}$   | 12 MB              | Simulations indicate that 200 kB/s throughput is feasible at this block size.                                                                                                               |
+| Endorser block max size                       | $S_\text{EB}$      | 512 kB             | Endorser blocks must not be so large that the transaction-execution bitmap is not too large to fit in a Praos block.                                                                        |
+| Maximum Plutus steps per endorser block       | -                  | 2000G step units   | Simulations at high transaction-validation CPU usage.                                                                                                                                       |
+| Maximum Plutus memory per endorser block      | -                  | 7000M memory units | Simulations at high transaction-validation CPU usage.                                                                                                                                       |
+| Maximum Plutus steps per transaction          | -                  | 100G step units    | Raise per-transaction limit by a factor of twenty relative to Praos.                                                                                                                        |
+| Maximum Plutus memory per transaction         | -                  | 350M memory units  | Raise per-transaction limit by a factor of twenty relative to Praos.                                                                                                                        |
+| Ranking block max size                        | $S_\text{RB}$      | 90,112 bytes       | This is the current value on the Cardano mainnet.                                                                                                                                           |
+| Praos active slot coefficient                 | $f_\text{RB}$      | 0.05 /slot         | This is the current value on the Cardano mainnet.                                                                                                                                           |
+| Mean committee size                           | $n$                | 600 stakepools     | Modeling of the proposed certificate scheme indicates that certificates reach their minimum size of ~8 kB at this committee size, given a realistic distribution of stake among pools.      |
+| Quorum size                                   | $\tau$             | 60%                | Quorum should be enough greater than 50% that sortition fluctuations do not give a 50% adversary a temporary majority, but low enough that weak adversaries cannot thwart an honest quorum. |
 
-_Table 4: Feasible Protocol Parameters_
+_Table 5: Feasible Protocol Parameters_
 
 </div>
+
+> [!IMPORTANT]
+>
+> TODO: **@bwbush**
+>
+> - [ ] Determine how long the recovery period should be, entering it into the table.
+> - [ ] Add a paragraph about the recovery period.
+> - [ ] Are the per-transaction Plutus limits appropriate?
+
+Simulations on mainnet-like topologies indicate that seven slots is more than sufficient to diffuse the transactions, blocks, and votes required by Leios. Most nodes receive these in one second or less and even the tardiest nodes receive them in under two seconds. Similarly, the cryptography involved can be easily executed within the CPU budget. Seven-second voting periods provide a long safety margin for the transport and computation. A longer voting period would increase the probability that a ranking block is forged during the voting period: in such a situation, the endorser block would have to be discarded. Thus there is a tradeoff between allowing enough time for diffusion and computing but not so much time that endorser blocks are too frequently discarded. Higher-fidelity simulators, better empirical data on mainnet performance, and Leios testnet operations will can test the appropriateness of this parameter and refine its value for a final recommendation.
+
+The aforementioned simulations also demonstrate that Leios operates up to 0.2 TxMB/s without experiencing congestion, provided endorser blocks reference no more than 12 MB of transactions. Even under adversarial conditions, where malicious nodes release transactions from their private memory pool at the same time that they forge a ranking block and an endorser block, simulations demonstrate that 12 MB of transactions diffuse rapidly enough for the protocol to operate smoothly, achieving a quorum of votes before the voting period ends. It is important to limit the number of transactions referenced by an endorser block because the transaction-execution bitmap in a subsequent ranking block may have to record information about conflicted transactions. A limit of 512 kB on the size of the endorser block itself ensures fast diffusion and limits its contents to 16,000 transactions, since each transaction hash is 32 bytes. That limit keeps the size of the bitmap in the few-kilobyte range, ensuring that it easily fits in the ranking block. The combination of 12 MB of transaction data and 16,000 transactions implies an average transaction size of 2000 bytes when both limits are reached: this is higher than the recent average transaction size on Cardano mainnet.
+
+Estimating the feasible limits for Plutus execution requires a more solid grounding, than currently exists, of the Plutus cost model in terms of actual CPU resources required to execute Plutus steps and memory. The empirical analysis and simulations presented above suggest the the per-block Plutus budget could be substantially increased. Results indicate that 2000 billion Plutus steps would consume less than two CPU-seconds of computation on typical node hardware. On a four-core machine there would be sufficient resources to evaluate the Plutus rapidly enough so as not to interfere with voting for endorser blocks. As in Praos, that block-level budget could be allocated to transactions in such a manner that several Plutus-heavy transaction fit in a single endorser block. Limiting a transaction to 100 billion steps, for instance, would allow 20 such transactions in each endorser block. For reference, this is ten times the recent Praos limit on transaction execution steps. The per-transaction limit can be adjusted to suit the needs of the community: i.e., it could be tuned to favor many light Plutus transactions vs a few heavy Plutus transactions.
+
+Although the Praos maximum block size could be modestly raised in Leios and the active-slot coefficient adjusted slightly, there is no compelling reason to alter these. They could, however, be re-evaluated in the context of the Leios testnet.
 
 The analysis
 [Committee size and quorum requirement][committee-size-analysis]
 in the first Leios Technical Report indicates that the Leios committee size
 should be no smaller than 500 votes and the quorum should be at least 60% of
-those votes. However, the proposed [Fait Accompli][fait-accompli-sortition][^1] scheme wFA<sup>LS</sup>
+those votes. However, the proposed [Fait Accompli][fait-accompli-sortition][^fasort] scheme wFA<sup>LS</sup>
 achieves compact certificates that do not become larger as the number of voters
 increases, so larger committee sizes might be permitted for broader SPO
 participation and higher security. The committee size should be large enough
@@ -999,64 +1098,6 @@ probability of an adversarial quorum when the adversarial stake is just under
 50%. The quorum size should be kept large enough above 50% so that those same
 fluctuations do not prevent an honest quorum. Larger committees require more
 network traffic, of course.
-
-<a name="resource-requirements"></a>**Resource requirements**
-
-> [!WARNING]
-> TODO
-> - Introduce how these values have been found
-> - Summarize and evidence of increased network, compute and storage demands during max load
-> - Recommended hardware requirements (any change to [these](https://developers.cardano.org/docs/operate-a-stake-pool/hardware-requirements/))
-
-The resource requirements for operating Leios nodes have been estimated from
-benchmarking and simulation studies. The benchmark values for various Leios
-operations come either from measurements of the cryptography prototype[^3] or
-from the IOG benchmarking cluster for the Cardano node. These were input to the
-Haskell and Rust simulators for Leios to make holistic estimates of resource
-usage of operating nodes.
-
-> [!CAUTION]
->
-> The plots below are placeholders. All of the simulations in this section need
-> to be re-run:
->
-> - [ ] Final version of the Leios protocol
-> - [ ] Realistic mainnet topology
-> - [ ] Protocol parameters close to the recommended value
-> - [ ] CPU
->   - [ ] Unlimited?
->   - [ ] Six cores?
-> - [ ] Strip the major titles from the diagrams
-> - [ ] Use SVG format
-
-At high throughput, network egress can become a significant cost for nodes
-hosted on some cloud-computing providers. The violin plots below indicate that
-at the higher throughput that Leios can support, network egress can reach nearly
-2 MB/s.
-
-![Simulation of Leios network egress](images/network.png)
-
-Disk usage is correlated with network usage, as most of the blocks moving over
-the network also need to be persisted permanently; only the votes do not require
-disk storage. The plots below demonstrate that disk usage scales directly as the
-product of the IB rate and the IB size.
-
-![Simulation of Leios disk usage](images/disk.png)
-
-Both the average CPU usage and the peak CPU usage are relevant for deciding how
-to provision hardware for Leios nodes. The following plots indicate that two
-CPUs are sufficient for sustained and for peak Leios operation at high
-throughput. Real deployments should over-provision CPU, of course, in order to
-handle rare extraordinary peak conditions and to speed syncing from genesis.
-
-![Simulation of average CPU usage for Leios](images/cpu-mean.png)
-
-![Simulation of peak CPU usage for Leios](images/cpu-peak.png)
-
-Overall the most significant Leios hardware requirement changes compared to
-Praos are the higher levels of network egress and the rapidly growing disk space
-to store the Leios blocks. CPU requirements are quite similar to existing Praos
-deployments.
 
 <a name="operating-costs"></a>**Operating costs**
 
@@ -1068,7 +1109,7 @@ the maximum size of existing Praos blocks, to the cost per node and the total
 cost of all nodes.
 
 <div align="center">
-<a name="table-5" id="table-5"></a>
+<a name="table-7" id="table-7"></a>
 
 | IB/s Rate | Cost per Node (Avg) | Network Cost (10,000 nodes) |
 | --------: | ------------------: | --------------------------: |
@@ -1079,7 +1120,7 @@ cost of all nodes.
 |        20 |    $2,500 USD/month |       $25,000,000 USD/month |
 |        30 |    $3,600 USD/month |       $36,000,000 USD/month |
 
-_Table 5: Operating Costs by IB Production Rate_
+_Table 7: Operating Costs by IB Production Rate_
 
 </div>
 
@@ -1088,7 +1129,7 @@ and fees, we can calculate the required TPS to generate enough fees to cover
 infrastructure costs.
 
 <div align="center">
-<a name="table-6" id="table-6"></a>
+<a name="table-8" id="table-8"></a>
 
 | Infrastructure Cost (USD/month) | Required ADA (at $0.45/ADA) | TPS (Avg Tx) | TPS (Min Tx) | Equivalent IB/s |
 | ------------------------------: | --------------------------: | -----------: | -----------: | --------------: |
@@ -1099,7 +1140,7 @@ infrastructure costs.
 |                     $25,000,000 |                  55,555,556 |         9.71 |        12.47 |           0.139 |
 |                     $36,000,000 |                  80,000,000 |        13.99 |        17.96 |           0.200 |
 
-_Table 6: Required TPS for Infrastructure Cost Coverage_
+_Table 8: Required TPS for Infrastructure Cost Coverage_
 
 </div>
 
@@ -1107,7 +1148,7 @@ _Required TPS for Current Reward Maintenance:_ To maintain current reward levels
 (~48 million ADA monthly) through transaction fees as the Reserve depletes.
 
 <div align="center">
-<a name="table-7" id="table-7"></a>
+<a name="table-9" id="table-9"></a>
 
 | Year | Reserve Depletion | Rewards from Fees (ADA) | Required TPS (Avg Tx) | Required IB/s |
 | ---: | ----------------: | ----------------------: | --------------------: | ------------: |
@@ -1118,7 +1159,7 @@ _Required TPS for Current Reward Maintenance:_ To maintain current reward levels
 | 2029 |              ~43% |              20,640,000 |                  36.1 |          0.52 |
 | 2030 |              ~50% |              24,000,000 |                  41.9 |          0.60 |
 
-_Table 7: Required TPS for Current Reward Maintenance_
+_Table 9: Required TPS for Current Reward Maintenance_
 
 </div>
 
@@ -1546,9 +1587,9 @@ protocol.
 [apache-2.0]: http://www.apache.org/licenses/LICENSE-2.0 "Apache License 2.0"
 
 <!-- Footnotes -->
-[^1]: The Fait Accompli sortition scheme
+[^fasort]: The Fait Accompli sortition scheme
 [^2]: Leios: Dynamic Availability for Blockchain Sharding (2025)
-[^3]: Leios cryptography prototype implementation
+[^leioscrypto]: Leios cryptography prototype implementation
 
 ## Appendix
 
