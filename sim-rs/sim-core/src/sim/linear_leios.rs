@@ -456,32 +456,20 @@ impl LinearLeiosNode {
         {
             return;
         }
-        let referenced_by_eb = self.acknowledge_tx(&tx);
-        if !referenced_by_eb {
-            let rb_ref = self.latest_rb().map(|rb| rb.header.id);
-            let ledger_state = self.resolve_ledger_state(rb_ref);
-            if ledger_state.is_some_and(|ls| ls.spent_inputs.contains(&tx.input_id)) {
-                // Ignoring a TX which conflicts with something already onchain
-                return;
-            }
-            if self
-                .praos
-                .mempool
-                .values()
-                .any(|mempool_tx| mempool_tx.input_id == tx.input_id)
-            {
-                // Ignoring a TX which conflicts with the current mempool contents.
-                return;
-            }
-            self.praos.mempool.insert(tx.id, tx.clone());
-        }
 
+        let referenced_by_eb = self.acknowledge_tx(&tx);
+        let added_to_mempool = self.try_add_tx_to_mempool(&tx);
+
+        // If we added the TX to our mempool, we want to propagate it so our peers can as well.
+        // If it was referenced by an EB, we want to propagate it so our peers have the full EB.
         // TODO: should send to producers instead (make configurable)
-        for peer in &self.consumers {
-            if *peer == from {
-                continue;
+        if referenced_by_eb || added_to_mempool {
+            for peer in &self.consumers {
+                if *peer == from {
+                    continue;
+                }
+                self.queued.send_to(*peer, Message::AnnounceTx(id));
             }
-            self.queued.send_to(*peer, Message::AnnounceTx(id));
         }
     }
 
@@ -1318,6 +1306,26 @@ impl LinearLeiosNode {
 
 // Ledger/mempool operations
 impl LinearLeiosNode {
+    fn try_add_tx_to_mempool(&mut self, tx: &Arc<Transaction>) -> bool {
+        let ledger_state = self.resolve_ledger_state(self.latest_rb().map(|rb| rb.header.id));
+        if ledger_state.spent_inputs.contains(&tx.input_id) {
+            // This TX conflicts with something already on-chain
+            return false;
+        }
+
+        if self
+            .praos
+            .mempool
+            .values()
+            .any(|t| t.input_id == tx.input_id)
+        {
+            // This TX conflicts with something already in the mempool
+            return false;
+        }
+        self.praos.mempool.insert(tx.id, tx.clone());
+        true
+    }
+
     fn sample_from_mempool(
         &mut self,
         txs: &mut Vec<Arc<Transaction>>,
@@ -1373,12 +1381,12 @@ impl LinearLeiosNode {
             .retain(|_, tx| !inputs.contains(&tx.input_id));
     }
 
-    fn resolve_ledger_state(&mut self, rb_ref: Option<BlockId>) -> Option<Arc<LedgerState>> {
+    fn resolve_ledger_state(&mut self, rb_ref: Option<BlockId>) -> Arc<LedgerState> {
         let Some(block_id) = rb_ref else {
-            return Some(Arc::new(LedgerState::default()));
+            return Arc::new(LedgerState::default());
         };
         if let Some(state) = self.ledger_states.get(&block_id) {
-            return Some(state.clone());
+            return state.clone();
         };
 
         let mut state = self
@@ -1388,6 +1396,7 @@ impl LinearLeiosNode {
             .unwrap_or_default();
 
         let mut block_queue = vec![block_id];
+        let mut complete = true;
         while let Some(block_id) = block_queue.pop() {
             if !state.seen_blocks.insert(block_id) {
                 continue;
@@ -1404,24 +1413,29 @@ impl LinearLeiosNode {
             }
 
             if let Some(endorsement) = &rb.endorsement {
-                let Some(EndorserBlockView::Received {
-                    eb,
-                    validated: true,
-                    ..
-                }) = self.leios.ebs.get(&endorsement.eb)
-                else {
-                    // We haven't validated the EB yet, so we don't know the ledger state
-                    return None;
-                };
-                for tx in &eb.txs {
-                    state.spent_inputs.insert(tx.input_id);
+                match self.leios.ebs.get(&endorsement.eb) {
+                    Some(EndorserBlockView::Received { eb, .. }) => {
+                        for tx in &eb.txs {
+                            if self.has_tx(tx.id) {
+                                state.spent_inputs.insert(tx.input_id);
+                            } else {
+                                complete = false;
+                            }
+                        }
+                    }
+                    _ => {
+                        // We haven't validated the EB yet, so we don't know the full ledger state
+                        complete = false;
+                    }
                 }
             }
         }
 
         let state = Arc::new(state);
-        self.ledger_states.insert(block_id, state.clone());
-        Some(state)
+        if complete {
+            self.ledger_states.insert(block_id, state.clone());
+        }
+        state
     }
 }
 
