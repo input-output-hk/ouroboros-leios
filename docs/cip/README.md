@@ -1313,6 +1313,14 @@ transactions would make it onto the ledger.
 
 <a name="key-limitations"></a>**Key limitations**
 
+<a name="eb-propagation-resilience"></a>**EB Availability Limitations**
+
+The current specification requires nodes to receive EBs within $L_\text{vote}$ to participate in voting. When network conditions prevent nodes from obtaining all transactions referenced by an EB, this creates a binary outcome: either sufficient nodes can vote (enabling certification) or they can't (causing the EB to be discarded). 
+
+One potential approach to address this limitation involves [partial EB certification mechanisms](https://gist.githubusercontent.com/will-break-it/aa959601a13e2a9899a96de150fcafdd/raw/70b91ef564c484472ee81b2138ae4e92c5ed1088/leios-progressive-eb-certification.md) using merkle tree structures that would allow nodes to vote on partial transaction subsets when they cannot obtain all referenced transactions. This concept trades increased EB size for improved resilience under adverse network conditions, transforming the binary success/failure dynamic into graduated progress.
+
+This approach remains exploratory and would require careful analysis of the bandwidth vs. resilience trade-offs and validation through simulation to determine whether nodes actually receive transactions in the contiguous patterns the mechanism assumes.
+
 > [!WARNING]
 > TODO:
 > - ΔEB timing constraints and consequences
