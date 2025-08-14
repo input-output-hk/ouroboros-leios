@@ -1,42 +1,31 @@
 # Conformance testing
 
-The goal of conformance testing is to check that an implementation of a protocol behaves as described in the formal specification of the protocol, i.e. conformance testing verifies that a given trace from an execution of the protocol is one of the possible paths defined by a relation in the formal specification.
+The goal of conformance testing is to check that an implementation of a protocol behaves as described in the formal specification of the protocol.
+In Leios this is achieved by doing trace verification. The trace verifier checks, whether a trace log corresponds to a possible execution path of the relation in the formal specification.
 
 ## Formal specification
 
 The formal specification of [Ouroboros Leios](https://github.com/input-output-hk/ouroboros-leios-formal-spec) is implemented in Agda as a relational specification. Different variants of the Leios protocol have been explored in the formal specification, with a focus on Short-Leios.
-A common code base for the variants is used in order to share data types, like the block types for example.
+A common code base for the variants is used in order to share data types, for example the block types.
 The functionalities (FFD, VRF, Base ledger, etc.) are abstract data types with defining properties.
 
 ### Categorical crypto framework
 
-Motivated by the need for better runtime performance of the trace verifier, the Categorical Crypto Framework developed by André Knispel has been introduced in the project. The framework facilitates the composition of the different components and we no longer have to manage the state of the functionalities explicitly (previously state of the functionalities was also put into the `LeiosState` for convenience).
+Motivated by the need for better runtime performance of the trace verifier, the Categorical Crypto Framework has been introduced in the project. The framework facilitates the composition of the different components and we no longer have to manage the state of the functionalities explicitly (previously state of the functionalities was also put into the `LeiosState` for convenience).
 
-### Single node view
+In this setup the Leios protocol is specified from the view of a single, honest party, describing all the possible changes of the `LeiosState` for given pre-conditions.
 
-The formal spec describes the evolution of a single, honest node running the Leios protocol, i.e., it describes all the possible changes of the `LeiosState` with given pre-conditions.
 This is different to the formal specifications of [Ouroboros Peras](https://github.com/input-output-hk/peras-design/blob/main/src/Peras/SmallStep.lagda.md) or [Ouroboros Praos](https://github.com/input-output-hk/ouroboros-praos-formal-spec/blob/main/src/Protocol/Semantics.agda), where in both cases all nodes of the distributed system, including adversarial nodes, are modelled and the relation in the formal specification describes the possible evolution of the distributed system as a whole.
 
 ### State transitions in Leios
 
-The Short-Leios relation does the following state transition steps:
-
-* Creating an InputBlock
-* Creating an EndorserBlock
-* Voting
-* Not elected to create an InputBlock
-* Not elected to create an EndorserBlock
-* Not elected to vote
-* Transitioning to the next slot
-* Interaction with Base Ledger
-
-A state transition step usually has pre-conditions that need to be fulfilled. For details, see [(Full-)Short Leios transitions](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Short.lagda.md#full-short-leios-transitions) in the formal specification.
+The relation specifying the Short-Leios protocol carries out state transition steps upon block creation, transitioning to next slot and interacting with the base ledger. Those steps usually have pre-conditions that need to be fulfilled. For details, see [(Full-)Short Leios transitions](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Short.lagda.md#full-short-leios-transitions) in the formal specification.
 
 ## Trace verification
 
-Trace verification checks, if an execution trace of the Leios protocol is possible with respect to the formal specification. The idea has been developed in the [formal-streamlet](https://github.com/input-output-hk/formal-streamlet) protocol and been adapted in the [Fast-BFT](https://github.com/input-output-hk/innovation-fastbft) and Leios projects. Trace verification in the Leios project is currently implemented for Short-Leios.
+Trace verification checks, whether an execution trace of the Leios protocol is a possible realization of the formal specification. This idea has been developed in the [formal-streamlet](https://github.com/input-output-hk/formal-streamlet) protocol and been adapted in the [Fast-BFT](https://github.com/input-output-hk/innovation-fastbft) and Leios projects. Trace verification in the Leios project is currently implemented for Short-Leios.
 
-When parsing a trace log file, events are mapped to actions that trigger a step in the relational specification. As long as for an action the pre-conditions for the next transition step can be fulfilled and the step can be done, the transition is considered correct with respect to the formal specification. Steps are done sequentially until a transition fails with a proof providing the reason of failure that gets included in the error message.
+When parsing a trace log file, events are mapped to actions that trigger a step in the relational specification of the protocol. As long as for an action the pre-conditions for the next transition step can be fulfilled and the step can be done, the transition is considered correct with respect to the formal specification. Steps are done sequentially until a transition fails with a proof providing the reason of failure that gets included in the error.
 
 ### Error handling
 
