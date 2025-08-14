@@ -250,7 +250,7 @@ This creates a compact **certificate** proving the EB's validity.
 The certificate for an EB may be included in the body of a new ranking block `RB'` only if all of the following conditions hold:
   1. `RB'` directly extends the RB which announced this EB (as illustrated in Figure 4 where `RB'` contains the certificate for the EB announced by the preceding RB).
   2. The certificate is valid as defined in [Certificate Validation](#certificate-validation).
-  3. If the EB contains an `execution_bitmap`, this bitmap must be applied to determine which transactions from previous RBs back to the last RB that included a certificate were successfully executed (correction mechanisms are detailed in the following [Transaction Validation](#transaction-validation) section).
+  3. If the EB contains a `tx_execution_bitmap`, this bitmap must be applied to determine which transactions from previous RBs back to the last RB that included a certificate were successfully executed (correction mechanisms are detailed in the following [Transaction Validation](#transaction-validation) section).
 
 This **conditional inclusion** ensures transaction availability to honest nodes with good probability while achieving higher throughput. When included:
 
@@ -288,9 +288,11 @@ Leios resolves this by allowing RBs in HTM to temporarily include <a name="unval
 
 As a direct consequence of allowing unvalidated transactions, the protocol must implement **correction mechanisms** to track which transactions were executed. Transaction corrections follow exactly **two rules** based on timing:
 
-**Rule 1 - EB Corrections (Last cert ≤ $L_\text{recover}$)**: When an EB certificate is produced within $L_\text{recover}$ slots of the latest certificate in the chain, the certified EB must include an `execution_bitmap` field (labeled as `<TxBitMap>` in figures) indicating the execution status of transactions in RBs between this certificate and the previous EB certificate. As shown in Figure 5, EB<sub>2</sub> includes such corrections.
+<a id="correction-rule-1"></a>**Rule 1 - EB Corrections (Last cert ≤ $L_\text{recover}$)**: When an EB certificate is produced within $L_\text{recover}$ slots of the latest certificate in the chain, the certified EB must include a `tx_execution_bitmap` field (labeled as `<TxBitMap>` in figures) indicating the execution status of transactions in RBs between this certificate and the previous EB certificate. As shown in Figure 5, EB<sub>2</sub> includes such corrections.
 
-**Rule 2 - RB Corrections (Last cert > $L_\text{recover}$)**: When the first RB is generated more than $L_\text{recover}$ slots after the latest EB certificate in the chain, this RB must include an `execution_bitmap` field (labeled as `<TxBitMap>` in figures) indicating the execution status of transactions in RBs between this RB and that EB certificate. As shown in Figure 5, RB<sub>8</sub> includes corrections spanning the range between RB<sub>5</sub> (which included the last certificate) and RB<sub>7</sub>.
+<a id="correction-rule-2"></a>**Rule 2 - RB Corrections (Last cert > $L_\text{recover}$)**: When the first RB is generated more than $L_\text{recover}$ slots after the latest EB certificate in the chain, this RB must include a `tx_execution_bitmap` field (labeled as `<TxBitMap>` in figures) indicating the execution status of transactions in RBs between this RB and that EB certificate. As shown in Figure 5, RB<sub>8</sub> includes corrections spanning the range between RB<sub>5</sub> (which included the last certificate) and RB<sub>7</sub>.
+
+The size of the transaction execution bitmap is bounded by protocol parameters to prevent excessive block space consumption. The bitmap size depends on the number of transactions that could appear during the recovery period, with the exact calculation detailed in the [Protocol Parameters](#protocol-parameters) section.
 
 The timing constraints that enable these correction mechanisms are also shown in Figure 5:
 - <a id="l-vote" href="#l-vote"></a>**$L_\text{vote}$ periods** (timing brackets under each EB): Define when committee members can vote on EBs, ensuring sufficient time for EB diffusion and validation before certification (see [Protocol Parameters](#protocol-parameters) for constraints)
@@ -317,11 +319,15 @@ RBs are Praos blocks extended to support Leios by optionally announcing EBs in t
 
 2. **Body additions**:
    - `eb_certificate` (optional): certificate proving EB availability & validity
-   - `execution_bitmap` (optional): bitmap tracking transaction execution status
+   - `tx_execution_bitmap` (optional): bitmap tracking transaction execution status
 
 <a id="rb-inclusion-rules" href="#rb-inclusion-rules"></a>**Inclusion Rules**: When an RB header includes a `certified_eb` field, the corresponding body must include a matching `eb_certificate`. Conversely, an `eb_certificate` can only be included when a `certified_eb` field references the EB being certified.
 
-<a id="rb-corrections" href="#rb-corrections"></a>**RB Corrections**: Following **Rule 2**, when the first RB is generated more than $L$<sub>recover</sub> slots after the latest EB certificate, the `execution_bitmap` field must indicate the execution status of transactions in RBs between this RB and that EB certificate. The bitmap provides a unified encoding where each bit indicates whether a transaction was executed or not, enabling nodes to construct the complete ledger state for the entire HTM period. This ensures the ledger state is fully determined before CM resumes.
+<a id="rb-corrections" href="#rb-corrections"></a>**RB Corrections**: Following <a href="#correction-rule-2">**Rule 2**</a>, when the first RB is generated more than $L$<sub>recover</sub> slots after the latest EB certificate, the `tx_execution_bitmap` field must indicate the execution status of transactions in RBs between this RB and that EB certificate. The bitmap provides a unified encoding where each bit indicates whether a transaction was executed or not, enabling nodes to construct the complete ledger state for the entire HTM period. This ensures the ledger state is fully determined before CM resumes.
+
+<a id="bitmap-size-constraint" href="#bitmap-size-constraint"></a>**Bitmap Size Constraint**: The transaction execution bitmap size $S_\text{bitmap}$ (see [Protocol Parameters](#protocol-parameters)) must fit within $S_\text{RB}$ alongside other required data. This is ensured by bounding $L_\text{recover}$ implicitly via $S_\text{bitmap} < S_\text{RB}$ (see [Bitmap Size Relationships](#bitmap-size-relationships)).
+
+<a id="cost-proportionality" href="#cost-proportionality"></a>**Cost Proportionality**: The first CM block pays a cost proportional to the **uncorrected** HTM window—i.e., RB transactions since the last EB certificate. EB corrections already included during HTM reduce this cost; only the remaining window requires an RB-side bitmap.
 
 > [!WARNING]
 > **TODO:** Add transaction confirmation levels and their implications for applications
@@ -334,15 +340,15 @@ EBs are produced by the same stake pool that created the corresponding announcin
 
 <a id="eb-structure" href="#eb-structure"></a>**EB Structure**: EBs have a simplified structure without header/body separation:
 - `transaction_references`: List of transaction references (transaction ids)
-- `execution_bitmap`: Bitmap tracking execution status of transactions from previous RBs
+- `tx_execution_bitmap`: Bitmap tracking execution status of transactions from previous RBs
 
-<a id="eb-corrections" href="#eb-corrections"></a>**EB Corrections**: The `execution_bitmap` field serves a critical role in maintaining ledger integrity during HTM. Following **Rule 1**, when validators create an EB certificate within $L_\text{recover}$ slots of the latest certificate, they determine the execution status of transactions in RBs within the specified range. The bitmap provides a unified encoding where each bit indicates whether a transaction was executed or not, enabling nodes to construct the complete ledger state. This bitmap is included in the EB and ensures that:
+<a id="eb-corrections" href="#eb-corrections"></a>**EB Corrections**: The `tx_execution_bitmap` field serves a critical role in maintaining ledger integrity during HTM. Following **Rule 1**, when validators create an EB certificate within $L_\text{recover}$ slots of the latest certificate, they determine the execution status of transactions in RBs within the specified range. The bitmap provides a unified encoding where each bit indicates whether a transaction was executed or not, enabling nodes to construct the complete ledger state. This bitmap is included in the EB and ensures that:
 - Transaction execution status is continuously tracked during HTM as EBs are certified
 - The ledger state remains consistent despite temporary inclusion of unvalidated transactions
 - Constant-size encoding regardless of the number of invalid transactions
 
 > [!NOTE]
-> **Light Node Optimization**: As a future optimization, execution bitmaps could also be included in EB certificates to allow light nodes to determine transaction execution status without downloading full EBs.
+> **Light Node Optimization**: As a future optimization, transaction execution bitmaps could also be included in EB certificates to allow light nodes to determine transaction execution status without downloading full EBs.
 
 When an EB is announced in an RB header via the `announced_eb` field, a voting period begins as described in [Votes and Certificates](#votes-and-certificates). Only RBs that directly extend the announcing RB are eligible to certify the announced EB by including a certificate.
 
@@ -409,6 +415,7 @@ These are observed properties of the network topology and node capabilities:
 | RB diffusion time         | $\Delta_\text{RB}$  | slot  | Observed upper bound for RB diffusion and adoption to all nodes     |            2-6 slots            | Depends on network topology and conditions         |
 | RB header diffusion time  | $\Delta_\text{hdr}$ | slot  | Observed time for RB headers to reach all nodes                 |     $\leq \Delta_\text{RB}$     | Usually faster than full block diffusion           |
 | EB diffusion time         | $\Delta_\text{EB}$  | slot  | Observed upper bound for EB diffusion, transaction retrieval, and ledger state building at all nodes when no competing or fresher blocks exist    |            $\geq \Delta_\text{RB}$            | Slower than RBs due to larger size and additional processing requirements          |
+| Minimum transaction size  | $T_\text{min}$      | bytes | Observed lower bound on transaction size on mainnet                     |           $\geq 55$ bytes          | Anchored to observed 55-byte transaction [mainnet-min-tx]; implementations may choose safety margins |
 
 _Table 1: Network Characteristics_
 
@@ -425,13 +432,14 @@ constrained by the network characteristics above:
 | Parameter                     |    Symbol     |  Units   | Description                                                            |                   Constraints                   | Rationale                                                     |
 | ----------------------------- | :-----------: | :------: | ---------------------------------------------------------------------- | :---------------------------------------------: | ------------------------------------------------------------- |
 | Voting period length          | $L_\text{vote}$ |   slot   | Duration during which committee members can vote on endorser blocks    | $L_\text{vote} > 3\Delta_\text{hdr}$ | Must allow EB diffusion and equivocation detection before voting; the constraint ensures sufficient time for header propagation and equivocation detection before voting begins. <br /><br />**Liveness**: To ensure that honest EBs are certified most of the time, $L_\text{vote}$ should be set so that there is enough time for an honestly produced EB to be diffused and processed by a large fraction of the network, assuming no other "fresher" RB is produced in the same period |
-| Recovery period length       | $L_\text{recover}$ |   slot   | Duration without certificates before returning to Conservative mode    | $L_\text{recover} > \Delta_\text{EB}$ | Must ensure all nodes receive certified EBs before mode transition; prevents delayed EB synchronization |
+| Recovery period length       | $L_\text{recover}$ |   slot   | Duration without certificates before returning to Conservative mode    | $L_\text{recover} > \Delta_\text{EB}$ | Must ensure all nodes receive certified EBs before mode transition. Implicitly constrained by bitmap size requirement (see $S_\text{bitmap}$ row) |
 | Ranking block max size        | $S_\text{RB}$ |  bytes   | Maximum size of a ranking block                                        |                $S_\text{RB} > 0$                | Limits RB size to ensure timely diffusion                     |
 | Endorser-block referenceable transaction size | $S_\text{EB-tx}$ |  bytes   | Maximum total size of transactions that can be referenced by an endorser block |                $S_\text{EB-tx} > 0$                | Limits total transaction payload to ensure timely diffusion within stage length |
 | Endorser block max size       | $S_\text{EB}$ |  bytes   | Maximum size of an endorser block itself                               |                $S_\text{EB} > 0$                | Limits EB size to ensure timely diffusion; prevents issues with many small transactions |
 | Praos active slot coefficient | $f_\text{RB}$ |  1/slot  | Probability that a party will be the slot leader for a particular slot |       $0 < f_\text{RB} \leq \Delta_\text{RB}^{-1}$        | Blocks should not be produced faster than network delay       |
 | Mean committee size           |      $n$      | parties  | Average number of stake pools selected for voting                      |                     $n > 0$                     | Ensures sufficient decentralization and security              |
 | Quorum size                   |    $\tau$     | fraction | Minimum fraction of committee votes required for certification         |                  $\tau > 0.5$                   | Prevents adversarial control while ensuring liveness          |
+| Maximum correction bitmap size | $S_\text{bitmap}$ |  bytes   | Maximum size of transaction execution bitmap for corrections           | $S_\text{bitmap} = \lceil L_\text{recover} \times f_\text{RB} \times S_\text{RB} / (8 \times T_\text{min}) \rceil$ | Calculated based on worst-case scenario with maximum RBs containing minimum-sized transactions during recovery period. Protocol must ensure all corrections are included before CM to maintain ledger integrity |
 
 _Table 2: Leios Protocol Parameters_
 
@@ -445,6 +453,23 @@ _Table 2: Leios Protocol Parameters_
 > - $S_\text{EB-tx}$ limits the total size of transactions that can be referenced, controlling the actual transaction payload
 > 
 > For example, an EB referencing 10,000 transactions of 100 bytes each would have $S_\text{EB-tx} = 1$ MB but the EB itself would be at least 320 KB just for the transaction hashes.
+
+<a id="bitmap-size-relationships"></a>
+> [!NOTE]
+> **Bitmap Size Relationships**
+> 
+> The maximum correction bitmap size parameter $S_\text{bitmap}$ creates a fundamental relationship between recovery period length and transaction throughput:
+> - Longer recovery periods ($L_\text{recover}$) require larger bitmaps to track more potential transactions
+> - Higher block production rates ($f_\text{RB}$) increase the number of blocks needing corrections
+> - Smaller minimum transaction sizes ($T_\text{min}$) allow more transactions per block, requiring more correction bits
+> 
+> **Implicit Constraint on $L_\text{recover}$**: The requirement that $S_\text{bitmap} < S_\text{RB}$ creates an upper bound on the recovery period:
+> 
+> $$L_\text{recover} < \frac{8 \times T_\text{min}}{f_\text{RB}}$$
+> 
+> For example, with $T_\text{min} = 55$ bytes and $f_\text{RB} = 0.05$, this gives $L_\text{recover} < 8{,}800$ slots. This bound is far beyond any practical recovery period, so the constraint is not limiting in practice.
+> 
+> The critical requirement is that all transaction corrections MUST be included before entering CM to ensure ledger integrity. In extreme cases, the first CM block may need to dedicate most of its space to corrections, temporarily sacrificing transaction throughput for safety.
 
 ### Node Behavior
 
@@ -1566,6 +1591,7 @@ protocol.
 <!-- Technical specifications and benchmarks -->
 [bls-spec]: https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md "BLS certificates specification"
 [bls-benchmarks]: https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#benchmarks-in-rust "BLS certificates benchmarks"
+[mainnet-min-tx]: https://cardanoscan.io/transaction/d2a2098fabb73ace002e2cf7bf7131a56723cd0745b1ef1a4f9e29fd27c0eb68?tab=summary "Observed 55-byte transaction on mainnet"
 
 <!-- Technical reports and documentation -->
 [committee-size-analysis]: https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-1.md#committee-size-and-quorum-requirement "Committee size and quorum requirement"
@@ -1634,7 +1660,7 @@ This appendix contains the complete CDDL specifications for all Leios protocol m
    , transaction_bodies       : [* transaction_body]
    , transaction_witness_sets : [* transaction_witness_set]
    , auxiliary_data_set       : {* transaction_index => auxiliary_data}
-+  , ? execution_bitmap       : bytes
++  , ? tx_execution_bitmap    : bytes
 +  , ? eb_certificate         : leios_certificate
    ]
 
@@ -1661,7 +1687,7 @@ block_header =
 
 ```cddl
 endorser_block =
-  [ execution_bitmap         : bytes
+  [ tx_execution_bitmap      : bytes
   , transaction_references   : [* tx_reference]
   ]
 
