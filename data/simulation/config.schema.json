@@ -80,7 +80,7 @@
       "description": "Configuration for a \"late EB\" attack,\nwhere nodes deliberately withhold EBs until near the end of the voting phase.",
       "properties": {
         "attackers": {
-          "$ref": "#/definitions/NodesNodeSelection",
+          "$ref": "#/definitions/NodeSelection",
           "description": "The set of stake pools which are participating in the attack."
         },
         "propagation-delay-ms": {
@@ -98,7 +98,7 @@
           "type": "number"
         },
         "attackers": {
-          "$ref": "#/definitions/NodesNodeSelection",
+          "$ref": "#/definitions/NodeSelection",
           "description": "The set of stake pools which are participating in the attack."
         },
         "tx-generation-distribution": {
@@ -138,6 +138,16 @@
       "enum": ["ordered-by-id", "random"],
       "type": "string"
     },
+    "NodeSelection": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/NodesNodeSelection"
+        },
+        {
+          "$ref": "#/definitions/StakeFractionNodeSelection"
+        }
+      ]
+    },
     "NodesNodeSelection": {
       "properties": {
         "nodes": {
@@ -167,6 +177,14 @@
     "RelayStrategy": {
       "enum": ["request-from-all", "request-from-first"],
       "type": "string"
+    },
+    "StakeFractionNodeSelection": {
+      "properties": {
+        "stake-fraction": {
+          "type": "number"
+        }
+      },
+      "type": "object"
     }
   },
   "description": "A configuration for a Leios simulation.",
