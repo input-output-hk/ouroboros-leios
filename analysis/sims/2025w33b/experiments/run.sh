@@ -8,7 +8,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 TX_START=60
 TX_STOP=960
 SIM_STOP=1200
-BW=50
+BW=10
 CPU_COUNT=4
 NETWORK=topology-v2
 SIM=Rust
