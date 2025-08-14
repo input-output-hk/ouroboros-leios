@@ -367,7 +367,10 @@ export interface LateTXAttackConfig {
   "tx-generation-distribution": Distribution,
 }
 
-export type NodeSelection = NodesNodeSelection;
+export type NodeSelection = NodesNodeSelection | StakeFractionNodeSelection;
 export interface NodesNodeSelection {
   "nodes": string[];
+}
+export interface StakeFractionNodeSelection {
+  "stake-fraction": number,
 }

@@ -71,7 +71,7 @@ When a node receives an RB body, it immediately removes all referenced/conflicti
 
 A set of nodes can be configured to collude with each other, to distribute an EB close to the end of L_diff.
 
-Example config:
+Example config (with explicit list of attackers):
 ```yaml
 late-eb-attack:
   attackers:
@@ -85,7 +85,15 @@ late-eb-attack:
   propagation-delay-ms: 4500.0
 ```
 
-The `attackers` list controls which nodes are participating in the attack. (I will get around to letting you just choose a `stake` sometime soon). These nodes can communicate out of band, without taking latency or bandwidth into account.
+Example config (with fraction of stake):
+```yaml
+late-eb-attack:
+  attackers:
+    stake-fraction: 0.51
+  propagation-delay-ms: 4500.0
+```
+
+The `attackers` list controls which nodes are participating in the attack. These nodes can communicate out of band, without taking latency or bandwidth into account.
 
 When one of the attackers generates an EB, it will instantly and instantaneously send that EB to all other attackers. The attackers will all wait for `propagation-delay-ms` to elapse, and _then_ announce the EB to all peers.
 
@@ -93,7 +101,7 @@ When one of the attackers generates an EB, it will instantly and instantaneously
 
 A set of nodes can be configured to "withhold" some number of TXs until the moment they generate an EB.
 
-Example config:
+Example config (with explicit list of attackers):
 ```yaml
 late-tx-attack:
   attackers:
@@ -110,7 +118,18 @@ late-tx-attack:
     value: 3
 ```
 
-The `attackers` list controls which nodes are participating in the attack. (I will get around to letting you just choose a `stake` sometime soon).
+Example config (with fraction of stake):
+```yaml
+late-tx-attack:
+  attackers:
+    stake-fraction: 0.51
+  attack-probability: 1.0
+  tx-generation-distribution:
+    distribution: constant
+    value: 3
+```
+
+The `attackers` list controls which nodes are participating in the attack.
 
 When an attacker generates an EB, with probability `attack-probability` they will also generate `tx-generation-distribution` brand-new transactions. Both the EB and the transactions will be immediately announced to peers as normal.
 

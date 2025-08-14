@@ -32,7 +32,7 @@ const DEFAULT_TOPOLOGY_PATHS: &[&str] = &[
 ];
 
 #[derive(Parser)]
-#[command(version = env!("VERGEN_GIT_SHA"))]
+#[command(version = concat!(env!("CARGO_PKG_VERSION"), "-", env!("VERGEN_GIT_SHA")))]
 struct Args {
     #[clap(default_value = None)]
     topology: Option<PathBuf>,
