@@ -104,6 +104,18 @@ maintaining settlement guarantees and supporting dynamic participation.
 
 Want to catch up on the latest Leios news but can't make the monthly status meeting? No problem! Take a look at our brief meeting recaps to see what was discussed and where the team is headed next!
 
+July 2025 Recap:
+<div style={{position: 'relative', paddingBottom: '56.25%', height: 0}}>
+  <iframe
+    style={{position: 'absolute', top: 0, left: 0, width: '100%', height: '100%'}}
+    src="https://www.youtube.com/embed/uiie7zumDSk?si=nfV1PGodm-xrWHWP"
+    title="July 2025 Recap"
+    frameborder="0"
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+    allowfullscreen
+  />
+</div>
+    
 June 2025 Recap:
 <div style={{position: 'relative', paddingBottom: '56.25%', height: 0}}>
   <iframe
