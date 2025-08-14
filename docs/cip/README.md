@@ -1508,7 +1508,6 @@ protocol.
 <!-- Technical specifications and benchmarks -->
 [bls-spec]: https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md "BLS certificates specification"
 [bls-benchmarks]: https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#benchmarks-in-rust "BLS certificates benchmarks"
-[preprod-min-tx]: https://preprod.cardanoscan.io/transaction/02f6108960743311e915bdc48607574821a9c64b3e79945f92a54df039c8ef93?tab=utxo "Observed minimum-size transaction on preprod"
 [mainnet-min-tx]: https://cardanoscan.io/transaction/d2a2098fabb73ace002e2cf7bf7131a56723cd0745b1ef1a4f9e29fd27c0eb68?tab=summary "Observed 55-byte transaction on mainnet"
 
 <!-- Technical reports and documentation -->
