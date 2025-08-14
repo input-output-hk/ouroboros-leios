@@ -314,9 +314,9 @@ RBs are Praos blocks extended to support Leios by optionally announcing EBs in t
 
 <a id="rb-corrections" href="#rb-corrections"></a>**RB Corrections**: Following <a href="#correction-rule-2">**Rule 2**</a>, when the first RB is generated more than $L$<sub>recover</sub> slots after the latest EB certificate, the `tx_execution_bitmap` field must indicate the execution status of transactions in RBs between this RB and that EB certificate. The bitmap provides a unified encoding where each bit indicates whether a transaction was executed or not, enabling nodes to construct the complete ledger state for the entire HTM period. This ensures the ledger state is fully determined before CM resumes.
 
-<a id="bitmap-size-constraint" href="#bitmap-size-constraint"></a>**Bitmap Size Constraint**: The transaction execution bitmap size is calculated as $S_\text{bitmap}$ (see [Protocol Parameters](#protocol-parameters)). The protocol parameters must be chosen such that even in the worst case, the bitmap plus other required block data never exceeds $S_\text{RB}$. This is guaranteed by the constraint on $L_\text{recover}$, which prevents the bitmap from growing beyond what can fit in a block.
+<a id="bitmap-size-constraint" href="#bitmap-size-constraint"></a>**Bitmap Size Constraint**: The transaction execution bitmap size $S_\text{bitmap}$ (see [Protocol Parameters](#protocol-parameters)) must fit within $S_\text{RB}$ alongside other required data. This is ensured by bounding $L_\text{recover}$ implicitly via $S_\text{bitmap} < S_\text{RB}$ (see [Bitmap Size Relationships](#bitmap-size-relationships)).
 
-<a id="cost-proportionality" href="#cost-proportionality"></a>**Cost Proportionality**: The first CM block pays a cost proportional to the amount of **uncorrected** HTM history - specifically, transactions in RBs produced since the last EB certificate. EB corrections during HTM progressively reduce this burden by tracking transaction execution status as certificates are produced. Only the remaining uncorrected period (from the last certificate to the CM transition) requires correction in the first CM block. This design ensures the protocol can always return to a fully validated state, with correction overhead limited to the most recent uncertified period rather than the entire HTM duration.
+<a id="cost-proportionality" href="#cost-proportionality"></a>**Cost Proportionality**: The first CM block pays a cost proportional to the **uncorrected** HTM window—i.e., RB transactions since the last EB certificate. EB corrections already included during HTM reduce this cost; only the remaining window requires an RB-side bitmap.
 
 > [!WARNING]
 > **TODO:** Add transaction confirmation levels and their implications for applications
@@ -443,6 +443,7 @@ _Table 2: Leios Protocol Parameters_
 > 
 > For example, an EB referencing 10,000 transactions of 100 bytes each would have $S_\text{EB-tx} = 1$ MB but the EB itself would be at least 320 KB just for the transaction hashes.
 
+<a id="bitmap-size-relationships"></a>
 > [!NOTE]
 > **Bitmap Size Relationships**
 > 
