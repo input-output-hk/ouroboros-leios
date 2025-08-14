@@ -463,13 +463,17 @@ _Table 2: Leios Protocol Parameters_
 > - Higher block production rates ($f_\text{RB}$) increase the number of blocks needing corrections
 > - Smaller minimum transaction sizes ($T_\text{min}$) allow more transactions per block, requiring more correction bits
 > 
-> **Implicit Constraint on $L_\text{recover}$**: The requirement that $S_\text{bitmap} < S_\text{RB}$ creates an upper bound on the recovery period:
+> **Implicit Constraint on $L_\text{recover}$**:
+> 
+> The requirement that $S_\text{bitmap} < S_\text{RB}$ creates an upper bound on the recovery period:
 > 
 > $$L_\text{recover} < \frac{8 \times T_\text{min}}{f_\text{RB}}$$
 > 
-> For example, with $T_\text{min} = 55$ bytes and $f_\text{RB} = 0.05$, this gives $L_\text{recover} < 8{,}800$ slots. This bound is far beyond any practical recovery period, so the constraint is not limiting in practice.
+> For example, with $T_\text{min} = 55$ bytes[^mainnet-min-tx] and $f_\text{RB} = 0.05$, this gives $L_\text{recover} < 8{,}800$ slots. This bound is far beyond any practical recovery period, so the constraint is not limiting in practice.
 > 
 > The critical requirement is that all transaction corrections MUST be included before entering CM to ensure ledger integrity. In extreme cases, the first CM block may need to dedicate most of its space to corrections, temporarily sacrificing transaction throughput for safety.
+
+[^mainnet-min-tx]: Observed 55-byte transaction on mainnet: https://cardanoscan.io/transaction/d2a2098fabb73ace002e2cf7bf7131a56723cd0745b1ef1a4f9e29fd27c0eb68?tab=summary
 
 ### Node Behavior
 
