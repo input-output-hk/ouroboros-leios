@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg width="1200" height="550" xmlns="http://www.w3.org/2000/svg">
+<svg width="1200" height="580" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <!-- Pattern for inactive periods -->
     <pattern id="inactivePattern" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
@@ -57,7 +57,7 @@
   </defs>
   
   <!-- Background -->
-  <rect width="1200" height="550" fill="#ffffff"/>
+  <rect width="1200" height="580" fill="#ffffff"/>
   
   <!-- Protocol state timeline (background) -->
   <g id="state-timeline">
@@ -77,16 +77,20 @@
   <!-- L_recover window indicators (thin lines with offsets for overlaps) -->
   <g id="window-indicators">
     <!-- First L_recover window from RB3 (center at x=360, same width as second window) -->
-    <line x1="360" y1="20" x2="360" y2="136" stroke="#7cb342" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.8"/>
-    <line x1="360" y1="25" x2="660" y2="25" stroke="#7cb342" stroke-width="4" opacity="0.9"/>
-    <line x1="660" y1="20" x2="660" y2="40" stroke="#7cb342" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.8"/>
-    <text x="510" y="15" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#5a8030"><tspan font-family="Times New Roman, serif" font-style="italic" font-size="14">L</tspan><tspan font-size="9" baseline-shift="sub">recover-RB3</tspan></text>
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#l-recover" class="param-link">
+      <line x1="360" y1="20" x2="360" y2="136" stroke="#7cb342" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.8"/>
+      <line x1="360" y1="25" x2="660" y2="25" stroke="#7cb342" stroke-width="4" opacity="0.9"/>
+      <line x1="660" y1="20" x2="660" y2="40" stroke="#7cb342" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.8"/>
+      <text x="510" y="15" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#5a8030"><tspan font-family="Times New Roman, serif" font-style="italic" font-size="14">L</tspan><tspan font-size="9" baseline-shift="sub">recover-RB3</tspan></text>
+    </a>
     
     <!-- Second L_recover window from RB5 (center at x=580, overlapping first) -->
-    <line x1="580" y1="20" x2="580" y2="136" stroke="#7cb342" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.8"/>
-    <line x1="580" y1="33" x2="880" y2="33" stroke="#7cb342" stroke-width="4" opacity="0.9"/>
-    <line x1="880" y1="20" x2="880" y2="136" stroke="#7cb342" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.8"/>
-    <text x="730" y="47" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#5a8030"><tspan font-family="Times New Roman, serif" font-style="italic" font-size="14">L</tspan><tspan font-size="9" baseline-shift="sub">recover-RB5</tspan></text>
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#l-recover" class="param-link">
+      <line x1="580" y1="20" x2="580" y2="136" stroke="#7cb342" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.8"/>
+      <line x1="580" y1="33" x2="880" y2="33" stroke="#7cb342" stroke-width="4" opacity="0.9"/>
+      <line x1="880" y1="20" x2="880" y2="136" stroke="#7cb342" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.8"/>
+      <text x="730" y="47" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#5a8030"><tspan font-family="Times New Roman, serif" font-style="italic" font-size="14">L</tspan><tspan font-size="9" baseline-shift="sub">recover-RB5</tspan></text>
+    </a>
   </g>
   
   <!-- Annotations for window transitions -->
@@ -297,10 +301,11 @@
     </g>
   </g>
   
-  <!-- Legend (centered horizontally) -->
-  <g id="legend" transform="translate(150, 520)">
+  <!-- Legend (centered horizontally, two rows) -->
+  <g id="legend" transform="translate(150, 510)">
     <text x="450" y="-15" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#333" text-anchor="middle">Legend</text>
     
+    <!-- First row: RB, EB, Certificate -->
     <!-- RB solid and dashed side by side -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
       <rect x="70" y="0" width="18" height="24" fill="#fce5cd" stroke="#783f04" stroke-width="1.5" rx="2"/>
@@ -312,34 +317,33 @@
     
     <!-- EB -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#endorser-blocks-ebs" class="block-link">
-      <rect x="270" y="3" width="24" height="18" fill="#d9ead3" stroke="#274e13" stroke-width="1.5" rx="2"/>
+      <rect x="330" y="3" width="24" height="18" fill="#d9ead3" stroke="#274e13" stroke-width="1.5" rx="2"/>
     </a>
-    <text x="300" y="16" font-family="Arial, sans-serif" font-size="14" fill="#333">Endorser Block (EB)</text>
+    <text x="360" y="16" font-family="Arial, sans-serif" font-size="14" fill="#333">Endorser Block (EB)</text>
     
     <!-- Certificate -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="block-link">
-      <polygon points="450,0 460,6 460,18 450,24 440,18 440,6" fill="#fff2cc" stroke="#f9a825" stroke-width="1"/>
+      <polygon points="570,0 580,6 580,18 570,24 560,18 560,6" fill="#fff2cc" stroke="#f9a825" stroke-width="1"/>
     </a>
-    <text x="468" y="16" font-family="Arial, sans-serif" font-size="14" fill="#333">Certificate</text>
+    <text x="588" y="16" font-family="Arial, sans-serif" font-size="14" fill="#333">Certificate</text>
     
+    <!-- Second row: Vote, L_recover window, Transaction execution bitmap -->
     <!-- Vote -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="vote-link">
-      <rect x="555" y="5" width="10" height="10" fill="#f9a825" transform="rotate(45 560 10)"/>
+      <rect x="125" y="35" width="10" height="10" fill="#f9a825" transform="rotate(45 130 40)"/>
     </a>
-    <text x="575" y="16" font-family="Arial, sans-serif" font-size="14" fill="#333">Vote</text>
+    <text x="145" y="46" font-family="Arial, sans-serif" font-size="14" fill="#333">Vote</text>
     
     <!-- L_recover window with dashed verticals -->
-    <line x1="640" y1="7" x2="640" y2="19" stroke="#7cb342" stroke-width="1" stroke-dasharray="2,2" opacity="0.8"/>
-    <line x1="640" y1="12" x2="670" y2="12" stroke="#7cb342" stroke-width="3" opacity="0.8"/>
-    <line x1="670" y1="7" x2="670" y2="19" stroke="#7cb342" stroke-width="1" stroke-dasharray="2,2" opacity="0.8"/>
-    <text x="675" y="16" font-family="Arial, sans-serif" font-size="14" fill="#333"><tspan font-family="Times New Roman, serif" font-style="italic" font-size="16">L</tspan><tspan font-size="10" baseline-shift="sub">recover</tspan> window</text>
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#l-recover" class="param-link">
+      <line x1="280" y1="37" x2="280" y2="49" stroke="#7cb342" stroke-width="1" stroke-dasharray="2,2" opacity="0.8"/>
+      <line x1="280" y1="42" x2="310" y2="42" stroke="#7cb342" stroke-width="3" opacity="0.8"/>
+      <line x1="310" y1="37" x2="310" y2="49" stroke="#7cb342" stroke-width="1" stroke-dasharray="2,2" opacity="0.8"/>
+      <text x="315" y="46" font-family="Arial, sans-serif" font-size="14" fill="#333"><tspan font-family="Times New Roman, serif" font-style="italic" font-size="16">L</tspan><tspan font-size="10" baseline-shift="sub">recover</tspan> window</text>
+    </a>
     
-    <!-- Standard validation period -->
-    <rect x="0" y="30" width="40" height="15" fill="url(#inactivePattern)" stroke="#783f04" stroke-width="0.5" stroke-opacity="0.3"/>
-    <text x="45" y="41" font-family="Arial, sans-serif" font-size="12" fill="#333333">Standard validation period</text>
-    
-    <!-- Bitmap indicator -->
-    <rect x="200" y="30" width="40" height="12" fill="#ffcccc" stroke="#cc0000" stroke-width="1" rx="3"/>
-    <text x="245" y="41" font-family="Arial, sans-serif" font-size="12" fill="#333333">Transaction execution bitmap</text>
+    <!-- Transaction execution bitmap -->
+    <rect x="500" y="36" width="30" height="12" fill="#ffcccc" stroke="#cc0000" stroke-width="1" rx="3"/>
+    <text x="535" y="46" font-family="Arial, sans-serif" font-size="14" fill="#333">Transaction execution bitmap</text>
   </g>
 </svg>

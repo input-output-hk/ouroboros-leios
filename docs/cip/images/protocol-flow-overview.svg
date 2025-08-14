@@ -61,15 +61,17 @@
   
   <!-- L_recover window indicator (thin line) -->
   <g id="window-indicator">
-    <!-- Start of window at RB' certificate -->
-    <line x1="820" y1="20" x2="820" y2="100" stroke="#7cb342" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.8"/>
-    
-    <!-- L_recover window line -->
-    <line x1="820" y1="30" x2="1100" y2="30" stroke="#7cb342" stroke-width="4" opacity="0.8"/>
-    <text x="960" y="20" font-family="Times New Roman, serif" font-size="20" font-style="italic" text-anchor="middle" fill="#5a8030">L<tspan font-family="Arial, sans-serif" font-size="10" font-style="normal" baseline-shift="sub">recover-RB'</tspan></text>
-    
-    <!-- End of window -->
-    <line x1="1100" y1="20" x2="1100" y2="100" stroke="#7cb342" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.8"/>
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#l-recover" class="param-link">
+      <!-- Start of window at RB' certificate -->
+      <line x1="820" y1="20" x2="820" y2="100" stroke="#7cb342" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.8"/>
+      
+      <!-- L_recover window line -->
+      <line x1="820" y1="30" x2="1100" y2="30" stroke="#7cb342" stroke-width="4" opacity="0.8"/>
+      <text x="960" y="20" font-family="Times New Roman, serif" font-size="20" font-style="italic" text-anchor="middle" fill="#5a8030">L<tspan font-family="Arial, sans-serif" font-size="10" font-style="normal" baseline-shift="sub">recover-RB'</tspan></text>
+      
+      <!-- End of window -->
+      <line x1="1100" y1="20" x2="1100" y2="100" stroke="#7cb342" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.8"/>
+    </a>
   </g>
   
   <!-- Main protocol flow content -->
@@ -200,9 +202,11 @@
     <text x="575" y="16" font-family="Arial, sans-serif" font-size="14" fill="#333">Vote</text>
     
     <!-- L_recover window with dashed verticals -->
-    <line x1="640" y1="7" x2="640" y2="19" stroke="#7cb342" stroke-width="1" stroke-dasharray="2,2" opacity="0.8"/>
-    <line x1="640" y1="12" x2="670" y2="12" stroke="#7cb342" stroke-width="3" opacity="0.8"/>
-    <line x1="670" y1="7" x2="670" y2="19" stroke="#7cb342" stroke-width="1" stroke-dasharray="2,2" opacity="0.8"/>
-    <text x="675" y="16" font-family="Arial, sans-serif" font-size="14" fill="#333"><tspan font-family="Times New Roman, serif" font-style="italic" font-size="16">L</tspan><tspan font-size="10" baseline-shift="sub">recover</tspan> window</text>
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#l-recover" class="param-link">
+      <line x1="640" y1="7" x2="640" y2="19" stroke="#7cb342" stroke-width="1" stroke-dasharray="2,2" opacity="0.8"/>
+      <line x1="640" y1="12" x2="670" y2="12" stroke="#7cb342" stroke-width="3" opacity="0.8"/>
+      <line x1="670" y1="7" x2="670" y2="19" stroke="#7cb342" stroke-width="1" stroke-dasharray="2,2" opacity="0.8"/>
+      <text x="675" y="16" font-family="Arial, sans-serif" font-size="14" fill="#333"><tspan font-family="Times New Roman, serif" font-style="italic" font-size="16">L</tspan><tspan font-size="10" baseline-shift="sub">recover</tspan> window</text>
+    </a>
   </g>
 </svg>

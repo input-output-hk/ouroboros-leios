@@ -15,7 +15,7 @@
     
     <!-- Hover effects -->
     <style>
-      .block-link {
+      .block-link, .param-link {
         cursor: pointer;
       }
       .block-link:hover rect {
@@ -25,6 +25,16 @@
       .block-link:hover polygon {
         stroke-width: 2;
         filter: brightness(1.1);
+      }
+      .param-link:hover line {
+        stroke-width: 3;
+        filter: brightness(1.1);
+      }
+      .param-link:hover rect {
+        filter: brightness(1.1);
+      }
+      .param-link:hover text {
+        font-weight: bold;
       }
     </style>
   </defs>
@@ -39,16 +49,20 @@
     <text x="150" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#783f04">Standard Validation</text>
     
     <!-- Certificate-active period 1 (300 width) -->
-    <rect x="250" y="60" width="300" height="40" fill="url(#activePattern)" stroke="#7cb342" stroke-width="0.5" stroke-opacity="0.3"/>
-    <text x="400" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#5a8030">Certificate Active</text>
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#l-recover" class="param-link">
+      <rect x="250" y="60" width="300" height="40" fill="url(#activePattern)" stroke="#7cb342" stroke-width="0.5" stroke-opacity="0.3"/>
+      <text x="400" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#5a8030">Certificate Active</text>
+    </a>
     
     <!-- Standard validation period 2 -->
     <rect x="550" y="60" width="150" height="40" fill="url(#praosPattern)" fill-opacity="0.6" stroke="#783f04" stroke-width="0.5" stroke-opacity="0.3"/>
     <text x="625" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#783f04">Standard Validation</text>
     
     <!-- Certificate-active period 2 (300 width) -->
-    <rect x="700" y="60" width="300" height="40" fill="url(#activePattern)" stroke="#7cb342" stroke-width="0.5" stroke-opacity="0.3"/>
-    <text x="850" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#5a8030">Certificate Active</text>
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#l-recover" class="param-link">
+      <rect x="700" y="60" width="300" height="40" fill="url(#activePattern)" stroke="#7cb342" stroke-width="0.5" stroke-opacity="0.3"/>
+      <text x="850" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#5a8030">Certificate Active</text>
+    </a>
     
     <!-- Standard validation period 3 -->
     <rect x="1000" y="60" width="100" height="40" fill="url(#praosPattern)" fill-opacity="0.6" stroke="#783f04" stroke-width="0.5" stroke-opacity="0.3"/>
@@ -61,14 +75,18 @@
   <!-- L_recover window indicators (thin lines with dashed verticals) -->
   <g id="window-indicators">
     <!-- First window from RB3 certificate (center at x=250) -->
-    <line x1="250" y1="40" x2="250" y2="110" stroke="#7cb342" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>
-    <line x1="250" y1="45" x2="550" y2="45" stroke="#7cb342" stroke-width="3" opacity="0.8"/>
-    <line x1="550" y1="40" x2="550" y2="110" stroke="#7cb342" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#l-recover" class="param-link">
+      <line x1="250" y1="40" x2="250" y2="110" stroke="#7cb342" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>
+      <line x1="250" y1="45" x2="550" y2="45" stroke="#7cb342" stroke-width="3" opacity="0.8"/>
+      <line x1="550" y1="40" x2="550" y2="110" stroke="#7cb342" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>
+    </a>
     
     <!-- Second window from RB with cert (center at x=700) -->
-    <line x1="700" y1="40" x2="700" y2="110" stroke="#7cb342" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>
-    <line x1="700" y1="50" x2="1000" y2="50" stroke="#7cb342" stroke-width="3" opacity="0.8"/>
-    <line x1="1000" y1="40" x2="1000" y2="110" stroke="#7cb342" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#l-recover" class="param-link">
+      <line x1="700" y1="40" x2="700" y2="110" stroke="#7cb342" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>
+      <line x1="700" y1="50" x2="1000" y2="50" stroke="#7cb342" stroke-width="3" opacity="0.8"/>
+      <line x1="1000" y1="40" x2="1000" y2="110" stroke="#7cb342" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>
+    </a>
   </g>
   
   <!-- Block chain with RBs and EBs -->
@@ -227,9 +245,11 @@
     <text x="383" y="28" font-family="Arial, sans-serif" font-size="11" fill="#333">Certificate</text>
     
     <!-- L_recover window with dashed verticals -->
-    <line x1="480" y1="18" x2="480" y2="30" stroke="#7cb342" stroke-width="1" stroke-dasharray="2,2" opacity="0.8"/>
-    <line x1="480" y1="23" x2="510" y2="23" stroke="#7cb342" stroke-width="3" opacity="0.8"/>
-    <line x1="510" y1="18" x2="510" y2="30" stroke="#7cb342" stroke-width="1" stroke-dasharray="2,2" opacity="0.8"/>
-    <text x="515" y="28" font-family="Arial, sans-serif" font-size="11" fill="#333"><tspan font-family="Times New Roman, serif" font-style="italic" font-size="14">L</tspan><tspan font-size="8" baseline-shift="sub">recover</tspan> window</text>
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#l-recover" class="param-link">
+      <line x1="480" y1="18" x2="480" y2="30" stroke="#7cb342" stroke-width="1" stroke-dasharray="2,2" opacity="0.8"/>
+      <line x1="480" y1="23" x2="510" y2="23" stroke="#7cb342" stroke-width="3" opacity="0.8"/>
+      <line x1="510" y1="18" x2="510" y2="30" stroke="#7cb342" stroke-width="1" stroke-dasharray="2,2" opacity="0.8"/>
+      <text x="515" y="28" font-family="Arial, sans-serif" font-size="11" fill="#333"><tspan font-family="Times New Roman, serif" font-style="italic" font-size="14">L</tspan><tspan font-size="8" baseline-shift="sub">recover</tspan> window</text>
+    </a>
   </g>
 </svg>
