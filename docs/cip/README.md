@@ -57,9 +57,9 @@ economic sustainability and reduced complexity through fewer new protocol elemen
 
 - [Figure 1: Forecast of rewards on Cardano mainnet](#figure-1)
 - [Figure 2: SPO profitability under Praos, as a function of transaction volume](#figure-2)
-- [Figure 3: Ouroboros Leios Dual-Mode Operation](#figure-3)
+- [Figure 3: Ouroboros Leios Rolling Window Mechanism](#figure-3)
 - [Figure 4: Leios Protocol Flow](#figure-4)
-- [Figure 5: Detailed protocol flow showing mode transitions and correction mechanisms](#figure-5)
+- [Figure 5: Detailed protocol flow showing rolling windows and correction mechanisms](#figure-5)
 - [Figure 6: Up- and downstream interactions of a node (simplified)](#figure-6)
 - [Figure 7: Time for transaction to reach the ledger](#figure-7)
 - [Figure 8: Transactions reaching the ledger](#figure-8)
@@ -75,14 +75,15 @@ economic sustainability and reduced complexity through fewer new protocol elemen
 ### Tables
 
 - [Table 1: Network Characteristics](#table-1)
-- [Table 2: Leios Protocol Parameters](#table-2)
-- [Table 3: Performance Metrics](#table-3)
-- [Table 4: Leios effficiency at different throughputs](#table-4)
-- [Table 5: Feasible Protocol Parameters](#table-5)
-- [Table 6: Operating Costs by IB Production Rate](#table-6)
-- [Table 7: Required TPS for Infrastructure Cost Coverage](#table-7)
-- [Table 8: Required TPS for Current Reward Maintenance](#table-8)
-- [Table 9: Leios Mini-Protocols](#table-9)
+- [Table 2: Protocol Design Constants](#table-2)
+- [Table 3: Leios Protocol Parameters](#table-3)
+- [Table 4: Performance Metrics](#table-4)
+- [Table 5: Leios effficiency at different throughputs](#table-5)
+- [Table 6: Feasible Protocol Parameters](#table-6)
+- [Table 7: Operating Costs by IB Production Rate](#table-7)
+- [Table 8: Required TPS for Infrastructure Cost Coverage](#table-8)
+- [Table 9: Required TPS for Current Reward Maintenance](#table-9)
+- [Table 10: Leios Mini-Protocols](#table-10)
 
 </details>
 
@@ -171,28 +172,25 @@ throughput capacity.
 
 ## Specification
 
-Leios extends Ouroboros Praos by adding a second operating mode. The protocol switches between these two modes automatically based on network conditions and whether certificates appear in blocks. This lets the protocol keep all of Praos's security properties while processing more transactions when the network can handle it.
+Leios extends Ouroboros Praos by introducing [**Endorser Blocks (EBs)**](#endorser-blocks-ebs) - secondary blocks containing additional transactions that undergo committee validation before inclusion in the permanent ledger.
 
 <div align="center">
   <a name="figure-3" id="figure-3"></a>
-  <p name="dual-mode-figure">
-    <img src="images/dual-mode-simplified.svg" alt="Dual-Mode Operation">
+  <p name="rolling-window-figure">
+    <img src="images/rolling-window-simplified.svg" alt="Rolling Window Operation">
   </p>
 
-  <em>Figure 3: Ouroboros Leios Dual-Mode Operation</em>
+  <em>Figure 3: Ouroboros Leios rolling window mechanism</em>
 </div>
 
-The protocol operates in two modes:
+The protocol's behavior is governed by a **rolling window mechanism** that tracks certificate inclusion timing. When a committee successfully certifies an EB, this triggers a rolling window of $L_\text{recover}$ slots during which the network can process additional transactions at higher throughput. The protocol continuously evaluates this timing to determine validation requirements:
 
-<a name="conservative-mode"></a>**Conservative Mode (CM)** operates with the same transaction validation approach as today's Cardano protocol. Every transaction is fully validated before being included in a block, providing the same security guarantees. However, the protocol also handles certificate announcements and other Leios infrastructure in preparation for potential throughput increases.
+- **Beyond the window** (no certificate within past $L_\text{recover}$ slots): Standard Cardano validation applies - every transaction must be fully validated before block inclusion
+- **Within the window** (certificate included within past $L_\text{recover}$ slots): Enhanced throughput enabled through relaxed validation requirements, with correction mechanisms ensuring ledger integrity
 
-<a name="high-throughput-mode"></a>**High-Throughput Mode (HTM)** activates when the network successfully certifies additional transaction capacity. This mode processes more transactions while keeping consensus security intact.
+This design preserves Ouroboros Praos security properties while automatically delivering higher throughput when network conditions support successful EB certification.
 
-The protocol switches between modes automatically based on certificate inclusion. When the network can handle distributing and validating larger transaction volumes, it enters High-Throughput mode. When it can't, it stays in or returns to Conservative mode.
-
-This design ensures the protocol never performs worse than today's Cardano protocol while delivering higher throughput when network conditions allow. The mode switches happen automatically according to protocol rules (detailed in the [Mode Transition Rules](#mode-transition-rules) section) without requiring any manual coordination from stake pool operators.
-
-### HTM Protocol Flow
+### Protocol Flow
 
 <div align="center">
   <a name="figure-4" id="figure-4"></a>
@@ -215,7 +213,7 @@ A standard Praos block with extended header fields to optionally certify one pre
 1. **[Endorser Block (EB)](#endorser-blocks-ebs)**
 A larger block containing additional transaction references. There are no other ways to create EBs.
 
-As shown in Figure 4, EBs may be announced in either CM or HTM - the protocol does not require being in HTM to announce an EB. The RB chain continues to be distributed exactly as in Praos, while Leios introduces a separate header distribution mechanism for rapid EB discovery and equivocation detection.
+The RB chain continues to be distributed exactly as in Praos, while Leios introduces a separate header distribution mechanism for rapid EB discovery and equivocation detection.
 
 Due to the voting overhead per EB, nodes announce an EB only when the RB is full, they do not announce empty EBs.
 
@@ -258,52 +256,52 @@ This **conditional inclusion** ensures transaction availability to honest nodes 
 - Throughput increases significantly for that segment of the chain
 - If timing is insufficient, only the standard RB is included (maintaining Praos baseline)
 
-#### Mode Transition Rules
+#### Rolling Window Rules
 
-The protocol manages transitions between CM and HTM through simple, deterministic rules:
+The rolling window mechanism operates through three key behaviors that automatically manage throughput based on certificate inclusion timing:
 
-**CM → HTM Transition**: The protocol enters HTM when a RB includes a valid certificate for an EB. This certificate serves as proof that the network successfully validated additional transaction capacity. As shown in Figure 5 below, the transition to HTM occurs when RB<sub>3</sub> includes the certificate, even though the EB announcement may have occurred while still in CM - RB<sub>2</sub> announcing EB<sub>1</sub>.
+**Window Reset**: Each certificate inclusion immediately resets the $L_\text{recover}$ countdown, extending the enhanced throughput period. As shown in Figure 5 below, when RB<sub>3</sub> includes a certificate, it starts a new window ($L_\text{recover-RB3}$). Later, RB<sub>5</sub> resets this timer again, creating overlapping windows that maintain continuous high throughput.
 
-**HTM → CM Transition**: The protocol returns to CM if no certificate has been included for $L$<sub>recover</sub> consecutive slots since the last certificate was included in an RB. This recovery period ensures that all nodes have sufficient time to synchronize any delayed EBs. The countdown resets each time a new certificate is included. As shown in Figure 5 below, this occurs after $L$<sub>recover</sub> slots following the last certificate in RB<sub>5</sub>.
+**Window Expiration**: Only when $L_\text{recover}$ consecutive slots pass without any certificate does the protocol revert to standard validation. This recovery period ensures all nodes synchronize any delayed EBs before validation resumes. In Figure 5, this occurs after the $L_\text{recover-RB5}$ window expires.
+
+**Automatic Operation**: The protocol tracks this timing continuously without manual intervention or discrete state changes, automatically adjusting validation requirements based on recent certificate activity.
 
 <div align="center">
 <a name="figure-5" id="figure-5"></a>
 <p name="mode-transitions-figure">
-  <img src="images/protocol-flow-detail.svg" alt="Mode Transitions Timeline">
+  <img src="images/protocol-flow-detail.svg" alt="Rolling Window Timeline">
 </p>
 
-_Figure 5: Detailed protocol flow showing mode transitions and transaction execution tracking_
+_Figure 5: Detailed protocol flow showing rolling $L_\text{recover}$ windows and transaction execution tracking_
 
 </div>
 
 <a id="transaction-validation" href="#transaction-validation"></a>**Transaction Validation**
 
-The dual-mode design introduces a fundamental difference for transaction validation:
+The rolling window mechanism enables different validation approaches that balance throughput with safety:
 
-**In CM**: Block producers always have access to the complete ledger state and must validate all transactions before including them in blocks. RBs containing invalid transactions are rejected by honest nodes, maintaining the standard Praos validation guarantees.
+**Standard Validation** (beyond window): Block producers have complete ledger state and must validate all transactions before inclusion, maintaining current Ouroboros Praos guarantees.
 
-**In HTM**: Block producers may need to create RBs before receiving all previously certified EBs due to network delays. Without these EBs, they cannot construct the complete ledger state or determine which transactions in their mempool are valid. This creates a dilemma: wait (potentially violating Praos timing constraints) or proceed with potentially invalid transactions.
+**Enhanced Throughput** (within window): Block producers may create RBs before receiving all previously certified EBs due to network delays. Since they cannot determine complete ledger state, Leios allows temporary inclusion of <a name="unvalidated-transactions"></a>**unvalidated transactions** - transactions whose validity cannot be immediately confirmed.
 
-Leios resolves this by allowing RBs in HTM to temporarily include <a name="unvalidated-transactions"></a>**unvalidated transactions** - transactions whose validity cannot be confirmed due to incomplete ledger state. This ensures honest block producers can always fulfill their duties without violating protocol timing requirements. As shown in Figure 5, all RBs produced during HTM period (RB<sub>3</sub> through RB<sub>7</sub>, marked with red dashed borders) may contain such unvalidated transactions.
+This resolves the timing dilemma that would otherwise force block producers to either violate Praos constraints (by waiting) or include potentially invalid transactions without tracking. As shown in Figure 5, RBs produced during certificate-active periods (RB<sub>3</sub> through RB<sub>7</sub>, marked with red dashed borders) may contain such transactions.
 
-As a direct consequence of allowing unvalidated transactions, the protocol must implement **correction mechanisms** to track which transactions were executed. Transaction corrections follow exactly **two rules** based on timing:
+**Correction Mechanisms**: To maintain ledger integrity when unvalidated transactions are included, the protocol implements transaction execution tracking through `tx_execution_bitmap` fields. These corrections follow two simple rules:
 
-<a id="correction-rule-1"></a>**Rule 1 - EB Corrections (Last cert ≤ $L_\text{recover}$)**: When an EB certificate is produced within $L_\text{recover}$ slots of the latest certificate in the chain, the certified EB must include a `tx_execution_bitmap` field (labeled as `<TxBitMap>` in figures) indicating the execution status of transactions in RBs between this certificate and the previous EB certificate. As shown in Figure 5, EB<sub>2</sub> includes such corrections.
+**1. <a id="correction-rule-1"></a>During enhanced throughput**: When EBs are certified within the rolling window, each certified EB includes corrections for RB transactions that occurred since the previous certificate. Since validators can only certify EBs when they have sufficient ledger state, they correct transactions from the known baseline forward (see EB<sub>2</sub> in Figure 5).
 
-<a id="correction-rule-2"></a>**Rule 2 - RB Corrections (Last cert > $L_\text{recover}$)**: When the first RB is generated more than $L_\text{recover}$ slots after the latest EB certificate in the chain, this RB must include a `tx_execution_bitmap` field (labeled as `<TxBitMap>` in figures) indicating the execution status of transactions in RBs between this RB and that EB certificate. As shown in Figure 5, RB<sub>8</sub> includes corrections spanning the range between RB<sub>5</sub> (which included the last certificate) and RB<sub>7</sub>.
+**2. <a id="correction-rule-2"></a>When returning to standard validation**: The first RB after window expiration includes corrections for all remaining unvalidated transactions from the certificate-active period (see RB<sub>8</sub> in Figure 5, which corrects transactions from RB<sub>5</sub> through RB<sub>7</sub>).
 
-The size of the transaction execution bitmap is bounded by protocol parameters to prevent excessive block space consumption. The bitmap size depends on the number of transactions that could appear during the recovery period, with the exact calculation detailed in the [Protocol Parameters](#protocol-parameters) section.
+Figure 5 also shows the timing constraints that enable these mechanisms:
+- <a id="l-vote" href="#l-vote"></a>**$L_\text{vote}$ periods** (timing brackets under each EB): Define the voting window for committee members
+- <a id="l-recover" href="#l-recover"></a>**$L_\text{recover}$ windows** (thin green bars): The rolling countdown periods that determine validation requirements
 
-The timing constraints that enable these correction mechanisms are also shown in Figure 5:
-- <a id="l-vote" href="#l-vote"></a>**$L_\text{vote}$ periods** (timing brackets under each EB): Define when committee members can vote on EBs, ensuring sufficient time for EB diffusion and validation before certification (see [Protocol Parameters](#protocol-parameters) for constraints)
-- <a id="l-recover" href="#l-recover"></a>**$L_\text{recover}$ period** (rolling countdown from the latest certificate): Ensures all nodes have time to receive certified EBs before returning to CM; the countdown resets whenever a new certificate is included. Only after $L_\text{recover}$ consecutive slots without any certificate does the protocol return to CM. This makes the edge case of missing EBs exponentially unlikely.
-
-These parameters are critical for protocol safety and their constraints are defined in the [Protocol Parameters](#protocol-parameters) section and feasible values discussed in TODO - rationale feasiable protocol parameters.
+Parameter constraints are detailed in the [Protocol Parameters](#protocol-parameters) section.
 
 > [!NOTE]
 > **Edge Case: Delayed EB Synchronization**
 > 
-> When a node transitions from [High-Throughput mode (HTM)](#high-throughput-mode) to [Conservative mode (CM)](#conservative-mode) but has not yet received all certified EBs, it must wait to synchronize before producing new blocks or adopting longer chains. Without the complete ledger state from all certified EBs, the node cannot identify which transactions from the HTM period were invalid and thus cannot create the necessary corrections in its first CM block. The protocol parameter $L_\text{recover}$ is designed to prevent this scenario.
+> When a node reaches the end of a certificate-active window (i.e., $L_\text{recover}$ slots have passed since the last certificate) but has not yet received all certified EBs, it **must** wait to synchronize before producing new blocks or adopting longer chains. Without the complete ledger state from all certified EBs, the node cannot identify which transactions from the certificate-active period were invalid and thus cannot create the necessary corrections in its next block. The protocol parameter $L_\text{recover}$ is designed to prevent this scenario.
 
 ### Protocol Component Details
 
@@ -323,11 +321,11 @@ RBs are Praos blocks extended to support Leios by optionally announcing EBs in t
 
 <a id="rb-inclusion-rules" href="#rb-inclusion-rules"></a>**Inclusion Rules**: When an RB header includes a `certified_eb` field, the corresponding body must include a matching `eb_certificate`. Conversely, an `eb_certificate` can only be included when a `certified_eb` field references the EB being certified.
 
-<a id="rb-corrections" href="#rb-corrections"></a>**RB Corrections**: Following <a href="#correction-rule-2">**Rule 2**</a>, when the first RB is generated more than $L$<sub>recover</sub> slots after the latest EB certificate, the `tx_execution_bitmap` field must indicate the execution status of transactions in RBs between this RB and that EB certificate. The bitmap provides a unified encoding where each bit indicates whether a transaction was executed or not, enabling nodes to construct the complete ledger state for the entire HTM period. This ensures the ledger state is fully determined before CM resumes.
+<a id="rb-corrections" href="#rb-corrections"></a>**RB Corrections**: Following <a href="#correction-rule-2">**Rule 2**</a>, when the first RB is generated more than $L$<sub>recover</sub> slots after the latest EB certificate, the `tx_execution_bitmap` field must indicate the execution status of transactions in RBs between this RB and that EB certificate. This ensures the ledger state is fully determined before standard validation resumes.
 
 <a id="bitmap-size-constraint" href="#bitmap-size-constraint"></a>**Bitmap Size Constraint**: The transaction execution bitmap size $S_\text{bitmap}$ (see [Protocol Parameters](#protocol-parameters)) must fit within $S_\text{RB}$ alongside other required data. This is ensured by bounding $L_\text{recover}$ implicitly via $S_\text{bitmap} < S_\text{RB}$ (see [Bitmap Size Relationships](#bitmap-size-relationships)).
 
-<a id="cost-proportionality" href="#cost-proportionality"></a>**Cost Proportionality**: The first CM block pays a cost proportional to the **uncorrected** HTM window—i.e., RB transactions since the last EB certificate. EB corrections already included during HTM reduce this cost; only the remaining window requires an RB-side bitmap.
+<a id="cost-proportionality" href="#cost-proportionality"></a>**Cost Proportionality**: The first block after the certificate-active window expires pays a cost proportional to the **uncorrected** transactions - i.e., RB transactions since the last EB certificate. EB corrections already included during the certificate-active period reduce this cost; only the remaining transactions require an RB-side bitmap.
 
 > [!WARNING]
 > **TODO:** Add transaction confirmation levels and their implications for applications
@@ -342,10 +340,7 @@ EBs are produced by the same stake pool that created the corresponding announcin
 - `transaction_references`: List of transaction references (transaction ids)
 - `tx_execution_bitmap`: Bitmap tracking execution status of transactions from previous RBs
 
-<a id="eb-corrections" href="#eb-corrections"></a>**EB Corrections**: The `tx_execution_bitmap` field serves a critical role in maintaining ledger integrity during HTM. Following **Rule 1**, when validators create an EB certificate within $L_\text{recover}$ slots of the latest certificate, they determine the execution status of transactions in RBs within the specified range. The bitmap provides a unified encoding where each bit indicates whether a transaction was executed or not, enabling nodes to construct the complete ledger state. This bitmap is included in the EB and ensures that:
-- Transaction execution status is continuously tracked during HTM as EBs are certified
-- The ledger state remains consistent despite temporary inclusion of unvalidated transactions
-- Constant-size encoding regardless of the number of invalid transactions
+<a id="eb-corrections" href="#eb-corrections"></a>**EB Corrections**: Following <a href="#correction-rule-1">**Rule 1**</a>, when validators create an EB certificate within $L_\text{recover}$ slots of the latest certificate, they determine the execution status of transactions in RBs that occurred since the previous certificate. The `tx_execution_bitmap` field tracks this information, ensuring ledger state consistency during certificate-active periods while reducing the correction burden for the RB that will include all remaining corrections following $L_\text{recover}$ expiration.
 
 > [!NOTE]
 > **Light Node Optimization**: As a future optimization, transaction execution bitmaps could also be included in EB certificates to allow light nodes to determine transaction execution status without downloading full EBs.
@@ -366,7 +361,7 @@ To participate in the Leios protocol as voting member/ block producing node, sta
 - **Persistent Voters**: Selected once per epoch using [Fait Accompli sortition][fait-accompli-sortition], vote in every election, identified by compact identifiers
 - **Non-persistent Voters**: Selected per EB via local sortition with Poisson-distributed stake-weighted probability
 
-This dual approach prevents linear certificate size growth by leveraging non-uniform stake distribution, enabling faster certificate diffusion while maintaining broad participation.
+This dual approach prevents linear certificate size growth by leveraging non-uniform stake distribution, enabling faster certificate diffusion while maintaining broad participation. Certificate sizes remain compact (under 10 kB) even with large committees, as shown in the [BLS certificates specification][bls-spec].
 
 <a id="vote-structure" href="#vote-structure"></a>**Vote Structure**: All votes include the `endorser_block_hash` field that uniquely identifies the target EB:
 - **Persistent votes**:
@@ -415,33 +410,47 @@ These are observed properties of the network topology and node capabilities:
 | RB diffusion time         | $\Delta_\text{RB}$  | slot  | Observed upper bound for RB diffusion and adoption to all nodes     |            2-6 slots            | Depends on network topology and conditions         |
 | RB header diffusion time  | $\Delta_\text{hdr}$ | slot  | Observed time for RB headers to reach all nodes                 |     $\leq \Delta_\text{RB}$     | Usually faster than full block diffusion           |
 | EB diffusion time         | $\Delta_\text{EB}$  | slot  | Observed upper bound for EB diffusion, transaction retrieval, and ledger state building at all nodes when no competing or fresher blocks exist    |            $\geq \Delta_\text{RB}$            | Slower than RBs due to larger size and additional processing requirements          |
-| Minimum transaction size  | $T_\text{min}$      | bytes | Observed lower bound on transaction size on mainnet                     |           $\geq 55$ bytes          | Anchored to observed 55-byte transaction [^mainnet-min-tx]; implementations may choose safety margins |
 
 _Table 1: Network Characteristics_
+
+</div>
+
+<a id="protocol-design-constants" href="#protocol-design-constants"></a>**Protocol Design Constants**
+
+These constants are determined by fundamental protocol design decisions and cannot be changed through governance:
+
+<div align="center">
+<a name="table-2" id="table-2"></a>
+
+| Constant                  |    Symbol     |  Units   | Description                                                            |                   Value                   | Notes                                                     |
+| ------------------------- | :-----------: | :------: | ---------------------------------------------------------------------- | :---------------------------------------: | --------------------------------------------------------- |
+| Minimum transaction size  | $T_\text{min}$ |  bytes   | Lower bound on transaction size determined by protocol design          |           $\geq 55$ bytes          | Anchored to observed 55-byte transaction [^mainnet-min-tx]; determined by signature schemes, UTxO structure, and other design choices |
+
+_Table 2: Protocol Design Constants_
 
 </div>
 
 <a id="protocol-parameters" href="#protocol-parameters"></a>**Protocol Parameters**
 
 These parameters are configurable and subject to governance decisions,
-constrained by the network characteristics above:
+constrained by the network characteristics and design constants above:
 
 <div align="center">
-<a name="table-2" id="table-2"></a>
+<a name="table-3" id="table-3"></a>
 
 | Parameter                     |    Symbol     |  Units   | Description                                                            |                   Constraints                   | Rationale                                                     |
 | ----------------------------- | :-----------: | :------: | ---------------------------------------------------------------------- | :---------------------------------------------: | ------------------------------------------------------------- |
 | Voting period length          | $L_\text{vote}$ |   slot   | Duration during which committee members can vote on endorser blocks    | $L_\text{vote} > 3\Delta_\text{hdr}$ | Must allow EB diffusion and equivocation detection before voting; the constraint ensures sufficient time for header propagation and equivocation detection before voting begins. <br /><br />**Liveness**: To ensure that honest EBs are certified most of the time, $L_\text{vote}$ should be set so that there is enough time for an honestly produced EB to be diffused and processed by a large fraction of the network, assuming no other "fresher" RB is produced in the same period |
-| Recovery period length       | $L_\text{recover}$ |   slot   | Duration without certificates before returning to Conservative mode    | $L_\text{recover} > \Delta_\text{EB}$ | Must ensure all nodes receive certified EBs before mode transition. Implicitly constrained by bitmap size requirement (see $S_\text{bitmap}$ row) |
+| Recovery period length       | $L_\text{recover}$ |   slot   | Duration of rolling window that tracks time since last certificate    | $L_\text{recover} > \Delta_\text{EB}$ | Must ensure all nodes receive certified EBs before window expires. Implicitly constrained by bitmap size requirement (see $S_\text{bitmap}$ row) |
 | Ranking block max size        | $S_\text{RB}$ |  bytes   | Maximum size of a ranking block                                        |                $S_\text{RB} > 0$                | Limits RB size to ensure timely diffusion                     |
 | Endorser-block referenceable transaction size | $S_\text{EB-tx}$ |  bytes   | Maximum total size of transactions that can be referenced by an endorser block |                $S_\text{EB-tx} > 0$                | Limits total transaction payload to ensure timely diffusion within stage length |
 | Endorser block max size       | $S_\text{EB}$ |  bytes   | Maximum size of an endorser block itself                               |                $S_\text{EB} > 0$                | Limits EB size to ensure timely diffusion; prevents issues with many small transactions |
 | Praos active slot coefficient | $f_\text{RB}$ |  1/slot  | Probability that a party will be the slot leader for a particular slot |       $0 < f_\text{RB} \leq \Delta_\text{RB}^{-1}$        | Blocks should not be produced faster than network delay       |
 | Mean committee size           |      $n$      | parties  | Average number of stake pools selected for voting                      |                     $n > 0$                     | Ensures sufficient decentralization and security              |
 | Quorum size                   |    $\tau$     | fraction | Minimum fraction of committee votes required for certification         |                  $\tau > 0.5$                   | Prevents adversarial control while ensuring liveness          |
-| Maximum correction bitmap size | $S_\text{bitmap}$ |  bytes   | Maximum size of transaction execution bitmap for corrections           | $S_\text{bitmap} = \lceil L_\text{recover} \times f_\text{RB} \times S_\text{RB} / (8 \times T_\text{min}) \rceil$ | Calculated based on worst-case scenario with maximum RBs containing minimum-sized transactions during recovery period. Protocol must ensure all corrections are included before CM to maintain ledger integrity |
+| Maximum correction bitmap size | $S_\text{bitmap}$ |  bytes   | Maximum size of transaction execution bitmap for corrections           | $S_\text{bitmap} = \lceil L_\text{recover} \times f_\text{RB} \times S_\text{RB} / (8 \times T_\text{min}) \rceil$ | Calculated based on worst-case scenario with maximum RBs containing minimum-sized transactions during recovery period. Protocol must ensure all corrections are included before standard validation resumes to maintain ledger integrity |
 
-_Table 2: Leios Protocol Parameters_
+_Table 3: Leios Protocol Parameters_
 
 </div>
 
@@ -455,6 +464,7 @@ _Table 2: Leios Protocol Parameters_
 > For example, an EB referencing 10,000 transactions of 100 bytes each would have $S_\text{EB-tx} = 1$ MB but the EB itself would be at least 320 KB just for the transaction hashes.
 
 <a id="bitmap-size-relationships"></a>
+
 > [!NOTE]
 > **Bitmap Size Relationships**
 > 
@@ -471,7 +481,7 @@ _Table 2: Leios Protocol Parameters_
 > 
 > For example, with $T_\text{min} = 55$ bytes[^mainnet-min-tx] and $f_\text{RB} = 0.05$, this gives $L_\text{recover} < 8{,}800$ slots. This bound is far beyond any practical recovery period, so the constraint is not limiting in practice.
 > 
-> The critical requirement is that all transaction corrections MUST be included before entering CM to ensure ledger integrity. In extreme cases, the first CM block may need to dedicate most of its space to corrections, temporarily sacrificing transaction throughput for safety.
+> The critical requirement is that all transaction corrections **must** be included before the certificate-active window expires to ensure ledger integrity. In extreme cases, the first block after window expiration may need to dedicate most of its space to corrections, temporarily sacrificing transaction throughput for safety.
 
 [^mainnet-min-tx]: Observed 55-byte transaction on mainnet: https://cardanoscan.io/transaction/d2a2098fabb73ace002e2cf7bf7131a56723cd0745b1ef1a4f9e29fd27c0eb68?tab=summary
 
@@ -622,7 +632,7 @@ As described in [Node Behavior](#node-behavior), existing Praos mini-protocols c
 Leios introduces **five new mini-protocols** to handle the additional message types required for EB distribution, voting, and certificate construction.
 
 <div align="center">
-<a name="table-9" id="table-9"></a>
+<a name="table-10" id="table-10"></a>
 
 | **Protocol** | **Purpose** | **Timing Constraint** |
 | :----------: | ----------- | --------------------- |
@@ -632,7 +642,7 @@ Leios introduces **five new mini-protocols** to handle the additional message ty
 | **EbFetch** | Retrieve certified EBs for chain reconstruction | On-demand after certificate inclusion |
 | **TxFetch** | Retrieve referenced transactions for EB validation | Before EB validation completes |
 
-_Table 9: Leios Mini-Protocols_
+_Table 10: Leios Mini-Protocols_
 
 </div>
 
@@ -744,7 +754,7 @@ appear in the following section on Simulation Results. Additionally, future
 implementations of Leios can be assessed in these terms.
 
 <div align="center">
-<a name="table-3" id="table-3"></a>
+<a name="table-4" id="table-4"></a>
 
 | Category   | Metric                                                    | Measurement                                                                                                     |
 | ---------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
@@ -760,7 +770,7 @@ implementations of Leios can be assessed in these terms.
 |            | Peak CPU usage, $\hat{q}_\text{vcpu}$                     | Maximum virtual CPU cores used by a node over a one-slot window                                                 |
 | Resilience | Adversarial stake, $\eta_\text{adversary}(s)$             | Fractional loss in throughput due to adversial stake of $s$                                                     |
 
-_Table 3: Performance Metrics_
+_Table 4: Performance Metrics_
 
 </div>
 
@@ -901,7 +911,7 @@ diffusion is consistent with the Praos performance model.[^praosp]
 The simulation results in the remainder of this section use the Rust simulator with a set of protocol parameters suitable for running Linear Leios at 200 kB/s of transactions, which corresponds to approximately 150 tx/s of transactions of sizes typical on the Cardano mainnet. The maximum size of transactions referenced by an EB is 12 MB and the stage length is $L_\text{diff} = L_\text{vote} = 7 \text{ slots}$. In order to illustrate the minimal infrastructure resources used by Leios at these throughputs, we have limited nodes to 4 virtual CPUs each and limited inter-node bandwidth to 10 Mb/s. We vary the throughput to illustrate the protocol's behavior in light vs congested transaction loads, and inject transaction from the 60th through 960th slots of the simulation; the simulation continues until the 1500th slot, so that the effects of clearing the memory pool are apparent. The table below summarizes the results of the simulation experiment. We see that a transaction at the front of the memory pool can become referenced by an EB in as few as 20 seconds when the system is lightly or moderately loaded and that it can reach certification on the ledger in about one minute. These times can double under congested conditions. In all cases there is little overhead, relative to the total bytes of transactions, in data that must be stored permanently as the ledger history.
 
 <div align="center">
-<a name="table-4" id="table-4"></a>
+<a name="table-5" id="table-5"></a>
 
 | Throughput [TxMB/s] | TPS at 1500 B/tx | Conditions      | Mempool to EB [s] | Mempool to ledger [s] | Space efficiency [%] |
 |--------------------:|-----------------:|-----------------|------------------:|----------------------:|---------------------:|
@@ -911,7 +921,7 @@ The simulation results in the remainder of this section use the Rust simulator w
 |               0.250 |            166.7 | some congestion |              42.1 |                  84.3 |                94.92 |
 |               0.300 |            200.0 | much congestion |              83.5 |                 125.8 |                95.09 |
 
-_Table 4. Leios effficiency at different throughputs._
+_Table 5. Leios effficiency at different throughputs._
 
 </div>
 
@@ -1081,7 +1091,7 @@ the Cardano mainnet must be subject to discussion and consideration of
 tradeoffs.
 
 <div align="center">
-<a name="table-5" id="table-5"></a>
+<a name="table-6" id="table-6"></a>
 
 | Parameter                                     |    Symbol          |  Feasible value    | Justification
 | --------------------------------------------- | :----------------: | :----------------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1098,7 +1108,7 @@ tradeoffs.
 | Mean committee size                           | $n$                | 600 stakepools     | Modeling of the proposed certificate scheme indicates that certificates reach their minimum size of ~8 kB at this committee size, given a realistic distribution of stake among pools.      |
 | Quorum size                                   | $\tau$             | 60%                | Quorum should be enough greater than 50% that sortition fluctuations do not give a 50% adversary a temporary majority, but low enough that weak adversaries cannot thwart an honest quorum. |
 
-_Table 5: Feasible Protocol Parameters_
+_Table 6: Feasible Protocol Parameters_
 
 </div>
 
@@ -1142,7 +1152,7 @@ the maximum size of existing Praos blocks, to the cost per node and the total
 cost of all nodes.
 
 <div align="center">
-<a name="table-6" id="table-6"></a>
+<a name="table-7" id="table-7"></a>
 
 | IB/s Rate | Cost per Node (Avg) | Network Cost (10,000 nodes) |
 | --------: | ------------------: | --------------------------: |
@@ -1153,7 +1163,7 @@ cost of all nodes.
 |        20 |    $2,500 USD/month |       $25,000,000 USD/month |
 |        30 |    $3,600 USD/month |       $36,000,000 USD/month |
 
-_Table 6: Operating Costs by IB Production Rate_
+_Table 7: Operating Costs by IB Production Rate_
 
 </div>
 
@@ -1162,7 +1172,7 @@ and fees, we can calculate the required TPS to generate enough fees to cover
 infrastructure costs.
 
 <div align="center">
-<a name="table-7" id="table-7"></a>
+<a name="table-8" id="table-8"></a>
 
 | Infrastructure Cost (USD/month) | Required ADA (at $0.45/ADA) | TPS (Avg Tx) | TPS (Min Tx) | Equivalent IB/s |
 | ------------------------------: | --------------------------: | -----------: | -----------: | --------------: |
@@ -1173,7 +1183,7 @@ infrastructure costs.
 |                     $25,000,000 |                  55,555,556 |         9.71 |        12.47 |           0.139 |
 |                     $36,000,000 |                  80,000,000 |        13.99 |        17.96 |           0.200 |
 
-_Table 7: Required TPS for Infrastructure Cost Coverage_
+_Table 8: Required TPS for Infrastructure Cost Coverage_
 
 </div>
 
@@ -1192,7 +1202,7 @@ _Required TPS for Current Reward Maintenance:_ To maintain current reward levels
 | 2029 |              ~43% |              20,640,000 |                  36.1 |          0.52 |
 | 2030 |              ~50% |              24,000,000 |                  41.9 |          0.60 |
 
-_Table 8: Required TPS for Current Reward Maintenance_
+_Table 9: Required TPS for Current Reward Maintenance_
 
 </div>
 
