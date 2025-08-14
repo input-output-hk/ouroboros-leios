@@ -509,11 +509,7 @@ impl LinearLeiosNode {
 
         let parent = self.latest_rb().map(|rb| rb.header.id);
         let endorsement = parent.and_then(|rb_id| {
-            if rb_id.slot
-                + self.sim_config.linear_vote_stage_length
-                + self.sim_config.linear_diffuse_stage_length
-                > slot
-            {
+            if rb_id.slot + self.sim_config.linear_diffuse_stage_length > slot {
                 // This RB was generated too quickly after another; hasn't been time to gather all the votes.
                 // No endorsement.
                 return None;
