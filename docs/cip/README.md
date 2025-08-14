@@ -415,7 +415,7 @@ These are observed properties of the network topology and node capabilities:
 | RB diffusion time         | $\Delta_\text{RB}$  | slot  | Observed upper bound for RB diffusion and adoption to all nodes     |            2-6 slots            | Depends on network topology and conditions         |
 | RB header diffusion time  | $\Delta_\text{hdr}$ | slot  | Observed time for RB headers to reach all nodes                 |     $\leq \Delta_\text{RB}$     | Usually faster than full block diffusion           |
 | EB diffusion time         | $\Delta_\text{EB}$  | slot  | Observed upper bound for EB diffusion, transaction retrieval, and ledger state building at all nodes when no competing or fresher blocks exist    |            $\geq \Delta_\text{RB}$            | Slower than RBs due to larger size and additional processing requirements          |
-| Minimum transaction size  | $T_\text{min}$      | bytes | Observed lower bound on transaction size on mainnet                     |           $\geq 55$ bytes          | Anchored to observed 55-byte transaction [mainnet-min-tx]; implementations may choose safety margins |
+| Minimum transaction size  | $T_\text{min}$      | bytes | Observed lower bound on transaction size on mainnet                     |           $\geq 55$ bytes          | Anchored to observed 55-byte transaction [^mainnet-min-tx]; implementations may choose safety margins |
 
 _Table 1: Network Characteristics_
 
@@ -1595,7 +1595,6 @@ protocol.
 <!-- Technical specifications and benchmarks -->
 [bls-spec]: https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md "BLS certificates specification"
 [bls-benchmarks]: https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#benchmarks-in-rust "BLS certificates benchmarks"
-[mainnet-min-tx]: https://cardanoscan.io/transaction/d2a2098fabb73ace002e2cf7bf7131a56723cd0745b1ef1a4f9e29fd27c0eb68?tab=summary "Observed 55-byte transaction on mainnet"
 
 <!-- Technical reports and documentation -->
 [committee-size-analysis]: https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-1.md#committee-size-and-quorum-requirement "Committee size and quorum requirement"
