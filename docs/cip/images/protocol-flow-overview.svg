@@ -1,62 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg width="1200" height="500" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <!-- Define patterns for modes (matching other SVGs) -->
-    <pattern id="praosPattern" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
-      <rect width="20" height="20" fill="#fce5cd"/>
-      <line x1="0" y1="20" x2="20" y2="0" stroke="#f6d3b4" stroke-width="0.5"/>
-    </pattern>
-    
-    <pattern id="leiosPattern" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
-      <rect width="20" height="20" fill="#f0f8e8"/>
-      <line x1="0" y1="20" x2="20" y2="0" stroke="#d4edda" stroke-width="0.5"/>
-    </pattern>
-    
-    <!-- Gradient for CM to HTM transition -->
-    <linearGradient id="cmToHtmGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#fce5cd;stop-opacity:1"/>
-      <stop offset="100%" style="stop-color:#f0f8e8;stop-opacity:1"/>
-    </linearGradient>
-    
-    <!-- Pattern with gradient background and diagonal texture -->
-    <pattern id="cmToHtmPattern" x="50" y="40" width="650" height="40" patternUnits="userSpaceOnUse">
-      <rect width="650" height="40" fill="url(#cmToHtmGradient)"/>
-      <!-- Create diagonal lines across the entire pattern -->
-      <g stroke="#b8a877" stroke-width="0.5" opacity="0.3">
-        <line x1="0" y1="40" x2="40" y2="0"/>
-        <line x1="20" y1="40" x2="60" y2="0"/>
-        <line x1="40" y1="40" x2="80" y2="0"/>
-        <line x1="60" y1="40" x2="100" y2="0"/>
-        <line x1="80" y1="40" x2="120" y2="0"/>
-        <line x1="100" y1="40" x2="140" y2="0"/>
-        <line x1="120" y1="40" x2="160" y2="0"/>
-        <line x1="140" y1="40" x2="180" y2="0"/>
-        <line x1="160" y1="40" x2="200" y2="0"/>
-        <line x1="180" y1="40" x2="220" y2="0"/>
-        <line x1="200" y1="40" x2="240" y2="0"/>
-        <line x1="220" y1="40" x2="260" y2="0"/>
-        <line x1="240" y1="40" x2="280" y2="0"/>
-        <line x1="260" y1="40" x2="300" y2="0"/>
-        <line x1="280" y1="40" x2="320" y2="0"/>
-        <line x1="300" y1="40" x2="340" y2="0"/>
-        <line x1="320" y1="40" x2="360" y2="0"/>
-        <line x1="340" y1="40" x2="380" y2="0"/>
-        <line x1="360" y1="40" x2="400" y2="0"/>
-        <line x1="380" y1="40" x2="420" y2="0"/>
-        <line x1="400" y1="40" x2="440" y2="0"/>
-        <line x1="420" y1="40" x2="460" y2="0"/>
-        <line x1="440" y1="40" x2="480" y2="0"/>
-        <line x1="460" y1="40" x2="500" y2="0"/>
-        <line x1="480" y1="40" x2="520" y2="0"/>
-        <line x1="500" y1="40" x2="540" y2="0"/>
-        <line x1="520" y1="40" x2="560" y2="0"/>
-        <line x1="540" y1="40" x2="580" y2="0"/>
-        <line x1="560" y1="40" x2="600" y2="0"/>
-        <line x1="580" y1="40" x2="620" y2="0"/>
-        <line x1="600" y1="40" x2="640" y2="0"/>
-        <line x1="620" y1="40" x2="660" y2="0"/>
-        <line x1="640" y1="40" x2="680" y2="0"/>
-      </g>
+    <!-- Pattern for timeline background -->
+    <pattern id="timelinePattern" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+      <rect width="40" height="40" fill="#f8f8f8"/>
+      <line x1="0" y1="40" x2="40" y2="0" stroke="#e8e8e8" stroke-width="0.5"/>
     </pattern>
     
     <!-- Arrow markers -->
@@ -69,17 +17,10 @@
       <polygon points="0 0, 6 2, 0 4" fill="#f9a825"/>
     </marker>
     
-    <!-- Hover effects for interactive links -->
+    <!-- Hover effects -->
     <style>
-      .mode-link, .block-link, .vote-link, .param-link {
+      .block-link, .vote-link, .param-link {
         cursor: pointer;
-      }
-      .mode-link:hover rect {
-        fill-opacity: 0.9;
-        stroke-width: 1.5;
-      }
-      .mode-link:hover text {
-        font-weight: bold;
       }
       .block-link:hover rect {
         stroke-width: 3;
@@ -112,29 +53,31 @@
   <!-- Background -->
   <rect width="1200" height="500" fill="#ffffff"/>
   
-  <!-- Mode Timeline (Top) - showing transition into HTM -->
-  <g id="mode-timeline">
-          <!-- Conservative or High-Throughput Mode -->
-      <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#conservative-mode" class="mode-link">
-        <rect x="50" y="40" width="650" height="40" fill="url(#cmToHtmPattern)" stroke="#969966" stroke-width="0.5" stroke-opacity="0.5"/>
-        <text x="375" y="60" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="18" font-weight="bold" text-anchor="middle">
-          <tspan fill="#783f04">CM</tspan><tspan fill="#555"> / </tspan><tspan fill="#5a8030">HTM</tspan>
-        </text>
-      </a>
-    
-    <!-- High-Throughput Mode starts just before certificate -->
-    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#high-throughput-mode" class="mode-link">
-      <rect x="700" y="40" width="450" height="40" fill="url(#leiosPattern)" stroke="#7cb342" stroke-width="0.5" stroke-opacity="0.3"/>
-      <text x="925" y="60" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" text-anchor="middle" fill="#5a8030">HTM</text>
-    </a>
+  <!-- Timeline background -->
+  <g id="timeline">
+    <rect x="50" y="40" width="1100" height="40" fill="url(#timelinePattern)" stroke="#ddd" stroke-width="0.5"/>
+    <text x="600" y="65" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#999">Time in slots</text>
   </g>
   
-  <!-- Main chain extension content -->
-  <g id="chain-extension">
-<!-- Continuation dots -->
+  <!-- L_recover window indicator (thin line) -->
+  <g id="window-indicator">
+    <!-- Start of window at RB' certificate -->
+    <line x1="820" y1="20" x2="820" y2="100" stroke="#7cb342" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.8"/>
+    
+    <!-- L_recover window line -->
+    <line x1="820" y1="30" x2="1100" y2="30" stroke="#7cb342" stroke-width="4" opacity="0.8"/>
+    <text x="960" y="20" font-family="Times New Roman, serif" font-size="20" font-style="italic" text-anchor="middle" fill="#5a8030">L<tspan font-family="Arial, sans-serif" font-size="10" font-style="normal" baseline-shift="sub">recover-RB'</tspan></text>
+    
+    <!-- End of window -->
+    <line x1="1100" y1="20" x2="1100" y2="100" stroke="#7cb342" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.8"/>
+  </g>
+  
+  <!-- Main protocol flow content -->
+  <g id="protocol-flow">
+    <!-- Continuation dots -->
     <text x="260" y="181" font-family="Arial, sans-serif" font-size="28" fill="#666" text-anchor="middle">...</text>
 
-    <!-- RB with EB announcement (could be in either mode) -->
+    <!-- RB with EB announcement -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
       <rect x="330" y="120" width="100" height="120" fill="#fce5cd" stroke="#783f04" stroke-width="2" rx="8"/>
       <text x="380" y="165" font-family="Arial, sans-serif" font-size="24" font-weight="bold" text-anchor="middle" fill="#783f04">RB</text>
@@ -152,10 +95,10 @@
       <text x="380" y="350" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#274e13">[TxRefs]</text>
     </a>
     
-    <!-- Arrow from predecessor (dashed) pointing to something off-screen -->
+    <!-- Arrow from predecessor -->
     <path d="M 330 180 L 290 180" stroke="#783f04" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrowhead)"/>
     
-    <!-- Solid arrow connecting the two RBs (pointing left to first RB) -->
+    <!-- Solid arrow connecting the two RBs -->
     <path d="M 770 180 L 430 180" stroke="#783f04" stroke-width="2" marker-end="url(#arrowhead)"/>
     
     <!-- Voting phase indicators -->
@@ -198,9 +141,9 @@
       </text>
     </a>
     
-    <!-- RB with certificate -->
+    <!-- RB' with certificate (starts/extends window) -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
-      <rect x="770" y="120" width="100" height="120" fill="#fce5cd" stroke="#ff6b6b" stroke-width="2" rx="8" stroke-dasharray="5,5"/>
+      <rect x="770" y="120" width="100" height="120" fill="#fce5cd" stroke="#ff6b6b" stroke-width="2" stroke-dasharray="6,3" rx="8"/>
       <text x="820" y="165" font-family="Arial, sans-serif" font-size="24" font-weight="bold" text-anchor="middle" fill="#783f04">RB'</text>
       <text x="820" y="195" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#783f04">[Txs]</text>
     </a>
@@ -218,39 +161,48 @@
     <!-- Arrow from certificate back to EB -->
     <path d="M 820 270 Q 720 330 455 330" stroke="#f9a825" stroke-width="2" stroke-dasharray="2,2" fill="none" marker-end="url(#votearrowhead)"/>
     
-    <!-- Arrow from something off-screen to certificate RB (dashed) -->
+    <!-- Arrow to next block -->
     <path d="M 920 180 L 870 180" stroke="#783f04" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrowhead)"/>
     
     <!-- Continuation dots -->
     <text x="950" y="181" font-family="Arial, sans-serif" font-size="28" fill="#666" text-anchor="middle">...</text>
   </g>
   
-  <!-- Legend -->
-  <g id="legend" transform="translate(340, 440)">
-    <text x="280" y="0" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#333" text-anchor="middle">Legend</text>
+  <!-- Legend (centered horizontally, single line) -->
+  <g id="legend" transform="translate(150, 440)">
+    <text x="450" y="-15" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#333" text-anchor="middle">Legend</text>
     
-    <!-- RB -->
+    <!-- RB solid and dashed side by side -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
-      <rect x="70" y="12" width="18" height="24" fill="#fce5cd" stroke="#783f04" stroke-width="1.5" rx="2"/>
+      <rect x="70" y="0" width="18" height="24" fill="#fce5cd" stroke="#783f04" stroke-width="1.5" rx="2"/>
     </a>
-    <text x="98" y="28" font-family="Arial, sans-serif" font-size="14" fill="#333">Ranking Block (RB)</text>
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
+      <rect x="92" y="0" width="18" height="24" fill="#fce5cd" stroke="#ff6b6b" stroke-width="1.5" stroke-dasharray="4,2" rx="2"/>
+    </a>
+    <text x="122" y="16" font-family="Arial, sans-serif" font-size="14" fill="#333">Ranking Block (RB)</text>
     
     <!-- EB -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#endorser-blocks-ebs" class="block-link">
-      <rect x="230" y="15" width="24" height="18" fill="#d9ead3" stroke="#274e13" stroke-width="1.5" rx="2"/>
+      <rect x="270" y="3" width="24" height="18" fill="#d9ead3" stroke="#274e13" stroke-width="1.5" rx="2"/>
     </a>
-    <text x="260" y="28" font-family="Arial, sans-serif" font-size="14" fill="#333">Endorser Block (EB)</text>
+    <text x="300" y="16" font-family="Arial, sans-serif" font-size="14" fill="#333">Endorser Block (EB)</text>
     
     <!-- Certificate -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="block-link">
-      <polygon points="405,12 415,18 415,30 405,36 395,30 395,18" fill="#fff2cc" stroke="#f9a825" stroke-width="1"/>
+      <polygon points="450,0 460,6 460,18 450,24 440,18 440,6" fill="#fff2cc" stroke="#f9a825" stroke-width="1"/>
     </a>
-    <text x="423" y="28" font-family="Arial, sans-serif" font-size="14" fill="#333">Certificate</text>
+    <text x="468" y="16" font-family="Arial, sans-serif" font-size="14" fill="#333">Certificate</text>
     
     <!-- Vote -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="vote-link">
-      <rect x="505" y="17" width="10" height="10" fill="#f9a825" transform="rotate(45 510 22)"/>
+      <rect x="555" y="5" width="10" height="10" fill="#f9a825" transform="rotate(45 560 10)"/>
     </a>
-    <text x="525" y="28" font-family="Arial, sans-serif" font-size="14" fill="#333">Vote</text>
+    <text x="575" y="16" font-family="Arial, sans-serif" font-size="14" fill="#333">Vote</text>
+    
+    <!-- L_recover window with dashed verticals -->
+    <line x1="640" y1="7" x2="640" y2="19" stroke="#7cb342" stroke-width="1" stroke-dasharray="2,2" opacity="0.8"/>
+    <line x1="640" y1="12" x2="670" y2="12" stroke="#7cb342" stroke-width="3" opacity="0.8"/>
+    <line x1="670" y1="7" x2="670" y2="19" stroke="#7cb342" stroke-width="1" stroke-dasharray="2,2" opacity="0.8"/>
+    <text x="675" y="16" font-family="Arial, sans-serif" font-size="14" fill="#333"><tspan font-family="Times New Roman, serif" font-style="italic" font-size="16">L</tspan><tspan font-size="10" baseline-shift="sub">recover</tspan> window</text>
   </g>
 </svg>
