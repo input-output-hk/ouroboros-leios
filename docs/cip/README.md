@@ -452,11 +452,13 @@ _Table 2: Leios Protocol Parameters_
 > - Higher block production rates ($f_\text{RB}$) increase the number of blocks needing corrections
 > - Smaller minimum transaction sizes ($T_\text{min}$) allow more transactions per block, requiring more correction bits
 > 
-> **Implicit Constraint on $L_\text{recover}$**: The requirement that $S_\text{bitmap} < S_\text{RB}$ creates an upper bound on the recovery period:
+> **Implicit Constraint on $L_\text{recover}$**:
+> 
+> The requirement that $S_\text{bitmap} < S_\text{RB}$ creates an upper bound on the recovery period:
 > 
 > $$L_\text{recover} < \frac{8 \times T_\text{min}}{f_\text{RB}}$$
 > 
-> For example, with $T_\text{min} = 55$ bytes and $f_\text{RB} = 0.05$, this gives $L_\text{recover} < 8{,}800$ slots. This bound is far beyond any practical recovery period, so the constraint is not limiting in practice.
+> For example, with $T_\text{min} = 55$ bytes[^mainnet-min-tx] and $f_\text{RB} = 0.05$, this gives $L_\text{recover} < 8{,}800$ slots. This bound is far beyond any practical recovery period, so the constraint is not limiting in practice.
 > 
 > The critical requirement is that all transaction corrections MUST be included before entering CM to ensure ledger integrity. In extreme cases, the first CM block may need to dedicate most of its space to corrections, temporarily sacrificing transaction throughput for safety.
 
@@ -1509,6 +1511,7 @@ protocol.
 [bls-spec]: https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md "BLS certificates specification"
 [bls-benchmarks]: https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#benchmarks-in-rust "BLS certificates benchmarks"
 [mainnet-min-tx]: https://cardanoscan.io/transaction/d2a2098fabb73ace002e2cf7bf7131a56723cd0745b1ef1a4f9e29fd27c0eb68?tab=summary "Observed 55-byte transaction on mainnet"
+[^mainnet-min-tx]: Observed 55-byte transaction on mainnet: https://cardanoscan.io/transaction/d2a2098fabb73ace002e2cf7bf7131a56723cd0745b1ef1a4f9e29fd27c0eb68?tab=summary
 
 <!-- Technical reports and documentation -->
 [committee-size-analysis]: https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-1.md#committee-size-and-quorum-requirement "Committee size and quorum requirement"
