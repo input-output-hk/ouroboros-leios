@@ -258,13 +258,11 @@ This **conditional inclusion** ensures transaction availability to honest nodes 
 
 #### Rolling Window Rules
 
-The rolling window mechanism operates through three key behaviors that automatically manage throughput based on certificate inclusion timing:
+The rolling window mechanism operates through two key behaviors that automatically manage throughput based on certificate inclusion timing:
 
 **Window Reset**: Each certificate inclusion immediately resets the $L_\text{recover}$ countdown, extending the enhanced throughput period. As shown in Figure 5 below, when RB<sub>3</sub> includes a certificate, it starts a new window ($L_\text{recover-RB3}$). Later, RB<sub>5</sub> resets this timer again, creating overlapping windows that maintain continuous high throughput.
 
 **Window Expiration**: Only when $L_\text{recover}$ consecutive slots pass without any certificate does the protocol revert to standard validation. This recovery period ensures all nodes synchronize any delayed EBs before validation resumes. In Figure 5, this occurs after the $L_\text{recover-RB5}$ window expires.
-
-**Automatic Operation**: The protocol tracks this timing continuously without manual intervention or discrete state changes, automatically adjusting validation requirements based on recent certificate activity.
 
 <div align="center">
 <a name="figure-5" id="figure-5"></a>
