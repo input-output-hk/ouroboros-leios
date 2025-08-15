@@ -420,9 +420,9 @@ These characteristics are determined by fundamental protocol design decisions an
 <div align="center">
 <a name="table-2" id="table-2"></a>
 
-| Constant                  |    Symbol     |  Units   | Description                                                            |                   Value                   | Notes                                                     |
+| Characteristic            |    Symbol     |  Units   | Description                                                            |                   Value                   | Notes                                                     |
 | ------------------------- | :-----------: | :------: | ---------------------------------------------------------------------- | :---------------------------------------: | --------------------------------------------------------- |
-| Minimum transaction size  | $T_\text{min}$ |  bytes   | Lower bound on transaction size determined by protocol design          |           $\geq 55$ bytes          | Anchored to observed 55-byte transaction [^mainnet-min-tx]; determined by signature schemes, UTxO structure, and other design choices |
+| Minimum transaction size  | $T_\text{min}$ |  bytes   | Lower bound on transaction size          |           $\geq 55$ bytes          | Anchored to observed 55-byte transaction [^mainnet-min-tx] |
 
 _Table 2: Protocol Characteristics_
 
@@ -431,7 +431,7 @@ _Table 2: Protocol Characteristics_
 <a id="protocol-parameters" href="#protocol-parameters"></a>**Protocol Parameters**
 
 These parameters are configurable and subject to governance decisions,
-constrained by the network characteristics and design constants above:
+constrained by the network characteristics and protocol characteristics above:
 
 <div align="center">
 <a name="table-3" id="table-3"></a>
