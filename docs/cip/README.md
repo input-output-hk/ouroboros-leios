@@ -703,7 +703,7 @@ RbHeaderRelay is a **pull-based relay protocol** that enables nodes to request a
 
 <a id="hardware-upgrade-incentives" href="#hardware-upgrade-incentives"></a>**Hardware Upgrade Incentives**: The increased computational and bandwidth requirements for Leios operation are offset by higher potential rewards from increased transaction throughput. As demonstrated in the [operating costs analysis](#operating-costs), SPO profitability improves significantly once sustained throughput exceeds 30-50 TPS, providing clear economic incentives for infrastructure upgrades.
 
-#### Reserve Contribution Adjustments
+**Reserve Contribution Adjustments**
 
 <a id="reserve-contribution-adjustments" href="#reserve-contribution-adjustments"></a>During low-traffic periods when EB production is minimal, the protocol maintains current Reserve contribution patterns without artificial inflation. The adaptive production mechanism ensures that enhanced infrastructure costs are only incurred when corresponding revenue opportunities exist through increased transaction processing.
 
