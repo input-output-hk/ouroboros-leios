@@ -19,6 +19,13 @@ Artifacts:
 - [Notebook](analysis/simms/2025w33b/analysis.ipynb)
 - [Configurations](analysis/simms/2025w33b/experiments/)
 
+### Rust simulation
+
+- Released version 1.0.0 (started tracking version numbers for reference in the CIP)
+- Removed the `L_vote` timing restriction when including a certificate in a Linear Leios RB
+- Fixed mempool behavior for TXs referenced by EBs
+- Allow selecting a fraction of attackers by stake
+
 ## 2025-08-12
 
 ### First simulation experiment for attacks
