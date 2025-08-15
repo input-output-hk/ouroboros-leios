@@ -543,19 +543,19 @@ Whenever an EB is announced through an RB header, nodes must fetch the EB conten
 
 #### Voting & Certification
 
-<a id="VotingEB" href="#VotingEB"></a>**Voting Process**: Committee members [selected through a lottery process](#votes-and-certificates) vote on EBs as soon as vote requirements are met according to protocol (step 10). An honest node casts only one vote for the EB extending its current longest chain.
+<a id="VotingEB" href="#VotingEB"></a>**Voting Process**: Committee members [selected through a lottery process](#votes-and-certificates) vote on EBs as soon as vote requirements are met according to protocol (step 9). An honest node casts only one vote for the EB extending its current longest chain.
     
-<a id="VoteDiffusion" href="#VoteDiffusion"></a>**Vote Propagation**: Votes propagate through the network during the vote diffusion period ($L_\text{diff}$ slots) (steps 11 and 11a). While nodes forward votes on EBs across all candidate chains, they only forward at most one vote per committee member per slot.
+<a id="VoteDiffusion" href="#VoteDiffusion"></a>**Vote Propagation**: Votes propagate through the network during the vote diffusion period ($L_\text{diff}$ slots) (steps 10 and 10a). While nodes forward votes on EBs across all candidate chains, they only forward at most one vote per committee member per slot.
     
 > [!WARNING]
 > - How long should votes be propagated? (Likely not critical - "30 seconds" would probably suffice)
 > - Nodes should receive and relay votes for EBs even before acquiring/validating the EB, but only if they've seen an RB header announcing that EB
 
-<a id="CertificateAggregation" href="#CertificateAggregation"></a>**Certificate Construction**: Nodes receive votes from upstream peers, maintaining a running tally for each EB to track progress toward the quorum threshold (step 12). When enough votes are collected during the vote diffusion period, nodes aggregate them into a compact certificate. This creates a cryptographic proof that the EB has received sufficient committee approval, and therefore must have already been validated by some honest stake.
+<a id="CertificateAggregation" href="#CertificateAggregation"></a>**Certificate Construction**: Nodes receive votes from upstream peers, maintaining a running tally for each EB to track progress toward the quorum threshold (step 11). When enough votes are collected during the vote diffusion period, nodes aggregate them into a compact certificate. This creates a cryptographic proof that the EB has received sufficient committee approval, and therefore must have already been validated by some honest stake.
     
 #### Next Block Production
 
-<a id="certificate-inclusion" href="#certificate-inclusion"></a>**Certificate Inclusion**: Block producers creating new RBs include certificates for EBs where the full stage duration ($L_\text{vote}$ slots) has elapsed since the EB's creation (step 13). The producer may also announce a new EB extending their RB. Including a certificate resets the $L_\text{recover}$ rolling window, either extending an existing enhanced throughput period or starting a new one (as detailed in [Rolling Window Rules](#rolling-window-rules)). 
+<a id="certificate-inclusion" href="#certificate-inclusion"></a>**Certificate Inclusion**: Block producers creating new RBs include certificates for EBs where the full stage duration ($L_\text{vote}$ slots) has elapsed since the EB's creation (step 12). The producer may also announce a new EB extending their RB. Including a certificate resets the $L_\text{recover}$ rolling window, either extending an existing enhanced throughput period or starting a new one (as detailed in [Rolling Window Rules](#rolling-window-rules)). 
 
 
 #### Ledger Management
