@@ -270,7 +270,7 @@ The rolling window mechanism operates through two key behaviors that automatical
   <img src="images/protocol-flow-detail.svg" alt="Rolling Window Timeline">
 </p>
 
-_Figure 5: Detailed protocol flow showing rolling $L_\text{recover}$ windows and transaction execution tracking_
+<sub>Figure 5: Detailed protocol flow showing rolling $L_\text{recover}$ windows and transaction execution tracking</sub>
 
 </div>
 
