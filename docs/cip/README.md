@@ -215,7 +215,7 @@ A larger block containing additional transaction references. There are no other 
 
 The RB chain continues to be distributed exactly as in Praos, while Leios introduces a separate header distribution mechanism for rapid EB discovery and equivocation detection.
 
-Due to the voting overhead per EB, nodes announce an EB only when the RB is full, they do not announce empty EBs.
+Due to the voting overhead per EB, nodes should generally avoid announcing EBs with insufficient transaction content to justify the voting costs, as detailed in the [adaptive EB production](#adaptive-eb-production) incentive mechanism.
 
 #### Step 2: EB Distribution
 
@@ -377,7 +377,7 @@ This dual approach prevents linear certificate size growth by leveraging non-uni
 <a id="certificate-validation" href="#certificate-validation"></a>**Certificate Validation**: When an RB includes an EB certificate, nodes must validate the following before accepting the block:
 
 1. **CDDL Format Compliance**: Certificate structure matches the specification format defined in <a href="#votes-certificates-cddl">Appendix B: Votes and Certificates CDDL</a>
-2. **Cryptographic Signatures**: All BLS signatures are validGiven the voting overhead per EB, EBs should only be announced if the base RB is full. In other words, empty EBs should not be announced in the network as they induce a non-zero cost.
+2. **Cryptographic Signatures**: All BLS signatures are valid
 
 3. **Voter Eligibility**: 
    - Persistent voters must have been selected as such by the [Fait Accompli scheme][fait-accompli-sortition] for the current epoch
@@ -679,13 +679,33 @@ RbHeaderRelay is a **pull-based relay protocol** that enables nodes to request a
 
 ### Incentives
 
-> [!Warning]
->
-> This section is work in progress.
+<a id="incentive-structure" href="#incentive-structure"></a>The Leios incentive structure builds upon the existing Ouroboros Praos reward mechanism while introducing new considerations for EB production, voting participation, and dual-block production scenarios. The design aims to maintain economic security while optimizing for throughput efficiency.
 
-- Reward EB creation, even if some EBs are not included in the final chain
-- Motivate voter participation, while blocking system gaming
-- Distribute fees among EB producers, main block producers, and voters
+**Reward Function Evolution**
+
+<a id="current-reward-function" href="#current-reward-function"></a>The current Praos reward function tracks the number of RBs created by each SPO compared to their expected production, using this performance metric (β) to determine rewards proportional to stake. This mechanism detects offline behavior and incentivizes consistent participation without directly measuring transaction inclusion - empty blocks count equally toward the performance factor.
+
+<a id="performance-based-rewards" href="#performance-based-rewards"></a>**Performance-Based Rewards**: Leios extends this approach by refining the performance calculation to account for block validity in enhanced throughput scenarios. When operating within the rolling window (certificate-active periods), RBs containing invalid transactions due to incomplete ledger state knowledge should not negatively impact the producer's performance factor. The proposed enhancement excludes RBs with invalid transactions from performance calculations, ensuring honest parties maintaining connectivity can always produce valid empty blocks even when lacking complete EB synchronization.
+
+<a id="voting-participation-rewards" href="#voting-participation-rewards"></a>**Voting Participation Rewards**: A second extension incorporates committee votes in certified EBs into reward calculations. Since votes occur more frequently than RB production, this significantly reduces reward variance for participating SPOs. This mechanism follows similar anti-gaming principles as RB production - while malicious parties might ignore certain votes to favor preferred chains, such behavior risks delaying their own block publication and reducing main chain inclusion probability.
+
+**Fee Structure Considerations**
+
+<a id="single-vs-dual-pricing" href="#single-vs-dual-pricing"></a>**Single vs. Dual Pricing**: The protocol maintains a unified fee structure for transactions regardless of inclusion method (RB vs. EB). While separate pricing could theoretically reduce off-chain bribing incentives (since RB inclusion offers superior service guarantees), the implementation complexity and ecosystem disruption costs outweigh the benefits. The existing single-price model already experiences potential bribing pressures for mempool queue jumping, and Leios does not fundamentally alter this dynamic.
+
+<a id="service-quality-differentiation" href="#service-quality-differentiation"></a>**Service Quality Differentiation**: The inherent service difference between RB and EB inclusion (immediate vs. certificate-dependent confirmation) creates natural economic incentives without requiring protocol-level price differentiation. Applications requiring immediate confirmation can adjust their fee strategies accordingly within the existing framework.
+
+**Operational Cost Optimization**
+
+<a id="adaptive-eb-production" href="#adaptive-eb-production"></a>**Adaptive EB Production**: To address concerns about operational costs during low-traffic periods, the protocol implements adaptive EB announcement based on transaction availability. SPOs should only announce EBs when they contain sufficient transactions (e.g., 10% capacity utilization) to justify the voting overhead costs. When traffic levels can be adequately served by RBs alone, no EBs are announced, reducing operational costs to Praos levels.
+
+<a id="cost-scaling-mechanism" href="#cost-scaling-mechanism"></a>This adaptive mechanism ensures the protocol's cost structure scales with actual throughput demand rather than imposing fixed overhead regardless of network utilization.
+
+<a id="hardware-upgrade-incentives" href="#hardware-upgrade-incentives"></a>**Hardware Upgrade Incentives**: The increased computational and bandwidth requirements for Leios operation are offset by higher potential rewards from increased transaction throughput. As demonstrated in the [operating costs analysis](#operating-costs), SPO profitability improves significantly once sustained throughput exceeds 30-50 TPS, providing clear economic incentives for infrastructure upgrades.
+
+#### Reserve Contribution Adjustments
+
+<a id="reserve-contribution-adjustments" href="#reserve-contribution-adjustments"></a>During low-traffic periods when EB production is minimal, the protocol maintains current Reserve contribution patterns without artificial inflation. The adaptive production mechanism ensures that enhanced infrastructure costs are only incurred when corresponding revenue opportunities exist through increased transaction processing.
 
 ## Rationale
 
