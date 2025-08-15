@@ -35,37 +35,74 @@ Error handling is the interpretation of the failure proofs, mapping the failure 
 
 For conformance testing additional events had to be added to the Haskell and Rust simulation. First, an explicit event for the slot transition of a node has been added (the event could also be inferred from the other log entries), second the non-election for block creation or voting events have been added as well. Those "negative" events are needed as the formal specification enforces a node to always check, whether a block or vote can be created.
 
-### Formal spec repo
+### Formal spec repository
 
 The formal specification of the Leios protocol is implemented in the repository [ouroboros-leios-formal-spec](https://github.com/input-output-hk/ouroboros-leios-formal-spec).
 In that repository there are [examples](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Short/Trace/Verifier/Test.lagda.md) that illustrate how the trace verifier works. Here the trace is part of the example in the Agda file. In addition in order to setup the trace verifier we need the following configuration values:
 
-* Stake distribution
-* Configuration
-* Parameters
+* Network parameters
+  * numberOfParties: Number of parties (nodes) in the distributed system
+  * stakeDistribution: The stake distribution, i.e. stake per node
+  * stageLength: The Leios stage length parameter
+  * ledgerQuality: The Leios ledger quality parameter
+  * lateIBInclusion: The Leios late-IB-inclusion flag
 
-### Leios repo
+* Other parameters
+  * sutId: The id of the system under test (SUT)
+  * winning-slots: The lotteries for IB, EB and Votes
 
-In the `leios-trace-verifier` module in the Leios repo the executable for the trace verifier is built. This is done by extracting the Agda code as MAlonzo to Haskell. Having the Haskell code for the trace verifier also to use it together with log file parser from the module `leios-trace-hs`. The Haskell module is a shared module that both the Haskell simulation code and the trace verifier use.
+### Leios repository
+
+In the `leios-trace-verifier` module in the Leios repository the executable for the trace verifier is built. This is done by extracting the Agda code as MAlonzo to Haskell. Having the Haskell code for the trace verifier allows to use it together with log file parser from the module `leios-trace-hs`. The Haskell module is a shared module that both the Haskell simulation code and the trace verifier use.
 
 In addition there is a common trace log file format specified in JSON, that both the Haskell and Rust simulation use when externalizing events into the trace log file.
 
 ```bash
-{"message":{"id":"0-0","pipeline":0,"producer":"node-0","rb_ref":"genesis","size_bytes":98608,"slot":0,"tx_payload_bytes":98304,"type":"IBGenerated"},"time_s":0.13}
-{"message":{"id":"1-0","pipeline":0,"producer":"node-1","rb_ref":"genesis","size_bytes":98608,"slot":0,"tx_payload_bytes":98304,"type":"IBGenerated"},"time_s":0.13}
-{"message":{"id":"2-0","pipeline":0,"producer":"node-2","rb_ref":"genesis","size_bytes":98608,"slot":0,"tx_payload_bytes":98304,"type":"IBGenerated"},"time_s":0.13}
+{"message":{"node":"node-0","slot":25,"type":"Slot"},"time_s":25}
+{"message":{"node":"node-0","slot":25,"type":"NoIBGenerated"},"time_s":25}
+{"message":{"id":"54-2","recipient":"node-0","type":"IBReceived"},"time_s":25.028918}
+{"message":{"id":"20-3","node":"node-0","slot":24,"type":"IBEnteredState"},"time_s":25.065875}
+{"message":{"id":"54-2","node":"node-0","slot":23,"type":"IBEnteredState"},"time_s":25.12807}
+{"message":{"id":"21-0","recipient":"node-0","type":"IBReceived"},"time_s":25.23862}
+{"message":{"id":"21-0","node":"node-0","slot":24,"type":"IBEnteredState"},"time_s":25.337772}
+{"message":{"id":"51-1","recipient":"node-0","type":"IBReceived"},"time_s":25.680406}
+{"message":{"id":"83-0","recipient":"node-0","type":"IBReceived"},"time_s":25.743445}
+{"message":{"id":"51-1","node":"node-0","slot":24,"type":"IBEnteredState"},"time_s":25.779558}
+{"message":{"id":"83-0","node":"node-0","slot":25,"type":"IBEnteredState"},"time_s":25.842597}
+{"message":{"node":"node-0","slot":26,"type":"Slot"},"time_s":26}
+{"message":{"node":"node-0","slot":26,"type":"NoIBGenerated"},"time_s":26}
+{"message":{"id":"24-2","recipient":"node-0","type":"IBReceived"},"time_s":26.299945}
+{"message":{"id":"24-2","node":"node-0","slot":24,"type":"IBEnteredState"},"time_s":26.399097}
+{"message":{"id":"17-2","recipient":"node-0","type":"IBReceived"},"time_s":26.840607}
+{"message":{"id":"90-1","recipient":"node-0","type":"IBReceived"},"time_s":26.920078}
+{"message":{"id":"57-2","recipient":"node-0","type":"IBReceived"},"time_s":26.921749}
+{"message":{"id":"17-2","node":"node-0","slot":26,"type":"IBEnteredState"},"time_s":26.939759}
+{"message":{"node":"node-0","slot":27,"type":"Slot"},"time_s":27}
+{"message":{"node":"node-0","slot":27,"type":"NoIBGenerated"},"time_s":27}
+{"message":{"id":"45-4","recipient":"node-0","type":"IBReceived"},"time_s":27.005877}
+{"message":{"id":"90-1","node":"node-0","slot":25,"type":"IBEnteredState"},"time_s":27.01923}
+{"message":{"id":"57-2","node":"node-0","slot":24,"type":"IBEnteredState"},"time_s":27.020901}
+{"message":{"id":"45-4","node":"node-0","slot":26,"type":"IBEnteredState"},"time_s":27.105029}
+{"message":{"id":"40-1","recipient":"node-0","type":"IBReceived"},"time_s":27.393871}
+{"message":{"id":"40-1","node":"node-0","slot":27,"type":"IBEnteredState"},"time_s":27.493023}
+{"message":{"id":"35-2","recipient":"node-0","type":"IBReceived"},"time_s":27.502044}
+{"message":{"id":"35-2","node":"node-0","slot":26,"type":"IBEnteredState"},"time_s":27.601196}
 ```
 
-* buildup stake distr
-* read topo file, etc.
+The stake distribution, that has to be passed to the trace verifier as argument is deduced from the trace log file. This is possible as in the log file there are also the negative events, i.e. for every slot there is a message, if block was created or not.
+
+Other parameters are read from the configuration files that were used to run the simulations as well. Those are:
+* topology file
+* configuration file
+* trace log file
 
 ### Running the trace verifier
 
-Example execution
+The Leios trace verifier needs a simulation output.
 
 #### Generate a trace file
 
-Currently both simulations, Rust and Haskell, support generating the additional events needed for conformance testing by adding the flag `--conformance-testing` when running the simulation from the command line.
+Currently both simulations, Rust and Haskell, support generating the additional events needed for conformance testing by adding the flag `--conformance-testing` when running the simulation from the command line. A Rust simulation output for a whole day can be produced as follows:
 
 ```bash
 $ cargo run --release -- --slots 86400 --conformance-events ../leios-trace-verifier/examples/topology.yaml ../sim-rs.out
@@ -75,7 +112,7 @@ $ cargo run --release -- --slots 86400 --conformance-events ../leios-trace-verif
 
 It is recommended to run trace verifier using Nix and with the Haskell runtime system parameters setting the minimal heap size.
 
-#### flags
+The trace verifier can be invoked as follows:
 
 ```bash
 $ nix run .#leios-trace-verifier -- +RTS -H1G -s -RTS --help
@@ -94,10 +131,12 @@ Available options:
   -h,--help                Show this help text
 ```
 
+Make sure, to specify the same topology and configuration files as used to generate the log trace.
+
 ```bash
 $ nix run .#leios-trace-verifier -- +RTS -H1G -s -RTS --trace-file trace.log --config-file data/simulation/config.default.yaml --topology-file leios-trace-verifier/examples/topology.yaml --idSut 0
 ```
 
 #### Performance
 
-GC degrades for long traces
+The performance of the trace verifier is still an open issue. When running log traces, the performance degrades significantly and the Haskell garbage collector takes a lot of time.
