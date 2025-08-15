@@ -394,7 +394,7 @@ Detailed specifications, performance, and benchmarks are available in the [BLS c
 
 ### Network Characteristics and Protocol Parameters
 
-The following sections distinguish between observed **network characteristics** (which depend on topology and node capabilities) and tunable **protocol parameters** (which can be adjusted via governance).
+The following sections distinguish between observed **network characteristics** (which depend on topology and node capabilities), **protocol characteristics** (determined by architectural design decisions), and tunable **protocol parameters** (which can be adjusted via governance).
 
 <a id="network-characteristics" href="#network-characteristics"></a>**Network Characteristics**
 
@@ -413,9 +413,9 @@ _Table 1: Network Characteristics_
 
 </div>
 
-<a id="protocol-design-constants" href="#protocol-design-constants"></a>**Protocol Design Constants**
+<a id="protocol-characteristics" href="#protocol-characteristics"></a>**Protocol Characteristics**
 
-These constants are determined by fundamental protocol design decisions and cannot be changed through governance:
+These characteristics are determined by fundamental protocol design decisions and cannot be changed through governance:
 
 <div align="center">
 <a name="table-2" id="table-2"></a>
@@ -424,7 +424,7 @@ These constants are determined by fundamental protocol design decisions and cann
 | ------------------------- | :-----------: | :------: | ---------------------------------------------------------------------- | :---------------------------------------: | --------------------------------------------------------- |
 | Minimum transaction size  | $T_\text{min}$ |  bytes   | Lower bound on transaction size determined by protocol design          |           $\geq 55$ bytes          | Anchored to observed 55-byte transaction [^mainnet-min-tx]; determined by signature schemes, UTxO structure, and other design choices |
 
-_Table 2: Protocol Design Constants_
+_Table 2: Protocol Characteristics_
 
 </div>
 
