@@ -1,5 +1,24 @@
 # Leios logbook
 
+## 2025-08-15
+
+### Parameter-sweep experiment for late-EB attacks
+
+A follow-up experiment on the attack experiment earlier this week was conducted to determine for what EB delay the attack was strongest. For the promising `txs-received` propagation and with L<sub>diff</sub> on/off, the delay of adversaries releasing their EBs and transactions was varied from six to eight seconds. Note that L<sub>vote</sub> = 7s in this simulations and that the adversary controlled 33% of the stake.
+
+Findings:
+
+1. Efficiency starts dropping when EBs and transactions are delayed 6.5 seconds.
+2. Efficiency doesn’t continue dropping much after delays of 7 seconds.
+3. L<sub>diff</sub> = 0s performs better than L<sub>diff</sub> = 7s.
+4. None of the cases, using txs-received, loses transactions or bogs down.
+
+Artifacts:
+
+- [Slides](analysis/simms/2025w33b/ReadMe.pdf)
+- [Notebook](analysis/simms/2025w33b/analysis.ipynb)
+- [Configurations](analysis/simms/2025w33b/experiments/)
+
 ## 2025-08-12
 
 ### First simulation experiment for attacks
@@ -9,6 +28,8 @@ An experiment invovling late EB and/or late transaction diffusion was run, where
 - [Slides](analysis/sims/2025w33/ReadMe.pdf)
 - [Notebook](analysis/sims/2025w33/analysis.ipynb)
 - [Configurations](analysis/sims/2025w33/experiments/)
+
+Follow-up analysis determined that transactions were lost in some cases due to a misformulation of the memory-pool rules in the simulator.
 
 ## 2025-08-08
 
