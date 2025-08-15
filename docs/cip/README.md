@@ -185,7 +185,7 @@ Leios extends Ouroboros Praos by introducing [**Endorser Blocks (EBs)**](#endors
 
 The protocol's behavior is governed by a **rolling window mechanism** that tracks certificate inclusion timing. When a committee successfully certifies an EB, this triggers a rolling window of $L_\text{recover}$ slots during which the network can process additional transactions at higher throughput. The protocol continuously evaluates this timing to determine validation requirements:
 
-- **Beyond the window** (no certificate within past $L_\text{recover}$ slots): Standard Cardano validation applies - every transaction must be fully validated before block inclusion
+- **Beyond the window** (no certificate within past $L_\text{recover}$ slots): Standard Praos validation applies - every transaction must be fully validated before block inclusion
 - **Within the window** (certificate included within past $L_\text{recover}$ slots): Enhanced throughput enabled through relaxed validation requirements, with correction mechanisms ensuring ledger integrity
 
 This design preserves Ouroboros Praos security properties while automatically delivering higher throughput when network conditions support successful EB certification.
@@ -1191,7 +1191,7 @@ _Required TPS for Current Reward Maintenance:_ To maintain current reward levels
 (~48 million ADA monthly) through transaction fees as the Reserve depletes.
 
 <div align="center">
-<a name="table-8" id="table-8"></a>
+<a name="table-9" id="table-9"></a>
 
 | Year | Reserve Depletion | Rewards from Fees (ADA) | Required TPS (Avg Tx) | Required IB/s |
 | ---: | ----------------: | ----------------------: | --------------------: | ------------: |
