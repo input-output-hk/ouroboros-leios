@@ -489,45 +489,9 @@ The Leios protocol introduces new node responsibilities and message flows beyond
 
 <div align="center">
 <a name="figure-6" id="figure-6"></a>
-
-```mermaid
-sequenceDiagram
-    participant U as Upstream<br/>previous block (RB) producer
-    participant BP as Block Producer<br/>current node  
-    participant D as Downstream<br/>subsequent node(s)
-
-    Note over U,D: Transaction Propagation
-    D->>BP: Diffuse Transaction
-    Note over BP: Add to Mempool
-    BP->>U: Diffuse Transaction
-    Note over U: Add to Mempool
-
-    Note over U,D: Block Production
-
-    Note over U: 1. Create RB<br/>& announce EB
-    
-    U->>BP: 2a. Sync chain + relay headers
-    BP->>D: 2b. Sync chain + relay headers
-    
-    U->>BP: 3. Fetch RB Body
-
-    Note over BP: 4. Validate and adopt RB
-    BP->>D: 5. Serve RB
-    
-    U->>BP: 6. Fetch EB
-    U->>BP: 6a. Fetch missing transactions
-    Note over BP: Validate EB body (fast)
-    BP->>D: 7. Serve EB
-    BP->>D: 7a. Fetch missing transactions
-    Note over BP: 8. Validate endorsed transactions (slow)
-    
-    Note over BP: 10. Vote on EB<br />(if eligible)
-    U->>BP: 11. Relay votes
-    BP->>D: 11.a Relay votes (+ own vote)
-    
-    Note over BP: 12. Aggregate certificate<br/>from votes  
-    Note over BP: 13. Create next RB<br />certifying EB &<br />announcing next EB
-```
+<p>
+  <img src="images/node-behavior-sequence.svg" alt="Node Behavior Sequence">
+</p>
 
 _Figure 6: Up- and downstream interactions of a node (simplified)_
 
@@ -570,7 +534,7 @@ Whenever an EB is announced through an RB header, nodes must fetch the EB conten
 > **TODO**
 > Clarify if this is optimistic enough, or whether nodes should announce EBs before having all transactions available or make use of optimization by offering "chunks" of the transaction reference list.
 
-<a id="transaction-retrieval" href="#transaction-retrieval"></a>**Transaction Retrieval**: Nodes check transaction availability for the EB and fetch any missing transactions from peers (steps 6a and 7a). Once all transactions are available, nodes can serve EBs to downstream peers (step 7). This guarantees that when a node announces an EB its downstream peers can trust it has all EB transactions available.
+<a id="transaction-retrieval" href="#transaction-retrieval"></a>**Transaction Retrieval**: Nodes check transaction availability for the EB and fetch any missing transactions from peers (steps 6a and 7a). After receiving the EB body, nodes perform fast validation (step 6b) with only lightweight verification (hash consistency, basic structure validation) to prevent DoS attacks before proceeding with transaction retrieval. Once all transactions are available, nodes can serve EBs to downstream peers (step 7). This guarantees that when a node announces an EB its downstream peers can trust it has all EB transactions available.
     
 <a id="eb-transaction-validation" href="#eb-transaction-validation"></a>**Transaction Validation**: With all transactions available, nodes validate the endorsed transaction sequence against the appropriate ledger state (step 8), ensuring the transactions form a valid extension of the announcing RB and meet size constraints.
     
