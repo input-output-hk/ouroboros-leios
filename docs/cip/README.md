@@ -130,10 +130,7 @@ viability as rewards contributions from the Reserve pot diminish: fees from more
 transactions will be needed to make up that deficit and keep sound the finances
 of stakepool operations.
 
-A major protocol upgrade like Leios will take
-significant time to implement, test, and audit, it is important to began
-implementation well before transaction demand on mainnet exceeds the
-capabilities of Ouroboros Praos. The plot below shows the historically
+A major protocol upgrade like Leios will take significant time to implement, test, and audit. It is therefore critical to have begun implementation well before transaction demand on mainnet exceeds the capabilities of Ouroboros Praos. The plot below shows the historically
 diminishing rewards and a forecast of their continued reduction: the forecast is
 mildly uncertain because the future pattern of staking behavior, transaction
 fees, and node efficiency might vary considerably.
@@ -323,7 +320,7 @@ RBs are Praos blocks extended to support Leios by optionally announcing EBs in t
 
 <a id="bitmap-size-constraint" href="#bitmap-size-constraint"></a>**Bitmap Size Constraint**: The transaction execution bitmap size $S_\text{bitmap}$ (see [Protocol Parameters](#protocol-parameters)) must fit within $S_\text{RB}$ alongside other required data. This is ensured by bounding $L_\text{recover}$ implicitly via $S_\text{bitmap} < S_\text{RB}$ (see [Bitmap Size Relationships](#bitmap-size-relationships)).
 
-<a id="cost-proportionality" href="#cost-proportionality"></a>**Cost Proportionality**: The first block after the certificate-active window expires pays a cost proportional to the **uncorrected** transactions - i.e., RB transactions since the last EB certificate. EB corrections already included during the certificate-active period reduce this cost; only the remaining transactions require an RB-side bitmap.
+<a id="cost-proportionality" href="#cost-proportionality"></a>**Cost Proportionality**: The first block, after the certificate-active window expires pays a cost proportional to the **uncorrected** transactions - i.e., RB transactions since the last EB certificate. EB corrections already included during the certificate-active period reduce this cost; only the remaining transactions require an RB-side bitmap.
 
 > [!WARNING]
 > **TODO:** Add transaction confirmation levels and their implications for applications
@@ -446,7 +443,7 @@ constrained by the network characteristics and protocol characteristics above:
 | Praos active slot coefficient | $f_\text{RB}$ |  1/slot  | Probability that a party will be the slot leader for a particular slot |       $0 < f_\text{RB} \leq \Delta_\text{RB}^{-1}$        | Blocks must not be produced faster than network delay       |
 | Mean committee size           |      $n$      | parties  | Average number of stake pools selected for voting                      |                     $n > 0$                     | Ensures sufficient decentralization and security              |
 | Quorum size                   |    $\tau$     | fraction | Minimum fraction of committee votes required for certification         |                  $\tau > 0.5$                   | Prevents adversarial control while ensuring liveness          |
-| Maximum correction bitmap size | $S_\text{bitmap}$ |  bytes   | Maximum size of transaction execution bitmap for corrections           | $S_\text{bitmap} = \lceil L_\text{recover} \times f_\text{RB} \times S_\text{RB} / (8 \times T_\text{min}) \rceil$ | Calculated based on worst-case scenario with maximum RBs containing minimum-sized transactions during recovery period. Protocol must ensure all corrections are included before standard validation resumes to maintain ledger integrity |
+| Maximum correction bitmap size | $S_\text{bitmap}$ |  bytes   | Maximum size of transaction execution bitmap for corrections           | $S_\text{bitmap} = \lceil L_\text{recover} \times S_\text{RB} / (8 \times T_\text{min}) \rceil$ | Calculated based on worst-case scenario with one RB per slot containing minimum-sized transactions during recovery period. Protocol must ensure all corrections are included before standard validation resumes to maintain ledger integrity |
 
 _Table 3: Leios Protocol Parameters_
 
@@ -468,16 +465,16 @@ _Table 3: Leios Protocol Parameters_
 > 
 > The maximum correction bitmap size parameter $S_\text{bitmap}$ creates a fundamental relationship between recovery period length and transaction throughput:
 > - Longer recovery periods ($L_\text{recover}$) require larger bitmaps to track more potential transactions
-> - Higher block production rates ($f_\text{RB}$) increase the number of blocks needing corrections
+> - The worst-case scenario assumes one ranking block per slot during the recovery period
 > - Smaller minimum transaction sizes ($T_\text{min}$) allow more transactions per block, requiring more correction bits
 > 
 > **Implicit Constraint on $L_\text{recover}$**:
 > 
 > The requirement that $S_\text{bitmap} < S_\text{RB}$ creates an upper bound on the recovery period:
 > 
-> $$L_\text{recover} < \frac{8 \times T_\text{min}}{f_\text{RB}}$$
+> $$L_\text{recover} < 8 \times T_\text{min}$$
 > 
-> For example, with $T_\text{min} = 55$ bytes[^mainnet-min-tx] and $f_\text{RB} = 0.05$, this gives $L_\text{recover} < 8{,}800$ slots. This bound is far beyond any practical recovery period, so the constraint is not limiting in practice.
+> For example, with $T_\text{min} = 55$ bytes[^mainnet-min-tx], this gives $L_\text{recover} < 440$ slots. This constraint ensures the bitmap can fit within a ranking block even in the worst-case scenario of continuous block production.
 > 
 > The critical requirement is that all transaction corrections **must** be included before the certificate-active window expires to ensure ledger integrity. In extreme cases, the first block after window expiration may need to dedicate most of its space to corrections, temporarily sacrificing transaction throughput for safety.
 
@@ -677,6 +674,8 @@ This ensures transactions requiring higher Plutus execution limits can be includ
 <a id="reserve-contribution-adjustments" href="#reserve-contribution-adjustments"></a>During low-traffic periods when EB production is minimal, the protocol maintains current Reserve contribution patterns without artificial inflation. The adaptive production mechanism ensures that enhanced infrastructure costs are only incurred when corresponding revenue opportunities exist through increased transaction processing.
 
 ## Rationale
+
+Ouroboros Leios introduces a committee-based voting layer over Nakamoto-style consensus to handle transaction surplus beyond current Praos block limits, enabling substantial throughput increases while preserving existing security properties.
 
 ### How Leios addresses CPS-18 and increases throughput
 
