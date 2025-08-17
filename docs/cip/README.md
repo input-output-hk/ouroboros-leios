@@ -215,7 +215,7 @@ A larger block containing additional transaction references. There are no other 
 
 The RB chain continues to be distributed exactly as in Praos, while Leios introduces a separate header distribution mechanism for rapid EB discovery and equivocation detection.
 
-Due to the voting overhead per EB, nodes should generally avoid announcing EBs with insufficient transaction content to justify the voting costs, as detailed in the [adaptive EB production](#adaptive-eb-production) incentive mechanism.
+Due to the voting overhead per EB, nodes should generally avoid announcing EBs with insufficient transaction content to justify the voting costs, as detailed in the [adaptive EB production](#adaptive-eb-production) incentive mechanism. However, EBs may also be announced when RB resource constraints (size or Plutus limits) are reached, even at lower transaction volumes.
 
 #### Step 2: EB Distribution
 
@@ -349,35 +349,35 @@ The hash referenced in RB headers (`announced_eb` and `certified_eb` fields) is 
 
 #### Votes and Certificates
 
-Leios employs a BLS-based voting and certificate scheme where committee members cast votes that reference specific EBs, which are then aggregated into compact certificates for inclusion in RBs.
+Leios employs a voting and certificate scheme where committee members cast votes that reference specific EBs, which are then aggregated into compact certificates for inclusion in RBs. This specification uses BLS signatures as the implementation example, though the protocol is designed to accommodate any efficient aggregate signature scheme that Cardano may adopt.
 
 The implementation meets the <a href="#appendix-a-requirements">requirements for votes and certificates</a> specified in Appendix A. Alternative schemes satisfying these requirements could be substituted, enabling unified voting infrastructure across Ouroboros Leios, Ouroboros Peras, and other protocols.
 
-To participate in the Leios protocol as voting member/ block producing node, stake pool operators must register one additional BLS12-381 key alongside their existing VRF and KES keys.
+To participate in the Leios protocol as voting member/ block producing node, stake pool operators must register one additional cryptographic key for the voting scheme alongside their existing VRF and KES keys. In the BLS implementation described here, this would be a BLS12-381 key.
 
 <a id="committee-structure" href="#committee-structure"></a>**Committee Structure**: Two types of voters validate EBs, balancing security, decentralization, and efficiency:
 - **Persistent Voters**: Selected once per epoch using [Fait Accompli sortition][fait-accompli-sortition], vote in every election, identified by compact identifiers
 - **Non-persistent Voters**: Selected per EB via local sortition with Poisson-distributed stake-weighted probability
 
-This dual approach prevents linear certificate size growth by leveraging non-uniform stake distribution, enabling faster certificate diffusion while maintaining broad participation. Certificate sizes remain compact (under 10 kB) even with large committees, as shown in the [BLS certificates specification][bls-spec].
+This dual approach prevents linear certificate size growth by leveraging non-uniform stake distribution, enabling faster certificate diffusion while maintaining broad participation. With efficient aggregate signature schemes like BLS, certificate sizes remain compact (under 10 kB) even with large committees, as shown in the [BLS certificates specification][bls-spec].
 
 <a id="vote-structure" href="#vote-structure"></a>**Vote Structure**: All votes include the `endorser_block_hash` field that uniquely identifies the target EB:
 - **Persistent votes**:
   - `election_id`: Identifier for the voting round
   - `persistent_voter_id`: Epoch-specific pool identifier
   - `endorser_block_hash`: Hash of the target EB
-  - `vote_signature`: BLS signature
+  - `vote_signature`: Cryptographic signature (BLS in this implementation)
 - **Non-persistent votes**:
   - `election_id`: Identifier for the voting round
   - `pool_id`: Pool identifier
-  - `eligibility_signature`: BLS proof of sortition eligibility
+  - `eligibility_signature`: Cryptographic proof of sortition eligibility (BLS in this implementation)
   - `endorser_block_hash`: Hash of the target EB
-  - `vote_signature`: BLS signature
+  - `vote_signature`: Cryptographic signature (BLS in this implementation)
 
 <a id="certificate-validation" href="#certificate-validation"></a>**Certificate Validation**: When an RB includes an EB certificate, nodes must validate the following before accepting the block:
 
 1. **CDDL Format Compliance**: Certificate structure matches the specification format defined in <a href="#votes-certificates-cddl">Appendix B: Votes and Certificates CDDL</a>
-2. **Cryptographic Signatures**: All BLS signatures are valid
+2. **Cryptographic Signatures**: All cryptographic signatures are valid (BLS signatures in this implementation)
 
 3. **Voter Eligibility**: 
    - Persistent voters must have been selected as such by the [Fait Accompli scheme][fait-accompli-sortition] for the current epoch
@@ -499,13 +499,11 @@ _Figure 6: Up- and downstream interactions of a node (simplified)_
 
 The diagram above illustrates the Leios protocol in a simplified sequential order. In practice, these operations occur concurrently and the actual execution order depends on network conditions, timing, and node state. While many steps introduce new behaviors, several core Praos mechanisms remain unchanged.
 
-**Chain selection** follows the longest-chain rule exactly as in Praos. EBs are treated as auxiliary data that do not affect chain validity or selection decisions. Fork choice depends solely on RB chain length, with EB certificates serving only as inclusion proofs for transaction content. This design ensures the protocol maintains liveness - the RB chain can continue growing even if some EBs fail to achieve certification, with RBs simply excluding uncertified EBs and validating transactions against the predecessor RB's ledger state.
-
 #### Transaction Diffusion
     
 <a id="transaction-propagation" href="#transaction-propagation"></a>**Transaction Propagation**: Uses the TxSubmission mini-protocol exactly as implemented in Praos. Transactions flow from downstream to upstream nodes through diffusion, where they are validated against the current ledger state before being added to local mempools. The protocol maintains the same FIFO ordering and duplicate detection mechanisms.
 
-<a id="mempool-design" href="#mempool-design"></a>**Mempool Design**: The mempool follows the same design as current Praos deployment with increased capacity to support both RB and EB production. Mempool capacity must accommodate expanded transaction volume:
+<a id="mempool-design" href="#mempool-design"></a>**Mempool Design**: The mempool follows the same design as current Praos deployment with increased capacity to support both RB and EB production. Mempool capacity should accommodate expanded transaction volume:
 
 <div align="center">
 
@@ -515,7 +513,7 @@ $\text{Mempool} \geq 2 \times (S_\text{RB} + S_\text{EB-tx})$
     
 #### RB Block Production and Diffusion
     
-When a stake pool wins block leadership (step 1), they simultaneously create two things: a RB and an EB. The RB is a standard Praos block with extended header fields to reference one EB and announce another EB. The EB is a larger block containing references to additional transactions. The RB chain continues to be distributed exactly as in Praos, while Leios introduces a separate mechanism to distribute the same headers for rapid EB discovery and equivocation detection.
+When a stake pool wins block leadership (step 1), they create a RB and **optionally** an EB based on the [adaptive EB production](#adaptive-eb-production) criteria. The RB is a standard Praos block with extended header fields to reference one EB and announce another EB when created. The optional EB is a larger block containing references to additional transactions. The RB chain continues to be distributed exactly as in Praos, while Leios introduces a separate mechanism to distribute the same headers for rapid EB discovery and equivocation detection.
 
 <a id="rb-header-diffusion" href="#rb-header-diffusion"></a>**RB Header Diffusion**: RB headers diffuse via a new [RbHeaderRelay mini-protocol](#rbheaderrelay-mini-protocol) independently of standard ChainSync (steps 2a and 2b). This separate mechanism enables rapid EB discovery within the strict timing bound $\Delta_\text{hdr}$. Headers are diffused freshest-first to facilitate timely EB delivery, with nodes propagating at most two headers per (slot, issuer) pair to detect equivocation - where an attacker creates multiple EBs for the same block generation opportunity - while limiting network overhead. The header contains the EB hash when the block producer created an EB, allowing peers to discover the corresponding EB.
 
@@ -551,7 +549,7 @@ Whenever an EB is announced through an RB header, nodes must fetch the EB conten
 > - How long should votes be propagated? (Likely not critical - "30 seconds" would probably suffice)
 > - Nodes should receive and relay votes for EBs even before acquiring/validating the EB, but only if they've seen an RB header announcing that EB
 
-<a id="CertificateAggregation" href="#CertificateAggregation"></a>**Certificate Construction**: Nodes receive votes from upstream peers, maintaining a running tally for each EB to track progress toward the quorum threshold (step 11). When enough votes are collected during the vote diffusion period, nodes aggregate them into a compact certificate. This creates a cryptographic proof that the EB has received sufficient committee approval, and therefore must have already been validated by some honest stake.
+<a id="CertificateAggregation" href="#CertificateAggregation"></a>**Certificate Construction**: All nodes receive votes from upstream peers, maintaining a running tally for each EB to track progress toward the quorum threshold (step 11). However, only RB producers need to create certificates. Stakepool nodes know the leadership schedule, so they know when they should create a certificate for an upcoming RB they will produce. When enough votes are collected during the vote diffusion period, the RB producer aggregates them into a compact certificate. This creates a cryptographic proof that the EB has received sufficient committee approval, and therefore must have already been validated by some honest stake.
     
 #### Next Block Production
 
@@ -564,7 +562,7 @@ Whenever an EB is announced through an RB header, nodes must fetch the EB conten
 
 <a id="ledger-state-transitions" href="#ledger-state-transitions"></a>**State Transitions**: EBs add transactions to the ledger only when properly certified and included via RB references. RBs can include both certificates and their own transactions. The ledger state for validating RB transactions is constructed based on either the predecessor RB (when no EB certificate is included) or the certified EB (when a valid certificate is present). Note that EB transactions are validated against the ledger state from the RB that announced the EB (i.e., the predecessor RB of the certifying RB), ensuring the predecessor RB's transactions are relevant in both validation scenarios.
 
-<a id="chain-selection" href="#chain-selection"></a>**Chain Selection**: Chain selection follows the longest-chain rule exactly as in Praos. EBs are treated as auxiliary data that do not affect chain validity or selection decisions. Fork choice depends solely on RB chain length, with EB certificates serving only as inclusion proofs for transaction content. The [EB propagation for chain selection](#eb-chain-selection) requirement ensures that nodes already possess all necessary EBs from alternative forks, eliminating additional propagation delays during fork switches.
+<a id="chain-selection" href="#chain-selection"></a>**Chain Selection**: Chain selection follows the densest chain rule as in Ouroboros Genesis. EBs are treated as auxiliary data that do not affect chain validity or selection decisions. Fork choice depends solely on RB chain density, with EB certificates serving only as inclusion proofs for transaction content. The [EB propagation for chain selection](#eb-chain-selection) requirement ensures that nodes already possess all necessary EBs from alternative forks, eliminating additional propagation delays during fork switches.
 
 <a id="mempool-capacity" href="#mempool-capacity"></a>**Mempool Capacity Requirements**: The mempool must accommodate both RB and EB transaction production. The capacity requirements are significantly increased compared to Praos to handle the additional transaction volume expected from EB production.
 
@@ -661,7 +659,14 @@ RbHeaderRelay is a **pull-based relay protocol** that enables nodes to request a
 
 **Operational Cost Optimization**
 
-<a id="adaptive-eb-production" href="#adaptive-eb-production"></a>**Adaptive EB Production**: To address concerns about operational costs during low-traffic periods, the protocol implements adaptive EB announcement based on transaction availability. SPOs should only announce EBs when they contain sufficient transactions (e.g., 10% capacity utilization) to justify the voting overhead costs. When traffic levels can be adequately served by RBs alone, no EBs are announced, reducing operational costs to Praos levels.
+<a id="adaptive-eb-production" href="#adaptive-eb-production"></a>**Adaptive EB Production**: To address concerns about operational costs during low-traffic periods, the protocol implements adaptive EB announcement based on transaction availability and resource constraints. SPOs should announce EBs when **either** condition is met:
+
+1. **Capacity utilization**: EB contains sufficient transactions (e.g., 10% capacity utilization) to justify voting overhead costs
+2. **Resource constraints**: RB is considered "full" due to **either** size or computational limits being reached:
+   - **Size constraint**: RB approaches $S_\text{RB}$ byte limit
+   - **Plutus constraint**: Remaining RB Plutus budget cannot accommodate transactions in mempool that would fit in EB Plutus budget
+
+This ensures transactions requiring higher Plutus execution limits can be included in EBs without waiting for byte-based RB saturation. When traffic levels can be adequately served by RBs alone within both size and computational constraints, no EBs are announced, reducing operational costs to Praos levels.
 
 <a id="cost-scaling-mechanism" href="#cost-scaling-mechanism"></a>This adaptive mechanism ensures the protocol's cost structure scales with actual throughput demand rather than imposing fixed overhead regardless of network utilization.
 
@@ -686,11 +691,11 @@ This simplification avoids the complexity and ecosystem disruption of implementi
 
 <a name="economic-sustainability"></a>**1. Economic sustainability: Capacity without utilization risk**
 
-On one hand, this approach avoids over-engineering massive throughput capacity without proven demand. Creating fundamental system changes to support multiple orders of magnitude more throughput adds to the cost of running a more expensive, more capable system that doesn't pay for itself until utilization increases.
+On one hand, this approach avoids over-engineering massive throughput capacity without proven demand. Creating fundamental system changes to support multiple orders of magnitude more throughput adds to the cost of running a more expensive, more capable system that does not pay for itself until utilization increases.
 
 On the other hand, the minimum economic requirement establishes the lower bound. As the Cardano Reserve diminishes, transaction fees must replace rewards to maintain network security and SPO profitability. Currently, the Reserve contributes more than 85% of epoch rewards, with less than 15% coming from transaction fees. By 2029, to compensate for Reserve depletion, the network requires approximately 36-50 TPS with average-sized transactions - roughly 10 times current mainnet throughput. This conservative lower bound represents the breakeven point for running the protocol sustainably.
 
-However, TPS isn't a good metric for defining these bounds. To properly assess economic breakeven points, we measure throughput in Transaction Bytes per second (TxB/s) rather than Transactions per second (TPS). TPS doesn't account for transaction size or computational complexity, making systems with smaller transactions appear "faster" while providing less utility. Current Cardano mainnet provides 4,500 TxB/s, while this specification targets 140,000-300,000 TxB/s (equivalent to roughly 100-200 TPS) - a 30-65x increase sufficient for economic sustainability.
+However, TPS is not a good metric for defining these bounds. To properly assess economic breakeven points, we measure throughput in Transaction Bytes per second (TxB/s) rather than Transactions per second (TPS). TPS does not account for transaction size or computational complexity, making systems with smaller transactions appear "faster" while providing less utility. Current Cardano mainnet provides 4,500 TxB/s, while this specification targets 140,000-300,000 TxB/s (equivalent to roughly 100-200 TPS) - a 30-65x increase sufficient for economic sustainability.
 
 Achieving this capacity increase requires trade-offs, as detailed below.
 
@@ -702,11 +707,11 @@ The linearization approach eliminates complex distributed systems problems aroun
 
 Beyond preserving transaction behavior, the design minimizes infrastructure and operational disruption for the existing ecosystem. The proposed protocol still functions as an overlay extending Praos - just like the research paper version, allowing SPOs to upgrade progressively without coordinated migrations. 
 
-The most obvious approach to increasing throughput while minimizing disruption would be simply increasing Praos block sizes. However, this naive alternative would create proportionally longer propagation times that violate Praos timing assumptions and lack sufficient scalability for long-term viability.
+The most obvious approach to increasing throughput while minimizing disruption would be simply increasing Praos block sizes. However, this naive alternative would create proportionally longer propagation times that violate Praos timing assumptions and lack sufficient scalability for long-term viability. Additionally, Praos blocks larger than approximately 3 MB would pose security risks by increasing the frequency of short forks that adversaries could exploit to compromise the common prefix property and enable attacks such as double-spending.
 
 <a name="competitiveness"></a>**4. Competitive positioning**
 
-The coupled block production design can be extended towards higher concurrency models, as demonstrated in simulation results. It maintains compatibility with more aggressive scaling approaches including full Leios variants, EB and IB (input block) decoupling, and sharding extensions, ensuring current throughput gains don't preclude 100x+ improvements when chain growth solutions mature.
+The coupled block production design can be extended towards higher concurrency models, as demonstrated in simulation results. It maintains compatibility with more aggressive scaling approaches including full Leios variants, EB and IB (input block) decoupling, and sharding extensions, ensuring current throughput gains do not preclude 100x+ improvements when chain growth solutions mature.
 
 <a name="optimal-tradeoffs"></a>**Conclusion**
 
@@ -1121,6 +1126,12 @@ network traffic, of course.
 
 <a name="operating-costs"></a>**Operating costs**
 
+> [!IMPORTANT]
+>
+> TODO: **@bwbush**
+>
+> - [ ] Revise this section and the computations to align with Linear Leios
+
 A detailed cost analysis of Leios deployment is documented in
 [Leios node operating costs][cost-estimate]
 in the github repository for the Leios R&D effort. The major conclusion of that
@@ -1292,7 +1303,7 @@ transactions would make it onto the ledger.
 
 <a name="eb-propagation-resilience"></a>**EB Availability Limitations**
 
-The current specification requires nodes to receive EBs within $L_\text{vote}$ to participate in voting. When network conditions prevent nodes from obtaining all transactions referenced by an EB, this creates a binary outcome: either sufficient nodes can vote (enabling certification) or they can't (causing the EB to be discarded). 
+The current specification requires nodes to receive EBs within $L_\text{vote}$ to participate in voting. When network conditions prevent nodes from obtaining all transactions referenced by an EB, this creates a binary outcome: either sufficient nodes can vote (enabling certification) or they cannot (causing the EB to be discarded). 
 
 One potential approach to address this limitation involves [partial EB certification mechanisms](https://gist.githubusercontent.com/will-break-it/aa959601a13e2a9899a96de150fcafdd/raw/70b91ef564c484472ee81b2138ae4e92c5ed1088/leios-progressive-eb-certification.md) using merkle tree structures that would allow nodes to vote on partial transaction subsets when they cannot obtain all referenced transactions. This concept trades increased EB size for improved resilience under adverse network conditions, transforming the binary success/failure dynamic into graduated progress.
 
@@ -1504,6 +1515,7 @@ This section outlines alternative approaches, future work, and extensions that b
   - Compatibility between Peras, Leios, and Genesis.
   - Common design and implementation for certificates, voting, and related key
     registration: Mithril, Peras, Leios, and partner chains.
+  - https://github.com/berewt/CIPs/blob/master/CIP-xxxx/CIP-xxxx.md is relevant
 - Triage by intersect Core Infrastructure, Consensus, Ledger, and Network
   functions.
 
@@ -1643,7 +1655,7 @@ The voting and certificate scheme for Leios must satisfy the following requireme
 
 9. **Fast cryptography:** The computational burden of creating and verifying voting eligibility, the votes themselves, and the resulting certificate must be small enough to fit within the CPU budget for Leios stages.
 
-The BLS-based implementation specified in this document satisfies all these requirements, as evidenced by the performance characteristics and certificate sizes documented in the [Specification for votes and certificates](#specification-for-votes-and-certificates) section.
+The aggregate signature scheme implementation specified in this document (using BLS as an example) satisfies all these requirements, as evidenced by the performance characteristics and certificate sizes documented in the [Specification for votes and certificates](#specification-for-votes-and-certificates) section.
 
 
 <h3 id="appendix-b-cddl">Appendix B: Wire Format Specifications (CDDL)</h2>
