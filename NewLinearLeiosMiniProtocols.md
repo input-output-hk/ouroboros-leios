@@ -18,7 +18,7 @@ Some of the details in this table are incompatible with the initial iterations o
 | Sender | Name | Arguments | Semantics |
 | - | - | - | - |
 | Client | LeiosNotificationsBytes | byte count | Requests notifications (Leios announcements and delivery offers) up to some total byte size. A low-watermark scheme would suffice to ensure there's always sufficient room for more notifications. |
-| Server | LinearLeiosAnnouncement | RankingBlockHeader | The server has seen this LLB announcement. It must never send a third announcement for some election, since two already evidence equivocation. Each header must not be invalid in a way that a recent-but-not-perfectly-up-to-date ledger state could notice. |
+| Server | LinearLeiosAnnouncement | RankingBlockHeader that announces an LLB | The server has seen this LLB announcement. It must never send a third announcement for some election, since two already evidence equivocation. Each header must not be invalid in a way that a recent-but-not-perfectly-up-to-date ledger state could notice. |
 | Server | LinearLeiosBlockOffer | slot and hash | The server can immediately deliver this block. It must have already sent a LinearLeiosAnnouncement for the same block. |
 | Server | LeiosBlockTxsOffer | slot and hash | The server can immediately deliver any tx referenced by this block. It must have already sent a LinearLeiosAnnouncement for the same block. |
 | Server | LinearLeiosVoteOffer | slot and vote-issuer-id | The server can immediately deliver this vote. It must have already sent a LeiosAnnouncement for the same slot. |
@@ -48,11 +48,13 @@ But that possibility is already introduced by LeiosBlockTxsId, so allowing it fo
 
 ### Iteration 1
 
-TODO introduction, including a link to mini protocols specification at least introducing gold/cyan for agencies.
-
 The following mini protocol is a useful starting point.
 It is superficially plausible for conveying the rows of the IER table, but has some major problems.
 They will be explained below in order to motivate and derive the actual mini protocol proposal.
+
+If mini protocols are unfamiliar, see the Chapter 2 Multiplexing mini-protocols and Chapter 3 Mini Protocol of the `ouroboros-network`'s [Ouroboros Network Specification PDF](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf).
+A brief summary is that a mini protocol is a state machine that two nodes cooperatively navigate; each node only sends a message when it has _agency_, and at most one node has agency in any state
+The agencies are indicated in this document as gold or cyan.
 
 ```mermaid
 ---
@@ -314,9 +316,6 @@ Even the LeiosIteration1 and the subsequent iterations, the timeouts would have 
 Different replies in the same state (eg even StBlockTx) might be several orders of magnitude larger than others.
 Instead, the client's centralized decision logic that controls LeiosRequests and reacts to LeiosReply will need to explicitly manage timeouts, and do so in a way that tolerates the server reordering according to FreshestFirstDelivery, for example.
 
-TODO specify the timeouts.
-How exactly, given reordering?
-
 ### Detailed Message Semantics
 
 The MsgLeoisRequest and MsgLeiosReply mini protocol messages carry LeiosRequestPayload and LeiosReplyPayload, respectively.
@@ -384,7 +383,7 @@ Additional message details, beyond the IER table.
   However, every LeiosDeliverableIds request incurs exactly one LeiosDeliveries reply.
   If the client would have benefited from receiving some of the deliverables sooner than others, it should have sent separate requests.
   (TODO why is this important for BlockFetch but not Leios? Maybe it will be for Leios too, but only for syncing?)
-  (TODO I now state the opposite above; so I should relax this and add CompletionFlag here too, I guess.)
+  (TODO I now state the opposite, both above and below, so I should relax this and add CompletionFlag here too, I presume.)
 - When FreshestFirstDelivery justifies the client sending two overlapping requests (eg if a younger LLB refers to the same txs as an already requested older LLB), the server might reply in-order or out-of-order, depending on how timings resolve.
   Whichever reply is sent second should exclude the content that was already included in the first reply, in order to not waste bandwidth (recall that it should be common for contemporary LLBs to share most txs).
   In an extreme case, this might cause the argument to LeiosBlockTxsDelivery to be empty.
@@ -395,6 +394,32 @@ TODO discuss fetching "missing" LLBs, eg after L_recover, etc
 TODO age limits for notifications
 
 TODO discuss OpCertIssueNumbers
+
+### Timeouts
+
+The ChainSync and TxSubmission mini protocols enforce a 10 second timeout when the peer must not be blocked.
+The BlockFetch mini protocol enforces a generous 60 second timeout when the peer must not be blocked.
+60 seconds would be intolerable as an average, which is why the Ouroboros Genesis design introduces additional, more aggressive, adaptive timeouts for a syncing node.
+However, for caught-up nodes, mini protocols' timeouts aren't intended to ensure an average responsiveness; it's the churning of peers based on their recent performance that prevents terrible performance over longer periods, under the assumption that at least some peers are honest and so won't have terrible performance.
+Mini protocols' timeouts are instead merely used to stop wasting resources on a clearly defunct peer.
+(TODO this is my inference---I haven't found an explanation in any written document.)
+
+A LeiosNotificationBytes request should not incur any timeout; there's no absolute limit on the duration until the next upstream Leios event (eg SPOs could choose to stop issuing LLBs alongside their RBs).
+LeiosDeliverableIdsf are only submitted when the peer is not blocked, but are larger than ChainSync and TxSubmission messages, and so a 60 second timeout seems comparable, copied from BlockFetch.
+For a pipelined mini protocol message, the existing `ouroboros-network` infrastructure begins the timeout as soon as the request is sent.
+
+That simple rule would be incorrect for LeiosRequest-LeiosReply due to server-side reordering and/or partial responses.
+Both of those phenomena mean that the nth message sent won't necessarily be resolved by nth message to arrive.
+
+Instead, LeiosReply should throw a timeout exception if it ever waits more than 60 seconds for a message it was expecting.
+More concretely, a 60 second timeout should start whenever LeiosRequest sends a LeiosDeliverables message while there were no outstanding LeiosDeliverableIds requests.
+That timeout is discharged when LeiosReply receives any LeiosDeliverables message.
+If there are still outstanding LeiosDeliverableIds requests after LeiosReply receives a LeiosDeliverables message, LeiosReply should reset the timeout to another 60 seconds.
+
+Remarks.
+
+- If a request takes more than a few seconds to be resolved (perhaps as an expected consequence of server-side reordering!), the node might be well justified to also send the same request to another peer, in order to fulfill it sooner, regardless of whether or not the first peer exceeds the generous mini protocol timeout.
+- For LeiosIteration5A and LeiosIteration5B instead of LeiosRequest and LeiosReply, the timeouts would be 10 seconds and 60 seconds respectively, and could be handled normally by the `ouroboros-network` infrastructure, assuming its enhancement for server-side reordering include some clever timeout handling.
 
 ### Concise Data Definition Language (CDDL)
 
@@ -442,4 +467,4 @@ I suppose LinearLeiosBlockId is fine, but a range-y request like BlockFetch migh
 (Which it might be, eg during periods of low utilization?)
 
 TODO when to start sending LeiosNotificationsBytes?
-Until you're caught-up, ChainSync and BlockFetch always (modulo L_recover) enable LinearLeiosBlockId, whereas LinearLeiosBlockOffer only does when you're caught-up.
+Until you're caught-up, ChainSync and BlockFetch always (modulo L_recover) enable LinearLeiosBlockId, whereas LinearLeiosBlockOffer only does when you're caught-up
