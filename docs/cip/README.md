@@ -2476,7 +2476,7 @@ This appendix contains the complete CDDL specifications for all Leios protocol
 messages and data structures. These definitions specify the exact wire format
 for network communication.
 
-<a id="ranking-block-cddl">**Ranking Block**</a>
+<a id="ranking-block-cddl" href="#ranking-block-cddl">**Ranking Block**</a>
 
 ```diff
  ranking_block =
@@ -2507,7 +2507,7 @@ block_header =
    ]
 ```
 
-<a id="endorser-block-cddl">**Endorser Block**</a>
+<a id="endorser-block-cddl" href="#endorser-block-cddl">**Endorser Block**</a>
 
 ```cddl
 endorser_block =
@@ -2519,7 +2519,7 @@ endorser_block =
 tx_reference = hash32
 ```
 
-<a id="votes-certificates-cddl">**Votes and Certificates**</a>
+<a id="votes-certificates-cddl" href="#votes-certificates-cddl">**Votes and Certificates**</a>
 
 ```cddl
 leios_certificate =
