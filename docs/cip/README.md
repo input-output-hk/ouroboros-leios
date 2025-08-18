@@ -1379,12 +1379,12 @@ by prototype simulations written in Haskell and Rust.
 > TODO: **@bwbush**
 >
 > - [ ] Regenerate the plots below each time the version of `sim-cli` is bumped.
-> - [ ] Discuss only displaying three or four cases, instead of the five.
+> - [x] Discuss only displaying three or four cases, instead of the five.
 > - [ ] In next set of re-runs . . .
 >   - [ ] In the CPU plot, expand the abbrevations into phrases.
->   - [ ] In the EB-size plot, remove empty EBs (created at the start or end of
+>   - [x] In the EB-size plot, remove empty EBs (created at the start or end of
 >         the simulation).
-> - [ ] Review and possibly elaborate the figure and table captions.
+> - [x] Review and possibly elaborate the figure and table captions.
 > - [ ] In the final version . . .
 >   - [ ] Remove title and subtitle.
 
@@ -1480,18 +1480,6 @@ might take three minutes or even longer. The capacity parameter $S_\text{EB-tx}$
 (12 MB/EB in these simulations) fundamentally limits the amortized maximum
 throughput of Linear Leios: furthermore, it affects how long it takes
 transactions to reach the ledger as the throughput approaches the capacity.
-
-> [!IMPORTANT]
->
-> TODO: **@bwbush**
->
-> Would it be appropriate to include these equations and/or figures at this
-> point?
->
-> - [ ] Throughput as a function of the capacity parameter and the active slot
->       coefficient.
-> - [ ] Time-to-ledger as a function of the capacity parameter and the active
->       slot coefficient.
 
 <div align="center">
 <a name="figure-7" id="figure-7"></a>
@@ -1673,18 +1661,18 @@ safely be 2000 billion steps, or 100 times the Plutus budget of Praos.
 >
 > - [ ] Regenerate the plots below each time the version of `sim-cli` is bumped.
 > - [ ] In next set of re-runs . . .
->   - [ ] Use SVG format.
->   - [ ] Align with the base case of the previous section.
->   - [ ] In the transaction plot, switch to the minute-based ledged.
+>   - [x] Use SVG format.
+>   - [x] Align with the base case of the previous section.
+>   - [x] In the transaction plot, switch to the minute-based ledged.
 >   - [ ] In the CPU plot, expand the abbrevations into phrases.
-> - [ ] Review and possibly elaborate the figure and table captions.
+> - [x] Review and possibly elaborate the figure and table captions.
 > - [ ] In the final version . . .
 >   - [ ] Remove title and subtitle.
 
 <div align="center">
 <a name="figure-15" id="figure-15"></a>
 
-![Fate of Plutus-heavy transactions in Leios](images/plutus-temporal-efficiency-bar.png)
+![Fate of Plutus-heavy transactions in Leios](images/plutus-temporal-efficiency-bar.svg)
 
 <em>Figure 15: Fate of Plutus-heavy transactions in Leios</em>
 
@@ -1693,7 +1681,7 @@ safely be 2000 billion steps, or 100 times the Plutus budget of Praos.
 <div align="center">
 <a name="figure-16" id="figure-16"></a>
 
-![CPU usage in Plutus-heavy workloads for Leios](images/plutus-cpu-mean-histogram.png)
+![CPU usage in Plutus-heavy workloads for Leios](images/plutus-cpu-mean-histogram.svg)
 
 <em>Figure 16: CPU usage in Plutus-heavy workloads for Leios</em>
 
