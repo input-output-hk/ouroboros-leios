@@ -115,7 +115,7 @@ and bandwidth resources of individual nodes often remain significantly
 underutilized.
 
 To transcend these inherent scaling barriers and unlock the latent capacity of
-the Cardano network, a measured evolution of the core consensus algorithm is
+the Cardano network, a systematic evolution of the core consensus algorithm is
 required. This specification presents the first version of the Ouroboros Leios
 protocol family - a stepping stone toward higher throughput while preserving the
 proven security and stability characteristics of Praos. This initial protocol
