@@ -214,7 +214,7 @@ Nodes receiving the RB header discover the announced EB and fetch its content. T
 
 #### Step 3: Committee Validation
 
-A voting committee of stake pools validates the EB. As depicted in Figure 4, votes are collected during the $L_\text{vote}$ period following the EB announcement, with voting beginning $3\Delta_\text{hdr}$ slots after the EB creation to ensure sufficient time for [equivocation detection](#rbheaderrelay-mini-protocol). Committee members are [selected via sortition](#committee-structure) (lottery based on stake). A committee member votes for an EB only if:
+A voting committee of stake pools validates the EB. As depicted in Figure 4, votes are collected during the $L_\text{vote}$ period following the EB announcement, with voting beginning $3\Delta_\text{hdr}$ slots after the EB creation to ensure sufficient time for [equivocation detection](#rbheaderrelay-mini-protocol). Equivocation refers to the malicious act of creating multiple conflicting blocks for the same block generation opportunity. Committee members are [selected via sortition](#committee-structure) (lottery based on stake). A committee member votes for an EB only if:
 
   1. It has received the EB within $L_\text{vote}$ slots from its creation,
   2. It has **not** received an equivocated RB header for this EB within $L_\text{vote}$ slots,
