@@ -142,7 +142,7 @@ fees, and node efficiency might vary considerably.
   <img src="images/reward-forecast-bau.svg" alt="Forecast of rewards on Cardano mainnet">
 </p>
 
-_Figure 1: Forecast of rewards on Cardano mainnet_
+<em>Figure 1: Forecast of rewards on Cardano mainnet</em>
 
 </div>
 
@@ -158,7 +158,7 @@ augmenting the Treasury, and increasing SPO and delegator rewards.
   <img src="images/spo-profitability.svg" alt="SPO profitability under Praos, as a function of transaction volume">
 </p>
 
-_Figure 2: SPO profitability under Praos, as a function of transaction volume_
+<em>Figure 2: SPO profitability under Praos, as a function of transaction volume</em>
 
 </div>
 
@@ -246,7 +246,7 @@ This creates a compact **certificate** proving the EB's validity.
 The certificate for an EB shall be included in the body of a new ranking block `RB'` only if all of the following conditions hold:
   1. `RB'` directly extends the RB which announced this EB (as illustrated in Figure 4 where `RB'` contains the certificate for the EB announced by the preceding RB).
   2. The certificate is valid as defined in [Certificate Validation](#certificate-validation).
-  3. If the EB contains a `tx_execution_bitmap`, this bitmap must be applied to determine which transactions from previous RBs back to the last RB that included a certificate were successfully executed (correction mechanisms are detailed in the following [Transaction Validation](#transaction-validation) section).
+  3. If the EB contains a `tx_execution_bitmap`, this bitmap must be applied to determine which transactions from previous RBs back to the last RB that included a certificate were successfully executed: correction mechanisms are detailed in the following [Transaction Validation](#transaction-validation) section.
 
 This **conditional inclusion** ensures transaction availability to honest nodes with high probability while achieving higher throughput. When included:
 
@@ -268,7 +268,7 @@ The rolling window mechanism operates through two key behaviors that automatical
   <img src="images/protocol-flow-detail.svg" alt="Rolling Window Timeline">
 </p>
 
-<sub>Figure 5: Detailed protocol flow showing rolling $L_\text{recover}$ windows and transaction execution tracking</sub>
+<em>Figure 5: Detailed protocol flow showing rolling $L_\text{recover}$ windows and transaction execution tracking</em>
 
 </div>
 
@@ -491,7 +491,7 @@ The Leios protocol introduces new node responsibilities and message flows beyond
   <img src="images/node-behavior-sequence.svg" alt="Node Behavior Sequence">
 </p>
 
-_Figure 6: Up- and downstream interactions of a node (simplified)_
+<em>Figure 6: Up- and downstream interactions of a node (simplified)</em>
 
 </div>
 
@@ -923,7 +923,7 @@ The first plot below demonstrates that most transactions reach the ledger in und
 
 ![Time for transaction to reach the ledger](images/reach-rb-tx.svg)
 
-_Figure 7. Time for transaction to reach the ledger._
+<em>Figure 7: Time for transaction to reach the ledger</em>
 
 </div>
 
@@ -932,7 +932,7 @@ _Figure 7. Time for transaction to reach the ledger._
 
 ![Transactions reaching the ledger](images/temporal-efficiency-bar.svg)
 
-_Figure 8. Transactions reaching the ledger._
+<em>Figure 8: Transactions reaching the ledger</em>
 
 </div>
 
@@ -943,7 +943,7 @@ The effect of EBs being discarded when RBs are too close together is evidenced i
 
 ![Number of TX references](images/references-tx.svg)
 
-_Figure 9. Number of TX references._
+<em>Figure 9: Number of TX references</em>
 
 </div>
 
@@ -952,7 +952,7 @@ _Figure 9. Number of TX references._
 
 ![Disposition of transactions in blocks](images/disposition-size-timeseries.svg)
 
-_Figure 10. Disposition of transactions in blocks._
+<em>Figure 10: Disposition of transactions in blocks</em>
 
 </div>
 
@@ -963,7 +963,7 @@ When demand is not high relative to capacity, the total size of transactions ref
 
 ![Size of transactions referenced by EBs](images/contents-ebs-size.svg)
 
-_Figure 11. Size of transactions referenced by EBs._
+<em>Figure 11: Size of transactions referenced by EBs</em>
 
 </div>
 
@@ -977,7 +977,7 @@ Because of the aforementioned backpressure, diffusion occurs in Leios in an orde
 | ![Arrival delay for TXs](images/elapsed-TX.svg) | ![Arrival delay for RBs](images/elapsed-RB.svg) |
 | ![Arrival delay for VTs](images/elapsed-VT.svg) | ![Arrival delay for EBs](images/elapsed-EB.svg) |
 
-_Figure 12. Arrival delays for transactions, ranking blocks, votes, and endorser blocks._
+<em>Figure 12: Arrival delays for transactions, ranking blocks, votes, and endorser blocks</em>
 
 </div>
 
@@ -999,7 +999,7 @@ In terms of resource usage, the throughputs in these simulations do no stress th
 | ------------------------------------------------------ | ---------------------------------------------------------------- |
 | ![Mean nodal ingress](images/ingress-average-area.svg) | ![Mean CPU load among all nodes](images/cpu-mean-timeseries.svg) |
 
-_Figure 13. Mean nodal ingress (left) and Mean CPU load among all nodes (right)._
+<em>Figure 13: Mean nodal ingress (left) and Mean CPU load among all nodes (right)</em>
 
 </div>
 
@@ -1008,7 +1008,7 @@ _Figure 13. Mean nodal ingress (left) and Mean CPU load among all nodes (right).
 
 ![Mean CPU load among all nodes](images/cpu-mean-histogram.svg)
 
-_Figure 14. Mean CPU load among all nodes._
+<em>Figure 14: Mean CPU load among all nodes</em>
 
 </div>
 
@@ -1045,7 +1045,7 @@ The Leios simulators use the value `0.4284 ms` as the validation time for each t
 
 ![Fate of Plutus-heavy transactions in Leios](images/plutus-temporal-efficiency-bar.png)
 
-_Figure 15. Fate of Plutus-heavy transactions in Leios._
+<em>Figure 15: Fate of Plutus-heavy transactions in Leios</em>
 
 </div>
 
@@ -1054,7 +1054,7 @@ _Figure 15. Fate of Plutus-heavy transactions in Leios._
 
 ![CPU usage in Plutus-heavy workloads for Leios](images/plutus-cpu-mean-histogram.png)
 
-_Figure 16. CPU usage in Plutus-heavy workloads for Leios._
+<em>Figure 16: CPU usage in Plutus-heavy workloads for Leios</em>
 
 </div>
 
@@ -1392,6 +1392,8 @@ profitability slows at very high throughput because of the substantial expense
 of network egress and storage of the ledger.
 
 ![SPO profitability under Leios.](images/leios-forecast-sqrt-fill.svg)
+
+<em>Figure 17: SPO profitability under Leios</em>
 
 <a id="intensive-plutus-execution" href="#intensive-plutus-execution">**Intensive Plutus execution**</a>
 
