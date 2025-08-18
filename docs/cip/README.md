@@ -281,14 +281,14 @@ components:
 
 The RB chain continues to be distributed exactly as in Praos, while Leios
 introduces a separate header distribution mechanism for rapid EB discovery and
-equivocation detection. 
+equivocation detection.
 
 <a id="equivocation"></a>
 
 > [!Note]
 >
-> **Equivocation** refers to the malicious act of creating
-> multiple conflicting blocks for the same block generation opportunity.
+> **Equivocation** refers to the malicious act of creating multiple conflicting
+> blocks for the same block generation opportunity.
 
 Due to the voting overhead per EB, nodes should generally avoid announcing EBs
 with insufficient transaction content to justify the voting costs, as detailed
@@ -308,17 +308,18 @@ EB, it explicitly requests that transaction from peers.
 A voting committee of stake pools validates the EB. As depicted in Figure 4,
 votes are collected during the $L_\text{vote}$ period following the EB
 announcement, with voting beginning $3\Delta_\text{hdr}$ slots after the EB
-creation to ensure sufficient time for
-<a href="#equivocation">equivocation detection</a>. Committee members are
-[selected via sortition](#committee-structure) based on the slot number of the RB that announced the EB. A
-committee member votes for an EB only if:
+creation to ensure sufficient time for <a href="#equivocation">equivocation
+detection</a>. Committee members are
+[selected via sortition](#committee-structure) based on the slot number of the
+RB that announced the EB. A committee member votes for an EB only if:
 
 1. It has received the EB within $L_\text{vote}$ slots from its creation,
 2. It has **not** received an equivocated RB header for this EB within
    $L_\text{vote}$ slots,
 3. The EB is the one announced by the latest RB in the voter's current chain,
 4. The EB's transactions form a **valid** extension of the RB that announced it,
-5. For non-persistent voters, it is eligible to vote based on sortition using the announcing RB's slot number as the election identifier.
+5. For non-persistent voters, it is eligible to vote based on sortition using
+   the announcing RB's slot number as the election identifier.
 
 where $L_\text{vote}$ is a protocol parameter represented by a number of slots.
 
@@ -383,7 +384,8 @@ expires.
   <img src="images/protocol-flow-detail.svg" alt="Rolling Window Timeline">
 </p>
 
-<em>Figure 5: Detailed protocol flow showing rolling windows and transaction execution tracking</em>
+<em>Figure 5: Detailed protocol flow showing rolling windows and transaction
+execution tracking</em>
 
 </div>
 
@@ -579,12 +581,14 @@ as shown in the [BLS certificates specification][bls-spec].
 include the `endorser_block_hash` field that uniquely identifies the target EB:
 
 - **Persistent votes**:
-  - `election_id`: Identifier for the voting round (derived from the slot number of the RB that announced the target EB)
+  - `election_id`: Identifier for the voting round (derived from the slot number
+    of the RB that announced the target EB)
   - `persistent_voter_id`: Epoch-specific pool identifier
   - `endorser_block_hash`: Hash of the target EB
   - `vote_signature`: Cryptographic signature (BLS in this implementation)
 - **Non-persistent votes**:
-  - `election_id`: Identifier for the voting round (derived from the slot number of the RB that announced the target EB)
+  - `election_id`: Identifier for the voting round (derived from the slot number
+    of the RB that announced the target EB)
   - `pool_id`: Pool identifier
   - `eligibility_signature`: Cryptographic proof of sortition eligibility (BLS
     in this implementation)
@@ -604,8 +608,17 @@ following before accepting the block:
 3. **Voter Eligibility**:
    - Persistent voters must have been selected as such by the [Fait Accompli
      scheme][fait-accompli-sortition] for the current epoch
-   - Non-persistent voters must provide valid sortition proofs based on the `election_id`
-   - **Vote Eligibility Determination**: For non-persistent voters, sortition eligibility is determined using the `election_id` derived from the slot number of the RB that announced the target EB. This ensures that vote eligibility is verifiable and deterministic - all nodes can agree on which stake pools are eligible to vote for a specific EB based solely on the EB's announcing RB slot, preventing multiple voting opportunities across different slots for the same EB. This requirement stems from the BLS sortition mechanism which uses the election identifier as input to the VRF calculation for non-persistent voter selection.
+   - Non-persistent voters must provide valid sortition proofs based on the
+     `election_id`
+   - **Vote Eligibility Determination**: For non-persistent voters, sortition
+     eligibility is determined using the `election_id` derived from the slot
+     number of the RB that announced the target EB. This ensures that vote
+     eligibility is verifiable and deterministic - all nodes can agree on which
+     stake pools are eligible to vote for a specific EB based solely on the EB's
+     announcing RB slot, preventing multiple voting opportunities across
+     different slots for the same EB. This requirement stems from the BLS
+     sortition mechanism which uses the election identifier as input to the VRF
+     calculation for non-persistent voter selection.
 4. **Stake Verification**: Total voting stake meets the required quorum
    threshold
 5. **EB Consistency**: Certificate references the correct EB hash announced in
@@ -796,10 +809,11 @@ Diffusion**: RB headers diffuse via a new
 standard ChainSync (steps 2a and 2b). This separate mechanism enables rapid EB
 discovery within the strict timing bound $\Delta_\text{hdr}$. Headers are
 diffused freshest-first to facilitate timely EB delivery, with nodes propagating
-at most two headers per (slot, issuer) pair to detect <a href="#equivocation">equivocation</a> - where an
-attacker creates multiple EBs for the same block generation opportunity - while
-limiting network overhead. The header contains the EB hash when the block
-producer created an EB, allowing peers to discover the corresponding EB.
+at most two headers per (slot, issuer) pair to detect
+<a href="#equivocation">equivocation</a> - where an attacker creates multiple
+EBs for the same block generation opportunity - while limiting network overhead.
+The header contains the EB hash when the block producer created an EB, allowing
+peers to discover the corresponding EB.
 
 <a id="rb-body-diffusion" href="#rb-body-diffusion"></a>**RB Body Diffusion**:
 After receiving headers, nodes fetch RB bodies via standard BlockFetch protocol
@@ -1185,13 +1199,13 @@ Achieving this capacity increase requires trade-offs, as detailed below.
 <a name="time-to-market"></a>**2. Reasonable time to market: Complexity
 trade-offs**
 
-The linearization approach avoids complex distributed systems problems
-around transaction sharding and sophisticated mempool coordination that could
-delay deployment by years. While Leios does implement conflict resolution through
+The linearization approach avoids complex distributed systems problems around
+transaction sharding and sophisticated mempool coordination that could delay
+deployment by years. While Leios does implement conflict resolution through
 transaction execution bitmaps and rolling window corrections, this represents a
-much simpler and more deterministic approach. Also, the protocol maintains familiar
-transaction semantics, deterministic ordering, and predictable finality patterns
-that existing dApps and infrastructure depend on today.
+much simpler and more deterministic approach. Also, the protocol maintains
+familiar transaction semantics, deterministic ordering, and predictable finality
+patterns that existing dApps and infrastructure depend on today.
 
 <a name="downstream-impact"></a>**3. Minimal downstream impact: Ecosystem
 preservation**

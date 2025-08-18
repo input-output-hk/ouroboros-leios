@@ -53,26 +53,25 @@ def generate_toc(content):
     in_abstract = False
     
     for line in lines:
-        # Check if we're entering or leaving the Abstract section
-        if re.match(r'^##\s+Abstract\s*$', line.strip()):
-            in_abstract = True
-            continue
-        elif re.match(r'^##\s+', line.strip()) and in_abstract:
-            in_abstract = False
-        
         # Match headers (## to ####)
         match = re.match(r'^(#{2,4})\s+(.+)$', line.strip())
         if match:
             level = len(match.group(1))
             title = match.group(2).strip()
             
+            # Check if we're entering or leaving the Abstract section
+            if title.lower() == 'abstract':
+                in_abstract = True
+            elif level == 2 and in_abstract and title.lower() != 'abstract':
+                in_abstract = False
+            
             # Skip organizational headers that shouldn't be in main TOC
             skip_titles = ['figures', 'tables', 'table of contents', 'table of figures and tables']
             if title.lower() in skip_titles:
                 continue
             
-            # Skip figures and tables under Abstract
-            if in_abstract and ('figure' in title.lower() or 'table' in title.lower()):
+            # Skip figures and tables under Abstract (but include Abstract itself)
+            if in_abstract and title.lower() != 'abstract' and ('figure' in title.lower() or 'table' in title.lower()):
                 continue
             
             # Generate anchor
