@@ -1183,9 +1183,11 @@ Achieving this capacity increase requires trade-offs, as detailed below.
 <a name="time-to-market"></a>**2. Reasonable time to market: Complexity
 trade-offs**
 
-The linearization approach eliminates complex distributed systems problems
-around transaction sharding, conflict resolution, and sophisticated mempool
-coordination that could delay deployment by years. It also maintains familiar
+The linearization approach avoids complex distributed systems problems
+around transaction sharding and sophisticated mempool coordination that could
+delay deployment by years. While Leios does implement conflict resolution through
+transaction execution bitmaps and rolling window corrections, this represents a
+much simpler and more deterministic approach. Also, the protocol maintains familiar
 transaction semantics, deterministic ordering, and predictable finality patterns
 that existing dApps and infrastructure depend on today.
 
