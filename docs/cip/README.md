@@ -2519,7 +2519,8 @@ endorser_block =
 tx_reference = hash32
 ```
 
-<a id="votes-certificates-cddl" href="#votes-certificates-cddl">**Votes and Certificates**</a>
+<a id="votes-certificates-cddl" href="#votes-certificates-cddl">**Votes and
+Certificates**</a>
 
 ```cddl
 leios_certificate =
