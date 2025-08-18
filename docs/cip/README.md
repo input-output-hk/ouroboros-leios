@@ -238,9 +238,10 @@ the permanent ledger.
 
 The protocol's behavior is governed by a **rolling window mechanism** that
 tracks certificate inclusion timing. When a committee successfully certifies an
-EB, this triggers a rolling window of $L_\text{recover}$ slots during which the
-network can process additional transactions at higher throughput. The protocol
-continuously evaluates this timing to determine validation requirements:
+EB and the certificate is included in an RB, this triggers a rolling window of
+$L_\text{recover}$ slots during which the network can process additional
+transactions at higher throughput. The protocol continuously evaluates this
+timing to determine validation requirements:
 
 - **Beyond the window** (no certificate within past $L_\text{recover}$ slots):
   Standard Praos validation applies - every transaction must be fully validated
@@ -277,7 +278,7 @@ components:
    extended header fields to optionally certify one previously announced EB and
    optionally announce one EB for the next subsequent RB to certify.
 1. **[Endorser Block (EB)](#endorser-blocks-ebs)** A larger block containing
-   additional transaction references. There are no other ways to create EBs.
+   additional transaction references.
 
 The RB chain continues to be distributed exactly as in Praos, while Leios
 introduces a separate header distribution mechanism for rapid EB discovery and

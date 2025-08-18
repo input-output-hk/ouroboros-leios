@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg width="1200" height="500" xmlns="http://www.w3.org/2000/svg">
+<svg width="1200" height="580" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <!-- Pattern for timeline background -->
     <pattern id="timelinePattern" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
@@ -51,7 +51,7 @@
   </defs>
   
   <!-- Background -->
-  <rect width="1200" height="500" fill="#ffffff"/>
+  <rect width="1200" height="580" fill="#ffffff"/>
   
   <!-- Timeline background -->
   <g id="timeline">
@@ -106,40 +106,44 @@
     <!-- Voting phase indicators -->
     <g id="votes">
       <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="vote-link">
-        <rect x="540" y="210" width="8" height="8" fill="#f9a825" transform="rotate(45 544 214)"/>
+        <rect x="390" y="400" width="8" height="8" fill="#f9a825" transform="rotate(45 394 404)"/>
       </a>
       <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="vote-link">
-        <rect x="560" y="220" width="8" height="8" fill="#f9a825" transform="rotate(45 564 224)"/>
+        <rect x="424" y="410" width="8" height="8" fill="#f9a825" transform="rotate(45 428 414)"/>
       </a>
       <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="vote-link">
-        <rect x="580" y="205" width="8" height="8" fill="#f9a825" transform="rotate(45 584 209)"/>
+        <rect x="458" y="395" width="8" height="8" fill="#f9a825" transform="rotate(45 462 399)"/>
       </a>
       <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="vote-link">
-        <rect x="600" y="215" width="8" height="8" fill="#f9a825" transform="rotate(45 604 219)"/>
+        <rect x="492" y="405" width="8" height="8" fill="#f9a825" transform="rotate(45 496 409)"/>
       </a>
       <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="vote-link">
-        <rect x="620" y="210" width="8" height="8" fill="#f9a825" transform="rotate(45 624 214)"/>
+        <rect x="526" y="400" width="8" height="8" fill="#f9a825" transform="rotate(45 530 404)"/>
       </a>
       <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="vote-link">
-        <rect x="640" y="220" width="8" height="8" fill="#f9a825" transform="rotate(45 644 224)"/>
+        <rect x="560" y="410" width="8" height="8" fill="#f9a825" transform="rotate(45 564 414)"/>
+      </a>
+      <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="vote-link">
+        <rect x="594" y="395" width="8" height="8" fill="#f9a825" transform="rotate(45 598 399)"/>
       </a>
     </g>
     
     <!-- Vote arrows pointing to EB -->
-    <path d="M 540 220 Q 480 280 455 330" stroke="#f9a825" stroke-width="1" stroke-dasharray="2,2" fill="none" marker-end="url(#votearrowhead)"/>
-    <path d="M 560 230 Q 490 280 455 330" stroke="#f9a825" stroke-width="1" stroke-dasharray="2,2" fill="none" marker-end="url(#votearrowhead)"/>
-    <path d="M 580 215 Q 500 280 455 330" stroke="#f9a825" stroke-width="1" stroke-dasharray="2,2" fill="none" marker-end="url(#votearrowhead)"/>
-    <path d="M 600 225 Q 510 280 455 330" stroke="#f9a825" stroke-width="1" stroke-dasharray="2,2" fill="none" marker-end="url(#votearrowhead)"/>
-    <path d="M 620 220 Q 520 280 455 330" stroke="#f9a825" stroke-width="1" stroke-dasharray="2,2" fill="none" marker-end="url(#votearrowhead)"/>
-    <path d="M 640 230 Q 530 280 455 330" stroke="#f9a825" stroke-width="1" stroke-dasharray="2,2" fill="none" marker-end="url(#votearrowhead)"/>
+    <path d="M 390 400 Q 420 370 455 330" stroke="#f9a825" stroke-width="1" stroke-dasharray="2,2" fill="none" marker-end="url(#votearrowhead)"/>
+    <path d="M 424 410 Q 440 370 455 330" stroke="#f9a825" stroke-width="1" stroke-dasharray="2,2" fill="none" marker-end="url(#votearrowhead)"/>
+    <path d="M 458 395 Q 456 360 455 330" stroke="#f9a825" stroke-width="1" stroke-dasharray="2,2" fill="none" marker-end="url(#votearrowhead)"/>
+    <path d="M 492 405 Q 470 370 455 330" stroke="#f9a825" stroke-width="1" stroke-dasharray="2,2" fill="none" marker-end="url(#votearrowhead)"/>
+    <path d="M 526 400 Q 490 370 455 330" stroke="#f9a825" stroke-width="1" stroke-dasharray="2,2" fill="none" marker-end="url(#votearrowhead)"/>
+    <path d="M 560 410 Q 510 370 455 330" stroke="#f9a825" stroke-width="1" stroke-dasharray="2,2" fill="none" marker-end="url(#votearrowhead)"/>
+    <path d="M 594 395 Q 530 370 455 330" stroke="#f9a825" stroke-width="1" stroke-dasharray="2,2" fill="none" marker-end="url(#votearrowhead)"/>
     
     <!-- L_vote period indicator -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#l-vote" class="param-link">
-      <line x1="520" y1="250" x2="660" y2="250" stroke="#f9a825" stroke-width="1" stroke-dasharray="4,4"/>
-      <path d="M 520 250 L 520 255 Q 520 260 525 260 L 585 260 L 590 267 L 595 260 L 655 260 Q 660 260 660 255 L 660 250" 
+      <line x1="380" y1="430" x2="620" y2="430" stroke="#f9a825" stroke-width="1" stroke-dasharray="4,4"/>
+      <path d="M 380 430 L 380 435 Q 380 440 385 440 L 490 440 L 500 447 L 510 440 L 615 440 Q 620 440 620 435 L 620 430" 
             stroke="#f9a825" stroke-width="2" fill="none"/>
-      <text x="590" y="280" font-size="18" text-anchor="middle" fill="#f9a825">
-        <tspan font-family="serif" font-style="italic" font-size="24">L</tspan><tspan font-family="Arial, sans-serif" font-size="14" baseline-shift="sub">vote</tspan>
+      <text x="500" y="465" font-size="22" text-anchor="middle" fill="#f9a825">
+        <tspan font-family="serif" font-style="italic" font-size="28">L</tspan><tspan font-family="Arial, sans-serif" font-size="18" baseline-shift="sub">vote</tspan>
       </text>
     </a>
     
@@ -171,7 +175,7 @@
   </g>
   
   <!-- Legend (centered horizontally, single line) -->
-  <g id="legend" transform="translate(150, 440)">
+  <g id="legend" transform="translate(150, 500)">
     <text x="450" y="-15" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#333" text-anchor="middle">Legend</text>
     
     <!-- RB solid and dashed side by side -->
