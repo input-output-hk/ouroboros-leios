@@ -1823,49 +1823,42 @@ require more network traffic, of course.
 
 <a name="operating-costs"></a>**Operating costs**
 
-> [!IMPORTANT]
->
-> TODO: **@bwbush**
->
-> - [ ] Revise this section and the computations to align with Linear Leios
-
-A detailed cost analysis of Leios deployment is documented in [Leios node
-operating costs][cost-estimate] in the github repository for the Leios R&D
-effort. The major conclusion of that report is the following table that relates
-IB production rate, assuming IBs are the maximum size of existing Praos blocks,
-to the cost per node and the total cost of all nodes.
+Approximate Leios operating costs are estimated based on the detailed cost analysis of Leios deployment in [Leios node
+operating costs][cost-estimate], the simulation results, and the hardware
+recommendation for Leios. However, these costs depend on the specific choice of cloud provider hardware and the current
+market conditions. The estimates below were made in April 2025 for the median pricing of ten common hyperscale and
+discount cloud providers. The cost of a 10,000-node Leios network can be computed from the cost per node. Storage costs
+increase each month as the ledger becomes larger.
 
 <div align="center">
 <a name="table-7" id="table-7"></a>
 
-| IB/s Rate | Cost per Node (Avg) | Network Cost (10,000 nodes) |
-| --------: | ------------------: | --------------------------: |
-|      0.05 |       $80 USD/month |          $800,000 USD/month |
-|         1 |      $200 USD/month |        $2,000,000 USD/month |
-|         5 |      $700 USD/month |        $7,000,000 USD/month |
-|        10 |    $1,300 USD/month |       $13,000,000 USD/month |
-|        20 |    $2,500 USD/month |       $25,000,000 USD/month |
-|        30 |    $3,600 USD/month |       $36,000,000 USD/month |
+|Throughput|Average-size transactions|Small transactions|Per-node operation|Per-node storage|10k-node network<br/>(first year)|10k-node network<br/>(first year)|
+|--:|--:|--:|--:|--:|--:|--:|
+|100 TxkB/s|67 Tx/s|333 Tx/s|$112.76/month|$17.87/month/month|$14.6M|$200k/epoch|
+|150 TxkB/s|100 Tx/s|500 Tx/s|$119.38/month|$26.86/month/month|$15.9M|$218k/epoch|
+|200 TxkB/s|133 Tx/s|667 Tx/s|$128.02/month|$38.26/month/month|$17.7M|$242k/epoch|
+|250 TxkB/s|167 Tx/s|833 Tx/s|$132.73/month|$44.76/month/month|$18.6M|$255k/epoch|
+|300 TxkB/s|200 Tx/s|1000 Tx/s|$139.09/month|$53.34/month/month|$19.9M|$272k/epoch|
 
-<em>Table 7: Operating Costs by IB Production Rate</em>
+<em>Table 7: Operating Costs by Transaction Throughput</em>
 
 </div>
 
 _Required TPS for Infrastructure Cost Coverage:_ Using average transaction sizes
 and fees, we can calculate the required TPS to generate enough fees to cover
-infrastructure costs.
+infrastructure costs. Not that only about 20% of fees currently accrue to SPOs, but the table assumes 100% would accrue to them: to maintain the current 80%-20% split, fives times as much fee would have to be collected compared to what is listed in the table.
 
 <div align="center">
 <a name="table-8" id="table-8"></a>
 
-| Infrastructure Cost (USD/month) | Required ADA (at $0.45/ADA) | TPS (Avg Tx) | TPS (Min Tx) | Equivalent IB/s |
-| ------------------------------: | --------------------------: | -----------: | -----------: | --------------: |
-|                        $800,000 |                   1,777,778 |         0.31 |         0.40 |           0.004 |
-|                      $2,000,000 |                   4,444,444 |         0.78 |         1.00 |           0.011 |
-|                      $7,000,000 |                  15,555,556 |         2.72 |         3.49 |           0.039 |
-|                     $13,000,000 |                  28,888,889 |         5.05 |         6.48 |           0.072 |
-|                     $25,000,000 |                  55,555,556 |         9.71 |        12.47 |           0.139 |
-|                     $36,000,000 |                  80,000,000 |        13.99 |        17.96 |           0.200 |
+|Infrastructure cost|Required ada<br/>@ $0.45/ADA|Required transactions<br/>(average size)<br/>@ $0.45/ADA|Required transactions<br/>(small size)<br/>@ $0.45/ADA|
+|--:|--:|--:|--:|
+|$14.6M/year|444k ADA/epoch|4.74 Tx/s|6.18 Tx/s|
+|$15.9M/year|485k ADA/epoch|5.17 Tx/s|6.74 Tx/s|
+|$17.7M/year|537k ADA/epoch|5.73 Tx/s|7.47 Tx/s|
+|$18.6M/year|566k ADA/epoch|6.04 Tx/s|7.88 Tx/s|
+|$19.9M/year|605k ADA/epoch|6.45 Tx/s|8.42 Tx/s|
 
 <em>Table 8: Required TPS for Infrastructure Cost Coverage</em>
 
@@ -1877,22 +1870,22 @@ _Required TPS for Current Reward Maintenance:_ To maintain current reward levels
 <div align="center">
 <a name="table-9" id="table-9"></a>
 
-| Year | Reserve Depletion | Rewards from Fees (ADA) | Required TPS (Avg Tx) | Required IB/s |
+| Year | Reserve Depletion | Rewards from Fees (ADA) | Required TPS (Average size) | Required Throughput |
 | ---: | ----------------: | ----------------------: | --------------------: | ------------: |
-| 2025 |               ~0% |                       0 |                     0 |             0 |
-| 2026 |              ~13% |               6,240,000 |                  10.9 |          0.16 |
-| 2027 |              ~24% |              11,520,000 |                  20.1 |          0.29 |
-| 2028 |              ~34% |              16,320,000 |                  28.5 |          0.41 |
-| 2029 |              ~43% |              20,640,000 |                  36.1 |          0.52 |
-| 2030 |              ~50% |              24,000,000 |                  41.9 |          0.60 |
+| 2025 |               ~0% |                       0 |                     0 |             0 TxkB/s|
+| 2026 |              ~13% |               6,240,000 |                  10.9 |          15 TxkB/s |
+| 2027 |              ~24% |              11,520,000 |                  20.1 |          28 TxkB/s |
+| 2028 |              ~34% |              16,320,000 |                  28.5 |          40 TxkB/s |
+| 2029 |              ~43% |              20,640,000 |                  36.1 |          51 TxkB/s |
+| 2030 |              ~50% |              24,000,000 |                  41.9 |          59 TxkB/s |
 
 <em>Table 9: Required TPS for Current Reward Maintenance</em>
 
 </div>
-
+ 
 Note that by 2029, to compensate for Reserve depletion, the network would need
-to process approximately 36 TPS with average-sized transactions, requiring an
-Input Block rate of around 0.52 IB/s, roughly 10 times the current mainnet
+to process approximately 36 TPS with average-sized transactions, requiring a
+transaction throughput of around 51 TxkB/s, roughly 20 times the current mainnet
 throughput. Leios's design would comfortably support this increased throughput
 while maintaining decentralization.
 
