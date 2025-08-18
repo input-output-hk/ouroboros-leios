@@ -281,8 +281,14 @@ components:
 
 The RB chain continues to be distributed exactly as in Praos, while Leios
 introduces a separate header distribution mechanism for rapid EB discovery and
-equivocation detection. Equivocation refers to the malicious act of creating
-multiple conflicting blocks for the same block generation opportunity.
+equivocation detection. 
+
+<a id="equivocation"></a>
+
+> [!Note]
+>
+> **Equivocation** refers to the malicious act of creating
+> multiple conflicting blocks for the same block generation opportunity.
 
 Due to the voting overhead per EB, nodes should generally avoid announcing EBs
 with insufficient transaction content to justify the voting costs, as detailed
@@ -303,7 +309,7 @@ A voting committee of stake pools validates the EB. As depicted in Figure 4,
 votes are collected during the $L_\text{vote}$ period following the EB
 announcement, with voting beginning $3\Delta_\text{hdr}$ slots after the EB
 creation to ensure sufficient time for
-[equivocation detection](#rbheaderrelay-mini-protocol). Committee members are
+<a href="#equivocation">equivocation detection</a>. Committee members are
 [selected via sortition](#committee-structure) (lottery based on stake). A
 committee member votes for an EB only if:
 
@@ -780,7 +786,7 @@ $\text{Mempool} \geq 2 \times (S_\text{RB} + S_\text{EB-tx})$
     
 #### RB Block Production and Diffusion
     
-When a stake pool wins block leadership (step 1), they create a Ranking Block (RB) and **optionally** an Endorser Block (EB) based on the [adaptive EB production](#adaptive-eb-production) criteria. The RB is a standard Praos block with extended header fields to reference one EB and announce another EB when created. The optional EB is a larger block containing references to additional transactions. The RB chain continues to be distributed exactly as in Praos, while Leios introduces a separate mechanism to distribute the same headers for rapid EB discovery and equivocation detection.
+When a stake pool wins block leadership (step 1), they create a Ranking Block (RB) and **optionally** an Endorser Block (EB) based on the [adaptive EB production](#adaptive-eb-production) criteria. The RB is a standard Praos block with extended header fields to reference one EB and announce another EB when created. The optional EB is a larger block containing references to additional transactions. The RB chain continues to be distributed exactly as in Praos, while Leios introduces a separate mechanism to distribute the same headers for rapid EB discovery and <a href="#equivocation">equivocation detection</a>.
 
 <a id="rb-header-diffusion" href="#rb-header-diffusion"></a>**RB Header
 Diffusion**: RB headers diffuse via a new
@@ -788,7 +794,7 @@ Diffusion**: RB headers diffuse via a new
 standard ChainSync (steps 2a and 2b). This separate mechanism enables rapid EB
 discovery within the strict timing bound $\Delta_\text{hdr}$. Headers are
 diffused freshest-first to facilitate timely EB delivery, with nodes propagating
-at most two headers per (slot, issuer) pair to detect equivocation - where an
+at most two headers per (slot, issuer) pair to detect <a href="#equivocation">equivocation</a> - where an
 attacker creates multiple EBs for the same block generation opportunity - while
 limiting network overhead. The header contains the EB hash when the block
 producer created an EB, allowing peers to discover the corresponding EB.
