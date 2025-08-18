@@ -114,14 +114,7 @@ potential of the network's underlying infrastructure, where the computational
 and bandwidth resources of individual nodes often remain significantly
 underutilized.
 
-To transcend these inherent scaling barriers and unlock the latent capacity of
-the Cardano network, a systematic evolution of the core consensus algorithm is
-required. This specification presents the first version of the Ouroboros Leios
-protocol family - a stepping stone toward higher throughput while preserving the
-proven security and stability characteristics of Praos. This initial protocol
-version extends Praos with optional secondary blocks and committee validation
-to achieve significant increases in throughput while
-maintaining familiar transaction semantics.
+To transcend these inherent scaling barriers and unlock the latent capacity of the Cardano network, a fundamental evolution of the core consensus algorithm is imperative. Ouroboros Leios represents a departure from the sequential processing model of Praos, aiming to introduce mechanisms for parallel transaction processing and more efficient aggregation of transaction data. By reorganizing how transactions are proposed, validated, and ultimately recorded on the blockchain, this protocol upgrade seeks to achieve a substantial increase in the network's overall throughput, enabling it to handle a significantly greater volume of transactions within a given timeframe.
 
 The Cardano Problem Statement [CPS-18 Greater Transaction Throughput][cps-18]
 further motivates the need for higher transaction throughput and marshals
@@ -246,7 +239,7 @@ This creates a compact **certificate** proving the EB's validity.
 The certificate for an EB shall be included in the body of a new ranking block `RB'` only if all of the following conditions hold:
   1. `RB'` directly extends the RB which announced this EB (as illustrated in Figure 4 where `RB'` contains the certificate for the EB announced by the preceding RB).
   2. The certificate is valid as defined in [Certificate Validation](#certificate-validation).
-  3. If the EB contains a `tx_execution_bitmap`, this bitmap must be applied to determine which transactions from previous RBs back to the last RB that included a certificate were successfully executed: correction mechanisms are detailed in the following [Transaction Validation](#transaction-validation) section.
+  3. If the EB contains a `tx_execution_bitmap`, this bitmap must be applied to determine which transactions from RBs produced after the last RB that included a certificate (exclusive) were successfully executed: correction mechanisms are detailed in the following [Transaction Validation](#transaction-validation) section.
 
 This **conditional inclusion** ensures transaction availability to honest nodes with high probability while achieving higher throughput. When included:
 
@@ -280,13 +273,13 @@ The rolling window mechanism enables different validation approaches that balanc
 
 **Enhanced Throughput** (within window): Block producers are permitted to create RBs before receiving all previously certified EBs due to network delays. Since they cannot determine complete ledger state, Leios allows temporary inclusion of <a name="unvalidated-transactions"></a>**unvalidated transactions** - transactions whose validity cannot be immediately confirmed.
 
-This resolves the timing dilemma that would otherwise force block producers to either violate Praos constraints (by waiting) or include potentially invalid transactions without tracking. As shown in Figure 5, RBs produced during certificate-active periods (RB<sub>3</sub> through RB<sub>7</sub>, marked with red dashed borders) are permitted to contain such transactions.
+This resolves the timing dilemma that would otherwise force block producers to either violate Praos constraints (by waiting) or include potentially invalid transactions without tracking. As shown in Figure 5, RBs produced during certificate-active periods (RB<sub>3</sub> to RB<sub>7</sub> inclusive, marked with red dashed borders) are permitted to contain such transactions.
 
 **Correction Mechanisms**: To maintain ledger integrity when unvalidated transactions are included, the protocol implements transaction execution tracking through `tx_execution_bitmap` fields. These corrections follow two simple rules:
 
-**1. <a id="correction-rule-1"></a>During enhanced throughput**: When EBs are certified within the rolling window, each certified EB includes corrections for RB transactions that occurred since the previous certificate. Since validators can only certify EBs when they have sufficient ledger state, they correct transactions from the known baseline forward (see EB<sub>2</sub> in Figure 5).
+**1. <a id="correction-rule-1"></a>During enhanced throughput**: When EBs are certified within the rolling window, each certified EB includes corrections for RB transactions that occurred after the previous certificate was included (exclusive). Since validators can only certify EBs when they have sufficient ledger state, they correct transactions from the known baseline forward (see EB<sub>2</sub> in Figure 5).
 
-**2. <a id="correction-rule-2"></a>When returning to standard validation**: The first RB after window expiration includes corrections for all remaining unvalidated transactions from the certificate-active period (see RB<sub>8</sub> in Figure 5, which corrects transactions from RB<sub>5</sub> through RB<sub>7</sub>).
+**2. <a id="correction-rule-2"></a>When returning to standard validation**: The first RB after window expiration includes corrections for all remaining unvalidated transactions from the certificate-active period (see RB<sub>8</sub> in Figure 5, which corrects transactions from RB<sub>5</sub> to RB<sub>7</sub> inclusive).
 
 Figure 5 also shows the timing constraints that enable these mechanisms:
 - <a id="l-vote" href="#l-vote"></a>**$L_\text{vote}$ periods** (timing brackets under each EB): Define the voting window for committee members
@@ -305,7 +298,7 @@ The protocol extends Praos with three main elements:
 
 #### Ranking Blocks (RBs)
 
-RBs are Praos blocks extended to support Leios by optionally announcing EBs in their headers and embedding EB certificates in their bodies.
+RBs are Praos blocks extended to support Leios by optionally announcing EBs in their headers and embedding EB certificates and execution bitmaps in their bodies.
 
 1. **Header additions**:
    - `announced_eb` (optional): Hash of the EB created by this block producer
@@ -317,11 +310,11 @@ RBs are Praos blocks extended to support Leios by optionally announcing EBs in t
 
 <a id="rb-inclusion-rules" href="#rb-inclusion-rules"></a>**Inclusion Rules**: When an RB header includes a `certified_eb` field, the corresponding body must include a matching `eb_certificate`. Conversely, an `eb_certificate` shall only be included when a `certified_eb` field references the EB being certified.
 
-<a id="rb-corrections" href="#rb-corrections"></a>**RB Corrections**: Following <a href="#correction-rule-2">**Rule 2**</a>, when the first RB is generated more than $L$<sub>recover</sub> slots after the latest EB certificate, the `tx_execution_bitmap` field must indicate the execution status of transactions in RBs between this RB and that EB certificate. This ensures the ledger state is fully determined before standard validation resumes.
+<a id="rb-corrections" href="#rb-corrections"></a>**RB Corrections**: Following <a href="#correction-rule-2">**Rule 2**</a>, when the first RB is generated more than $L$<sub>recover</sub> slots after the latest EB certificate, the `tx_execution_bitmap` field must indicate the execution status of transactions in RBs produced after that EB certificate was included, up to but not including this correcting RB. This ensures the ledger state is fully determined before standard validation resumes.
 
 <a id="bitmap-size-constraint" href="#bitmap-size-constraint"></a>**Bitmap Size Constraint**: The transaction execution bitmap size $S_\text{bitmap}$ (see [Protocol Parameters](#protocol-parameters)) must fit within $S_\text{RB}$ alongside other required data. This is ensured by bounding $L_\text{recover}$ implicitly via $S_\text{bitmap} < S_\text{RB}$ (see [Bitmap Size Relationships](#bitmap-size-relationships)).
 
-<a id="cost-proportionality" href="#cost-proportionality"></a>**Cost Proportionality**: The first block, after the certificate-active window expires pays a cost proportional to the **uncorrected** transactions - i.e., RB transactions since the last EB certificate. EB corrections already included during the certificate-active period reduce this cost; only the remaining transactions require an RB-side bitmap.
+<a id="cost-proportionality" href="#cost-proportionality"></a>**Cost Proportionality**: The first block, after the certificate-active window expires pays a cost proportional to the **uncorrected** transactions - i.e., RB transactions produced after the last EB certificate was included (exclusive). EB corrections already included during the certificate-active period reduce this cost; only the remaining transactions require an RB-side bitmap.
 
 > [!WARNING]
 > **TODO:** Add transaction confirmation levels and their implications for applications
@@ -336,7 +329,7 @@ EBs are produced by the same stake pool that created the corresponding announcin
 - `transaction_references`: List of transaction references (transaction ids)
 - `tx_execution_bitmap`: Bitmap tracking execution status of transactions from previous RBs
 
-<a id="eb-corrections" href="#eb-corrections"></a>**EB Corrections**: Following <a href="#correction-rule-1">**Rule 1**</a>, when validators create an EB certificate within $L_\text{recover}$ slots of the latest certificate, they determine the execution status of transactions in RBs that occurred since the previous certificate. The `tx_execution_bitmap` field tracks this information, ensuring ledger state consistency during certificate-active periods while reducing the correction burden for the RB that will include all remaining corrections following $L_\text{recover}$ expiration.
+<a id="eb-corrections" href="#eb-corrections"></a>**EB Corrections**: Following <a href="#correction-rule-1">**Rule 1**</a>, when the block producer creates an EB certificate within $L_\text{recover}$ slots of the latest certificate, they determine the execution status of transactions in RBs that occurred after the previous certificate was included (exclusive). The `tx_execution_bitmap` field tracks this information, ensuring ledger state consistency during certificate-active periods while reducing the correction burden for the RB that will include all remaining corrections following $L_\text{recover}$ expiration.
 
 > [!NOTE]
 > **Light Node Optimization**: As a future optimization, transaction execution bitmaps could also be included in EB certificates to allow light nodes to determine transaction execution status without downloading full EBs.
