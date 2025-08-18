@@ -100,8 +100,8 @@
     <text x="365" y="122" font-family="Arial, sans-serif" font-size="12" fill="#595959"><tspan font-family="Times New Roman, serif" font-style="italic" font-size="14">L</tspan><tspan font-size="10" baseline-shift="sub">recover</tspan> window</text>
     
     <!-- Second certificate resets window -->
-    <text x="585" y="105" font-family="Arial, sans-serif" font-size="12" fill="#595959">Resets</text>
-    <text x="585" y="122" font-family="Arial, sans-serif" font-size="12" fill="#595959"><tspan font-family="Times New Roman, serif" font-style="italic" font-size="14">L</tspan><tspan font-size="10" baseline-shift="sub">recover-RB3</tspan></text>
+    <text x="585" y="105" font-family="Arial, sans-serif" font-size="12" fill="#595959">Overlaps with <tspan font-family="Times New Roman, serif" font-style="italic" font-size="14">L</tspan><tspan font-size="10" baseline-shift="sub">recover-RB3</tspan></text>
+    <text x="585" y="122" font-family="Arial, sans-serif" font-size="12" fill="#595959">Extends high throughput period</text>
     
     <!-- Windows expiration -->
     <text x="885" y="105" font-family="Arial, sans-serif" font-size="12" fill="#595959">Windows expired,</text>
