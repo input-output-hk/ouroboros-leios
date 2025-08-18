@@ -1,12 +1,13 @@
 name: Auto-format CIP
 
 on:
-  push:
-    paths:
-      - "docs/cip/README.md"
-  pull_request:
-    paths:
-      - "docs/cip/README.md"
+# Disabled - uncomment to re-enable auto-formatting
+# push:
+#   paths:
+#     - "docs/cip/README.md"
+# pull_request:
+#   paths:
+#     - "docs/cip/README.md"
 
 permissions:
   contents: write

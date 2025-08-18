@@ -50,6 +50,8 @@ sustainability and reduced complexity through fewer new protocol elements.
   <summary><h2>Table of contents</h2></summary>
 
 - [Abstract](#abstract)
+  - [Figures](#figures)
+  - [Tables](#tables)
 - [Motivation](#motivation)
 - [Specification](#specification)
   - [Protocol Flow](#protocol-flow)
@@ -68,19 +70,24 @@ sustainability and reduced complexity through fewer new protocol elements.
     - [Transaction Diffusion](#transaction-diffusion)
     - [RB Block Production and Diffusion](#rb-block-production-and-diffusion)
     - [EB Diffusion](#eb-diffusion)
-    - [Voting & Certification](#voting-certification)
+    - [Voting \& Certification](#voting--certification)
     - [Next Block Production](#next-block-production)
     - [Ledger Management](#ledger-management)
     - [Epoch Boundary](#epoch-boundary)
   - [Network](#network)
     - [Praos Mini-Protocols](#praos-mini-protocols)
     - [Leios Mini-Protocols](#leios-mini-protocols)
+      - [RbHeaderRelay Mini-Protocol](#rbheaderrelay-mini-protocol)
+      - [EbRelay Mini-Protocol](#ebrelay-mini-protocol)
+      - [VoteRelay Mini-Protocol](#voterelay-mini-protocol)
+      - [EbFetch Mini-Protocol](#ebfetch-mini-protocol)
+      - [TxFetch Mini-Protocol](#txfetch-mini-protocol)
   - [Incentives](#incentives)
 - [Rationale](#rationale)
   - [How Leios addresses CPS-18](#how-leios-addresses-cps-18)
   - [Evidence](#evidence)
-  - [Trade-offs & Limitations](#trade-offs-limitations)
-  - [Roadmap & Next Steps](#roadmap-next-steps)
+  - [Trade-offs \& Limitations](#trade-offs--limitations)
+  - [Roadmap \& Next Steps](#roadmap--next-steps)
 - [Path to active](#path-to-active)
 - [Versioning](#versioning)
 - [References](#references)
@@ -310,14 +317,15 @@ votes are collected during the $L_\text{vote}$ period following the EB
 announcement, with voting beginning $3\Delta_\text{hdr}$ slots after the EB
 creation to ensure sufficient time for
 <a href="#equivocation">equivocation detection</a>. Committee members are
-[selected via sortition](#committee-structure) (lottery based on stake). A
+[selected via sortition](#committee-structure) based on the slot number of the RB that announced the EB. A
 committee member votes for an EB only if:
 
 1. It has received the EB within $L_\text{vote}$ slots from its creation,
 2. It has **not** received an equivocated RB header for this EB within
    $L_\text{vote}$ slots,
 3. The EB is the one announced by the latest RB in the voter's current chain,
-4. The EB's transactions form a **valid** extension of the RB that announced it.
+4. The EB's transactions form a **valid** extension of the RB that announced it,
+5. For non-persistent voters, it is eligible to vote based on sortition using the announcing RB's slot number as the election identifier.
 
 where $L_\text{vote}$ is a protocol parameter represented by a number of slots.
 
@@ -578,12 +586,12 @@ as shown in the [BLS certificates specification][bls-spec].
 include the `endorser_block_hash` field that uniquely identifies the target EB:
 
 - **Persistent votes**:
-  - `election_id`: Identifier for the voting round
+  - `election_id`: Identifier for the voting round (derived from the slot number of the RB that announced the target EB)
   - `persistent_voter_id`: Epoch-specific pool identifier
   - `endorser_block_hash`: Hash of the target EB
   - `vote_signature`: Cryptographic signature (BLS in this implementation)
 - **Non-persistent votes**:
-  - `election_id`: Identifier for the voting round
+  - `election_id`: Identifier for the voting round (derived from the slot number of the RB that announced the target EB)
   - `pool_id`: Pool identifier
   - `eligibility_signature`: Cryptographic proof of sortition eligibility (BLS
     in this implementation)
@@ -603,7 +611,8 @@ following before accepting the block:
 3. **Voter Eligibility**:
    - Persistent voters must have been selected as such by the [Fait Accompli
      scheme][fait-accompli-sortition] for the current epoch
-   - Non-persistent voters must provide valid sortition proofs
+   - Non-persistent voters must provide valid sortition proofs based on the `election_id`
+   - **Vote Eligibility Determination**: For non-persistent voters, sortition eligibility is determined using the `election_id` derived from the slot number of the RB that announced the target EB. This ensures that vote eligibility is verifiable and deterministic - all nodes can agree on which stake pools are eligible to vote for a specific EB based solely on the EB's announcing RB slot, preventing multiple voting opportunities across different slots for the same EB. This requirement stems from the BLS sortition mechanism which uses the election identifier as input to the VRF calculation for non-persistent voter selection.
 4. **Stake Verification**: Total voting stake meets the required quorum
    threshold
 5. **EB Consistency**: Certificate references the correct EB hash announced in
