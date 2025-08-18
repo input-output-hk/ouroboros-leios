@@ -232,7 +232,7 @@ $$
 \sum_{v \in \text{votes}} \text{stake}(v) \geq \tau \times \text{stake}_{\text{total-active}}
 $$
 
-This creates a compact **certificate** proving the EB's validity.
+When this threshold is met, the EB becomes **certified**. A ranking block (RB) producer can then construct a compact **certificate** proving the EB's validity by aggregating the collected votes.
 
 #### Step 5: Chain Inclusion
 
@@ -305,7 +305,7 @@ RBs are Praos blocks extended to support Leios by optionally announcing EBs in t
    - `certified_eb` (optional): Hash of the EB being certified by this RB
 
 2. **Body additions**:
-   - `eb_certificate` (optional): certificate proving EB availability & validity
+   - `eb_certificate` (optional): aggregated certificate proving EB availability & validity
    - `tx_execution_bitmap` (optional): bitmap tracking transaction execution status
 
 <a id="rb-inclusion-rules" href="#rb-inclusion-rules"></a>**Inclusion Rules**: When an RB header includes a `certified_eb` field, the corresponding body must include a matching `eb_certificate`. Conversely, an `eb_certificate` shall only be included when a `certified_eb` field references the EB being certified.
@@ -540,7 +540,7 @@ Whenever an EB is announced through an RB header, nodes must fetch the EB conten
 > - How long should votes be propagated? (Likely not critical - "30 seconds" would be sufficient)
 > - Nodes should receive and relay votes for EBs even before acquiring/validating the EB, but only if they have seen an RB header announcing that EB
 
-<a id="CertificateAggregation" href="#CertificateAggregation"></a>**Certificate Construction**: All nodes receive votes from upstream peers, maintaining a running tally for each EB to track progress toward the quorum threshold (step 11). However, only RB producers need to create certificates. Stakepool nodes know the leadership schedule, so they know when they are eligible to create a certificate for an upcoming RB they will produce. When enough votes are collected during the vote diffusion period, the RB producer aggregates them into a compact certificate. This creates a cryptographic proof that the EB has received sufficient committee approval, and therefore must have already been validated by some honest stake.
+<a id="CertificateAggregation" href="#CertificateAggregation"></a>**Certificate Construction**: All nodes receive votes from upstream peers, maintaining a running tally for each EB to track progress toward the quorum threshold (step 11). However, only RB producers create certificates when they are about to produce a new ranking block. Stakepool nodes know the leadership schedule, so they know when they are eligible to construct a certificate for an upcoming RB they will produce. When enough votes are collected during the vote diffusion period, the RB producer aggregates them into a compact certificate. This certificate is embedded directly in the RB body and serves as cryptographic proof that the EB has received sufficient committee approval.
     
 #### Next Block Production
 
