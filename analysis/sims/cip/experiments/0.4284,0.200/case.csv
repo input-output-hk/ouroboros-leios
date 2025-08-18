@@ -1,0 +1,2 @@
+Network,Bandwidth,CPU,Diffusion duration,Voting duration,Max EB size,Tx size,Throughput,Tx validation,Tx start [s],Tx stop [s],Sim stop [s]
+topology-v2,10 Mb/s,4 vCPU/node,L_diff = 0 slots,L_vote = 7 slots,12 MB/EB,1500 B/Tx,0.200 TxMB/s,0.4284 ms/Tx,60,960,1200
