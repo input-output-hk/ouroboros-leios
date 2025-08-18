@@ -210,7 +210,7 @@ Due to the voting overhead per EB, nodes should generally avoid announcing EBs w
 
 #### Step 2: EB Distribution
 
-Nodes receiving the RB header discover the announced EB and fetch its content. The EB contains references to transactions. If a node does not already possess a transaction referenced in the EB, it explicitly requests that transaction from peers.
+Nodes receiving the RB header discover the announced EB, via its referencing by the RB header, and fetch its content. The EB contains references to transactions. If a node does not already possess a transaction referenced in the EB, it explicitly requests that transaction from peers.
 
 #### Step 3: Committee Validation
 
