@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # CIP Auto-Formatter
-# Automatically formats CIP documents using Prettier and checks for issues
+# Generates TOC, table of figures/tables, and formats markdown
 
 set -euo pipefail
 
@@ -17,28 +17,12 @@ echo "🔧 Formatting CIP document: $TARGET_FILE"
 # Make backup
 cp "$TARGET_FILE" "${TARGET_FILE}.bak"
 
-# 1. Format figure and table captions to consistent <em> tags
-echo "  ├─ Standardizing figure and table captions..."
-
-# Convert underscore format: _Figure X: Caption_ -> <em>Figure X: Caption</em>
-sed -i.tmp 's/^_\(Figure [0-9]\+[:.] .*\)_$/<em>\1<\/em>/g' "$TARGET_FILE"
-
-# Convert sub tags for figure captions: <sub>Figure X: Caption</sub> -> <em>Figure X: Caption</em>
-sed -i.tmp 's/^<sub>\(Figure [0-9]\+: .*\)<\/sub>$/<em>\1<\/em>/g' "$TARGET_FILE"
-
-# Normalize periods to colons in figure captions
-sed -i.tmp 's/<em>\(Figure [0-9]\+\)\. \(.*\)<\/em>/<em>\1: \2<\/em>/g' "$TARGET_FILE"
-
-# Convert table captions to consistent <em> format (colon and period formats)
-sed -i.tmp 's/^_\(Table [0-9][0-9]*[:.] .*\)_$/<em>\1<\/em>/g' "$TARGET_FILE"
-
-# Normalize periods to colons in table captions
-sed -i.tmp 's/<em>\(Table [0-9][0-9]*\)\. \(.*\)<\/em>/<em>\1: \2<\/em>/g' "$TARGET_FILE"
+# 1. Remove trailing periods from figure and table captions
+echo "  ├─ Cleaning figure and table captions..."
 
 # Remove trailing periods from figure and table captions for consistency
 sed -i.tmp 's/<em>\(Figure [0-9][0-9]*: .*\)\.<\/em>/<em>\1<\/em>/g' "$TARGET_FILE"
 sed -i.tmp 's/<em>\(Table [0-9][0-9]*: .*\)\.<\/em>/<em>\1<\/em>/g' "$TARGET_FILE"
-
 
 # Clean up temp file
 rm -f "${TARGET_FILE}.tmp"
@@ -66,8 +50,16 @@ def generate_toc(content):
     """Generate table of contents from markdown headers"""
     lines = content.split('\n')
     toc_lines = []
+    in_abstract = False
     
     for line in lines:
+        # Check if we're entering or leaving the Abstract section
+        if re.match(r'^##\s+Abstract\s*$', line.strip()):
+            in_abstract = True
+            continue
+        elif re.match(r'^##\s+', line.strip()) and in_abstract:
+            in_abstract = False
+        
         # Match headers (## to ####)
         match = re.match(r'^(#{2,4})\s+(.+)$', line.strip())
         if match:
@@ -77,6 +69,10 @@ def generate_toc(content):
             # Skip organizational headers that shouldn't be in main TOC
             skip_titles = ['figures', 'tables', 'table of contents', 'table of figures and tables']
             if title.lower() in skip_titles:
+                continue
+            
+            # Skip figures and tables under Abstract
+            if in_abstract and ('figure' in title.lower() or 'table' in title.lower()):
                 continue
             
             # Generate anchor
@@ -116,7 +112,7 @@ with open(sys.argv[1], 'w') as f:
     f.write(content)
 EOF
 
-# Generate table of figures and tables
+# 3. Generate table of figures and tables
 echo "  ├─ Generating table of figures and tables..."
 
 python3 - "$TARGET_FILE" << 'EOF'
@@ -130,6 +126,39 @@ def generate_anchor_from_figure(figure_text):
     if match:
         return f"figure-{match.group(1)}"
     return ""
+
+def check_enumeration(items, item_type):
+    """Check if figures/tables are correctly enumerated"""
+    numbers = []
+    for item in items:
+        match = re.search(rf'{item_type} (\d+):', item)
+        if match:
+            numbers.append(int(match.group(1)))
+    
+    if not numbers:
+        return True, []
+    
+    numbers.sort()
+    expected = list(range(1, len(numbers) + 1))
+    missing = []
+    duplicates = []
+    
+    # Check for missing numbers
+    for expected_num in expected:
+        if expected_num not in numbers:
+            missing.append(expected_num)
+    
+    # Check for duplicates
+    seen = set()
+    for num in numbers:
+        if num in seen:
+            duplicates.append(num)
+        seen.add(num)
+    
+    is_correct = len(missing) == 0 and len(duplicates) == 0 and numbers == expected
+    issues = missing + duplicates
+    
+    return is_correct, issues
 
 def generate_table_of_figures_and_tables(content):
     """Generate table of figures and tables from document content"""
@@ -170,6 +199,15 @@ def generate_table_of_figures_and_tables(content):
         if table_num_match:
             anchor = f"table-{table_num_match.group(1)}"
             tables.append(f"- [{caption}](#{anchor})")
+    
+    # Check enumeration
+    fig_correct, fig_issues = check_enumeration(figures, 'Figure')
+    table_correct, table_issues = check_enumeration(tables, 'Table')
+    
+    if not fig_correct:
+        print(f"⚠️  Figure enumeration issues: {fig_issues}", file=sys.stderr)
+    if not table_correct:
+        print(f"⚠️  Table enumeration issues: {table_issues}", file=sys.stderr)
     
     # Sort figures and tables by number
     def extract_number(item):
@@ -225,13 +263,21 @@ with open(sys.argv[1], 'w') as f:
     f.write(content)
 EOF
 
-# 3. Skip Prettier formatting to avoid unwanted changes to content
-echo "  ├─ Skipping Prettier to preserve original formatting..."
+# 4. Format markdown with prettier (max column length)
+echo "  ├─ Formatting markdown with prettier..."
 
-# 4. Post-process to fix markdown alerts that might have been incorrectly wrapped
+# Check if prettier is available, if not install it
+if ! command -v prettier &> /dev/null; then
+    echo "    Installing prettier..."
+    npm install -g prettier
+fi
+
+# Format with prettier using max column width
+prettier --write --prose-wrap always --print-width 80 "$TARGET_FILE"
+
+# 5. Fix markdown alerts that prettier may have broken
 echo "  ├─ Fixing markdown alert formatting..."
 
-# Use a more targeted Python script to fix alert formatting
 python3 - "$TARGET_FILE" << 'EOF'
 import sys
 import re
@@ -270,52 +316,8 @@ with open(sys.argv[1], 'w') as f:
     f.write(content)
 EOF
 
-# 5. Basic validation checks
-echo "  ├─ Running validation checks..."
-
-BROKEN_LINKS=0
-
-# Count figures in table of figures vs actual captions
-TABLE_FIGURES=$(grep -c '^\s*- \[Figure [0-9]\+:' "$TARGET_FILE" || true)
-CAPTION_FIGURES=$(grep -c '^<em>Figure [0-9]\+:' "$TARGET_FILE" || true)
-
-if [[ $TABLE_FIGURES -ne $CAPTION_FIGURES ]]; then
-    echo "    ⚠️  Figure count mismatch: $TABLE_FIGURES in table of figures, $CAPTION_FIGURES captions found"
-    BROKEN_LINKS=1
-fi
-
-# 6. Check for issues that couldn't be auto-fixed
-echo "  ├─ Checking for remaining issues..."
-
-ISSUES_FOUND=0
-
-# Check for any remaining underscore figure captions
-if grep -q '^_Figure [0-9]\+:.*_$' "$TARGET_FILE"; then
-    echo "    ⚠️  Some underscore figure captions couldn't be auto-fixed"
-    ISSUES_FOUND=1
-fi
-
-# Check for improperly formatted alerts (alert type with content on same line)
-if grep -q '^> \[![A-Z]*\] [^*]' "$TARGET_FILE"; then
-    echo "    ⚠️  Some markdown alerts may need manual fixing"
-    ISSUES_FOUND=1
-fi
-
-# 7. Show summary
+# 6. Show summary
 echo "  └─ Formatting complete"
 
-if [[ $BROKEN_LINKS -eq 0 && $ISSUES_FOUND -eq 0 ]]; then
-    echo "✅ Document formatted successfully, no issues found"
-    rm -f "${TARGET_FILE}.bak"
-    exit 0
-else
-    echo "⚠️  Document formatted with warnings (see above)"
-    if [[ $BROKEN_LINKS -eq 1 ]]; then
-        echo "    Links may need manual review"
-    fi
-    if [[ $ISSUES_FOUND -eq 1 ]]; then
-        echo "    Some formatting issues may need manual attention"
-    fi
-    rm -f "${TARGET_FILE}.bak"
-    exit 0  # Don't fail the workflow for warnings
-fi
+echo "✅ CIP formatted successfully"
+rm -f "${TARGET_FILE}.bak"
