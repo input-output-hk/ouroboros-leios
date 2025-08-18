@@ -50,6 +50,8 @@ sustainability and reduced complexity through fewer new protocol elements.
   <summary><h2>Table of contents</h2></summary>
 
 - [Abstract](#abstract)
+  - [Figures](#figures)
+  - [Tables](#tables)
 - [Motivation](#motivation)
 - [Specification](#specification)
   - [Protocol Flow](#protocol-flow)
@@ -68,19 +70,24 @@ sustainability and reduced complexity through fewer new protocol elements.
     - [Transaction Diffusion](#transaction-diffusion)
     - [RB Block Production and Diffusion](#rb-block-production-and-diffusion)
     - [EB Diffusion](#eb-diffusion)
-    - [Voting & Certification](#voting-certification)
+    - [Voting \& Certification](#voting--certification)
     - [Next Block Production](#next-block-production)
     - [Ledger Management](#ledger-management)
     - [Epoch Boundary](#epoch-boundary)
   - [Network](#network)
     - [Praos Mini-Protocols](#praos-mini-protocols)
     - [Leios Mini-Protocols](#leios-mini-protocols)
+      - [RbHeaderRelay Mini-Protocol](#rbheaderrelay-mini-protocol)
+      - [EbRelay Mini-Protocol](#ebrelay-mini-protocol)
+      - [VoteRelay Mini-Protocol](#voterelay-mini-protocol)
+      - [EbFetch Mini-Protocol](#ebfetch-mini-protocol)
+      - [TxFetch Mini-Protocol](#txfetch-mini-protocol)
   - [Incentives](#incentives)
 - [Rationale](#rationale)
   - [How Leios addresses CPS-18](#how-leios-addresses-cps-18)
   - [Evidence](#evidence)
-  - [Trade-offs & Limitations](#trade-offs-limitations)
-  - [Roadmap & Next Steps](#roadmap-next-steps)
+  - [Trade-offs \& Limitations](#trade-offs--limitations)
+  - [Roadmap \& Next Steps](#roadmap--next-steps)
 - [Path to active](#path-to-active)
 - [Versioning](#versioning)
 - [References](#references)
@@ -98,7 +105,7 @@ sustainability and reduced complexity through fewer new protocol elements.
 - [Figure 2: SPO profitability under Praos, as a function of transaction volume](#figure-2)
 - [Figure 3: Ouroboros Leios rolling window mechanism](#figure-3)
 - [Figure 4: Leios Protocol Flow](#figure-4)
-- [Figure 5: Detailed protocol flow showing rolling $L_\text{recover}$ windows and transaction execution tracking](#figure-5)
+- [Figure 5: Detailed protocol flow showing rolling windows and transaction execution tracking](#figure-5)
 - [Figure 6: Up- and downstream interactions of a node (simplified)](#figure-6)
 - [Figure 7: Time for transaction to reach the ledger](#figure-7)
 - [Figure 8: Transactions reaching the ledger](#figure-8)
@@ -281,7 +288,8 @@ components:
 
 The RB chain continues to be distributed exactly as in Praos, while Leios
 introduces a separate header distribution mechanism for rapid EB discovery and
-equivocation detection.
+equivocation detection. Equivocation refers to the malicious act of creating
+multiple conflicting blocks for the same block generation opportunity.
 
 Due to the voting overhead per EB, nodes should generally avoid announcing EBs
 with insufficient transaction content to justify the voting costs, as detailed
@@ -302,9 +310,7 @@ A voting committee of stake pools validates the EB. As depicted in Figure 4,
 votes are collected during the $L_\text{vote}$ period following the EB
 announcement, with voting beginning $3\Delta_\text{hdr}$ slots after the EB
 creation to ensure sufficient time for
-[equivocation detection](#rbheaderrelay-mini-protocol). Equivocation refers to
-the malicious act of creating multiple conflicting blocks for the same block
-generation opportunity. Committee members are
+[equivocation detection](#rbheaderrelay-mini-protocol). Committee members are
 [selected via sortition](#committee-structure) (lottery based on stake). A
 committee member votes for an EB only if:
 
@@ -377,8 +383,7 @@ expires.
   <img src="images/protocol-flow-detail.svg" alt="Rolling Window Timeline">
 </p>
 
-<em>Figure 5: Detailed protocol flow showing rolling $L_\text{recover}$ windows
-and transaction execution tracking</em>
+<em>Figure 5: Detailed protocol flow showing rolling windows and transaction execution tracking</em>
 
 </div>
 

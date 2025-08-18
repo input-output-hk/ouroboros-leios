@@ -145,11 +145,13 @@ def generate_table_of_figures_and_tables(content):
         caption = match.strip()
         # Remove line breaks and normalize whitespace
         caption = re.sub(r'\s+', ' ', caption).strip()
-        # Escape LaTeX formulas to prevent Prettier from mangling them
-        caption_escaped = caption.replace('\\', '\\\\')
+        # Remove LaTeX formulas for cleaner table of figures
+        caption = re.sub(r'\$[^$]+\$', '', caption)
+        # Clean up extra spaces after formula removal
+        caption = re.sub(r'\s+', ' ', caption).strip()
         anchor = generate_anchor_from_figure(caption)
         if anchor:
-            figures.append(f"- [{caption_escaped}](#{anchor})")
+            figures.append(f"- [{caption}](#{anchor})")
     
     # Find all table captions (including multi-line)
     table_pattern = r'<em>(Table \d+: [^<]+)</em>'
@@ -159,13 +161,15 @@ def generate_table_of_figures_and_tables(content):
         caption = match.strip()
         # Remove line breaks and normalize whitespace
         caption = re.sub(r'\s+', ' ', caption).strip()
-        # Escape LaTeX formulas to prevent Prettier from mangling them
-        caption_escaped = caption.replace('\\', '\\\\')
+        # Remove LaTeX formulas for cleaner table of figures
+        caption = re.sub(r'\$[^$]+\$', '', caption)
+        # Clean up extra spaces after formula removal
+        caption = re.sub(r'\s+', ' ', caption).strip()
         # Extract table number for anchor
         table_num_match = re.search(r'Table (\d+)', caption)
         if table_num_match:
             anchor = f"table-{table_num_match.group(1)}"
-            tables.append(f"- [{caption_escaped}](#{anchor})")
+            tables.append(f"- [{caption}](#{anchor})")
     
     # Sort figures and tables by number
     def extract_number(item):
@@ -221,42 +225,10 @@ with open(sys.argv[1], 'w') as f:
     f.write(content)
 EOF
 
-# 3. Format with Prettier using a less aggressive configuration
-echo "  ├─ Formatting with Prettier..."
+# 3. Skip Prettier formatting to avoid unwanted changes to content
+echo "  ├─ Skipping Prettier to preserve original formatting..."
 
-# Check if prettier is available, install if needed
-if ! command -v npx &> /dev/null; then
-    echo "    ❌ npx not found. Please install Node.js"
-    exit 1
-fi
-
-# Create a prettier config that's more conservative with markdown
-cat > .prettierrc.json << EOF
-{
-  "proseWrap": "always",
-  "printWidth": 80,
-  "tabWidth": 2,
-  "useTabs": false,
-  "overrides": [
-    {
-      "files": "*.md",
-      "options": {
-        "proseWrap": "always",
-        "printWidth": 80,
-        "endOfLine": "lf"
-      }
-    }
-  ]
-}
-EOF
-
-# Run prettier
-npx prettier --config .prettierrc.json --write "$TARGET_FILE"
-
-# Clean up temp config
-rm -f .prettierrc.json
-
-# 3. Post-process to fix markdown alerts that might have been incorrectly wrapped
+# 4. Post-process to fix markdown alerts that might have been incorrectly wrapped
 echo "  ├─ Fixing markdown alert formatting..."
 
 # Use a more targeted Python script to fix alert formatting
@@ -298,7 +270,7 @@ with open(sys.argv[1], 'w') as f:
     f.write(content)
 EOF
 
-# 4. Basic validation checks
+# 5. Basic validation checks
 echo "  ├─ Running validation checks..."
 
 BROKEN_LINKS=0
@@ -312,7 +284,7 @@ if [[ $TABLE_FIGURES -ne $CAPTION_FIGURES ]]; then
     BROKEN_LINKS=1
 fi
 
-# 5. Check for issues that couldn't be auto-fixed
+# 6. Check for issues that couldn't be auto-fixed
 echo "  ├─ Checking for remaining issues..."
 
 ISSUES_FOUND=0
@@ -329,7 +301,7 @@ if grep -q '^> \[![A-Z]*\] [^*]' "$TARGET_FILE"; then
     ISSUES_FOUND=1
 fi
 
-# 6. Show summary
+# 7. Show summary
 echo "  └─ Formatting complete"
 
 if [[ $BROKEN_LINKS -eq 0 && $ISSUES_FOUND -eq 0 ]]; then
