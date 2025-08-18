@@ -50,6 +50,8 @@ sustainability and reduced complexity through fewer new protocol elements.
   <summary><h2>Table of contents</h2></summary>
 
 - [Abstract](#abstract)
+  - [Figures](#figures)
+  - [Tables](#tables)
 - [Motivation](#motivation)
 - [Specification](#specification)
   - [Protocol Flow](#protocol-flow)
@@ -68,19 +70,24 @@ sustainability and reduced complexity through fewer new protocol elements.
     - [Transaction Diffusion](#transaction-diffusion)
     - [RB Block Production and Diffusion](#rb-block-production-and-diffusion)
     - [EB Diffusion](#eb-diffusion)
-    - [Voting & Certification](#voting-certification)
+    - [Voting \& Certification](#voting--certification)
     - [Next Block Production](#next-block-production)
     - [Ledger Management](#ledger-management)
     - [Epoch Boundary](#epoch-boundary)
   - [Network](#network)
     - [Praos Mini-Protocols](#praos-mini-protocols)
     - [Leios Mini-Protocols](#leios-mini-protocols)
+      - [RbHeaderRelay Mini-Protocol](#rbheaderrelay-mini-protocol)
+      - [EbRelay Mini-Protocol](#ebrelay-mini-protocol)
+      - [VoteRelay Mini-Protocol](#voterelay-mini-protocol)
+      - [EbFetch Mini-Protocol](#ebfetch-mini-protocol)
+      - [TxFetch Mini-Protocol](#txfetch-mini-protocol)
   - [Incentives](#incentives)
 - [Rationale](#rationale)
   - [How Leios addresses CPS-18](#how-leios-addresses-cps-18)
   - [Evidence](#evidence)
-  - [Trade-offs & Limitations](#trade-offs-limitations)
-  - [Roadmap & Next Steps](#roadmap-next-steps)
+  - [Trade-offs \& Limitations](#trade-offs--limitations)
+  - [Roadmap \& Next Steps](#roadmap--next-steps)
 - [Path to active](#path-to-active)
 - [Versioning](#versioning)
 - [References](#references)
@@ -2476,7 +2483,7 @@ This appendix contains the complete CDDL specifications for all Leios protocol
 messages and data structures. These definitions specify the exact wire format
 for network communication.
 
-<h4 id="ranking-block-cddl">Ranking Block</h4>
+<a id="ranking-block-cddl">**Ranking Block**</a>
 
 ```diff
  ranking_block =
@@ -2507,7 +2514,7 @@ block_header =
    ]
 ```
 
-<h4 id="endorser-block-cddl">Endorser Block</h4>
+<a id="endorser-block-cddl">**Endorser Block**</a>
 
 ```cddl
 endorser_block =
@@ -2519,7 +2526,7 @@ endorser_block =
 tx_reference = hash32
 ```
 
-<h4 id="votes-certificates-cddl">Votes and Certificates</h4>
+<a id="votes-certificates-cddl">**Votes and Certificates**</a>
 
 ```cddl
 leios_certificate =
