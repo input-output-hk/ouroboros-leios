@@ -29,6 +29,15 @@ The sim can be configured to propagate EBs after validation at any of these leve
 
 Nodes will only vote for an EB after it has been fully validated.
 
+## Voting rules
+
+A node will wait at least `3 * Δhdr` after an EB was created before voting for that EB. It will also wait until it has fully validated the EB.
+
+For a node to vote for an EB, all of the following must be true.
+- The RB which announced that EB is currently the head of that node's chain.
+- The node received the relevant RB header at most `Δhdr` after it was created.
+- The node received the EB body itself at most `L_vote` after it was created.
+
 ## Mempool behavior
 
 When a node creates an RB, it will follow these steps in order:
