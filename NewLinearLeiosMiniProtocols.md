@@ -333,7 +333,7 @@ data LeiosRequestPayload
 
 data LeiosReplyPayload
   = LeiosNotifications RequestNo CompletionFlag (NonEmptyList LeiosNotification)
-  | LeiosDeliveries RequestNo (List LeiosDelivery)
+  | LeiosDeliveries RequestNo CompletionFlag (List LeiosDelivery)
 
 --
 
@@ -360,7 +360,7 @@ data LeiosDeliverableId
 
 data LeiosDeliverable
   = LinearLeiosBlockDelivery LinearLeiosBlock
-  | LeiosBlockTxsDelivery LeiosPoint (Map Index16 (List Tx))
+  | LeiosBlockTxsDelivery LeiosPoint (NonEmptyMap Index16 (List Tx))
   | LinearLeiosVoteDelivery LinearLeiosVote
 ```
 
@@ -375,24 +375,19 @@ Additional message details, beyond the IER table.
   (If every EB incurred 10000 requests between two specific peers, their connection would have to last more than a billion years to exhaust Word64, assuming an average of one per 20 seconds.)
 - Every MsgLeiosReply identifies the corresponding MsgLeiosRequest by its RequestNo.
   If there is no such outstanding request, the client should disconnect.
-- The CompletionFlag indicates whether the server considers this message to completely resolve the corresponding LeiosNotificationsBytes request.
+- The CompletionFlag indicates whether the server considers this message to completely resolve the corresponding request.
   This flag is redundant, but it will at least be useful for troubleshooting related bugs.
   If the client disagrees with a CompletionFlag, it should disconnect.
-  The flag should be set on the first notification whose size includes the last byte of the request.
+  The flag should be set on the first notification whose size includes the last byte of a LeiosNotificationBytes request.
   That same notification might include the first byte of the next LeiosNotificationsBytes request, but it should never also include the last byte of that second request.
+  The flag should also be set on the delivery that includes the last of the objects identified by some LeiosDeliverableIds request.
   If it does, the client should disconnect, because the lower bound on MaxNotificationSize prevents the server from being forced to send such a message.
 - If the argument of a LeiosNotificationBytes request is less than some MaxNotificationSize constant determined by the negotiated mini protocol version, the server should disconnect.
   Every MaxNotificationSize constant must accommodate at least any single LeiosNotification carrying the biggest argument it can, so MaxNotificationSize must be no less than the maximum size of a RankingBlockHeader.
-- A single LeiosNotificationBytes request may incur multiple LeiosNotifications replies.
-  However, every LeiosDeliverableIds request incurs exactly one LeiosDeliveries reply.
-  If the client would have benefited from receiving some of the deliverables sooner than others, it should have sent separate requests.
-  (TODO why is this important for BlockFetch but not Leios? Maybe it will be for Leios too, but only for syncing?)
-  (TODO I now state the opposite, both above and below, so I should relax this and add CompletionFlag here too, I presume.)
-  (TODO LinearLeiosStaleBlockRangeId fully opposes this)
 - When FreshestFirstDelivery justifies the client sending two overlapping requests (eg if a younger LLB refers to the same txs as an already requested older LLB), the server might reply in-order or out-of-order, depending on how timings resolve.
   Whichever reply is sent second should exclude the content that was already included in the first reply, in order to not waste bandwidth (recall that it should be common for contemporary LLBs to share most txs).
-  In an extreme case, this might cause the argument to LeiosBlockTxsDelivery to be empty.
-  (TODO partial deliveries/delivery CompletionFlag would again mean the map needs to be non-empty.)
+  In an extreme case, this might require a LeiosDeliveries message to carry an empty list.
+  (TODO for extra explicitness, would we also want to send a LeiosBlockTxsDelivery with an empty map?)
 
 TODO discuss fetching "missing" LLBs, eg after L_recover, etc.
 Maybe LinearLeiosStaleBlockRangeId covers it?
