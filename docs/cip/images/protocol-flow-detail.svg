@@ -289,22 +289,13 @@
       </a>
     </g>
     
-    <!-- Vote indicators for EB1 (de-emphasized) -->
+    <!-- Vote indicators for EB1 (de-emphasized, fewer votes) -->
     <g id="votes-eb1" transform="translate(120, 160)" mask="url(#deemphasizeMask)">
       <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="vote-link">
         <rect x="10" y="395" width="4" height="4" fill="#f9a825" transform="rotate(45 12 397)"/>
       </a>
       <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="vote-link">
-        <rect x="30" y="395" width="4" height="4" fill="#f9a825" transform="rotate(45 32 397)"/>
-      </a>
-      <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="vote-link">
         <rect x="50" y="395" width="4" height="4" fill="#f9a825" transform="rotate(45 52 397)"/>
-      </a>
-      <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="vote-link">
-        <rect x="70" y="395" width="4" height="4" fill="#f9a825" transform="rotate(45 72 397)"/>
-      </a>
-      <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="vote-link">
-        <rect x="90" y="395" width="4" height="4" fill="#f9a825" transform="rotate(45 92 397)"/>
       </a>
     </g>
     
@@ -376,19 +367,13 @@
       </a>
     </g>
     
-    <!-- Vote indicators for EB3 (de-emphasized) -->
+    <!-- Vote indicators for EB3 (de-emphasized, fewer votes) -->
     <g id="votes-eb3" transform="translate(360, 160)" mask="url(#deemphasizeMask)">
       <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="vote-link">
         <rect x="10" y="395" width="4" height="4" fill="#f9a825" transform="rotate(45 12 397)"/>
       </a>
       <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="vote-link">
-        <rect x="30" y="395" width="4" height="4" fill="#f9a825" transform="rotate(45 32 397)"/>
-      </a>
-      <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="vote-link">
         <rect x="50" y="395" width="4" height="4" fill="#f9a825" transform="rotate(45 52 397)"/>
-      </a>
-      <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="vote-link">
-        <rect x="70" y="395" width="4" height="4" fill="#f9a825" transform="rotate(45 72 397)"/>
       </a>
       <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="vote-link">
         <rect x="90" y="395" width="4" height="4" fill="#f9a825" transform="rotate(45 92 397)"/>
