@@ -299,10 +299,12 @@ limits) are reached, even at lower transaction volumes.
 
 #### Step 2: EB Distribution
 
-Nodes receiving the RB header discover the announced EB, via its referencing by
-the RB header, and fetch its content. The EB contains references to
-transactions. If a node does not already possess a transaction referenced in the
-EB, it explicitly requests that transaction from peers.
+Nodes receiving the RB header via the
+[RbHeaderRelay mini-protocol](#rbheaderrelay-mini-protocol) discover the
+announced EB, via its referencing by the RB header, and fetch its content. The
+EB contains references to transactions. If a node does not already possess a
+transaction referenced in the EB, it explicitly requests that transaction from
+peers.
 
 #### Step 3: Committee Validation
 
@@ -316,19 +318,21 @@ RB that announced the EB. A committee member votes for an EB only if:
 
 1. It has received the EB within $L_\text{vote}$ slots from its creation,
 2. It has **not** received an equivocated RB header for this EB within
-   $L_\text{vote}$ slots,
+   $\Delta_\text{hdr}$ slots,
 3. The EB is the one announced by the latest RB in the voter's current chain,
 4. The EB's transactions form a **valid** extension of the RB that announced it,
 5. For non-persistent voters, it is eligible to vote based on sortition using
-   the announcing RB's slot number as the election identifier.
+   the announcing RB's slot number as the election identifier,
+6. The RB header arrived within $\Delta_\text{hdr}$.
 
-where $L_\text{vote}$ is a protocol parameter represented by a number of slots.
+where $L_\text{vote}$ and $\Delta_\text{hdr}$ are
+<a href="#protocol-parameters">protocol parameters</a> represented by a number
+of slots.
 
 #### Step 4: Certification
 
-If enough committee votes are collected such that the total active stake exceeds
-a **threshold** parameter ($\tau$), for example 60%, the EB becomes
-**certified**:
+If enough committee votes are collected such that the total stake exceeds a
+**threshold** parameter ($\tau$), for example 60%, the EB becomes **certified**:
 
 $$
 \sum_{v \in \text{votes}} \text{stake}(v) \geq \tau \times \text{stake}_{\text{total-active}}
@@ -348,11 +352,12 @@ The certificate for an EB shall be included in the body of a new ranking block
    preceding RB).
 2. The certificate is valid as defined in
    [Certificate Validation](#certificate-validation).
-3. If the EB contains a `tx_execution_bitmap`, this bitmap must be applied to
-   determine which transactions from RBs produced after the last RB that
-   included a certificate (exclusive) were successfully executed: correction
-   mechanisms are detailed in the following
-   [Transaction Validation](#transaction-validation) section.
+
+When a certificate is included, if the EB contains a `tx_execution_bitmap`, this
+bitmap must be applied to determine which transactions from RBs produced after
+the last RB that included a certificate (exclusive) were successfully executed:
+correction mechanisms are detailed in the following
+[Transaction Validation](#transaction-validation) section.
 
 This **conditional inclusion** ensures transaction availability to honest nodes
 with high probability while achieving higher throughput. When included:
@@ -412,10 +417,12 @@ transactions without tracking. As shown in Figure 5, RBs produced during
 certificate-active periods (RB<sub>3</sub> to RB<sub>7</sub> inclusive, marked
 with red dashed borders) are permitted to contain such transactions.
 
-**Correction Mechanisms**: To maintain ledger integrity when unvalidated
-transactions are included, the protocol implements transaction execution
-tracking through `tx_execution_bitmap` fields. These corrections follow two
-simple rules:
+**Correction Mechanisms**: To maintain ledger integrity for light nodes when
+unvalidated transactions are included, the protocol implements transaction
+execution tracking through `tx_execution_bitmap` fields. These corrections are
+specifically designed for light nodes, as full nodes can verify whether
+transactions were executed when they catch up to the current ledger state. The
+corrections follow two simple rules:
 
 **1. <a id="correction-rule-1"></a>During enhanced throughput**: When EBs are
 certified within the rolling window, each certified EB includes corrections for
@@ -651,11 +658,14 @@ These are observed properties of the network topology and node capabilities:
 <div align="center">
 <a name="table-1" id="table-1"></a>
 
-| Characteristic           |       Symbol        | Units | Description                                                                                                                                    |      Typical Range      | Notes                                                                     |
-| ------------------------ | :-----------------: | :---: | ---------------------------------------------------------------------------------------------------------------------------------------------- | :---------------------: | ------------------------------------------------------------------------- |
-| RB diffusion time        | $\Delta_\text{RB}$  | slot  | Observed upper bound for RB diffusion and adoption to all nodes                                                                                |        2-6 slots        | Depends on network topology and conditions                                |
-| RB header diffusion time | $\Delta_\text{hdr}$ | slot  | Observed time for RB headers to reach all nodes                                                                                                | $\leq \Delta_\text{RB}$ | Usually faster than full block diffusion                                  |
-| EB diffusion time        | $\Delta_\text{EB}$  | slot  | Observed upper bound for EB diffusion, transaction retrieval, and ledger state building at all nodes when no competing or fresher blocks exist | $\geq \Delta_\text{RB}$ | Slower than RBs due to larger size and additional processing requirements |
+| Characteristic    |       Symbol       | Units | Description                                                     | Typical Range | Notes                                      |
+| ----------------- | :----------------: | :---: | --------------------------------------------------------------- | :-----------: | ------------------------------------------ |
+| RB diffusion time | $\Delta_\text{RB}$ | slot  | Observed upper bound for RB diffusion and adoption to all nodes |   2-6 slots   | Depends on network topology and conditions |
+
+| EB diffusion time | $\Delta_\text{EB}$ | slot | Observed upper bound for EB
+diffusion, transaction retrieval, and ledger state building at all nodes when no
+competing or fresher blocks exist | $\geq \Delta_\text{RB}$ | Slower than RBs
+due to larger size and additional processing requirements |
 
 <em>Table 1: Network Characteristics</em>
 
@@ -687,17 +697,18 @@ constrained by the network characteristics and protocol characteristics above:
 <div align="center">
 <a name="table-3" id="table-3"></a>
 
-| Parameter                                     |       Symbol       |  Units   | Description                                                                    |                                           Constraints                                           | Rationale                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| --------------------------------------------- | :----------------: | :------: | ------------------------------------------------------------------------------ | :---------------------------------------------------------------------------------------------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Voting period length                          |  $L_\text{vote}$   |   slot   | Duration during which committee members can vote on endorser blocks            |                              $L_\text{vote} > 3\Delta_\text{hdr}$                               | Must allow EB diffusion and equivocation detection before voting; the constraint ensures sufficient time for header propagation and equivocation detection before voting begins. <br /><br />**Liveness**: To ensure that honest EBs are certified most of the time, $L_\text{vote}$ must be set so that there is sufficient time for an honestly produced EB to be diffused and processed by a large fraction of the network, assuming no other "fresher" RB is produced in the same period |
-| Recovery period length                        | $L_\text{recover}$ |   slot   | Duration of rolling window that tracks time since last certificate             |                              $L_\text{recover} > \Delta_\text{EB}$                              | Must ensure all nodes receive certified EBs before window expires. Implicitly constrained by bitmap size requirement (see $S_\text{bitmap}$ row)                                                                                                                                                                                                                                                                                                                                             |
-| Ranking block max size                        |   $S_\text{RB}$    |  bytes   | Maximum size of a ranking block                                                |                                        $S_\text{RB} > 0$                                        | Limits RB size to ensure timely diffusion                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| Endorser-block referenceable transaction size |  $S_\text{EB-tx}$  |  bytes   | Maximum total size of transactions that can be referenced by an endorser block |                                      $S_\text{EB-tx} > 0$                                       | Limits total transaction payload to ensure timely diffusion within stage length                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Endorser block max size                       |   $S_\text{EB}$    |  bytes   | Maximum size of an endorser block itself                                       |                                        $S_\text{EB} > 0$                                        | Limits EB size to ensure timely diffusion; prevents issues with many small transactions                                                                                                                                                                                                                                                                                                                                                                                                      |
-| Praos active slot coefficient                 |   $f_\text{RB}$    |  1/slot  | Probability that a party will be the slot leader for a particular slot         |                          $0 < f_\text{RB} \leq \Delta_\text{RB}^{-1}$                           | Blocks must not be produced faster than network delay                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| Mean committee size                           |        $n$         | parties  | Average number of stake pools selected for voting                              |                                             $n > 0$                                             | Ensures sufficient decentralization and security                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| Quorum size                                   |       $\tau$       | fraction | Minimum fraction of committee votes required for certification                 |                                          $\tau > 0.5$                                           | Prevents adversarial control while ensuring liveness                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Maximum correction bitmap size                | $S_\text{bitmap}$  |  bytes   | Maximum size of transaction execution bitmap for corrections                   | $S_\text{bitmap} = \lceil L_\text{recover} \times S_\text{RB} / (8 \times T_\text{min}) \rceil$ | Calculated based on worst-case scenario with one RB per slot containing minimum-sized transactions during recovery period. Protocol must ensure all corrections are included before standard validation resumes to maintain ledger integrity                                                                                                                                                                                                                                                 |
+| Parameter                                     |       Symbol        |  Units   | Description                                                                       |                                           Constraints                                           | Rationale                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| --------------------------------------------- | :-----------------: | :------: | --------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RB header diffusion bound                     | $\Delta_\text{hdr}$ |   slot   | Maximum allowed time for RB headers to reach all nodes for equivocation detection |                            $\Delta_\text{hdr} \leq \Delta_\text{RB}$                            | Required for equivocation detection timing; RbHeaderRelay mini-protocol must achieve this bound. Usually faster than full RB diffusion due to smaller header size                                                                                                                                                                                                                                                                                                                            |
+| Voting period length                          |   $L_\text{vote}$   |   slot   | Duration during which committee members can vote on endorser blocks               |                              $L_\text{vote} > 3\Delta_\text{hdr}$                               | Must allow EB diffusion and equivocation detection before voting; the constraint ensures sufficient time for header propagation and equivocation detection before voting begins. <br /><br />**Liveness**: To ensure that honest EBs are certified most of the time, $L_\text{vote}$ must be set so that there is sufficient time for an honestly produced EB to be diffused and processed by a large fraction of the network, assuming no other "fresher" RB is produced in the same period |
+| Recovery period length                        | $L_\text{recover}$  |   slot   | Duration of rolling window that tracks time since last certificate                |                              $L_\text{recover} > \Delta_\text{EB}$                              | Must ensure all nodes receive certified EBs before window expires. Implicitly constrained by bitmap size requirement (see $S_\text{bitmap}$ row)                                                                                                                                                                                                                                                                                                                                             |
+| Ranking block max size                        |    $S_\text{RB}$    |  bytes   | Maximum size of a ranking block                                                   |                                        $S_\text{RB} > 0$                                        | Limits RB size to ensure timely diffusion                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Endorser-block referenceable transaction size |  $S_\text{EB-tx}$   |  bytes   | Maximum total size of transactions that can be referenced by an endorser block    |                                      $S_\text{EB-tx} > 0$                                       | Limits total transaction payload to ensure timely diffusion within stage length                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Endorser block max size                       |    $S_\text{EB}$    |  bytes   | Maximum size of an endorser block itself                                          |                                        $S_\text{EB} > 0$                                        | Limits EB size to ensure timely diffusion; prevents issues with many small transactions                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Praos active slot coefficient                 |    $f_\text{RB}$    |  1/slot  | Probability that a party will be the slot leader for a particular slot            |                          $0 < f_\text{RB} \leq \Delta_\text{RB}^{-1}$                           | Blocks must not be produced faster than network delay                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Mean committee size                           |         $n$         | parties  | Average number of stake pools selected for voting                                 |                                             $n > 0$                                             | Ensures sufficient decentralization and security                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Quorum size                                   |       $\tau$        | fraction | Minimum fraction of committee votes required for certification                    |                                          $\tau > 0.5$                                           | Prevents adversarial control while ensuring liveness                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Maximum correction bitmap size                |  $S_\text{bitmap}$  |  bytes   | Maximum size of transaction execution bitmap for corrections                      | $S_\text{bitmap} = \lceil L_\text{recover} \times S_\text{RB} / (8 \times T_\text{min}) \rceil$ | Calculated based on worst-case scenario with one RB per slot containing minimum-sized transactions during recovery period. Protocol must ensure all corrections are included before standard validation resumes to maintain ledger integrity                                                                                                                                                                                                                                                 |
 
 <em>Table 3: Leios Protocol Parameters</em>
 
@@ -1716,20 +1727,21 @@ tradeoffs.
 <div align="center">
 <a name="table-6" id="table-6"></a>
 
-| Parameter                                     |       Symbol       |   Feasible value   | Justification                                                                                                                                                                               |
-| --------------------------------------------- | :----------------: | :----------------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Voting period length                          |  $L_\text{vote}$   |      7 slots       | Short stages increase settlement speed, but the stage length must be generously larger than the propagation time for EBs.                                                                   |
-| Recovery period length                        | $L_\text{recover}$ |      ?? slots      | ???                                                                                                                                                                                         |
-| Endorser-block referenceable transaction size |  $S_\text{EB-tx}$  |       12 MB        | Simulations indicate that 200 kB/s throughput is feasible at this block size.                                                                                                               |
-| Endorser block max size                       |   $S_\text{EB}$    |       512 kB       | Endorser blocks must not be so large that the transaction-execution bitmap is not too large to fit in a Praos block.                                                                        |
-| Maximum Plutus steps per endorser block       |         -          |  2000G step units  | Simulations at high transaction-validation CPU usage.                                                                                                                                       |
-| Maximum Plutus memory per endorser block      |         -          | 7000M memory units | Simulations at high transaction-validation CPU usage.                                                                                                                                       |
-| Maximum Plutus steps per transaction          |         -          |  100G step units   | Raise per-transaction limit by a factor of twenty relative to Praos.                                                                                                                        |
-| Maximum Plutus memory per transaction         |         -          | 350M memory units  | Raise per-transaction limit by a factor of twenty relative to Praos.                                                                                                                        |
-| Ranking block max size                        |   $S_\text{RB}$    |    90,112 bytes    | This is the current value on the Cardano mainnet.                                                                                                                                           |
-| Praos active slot coefficient                 |   $f_\text{RB}$    |     0.05 /slot     | This is the current value on the Cardano mainnet.                                                                                                                                           |
-| Mean committee size                           |        $n$         |   600 stakepools   | Modeling of the proposed certificate scheme indicates that certificates reach their minimum size of ~8 kB at this committee size, given a realistic distribution of stake among pools.      |
-| Quorum size                                   |       $\tau$       |        60%         | Quorum should be enough greater than 50% that sortition fluctuations do not give a 50% adversary a temporary majority, but low enough that weak adversaries cannot thwart an honest quorum. |
+| Parameter                                     |       Symbol        |   Feasible value   | Justification                                                                                                                                                                               |
+| --------------------------------------------- | :-----------------: | :----------------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RB header diffusion bound                     | $\Delta_\text{hdr}$ |      2 slots       | Must be faster than full RB diffusion for equivocation detection; simulations show headers reach all nodes within 1-2 slots due to smaller size.                                            |
+| Voting period length                          |   $L_\text{vote}$   |      7 slots       | Short stages increase settlement speed, but the stage length must be generously larger than the propagation time for EBs.                                                                   |
+| Recovery period length                        | $L_\text{recover}$  |      ?? slots      | ???                                                                                                                                                                                         |
+| Endorser-block referenceable transaction size |  $S_\text{EB-tx}$   |       12 MB        | Simulations indicate that 200 kB/s throughput is feasible at this block size.                                                                                                               |
+| Endorser block max size                       |    $S_\text{EB}$    |       512 kB       | Endorser blocks must not be so large that the transaction-execution bitmap is not too large to fit in a Praos block.                                                                        |
+| Maximum Plutus steps per endorser block       |          -          |  2000G step units  | Simulations at high transaction-validation CPU usage.                                                                                                                                       |
+| Maximum Plutus memory per endorser block      |          -          | 7000M memory units | Simulations at high transaction-validation CPU usage.                                                                                                                                       |
+| Maximum Plutus steps per transaction          |          -          |  100G step units   | Raise per-transaction limit by a factor of twenty relative to Praos.                                                                                                                        |
+| Maximum Plutus memory per transaction         |          -          | 350M memory units  | Raise per-transaction limit by a factor of twenty relative to Praos.                                                                                                                        |
+| Ranking block max size                        |    $S_\text{RB}$    |    90,112 bytes    | This is the current value on the Cardano mainnet.                                                                                                                                           |
+| Praos active slot coefficient                 |    $f_\text{RB}$    |     0.05 /slot     | This is the current value on the Cardano mainnet.                                                                                                                                           |
+| Mean committee size                           |         $n$         |   600 stakepools   | Modeling of the proposed certificate scheme indicates that certificates reach their minimum size of ~8 kB at this committee size, given a realistic distribution of stake among pools.      |
+| Quorum size                                   |       $\tau$        |        60%         | Quorum should be enough greater than 50% that sortition fluctuations do not give a 50% adversary a temporary majority, but low enough that weak adversaries cannot thwart an honest quorum. |
 
 <em>Table 6: Feasible Protocol Parameters</em>
 
