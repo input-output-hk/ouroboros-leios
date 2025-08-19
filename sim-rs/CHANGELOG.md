@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## v1.1.0
+
+### Linear Leios
 
 - Update dependencies to fix vulnerability
 - Apply RB/EB validation CPU time when generating new RB/EBs.

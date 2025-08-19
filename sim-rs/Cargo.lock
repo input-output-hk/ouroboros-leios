@@ -1213,7 +1213,7 @@ dependencies = [
 
 [[package]]
 name = "sim-cli"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "async-compression",
@@ -1241,7 +1241,7 @@ dependencies = [
 
 [[package]]
 name = "sim-core"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "async-stream",
