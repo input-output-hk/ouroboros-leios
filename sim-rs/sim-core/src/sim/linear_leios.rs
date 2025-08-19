@@ -164,8 +164,16 @@ impl SimCpuTask for CpuTask {
     fn times(&self, config: &CpuTimeConfig) -> Vec<Duration> {
         match self {
             Self::TransactionValidated(_, _) => vec![config.tx_validation],
-            Self::RBBlockGenerated(_, _, _) => {
-                vec![config.rb_generation, config.eb_generation]
+            Self::RBBlockGenerated(rb, eb, _) => {
+                let mut rb_time = config.rb_generation + config.rb_body_validation_constant;
+                let rb_bytes: u64 = rb.transactions.iter().map(|tx| tx.bytes).sum();
+                rb_time += config.rb_validation_per_byte * (rb_bytes as u32);
+
+                let mut eb_time = config.eb_generation + config.eb_body_validation_constant;
+                let eb_bytes: u64 = eb.txs.iter().map(|tx| tx.bytes).sum();
+                eb_time += config.eb_body_validation_per_byte * (eb_bytes as u32);
+
+                vec![rb_time, eb_time]
             }
             Self::RBHeaderValidated(_, _, _, _) => vec![config.rb_head_validation],
             Self::RBBlockValidated(rb) => {

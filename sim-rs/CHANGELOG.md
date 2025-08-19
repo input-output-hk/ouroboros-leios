@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Update dependencies to fix vulnerability
+- Apply RB/EB validation CPU time when generating new RB/EBs.
 
 ## v1.0.0
 
