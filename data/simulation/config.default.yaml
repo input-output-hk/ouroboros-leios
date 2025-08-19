@@ -141,7 +141,6 @@ eb-generation-probability: 1.5
 eb-size-bytes-constant: 240
 # IB hash
 eb-size-bytes-per-ib: 32
-eb-body-avg-size-bytes: 0
 # Collecting the IBs to reference and cryptography are the main tasks.
 # A comparable task is maybe mempool snapshotting.
 # Sec 2.3 Forging, of the benchmark cluster report, lists
