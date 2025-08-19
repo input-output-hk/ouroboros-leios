@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.1.0
+
+### Linear Leios
+
+- Update dependencies to fix vulnerability
+- Apply RB/EB validation CPU time when generating new RB/EBs.
+- Only vote for EBs if their RB was received within `Δ_header` of its production.
+
 ## v1.0.0
 
 ### Linear Leios

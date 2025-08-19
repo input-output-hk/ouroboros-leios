@@ -164,8 +164,16 @@ impl SimCpuTask for CpuTask {
     fn times(&self, config: &CpuTimeConfig) -> Vec<Duration> {
         match self {
             Self::TransactionValidated(_, _) => vec![config.tx_validation],
-            Self::RBBlockGenerated(_, _, _) => {
-                vec![config.rb_generation, config.eb_generation]
+            Self::RBBlockGenerated(rb, eb, _) => {
+                let mut rb_time = config.rb_generation + config.rb_body_validation_constant;
+                let rb_bytes: u64 = rb.transactions.iter().map(|tx| tx.bytes).sum();
+                rb_time += config.rb_validation_per_byte * (rb_bytes as u32);
+
+                let mut eb_time = config.eb_generation + config.eb_body_validation_constant;
+                let eb_bytes: u64 = eb.txs.iter().map(|tx| tx.bytes).sum();
+                eb_time += config.eb_body_validation_per_byte * (eb_bytes as u32);
+
+                vec![rb_time, eb_time]
             }
             Self::RBHeaderValidated(_, _, _, _) => vec![config.rb_head_validation],
             Self::RBBlockValidated(rb) => {
@@ -495,7 +503,7 @@ impl LinearLeiosNode {
             return;
         };
 
-        let parent = self.latest_rb().map(|rb| rb.header.id);
+        let parent = self.latest_rb_id();
         let endorsement = parent.and_then(|rb_id| {
             if rb_id.slot + self.sim_config.linear_diffuse_stage_length > slot {
                 // This RB was generated too quickly after another; hasn't been time to gather all the votes.
@@ -839,14 +847,18 @@ impl LinearLeiosNode {
         self.publish_rb(rb, true);
     }
 
-    fn latest_rb(&self) -> Option<&Arc<RankingBlock>> {
+    fn latest_rb(&self) -> Option<(&Arc<RankingBlock>, Timestamp)> {
         self.praos.blocks.iter().rev().find_map(|(_, rb)| {
-            if let RankingBlockView::Received { rb, .. } = rb {
-                Some(rb)
+            if let RankingBlockView::Received { rb, header_seen } = rb {
+                Some((rb, *header_seen))
             } else {
                 None
             }
         })
+    }
+
+    fn latest_rb_id(&self) -> Option<BlockId> {
+        self.latest_rb().map(|(rb, _)| rb.header.id)
     }
 }
 
@@ -1198,18 +1210,25 @@ impl LinearLeiosNode {
     }
 
     fn should_vote_for(&self, eb: &EndorserBlock, seen: Timestamp) -> Result<(), NoVoteReason> {
-        let must_be_received_by =
+        let eb_must_be_received_by =
             Timestamp::from_secs(eb.slot + self.sim_config.linear_vote_stage_length);
-        if seen > must_be_received_by {
+        if seen > eb_must_be_received_by {
             // An EB must be received within L_vote slots of its creation.
             return Err(NoVoteReason::LateEB);
         }
-        if self
-            .latest_rb()
-            .is_none_or(|rb| rb.header.eb_announcement != eb.id())
-        {
+        let Some((rb, header_seen)) = self.latest_rb() else {
             // We only vote for whichever EB we was referenced by the head of the current chain.
             return Err(NoVoteReason::WrongEB);
+        };
+        if rb.header.eb_announcement != eb.id() {
+            // We only vote for whichever EB we was referenced by the head of the current chain.
+            return Err(NoVoteReason::WrongEB);
+        }
+        let rb_header_must_be_received_by =
+            Timestamp::from_secs(eb.slot) + self.sim_config.header_diffusion_time;
+        if header_seen >= rb_header_must_be_received_by {
+            // The RB header must be received more quickly
+            return Err(NoVoteReason::LateRBHeader);
         }
 
         if self.sim_config.variant == LeiosVariant::LinearWithTxReferences {
@@ -1307,7 +1326,7 @@ impl LinearLeiosNode {
 // Ledger/mempool operations
 impl LinearLeiosNode {
     fn try_add_tx_to_mempool(&mut self, tx: &Arc<Transaction>) -> bool {
-        let ledger_state = self.resolve_ledger_state(self.latest_rb().map(|rb| rb.header.id));
+        let ledger_state = self.resolve_ledger_state(self.latest_rb_id());
         if ledger_state.spent_inputs.contains(&tx.input_id) {
             // This TX conflicts with something already on-chain
             return false;

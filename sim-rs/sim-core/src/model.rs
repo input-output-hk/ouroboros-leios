@@ -282,6 +282,7 @@ pub enum NoVoteReason {
     ExtraTX,
     MissingTX,
     UncertifiedEBReference,
+    LateRBHeader,
     LateEB,
     WrongEB,
 }
