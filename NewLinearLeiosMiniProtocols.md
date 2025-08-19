@@ -17,18 +17,18 @@ Some of the details in this table are incompatible with the initial concrete ite
 
 | Sender | Name | Arguments | Semantics |
 | - | - | - | - |
-| Client | LeiosNotificationsBytes | byte count | Requests notifications (Leios announcements and delivery offers) up to some total byte size. A low-watermark scheme would suffice to ensure there's always sufficient room for more notifications. |
-| Server | LinearLeiosAnnouncement | RankingBlockHeader that announces an LLB | The server has seen this LLB announcement. It must never send a third announcement for some election, since two already evidence equivocation. Each header must not be invalid in a way that a recent-but-not-perfectly-up-to-date ledger state could notice. |
-| Server | LinearLeiosBlockOffer | slot and hash | The server can immediately deliver this block. It must have already sent a LinearLeiosAnnouncement for the same block. |
-| Server | LeiosBlockTxsOffer | slot and hash | The server can immediately deliver any tx referenced by this block. It must have already sent a LinearLeiosAnnouncement for the same block. |
-| Server | LinearLeiosVoteOffer | slot and vote-issuer-id | The server can immediately deliver this vote. It must have already sent a LeiosAnnouncement for the same slot. |
-| Client | LinearLeiosBlockId | slot and hash | The server must deliver this block. The server disconnects if it doesn't have it. |
-| Client | LeiosBlockTxsId | slot, hash, and map from 16-bit index to 64-bit bitmap | The server must deliver these txs from this Leios block. The server disconnects if it doesn't have the block or is missing any of its txs. The given bitmap identifies which of 64 contiguous txs are requested, and the offset of the tx corresponding to the bitmap's first bit is 64 times the given index. |
-| Client | LinearLeiosVoteId | slot and vote-issuer-id | The server must deliver this vote. The server disconnects if it doesn't have it. |
-| Server | LinearLeiosBlockDelivery | Leios block | The block from an earlier LinearLeiosBlockId. |
-| Server | LeiosBlockTxsDelivery | slot, hash, and map from 16-bit index to sequences of txs | A subset of the txs from an earlier LeiosBlockTxsId. Note that this map's keys are a non-empty subset of the request's map's keys. A server is allowed to send multiple LeiosBlockTxsDelivery in reply to a single LeiosBlockTxsId. |
-| Server | LinearLeiosVoteDelivery | Leios vote | The vote from an earlier LinearLeiosVoteId. |
-| Client | LinearLeiosStaleBlockRangeId | two slots and two hashes | For LLBs that are older than L_recover. The server must deliver all LLBs that are certified within this range of the identified Ranking Blocks. It should do so in order, ignoring FreshestFirstDelivery. If the requested range is not on the server's current selection, it should disconnect. If the server doesn't have all of the LLBs, it should disconnect. The client is advised to not send this while the wall clock is still within any of the requested LLB's L_recover window; LinearLeiosBlockId is more suitable for such blocks. |
+| Client→ | LeiosNotificationsBytes | byte count | Requests notifications (Leios announcements and delivery offers) up to some total byte size. A low-watermark scheme would suffice to ensure there's always sufficient room for more notifications. |
+| ←Server | LinearLeiosAnnouncement | RankingBlockHeader that announces an LLB | The server has seen this LLB announcement. It must never send a third announcement for some election, since two already evidence equivocation. Each header must not be invalid in a way that a recent-but-not-perfectly-up-to-date ledger state could notice. |
+| ←Server | LinearLeiosBlockOffer | slot and hash | The server can immediately deliver this block. It must have already sent a LinearLeiosAnnouncement for the same block. |
+| ←Server | LeiosBlockTxsOffer | slot and hash | The server can immediately deliver any tx referenced by this block. It must have already sent a LinearLeiosAnnouncement for the same block. |
+| ←Server | LinearLeiosVoteOffer | slot and vote-issuer-id | The server can immediately deliver this vote. It must have already sent a LeiosAnnouncement for the same slot. |
+| Client→ | LinearLeiosBlockId | slot and hash | The server must deliver this block. The server disconnects if it doesn't have it. |
+| Client→ | LeiosBlockTxsId | slot, hash, and map from 16-bit index to 64-bit bitmap | The server must deliver these txs from this Leios block. The server disconnects if it doesn't have the block or is missing any of its txs. The given bitmap identifies which of 64 contiguous txs are requested, and the offset of the tx corresponding to the bitmap's first bit is 64 times the given index. |
+| Client→ | LinearLeiosVoteId | slot and vote-issuer-id | The server must deliver this vote. The server disconnects if it doesn't have it. |
+| ←Server | LinearLeiosBlockDelivery | Leios block | The block from an earlier LinearLeiosBlockId. |
+| ←Server | LeiosBlockTxsDelivery | slot, hash, and map from 16-bit index to sequences of txs | A subset of the txs from an earlier LeiosBlockTxsId. Note that this map's keys are a non-empty subset of the request's map's keys. A server is allowed to send multiple LeiosBlockTxsDelivery in reply to a single LeiosBlockTxsId. |
+| ←Server | LinearLeiosVoteDelivery | Leios vote | The vote from an earlier LinearLeiosVoteId. |
+| Client→ | LinearLeiosStaleBlockRangeId | two slots and two hashes | For LLBs that are older than L_recover. The server must deliver all LLBs that are certified within this range of the identified Ranking Blocks. It should do so in order, ignoring FreshestFirstDelivery. If the requested range is not on the server's current selection, it should disconnect. If the server doesn't have all of the LLBs, it should disconnect. The client is advised to not send this while the wall clock is still within any of the requested LLB's L_recover window; LinearLeiosBlockId is more suitable for such blocks. |
 
 **Only new notifications**.
 When a client connects and sends LeiosNotificationsBytes, the server should not immediately send several recent notifications.
