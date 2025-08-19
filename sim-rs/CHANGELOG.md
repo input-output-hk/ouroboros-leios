@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Update dependencies to fix vulnerability
+
 ## v1.0.0
 
 ### Linear Leios
