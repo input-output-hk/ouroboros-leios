@@ -511,8 +511,8 @@ cost; only the remaining transactions require an RB-side bitmap.
 > [!WARNING] **TODO:** Add transaction confirmation levels and their
 > implications for applications
 
-Transactions from certified EBs are included in the ledger alongside direct RB
-transactions.
+Transactions from certified EBs are included in the ledger before transactions
+directly included in the RB to preserve correctness.
 
 #### Endorser Blocks (EBs)
 
@@ -540,7 +540,9 @@ will include all remaining corrections following $L_\text{recover}$ expiration.
 >
 > **Light Node Optimization**: As a future optimization, transaction execution
 > bitmaps could also be included in EB certificates to allow light nodes to
-> determine transaction execution status without downloading full EBs.
+> determine transaction execution status without downloading full EBs. This
+> optimization is solely for the benefit of light nodes, as full nodes can check
+> whether transactions were executed when they catch up.
 
 When an EB is announced in an RB header via the `announced_eb` field, a voting
 period begins as described in [Votes and Certificates](#votes-and-certificates).
@@ -846,9 +848,10 @@ which are permitted to include diffusion pipelining with delayed validation.
 
 Whenever an EB is announced through an RB header, nodes must fetch the EB
 content promptly (step 6), such that they receive it within $L_\text{vote}$ and
-consequently enables them to vote. Only the EB body corresponding to the first
-EB announcement/RB header received for a given RB creation opportunity shall be
-downloaded. The EB contains references to transactions.
+consequently enables them to vote. EBs are fetched freshest-first to ensure
+timely delivery within the voting window. Only the EB body corresponding to the
+first EB announcement/RB header received for a given RB creation opportunity
+shall be downloaded. The EB contains references to transactions.
 
 <a id="eb-chain-selection" href="#eb-chain-selection"></a>**EB Propagation for
 Chain Selection**: To support efficient chain selection, nodes must receive
