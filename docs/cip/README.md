@@ -1082,19 +1082,69 @@ Rewards**: Leios extends this approach by refining the performance calculation
 to account for block validity in enhanced throughput scenarios. When operating
 within the rolling window (certificate-active periods), RBs containing invalid
 transactions due to incomplete ledger state knowledge should not negatively
-impact the producer's performance factor. The proposed enhancement excludes RBs
-with invalid transactions from performance calculations, ensuring honest parties
-maintaining connectivity can always produce valid empty blocks even when lacking
-complete EB synchronization.
+impact the producer's performance factor.
+
+**Invalid Transaction Disincentives**: The protocol implements specific
+mechanisms to disincentivize RB producers from including invalid transactions
+while protecting honest participants. Rather than counting all RBs toward the
+performance factor β (the fraction of all blocks within an epoch that a stake
+pool created), the enhanced reward calculation counts only RBs containing
+exclusively valid transactions. This modification ensures that:
+
+1. **Honest party protection**: SPOs operating with incomplete ledger state can
+   always produce valid empty RBs, maintaining their performance factor even
+   when lacking complete EB synchronization
+2. **Invalid transaction penalty**: RBs containing any invalid transactions are
+   excluded from the β calculation, directly reducing the producer's reward
+   proportional to their stake
+3. **Maintained incentive structure**: The existing reward mechanism remains
+   intact while adding precision to performance measurement
+
+For detailed information about the current reward formula, see the
+[Cardano documentation on pledging and rewards](https://docs.cardano.org/about-cardano/learn/pledging-rewards).
 
 <a id="voting-participation-rewards" href="#voting-participation-rewards"></a>**Voting
 Participation Rewards**: A second extension incorporates committee votes in
 certified EBs into reward calculations. Since votes occur more frequently than
 RB production, this significantly reduces reward variance for participating
-SPOs. This mechanism follows similar anti-gaming principles as RB production -
-while malicious parties might ignore certain votes to favor preferred chains,
-such behavior risks delaying their own block publication and reducing main chain
-inclusion probability.
+SPOs.
+
+**Vote Counting Mechanism**: The reward calculation counts valid votes cast by
+SPOs on certified EBs as part of their performance assessment. This provides a
+more granular and frequent measure of participation compared to RB production
+alone. However, similar anti-gaming principles apply:
+
+1. **Strategic vote exclusion risks**: While malicious parties might attempt to
+   ignore votes from non-preferred parties to manipulate chain selection, such
+   behavior carries significant costs
+2. **Publication delay consequences**: Excluding valid votes may delay the
+   release of the malicious party's own RBs, reducing their probability of main
+   chain inclusion
+3. **Natural counter-incentives**: The economic cost of delayed block
+   publication provides a built-in mechanism against vote manipulation
+
+This voting reward mechanism maintains the same principle as RB rewards - honest
+participation is rewarded while strategic manipulation carries inherent economic
+penalties.
+
+**Alternative Approaches and Limitations**
+
+**Online State Detection**: An alternative approach to performance measurement
+would involve detecting whether a party is online and maintaining current ledger
+state. However, this presents significant implementation challenges:
+
+1. **Ambiguous indicators**: SPOs can fill RBs and EBs with transactions while
+   operating with outdated UTxO state, particularly when consuming their own
+   known-valid UTxOs
+2. **False positives**: Transaction inclusion alone cannot reliably indicate
+   current state synchronization, as parties may strategically avoid
+   double-spend conflicts without full state knowledge
+3. **Implementation complexity**: Direct state synchronization measurement would
+   require additional protocol mechanisms and verification overhead
+
+The current approach of excluding blocks with invalid transactions provides a
+more implementable and verifiable mechanism while achieving the same fundamental
+goal of incentivizing proper participation.
 
 **Fee Structure Considerations**
 
