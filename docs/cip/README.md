@@ -353,12 +353,6 @@ The certificate for an EB shall be included in the body of a new ranking block
 2. The certificate is valid as defined in
    [Certificate Validation](#certificate-validation).
 
-When a certificate is included, if the EB contains a `tx_execution_bitmap`, this
-bitmap must be applied to determine which transactions from RBs produced after
-the last RB that included a certificate (exclusive) were successfully executed:
-correction mechanisms are detailed in the following
-[Transaction Validation](#transaction-validation) section.
-
 This **conditional inclusion** ensures transaction availability to honest nodes
 with high probability while achieving higher throughput. When included:
 
