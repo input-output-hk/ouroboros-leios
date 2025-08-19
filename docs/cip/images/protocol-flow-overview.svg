@@ -128,15 +128,6 @@
       </a>
     </g>
     
-    <!-- Vote arrows pointing to EB -->
-    <path d="M 390 400 Q 420 370 455 330" stroke="#f9a825" stroke-width="1" stroke-dasharray="2,2" fill="none" marker-end="url(#votearrowhead)"/>
-    <path d="M 424 410 Q 440 370 455 330" stroke="#f9a825" stroke-width="1" stroke-dasharray="2,2" fill="none" marker-end="url(#votearrowhead)"/>
-    <path d="M 458 395 Q 456 360 455 330" stroke="#f9a825" stroke-width="1" stroke-dasharray="2,2" fill="none" marker-end="url(#votearrowhead)"/>
-    <path d="M 492 405 Q 470 370 455 330" stroke="#f9a825" stroke-width="1" stroke-dasharray="2,2" fill="none" marker-end="url(#votearrowhead)"/>
-    <path d="M 526 400 Q 490 370 455 330" stroke="#f9a825" stroke-width="1" stroke-dasharray="2,2" fill="none" marker-end="url(#votearrowhead)"/>
-    <path d="M 560 410 Q 510 370 455 330" stroke="#f9a825" stroke-width="1" stroke-dasharray="2,2" fill="none" marker-end="url(#votearrowhead)"/>
-    <path d="M 594 395 Q 530 370 455 330" stroke="#f9a825" stroke-width="1" stroke-dasharray="2,2" fill="none" marker-end="url(#votearrowhead)"/>
-    
     <!-- L_vote period indicator -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#l-vote" class="param-link">
       <line x1="380" y1="430" x2="620" y2="430" stroke="#f9a825" stroke-width="1" stroke-dasharray="4,4"/>
