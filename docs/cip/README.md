@@ -423,7 +423,7 @@ certified within the rolling window, each certified EB includes corrections for
 RB transactions that occurred after the previous certificate was included
 (exclusive). Since validators can only certify EBs when they have sufficient
 ledger state, they correct transactions from the known baseline forward (see
-EB<sub>2</sub> in Figure 5).
+EB<sub>4</sub> in Figure 5).
 
 **2. <a id="correction-rule-2"></a>When returning to standard validation**: The
 first RB after window expiration includes corrections for all remaining
