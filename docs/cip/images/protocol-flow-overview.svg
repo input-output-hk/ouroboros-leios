@@ -202,7 +202,7 @@
       <line x1="620" y1="7" x2="620" y2="19" stroke="#9c27b0" stroke-width="1" stroke-dasharray="2,2" opacity="0.8"/>
       <line x1="620" y1="12" x2="650" y2="12" stroke="#9c27b0" stroke-width="3" opacity="0.8"/>
       <line x1="650" y1="7" x2="650" y2="19" stroke="#9c27b0" stroke-width="1" stroke-dasharray="2,2" opacity="0.8"/>
-      <text x="655" y="16" font-family="Arial, sans-serif" font-size="14" fill="#333"><tspan font-family="Times New Roman, serif" font-style="italic" font-size="16">3Δ</tspan><tspan font-size="10" baseline-shift="sub">hdr</tspan> period</text>
+      <text x="655" y="16" font-family="Arial, sans-serif" font-size="14" fill="#333"><tspan font-family="Times New Roman, serif" font-size="16">3Δ</tspan><tspan font-size="10" baseline-shift="sub">hdr</tspan> period</text>
     </a>
     
     <!-- L_recover window with dashed verticals -->
