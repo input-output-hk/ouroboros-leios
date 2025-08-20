@@ -1,10 +1,13 @@
 ## Mini Protocols
 
+(TODO this section is written as if L_recover is anchored in the slot of the certified EB rather than the slot of the certifying RB.
+That actually seems correct (Giorgos agrees), despite it being an accident: the team has so far assumed opposite.)
+
 The design of the Leios mini protocols is predominantly determined by which information two nodes need to exchange, when that information should be sent, and how to bound resource utilization on both sides of the mini protocol.
 Notably, the FreshestFirstDelivery scheme constrains some of the timings.
 
 A CIP ideally proposes exact mini protocols, so that nodes with different implementors will be able to interact.
-There is precedent for CIPs (eg Peras) to instead let the implementors determine the details of the mini protocol separate (preferably in a separate CIP).
+There is precedent for CIPs (eg Ouroboros Peras) to instead let the implementors determine the details of the mini protocol separate (preferably in a separate CIP).
 However, optimized diffusion times are a core concern of Leios, so a more detailed mini protocol specification is appropriate in this CIP, at least to demonstrate feasibility and highlight key factors.
 
 ### Information Exchange Requirements
@@ -22,24 +25,89 @@ Some of the details in this table are not fully compatible with the initial conc
 | - | - | - | - |
 | Client→ | LeiosNotificationsBytes | byte count | Requests Leios notifications (announcements and delivery offers) up to some total byte size. A low-watermark scheme would suffice to ensure there's always sufficient room for more notifications. |
 | ←Server | LinearLeiosAnnouncement | RankingBlockHeader that announces an LLB | The server has seen this LLB announcement. The client should disconnect if the server sends a third announcement with the same election, since two already evidence equivocation. The client should disconnect if the header is invalid in a way that any recent ledger state could notice, not only the ledger state of the header's predecessor. |
-| ←Server | LinearLeiosBlockOffer | slot and hash | The server could immediately deliver this block. The client should disconnect if the server had not already sent a LinearLeiosAnnouncement for the same block. |
-| ←Server | LeiosBlockTxsOffer | slot and hash | The server could immediately deliver any tx referenced by this block. The client should disconnect if the server had not already sent a LinearLeiosAnnouncement for the same block. |
+| ←Server | LinearLeiosBlockOffer | slot and Leios hash | The server could immediately deliver this block. The client should disconnect if the server had not already sent a LinearLeiosAnnouncement for the same block. |
+| ←Server | LeiosBlockTxsOffer | slot and Leios hash | The server could immediately deliver any tx referenced by this block. The client should disconnect if the server had not already sent a LinearLeiosAnnouncement for the same block. |
 | ←Server | LinearLeiosVoteOffer | slot and vote-issuer-id | The server could immediately deliver this vote. The client should disconnect if the server had not already sent a LeiosAnnouncement for the same slot (rather than block, for the other messages). |
-| Client→ | LinearLeiosBlockId | slot and hash | The server must deliver this block. The server disconnects if it doesn't have it. |
-| Client→ | LeiosBlockTxsId | slot, hash, and map from 16-bit index to 64-bit bitmap | The server must deliver these txs from this Leios block. The server disconnects if it doesn't have the block or is missing any of its txs. The given bitmap identifies which of 64 contiguous txs are requested, and the offset of the tx corresponding to the bitmap's first bit is 64 times the given index. |
+| Client→ | LinearLeiosBlockId | slot and Leios hash | The server must deliver this block. The server disconnects if it doesn't have it. |
+| Client→ | LeiosBlockTxsId | slot, Leios hash, and map from 16-bit index to 64-bit bitmap | The server must deliver these txs from this Leios block. The server disconnects if it doesn't have the block or is missing any of its txs. The given bitmap identifies which of 64 contiguous txs are requested, and the offset of the tx corresponding to the bitmap's first bit is 64 times the given index. |
 | Client→ | LinearLeiosVoteId | slot and vote-issuer-id | The server must deliver this vote. The server disconnects if it doesn't have it. |
 | ←Server | LinearLeiosBlockDelivery | Leios block | The block from an earlier LinearLeiosBlockId. |
-| ←Server | LeiosBlockTxsDelivery | slot, hash, map from 16-bit index to sequences of txs | A subset of the txs from an earlier LeiosBlockTxsId. Note that this map's keys are a non-empty subset of the request's map's keys. A server is allowed to send multiple LeiosBlockTxsDelivery in reply to a single LeiosBlockTxsId. |
+| ←Server | LeiosBlockTxsDelivery | slot, Leios hash, map from 16-bit index to sequences of txs | A subset of the txs from an earlier LeiosBlockTxsId. Note that this map's keys are a non-empty subset of the request's map's keys. A server is allowed to send multiple LeiosBlockTxsDelivery in reply to a single LeiosBlockTxsId. |
 | ←Server | LinearLeiosVoteDelivery | Leios vote | The vote from an earlier LinearLeiosVoteId. |
-| Client→ | LinearLeiosStaleBlockRangeId | two slots and two hashes | The server must deliver all LLBs that are certified within this range of the identified Ranking Blocks. The client should disconnect if the server doesn't send the block in the same order as the chain, contrary to FreshestFirstDelivery. If the requested range is not on the server's current selection, it should disconnect. If the server doesn't have all of the LLBs, it should disconnect. The client is advised to not send this message while the wall clock is still within any of the requested LLB's L_recover window; LinearLeiosBlockId is more suitable for such blocks. |
+| Client→ | LinearLeiosStaleBlockRangeId | two slots and two RankingBlock hashes | The server must deliver all LLBs and all of their txs (ie via LinearLeiosBlockDelivery and LeiosBlockTxsDelivery) that are certified within this range of the identified Ranking Blocks. The client should disconnect if the server doesn't send the block in the same order as the chain, contrary to FreshestFirstDelivery. If the requested range contains more than one block and is not on the server's current selection, it should disconnect. If the server doesn't have all of the LLBs, it should disconnect. The client is advised to not send this message while the wall clock is still within any of the requested LLB's L_recover window; LinearLeiosBlockId is more suitable for such blocks. |
 
-**Age bounds for lightweight servers**.
+### Tolerable Resource Utilization
+
+The information exchange requirements would be unsatisfiable if they implied overwhelming resource utilization.
+This section sketches a possible set of lower-level rules that demonstrates the IER table is tractable.
+The focus is to demonstrate that a server only needs to separately maintain lightweight state per peer, because it is not uncommon for a server to have hundreds of downstream peers.
+
+**Announcement age bounds**.
 Some information (eg LinearLeiosVoteOffer) cannot be sent before other information (ie LinearLeiosAnnouncement) has been sent.
-This is the only constraint preventing the server from sending an unbounded amount of nonsensical offers to the client.
+This is the only constraint preventing the server from sending (an unbounded amount of) nonsensical offers to the client.
 Unfortunately, it also requires the server to separately maintain commensurate state for each client.
-It is not uncommon for a server to have hundreds of downstream peers, so servers can only afford to maintain lightweight state separately per peer.
-This per-client state of Leios server is sufficiently bounded because servers can safely forget about LLBs that are older than L_recover, and votes can be forgotten even sooner, after L_vote.
-L_recover will never exceed a few minutes, so the server will never be responsible for a large number LLBs simultaneously.
+
+A sufficient rule would be that a server should only relay a LinearLeiosAnnouncement to clients that already sent sufficient LeiosNotificationsBytes before the server itself received the LinearLeiosAnnouncement.
+This rule indirectly prevents the server from sending to a client any offers involving an LLB whose LinearLeiosAnnouncement was not sent, since offers (eg LinearLeiosBlockOffer) cannot be sent unless the corresponding LinearLeiosAnnouncement already has been.
+
+Let GracePeriod be 10 seconds; this accomodates some combination of clock skew and an unfortunate latency spike.
+
+The requisite per-client state for the ordering constraint would then simply be the set of LLBs whose LinearLeiosAnnouncement was sent to this client and are still younger than L_recover + GracePeriod.
+That state is sufficiently bounded because servers never need to send notifications regarding an LLB older than L_recover.
+L_recover will never exceed a few minutes, so this set will never include a large number LLBs simultaneously.
+
+**Vote age bounds**.
+Votes have the smallest lifetime in the protocol.
+The following rules would be plausible.
+
+- The server should only send LinearLeiosVoteOffer to a client to which it had already sent the LinearLeiosAnnouncement before the vote arrived at the server itself.
+- If a vote is older than L_vote, the protocol doesn't assume it is still diffusing, and so the client should not send a LinearLeiosVoteId for it.
+- Moreover, old votes are no longer useful; only old certificates are.
+  The server can safely forget votes that are older than L_vote + GracePeriod, and so will disconnect if a request for one arrives.
+- Thus, the server should not send LinearLeiosVoteOffer for a vote that is L_vote old---the honest client would not be able to act on that offer.
+
+**Block age bounds**.
+LLBs have three diffusion intervals.
+This first interval is analogous to votes but lasts L_recover instead of L_vote.
+
+- The server should only send LinearLeiosBlockOffer/LeiosBlockTxsOffer to a client to which it had already sent the LinearLeiosAnnouncement before the blocks/txs arrived at the server itself.
+- If an LLB is older than L_recover, the protocol doesn't assume it is still diffusing, and so the client should not send a LinearLeiosBlockId/LeiosBlockTxsId for it.
+- Thus, the server can disconnect if a client sends LinearLeiosBlockId/LeiosBlockTxsId for a block that is older than L_recover + GracePeriod.
+- The server should send LinearLeiosBlockOffer/LeiosBlockTxsOffer for a block that is L_recover old---the honest client would not be able to act on those offers.
+
+In some real-world corner cases, however, nodes (syncing nodes but also even unfortunate otherwise-caught-up nodes) will need to acquire LLBs that are older than L_recover.
+Thus, the second diffusion interval involves blocks that are older than L_recover.
+The same rules also handle the third diffusion interval as well, since that simply indefinitely extends the second interval for blocks on the historical chain.
+
+- Clients can send LinearLeiosStaleBlockRangeId requests, regardless of the age of the LLBs.
+- Ultimately, the protocol itself expects the server to retain all LLBs (and their referenced txs) while they might be certified on some chain the node has any chance of selecting.
+  That chance can only diminish all the way to when their slots are certainly settled.
+  That happens usually happens after ~12 hr on Cardano mainnet (much faster with Ouroboros Peras), but the worst-case will always be ~36 hr.
+- There is a very unlikely scenario that an honest client requests an LLB that the server discards while the request is in-flight.
+  This event should be so rare that it's fine for the server to disconnect.
+- TODO should the server disconnect if the range include blocks younger than L_recover - GracePeriod?
+  Should clients be forced to favor LinearLeiosBlockId and LeiosBlockTxsId for young blocks?
+
+**Overlapping tx requests**.
+Two different LeiosBlockTxsId requests might overlap, even for different blocks, since normal circumstances imply the tx references within contemporary LLBs will overlap.
+A client could avoid this by excluding the overlap from its second request (even if it's pipelining requests).
+However, the server could only (perfectly) force the client to do so if the server was already maintaining enough state that it could simply itself skip over the redundant parts of the second request.
+If server-side reordering (discussed below) is not allowed, then the server must either maintain the state or unknowingly waste bandwidth when requests overlap.
+
+If server-side reordering is allowed, then the client cannot necessarily avoid redundant requests, since it cannot be sure which request will be handled first.
+With server-side reordering, the client could only rely on the server---as the ultimate decider of reply order---to eliminate the redundancy in its deliveries.
+Thus, with or without server-side reordering, the server must maintain some state to eliminate redundancy in responses.
+Requests for blocks and votes cannot overlap in any way, so this state is only needed for txs.
+
+The necessary state can also be bounded, since the server doesn't have to track/avoid redundancy forever, merely over whatever duration server-side reordering might force the honest client to send redundant requests.
+It seems sufficient to limit it by the number of LLBs, rather than a time-based duration; it's unlikely a server will make large requests from more than, say, three LLBs at once, due to the size of the corresponding receive-buffer commitment.
+So the server would not be expected to eliminate redundancy from among more than three LeiosBlockTxsDelivery at once.
+The size limit on a single LLB prevents one from ever referring to more than ~7150 txs, so the server would only need to track at most ~21500 txs at once per client to avoid overlap even across requests spanning three full LLBs even if they mostly do not overlap.
+Moreover, the identifiers the server uses when tracking txs can be subjective, so the server's centralized internal state can maintain an injective mapping from txs in currently-young LLBs to arbitrary 32-bit integers.
+Thus, even with a relatively naive implementation, this state requires at most 21,500 * 4 = 86,000 bytes per client (there's no need for sharing/persistence, so GC overhead can be avoided), ie 8.6 megabytes per 100 downstream nodes.
+The boundedness prevents a guarantee that the server will eliminate all redundancy among every set of pipelined requests, but the scheme almost always eliminates redundancy among requests from honest nodes under normal circumstances.
+
+(TODO should the server enforce that the client never has outstanding requests for more than 21500 unique txs at once?)
 
 **Bundling txs**.
 Only LeiosBlockTxsOffer, LeiosBlockTxsId, and LeiosBlockTxsDelivery explicitly bundle requests for multiple objects (ie txs in a Leios block).
@@ -58,34 +126,18 @@ Thus, the mini protocol messages will accommodate it for any object without requ
 A bundled request does naturally create the opportunity for multiple messages to cooperatively reply to the same request, which is somewhat sophisticated.
 But that possibility is already introduced by LeiosBlockTxsId, so allowing it for other objects too is merely marginal additional complexity.
 
-**Overlapping tx requests and lightweight servers**.
-Two different LeiosBlockTxsId requests might overlap, even for different blocks, since normal circumstances imply the tx references within contemporary LLBs will overlap.
-A client could avoid this by excluding the overlap from its second request (even if it's pipelining requests).
-However, the server could only (perfectly) force the client to do so if the server was already maintaining enough state that it could simply itself skip over the redundant parts of the second request.
-If server-side reordering (discussed below) is not allowed, then the server must either maintain the state or unknowingly waste bandwidth when requests overlap.
+**Operational certficate issue numbers (OCINs)**
 
-If server-side reordering is allowed, then the client cannot necessarily avoid redundant requests, since it cannot be sure which request will be handled first.
-With server-side reordering, the client could only rely on the server---as the ultimate decider of reply order---to eliminate the redundancy in its deliveries.
-Thus, with or without server-side reordering, the server must maintain some state to eliminate redundancy in responses.
-Requests for blocks and votes cannot overlap in any way, so this state is only needed for txs.
-
-The necessary state can also be bounded, since the server doesn't have to track/avoid redundancy forever, merely over whatever duration server-side reordering might force the honest client to send redundant requests.
-It seems sufficient to limit it by the number of LLBs, rather than a time-based duration; it's unlikely a server will make large requests from more than, say, three LLBs at once, due to the size of the corresponding receive-buffer commitment.
-So the server would not be expected to eliminate redundancy from among more than three LeiosBlockTxsDelivery at once.
-The size limit on a single LLB prevents one from ever referring to more than ~6250 txs, so the server would only need to track at most ~20000 txs at once per client to avoid overlap even across requests spanning three full LLBs even if they mostly do not overlap.
-(TODO should the server enforce that the client never has outstanding requests for more than 20000 unique txs at once?)
-Moreover, the identifiers the server uses when tracking txs can be subjective, so the server's centralized internal state can maintain an injective mapping from txs in currently-young LLBs to arbitrary 32-bit integers.
-Thus, even with a relatively naive implementation, this state requires at most 20,000 * 4 = 80,000 bytes per client (there's no need for sharing/persistence, so GC overhead can be avoided), ie 8 megabytes per 100 downstream nodes.
-The boundedness prevents a guarantee that the server will eliminate all redundancy among every set of pipelined requests, but the scheme almost always eliminates redundancy among requests from honest nodes under normal circumstances.
+TODO copy over the OpCertIssueNumber discussion
 
 ### Iteration 1
 
-The following mini protocol is a useful starting point.
+The following mini protocol is a useful starting point for a derivation.
 It is superficially plausible for conveying the rows of the IER table, but has some major problems.
 They will be explained below in order to motivate and derive the actual mini protocol proposal.
 
-If mini protocols are unfamiliar, see the Chapter 2 Multiplexing mini-protocols and Chapter 3 Mini Protocol of the `ouroboros-network`'s [Ouroboros Network Specification PDF](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf).
-A brief summary is that a mini protocol is a state machine that two nodes cooperatively navigate; each node only sends a message when it has _agency_, and at most one node has agency in any state
+If the general structure and semantics of mini protocols is not already familiar, see the Chapter 2 Multiplexing mini-protocols and Chapter 3 Mini Protocol of the `ouroboros-network`'s [Ouroboros Network Specification PDF](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf).
+A brief summary is that a mini protocol is a state machine that two nodes cooperatively navigate; each node only sends a message when it has _agency_, and at most one node has agency in any state.
 The agencies are indicated in this document as gold or cyan.
 
 ```mermaid
@@ -370,6 +422,7 @@ type Bitmap64 = Word64
 type SlotNo = Word64
 
 type LeiosPoint = (SlotNo, LeiosBlockHash)
+type RankingPoint = (SlotNo, RankingBlockHash)
 
 data LeiosNotification
   = LinearLeiosAnnouncement RankingBlockHeader
@@ -381,7 +434,7 @@ data LeiosDeliverableId
   = LinearLeiosBlockId LeiosPoint
   | LeiosBlockTxsId LeiosPoint (NonEmptyMap Index16 NonEmptyBitmap64)
   | LinearLeiosVoteId SlotNo VoteIssuer
-  | LinearLeiosStaleBlockRangeId LeiosPoint LeiosPoint
+  | LinearLeiosStaleBlockRangeId RankingPoint RankingPoint
 
 data LeiosDeliverable
   = LinearLeiosBlockDelivery LinearLeiosBlock
@@ -413,16 +466,6 @@ Additional message details, beyond the IER table.
   Whichever reply is sent second should exclude the content that was already included in the first reply, in order to not waste bandwidth (recall that it should be common for contemporary LLBs to share most txs).
   In an extreme case, this might require a LeiosDeliveries message to carry an empty list.
   (TODO for extra explicitness, would we also want to send a LeiosBlockTxsDelivery with an empty map?)
-
-TODO discuss fetching "missing" LLBs, eg after L_recover, etc.
-Maybe LinearLeiosStaleBlockRangeId covers it?
-Would its disconnect-if-not-on-selection rule be too severe for this use case?
-
-TODO age limits for notifications?
-Maybe a generous, say 5 minutes?
-Does pull-based LeiosNotificationBytes mean adversarially-old notifications would be harmless even without an explicit rule against them?
-
-TODO copy over the OpCertIssueNumber discussion
 
 ### Timeouts
 
@@ -456,7 +499,8 @@ It's OK if different clients enforce different timeouts---the honest server will
 
 ### Concise Data Definition Language (CDDL)
 
-TODO write out the full CDDL for these messages
+TODO Write out the full CDDL for these messages.
+I'm differing this labor until we're sure which mini protocol iteration will actually be the focus of this CIP.
 
 ### Head-of-Line Blocking and Sharing Bandwidth with Praos
 
@@ -498,17 +542,14 @@ Once Praos and Leios are within the same Reply mini protocol, both the client an
 There are two kinds of syncing node, with Ouroboros Genesis and without (eg via a trusted relay or via a semi-centralized "bootstrap peer").
 
 With Ouroboros Genesis, LLBs that are certified on chain should be fetched from the same peer that Devoted BlockFetch is fetching its blocks from.
-It would be sufficient to send LinearLeiosBlockId requests to that peer via LeiosRequest when the headers it has sent via ChainSync imply those LLBs are certified on the chain it's serving.
-The only time that node wouldn't be able to immediately serve the LLB is if the wall clock is still within that LLB's L_recover window.
-If the node is actually a healthy caught-up upstream, that should be rare and ephemeral.
-If it does happen severely enough to starve the syncing node, then LeiosRequest should rotate the Dynamo just like Devoted BlockFetch would have.
+It would be sufficient to send LinearLeiosStaleBlockRangeId requests to that peer via LeiosRequest when the headers it has sent via ChainSync imply those LLBs are certified on the chain it's serving.
+The only time that node wouldn't be able to immediately serve the LLB is if the wall clock is still within that LLB's L_recover window, but in that case the syncing node could send LinearLeiosBlockId and LeiosBlockTxsId instead of LinearLeiosStaleBlockRangeId.
+
+If the node is actually a healthy caught-up upstream, is should almost always be able to promptly send the requested block.
+If it fails to do so enough that it starves the syncing node of work, then LeiosRequest should rotate the Dynamo just like Devoted BlockFetch would have.
 No other part of Ouroboros Genesis would need to change for the proposed Leios protocol.
 
-When the node is syncing without Ouroboros Genesis, LeiosRequest would do the same except it does not need to monitor for and react to starvation a la Devoted BlockFetch.
-
-For blocks older than L_recover, the syncing node could eliminate some overhead by sending LinearLeiosStaleBlockRangeId instead of LinearLeiosBlockId.
-TODO should the server enforce that time limit?
-TODO will the certificate density be high enough that this compactly bundled request is worthwhile?
+When the node is syncing without Ouroboros Genesis, LeiosRequest would do the same as above except it would not need to monitor for and react to starvation, since Devoted BlockFetch is not enabled.
 
 With or without Ouroboros Genesis, the syncing node should not send LeiosNotificationBytes until it is nearly caught-up.
 If sent too soon, the server might reply with headers that the syncing node's ledger state is incapable of validating at all.
