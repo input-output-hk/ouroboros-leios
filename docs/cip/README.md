@@ -310,16 +310,17 @@ peers.
 
 A voting committee of stake pools validates the EB. As depicted in Figure 4,
 votes are collected during the $L_\text{vote}$ period following the EB
-announcement, with voting beginning $3\Delta_\text{hdr}$ slots after the EB
-creation to ensure sufficient time for <a href="#equivocation">equivocation
-detection</a>. Committee members are
+announcement, with voting beginning $3\Delta_\text{hdr}$ slots after the start
+of the EB's slot to ensure sufficient time for
+<a href="#equivocation">equivocation detection</a>. Committee members are
 [selected via sortition](#committee-structure) based on the slot number of the
 RB that announced the EB. A committee member votes for an EB only if:
 
 1. The RB header arrived within $\Delta_\text{hdr}$,
 2. It has **not** received an equivocating RB header for this EB within
    $3\Delta_\text{hdr}$,
-3. It has received the EB within $L_\text{vote}$ slots from its creation,
+3. It has received the EB within $L_\text{vote}$ slots from the start of the
+   EB's slot,
 4. The EB is the one announced by the latest RB in the voter's current chain,
 5. The EB's transactions form a **valid** extension of the RB that announced it,
 6. For non-persistent voters, it is eligible to vote based on sortition using
