@@ -364,20 +364,19 @@ with high probability while achieving higher throughput. When included:
 
 #### Rolling Window Rules
 
-The rolling window mechanism operates through two key behaviors that
-automatically manage throughput based on certificate inclusion timing:
+The protocol automatically switches between two validation modes based on recent
+certificate activity:
 
-**Window Reset**: Each certificate inclusion immediately resets the
-$L_\text{recover}$ countdown, extending the enhanced throughput period. As shown
-in Figure 5 below, when RB<sub>3</sub> includes a certificate, it starts a new
-window ($L_\text{recover-RB3}$). Later, RB<sub>5</sub> resets this timer again,
-creating overlapping windows that maintain continuous high throughput.
+**Enhanced Throughput Mode**: Active when any certificate was included within
+the past $L_\text{recover}$ slots. Each new certificate resets this countdown,
+maintaining continuous high throughput. As shown in Figure 5, when
+RB<sub>3</sub> includes a certificate, it starts window $L_\text{recover-RB3}$.
+Later, RB<sub>5</sub> resets this timer, creating overlapping windows.
 
-**Window Expiration**: Only when $L_\text{recover}$ consecutive slots pass
-without any certificate does the protocol revert to standard validation. This
-recovery period ensures all nodes synchronize any delayed EBs before validation
-resumes. In Figure 5, this occurs after the $L_\text{recover-RB5}$ window
-expires.
+**Standard Validation Mode**: Activated when $L_\text{recover}$ consecutive
+slots pass without any certificate, ensuring all nodes synchronize before
+resuming full validation requirements. In Figure 5, this occurs after the
+$L_\text{recover-RB5}$ window expires.
 
 <div align="center">
 <a name="figure-5" id="figure-5"></a>
@@ -393,24 +392,16 @@ execution tracking</em>
 <a id="transaction-validation" href="#transaction-validation"></a>**Transaction
 Validation**
 
-The rolling window mechanism enables different validation approaches that
-balance throughput with safety:
+**Standard Validation Mode**: Block producers validate all transactions against
+complete ledger state before inclusion, maintaining current Praos guarantees.
 
-**Standard Validation** (beyond window): Block producers have complete ledger
-state and must validate all transactions before inclusion, maintaining current
-Ouroboros Praos guarantees.
-
-**Enhanced Throughput** (within window): Block producers are permitted to create
-RBs before receiving all previously certified EBs due to network delays. Since
-they cannot determine complete ledger state, Leios allows temporary inclusion of
+**Enhanced Throughput Mode**: Honest producers create empty RBs when missing
+certified EB transactions to avoid UTxO conflicts. The protocol handles
+malicious producers who may include
 <a name="unvalidated-transactions"></a>**unvalidated transactions** -
-transactions whose validity cannot be immediately confirmed.
-
-This resolves the timing dilemma that would otherwise force block producers to
-either violate Praos constraints (by waiting) or include potentially invalid
-transactions without tracking. As shown in Figure 5, RBs produced during
-certificate-active periods (RB<sub>3</sub> to RB<sub>7</sub> inclusive, marked
-with red dashed borders) are permitted to contain such transactions.
+transactions with potential UTxO conflicts due to delayed certified EBs. All
+cryptographic signatures, Plutus scripts, and transaction structure remain fully
+validated regardless of producer behavior.
 
 **Correction Mechanisms**: To maintain ledger integrity for light nodes when
 unvalidated transactions are included, the protocol implements transaction
@@ -425,27 +416,24 @@ execution tracking through `tx_execution_bitmap` fields.
 > on EBs let light nodes know which transactions were executed, while voting
 > ensures this information is correct. However, due to low participation, EBs
 > may not be certified for some time. As a further step, if a sufficiently long
-> amount of time has passed without an EB being generated ($L_\text{recover}$
+> amount of time has passed without an EB being certified ($L_\text{recover}$
 > window), corrections are forced to the RB level. This creates tension with
 > security, as a node that does not have the required information will have to
 > wait before validating a new block.
 
-These corrections are specifically designed for light nodes, as full nodes can
-verify whether transactions were executed when they catch up to the current
-ledger state. The corrections follow two simple rules:
+These corrections serve light nodes only - full nodes immediately identify UTxO
+conflicts during ledger construction without requiring rewind capabilities
+beyond the standard k-block security parameter. Two correction rules apply:
 
-**1. <a id="correction-rule-1"></a>During enhanced throughput**: When EBs are
-certified within the rolling window, each certified EB includes corrections for
-RB transactions that occurred after the previous certificate was included
-(exclusive). Since validators can only certify EBs when they have sufficient
-ledger state, they correct transactions from the known baseline forward (see
-EB<sub>4</sub> in Figure 5).
+**1. <a id="correction-rule-1"></a>EB Corrections**: Certified EBs include
+corrections for RB transactions that occurred after the previous certificate was
+included (exclusive) (see EB<sub>4</sub> in Figure 5).
 
-**2. <a id="correction-rule-2"></a>When returning to standard validation**: The
-first RB after window expiration includes corrections for all remaining
-unvalidated transactions from the certificate-active period (see RB<sub>8</sub>
-in Figure 5, which corrects transactions from RB<sub>5</sub> to RB<sub>7</sub>
-inclusive).
+**2. <a id="correction-rule-2"></a>RB Corrections**: The first RB after window
+expiration corrects all remaining unvalidated transactions from RBs produced
+after the last EB certificate was included (exclusive), up to but not including
+this correcting RB (see RB<sub>8</sub> correcting RB<sub>5</sub> to
+RB<sub>7</sub> inclusive in Figure 5).
 
 Figure 5 also shows the timing constraints that enable these mechanisms:
 
@@ -1055,9 +1043,10 @@ while protecting honest participants.
 > more common that an EB is served late to some parties. By naively waiting for
 > the EB before processing the relevant RB (and related chain), a **new source
 > of delays** would be introduced that may affect the security of Praos (as it
-> increases Δ for the relevant delivery assumption). By allowing invalid
-> transactions in RBs, this threat is mitigated by enabling adoption of chains
-> without having the relevant EBs.
+> increases Δ for the relevant delivery assumption). By allowing transactions
+> with potential UTXO conflicts in RBs (while maintaining all other validation
+> guarantees), this threat is mitigated by enabling adoption of chains without
+> having the relevant EBs.
 
 Rather than counting all RBs toward the performance factor β (the fraction of
 all blocks within an epoch that a stake pool created), the enhanced reward
