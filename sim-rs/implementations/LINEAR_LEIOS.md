@@ -65,7 +65,7 @@ When a node receives an RB body, it immediately removes all referenced/conflicti
 ## CPU model
 |Task name in logs|Task name in code|When does it run|What happens when it completes|CPU cost
 |---|---|---|---|---|
-|`ValTX`|`TransactionValidated`|After a transaction has been received from a peer.|That TX is announced to other peers.|`tx-validation-cpu-time-ms`|
+|`ValTX`|`TransactionValidated`|After a transaction has been received from a peer.|That TX is announced to other peers.|`tx-validation-cpu-time-ms` + `tx-validation-cpu-time-ms-per-byte` for each byte of TX|
 |`GenRB`|`RBBlockGenerated`|After a new ranking block has been generated.|That RB and its EB are announced to peers.|RB generation and EB generation run in parallel.</br>**RB generation**: `rb-generation-cpu-time-ms` + the CPU time of `ValRB`<br/>**EB generation**: `eb-generation-cpu-time-ms` + the CPU time of `ValEB`|
 |`ValRH`|`RBHeaderValidated`|After a ranking block header has been received.|That RB is announced to peers.<br/>The referenced EB is queued to be downloaded when available.|`rb-head-validation-cpu-time-ms`|
 |`ValRB`|`RBBlockValidated`|After a ranking block body has been received.|That RB body is announced to peers and (potentially) accepted as the tip of the chain.|`rb-body-legacy-praos-payload-validation-cpu-time-ms-constant` + `rb-body-legacy-praos-payload-validation-cpu-time-ms-per-byte` for each byte of TX|

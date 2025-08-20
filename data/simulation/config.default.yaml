@@ -61,6 +61,7 @@ tx-overcollateralization-factor-distribution:
   distribution: constant
   value: 0
 tx-validation-cpu-time-ms: 1.5
+tx-validation-cpu-time-ms-per-byte: 0
 tx-max-size-bytes: 16384
 tx-conflict-fraction: 0
 

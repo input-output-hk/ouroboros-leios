@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### All Leios variants
+
+Add a `tx-validation-cpu-time-ms-per-byte` setting, a CPU cost which applies to transactions before adding them to the mempool (or to an EB in Linear Leios).
+
 ## v1.1.0
 
 ### Linear Leios

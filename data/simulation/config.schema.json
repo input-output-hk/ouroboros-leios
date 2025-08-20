@@ -511,6 +511,10 @@
       "description": "Only supported by Rust simulation.",
       "type": "number"
     },
+    "tx-validation-cpu-time-ms-per-byte": {
+      "description": "Only supported by Rust simulation.",
+      "type": "number"
+    },
     "vote-bundle-size-bytes-constant": {
       "additionalProperties": false,
       "properties": {},

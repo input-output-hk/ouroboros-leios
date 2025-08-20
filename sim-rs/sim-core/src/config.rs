@@ -85,6 +85,7 @@ pub struct RawParameters {
     pub tx_size_bytes_distribution: DistributionConfig,
     pub tx_overcollateralization_factor_distribution: DistributionConfig,
     pub tx_validation_cpu_time_ms: f64,
+    pub tx_validation_cpu_time_ms_per_byte: f64,
     pub tx_max_size_bytes: u64,
     pub tx_conflict_fraction: Option<f64>,
     pub tx_start_time: Option<f64>,
@@ -393,7 +394,8 @@ impl From<RawTopology> for Topology {
 
 #[derive(Debug, Clone)]
 pub(crate) struct CpuTimeConfig {
-    pub tx_validation: Duration,
+    pub tx_validation_constant: Duration,
+    pub tx_validation_per_byte: Duration,
     pub rb_generation: Duration,
     pub rb_head_validation: Duration,
     pub rb_body_validation_constant: Duration,
@@ -419,7 +421,8 @@ pub(crate) struct CpuTimeConfig {
 impl CpuTimeConfig {
     fn new(params: &RawParameters) -> Self {
         Self {
-            tx_validation: duration_ms(params.tx_validation_cpu_time_ms),
+            tx_validation_constant: duration_ms(params.tx_validation_cpu_time_ms),
+            tx_validation_per_byte: duration_ms(params.tx_validation_cpu_time_ms_per_byte),
             rb_generation: duration_ms(params.rb_generation_cpu_time_ms),
             rb_head_validation: duration_ms(params.rb_head_validation_cpu_time_ms),
             rb_body_validation_constant: duration_ms(

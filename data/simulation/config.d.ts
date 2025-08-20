@@ -113,6 +113,8 @@ export interface Config {
   /** Only supported by Rust simulation. */
   "tx-validation-cpu-time-ms": number;
   /** Only supported by Rust simulation. */
+  "tx-validation-cpu-time-ms-per-byte": number;
+  /** Only supported by Rust simulation. */
   "tx-max-size-bytes": bigint;
   /**
    * What fraction of TXs (from 0 to 1) should introduce conflicts with transactions which were produced before?
