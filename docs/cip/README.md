@@ -2236,36 +2236,71 @@ expanded functionality as the ecosystem matures.
 
 ### Roadmap & Next Steps
 
-This section outlines alternative approaches, future work, and extensions that
-build upon the specified Leios protocol to achieve even higher performance and
-expanded functionality.
+**Long-term roadmap**
 
-<a name="alternatives"></a>**Alternative approaches**
+The proposed Leios specification provides a foundation for progressive
+enhancement toward higher throughput variants while maintaining ecosystem
+compatibility. As ecosystem priorities emerge and become clearer, any of the
+following pathways could become more attractive to implement, each offering
+distinct trade-offs in terms of user experience, implementation cost, security
+considerations, and throughput potential. This roadmap outlines key development
+pathways that build incrementally upon the base protocol.
 
-> [!WARNING]
->
-> TODO:
->
-> - alternatives analysis (e.g., Praos big blocks)
-> - solution space positioning
+**Transaction Groups**
 
-<a name="next-steps"></a>**Next steps**
+Transaction grouping mechanisms offer natural throughput optimization by
+reducing reference overhead in Endorser Blocks. Rather than individual
+transaction references, EBs could reference transaction groups, enabling
+inclusion of more transaction bytes within existing block size constraints. This
+enhancement requires no fundamental protocol changes if nested transaction
+approaches like [CIP-118](https://github.com/cardano-foundation/CIPs/pull/862)
+provide the underlying grouping infrastructure. The approach maintains full
+compatibility with existing transaction validation while improving space
+efficiency.
 
-> [!WARNING]
->
-> TODO:
->
-> - immediate next steps for development
-> - future work and extensions of proposed design
+**Interaction with Peras**
 
-<a name="roadmap"></a>**Long-term roadmap**
+The integration pathway with Peras remains an active area of research, focusing
+on optimizing the interaction between Leios's enhanced throughput mechanisms and
+Peras's finality guarantees. Key considerations include synchronizing committee
+selection processes, coordinating voting mechanisms to avoid redundancy, and
+ensuring that enhanced throughput periods align effectively with finality
+checkpoints. This integration could provide both higher throughput and stronger
+finality assurances than either protocol achieves independently.
 
-> [!WARNING]
->
-> TODO:
->
-> - pathway to higher throughput variants
-> - integration with other scaling solutions
+**Decoupling EB Production**
+
+Introducing independent scheduling for Endorser Block production represents the
+first step toward concurrent block production. This approach separates EB
+cadence from Ranking Block timing through dedicated VRF lotteries or
+deterministic schedules, providing greater flexibility in optimizing diffusion
+timings and reducing censorship opportunities for stake-based attackers. While
+this introduces potential conflicts between transactions in RBs and those
+endorsed in EBs, the enhanced scheduling flexibility enables better parameter
+tuning for diverse network conditions.
+
+**EBs Referencing EBs**
+
+Building chains of certified Endorser Blocks before anchoring them to the main
+chain enables more granular transaction processing and improved inclusion
+latency. This approach allows multiple smaller EBs instead of monolithic blocks,
+reusing validation and voting work already performed while continuing
+transaction processing during periods of poor chain quality. The shorter
+possible cadence particularly benefits scenarios with unfavorable RB sortition,
+providing more consistent transaction inclusion opportunities.
+
+**Input Block Production**
+
+Full concurrent block production through Input Blocks represents the highest
+throughput pathway but introduces significant complexity. This approach
+front-loads validation and diffusion work across multiple concurrent streams,
+substantially increasing transaction conflict likelihood even under honest
+operation. Resolution mechanisms include accepting conflicts with fee collection
+from non-executed transactions, reducing conflict probability through ledger
+sharding or controlled IB production, and implementing reconciliation systems
+with tombstoning to manage storage efficiency. While offering the greatest
+throughput potential, this pathway requires careful analysis of economic
+incentives and conflict resolution trade-offs.
 
 ## Path to active
 
