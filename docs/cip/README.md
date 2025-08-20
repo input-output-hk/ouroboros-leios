@@ -807,6 +807,8 @@ accommodate expanded transaction volume:
 $\text{Mempool} \geq 2 \times (S_\text{RB} + S_\text{EB-tx})$
 
 </div>
+
+Nodes maintain a set $S$ of transactions seen in EBs to enable validation work reuse, with detailed processing rules specified in the <a href="#eb-transaction-handling">EB transaction handling</a> section.
     
 #### RB Block Production and Diffusion
     
@@ -872,6 +874,14 @@ Validation**: With all transactions available, nodes validate the endorsed
 transaction sequence against the appropriate ledger state (step 8), ensuring the
 transactions form a valid extension of the announcing RB and meet size
 constraints.
+
+<a id="eb-transaction-handling" href="#eb-transaction-handling"></a>
+To optimize validation work, nodes maintain a set $S$ of transactions seen in recently received EBs. Each entry in $S$ contains:
+
+1. The transaction itself
+2. A validation flag indicating whether the transaction has been verified (signatures, scripts, etc.)
+
+Upon receiving an EB, included transactions are added to $S$ with validation flags initially set to false. When validating an EB or observing a certificate for the EB, the validation flags for related transactions in $S$ are set to true. During transaction submission, if space permits and the transaction is valid, it is added to the mempool end; if the transaction exists in $S$, the node avoids redownloading or revalidating to optimize performance. Upon ledger state changes, the mempool is revalidated against the new state. When processing transactions in EBs or RBs, nodes check $S$ first to avoid redundant download and validation work. Finally, older transactions are periodically removed from $S$ to prevent unbounded growth.
 
 #### Voting & Certification
 
