@@ -15,7 +15,7 @@ Voting for endorser blocks also behaves mostly the same as in the original Leios
 ## CPU model
 |Task name in logs|Task name in code|When does it run|What happens when it completes|CPU cost
 |---|---|---|---|---|
-|`ValTX`|`TransactionValidated`|After a transaction has been received from a peer.|That TX is announced to other peers.|`tx-validation-cpu-time-ms`|
+|`ValTX`|`TransactionValidated`|After a transaction has been received from a peer.|That TX is announced to other peers.|`tx-validation-cpu-time-ms` + `tx-validation-cpu-time-ms-per-byte` for each byte of TX|
 |`GenRB`|`RBBlockGenerated`|After a new ranking block has been generated.|That RB is announced to peers.|`rb-generation-cpu-time-ms` + `cert-generation-cpu-time-ms-constant` + `cert-generation-cpu-time-ms-per-node` for each node that voted for the endorsed EB|
 |`ValRB`|`RBBlockValidated`|After a ranking block has been received.|That RB body is announced to peers and (potentially) accepted as the tip of the chain.|`rb-body-legacy-praos-payload-validation-cpu-time-ms-constant` + `rb-body-legacy-praos-payload-validation-cpu-time-ms-per-byte` for each byte of TX  + `cert-generation-cpu-time-ms-constant` + `cert-generation-cpu-time-ms-per-node` for each node that voted for the endorsed EB|
 |`GenEB`|`EBBlockGenerated`|After a new EB has been generated.|That EB is announced to peers.|`eb-generation-cpu-time-ms`|

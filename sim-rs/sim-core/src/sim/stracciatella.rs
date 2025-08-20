@@ -132,7 +132,9 @@ impl SimCpuTask for CpuTask {
 
     fn times(&self, config: &crate::config::CpuTimeConfig) -> Vec<std::time::Duration> {
         match self {
-            Self::TransactionValidated(_, _) => vec![config.tx_validation],
+            Self::TransactionValidated(_, tx) => vec![
+                config.tx_validation_constant + config.tx_validation_per_byte * tx.bytes as u32,
+            ],
             Self::RBBlockGenerated(rb) => {
                 let mut time = config.rb_generation;
                 if let Some(endorsement) = &rb.endorsement {
