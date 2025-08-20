@@ -517,9 +517,6 @@ transactions produced after the last EB certificate was included (exclusive). EB
 corrections already included during the certificate-active period reduce this
 cost; only the remaining transactions require an RB-side bitmap.
 
-> [!WARNING] **TODO:** Add transaction confirmation levels and their
-> implications for applications
-
 Transactions from certified EBs are included in the ledger before transactions
 directly included in the RB to preserve correctness.
 
