@@ -3,6 +3,10 @@
 The design of the Leios mini protocols is predominantly determined by which information two nodes need to exchange, when that information should be sent, and how to bound resource utilization on both sides of the mini protocol.
 Notably, the FreshestFirstDelivery scheme constrains some of the timings.
 
+A CIP ideally proposes exact mini protocols, so that nodes with different implementors will be able to interact.
+There is precedent for CIPs (eg Peras) to instead let the implementors determine the details of the mini protocol separate (preferably in a separate CIP).
+However, optimized diffusion times are a core concern of Leios, so a more detailed mini protocol specification is appropriate in this CIP, at least to demonstrate feasibility and highlight key factors.
+
 ### Information Exchange Requirements
 
 It would be premature to discuss concrete mini protocols without the motivating context of what information they're required to exchange.
@@ -10,37 +14,38 @@ It would be premature to discuss concrete mini protocols without the motivating 
 The primary messages will carry information that is directly required by the Leios description above: headers, blocks, txs referenced by blocks, and votes for blocks.
 However, some lower-level information must also be carried by secondary messages, eg indicating when the peer is first able to send the block.
 
-The required information exchange between two neighboring nodes is captured by the following Information Exchange Requirements (IER) table.
-Each row is a datum that some mini protocol message will carry, although a single mini protocol message might involve more than one row.
-
-Some of the details in this table are incompatible with the initial concrete iterations of the mini protocol below, but they are compatible with the later iterations.
+The required exchanges between two neighboring nodes is captured by the following Information Exchange Requirements (IER) table.
+Each row is a datum that some mini protocol message will carry, although a single message might bundle multiple rows.
+Some of the details in this table are not fully compatible with the initial concrete iterations of the mini protocol below; they instead match the later iterations.
 
 | Sender | Name | Arguments | Semantics |
 | - | - | - | - |
-| Client→ | LeiosNotificationsBytes | byte count | Requests notifications (Leios announcements and delivery offers) up to some total byte size. A low-watermark scheme would suffice to ensure there's always sufficient room for more notifications. |
-| ←Server | LinearLeiosAnnouncement | RankingBlockHeader that announces an LLB | The server has seen this LLB announcement. It must never send a third announcement for some election, since two already evidence equivocation. Each header must not be invalid in a way that a recent-but-not-perfectly-up-to-date ledger state could notice. |
-| ←Server | LinearLeiosBlockOffer | slot and hash | The server can immediately deliver this block. It must have already sent a LinearLeiosAnnouncement for the same block. |
-| ←Server | LeiosBlockTxsOffer | slot and hash | The server can immediately deliver any tx referenced by this block. It must have already sent a LinearLeiosAnnouncement for the same block. |
-| ←Server | LinearLeiosVoteOffer | slot and vote-issuer-id | The server can immediately deliver this vote. It must have already sent a LeiosAnnouncement for the same slot. |
+| Client→ | LeiosNotificationsBytes | byte count | Requests Leios notifications (announcements and delivery offers) up to some total byte size. A low-watermark scheme would suffice to ensure there's always sufficient room for more notifications. |
+| ←Server | LinearLeiosAnnouncement | RankingBlockHeader that announces an LLB | The server has seen this LLB announcement. The client should disconnect if the server sends a third announcement with the same election, since two already evidence equivocation. The client should disconnect if the header is invalid in a way that any recent ledger state could notice, not only the ledger state of the header's predecessor. |
+| ←Server | LinearLeiosBlockOffer | slot and hash | The server could immediately deliver this block. The client should disconnect if the server had not already sent a LinearLeiosAnnouncement for the same block. |
+| ←Server | LeiosBlockTxsOffer | slot and hash | The server could immediately deliver any tx referenced by this block. The client should disconnect if the server had not already sent a LinearLeiosAnnouncement for the same block. |
+| ←Server | LinearLeiosVoteOffer | slot and vote-issuer-id | The server could immediately deliver this vote. The client should disconnect if the server had not already sent a LeiosAnnouncement for the same slot (rather than block, for the other messages). |
 | Client→ | LinearLeiosBlockId | slot and hash | The server must deliver this block. The server disconnects if it doesn't have it. |
 | Client→ | LeiosBlockTxsId | slot, hash, and map from 16-bit index to 64-bit bitmap | The server must deliver these txs from this Leios block. The server disconnects if it doesn't have the block or is missing any of its txs. The given bitmap identifies which of 64 contiguous txs are requested, and the offset of the tx corresponding to the bitmap's first bit is 64 times the given index. |
 | Client→ | LinearLeiosVoteId | slot and vote-issuer-id | The server must deliver this vote. The server disconnects if it doesn't have it. |
 | ←Server | LinearLeiosBlockDelivery | Leios block | The block from an earlier LinearLeiosBlockId. |
-| ←Server | LeiosBlockTxsDelivery | slot, hash, and map from 16-bit index to sequences of txs | A subset of the txs from an earlier LeiosBlockTxsId. Note that this map's keys are a non-empty subset of the request's map's keys. A server is allowed to send multiple LeiosBlockTxsDelivery in reply to a single LeiosBlockTxsId. |
+| ←Server | LeiosBlockTxsDelivery | slot, hash, map from 16-bit index to sequences of txs | A subset of the txs from an earlier LeiosBlockTxsId. Note that this map's keys are a non-empty subset of the request's map's keys. A server is allowed to send multiple LeiosBlockTxsDelivery in reply to a single LeiosBlockTxsId. |
 | ←Server | LinearLeiosVoteDelivery | Leios vote | The vote from an earlier LinearLeiosVoteId. |
-| Client→ | LinearLeiosStaleBlockRangeId | two slots and two hashes | For LLBs that are older than L_recover. The server must deliver all LLBs that are certified within this range of the identified Ranking Blocks. It should do so in order, ignoring FreshestFirstDelivery. If the requested range is not on the server's current selection, it should disconnect. If the server doesn't have all of the LLBs, it should disconnect. The client is advised to not send this while the wall clock is still within any of the requested LLB's L_recover window; LinearLeiosBlockId is more suitable for such blocks. |
+| Client→ | LinearLeiosStaleBlockRangeId | two slots and two hashes | The server must deliver all LLBs that are certified within this range of the identified Ranking Blocks. The client should disconnect if the server doesn't send the block in the same order as the chain, contrary to FreshestFirstDelivery. If the requested range is not on the server's current selection, it should disconnect. If the server doesn't have all of the LLBs, it should disconnect. The client is advised to not send this message while the wall clock is still within any of the requested LLB's L_recover window; LinearLeiosBlockId is more suitable for such blocks. |
 
-**Only new notifications**.
-When a client connects and sends LeiosNotificationsBytes, the server should not immediately send several recent notifications.
-The server should only send notifications for events that happened _after_ the client sent its request.
-It might be useful to slightly relax, so that a node that briefly lost all connectivity for, say, one minute could immediately catch back up to the extent that FreshestFirstDelivery allows.
-However, it's not crucial, and the more old notifications sent, the more expensive of a burst each new connection incurs.
+**Age bounds for lightweight servers**.
+Some information (eg LinearLeiosVoteOffer) cannot be sent before other information (ie LinearLeiosAnnouncement) has been sent.
+This is the only constraint preventing the server from sending an unbounded amount of nonsensical offers to the client.
+Unfortunately, it also requires the server to separately maintain commensurate state for each client.
+It is not uncommon for a server to have hundreds of downstream peers, so servers can only afford to maintain lightweight state separately per peer.
+This per-client state of Leios server is sufficiently bounded because servers can safely forget about LLBs that are older than L_recover, and votes can be forgotten even sooner, after L_vote.
+L_recover will never exceed a few minutes, so the server will never be responsible for a large number LLBs simultaneously.
 
 **Bundling txs**.
 Only LeiosBlockTxsOffer, LeiosBlockTxsId, and LeiosBlockTxsDelivery explicitly bundle requests for multiple objects (ie txs in a Leios block).
 This bundling is necessary, because an adversarial Leios block could cause honest nodes to request thousands of txs simultaneously, and thousands of individual request-response pairs is an intolerable amount of overhead.
-This bundling is also mostly harmless, because a node cannot send LeiosBlockTxsOffer to its downstream peers until it has all of the Leios block's txs, so the fact that the first tx in a bundle would have arrived much sooner than the last if they weren't bundled is not particularly relevant to diffusion.
-Moreover, this bundling is compact, because the Leios design itself enables a compact scheme for referring to multiple txs: by their location within a particular Leios block.
+This bundling is also mostly harmless, because---without a design for streaming each LLB---a node cannot send LeiosBlockTxsOffer to its downstream peers until it has all of the Leios block's txs, so the fact that the first tx in a bundle would have arrived much sooner than the last if they weren't bundled is not particularly relevant to diffusion.
+Moreover, this bundling is compact, because the Leios design inherently enables a compact scheme for referring to multiple txs: by their location within a particular Leios block.
 
 **Bundling votes and/or blocks**.
 All other rows in the table refer only to individual objects, in part because no compact addressing scheme as obvious for blocks or votes as it is for txs.
@@ -52,6 +57,26 @@ Thus, the mini protocol messages will accommodate it for any object without requ
 
 A bundled request does naturally create the opportunity for multiple messages to cooperatively reply to the same request, which is somewhat sophisticated.
 But that possibility is already introduced by LeiosBlockTxsId, so allowing it for other objects too is merely marginal additional complexity.
+
+**Overlapping tx requests and lightweight servers**.
+Two different LeiosBlockTxsId requests might overlap, even for different blocks, since normal circumstances imply the tx references within contemporary LLBs will overlap.
+A client could avoid this by excluding the overlap from its second request (even if it's pipelining requests).
+However, the server could only (perfectly) force the client to do so if the server was already maintaining enough state that it could simply itself skip over the redundant parts of the second request.
+If server-side reordering (discussed below) is not allowed, then the server must either maintain the state or unknowingly waste bandwidth when requests overlap.
+
+If server-side reordering is allowed, then the client cannot necessarily avoid redundant requests, since it cannot be sure which request will be handled first.
+With server-side reordering, the client could only rely on the server---as the ultimate decider of reply order---to eliminate the redundancy in its deliveries.
+Thus, with or without server-side reordering, the server must maintain some state to eliminate redundancy in responses.
+Requests for blocks and votes cannot overlap in any way, so this state is only needed for txs.
+
+The necessary state can also be bounded, since the server doesn't have to track/avoid redundancy forever, merely over whatever duration server-side reordering might force the honest client to send redundant requests.
+It seems sufficient to limit it by the number of LLBs, rather than a time-based duration; it's unlikely a server will make large requests from more than, say, three LLBs at once, due to the size of the corresponding receive-buffer commitment.
+So the server would not be expected to eliminate redundancy from among more than three LeiosBlockTxsDelivery at once.
+The size limit on a single LLB prevents one from ever referring to more than ~6250 txs, so the server would only need to track at most ~20000 txs at once per client to avoid overlap even across requests spanning three full LLBs even if they mostly do not overlap.
+(TODO should the server enforce that the client never has outstanding requests for more than 20000 unique txs at once?)
+Moreover, the identifiers the server uses when tracking txs can be subjective, so the server's centralized internal state can maintain an injective mapping from txs in currently-young LLBs to arbitrary 32-bit integers.
+Thus, even with a relatively naive implementation, this state requires at most 20,000 * 4 = 80,000 bytes per client (there's no need for sharing/persistence, so GC overhead can be avoided), ie 8 megabytes per 100 downstream nodes.
+The boundedness prevents a guarantee that the server will eliminate all redundancy among every set of pipelined requests, but the scheme almost always eliminates redundancy among requests from honest nodes under normal circumstances.
 
 ### Iteration 1
 
