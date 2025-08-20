@@ -103,38 +103,39 @@
     <!-- Solid arrow connecting the two RBs -->
     <path d="M 770 180 L 430 180" stroke="#783f04" stroke-width="2" marker-end="url(#arrowhead)"/>
     
-    <!-- Voting phase indicators -->
+    <!-- Voting phase indicators (only within L_vote period) -->
     <g id="votes">
       <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="vote-link">
-        <rect x="390" y="400" width="8" height="8" fill="#f9a825" transform="rotate(45 394 404)"/>
+        <rect x="492" y="380" width="8" height="8" fill="#f9a825" transform="rotate(45 496 384)"/>
       </a>
       <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="vote-link">
-        <rect x="424" y="410" width="8" height="8" fill="#f9a825" transform="rotate(45 428 414)"/>
+        <rect x="526" y="375" width="8" height="8" fill="#f9a825" transform="rotate(45 530 379)"/>
       </a>
       <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="vote-link">
-        <rect x="458" y="395" width="8" height="8" fill="#f9a825" transform="rotate(45 462 399)"/>
+        <rect x="560" y="385" width="8" height="8" fill="#f9a825" transform="rotate(45 564 389)"/>
       </a>
       <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="vote-link">
-        <rect x="492" y="405" width="8" height="8" fill="#f9a825" transform="rotate(45 496 409)"/>
-      </a>
-      <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="vote-link">
-        <rect x="526" y="400" width="8" height="8" fill="#f9a825" transform="rotate(45 530 404)"/>
-      </a>
-      <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="vote-link">
-        <rect x="560" y="410" width="8" height="8" fill="#f9a825" transform="rotate(45 564 414)"/>
-      </a>
-      <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="vote-link">
-        <rect x="594" y="395" width="8" height="8" fill="#f9a825" transform="rotate(45 598 399)"/>
+        <rect x="594" y="370" width="8" height="8" fill="#f9a825" transform="rotate(45 598 374)"/>
       </a>
     </g>
     
-    <!-- L_vote period indicator -->
+    <!-- 3 Delta_hdr period indicator -->
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#delta-hdr" class="param-link">
+      <line x1="380" y1="405" x2="480" y2="405" stroke="#9c27b0" stroke-width="1" stroke-dasharray="4,4"/>
+      <path d="M 380 405 L 380 410 Q 380 415 385 415 L 425 415 L 430 422 L 435 415 L 475 415 Q 480 415 480 410 L 480 405" 
+            stroke="#9c27b0" stroke-width="2" fill="none"/>
+      <text x="430" y="440" font-size="22" text-anchor="middle" fill="#9c27b0">
+        <tspan font-family="serif" font-size="26">3Δ</tspan><tspan font-family="Arial, sans-serif" font-size="18" baseline-shift="sub">hdr</tspan>
+      </text>
+    </a>
+    
+    <!-- L_vote period indicator (shifted right) -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#l-vote" class="param-link">
-      <line x1="380" y1="430" x2="620" y2="430" stroke="#f9a825" stroke-width="1" stroke-dasharray="4,4"/>
-      <path d="M 380 430 L 380 435 Q 380 440 385 440 L 490 440 L 500 447 L 510 440 L 615 440 Q 620 440 620 435 L 620 430" 
+      <line x1="480" y1="405" x2="620" y2="405" stroke="#f9a825" stroke-width="1" stroke-dasharray="4,4"/>
+      <path d="M 480 405 L 480 410 Q 480 415 485 415 L 540 415 L 550 422 L 560 415 L 615 415 Q 620 415 620 410 L 620 405" 
             stroke="#f9a825" stroke-width="2" fill="none"/>
-      <text x="500" y="465" font-size="22" text-anchor="middle" fill="#f9a825">
-        <tspan font-family="serif" font-style="italic" font-size="28">L</tspan><tspan font-family="Arial, sans-serif" font-size="18" baseline-shift="sub">vote</tspan>
+      <text x="550" y="440" font-size="22" text-anchor="middle" fill="#f9a825">
+        <tspan font-family="serif" font-style="italic" font-size="26">L</tspan><tspan font-family="Arial, sans-serif" font-size="18" baseline-shift="sub">vote</tspan>
       </text>
     </a>
     
@@ -196,12 +197,20 @@
     </a>
     <text x="575" y="16" font-family="Arial, sans-serif" font-size="14" fill="#333">Vote</text>
     
+    <!-- 3 Delta_hdr period -->
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#delta-hdr" class="param-link">
+      <line x1="620" y1="7" x2="620" y2="19" stroke="#9c27b0" stroke-width="1" stroke-dasharray="2,2" opacity="0.8"/>
+      <line x1="620" y1="12" x2="650" y2="12" stroke="#9c27b0" stroke-width="3" opacity="0.8"/>
+      <line x1="650" y1="7" x2="650" y2="19" stroke="#9c27b0" stroke-width="1" stroke-dasharray="2,2" opacity="0.8"/>
+      <text x="655" y="16" font-family="Arial, sans-serif" font-size="14" fill="#333"><tspan font-family="Times New Roman, serif" font-style="italic" font-size="16">3Δ</tspan><tspan font-size="10" baseline-shift="sub">hdr</tspan> period</text>
+    </a>
+    
     <!-- L_recover window with dashed verticals -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#l-recover" class="param-link">
-      <line x1="640" y1="7" x2="640" y2="19" stroke="#7cb342" stroke-width="1" stroke-dasharray="2,2" opacity="0.8"/>
-      <line x1="640" y1="12" x2="670" y2="12" stroke="#7cb342" stroke-width="3" opacity="0.8"/>
-      <line x1="670" y1="7" x2="670" y2="19" stroke="#7cb342" stroke-width="1" stroke-dasharray="2,2" opacity="0.8"/>
-      <text x="675" y="16" font-family="Arial, sans-serif" font-size="14" fill="#333"><tspan font-family="Times New Roman, serif" font-style="italic" font-size="16">L</tspan><tspan font-size="10" baseline-shift="sub">recover</tspan> window</text>
+      <line x1="760" y1="7" x2="760" y2="19" stroke="#7cb342" stroke-width="1" stroke-dasharray="2,2" opacity="0.8"/>
+      <line x1="760" y1="12" x2="790" y2="12" stroke="#7cb342" stroke-width="3" opacity="0.8"/>
+      <line x1="790" y1="7" x2="790" y2="19" stroke="#7cb342" stroke-width="1" stroke-dasharray="2,2" opacity="0.8"/>
+      <text x="795" y="16" font-family="Arial, sans-serif" font-size="14" fill="#333"><tspan font-family="Times New Roman, serif" font-style="italic" font-size="16">L</tspan><tspan font-size="10" baseline-shift="sub">recover</tspan> window</text>
     </a>
   </g>
 </svg>
