@@ -10,9 +10,8 @@ Authors:
   - Nicolas Frisby <nick.frisby@iohk.io>
   - Giorgos Panagiotakos <giorgos.panagiotakos@iohk.io>
   - Andre Knipsel <andre.knispel@iohk.io>
-  - Simon Gellis <simon@sundae.fi>
   - Yves Hauser <yves.hauser@iohk.io>
-  - Yuriy Syrovetskiy <yuriy.syrovetskiy@iohk.io>
+  - Simon Gellis <simon@sundae.fi>
   - PLEASE ADD YOUR NAME IF YOU CONTRIBUTE TEXT TO THIS DOCUMENT
 Implementors:
   - Intersect
