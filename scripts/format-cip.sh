@@ -37,11 +37,16 @@ import re
 
 def generate_anchor(text):
     """Convert header text to GitHub-style anchor"""
+    # Preserve escaped ampersands before processing
+    text = text.replace('\\&', '&')
     # Convert to lowercase
     anchor = text.lower()
-    # Replace spaces and special chars with hyphens
+    # Replace spaces around ampersands, then replace ampersands with double hyphens
+    anchor = re.sub(r'\s*&\s*', '--', anchor)
+    # Replace other special chars with nothing, but keep hyphens and spaces
     anchor = re.sub(r'[^\w\s-]', '', anchor)
-    anchor = re.sub(r'[-\s]+', '-', anchor)
+    # Replace spaces with hyphens
+    anchor = re.sub(r'\s+', '-', anchor)
     # Remove leading/trailing hyphens
     anchor = anchor.strip('-')
     return anchor
@@ -77,11 +82,14 @@ def generate_toc(content):
             # Generate anchor
             anchor = generate_anchor(title)
             
+            # Preserve escaped ampersands in the display title
+            display_title = title.replace('&', '\\&')
+            
             # Create indentation based on header level
             indent = '  ' * (level - 2)  # h2 = no indent, h3 = 2 spaces, h4 = 4 spaces
             
             # Format as markdown link
-            toc_line = f"{indent}- [{title}](#{anchor})"
+            toc_line = f"{indent}- [{display_title}](#{anchor})"
             toc_lines.append(toc_line)
     
     return '\n'.join(toc_lines)
@@ -221,14 +229,14 @@ def generate_table_of_figures_and_tables(content):
     
     # Build the figures and tables section
     result = []
-    result.append("### Figures")
+    result.append("**Figures**")
     result.append("")
     if figures:
         result.extend(figures)
     else:
         result.append("No figures found.")
     result.append("")
-    result.append("### Tables")
+    result.append("**Tables**")
     result.append("")
     if tables:
         result.extend(tables)
