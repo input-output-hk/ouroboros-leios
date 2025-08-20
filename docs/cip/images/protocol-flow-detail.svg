@@ -237,7 +237,7 @@
     <!-- Arrow from certificate to EB4 -->
     <path d="M 580 275 Q 580 340 540 340" stroke="#f9a825" stroke-width="2" stroke-dasharray="2,2" fill="none" marker-end="url(#votearrowhead)"/>
     
-    <path d="M 540 200 L 500 200" stroke="#783f04" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <path d="M 540 200 L 520 200" stroke="#783f04" stroke-width="2" marker-end="url(#arrowhead)"/>
     <path d="M 660 200 L 620 200" stroke="#783f04" stroke-width="2" marker-end="url(#arrowhead)"/>
     
     <!-- More RBs within window -->
