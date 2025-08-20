@@ -868,12 +868,6 @@ EB propagation delays. EBs are forwarded before complete validity checks, with
 only lightweight verification (hash consistency, basic structure validation)
 performed initially to prevent DoS attacks.
 
-> [!Warning]
->
-> **TODO** Clarify if this is optimistic enough, or whether nodes should
-> announce EBs before having all transactions available or make use of
-> optimization by offering "chunks" of the transaction reference list.
-
 <a id="transaction-retrieval" href="#transaction-retrieval"></a>**Transaction
 Retrieval**: Nodes check transaction availability for the EB and fetch any
 missing transactions from peers (steps 6a and 7a). After receiving the EB body,
@@ -890,12 +884,6 @@ transaction sequence against the appropriate ledger state (step 8), ensuring the
 transactions form a valid extension of the announcing RB and meet size
 constraints.
 
-> [!WARNING]
->
-> - Stop serving an EB if we determined the endorsed sequence of transactions as
->   invalid? (Could be done without radical mini-protocol changes, but needs
->   further analysis)
-
 #### Voting & Certification
 
 <a id="VotingEB" href="#VotingEB"></a>**Voting Process**: Committee members
@@ -908,13 +896,11 @@ propagate through the network during the vote diffusion period ($L_\text{diff}$
 slots) (steps 10 and 10a). While nodes forward votes on EBs across all candidate
 chains, they only forward at most one vote per committee member per slot.
 
-> [!WARNING]
->
-> - How long should votes be propagated? (Likely not critical - "30 seconds"
->   would be sufficient)
-> - Nodes should receive and relay votes for EBs even before
->   acquiring/validating the EB, but only if they have seen an RB header
->   announcing that EB
+Nodes maintain and relay votes for a bounded duration to limit resource usage.
+Since freshest-first delivery ensures that newer votes are prioritized over
+older ones, the exact bound is not critical for protocol correctness. A
+conservative bound of a few minutes is sufficient to handle network delays while
+allowing nodes to discard votes that are no longer relevant.
 
 <a id="CertificateAggregation" href="#CertificateAggregation"></a>**Certificate
 Construction**: All nodes receive votes from upstream peers, maintaining a
@@ -1808,7 +1794,7 @@ tradeoffs.
 
 | Parameter                                     |       Symbol        |   Feasible value   | Justification                                                                                                                                                                               |
 | --------------------------------------------- | :-----------------: | :----------------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| RB header diffusion bound                     | $\Delta_\text{hdr}$ |      2 slots       | Must be faster than full RB diffusion for equivocation detection; simulations show headers reach all nodes within 1-2 slots due to smaller size.                                            |
+| RB header diffusion bound                     | $\Delta_\text{hdr}$ |       1 slot       | Must be faster than full RB diffusion for equivocation detection; simulations show headers reach all nodes within 1 slot due to smaller size.                                              |
 | Voting period length                          |   $L_\text{vote}$   |      7 slots       | Short stages increase settlement speed, but the stage length must be generously larger than the propagation time for EBs.                                                                   |
 | Recovery period length                        | $L_\text{recover}$  |      ?? slots      | ???                                                                                                                                                                                         |
 | Endorser-block referenceable transaction size |  $S_\text{EB-tx}$   |       12 MB        | Simulations indicate that 200 kB/s throughput is feasible at this block size.                                                                                                               |
