@@ -316,14 +316,14 @@ detection</a>. Committee members are
 [selected via sortition](#committee-structure) based on the slot number of the
 RB that announced the EB. A committee member votes for an EB only if:
 
-1. It has received the EB within $L_\text{vote}$ slots from its creation,
+1. The RB header arrived within $\Delta_\text{hdr}$,
 2. It has **not** received an equivocating RB header for this EB within
    $3\Delta_\text{hdr}$,
-3. The EB is the one announced by the latest RB in the voter's current chain,
-4. The EB's transactions form a **valid** extension of the RB that announced it,
-5. For non-persistent voters, it is eligible to vote based on sortition using
+3. It has received the EB within $L_\text{vote}$ slots from its creation,
+4. The EB is the one announced by the latest RB in the voter's current chain,
+5. The EB's transactions form a **valid** extension of the RB that announced it,
+6. For non-persistent voters, it is eligible to vote based on sortition using
    the announcing RB's slot number as the election identifier,
-6. The RB header arrived within $\Delta_\text{hdr}$.
 
 where $L_\text{vote}$ and $\Delta_\text{hdr}$ are
 <a href="#protocol-parameters">protocol parameters</a> represented by a number
