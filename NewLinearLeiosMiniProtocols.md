@@ -128,7 +128,29 @@ But that possibility is already introduced by LeiosBlockTxsId, so allowing it fo
 
 **Operational certficate issue numbers (OCINs)**
 
-TODO copy over the OpCertIssueNumber discussion
+(TODO this subsection likely belongs in a different part of the CIP, despite being a resource utilization concern)
+
+The Leios protocol requires that each server must send at most two LinearLeiosAnnouncement notifications that equivocate the same election.
+This is easy enforce on both the client and the server, but does require a necessary and sufficient definition of which elections are the "same".
+
+The key complication is operational certificates (TODO link).
+With the current system, a Stake Pool Operator (SPO) is free to issue an arbitrary OCIN every time they're elected.
+Whether the header carrying some OCIN is valid depends on the chain it extends, because the Praos protocol rules along a single chain only allow an SPO's OCIN to be incremented once per header issued by that SPO.
+
+The Leios mini protocols, in contrast, are expected to diffuse contemporary EBs regardless of which chain they're on, and so cannot assume that it has seen the predecessor header of every LinearLeiosAnnouncement.
+It also can't simply require that it has seen them all, because that would complicate the timing restrictions and require tracking a potentially unbounded number of forks.
+Thus, without any additional changes, the Leios mini protocols might end up diffusing a LinearLeiosAnnouncement that has an arbitrarily increased OCINs.
+For this reason, Leios requires that OCIN growth is systematically constrained more restrictively than it is in Praos today.
+
+A sufficient restriction on OCINs, more strict than Praos, would be that an SPO's OCIN can be incremented at most once in any 36 hr interval on any single chain.
+This would justify the the following LinearLeiosAnnouncement validity rule in the Leios mini protocols.
+
+- For a single pair of slot and SPO identity (ie their public cold key), the server may send at most two LinearLeiosAnnouncement notifications, regardless of their OCIN.
+- Additionally, the server must never send a header whose OCIN is less than one sent in an older slot.
+  Thus, the only time the server can send a header with a lesser OCIN is for the same slot.
+
+With these rules, an SPO who lost control of their hot key would not have unique control over their LLB announcements until the _second_ election they used the new OCIN for.
+For their first election, the Leios mini protocols would not yet ignore the adversarial non-incremented OCIN.
 
 ### Iteration 1
 
