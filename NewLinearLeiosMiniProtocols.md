@@ -69,21 +69,23 @@ The following rules would be plausible.
 
 **Block age bounds**.
 LLBs have three diffusion intervals.
-This first interval is analogous to votes but lasts L_recover instead of L_vote.
+This first interval is analogous to votes' but has a duration of L_recover instead of L_vote.
 
 - The server should only send LinearLeiosBlockOffer/LeiosBlockTxsOffer to a client to which it had already sent the LinearLeiosAnnouncement before the blocks/txs arrived at the server itself.
 - If an LLB is older than L_recover, the protocol doesn't assume it is still diffusing, and so the client should not send a LinearLeiosBlockId/LeiosBlockTxsId for it.
-- Thus, the server can disconnect if a client sends LinearLeiosBlockId/LeiosBlockTxsId for a block that is older than L_recover + GracePeriod.
-- The server should send LinearLeiosBlockOffer/LeiosBlockTxsOffer for a block that is L_recover old---the honest client would not be able to act on those offers.
+- Thus, the server can disconnect if it receives a LinearLeiosBlockId/LeiosBlockTxsId for a block that is older than L_recover + GracePeriod.
+- The server should not send LinearLeiosBlockOffer/LeiosBlockTxsOffer for a block that is L_recover old---the honest client would not be able to act on those offers.
 
 In some real-world corner cases, however, nodes (syncing nodes but also even unfortunate otherwise-caught-up nodes) will need to acquire LLBs that are older than L_recover.
 Thus, the second diffusion interval involves blocks that are older than L_recover.
 The same rules also handle the third diffusion interval as well, since that simply indefinitely extends the second interval for blocks on the historical chain.
 
 - Clients can send LinearLeiosStaleBlockRangeId requests, regardless of the age of the LLBs.
+  If the slots are not already settled, then the client should send one LinearLeiosStaleBlockRangeId per LLB, instead of a range.
+  (This threshold prevents the server from having to search for chains formed by blocks that are not on its current selection.)
 - Ultimately, the protocol itself expects the server to retain all LLBs (and their referenced txs) while they might be certified on some chain the node has any chance of selecting.
-  That chance can only diminish all the way to when their slots are certainly settled.
-  That happens usually happens after ~12 hr on Cardano mainnet (much faster with Ouroboros Peras), but the worst-case will always be ~36 hr.
+  That chance can only diminish all the way to zero when the correspondings slots are certainly settled.
+  That usually happens after ~12 hr on Cardano mainnet (much faster with Ouroboros Peras), but the worst-case will always be ~36 hr.
 - There is a very unlikely scenario that an honest client requests an LLB that the server discards while the request is in-flight.
   This event should be so rare that it's fine for the server to disconnect.
 - TODO should the server disconnect if the range include blocks younger than L_recover - GracePeriod?
@@ -100,11 +102,11 @@ With server-side reordering, the client could only rely on the server---as the u
 Thus, with or without server-side reordering, the server must maintain some state to eliminate redundancy in responses.
 Requests for blocks and votes cannot overlap in any way, so this state is only needed for txs.
 
-The necessary state can also be bounded, since the server doesn't have to track/avoid redundancy forever, merely over whatever duration server-side reordering might force the honest client to send redundant requests.
-It seems sufficient to limit it by the number of LLBs, rather than a time-based duration; it's unlikely a server will make large requests from more than, say, three LLBs at once, due to the size of the corresponding receive-buffer commitment.
-So the server would not be expected to eliminate redundancy from among more than three LeiosBlockTxsDelivery at once.
+The state necessary to identify overlapping LeiosBlockTxsId requests can be bounded, since the server doesn't have to track/avoid redundancy forever, merely over whatever duration server-side reordering might force the honest client to send redundant requests.
+It seems sufficient to limit it by the total number of requested txs (not double counting overlap), rather than a time-based duration; it's unlikely a server will make large requests from more than, say, three LLBs at once, due to the size of the corresponding receive-buffer commitment.
 The size limit on a single LLB prevents one from ever referring to more than ~7150 txs, so the server would only need to track at most ~21500 txs at once per client to avoid overlap even across requests spanning three full LLBs even if they mostly do not overlap.
-Moreover, the identifiers the server uses when tracking txs can be subjective, so the server's centralized internal state can maintain an injective mapping from txs in currently-young LLBs to arbitrary 32-bit integers.
+
+Moreover, the identifiers the server uses when tracking txs do not need to be externally interpretable, so the server's centralized internal state can maintain an injective mapping from txs in currently-young LLBs to arbitrary 32-bit integers.
 Thus, even with a relatively naive implementation, this state requires at most 21,500 * 4 = 86,000 bytes per client (there's no need for sharing/persistence, so GC overhead can be avoided), ie 8.6 megabytes per 100 downstream nodes.
 The boundedness prevents a guarantee that the server will eliminate all redundancy among every set of pipelined requests, but the scheme almost always eliminates redundancy among requests from honest nodes under normal circumstances.
 
@@ -113,14 +115,14 @@ The boundedness prevents a guarantee that the server will eliminate all redundan
 **Bundling txs**.
 Only LeiosBlockTxsOffer, LeiosBlockTxsId, and LeiosBlockTxsDelivery explicitly bundle requests for multiple objects (ie txs in a Leios block).
 This bundling is necessary, because an adversarial Leios block could cause honest nodes to request thousands of txs simultaneously, and thousands of individual request-response pairs is an intolerable amount of overhead.
-This bundling is also mostly harmless, because---without a design for streaming each LLB---a node cannot send LeiosBlockTxsOffer to its downstream peers until it has all of the Leios block's txs, so the fact that the first tx in a bundle would have arrived much sooner than the last if they weren't bundled is not particularly relevant to diffusion.
+This bundling is also mostly harmless, because---without a design for streaming each LLB---a node cannot send LeiosBlockTxsOffer to its downstream peers until it has all of referenced txs, so the fact that the first tx in a bundle would have arrived much sooner than the last if they weren't bundled is not particularly relevant to diffusion.
 Moreover, this bundling is compact, because the Leios design inherently enables a compact scheme for referring to multiple txs: by their location within a particular Leios block.
 
 **Bundling votes and/or blocks**.
-All other rows in the table refer only to individual objects, in part because no compact addressing scheme as obvious for blocks or votes as it is for txs.
+All other rows in the IER table refer only to individual objects, in part because there's no compact addressing scheme as obvious for blocks or votes as it is for txs.
 Even so, simply concatenating multiple requests and/or responses within a single mini protocol message would eliminate some overhead.
-In particular, there will also be hundreds of votes in-flight at a time, so some bundling might be appropriate there too.
-Too much bundling, however, would be harmful for votes, since the first vote within a bundled response might be enough to establish a quorum, and wouldn't be able to arrive sooner than the last vote in a bundle.
+In particular, there will also be hundreds of votes in-flight at a time, so some bundling might be appropriate.
+Too much bundling, however, would be harmful for votes, since the first vote within a bundled response might be enough to establish a quorum, and wouldn't be able to arrive sooner than the last vote in the same bundle.
 The ideal degree of bundling for small objects like votes or even mostly-empty Leios blocks is a trade-off to be balanced heuristically.
 Thus, the mini protocol messages will accommodate it for any object without requiring it.
 
@@ -166,7 +168,7 @@ The following mini protocol is a useful starting point for a derivation.
 It is superficially plausible for conveying the rows of the IER table, but has some major problems.
 They will be explained below in order to motivate and derive the actual mini protocol proposal.
 
-If the general structure and semantics of mini protocols is not already familiar, see the Chapter 2 Multiplexing mini-protocols and Chapter 3 Mini Protocol of the `ouroboros-network`'s [Ouroboros Network Specification PDF](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf).
+If the general structure and semantics of mini protocols is not already familiar, see the Chapter 2 "Multiplexing mini-protocols" and Chapter 3 "Mini Protocols" of the `ouroboros-network`'s [Ouroboros Network Specification PDF](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf).
 A brief summary is that a mini protocol is a state machine that two nodes cooperatively navigate; each node only sends a message when it has _agency_, and at most one node has agency in any state.
 The agencies are indicated in this document as gold or cyan.
 
@@ -207,7 +209,7 @@ The above mini protocol lacks the following desired properties.
   The FreshestFirstDelivery scheme, however, naturally implies that a server should usually instead reply to the youngest of the outstanding requests.
     - In the basic interpretation of a mini protocol, the client cannot even send multiple outstanding requests.
     - _Mini protocol pipelining_ already allows exactly that, but today's implementation does not also allow the server to react to subsequent messages before it's done responding to the oldest outstanding message.
-    - It seems plausible to somehow add that capability to the `ouroboros-network` infrastructure (eg the server, when it unblocks, receives the latest accumulation of client requests instead of the merely the first of them); see a further discussion below.
+    - It seems plausible to somehow add that capability to the `ouroboros-network` infrastructure (eg the server, when it unblocks, receives the latest accumulation of client requests instead of the merely the first of them), but such a change isn't absolutely necessary; see more details in Iteration 6.
 - **Bundling**.
   LeiosIteration1 does not permit any bundling of blocks or votes.
 - **Many replies per single request**.
@@ -221,7 +223,7 @@ The above mini protocol lacks the following desired properties.
 
 ### Iteration 2: Decoupled Requests and Minimized Structure (Part 1 of 2)
 
-Decoupled requests could be achieved by simply splitting the above mini protocol into its left and right halves.
+Decoupled requests could be achieved by simply splitting the above mini protocol into its left and right halves; separate mini protocols can proceed independently.
 Simultaneously, the mini protocol structure can be minimized by combining the four replies into a `MsgLeiosNotification` that carries a tagged union.
 The right half can't be similarly collapsed, since the requests target distinct states.
 
@@ -259,7 +261,6 @@ graph LR
 
 A server might have good reason to send multiple MsgLeiosBlockTx messages in response to a large MsgLeiosBlockTxRequest.
 The following demonstrates how a mini protocol would express the possibility of many replies to a single request (eg BlockFetch already does), for both MsgLeiosNextNotificationRequest and MsgLeiosBlockTxsRequest.
-If other requests could be bundled (eg votes), then this same transformation should be repeated for them.
 
 ```mermaid
 ---
@@ -290,6 +291,8 @@ graph LR
 
    StIdle -->|MsgDone| StDone
 ```
+
+If other requests could be bundled (eg votes), then this same transformation should be repeated for them.
 
 ### Iterations 4 and 5: Reordering and Minimized Structure (Part 2 of 2)
 
@@ -348,7 +351,7 @@ And so a MsgLeiosPartialReply could carry any number of LinearLeiosBlockDelivery
 
 ### Discussion
 
-LeiosIteration5A and LeiosIteration5B address every problem identified with LeiosIteration1, assuming that the client pipelines its requests and that the server is able to reorder those requests when actual timings and the priorization rules allow.
+LeiosIteration5A and LeiosIteration5B address every problem identified with LeiosIteration1, assuming that the client pipelines its requests and that the server is able to reorder those requests when the prioritization rules and actual timings allow.
 
 Unfortunately, server-side reordering is not permitted by the existing `ouroboros-network` infrastructure for specifying server behavior.
 Today's server is unaware of request pipelining; it's only ever aware of the first of however many messages have arrived but not yet been processed.
@@ -357,7 +360,7 @@ Reordering pipelined requests (when possible) is a new desideratum, due to the F
 
 The missing feature for servers could be implemented in `ouroboros-network`, but the best interface is not already clear.
 Once that feature is available, LeiosIteration5A and LeiosIteration5B would be sufficient for Leios with a defensibly-granular interpretation of FreshestFirstDelivery.
-See section XXX for what an even more granular interpretation of FreshestFirstDelivery would require, such as message preemption.
+See section XXX (TODO) for what an even more granular interpretation of FreshestFirstDelivery would require, such as message preemption.
 
 ### Iteration 6: extremely generic alternative
 
@@ -374,8 +377,8 @@ However, it's nothing more than reintroducing to LeiosIteration5B separate busy 
 If I recall correctly, it's "perfectly" interleaving the reponses, isn't it?
 Which is most comparable to not reordering?)
 
-If server-side reordering is required but Leios for some reason must not be blocked on the corresponding changes to `ouroboros-network`, then there is another mini protocol design that addresses all of problems identified with LeiosIteration1 above, including reordering.
-It's essentially the other possible split from Iteration 2: instead of separating notifications (LeiosIteration2A) from deliverables (LeiosIterationAB), the alternative split separates all requests from responses.
+If server-side reordering is required but Leios for some reason must not be blocked on the corresponding changes to `ouroboros-network`, then there is another mini protocol design that addresses all of the problems identified with LeiosIteration1 above, including reordering.
+It's essentially the other possible split from Iteration 2: instead of separating notifications (LeiosIteration2A) from deliverables (LeiosIteration2B), the alternative split separates all requests from responses.
 Once requests and responses are decoupled, the two server threads would simply share the state of the set of outstanding requests as sole producer and sole consumer.
 
 ```mermaid
@@ -427,6 +430,7 @@ All of the Leios details are hidden in the tagged union of (lists of) rows from 
         - Existing timeouts begin when the mini protocol enters some state, but these mini protocols spend all of their time in a single state.
         - Moreover, the duration of a timeout was determined by the specific state, but that distinction doesn't exist for these mini protocols.
         - Instead, the client's centralized decision logic that controls LeiosRequests and reacts to LeiosReply will need to explicitly manage timeouts, and do so in a way that tolerates the server reordering according to FreshestFirstDelivery, for example.
+        - A tenable timeout scheme will be proposed below.
 
 ### Detailed Message Semantics
 
@@ -486,9 +490,9 @@ Additional message details, beyond the IER table.
 - The CompletionFlag indicates whether the server considers this message to completely resolve the corresponding request.
   This flag is redundant, but it will at least be useful for troubleshooting related bugs.
   If the client disagrees with a CompletionFlag, it should disconnect.
+  The flag should be set on the LeiosDeliveries that includes the last of the objects identified by some LeiosDeliverableIds request.
   The flag should be set on the first notification whose size includes the last byte of a LeiosNotificationBytes request.
-  That same notification might include the first byte of the next LeiosNotificationsBytes request, but it should never also include the last byte of that second request.
-  The flag should also be set on the delivery that includes the last of the objects identified by some LeiosDeliverableIds request.
+  That same notification might include the first byte of the next LeiosNotificationsBytes request, but it should never also include the last byte of that second request (see MaxNotificationSize, close below).
   If it does, the client should disconnect, because the lower bound on MaxNotificationSize prevents the server from being forced to send such a message.
 - If the argument of a LeiosNotificationBytes request is less than some MaxNotificationSize constant determined by the negotiated mini protocol version, the server should disconnect.
   Every MaxNotificationSize constant must accommodate at least any single LeiosNotification carrying the biggest argument it can, so MaxNotificationSize must be no less than the maximum size of a RankingBlockHeader.
@@ -543,6 +547,7 @@ However, duplicating LeiosReply has two drawbacks.
 
 - It's an artifical workaround that would explicitly manifest in the concrete interface between communicating nodes.
   Every node would need to accommodate it, and when the workaround is eventually replaced by something preferable (eg perhaps the mux could allow a single mini protocol to interleave its own messages), the mini protocol specification would need to be updated accordingly, despite the LeiosRequest-LeiosReply pair _already_ accommodating out-of-order replies.
+  (TODO The same criticism applies to Iteration 6.)
 - The existing mux logic is flat, so adding a second Leios mini protocol instance (it's not a third, since LeiosRequest only sends messages in the opposite direction) means that Leios would sometimes consume a larger share of the bandwidth that's split among all sending mini protocols.
   This is explicitly undesirable, since Praos messages should always be prioritized over Leios messages---the fundamental restriction is that Leios must not disrupt Praos.
   (A more expressive configuration for the `ouroboros-network` mux would likely also help here; for example, biased sampling of active mini protocols.)
@@ -556,7 +561,7 @@ Because of the aforementioned restriction that the server must not combine multi
 For example, if the client tried to never send a single request that incurred more than 100,000 bytes, then---with modern bandwidths---the worst-case head-of-line blocking would be on the order of ten milliseconds.
 In the proposed Linear Leios design, the only object that is atomic and potentially larger than that is LLBs, but at most by a factor of three.
 (There might be other benefits to explicitly decomposing LLBs, such as being able to stream them across the network.
-Remarkably, the proposed mini protocols could accommodate that by merely adding one summand to LeiosDeliverable, since the sub-blocks should have unique hashes.)
+Remarkably, the proposed mini protocols might be able to already accommodate that, since the sub-blocks should have unique hashes.)
 
 TODO this assumes the server `Peer`'s `Yield` would block instead of pushing the total enqueued past 100,000 bytes?
 
@@ -569,17 +574,17 @@ Once Praos and Leios are within the same Reply mini protocol, both the client an
 
 ### Linear Leios for Syncing Nodes
 
-There are two kinds of syncing node, with Ouroboros Genesis and without (eg via a trusted relay or via a semi-centralized "bootstrap peer").
+There are two kinds of syncing node, with Ouroboros Genesis and without (ie trusting all upstream peers, eg the semi-centralized bootstrap peers).
 
 With Ouroboros Genesis, LLBs that are certified on chain should be fetched from the same peer that Devoted BlockFetch is fetching its blocks from.
 It would be sufficient to send LinearLeiosStaleBlockRangeId requests to that peer via LeiosRequest when the headers it has sent via ChainSync imply those LLBs are certified on the chain it's serving.
 The only time that node wouldn't be able to immediately serve the LLB is if the wall clock is still within that LLB's L_recover window, but in that case the syncing node could send LinearLeiosBlockId and LeiosBlockTxsId instead of LinearLeiosStaleBlockRangeId.
 
-If the node is actually a healthy caught-up upstream, is should almost always be able to promptly send the requested block.
-If it fails to do so enough that it starves the syncing node of work, then LeiosRequest should rotate the Dynamo just like Devoted BlockFetch would have.
+If the upstream node is actually healthy and caught-up, is should almost always be able to promptly send the requested blocks.
+If it fails to do so enough that it starves the syncing node of work, then LeiosRequest should rotate the Dynamo just like Devoted BlockFetch does when a Praos block is too slow to arrive.
 No other part of Ouroboros Genesis would need to change for the proposed Leios protocol.
 
-When the node is syncing without Ouroboros Genesis, LeiosRequest would do the same as above except it would not need to monitor for and react to starvation, since Devoted BlockFetch is not enabled.
+When the node is syncing without Ouroboros Genesis, LeiosRequest would do the same as above except it would not need to monitor for and react to starvation, analogously to Devoted BlockFetch being disabled in the absence of Ouroboros Genesis.
 
 With or without Ouroboros Genesis, the syncing node should not send LeiosNotificationBytes until it is nearly caught-up.
 If sent too soon, the server might reply with headers that the syncing node's ledger state is incapable of validating at all.
