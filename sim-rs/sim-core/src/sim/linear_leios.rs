@@ -170,6 +170,11 @@ impl SimCpuTask for CpuTask {
                 let mut rb_time = config.rb_generation + config.rb_body_validation_constant;
                 let rb_bytes: u64 = rb.transactions.iter().map(|tx| tx.bytes).sum();
                 rb_time += config.rb_validation_per_byte * (rb_bytes as u32);
+                if let Some(endorsement) = &rb.endorsement {
+                    let nodes = endorsement.votes.len();
+                    rb_time += config.cert_generation_constant
+                        + (config.cert_generation_per_node * nodes as u32);
+                }
 
                 let mut eb_time = config.eb_generation + config.eb_body_validation_constant;
                 let eb_bytes: u64 = eb.txs.iter().map(|tx| tx.bytes).sum();
@@ -182,6 +187,11 @@ impl SimCpuTask for CpuTask {
                 let mut time = config.rb_body_validation_constant;
                 let bytes: u64 = rb.transactions.iter().map(|tx| tx.bytes).sum();
                 time += config.rb_validation_per_byte * (bytes as u32);
+                if let Some(endorsement) = &rb.endorsement {
+                    let nodes = endorsement.votes.len();
+                    time += config.cert_validation_constant
+                        + (config.cert_validation_per_node * nodes as u32);
+                }
                 vec![time]
             }
             Self::EBHeaderValidated(_, _) => vec![config.eb_header_validation],

@@ -6,6 +6,14 @@
 
 Add a `tx-validation-cpu-time-ms-per-byte` setting, a CPU cost which applies to transactions before adding them to the mempool (or to an EB in Linear Leios).
 
+### Linear Leios
+
+Respect cerificate CPU time settings:
+ - `cert-generation-cpu-time-ms-constant`
+ - `cert-generation-cpu-time-ms-per-node` (currently set to 0)
+ - `cert-validation-cpu-time-ms-constant`
+ - `cert-validation-cpu-time-ms-per-node` (currently set to 0)
+
 ## v1.1.0
 
 ### Linear Leios
