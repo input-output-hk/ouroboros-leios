@@ -1238,11 +1238,22 @@ trade-offs**
 
 The linearization approach avoids complex distributed systems problems around
 transaction sharding and sophisticated mempool coordination that could delay
-deployment by years. While Leios does implement conflict resolution through
-transaction execution bitmaps and rolling window corrections, this represents a
-much simpler and more deterministic approach. Also, the protocol maintains
-familiar transaction semantics, deterministic ordering, and predictable finality
-patterns that existing dApps and infrastructure depend on today.
+deployment by years. Critically, this linearization approach also simplifies
+conflict resolution compared to highly concurrent variants. In the proposed
+protocol, invalid transactions typically arise only in circumstances where most
+honest stake immediately recognizes them as invalid and can treat them as such
+without ambiguity. In contrast, highly concurrent variants like Input
+Block-based protocols or more generally protocol with additional decoupled block
+production create scenarios where honest nodes become helpless when conflicts
+arise between valid transactions created simultaneously by honest participants,
+requiring more sophisticated resolution mechanisms.
+
+This simplified approach enables deterministic conflict resolution through
+transaction execution bitmaps and rolling window corrections, avoiding complex
+distributed coordination problems that could delay deployment significantly. The
+protocol also maintains familiar transaction semantics, deterministic ordering,
+and predictable finality patterns that existing dApps and infrastructure depend
+on today.
 
 <a name="downstream-impact"></a>**3. Minimal downstream impact: Ecosystem
 preservation**
