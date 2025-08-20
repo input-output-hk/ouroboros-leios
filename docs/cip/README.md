@@ -290,11 +290,12 @@ equivocation detection.
 > **Equivocation** refers to the malicious act of creating multiple conflicting
 > blocks for the same block generation opportunity.
 
-Due to the voting overhead per EB, nodes should generally avoid announcing EBs
-with insufficient transaction content to justify the voting costs, as detailed
-in the [adaptive EB production](#adaptive-eb-production) incentive mechanism.
-However, EBs may also be announced when RB resource constraints (size or Plutus
-limits) are reached, even at lower transaction volumes.
+Due to the voting overhead per EB, EBs should only be announced if the base RB
+is full or when sufficient transaction content justifies the voting costs, as
+detailed in the [adaptive EB production](#adaptive-eb-production) incentive
+mechanism. Empty EBs should not be announced in the network as they induce a
+non-zero cost. EBs may also be announced when RB resource constraints (size or
+Plutus limits) are reached, even at lower transaction volumes.
 
 #### Step 2: EB Distribution
 
@@ -316,8 +317,8 @@ detection</a>. Committee members are
 RB that announced the EB. A committee member votes for an EB only if:
 
 1. It has received the EB within $L_\text{vote}$ slots from its creation,
-2. It has **not** received an equivocated RB header for this EB within
-   $\Delta_\text{hdr}$ slots,
+2. It has **not** received an equivocating RB header for this EB within
+   $3\Delta_\text{hdr}$,
 3. The EB is the one announced by the latest RB in the voter's current chain,
 4. The EB's transactions form a **valid** extension of the RB that announced it,
 5. For non-persistent voters, it is eligible to vote based on sortition using
