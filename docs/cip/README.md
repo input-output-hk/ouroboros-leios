@@ -67,7 +67,7 @@ sustainability and reduced complexity through fewer new protocol elements.
     - [Transaction Diffusion](#transaction-diffusion)
     - [RB Block Production and Diffusion](#rb-block-production-and-diffusion)
     - [EB Diffusion](#eb-diffusion)
-    - [Voting \& Certification](#voting--certification)
+    - [Voting & Certification](#voting-certification)
     - [Next Block Production](#next-block-production)
     - [Ledger Management](#ledger-management)
     - [Epoch Boundary](#epoch-boundary)
@@ -78,8 +78,8 @@ sustainability and reduced complexity through fewer new protocol elements.
 - [Rationale](#rationale)
   - [How Leios addresses CPS-18](#how-leios-addresses-cps-18)
   - [Evidence](#evidence)
-  - [Trade-offs \& Limitations](#trade-offs--limitations)
-  - [Roadmap \& Next Steps](#roadmap--next-steps)
+  - [Trade-offs & Limitations](#trade-offs-limitations)
+  - [Roadmap & Next Steps](#roadmap-next-steps)
 - [Path to active](#path-to-active)
 - [Versioning](#versioning)
 - [References](#references)
@@ -91,7 +91,7 @@ sustainability and reduced complexity through fewer new protocol elements.
 <details>
   <summary><h2>Table of figures and tables</h2></summary>
 
-**Figures**
+### Figures
 
 - [Figure 1: Forecast of rewards on Cardano mainnet](#figure-1)
 - [Figure 2: SPO profitability under Praos, as a function of transaction volume](#figure-2)
@@ -111,7 +111,7 @@ sustainability and reduced complexity through fewer new protocol elements.
 - [Figure 16: CPU usage in Plutus-heavy workloads for Leios](#figure-16)
 - [Figure 17: SPO profitability under Leios](#figure-17)
 
-**Tables**
+### Tables
 
 - [Table 1: Network Characteristics](#table-1)
 - [Table 2: Protocol Characteristics](#table-2)
