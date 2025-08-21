@@ -42,12 +42,12 @@ tx-overcollateralization-factor-distribution:
 # for the `Apply` operation, either with or without a term for Plutus execution
 # steps.
 #
-# `Apply CPU [ms]` ~ 0 + (0.4559 ms/tx) * `Tx count`
+# `Apply CPU [ms]` / `Tx count` ~ (0.6201 ms/tx)
 #
-# `Apply CPU [ms]` ~ 0 + (0.2624 ms/tx) * `Tx count`
-#                      + (0.9487 ms/Gstep) * `Tx exec [Gstep]`
+# `Apply CPU [ms]` / `Tx count` ~ (0.6006 ms)
+#                               + (0.005765 ms/Gstep) * `Tx exec [Gstep]`
 #
-tx-validation-cpu-time-ms: 0.4559
+tx-validation-cpu-time-ms: 0.6201
 
 # Inherited from Cardano mainnet protocol parameters for Praos.
 tx-max-size-bytes: 16384
