@@ -2,6 +2,10 @@
 
 ## 2025-08-21
 
+### Analysis of diffusion of empty blocks on Cardano mainnet
+
+The Jupyter notebook [analysis/delta-header/analysis.ipynb](analysis/delta-header/analysis.ipynb) analyzes diffusion data obtained from https://pooltool.io/ for empty blocks in each epoch of Cardano mainnet. This data is used to inform estimates of the value of $\Delta_\text{hdr}$ required by the Leios protocol. Based on this data, 94.0% of empty Praos blocks arrive at nodes in less than one second after the start of the block's slot.
+
 ### Additional regressions on mainnet validation data
 
 The Jupyter notebook [analysis/timings/ReadMe.ipynb](analysis/timings/ReadMe.ipynb) has been augmented to include linear statistical models aimed at predicting the `Apply` and `Reapply` phases of the ledger update. These regressions are being used in the studies of Leios performance in the CIP, especially where higher Plutus limits are considered.
