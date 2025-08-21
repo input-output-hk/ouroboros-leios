@@ -99,17 +99,18 @@ sustainability and reduced complexity through fewer new protocol elements.
 - [Figure 4: Leios Protocol Flow](#figure-4)
 - [Figure 5: Detailed protocol flow showing rolling windows and transaction execution tracking](#figure-5)
 - [Figure 6: Up- and downstream interactions of a node (simplified)](#figure-6)
-- [Figure 7: Time for transaction to reach the ledger](#figure-7)
-- [Figure 8: Transactions reaching the ledger](#figure-8)
-- [Figure 9: Number of TX references](#figure-9)
-- [Figure 10: Disposition of transactions in blocks](#figure-10)
-- [Figure 11: Size of transactions referenced by EBs](#figure-11)
-- [Figure 12: Arrival delays for transactions, ranking blocks, votes, and endorser blocks](#figure-12)
-- [Figure 13: Mean nodal ingress (left) and Mean CPU load among all nodes (right)](#figure-13)
-- [Figure 14: Mean CPU load among all nodes](#figure-14)
-- [Figure 15: Fate of Plutus-heavy transactions in Leios](#figure-15)
-- [Figure 16: CPU usage in Plutus-heavy workloads for Leios](#figure-16)
-- [Figure 17: SPO profitability under Leios](#figure-17)
+- [Figure 7: SPO profitability forecast under Leios showing clear economic benefits once sustained throughput exceeds 50-70 TxkB/s (36-50 TPS equivalent)](#figure-7)
+- [Figure 8: Time for transaction to reach the ledger](#figure-8)
+- [Figure 9: Transactions reaching the ledger](#figure-9)
+- [Figure 10: Number of TX references](#figure-10)
+- [Figure 11: Disposition of transactions in blocks](#figure-11)
+- [Figure 12: Size of transactions referenced by EBs](#figure-12)
+- [Figure 13: Arrival delays for transactions, ranking blocks, votes, and endorser blocks](#figure-13)
+- [Figure 14: Mean nodal ingress (left) and Mean CPU load among all nodes (right)](#figure-14)
+- [Figure 15: Mean CPU load among all nodes](#figure-15)
+- [Figure 16: Fate of Plutus-heavy transactions in Leios](#figure-16)
+- [Figure 17: CPU usage in Plutus-heavy workloads for Leios](#figure-17)
+- [Figure 18: Performance comparison across three approaches: Ouroboros Praos (red), proposed Leios (teal), and research paper's over-collateralized sharded Leios (orange)](#figure-18)
 
 **Tables**
 
@@ -1525,7 +1526,7 @@ properties.
 
 The [Leios research paper][leios-paper] describes a highly concurrent protocol
 with three block types - Input Blocks (IBs), Endorser Blocks (EBs), and Ranking
-Blocks (RBs)-produced independently across decoupled, pipelined stages. This
+Blocks (RBs) - produced independently across decoupled, pipelined stages. This
 specification simplifies that design by eliminating IBs and coupling EB
 production with RB production, reducing complexity while preserving substantial
 throughput gains.
@@ -1566,6 +1567,18 @@ transactions appear "faster" while providing less utility. Current Cardano
 mainnet provides 4,500 TxB/s, while this specification targets 140,000-300,000
 TxB/s (equivalent to roughly 100-200 TPS) - a 30-65x increase sufficient for
 economic sustainability.
+
+<div align="center">
+<a name="figure-7" id="figure-7"></a>
+<p>
+  <img src="images/leios-forecast-sqrt-fill.svg" alt="SPO profitability forecast under Leios">
+</p>
+
+<em>Figure 7: SPO profitability forecast under Leios showing clear economic
+benefits once sustained throughput exceeds 50-70 TxkB/s (36-50 TPS
+equivalent)</em>
+
+</div>
 
 Achieving this capacity increase requires trade-offs, as detailed below.
 
@@ -1865,20 +1878,20 @@ throughput of Linear Leios: furthermore, it affects how long it takes
 transactions to reach the ledger as the throughput approaches the capacity.
 
 <div align="center">
-<a name="figure-7" id="figure-7"></a>
+<a name="figure-8" id="figure-8"></a>
 
 ![Time for transaction to reach the ledger](images/reach-rb-tx.svg)
 
-<em>Figure 7: Time for transaction to reach the ledger</em>
+<em>Figure 8: Time for transaction to reach the ledger</em>
 
 </div>
 
 <div align="center">
-<a name="figure-8" id="figure-8"></a>
+<a name="figure-9" id="figure-9"></a>
 
 ![Transactions reaching the ledger](images/temporal-efficiency-bar.svg)
 
-<em>Figure 8: Transactions reaching the ledger</em>
+<em>Figure 9: Transactions reaching the ledger</em>
 
 </div>
 
@@ -1895,20 +1908,20 @@ not produced or are produced too close together. The same phenomenon occurs in
 Praos, but Linear Leios amplifies the intermittency.
 
 <div align="center">
-<a name="figure-9" id="figure-9"></a>
+<a name="figure-10" id="figure-10"></a>
 
 ![Number of TX references](images/references-tx.svg)
 
-<em>Figure 9: Number of TX references</em>
+<em>Figure 10: Number of TX references</em>
 
 </div>
 
 <div align="center">
-<a name="figure-9" id="figure-9"></a>
+<a name="figure-11" id="figure-11"></a>
 
 ![Disposition of transactions in blocks](images/disposition-size-timeseries.svg)
 
-<em>Figure 10: Disposition of transactions in blocks</em>
+<em>Figure 11: Disposition of transactions in blocks</em>
 
 </div>
 
@@ -1921,11 +1934,11 @@ Thus the capacity parameter provides a natural form of backpressure that limits
 the potential EB-related work a node must do when demand is high.
 
 <div align="center">
-<a name="figure-11" id="figure-11"></a>
+<a name="figure-12" id="figure-12"></a>
 
 ![Size of transactions referenced by EBs](images/contents-ebs-size.svg)
 
-<em>Figure 11: Size of transactions referenced by EBs</em>
+<em>Figure 12: Size of transactions referenced by EBs</em>
 
 </div>
 
@@ -1945,14 +1958,14 @@ transactions, RBs, votes, and EBs do not interfere with one another: for
 example, delays in EBs and high throughput do not also delay RBs in those cases.
 
 <div align="center">
-<a name="figure-12" id="figure-12"></a>
+<a name="figure-13" id="figure-13"></a>
 
 |                                                 |                                                 |
 | ----------------------------------------------- | ----------------------------------------------- |
 | ![Arrival delay for TXs](images/elapsed-TX.svg) | ![Arrival delay for RBs](images/elapsed-RB.svg) |
 | ![Arrival delay for VTs](images/elapsed-VT.svg) | ![Arrival delay for EBs](images/elapsed-EB.svg) |
 
-<em>Figure 12: Arrival delays for transactions, ranking blocks, votes, and
+<em>Figure 13: Arrival delays for transactions, ranking blocks, votes, and
 endorser blocks</em>
 
 </div>
@@ -1980,23 +1993,23 @@ for lazy computations, caching, etc. that will spread out the occasional spikes
 in CPU usage over time.
 
 <div align="center">
-<a name="figure-13" id="figure-13"></a>
+<a name="figure-14" id="figure-14"></a>
 
 |                                                        |                                                                  |
 | ------------------------------------------------------ | ---------------------------------------------------------------- |
 | ![Mean nodal ingress](images/ingress-average-area.svg) | ![Mean CPU load among all nodes](images/cpu-mean-timeseries.svg) |
 
-<em>Figure 13: Mean nodal ingress (left) and Mean CPU load among all nodes
+<em>Figure 14: Mean nodal ingress (left) and Mean CPU load among all nodes
 (right)</em>
 
 </div>
 
 <div align="center">
-<a name="figure-14" id="figure-14"></a>
+<a name="figure-15" id="figure-15"></a>
 
 ![Mean CPU load among all nodes](images/cpu-mean-histogram.svg)
 
-<em>Figure 14: Mean CPU load among all nodes</em>
+<em>Figure 15: Mean CPU load among all nodes</em>
 
 </div>
 
@@ -2053,20 +2066,20 @@ safely be 2000 billion steps, or 100 times the Plutus budget of Praos.
 >   - [ ] Remove title and subtitle.
 
 <div align="center">
-<a name="figure-15" id="figure-15"></a>
+<a name="figure-16" id="figure-16"></a>
 
 ![Fate of Plutus-heavy transactions in Leios](images/plutus-temporal-efficiency-bar.svg)
 
-<em>Figure 15: Fate of Plutus-heavy transactions in Leios</em>
+<em>Figure 16: Fate of Plutus-heavy transactions in Leios</em>
 
 </div>
 
 <div align="center">
-<a name="figure-16" id="figure-16"></a>
+<a name="figure-17" id="figure-17"></a>
 
 ![CPU usage in Plutus-heavy workloads for Leios](images/plutus-cpu-mean-histogram.svg)
 
-<em>Figure 16: CPU usage in Plutus-heavy workloads for Leios</em>
+<em>Figure 17: CPU usage in Plutus-heavy workloads for Leios</em>
 
 </div>
 
@@ -2274,272 +2287,60 @@ security risks and practical constraints that inform deployment considerations.
 
 ### Trade-offs & Limitations
 
-This section examines the key threats, limitations, and trade-offs inherent in
-the Leios design, along with their mitigations and consequences for practical
-deployment.
+High-throughput blockchain protocols require fundamental trade-offs between
+throughput, latency, complexity, and security. The proposed specification
+balances these competing dimensions to achieve substantial throughput gains
+while preserving ecosystem compatibility.
 
-<a name="solution-space"></a>**Solution space analysis**
+<div align="center">
+<a name="figure-18" id="figure-18"></a>
 
-> [!WARNING]
->
-> TODO:
->
-> - A short overview of the threat model
-> - Highlight key 2-3 threats and mitigations
-> - Link the
->   [dedicated threat model](https://github.com/input-output-hk/ouroboros-leios/pull/452)
->   once merged?
-> - Link [threat model in report #1][threat-model], [comments in report
->   #2][threat-model-report2]?
+![Leios Variants Comparison](images/leios-variants-comparison-radar.svg)
 
-The Leios protocol may have to mitigate the following categories of threats.
+<em>Figure 18: Performance comparison across three approaches: Ouroboros Praos
+(red), proposed Leios (teal), and research paper's over-collateralized sharded
+Leios (orange)</em>
 
-- Grinding the VRF to obtain an advantage in Leios sortition
-- Equivocating IBs, EBs, or RBs
-- Declining to create IBs, EBs, or votes
-- Manipulating the content of IBs or EBs
-- Sending invalid txs, IBs, EBs, or certificates
-- Abusing the sync protocol
-- Delaying diffusion of IBs, EBs, or votes
-- Submitting invalid, conflicting, or duplicate transactions
+</div>
 
-Nearly all of these _hypothetical_ threats are already mitigated by the protocol
-design, the incentive structure, or the cost of the resources needed to execute
-the threat. The [Threat model][threat-model] section of the first Leios
-Technical report contains a detailed taxonomy that we summarize here. The
-general impact of such attacks varies:
+The comparison illustrates the fundamental trade-off between throughput capacity
+and ecosystem disruption. While the research paper's approach (orange) achieves
+higher throughput, it requires extensive ecosystem changes, significantly longer
+confirmation times (2-3 minutes), and extended development timelines (2.5-3
+years). The proposed specification (teal) strikes a strategic balance,
+delivering substantial throughput improvements while maintaining manageable
+latency increases and ecosystem compatibility.
 
-- Resource burden on nodes
-- Lowered throughput
-- Increased transaction delay
-- Manipulation of dapps or oracles
+**Key Trade-offs:**
 
-_Grinding and other threats to Praos:_ Threats to the ranking blocks used by
-Leios are already mitigated by Ouroboros Praos and Genesis. Nevertheless, the
-possibility of _grinding attacks_, as discussed in [CPS-0017][cps-17], will
-always exist, albeit at low probability of success. Such an attack, which
-requires some stake, involves using CPU resources to try to manipulate the epoch
-nonce to a value which will result in higher probability of being select as an
-RB, IB, or EB producer or as a voter in a subsequent epoch. This presumes that
-the Praos VRF will be used for the sortition in Leios. Currently, large and
-expensive amounts of CPU power would be required to successfully conduct a grind
-attack on Praos. Nevertheless, additional research and development are underway
-to further harden Praos.
+- **Throughput**: 30-65x increase (from ~4.5 TxkB/s to ~140-300 TxkB/s)
+  addresses economic sustainability and Reserve depletion timeline
+- **Transaction Inclusion Latency**: Increases from ~20 seconds to 45-60 seconds
+- **Infrastructure**: Requires modest hardware upgrades (4-core machines) and
+  cryptographic key registration, offset by enhanced rewards
+- **Time to Market**: ~1-1.5 years for deployment versus 2.5-3 years for
+  higher-concurrency alternatives
 
-_Equivocation:_ In Leios, an IB producer, EB producers, or voter is only allowed
-one production for each winning of the sortition lottery. (Note that they may
-win more than once in the same slot because a lottery takes place for each
-lovelace staked.) A malicious producer or voter might create two conflicting
-IBs, EBs, or votes and diffuse them to different downstream peers in an attempt
-to disrupt the Leios protocol. The [Leios paper][leios-paper] mitigates this
-situation explicitly by identifying nodes that misbehave in this manner and
-notifying downstream peers in a controlled manner.
+**Protocol Limitations:**
 
-_Inaction and nuisance:_ Producer nodes might also attempt to disrupt the
-protocol by failing to play their assigned role or by attempting to diffuse
-invalid information. Failing to produce a block (RB, IB, or EB) or to vote when
-entitled will result in the attacker receiving fewer rewards for their Leios
-work. Similarly for creating invalid blocks or votes. Very little advantage
-would be gained by such attacks because they really only reduce throughput or
-create a minor annoyance to their first downstream nodes by burdening them with
-useless verification work. Presumably, the loss of rewards would not compensate
-for the small disruption they create. The cryptographic aspects of Leios quickly
-catch invalid blocks or votes, of course.
+The specification involves operational constraints including timing dependencies
+that require careful parameter tuning, confirmation complexity through multiple
+transaction states, and interdependent protocol parameters requiring ongoing
+optimization. These represent acceptable trade-offs for achieving substantial
+throughput improvements while maintaining familiar transaction structures and
+ecosystem compatibility.
 
-_Omission and manipulation:_ In Praos, omitting transactions from a block being
-forged does not directly affect the producer's rewards, but it may reduce the
-overall size of the rewards pot for the whole epoch. However, a malicious
-producer has little leverage by such omissions because of the very high
-probability that the omitted transactions reside elsewhere in the memory pool
-and will soon be included in subsequent honest blocks. Reordering IBs when an EB
-is created is not an option for an attacker because the Leios paper specifies a
-fixed ordering.
+**Security Considerations:**
 
-_Network interference:_ Malicious network activity such as violating the sync
-protocol or delaying diffusion of block or votes creates a minor annoyance that
-the node's sync protocol will quickly avoid by preferring efficient and honest
-nodes. Large numbers of malicious relays would be needed to impinge on
-efficiency even in a small degree.
-
-_Denial of service:_ Transaction-based denial of service attacks on Leios would
-involve submitting numerous invalid, duplicate, or conflicting transactions to
-different nodes so that they would all make their way into the memory pool and
-then to IBs, only to be invalidated when transaction reconciliation occurs after
-those IBs are indirectly referenced by a certificate on a Praos ranking block.
-Such a denial of service would result in extra computation by the nodes and
-wasted permanent storage in the IBs. (Plutus transactions may be especially
-burdensome in this respect.) Ongoing research will mitigate such denial of
-service via sharding techniques and Leios's fee structure. Sharding will prevent
-duplicate transactions from reaching IBs and the fee structure will enforce
-payment for intentionally conflicted transactions, even though only one of the
-transactions would make it onto the ledger.
-
-<a name="key-limitations"></a>**Key limitations**
-
-<a name="eb-propagation-resilience"></a>**EB Availability Limitations**
-
-The current specification requires nodes to receive EBs within $L_\text{vote}$
-to participate in voting. When network conditions prevent nodes from obtaining
-all transactions referenced by an EB, this creates a binary outcome: either
-sufficient nodes can vote (enabling certification) or they cannot (causing the
-EB to be discarded).
-
-One potential approach to address this limitation involves
-[partial EB certification mechanisms](https://gist.githubusercontent.com/will-break-it/aa959601a13e2a9899a96de150fcafdd/raw/70b91ef564c484472ee81b2138ae4e92c5ed1088/leios-progressive-eb-certification.md)
-using merkle tree structures that would allow nodes to vote on partial
-transaction subsets when they cannot obtain all referenced transactions. This
-concept trades increased EB size for improved resilience under adverse network
-conditions, transforming the binary success/failure dynamic into graduated
-progress.
-
-This approach remains exploratory and would require careful analysis of the
-bandwidth vs. resilience trade-offs and validation through simulation to
-determine whether nodes actually receive transactions in the contiguous patterns
-the mechanism assumes.
-
-> [!WARNING]
->
-> TODO:
->
-> - ΔEB timing constraints and consequences
-> - High-throughput liveness analysis
-> - Praos safety argument impacts
-> - Increased inclusion delay trade-offs
-
-<a name="ecosystem-impact"></a>**Impact onto ecosystem**
-
-> [!WARNING]
->
-> TODO:
->
-> - Refer back to [CPS-18][cps-18] use cases and explain how proposed protocol
->   improves them
-> - Review and only mention use cases we have evidence for
-
-Leios immediately enables use cases for high transaction volume and for more
-computationally intensive Plutus scripts, but future minor modifications of the
-protocol can open additional novel and custom transaction workflows.
-
-<a id="high-transaction-volume" href="#high-transaction-volume">**High
-transaction volume**</a>
-
-Prototype simulations of the Leios protocol indicate that it can achieve at
-least 20 times the maximum throughput of the current Cardano mainnet. This
-amounts to approximately 2 MB/s or 1500 tx/s, assuming the current mean
-transaction size of 1400 bytes. The availability of Leios, however, would likely
-affect the characteristics of the mix of transactions, so the maximum
-transaction rate could be higher or lower than this estimate. Whatever the
-specifics, Leios will enable transaction volumes that are orders of magnitude
-greater than Praos.
-
-Aside from the general benefit of high capacity, several specific use cases
-could benefit.
-
-- _Enterprise or national-state adoption:_ Enterprises and nation states require
-  sustained and guaranteed scalability for their blockchain transactions, and
-  large entities may become heavy users of Cardano.
-- _Finance:_ High volume and high frequency trading may become more practical
-  given the higher throughput supported by Leios.
-- _Airdrops:_ The high throughput of Leios could streamline the user experience
-  of claiming tokens for large (or extremely large) airdrops.
-- _Partner chains, bridges, and oracles:_ Multiple simultaneous operation of
-  partner chains, bridges, and oracles on Cardano will require high transaction
-  rates and minimal delays from the time a transaction reaches the memory pool
-  to when it is recorded in the ledger.
-- _Games:_ High throughput and lower transaction cost may enable cost-effective
-  coupling of games (e.g., markets for in-game items).
-- _Improved user experience:_ From the onset of the Alonzo era, the usability of
-  particular dapps has occasionally been constrained by the transaction
-  throughput available on Praos. This is especially important and severe when a
-  popular new dapps launches and experiences high activity. Congestion that
-  sometimes occurs during spikes in transaction activity would be alleviated.
-- _More complex governance actions:_ Expansion of Cardano and DAO governance
-  would required high volumes of transactions if large portions of the community
-  participate. This is particularly important if the number of dreps increases
-  and Cardano moves towards a "direct democracy" style of voting.
-
-<a id="improved-cost-structure" href="#improved-cost-structure">**Improved cost
-structure**</a>
-
-Techno-economic analyses indicate that at a sustained transaction volume of 50
-tx/s or greater the profitability profile of Cardano will improve in several
-ways. If the current transaction fee structure remains the same as now, Leios
-would have three economic effects at 50+ tx/s:
-
-1. The intake of transaction fees would be large enough to lessen or eliminate
-   the need for supplementing rewards from the Reserve pot. In particular, the
-   `monetaryExpansion` protocol parameters to be lowered and/or the
-   `treasuryCut` parameter could be increased.
-2. Stake rewards would increase.
-3. Stake pools would become more profitable. In particular, at 50+ tx/s the
-   costlier Leios hardware would be overcome by higher rewards.
-4. Transaction fees could be somewhat lowered. That could further drive adoption
-   and make smaller transactions more cost effective, perhaps even opening the
-   possibilities for micropayments or IoT applications.
-
-The following plot shows a forecast for SPO profitability under Leios, assuming
-a "business as usual" scenario where the fee, treasury, and monetary expansion
-protocol parameter stay the same as presently. The precise profitability of
-individual SPOs depends strongly upon how they host their nodes, but there is a
-clear trend towards profitability (without any contributions from the Cardano
-Reserve) once 30-50 transactions per second are sustained. Note that
-profitability slows at very high throughput because of the substantial expense
-of network egress and storage of the ledger.
-
-![SPO profitability under Leios.](images/leios-forecast-sqrt-fill.svg)
-
-<em>Figure 17: SPO profitability under Leios</em>
-
-<a id="intensive-plutus-execution" href="#intensive-plutus-execution">**Intensive
-Plutus execution**</a>
-
-Because there typically is a time window of several seconds from the time a
-Leios endorser block can be created to when voting must complete, there is also
-an opportunity to do more computation validating transactions within an endorser
-block than for a Praos ranking block. This opens the possibility of increasing
-the Plutus execution budget for endorser blocks so that it is significantly
-larger than the budget for Praos blocks. At the very least a script could be
-allowed to use the whole Plutus execution budget for an endorser block, instead
-of just one quarter of it as is the case for Praos.
-
-Numerous emerging use cases on Cardano would benefit from larger Plutus
-execution budgets. Complex dapps currently have to split a single logical
-operation into a sequence of several transactions, increasing the development
-effort, the complexity, and the attack surface of the scripts involved.
-
-- _ZK proofs:_ It may be possible to increase the Plutus execution budget enough
-  that a complete ZK proof could verified in a single transaction.
-- _Large number of parties:_ Scripts managing potential interactions with a
-  large number of parties (e.g., airdrops, lotteries, and local accounts) are
-  intrinsically limited by Plutus execution limits.
-- _On-chain interpreters:_ Dapps like Marlowe run interpreters for their DSL in
-  a Plutus script. Execution limits currently restrict the complexity of the DSL
-  expressions that can be evaluated in a single transaction.
-
-<a id="novel-user-cases" href="#novel-user-cases">**Novel use cases**</a>
-
-Although the version of Leios proposed in this document does not support the
-particular use cases listed below, a minor variant or future version of Leios
-could.
-
-- _Priority pipelines:_ Different Leios pipelines might have different stage
-  lengths, throughput, fees, and/or Plutus execution limits, enabling
-  applications to select their level of service.
-- _Externally batched endorser blocks:_ Third parties could construct endorser
-  blocks and provide them directly to the block producers, allowing a dapp or an
-  exchange detailed control over sequencing of interdependent transactions
-  within the endorser block.
-- _Nuanced roles for SPOs:_ Leios opens the possibility of separating the
-  protocol functions into separate processes that could be run independently but
-  in coordination. For example, some SPOs (or parts of an SPO) might focus on
-  voting and validation while others might specialize in ranking block
-  production. In addition to enabling flexible configuration of Cardano worker
-  services, this could encourage new operational models for SPO consortia.
-
-The current specification delivers immediate throughput benefits while
-preserving pathways to these enhanced capabilities. The following section
-outlines how this foundation can evolve toward even higher performance and
-expanded functionality as the ecosystem matures.
+The proposed specification maintains Praos security properties while introducing
+minimal new attack vectors. New threats include equivocation by EB
+producers/voters, transaction availability attacks, and denial-of-service
+through invalid transactions. These are mitigated through cryptographic
+validation, equivocation detection, redundant connections, and economic
+disincentives. Comprehensive analysis is documented in the
+[threat model](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/threat-model.md)
+and
+[technical reports](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-2.md).
 
 ### Alternatives & Extensions
 
