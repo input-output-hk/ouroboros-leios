@@ -32,13 +32,13 @@ trap cleanup EXIT
 
 grep -E -v '(Slot|No.*Generated|CpuTask|Lottery)' sim.log | pigz -p 3 -9c > sim.log.gz &
 
-../../sim-cli-$SIM --parameters ../config.yaml network.yaml --slots 600 --conformance-events sim.log > stdout 2> stderr
+../../sim-cli-$SIM --parameters ../config.yaml network.yaml --slots 1200 --conformance-events sim.log > stdout 2> stderr
 
 wait
 
 cat << EOI > case.csv
 sim-cli,Tx start [s],Tx stop [s],Sim stop [s]
-$SIM,60,360,600
+$SIM,60,660,1200
 EOI
 
 zcat sim.log.gz \
