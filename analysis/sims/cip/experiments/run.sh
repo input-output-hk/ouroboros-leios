@@ -7,7 +7,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 
 TX_START=60
 TX_STOP=960
-SIM_STOP=1200
+SIM_STOP=1500
 BW=10
 CPU_COUNT=4
 NETWORK=topology-v2
@@ -16,9 +16,9 @@ VARIANT=linear-with-tx-references
 BLOCK_SIZE=12
 TX_SIZE=1500
 LABEL=$(basename "$PWD")
-PROPAGATION=txs-received
+PROPAGATION=eb-received
 STAGE_LENGTH_DIFF=0
-STAGE_LENGTH_VOTE=7
+STAGE_LENGTH_VOTE=15
 PLUTUS=$(echo -n "$LABEL" | sed -e 's/^\(.*\),\(.*\)/\1/')
 THROUGHPUT=$(echo -n "$LABEL" | sed -e 's/^\(.*\),\(.*\)/\2/')
 TX_SPACING_HONEST=$(echo "scale=3; $TX_SIZE / $THROUGHPUT / 1000" | bc)
@@ -51,7 +51,19 @@ yaml2json ../config.yaml \
 , "tx-generation-distribution": {distribution: "constant", value: '"$TX_SPACING_HONEST"'}
 , "tx-start-time": '"$TX_START"'
 , "tx-stop-time": '"$TX_STOP"'
-}
+} + (
+  if "'"$PLUTUS"'" == "NA"
+  then
+    {}
+  else
+    {
+      "rb-body-legacy-praos-payload-validation-cpu-time-ms-constant": (1.760 + ("'"$PLUTUS"'" | tonumber) * 0.7202)
+    , "rb-body-legacy-praos-payload-validation-cpu-time-ms-per-byte": 0.0001100
+    , "eb-body-validation-cpu-time-ms-constant": (1.760 + ("'"$PLUTUS"'" | tonumber) * 0.7202)
+    , "eb-body-validation-cpu-time-ms-per-byte": 0.0001100
+    }
+  end
+)
 ' > config.yaml
 
 function cleanup() {
@@ -60,7 +72,8 @@ function cleanup() {
 }
 trap cleanup EXIT
 
-grep -E -v '(Slot|No.*Generated|CpuTask|Lottery)' sim.log | pigz -p 3 -9c > sim.log.gz &
+#FIXME#grep -E -v '(Slot|No.*Generated|CpuTask|Lottery)' sim.log | pigz -p 3 -9c > sim.log.gz &
+grep -E -v '(Slot|CpuTask)' sim.log | pigz -p 3 -9c > sim.log.gz &
 
 case "$SIM" in
   Rust)
@@ -75,10 +88,18 @@ esac
 
 wait
 
+if [[ "$PLUTUS" == "NA" ]]
+then
 cat << EOI > case.csv
 Network,Bandwidth,CPU,Diffusion duration,Voting duration,Max EB size,Tx size,Throughput,Plutus,Tx start [s],Tx stop [s],Sim stop [s]
-$NETWORK,$BW Mb/s,$CPU_COUNT vCPU/node,L_diff = $STAGE_LENGTH_DIFF slots,L_vote = $STAGE_LENGTH_VOTE slots,$BLOCK_SIZE MB/EB,$TX_SIZE B/Tx,$THROUGHPUT TxMB/s,$PLUTUS,$TX_START,$TX_STOP,$SIM_STOP
+$NETWORK,$BW Mb/s,$CPU_COUNT vCPU/node,L_diff = $STAGE_LENGTH_DIFF slots,L_vote = $STAGE_LENGTH_VOTE slots,$BLOCK_SIZE MB/EB,$TX_SIZE B/Tx,$THROUGHPUT TxMB/s,,$TX_START,$TX_STOP,$SIM_STOP
 EOI
+else
+cat << EOI > case.csv
+Network,Bandwidth,CPU,Diffusion duration,Voting duration,Max EB size,Tx size,Throughput,Plutus,Tx start [s],Tx stop [s],Sim stop [s]
+$NETWORK,$BW Mb/s,$CPU_COUNT vCPU/node,L_diff = $STAGE_LENGTH_DIFF slots,L_vote = $STAGE_LENGTH_VOTE slots,$BLOCK_SIZE MB/EB,$TX_SIZE B/Tx,$THROUGHPUT TxMB/s,$PLUTUS Gstep/Ek,$TX_START,$TX_STOP,$SIM_STOP
+EOI
+fi
 
 zcat sim.log.gz \
 | ../../leios-trace-processor \

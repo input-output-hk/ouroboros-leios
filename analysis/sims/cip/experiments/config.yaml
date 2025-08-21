@@ -22,7 +22,7 @@ eb-size-bytes-per-ib: 32
 
 # A conservative upper bound based on empiricial data of empty Praos blocks on
 # Cardano mainnet.
-leios-header-diffusion-time-ms: 1000.0
+leios-header-diffusion-time-ms: 2000.0
 
 # Scenario-specific parameters for transaction generation.
 tx-start-time: 60                                               
@@ -38,13 +38,15 @@ tx-overcollateralization-factor-distribution:
   distribution: constant                   
   value: 0                             
 
-# Assume a lazy approach where only the Blake3b hash is computed when the
-# transaction is received. The phase 1 and phase 2 validation will be undertaken
-# when the block is generated or validated. A more sophisticated simulation
-# would track phase 1 & 2 validation whenever they occur and would not repeat
-# that. Here we use the Blake3b benchmark of a 500 MB/s hash rate and apply it
-# to a typical 2 kB transaction
-tx-validation-cpu-time-ms: 0.004
+#IGNORE## Assume a lazy approach where only the Blake3b hash is computed when the
+#IGNORE## transaction is received. The phase 1 and phase 2 validation will be undertaken
+#IGNORE## when the block is generated or validated. A more sophisticated simulation
+#IGNORE## would track phase 1 & 2 validation whenever they occur and would not repeat
+#IGNORE## that. Here we use the Blake3b benchmark of a 500 MB/s hash rate and apply it
+#IGNORE## to a typical 2 kB transaction.
+#IGNORE#tx-validation-cpu-time-ms: 0.004
+
+tx-validation-cpu-time-ms: 0.2147
 
 # Inherited from Cardano mainnet protocol parameters for Praos.
 tx-max-size-bytes: 16384
@@ -52,7 +54,7 @@ rb-generation-probability: 0.05
 rb-head-size-bytes: 1024
 rb-body-max-size-bytes: 90112
 
-# Based on benchmark cluster "Forging: Slot start to announced".
+# Worst case based on benchmark cluster "Forging: Slot start to announced".
 rb-generation-cpu-time-ms: 71.02
 
 # Based on `apply` statistics for empty blocks using `db-analyser` on blocks
@@ -60,24 +62,29 @@ rb-generation-cpu-time-ms: 71.02
 rb-head-validation-cpu-time-ms: 0.4438
 eb-header-validation-cpu-time-ms: 0.4438
 
-# Since only the transaction hashes were previously verified, the complete
-# `apply`, including phase 1 & 2 validation, must occur when an RB or EB is
-# generated. We base the values adopted upon empirical analysis of
-# `db-analyser` results for Cardano mainnet blocks. We estimate the following
-# regression formulae.
-#
-# Application time as a function of the total size of transactions:
-#   `Apply CPU [ms]` ~ (1.965326 ms) + (0.180536 ms/kB) * `Txs size [kB]`
-#
-# Application time as a function of the total size of transactions and the
-# Plutus execution steps:
-#   `Apply CPU [ms]` ~ (1.7600 ms) + (0.1100 ms/kB) * `Txs size [kB]`
-#                    + (0.7202 ms/Gstep) * `Txs execution units [Gstep]`
-#   
-rb-body-legacy-praos-payload-validation-cpu-time-ms-constant: 1.965326
-rb-body-legacy-praos-payload-validation-cpu-time-ms-per-byte: 0.000180536
-eb-body-validation-cpu-time-ms-constant: 1.965326
-eb-body-validation-cpu-time-ms-per-byte: 0.000180536
+#IGNORE## Since only the transaction hashes were previously verified, the complete
+#IGNORE## `apply`, including phase 1 & 2 validation, must occur when an RB or EB is
+#IGNORE## generated. We base the values adopted upon empirical analysis of
+#IGNORE## `db-analyser` results for Cardano mainnet blocks. We estimate the following
+#IGNORE## regression formulae.
+#IGNORE##
+#IGNORE## Application time as a function of the total size of transactions:
+#IGNORE##   `Apply CPU [ms]` ~ (1.965326 ms) + (0.180536 ms/kB) * `Txs size [kB]`
+#IGNORE##
+#IGNORE## Application time as a function of the total size of transactions and the
+#IGNORE## Plutus execution steps:
+#IGNORE##   `Apply CPU [ms]` ~ (1.7600 ms) + (0.1100 ms/kB) * `Txs size [kB]`
+#IGNORE##                    + (0.7202 ms/Gstep) * `Txs execution units [Gstep]`
+#IGNORE##   
+#IGNORE#rb-body-legacy-praos-payload-validation-cpu-time-ms-constant: 1.965326
+#IGNORE#rb-body-legacy-praos-payload-validation-cpu-time-ms-per-byte: 0.000180536
+#IGNORE#eb-body-validation-cpu-time-ms-constant: 1.965326
+#IGNORE#eb-body-validation-cpu-time-ms-per-byte: 0.000180536
+   
+rb-body-legacy-praos-payload-validation-cpu-time-ms-constant: 0.3539
+rb-body-legacy-praos-payload-validation-cpu-time-ms-per-byte: 0.00002151
+eb-body-validation-cpu-time-ms-constant: 0.3539
+eb-body-validation-cpu-time-ms-per-byte: 0.00002151
 
 # Based on analysis of wFA+LS sortition for realistic stake distribution similar
 # to that of Cardano mainnet.
