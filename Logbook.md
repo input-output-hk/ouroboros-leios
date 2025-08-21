@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2025-08-21
+
+### Additional regressions on mainnet validation data
+
+The Jupyter notebook [analysis/timings/ReadMe.ipynb](analysis/timings/ReadMe.ipynb) has been augmented to include linear statistical models aimed at predicting the `Apply` and `Reapply` phases of the ledger update. These regressions are being used in the studies of Leios performance in the CIP, especially where higher Plutus limits are considered.
+
 ## 2025-08-15
 
 ### Parameter-sweep experiment for late-EB attacks
