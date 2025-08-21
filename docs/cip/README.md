@@ -2226,9 +2226,7 @@ preserving pathways to these enhanced capabilities. The following section
 outlines how this foundation can evolve toward even higher performance and
 expanded functionality as the ecosystem matures.
 
-### Roadmap & Next Steps
-
-**Long-term roadmap**
+### Alternatives & Extensions
 
 The proposed Leios specification provides a foundation for progressive
 enhancement toward higher throughput variants while maintaining ecosystem
@@ -2237,6 +2235,18 @@ following pathways could become more attractive to implement, each offering
 distinct trade-offs in terms of user experience, implementation cost, security
 considerations, and throughput potential. This roadmap outlines key development
 pathways that build incrementally upon the base protocol.
+
+> [!WARNING]
+> TODO:
+> **Increase praos parameters**
+>
+> - Bigger blocks and/or higher active slot coefficient
+> - ΔQ analysis and simulations confirm there is some room to improve
+>     - Analysis of 50 tx/s and 100 tx/s (84 TxkB/s and 172 TxkB/s respectively): https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w26/analysis-praos.ipynb
+> - As alternative: The 50 tx/s case would be enough for economically sustainable throughput, but RB diffusion dangerously close at Δ assumption and leading to increased amount of forks in the network
+>     - Link Brian's slides of more forks too?
+>     - The change alone does not give more room to grow
+> - As extension: Instead of bigger blocks, more frequent blocks could enhance Leios variants leading to more frequent certifications and lower inclusion latency (but tighter requirements on EB diffusion)
 
 **Transaction Groups**
 
