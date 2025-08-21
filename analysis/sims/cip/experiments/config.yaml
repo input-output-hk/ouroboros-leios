@@ -8,8 +8,8 @@ cleanup-policies:
 # Protocol parameters for Linear Leios.
 leios-variant: linear-with-tx-references
 linear-eb-propagation-criteria: eb-received
-linear-vote-stage-length-slots: 15
-linear-diffuse-stage-length-slots: 0
+linear-vote-stage-length-slots: 7
+linear-diffuse-stage-length-slots: 7
 praos-fallback-enabled: true      
 leios-stage-active-voting-slots: 1
 leios-mempool-sampling-strategy: ordered-by-id
@@ -38,15 +38,16 @@ tx-overcollateralization-factor-distribution:
   distribution: constant                   
   value: 0                             
 
-#IGNORE## Assume a lazy approach where only the Blake3b hash is computed when the
-#IGNORE## transaction is received. The phase 1 and phase 2 validation will be undertaken
-#IGNORE## when the block is generated or validated. A more sophisticated simulation
-#IGNORE## would track phase 1 & 2 validation whenever they occur and would not repeat
-#IGNORE## that. Here we use the Blake3b benchmark of a 500 MB/s hash rate and apply it
-#IGNORE## to a typical 2 kB transaction.
-#IGNORE#tx-validation-cpu-time-ms: 0.004
-
-tx-validation-cpu-time-ms: 0.2147
+# Based on a linear model fit from `db-analyser` measurements of mainnet blocks
+# for the `Apply` operation, either with or without a term for Plutus execution
+# steps.
+#
+# `Apply CPU [ms]` ~ 0 + (0.4559 ms/tx) * `Tx count`
+#
+# `Apply CPU [ms]` ~ 0 + (0.2624 ms/tx) * `Tx count`
+#                      + (0.9487 ms/Gstep) * `Tx exec [Gstep]`
+#
+tx-validation-cpu-time-ms: 0.4559
 
 # Inherited from Cardano mainnet protocol parameters for Praos.
 tx-max-size-bytes: 16384
@@ -62,34 +63,24 @@ rb-generation-cpu-time-ms: 71.02
 rb-head-validation-cpu-time-ms: 0.4438
 eb-header-validation-cpu-time-ms: 0.4438
 
-#IGNORE## Since only the transaction hashes were previously verified, the complete
-#IGNORE## `apply`, including phase 1 & 2 validation, must occur when an RB or EB is
-#IGNORE## generated. We base the values adopted upon empirical analysis of
-#IGNORE## `db-analyser` results for Cardano mainnet blocks. We estimate the following
-#IGNORE## regression formulae.
-#IGNORE##
-#IGNORE## Application time as a function of the total size of transactions:
-#IGNORE##   `Apply CPU [ms]` ~ (1.965326 ms) + (0.180536 ms/kB) * `Txs size [kB]`
-#IGNORE##
-#IGNORE## Application time as a function of the total size of transactions and the
-#IGNORE## Plutus execution steps:
-#IGNORE##   `Apply CPU [ms]` ~ (1.7600 ms) + (0.1100 ms/kB) * `Txs size [kB]`
-#IGNORE##                    + (0.7202 ms/Gstep) * `Txs execution units [Gstep]`
-#IGNORE##   
-#IGNORE#rb-body-legacy-praos-payload-validation-cpu-time-ms-constant: 1.965326
-#IGNORE#rb-body-legacy-praos-payload-validation-cpu-time-ms-per-byte: 0.000180536
-#IGNORE#eb-body-validation-cpu-time-ms-constant: 1.965326
-#IGNORE#eb-body-validation-cpu-time-ms-per-byte: 0.000180536
-   
+# Based on a linear model fit from `db-analyser` measurements of mainnet blocks
+# for the `Reapply` operation, either with or without a term for Plutus
+# execution steps.
+#
+# `Reapply CPU [ms]` ~ (0.3539 ms) + (0.02151 ms/kB) * `Tx size [kB]`
+#
+# `Reapply CPU [ms]` ~ (0.3478 ms) + (0.01943 ms/kB) * `Tx size [kB]`
+#                                  + (0.02127 ms/Gstep) * `Tx exec [Gstep]`
+#
 rb-body-legacy-praos-payload-validation-cpu-time-ms-constant: 0.3539
 rb-body-legacy-praos-payload-validation-cpu-time-ms-per-byte: 0.00002151
 eb-body-validation-cpu-time-ms-constant: 0.3539
 eb-body-validation-cpu-time-ms-per-byte: 0.00002151
 
 # Based on analysis of wFA+LS sortition for realistic stake distribution similar
-# to that of Cardano mainnet.
-vote-generation-probability: 500.0
-vote-threshold: 300
+# to that of Cardano mainnet, and on the security requirement.
+vote-generation-probability: 600
+vote-threshold: 450
 
 # Based on CDDL for votes, worst case for non-persistent voters.
 vote-bundle-size-bytes-constant: 0
