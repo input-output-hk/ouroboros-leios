@@ -25,8 +25,8 @@
       <line x1="0" y1="0" x2="-160" y2="0"/>
     </g>
     
-    <!-- Over-collateralized Sharded Leios polygon (1+ TxMB/s, 300s+ inclusion, very high ecosystem cost, 2.75yr) - drawn first (behind others) -->
-    <polygon points="0,-155 150,0 0,140 -105,0" 
+    <!-- Over-collateralized Sharded Leios polygon (1+ TxMB/s, 300s+ inclusion, very high ecosystem cost, 3+ yr) - drawn first (behind others) -->
+    <polygon points="0,-155 150,0 0,140 -160,0" 
              fill="rgba(255, 165, 0, 0.3)" 
              stroke="#cc7a00" 
              stroke-width="2"/>
@@ -48,7 +48,7 @@
       <circle cx="0" cy="-155" r="4"/>
       <circle cx="150" cy="0" r="4"/>
       <circle cx="0" cy="140" r="4"/>
-      <circle cx="-105" cy="0" r="4"/>
+      <circle cx="-160" cy="0" r="4"/>
     </g>
     
     <!-- Data points for Proposed Leios -->
@@ -69,7 +69,7 @@
     
     <!-- Axis labels with proper spacing -->
     <text x="0" y="-185" text-anchor="middle" font-family="Arial" font-size="14" font-weight="bold" fill="#333">Throughput</text>
-    <text x="0" y="-171" text-anchor="middle" font-family="Arial" font-size="11" fill="#666" font-weight="bold">(Transaction Bytes per Second)</text>
+    <text x="0" y="-171" text-anchor="middle" font-family="Arial" font-size="11" fill="#666" font-weight="bold">(KiloBytes per Second)</text>
     
     <text x="200" y="5" text-anchor="start" font-family="Arial" font-size="14" font-weight="bold" fill="#333">Inclusion Latency</text>
     <text x="200" y="19" text-anchor="start" font-family="Arial" font-size="11" font-weight="bold" fill="#666">(Seconds)</text>
@@ -82,7 +82,7 @@
     
     <!-- Circular axis labels at intersection points -->
     <!-- Throughput axis (center = 0, outward = higher) - orders of magnitude -->
-    <text x="12" y="-155" font-family="Arial" font-size="11" fill="#999">1+ TxMB/s</text>
+    <text x="12" y="-155" font-family="Arial" font-size="11" fill="#999">1,000+ TxkB/s</text>
     <text x="12" y="-115" font-family="Arial" font-size="11" fill="#999">100 TxkB/s</text>
     <text x="12" y="-75" font-family="Arial" font-size="11" fill="#999">10 TxkB/s</text>
     <text x="12" y="-35" font-family="Arial" font-size="11" fill="#999">1 TxkB/s</text>
@@ -101,8 +101,8 @@
     
     <!-- Time to Market axis (center = 0 for Praos, outward = longer) -->
     <text x="-165" y="15" font-family="Arial" font-size="11" fill="#999">3+ yr</text>
-    <text x="-125" y="15" font-family="Arial" font-size="11" fill="#999">2.5yr</text>
-    <text x="-85" y="15" font-family="Arial" font-size="11" fill="#999">1.5yr</text>
+    <text x="-125" y="15" font-family="Arial" font-size="11" fill="#999">2 yr</text>
+    <text x="-85" y="15" font-family="Arial" font-size="11" fill="#999">1 yr</text>
     <text x="-45" y="15" font-family="Arial" font-size="11" fill="#999">0.5yr</text>
   </g>
   
