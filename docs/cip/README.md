@@ -1032,7 +1032,8 @@ But these details do not necessarily constrain the Leios implementation.
 The implementation of the Leios overlay must satisfy the following requirements.
 
 - **Leios Correctness**.
-  The nodes must exchange the new Leios data while prioritizing younger over older as implied by Leios's freshest-first delivery assumption.
+  The nodes must exchange the Leios data while prioritizing younger over older as implied by Leios's freshest-first delivery assumption.
+  Because Leios is about improved resource utilization, wasting resources via unnecessary overhead/latency/etc can be considered a correctness violation, even more so than in Praos.
 - **Praos Independence**.
   The Cardano network must grow RB chains—both adversarial and honest—of the same shape (i.e., forks and their lengths) regardless of whether it's executing the Leios overlay.
   In other words, the shape of all RB forks that exist at some instant would ideally not provide any indication whether the Leios overlay is being executed.
@@ -1060,7 +1061,7 @@ The $L_\text{diff}$ parameter prevents such urgency inversion from occurring eno
 
 In reality, the priorization of Praos over Leios does not need to be perfectly strict (and in fact could never be on hardware and software infrastructure that is mostly commodity and partly public).
 The fundamental requirement is that the network assumptions that were originally used to parametrize Praos must still be valid—up to some tolerated error probability—when the same nodes are simultaneously executing the Leios overlay.
-Concretely, the worst case delay between an honest block producer issuing a uniquely best RB and the last honest block producer selecting that RB (i.e., Praos's $\Delta$) must not be protracted by Leios so much that the existing Praos parameter values (eg the stability window of 36 hr) are no longer sufficient.
+Concretely, the worst case delay between an honest block producer issuing a uniquely best RB and the last honest block producer selecting that RB (i.e., Praos's $\Delta$) must not be protracted by Leios so much that the existing Praos parameter values (e.g., the stability window of 36 hr) are no longer sufficient.
 
 **Leios Correctness**.
 The implementation of freshest-first delivery also does not need to be perfect.
@@ -1191,7 +1192,7 @@ The mini-protocol pair does not already address the following challenges, but th
 - With server-side reordering, LeiosFetch could also be free to interleave small replies to vote requests with large replies to block/transaction requests.
   Without it, however, the colocation of small replies and large replies in a single mini-protocol (that has granular states) leads to head-of-line blocking.
   That blocking might increase some key latencies, thereby threatening freshest-first delivery or even motivating inflations of $L_\text{vote}$ and/or  $L_\text{diff}$.
-  One immediate option is to have two instances of LeiosFetch, and reserve one for requests that are small and urgent (eg small blocks, a few missing transactions, or perhaps all votes).
+  One immediate option is to have two instances of LeiosFetch, and reserve one for requests that are small and urgent (e.g., small blocks, a few missing transactions, or perhaps all votes).
 
 **Operational certficate issue numbers (OCINs)**.
 There is one more clarification regarding feasibility, that is more subtle than the rest.
