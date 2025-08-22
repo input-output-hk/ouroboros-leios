@@ -103,7 +103,6 @@
     <text x="-165" y="15" font-family="Arial" font-size="11" fill="#999">3+ yr</text>
     <text x="-125" y="15" font-family="Arial" font-size="11" fill="#999">2 yr</text>
     <text x="-85" y="15" font-family="Arial" font-size="11" fill="#999">1 yr</text>
-    <text x="-45" y="15" font-family="Arial" font-size="11" fill="#999">0.5yr</text>
   </g>
   
   <!-- Legend - centered horizontally -->
