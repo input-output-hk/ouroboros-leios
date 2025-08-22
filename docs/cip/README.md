@@ -2307,35 +2307,48 @@ incentives and conflict resolution trade-offs.
 
 The proposal will be considered active once the following criteria are met:
 
-- [ ] Protocol performance validated through load tests in a representative environment.
-- [ ] Required changes are documented in an implementation-independent way via the [Cardano blueprint](https://cardano-scaling.github.io/cardano-blueprint/) including conformance tests.
+- [ ] Protocol performance validated through load tests in a representative
+      environment.
+- [ ] Required changes are documented in an implementation-independent way via
+      the
+      [Cardano blueprint](https://cardano-scaling.github.io/cardano-blueprint/)
+      including conformance tests.
 - [ ] Formal specification of the consensus and ledger changes is available.
 - [ ] ΔQSD model available for Leios parameter selection.
 - [ ] Community agreement on initial Leios protocol parameters.
 - [ ] A peer-reviewed implementation of a Leios-enabled node is available.
-- [ ] Successful operation with open participation in testnet environments over several months.
-- [ ] Key infrastructure signalled readiness for Leios-enhanced throughput. 
+- [ ] Successful operation with open participation in testnet environments over
+      several months.
+- [ ] Key infrastructure signalled readiness for Leios-enhanced throughput.
 - [ ] Hard-fork enabling Leios is successfully executed on mainnet.
 
 **Implementation plan**
 
-Key steps on the roadmap to realize Leios, somewhat ordered but not sequential, are:
+Key steps on the roadmap to realize Leios, somewhat ordered but not sequential,
+are:
 
 - [x] Simulations to confirm general feasibility using a model of mainnet.
 - [x] Ecosystem impact analysis and establish a threat model.
-- [ ] Coordinate with related activities on other protocol enhancements (Phalanx, Peras, Mithril).
-- [ ] Detailed node-level (as opposed to this protocol-level) technical specification.
+- [ ] Coordinate with related activities on other protocol enhancements
+      (Phalanx, Peras, Mithril).
+- [ ] Detailed node-level (as opposed to this protocol-level) technical
+      specification.
 - [ ] Complete ΔQSD analysis of new/changed network interactions.
-- [ ] Complete formal protocol specification in Agda of ledger and consensus changes.
+- [ ] Complete formal protocol specification in Agda of ledger and consensus
+      changes.
 - [ ] Create network prototypes and conduct large scale experiments.
-  - Load tests in a controlled topology 
+  - Load tests in a controlled topology
   - Validate protocol parameters
   - Stake- and network-based attacks
-- [ ] Develop node-level, but implementation-independent conformance test suites (blueprint).
-- [ ] Create a public leios-specific testnet with repeated load tests and encourage dependant infrastructure updates.
-- [ ] Implement / integrate necessary changes to `cardano-node` and other node implementations (this is big).
+- [ ] Develop node-level, but implementation-independent conformance test suites
+      (blueprint).
+- [ ] Create a public leios-specific testnet with repeated load tests and
+      encourage dependant infrastructure updates.
+- [ ] Implement / integrate necessary changes to `cardano-node` and other node
+      implementations (this is big).
 - [ ] Audit protocol and implementation changes.
-- [ ] Align on node releases and hard-fork schedule to mature pre-releases through preview and preprod testnets.
+- [ ] Align on node releases and hard-fork schedule to mature pre-releases
+      through preview and preprod testnets.
 
 ## Versioning
 
