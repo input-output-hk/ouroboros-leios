@@ -57,7 +57,7 @@ yaml2json ../config.yaml \
     {}
   else
     {
-      "tx-validation-cpu-time-ms": (0.6006 + ("'"$PLUTUS"'" | tonumber) * 0.05 / '"$THROUGHPUT"' * '"$TX_SIZE"' * 0.005765)
+      "tx-validation-cpu-time-ms": (0.6006 + ("'"$PLUTUS"'" | tonumber) * 0.05 / '"$THROUGHPUT"' / 1000000 * '"$TX_SIZE"' * 0.005765)
     , "rb-body-legacy-praos-payload-validation-cpu-time-ms-constant": (0.3478 + 20 * 0.02127)
     , "rb-body-legacy-praos-payload-validation-cpu-time-ms-per-byte": 0.00001943
     , "eb-body-validation-cpu-time-ms-constant": (0.3478 + (("'"$PLUTUS"'" | tonumber) - 20) * 0.02127)
