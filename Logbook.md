@@ -35,9 +35,9 @@ Findings:
 
 Artifacts:
 
-- [Slides](analysis/simms/2025w33b/ReadMe.pdf)
-- [Notebook](analysis/simms/2025w33b/analysis.ipynb)
-- [Configurations](analysis/simms/2025w33b/experiments/)
+- [Slides](analysis/sims/2025w33b/ReadMe.pdf)
+- [Notebook](analysis/sims/2025w33b/analysis.ipynb)
+- [Configurations](analysis/sims/2025w33b/experiments/)
 
 ### Rust simulation
 

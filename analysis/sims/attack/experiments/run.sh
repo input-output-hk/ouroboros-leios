@@ -95,8 +95,8 @@ esac
 wait
 
 cat << EOI > case.csv
-Simulator,Propagation,Network,Bandwidth,CPU,Diffusion duration,Voting duration,Max EB size,Adversary,EB delay,Tx attack,Tx size,Throughput,Tx start [s],Tx stop [s],Sim stop [s]
-$SIM,$PROPAGATION,$NETWORK,$BW Mb/s,$CPU_COUNT vCPU/node,L_diff = $STAGE_LENGTH_DIFF slots,L_vote = $STAGE_LENGTH_VOTE slots,$BLOCK_SIZE MB/EB,33% adversary,EB attack: $(echo "$EB_DELAY s/EB" | sed -e 's@^0\.0 s/EB@none@'),Tx attack: $(echo "$((100 * TX_ATTACK))%" | sed -e 's@^0%@none@'),$TX_SIZE B/Tx,$THROUGHPUT TxMB/s,$TX_START,$TX_STOP,$SIM_STOP
+Adversary,EB delay,Tx attack,Tx size,Throughput,Tx start [s],Tx stop [s],Sim stop [s]
+33% adversary,EB attack: $(echo "$EB_DELAY s/EB" | sed -e 's@^0\.0 s/EB@none@'),Tx attack: $(echo "$((100 * TX_ATTACK))%" | sed -e 's@^0%@none@'),$TX_SIZE B/Tx,$THROUGHPUT TxMB/s,$TX_START,$TX_STOP,$SIM_STOP
 EOI
 
 zcat sim.log.gz \
