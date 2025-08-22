@@ -1068,14 +1068,14 @@ The prioritization of young over old merely needs to be robust enough to justify
 
 ##### Feasbility Sketch
 
-The following two new mini protocols would be feasible and tractable for a Leios implementation.
+The following two new mini-protocols would be feasible and tractable for a Leios implementation.
 
-If the general structure and semantics of mini protocols is not already familiar, see the Chapter 2 "Multiplexing mini-protocols" and Chapter 3 "Mini Protocols" of the `ouroboros-network`'s [Ouroboros Network Specification PDF](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf).
-A brief summary is that a mini protocol is a state machine that two nodes cooperatively navigate; each node only sends a message when it has _agency_, and at most one node has agency in any state.
+If the general structure and semantics of mini-protocols is not already familiar, see the Chapter 2 "Multiplexing mini-protocols" and Chapter 3 "Mini-Protocols" of the `ouroboros-network`'s [Ouroboros Network Specification PDF](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf).
+A brief summary is that a mini-protocol is a state machine that two nodes cooperatively navigate; each node only sends a message when it has _agency_, and at most one node has agency in any state.
 The agencies are indicated in this document as gold or cyan.
 
 The gold agency is the client, the downstream peer that initiated the connection, and cyan is the server.
-If some of a node's upstream peers are also downstream peers, then there are two instances of the mini protocol running independently for each such peer, with the node as the client in one and the server in the other.
+If some of a node's upstream peers are also downstream peers, then there are two instances of the mini-protocol running independently for each such peer, with the node as the client in one and the server in the other.
 Recall that Cardano's topology results in each relay having many more downstream peers than upstream peers.
 Syncing peers will be discussed below.
 
@@ -1119,7 +1119,7 @@ The primary messages will carry information that is directly required by the Lei
 However, some lower-level information must also be carried by secondary messages, eg indicating when the peer is first able to send the block.
 
 The required exchanges between two neighboring nodes is captured by the following Information Exchange Requirements table (IER table).
-For the sake of minimizing this demonstration of feasibility, each row is a mini protocol message, but that correspondence in the real implementation does not need to be one-to-one.
+For the sake of minimizing this demonstration of feasibility, each row is a mini-protocol message, but that correspondence in the real implementation does not need to be one-to-one.
 
 <div align="center">
 <a name="table-99" id="table-99"></a>
@@ -1144,16 +1144,16 @@ For the sake of minimizing this demonstration of feasibility, each row is a mini
 <em>Table 99: Leios Information Exchange Requirements table (IER table)</em>
 </div>
 
-This mini protocol pair satisfies the above requirements in the following ways.
+This mini-protocol pair satisfies the above requirements in the following ways.
 
-- These mini protocols have less width than the LocalStateQuery mini protocol and less depth than the TxSubmission mini protocol.
+- These mini-protocols have less width than the LocalStateQuery mini-protocol and less depth than the TxSubmission mini-protocol.
   Thus, its structure is not prohibitively complicated, and e.g. per-state timeouts can be tuned analogously to existing protocols.
 - ChainSync, BlockFetch, and TxSubmission are unchanged.
-  Moreover, they can progress independently of the Leios mini protocols because they are separate mini protocols.
-- Depending on how severely the node must prioritize Praos over Leios, the separation of their mini protocols may simplify the prioritization mechanism.
+  Moreover, they can progress independently of the Leios mini-protocols because they are separate mini-protocols.
+- Depending on how severely the node must prioritize Praos over Leios, the separation of their mini-protocols may simplify the prioritization mechanism.
   However, urgency inversion means that at least MsgLeiosBlockRangeRequest, MsgLeiosNextBlockAndTxsInRange, and MsgLeiosLastBlockAndTxsInRange may occasionally need to have the same priority as Praos.
-  If it would benefit the prioritization implementation, those three messages could be isolated in a third Leios mini protocol that has equal priorty as the Praos mini protocols.
-- LeiosNotify and LeiosFetch can also progress independently, because they are separate mini protocols.
+  If it would benefit the prioritization implementation, those three messages could be isolated in a third Leios mini-protocol that has equal priorty as the Praos mini-protocols.
+- LeiosNotify and LeiosFetch can also progress independently, because they are separate mini-protocols.
   A client can therefore receive notifications about new Leios data and when it could be fetched from this peer even while a large reply is arriving via LeiosFetch.
   This avoids unnecessary increases in the latency of Leios messages.
 - The client can prioritize the youngest of outstanding offers from the peer when deciding which LeiosFetch request to send next, as freshest-first delivery requires.
@@ -1180,16 +1180,16 @@ This mini protocol pair satisfies the above requirements in the following ways.
   These age restrictions ensure that the amount of data any honest client could request _with urgency_ is always bounded, and so the server's memory requirements are also bounded.
   Because equivocation detection prevents limits the about of Leios traffic per Praos election, and Praos elections are almost always separate by a matter of seconds, this memory bound is lower enough to admit existing Cardano infrastructure.
 
-The mini protocol pair does not already address the following challenges, but the corresponding enrichments---if necessary---seem tractable.
+The mini-protocol pair does not already address the following challenges, but the corresponding enrichments---if necessary---seem tractable.
 
-- Depending on how severely the node must prioritize younger Leios traffic over older, the mini protocols' states might need to be less granular.
+- Depending on how severely the node must prioritize younger Leios traffic over older, the mini-protocols' states might need to be less granular.
   Because distinct client requests transition to distinct cyan states, the server is unable to reply to the client's requests in a different order than the client sent them.
   If a client pipelined several requests and then learned of a new youngest EB and requested it, the server---if timing allows---could conceptually reply to that last request before the others, for the sake of freshest-first delivery.
-  But it cannot do so if the mini protocol's structure prevents those replies, as the existing granular states do.
-  The existing support for pipelined requests within the Cardano mini protocol infrastructure was only concerned about latency hiding, and so does not explicitly support server-side request reordering.
-  It is already achievable with the existing infrastructure, but only by splitting the mini protocol's requests and responses into different mini protocols, which might be prohibitively obfuscated.
+  But it cannot do so if the mini-protocol's structure prevents those replies, as the existing granular states do.
+  The existing support for pipelined requests within the Cardano mini-protocol infrastructure was only concerned about latency hiding, and so does not explicitly support server-side request reordering.
+  It is already achievable with the existing infrastructure, but only by splitting the mini-protocol's requests and responses into different mini-protocols, which might be prohibitively obfuscated.
 - With server-side reordering, LeiosFetch could also be free to interleave small replies to vote requests with large replies to block/transaction requests.
-  Without it, however, the colocation of small replies and large replies in a single mini protocol (that has granular states) leads to head-of-line blocking.
+  Without it, however, the colocation of small replies and large replies in a single mini-protocol (that has granular states) leads to head-of-line blocking.
   That blocking might increase some key latencies, thereby threatening freshest-first delivery or even motivating inflations of $L_\text{vote}$ and/or  $L_\text{diff}$.
   One immediate option is to have two instances of LeiosFetch, and reserve one for requests that are small and urgent (eg small blocks, a few missing transactions, or perhaps all votes).
 
@@ -1201,7 +1201,7 @@ This would be trivial to enforce on both the client and the server, if it were n
 With the current Praos system, a Stake Pool Operator (SPO) is free to issue an arbitrary OCIN every time they issue an RB header, but honest SPOs will only increment their OCIN when they need to.
 Whether the OCIN carried by some header is valid depends on the chain it extends, because the Praos protocol rules along a single chain only allow an SPO's OCIN to be incremented at most once per header issued by that SPO.
 
-The Leios mini protocols, in contrast, are expected to diffuse contemporary EBs regardless of which chain they're on, and so cannot assume that it has seen the predecessor header of every MsgLeiosBlockAnnouncement.
+The Leios mini-protocols, in contrast, are expected to diffuse contemporary EBs regardless of which chain they're on, and so cannot assume that it has seen the predecessor header of every MsgLeiosBlockAnnouncement.
 It also can't simply require that it has seen them all, because that would complicate the timing restrictions and require tracking a potentially unbounded number of forks.
 Thus, neither of the following simple extremes would be acceptable for Leios.
 
