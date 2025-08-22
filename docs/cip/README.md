@@ -221,9 +221,9 @@ the foundation for subsequent protocol versions with higher throughput capacity.
 
 Ouroboros Leios achieves higher transaction throughput by allowing block
 producers to create additional blocks alongside the regular Praos chain. These
-supplementary blocks, called **Endorser Blocks (EBs)**, reference extra transactions
-that would otherwise wait for future slots. To ensure safety, these blocks
-undergo committee validation before their transactions become part of the
+supplementary blocks, called **Endorser Blocks (EBs)**, reference extra
+transactions that would otherwise wait for future slots. To ensure safety, these
+blocks undergo committee validation before their transactions become part of the
 permanent ledger.
 
 The key insight is that we can maintain Praos' security guarantees while
