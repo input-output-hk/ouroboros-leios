@@ -1016,27 +1016,59 @@ mempool capacity to support both RB and EB transaction pools.
 
 #### Leios Mini-Protocols
 
-Leios introduces **five new mini-protocols** to handle the additional message
+Leios will introduce new mini-protocols to handle the additional message
 types required for EB distribution, voting, and certificate construction.
 
-<div align="center">
-<a name="table-10" id="table-10"></a>
+This CIP does not specify how exactly Leios nodes exchange messages.
+Those details must eventually be specified so that different node implementations can interoperate, but that standardization can be deferred to a follow-up CIP.
+The present CIP is only obligated to list key requirements and demonstrate they're satisfiable—that some implementation is feasible and not prohibitively complicated.
 
-|   **Protocol**    | **Purpose**                                        | **Timing Constraint**                      |
-| :---------------: | -------------------------------------------------- | ------------------------------------------ |
-| **RbHeaderRelay** | Diffuse RB headers for equivocation detection      | Must achieve $\Delta_\text{hdr}$ diffusion |
-|    **EbRelay**    | Diffuse fresh EBs to enable timely validation      | Must reach voters within $L_\text{vote}$   |
-|   **VoteRelay**   | Diffuse valid votes for certificate aggregation    | Must diffuse within $L_\text{diff}$        |
-|    **EbFetch**    | Retrieve certified EBs for chain reconstruction    | On-demand after certificate inclusion      |
-|    **TxFetch**    | Retrieve referenced transactions for EB validation | Before EB validation completes             |
+To that end, this CIP does include an example concrete message exchange scheme and an argument its resource utilization is sufficiently bounded.
+But these details do not necessarily constrain the Leios implementation.
+(TODO relegate this to an appendix?)
 
-<em>Table 10: Leios Mini-Protocols</em>
+##### Requirements
 
-</div>
+The implementation of the Leios overlay must satisfy the following requirements.
 
-These protocols implement freshest-first delivery and cryptographic validation
-to meet their respective timing constraints while preventing spam and DoS
-attacks.
+- **Leios Correctness**.
+  The nodes must exchange the new Leios data while prioritizing younger over older as implied by Leios's freshest-first delivery assumption.
+- **Praos Independence**.
+  The Cardano network must grow RB chains—both adversarial and honest—of the same shape (i.e., forks and their lengths) regardless of whether it's executing the Leios overlay.
+  In other words, the shape of all RB forks that exist at some instant would ideally not provide any indication whether the Leios overlay is being executed.
+  Moreover, the honest majority must still have the same control over which txs are included by the RBs on the best chain.
+- **Existing Resources.** The Leios overlay enables Cardano to increase utilization of existing resources.
+  The Leios overlay will use more resources than Praos does, but it simultaneously will not inherently require today's Cardano SPOs or users to provision additional resources, beyond some minor exceptions (eg disk).
+  The necessary resources already exist; Praos just can't utilize them all.
+- **Tolerable Implementation Complexity**.
+  The above requirements must admit an implementation without incurring prohibitive costs for construction and future maintenance.
+
+##### Discussion
+
+**Existing Resources**.
+Because Praos cannot already fully utilize the existing Cardano infrastructure, this CIP can increase utilization without disrupting Praos; the currently unutilized resources are sufficient for Leios.
+More aggressive Leios deployments/extensions in the future will have to navigate that trade-off, but simulations indicate that it's not already required by this CIP, with two possible exceptions.
+First, nodes might require additional disk capacity as a direct result of the increased throughput (TODO link to CPS for archival nodes).
+Second, a party with significant stake might need to provision more resources across their relays since each of the hundreds of downstream peers is now more demanding on average.
+
+**Praos Independence**.To prevent Leios from accidentally depriving Praos of resources, the node implementation must prioritize Praos over Leios.
+For example, when a node simultaneously issues an RB and the EB it announces, the diffusion of the EB should not delay the diffusion of the RB; that RB is strictly more urgent than that EB.
+
+*Remark*.
+In contrast, the EB certified by a RB that also includes some txs is exactly as urgent as that RB, because the RB cannot be selected without the EB.
+The $L_\text{diff}$ parameter prevents such urgency inversion from occurring enough to matter, as explained in the Leios security argument (TODO link section).
+
+In reality, the priorization of Praos over Leios does not need to be perfectly strict (and in fact could never be on hardware and software infrastructure that is mostly commodity and partly public).
+The fundamental requirement is that the network assumptions that were originally used to parametrize Praos must still be valid—up to some tolerated error probability—when the same nodes are simultaneously executing the Leios overlay.
+Concretely, the worst case delay between an honest block producer issuing a uniquely best RB and the last honest block producer selecting that RB (i.e., Praos's $\Delta$) must not be protracted by Leios so much that the existing Praos parameter values (eg the stability window of 36 hr) are no longer sufficient.
+
+**Leios Correctness**.
+The implementation of freshest-first delivery also does not need to be perfect.
+The prioritization of young over old merely needs to be robust enough to justify the chosen values of $L_\text{vote}$ and $L_\text{diff}$ even during a burst of valid withheld messages.
+
+##### Feasbility Sketch
+
+TODO copy some details from https://github.com/input-output-hk/ouroboros-leios/pull/498
 
 ### Incentives
 
