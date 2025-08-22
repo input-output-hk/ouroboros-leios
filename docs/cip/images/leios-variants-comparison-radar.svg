@@ -1,19 +1,12 @@
 <svg width="650" height="550" viewBox="0 0 650 550" xmlns="http://www.w3.org/2000/svg">
-  <!-- Background -->
   <rect width="650" height="550" fill="#f8f9fa"/>
-  
-  <!-- Radar chart centered -->
   <g transform="translate(300, 250)">
-    
-    <!-- Radar background circles -->
     <g stroke="#ddd" fill="none" stroke-width="1">
       <circle cx="0" cy="0" r="160" opacity="0.5"/>
       <circle cx="0" cy="0" r="120" opacity="0.4"/>
       <circle cx="0" cy="0" r="80" opacity="0.4"/>
       <circle cx="0" cy="0" r="40" opacity="0.4"/>
     </g>
-    
-    <!-- Axis lines -->
     <g stroke="#666" stroke-width="2">
       <!-- Throughput (top) -->
       <line x1="0" y1="0" x2="0" y2="-160"/>
@@ -24,95 +17,65 @@
       <!-- Time to Market (left) -->
       <line x1="0" y1="0" x2="-160" y2="0"/>
     </g>
-    
-    <!-- Over-collateralized Sharded Leios polygon (1+ TxMB/s, 300s+ inclusion, very high ecosystem cost, 3+ yr) - drawn first (behind others) -->
     <polygon points="0,-155 150,0 0,140 -160,0" 
              fill="rgba(255, 165, 0, 0.3)" 
              stroke="#cc7a00" 
              stroke-width="2"/>
-    
-    <!-- Proposed Leios polygon (140-150 TxkB/s, 52s inclusion, low ecosystem cost, 1.5yr) -->
     <polygon points="0,-135 65,0 0,42 -60,0" 
              fill="rgba(75, 192, 192, 0.3)" 
              stroke="#2e8b8b" 
              stroke-width="2"/>
-    
-    <!-- Praos baseline polygon (4.5 TxkB/s, 20s inclusion, 0 ecosystem cost, 0 time to market) -->
     <polygon points="0,-42 30,0 0,0 0,0" 
              fill="rgba(220, 53, 69, 0.3)" 
              stroke="#a71d2a" 
              stroke-width="2"/>
-    
-    <!-- Data points for Over-collateralized Sharded Leios (drawn first, behind others) -->
     <g fill="rgba(255, 165, 0, 0.9)" stroke="#cc7a00" stroke-width="2">
       <circle cx="0" cy="-155" r="4"/>
       <circle cx="150" cy="0" r="4"/>
       <circle cx="0" cy="140" r="4"/>
       <circle cx="-160" cy="0" r="4"/>
     </g>
-    
-    <!-- Data points for Proposed Leios -->
     <g fill="#4bc0c0" stroke="#2e8b8b" stroke-width="2">
       <circle cx="0" cy="-135" r="4"/>
       <circle cx="65" cy="0" r="4"/>
       <circle cx="0" cy="42" r="4"/>
       <circle cx="-60" cy="0" r="4"/>
     </g>
-    
-    <!-- Data points for Praos -->
     <g fill="rgba(220, 53, 69, 0.9)" stroke="#a71d2a" stroke-width="2">
       <circle cx="0" cy="-42" r="4"/>
       <circle cx="30" cy="0" r="4"/>
       <circle cx="0" cy="0" r="4"/>
       <circle cx="0" cy="0" r="4"/>
     </g>
-    
-    <!-- Axis labels with proper spacing -->
     <text x="0" y="-185" text-anchor="middle" font-family="Arial" font-size="14" font-weight="bold" fill="#333">Throughput</text>
     <text x="0" y="-171" text-anchor="middle" font-family="Arial" font-size="11" fill="#666" font-weight="bold">(KiloBytes per Second)</text>
-    
     <text x="200" y="5" text-anchor="start" font-family="Arial" font-size="14" font-weight="bold" fill="#333">Inclusion Latency</text>
     <text x="200" y="19" text-anchor="start" font-family="Arial" font-size="11" font-weight="bold" fill="#666">(Seconds)</text>
-    
     <text x="0" y="190" text-anchor="middle" font-family="Arial" font-size="14" font-weight="bold" fill="#333">Ecosystem Impact</text>
     <text x="0" y="204" text-anchor="middle" font-family="Arial" font-size="11" font-weight="bold" fill="#666">(Adaptation Cost)</text>
-    
     <text x="-185" y="5" text-anchor="end" font-family="Arial" font-size="14" font-weight="bold" fill="#333">Time to Market</text>
     <text x="-185" y="19" text-anchor="end" font-family="Arial" font-size="11" font-weight="bold" fill="#666">(Years)</text>
-    
-    <!-- Circular axis labels at intersection points -->
-    <!-- Throughput axis (center = 0, outward = higher) - orders of magnitude -->
     <text x="12" y="-155" font-family="Arial" font-size="11" fill="#999">1,000+ TxkB/s</text>
     <text x="12" y="-115" font-family="Arial" font-size="11" fill="#999">100 TxkB/s</text>
     <text x="12" y="-75" font-family="Arial" font-size="11" fill="#999">10 TxkB/s</text>
     <text x="12" y="-35" font-family="Arial" font-size="11" fill="#999">1 TxkB/s</text>
-    
-    <!-- Transaction Inclusion Latency axis (center = 0, outward = longer) -->
     <text x="165" y="15" font-family="Arial" font-size="11" fill="#999">300s+</text>
     <text x="125" y="15" font-family="Arial" font-size="11" fill="#999">180s</text>
     <text x="85" y="15" font-family="Arial" font-size="11" fill="#999">90s</text>
     <text x="45" y="15" font-family="Arial" font-size="11" fill="#999">45s</text>
-    
-    <!-- Ecosystem Adaptation Cost axis (center = 0, outward = higher cost) -->
     <text x="12" y="155" font-family="Arial" font-size="11" fill="#999">Very High</text>
     <text x="12" y="115" font-family="Arial" font-size="11" fill="#999">High</text>
     <text x="12" y="75" font-family="Arial" font-size="11" fill="#999">Medium</text>
     <text x="12" y="35" font-family="Arial" font-size="11" fill="#999">Low</text>
-    
-    <!-- Time to Market axis (center = 0 for Praos, outward = longer) -->
     <text x="-165" y="15" font-family="Arial" font-size="11" fill="#999">3+ yr</text>
     <text x="-125" y="15" font-family="Arial" font-size="11" fill="#999">2 yr</text>
     <text x="-85" y="15" font-family="Arial" font-size="11" fill="#999">1 yr</text>
   </g>
-  
-  <!-- Legend - centered horizontally -->
   <g transform="translate(325, 510)">
     <circle cx="-160" cy="0" r="4" fill="rgba(220, 53, 69, 0.9)" stroke="#a71d2a" stroke-width="2"/>
     <text x="-145" y="5" text-anchor="start" font-family="Arial" font-size="12" fill="#333">Ouroboros Praos</text>
-    
     <circle cx="-20" cy="0" r="4" fill="#4bc0c0" stroke="#2e8b8b" stroke-width="2"/>
     <text x="-5" y="5" text-anchor="start" font-family="Arial" font-size="12" fill="#333">Proposed Leios</text>
-    
     <circle cx="120" cy="0" r="4" fill="rgba(255, 165, 0, 0.9)" stroke="#cc7a00" stroke-width="2"/>
     <text x="135" y="5" text-anchor="start" font-family="Arial" font-size="12" fill="#333">Research Paper Leios</text>
   </g>

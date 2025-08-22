@@ -1492,20 +1492,20 @@ throughput of Linear Leios: furthermore, it affects how long it takes
 transactions to reach the ledger as the throughput approaches the capacity.
 
 <div align="center">
-<a name="figure-7" id="figure-7"></a>
+<a name="figure-8" id="figure-8"></a>
 
 ![Time for transaction to reach the ledger](images/reach-rb-tx.svg)
 
-<em>Figure 7: Time for transaction to reach the ledger</em>
+<em>Figure 8: Time for transaction to reach the ledger</em>
 
 </div>
 
 <div align="center">
-<a name="figure-8" id="figure-8"></a>
+<a name="figure-9" id="figure-9"></a>
 
 ![Transactions reaching the ledger](images/temporal-efficiency-bar.svg)
 
-<em>Figure 8: Transactions reaching the ledger</em>
+<em>Figure 9: Transactions reaching the ledger</em>
 
 </div>
 
@@ -1522,11 +1522,11 @@ not produced or are produced too close together. The same phenomenon occurs in
 Praos, but Linear Leios amplifies the intermittency.
 
 <div align="center">
-<a name="figure-9" id="figure-9"></a>
+<a name="figure-10" id="figure-10"></a>
 
 ![Number of TX references](images/references-tx.svg)
 
-<em>Figure 9: Number of TX references</em>
+<em>Figure 10: Number of TX references</em>
 
 </div>
 
@@ -1535,7 +1535,7 @@ Praos, but Linear Leios amplifies the intermittency.
 
 ![Disposition of transactions in blocks](images/disposition-size-timeseries.svg)
 
-<em>Figure 10: Disposition of transactions in blocks</em>
+<em>Figure 11: Disposition of transactions in blocks</em>
 
 </div>
 
@@ -1548,11 +1548,11 @@ Thus the capacity parameter provides a natural form of backpressure that limits
 the potential EB-related work a node must do when demand is high.
 
 <div align="center">
-<a name="figure-11" id="figure-11"></a>
+<a name="figure-12" id="figure-12"></a>
 
 ![Size of transactions referenced by EBs](images/contents-ebs-size.svg)
 
-<em>Figure 11: Size of transactions referenced by EBs</em>
+<em>Figure 12: Size of transactions referenced by EBs</em>
 
 </div>
 
@@ -1572,14 +1572,14 @@ transactions, RBs, votes, and EBs do not interfere with one another: for
 example, delays in EBs and high throughput do not also delay RBs in those cases.
 
 <div align="center">
-<a name="figure-12" id="figure-12"></a>
+<a name="figure-13" id="figure-13"></a>
 
 |                                                 |                                                 |
 | ----------------------------------------------- | ----------------------------------------------- |
 | ![Arrival delay for TXs](images/elapsed-TX.svg) | ![Arrival delay for RBs](images/elapsed-RB.svg) |
 | ![Arrival delay for VTs](images/elapsed-VT.svg) | ![Arrival delay for EBs](images/elapsed-EB.svg) |
 
-<em>Figure 12: Arrival delays for transactions, ranking blocks, votes, and
+<em>Figure 13: Arrival delays for transactions, ranking blocks, votes, and
 endorser blocks</em>
 
 </div>
@@ -1607,23 +1607,23 @@ for lazy computations, caching, etc. that will spread out the occasional spikes
 in CPU usage over time.
 
 <div align="center">
-<a name="figure-13" id="figure-13"></a>
+<a name="figure-14" id="figure-14"></a>
 
 |                                                        |                                                                  |
 | ------------------------------------------------------ | ---------------------------------------------------------------- |
 | ![Mean nodal ingress](images/ingress-average-area.svg) | ![Mean CPU load among all nodes](images/cpu-mean-timeseries.svg) |
 
-<em>Figure 13: Mean nodal ingress (left) and Mean CPU load among all nodes
+<em>Figure 14: Mean nodal ingress (left) and Mean CPU load among all nodes
 (right)</em>
 
 </div>
 
 <div align="center">
-<a name="figure-14" id="figure-14"></a>
+<a name="figure-15" id="figure-15"></a>
 
 ![Mean CPU load among all nodes](images/cpu-mean-histogram.svg)
 
-<em>Figure 14: Mean CPU load among all nodes</em>
+<em>Figure 15: Mean CPU load among all nodes</em>
 
 </div>
 
@@ -1680,20 +1680,20 @@ safely be 2000 billion steps, or 100 times the Plutus budget of Praos.
 >   - [ ] Remove title and subtitle.
 
 <div align="center">
-<a name="figure-15" id="figure-15"></a>
+<a name="figure-16" id="figure-16"></a>
 
 ![Fate of Plutus-heavy transactions in Leios](images/plutus-temporal-efficiency-bar.svg)
 
-<em>Figure 15: Fate of Plutus-heavy transactions in Leios</em>
+<em>Figure 16: Fate of Plutus-heavy transactions in Leios</em>
 
 </div>
 
 <div align="center">
-<a name="figure-16" id="figure-16"></a>
+<a name="figure-17" id="figure-17"></a>
 
 ![CPU usage in Plutus-heavy workloads for Leios](images/plutus-cpu-mean-histogram.svg)
 
-<em>Figure 16: CPU usage in Plutus-heavy workloads for Leios</em>
+<em>Figure 17: CPU usage in Plutus-heavy workloads for Leios</em>
 
 </div>
 
@@ -2060,50 +2060,50 @@ incentives and conflict resolution trade-offs.
 
 **Acceptance criteria**
 
-> [!NOTE]
->
-> Describes what are the acceptance criteria whereby a proposal becomes
-> _'Active'_.
->
-> This sub-section must define a list of criteria by which the proposal can
-> become active. Criteria must relate to observable metrics or deliverables and
-> be reviewed by editors and project maintainers when applicable. For example:
-> "The changes to the ledger rules are implemented and deployed on Cardano
-> mainnet by a majority of the network", or "The following key projects have
-> implemented support for this standard".
+The proposal will be considered active once the following criteria are met:
 
-- [ ] The revised `cardano-node` implementations pass the node-level conformance
-      test suites.
-- [ ] Audit.
-- [ ] Successful operation in testnet environments.
-- [ ] Community agreement on the settings for the Leios protocol parameters.
+- [ ] Protocol performance validated through load tests in a representative
+      environment.
+- [ ] Required changes are documented in an implementation-independent way via
+      the
+      [Cardano blueprint](https://cardano-scaling.github.io/cardano-blueprint/)
+      including conformance tests.
+- [ ] Formal specification of the consensus and ledger changes is available.
+- [ ] ΔQSD model available for Leios parameter selection.
+- [ ] Community agreement on initial Leios protocol parameters.
+- [ ] A peer-reviewed implementation of a Leios-enabled node is available.
+- [ ] Successful operation with open participation in testnet environments over
+      several months.
+- [ ] Key infrastructure signalled readiness for Leios-enhanced throughput.
+- [ ] Hard-fork enabling Leios is successfully executed on mainnet.
 
 **Implementation plan**
 
-> [!NOTE]
->
-> Either a plan to meet those criteria or `N/A` if not applicable.
->
-> This sub-section should define the plan by which a proposal will meet its
-> acceptance criteria, when applicable. More, proposals that require
-> implementation work in a specific project may indicate one or more
-> implementors. Implementors must sign off on the plan and be referenced in the
-> document's preamble.
->
-> In particular, an implementation that requires a hard-fork should explicitly
-> mention it in its _'Implementation Plan'_.
+Key steps on the roadmap to realize Leios, somewhat ordered but not sequential,
+are:
 
-- [ ] Detailed node-level (as opposed to this protocol-level) specification.
-- [ ] Develop node-level conformance test suite.
-- Consider developing a "quick and dirty" implementation for large scale
-  experiments.
-- Coordinate with related activities on other protocol enhancements.
-  - Compatibility between Peras, Leios, and Genesis.
-  - Common design and implementation for certificates, voting, and related key
-    registration: Mithril, Peras, Leios, and partner chains.
-  - https://github.com/berewt/CIPs/blob/master/CIP-xxxx/CIP-xxxx.md is relevant
-- Triage by intersect Core Infrastructure, Consensus, Ledger, and Network
-  functions.
+- [x] Simulations to confirm general feasibility using a model of mainnet.
+- [x] Ecosystem impact analysis and establish a threat model.
+- [ ] Coordinate with related activities on other protocol enhancements
+      (Phalanx, Peras, Mithril).
+- [ ] Detailed node-level (as opposed to this protocol-level) technical
+      specification.
+- [ ] Complete ΔQSD analysis of new/changed network interactions.
+- [ ] Complete formal protocol specification in Agda of ledger and consensus
+      changes.
+- [ ] Create network prototypes and conduct large scale experiments.
+  - Load tests in a controlled topology
+  - Validate protocol parameters
+  - Stake- and network-based attacks
+- [ ] Develop node-level, but implementation-independent conformance test suites
+      (blueprint).
+- [ ] Create a public leios-specific testnet with repeated load tests and
+      encourage dependant infrastructure updates.
+- [ ] Implement / integrate necessary changes to `cardano-node` and other node
+      implementations (this is big).
+- [ ] Audit protocol and implementation changes.
+- [ ] Align on node releases and hard-fork schedule to mature pre-releases
+      through preview and preprod testnets.
 
 ## Versioning
 
