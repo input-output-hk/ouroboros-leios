@@ -44,8 +44,8 @@ tx-overcollateralization-factor-distribution:
 #
 # `Apply CPU [ms]` / `Tx count` ~ (0.6201 ms/tx)
 #
-# `Apply CPU [ms]` / `Tx count` ~ (0.6006 ms/tx)
-#                               + (0.005765 ms/Gstep) * `Tx exec [Gstep/tx]`
+# `Apply CPU [ms]` ~ 0 + (0.2624 ms/tx) * `Tx count`
+#                      + (0.9487 ms/Gstep) * `Tx exec [Gstep]`
 #
 tx-validation-cpu-time-ms: 0.6201
 
