@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg width="1000" height="520" xmlns="http://www.w3.org/2000/svg">
+<svg width="1000" height="580" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <!-- Pattern for timeline background -->
     <pattern id="timelinePattern" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
@@ -51,47 +51,47 @@
   </defs>
   
   <!-- Background -->
-  <rect width="1000" height="520" fill="#ffffff"/>
+  <rect width="1000" height="580" fill="#ffffff"/>
   
   <!-- Slot grid (finer detail) -->
   <g id="slot-grid">
     <!-- Major slot lines (every 5 slots) -->
     <g stroke="#ddd" stroke-width="1">
-      <line x1="100" y1="30" x2="100" y2="500"/>
-      <line x1="250" y1="30" x2="250" y2="500"/>
-      <line x1="400" y1="30" x2="400" y2="500"/>
-      <line x1="550" y1="30" x2="550" y2="500"/>
-      <line x1="700" y1="30" x2="700" y2="500"/>
-      <line x1="850" y1="30" x2="850" y2="500"/>
+      <line x1="100" y1="30" x2="100" y2="560"/>
+      <line x1="250" y1="30" x2="250" y2="560"/>
+      <line x1="400" y1="30" x2="400" y2="560"/>
+      <line x1="550" y1="30" x2="550" y2="560"/>
+      <line x1="700" y1="30" x2="700" y2="560"/>
+      <line x1="850" y1="30" x2="850" y2="560"/>
     </g>
     
     <!-- Minor slot lines (individual slots) -->
     <g stroke="#f0f0f0" stroke-width="0.5">
       <!-- Slots 1-4 -->
-      <line x1="130" y1="30" x2="130" y2="500"/>
-      <line x1="160" y1="30" x2="160" y2="500"/>
-      <line x1="190" y1="30" x2="190" y2="500"/>
-      <line x1="220" y1="30" x2="220" y2="500"/>
+      <line x1="130" y1="30" x2="130" y2="560"/>
+      <line x1="160" y1="30" x2="160" y2="560"/>
+      <line x1="190" y1="30" x2="190" y2="560"/>
+      <line x1="220" y1="30" x2="220" y2="560"/>
       <!-- Slots 6-9 -->
-      <line x1="280" y1="30" x2="280" y2="500"/>
-      <line x1="310" y1="30" x2="310" y2="500"/>
-      <line x1="340" y1="30" x2="340" y2="500"/>
-      <line x1="370" y1="30" x2="370" y2="500"/>
+      <line x1="280" y1="30" x2="280" y2="560"/>
+      <line x1="310" y1="30" x2="310" y2="560"/>
+      <line x1="340" y1="30" x2="340" y2="560"/>
+      <line x1="370" y1="30" x2="370" y2="560"/>
       <!-- Slots 11-14 -->
-      <line x1="430" y1="30" x2="430" y2="500"/>
-      <line x1="460" y1="30" x2="460" y2="500"/>
-      <line x1="490" y1="30" x2="490" y2="500"/>
-      <line x1="520" y1="30" x2="520" y2="500"/>
+      <line x1="430" y1="30" x2="430" y2="560"/>
+      <line x1="460" y1="30" x2="460" y2="560"/>
+      <line x1="490" y1="30" x2="490" y2="560"/>
+      <line x1="520" y1="30" x2="520" y2="560"/>
       <!-- Slots 16-19 -->
-      <line x1="580" y1="30" x2="580" y2="500"/>
-      <line x1="610" y1="30" x2="610" y2="500"/>
-      <line x1="640" y1="30" x2="640" y2="500"/>
-      <line x1="670" y1="30" x2="670" y2="500"/>
+      <line x1="580" y1="30" x2="580" y2="560"/>
+      <line x1="610" y1="30" x2="610" y2="560"/>
+      <line x1="640" y1="30" x2="640" y2="560"/>
+      <line x1="670" y1="30" x2="670" y2="560"/>
       <!-- Slots 21-24 -->
-      <line x1="730" y1="30" x2="730" y2="500"/>
-      <line x1="760" y1="30" x2="760" y2="500"/>
-      <line x1="790" y1="30" x2="790" y2="500"/>
-      <line x1="820" y1="30" x2="820" y2="500"/>
+      <line x1="730" y1="30" x2="730" y2="560"/>
+      <line x1="760" y1="30" x2="760" y2="560"/>
+      <line x1="790" y1="30" x2="790" y2="560"/>
+      <line x1="820" y1="30" x2="820" y2="560"/>
     </g>
     
     <!-- Slot labels -->
@@ -106,7 +106,7 @@
   <!-- Timeline ruler -->
   <g id="timeline">
     <rect x="100" y="40" width="750" height="30" fill="url(#timelinePattern)" stroke="#ddd" stroke-width="0.5"/>
-    <text x="475" y="60" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#999">Time →</text>
+    <text x="475" y="60" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#999">Time (slots) →</text>
   </g>
   
   <!-- Main protocol flow -->
@@ -129,82 +129,97 @@
       <text x="250" y="268" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#274e13">[TxRefs]</text>
     </a>
     
-    <!-- Phase 1: 3Δ_hdr (slots 5-8, i.e., 3 slots) -->
-    <a href="#delta-hdr" class="param-link">
-      <line x1="250" y1="320" x2="340" y2="320" stroke="#9c27b0" stroke-width="1" stroke-dasharray="2,2"/>
-      <path d="M 250 320 L 250 325 Q 250 330 255 330 L 290 330 L 295 337 L 300 330 L 335 330 Q 340 330 340 325 L 340 320" 
-            stroke="#9c27b0" stroke-width="2" fill="none"/>
-      <text x="295" y="355" font-size="18" text-anchor="middle" fill="#9c27b0">
-        <tspan font-family="serif" font-size="24">3Δ</tspan><tspan font-family="Arial, sans-serif" font-size="16" baseline-shift="sub">hdr</tspan>
+    <!-- Phase 1: L_vote (voting period) - starts at same time as EB announcement -->
+    <a href="#l-vote" class="param-link">
+      <line x1="250" y1="320" x2="460" y2="320" stroke="#f9a825" stroke-width="1" stroke-dasharray="2,2"/>
+      <path d="M 250 320 L 250 325 Q 250 330 255 330 L 350 330 L 355 337 L 360 330 L 455 330 Q 460 330 460 325 L 460 320" 
+            stroke="#f9a825" stroke-width="2" fill="none"/>
+      <text x="355" y="355" font-size="18" text-anchor="middle" fill="#f9a825">
+        <tspan font-family="serif" font-style="italic" font-size="24">L</tspan><tspan font-family="Arial, sans-serif" font-size="16" baseline-shift="sub">vote</tspan>
       </text>
     </a>
     
-    <!-- Phase 2: L_vote (voting period) - pushed down -->
-    <a href="#l-vote" class="param-link">
-      <line x1="340" y1="340" x2="550" y2="340" stroke="#f9a825" stroke-width="1" stroke-dasharray="2,2"/>
-      <path d="M 340 340 L 340 345 Q 340 350 345 350 L 440 350 L 445 357 L 450 350 L 545 350 Q 550 350 550 345 L 550 340" 
-            stroke="#f9a825" stroke-width="2" fill="none"/>
-      <text x="445" y="375" font-size="18" text-anchor="middle" fill="#f9a825">
-        <tspan font-family="serif" font-style="italic" font-size="24">L</tspan><tspan font-family="Arial, sans-serif" font-size="16" baseline-shift="sub">vote</tspan>
+    <!-- Phase 2: 3Δ_hdr (slots 5-8, i.e., 3 slots) - subset of L_vote -->
+    <a href="#delta-hdr" class="param-link">
+      <line x1="250" y1="380" x2="340" y2="380" stroke="#9c27b0" stroke-width="1" stroke-dasharray="2,2"/>
+      <path d="M 250 380 L 250 385 Q 250 390 255 390 L 290 390 L 295 397 L 300 390 L 335 390 Q 340 390 340 385 L 340 380" 
+            stroke="#9c27b0" stroke-width="2" fill="none"/>
+      <text x="295" y="415" font-size="18" text-anchor="middle" fill="#9c27b0">
+        <tspan font-family="serif" font-size="24">3Δ</tspan><tspan font-family="Arial, sans-serif" font-size="16" baseline-shift="sub">hdr</tspan>
       </text>
     </a>
     
     <!-- Voting indicators -->
     <g id="votes">
       <a href="#votes-and-certificates" class="vote-link">
-        <rect x="382" y="295" width="6" height="6" fill="#f9a825" transform="rotate(45 385 298)"/>
+        <rect x="282" y="295" width="6" height="6" fill="#f9a825" transform="rotate(45 285 298)"/>
       </a>
       <a href="#votes-and-certificates" class="vote-link">
-        <rect x="422" y="290" width="6" height="6" fill="#f9a825" transform="rotate(45 425 293)"/>
+        <rect x="322" y="290" width="6" height="6" fill="#f9a825" transform="rotate(45 325 293)"/>
       </a>
       <a href="#votes-and-certificates" class="vote-link">
-        <rect x="462" y="300" width="6" height="6" fill="#f9a825" transform="rotate(45 465 303)"/>
+        <rect x="362" y="300" width="6" height="6" fill="#f9a825" transform="rotate(45 365 303)"/>
       </a>
       <a href="#votes-and-certificates" class="vote-link">
-        <rect x="502" y="285" width="6" height="6" fill="#f9a825" transform="rotate(45 505 288)"/>
+        <rect x="402" y="285" width="6" height="6" fill="#f9a825" transform="rotate(45 405 288)"/>
       </a>
       <a href="#votes-and-certificates" class="vote-link">
-        <rect x="532" y="295" width="6" height="6" fill="#f9a825" transform="rotate(45 535 298)"/>
+        <rect x="432" y="295" width="6" height="6" fill="#f9a825" transform="rotate(45 435 298)"/>
       </a>
     </g>
     
-    <!-- Phase 3: L_diff (additional diffusion) - pushed down further -->
+    <!-- Phase 3: L_diff (additional diffusion) - starts after L_vote -->
     <a href="#l-diff" class="param-link">
-      <line x1="550" y1="360" x2="760" y2="360" stroke="#4caf50" stroke-width="1" stroke-dasharray="2,2"/>
-      <path d="M 550 360 L 550 365 Q 550 370 555 370 L 650 370 L 655 377 L 660 370 L 755 370 Q 760 370 760 365 L 760 360" 
+      <line x1="460" y1="340" x2="670" y2="340" stroke="#4caf50" stroke-width="1" stroke-dasharray="2,2"/>
+      <path d="M 460 340 L 460 345 Q 460 350 465 350 L 560 350 L 565 357 L 570 350 L 665 350 Q 670 350 670 345 L 670 340" 
             stroke="#4caf50" stroke-width="2" fill="none"/>
-      <text x="655" y="395" font-size="18" text-anchor="middle" fill="#4caf50">
+      <text x="565" y="375" font-size="18" text-anchor="middle" fill="#4caf50">
         <tspan font-family="serif" font-style="italic" font-size="24">L</tspan><tspan font-family="Arial, sans-serif" font-size="16" baseline-shift="sub">diff</tspan>
       </text>
     </a>
     
     <!-- RB Diffusion (Δ_RB) -->
     <g id="rb-diffusion">
-      <line x1="250" y1="415" x2="250" y2="425" stroke="#783f04" stroke-width="2"/>
-      <line x1="250" y1="420" x2="400" y2="420" stroke="#783f04" stroke-width="2" stroke-dasharray="4,2"/>
-      <line x1="400" y1="415" x2="400" y2="425" stroke="#783f04" stroke-width="2"/>
-      <text x="325" y="410" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#783f04">Δ<tspan font-size="10" baseline-shift="sub">RB</tspan></text>
+      <line x1="250" y1="445" x2="250" y2="455" stroke="#783f04" stroke-width="2"/>
+      <line x1="250" y1="450" x2="400" y2="450" stroke="#783f04" stroke-width="2" stroke-dasharray="4,2"/>
+      <line x1="400" y1="445" x2="400" y2="455" stroke="#783f04" stroke-width="2"/>
+      <text x="325" y="440" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#783f04">Δ<tspan font-size="14" baseline-shift="sub">RB</tspan></text>
     </g>
     
     <!-- EB diffusion visualization -->
     <g id="eb-diffusion">
       <!-- Optimistic case -->
-      <line x1="250" y1="445" x2="250" y2="455" stroke="#4caf50" stroke-width="2"/>
-      <line x1="250" y1="450" x2="550" y2="450" stroke="#4caf50" stroke-width="2" stroke-dasharray="4,2"/>
-      <line x1="550" y1="445" x2="550" y2="455" stroke="#4caf50" stroke-width="2"/>
-      <text x="400" y="440" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#4caf50">Δ<tspan font-size="10" baseline-shift="sub">EB</tspan><tspan font-size="8" baseline-shift="super">opt</tspan></text>
+      <line x1="250" y1="475" x2="250" y2="485" stroke="#4caf50" stroke-width="2"/>
+      <line x1="250" y1="480" x2="460" y2="480" stroke="#4caf50" stroke-width="2" stroke-dasharray="4,2"/>
+      <line x1="460" y1="475" x2="460" y2="485" stroke="#4caf50" stroke-width="2"/>
+      <text x="355" y="470" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#4caf50">Δ<tspan font-size="14" baseline-shift="sub">EB</tspan><tspan font-size="12" baseline-shift="super">opt</tspan></text>
       
       <!-- Additional diffusion needed -->
-      <line x1="550" y1="465" x2="550" y2="475" stroke="#ff5722" stroke-width="2"/>
-      <line x1="550" y1="470" x2="760" y2="470" stroke="#ff5722" stroke-width="2" stroke-dasharray="4,2"/>
-      <line x1="760" y1="465" x2="760" y2="475" stroke="#ff5722" stroke-width="2"/>
-      <text x="655" y="465" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#ff5722">Additional time</text>
+      <line x1="460" y1="495" x2="460" y2="505" stroke="#ff5722" stroke-width="2"/>
+      <line x1="460" y1="500" x2="670" y2="500" stroke="#ff5722" stroke-width="2" stroke-dasharray="4,2"/>
+      <line x1="670" y1="495" x2="670" y2="505" stroke="#ff5722" stroke-width="2"/>
+      <text x="565" y="495" font-family="Arial, sans-serif" font-size="16" text-anchor="middle" fill="#ff5722">Additional time</text>
       
       <!-- Total worst case -->
-      <line x1="250" y1="485" x2="250" y2="495" stroke="#333" stroke-width="2"/>
-      <line x1="250" y1="490" x2="760" y2="490" stroke="#333" stroke-width="2" stroke-dasharray="4,2"/>
-      <line x1="760" y1="485" x2="760" y2="495" stroke="#333" stroke-width="2"/>
-      <text x="505" y="505" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#333">Δ<tspan font-size="10" baseline-shift="sub">EB</tspan><tspan font-size="8" baseline-shift="super">wc</tspan></text>
+      <line x1="250" y1="515" x2="250" y2="525" stroke="#333" stroke-width="2"/>
+      <line x1="250" y1="520" x2="670" y2="520" stroke="#333" stroke-width="2" stroke-dasharray="4,2"/>
+      <line x1="670" y1="515" x2="670" y2="525" stroke="#333" stroke-width="2"/>
+      <text x="460" y="535" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#333">Δ<tspan font-size="14" baseline-shift="sub">EB</tspan><tspan font-size="12" baseline-shift="super">wc</tspan></text>
+    </g>
+    
+    <!-- CPU and Apply deltas -->
+    <g id="cpu-apply-deltas">
+      <!-- Delta CPU -->
+      <line x1="250" y1="545" x2="250" y2="555" stroke="#9c27b0" stroke-width="2"/>
+      <line x1="250" y1="550" x2="370" y2="550" stroke="#9c27b0" stroke-width="2" stroke-dasharray="4,2"/>
+      <line x1="370" y1="545" x2="370" y2="555" stroke="#9c27b0" stroke-width="2"/>
+      <text x="310" y="540" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#9c27b0">Δ<tspan font-size="14" baseline-shift="sub">cpu</tspan></text>
+      
+      <!-- Delta Apply -->
+      <line x1="250" y1="565" x2="250" y2="575" stroke="#2196F3" stroke-width="2"/>
+      <line x1="250" y1="570" x2="340" y2="570" stroke="#2196F3" stroke-width="2" stroke-dasharray="4,2"/>
+      <line x1="340" y1="565" x2="340" y2="575" stroke="#2196F3" stroke-width="2"/>
+      <text x="295" y="560" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#2196F3">Δ<tspan font-size="14" baseline-shift="sub">apply</tspan></text>
     </g>
     
     <!-- RB' with certificate (at slot 24) -->
