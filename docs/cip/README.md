@@ -122,7 +122,7 @@ sustainability and reduced complexity through fewer new protocol elements.
 - [Table 7: Operating Costs by Transaction Throughput](#table-7)
 - [Table 8: Required TPS for Infrastructure Cost Coverage](#table-8)
 - [Table 9: Required TPS for Current Reward Maintenance](#table-9)
-- [Table 10: Leios Mini-Protocols](#table-10)
+- [Table 99: Leios Information Exchange Requirements table (IER table)](#table-99)
 
 </details>
 
@@ -1016,67 +1016,107 @@ mempool capacity to support both RB and EB transaction pools.
 
 #### Leios Mini-Protocols
 
-Leios will introduce new mini-protocols to handle the additional message
-types required for EB distribution, voting, and certificate construction.
+Leios will introduce new mini-protocols to handle the additional message types
+required for EB distribution, voting, and certificate construction.
 
-This CIP does not specify how exactly Leios nodes exchange messages.
-Those details must eventually be specified so that different node implementations can interoperate, but that standardization can be deferred to a follow-up CIP.
-The present CIP is only obligated to list key requirements and demonstrate they're satisfiable—that some implementation is feasible and not prohibitively complicated.
+This CIP does not specify how exactly Leios nodes exchange messages. Those
+details must eventually be specified so that different node implementations can
+interoperate, but that standardization can be deferred to a follow-up CIP. The
+present CIP is only obligated to list key requirements and demonstrate they're
+satisfiable—that some implementation is feasible and not prohibitively
+complicated.
 
-To that end, this CIP does include an example concrete message exchange scheme and an argument its resource utilization is sufficiently bounded.
-But these details do not necessarily constrain the Leios implementation.
-(TODO relegate this to an appendix?)
+To that end, this CIP does include an example concrete message exchange scheme
+and an argument its resource utilization is sufficiently bounded. But these
+details do not necessarily constrain the Leios implementation. (TODO relegate
+this to an appendix?)
 
 ##### Requirements
 
 The implementation of the Leios overlay must satisfy the following requirements.
 
-- **Leios Correctness**.
-  The nodes must exchange the Leios data while prioritizing younger over older as implied by Leios's freshest-first delivery assumption.
-  Because Leios is about improved resource utilization, wasting resources via unnecessary overhead/latency/etc can be considered a correctness violation, even more so than in Praos.
-- **Praos Independence**.
-  The Cardano network must grow RB chains—both adversarial and honest—of the same shape (i.e., forks and their lengths) regardless of whether it's executing the Leios overlay.
-  In other words, the shape of all RB forks that exist at some instant would ideally not provide any indication whether the Leios overlay is being executed.
-  Moreover, the honest majority must still have the same control over which transactions are included by the RBs on the best chain.
-- **Existing Resources.** The Leios overlay enables Cardano to increase utilization of existing resources.
-  The Leios overlay will use more resources than Praos does, but it simultaneously will not inherently require today's Cardano SPOs or users to provision additional resources, beyond some minor exceptions.
-  The necessary resources already exist; Praos just can't utilize them all.
-- **Tolerable Implementation Complexity**.
-  The above requirements must admit an implementation without incurring prohibitive costs for construction and future maintenance.
+- **Leios Correctness**. The nodes must exchange the Leios data while
+  prioritizing younger over older as implied by Leios's freshest-first delivery
+  assumption. Because Leios is about improved resource utilization, wasting
+  resources via unnecessary overhead/latency/etc can be considered a correctness
+  violation, even more so than in Praos.
+- **Praos Independence**. The Cardano network must grow RB chains—both
+  adversarial and honest—of the same shape (i.e., forks and their lengths)
+  regardless of whether it's executing the Leios overlay. In other words, the
+  shape of all RB forks that exist at some instant would ideally not provide any
+  indication whether the Leios overlay is being executed. Moreover, the honest
+  majority must still have the same control over which transactions are included
+  by the RBs on the best chain.
+- **Existing Resources.** The Leios overlay enables Cardano to increase
+  utilization of existing resources. The Leios overlay will use more resources
+  than Praos does, but it simultaneously will not inherently require today's
+  Cardano SPOs or users to provision additional resources, beyond some minor
+  exceptions. The necessary resources already exist; Praos just can't utilize
+  them all.
+- **Tolerable Implementation Complexity**. The above requirements must admit an
+  implementation without incurring prohibitive costs for construction and future
+  maintenance.
 
 ##### Discussion
 
-**Existing Resources**.
-Because Praos cannot already fully utilize the existing Cardano infrastructure, this CIP can increase utilization without disrupting Praos; the currently unutilized resources are sufficient for Leios.
-More aggressive Leios deployments/extensions in the future will have to navigate that trade-off, but simulations indicate that it's not already required by this CIP, with two possible exceptions.
-First, nodes might require additional disk capacity as a direct result of the increased throughput (TODO link to CPS for archival nodes).
-Second, a party with significant stake might need to provision more resources across their relays since each of the hundreds of downstream peers is now more demanding on average.
+**Existing Resources**. Because Praos cannot already fully utilize the existing
+Cardano infrastructure, this CIP can increase utilization without disrupting
+Praos; the currently unutilized resources are sufficient for Leios. More
+aggressive Leios deployments/extensions in the future will have to navigate that
+trade-off, but simulations indicate that it's not already required by this CIP,
+with two possible exceptions. First, nodes might require additional disk
+capacity as a direct result of the increased throughput (TODO link to CPS for
+archival nodes). Second, a party with significant stake might need to provision
+more resources across their relays since each of the hundreds of downstream
+peers is now more demanding on average.
 
-**Praos Independence**.To prevent Leios from accidentally depriving Praos of resources, the node implementation must prioritize Praos over Leios.
-For example, when a node simultaneously issues an RB and the EB it announces, the diffusion of the EB should not delay the diffusion of the RB; that RB is strictly more urgent than that EB.
+**Praos Independence**.To prevent Leios from accidentally depriving Praos of
+resources, the node implementation must prioritize Praos over Leios. For
+example, when a node simultaneously issues an RB and the EB it announces, the
+diffusion of the EB should not delay the diffusion of the RB; that RB is
+strictly more urgent than that EB.
 
-*Remark*.
-In contrast, the EB certified by a RB that also includes some transactions is exactly as urgent as that RB, because the RB cannot be selected without the EB.
-The $L_\text{diff}$ parameter prevents such urgency inversion from occurring enough to matter, as explained in the Leios security argument (TODO link section), but that is assuming nodes automatically eventually recover when it does happen.
+_Remark_. In contrast, the EB certified by a RB that also includes some
+transactions is exactly as urgent as that RB, because the RB cannot be selected
+without the EB. The $L_\text{diff}$ parameter prevents such urgency inversion
+from occurring enough to matter, as explained in the Leios security argument
+(TODO link section), but that is assuming nodes automatically eventually recover
+when it does happen.
 
-In reality, the prioritization of Praos over Leios does not need to be perfectly strict (and in fact could never be on hardware and software infrastructure that is mostly commodity and partly public).
-The fundamental requirement is that the network assumptions that were originally used to parametrize Praos must still be valid—up to some tolerated error probability—when the same nodes are simultaneously executing the Leios overlay.
-Concretely, the worst case delay between an honest block producer issuing a uniquely best RB and the last honest block producer selecting that RB (i.e., Praos's $\Delta$) must not be protracted by Leios so much that the existing Praos parameter values (e.g., the stability window of 36 hr) are no longer sufficient.
+In reality, the prioritization of Praos over Leios does not need to be perfectly
+strict (and in fact could never be on hardware and software infrastructure that
+is mostly commodity and partly public). The fundamental requirement is that the
+network assumptions that were originally used to parametrize Praos must still be
+valid—up to some tolerated error probability—when the same nodes are
+simultaneously executing the Leios overlay. Concretely, the worst case delay
+between an honest block producer issuing a uniquely best RB and the last honest
+block producer selecting that RB (i.e., Praos's $\Delta$) must not be protracted
+by Leios so much that the existing Praos parameter values (e.g., the stability
+window of 36 hr) are no longer sufficient.
 
-**Leios Correctness**.
-The implementation of freshest-first delivery also does not need to be perfect.
-The prioritization of young over old merely needs to be robust enough to justify the chosen values of $L_\text{vote}$ and $L_\text{diff}$ even during a burst of withheld-but-valid messages.
+**Leios Correctness**. The implementation of freshest-first delivery also does
+not need to be perfect. The prioritization of young over old merely needs to be
+robust enough to justify the chosen values of $L_\text{vote}$ and
+$L_\text{diff}$ even during a burst of withheld-but-valid messages.
 
 ##### Feasbility Sketch
 
-The following two new mini-protocols would be feasible and tractable for a Leios implementation.
+The following two new mini-protocols would be feasible and tractable for a Leios
+implementation.
 
-If the general structure and semantics of mini-protocols is not already familiar, see the Chapter 2 "Multiplexing mini-protocols" and Chapter 3 "Mini-Protocols" of the `ouroboros-network`'s [Ouroboros Network Specification PDF](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf).
-A brief summary is that a mini-protocol is a state machine that two nodes cooperatively navigate; each node only sends a message when it has _agency_, and at most one node has agency in any state.
-The agencies are indicated in this document as gold or cyan.
-The gold agency is the client, the downstream peer that initiated the connection, and cyan is the server.
-If some of a node's upstream peers are also downstream peers, then there are two instances of the mini-protocol running independently for each such peer, with the node as the client in one and the server in the other.
-Recall that Cardano's topology results in each relay having many more downstream peers than upstream peers.
+If the general structure and semantics of mini-protocols is not already
+familiar, see the Chapter 2 "Multiplexing mini-protocols" and Chapter 3
+"Mini-Protocols" of the `ouroboros-network`'s
+[Ouroboros Network Specification PDF](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf).
+A brief summary is that a mini-protocol is a state machine that two nodes
+cooperatively navigate; each node only sends a message when it has _agency_, and
+at most one node has agency in any state. The agencies are indicated in this
+document as gold or cyan. The gold agency is the client, the downstream peer
+that initiated the connection, and cyan is the server. If some of a node's
+upstream peers are also downstream peers, then there are two instances of the
+mini-protocol running independently for each such peer, with the node as the
+client in one and the server in the other. Recall that Cardano's topology
+results in each relay having many more downstream peers than upstream peers.
 Syncing peers will be discussed below.
 
 ```mermaid
@@ -1115,117 +1155,203 @@ graph LR
    StIdle -->|MsgDone| StDone
 ```
 
-The primary messages will carry information that is directly required by the Leios description above: headers, blocks, transactions referenced by blocks, and votes for blocks.
-However, some lower-level information must also be carried by secondary messages, eg indicating when the peer is first able to send the block.
+The primary messages will carry information that is directly required by the
+Leios description above: headers, blocks, transactions referenced by blocks, and
+votes for blocks. However, some lower-level information must also be carried by
+secondary messages, eg indicating when the peer is first able to send the block.
 
-The required exchanges between two neighboring nodes is captured by the following Information Exchange Requirements table (IER table).
-For the sake of minimizing this demonstration of feasibility, each row is a mini-protocol message, but that correspondence in the follow-up CIP does not need to be one-to-one.
+The required exchanges between two neighboring nodes is captured by the
+following Information Exchange Requirements table (IER table). For the sake of
+minimizing this demonstration of feasibility, each row is a mini-protocol
+message, but that correspondence in the follow-up CIP does not need to be
+one-to-one.
 
 <div style="text-align: center">
 <a name="table-99" id="table-99"></a>
 
-| Sender | Name | Arguments | Semantics |
-| - | - | - | - |
-| Client→ | MsgLeiosNotificationRequestNext | $\emptyset$ | Requests one Leios notifications, the announcement of an EB or delivery offers for blocks, transactions, and votes. |
-| ←Server | MsgLeiosBlockAnnouncement | RB header that announces an EB | The server has seen this EB announcement. |
-| ←Server | MsgLeiosBlockOffer | slot and Leios hash | The server could immediately deliver this block. |
-| ←Server | MsgLeiosBlockTxsOffer | slot and Leios hash | The server could immediately deliver any transaction referenced by this block. |
-| ←Server | MsgLeiosVotesOffer | list of slot and vote-issuer-id pairs | The server could immediately deliver votes with these identifiers. |
-| Client→ | MsgLeiosBlockRequest | slot and Leios hash | The server must now send deliver this block. |
-| ←Server | MsgLeiosBlock | EB block | The block from an earlier MsgLeiosBlockRequest. |
-| Client→ | MsgLeiosBlockTxsRequest | slot, Leios hash, and map from 16-bit index to 64-bit bitmap | The server must now deliver these transactions. The given bitmap identifies which of 64 contiguous transactions are requested, and the offset of the transaction corresponding to the bitmap's first bit is 64 times the given index. |
-| ←Server | MsgLeiosBlockTxs | list of transactions | The transactions from an earlier MsgLeiosBlockTxsRequest. |
-| Client→ | MsgLeiosVotesRequest | list of slot and vote-issuer-id | The server must now deliver these votes. |
-| ←Server | MsgLeiosVoteDelivery | list of votes | The votes from an earlier MsgLeiosVotesRequest. |
-| Client→ | MsgLeiosBlockRangeRequest| two slots and two RB header hashes | The server must now deliver the EBs certified by the given range of RBs, in order. |
-| ←Server | MsgLeiosNextBlockAndTxsInRange | an EB and all of its transactions | The next certified block from an earlier MsgLeiosBlockRangeRequest. |
-| ←Server | MsgLeiosLastBlockAndTxsInRange | an EB and all of its transactions | The last certified block from an earlier MsgLeiosBlockRangeRequest. |
+| Sender  | Name                            | Arguments                                                    | Semantics                                                                                                                                                                                                                             |
+| ------- | ------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Client→ | MsgLeiosNotificationRequestNext | $\emptyset$                                                  | Requests one Leios notifications, the announcement of an EB or delivery offers for blocks, transactions, and votes.                                                                                                                   |
+| ←Server | MsgLeiosBlockAnnouncement       | RB header that announces an EB                               | The server has seen this EB announcement.                                                                                                                                                                                             |
+| ←Server | MsgLeiosBlockOffer              | slot and Leios hash                                          | The server could immediately deliver this block.                                                                                                                                                                                      |
+| ←Server | MsgLeiosBlockTxsOffer           | slot and Leios hash                                          | The server could immediately deliver any transaction referenced by this block.                                                                                                                                                        |
+| ←Server | MsgLeiosVotesOffer              | list of slot and vote-issuer-id pairs                        | The server could immediately deliver votes with these identifiers.                                                                                                                                                                    |
+| Client→ | MsgLeiosBlockRequest            | slot and Leios hash                                          | The server must now send deliver this block.                                                                                                                                                                                          |
+| ←Server | MsgLeiosBlock                   | EB block                                                     | The block from an earlier MsgLeiosBlockRequest.                                                                                                                                                                                       |
+| Client→ | MsgLeiosBlockTxsRequest         | slot, Leios hash, and map from 16-bit index to 64-bit bitmap | The server must now deliver these transactions. The given bitmap identifies which of 64 contiguous transactions are requested, and the offset of the transaction corresponding to the bitmap's first bit is 64 times the given index. |
+| ←Server | MsgLeiosBlockTxs                | list of transactions                                         | The transactions from an earlier MsgLeiosBlockTxsRequest.                                                                                                                                                                             |
+| Client→ | MsgLeiosVotesRequest            | list of slot and vote-issuer-id                              | The server must now deliver these votes.                                                                                                                                                                                              |
+| ←Server | MsgLeiosVoteDelivery            | list of votes                                                | The votes from an earlier MsgLeiosVotesRequest.                                                                                                                                                                                       |
+| Client→ | MsgLeiosBlockRangeRequest       | two slots and two RB header hashes                           | The server must now deliver the EBs certified by the given range of RBs, in order.                                                                                                                                                    |
+| ←Server | MsgLeiosNextBlockAndTxsInRange  | an EB and all of its transactions                            | The next certified block from an earlier MsgLeiosBlockRangeRequest.                                                                                                                                                                   |
+| ←Server | MsgLeiosLastBlockAndTxsInRange  | an EB and all of its transactions                            | The last certified block from an earlier MsgLeiosBlockRangeRequest.                                                                                                                                                                   |
 
 <em>Table 99: Leios Information Exchange Requirements table (IER table)</em>
+
 </div>
 
 This mini-protocol pair satisfies the above requirements in the following ways.
 
-- These mini-protocols have less width than the LocalStateQuery mini-protocol and less depth than the TxSubmission mini-protocol.
-  Thus, its structure is not prohibitively complicated, and e.g. per-state timeouts can be tuned analogously to existing protocols.
-- ChainSync, BlockFetch, and TxSubmission are unchanged.
-  Moreover, they can progress independently of the Leios mini-protocols because they are separate mini-protocols.
-- Depending on how severely the node must prioritize Praos over Leios, the separation of their mini-protocols may simplify the prioritization mechanism.
-  However, urgency inversion means that at least MsgLeiosBlockRangeRequest, MsgLeiosNextBlockAndTxsInRange, and MsgLeiosLastBlockAndTxsInRange may occasionally need to have the same priority as Praos.
-  If it would benefit the prioritization implementation, those three messages could be isolated in a third Leios mini-protocol that has equal priorty as the Praos mini-protocols.
-- LeiosNotify and LeiosFetch can also progress independently, because they are separate mini-protocols.
-  A client can therefore receive notifications about new Leios data and when it could be fetched from this peer even while a large reply is arriving via LeiosFetch.
-  This avoids unnecessary increases in the latency of Leios messages.
-- The client can prioritize the youngest of outstanding offers from the peer when deciding which LeiosFetch request to send next, as freshest-first delivery requires.
-- Because the client only has agency in one state, it can pipeline its requests for the sake of latency hiding.
-- The client can request multiple transactions at once, which avoids wasting resources on overhead due to the potentially thousands of transactions exchanged per EB.
-  (Most EBs' transactions will usually have already arrived via the Mempool, but the adversary can prevent that for their EBs.)
-  The bitmap-based addressing scheme allows for compact requests for even thousands of transactions.
-- The client can request multiple votes at once, which avoids wasting resources on overhead due to the hundreds of votes exchanged per EB.
-  Because the first vote in a bundle could have arrived sooner than the last vote in a bundle if it hadn't been bundled, maximal bundling risks unnecessary increases in latency.
-  Some heuristic will balance the overhead decrease and latency increase, such as the client gradually stopps bundling its vote requests as its set of received votes approaches a quorum.
-- The server can do the same when bundling vote offers, but it should be more conservative, in case the client is already closer to a quorum than it is.
-- MsgLeiosBlockRangeRequest lets syncing nodes avoid wasting resources on overhead due to the (hopefully) high rate of EBs per RB.
-  BlockFetch already bundles its RB requests, and this message lets LeiosFetch do the same.
-  The starvation detection and avoidance mechanism used by Ouroboros Genesis's Devoted BlockFetch variant can be easily copied for MsgLeiosBlockRangeRequest if Ouroboros Genesis is enabled.
-- MsgLeiosBlockRangeRequest also allows the unfortunate node that suffers from a $\Delta_{EB}$ violation to recover, i.e. when it didn't receive a certified EB before receiving the RB that certifies it.
-  The protocol design requires that that event is rare or at least confined to a small portion of honest stake at a time.
-  But it will occasionally happen to some honest nodes, and they must be able to recover automatically and with minimal disruption.
-- Every Leios object is associated with the slot of an EB, and so has an explicit age.
-  This enables freshest-first delivery prioritization.
-  In addition, objects of a certain age should no longer diffuse, or at least can diffuse less aggressively.
-  Votes are no longer relevant once they're somewhat older than $L_\text{vote}$, for example.
-  EBs and their transactions could be restricted to MsgLeiosBlockRangeRequest once they're somewhat older than a reasonable value of $\Delta_{EB}$.
-  These age restrictions ensure that the amount of data any honest client could request _with urgency_ is always bounded, and so the server's memory requirements are also bounded.
-  Because equivocation detection limits the amount of Leios traffic per Praos election, and Praos elections have a stochastically low arrival rate, this memory bound is low enough to admit existing Cardano infrastructure.
+- These mini-protocols have less width than the LocalStateQuery mini-protocol
+  and less depth than the TxSubmission mini-protocol. Thus, its structure is not
+  prohibitively complicated, and e.g. per-state timeouts can be tuned
+  analogously to existing protocols.
+- ChainSync, BlockFetch, and TxSubmission are unchanged. Moreover, they can
+  progress independently of the Leios mini-protocols because they are separate
+  mini-protocols.
+- Depending on how severely the node must prioritize Praos over Leios, the
+  separation of their mini-protocols may simplify the prioritization mechanism.
+  However, urgency inversion means that at least MsgLeiosBlockRangeRequest,
+  MsgLeiosNextBlockAndTxsInRange, and MsgLeiosLastBlockAndTxsInRange may
+  occasionally need to have the same priority as Praos. If it would benefit the
+  prioritization implementation, those three messages could be isolated in a
+  third Leios mini-protocol that has equal priorty as the Praos mini-protocols.
+- LeiosNotify and LeiosFetch can also progress independently, because they are
+  separate mini-protocols. A client can therefore receive notifications about
+  new Leios data and when it could be fetched from this peer even while a large
+  reply is arriving via LeiosFetch. This avoids unnecessary increases in the
+  latency of Leios messages.
+- The client can prioritize the youngest of outstanding offers from the peer
+  when deciding which LeiosFetch request to send next, as freshest-first
+  delivery requires.
+- Because the client only has agency in one state, it can pipeline its requests
+  for the sake of latency hiding.
+- The client can request multiple transactions at once, which avoids wasting
+  resources on overhead due to the potentially thousands of transactions
+  exchanged per EB. (Most EBs' transactions will usually have already arrived
+  via the Mempool, but the adversary can prevent that for their EBs.) The
+  bitmap-based addressing scheme allows for compact requests for even thousands
+  of transactions.
+- The client can request multiple votes at once, which avoids wasting resources
+  on overhead due to the hundreds of votes exchanged per EB. Because the first
+  vote in a bundle could have arrived sooner than the last vote in a bundle if
+  it hadn't been bundled, maximal bundling risks unnecessary increases in
+  latency. Some heuristic will balance the overhead decrease and latency
+  increase, such as the client gradually stopps bundling its vote requests as
+  its set of received votes approaches a quorum.
+- The server can do the same when bundling vote offers, but it should be more
+  conservative, in case the client is already closer to a quorum than it is.
+- MsgLeiosBlockRangeRequest lets syncing nodes avoid wasting resources on
+  overhead due to the (hopefully) high rate of EBs per RB. BlockFetch already
+  bundles its RB requests, and this message lets LeiosFetch do the same. The
+  starvation detection and avoidance mechanism used by Ouroboros Genesis's
+  Devoted BlockFetch variant can be easily copied for MsgLeiosBlockRangeRequest
+  if Ouroboros Genesis is enabled.
+- MsgLeiosBlockRangeRequest also allows the unfortunate node that suffers from a
+  $\Delta_{EB}$ violation to recover, i.e. when it didn't receive a certified EB
+  before receiving the RB that certifies it. The protocol design requires that
+  that event is rare or at least confined to a small portion of honest stake at
+  a time. But it will occasionally happen to some honest nodes, and they must be
+  able to recover automatically and with minimal disruption.
+- Every Leios object is associated with the slot of an EB, and so has an
+  explicit age. This enables freshest-first delivery prioritization. In
+  addition, objects of a certain age should no longer diffuse, or at least can
+  diffuse less aggressively. Votes are no longer relevant once they're somewhat
+  older than $L_\text{vote}$, for example. EBs and their transactions could be
+  restricted to MsgLeiosBlockRangeRequest once they're somewhat older than a
+  reasonable value of $\Delta_{EB}$. These age restrictions ensure that the
+  amount of data any honest client could request _with urgency_ is always
+  bounded, and so the server's memory requirements are also bounded. Because
+  equivocation detection limits the amount of Leios traffic per Praos election,
+  and Praos elections have a stochastically low arrival rate, this memory bound
+  is low enough to admit existing Cardano infrastructure.
 
-The mini-protocol pair does not already address the following challenges, but the corresponding enrichments---if necessary---seem tractable.
+The mini-protocol pair does not already address the following challenges, but
+the corresponding enrichments---if necessary---seem tractable.
 
-- Depending on how severely the node must prioritize younger Leios traffic over older, the mini-protocols' states might need to be less granular.
-  Because distinct client requests transition to distinct cyan states, the server is unable to reply to the client's requests in a different order than the client sent them.
-  If a client pipelined several requests and then learned of a new youngest EB and requested it, the server---if timing allows---could conceptually reply to that last request before the others, for the sake of freshest-first delivery.
-  But it cannot do so if the mini-protocol's structure prevents those replies, as the existing granular states do.
-  The existing support for pipelined requests within the Cardano mini-protocol infrastructure was only concerned about latency hiding, and so does not explicitly support server-side request reordering.
-  It is already achievable with the existing infrastructure, but only by splitting the mini-protocol's requests and responses into different mini-protocols, which might be prohibitively obfuscated.
-- With server-side reordering, LeiosFetch could also be free to interleave small replies to vote requests with large replies to block/transaction requests.
-  Without it, however, the colocation of small replies and large replies in a single mini-protocol with granular states incurs head-of-line blocking.
-  That risks occasionally increasing some key latencies, thereby threatening freshest-first delivery or even motivating inflations of $L_\text{vote}$ and/or  $L_\text{diff}$.
-  One possible mitigation would run two instances of LeiosFetch and reserve one for requests that are small and urgent (e.g., small blocks, a few missing transactions, or perhaps all votes); the existing infrastructure would naturally interleave those with the larger and/or less urgent requests.
+- Depending on how severely the node must prioritize younger Leios traffic over
+  older, the mini-protocols' states might need to be less granular. Because
+  distinct client requests transition to distinct cyan states, the server is
+  unable to reply to the client's requests in a different order than the client
+  sent them. If a client pipelined several requests and then learned of a new
+  youngest EB and requested it, the server---if timing allows---could
+  conceptually reply to that last request before the others, for the sake of
+  freshest-first delivery. But it cannot do so if the mini-protocol's structure
+  prevents those replies, as the existing granular states do. The existing
+  support for pipelined requests within the Cardano mini-protocol infrastructure
+  was only concerned about latency hiding, and so does not explicitly support
+  server-side request reordering. It is already achievable with the existing
+  infrastructure, but only by splitting the mini-protocol's requests and
+  responses into different mini-protocols, which might be prohibitively
+  obfuscated.
+- With server-side reordering, LeiosFetch could also be free to interleave small
+  replies to vote requests with large replies to block/transaction requests.
+  Without it, however, the colocation of small replies and large replies in a
+  single mini-protocol with granular states incurs head-of-line blocking. That
+  risks occasionally increasing some key latencies, thereby threatening
+  freshest-first delivery or even motivating inflations of $L_\text{vote}$
+  and/or $L_\text{diff}$. One possible mitigation would run two instances of
+  LeiosFetch and reserve one for requests that are small and urgent (e.g., small
+  blocks, a few missing transactions, or perhaps all votes); the existing
+  infrastructure would naturally interleave those with the larger and/or less
+  urgent requests.
 
-**Operational certficate issue numbers (OCINs)**.
-There is one last clarification regarding feasibility that is more involved than the above discussion.
-The Leios protocol requires that each server must send at most two MsgLeiosBlockAnnouncement notifications that equivocate the same Praos election.
-This would be trivial to enforce on both the client and the server, if it were not for operational certificates (TODO link), which complicate the notion of which sets of headers qualify as equivocating.
+**Operational certficate issue numbers (OCINs)**. There is one last
+clarification regarding feasibility that is more involved than the above
+discussion. The Leios protocol requires that each server must send at most two
+MsgLeiosBlockAnnouncement notifications that equivocate the same Praos election.
+This would be trivial to enforce on both the client and the server, if it were
+not for operational certificates (TODO link), which complicate the notion of
+which sets of headers qualify as equivocating.
 
-With the current Praos system, a SPO is free to issue an arbitrary OCIN every time they issue an RB header, but honest SPOs will only increment their OCIN when they need to.
-Whether the OCIN carried by some header is valid depends on the chain it extends, because the Praos protocol rules along a single chain only allow an SPO's OCIN to be incremented at most once per header issued by that SPO.
+With the current Praos system, a SPO is free to issue an arbitrary OCIN every
+time they issue an RB header, but honest SPOs will only increment their OCIN
+when they need to. Whether the OCIN carried by some header is valid depends on
+the chain it extends, because the Praos protocol rules along a single chain only
+allow an SPO's OCIN to be incremented at most once per header issued by that
+SPO.
 
-The Leios mini-protocols, in contrast, are expected to diffuse contemporary EBs regardless of which chain they're on, and so cannot assume that it has seen the predecessor header of every MsgLeiosBlockAnnouncement.
-It also can't simply require that it has seen them all, because that would complicate the timing restrictions and require tracking a potentially unbounded number of forks.
-Thus, neither of the following simple extremes would be acceptable for Leios.
+The Leios mini-protocols, in contrast, are expected to diffuse contemporary EBs
+regardless of which chain they're on, and so cannot assume that it has seen the
+predecessor header of every MsgLeiosBlockAnnouncement. It also can't simply
+require that it has seen them all, because that would complicate the timing
+restrictions and require tracking a potentially unbounded number of forks. Thus,
+neither of the following simple extremes would be acceptable for Leios.
 
-- If Leios ignores OCINs, then a leaked hot key would let the adversary issue impersonating EBs whenever the stake pool is elected until that KES period expires, which can be up to 90 days later on Cardano mainnet.
-  That's unacceptably long.
-  (Significantly shortening the 90 day period is not an option, because that would excessively burden SPOs by forcing them to utilize their cold key more often.)
-- If Leios instead over-interprets distinct OCINs as separate elections, then any adversary can diffuse any number of EB announcements per actual election, with arbitrary OCINs.
-  Those announcements would be an unacceptable unbounded burst of work for honest nodes to relay throughout the entire network, even if they still only relayed at most one EB body per actual election.
+- If Leios ignores OCINs, then a leaked hot key would let the adversary issue
+  impersonating EBs whenever the stake pool is elected until that KES period
+  expires, which can be up to 90 days later on Cardano mainnet. That's
+  unacceptably long. (Significantly shortening the 90 day period is not an
+  option, because that would excessively burden SPOs by forcing them to utilize
+  their cold key more often.)
+- If Leios instead over-interprets distinct OCINs as separate elections, then
+  any adversary can diffuse any number of EB announcements per actual election,
+  with arbitrary OCINs. Those announcements would be an unacceptable unbounded
+  burst of work for honest nodes to relay throughout the entire network, even if
+  they still only relayed at most one EB body per actual election.
 
-There is no simple compromise between those extrema.
-In particular, if there's any way for the adversary to have revealed incremented OCINs to some nodes but definitely not all, then the worst-case diffusion behavior of adversarial EBs might be worse than that of honest EBs, which would complicate the acceptable lower bound on $L_\text{diff}$, for example.
-On the other hand, if every OCIN increment---even those disallowed by Praos---is always eventually relayed to all nodes, then an adversary can create unbounded work by constantly incrementing their OCINs---without the context provided by forks, there's no bound on the OCINs the Leios mini-protocols would relay.
+There is no simple compromise between those extrema. In particular, if there's
+any way for the adversary to have revealed incremented OCINs to some nodes but
+definitely not all, then the worst-case diffusion behavior of adversarial EBs
+might be worse than that of honest EBs, which would complicate the acceptable
+lower bound on $L_\text{diff}$, for example. On the other hand, if every OCIN
+increment---even those disallowed by Praos---is always eventually relayed to all
+nodes, then an adversary can create unbounded work by constantly incrementing
+their OCINs---without the context provided by forks, there's no bound on the
+OCINs the Leios mini-protocols would relay.
 
-Thus, the diffusion of EB announcements (regardless of who issued them) is only tractable and robust if it's restricted to a bounded set of OCINs that all honest nodes almost certainly agree on.
-For this reason, the Leios node should ignore an EB announcement that is less than the OCIN on its settled ledger state or more than one greater than that OCIN.
-After not ignoring two announcements with the same election, the Leios node should ignore (including not relaying) any subsequent announcements for that election.
-An intended implication of this rule is that an honest server would send the same one or two announcements to all of its clients; it doesn't have to track any extra state per-client.
+Thus, the diffusion of EB announcements (regardless of who issued them) is only
+tractable and robust if it's restricted to a bounded set of OCINs that all
+honest nodes almost certainly agree on. For this reason, the Leios node should
+ignore an EB announcement that is less than the OCIN on its settled ledger state
+or more than one greater than that OCIN. After not ignoring two announcements
+with the same election, the Leios node should ignore (including not relaying)
+any subsequent announcements for that election. An intended implication of this
+rule is that an honest server would send the same one or two announcements to
+all of its clients; it doesn't have to track any extra state per-client.
 
-With this rule, a client will crucially disconnect if and only if a server sends more than two announcements with the same election.
-It will also ignore headers from leaked hot keys once the SPO increments their OCIN, but unfortunately---and in contrast to Praos---not immediately.
-The Leios node will only ignore unincremented OCINs after the increment has settled on the chain.
-With Ouroboros Peras, that could be a matter of minutes.
-Without Peras, it's typically 12 hr under normal conditions and would take at most 36 hr before Cardano would consider it to be a disaster scenario.
-Thus, if an SPO leaks their hot key, the network would not diffuse their EBs until up to 36 hr later (usually 12 hr, and much sooner with Ouroboros Peras).
-SPOs should not leak their hot keys that frequently, and even if they do, it's still much sooner than waiting for the full 90 days.
+With this rule, a client will crucially disconnect if and only if a server sends
+more than two announcements with the same election. It will also ignore headers
+from leaked hot keys once the SPO increments their OCIN, but unfortunately---and
+in contrast to Praos---not immediately. The Leios node will only ignore
+unincremented OCINs after the increment has settled on the chain. With Ouroboros
+Peras, that could be a matter of minutes. Without Peras, it's typically 12 hr
+under normal conditions and would take at most 36 hr before Cardano would
+consider it to be a disaster scenario. Thus, if an SPO leaks their hot key, the
+network would not diffuse their EBs until up to 36 hr later (usually 12 hr, and
+much sooner with Ouroboros Peras). SPOs should not leak their hot keys that
+frequently, and even if they do, it's still much sooner than waiting for the
+full 90 days.
 
 ### Incentives
 
