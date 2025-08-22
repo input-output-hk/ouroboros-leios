@@ -1210,21 +1210,22 @@ Thus, neither of the following simple extremes would be acceptable for Leios.
 - If Leios instead over-interprets distinct OCINs as separate elections, then any adversary can diffuse any number of EB announcements per actual election, with arbitrary OCINs.
   Those announcements would be an unacceptable unbounded burst of work for honest nodes to relay throughout the entire network, even if they still only relayed at most one EB body per actual election.
 
-There is an acceptable compromise between those extrema.
-Every Leios node should ignore an EB announcement if it has already seen a greater OCIN in a strictly older slot.
+There is no simple compromise between those extrema.
+In particular, if there's any way for the adversary to have revealed incremented OCINs to some nodes but definitely not all, then the worst-case diffusion behavior of adversarial EBs might be worse than that of honest EBs, which would complicate the acceptable lower bound on $L_\text{diff}$, for example.
+On the other hand, if every OCIN increment---even those disallowed by Praos---is always eventually relayed to all nodes, then an adversary can create unbounded work by constantly incrementing their OCINs---without the context provided by forks, there's no bound on the OCINs the Leios mini-protocols would relay.
+
+Thus, the diffusion of EB announcements (regardless of who issued them) is only tractable and robust if it's restricted to a bounded set of OCINs that all honest nodes almost certainly agree on.
+For this reason, the Leios node should ignore an EB announcement that is less than the OCIN on its settled ledger state or more than one greater than that OCIN.
 After not ignoring two announcements with the same election, the Leios node should ignore (including not relaying) any subsequent announcements for that election.
 An intended implication of this rule is that an honest server would send the same one or two announcements to all of its clients; it doesn't have to track any extra state per-client.
 
-Crucially, this rule is also influenced by OCINs seen in valid headers received via ChainSync.
-Without that additional avenue, the limitation to two headers per election would risk preventing a node from ever seeing the one-per-election honest header that increments the OCIN.
-
-A client should only disconnect from a server that sends an OCIN that's less than an OCIN the same server sent in an older slot or if it sends a third announcement for the same election.
-In particular, since a client has multiple servers, it might ignore up to two announcements per election from each server without having reason to disconnect from any of them.
-
-With this rule, a client will crucially disconnect if a server sends more than two announcements with the same election.
+With this rule, a client will crucially disconnect if and only if a server sends more than two announcements with the same election.
 It will also ignore headers from leaked hot keys once the SPO increments their OCIN, but unfortunately---and in contrast to Praos---not immediately.
-The Leios node will still consider the first header with an incremented OCIN to equivocate with headers with the same election and an unincremented OCIN.
-However, the second header with that new OCIN will not be contested (unless that hot key was also already leaked), and thus the SPO's control over whether Leios considers its elections to be equivocated is very likely to be reestablished much sooner than 90 days.
+The Leios node will only ignore unincremented OCINs after the increment has settled on the chain.
+With Ouroboros Peras, that could be a matter of minutes.
+Without Peras, it's typically 12 hr under normal conditions and would take at most 36 hr before Cardano would consider it to be a disaster scenario.
+Thus, if an SPO leaks their hot key, the network would not diffuse their EBs until up to 36 hr later (usually 12 hr, and much sooner with Ouroboros Peras).
+SPOs should not leak their hot keys that frequently, and even if they do, it's still much sooner than waiting for the full 90 days.
 
 ### Incentives
 
