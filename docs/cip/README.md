@@ -1068,7 +1068,81 @@ The prioritization of young over old merely needs to be robust enough to justify
 
 ##### Feasbility Sketch
 
-TODO copy some details from https://github.com/input-output-hk/ouroboros-leios/pull/498
+The following two new mini protocols would be feasible and tractable for a Leios implementation.
+
+If the general structure and semantics of mini protocols is not already familiar, see the Chapter 2 "Multiplexing mini-protocols" and Chapter 3 "Mini Protocols" of the `ouroboros-network`'s [Ouroboros Network Specification PDF](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf).
+A brief summary is that a mini protocol is a state machine that two nodes cooperatively navigate; each node only sends a message when it has _agency_, and at most one node has agency in any state.
+The agencies are indicated in this document as gold or cyan.
+
+The gold agency is the client, the downstream peer that initiated the connection, and cyan is the server.
+If some of a node's upstream peers are also downstream peers, then there are two instances of the mini protocol running independently for each such peer, with the node as the client in one and the server in the other.
+Recall that Cardano's topology results in each relay having many more downstream peers than upstream peers.
+Syncing peers will be discussed below.
+
+```mermaid
+---
+title: LeiosNotify
+---
+graph LR
+   style StIdle color:gold;
+   style StBusy color:cyan;
+
+   StIdle -->|MsgLeiosNotificationRequestNext| StBusy
+   StBusy -->|MsgLeiosBlockAnnouncement| StIdle
+   StBusy -->|MsgLeiosBlockOffer| StIdle
+   StBusy -->|MsgLeiosBlockTxsOffer| StIdle
+   StBusy -->|MsgLeiosVotesOffer| StIdle
+
+   StIdle -->|MsgDone| StDone
+```
+
+```mermaid
+---
+title: LeiosFetch
+---
+graph LR
+   style StIdle color:gold;
+   style StBlock color:cyan;
+   style StBlockTxs color:cyan;
+   style StVotes color:cyan;
+   style StBlockRange color:cyan;
+
+   StIdle -->|MsgLeiosBlockRequest| StBlock -->|MsgLeiosBlock| StIdle
+   StIdle -->|MsgLeiosBlockTxsRequest| StBlockTxs -->|MsgLeiosSomeBlockTxs| StIdle
+   StIdle -->|MsgLeiosVotesRequest| StVotes -->|MsgLeiosVotes| StIdle
+   StIdle -->|MsgLeiosBlockRangeRequest| StBlockRange -->|MsgLeiosNextBlockAndTxsInRange| StBlockRange -->|MsgLeiosLastBlockAndTxsInRange| StIdle
+
+   StIdle -->|MsgDone| StDone
+```
+
+The primary messages will carry information that is directly required by the Leios description above: headers, blocks, txs referenced by blocks, and votes for blocks.
+However, some lower-level information must also be carried by secondary messages, eg indicating when the peer is first able to send the block.
+
+The required exchanges between two neighboring nodes is captured by the following Information Exchange Requirements table (IER table).
+In this sketch, each row is a mini protocol message, but that correspondence in the real implementation does not need to be one-to-one.
+
+<div align="center">
+<a name="table-99" id="table-99"></a>
+
+| Sender | Name | Arguments | Semantics |
+| - | - | - | - |
+| Client→ | MsgLeiosNotificationRequestNext | $\emptyset$ | Requests one Leios notifications, the announcement of an EB or delivery offers for blocks, txs, and votes. |
+| ←Server | MsgLeiosBlockAnnouncement | RB header that announces an EB | The server has seen this LLB announcement. |
+| ←Server | MsgLeiosBlockOffer | slot and Leios hash | The server could immediately deliver this block. |
+| ←Server | MsgLeiosBlockTxsOffer | slot and Leios hash | The server could immediately deliver any tx referenced by this block. |
+| ←Server | MsgLeiosVotesOffer | list of slot and vote-issuer-id pairs | The server could immediately deliver votes with these identifiers. |
+| Client→ | MsgLeiosBlockRequest | slot and Leios hash | The server must now send deliver this block. |
+| ←Server | MsgLeiosBlock | EB block | The block from an earlier MsgLeiosBlockRequest. |
+| Client→ | MsgLeiosBlockTxsRequest | slot, Leios hash, and map from 16-bit index to 64-bit bitmap | The server must now deliver these txs. The given bitmap identifies which of 64 contiguous txs are requested, and the offset of the tx corresponding to the bitmap's first bit is 64 times the given index. |
+| ←Server | MsgLeiosBlockTxs | list of txs | The txs from an earlier MsgLeiosBlockTxsRequest. |
+| Client→ | MsgLeiosVotesRequest | list of slot and vote-issuer-id | The server must now deliver these votes. |
+| ←Server | MsgLeiosVoteDelivery | list of votes | The votes from an earlier MsgLeiosVotesRequest. |
+| Client→ | MsgLeiosBlockRangeRequest| two slots and two RB header hashes | The server must now deliver the EBs certified by the given range of RBs, in order. |
+| ←Server | MsgLeiosNextBlockAndTxsInRange | an EB and all of its txs | The next certified block from an earlier MsgLeiosBlockRangeRequest. |
+| ←Server | MsgLeiosLastBlockAndTxsInRange | an EB and all of its txs | The last certified block from an earlier MsgLeiosBlockRangeRequest. |
+
+<em>Table 99: Leios Information Exchange Requirements table (IER table)</em>
+</div>
 
 ### Incentives
 
