@@ -1125,6 +1125,7 @@ For the sake of minimizing this demonstration of feasibility, each row is a mini
 <div align="center">
 <a name="table-99" id="table-99"></a>
 
+<div align="normal">
 | Sender | Name | Arguments | Semantics |
 | - | - | - | - |
 | Client→ | MsgLeiosNotificationRequestNext | $\emptyset$ | Requests one Leios notifications, the announcement of an EB or delivery offers for blocks, transactions, and votes. |
@@ -1141,6 +1142,7 @@ For the sake of minimizing this demonstration of feasibility, each row is a mini
 | Client→ | MsgLeiosBlockRangeRequest| two slots and two RB header hashes | The server must now deliver the EBs certified by the given range of RBs, in order. |
 | ←Server | MsgLeiosNextBlockAndTxsInRange | an EB and all of its transactions | The next certified block from an earlier MsgLeiosBlockRangeRequest. |
 | ←Server | MsgLeiosLastBlockAndTxsInRange | an EB and all of its transactions | The last certified block from an earlier MsgLeiosBlockRangeRequest. |
+</div>
 
 <em>Table 99: Leios Information Exchange Requirements table (IER table)</em>
 </div>
