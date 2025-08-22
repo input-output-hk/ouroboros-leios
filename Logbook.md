@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2025-08-22
+
+### Analysis for regressions in Rust simulator
+
+The experiment [analysis/sims/regression/](analysis/sims/regression/) compares the behavior of all of the tagged versions of the Rust simulator, `sim-cli`, against each other when the same network topology and configuration file is used. This speeds detection of changes in behavior of the simulator.
+
 ## 2025-08-21
 
 ### Analysis of diffusion of empty blocks on Cardano mainnet
