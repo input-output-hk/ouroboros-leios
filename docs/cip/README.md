@@ -1121,10 +1121,8 @@ However, some lower-level information must also be carried by secondary messages
 The required exchanges between two neighboring nodes is captured by the following Information Exchange Requirements table (IER table).
 For the sake of minimizing this demonstration of feasibility, each row is a mini-protocol message, but that correspondence in the follow-up CIP does not need to be one-to-one.
 
-<div align="center">
+<div style="text-align: center">
 <a name="table-99" id="table-99"></a>
-
-<div align="normal">
 
 | Sender | Name | Arguments | Semantics |
 | - | - | - | - |
@@ -1142,8 +1140,6 @@ For the sake of minimizing this demonstration of feasibility, each row is a mini
 | Client→ | MsgLeiosBlockRangeRequest| two slots and two RB header hashes | The server must now deliver the EBs certified by the given range of RBs, in order. |
 | ←Server | MsgLeiosNextBlockAndTxsInRange | an EB and all of its transactions | The next certified block from an earlier MsgLeiosBlockRangeRequest. |
 | ←Server | MsgLeiosLastBlockAndTxsInRange | an EB and all of its transactions | The last certified block from an earlier MsgLeiosBlockRangeRequest. |
-
-</div>
 
 <em>Table 99: Leios Information Exchange Requirements table (IER table)</em>
 </div>
