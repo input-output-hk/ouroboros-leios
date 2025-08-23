@@ -1,4 +1,5 @@
 experiments/0.0,0/run.sh
+experiments/0.0,1/run.sh
 experiments/6.5,0/run.sh
 experiments/6.5,1/run.sh
 experiments/7.0,0/run.sh
