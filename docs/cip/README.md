@@ -1803,7 +1803,7 @@ eventually do arrive on the ledger, but that they may have to wait long during
 congestion. During light load a transaction takes one or two minutes to reach
 the ledger, but in heavier load it might take three minutes or even longer. The
 capacity parameter $S_\text{EB-tx}$ (12 MB/EB in these simulations)
-fundamentally limits the amortized maximum throughput of Linear Leios:
+fundamentally limits the amortized maximum throughput of Leios:
 furthermore, it affects how long it takes transactions to reach the ledger as
 the throughput approaches the capacity.
 
@@ -1827,7 +1827,7 @@ the throughput approaches the capacity.
 
 The effect of EBs being discarded when RBs are too close together is evidenced
 in the following plot. A transaction referenced only once by an EB is one that
-reaches the ledger on the first attempt. If a transaction is referenced more
+reaches the ledger on the first attempt. If a transaction is referenced by more
 than one EB, it means that several attempts were made to before a relevant EB's
 certificate was included in an RB. The subsequent plot shows Leios's irregular
 rhythm of forging, sometimes discarding, and certifying EB. (Note that RBs are
@@ -1835,7 +1835,7 @@ so small relative to most EBs that they are difficult to see in the histogram.)
 The diagram also provides a sense of the intermittency of successful
 certification and the presence of periods of unfavorable sortition where RBs are
 not produced or are produced too close together. The same phenomenon occurs in
-Praos, but Linear Leios amplifies the intermittency.
+Praos, but Leios amplifies the intermittency.
 
 <div align="center">
 <a name="figure-11" id="figure-11"></a>
@@ -1851,13 +1851,13 @@ Praos, but Linear Leios amplifies the intermittency.
 
 ![Disposition of transactions in blocks](images/disposition-size-timeseries.svg)
 
-<em>Figure 12: Disposition of transactions in blocks</em>
+<em>Figure 12: Disposition of transactions in blocks (RBs are so small as not to be visible in the histograms. When an EB is generated, it is labeled in the plot as to whether it will eventually be certified ("EB later certified") or not ("EB later not certified"). When the certificate is included in an RB, the EB is labeled "EB now certified".)</em>
 
 </div>
 
 When demand is not high relative to capacity, the total size of transactions
 referenced by an EB varies randomly and rarely reaches the maximum size of 12
-MB/EB: see the following figure. One can see that at higher demands, fully
+MB/EB: see the following figure. One can see that at higher demands fully
 utilized blocks predominate. The presence of those full blocks means that other
 transactions are waiting in the memory pool for referencing by a subsequent EB.
 Thus the capacity parameter provides a natural form of backpressure that limits
@@ -1878,10 +1878,10 @@ histograms of diffusion time (i.e., the time from a transaction's, RB's, EB's,
 or vote's creation to its reaching the nodes in the network). Transactions and
 votes typically diffuse rapidly throughout the whole network in fractions of a
 second, due to their small sizes, often small enough to fit in a single TCP
-transmission unit. RBs diffuse in less one second, with the empty RBs at the
+transmission unit. RBs diffuse in approximately one second, with the empty RBs at the
 start and end of the simulation diffusing fastest. Similarly, EBs diffuse fast
 when empty or when demand is low, but once full EBs are diffusing, it can take
-up to two seconds for them to diffuse. All of the distribution have long tails
+up to two seconds for them to diffuse. All of the distributions have long tails
 where messages arrive much later for nodes with unfavorably topological
 locations. The Leios protocol possesses the important property that traffic in
 transactions, RBs, votes, and EBs do not interfere with one another: for
@@ -1895,8 +1895,8 @@ example, delays in EBs and high throughput do not also delay RBs in those cases.
 | ![Arrival delay for TXs](images/elapsed-TX.svg) | ![Arrival delay for RBs](images/elapsed-RB.svg) |
 | ![Arrival delay for VTs](images/elapsed-VT.svg) | ![Arrival delay for EBs](images/elapsed-EB.svg) |
 
-<em>Figure 14: Arrival delays for transactions, ranking blocks, votes, and
-endorser blocks</em>
+<em>Figure 14: Arrival delays for transactions ("TX", upper left), ranking blocks ("RB", upper right), votes ("VT", lower left), and
+endorser blocks ("EB", lower right)</em>
 
 </div>
 
@@ -1914,8 +1914,8 @@ In terms of resource usage, the throughputs in these simulations do no stress
 the four virtual CPUs of each node or saturate the 10 Mb/s available bandwidth
 between nodes. The figures below show that bandwidth usage does not exceed 4
 Mb/s and that most of that is consumed by diffusion of transactions among the
-nodes. Furthermore, vCPU usage stays below 200% (i.e., the equivalent of two
-vCPUs operating fully), though it is very bursty because of the uneven workload
+nodes. Furthermore, vCPU usage stays below 100% (i.e., the equivalent of one
+vCPU operating fully), though it is very bursty because of the uneven workload
 of cryptographic and ledger operations. The last figure quantifies how
 transaction and EB body validation dominate CPU usage. Averaged over time, CPU
 usage is low: there may be opportunities in the implementation of the Leios node
@@ -1939,7 +1939,7 @@ in CPU usage over time.
 
 ![Mean CPU load among all nodes](images/cpu-mean-histogram.svg)
 
-<em>Figure 16: Mean CPU load among all nodes</em>
+<em>Figure 16: Mean CPU load among all nodes ("Gen" = generated, "Val" = validated, "RH" = ranking block header, "RB" = ranking block body, "EH" = endorser block header, "EB" = endorser block body", "TX" = transaction)</em>
 
 </div>
 
