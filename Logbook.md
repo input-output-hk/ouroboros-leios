@@ -1,5 +1,19 @@
 # Leios logbook
 
+## 2025-08-23
+
+### Re-ran late-release attack experiment
+
+The [late-release attack experiment](analysis/sims/attack) was rerun with the latest version of the Rust simulation. The findings remain unchanged.
+
+### Re-ran simulation experiment for CIP figures
+
+The [simulation experiment for the CIP figures](analysis/sims/cip/) was rerun with the latest version of the Rust simulation, and several improvements were made:
+
+- Semi-optimal settings for protocol parameters
+- Improved assumptions for validation costs
+- Explored effects of increased Plutus execution steps
+
 ## 2025-08-22
 
 ### Analysis for regressions in Rust simulator
@@ -35,9 +49,9 @@ Findings:
 
 Artifacts:
 
-- [Slides](analysis/simms/2025w33b/ReadMe.pdf)
-- [Notebook](analysis/simms/2025w33b/analysis.ipynb)
-- [Configurations](analysis/simms/2025w33b/experiments/)
+- [Slides](analysis/sims/2025w33b/ReadMe.pdf)
+- [Notebook](analysis/sims/2025w33b/analysis.ipynb)
+- [Configurations](analysis/sims/2025w33b/experiments/)
 
 ### Rust simulation
 
