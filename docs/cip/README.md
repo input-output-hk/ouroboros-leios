@@ -613,11 +613,21 @@ availability:
 | <a id="delta-rb" href="#delta-rb"></a>RB diffusion                 |      $\Delta_\text{RB}$       | Complete ranking block propagation and adoption time                 |    <5 slots    |
 | <a id="delta-eb-H" href="#delta-eb-H"></a>EB honest diffusion      | $\Delta_\text{EB}^{\text{H}}$ | EB propagation time when released on schedule with no fresher EB     |   7-10 slots   |
 | <a id="delta-eb-A" href="#delta-eb-A"></a>EB adversarial diffusion | $\Delta_\text{EB}^{\text{A}}$ | EB propagation time starting from >25% network coverage after voting |  15-20 slots   |
+
+<em>Table 1: Network Characteristics</em>
+
+</div>
+
+<div align="center">
+<a name="table-2" id="table-2"></a>
+
+| Characteristic                                                     |            Symbol             | Description                                                          | Observed Range by Simulations |
+| ------------------------------------------------------------------ | :---------------------------: | -------------------------------------------------------------------- | :------------: |
 | <a id="delta-cpu" href="#delta-cpu"></a>EB validation              |      $\Delta_\text{cpu}$      | Full EB validation including signatures, scripts, and state updates  |   2-4 slots    |
 | <a id="delta-reapply" href="#delta-reapply"></a>EB reapplication   |    $\Delta_\text{reapply}$    | Certified EB reapplication with minimal checks and UTxO updates      |    <1 slot     |
 | <a id="delta-tx" href="#delta-tx"></a>Transaction validation       |      $\Delta_\text{TX}$       | Standard Praos transaction validation time for RB processing         |    ~1 slot     |
 
-<em>Table 1: Network Characteristics</em>
+<em>Table 2: Ledger Characteristics</em>
 
 </div>
 
