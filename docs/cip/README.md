@@ -247,11 +247,16 @@ included in the chain (green), while others cannot be certified in time (gray).
 This happens because the protocol requires sufficient time between an EB's
 announcement and the next RB that could potentially include its certificate to
 ensure that honest stake can validate it. These timing constraints arise from
-both network diffusion delays and the computational work required to validate
+both network transmission delays and the computational work required to validate
 transactions - the protocol must account for the time to propagate data and
 process it. The precise timing mechanism is detailed in the following section.
 
 ### Protocol Flow
+
+The protocol operates through the following steps. Figure 4 visualizes the
+precise timing mechanism that governs when certificates can be safely included
+in the chain, showing both the protocol phases and the underlying network
+characteristics that inform their design.
 
 <div align="center">
   <a name="figure-4" id="figure-4"></a>
@@ -263,11 +268,6 @@ process it. The precise timing mechanism is detailed in the following section.
 certification</em>
 
 </div>
-
-The protocol operates through the following steps. Figure 4 visualizes the
-precise timing mechanism that governs when certificates can be safely included
-in the chain, showing both the protocol phases and the underlying network
-characteristics that inform their design.
 
 #### Step 1: Block Production
 
