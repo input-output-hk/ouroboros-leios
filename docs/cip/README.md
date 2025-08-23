@@ -371,6 +371,8 @@ This timing constraint ensures certified EBs have sufficient time to diffuse
 throughout the network before their transactions are included in the ledger,
 preventing chain adoption delays.
 
+**Transaction Ordering**: When processing a chain, transactions from certified EBs are applied to the ledger before transactions directly included in the subsequent RB. This ensures proper transaction sequencing.
+
 <a id="rb-content-rules" href="#rb-content-rules"></a>
 
 > [!Important]
@@ -411,8 +413,7 @@ availability:
 
 <a id="three-phase-protocol"></a>**Timing Phases for Certificate Inclusion**
 
-The certificate inclusion process (Steps 3-5) involves three distinct timing
-phases that ensure network-wide EB availability:
+The certificate inclusion process (Steps 3-5) involves three sequential timing phases:
 
 <a id="equivocation-detection"></a>
 
@@ -426,7 +427,7 @@ worst-case equivocation scenario:
 2. [$\Delta_\text{hdr}$](#delta-hdr): Conflicting header propagation  
 3. [$\Delta_\text{hdr}$](#delta-hdr): Equivocation proof propagation
 
-Therefore, $L_\text{equi} \geq 3\Delta_\text{hdr}$ to ensure reliable detection (where [$L_\text{equi}$](#l-equi) and [$\Delta_\text{hdr}$](#delta-hdr) are defined in the protocol parameters).
+Therefore, $L_\text{equi} \geq 3\Delta_\text{hdr}$ to ensure reliable detection (where [$L_\text{equi}$](#l-equi) and [$\Delta_\text{hdr}$](#delta-hdr) are defined as number of slots).
 This prevents adversaries from sending different EBs to different network parts of the
 network, as honest nodes will refuse to vote if they detect equivocation. Voting
 cannot begin until this phase completes.
@@ -434,11 +435,11 @@ cannot begin until this phase completes.
 <a id="voting-period"></a>
 
 **Phase 2: Voting Period ($L_\text{vote}$)**  
-Voting begins after the equivocation detection period $L_\text{equi}$ completes.
 The voting period must accommodate both EB propagation and validation:
 
 $$L_\text{vote} > \Delta_\text{EB}^{\text{H}} + \Delta_\text{cpu}$$
-honest EB propagation time), and [$\Delta_\text{cpu}$](#delta-cpu) (validation time) are defined in the [network characteristics and protocol parameters](#network-characteristics).
+
+where [$\Delta_\text{EB}^{\text{H}}$](#delta-eb-H) (honest EB propagation time), and [$\Delta_\text{cpu}$](#delta-cpu) (validation time) are defined as part of the [network characteristics and protocol parameters](#network-characteristics) section.
 
 This ensures all honest committee members can participate by having sufficient
 time to:
@@ -453,18 +454,15 @@ assumption for the diffusion period.
 <a id="diffusion-period"></a>
 
 **Phase 3: Diffusion Period ($L_\text{diff}$)**  
-After voting completes, an additional diffusion period ensures network-wide EB
-availability. This leverages the network assumption that data known to >25% of
-the network (guaranteed by the 75% voting threshold) will propagate fully within
-this time.
+Ensures network-wide EB availability by leveraging the assumption that data known to >25% of the network (guaranteed by the voting threshold) propagates fully within this period.
 
 The critical timing constraint that preserves Praos security relates the total
 time available for EB processing to the actual time required:
 
-$$(L_\text{equi} + L_\text{vote} + L_\text{diff}) + \Delta_\text{RB} > \Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply}$$
+$$L_\text{equi} + L_\text{vote} + L_\text{diff} + \Delta_\text{RB} > \Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply}$$
 
 where:
-- $(L_\text{equi} + L_\text{vote} + L_\text{diff})$ represents the total time for EB processing
+- $L_\text{equi} + L_\text{vote} + L_\text{diff}$ represents the total time for EB processing
 - $\Delta_\text{RB}$ represents RB' propagation time  
 - $\Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply}$ represents the time to receive and reapply EB
 
@@ -525,10 +523,6 @@ their headers and embedding EB certificates in their bodies.
 - The content rules for RBs are detailed as part of
   [Step 5: Chain Inclusion](#rb-content-rules)
 
-**Transaction Ordering**: When processing a chain, transactions from certified
-EBs are applied to the ledger before transactions directly included in the
-subsequent RB. This ensures proper transaction sequencing.
-
 #### Endorser Blocks (EBs)
 
 EBs are produced by the same stake pool that created the corresponding
@@ -541,17 +535,10 @@ simplified structure:
 - `transaction_references`: Ordered list of transaction references (transaction
   ids)
 
-> [!Important] Transaction references **must** maintain their order. When
-> applying an EB to the ledger, transactions are processed sequentially in the
-> order specified.
-
 When an EB is announced in an RB header via the `announced_eb` field, a voting
 period begins as described in [Votes and Certificates](#votes-and-certificates).
-The EB certificate can only be included in RBs that:
-
-1. Directly extend the announcing RB
-2. Are created at least $L_\text{equi} + L_\text{vote} + L_\text{diff}$ slots after the
-   announcing RB's slot
+The EB certificate inclusion follows the timing constraints and rules detailed in
+[Step 5: Chain Inclusion](#step-5-chain-inclusion).
 
 The hash referenced in RB headers (`announced_eb` and `certified_eb` fields) is
 computed from the complete EB structure and serves as the unique identifier for
