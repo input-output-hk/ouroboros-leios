@@ -855,12 +855,8 @@ at least $L_\text{equi} + L_\text{vote} + L_\text{diff}$ slots have elapsed sinc
 the RB that announced the EB (step 12). This timing constraint ensures the
 certified EB has had sufficient time to diffuse throughout the network.
 
-**Transaction Selection**: When producing an RB that includes an EB certificate,
-the block contains only the certificate. When producing an RB without a
-certificate, the producer includes transactions from their mempool only if they
-can validate all transactions against the complete ledger state (including all
-certified EBs). If missing any certified EB data, the producer creates an empty
-RB.
+**Transaction Selection**: RB producers follow the content constraints
+detailed in [Step 5: Chain Inclusion](#step-5-chain-inclusion).
 
 #### Ledger Management
 
