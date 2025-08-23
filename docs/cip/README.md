@@ -318,8 +318,8 @@ RB that announced the EB to ensure sufficient time for
 RB that announced the EB. A committee member votes for an EB only if:
 
 1. The RB header arrived within <a href="#delta-hdr">$\Delta_\text{hdr}$</a>,
-2. It has **not** received an equivocating RB header for this EB within
-   <a href="#l-equi">$L_\text{equi}$</a> slots,
+2. It has **not** detected any equivocating RB header for the same slot within
+   <a href="#l-equi">$L_\text{equi}$</a> slots of the original RB's slot,
 3. It has received the EB within $L_\text{equi} + L_\text{vote}$ slots from the
    start of the EB's slot,
 4. The EB is the one announced by the latest RB in the voter's current chain,
@@ -399,19 +399,49 @@ phases:
 **Phase 1: Equivocation Detection ($L_\text{equi}$)**  
 This phase occurs immediately when an RB announces an EB. During this period,
 the network detects any attempts by adversaries to create multiple conflicting
-blocks for the same slot. The equivocation detection period must accommodate the
-worst-case equivocation scenario:
+blocks for the same slot. The equivocation detection mechanism ensures that
+honest nodes can reliably identify and reject equivocating behavior before
+participating in voting.
 
-1. [$\Delta_\text{hdr}$](#delta-hdr): First header propagation
-2. [$\Delta_\text{hdr}$](#delta-hdr): Conflicting header propagation
-3. [$\Delta_\text{hdr}$](#delta-hdr): Equivocation proof propagation
+**Equivocation Attack Model**: An adversary controlling a block production slot
+may attempt to create multiple conflicting EBs and distribute different versions
+to different parts of the network. This could potentially split the honest vote,
+preventing certification of any EB, or worse, allow certification of an
+adversarial EB if honest nodes vote on different versions.
 
-Therefore, $L_\text{equi} \geq 3\Delta_\text{hdr}$ to ensure reliable detection
-(where [$L_\text{equi}$](#l-equi) and [$\Delta_\text{hdr}$](#delta-hdr) are
-defined as number of slots). This prevents adversaries from sending different
-EBs to different network parts of the network, as honest nodes will refuse to
-vote if they detect equivocation. Voting cannot begin until this phase
-completes.
+**Detection Mechanism**: The protocol defends against equivocation through a
+multi-step detection process that must accommodate the worst-case propagation
+scenario:
+
+1. **[$\Delta_\text{hdr}$](#delta-hdr)**: Initial header propagation - the first (honest or
+   adversarial) RB header reaches all honest nodes
+2. **[$\Delta_\text{hdr}$](#delta-hdr)**: Conflicting header propagation - any equivocating
+   header from the same slot reaches honest nodes  
+3. **[$\Delta_\text{hdr}$](#delta-hdr)**: Equivocation evidence propagation - proof of
+   conflicting headers propagates network-wide, allowing all honest nodes to
+   detect the equivocation
+
+Therefore, [$L_\text{equi}$](#l-equi) $\geq 3$[$\Delta_\text{hdr}$](#delta-hdr) to
+ensure reliable detection before voting begins. This constraint is derived from
+the network model where headers must propagate within [$\Delta_\text{hdr}$](#delta-hdr) to
+maintain Praos security assumptions.
+
+**Security Guarantee**: By waiting [$L_\text{equi}$](#l-equi) slots before voting begins,
+the protocol ensures that if any equivocation occurred, all honest nodes will
+have detected it and will refuse to vote for any EB from that slot. This
+prevents adversaries from exploiting network partitions to gain unfair
+advantages in the voting process, as honest nodes will only vote for EBs where
+no equivocation was detected during the detection period.
+
+> [!NOTE]
+>
+> **Comparison with Research Paper**: The [Leios research paper][leios-paper]
+> describes a more complex protocol variant that requires $5$[$\Delta_\text{hdr}$](#delta-hdr)
+> for equivocation detection due to additional coordination mechanisms between
+> Input Blocks and Endorser Blocks. This specification's simplified approach,
+> where EBs are directly announced by RBs, reduces the equivocation detection
+> requirement to $3$[$\Delta_\text{hdr}$](#delta-hdr) while maintaining the same security
+> guarantees against equivocation attacks.
 
 <a id="voting-period"></a>
 
