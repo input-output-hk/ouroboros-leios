@@ -2343,13 +2343,14 @@ better user experience through reduced transaction confirmation times.
 
 **Relax EB diffusion constraints**
 
-The current design requires <a href="#delta-eb-A">$\Delta_\text{EB}^A$</a> (worst
-case) to be fairly small to enable selection of reasonable <a href="#l-diff">$L_\text{diff}$</a>
-values that ensure certified EBs don't impact Praos safety while maintaining
-frequent enough certification for high throughput. Should worst-case EB
-diffusion prove much larger than average or honest cases, introducing an
-additional recovery period $L_\text{recover}$ after certificate inclusion could allow
-EBs to remain unavailable for extended periods.
+The current design requires <a href="#delta-eb-A">$\Delta_\text{EB}^A$</a>
+(worst case) to be fairly small to enable selection of reasonable
+<a href="#l-diff">$L_\text{diff}$</a> values that ensure certified EBs don't
+impact Praos safety while maintaining frequent enough certification for high
+throughput. Should worst-case EB diffusion prove much larger than average or
+honest cases, introducing an additional recovery period $L_\text{recover}$ after
+certificate inclusion could allow EBs to remain unavailable for extended
+periods.
 
 This approach provides greater freedom in selecting $L_\text{diff}$ parameters,
 potentially allowing values as low as zero. However, the security argument must
