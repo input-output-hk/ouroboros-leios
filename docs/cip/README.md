@@ -431,7 +431,7 @@ no equivocation was detected during the detection period.
 > for equivocation detection due to additional coordination mechanisms between
 > Input Blocks and Endorser Blocks. This specification's simplified approach,
 > where EBs are directly announced by RBs, reduces the equivocation detection
-> requirement to $3$$\Delta_\text{hdr}$ while maintaining the same security
+> requirement to $3\Delta_\text{hdr}$ while maintaining the same security
 > guarantees against equivocation attacks.
 
 <a id="voting-period"></a>
