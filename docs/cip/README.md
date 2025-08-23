@@ -1264,7 +1264,7 @@ future implementations of Leios can be assessed in these terms.
 <a name="table-5" id="table-5"></a>
 
 | Category   | Metric                                             | Measurement                                                                                           |
-| ---------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| :--------: | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | Efficiency | Spatial efficiency, $\epsilon_\text{spatial}$      | Ratio of total transactions size to persistent storage                                                |
 |            | Temporal efficiency, $\epsilon_\text{temporal}(s)$ | Time to include transaction on ledger                                                                 |
 |            | Network efficiency, $\epsilon_\text{network}$      | Ratio of total transaction size to node-averaged network usage                                        |
