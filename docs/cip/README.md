@@ -609,7 +609,7 @@ availability:
 
 | Characteristic                                                     |            Symbol             | Description                                                          | Observed Range by Simulations |
 | ------------------------------------------------------------------ | :---------------------------: | -------------------------------------------------------------------- | :------------: |
-| <a id="delta-hdr" href="#delta-hdr"></a>RB header propagation      |      $\Delta_\text{hdr}$      | Time for RB headers to propagate network-wide (headers are small)    |    <1 slot     |
+| <a id="delta-hdr" href="#delta-hdr"></a>Header propagation      |      $\Delta_\text{hdr}$      | Time for constant size headers (< 1,500 bytes) to propagate network-wide    |    <1 slot     |
 | <a id="delta-rb" href="#delta-rb"></a>RB diffusion                 |      $\Delta_\text{RB}$       | Complete ranking block propagation and adoption time                 |    <5 slots    |
 | <a id="delta-eb-H" href="#delta-eb-H"></a>EB honest diffusion      | $\Delta_\text{EB}^{\text{H}}$ | EB propagation time when released on schedule with no fresher EB     |   7-10 slots   |
 | <a id="delta-eb-A" href="#delta-eb-A"></a>EB adversarial diffusion | $\Delta_\text{EB}^{\text{A}}$ | EB propagation time starting from >25% network coverage after voting |  15-20 slots   |
