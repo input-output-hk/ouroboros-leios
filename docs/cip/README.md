@@ -412,10 +412,10 @@ scenario:
    conflicting headers propagates network-wide, allowing all honest nodes to
    detect the equivocation
 
-Therefore, $L_\text{equi} \geq 3\Delta_\text{hdr}$ to ensure reliable
-detection before voting begins. This constraint is derived from the network
-model where headers must propagate within $\Delta_\text{hdr}$ to maintain Praos
-security assumptions.
+Therefore, $L_\text{equi} \geq 3\Delta_\text{hdr}$ to ensure reliable detection
+before voting begins. This constraint is derived from the network model where
+headers must propagate within $\Delta_\text{hdr}$ to maintain Praos security
+assumptions.
 
 **Security Guarantee**: By waiting $L_\text{equi}$ slots before voting begins,
 the protocol ensures that if any equivocation occurred, all honest nodes will
