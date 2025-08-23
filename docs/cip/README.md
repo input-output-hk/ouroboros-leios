@@ -1102,7 +1102,7 @@ minimizing this demonstration of feasibility, each row is a mini-protocol
 message, but that correspondence in the follow-up CIP does not need to be
 one-to-one.
 
-<div style="text-align: center">
+<div align="center">
 <a name="table-4" id="table-4"></a>
 
 | Sender  | Name                            | Arguments                                                    | Semantics                                                                                                                                                                                                                             |
