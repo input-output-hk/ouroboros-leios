@@ -2343,20 +2343,20 @@ better user experience through reduced transaction confirmation times.
 
 **Relax EB diffusion constraints**
 
-The current design requires [**$\Delta_\text{EB}^{\text{A}}$**](#delta-eb-A) (worst
-case) to be fairly small to enable selection of reasonable $L_\text{diff}$
-values that ensure certified EBs don't impact Praos safety while maintaining
-frequent enough certification for high throughput. Should worst-case EB
-diffusion prove much larger than average or honest cases, introducing an
-additional recovery period $L_\text{recover}$ after certificate inclusion could allow
-EBs to remain unavailable for extended periods.
+The current design requires [**$\Delta_\text{EB}^{\text{A}}$**](#delta-eb-A)
+(worst case) to be fairly small to enable selection of reasonable
+$L_\text{diff}$ values that ensure certified EBs don't impact Praos safety while
+maintaining frequent enough certification for high throughput. Should worst-case
+EB diffusion prove much larger than average or honest cases, introducing an
+additional recovery period $L_\text{recover}$ after certificate inclusion could
+allow EBs to remain unavailable for extended periods.
 
 This approach provides greater freedom in selecting $L_\text{diff}$ parameters,
 potentially allowing values as low as zero. However, the security argument must
-account for nodes being unable to validate blocks within $L_\text{recover}$ periods.
-To preserve Praos safety and liveness, this requires relaxed chain validity
-rules where potentially invalid transactions could be permitted in ranking
-blocks during recovery periods.
+account for nodes being unable to validate blocks within $L_\text{recover}$
+periods. To preserve Praos safety and liveness, this requires relaxed chain
+validity rules where potentially invalid transactions could be permitted in
+ranking blocks during recovery periods.
 
 The increased protocol optimism enables higher throughput at the cost of
 significant complexity and downstream impacts on chain validity semantics. Light
