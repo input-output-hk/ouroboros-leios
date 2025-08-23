@@ -6,6 +6,10 @@
 
 The experiment [analysis/sims/regression/](analysis/sims/regression/) compares the behavior of all of the tagged versions of the Rust simulator, `sim-cli`, against each other when the same network topology and configuration file is used. This speeds detection of changes in behavior of the simulator.
 
+### Rust simulation
+
+Released versions 1.1.0 and 1.2.0, with updated TX validation CPU models.
+
 ## 2025-08-21
 
 ### Analysis of diffusion of empty blocks on Cardano mainnet
