@@ -646,8 +646,6 @@ availability:
 
 </div>
 
-</div>
-
 <div align="center">
 <a name="table-3" id="table-3"></a>
 
@@ -658,8 +656,6 @@ availability:
 | <a id="delta-tx" href="#delta-tx"></a>Transaction validation     |   $\Delta_\text{TX}$    | Standard Praos transaction validation time for RB processing        |            ~1 slot            |
 
 <em>Table 2: Ledger Characteristics</em>
-
-</div>
 
 </div>
 
@@ -684,7 +680,7 @@ availability:
 | Maximum Plutus steps per transaction                                   |        -         |  step units  | Maximum computational steps allowed for Plutus scripts in a single transaction    | Limits computational resources per transaction to enable higher throughput                                                                                                                                                                       |
 | Maximum Plutus memory per transaction                                  |        -         | memory units | Maximum memory allowed for Plutus scripts in a single transaction                 | Limits memory resources per transaction to enable higher throughput                                                                                                                                                                              |
 
-<em>Table 3: Protocol Parameters</em>>
+<em>Table 3: Protocol Parameters</em>
 
 </div>
 
@@ -1614,7 +1610,7 @@ future implementations of Leios can be assessed in these terms.
 |            | Peak CPU usage, $\hat{q}_\text{vcpu}$              | Maximum virtual CPU cores used by a node over a one-slot window                                       |
 | Resilience | Adversarial stake, $\eta_\text{adversary}(s)$      | Fractional loss in throughput due to adversial stake of $s$                                           |
 
-<em>Table 5: Performance Metrics</em>>
+<em>Table 5: Performance Metrics</em>
 
 </div>
 
@@ -1787,7 +1783,7 @@ permanently as the ledger history.
 |               0.250 |            166.7 | some congestion |              42.1 |                  84.3 |                94.92 |
 |               0.300 |            200.0 | much congestion |              83.5 |                 125.8 |                95.09 |
 
-<em>Table 6: Leios effficiency at different throughputs</em>>
+<em>Table 6: Leios effficiency at different throughputs</em>
 
 </div>
 
@@ -2108,7 +2104,7 @@ consideration of tradeoffs.
 | Mean committee size                           |         $n$         |   600 stakepools   | Modeling of the proposed certificate scheme indicates that certificates reach their minimum size of ~8 kB at this committee size, given a realistic distribution of stake among pools. |
 | Quorum size                                   |       $\tau$        |        75%         | High threshold ensures certified EBs are known to >25% of honest nodes even with 50% adversarial stake. This enables the network assumption for safe diffusion within L_diff.          |
 
-<em>Table 7: Feasible Protocol Parameters</em>>
+<em>Table 7: Feasible Protocol Parameters</em>
 
 </div>
 
@@ -2199,7 +2195,7 @@ increase each month as the ledger becomes larger.
 | 250 TxkB/s |                  167 Tx/s |           833 Tx/s |      $132.73/month | $44.76/month/month |                            $18.6M |                       $255k/epoch |
 | 300 TxkB/s |                  200 Tx/s |          1000 Tx/s |      $139.09/month | $53.34/month/month |                            $19.9M |                       $272k/epoch |
 
-<em>Table 8: Operating Costs by Transaction Throughput</em>>
+<em>Table 8: Operating Costs by Transaction Throughput</em>
 
 </div>
 
@@ -2221,7 +2217,7 @@ listed in the table.
 |         $18.6M/year |               566k ADA/epoch |                                                6.04 Tx/s |                                              7.88 Tx/s |
 |         $19.9M/year |               605k ADA/epoch |                                                6.45 Tx/s |                                              8.42 Tx/s |
 
-<em>Table 9: Required TPS for Infrastructure Cost Coverage</em>>
+<em>Table 9: Required TPS for Infrastructure Cost Coverage</em>
 
 </div>
 
