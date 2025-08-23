@@ -102,7 +102,7 @@
   </g>
   
   <g id="protocol-flow">
-    <a href="https://github.com/IntersectMBO/ouroboros-leios/blob/cip/v2/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
       <rect x="220" y="100" width="60" height="80" fill="#fce5cd" stroke="#783f04" stroke-width="2" rx="6"/>
       <text x="250" y="135" font-family="Arial, sans-serif" font-size="20" font-weight="bold" text-anchor="middle" fill="#783f04">RB</text>
       <text x="250" y="160" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#783f04">[Txs]</text>
@@ -111,109 +111,110 @@
     <path d="M 250 180 L 250 216" stroke="#783f04" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrowhead)"/>
     <text x="255" y="200" font-family="Arial, sans-serif" font-size="11" text-anchor="start" fill="#783f04">announces</text>
     
-    <a href="https://github.com/IntersectMBO/ouroboros-leios/blob/cip/v2/docs/cip/README.md#endorser-blocks-ebs" class="block-link">
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#endorser-blocks-ebs" class="block-link">
       <rect x="200" y="220" width="100" height="60" fill="#d9ead3" stroke="#274e13" stroke-width="2" rx="6"/>
       <text x="250" y="250" font-family="Arial, sans-serif" font-size="18" font-weight="bold" text-anchor="middle" fill="#274e13">EB</text>
       <text x="250" y="268" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#274e13">[TxRefs]</text>
     </a>
     
-    <a href="https://github.com/IntersectMBO/ouroboros-leios/blob/cip/v2/docs/cip/README.md#voting-period" class="param-link">
-      <line x1="250" y1="320" x2="460" y2="320" stroke="#f9a825" stroke-width="1" stroke-dasharray="2,2"/>
-      <path d="M 250 320 L 250 325 Q 250 330 255 330 L 350 330 L 355 337 L 360 330 L 455 330 Q 460 330 460 325 L 460 320" 
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#l-equi" class="param-link">
+      <line x1="250" y1="300" x2="340" y2="300" stroke="#9c27b0" stroke-width="1" stroke-dasharray="2,2"/>
+      <path d="M 250 300 L 250 305 Q 250 310 255 310 L 290 310 L 295 317 L 300 310 L 335 310 Q 340 310 340 305 L 340 300" 
+            stroke="#9c27b0" stroke-width="2" fill="none"/>
+      <text x="295" y="335" font-size="18" text-anchor="middle" fill="#9c27b0">
+        <tspan font-family="serif" font-style="italic" font-size="24">L</tspan><tspan font-family="Arial, sans-serif" font-size="16" baseline-shift="sub">equi</tspan>
+      </text>
+    </a>
+    
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#l-vote" class="param-link">
+      <line x1="340" y1="320" x2="460" y2="320" stroke="#f9a825" stroke-width="1" stroke-dasharray="2,2"/>
+      <path d="M 340 320 L 340 325 Q 340 330 345 330 L 395 330 L 400 337 L 405 330 L 455 330 Q 460 330 460 325 L 460 320" 
             stroke="#f9a825" stroke-width="2" fill="none"/>
-      <text x="355" y="355" font-size="18" text-anchor="middle" fill="#f9a825">
+      <text x="400" y="355" font-size="18" text-anchor="middle" fill="#f9a825">
         <tspan font-family="serif" font-style="italic" font-size="24">L</tspan><tspan font-family="Arial, sans-serif" font-size="16" baseline-shift="sub">vote</tspan>
       </text>
     </a>
-    
-    <a href="https://github.com/IntersectMBO/ouroboros-leios/blob/cip/v2/docs/cip/README.md#equivocation-detection" class="param-link">
-      <line x1="250" y1="380" x2="340" y2="380" stroke="#9c27b0" stroke-width="1" stroke-dasharray="2,2"/>
-      <path d="M 250 380 L 250 385 Q 250 390 255 390 L 290 390 L 295 397 L 300 390 L 335 390 Q 340 390 340 385 L 340 380" 
-            stroke="#9c27b0" stroke-width="2" fill="none"/>
-      <text x="295" y="415" font-size="18" text-anchor="middle" fill="#9c27b0">
-        <tspan font-family="serif" font-size="24">3Δ</tspan><tspan font-family="Arial, sans-serif" font-size="16" baseline-shift="sub">hdr</tspan>
-      </text>
-    </a>
+
     
     <g id="votes">
-      <a href="https://github.com/IntersectMBO/ouroboros-leios/blob/cip/v2/docs/cip/README.md#votes-and-certificates" class="vote-link">
-        <rect x="282" y="295" width="6" height="6" fill="#f9a825" transform="rotate(45 285 298)"/>
+      <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#votes-and-certificates" class="vote-link">
+        <rect x="352" y="305" width="6" height="6" fill="#f9a825" transform="rotate(45 355 308)"/>
       </a>
-      <a href="https://github.com/IntersectMBO/ouroboros-leios/blob/cip/v2/docs/cip/README.md#votes-and-certificates" class="vote-link">
-        <rect x="322" y="290" width="6" height="6" fill="#f9a825" transform="rotate(45 325 293)"/>
+      <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#votes-and-certificates" class="vote-link">
+        <rect x="372" y="310" width="6" height="6" fill="#f9a825" transform="rotate(45 375 313)"/>
       </a>
-      <a href="https://github.com/IntersectMBO/ouroboros-leios/blob/cip/v2/docs/cip/README.md#votes-and-certificates" class="vote-link">
-        <rect x="362" y="300" width="6" height="6" fill="#f9a825" transform="rotate(45 365 303)"/>
+      <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#votes-and-certificates" class="vote-link">
+        <rect x="392" y="300" width="6" height="6" fill="#f9a825" transform="rotate(45 395 303)"/>
       </a>
-      <a href="https://github.com/IntersectMBO/ouroboros-leios/blob/cip/v2/docs/cip/README.md#votes-and-certificates" class="vote-link">
-        <rect x="402" y="285" width="6" height="6" fill="#f9a825" transform="rotate(45 405 288)"/>
+      <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#votes-and-certificates" class="vote-link">
+        <rect x="412" y="311" width="6" height="6" fill="#f9a825" transform="rotate(45 415 318)"/>
       </a>
-      <a href="https://github.com/IntersectMBO/ouroboros-leios/blob/cip/v2/docs/cip/README.md#votes-and-certificates" class="vote-link">
-        <rect x="432" y="295" width="6" height="6" fill="#f9a825" transform="rotate(45 435 298)"/>
+      <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#votes-and-certificates" class="vote-link">
+        <rect x="432" y="305" width="6" height="6" fill="#f9a825" transform="rotate(45 435 308)"/>
       </a>
     </g>
     
-    <a href="https://github.com/IntersectMBO/ouroboros-leios/blob/cip/v2/docs/cip/README.md#diffusion-period" class="param-link">
-      <line x1="460" y1="340" x2="670" y2="340" stroke="#4caf50" stroke-width="1" stroke-dasharray="2,2"/>
-      <path d="M 460 340 L 460 345 Q 460 350 465 350 L 560 350 L 565 357 L 570 350 L 665 350 Q 670 350 670 345 L 670 340" 
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#l-diff" class="param-link">
+      <line x1="460" y1="340" x2="580" y2="340" stroke="#4caf50" stroke-width="1" stroke-dasharray="2,2"/>
+      <path d="M 460 340 L 460 345 Q 460 350 465 350 L 515 350 L 520 357 L 525 350 L 575 350 Q 580 350 580 345 L 580 340" 
             stroke="#4caf50" stroke-width="2" fill="none"/>
-      <text x="565" y="375" font-size="18" text-anchor="middle" fill="#4caf50">
+      <text x="520" y="375" font-size="18" text-anchor="middle" fill="#4caf50">
         <tspan font-family="serif" font-style="italic" font-size="24">L</tspan><tspan font-family="Arial, sans-serif" font-size="16" baseline-shift="sub">diff</tspan>
       </text>
     </a>
     
-    <a href="https://github.com/IntersectMBO/ouroboros-leios/blob/cip/v2/docs/cip/README.md#network-characteristics" class="timing-link">
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#delta-rb" class="timing-link">
       <g id="rb-diffusion">
-        <line x1="695" y1="445" x2="695" y2="455" stroke="#783f04" stroke-width="2"/>
-        <line x1="695" y1="450" x2="855" y2="450" stroke="#783f04" stroke-width="2" stroke-dasharray="4,2"/>
-        <line x1="855" y1="445" x2="855" y2="455" stroke="#783f04" stroke-width="2"/>
-        <text x="775" y="435" font-family="Arial, sans-serif" font-size="20" text-anchor="middle" fill="#783f04">Δ<tspan font-size="16" baseline-shift="sub">RB</tspan><tspan font-size="14" baseline-shift="super">wc</tspan></text>
+        <line x1="700" y1="425" x2="700" y2="435" stroke="#783f04" stroke-width="2"/>
+        <line x1="700" y1="430" x2="855" y2="430" stroke="#783f04" stroke-width="2" stroke-dasharray="4,2"/>
+        <line x1="855" y1="425" x2="855" y2="435" stroke="#783f04" stroke-width="2"/>
+        <text x="777" y="415" font-family="Arial, sans-serif" font-size="20" text-anchor="middle" fill="#783f04">Δ<tspan font-size="16" baseline-shift="sub">RB</tspan><tspan font-size="14" baseline-shift="super">A</tspan></text>
       </g>
     </a>
     
     <g id="network-chars-vote">
-      <a href="https://github.com/IntersectMBO/ouroboros-leios/blob/cip/v2/docs/cip/README.md#network-characteristics" class="delta-link">
-        <line x1="245" y1="465" x2="245" y2="475" stroke="#4caf50" stroke-width="2"/>
-        <line x1="245" y1="470" x2="350" y2="470" stroke="#4caf50" stroke-width="2" stroke-dasharray="4,2"/>
-        <line x1="350" y1="465" x2="350" y2="475" stroke="#4caf50" stroke-width="2"/>
-        <text x="297" y="455" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#4caf50">Δ<tspan font-size="14" baseline-shift="sub">EB</tspan><tspan font-size="12" baseline-shift="super">opt</tspan></text>
+      <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#delta-eb-H" class="delta-link">
+        <line x1="250" y1="425" x2="250" y2="435" stroke="#4caf50" stroke-width="2"/>
+        <line x1="250" y1="430" x2="350" y2="430" stroke="#4caf50" stroke-width="2" stroke-dasharray="4,2"/>
+        <line x1="350" y1="425" x2="350" y2="435" stroke="#4caf50" stroke-width="2"/>
+        <text x="300" y="415" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#4caf50">Δ<tspan font-size="14" baseline-shift="sub">EB</tspan><tspan font-size="12" baseline-shift="super">H</tspan></text>
       </a>
       
-      <a href="https://github.com/IntersectMBO/ouroboros-leios/blob/cip/v2/docs/cip/README.md#network-characteristics" class="delta-link">
-        <line x1="355" y1="465" x2="355" y2="475" stroke="#9c27b0" stroke-width="2"/>
-        <line x1="355" y1="470" x2="455" y2="470" stroke="#9c27b0" stroke-width="2" stroke-dasharray="4,2"/>
-        <line x1="455" y1="465" x2="455" y2="475" stroke="#9c27b0" stroke-width="2"/>
-        <text x="405" y="455" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#9c27b0">Δ<tspan font-size="14" baseline-shift="sub">cpu</tspan><tspan font-size="12" baseline-shift="super">opt</tspan></text>
+      <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#delta-cpu" class="delta-link">
+        <line x1="355" y1="425" x2="355" y2="435" stroke="#9c27b0" stroke-width="2"/>
+        <line x1="355" y1="430" x2="455" y2="430" stroke="#9c27b0" stroke-width="2" stroke-dasharray="4,2"/>
+        <line x1="455" y1="425" x2="455" y2="435" stroke="#9c27b0" stroke-width="2"/>
+        <text x="405" y="415" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#9c27b0">Δ<tspan font-size="14" baseline-shift="sub">cpu</tspan><tspan font-size="12" baseline-shift="super">H</tspan></text>
       </a>
     </g>
     
     <g id="network-chars-after">
       <!-- Delta EB wc (extends beyond RB' creation) -->
-      <a href="https://github.com/IntersectMBO/ouroboros-leios/blob/cip/v2/docs/cip/README.md#network-characteristics" class="delta-link">
-        <line x1="245" y1="515" x2="245" y2="525" stroke="#ff5722" stroke-width="2"/>
-        <line x1="245" y1="520" x2="750" y2="520" stroke="#ff5722" stroke-width="2" stroke-dasharray="4,2"/>
-        <line x1="750" y1="515" x2="750" y2="525" stroke="#ff5722" stroke-width="2"/>
-        <text x="497" y="505" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#ff5722">Δ<tspan font-size="14" baseline-shift="sub">EB</tspan><tspan font-size="12" baseline-shift="super">wc</tspan></text>
+      <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#delta-eb-A" class="delta-link">
+        <line x1="250" y1="465" x2="250" y2="475" stroke="#ff5722" stroke-width="2"/>
+        <line x1="250" y1="470" x2="750" y2="470" stroke="#ff5722" stroke-width="2" stroke-dasharray="4,2"/>
+        <line x1="750" y1="465" x2="750" y2="475" stroke="#ff5722" stroke-width="2"/>
+        <text x="500" y="455" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#ff5722">Δ<tspan font-size="14" baseline-shift="sub">EB</tspan><tspan font-size="12" baseline-shift="super">A</tspan></text>
       </a>
       
       <!-- Delta reapply (after EB wc with small gap, same y-position) -->
-      <a href="https://github.com/IntersectMBO/ouroboros-leios/blob/cip/v2/docs/cip/README.md#network-characteristics" class="delta-link">
-        <line x1="755" y1="515" x2="755" y2="525" stroke="#2196F3" stroke-width="2"/>
-        <line x1="755" y1="520" x2="820" y2="520" stroke="#2196F3" stroke-width="2" stroke-dasharray="4,2"/>
-        <line x1="820" y1="515" x2="820" y2="525" stroke="#2196F3" stroke-width="2"/>
-        <text x="790" y="505" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#2196F3">Δ<tspan font-size="14" baseline-shift="sub">reapply</tspan><tspan font-size="12" baseline-shift="super">wc</tspan></text>
+      <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#delta-reapply" class="delta-link">
+        <line x1="755" y1="465" x2="755" y2="475" stroke="#2196F3" stroke-width="2"/>
+        <line x1="755" y1="470" x2="820" y2="470" stroke="#2196F3" stroke-width="2" stroke-dasharray="4,2"/>
+        <line x1="820" y1="465" x2="820" y2="475" stroke="#2196F3" stroke-width="2"/>
+        <text x="790" y="455" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#2196F3">Δ<tspan font-size="14" baseline-shift="sub">reapply</tspan><tspan font-size="12" baseline-shift="super">A</tspan></text>
       </a>
     </g>
     
     <!-- RB' with certificate (at slot 20 - after L_diff ends) -->
-    <a href="https://github.com/IntersectMBO/ouroboros-leios/blob/cip/v2/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
       <rect x="670" y="100" width="60" height="80" fill="#fce5cd" stroke="#783f04" stroke-width="2" rx="6"/>
       <text x="700" y="135" font-family="Arial, sans-serif" font-size="20" font-weight="bold" text-anchor="middle" fill="#783f04">RB'</text>
     </a>
     
     <!-- Certificate -->
     <g transform="translate(700, 185)">
-      <a href="https://github.com/IntersectMBO/ouroboros-leios/blob/cip/v2/docs/cip/README.md#votes-and-certificates" class="block-link">
+      <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#votes-and-certificates" class="block-link">
         <polygon points="0,-20 20,-10 20,10 0,20 -20,10 -20,-10" fill="#fff2cc" stroke="#f9a825" stroke-width="2"/>
         <text x="0" y="5" font-size="12" font-weight="bold" text-anchor="middle" fill="#7f6000">
           <tspan font-family="serif" font-style="italic" font-size="14">C</tspan><tspan font-family="Arial, sans-serif" font-size="10" font-style="normal" baseline-shift="sub">EB</tspan>

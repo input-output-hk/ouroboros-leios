@@ -99,29 +99,29 @@ sustainability and reduced complexity through fewer new protocol elements.
 - [Figure 4: Detailed timing mechanism showing the three critical phases for EB certification](#figure-4)
 - [Figure 5: Up- and downstream interactions of a node (simplified)](#figure-5)
 - [Figure 6: SPO profitability forecast under Leios showing clear economic benefits once sustained throughput exceeds 50-70 TxkB/s (36-50 TPS equivalent)](#figure-6)
-- [Figure 8: Time for transaction to reach the ledger](#figure-8)
-- [Figure 9: Transactions reaching the ledger](#figure-9)
-- [Figure 10: Number of TX references](#figure-10)
-- [Figure 11: Disposition of transactions in blocks](#figure-11)
-- [Figure 12: Size of transactions referenced by EBs](#figure-12)
-- [Figure 13: Arrival delays for transactions, ranking blocks, votes, and endorser blocks](#figure-13)
-- [Figure 14: Mean nodal ingress (left) and Mean CPU load among all nodes (right)](#figure-14)
-- [Figure 15: Mean CPU load among all nodes](#figure-15)
-- [Figure 16: Fate of Plutus-heavy transactions in Leios](#figure-16)
-- [Figure 17: CPU usage in Plutus-heavy workloads for Leios](#figure-17)
+- [Figure 7: Time for transaction to reach the ledger](#figure-7)
+- [Figure 8: Transactions reaching the ledger](#figure-8)
+- [Figure 9: Number of TX references](#figure-9)
+- [Figure 10: Disposition of transactions in blocks](#figure-10)
+- [Figure 11: Size of transactions referenced by EBs](#figure-11)
+- [Figure 12: Arrival delays for transactions, ranking blocks, votes, and endorser blocks](#figure-12)
+- [Figure 13: Mean nodal ingress (left) and Mean CPU load among all nodes (right)](#figure-13)
+- [Figure 14: Mean CPU load among all nodes](#figure-14)
+- [Figure 15: Fate of Plutus-heavy transactions in Leios](#figure-15)
+- [Figure 16: CPU usage in Plutus-heavy workloads for Leios](#figure-16)
 - [Figure 17: Performance comparison across three approaches: Ouroboros Praos (red), proposed Leios (teal), and research paper's over-collateralized sharded Leios (orange)](#figure-17)
 
 **Tables**
 
 - [Table 1: Network Characteristics](#table-1)
 - [Table 2: Leios Protocol Parameters](#table-2)
-- [Table 3: Performance Metrics](#table-3)
-- [Table 4: Leios effficiency at different throughputs](#table-4)
-- [Table 5: Feasible Protocol Parameters](#table-5)
-- [Table 6: Operating Costs by Transaction Throughput](#table-6)
-- [Table 7: Required TPS for Infrastructure Cost Coverage](#table-7)
-- [Table 8: Required TPS for Current Reward Maintenance](#table-8)
-- [Table 9: Leios Mini-Protocols](#table-9)
+- [Table 3: Leios Mini-Protocols](#table-3)
+- [Table 4: Performance Metrics](#table-4)
+- [Table 5: Leios effficiency at different throughputs](#table-5)
+- [Table 6: Feasible Protocol Parameters](#table-6)
+- [Table 7: Operating Costs by Transaction Throughput](#table-7)
+- [Table 8: Required TPS for Infrastructure Cost Coverage](#table-8)
+- [Table 9: Required TPS for Current Reward Maintenance](#table-9)
 
 </details>
 
@@ -323,7 +323,7 @@ RB that announced the EB. A committee member votes for an EB only if:
 
 1. The RB header arrived within $\Delta_\text{hdr}$,
 2. It has **not** received an equivocating RB header for this EB within
-   $3\Delta_\text{hdr}$,
+   $L_\text{equi}$ slots,
 3. It has received the EB within $L_\text{vote}$ slots from the start of the
    EB's slot,
 4. The EB is the one announced by the latest RB in the voter's current chain,
@@ -364,7 +364,7 @@ The certificate for an EB shall be included in the body of a new ranking block
    preceding RB).
 2. The certificate is valid as defined in
    [Certificate Validation](#certificate-validation).
-3. At least $L_\text{vote} + L_\text{diff}$ slots have elapsed since the slot of
+3. At least $L_\text{equi} + L_\text{vote} + L_\text{diff}$ slots have elapsed since the slot of
    the RB that announced the EB.
 
 This timing constraint ensures certified EBs have sufficient time to diffuse
@@ -950,7 +950,7 @@ Leios introduces **five new mini-protocols** to handle the additional message
 types required for EB distribution, voting, and certificate construction.
 
 <div align="center">
-<a name="table-9" id="table-9"></a>
+<a name="table-3" id="table-3"></a>
 
 |   **Protocol**    | **Purpose**                                        | **Timing Constraint**                      |
 | :---------------: | -------------------------------------------------- | ------------------------------------------ |
@@ -960,7 +960,7 @@ types required for EB distribution, voting, and certificate construction.
 |    **EbFetch**    | Retrieve certified EBs for chain reconstruction    | On-demand after certificate inclusion      |
 |    **TxFetch**    | Retrieve referenced transactions for EB validation | Before EB validation completes             |
 
-<em>Table 9: Leios Mini-Protocols</em>
+<em>Table 3: Leios Mini-Protocols</em>
 
 </div>
 
@@ -1273,7 +1273,7 @@ these appear in the following section on Simulation Results. Additionally,
 future implementations of Leios can be assessed in these terms.
 
 <div align="center">
-<a name="table-3" id="table-3"></a>
+<a name="table-4" id="table-4"></a>
 
 | Category   | Metric                                             | Measurement                                                                                           |
 | ---------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
@@ -1289,7 +1289,7 @@ future implementations of Leios can be assessed in these terms.
 |            | Peak CPU usage, $\hat{q}_\text{vcpu}$              | Maximum virtual CPU cores used by a node over a one-slot window                                       |
 | Resilience | Adversarial stake, $\eta_\text{adversary}(s)$      | Fractional loss in throughput due to adversial stake of $s$                                           |
 
-<em>Table 3: Performance Metrics</em>
+<em>Table 4: Performance Metrics</em>
 
 </div>
 
@@ -1453,7 +1453,7 @@ conditions. In all cases there is little overhead, relative to the total bytes
 of transactions, in data that must be stored permanently as the ledger history.
 
 <div align="center">
-<a name="table-4" id="table-4"></a>
+<a name="table-5" id="table-5"></a>
 
 | Throughput [TxMB/s] | TPS at 1500 B/tx | Conditions      | Mempool to EB [s] | Mempool to ledger [s] | Space efficiency [%] |
 | ------------------: | ---------------: | --------------- | ----------------: | --------------------: | -------------------: |
@@ -1463,7 +1463,7 @@ of transactions, in data that must be stored permanently as the ledger history.
 |               0.250 |            166.7 | some congestion |              42.1 |                  84.3 |                94.92 |
 |               0.300 |            200.0 | much congestion |              83.5 |                 125.8 |                95.09 |
 
-<em>Table 4: Leios effficiency at different throughputs</em>
+<em>Table 5: Leios effficiency at different throughputs</em>
 
 </div>
 
@@ -1492,20 +1492,20 @@ throughput of Linear Leios: furthermore, it affects how long it takes
 transactions to reach the ledger as the throughput approaches the capacity.
 
 <div align="center">
-<a name="figure-8" id="figure-8"></a>
+<a name="figure-7" id="figure-7"></a>
 
 ![Time for transaction to reach the ledger](images/reach-rb-tx.svg)
 
-<em>Figure 8: Time for transaction to reach the ledger</em>
+<em>Figure 7: Time for transaction to reach the ledger</em>
 
 </div>
 
 <div align="center">
-<a name="figure-9" id="figure-9"></a>
+<a name="figure-8" id="figure-8"></a>
 
 ![Transactions reaching the ledger](images/temporal-efficiency-bar.svg)
 
-<em>Figure 9: Transactions reaching the ledger</em>
+<em>Figure 8: Transactions reaching the ledger</em>
 
 </div>
 
@@ -1522,11 +1522,11 @@ not produced or are produced too close together. The same phenomenon occurs in
 Praos, but Linear Leios amplifies the intermittency.
 
 <div align="center">
-<a name="figure-10" id="figure-10"></a>
+<a name="figure-9" id="figure-9"></a>
 
 ![Number of TX references](images/references-tx.svg)
 
-<em>Figure 10: Number of TX references</em>
+<em>Figure 9: Number of TX references</em>
 
 </div>
 
@@ -1535,7 +1535,7 @@ Praos, but Linear Leios amplifies the intermittency.
 
 ![Disposition of transactions in blocks](images/disposition-size-timeseries.svg)
 
-<em>Figure 11: Disposition of transactions in blocks</em>
+<em>Figure 10: Disposition of transactions in blocks</em>
 
 </div>
 
@@ -1548,11 +1548,11 @@ Thus the capacity parameter provides a natural form of backpressure that limits
 the potential EB-related work a node must do when demand is high.
 
 <div align="center">
-<a name="figure-12" id="figure-12"></a>
+<a name="figure-11" id="figure-11"></a>
 
 ![Size of transactions referenced by EBs](images/contents-ebs-size.svg)
 
-<em>Figure 12: Size of transactions referenced by EBs</em>
+<em>Figure 11: Size of transactions referenced by EBs</em>
 
 </div>
 
@@ -1572,14 +1572,14 @@ transactions, RBs, votes, and EBs do not interfere with one another: for
 example, delays in EBs and high throughput do not also delay RBs in those cases.
 
 <div align="center">
-<a name="figure-13" id="figure-13"></a>
+<a name="figure-12" id="figure-12"></a>
 
 |                                                 |                                                 |
 | ----------------------------------------------- | ----------------------------------------------- |
 | ![Arrival delay for TXs](images/elapsed-TX.svg) | ![Arrival delay for RBs](images/elapsed-RB.svg) |
 | ![Arrival delay for VTs](images/elapsed-VT.svg) | ![Arrival delay for EBs](images/elapsed-EB.svg) |
 
-<em>Figure 13: Arrival delays for transactions, ranking blocks, votes, and
+<em>Figure 12: Arrival delays for transactions, ranking blocks, votes, and
 endorser blocks</em>
 
 </div>
@@ -1607,23 +1607,23 @@ for lazy computations, caching, etc. that will spread out the occasional spikes
 in CPU usage over time.
 
 <div align="center">
-<a name="figure-14" id="figure-14"></a>
+<a name="figure-13" id="figure-13"></a>
 
 |                                                        |                                                                  |
 | ------------------------------------------------------ | ---------------------------------------------------------------- |
 | ![Mean nodal ingress](images/ingress-average-area.svg) | ![Mean CPU load among all nodes](images/cpu-mean-timeseries.svg) |
 
-<em>Figure 14: Mean nodal ingress (left) and Mean CPU load among all nodes
+<em>Figure 13: Mean nodal ingress (left) and Mean CPU load among all nodes
 (right)</em>
 
 </div>
 
 <div align="center">
-<a name="figure-15" id="figure-15"></a>
+<a name="figure-14" id="figure-14"></a>
 
 ![Mean CPU load among all nodes](images/cpu-mean-histogram.svg)
 
-<em>Figure 15: Mean CPU load among all nodes</em>
+<em>Figure 14: Mean CPU load among all nodes</em>
 
 </div>
 
@@ -1680,20 +1680,20 @@ safely be 2000 billion steps, or 100 times the Plutus budget of Praos.
 >   - [ ] Remove title and subtitle.
 
 <div align="center">
-<a name="figure-16" id="figure-16"></a>
+<a name="figure-15" id="figure-15"></a>
 
 ![Fate of Plutus-heavy transactions in Leios](images/plutus-temporal-efficiency-bar.svg)
 
-<em>Figure 16: Fate of Plutus-heavy transactions in Leios</em>
+<em>Figure 15: Fate of Plutus-heavy transactions in Leios</em>
 
 </div>
 
 <div align="center">
-<a name="figure-17" id="figure-17"></a>
+<a name="figure-16" id="figure-16"></a>
 
 ![CPU usage in Plutus-heavy workloads for Leios](images/plutus-cpu-mean-histogram.svg)
 
-<em>Figure 17: CPU usage in Plutus-heavy workloads for Leios</em>
+<em>Figure 16: CPU usage in Plutus-heavy workloads for Leios</em>
 
 </div>
 
@@ -1759,7 +1759,7 @@ choice of parameters for Cardano mainnet must be subject to discussion and
 consideration of tradeoffs.
 
 <div align="center">
-<a name="table-5" id="table-5"></a>
+<a name="table-6" id="table-6"></a>
 
 | Parameter                                     |       Symbol        |   Feasible value   | Justification                                                                                                                                                                          |
 | --------------------------------------------- | :-----------------: | :----------------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1777,7 +1777,7 @@ consideration of tradeoffs.
 | Mean committee size                           |         $n$         |   600 stakepools   | Modeling of the proposed certificate scheme indicates that certificates reach their minimum size of ~8 kB at this committee size, given a realistic distribution of stake among pools. |
 | Quorum size                                   |       $\tau$        |        75%         | High threshold ensures certified EBs are known to >25% of honest nodes even with 50% adversarial stake. This enables the network assumption for safe diffusion within L_diff.          |
 
-<em>Table 5: Feasible Protocol Parameters</em>
+<em>Table 6: Feasible Protocol Parameters</em>
 
 </div>
 
@@ -1858,7 +1858,7 @@ pricing of ten common hyperscale and discount cloud providers. The cost of a
 increase each month as the ledger becomes larger.
 
 <div align="center">
-<a name="table-6" id="table-6"></a>
+<a name="table-7" id="table-7"></a>
 
 | Throughput | Average-size transactions | Small transactions | Per-node operation |   Per-node storage | 10k-node network<br/>(first year) | 10k-node network<br/>(first year) |
 | ---------: | ------------------------: | -----------------: | -----------------: | -----------------: | --------------------------------: | --------------------------------: |
@@ -1868,7 +1868,7 @@ increase each month as the ledger becomes larger.
 | 250 TxkB/s |                  167 Tx/s |           833 Tx/s |      $132.73/month | $44.76/month/month |                            $18.6M |                       $255k/epoch |
 | 300 TxkB/s |                  200 Tx/s |          1000 Tx/s |      $139.09/month | $53.34/month/month |                            $19.9M |                       $272k/epoch |
 
-<em>Table 6: Operating Costs by Transaction Throughput</em>
+<em>Table 7: Operating Costs by Transaction Throughput</em>
 
 </div>
 
@@ -1880,7 +1880,7 @@ split, fives times as much fee would have to be collected compared to what is
 listed in the table.
 
 <div align="center">
-<a name="table-7" id="table-7"></a>
+<a name="table-8" id="table-8"></a>
 
 | Infrastructure cost | Required ada<br/>@ $0.45/ADA | Required transactions<br/>(average size)<br/>@ $0.45/ADA | Required transactions<br/>(small size)<br/>@ $0.45/ADA |
 | ------------------: | ---------------------------: | -------------------------------------------------------: | -----------------------------------------------------: |
@@ -1890,7 +1890,7 @@ listed in the table.
 |         $18.6M/year |               566k ADA/epoch |                                                6.04 Tx/s |                                              7.88 Tx/s |
 |         $19.9M/year |               605k ADA/epoch |                                                6.45 Tx/s |                                              8.42 Tx/s |
 
-<em>Table 7: Required TPS for Infrastructure Cost Coverage</em>
+<em>Table 8: Required TPS for Infrastructure Cost Coverage</em>
 
 </div>
 
@@ -1898,7 +1898,7 @@ _Required TPS for Current Reward Maintenance:_ To maintain current reward levels
 (~48 million ADA monthly) through transaction fees as the Reserve depletes.
 
 <div align="center">
-<a name="table-8" id="table-8"></a>
+<a name="table-3" id="table-3"></a>
 
 | Year | Reserve Depletion | Rewards from Fees (ADA) | Required TPS (Average size) | Required Throughput |
 | ---: | ----------------: | ----------------------: | --------------------------: | ------------------: |
@@ -1909,7 +1909,7 @@ _Required TPS for Current Reward Maintenance:_ To maintain current reward levels
 | 2029 |              ~43% |              20,640,000 |                        36.1 |           51 TxkB/s |
 | 2030 |              ~50% |              24,000,000 |                        41.9 |           59 TxkB/s |
 
-<em>Table 8: Required TPS for Current Reward Maintenance</em>
+<em>Table 9: Required TPS for Current Reward Maintenance</em>
 
 </div>
  
