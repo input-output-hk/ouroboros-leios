@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # CIP Auto-Formatter
 # Generates TOC, table of figures/tables, and formats markdown
