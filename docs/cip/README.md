@@ -320,9 +320,7 @@ RB that announced the EB. A committee member votes for an EB only if:
 6. For non-persistent voters, it is eligible to vote based on sortition using
    the announcing RB's slot number as the election identifier.
 
-where $L_\text{equi}$,
-$L_\text{vote}$ and
-$\Delta_\text{hdr}$ are
+where $L_\text{equi}$, $L_\text{vote}$ and $\Delta_\text{hdr}$ are
 <a href="#network-characteristics-and-protocol-parameters">protocol parameters
 and network characteristics</a> represented by a number of slots.
 
@@ -359,9 +357,8 @@ inclusion decision follows these rules:
 3. At least $L_\text{equi} + L_\text{vote} + L_\text{diff}$ slots have elapsed
    since the slot of the RB that announced the EB.
 
-where $L_\text{equi}$,
-$L_\text{vote}$ and $L_\text{diff}$
-are <a href="#network-characteristics-and-protocol-parameters">protocol
+where $L_\text{equi}$, $L_\text{vote}$ and $L_\text{diff}$ are
+<a href="#network-characteristics-and-protocol-parameters">protocol
 parameters</a> represented by a number of slots.
 
 This **certificate inclusion delay** ensures certified EBs have sufficient time
@@ -406,35 +403,34 @@ adversarial EB if honest nodes vote on different versions.
 multi-step detection process that must accommodate the worst-case propagation
 scenario:
 
-1. **$\Delta_\text{hdr}$**: Initial header propagation - the first
-   (honest or adversarial) RB header reaches all honest nodes
-2. **$\Delta_\text{hdr}$**: Conflicting header propagation - any
-   equivocating header from the same slot reaches honest nodes
-3. **$\Delta_\text{hdr}$**: Equivocation evidence propagation -
-   proof of conflicting headers propagates network-wide, allowing all honest
-   nodes to detect the equivocation
+1. **$\Delta_\text{hdr}$**: Initial header propagation - the first (honest or
+   adversarial) RB header reaches all honest nodes
+2. **$\Delta_\text{hdr}$**: Conflicting header propagation - any equivocating
+   header from the same slot reaches honest nodes
+3. **$\Delta_\text{hdr}$**: Equivocation evidence propagation - proof of
+   conflicting headers propagates network-wide, allowing all honest nodes to
+   detect the equivocation
 
-Therefore, $L_\text{equi}$ $\geq 3$$\Delta_\text{hdr}$
-to ensure reliable detection before voting begins. This constraint is derived
-from the network model where headers must propagate within
-$\Delta_\text{hdr}$ to maintain Praos security assumptions.
+Therefore, $L_\text{equi}$ $\geq 3$$\Delta_\text{hdr}$ to ensure reliable
+detection before voting begins. This constraint is derived from the network
+model where headers must propagate within $\Delta_\text{hdr}$ to maintain Praos
+security assumptions.
 
-**Security Guarantee**: By waiting $L_\text{equi}$ slots before
-voting begins, the protocol ensures that if any equivocation occurred, all
-honest nodes will have detected it and will refuse to vote for any EB from that
-slot. This prevents adversaries from exploiting network partitions to gain
-unfair advantages in the voting process, as honest nodes will only vote for EBs
-where no equivocation was detected during the detection period.
+**Security Guarantee**: By waiting $L_\text{equi}$ slots before voting begins,
+the protocol ensures that if any equivocation occurred, all honest nodes will
+have detected it and will refuse to vote for any EB from that slot. This
+prevents adversaries from exploiting network partitions to gain unfair
+advantages in the voting process, as honest nodes will only vote for EBs where
+no equivocation was detected during the detection period.
 
 > [!NOTE]
 >
 > **Comparison with Research Paper**: The [Leios research paper][leios-paper]
-> describes a more complex protocol variant that requires
-> $5$$\Delta_\text{hdr}$ for equivocation detection due to
-> additional coordination mechanisms between Input Blocks and Endorser Blocks.
-> This specification's simplified approach, where EBs are directly announced by
-> RBs, reduces the equivocation detection requirement to
-> $3$$\Delta_\text{hdr}$ while maintaining the same security
+> describes a more complex protocol variant that requires $5$$\Delta_\text{hdr}$
+> for equivocation detection due to additional coordination mechanisms between
+> Input Blocks and Endorser Blocks. This specification's simplified approach,
+> where EBs are directly announced by RBs, reduces the equivocation detection
+> requirement to $3$$\Delta_\text{hdr}$ while maintaining the same security
 > guarantees against equivocation attacks.
 
 <a id="voting-period"></a>
@@ -444,8 +440,8 @@ The voting period must accommodate both EB propagation and validation:
 
 $$L_\text{vote} > \Delta_\text{EB}^{\text{H}} + \Delta_\text{cpu}$$
 
-where $\Delta_\text{EB}^{\text{H}}$ (honest EB propagation time),
-and $\Delta_\text{cpu}$ (validation time) are defined in the
+where $\Delta_\text{EB}^{\text{H}}$ (honest EB propagation time), and
+$\Delta_\text{cpu}$ (validation time) are defined in the
 [network characteristics](#network-characteristics) section.
 
 This ensures all honest committee members can participate by having sufficient
@@ -477,8 +473,8 @@ valid:
 
 $$\Delta_\text{reapply} < \Delta_\text{TX}$$
 
-where $\Delta_\text{reapply}$ (EB reapplication time) and
-$\Delta_\text{TX}$ (transaction validation time) are defined in the
+where $\Delta_\text{reapply}$ (EB reapplication time) and $\Delta_\text{TX}$
+(transaction validation time) are defined in the
 [network characteristics](#network-characteristics) section.
 
 ### Protocol Entities
@@ -2343,13 +2339,13 @@ better user experience through reduced transaction confirmation times.
 
 **Relax EB diffusion constraints**
 
-The current design requires $\Delta_\text{EB}^A$ (worst
-case) to be fairly small to enable selection of reasonable $L_\text{diff}$
-values that ensure certified EBs don't impact Praos safety while maintaining
-frequent enough certification for high throughput. Should worst-case EB
-diffusion prove much larger than average or honest cases, introducing an
-additional recovery period $L_\text{recover}$ after certificate inclusion could allow
-EBs to remain unavailable for extended periods.
+The current design requires $\Delta_\text{EB}^A$ (worst case) to be fairly small
+to enable selection of reasonable $L_\text{diff}$ values that ensure certified
+EBs don't impact Praos safety while maintaining frequent enough certification
+for high throughput. Should worst-case EB diffusion prove much larger than
+average or honest cases, introducing an additional recovery period
+$L_\text{recover}$ after certificate inclusion could allow EBs to remain
+unavailable for extended periods.
 
 This approach provides greater freedom in selecting $L_\text{diff}$ parameters,
 potentially allowing values as low as zero. However, the security argument must
