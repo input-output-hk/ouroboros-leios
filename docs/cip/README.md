@@ -78,6 +78,7 @@ sustainability and reduced complexity through fewer new protocol elements.
 - [Rationale](#rationale)
   - [How Leios addresses CPS-18](#how-leios-addresses-cps-18)
   - [Evidence](#evidence)
+  - [Feasible Protocol Parameters](#feasible-protocol-parameters)
   - [Trade-offs \& Limitations](#trade-offs--limitations)
   - [Roadmap \& Next Steps](#roadmap--next-steps)
 - [Path to active](#path-to-active)
@@ -319,7 +320,7 @@ RB that announced the EB. A committee member votes for an EB only if:
 1. The RB header arrived within <a href="#delta-hdr">$\Delta_\text{hdr}$</a>,
 2. It has **not** received an equivocating RB header for this EB within
    <a href="#l-equi">$L_\text{equi}$</a> slots,
-3. It has received the EB within $L_\text{vote}$ slots from the start of the
+3. It has received the EB within $L_\text{equi} + L_\text{vote}$ slots from the start of the
    EB's slot,
 4. The EB is the one announced by the latest RB in the voter's current chain,
 5. The EB's transactions form a **valid** extension of the RB that announced it,
@@ -605,10 +606,10 @@ availability:
 <div align="center">
 <a name="table-1" id="table-1"></a>
 
-| Characteristic                                                     |            Symbol             | Description                                                          | Observed Range |
+| Characteristic                                                     |            Symbol             | Description                                                          | Observed Range by Simulations |
 | ------------------------------------------------------------------ | :---------------------------: | -------------------------------------------------------------------- | :------------: |
 | <a id="delta-hdr" href="#delta-hdr"></a>RB header propagation      |      $\Delta_\text{hdr}$      | Time for RB headers to propagate network-wide (headers are small)    |    <1 slot     |
-| <a id="delta-rb" href="#delta-rb"></a>RB diffusion                 |      $\Delta_\text{RB}$       | Complete ranking block propagation and adoption time                 |    ~5 slots    |
+| <a id="delta-rb" href="#delta-rb"></a>RB diffusion                 |      $\Delta_\text{RB}$       | Complete ranking block propagation and adoption time                 |    <5 slots    |
 | <a id="delta-eb-H" href="#delta-eb-H"></a>EB honest diffusion      | $\Delta_\text{EB}^{\text{H}}$ | EB propagation time when released on schedule with no fresher EB     |   7-10 slots   |
 | <a id="delta-eb-A" href="#delta-eb-A"></a>EB adversarial diffusion | $\Delta_\text{EB}^{\text{A}}$ | EB propagation time starting from >25% network coverage after voting |  15-20 slots   |
 | <a id="delta-cpu" href="#delta-cpu"></a>EB validation              |      $\Delta_\text{cpu}$      | Full EB validation including signatures, scripts, and state updates  |   2-4 slots    |
@@ -1532,7 +1533,7 @@ Because of the aforementioned backpressure, diffusion occurs in Leios in an
 orderly manner even when demand is high. The following set of plots show
 histograms of diffusion time (i.e., the time from a transaction's, RB's, EB's,
 or vote's creation to its reaching the nodes in the network). Transactions and
-votes typically diffuse rapidly to ~95% of honest stake in fractions of a
+votes typically diffuse rapidly throughout the whole network in fractions of a
 second, due to their small sizes, often small enough to fit in a single TCP
 transmission unit. RBs diffuse in less one second, with the empty RBs at the
 start and end of the simulation diffusing fastest. Similarly, EBs diffuse fast
@@ -1687,17 +1688,16 @@ for further discussion.
 [^utxohd]:
     [Cardano Node 10.5.1 release notes](https://github.com/IntersectMBO/cardano-node/releases/tag/10.5.1)
 
-<a name="feasible-parameters"></a>**Feasible protocol parameters**
+### Feasible Protocol Parameters
 
 **Parameter Relationships and Network Assumptions**
 
-The key innovation in this specification is the relationship between the voting
-threshold ($\tau = 75\%$) and the diffusion period ($L_\text{diff}$). The high
+The key relation in the proposed protocol is between the voting
+threshold ($\tau = 75\%$) and propagation delay of EBs ($\Delta_\text{EB}$). The high
 voting threshold ensures that any certified EB is already known to at least 25%
 of honest nodes by the end of $L_\text{vote}$, even assuming 50% adversarial
 stake. This widespread initial knowledge enables the critical network
-assumption: an EB known to >25% of the network will reach all honest parties
-within the additional $L_\text{diff}$ period.
+assumption: an EB evidently known to >25% of the network will reach the remaining (online) honest stake within $L_\text{diff}$ and $\Delta_\text{RB}$, so to not impact blockchain safety and liveness.
 
 **Example Parameter Calculation**
 
@@ -1706,8 +1706,7 @@ consider the following example based on simulated network measurements:
 
 **Given Network Characteristics:**
 
-- $\Delta_\text{hdr} = 1$ slot, $\Delta_\text{RB} = 5$ slots (current Praos
-  observations)
+- $\Delta_\text{hdr} = 1$ slot, $\Delta_\text{RB} = 5$ slots (Cardano Mainnet assumption for Praos security)
 - $\Delta_\text{EB}^{\text{H}} = 7$ slots, $\Delta_\text{EB}^{\text{A}} = 15$
   slots (EB diffusion times)
 - $\Delta_\text{cpu} = 3$ slots, $\Delta_\text{reapply} = 1$ slot (validation
@@ -1717,14 +1716,12 @@ consider the following example based on simulated network measurements:
 
 - $L_\text{equi} = 3\Delta_\text{hdr} = 3 \times 1 = 3$ slots (ensures reliable
   equivocation detection)
-- $L_\text{vote} \approx \Delta_\text{EB}^{\text{H}} + \Delta_\text{cpu} = 7 + 3 = 10$
-  slots (ensures honest EBs diffuse optimally, with margin for validation)
-- $L_\text{diff} \geq \Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply} - \Delta_\text{RB} - L_\text{equi} - L_\text{vote} = 15 + 1 - 5 - 3 - 10 = -2$
+- $L_\text{vote} = 4$ slots: Since voting begins after $L_\text{equi}$, and EB propagation ($\Delta_\text{EB}^{\text{H}} = 7$ slots) can occur during equivocation detection, nodes only need 4 additional slots after $L_\text{equi}$ for validation ($\Delta_\text{cpu} = 3$ slots) plus margin
+- $L_\text{diff} \geq \Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply} - \Delta_\text{RB} - L_\text{equi} - L_\text{vote} = 15 + 1 - 5 - 3 - 4 = 4$
   slots (minimum)
-- Since the minimum is negative, we can set $L_\text{diff} = 0$ slots, but for
-  additional safety margin we use $L_\text{diff} = 7$ slots
+- For additional safety margin we use $L_\text{diff} = 7$ slots
 - **Total certificate inclusion delay:**
-  $L_\text{equi} + L_\text{vote} + L_\text{diff} = 3 + 10 + 7 = 20$ slots
+  $L_\text{equi} + L_\text{vote} + L_\text{diff} = 3 + 4 + 7 = 14$ slots
 
 **Simulation-Tested Parameters**
 
@@ -1740,8 +1737,8 @@ consideration of tradeoffs.
 | --------------------------------------------- | :-----------------: | :----------------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | RB header diffusion bound                     | $\Delta_\text{hdr}$ |       1 slot       | Must be faster than full RB diffusion for equivocation detection; simulations show headers reach all nodes within 1 slot due to smaller size.                                                        |
 | Equivocation detection period length          |   $L_\text{equi}$   |      3 slots       | Set to $3\Delta_\text{hdr}$ to accommodate worst-case equivocation scenario; ensures reliable detection before voting begins.                                                                        |
-| Voting period length                          |   $L_\text{vote}$   |      10 slots      | Short stages increase settlement speed, but the stage length must be generously larger than the propagation time for EBs and validation time.                                                        |
-| Diffusion period length                       |   $L_\text{diff}$   |     7-10 slots     | Calculated as $\Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply} - \Delta_\text{RB} - L_\text{equi} - L_\text{vote}$. With typical values: 15 + 1 - 5 - 3 - 10 = -2 (min), use 7 for safety margin |
+| Voting period length                          |   $L_\text{vote}$   |      4 slots       | Must accommodate EB propagation and validation time after equivocation detection ($\Delta_\text{EB}^{\text{H}} + \Delta_\text{cpu} - L_\text{equi} = 7 + 3 - 3 = 7$ slots from EB slot, but only 4 slots after $L_\text{equi}$). |
+| Diffusion period length                       |   $L_\text{diff}$   |      7 slots       | Calculated as $\Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply} - \Delta_\text{RB} - L_\text{equi} - L_\text{vote}$. With typical values: 15 + 1 - 5 - 3 - 4 = 4 (min), use 7 for safety margin  |
 | Endorser-block referenceable transaction size |  $S_\text{EB-tx}$   |       12 MB        | Simulations indicate that 200 kB/s throughput is feasible at this block size.                                                                                                                        |
 | Endorser block max size                       |    $S_\text{EB}$    |       512 kB       | Endorser blocks must be small enough to diffuse and be validated within the voting period $L_\text{vote}$.                                                                                           |
 | Maximum Plutus steps per endorser block       |          -          |  2000G step units  | Simulations at high transaction-validation CPU usage.                                                                                                                                                |
