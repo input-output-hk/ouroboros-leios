@@ -62,7 +62,7 @@ sustainability and reduced complexity through fewer new protocol elements.
     - [Ranking Blocks (RBs)](#ranking-blocks-rbs)
     - [Endorser Blocks (EBs)](#endorser-blocks-ebs)
     - [Votes and Certificates](#votes-and-certificates)
-  - [Protocol Parameters](#protocol-parameters)
+  - [Network Characteristics and Protocol Parameters](#network-characteristics-and-protocol-parameters)
   - [Node Behavior](#node-behavior)
     - [Transaction Diffusion](#transaction-diffusion)
     - [RB Block Production and Diffusion](#rb-block-production-and-diffusion)
@@ -114,7 +114,7 @@ sustainability and reduced complexity through fewer new protocol elements.
 **Tables**
 
 - [Table 1: Network Characteristics](#table-1)
-- [Table 2: Leios Protocol Parameters](#table-2)
+- [Table 2: Protocol Parameters](#table-2)
 - [Table 3: Leios Mini-Protocols](#table-3)
 - [Table 4: Performance Metrics](#table-4)
 - [Table 5: Leios effficiency at different throughputs](#table-5)
@@ -327,7 +327,7 @@ RB that announced the EB. A committee member votes for an EB only if:
    the announcing RB's slot number as the election identifier.
 
 where <a href="#l-equi">$L_\text{equi}$</a>, <a href="#l-vote">$L_\text{vote}$</a> and <a href="#delta-hdr">$\Delta_\text{hdr}$</a> are
-<a href="#protocol-parameters">protocol parameters</a> represented by a number
+<a href="#network-characteristics-and-protocol-parameters">protocol parameters and network characteristics</a> represented by a number
 of slots.
 
 #### Step 4: Certification
@@ -381,35 +381,7 @@ Additionally, all RBs must follow these content constraints:
 
 The timing constraints work together to maintain Praos' security assumptions
 while enabling higher throughput. These constraints prevent scenarios where
-honest nodes would be forced to delay chain adoption due to missing data.
-
-<a id="network-characteristics"></a>**Network Characteristics**
-
-The protocol timing is built upon observed network characteristics that describe
-how quickly different types of data propagate. All timing parameters target
-propagation to ~95% of honest stake, which represents practical network-wide
-availability:
-
-<div align="center">
-<a name="table-1" id="table-1"></a>
-
-| Characteristic          |             Symbol              | Description                                                          | Observed Range |
-| ----------------------- | :-----------------------------: | -------------------------------------------------------------------- | :------------: |
-| <a id="delta-hdr" href="#delta-hdr"></a>RB header propagation   |       $\Delta_\text{hdr}$       | Time for RB headers to propagate network-wide (headers are small)    |    <1 slot     |
-| <a id="delta-rb" href="#delta-rb"></a>RB diffusion            |       $\Delta_\text{RB}$        | Complete ranking block propagation and adoption time                 |    ~5 slots    |
-| <a id="delta-eb-H" href="#delta-eb-H"></a>EB honest diffusion    | $\Delta_\text{EB}^{\text{H}}$ | EB propagation time when released on schedule with no fresher EB     |   7-10 slots   |
-| <a id="delta-eb-A" href="#delta-eb-A"></a>EB adversarial diffusion | $\Delta_\text{EB}^{\text{A}}$  | EB propagation time starting from >25% network coverage after voting |  15-20 slots   |
-| <a id="delta-cpu" href="#delta-cpu"></a>EB validation           |       $\Delta_\text{cpu}$       | Full EB validation including signatures, scripts, and state updates  |   2-4 slots    |
-| <a id="delta-reapply" href="#delta-reapply"></a>EB reapplication        |     $\Delta_\text{reapply}$     | Certified EB reapplication with minimal checks and UTxO updates      |    <1 slot     |
-| <a id="delta-tx" href="#delta-tx"></a>Transaction validation        |       $\Delta_\text{TX}$        | Standard Praos transaction validation time for RB processing         |    ~1 slot     |
-
-<em>Table 1: Network Characteristics</em>
-
-</div>
-
-<a id="three-phase-protocol"></a>**Timing Phases for Certificate Inclusion**
-
-The certificate inclusion process (Steps 3-5) involves three sequential timing phases:
+honest nodes would be forced to delay chain adoption due to missing data. The certificate inclusion process (Steps 3-5) involves three sequential timing phases:
 
 <a id="equivocation-detection"></a>
 
@@ -435,7 +407,7 @@ The voting period must accommodate both EB propagation and validation:
 
 $$L_\text{vote} > \Delta_\text{EB}^{\text{H}} + \Delta_\text{cpu}$$
 
-where [$\Delta_\text{EB}^{\text{H}}$](#delta-eb-H) (honest EB propagation time), and [$\Delta_\text{cpu}$](#delta-cpu) (validation time) are defined as part of the [network characteristics and protocol parameters](#network-characteristics) section.
+where [$\Delta_\text{EB}^{\text{H}}$](#delta-eb-H) (honest EB propagation time), and [$\Delta_\text{cpu}$](#delta-cpu) (validation time) are defined in the [network characteristics](#network-characteristics) section.
 
 This ensures all honest committee members can participate by having sufficient
 time to:
@@ -602,13 +574,38 @@ certificates specification][bls-spec].
 > However, this only applies when EB production is decoupled from RBs, which is
 > not the case in this specification where each EB is announced by an RB.
 
-### Protocol Parameters
+### Network Characteristics and Protocol Parameters
 
-<a id="protocol-parameters" href="#protocol-parameters"></a>The protocol
-parameters are tunable values that can be adjusted via governance. These
+The protocol parameters are tunable values that can be adjusted via governance. These
 parameters fall into two categories: timing parameters derived from the
-[network characteristics and timing constraints](#timing-constraints), and
-size/resource parameters that manage throughput.
+network characteristics below and timing constraints, and size/resource parameters 
+that manage throughput.
+
+<a id="network-characteristics"></a>**Network Characteristics**
+
+The protocol timing is built upon observed network characteristics that describe
+how quickly different types of data propagate. All timing parameters target
+propagation to ~95% of honest stake, which represents practical network-wide
+availability:
+
+<div align="center">
+<a name="table-1" id="table-1"></a>
+
+| Characteristic          |             Symbol              | Description                                                          | Observed Range |
+| ----------------------- | :-----------------------------: | -------------------------------------------------------------------- | :------------: |
+| <a id="delta-hdr" href="#delta-hdr"></a>RB header propagation   |       $\Delta_\text{hdr}$       | Time for RB headers to propagate network-wide (headers are small)    |    <1 slot     |
+| <a id="delta-rb" href="#delta-rb"></a>RB diffusion            |       $\Delta_\text{RB}$        | Complete ranking block propagation and adoption time                 |    ~5 slots    |
+| <a id="delta-eb-H" href="#delta-eb-H"></a>EB honest diffusion    | $\Delta_\text{EB}^{\text{H}}$ | EB propagation time when released on schedule with no fresher EB     |   7-10 slots   |
+| <a id="delta-eb-A" href="#delta-eb-A"></a>EB adversarial diffusion | $\Delta_\text{EB}^{\text{A}}$  | EB propagation time starting from >25% network coverage after voting |  15-20 slots   |
+| <a id="delta-cpu" href="#delta-cpu"></a>EB validation           |       $\Delta_\text{cpu}$       | Full EB validation including signatures, scripts, and state updates  |   2-4 slots    |
+| <a id="delta-reapply" href="#delta-reapply"></a>EB reapplication        |     $\Delta_\text{reapply}$     | Certified EB reapplication with minimal checks and UTxO updates      |    <1 slot     |
+| <a id="delta-tx" href="#delta-tx"></a>Transaction validation        |       $\Delta_\text{TX}$        | Standard Praos transaction validation time for RB processing         |    ~1 slot     |
+
+<em>Table 1: Network Characteristics</em>
+
+</div>
+
+**Protocol Parameters**
 
 <div align="center">
 <a name="table-2" id="table-2"></a>
@@ -629,7 +626,7 @@ size/resource parameters that manage throughput.
 | Maximum Plutus steps per transaction                              |          -          |  step units  | Maximum computational steps allowed for Plutus scripts in a single transaction                         | Limits computational resources per transaction to enable higher throughput                                                                                                                                                                       |
 | Maximum Plutus memory per transaction                             |          -          | memory units | Maximum memory allowed for Plutus scripts in a single transaction                                      | Limits memory resources per transaction to enable higher throughput                                                                                                                                                                              |
 
-<em>Table 2: Leios Protocol Parameters</em>
+<em>Table 2: Protocol Parameters</em>
 
 </div>
 
