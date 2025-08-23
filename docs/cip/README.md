@@ -104,11 +104,11 @@ sustainability and reduced complexity through fewer new protocol elements.
 - [Figure 9: Time for transaction to reach the ledger](#figure-9)
 - [Figure 10: Transactions reaching the ledger](#figure-10)
 - [Figure 11: Number of TX references](#figure-11)
-- [Figure 12: Disposition of transactions in blocks](#figure-12)
+- [Figure 12: Disposition of transactions in blocks (RBs are so small as not to be visible in the histograms. When an EB is generated, it is labeled in the plot as to whether it will eventually be certified ("EB later certified") or not ("EB later not certified"). When the certificate is included in an RB, the EB is labeled "EB now certified".)](#figure-12)
 - [Figure 13: Size of transactions referenced by EBs](#figure-13)
-- [Figure 14: Arrival delays for transactions, ranking blocks, votes, and endorser blocks](#figure-14)
+- [Figure 14: Arrival delays for transactions ("TX", upper left), ranking blocks ("RB", upper right), votes ("VT", lower left), and endorser blocks ("EB", lower right)](#figure-14)
 - [Figure 15: Mean nodal ingress (left) and Mean CPU load among all nodes (right)](#figure-15)
-- [Figure 16: Mean CPU load among all nodes](#figure-16)
+- [Figure 16: Mean CPU load among all nodes ("Gen" = generated, "Val" = validated, "RH" = ranking block header, "RB" = ranking block body, "EH" = endorser block header, "EB" = endorser block body", "TX" = transaction)](#figure-16)
 - [Figure 17: Fate of Plutus-heavy transactions in Leios](#figure-17)
 - [Figure 18: CPU usage in Plutus-heavy workloads for Leios](#figure-18)
 - [Figure 19: Comparison: Praos (red), proposed Leios (teal), and research Leios (orange)](#figure-19)
@@ -1714,20 +1714,6 @@ The [Leios paper][leios-paper] provides a rigorous theoretical analysis of the
 safety and throughput of the protocol. That has been reinforced and demonstrated
 by prototype simulations written in Haskell and Rust.
 
-> [!IMPORTANT]
->
-> TODO: **@bwbush**
->
-> - [ ] Regenerate the plots below each time the version of `sim-cli` is bumped.
-> - [x] Discuss only displaying three or four cases, instead of the five.
-> - [ ] In next set of re-runs . . .
->   - [ ] In the CPU plot, expand the abbrevations into phrases.
->   - [x] In the EB-size plot, remove empty EBs (created at the start or end of
->         the simulation).
-> - [x] Review and possibly elaborate the figure and table captions.
-> - [ ] In the final version . . .
->   - [ ] Remove title and subtitle.
-
 The simulation results use a mainnet-like topology[^mnrm] that accurately
 reflects the characteristics of the Cardano mainnet. This includes a realistic
 distribution of stake and a representative number of stake pools. The network is
@@ -1786,11 +1772,11 @@ permanently as the ledger history.
 
 | Throughput [TxMB/s] | TPS at 1500 B/tx | Conditions      | Mempool to EB [s] | Mempool to ledger [s] | Space efficiency [%] |
 | ------------------: | ---------------: | --------------- | ----------------: | --------------------: | -------------------: |
-|               0.100 |             66.7 | light load      |              19.3 |                  60.8 |                92.22 |
-|               0.150 |            100.0 | moderate load   |              20.8 |                  63.8 |                94.08 |
-|               0.200 |            142.9 | heavy load      |              28.9 |                  71.7 |                94.79 |
-|               0.250 |            166.7 | some congestion |              42.1 |                  84.3 |                94.92 |
-|               0.300 |            200.0 | much congestion |              83.5 |                 125.8 |                95.09 |
+|               0.100 |             66.7 | light load      |              19.6 |                  48.0 |                 94.2 |
+|               0.150 |            100.0 | moderate load   |              21.6 |                  51.2 |                 96.3 |
+|               0.200 |            142.9 | heavy load      |              31.3 |                  57.7 |                 96.4 |
+|               0.250 |            166.7 | some congestion |              51.6 |                  81.9 |                 96.6 |
+|               0.300 |            200.0 | much congestion |             146.6 |                 173.2 |                 97.2 |
 
 <em>Table 6: Leios effficiency at different throughputs</em>
 
@@ -1817,9 +1803,9 @@ eventually do arrive on the ledger, but that they may have to wait long during
 congestion. During light load a transaction takes one or two minutes to reach
 the ledger, but in heavier load it might take three minutes or even longer. The
 capacity parameter $S_\text{EB-tx}$ (12 MB/EB in these simulations)
-fundamentally limits the amortized maximum throughput of Linear Leios:
-furthermore, it affects how long it takes transactions to reach the ledger as
-the throughput approaches the capacity.
+fundamentally limits the amortized maximum throughput of Leios: furthermore, it
+affects how long it takes transactions to reach the ledger as the throughput
+approaches the capacity.
 
 <div align="center">
 <a name="figure-9" id="figure-9"></a>
@@ -1841,7 +1827,7 @@ the throughput approaches the capacity.
 
 The effect of EBs being discarded when RBs are too close together is evidenced
 in the following plot. A transaction referenced only once by an EB is one that
-reaches the ledger on the first attempt. If a transaction is referenced more
+reaches the ledger on the first attempt. If a transaction is referenced by more
 than one EB, it means that several attempts were made to before a relevant EB's
 certificate was included in an RB. The subsequent plot shows Leios's irregular
 rhythm of forging, sometimes discarding, and certifying EB. (Note that RBs are
@@ -1849,7 +1835,7 @@ so small relative to most EBs that they are difficult to see in the histogram.)
 The diagram also provides a sense of the intermittency of successful
 certification and the presence of periods of unfavorable sortition where RBs are
 not produced or are produced too close together. The same phenomenon occurs in
-Praos, but Linear Leios amplifies the intermittency.
+Praos, but Leios amplifies the intermittency.
 
 <div align="center">
 <a name="figure-11" id="figure-11"></a>
@@ -1865,13 +1851,17 @@ Praos, but Linear Leios amplifies the intermittency.
 
 ![Disposition of transactions in blocks](images/disposition-size-timeseries.svg)
 
-<em>Figure 12: Disposition of transactions in blocks</em>
+<em>Figure 12: Disposition of transactions in blocks (RBs are so small as not to
+be visible in the histograms. When an EB is generated, it is labeled in the plot
+as to whether it will eventually be certified ("EB later certified") or not ("EB
+later not certified"). When the certificate is included in an RB, the EB is
+labeled "EB now certified".)</em>
 
 </div>
 
 When demand is not high relative to capacity, the total size of transactions
 referenced by an EB varies randomly and rarely reaches the maximum size of 12
-MB/EB: see the following figure. One can see that at higher demands, fully
+MB/EB: see the following figure. One can see that at higher demands fully
 utilized blocks predominate. The presence of those full blocks means that other
 transactions are waiting in the memory pool for referencing by a subsequent EB.
 Thus the capacity parameter provides a natural form of backpressure that limits
@@ -1892,11 +1882,11 @@ histograms of diffusion time (i.e., the time from a transaction's, RB's, EB's,
 or vote's creation to its reaching the nodes in the network). Transactions and
 votes typically diffuse rapidly throughout the whole network in fractions of a
 second, due to their small sizes, often small enough to fit in a single TCP
-transmission unit. RBs diffuse in less one second, with the empty RBs at the
-start and end of the simulation diffusing fastest. Similarly, EBs diffuse fast
-when empty or when demand is low, but once full EBs are diffusing, it can take
-up to two seconds for them to diffuse. All of the distribution have long tails
-where messages arrive much later for nodes with unfavorably topological
+transmission unit. RBs diffuse in approximately one second, with the empty RBs
+at the start and end of the simulation diffusing fastest. Similarly, EBs diffuse
+fast when empty or when demand is low, but once full EBs are diffusing, it can
+take up to two seconds for them to diffuse. All of the distributions have long
+tails where messages arrive much later for nodes with unfavorably topological
 locations. The Leios protocol possesses the important property that traffic in
 transactions, RBs, votes, and EBs do not interfere with one another: for
 example, delays in EBs and high throughput do not also delay RBs in those cases.
@@ -1909,8 +1899,9 @@ example, delays in EBs and high throughput do not also delay RBs in those cases.
 | ![Arrival delay for TXs](images/elapsed-TX.svg) | ![Arrival delay for RBs](images/elapsed-RB.svg) |
 | ![Arrival delay for VTs](images/elapsed-VT.svg) | ![Arrival delay for EBs](images/elapsed-EB.svg) |
 
-<em>Figure 14: Arrival delays for transactions, ranking blocks, votes, and
-endorser blocks</em>
+<em>Figure 14: Arrival delays for transactions ("TX", upper left), ranking
+blocks ("RB", upper right), votes ("VT", lower left), and endorser blocks ("EB",
+lower right)</em>
 
 </div>
 
@@ -1928,8 +1919,8 @@ In terms of resource usage, the throughputs in these simulations do no stress
 the four virtual CPUs of each node or saturate the 10 Mb/s available bandwidth
 between nodes. The figures below show that bandwidth usage does not exceed 4
 Mb/s and that most of that is consumed by diffusion of transactions among the
-nodes. Furthermore, vCPU usage stays below 200% (i.e., the equivalent of two
-vCPUs operating fully), though it is very bursty because of the uneven workload
+nodes. Furthermore, vCPU usage stays below 100% (i.e., the equivalent of one
+vCPU operating fully), though it is very bursty because of the uneven workload
 of cryptographic and ledger operations. The last figure quantifies how
 transaction and EB body validation dominate CPU usage. Averaged over time, CPU
 usage is low: there may be opportunities in the implementation of the Leios node
@@ -1953,7 +1944,9 @@ in CPU usage over time.
 
 ![Mean CPU load among all nodes](images/cpu-mean-histogram.svg)
 
-<em>Figure 16: Mean CPU load among all nodes</em>
+<em>Figure 16: Mean CPU load among all nodes ("Gen" = generated, "Val" =
+validated, "RH" = ranking block header, "RB" = ranking block body, "EH" =
+endorser block header, "EB" = endorser block body", "TX" = transaction)</em>
 
 </div>
 
@@ -1976,38 +1969,36 @@ uncertain.
 [^dbanalyser]:
     [Cardano instantiation of the Consensus Layer: db-analyser](https://github.com/IntersectMBO/ouroboros-consensus/blob/main/ouroboros-consensus-cardano/README.md#db-analyser)
 
-- CPU per transaction in a block: `428.4 μs/tx`.
-- CPU per byte of a block: `211.5 μs/kB`.
-- Linear models for signature verification and Plutus execution:
-  - `(148.1 μs/tx) * (number of transactions) + (114.1 μs/kB) * (number of bytes)`.
-  - `(137.5 μs/tx) * (number of transactions) + (60.2 μs/kB) * (number of bytes) + (585.2 μs/Gstep) * (billions of Plutus execution steps)`,
-    with a Lapace-distributed error having scale `1250 μs`.
+- Ledger "apply" operation, consisting of phase 1 & 2 validation along with
+  updating the current ledger state:
+  - CPU per transaction in a block: `620.1 μs/tx`.
+  - Linear model that accounts for Plutus:
+    `(262.4 μs/tx) * (number of transactions) + (948.7 μs/Gstep) * (billions of Plutus execution steps)`.
+- Ledger "reapply" operation, consisting of updating the current ledger state,
+  omitting previously performed phase 1 & 2 validation:
+  - Linear model: `(353.9 μs) + (21.51 μs/kB) * (size of the block)`
+  - Linear model that accounts for Plutus:
+    `(347.8 μs) + (19.43 μs/kB) * (size of the block) + (21.27 μs/Gstep) * (billions of Plutus execution steps)`
 
-The Leios simulators use the value `0.4284 ms` as the validation time for each
-transaction. A more nuanced model of CPU usage in the simulators would account
-for Plutus execution. In order to estimate the effect of Plutus-heavy workloads,
-one can vary that per-transaction time to higher values. Very approximately,
-validation times of `1 ms/tx`, `10 ms/tx`, or `100 ms/tx` correspond to 2, 20,
-or 200 billion Plutus steps per transaction, respectively. The following plot of
-simulation results limit each node to 6 vCPU cores and suggest that the
-`100 ms/tx` workload is untenable. The subsequent plot shows the 6 vCPUs
-becoming saturated with Plutus execution, so much so that EBs fail to be
-created. These results indicate that Leios's _block-level_ Plutus budget can
-safely be 2000 billion steps, or 100 times the Plutus budget of Praos.
-
-> [!IMPORTANT]
->
-> TODO: **@bwbush**
->
-> - [ ] Regenerate the plots below each time the version of `sim-cli` is bumped.
-> - [ ] In next set of re-runs . . .
->   - [x] Use SVG format.
->   - [x] Align with the base case of the previous section.
->   - [x] In the transaction plot, switch to the minute-based ledged.
->   - [ ] In the CPU plot, expand the abbrevations into phrases.
-> - [x] Review and possibly elaborate the figure and table captions.
-> - [ ] In the final version . . .
->   - [ ] Remove title and subtitle.
+The Leios simulators perform the "apply" operation when a transaction is first
+seen, either when it is received for the memory pool or when it is fetched after
+first being seen in an RB or EB; they perform the "reapply" operation when a
+block is being generated or validated. A more nuanced model of CPU usage in the
+simulators would account for Plutus execution explicitly, but the linear models
+described above are used to account for Plutus workloads implicitly. The
+following plot of simulation results limit each node to 4 vCPU cores and suggest
+that workloads of 20,000e9 Plutus execution steps per EB may be feasible: this
+is 1000 times the current Cardano mainnet limit of 20e9 steps for Praos blocks.
+The subsequent plot shows the 4 vCPUs becoming progressively more saturated with
+heavier Plutus execution. Although these results suggest that Leios's
+_block-level_ Plutus budget can safely be 5000 billion steps or more, it is
+important to remember that this is for conditions where honest nodes faithfully
+and promptly diffuse the transactions requiring the relatively expensive phase 2
+(Plutus) validation: adversarial nodes could attempt to delay diffusion of
+transactions in order to overwhelm honest nodes with the sudden arrival of many
+heavy Plutus transactions and little time to validate them all before voting
+upon the newly seen EB. Experiments with prototype Leios nodes will be necessary
+to more precisely quantify how much the Plutus budget could safely be increased.
 
 <div align="center">
 <a name="figure-17" id="figure-17"></a>
@@ -2021,7 +2012,9 @@ safely be 2000 billion steps, or 100 times the Plutus budget of Praos.
 <div align="center">
 <a name="figure-18" id="figure-18"></a>
 
-![CPU usage in Plutus-heavy workloads for Leios](images/plutus-cpu-mean-histogram.svg)
+|                                                                                             |                                                                                             |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| ![Mean CPU usage in Plutus-heavy workloads for Leios](images/plutus-cpu-mean-histogram.svg) | ![Peak CPU usage in Plutus-heavy workloads for Leios](images/plutus-cpu-peak-histogram.svg) |
 
 <em>Figure 18: CPU usage in Plutus-heavy workloads for Leios</em>
 
@@ -2104,8 +2097,8 @@ consideration of tradeoffs.
 | Diffusion period length                       |   $L_\text{diff}$   |      7 slots       | Per [diffusion period](#diffusion-period): minimum calculated as 4 slots with typical network values, use 7 for safety margin.                                                         |
 | Endorser-block referenceable transaction size |  $S_\text{EB-tx}$   |       12 MB        | Simulations indicate that 200 kB/s throughput is feasible at this block size.                                                                                                          |
 | Endorser block max size                       |    $S_\text{EB}$    |       512 kB       | Endorser blocks must be small enough to diffuse and be validated within the voting period $L_\text{vote}$.                                                                             |
-| Maximum Plutus steps per endorser block       |          -          |  2000G step units  | Simulations at high transaction-validation CPU usage.                                                                                                                                  |
-| Maximum Plutus memory per endorser block      |          -          | 7000M memory units | Simulations at high transaction-validation CPU usage.                                                                                                                                  |
+| Maximum Plutus steps per endorser block       |          -          |  2000G step units  | Simulations at high transaction-validation CPU usage, but an even higher limit may be possible.                                                                                        |
+| Maximum Plutus memory per endorser block      |          -          | 7000M memory units | Simulations at high transaction-validation CPU usage, but an even higher limit may be possible.                                                                                        |
 | Maximum Plutus steps per transaction          |          -          |  100G step units   | Raise per-transaction limit by a factor of twenty relative to Praos.                                                                                                                   |
 | Maximum Plutus memory per transaction         |          -          | 350M memory units  | Raise per-transaction limit by a factor of twenty relative to Praos.                                                                                                                   |
 | Ranking block max size                        |    $S_\text{RB}$    |    90,112 bytes    | This is the current value on the Cardano mainnet.                                                                                                                                      |
@@ -2198,11 +2191,11 @@ increase each month as the ledger becomes larger.
 
 | Throughput | Average-size transactions | Small transactions | Per-node operation |   Per-node storage | 10k-node network<br/>(first year) | 10k-node network<br/>(first year) |
 | ---------: | ------------------------: | -----------------: | -----------------: | -----------------: | --------------------------------: | --------------------------------: |
-| 100 TxkB/s |                   67 Tx/s |           333 Tx/s |      $112.76/month | $17.87/month/month |                            $14.6M |                       $200k/epoch |
-| 150 TxkB/s |                  100 Tx/s |           500 Tx/s |      $119.38/month | $26.86/month/month |                            $15.9M |                       $218k/epoch |
-| 200 TxkB/s |                  133 Tx/s |           667 Tx/s |      $128.02/month | $38.26/month/month |                            $17.7M |                       $242k/epoch |
-| 250 TxkB/s |                  167 Tx/s |           833 Tx/s |      $132.73/month | $44.76/month/month |                            $18.6M |                       $255k/epoch |
-| 300 TxkB/s |                  200 Tx/s |          1000 Tx/s |      $139.09/month | $53.34/month/month |                            $19.9M |                       $272k/epoch |
+| 100 TxkB/s |                   67 Tx/s |           333 Tx/s |      $112.99/month | $17.85/month/month |                            $14.6M |                       $200k/epoch |
+| 150 TxkB/s |                  100 Tx/s |           500 Tx/s |      $119.51/month | $26.80/month/month |                            $15.9M |                       $218k/epoch |
+| 200 TxkB/s |                  133 Tx/s |           667 Tx/s |      $128.35/month | $38.35/month/month |                            $17.7M |                       $242k/epoch |
+| 250 TxkB/s |                  167 Tx/s |           833 Tx/s |      $133.07/month | $44.61/month/month |                            $18.6M |                       $255k/epoch |
+| 300 TxkB/s |                  200 Tx/s |          1000 Tx/s |      $139.18/month | $53.20/month/month |                            $19.9M |                       $272k/epoch |
 
 <em>Table 8: Operating Costs by Transaction Throughput</em>
 
@@ -2220,10 +2213,10 @@ listed in the table.
 
 | Infrastructure cost | Required ada<br/>@ $0.45/ADA | Required transactions<br/>(average size)<br/>@ $0.45/ADA | Required transactions<br/>(small size)<br/>@ $0.45/ADA |
 | ------------------: | ---------------------------: | -------------------------------------------------------: | -----------------------------------------------------: |
-|         $14.6M/year |               444k ADA/epoch |                                                4.74 Tx/s |                                              6.18 Tx/s |
-|         $15.9M/year |               485k ADA/epoch |                                                5.17 Tx/s |                                              6.74 Tx/s |
-|         $17.7M/year |               537k ADA/epoch |                                                5.73 Tx/s |                                              7.47 Tx/s |
-|         $18.6M/year |               566k ADA/epoch |                                                6.04 Tx/s |                                              7.88 Tx/s |
+|         $14.6M/year |               444k ADA/epoch |                                                4.75 Tx/s |                                              6.19 Tx/s |
+|         $15.9M/year |               485k ADA/epoch |                                                5.17 Tx/s |                                              6.75 Tx/s |
+|         $17.7M/year |               537k ADA/epoch |                                                5.74 Tx/s |                                              7.49 Tx/s |
+|         $18.6M/year |               566k ADA/epoch |                                                6.05 Tx/s |                                              7.89 Tx/s |
 |         $19.9M/year |               605k ADA/epoch |                                                6.45 Tx/s |                                              8.42 Tx/s |
 
 <em>Table 9: Required TPS for Infrastructure Cost Coverage</em>
