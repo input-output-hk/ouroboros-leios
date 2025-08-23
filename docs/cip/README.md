@@ -768,7 +768,7 @@ which are permitted to include diffusion pipelining with delayed validation.
 #### EB Diffusion
 
 Whenever an EB is announced through an RB header, nodes must fetch the EB
-content promptly (step 6), such that they receive it within $L_\text{vote}$ and
+content promptly (step 6), such that they receive it within $L_\text{equi} + L_\text{vote}$ and
 consequently enables them to vote. EBs are fetched freshest-first to ensure
 timely delivery within the voting window. Only the EB body corresponding to the
 first EB announcement/RB header received for a given RB creation opportunity
@@ -851,7 +851,7 @@ proof that the EB has received sufficient committee approval.
 
 <a id="certificate-inclusion" href="#certificate-inclusion"></a>**Certificate
 Inclusion**: Block producers creating new RBs include certificates for EBs where
-at least $L_\text{vote} + L_\text{diff}$ slots have elapsed since the slot of
+at least $L_\text{equi} + L_\text{vote} + L_\text{diff}$ slots have elapsed since the slot of
 the RB that announced the EB (step 12). This timing constraint ensures the
 certified EB has had sufficient time to diffuse throughout the network.
 
@@ -943,7 +943,7 @@ types required for EB distribution, voting, and certificate construction.
 |   **Protocol**    | **Purpose**                                        | **Timing Constraint**                      |
 | :---------------: | -------------------------------------------------- | ------------------------------------------ |
 | **RbHeaderRelay** | Diffuse RB headers for equivocation detection      | Must achieve $\Delta_\text{hdr}$ diffusion |
-|    **EbRelay**    | Diffuse fresh EBs to enable timely validation      | Must reach voters within $L_\text{vote}$   |
+|    **EbRelay**    | Diffuse fresh EBs to enable timely validation      | Must reach voters within $L_\text{equi} + L_\text{vote}$   |
 |   **VoteRelay**   | Diffuse valid votes for certificate aggregation    | Must diffuse within $L_\text{diff}$        |
 |    **EbFetch**    | Retrieve certified EBs for chain reconstruction    | On-demand after certificate inclusion      |
 |    **TxFetch**    | Retrieve referenced transactions for EB validation | Before EB validation completes             |
@@ -1425,8 +1425,8 @@ The simulation results in the remainder of this section use the Rust simulator
 with a set of protocol parameters suitable for running Linear Leios at 200 kB/s
 of transactions, which corresponds to approximately 150 tx/s of transactions of
 sizes typical on the Cardano mainnet. The maximum size of transactions
-referenced by an EB is 12 MB and the stage length is
-$L_\text{diff} = L_\text{vote} = 7 \text{ slots}$. In order to illustrate the
+referenced by an EB is 12 MB and the stage lengths are
+$L_\text{equi} = 3$, $L_\text{vote} = 4$, and $L_\text{diff} = 7 \text{ slots}$. In order to illustrate the
 minimal infrastructure resources used by Leios at these throughputs, we have
 limited nodes to 4 virtual CPUs each and limited inter-node bandwidth to 10
 Mb/s. We vary the throughput to illustrate the protocol's behavior in light vs
@@ -1464,8 +1464,8 @@ cases, but that there are "lucky" or "unlucky" periods in the congested cases.
 The variability arises from the randomness of the RB production scheduled.
 First, a transaction may has to wait for an RB to be forged; second, a
 transaction referenced by an EB has to wait for the following RB to be forged.
-The EB is discarded, however, if the second RB is produced in fewer that
-$L_\text{diff} + L_\text{vote}$ after the first RB. Thus, both the time to the
+The EB is discarded, however, if the second RB is produced in fewer than
+$L_\text{equi} + L_\text{vote} + L_\text{diff}$ slots after the first RB. Thus, both the time to the
 next RB and the RB following that introduce unpredictability in a transaction
 reaching the ledger under even lightly loaded conditions. When the sortition
 happens to produce RBs too close together, transactions will accumulate in the
