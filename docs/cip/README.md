@@ -109,7 +109,7 @@ sustainability and reduced complexity through fewer new protocol elements.
 - [Figure 13: Mean nodal ingress (left) and Mean CPU load among all nodes (right)](#figure-13)
 - [Figure 14: Mean CPU load among all nodes](#figure-14)
 - [Figure 15: Fate of Plutus-heavy transactions in Leios](#figure-15)
-- [Figure 17: CPU usage in Plutus-heavy workloads for Leios](#figure-17)
+- [Figure 16: CPU usage in Plutus-heavy workloads for Leios](#figure-16)
 - [Figure 17: Performance comparison across three approaches: Ouroboros Praos (red), proposed Leios (teal), and research paper's over-collateralized sharded Leios (orange)](#figure-17)
 
 **Tables**
@@ -691,10 +691,6 @@ availability:
 > For example, an EB referencing 10,000 transactions of 100 bytes each would
 > have $S_\text{EB-tx} = 1$ MB but the EB itself would be at least 320 KB for
 > the transaction hashes alone.
-
-[^mainnet-min-tx]:
-    Observed 55-byte transaction on mainnet:
-    https://cardanoscan.io/transaction/d2a2098fabb73ace002e2cf7bf7131a56723cd0745b1ef1a4f9e29fd27c0eb68?tab=summary
 
 ### Node Behavior
 
@@ -2001,11 +1997,11 @@ safely be 2000 billion steps, or 100 times the Plutus budget of Praos.
 </div>
 
 <div align="center">
-<a name="figure-17" id="figure-17"></a>
+<a name="figure-16" id="figure-16"></a>
 
 ![CPU usage in Plutus-heavy workloads for Leios](images/plutus-cpu-mean-histogram.svg)
 
-<em>Figure 17: CPU usage in Plutus-heavy workloads for Leios</em>
+<em>Figure 16: CPU usage in Plutus-heavy workloads for Leios</em>
 
 </div>
 
@@ -2684,8 +2680,7 @@ requirements to ensure security, efficiency, and practical deployability:
 The aggregate signature scheme implementation specified in this document (using
 BLS as an example) satisfies all these requirements, as evidenced by the
 performance characteristics and certificate sizes documented in the
-[Votes and Certificates](#votes-and-certificates)
-section.
+[Votes and Certificates](#votes-and-certificates) section.
 
 <h3 id="appendix-b-cddl">Appendix B: Wire Format Specifications (CDDL)</h2>
 
