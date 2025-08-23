@@ -1803,9 +1803,9 @@ eventually do arrive on the ledger, but that they may have to wait long during
 congestion. During light load a transaction takes one or two minutes to reach
 the ledger, but in heavier load it might take three minutes or even longer. The
 capacity parameter $S_\text{EB-tx}$ (12 MB/EB in these simulations)
-fundamentally limits the amortized maximum throughput of Leios:
-furthermore, it affects how long it takes transactions to reach the ledger as
-the throughput approaches the capacity.
+fundamentally limits the amortized maximum throughput of Leios: furthermore, it
+affects how long it takes transactions to reach the ledger as the throughput
+approaches the capacity.
 
 <div align="center">
 <a name="figure-9" id="figure-9"></a>
@@ -1851,7 +1851,11 @@ Praos, but Leios amplifies the intermittency.
 
 ![Disposition of transactions in blocks](images/disposition-size-timeseries.svg)
 
-<em>Figure 12: Disposition of transactions in blocks (RBs are so small as not to be visible in the histograms. When an EB is generated, it is labeled in the plot as to whether it will eventually be certified ("EB later certified") or not ("EB later not certified"). When the certificate is included in an RB, the EB is labeled "EB now certified".)</em>
+<em>Figure 12: Disposition of transactions in blocks (RBs are so small as not to
+be visible in the histograms. When an EB is generated, it is labeled in the plot
+as to whether it will eventually be certified ("EB later certified") or not ("EB
+later not certified"). When the certificate is included in an RB, the EB is
+labeled "EB now certified".)</em>
 
 </div>
 
@@ -1878,11 +1882,11 @@ histograms of diffusion time (i.e., the time from a transaction's, RB's, EB's,
 or vote's creation to its reaching the nodes in the network). Transactions and
 votes typically diffuse rapidly throughout the whole network in fractions of a
 second, due to their small sizes, often small enough to fit in a single TCP
-transmission unit. RBs diffuse in approximately one second, with the empty RBs at the
-start and end of the simulation diffusing fastest. Similarly, EBs diffuse fast
-when empty or when demand is low, but once full EBs are diffusing, it can take
-up to two seconds for them to diffuse. All of the distributions have long tails
-where messages arrive much later for nodes with unfavorably topological
+transmission unit. RBs diffuse in approximately one second, with the empty RBs
+at the start and end of the simulation diffusing fastest. Similarly, EBs diffuse
+fast when empty or when demand is low, but once full EBs are diffusing, it can
+take up to two seconds for them to diffuse. All of the distributions have long
+tails where messages arrive much later for nodes with unfavorably topological
 locations. The Leios protocol possesses the important property that traffic in
 transactions, RBs, votes, and EBs do not interfere with one another: for
 example, delays in EBs and high throughput do not also delay RBs in those cases.
@@ -1895,8 +1899,9 @@ example, delays in EBs and high throughput do not also delay RBs in those cases.
 | ![Arrival delay for TXs](images/elapsed-TX.svg) | ![Arrival delay for RBs](images/elapsed-RB.svg) |
 | ![Arrival delay for VTs](images/elapsed-VT.svg) | ![Arrival delay for EBs](images/elapsed-EB.svg) |
 
-<em>Figure 14: Arrival delays for transactions ("TX", upper left), ranking blocks ("RB", upper right), votes ("VT", lower left), and
-endorser blocks ("EB", lower right)</em>
+<em>Figure 14: Arrival delays for transactions ("TX", upper left), ranking
+blocks ("RB", upper right), votes ("VT", lower left), and endorser blocks ("EB",
+lower right)</em>
 
 </div>
 
@@ -1939,7 +1944,9 @@ in CPU usage over time.
 
 ![Mean CPU load among all nodes](images/cpu-mean-histogram.svg)
 
-<em>Figure 16: Mean CPU load among all nodes ("Gen" = generated, "Val" = validated, "RH" = ranking block header, "RB" = ranking block body, "EH" = endorser block header, "EB" = endorser block body", "TX" = transaction)</em>
+<em>Figure 16: Mean CPU load among all nodes ("Gen" = generated, "Val" =
+validated, "RH" = ranking block header, "RB" = ranking block body, "EH" =
+endorser block header, "EB" = endorser block body", "TX" = transaction)</em>
 
 </div>
 
@@ -1962,20 +1969,36 @@ uncertain.
 [^dbanalyser]:
     [Cardano instantiation of the Consensus Layer: db-analyser](https://github.com/IntersectMBO/ouroboros-consensus/blob/main/ouroboros-consensus-cardano/README.md#db-analyser)
 
-- Ledger "apply" operation, consisting of phase 1 & 2 validation along with updating the current ledger state:
-    - CPU per transaction in a block: `620.1 μs/tx`.
-    - Linear model that accounts for Plutus: `(262.4 μs/tx) * (number of transactions) + (948.7 μs/Gstep) * (billions of Plutus execution steps)`.
-- Ledger "reapply" operation, consisting of updating the current ledger state, omitting previously performed phase 1 & 2 validation:
-    - Linear model: `(353.9 μs) + (21.51 μs/kB) * (size of the block)`
-    - Linear model that accounts for Plutus: `(347.8 μs) + (19.43 μs/kB) * (size of the block) + (21.27 μs/Gstep) * (billions of Plutus execution steps)`
+- Ledger "apply" operation, consisting of phase 1 & 2 validation along with
+  updating the current ledger state:
+  - CPU per transaction in a block: `620.1 μs/tx`.
+  - Linear model that accounts for Plutus:
+    `(262.4 μs/tx) * (number of transactions) + (948.7 μs/Gstep) * (billions of Plutus execution steps)`.
+- Ledger "reapply" operation, consisting of updating the current ledger state,
+  omitting previously performed phase 1 & 2 validation:
+  - Linear model: `(353.9 μs) + (21.51 μs/kB) * (size of the block)`
+  - Linear model that accounts for Plutus:
+    `(347.8 μs) + (19.43 μs/kB) * (size of the block) + (21.27 μs/Gstep) * (billions of Plutus execution steps)`
 
-The Leios simulators perform the "apply" operation when a transaction is first seen, either when it is received for the memory pool or when it is fetched after first being seen in an RB or EB; they perform the "reapply" operation when a block is being generated or validated.
-A more nuanced model of CPU usage in the simulators would account
-for Plutus execution explicitly, but the linear models described above are used to account for Plutus workloads implicitly.
-The following plot of
-simulation results limit each node to 4 vCPU cores and suggest that workloads of 20,000e9 Plutus execution steps per EB may be feasible: this is 1000 times the current Cardano mainnet limit of 20e9 steps for Praos blocks. The subsequent plot shows the 4 vCPUs
-becoming progressively more saturated with heavier Plutus execution.
-Although these results suggest that Leios's _block-level_ Plutus budget can safely be 5000 billion steps or more, it is important to remember that this is for conditions where honest nodes faithfully and promptly diffuse the transactions requiring the relatively expensive phase 2 (Plutus) validation: adversarial nodes could attempt to delay diffusion of transactions in order to overwhelm honest nodes with the sudden arrival of many heavy Plutus transactions and little time to validate them all before voting upon the newly seen EB. Experiments with prototype Leios nodes will be necessary to more precisely quantify how much the Plutus budget could safely be increased.
+The Leios simulators perform the "apply" operation when a transaction is first
+seen, either when it is received for the memory pool or when it is fetched after
+first being seen in an RB or EB; they perform the "reapply" operation when a
+block is being generated or validated. A more nuanced model of CPU usage in the
+simulators would account for Plutus execution explicitly, but the linear models
+described above are used to account for Plutus workloads implicitly. The
+following plot of simulation results limit each node to 4 vCPU cores and suggest
+that workloads of 20,000e9 Plutus execution steps per EB may be feasible: this
+is 1000 times the current Cardano mainnet limit of 20e9 steps for Praos blocks.
+The subsequent plot shows the 4 vCPUs becoming progressively more saturated with
+heavier Plutus execution. Although these results suggest that Leios's
+_block-level_ Plutus budget can safely be 5000 billion steps or more, it is
+important to remember that this is for conditions where honest nodes faithfully
+and promptly diffuse the transactions requiring the relatively expensive phase 2
+(Plutus) validation: adversarial nodes could attempt to delay diffusion of
+transactions in order to overwhelm honest nodes with the sudden arrival of many
+heavy Plutus transactions and little time to validate them all before voting
+upon the newly seen EB. Experiments with prototype Leios nodes will be necessary
+to more precisely quantify how much the Plutus budget could safely be increased.
 
 <div align="center">
 <a name="figure-17" id="figure-17"></a>
@@ -1989,8 +2012,8 @@ Although these results suggest that Leios's _block-level_ Plutus budget can safe
 <div align="center">
 <a name="figure-18" id="figure-18"></a>
 
-|   |   |
-|---|---|
+|                                                                                             |                                                                                             |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | ![Mean CPU usage in Plutus-heavy workloads for Leios](images/plutus-cpu-mean-histogram.svg) | ![Peak CPU usage in Plutus-heavy workloads for Leios](images/plutus-cpu-peak-histogram.svg) |
 
 <em>Figure 18: CPU usage in Plutus-heavy workloads for Leios</em>
