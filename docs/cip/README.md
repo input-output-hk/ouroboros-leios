@@ -273,7 +273,7 @@ certification</em>
 
 Leios preserves the existing Praos chain structure while adding a parallel
 transaction processing layer. When a stake pool wins block leadership, it may
-create two components:
+create two entities:
 
 1. **[Ranking Block (RB)](#ranking-blocks-rbs)** A standard Praos block with
    extended header fields to optionally certify one previously announced EB and
@@ -294,16 +294,13 @@ equivocation detection.
 > blocks for the same block generation opportunity.
 
 Due to the voting overhead per EB, EBs should only be announced if the base RB
-is full or when sufficient transaction content justifies the voting costs, as
-detailed in the [adaptive EB production](#adaptive-eb-production) incentive
-mechanism. Empty EBs should not be announced in the network as they induce a
+is full or when sufficient transaction content justifies the voting costs. Empty EBs should not be announced in the network as they induce a
 non-zero cost. EBs may also be announced when RB resource constraints (size or
 Plutus limits) are reached, even at lower transaction volumes.
 
 #### Step 2: EB Distribution
 
-Nodes receiving the RB header discover the announced EB, via its referencing by
-the RB header, and fetch its content. The EB contains references to
+Nodes receiving the RB header discover the announced EB and fetch its body. The EB body contains references to
 transactions. If a node does not already possess a transaction referenced in the
 EB, it explicitly requests that transaction from peers.
 
@@ -348,7 +345,7 @@ threshold** (e.g., 75%) ensures that any certified EB is already known to a
 large portion of the network (>25% even with 50% adversarial stake) by the end
 of the voting period. This widespread initial knowledge enables the network
 assumption that the EB will reach all honest parties within the additional
-diffusion period $L_\text{diff}$. A ranking block (RB) producer can then
+diffusion period $L_\text{diff}$. See [timing constraints](#timing-constraints) for details. A ranking block (RB) producer can then
 construct a compact **certificate** proving the EB's validity by aggregating the
 collected votes.
 
