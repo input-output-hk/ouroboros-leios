@@ -109,7 +109,7 @@ sustainability and reduced complexity through fewer new protocol elements.
 - [Figure 13: Mean nodal ingress (left) and Mean CPU load among all nodes (right)](#figure-13)
 - [Figure 14: Mean CPU load among all nodes](#figure-14)
 - [Figure 15: Fate of Plutus-heavy transactions in Leios](#figure-15)
-- [Figure 16: CPU usage in Plutus-heavy workloads for Leios](#figure-16)
+- [Figure 17: CPU usage in Plutus-heavy workloads for Leios](#figure-17)
 - [Figure 17: Performance comparison across three approaches: Ouroboros Praos (red), proposed Leios (teal), and research paper's over-collateralized sharded Leios (orange)](#figure-17)
 
 **Tables**
@@ -117,7 +117,7 @@ sustainability and reduced complexity through fewer new protocol elements.
 - [Table 1: Network Characteristics](#table-1)
 - [Table 2: Ledger Characteristics](#table-2)
 - [Table 3: Protocol Parameters](#table-3)
-- [Table 4: Leios Mini-Protocols](#table-4)
+- [Table 4: Leios Information Exchange Requirements table (IER table)](#table-4)
 - [Table 5: Performance Metrics](#table-5)
 - [Table 6: Leios effficiency at different throughputs](#table-6)
 - [Table 7: Feasible Protocol Parameters](#table-7)
@@ -193,9 +193,7 @@ vary considerably.
   <img src="images/reward-forecast-bau.svg" alt="Forecast of rewards on Cardano mainnet">
 </p>
 
-<em>Figure 1: Forecast of rewards on Cardano mainnet</em>
-
-</div>
+<em>Fig<em>Figure 1: Forecast of rewards on Cardano mainnet</em>>
 
 Ouroboros Praos cannot support the high transaction volume needed to generate
 the fees that will eventually be needed to offset the diminishing rewards.
@@ -209,10 +207,8 @@ augmenting the Treasury, and increasing SPO and delegator rewards.
   <img src="images/spo-profitability.svg" alt="SPO profitability under Praos, as a function of transaction volume">
 </p>
 
-<em>Figure 2: SPO profitability under Praos, as a function of transaction
-volume</em>
-
-</div>
+<em>Fig<em>Figure 2: SPO profitability under Praos, as a function of transaction
+volume</em>>
 
 The Leios protocol specified in this document represents a balance between
 immediate scalability needs and long-term protocol evolution. The approach
@@ -238,10 +234,8 @@ blocks are validated and included in the chain.
     <img src="images/protocol-overview.svg" alt="Leios Chain Structure">
   </p>
 
-<em>Figure 3: Leios chain structure showing the relationship between Ranking
-Blocks, Endorser Blocks, and Certificates</em>
-
-</div>
+<em>Fig<em>Figure 3: Leios chain structure showing the relationship between
+Ranking Blocks, Endorser Blocks, and Certificates</em>>
 
 Notice the timing constraint visible in Figure 3: some EBs get certified and are
 included in the chain (green), while others cannot be certified in time (gray).
@@ -265,10 +259,8 @@ characteristics that inform their design.
     <img src="images/protocol-flow.svg" alt="Leios Protocol Flow">
   </p>
 
-<em>Figure 4: Detailed timing mechanism showing the three critical phases for EB
-certification</em>
-
-</div>
+<em>Fig<em>Figure 4: Detailed timing mechanism showing the three critical phases
+for EB certification</em>>
 
 #### Step 1: Block Production
 
@@ -717,9 +709,8 @@ specific behaviors that nodes must implement.
   <img src="images/node-behavior-sequence.svg" alt="Node Behavior Sequence">
 </p>
 
-<em>Figure 5: Up- and downstream interactions of a node (simplified)</em>
-
-</div>
+<em>Fig<em>Figure 5: Up- and downstream interactions of a node
+(simplified)</em>>
 
 The diagram above illustrates the Leios protocol in a simplified sequential
 order. In practice, these operations occur concurrently and the actual execution
@@ -1107,7 +1098,7 @@ message, but that correspondence in the follow-up CIP does not need to be
 one-to-one.
 
 <div style="text-align: center">
-<a name="table-99" id="table-99"></a>
+<a name="table-4" id="table-4"></a>
 
 | Sender  | Name                            | Arguments                                                    | Semantics                                                                                                                                                                                                                             |
 | ------- | ------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1126,7 +1117,7 @@ one-to-one.
 | ←Server | MsgLeiosNextBlockAndTxsInRange  | an EB and all of its transactions                            | The next certified block from an earlier MsgLeiosBlockRangeRequest.                                                                                                                                                                   |
 | ←Server | MsgLeiosLastBlockAndTxsInRange  | an EB and all of its transactions                            | The last certified block from an earlier MsgLeiosBlockRangeRequest.                                                                                                                                                                   |
 
-<em>Table 99: Leios Information Exchange Requirements table (IER table)</em>
+<em>Table 4: Leios Information Exchange Requirements table (IER table)</em>
 
 </div>
 
@@ -1508,16 +1499,14 @@ TxB/s (equivalent to roughly 100-200 TPS) - a 30-65x increase sufficient for
 economic sustainability.
 
 <div align="center">
-<a name="figure-7" id="figure-7"></a>
+<a name="figure-6" id="figure-6"></a>
 <p>
   <img src="images/leios-forecast-sqrt-fill.svg" alt="SPO profitability forecast under Leios">
 </p>
 
-<em>Figure 7: SPO profitability forecast under Leios showing clear economic
-benefits once sustained throughput exceeds 50-70 TxkB/s (36-50 TPS
-equivalent)</em>
-
-</div>
+<em>Fig<em>Figure 6: SPO profitability forecast under Leios showing clear
+economic benefits once sustained throughput exceeds 50-70 TxkB/s (36-50 TPS
+equivalent)</em>>
 
 Achieving this capacity increase requires trade-offs, as detailed below.
 
@@ -1819,22 +1808,18 @@ furthermore, it affects how long it takes transactions to reach the ledger as
 the throughput approaches the capacity.
 
 <div align="center">
-<a name="figure-8" id="figure-8"></a>
+<a name="figure-6" id="figure-6"></a>
 
 ![Time for transaction to reach the ledger](images/reach-rb-tx.svg)
 
-<em>Figure 8: Time for transaction to reach the ledger</em>
-
-</div>
+<em>Fig<em>Figure 7: Time for transaction to reach the ledger</em>>
 
 <div align="center">
-<a name="figure-9" id="figure-9"></a>
+<a name="figure-6" id="figure-6"></a>
 
 ![Transactions reaching the ledger](images/temporal-efficiency-bar.svg)
 
-<em>Figure 9: Transactions reaching the ledger</em>
-
-</div>
+<em>Fig<em>Figure 8: Transactions reaching the ledger</em>>
 
 The effect of EBs being discarded when RBs are too close together is evidenced
 in the following plot. A transaction referenced only once by an EB is one that
@@ -1849,20 +1834,20 @@ not produced or are produced too close together. The same phenomenon occurs in
 Praos, but Linear Leios amplifies the intermittency.
 
 <div align="center">
-<a name="figure-10" id="figure-10"></a>
+<a name="figure-6" id="figure-6"></a>
 
 ![Number of TX references](images/references-tx.svg)
 
-<em>Figure 10: Number of TX references</em>
+<em>Figure 9: Number of TX references</em>
 
 </div>
 
 <div align="center">
-<a name="figure-11" id="figure-11"></a>
+<a name="figure-6" id="figure-6"></a>
 
 ![Disposition of transactions in blocks](images/disposition-size-timeseries.svg)
 
-<em>Figure 11: Disposition of transactions in blocks</em>
+<em>Figure 10: Disposition of transactions in blocks</em>
 
 </div>
 
@@ -1875,11 +1860,11 @@ Thus the capacity parameter provides a natural form of backpressure that limits
 the potential EB-related work a node must do when demand is high.
 
 <div align="center">
-<a name="figure-12" id="figure-12"></a>
+<a name="figure-6" id="figure-6"></a>
 
 ![Size of transactions referenced by EBs](images/contents-ebs-size.svg)
 
-<em>Figure 12: Size of transactions referenced by EBs</em>
+<em>Figure 11: Size of transactions referenced by EBs</em>
 
 </div>
 
@@ -1899,14 +1884,14 @@ transactions, RBs, votes, and EBs do not interfere with one another: for
 example, delays in EBs and high throughput do not also delay RBs in those cases.
 
 <div align="center">
-<a name="figure-13" id="figure-13"></a>
+<a name="figure-6" id="figure-6"></a>
 
 |                                                 |                                                 |
 | ----------------------------------------------- | ----------------------------------------------- |
 | ![Arrival delay for TXs](images/elapsed-TX.svg) | ![Arrival delay for RBs](images/elapsed-RB.svg) |
 | ![Arrival delay for VTs](images/elapsed-VT.svg) | ![Arrival delay for EBs](images/elapsed-EB.svg) |
 
-<em>Figure 13: Arrival delays for transactions, ranking blocks, votes, and
+<em>Figure 12: Arrival delays for transactions, ranking blocks, votes, and
 endorser blocks</em>
 
 </div>
@@ -1934,23 +1919,23 @@ for lazy computations, caching, etc. that will spread out the occasional spikes
 in CPU usage over time.
 
 <div align="center">
-<a name="figure-14" id="figure-14"></a>
+<a name="figure-6" id="figure-6"></a>
 
 |                                                        |                                                                  |
 | ------------------------------------------------------ | ---------------------------------------------------------------- |
 | ![Mean nodal ingress](images/ingress-average-area.svg) | ![Mean CPU load among all nodes](images/cpu-mean-timeseries.svg) |
 
-<em>Figure 14: Mean nodal ingress (left) and Mean CPU load among all nodes
+<em>Figure 13: Mean nodal ingress (left) and Mean CPU load among all nodes
 (right)</em>
 
 </div>
 
 <div align="center">
-<a name="figure-15" id="figure-15"></a>
+<a name="figure-6" id="figure-6"></a>
 
 ![Mean CPU load among all nodes](images/cpu-mean-histogram.svg)
 
-<em>Figure 15: Mean CPU load among all nodes</em>
+<em>Figure 14: Mean CPU load among all nodes</em>
 
 </div>
 
@@ -2007,11 +1992,11 @@ safely be 2000 billion steps, or 100 times the Plutus budget of Praos.
 >   - [ ] Remove title and subtitle.
 
 <div align="center">
-<a name="figure-16" id="figure-16"></a>
+<a name="figure-6" id="figure-6"></a>
 
 ![Fate of Plutus-heavy transactions in Leios](images/plutus-temporal-efficiency-bar.svg)
 
-<em>Figure 16: Fate of Plutus-heavy transactions in Leios</em>
+<em>Figure 15: Fate of Plutus-heavy transactions in Leios</em>
 
 </div>
 
