@@ -756,8 +756,7 @@ headers for rapid EB discovery and <a href="#equivocation">equivocation
 detection</a>.
 
 <a id="rb-header-diffusion" href="#rb-header-diffusion"></a>**RB Header
-Diffusion**: RB headers diffuse via a new
-[RbHeaderRelay mini-protocol](#rbheaderrelay-mini-protocol) independently of
+Diffusion**: RB headers diffuse independently of
 standard ChainSync (steps 2a and 2b). This separate mechanism enables rapid EB
 discovery within the strict timing bound $\Delta_\text{hdr}$. Headers are
 diffused freshest-first to facilitate timely EB delivery, with nodes propagating
