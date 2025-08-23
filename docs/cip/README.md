@@ -412,7 +412,7 @@ scenario:
    conflicting headers propagates network-wide, allowing all honest nodes to
    detect the equivocation
 
-Therefore, $L_\text{equi}$ $\geq 3$$\Delta_\text{hdr}$ to ensure reliable
+Therefore, $L_\text{equi} \geq 3\Delta_\text{hdr}$ to ensure reliable
 detection before voting begins. This constraint is derived from the network
 model where headers must propagate within $\Delta_\text{hdr}$ to maintain Praos
 security assumptions.
@@ -427,7 +427,7 @@ no equivocation was detected during the detection period.
 > [!NOTE]
 >
 > **Comparison with Research Paper**: The [Leios research paper][leios-paper]
-> describes a more complex protocol variant that requires $5$$\Delta_\text{hdr}$
+> describes a more complex protocol variant that requires $5\Delta_\text{hdr}$
 > for equivocation detection due to additional coordination mechanisms between
 > Input Blocks and Endorser Blocks. This specification's simplified approach,
 > where EBs are directly announced by RBs, reduces the equivocation detection
