@@ -1823,12 +1823,16 @@ the throughput approaches the capacity.
 
 <em>Figure 7: Time for transaction to reach the ledger</em>
 
+</div>
+
 <div align="center">
 <a name="figure-6" id="figure-6"></a>
 
 ![Transactions reaching the ledger](images/temporal-efficiency-bar.svg)
 
 <em>Figure 8: Transactions reaching the ledger</em>
+
+</div>
 
 The effect of EBs being discarded when RBs are too close together is evidenced
 in the following plot. A transaction referenced only once by an EB is one that
