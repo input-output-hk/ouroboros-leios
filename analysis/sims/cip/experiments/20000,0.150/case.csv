@@ -1,2 +1,2 @@
 Network,Bandwidth,CPU,Diffusion duration,Voting duration,Max EB size,Tx size,Throughput,Plutus,Tx start [s],Tx stop [s],Sim stop [s]
-topology-v2,10 Mb/s,4 vCPU/node,L_diff = 7 slots,L_vote = 7 slots,12 MB/EB,1500 B/Tx,0.150 TxMB/s,60 Gstep/EB,60,960,1500
+topology-v2,10 Mb/s,4 vCPU/node,L_diff = 7 slots,L_vote = 7 slots,12 MB/EB,1500 B/Tx,0.150 TxMB/s,20000 Gstep/EB,60,960,1500

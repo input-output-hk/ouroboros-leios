@@ -33,7 +33,7 @@
     "distribution": "constant",
     "value": 0
   },
-  "tx-validation-cpu-time-ms": 0.60204125,
+  "tx-validation-cpu-time-ms": 23.9799,
   "tx-max-size-bytes": 16384,
   "rb-generation-probability": 0.05,
   "rb-head-size-bytes": 1024,
@@ -43,7 +43,7 @@
   "eb-header-validation-cpu-time-ms": 0.4438,
   "rb-body-legacy-praos-payload-validation-cpu-time-ms-constant": 0.7732,
   "rb-body-legacy-praos-payload-validation-cpu-time-ms-per-byte": 0.00001943,
-  "eb-body-validation-cpu-time-ms-constant": 10.5574,
+  "eb-body-validation-cpu-time-ms-constant": 1063.4224000000002,
   "eb-body-validation-cpu-time-ms-per-byte": 0.00001943,
   "vote-generation-probability": 600,
   "vote-threshold": 450,

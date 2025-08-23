@@ -33,7 +33,7 @@
     "distribution": "constant",
     "value": 0
   },
-  "tx-validation-cpu-time-ms": 5765.600600000001,
+  "tx-validation-cpu-time-ms": 1.2111000000000003,
   "tx-max-size-bytes": 16384,
   "rb-generation-probability": 0.05,
   "rb-head-size-bytes": 1024,
