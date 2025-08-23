@@ -115,14 +115,15 @@ sustainability and reduced complexity through fewer new protocol elements.
 **Tables**
 
 - [Table 1: Network Characteristics](#table-1)
-- [Table 2: Protocol Parameters](#table-2)
-- [Table 3: Leios Mini-Protocols](#table-3)
-- [Table 4: Performance Metrics](#table-4)
-- [Table 5: Leios effficiency at different throughputs](#table-5)
-- [Table 6: Feasible Protocol Parameters](#table-6)
-- [Table 7: Operating Costs by Transaction Throughput](#table-7)
-- [Table 8: Required TPS for Infrastructure Cost Coverage](#table-8)
-- [Table 9: Required TPS for Current Reward Maintenance](#table-9)
+- [Table 2: Ledger Characteristics](#table-2)
+- [Table 3: Protocol Parameters](#table-3)
+- [Table 4: Leios Mini-Protocols](#table-4)
+- [Table 5: Performance Metrics](#table-5)
+- [Table 6: Leios effficiency at different throughputs](#table-6)
+- [Table 7: Feasible Protocol Parameters](#table-7)
+- [Table 8: Operating Costs by Transaction Throughput](#table-8)
+- [Table 9: Required TPS for Infrastructure Cost Coverage](#table-9)
+- [Table 10: Required TPS for Current Reward Maintenance](#table-10)
 
 </details>
 
@@ -223,9 +224,9 @@ the foundation for subsequent protocol versions with higher throughput capacity.
 Ouroboros Leios achieves higher transaction throughput by allowing block
 producers to create additional blocks alongside the regular Praos chain. These
 supplementary blocks, called **Endorser Blocks (EBs)**, reference extra
-transactions that would otherwise wait for ranking blocks in future active slots. To ensure safety, these
-blocks undergo committee validation before their transactions become part of the
-permanent ledger.
+transactions that would otherwise wait for ranking blocks in future active
+slots. To ensure safety, these blocks undergo committee validation before their
+transactions become part of the permanent ledger.
 
 The key insight is that we can maintain Praos' security guarantees while
 processing more transactions by carefully managing when and how these additional
@@ -294,15 +295,17 @@ equivocation detection.
 > blocks for the same block generation opportunity.
 
 Due to the voting overhead per EB, EBs should only be announced if the base RB
-is full or when sufficient transaction content justifies the voting costs. Empty EBs should not be announced in the network as they induce a
-non-zero cost. EBs may also be announced when RB resource constraints (size or
-Plutus limits) are reached, even at lower transaction volumes.
+is full or when sufficient transaction content justifies the voting costs. Empty
+EBs should not be announced in the network as they induce a non-zero cost. EBs
+may also be announced when RB resource constraints (size or Plutus limits) are
+reached, even at lower transaction volumes.
 
 #### Step 2: EB Distribution
 
-Nodes receiving the RB header discover the announced EB and fetch its body. The EB body contains references to
-transactions. If a node does not already possess a transaction referenced in the
-EB, it explicitly requests that transaction from peers.
+Nodes receiving the RB header discover the announced EB and fetch its body. The
+EB body contains references to transactions. If a node does not already possess
+a transaction referenced in the EB, it explicitly requests that transaction from
+peers.
 
 #### Step 3: Committee Validation
 
@@ -317,8 +320,8 @@ RB that announced the EB. A committee member votes for an EB only if:
 1. The RB header arrived within <a href="#delta-hdr">$\Delta_\text{hdr}$</a>,
 2. It has **not** received an equivocating RB header for this EB within
    <a href="#l-equi">$L_\text{equi}$</a> slots,
-3. It has received the EB within $L_\text{equi} + L_\text{vote}$ slots from the start of the
-   EB's slot,
+3. It has received the EB within $L_\text{equi} + L_\text{vote}$ slots from the
+   start of the EB's slot,
 4. The EB is the one announced by the latest RB in the voter's current chain,
 5. The EB's transactions form a **valid** extension of the RB that announced it,
 6. For non-persistent voters, it is eligible to vote based on sortition using
@@ -345,9 +348,9 @@ threshold** (e.g., 75%) ensures that any certified EB is already known to a
 large portion of the network (>25% even with 50% adversarial stake) by the end
 of the voting period. This widespread initial knowledge enables the network
 assumption that the EB will reach all honest parties within the additional
-diffusion period $L_\text{diff}$. See [timing constraints](#timing-constraints) for details. A ranking block (RB) producer can then
-construct a compact **certificate** proving the EB's validity by aggregating the
-collected votes.
+diffusion period $L_\text{diff}$. See [timing constraints](#timing-constraints)
+for details. A ranking block (RB) producer can then construct a compact
+**certificate** proving the EB's validity by aggregating the collected votes.
 
 #### Step 5: Chain Inclusion
 
@@ -363,14 +366,15 @@ inclusion decision follows these rules:
 3. At least $L_\text{equi} + L_\text{vote} + L_\text{diff}$ slots have elapsed
    since the slot of the RB that announced the EB.
 
-where <a href="#l-equi">$L_\text{equi}$</a>, <a href="#l-vote">$L_\text{vote}$</a> and <a href="#l-diff">$L_\text{diff}$</a> are
-<a href="#network-characteristics-and-protocol-parameters">protocol parameters</a> represented by a number
-of slots.
+where <a href="#l-equi">$L_\text{equi}$</a>,
+<a href="#l-vote">$L_\text{vote}$</a> and <a href="#l-diff">$L_\text{diff}$</a>
+are <a href="#network-characteristics-and-protocol-parameters">protocol
+parameters</a> represented by a number of slots.
 
-This **certificate inclusion delay** ensures certified EBs have sufficient
-time to diffuse throughout the network before their transactions are included in
-the ledger. If the next RB is produced before this minimum delay has elapsed,
-the EB certificate cannot be included and the EB is discarded, with the protocol
+This **certificate inclusion delay** ensures certified EBs have sufficient time
+to diffuse throughout the network before their transactions are included in the
+ledger. If the next RB is produced before this minimum delay has elapsed, the EB
+certificate cannot be included and the EB is discarded, with the protocol
 gracefully falling back to standard Praos operation.
 
 Additionally, all RBs must follow these content constraints:
@@ -607,40 +611,40 @@ availability:
 <div align="center">
 <a name="table-1" id="table-1"></a>
 
-| Characteristic                                                     |            Symbol             | Description                                                          | Observed Range by Simulations |
-| ------------------------------------------------------------------ | :---------------------------: | -------------------------------------------------------------------- | :------------: |
-| <a id="delta-hdr" href="#delta-hdr"></a>Header propagation      |      $\Delta_\text{hdr}$      | Time for constant size headers (< 1,500 bytes) to propagate network-wide    |    <1 slot     |
-| <a id="delta-rb" href="#delta-rb"></a>RB diffusion                 |      $\Delta_\text{RB}$       | Complete ranking block propagation and adoption time                 |    <5 slots    |
-| <a id="delta-eb-H" href="#delta-eb-H"></a>EB honest diffusion      | $\Delta_\text{EB}^{\text{H}}$ | EB propagation time when released on schedule with no fresher EB     |   7-10 slots   |
-| <a id="delta-eb-A" href="#delta-eb-A"></a>EB adversarial diffusion | $\Delta_\text{EB}^{\text{A}}$ | EB propagation time starting from >25% network coverage after voting |  15-20 slots   |
+| Characteristic                                                     |            Symbol             | Description                                                              | Observed Range by Simulations |
+| ------------------------------------------------------------------ | :---------------------------: | ------------------------------------------------------------------------ | :---------------------------: |
+| <a id="delta-hdr" href="#delta-hdr"></a>Header propagation         |      $\Delta_\text{hdr}$      | Time for constant size headers (< 1,500 bytes) to propagate network-wide |            <1 slot            |
+| <a id="delta-rb" href="#delta-rb"></a>RB diffusion                 |      $\Delta_\text{RB}$       | Complete ranking block propagation and adoption time                     |           <5 slots            |
+| <a id="delta-eb-H" href="#delta-eb-H"></a>EB honest diffusion      | $\Delta_\text{EB}^{\text{H}}$ | EB propagation time when released on schedule with no fresher EB         |          7-10 slots           |
+| <a id="delta-eb-A" href="#delta-eb-A"></a>EB adversarial diffusion | $\Delta_\text{EB}^{\text{A}}$ | EB propagation time starting from >25% network coverage after voting     |          15-20 slots          |
 
-<em>Table 1: Network Characteristics</em>
+<em>Table 1: Network Characteristics</em>>
 
 </div>
 
 <div align="center">
-<a name="table-2" id="table-2"></a>
+<a name="table-3" id="table-3"></a>
 
-| Characteristic                                                     |            Symbol             | Description                                                          | Observed Range by Simulations |
-| ------------------------------------------------------------------ | :---------------------------: | -------------------------------------------------------------------- | :------------: |
-| <a id="delta-cpu" href="#delta-cpu"></a>EB validation              |      $\Delta_\text{cpu}$      | Full EB validation including signatures, scripts, and state updates  |   2-4 slots    |
-| <a id="delta-reapply" href="#delta-reapply"></a>EB reapplication   |    $\Delta_\text{reapply}$    | Certified EB reapplication with minimal checks and UTxO updates      |    <1 slot     |
-| <a id="delta-tx" href="#delta-tx"></a>Transaction validation       |      $\Delta_\text{TX}$       | Standard Praos transaction validation time for RB processing         |    ~1 slot     |
+| Characteristic                                                   |         Symbol          | Description                                                         | Observed Range by Simulations |
+| ---------------------------------------------------------------- | :---------------------: | ------------------------------------------------------------------- | :---------------------------: |
+| <a id="delta-cpu" href="#delta-cpu"></a>EB validation            |   $\Delta_\text{cpu}$   | Full EB validation including signatures, scripts, and state updates |           2-4 slots           |
+| <a id="delta-reapply" href="#delta-reapply"></a>EB reapplication | $\Delta_\text{reapply}$ | Certified EB reapplication with minimal checks and UTxO updates     |            <1 slot            |
+| <a id="delta-tx" href="#delta-tx"></a>Transaction validation     |   $\Delta_\text{TX}$    | Standard Praos transaction validation time for RB processing        |            ~1 slot            |
 
-<em>Table 2: Ledger Characteristics</em>
+<em>Table 2: Ledger Characteristics</em>>
 
 </div>
 
 **Protocol Parameters**
 
 <div align="center">
-<a name="table-2" id="table-2"></a>
+<a name="table-3" id="table-3"></a>
 
 | Parameter                                                              |      Symbol      |    Units     | Description                                                                       | Rationale                                                                                                                                                                                                                                        |
 | ---------------------------------------------------------------------- | :--------------: | :----------: | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| <a id="l-equi" href="#l-equi"></a>Equivocation detection period length | $L_\text{equi}$  |     slot     | Duration for detecting conflicting blocks before voting begins                    | Per [equivocation detection](#equivocation-detection): must accommodate worst-case equivocation scenario. Prevents adversaries from sending different EBs to different network parts                                                           |
-| <a id="l-vote" href="#l-vote"></a>Voting period length                 | $L_\text{vote}$  |     slot     | Duration during which committee members can vote on endorser blocks               | Per [voting period](#voting-period): must accommodate EB propagation and validation time. Set to minimum value that ensures honest parties can participate in voting                                                                            |
-| <a id="l-diff" href="#l-diff"></a>Diffusion period length              | $L_\text{diff}$  |     slot     | Additional period after voting to ensure network-wide EB availability             | Per [diffusion period](#diffusion-period): derived from the fundamental safety constraint. Leverages the network assumption that data known to >25% of nodes propagates fully within this time                                               |
+| <a id="l-equi" href="#l-equi"></a>Equivocation detection period length | $L_\text{equi}$  |     slot     | Duration for detecting conflicting blocks before voting begins                    | Per [equivocation detection](#equivocation-detection): must accommodate worst-case equivocation scenario. Prevents adversaries from sending different EBs to different network parts                                                             |
+| <a id="l-vote" href="#l-vote"></a>Voting period length                 | $L_\text{vote}$  |     slot     | Duration during which committee members can vote on endorser blocks               | Per [voting period](#voting-period): must accommodate EB propagation and validation time. Set to minimum value that ensures honest parties can participate in voting                                                                             |
+| <a id="l-diff" href="#l-diff"></a>Diffusion period length              | $L_\text{diff}$  |     slot     | Additional period after voting to ensure network-wide EB availability             | Per [diffusion period](#diffusion-period): derived from the fundamental safety constraint. Leverages the network assumption that data known to >25% of nodes propagates fully within this time                                                   |
 | Ranking block max size                                                 |  $S_\text{RB}$   |    bytes     | Maximum size of a ranking block                                                   | Limits RB size to ensure timely diffusion                                                                                                                                                                                                        |
 | Endorser-block referenceable transaction size                          | $S_\text{EB-tx}$ |    bytes     | Maximum total size of transactions that can be referenced by an endorser block    | Limits total transaction payload to ensure timely diffusion within stage length                                                                                                                                                                  |
 | Endorser block max size                                                |  $S_\text{EB}$   |    bytes     | Maximum size of an endorser block itself                                          | Limits EB size to ensure timely diffusion; prevents issues with many small transactions                                                                                                                                                          |
@@ -652,7 +656,7 @@ availability:
 | Maximum Plutus steps per transaction                                   |        -         |  step units  | Maximum computational steps allowed for Plutus scripts in a single transaction    | Limits computational resources per transaction to enable higher throughput                                                                                                                                                                       |
 | Maximum Plutus memory per transaction                                  |        -         | memory units | Maximum memory allowed for Plutus scripts in a single transaction                 | Limits memory resources per transaction to enable higher throughput                                                                                                                                                                              |
 
-<em>Table 2: Protocol Parameters</em>
+<em>Table 3: Protocol Parameters</em>>
 
 </div>
 
@@ -934,7 +938,7 @@ Leios introduces **five new mini-protocols** to handle the additional message
 types required for EB distribution, voting, and certificate construction.
 
 <div align="center">
-<a name="table-3" id="table-3"></a>
+<a name="table-4" id="table-4"></a>
 
 |   **Protocol**    | **Purpose**                                        | **Timing Constraint**                      |
 | :---------------: | -------------------------------------------------- | ------------------------------------------ |
@@ -944,7 +948,7 @@ types required for EB distribution, voting, and certificate construction.
 |    **EbFetch**    | Retrieve certified EBs for chain reconstruction    | On-demand after certificate inclusion      |
 |    **TxFetch**    | Retrieve referenced transactions for EB validation | Before EB validation completes             |
 
-<em>Table 3: Leios Mini-Protocols</em>
+<em>Table 4: Leios Mini-Protocols</em>>
 
 </div>
 
@@ -1257,7 +1261,7 @@ these appear in the following section on Simulation Results. Additionally,
 future implementations of Leios can be assessed in these terms.
 
 <div align="center">
-<a name="table-4" id="table-4"></a>
+<a name="table-5" id="table-5"></a>
 
 | Category   | Metric                                             | Measurement                                                                                           |
 | ---------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
@@ -1273,7 +1277,7 @@ future implementations of Leios can be assessed in these terms.
 |            | Peak CPU usage, $\hat{q}_\text{vcpu}$              | Maximum virtual CPU cores used by a node over a one-slot window                                       |
 | Resilience | Adversarial stake, $\eta_\text{adversary}(s)$      | Fractional loss in throughput due to adversial stake of $s$                                           |
 
-<em>Table 4: Performance Metrics</em>
+<em>Table 5: Performance Metrics</em>>
 
 </div>
 
@@ -1437,7 +1441,7 @@ conditions. In all cases there is little overhead, relative to the total bytes
 of transactions, in data that must be stored permanently as the ledger history.
 
 <div align="center">
-<a name="table-5" id="table-5"></a>
+<a name="table-6" id="table-6"></a>
 
 | Throughput [TxMB/s] | TPS at 1500 B/tx | Conditions      | Mempool to EB [s] | Mempool to ledger [s] | Space efficiency [%] |
 | ------------------: | ---------------: | --------------- | ----------------: | --------------------: | -------------------: |
@@ -1447,7 +1451,7 @@ of transactions, in data that must be stored permanently as the ledger history.
 |               0.250 |            166.7 | some congestion |              42.1 |                  84.3 |                94.92 |
 |               0.300 |            200.0 | much congestion |              83.5 |                 125.8 |                95.09 |
 
-<em>Table 5: Leios effficiency at different throughputs</em>
+<em>Table 6: Leios effficiency at different throughputs</em>>
 
 </div>
 
@@ -1703,12 +1707,14 @@ for further discussion.
 
 **Parameter Relationships and Network Assumptions**
 
-The key relation in the proposed protocol is between the voting
-threshold ($\tau = 75\%$) and propagation delay of EBs ($\Delta_\text{EB}$). The high
+The key relation in the proposed protocol is between the voting threshold
+($\tau = 75\%$) and propagation delay of EBs ($\Delta_\text{EB}$). The high
 voting threshold ensures that any certified EB is already known to at least 25%
 of honest nodes by the end of $L_\text{vote}$, even assuming 50% adversarial
 stake. This widespread initial knowledge enables the critical network
-assumption: an EB evidently known to >25% of the network will reach the remaining (online) honest stake within $L_\text{diff}$ and $\Delta_\text{RB}$, so to not impact blockchain safety and liveness.
+assumption: an EB evidently known to >25% of the network will reach the
+remaining (online) honest stake within $L_\text{diff}$ and $\Delta_\text{RB}$,
+so to not impact blockchain safety and liveness.
 
 **Example Parameter Calculation**
 
@@ -1717,7 +1723,8 @@ consider the following example based on simulated network measurements:
 
 **Given Network Characteristics:**
 
-- $\Delta_\text{hdr} = 1$ slot, $\Delta_\text{RB} = 5$ slots (Cardano Mainnet assumption for Praos security)
+- $\Delta_\text{hdr} = 1$ slot, $\Delta_\text{RB} = 5$ slots (Cardano Mainnet
+  assumption for Praos security)
 - $\Delta_\text{EB}^{\text{H}} = 7$ slots, $\Delta_\text{EB}^{\text{A}} = 15$
   slots (EB diffusion times)
 - $\Delta_\text{cpu} = 3$ slots, $\Delta_\text{reapply} = 1$ slot (validation
@@ -1725,10 +1732,17 @@ consider the following example based on simulated network measurements:
 
 **Timing Parameter Calibration:**
 
-- $L_\text{equi} = 3\Delta_\text{hdr} = 3 \times 1 = 3$ slots (per [equivocation detection](#equivocation-detection))
-- $L_\text{vote} = 4$ slots: Since voting begins after $L_\text{equi}$, and EB propagation can occur during equivocation detection, nodes only need 4 additional slots after $L_\text{equi}$ for validation plus margin (per [voting period](#voting-period))
-- $L_\text{diff} = 7$ slots: Using the [diffusion period](#diffusion-period) constraint with typical values gives minimum of 4 slots, we use 7 for safety margin
-- **Total certificate inclusion delay:** $L_\text{equi} + L_\text{vote} + L_\text{diff} = 3 + 4 + 7 = 14$ slots
+- $L_\text{equi} = 3\Delta_\text{hdr} = 3 \times 1 = 3$ slots (per
+  [equivocation detection](#equivocation-detection))
+- $L_\text{vote} = 4$ slots: Since voting begins after $L_\text{equi}$, and EB
+  propagation can occur during equivocation detection, nodes only need 4
+  additional slots after $L_\text{equi}$ for validation plus margin (per
+  [voting period](#voting-period))
+- $L_\text{diff} = 7$ slots: Using the [diffusion period](#diffusion-period)
+  constraint with typical values gives minimum of 4 slots, we use 7 for safety
+  margin
+- **Total certificate inclusion delay:**
+  $L_\text{equi} + L_\text{vote} + L_\text{diff} = 3 + 4 + 7 = 14$ slots
 
 **Simulation-Tested Parameters**
 
@@ -1738,26 +1752,26 @@ choice of parameters for Cardano mainnet must be subject to discussion and
 consideration of tradeoffs.
 
 <div align="center">
-<a name="table-6" id="table-6"></a>
+<a name="table-7" id="table-7"></a>
 
-| Parameter                                     |       Symbol        |   Feasible value   | Justification                                                                                                                                                                                        |
-| --------------------------------------------- | :-----------------: | :----------------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| RB header diffusion bound                     | $\Delta_\text{hdr}$ |       1 slot       | Must be faster than full RB diffusion for equivocation detection; simulations show headers reach all nodes within 1 slot due to smaller size.                                                        |
-| Equivocation detection period length          |   $L_\text{equi}$   |      3 slots       | Per [equivocation detection](#equivocation-detection): accommodates worst-case equivocation scenario with reliable detection before voting begins.                                                 |
-| Voting period length                          |   $L_\text{vote}$   |      4 slots       | Per [voting period](#voting-period): accommodates EB propagation and validation time, with equivocation detection handled separately by $L_\text{equi}$.                                          |
-| Diffusion period length                       |   $L_\text{diff}$   |      7 slots       | Per [diffusion period](#diffusion-period): minimum calculated as 4 slots with typical network values, use 7 for safety margin.                                                                     |
-| Endorser-block referenceable transaction size |  $S_\text{EB-tx}$   |       12 MB        | Simulations indicate that 200 kB/s throughput is feasible at this block size.                                                                                                                        |
-| Endorser block max size                       |    $S_\text{EB}$    |       512 kB       | Endorser blocks must be small enough to diffuse and be validated within the voting period $L_\text{vote}$.                                                                                           |
-| Maximum Plutus steps per endorser block       |          -          |  2000G step units  | Simulations at high transaction-validation CPU usage.                                                                                                                                                |
-| Maximum Plutus memory per endorser block      |          -          | 7000M memory units | Simulations at high transaction-validation CPU usage.                                                                                                                                                |
-| Maximum Plutus steps per transaction          |          -          |  100G step units   | Raise per-transaction limit by a factor of twenty relative to Praos.                                                                                                                                 |
-| Maximum Plutus memory per transaction         |          -          | 350M memory units  | Raise per-transaction limit by a factor of twenty relative to Praos.                                                                                                                                 |
-| Ranking block max size                        |    $S_\text{RB}$    |    90,112 bytes    | This is the current value on the Cardano mainnet.                                                                                                                                                    |
-| Praos active slot coefficient                 |    $f_\text{RB}$    |     0.05 /slot     | This is the current value on the Cardano mainnet.                                                                                                                                                    |
-| Mean committee size                           |         $n$         |   600 stakepools   | Modeling of the proposed certificate scheme indicates that certificates reach their minimum size of ~8 kB at this committee size, given a realistic distribution of stake among pools.               |
-| Quorum size                                   |       $\tau$        |        75%         | High threshold ensures certified EBs are known to >25% of honest nodes even with 50% adversarial stake. This enables the network assumption for safe diffusion within L_diff.                        |
+| Parameter                                     |       Symbol        |   Feasible value   | Justification                                                                                                                                                                          |
+| --------------------------------------------- | :-----------------: | :----------------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RB header diffusion bound                     | $\Delta_\text{hdr}$ |       1 slot       | Must be faster than full RB diffusion for equivocation detection; simulations show headers reach all nodes within 1 slot due to smaller size.                                          |
+| Equivocation detection period length          |   $L_\text{equi}$   |      3 slots       | Per [equivocation detection](#equivocation-detection): accommodates worst-case equivocation scenario with reliable detection before voting begins.                                     |
+| Voting period length                          |   $L_\text{vote}$   |      4 slots       | Per [voting period](#voting-period): accommodates EB propagation and validation time, with equivocation detection handled separately by $L_\text{equi}$.                               |
+| Diffusion period length                       |   $L_\text{diff}$   |      7 slots       | Per [diffusion period](#diffusion-period): minimum calculated as 4 slots with typical network values, use 7 for safety margin.                                                         |
+| Endorser-block referenceable transaction size |  $S_\text{EB-tx}$   |       12 MB        | Simulations indicate that 200 kB/s throughput is feasible at this block size.                                                                                                          |
+| Endorser block max size                       |    $S_\text{EB}$    |       512 kB       | Endorser blocks must be small enough to diffuse and be validated within the voting period $L_\text{vote}$.                                                                             |
+| Maximum Plutus steps per endorser block       |          -          |  2000G step units  | Simulations at high transaction-validation CPU usage.                                                                                                                                  |
+| Maximum Plutus memory per endorser block      |          -          | 7000M memory units | Simulations at high transaction-validation CPU usage.                                                                                                                                  |
+| Maximum Plutus steps per transaction          |          -          |  100G step units   | Raise per-transaction limit by a factor of twenty relative to Praos.                                                                                                                   |
+| Maximum Plutus memory per transaction         |          -          | 350M memory units  | Raise per-transaction limit by a factor of twenty relative to Praos.                                                                                                                   |
+| Ranking block max size                        |    $S_\text{RB}$    |    90,112 bytes    | This is the current value on the Cardano mainnet.                                                                                                                                      |
+| Praos active slot coefficient                 |    $f_\text{RB}$    |     0.05 /slot     | This is the current value on the Cardano mainnet.                                                                                                                                      |
+| Mean committee size                           |         $n$         |   600 stakepools   | Modeling of the proposed certificate scheme indicates that certificates reach their minimum size of ~8 kB at this committee size, given a realistic distribution of stake among pools. |
+| Quorum size                                   |       $\tau$        |        75%         | High threshold ensures certified EBs are known to >25% of honest nodes even with 50% adversarial stake. This enables the network assumption for safe diffusion within L_diff.          |
 
-<em>Table 6: Feasible Protocol Parameters</em>
+<em>Table 7: Feasible Protocol Parameters</em>>
 
 </div>
 
@@ -1838,7 +1852,7 @@ pricing of ten common hyperscale and discount cloud providers. The cost of a
 increase each month as the ledger becomes larger.
 
 <div align="center">
-<a name="table-7" id="table-7"></a>
+<a name="table-8" id="table-8"></a>
 
 | Throughput | Average-size transactions | Small transactions | Per-node operation |   Per-node storage | 10k-node network<br/>(first year) | 10k-node network<br/>(first year) |
 | ---------: | ------------------------: | -----------------: | -----------------: | -----------------: | --------------------------------: | --------------------------------: |
@@ -1848,7 +1862,7 @@ increase each month as the ledger becomes larger.
 | 250 TxkB/s |                  167 Tx/s |           833 Tx/s |      $132.73/month | $44.76/month/month |                            $18.6M |                       $255k/epoch |
 | 300 TxkB/s |                  200 Tx/s |          1000 Tx/s |      $139.09/month | $53.34/month/month |                            $19.9M |                       $272k/epoch |
 
-<em>Table 7: Operating Costs by Transaction Throughput</em>
+<em>Table 8: Operating Costs by Transaction Throughput</em>>
 
 </div>
 
@@ -1860,7 +1874,7 @@ split, fives times as much fee would have to be collected compared to what is
 listed in the table.
 
 <div align="center">
-<a name="table-8" id="table-8"></a>
+<a name="table-9" id="table-9"></a>
 
 | Infrastructure cost | Required ada<br/>@ $0.45/ADA | Required transactions<br/>(average size)<br/>@ $0.45/ADA | Required transactions<br/>(small size)<br/>@ $0.45/ADA |
 | ------------------: | ---------------------------: | -------------------------------------------------------: | -----------------------------------------------------: |
@@ -1870,7 +1884,7 @@ listed in the table.
 |         $18.6M/year |               566k ADA/epoch |                                                6.04 Tx/s |                                              7.88 Tx/s |
 |         $19.9M/year |               605k ADA/epoch |                                                6.45 Tx/s |                                              8.42 Tx/s |
 
-<em>Table 8: Required TPS for Infrastructure Cost Coverage</em>
+<em>Table 9: Required TPS for Infrastructure Cost Coverage</em>>
 
 </div>
 
@@ -1878,7 +1892,7 @@ _Required TPS for Current Reward Maintenance:_ To maintain current reward levels
 (~48 million ADA monthly) through transaction fees as the Reserve depletes.
 
 <div align="center">
-<a name="table-3" id="table-3"></a>
+<a name="table-4" id="table-4"></a>
 
 | Year | Reserve Depletion | Rewards from Fees (ADA) | Required TPS (Average size) | Required Throughput |
 | ---: | ----------------: | ----------------------: | --------------------------: | ------------------: |
@@ -1889,7 +1903,7 @@ _Required TPS for Current Reward Maintenance:_ To maintain current reward levels
 | 2029 |              ~43% |              20,640,000 |                        36.1 |           51 TxkB/s |
 | 2030 |              ~50% |              24,000,000 |                        41.9 |           59 TxkB/s |
 
-<em>Table 9: Required TPS for Current Reward Maintenance</em>
+<em>Table 10: Required TPS for Current Reward Maintenance</em>
 
 </div>
  
