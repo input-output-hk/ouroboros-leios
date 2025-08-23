@@ -2323,52 +2323,19 @@ potential.
 Furthermore, most aspects build incrementally upon the base protocol and may
 form a roadmap of next steps.
 
-**Increase praos parameters**
+**Increase Praos Parameters**
 
-> [!WARNING]
->
-> - Bigger blocks and/or higher active slot coefficient
-> - ΔQ analysis and simulations confirm there is some room to improve
->   - Analysis of 50 tx/s and 100 tx/s (84 TxkB/s and 172 TxkB/s respectively):
->     https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w26/analysis-praos.ipynb
-> - As alternative: The 50 tx/s case would be enough for economically
->   sustainable throughput, but RB diffusion dangerously close at Δ assumption
->   and leading to increased amount of forks in the network
->   - Link Brian's slides of more forks too?
->   - The change alone does not give more room to grow
-> - As extension: Instead of bigger blocks, more frequent blocks could enhance
->   Leios variants leading to more frequent certifications and lower inclusion
->   latency (but tighter requirements on EB diffusion)
+Enhancing Praos parameters through bigger blocks and higher active slot coefficients offers a direct pathway to improved throughput. $\Delta$Q analysis and simulations confirm there is room for improvement, with analysis of 50 Tx/s and 100 Tx/s scenarios (84 TxkB/s and 172 TxkB/s respectively) demonstrating feasibility within current network constraints ([analysis details](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w26/analysis-praos.ipynb)). The 50 Tx/s case would provide economically sustainable throughput, though RB diffusion approaches the $\Delta$ assumption limits and leads to increased network forks. While this change alone does not provide significant room for future growth, it establishes a foundation for further enhancements.
+
+As an extension, more frequent blocks rather than larger blocks could enhance Leios variants by enabling more frequent certifications and lower inclusion latency. This approach requires tighter constraints on EB diffusion but provides better user experience through reduced transaction confirmation times.
 
 **Relax EB diffusion constraints**
 
-> [!CAUTION]
->
-> Assumes that we already updated the specification back to L_diff
+The current design requires [$\Delta_\text{EB}^{\text{A}}$](#delta-eb-A) (worst case) to be fairly small to enable selection of reasonable $L_\text{diff}$ values that ensure certified EBs don't impact Praos safety while maintaining frequent enough certification for high throughput. Should worst-case EB diffusion prove much larger than average or honest cases, introducing an additional recovery period $L_{recover}$ after certificate inclusion could allow EBs to remain unavailable for extended periods.
 
-> [!WARNING]
->
-> - Current design requires Δ_EB (worst case) to be fairly small, so that we can
->   pick a reasonable L_diff that ensures certified EBs don't impact praos
->   safety, but also see EBs certified and included often enough to have
->   high-throughput
-> - Should the worst case diffusion of EBs turn out to be much larger than the
->   average case (or honest), we can introduce another period after certificate
->   inclusion which allows EBs to be not available: L_recover
-> - Provides more freedom in picking L_diff, up to setting it to 0
-> - Security argument must consider that not all nodes can validate blocks
->   within L_recover
-> - To not impact praos safety or liveness, this implies relaxed chain validity
->   rules where for example "potentially invalid transactions" would be allowed
->   in ranking blocks
-> - Increases optimism of protocol design; allows more throughput, at the cost
->   of protocol complexity and downstream impact of a change in chain validity
-> - Especially light node use cases would be impacted as a full ledger would be
->   required to determine whether transactions in blocks are valid or not during
->   L_recover
-> - Corrections (lists of invalid transactions in past blocks) in the next
->   certified EB or any ranking block within L_recover could mitigate this at
->   the cost of even more protocol complexity
+This approach provides greater freedom in selecting $L_\text{diff}$ parameters, potentially allowing values as low as zero. However, the security argument must account for nodes being unable to validate blocks within $L_{recover}$ periods. To preserve Praos safety and liveness, this requires relaxed chain validity rules where potentially invalid transactions could be permitted in ranking blocks during recovery periods.
+
+The increased protocol optimism enables higher throughput at the cost of significant complexity and downstream impacts on chain validity semantics. Light node use cases would be particularly affected, requiring full ledger state to determine transaction validity during $L_{recover}$ periods. Correction mechanisms through invalid transaction lists in subsequent certified EBs or ranking blocks could mitigate these issues, though at the expense of additional protocol complexity.
 
 **Transaction Groups**
 
