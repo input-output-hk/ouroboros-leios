@@ -1717,12 +1717,12 @@ two dedicated relays. Furthermore, the topology incorporates realistic latencies
 based on the RIPE Atlas[^ripe] ping dataset and bandwidth that aligns with the
 lower end of what is typically found in cloud data centers. The node
 connectivity and geographic distribution (across various countries and
-autonomous systems) are also consistent with measurements provided by the
-Cardano Foundation.[^cf] A simulation study [^mncp] has demonstrated that
-analysis conclusions deriving from the `mini-mainnet` topology are also valid
-for the `pseudo-mainnet` topology; the advantage of using the former is that
-simulations run much more quickly. Simulated RB diffusion is consistent with the
-Praos performance model.[^praosp]
+autonomous systems) are also consistent with real-world measurements. A
+simulation study [^mncp] has demonstrated that analysis conclusions deriving
+from the `mini-mainnet` topology are also valid for the `pseudo-mainnet`
+topology; the advantage of using the former is that simulations run much more
+quickly. Simulated RB diffusion is consistent with the Praos performance
+model.[^praosp]
 
 [^mnrm]:
     [Mainnet-like topologies for Leios](https://github.com/input-output-hk/ouroboros-leios/blob/6d8619c53cc619a25b52eac184e7f1ff3c31b597/data/simulation/pseudo-mainnet/ReadMe.md)
@@ -1734,8 +1734,6 @@ Praos performance model.[^praosp]
     [Leios mini-mainnet topology](https://github.com/input-output-hk/ouroboros-leios/blob/6d8619c53cc619a25b52eac184e7f1ff3c31b597/data/simulation/pseudo-mainnet/topology-v2.md)
 
 [^ripe]: [RIPE Atlas](https://atlas.ripe.net/)
-
-[^cf]: [Cardano Foundation](https://cardanofoundation.org/)
 
 [^mncp]:
     https://github.com/input-output-hk/ouroboros-leios/blob/6d8619c53cc619a25b52eac184e7f1ff3c31b597/analysis/sims/2025w30b/analysis.ipynb
@@ -2535,7 +2533,6 @@ documentation_
 **External**
 
 - **RIPE Atlas** - [Network measurements][ripe-atlas]
-- **Cardano Foundation** - [Official site][cardano-foundation]
 
 <!-- Reference Index - DO NOT REMOVE -->
 <!-- The following reference definitions enable consistent linking throughout the document -->
@@ -2616,7 +2613,6 @@ documentation_
 <!-- External resources -->
 
 [ripe-atlas]: https://atlas.ripe.net/ "RIPE Atlas"
-[cardano-foundation]: https://cardanofoundation.org/ "Cardano Foundation"
 
 <!-- License -->
 
