@@ -119,64 +119,7 @@ with open(sys.argv[1], 'w') as f:
     f.write(content)
 EOF
 
-# 3. Fix figure and table enumeration
-echo "  ├─ Fixing figure and table enumeration..."
-
-python3 - "$TARGET_FILE" << 'EOF'
-import sys
-import re
-
-def fix_enumeration(content, item_type):
-    """Fix enumeration by renumbering items consecutively"""
-    # Find all items in captions (inside <em> tags)
-    pattern = rf'<em>({item_type} )(\d+)(: [^<]+)</em>'
-    matches = list(re.finditer(pattern, content))
-    
-    if not matches:
-        return content
-    
-    # Create mapping from old numbers to new numbers
-    old_to_new = {}
-    for i, match in enumerate(matches):
-        old_num = int(match.group(2))
-        new_num = i + 1
-        old_to_new[old_num] = new_num
-    
-    # Replace in reverse order to avoid position shifts
-    for match in reversed(matches):
-        old_num = int(match.group(2))
-        new_num = old_to_new[old_num]
-        
-        # Replace the number in the caption
-        start, end = match.span()
-        new_text = f"<em>{match.group(1)}{new_num}{match.group(3)}</em>"
-        content = content[:start] + new_text + content[end:]
-        
-        # Also update anchor references in TOC and links
-        old_anchor = f"{item_type.lower()}-{old_num}"
-        new_anchor = f"{item_type.lower()}-{new_num}"
-        content = content.replace(f"#{old_anchor}", f"#{new_anchor}")
-        content = content.replace(f'name="{old_anchor}"', f'name="{new_anchor}"')
-        content = content.replace(f'id="{old_anchor}"', f'id="{new_anchor}"')
-    
-    return content
-
-# Read the file
-with open(sys.argv[1], 'r') as f:
-    content = f.read()
-
-# Fix figure enumeration
-content = fix_enumeration(content, 'Figure')
-
-# Fix table enumeration  
-content = fix_enumeration(content, 'Table')
-
-# Write back
-with open(sys.argv[1], 'w') as f:
-    f.write(content)
-EOF
-
-# 4. Generate table of figures and tables
+# 3. Generate table of figures and tables
 echo "  ├─ Generating table of figures and tables..."
 
 python3 - "$TARGET_FILE" << 'EOF'

@@ -193,7 +193,9 @@ vary considerably.
   <img src="images/reward-forecast-bau.svg" alt="Forecast of rewards on Cardano mainnet">
 </p>
 
-<em>Fig<em>Figure 1: Forecast of rewards on Cardano mainnet</em>>
+<em>Figure 1: Forecast of rewards on Cardano mainnet</em>
+
+</div>
 
 Ouroboros Praos cannot support the high transaction volume needed to generate
 the fees that will eventually be needed to offset the diminishing rewards.
@@ -207,8 +209,10 @@ augmenting the Treasury, and increasing SPO and delegator rewards.
   <img src="images/spo-profitability.svg" alt="SPO profitability under Praos, as a function of transaction volume">
 </p>
 
-<em>Fig<em>Figure 2: SPO profitability under Praos, as a function of transaction
-volume</em>>
+<em>Figure 2: SPO profitability under Praos, as a function of transaction
+volume</em>
+
+</div>
 
 The Leios protocol specified in this document represents a balance between
 immediate scalability needs and long-term protocol evolution. The approach
@@ -234,8 +238,10 @@ blocks are validated and included in the chain.
     <img src="images/protocol-overview.svg" alt="Leios Chain Structure">
   </p>
 
-<em>Fig<em>Figure 3: Leios chain structure showing the relationship between
-Ranking Blocks, Endorser Blocks, and Certificates</em>>
+<em>Figure 3: Leios chain structure showing the relationship between Ranking
+Blocks, Endorser Blocks, and Certificates</em>
+
+</div>
 
 Notice the timing constraint visible in Figure 3: some EBs get certified and are
 included in the chain (green), while others cannot be certified in time (gray).
@@ -259,8 +265,10 @@ characteristics that inform their design.
     <img src="images/protocol-flow.svg" alt="Leios Protocol Flow">
   </p>
 
-<em>Fig<em>Figure 4: Detailed timing mechanism showing the three critical phases
-for EB certification</em>>
+<em>Figure 4: Detailed timing mechanism showing the three critical phases for EB
+certification</em>
+
+</div>
 
 #### Step 1: Block Production
 
@@ -634,7 +642,9 @@ availability:
 | <a id="delta-eb-H" href="#delta-eb-H"></a>EB honest diffusion      | $\Delta_\text{EB}^{\text{H}}$ | EB propagation time when released on schedule with no fresher EB         |          7-10 slots           |
 | <a id="delta-eb-A" href="#delta-eb-A"></a>EB adversarial diffusion | $\Delta_\text{EB}^{\text{A}}$ | EB propagation time starting from >25% network coverage after voting     |          15-20 slots          |
 
-<em>Table 1: Network Characteristics</em>>
+<em>Table 1: Network Characteristics</em>
+
+</div>
 
 </div>
 
@@ -647,7 +657,9 @@ availability:
 | <a id="delta-reapply" href="#delta-reapply"></a>EB reapplication | $\Delta_\text{reapply}$ | Certified EB reapplication with minimal checks and UTxO updates     |            <1 slot            |
 | <a id="delta-tx" href="#delta-tx"></a>Transaction validation     |   $\Delta_\text{TX}$    | Standard Praos transaction validation time for RB processing        |            ~1 slot            |
 
-<em>Table 2: Ledger Characteristics</em>>
+<em>Table 2: Ledger Characteristics</em>
+
+</div>
 
 </div>
 
@@ -705,8 +717,9 @@ specific behaviors that nodes must implement.
   <img src="images/node-behavior-sequence.svg" alt="Node Behavior Sequence">
 </p>
 
-<em>Fig<em>Figure 5: Up- and downstream interactions of a node
-(simplified)</em>>
+<em>Figure 5: Up- and downstream interactions of a node (simplified)</em>
+
+</div>
 
 The diagram above illustrates the Leios protocol in a simplified sequential
 order. In practice, these operations occur concurrently and the actual execution
@@ -1500,9 +1513,11 @@ economic sustainability.
   <img src="images/leios-forecast-sqrt-fill.svg" alt="SPO profitability forecast under Leios">
 </p>
 
-<em>Fig<em>Figure 6: SPO profitability forecast under Leios showing clear
-economic benefits once sustained throughput exceeds 50-70 TxkB/s (36-50 TPS
-equivalent)</em>>
+<em>Figure 6: SPO profitability forecast under Leios showing clear economic
+benefits once sustained throughput exceeds 50-70 TxkB/s (36-50 TPS
+equivalent)</em>
+
+</div>
 
 Achieving this capacity increase requires trade-offs, as detailed below.
 
@@ -1806,14 +1821,14 @@ the throughput approaches the capacity.
 
 ![Time for transaction to reach the ledger](images/reach-rb-tx.svg)
 
-<em>Fig<em>Figure 7: Time for transaction to reach the ledger</em>>
+<em>Figure 7: Time for transaction to reach the ledger</em>
 
 <div align="center">
 <a name="figure-6" id="figure-6"></a>
 
 ![Transactions reaching the ledger](images/temporal-efficiency-bar.svg)
 
-<em>Fig<em>Figure 8: Transactions reaching the ledger</em>>
+<em>Figure 8: Transactions reaching the ledger</em>
 
 The effect of EBs being discarded when RBs are too close together is evidenced
 in the following plot. A transaction referenced only once by an EB is one that
