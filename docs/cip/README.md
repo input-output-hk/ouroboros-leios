@@ -223,7 +223,7 @@ the foundation for subsequent protocol versions with higher throughput capacity.
 Ouroboros Leios achieves higher transaction throughput by allowing block
 producers to create additional blocks alongside the regular Praos chain. These
 supplementary blocks, called **Endorser Blocks (EBs)**, reference extra
-transactions that would otherwise wait for future slots. To ensure safety, these
+transactions that would otherwise wait for ranking blocks in future active slots. To ensure safety, these
 blocks undergo committee validation before their transactions become part of the
 permanent ledger.
 
@@ -627,9 +627,9 @@ availability:
 
 | Parameter                                                              |      Symbol      |    Units     | Description                                                                       | Rationale                                                                                                                                                                                                                                        |
 | ---------------------------------------------------------------------- | :--------------: | :----------: | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| <a id="l-equi" href="#l-equi"></a>Equivocation detection period length | $L_\text{equi}$  |     slot     | Duration for detecting conflicting blocks before voting begins                    | Must accommodate worst-case equivocation scenario: first header propagation, conflicting header propagation, and equivocation proof propagation. Prevents adversaries from sending different EBs to different network parts                      |
-| <a id="l-vote" href="#l-vote"></a>Voting period length                 | $L_\text{vote}$  |     slot     | Duration during which committee members can vote on endorser blocks               | Must accommodate EB propagation and validation time. Set to minimum value that ensures honest parties can participate in voting                                                                                                                  |
-| <a id="l-diff" href="#l-diff"></a>Diffusion period length              | $L_\text{diff}$  |     slot     | Additional period after voting to ensure network-wide EB availability             | Derived from the fundamental safety constraint. Leverages the network assumption that data known to >25% of nodes (from voting threshold) propagates fully within this time                                                                      |
+| <a id="l-equi" href="#l-equi"></a>Equivocation detection period length | $L_\text{equi}$  |     slot     | Duration for detecting conflicting blocks before voting begins                    | Per [equivocation detection](#equivocation-detection): must accommodate worst-case equivocation scenario. Prevents adversaries from sending different EBs to different network parts                                                           |
+| <a id="l-vote" href="#l-vote"></a>Voting period length                 | $L_\text{vote}$  |     slot     | Duration during which committee members can vote on endorser blocks               | Per [voting period](#voting-period): must accommodate EB propagation and validation time. Set to minimum value that ensures honest parties can participate in voting                                                                            |
+| <a id="l-diff" href="#l-diff"></a>Diffusion period length              | $L_\text{diff}$  |     slot     | Additional period after voting to ensure network-wide EB availability             | Per [diffusion period](#diffusion-period): derived from the fundamental safety constraint. Leverages the network assumption that data known to >25% of nodes propagates fully within this time                                               |
 | Ranking block max size                                                 |  $S_\text{RB}$   |    bytes     | Maximum size of a ranking block                                                   | Limits RB size to ensure timely diffusion                                                                                                                                                                                                        |
 | Endorser-block referenceable transaction size                          | $S_\text{EB-tx}$ |    bytes     | Maximum total size of transactions that can be referenced by an endorser block    | Limits total transaction payload to ensure timely diffusion within stage length                                                                                                                                                                  |
 | Endorser block max size                                                |  $S_\text{EB}$   |    bytes     | Maximum size of an endorser block itself                                          | Limits EB size to ensure timely diffusion; prevents issues with many small transactions                                                                                                                                                          |
@@ -1714,14 +1714,10 @@ consider the following example based on simulated network measurements:
 
 **Timing Parameter Calibration:**
 
-- $L_\text{equi} = 3\Delta_\text{hdr} = 3 \times 1 = 3$ slots (ensures reliable
-  equivocation detection)
-- $L_\text{vote} = 4$ slots: Since voting begins after $L_\text{equi}$, and EB propagation ($\Delta_\text{EB}^{\text{H}} = 7$ slots) can occur during equivocation detection, nodes only need 4 additional slots after $L_\text{equi}$ for validation ($\Delta_\text{cpu} = 3$ slots) plus margin
-- $L_\text{diff} \geq \Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply} - \Delta_\text{RB} - L_\text{equi} - L_\text{vote} = 15 + 1 - 5 - 3 - 4 = 4$
-  slots (minimum)
-- For additional safety margin we use $L_\text{diff} = 7$ slots
-- **Total certificate inclusion delay:**
-  $L_\text{equi} + L_\text{vote} + L_\text{diff} = 3 + 4 + 7 = 14$ slots
+- $L_\text{equi} = 3\Delta_\text{hdr} = 3 \times 1 = 3$ slots (per [equivocation detection](#equivocation-detection))
+- $L_\text{vote} = 4$ slots: Since voting begins after $L_\text{equi}$, and EB propagation can occur during equivocation detection, nodes only need 4 additional slots after $L_\text{equi}$ for validation plus margin (per [voting period](#voting-period))
+- $L_\text{diff} = 7$ slots: Using the [diffusion period](#diffusion-period) constraint with typical values gives minimum of 4 slots, we use 7 for safety margin
+- **Total certificate inclusion delay:** $L_\text{equi} + L_\text{vote} + L_\text{diff} = 3 + 4 + 7 = 14$ slots
 
 **Simulation-Tested Parameters**
 
@@ -1736,9 +1732,9 @@ consideration of tradeoffs.
 | Parameter                                     |       Symbol        |   Feasible value   | Justification                                                                                                                                                                                        |
 | --------------------------------------------- | :-----------------: | :----------------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | RB header diffusion bound                     | $\Delta_\text{hdr}$ |       1 slot       | Must be faster than full RB diffusion for equivocation detection; simulations show headers reach all nodes within 1 slot due to smaller size.                                                        |
-| Equivocation detection period length          |   $L_\text{equi}$   |      3 slots       | Set to $3\Delta_\text{hdr}$ to accommodate worst-case equivocation scenario; ensures reliable detection before voting begins.                                                                        |
-| Voting period length                          |   $L_\text{vote}$   |      4 slots       | Must accommodate EB propagation and validation time after equivocation detection ($\Delta_\text{EB}^{\text{H}} + \Delta_\text{cpu} - L_\text{equi} = 7 + 3 - 3 = 7$ slots from EB slot, but only 4 slots after $L_\text{equi}$). |
-| Diffusion period length                       |   $L_\text{diff}$   |      7 slots       | Calculated as $\Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply} - \Delta_\text{RB} - L_\text{equi} - L_\text{vote}$. With typical values: 15 + 1 - 5 - 3 - 4 = 4 (min), use 7 for safety margin  |
+| Equivocation detection period length          |   $L_\text{equi}$   |      3 slots       | Per [equivocation detection](#equivocation-detection): accommodates worst-case equivocation scenario with reliable detection before voting begins.                                                 |
+| Voting period length                          |   $L_\text{vote}$   |      4 slots       | Per [voting period](#voting-period): accommodates EB propagation and validation time, with equivocation detection handled separately by $L_\text{equi}$.                                          |
+| Diffusion period length                       |   $L_\text{diff}$   |      7 slots       | Per [diffusion period](#diffusion-period): minimum calculated as 4 slots with typical network values, use 7 for safety margin.                                                                     |
 | Endorser-block referenceable transaction size |  $S_\text{EB-tx}$   |       12 MB        | Simulations indicate that 200 kB/s throughput is feasible at this block size.                                                                                                                        |
 | Endorser block max size                       |    $S_\text{EB}$    |       512 kB       | Endorser blocks must be small enough to diffuse and be validated within the voting period $L_\text{vote}$.                                                                                           |
 | Maximum Plutus steps per endorser block       |          -          |  2000G step units  | Simulations at high transaction-validation CPU usage.                                                                                                                                                |
