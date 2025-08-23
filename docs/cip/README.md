@@ -315,15 +315,15 @@ EB, it explicitly requests that transaction from peers.
 
 A voting committee of stake pools validates the EB. As depicted in Figure 4,
 votes are collected during the $L_\text{vote}$ period following the EB
-announcement, with voting beginning $3\Delta_\text{hdr}$ slots after the slot of
+announcement, with voting beginning $L_\text{equi}$ slots after the slot of
 the RB that announced the EB to ensure sufficient time for
 <a href="#equivocation">equivocation detection</a>. Committee members are
 [selected via sortition](#committee-structure) based on the slot number of the
 RB that announced the EB. A committee member votes for an EB only if:
 
-1. The RB header arrived within $\Delta_\text{hdr}$,
+1. The RB header arrived within <a href="#delta-hdr">$\Delta_\text{hdr}$</a>,
 2. It has **not** received an equivocating RB header for this EB within
-   $L_\text{equi}$ slots,
+   <a href="#l-equi">$L_\text{equi}$</a> slots,
 3. It has received the EB within $L_\text{vote}$ slots from the start of the
    EB's slot,
 4. The EB is the one announced by the latest RB in the voter's current chain,
@@ -331,7 +331,7 @@ RB that announced the EB. A committee member votes for an EB only if:
 6. For non-persistent voters, it is eligible to vote based on sortition using
    the announcing RB's slot number as the election identifier.
 
-where $L_\text{vote}$ and $\Delta_\text{hdr}$ are
+where <a href="#l-equi">$L_\text{equi}$</a>, <a href="#l-vote">$L_\text{vote}$</a> and <a href="#delta-hdr">$\Delta_\text{hdr}$</a> are
 <a href="#protocol-parameters">protocol parameters</a> represented by a number
 of slots.
 
@@ -398,12 +398,12 @@ availability:
 
 | Characteristic          |             Symbol              | Description                                                          | Observed Range |
 | ----------------------- | :-----------------------------: | -------------------------------------------------------------------- | :------------: |
-| RB header propagation   |       $\Delta_\text{hdr}$       | Time for RB headers to propagate network-wide (headers are small)    |    <1 slot     |
-| RB diffusion            |       $\Delta_\text{RB}$        | Complete ranking block propagation and adoption time                 |    ~5 slots    |
-| EB optimal diffusion    | $\Delta_\text{EB}^{\text{opt}}$ | EB propagation time when released on schedule with no fresher EB     |   7-10 slots   |
-| EB worst-case diffusion | $\Delta_\text{EB}^{\text{wc}}$  | EB propagation time starting from >25% network coverage after voting |  15-20 slots   |
-| EB validation           |       $\Delta_\text{cpu}$       | Full EB validation including signatures, scripts, and state updates  |   2-4 slots    |
-| EB reapplication        |     $\Delta_\text{reapply}$     | Certified EB reapplication with minimal checks and UTxO updates      |    <1 slot     |
+| <a id="delta-hdr" href="#delta-hdr"></a>RB header propagation   |       $\Delta_\text{hdr}$       | Time for RB headers to propagate network-wide (headers are small)    |    <1 slot     |
+| <a id="delta-rb" href="#delta-rb"></a>RB diffusion            |       $\Delta_\text{RB}$        | Complete ranking block propagation and adoption time                 |    ~5 slots    |
+| <a id="delta-eb-H" href="#delta-eb-H"></a>EB honest diffusion    | $\Delta_\text{EB}^{\text{H}}$ | EB propagation time when released on schedule with no fresher EB     |   7-10 slots   |
+| <a id="delta-eb-A" href="#delta-eb-A"></a>EB adversarial diffusion | $\Delta_\text{EB}^{\text{A}}$  | EB propagation time starting from >25% network coverage after voting |  15-20 slots   |
+| <a id="delta-cpu" href="#delta-cpu"></a>EB validation           |       $\Delta_\text{cpu}$       | Full EB validation including signatures, scripts, and state updates  |   2-4 slots    |
+| <a id="delta-reapply" href="#delta-reapply"></a>EB reapplication        |     $\Delta_\text{reapply}$     | Certified EB reapplication with minimal checks and UTxO updates      |    <1 slot     |
 
 <em>Table 1: Network Characteristics</em>
 
@@ -416,27 +416,29 @@ phases that ensure network-wide EB availability:
 
 <a id="equivocation-detection"></a>
 
-**Phase 1: Equivocation Detection ($3\Delta_\text{hdr}$)**  
-This phase occurs at the beginning of $L_\text{vote}$ when an RB announces an
-EB. During these initial slots of the voting period, the network detects any
-attempts by adversaries to create multiple conflicting blocks for the same slot.
-The factor of 3 accounts for the worst-case equivocation scenario:
+**Phase 1: Equivocation Detection ($L_\text{equi}$)**  
+This phase occurs immediately when an RB announces an EB. During this period,
+the network detects any attempts by adversaries to create multiple conflicting
+blocks for the same slot. The equivocation detection period must accommodate the
+worst-case equivocation scenario:
 
-- $\Delta_\text{hdr}$: First header propagation
-- $\Delta_\text{hdr}$: Conflicting header propagation
-- $\Delta_\text{hdr}$: Equivocation proof propagation
+1. [$\Delta_\text{hdr}$](#delta-hdr): First header propagation
+2. [$\Delta_\text{hdr}$](#delta-hdr): Conflicting header propagation  
+3. [$\Delta_\text{hdr}$](#delta-hdr): Equivocation proof propagation
 
-This prevents adversaries from sending different EBs to different parts of the
+Therefore, $L_\text{equi} \geq 3\Delta_\text{hdr}$ to ensure reliable detection (where [$L_\text{equi}$](#l-equi) and [$\Delta_\text{hdr}$](#delta-hdr) are defined in the protocol parameters).
+This prevents adversaries from sending different EBs to different network parts of the
 network, as honest nodes will refuse to vote if they detect equivocation. Voting
 cannot begin until this phase completes.
 
 <a id="voting-period"></a>
 
 **Phase 2: Voting Period ($L_\text{vote}$)**  
-Voting begins after equivocation detection completes. The voting period must
-accommodate both EB propagation and validation:
+Voting begins after the equivocation detection period $L_\text{equi}$ completes.
+The voting period must accommodate both EB propagation and validation:
 
-$$L_\text{vote} > \underbrace{\Delta_\text{EB}^{\text{opt}}}_{\text{EB propagation}} + \underbrace{\Delta_\text{cpu}}_{\text{validation time}}$$
+$$L_\text{vote} > \Delta_\text{EB}^{\text{H}} + \Delta_\text{cpu}$$
+honest EB propagation time), and [$\Delta_\text{cpu}$](#delta-cpu) (validation time) are defined in the [network characteristics and protocol parameters](#network-characteristics).
 
 This ensures all honest committee members can participate by having sufficient
 time to:
@@ -459,7 +461,12 @@ this time.
 The critical timing constraint that preserves Praos security relates the total
 time available for EB processing to the actual time required:
 
-$$\underbrace{L_\text{vote} + L_\text{diff}}_{\text{time for EB processing}} + \underbrace{\Delta_\text{RB}}_{\text{RB' propagation}} > \underbrace{\Delta_\text{EB}^{\text{wc}} + \Delta_\text{reapply}}_{\text{time to receive and reapply EB}}$$
+$$(L_\text{equi} + L_\text{vote} + L_\text{diff}) + \Delta_\text{RB} > \Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply}$$
+
+where:
+- $(L_\text{equi} + L_\text{vote} + L_\text{diff})$ represents the total time for EB processing
+- $\Delta_\text{RB}$ represents RB' propagation time  
+- $\Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply}$ represents the time to receive and reapply EB
 
 This ensures that by the time an `RB'` containing a certificate propagates
 through the network, all honest parties will have received and applied the
@@ -467,23 +474,24 @@ certified EB to their state. The following constraint ensures that certified EBs
 reach all honest parties before they need to process RBs containing their
 certificates:
 
-$$L_\text{vote} + L_\text{diff} + \Delta_\text{RB} > \Delta_\text{EB}^{\text{wc}} + \Delta_\text{reapply}$$
+$$L_\text{equi} + L_\text{vote} + L_\text{diff} + \Delta_\text{RB} > \Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply}$$
 
 This can be rearranged to derive the minimum diffusion period:
-$$L_\text{diff} \geq \Delta_\text{EB}^{\text{wc}} + \Delta_\text{reapply} - \Delta_\text{RB} - L_\text{vote}$$
+$$L_\text{diff} \geq \Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply} - \Delta_\text{RB} - L_\text{equi} - L_\text{vote}$$
 
 The timing parameters are set to minimize certificate inclusion delay while
 satisfying safety constraints:
 
-- $L_\text{vote} \approx \Delta_\text{EB}^{\text{opt}} + \Delta_\text{cpu}$
+- $L_\text{equi} \geq 3\Delta_\text{hdr}$ (ensures reliable equivocation detection)
+- $L_\text{vote} \approx \Delta_\text{EB}^{\text{H}} + \Delta_\text{cpu}$
   (ensures honest parties can receive and validate EBs)
-- $L_\text{diff} \approx \Delta_\text{EB}^{\text{wc}} + \Delta_\text{reapply} - \Delta_\text{EB}^{\text{opt}} - \Delta_\text{cpu} - \Delta_\text{RB}$
+- $L_\text{diff} \approx \Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply} - \Delta_\text{EB}^{\text{H}} - \Delta_\text{cpu} - \Delta_\text{RB} - L_\text{equi}$
   (derived from safety constraint)
 
 Additionally, since reapplying a certified EB is part of RB validation:
 $$\Delta_\text{reapply} < \Delta_\text{TX}$$
 
-**Total Certificate Inclusion Delay:** $L_\text{vote} + L_\text{diff}$
+**Total Certificate Inclusion Delay:** $L_\text{equi} + L_\text{vote} + L_\text{diff}$
 
 This represents the minimum time from when an EB is announced until its
 certificate can be included in the chain. However, the actual inclusion time
@@ -542,7 +550,7 @@ period begins as described in [Votes and Certificates](#votes-and-certificates).
 The EB certificate can only be included in RBs that:
 
 1. Directly extend the announcing RB
-2. Are created at least $L_\text{vote} + L_\text{diff}$ slots after the
+2. Are created at least $L_\text{equi} + L_\text{vote} + L_\text{diff}$ slots after the
    announcing RB's slot
 
 The hash referenced in RB headers (`announced_eb` and `certified_eb` fields) is
@@ -654,9 +662,9 @@ size/resource parameters that manage throughput.
 
 | Parameter                                                         |       Symbol        |    Units     | Description                                                                                            |                                                 Constraints                                                  | Rationale                                                                                                                                                                                                                                        |
 | ----------------------------------------------------------------- | :-----------------: | :----------: | ------------------------------------------------------------------------------------------------------ | :----------------------------------------------------------------------------------------------------------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| <a id="delta-hdr" href="#delta-hdr"></a>RB header diffusion bound | $\Delta_\text{hdr}$ |     slot     | Maximum allowed time for RB headers to propagate around the network from the slot they were created in |                           $\Delta_\text{hdr} \geq \Delta_\text{hdr}^{\text{obs}}$                            | Protocol parameter conservatively set based on observed network behavior. Required for equivocation detection timing. The RbHeaderRelay mini-protocol must guarantee delivery within this bound                                                  |
-| Voting period length                                              |   $L_\text{vote}$   |     slot     | Duration during which committee members can vote on endorser blocks                                    |                     $L_\text{vote} > \Delta_\text{EB}^{\text{opt}} + \Delta_\text{cpu}$                      | Must accommodate EB propagation and validation time. Set to minimum value that ensures honest parties can participate in voting                                                                                                                  |
-| Diffusion period length                                           |   $L_\text{diff}$   |     slot     | Additional period after voting to ensure network-wide EB availability                                  | $L_\text{diff} \geq \Delta_\text{EB}^{\text{wc}} + \Delta_\text{reapply} - \Delta_\text{RB} - L_\text{vote}$ | Derived from the fundamental safety constraint. Leverages the network assumption that data known to >25% of nodes (from voting threshold) propagates fully within this time                                                                      |
+| <a id="l-equi" href="#l-equi"></a>Equivocation detection period length | $L_\text{equi}$ |     slot     | Duration for detecting conflicting blocks before voting begins                                         |                           $L_\text{equi} \geq 3\Delta_\text{hdr}$                            | Must accommodate worst-case equivocation scenario: first header propagation, conflicting header propagation, and equivocation proof propagation. Prevents adversaries from sending different EBs to different network parts                       |
+| <a id="l-vote" href="#l-vote"></a>Voting period length                                              |   $L_\text{vote}$   |     slot     | Duration during which committee members can vote on endorser blocks                                    |                     $L_\text{vote} > \Delta_\text{EB}^{\text{H}} + \Delta_\text{cpu}$                      | Must accommodate EB propagation and validation time. Set to minimum value that ensures honest parties can participate in voting                                                                                                                  |
+| <a id="l-diff" href="#l-diff"></a>Diffusion period length                                           |   $L_\text{diff}$   |     slot     | Additional period after voting to ensure network-wide EB availability                                  | $L_\text{diff} \geq \Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply} - \Delta_\text{RB} - L_\text{equi} - L_\text{vote}$ | Derived from the fundamental safety constraint. Leverages the network assumption that data known to >25% of nodes (from voting threshold) propagates fully within this time                                                                      |
 | Ranking block max size                                            |    $S_\text{RB}$    |    bytes     | Maximum size of a ranking block                                                                        |                                              $S_\text{RB} > 0$                                               | Limits RB size to ensure timely diffusion                                                                                                                                                                                                        |
 | Endorser-block referenceable transaction size                     |  $S_\text{EB-tx}$   |    bytes     | Maximum total size of transactions that can be referenced by an endorser block                         |                                             $S_\text{EB-tx} > 0$                                             | Limits total transaction payload to ensure timely diffusion within stage length                                                                                                                                                                  |
 | Endorser block max size                                           |    $S_\text{EB}$    |    bytes     | Maximum size of an endorser block itself                                                               |                                              $S_\text{EB} > 0$                                               | Limits EB size to ensure timely diffusion; prevents issues with many small transactions                                                                                                                                                          |
@@ -1736,20 +1744,22 @@ consider the following example based on simulated network measurements:
 
 - $\Delta_\text{hdr} = 1$ slot, $\Delta_\text{RB} = 5$ slots (current Praos
   observations)
-- $\Delta_\text{EB}^{\text{opt}} = 7$ slots, $\Delta_\text{EB}^{\text{wc}} = 15$
+- $\Delta_\text{EB}^{\text{H}} = 7$ slots, $\Delta_\text{EB}^{\text{A}} = 15$
   slots (EB diffusion times)
 - $\Delta_\text{cpu} = 3$ slots, $\Delta_\text{reapply} = 1$ slot (validation
   times)
 
 **Timing Parameter Calibration:**
 
-- $L_\text{vote} \approx \Delta_\text{EB}^{\text{opt}} = 7$ slots (ensures
+- $L_\text{equi} = 3\Delta_\text{hdr} = 3 \times 1 = 3$ slots (ensures reliable
+  equivocation detection)
+- $L_\text{vote} \approx \Delta_\text{EB}^{\text{H}} + \Delta_\text{cpu} = 7 + 3 = 10$ slots (ensures
   honest EBs diffuse optimally, with margin for validation)
-- $L_\text{diff} \geq \Delta_\text{EB}^{\text{wc}} + \Delta_\text{reapply} - \Delta_\text{RB} - L_\text{vote} = 15 + 1 - 5 - 7 = 4$
+- $L_\text{diff} \geq \Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply} - \Delta_\text{RB} - L_\text{equi} - L_\text{vote} = 15 + 1 - 5 - 3 - 10 = -2$
   slots (minimum)
-- Setting $L_\text{diff} = 8$ slots provides additional safety margin
+- Since the minimum is negative, we can set $L_\text{diff} = 0$ slots, but for additional safety margin we use $L_\text{diff} = 5$ slots
 - **Total certificate inclusion delay:**
-  $L_\text{vote} + L_\text{diff} = 7 + 8 = 15$ slots
+  $L_\text{equi} + L_\text{vote} + L_\text{diff} = 3 + 10 + 5 = 18$ slots
 
 **Simulation-Tested Parameters**
 
@@ -1764,8 +1774,9 @@ consideration of tradeoffs.
 | Parameter                                     |       Symbol        |   Feasible value   | Justification                                                                                                                                                                          |
 | --------------------------------------------- | :-----------------: | :----------------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | RB header diffusion bound                     | $\Delta_\text{hdr}$ |       1 slot       | Must be faster than full RB diffusion for equivocation detection; simulations show headers reach all nodes within 1 slot due to smaller size.                                          |
-| Voting period length                          |   $L_\text{vote}$   |      7 slots       | Short stages increase settlement speed, but the stage length must be generously larger than the propagation time for EBs.                                                              |
-| Diffusion period length                       |   $L_\text{diff}$   |     5-10 slots     | Calculated as $\Delta_\text{EB}^{\text{wc}} - \Delta_\text{RB} - L_\text{vote}$. With typical values: ~20 - 5 - 7 = 8 slots                                                            |
+| Equivocation detection period length          |   $L_\text{equi}$   |      3 slots       | Set to $3\Delta_\text{hdr}$ to accommodate worst-case equivocation scenario; ensures reliable detection before voting begins.                                                           |
+| Voting period length                          |   $L_\text{vote}$   |     10 slots       | Short stages increase settlement speed, but the stage length must be generously larger than the propagation time for EBs and validation time.                                          |
+| Diffusion period length                       |   $L_\text{diff}$   |     5-10 slots     | Calculated as $\Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply} - \Delta_\text{RB} - L_\text{equi} - L_\text{vote}$. With typical values: 15 + 1 - 5 - 3 - 10 = -2 (min), use 5 for safety margin |
 | Endorser-block referenceable transaction size |  $S_\text{EB-tx}$   |       12 MB        | Simulations indicate that 200 kB/s throughput is feasible at this block size.                                                                                                          |
 | Endorser block max size                       |    $S_\text{EB}$    |       512 kB       | Endorser blocks must not be so large that they cannot diffuse and be validated within the voting period $L_\text{vote}$.                                                               |
 | Maximum Plutus steps per endorser block       |          -          |  2000G step units  | Simulations at high transaction-validation CPU usage.                                                                                                                                  |
