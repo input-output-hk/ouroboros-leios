@@ -1962,38 +1962,20 @@ uncertain.
 [^dbanalyser]:
     [Cardano instantiation of the Consensus Layer: db-analyser](https://github.com/IntersectMBO/ouroboros-consensus/blob/main/ouroboros-consensus-cardano/README.md#db-analyser)
 
-- CPU per transaction in a block: `428.4 μs/tx`.
-- CPU per byte of a block: `211.5 μs/kB`.
-- Linear models for signature verification and Plutus execution:
-  - `(148.1 μs/tx) * (number of transactions) + (114.1 μs/kB) * (number of bytes)`.
-  - `(137.5 μs/tx) * (number of transactions) + (60.2 μs/kB) * (number of bytes) + (585.2 μs/Gstep) * (billions of Plutus execution steps)`,
-    with a Lapace-distributed error having scale `1250 μs`.
+- Ledger "apply" operation, consisting of phase 1 & 2 validation along with updating the current ledger state:
+    - CPU per transaction in a block: `620.1 μs/tx`.
+    - Linear model that accounts for Plutus: `(262.4 μs/tx) * (number of transactions) + (948.7 μs/Gstep) * (billions of Plutus execution steps)`.
+- Ledger "reapply" operation, consisting of updating the current ledger state, omitting previously performed phase 1 & 2 validation:
+    - Linear model: `(353.9 μs) + (21.51 μs/kB) * (size of the block)`
+    - Linear model that accounts for Plutus: `(347.8 μs) + (19.43 μs/kB) * (size of the block) + (21.27 μs/Gstep) * (billions of Plutus execution steps)`
 
-The Leios simulators use the value `0.4284 ms` as the validation time for each
-transaction. A more nuanced model of CPU usage in the simulators would account
-for Plutus execution. In order to estimate the effect of Plutus-heavy workloads,
-one can vary that per-transaction time to higher values. Very approximately,
-validation times of `1 ms/tx`, `10 ms/tx`, or `100 ms/tx` correspond to 2, 20,
-or 200 billion Plutus steps per transaction, respectively. The following plot of
-simulation results limit each node to 6 vCPU cores and suggest that the
-`100 ms/tx` workload is untenable. The subsequent plot shows the 6 vCPUs
-becoming saturated with Plutus execution, so much so that EBs fail to be
-created. These results indicate that Leios's _block-level_ Plutus budget can
-safely be 2000 billion steps, or 100 times the Plutus budget of Praos.
-
-> [!IMPORTANT]
->
-> TODO: **@bwbush**
->
-> - [ ] Regenerate the plots below each time the version of `sim-cli` is bumped.
-> - [ ] In next set of re-runs . . .
->   - [x] Use SVG format.
->   - [x] Align with the base case of the previous section.
->   - [x] In the transaction plot, switch to the minute-based ledged.
->   - [ ] In the CPU plot, expand the abbrevations into phrases.
-> - [x] Review and possibly elaborate the figure and table captions.
-> - [ ] In the final version . . .
->   - [ ] Remove title and subtitle.
+The Leios simulators perform the "apply" operation when a transaction is first seen, either when it is received for the memory pool or when it is fetched after first being seen in an RB or EB; they perform the "reapply" operation when a block is being generated or validated.
+A more nuanced model of CPU usage in the simulators would account
+for Plutus execution explicitly, but the linear models described above are used to account for Plutus workloads implicitly.
+The following plot of
+simulation results limit each node to 4 vCPU cores and suggest that workloads of 20,000e9 Plutus execution steps per EB may be feasible: this is 1000 times the current Cardano mainnet limit of 20e9 steps for Praos blocks. The subsequent plot shows the 4 vCPUs
+becoming progressively more saturated with heavier Plutus execution.
+Although these results suggest that Leios's _block-level_ Plutus budget can safely be 5000 billion steps or more, it is important to remember that this is for conditions where honest nodes faithfully and promptly diffuse the transactions requiring the relatively expensive phase 2 (Plutus) validation: adversarial nodes could attempt to delay diffusion of transactions in order to overwhelm honest nodes with the sudden arrival of many heavy Plutus transactions and little time to validate them all before voting upon the newly seen EB. Experiments with prototype Leios nodes will be necessary to more precisely quantify how much the Plutus budget could safely be increased.
 
 <div align="center">
 <a name="figure-17" id="figure-17"></a>
@@ -2007,7 +1989,9 @@ safely be 2000 billion steps, or 100 times the Plutus budget of Praos.
 <div align="center">
 <a name="figure-18" id="figure-18"></a>
 
-![CPU usage in Plutus-heavy workloads for Leios](images/plutus-cpu-mean-histogram.svg)
+|   |   |
+|---|---|
+| ![Mean CPU usage in Plutus-heavy workloads for Leios](images/plutus-cpu-mean-histogram.svg) | ![Peak CPU usage in Plutus-heavy workloads for Leios](images/plutus-cpu-peak-histogram.svg) |
 
 <em>Figure 18: CPU usage in Plutus-heavy workloads for Leios</em>
 
@@ -2090,8 +2074,8 @@ consideration of tradeoffs.
 | Diffusion period length                       |   $L_\text{diff}$   |      7 slots       | Per [diffusion period](#diffusion-period): minimum calculated as 4 slots with typical network values, use 7 for safety margin.                                                         |
 | Endorser-block referenceable transaction size |  $S_\text{EB-tx}$   |       12 MB        | Simulations indicate that 200 kB/s throughput is feasible at this block size.                                                                                                          |
 | Endorser block max size                       |    $S_\text{EB}$    |       512 kB       | Endorser blocks must be small enough to diffuse and be validated within the voting period $L_\text{vote}$.                                                                             |
-| Maximum Plutus steps per endorser block       |          -          |  2000G step units  | Simulations at high transaction-validation CPU usage.                                                                                                                                  |
-| Maximum Plutus memory per endorser block      |          -          | 7000M memory units | Simulations at high transaction-validation CPU usage.                                                                                                                                  |
+| Maximum Plutus steps per endorser block       |          -          |  2000G step units  | Simulations at high transaction-validation CPU usage, but an even higher limit may be possible.                                                                                        |
+| Maximum Plutus memory per endorser block      |          -          | 7000M memory units | Simulations at high transaction-validation CPU usage, but an even higher limit may be possible.                                                                                        |
 | Maximum Plutus steps per transaction          |          -          |  100G step units   | Raise per-transaction limit by a factor of twenty relative to Praos.                                                                                                                   |
 | Maximum Plutus memory per transaction         |          -          | 350M memory units  | Raise per-transaction limit by a factor of twenty relative to Praos.                                                                                                                   |
 | Ranking block max size                        |    $S_\text{RB}$    |    90,112 bytes    | This is the current value on the Cardano mainnet.                                                                                                                                      |
