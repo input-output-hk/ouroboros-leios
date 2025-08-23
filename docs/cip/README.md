@@ -356,10 +356,11 @@ collected votes.
 
 #### Step 5: Chain Inclusion
 
-The certificate for an EB shall be included in the body of a new ranking block
-`RB'` only if all of the following conditions hold:
+When an RB producer creates a new ranking block `RB'`, they must decide whether
+to include a certificate for the EB announced by the preceding RB. This
+inclusion decision follows these rules:
 
-1. `RB'` directly extends the RB which announced this EB (as illustrated in
+1. `RB'` directly extends the RB which announced the EB (as illustrated in
    Figure 4 where `RB'` contains the certificate for the EB announced by the
    preceding RB).
 2. The certificate is valid as defined in
@@ -367,20 +368,19 @@ The certificate for an EB shall be included in the body of a new ranking block
 3. At least $L_\text{equi} + L_\text{vote} + L_\text{diff}$ slots have elapsed since the slot of
    the RB that announced the EB.
 
-This timing constraint ensures certified EBs have sufficient time to diffuse
-throughout the network before their transactions are included in the ledger,
-preventing chain adoption delays.
+This **total certificate inclusion delay** ensures certified EBs have sufficient
+time to diffuse throughout the network before their transactions are included in
+the ledger. If the next RB is produced before this minimum delay has elapsed,
+the EB certificate cannot be included and the EB is discarded, with the protocol
+gracefully falling back to standard Praos operation.
 
-**Transaction Ordering**: When processing a chain, transactions from certified EBs are applied to the ledger before transactions directly included in the subsequent RB. This ensures proper transaction sequencing.
+Additionally, all RBs must follow these content constraints:
 
-<a id="rb-content-rules" href="#rb-content-rules"></a>
-
-> [!Important]
->
-> RBs can contain either an EB certificate **or** transactions directly, but
-> **not** both. All transactions must be valid against the complete ledger state
-> (including certified EBs). If a node lacks any certified EB data, it **must**
-> produce an empty RB to maintain chain validity.
+4. RBs contain either an EB certificate **or** transactions directly, but **not** both.
+5. All transactions must be valid against the complete ledger state (including
+   certified EBs).
+6. If a node lacks any certified EB data, it **must** produce an empty RB to
+   maintain chain validity.
 
 #### Timing Constraints
 
@@ -406,6 +406,7 @@ availability:
 | <a id="delta-eb-A" href="#delta-eb-A"></a>EB adversarial diffusion | $\Delta_\text{EB}^{\text{A}}$  | EB propagation time starting from >25% network coverage after voting |  15-20 slots   |
 | <a id="delta-cpu" href="#delta-cpu"></a>EB validation           |       $\Delta_\text{cpu}$       | Full EB validation including signatures, scripts, and state updates  |   2-4 slots    |
 | <a id="delta-reapply" href="#delta-reapply"></a>EB reapplication        |     $\Delta_\text{reapply}$     | Certified EB reapplication with minimal checks and UTxO updates      |    <1 slot     |
+| <a id="delta-tx" href="#delta-tx"></a>Transaction validation        |       $\Delta_\text{TX}$        | Standard Praos transaction validation time for RB processing         |    ~1 slot     |
 
 <em>Table 1: Network Characteristics</em>
 
@@ -447,57 +448,27 @@ time to:
 1. Receive the EB from the network
 2. Fully validate it (verify signatures, execute scripts, update state)
 
-With a 75% voting threshold, certification guarantees that at least 25% of
-honest stake has already received and processed the EB, setting up the network
-assumption for the diffusion period.
-
 <a id="diffusion-period"></a>
 
 **Phase 3: Diffusion Period ($L_\text{diff}$)**  
 Ensures network-wide EB availability by leveraging the assumption that data known to >25% of the network (guaranteed by the voting threshold) propagates fully within this period.
 
-The critical timing constraint that preserves Praos security relates the total
-time available for EB processing to the actual time required:
+The critical timing constraint preserves Praos security by ensuring that all
+honest parties receive and apply a certified EB before processing any RB that
+contains its certificate:
 
-$$L_\text{equi} + L_\text{vote} + L_\text{diff} + \Delta_\text{RB} > \Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply}$$
+$$L_\text{equi} + L_\text{vote} + L_\text{diff} + \Delta_\text{RB'} > \Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply}$$
 
-where:
-- $L_\text{equi} + L_\text{vote} + L_\text{diff}$ represents the total time for EB processing
-- $\Delta_\text{RB}$ represents RB' propagation time  
-- $\Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply}$ represents the time to receive and reapply EB
-
-This ensures that by the time an `RB'` containing a certificate propagates
-through the network, all honest parties will have received and applied the
-certified EB to their state. The following constraint ensures that certified EBs
-reach all honest parties before they need to process RBs containing their
-certificates:
-
-$$L_\text{equi} + L_\text{vote} + L_\text{diff} + \Delta_\text{RB} > \Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply}$$
-
-This can be rearranged to derive the minimum diffusion period:
+This constraint can be rearranged to derive the minimum diffusion period:
 $$L_\text{diff} \geq \Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply} - \Delta_\text{RB} - L_\text{equi} - L_\text{vote}$$
 
-The timing parameters are set to minimize certificate inclusion delay while
-satisfying safety constraints:
+The security of this protocol reduces to Praos security through a critical 
+constraint on EB reapplication costs. Since applying a certified EB is part of 
+RB validation, this constraint ensures the Praos timing assumptions remain valid:
 
-- $L_\text{equi} \geq 3\Delta_\text{hdr}$ (ensures reliable equivocation detection)
-- $L_\text{vote} \approx \Delta_\text{EB}^{\text{H}} + \Delta_\text{cpu}$
-  (ensures honest parties can receive and validate EBs)
-- $L_\text{diff} \approx \Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply} - \Delta_\text{EB}^{\text{H}} - \Delta_\text{cpu} - \Delta_\text{RB} - L_\text{equi}$
-  (derived from safety constraint)
-
-Additionally, since reapplying a certified EB is part of RB validation:
 $$\Delta_\text{reapply} < \Delta_\text{TX}$$
 
-**Total Certificate Inclusion Delay:** $L_\text{equi} + L_\text{vote} + L_\text{diff}$
-
-This represents the minimum time from when an EB is announced until its
-certificate can be included in the chain. However, the actual inclusion time
-depends on the RB production schedule, which follows Praos' probabilistic slot
-leadership election. If the next RB is produced before this minimum delay has
-elapsed, the EB certificate cannot be included and the EB is discarded, with the
-protocol gracefully falling back to standard Praos operation where transactions
-are processed through direct RB inclusion.
+where [$\Delta_\text{reapply}$](#delta-reapply) (EB reapplication time) and [$\Delta_\text{TX}$](#delta-tx) (transaction validation time) are defined in the [network characteristics](#network-characteristics) section.
 
 ### Protocol Entities
 
@@ -1744,9 +1715,9 @@ consider the following example based on simulated network measurements:
   honest EBs diffuse optimally, with margin for validation)
 - $L_\text{diff} \geq \Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply} - \Delta_\text{RB} - L_\text{equi} - L_\text{vote} = 15 + 1 - 5 - 3 - 10 = -2$
   slots (minimum)
-- Since the minimum is negative, we can set $L_\text{diff} = 0$ slots, but for additional safety margin we use $L_\text{diff} = 5$ slots
+- Since the minimum is negative, we can set $L_\text{diff} = 0$ slots, but for additional safety margin we use $L_\text{diff} = 7$ slots
 - **Total certificate inclusion delay:**
-  $L_\text{equi} + L_\text{vote} + L_\text{diff} = 3 + 10 + 5 = 18$ slots
+  $L_\text{equi} + L_\text{vote} + L_\text{diff} = 3 + 10 + 7 = 20$ slots
 
 **Simulation-Tested Parameters**
 
@@ -1763,7 +1734,7 @@ consideration of tradeoffs.
 | RB header diffusion bound                     | $\Delta_\text{hdr}$ |       1 slot       | Must be faster than full RB diffusion for equivocation detection; simulations show headers reach all nodes within 1 slot due to smaller size.                                          |
 | Equivocation detection period length          |   $L_\text{equi}$   |      3 slots       | Set to $3\Delta_\text{hdr}$ to accommodate worst-case equivocation scenario; ensures reliable detection before voting begins.                                                           |
 | Voting period length                          |   $L_\text{vote}$   |     10 slots       | Short stages increase settlement speed, but the stage length must be generously larger than the propagation time for EBs and validation time.                                          |
-| Diffusion period length                       |   $L_\text{diff}$   |     5-10 slots     | Calculated as $\Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply} - \Delta_\text{RB} - L_\text{equi} - L_\text{vote}$. With typical values: 15 + 1 - 5 - 3 - 10 = -2 (min), use 5 for safety margin |
+| Diffusion period length                       |   $L_\text{diff}$   |     7-10 slots     | Calculated as $\Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply} - \Delta_\text{RB} - L_\text{equi} - L_\text{vote}$. With typical values: 15 + 1 - 5 - 3 - 10 = -2 (min), use 7 for safety margin |
 | Endorser-block referenceable transaction size |  $S_\text{EB-tx}$   |       12 MB        | Simulations indicate that 200 kB/s throughput is feasible at this block size.                                                                                                          |
 | Endorser block max size                       |    $S_\text{EB}$    |       512 kB       | Endorser blocks must be small enough to diffuse and be validated within the voting period $L_\text{vote}$.                                                                             |
 | Maximum Plutus steps per endorser block       |          -          |  2000G step units  | Simulations at high transaction-validation CPU usage.                                                                                                                                  |
