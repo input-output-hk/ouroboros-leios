@@ -32,6 +32,14 @@ jobs:
           chmod +x scripts/format-cip.sh
           ./scripts/format-cip.sh docs/cip/README.md
 
+      - name: Check for dead links
+        uses: lycheeverse/lychee-action@v1
+        with:
+          args: --verbose --no-progress --exclude-all-private docs/cip/README.md
+          fail: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Check for changes
         id: verify-changed-files
         run: |
