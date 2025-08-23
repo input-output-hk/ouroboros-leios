@@ -363,7 +363,11 @@ inclusion decision follows these rules:
 3. At least $L_\text{equi} + L_\text{vote} + L_\text{diff}$ slots have elapsed
    since the slot of the RB that announced the EB.
 
-This **total certificate inclusion delay** ensures certified EBs have sufficient
+where <a href="#l-equi">$L_\text{equi}$</a>, <a href="#l-vote">$L_\text{vote}$</a> and <a href="#l-diff">$L_\text{diff}$</a> are
+<a href="#network-characteristics-and-protocol-parameters">protocol parameters</a> represented by a number
+of slots.
+
+This **certificate inclusion delay** ensures certified EBs have sufficient
 time to diffuse throughout the network before their transactions are included in
 the ledger. If the next RB is produced before this minimum delay has elapsed,
 the EB certificate cannot be included and the EB is discarded, with the protocol
@@ -371,11 +375,11 @@ gracefully falling back to standard Praos operation.
 
 Additionally, all RBs must follow these content constraints:
 
-4. RBs contain either an EB certificate **or** transactions directly, but
+1. RBs contain either an EB certificate **or** transactions directly, but
    **not** both.
-5. All transactions must be valid against the complete ledger state (including
+2. All transactions must be valid against the complete ledger state (including
    certified EBs).
-6. If a node lacks any certified EB data, it **must** produce an empty RB to
+3. If a node lacks any certified EB data, it **must** produce an empty RB to
    maintain chain validity.
 
 #### Timing Constraints
