@@ -79,7 +79,7 @@ sustainability and reduced complexity through fewer new protocol elements.
   - [How Leios addresses CPS-18](#how-leios-addresses-cps-18)
   - [Evidence](#evidence)
   - [Trade-offs \& Limitations](#trade-offs--limitations)
-  - [Roadmap \& Next Steps](#roadmap--next-steps)
+  - [Alternatives \& Extensions](#alternatives--extensions)
 - [Path to active](#path-to-active)
 - [Versioning](#versioning)
 - [References](#references)
@@ -2541,17 +2541,67 @@ preserving pathways to these enhanced capabilities. The following section
 outlines how this foundation can evolve toward even higher performance and
 expanded functionality as the ecosystem matures.
 
-### Roadmap & Next Steps
+### Alternatives & Extensions
 
-**Long-term roadmap**
+The presented Leios specification provides a solid foundation for progressive
+enhancement towards higher throughput while maintaining ecosystem compatibility.
+Several alternative ideas and protocol variants were considered, which are
+listed as possible extensions in this section.
 
-The proposed Leios specification provides a foundation for progressive
-enhancement toward higher throughput variants while maintaining ecosystem
-compatibility. As ecosystem priorities emerge and become clearer, any of the
-following pathways could become more attractive to implement, each offering
-distinct trade-offs in terms of user experience, implementation cost, security
-considerations, and throughput potential. This roadmap outlines key development
-pathways that build incrementally upon the base protocol.
+As ecosystem priorities change, any of the following pathways could become more
+attractive to implement, each offering distinct trade-offs in terms of user
+experience, implementation cost, security considerations, and throughput
+potential.
+
+Furthermore, most aspects build incrementally upon the base protocol and may
+form a roadmap of next steps.
+
+**Increase praos parameters**
+
+> [!WARNING]
+>
+> - Bigger blocks and/or higher active slot coefficient
+> - ΔQ analysis and simulations confirm there is some room to improve
+>   - Analysis of 50 tx/s and 100 tx/s (84 TxkB/s and 172 TxkB/s respectively):
+>     https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w26/analysis-praos.ipynb
+> - As alternative: The 50 tx/s case would be enough for economically
+>   sustainable throughput, but RB diffusion dangerously close at Δ assumption
+>   and leading to increased amount of forks in the network
+>   - Link Brian's slides of more forks too?
+>   - The change alone does not give more room to grow
+> - As extension: Instead of bigger blocks, more frequent blocks could enhance
+>   Leios variants leading to more frequent certifications and lower inclusion
+>   latency (but tighter requirements on EB diffusion)
+
+**Relax EB diffusion constraints**
+
+> [!CAUTION]
+>
+> Assumes that we already updated the specification back to L_diff
+
+> [!WARNING]
+>
+> - Current design requires Δ_EB (worst case) to be fairly small, so that we can
+>   pick a reasonable L_diff that ensures certified EBs don't impact praos
+>   safety, but also see EBs certified and included often enough to have
+>   high-throughput
+> - Should the worst case diffusion of EBs turn out to be much larger than the
+>   average case (or honest), we can introduce another period after certificate
+>   inclusion which allows EBs to be not available: L_recover
+> - Provides more freedom in picking L_diff, up to setting it to 0
+> - Security argument must consider that not all nodes can validate blocks
+>   within L_recover
+> - To not impact praos safety or liveness, this implies relaxed chain validity
+>   rules where for example "potentially invalid transactions" would be allowed
+>   in ranking blocks
+> - Increases optimism of protocol design; allows more throughput, at the cost
+>   of protocol complexity and downstream impact of a change in chain validity
+> - Especially light node use cases would be impacted as a full ledger would be
+>   required to determine whether transactions in blocks are valid or not during
+>   L_recover
+> - Corrections (lists of invalid transactions in past blocks) in the next
+>   certified EB or any ranking block within L_recover could mitigate this at
+>   the cost of even more protocol complexity
 
 **Transaction Groups**
 
