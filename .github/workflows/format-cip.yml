@@ -40,10 +40,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Clean up temporary files
+        run: |
+          rm -rf lychee/
+
       - name: Check for changes
         id: verify-changed-files
         run: |
-          if [ -n "$(git status --porcelain)" ]; then
+          if [ -n "$(git status --porcelain docs/cip/)" ]; then
             echo "changed=true" >> $GITHUB_OUTPUT
           else
             echo "changed=false" >> $GITHUB_OUTPUT
@@ -67,5 +71,5 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '🔧 **Auto-formatter applied** - Generated TOC, table of figures/tables, removed trailing periods, and formatted markdown with proper line length.'
+              body: '⚠️ **CIP formatting needed** - The CIP document needs formatting (TOC, figures/tables, markdown). Please run `./scripts/format-cip.sh docs/cip/README.md` locally and commit the changes.'
             })
