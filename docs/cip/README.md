@@ -2334,11 +2334,10 @@ form a roadmap of next steps.
 **Increase Praos Parameters**
 
 Enhancing Praos parameters through bigger blocks and higher active slot
-coefficients offers a direct pathway to improved throughput. $\Delta$ Q analysis
-and simulations confirm there is room for improvement, with analysis of 50 Tx/s
+coefficients offers a direct pathway to improved throughput. [Δ Q analysis][praos-delta-q]
+and [simulations][praos-simulations] confirm there is room for improvement, with analysis of 50 Tx/s
 and 100 Tx/s scenarios (84 TxkB/s and 172 TxkB/s respectively) demonstrating
-feasibility within current network constraints
-([analysis details](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w26/analysis-praos.ipynb)).
+feasibility within current network constraints.
 The 50 Tx/s case would provide economically sustainable throughput, though RB
 diffusion approaches the $\Delta$ assumption limits and leads to increased
 network forks. While this change alone does not provide significant room for
@@ -2644,6 +2643,10 @@ documentation_
 [^2]: Leios: Dynamic Availability for Blockchain Sharding (2025)
 
 [^leioscrypto]: Leios cryptography prototype implementation
+
+[praos-delta-q]: https://github.com/IntersectMBO/cardano-formal-specifications/tree/main?tab=readme-ov-file#performance-model
+
+[praos-simulations]: https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w26/analysis-praos.ipynb
 
 ## Appendix
 
