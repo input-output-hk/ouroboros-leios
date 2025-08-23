@@ -112,7 +112,7 @@ sustainability and reduced complexity through fewer new protocol elements.
 - [Figure 16: Mean CPU load among all nodes](#figure-16)
 - [Figure 17: Fate of Plutus-heavy transactions in Leios](#figure-17)
 - [Figure 18: CPU usage in Plutus-heavy workloads for Leios](#figure-18)
-- [Figure 19: Performance comparison across three approaches: Ouroboros Praos (red), proposed Leios (teal), and research paper's over-collateralized sharded Leios (orange)](#figure-19)
+- [Figure 19: Comparison: Praos (red), proposed Leios (teal), and research Leios (orange)](#figure-19)
 
 **Tables**
 
@@ -2275,8 +2275,7 @@ while preserving ecosystem compatibility.
 
 ![Leios Variants Comparison](images/leios-variants-comparison-radar.svg)
 
-<em>Figure 19: Performance comparison across three approaches: Ouroboros Praos
-(red), proposed Leios (teal), and research paper's over-collateralized sharded
+<em>Figure 19: Comparison: Praos (red), proposed Leios (teal), and research
 Leios (orange)</em>
 
 </div>
