@@ -1714,20 +1714,6 @@ The [Leios paper][leios-paper] provides a rigorous theoretical analysis of the
 safety and throughput of the protocol. That has been reinforced and demonstrated
 by prototype simulations written in Haskell and Rust.
 
-> [!IMPORTANT]
->
-> TODO: **@bwbush**
->
-> - [ ] Regenerate the plots below each time the version of `sim-cli` is bumped.
-> - [x] Discuss only displaying three or four cases, instead of the five.
-> - [ ] In next set of re-runs . . .
->   - [ ] In the CPU plot, expand the abbrevations into phrases.
->   - [x] In the EB-size plot, remove empty EBs (created at the start or end of
->         the simulation).
-> - [x] Review and possibly elaborate the figure and table captions.
-> - [ ] In the final version . . .
->   - [ ] Remove title and subtitle.
-
 The simulation results use a mainnet-like topology[^mnrm] that accurately
 reflects the characteristics of the Cardano mainnet. This includes a realistic
 distribution of stake and a representative number of stake pools. The network is
@@ -1786,11 +1772,11 @@ permanently as the ledger history.
 
 | Throughput [TxMB/s] | TPS at 1500 B/tx | Conditions      | Mempool to EB [s] | Mempool to ledger [s] | Space efficiency [%] |
 | ------------------: | ---------------: | --------------- | ----------------: | --------------------: | -------------------: |
-|               0.100 |             66.7 | light load      |              19.3 |                  60.8 |                92.22 |
-|               0.150 |            100.0 | moderate load   |              20.8 |                  63.8 |                94.08 |
-|               0.200 |            142.9 | heavy load      |              28.9 |                  71.7 |                94.79 |
-|               0.250 |            166.7 | some congestion |              42.1 |                  84.3 |                94.92 |
-|               0.300 |            200.0 | much congestion |              83.5 |                 125.8 |                95.09 |
+|               0.100 |             66.7 | light load      |              19.6 |                  48.0 |                 94.2 |
+|               0.150 |            100.0 | moderate load   |              21.6 |                  51.2 |                 96.3 |
+|               0.200 |            142.9 | heavy load      |              31.3 |                  57.7 |                 96.4 |
+|               0.250 |            166.7 | some congestion |              51.6 |                  81.9 |                 96.6 |
+|               0.300 |            200.0 | much congestion |             146.6 |                 173.2 |                 97.2 |
 
 <em>Table 6: Leios effficiency at different throughputs</em>
 
