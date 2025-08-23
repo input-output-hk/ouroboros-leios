@@ -12,7 +12,6 @@ Authors:
   - Andre Knipsel <andre.knispel@iohk.io>
   - Yves Hauser <yves.hauser@iohk.io>
   - Simon Gellis <simon@sundae.fi>
-  - PLEASE ADD YOUR NAME IF YOU CONTRIBUTE TEXT TO THIS DOCUMENT
 Implementors:
   - Intersect
 Discussions:
@@ -32,7 +31,7 @@ and support complex decentralized applications.
 We propose Ouroboros Leios, a consensus protocol designed for high-throughput
 operation while preserving Ouroboros Praos security properties. Block producers
 simultaneously create both a standard Praos block and a larger secondary block
-containing additional transactions. Secondary blocks undergo committee
+referencing additional transactions. Secondary blocks undergo committee
 validation before ledger inclusion, enabling significantly higher throughput.
 
 This specification presents the first version of the Ouroboros Leios protocol
