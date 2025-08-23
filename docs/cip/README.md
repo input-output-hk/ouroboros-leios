@@ -756,15 +756,14 @@ headers for rapid EB discovery and <a href="#equivocation">equivocation
 detection</a>.
 
 <a id="rb-header-diffusion" href="#rb-header-diffusion"></a>**RB Header
-Diffusion**: RB headers diffuse independently of
-standard ChainSync (steps 2a and 2b). This separate mechanism enables rapid EB
-discovery within the strict timing bound $\Delta_\text{hdr}$. Headers are
-diffused freshest-first to facilitate timely EB delivery, with nodes propagating
-at most two headers per (slot, issuer) pair to detect
-<a href="#equivocation">equivocation</a> - where an attacker creates multiple
-EBs for the same block generation opportunity - while limiting network overhead.
-The header contains the EB hash when the block producer created an EB, allowing
-peers to discover the corresponding EB.
+Diffusion**: RB headers diffuse independently of standard ChainSync (steps 2a
+and 2b). This separate mechanism enables rapid EB discovery within the strict
+timing bound $\Delta_\text{hdr}$. Headers are diffused freshest-first to
+facilitate timely EB delivery, with nodes propagating at most two headers per
+(slot, issuer) pair to detect <a href="#equivocation">equivocation</a> - where
+an attacker creates multiple EBs for the same block generation opportunity -
+while limiting network overhead. The header contains the EB hash when the block
+producer created an EB, allowing peers to discover the corresponding EB.
 
 <a id="rb-body-diffusion" href="#rb-body-diffusion"></a>**RB Body Diffusion**:
 After receiving headers, nodes fetch RB bodies via standard BlockFetch protocol
