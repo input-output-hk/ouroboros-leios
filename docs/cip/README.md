@@ -310,9 +310,9 @@ RB that announced the EB to ensure sufficient time for
 [selected via sortition](#committee-structure) based on the slot number of the
 RB that announced the EB. A committee member votes for an EB only if:
 
-1. The RB header arrived within <a href="#delta-hdr">$\Delta_\text{hdr}$</a>,
+1. The RB header arrived within $\Delta_\text{hdr}$,
 2. It has **not** detected any equivocating RB header for the same slot within
-   <a href="#l-equi">$L_\text{equi}$</a> slots of the original RB's slot,
+   $L_\text{equi}$ slots of the original RB's slot,
 3. It has received the EB within $L_\text{equi} + L_\text{vote}$ slots from the
    start of the EB's slot,
 4. The EB is the one announced by the latest RB in the voter's current chain,
@@ -320,9 +320,9 @@ RB that announced the EB. A committee member votes for an EB only if:
 6. For non-persistent voters, it is eligible to vote based on sortition using
    the announcing RB's slot number as the election identifier.
 
-where <a href="#l-equi">$L_\text{equi}$</a>,
-<a href="#l-vote">$L_\text{vote}$</a> and
-<a href="#delta-hdr">$\Delta_\text{hdr}$</a> are
+where $L_\text{equi}$,
+$L_\text{vote}$ and
+$\Delta_\text{hdr}$ are
 <a href="#network-characteristics-and-protocol-parameters">protocol parameters
 and network characteristics</a> represented by a number of slots.
 
@@ -359,8 +359,8 @@ inclusion decision follows these rules:
 3. At least $L_\text{equi} + L_\text{vote} + L_\text{diff}$ slots have elapsed
    since the slot of the RB that announced the EB.
 
-where <a href="#l-equi">$L_\text{equi}$</a>,
-<a href="#l-vote">$L_\text{vote}$</a> and <a href="#l-diff">$L_\text{diff}$</a>
+where $L_\text{equi}$,
+$L_\text{vote}$ and $L_\text{diff}$
 are <a href="#network-characteristics-and-protocol-parameters">protocol
 parameters</a> represented by a number of slots.
 
@@ -406,20 +406,20 @@ adversarial EB if honest nodes vote on different versions.
 multi-step detection process that must accommodate the worst-case propagation
 scenario:
 
-1. **[$\Delta_\text{hdr}$](#delta-hdr)**: Initial header propagation - the first
+1. **$\Delta_\text{hdr}$**: Initial header propagation - the first
    (honest or adversarial) RB header reaches all honest nodes
-2. **[$\Delta_\text{hdr}$](#delta-hdr)**: Conflicting header propagation - any
+2. **$\Delta_\text{hdr}$**: Conflicting header propagation - any
    equivocating header from the same slot reaches honest nodes
-3. **[$\Delta_\text{hdr}$](#delta-hdr)**: Equivocation evidence propagation -
+3. **$\Delta_\text{hdr}$**: Equivocation evidence propagation -
    proof of conflicting headers propagates network-wide, allowing all honest
    nodes to detect the equivocation
 
-Therefore, [$L_\text{equi}$](#l-equi) $\geq 3$[$\Delta_\text{hdr}$](#delta-hdr)
+Therefore, $L_\text{equi}$ $\geq 3$$\Delta_\text{hdr}$
 to ensure reliable detection before voting begins. This constraint is derived
 from the network model where headers must propagate within
-[$\Delta_\text{hdr}$](#delta-hdr) to maintain Praos security assumptions.
+$\Delta_\text{hdr}$ to maintain Praos security assumptions.
 
-**Security Guarantee**: By waiting [$L_\text{equi}$](#l-equi) slots before
+**Security Guarantee**: By waiting $L_\text{equi}$ slots before
 voting begins, the protocol ensures that if any equivocation occurred, all
 honest nodes will have detected it and will refuse to vote for any EB from that
 slot. This prevents adversaries from exploiting network partitions to gain
@@ -430,11 +430,11 @@ where no equivocation was detected during the detection period.
 >
 > **Comparison with Research Paper**: The [Leios research paper][leios-paper]
 > describes a more complex protocol variant that requires
-> $5$[$\Delta_\text{hdr}$](#delta-hdr) for equivocation detection due to
+> $5$$\Delta_\text{hdr}$ for equivocation detection due to
 > additional coordination mechanisms between Input Blocks and Endorser Blocks.
 > This specification's simplified approach, where EBs are directly announced by
 > RBs, reduces the equivocation detection requirement to
-> $3$[$\Delta_\text{hdr}$](#delta-hdr) while maintaining the same security
+> $3$$\Delta_\text{hdr}$ while maintaining the same security
 > guarantees against equivocation attacks.
 
 <a id="voting-period"></a>
@@ -444,8 +444,8 @@ The voting period must accommodate both EB propagation and validation:
 
 $$L_\text{vote} > \Delta_\text{EB}^{\text{H}} + \Delta_\text{cpu}$$
 
-where [$\Delta_\text{EB}^{\text{H}}$](#delta-eb-H) (honest EB propagation time),
-and [$\Delta_\text{cpu}$](#delta-cpu) (validation time) are defined in the
+where $\Delta_\text{EB}^{\text{H}}$ (honest EB propagation time),
+and $\Delta_\text{cpu}$ (validation time) are defined in the
 [network characteristics](#network-characteristics) section.
 
 This ensures all honest committee members can participate by having sufficient
@@ -477,8 +477,8 @@ valid:
 
 $$\Delta_\text{reapply} < \Delta_\text{TX}$$
 
-where [$\Delta_\text{reapply}$](#delta-reapply) (EB reapplication time) and
-[$\Delta_\text{TX}$](#delta-tx) (transaction validation time) are defined in the
+where $\Delta_\text{reapply}$ (EB reapplication time) and
+$\Delta_\text{TX}$ (transaction validation time) are defined in the
 [network characteristics](#network-characteristics) section.
 
 ### Protocol Entities
