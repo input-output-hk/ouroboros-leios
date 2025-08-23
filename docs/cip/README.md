@@ -285,14 +285,7 @@ create two entities:
 
 The RB chain continues to be distributed exactly as in Praos, while Leios
 introduces a separate header distribution mechanism for rapid EB discovery and
-equivocation detection.
-
-<a id="equivocation"></a>
-
-> [!Note]
->
-> **Equivocation** refers to the malicious act of creating multiple conflicting
-> blocks for the same block generation opportunity.
+<a id="equivocation" href="#equivocation-detection">equivocation detection</a>.
 
 Due to the voting overhead per EB, EBs should only be announced if the base RB
 is full or when sufficient transaction content justifies the voting costs. Empty
