@@ -406,34 +406,35 @@ adversarial EB if honest nodes vote on different versions.
 multi-step detection process that must accommodate the worst-case propagation
 scenario:
 
-1. **[$\Delta_\text{hdr}$](#delta-hdr)**: Initial header propagation - the first (honest or
-   adversarial) RB header reaches all honest nodes
-2. **[$\Delta_\text{hdr}$](#delta-hdr)**: Conflicting header propagation - any equivocating
-   header from the same slot reaches honest nodes  
-3. **[$\Delta_\text{hdr}$](#delta-hdr)**: Equivocation evidence propagation - proof of
-   conflicting headers propagates network-wide, allowing all honest nodes to
-   detect the equivocation
+1. **[$\Delta_\text{hdr}$](#delta-hdr)**: Initial header propagation - the first
+   (honest or adversarial) RB header reaches all honest nodes
+2. **[$\Delta_\text{hdr}$](#delta-hdr)**: Conflicting header propagation - any
+   equivocating header from the same slot reaches honest nodes
+3. **[$\Delta_\text{hdr}$](#delta-hdr)**: Equivocation evidence propagation -
+   proof of conflicting headers propagates network-wide, allowing all honest
+   nodes to detect the equivocation
 
-Therefore, [$L_\text{equi}$](#l-equi) $\geq 3$[$\Delta_\text{hdr}$](#delta-hdr) to
-ensure reliable detection before voting begins. This constraint is derived from
-the network model where headers must propagate within [$\Delta_\text{hdr}$](#delta-hdr) to
-maintain Praos security assumptions.
+Therefore, [$L_\text{equi}$](#l-equi) $\geq 3$[$\Delta_\text{hdr}$](#delta-hdr)
+to ensure reliable detection before voting begins. This constraint is derived
+from the network model where headers must propagate within
+[$\Delta_\text{hdr}$](#delta-hdr) to maintain Praos security assumptions.
 
-**Security Guarantee**: By waiting [$L_\text{equi}$](#l-equi) slots before voting begins,
-the protocol ensures that if any equivocation occurred, all honest nodes will
-have detected it and will refuse to vote for any EB from that slot. This
-prevents adversaries from exploiting network partitions to gain unfair
-advantages in the voting process, as honest nodes will only vote for EBs where
-no equivocation was detected during the detection period.
+**Security Guarantee**: By waiting [$L_\text{equi}$](#l-equi) slots before
+voting begins, the protocol ensures that if any equivocation occurred, all
+honest nodes will have detected it and will refuse to vote for any EB from that
+slot. This prevents adversaries from exploiting network partitions to gain
+unfair advantages in the voting process, as honest nodes will only vote for EBs
+where no equivocation was detected during the detection period.
 
 > [!NOTE]
 >
 > **Comparison with Research Paper**: The [Leios research paper][leios-paper]
-> describes a more complex protocol variant that requires $5$[$\Delta_\text{hdr}$](#delta-hdr)
-> for equivocation detection due to additional coordination mechanisms between
-> Input Blocks and Endorser Blocks. This specification's simplified approach,
-> where EBs are directly announced by RBs, reduces the equivocation detection
-> requirement to $3$[$\Delta_\text{hdr}$](#delta-hdr) while maintaining the same security
+> describes a more complex protocol variant that requires
+> $5$[$\Delta_\text{hdr}$](#delta-hdr) for equivocation detection due to
+> additional coordination mechanisms between Input Blocks and Endorser Blocks.
+> This specification's simplified approach, where EBs are directly announced by
+> RBs, reduces the equivocation detection requirement to
+> $3$[$\Delta_\text{hdr}$](#delta-hdr) while maintaining the same security
 > guarantees against equivocation attacks.
 
 <a id="voting-period"></a>
@@ -791,11 +792,12 @@ which are permitted to include diffusion pipelining with delayed validation.
 #### EB Diffusion
 
 Whenever an EB is announced through an RB header, nodes must fetch the EB
-content promptly (step 6), such that they receive it within $L_\text{equi} + L_\text{vote}$ and
-consequently enables them to vote. EBs are fetched freshest-first to ensure
-timely delivery within the voting window. Only the EB body corresponding to the
-first EB announcement/RB header received for a given RB creation opportunity
-shall be downloaded. The EB contains references to transactions.
+content promptly (step 6), such that they receive it within
+$L_\text{equi} + L_\text{vote}$ and consequently enables them to vote. EBs are
+fetched freshest-first to ensure timely delivery within the voting window. Only
+the EB body corresponding to the first EB announcement/RB header received for a
+given RB creation opportunity shall be downloaded. The EB contains references to
+transactions.
 
 <a id="eb-chain-selection" href="#eb-chain-selection"></a>**EB Propagation for
 Chain Selection**: To support efficient chain selection, nodes must receive
@@ -874,12 +876,13 @@ proof that the EB has received sufficient committee approval.
 
 <a id="certificate-inclusion" href="#certificate-inclusion"></a>**Certificate
 Inclusion**: Block producers creating new RBs include certificates for EBs where
-at least $L_\text{equi} + L_\text{vote} + L_\text{diff}$ slots have elapsed since the slot of
-the RB that announced the EB (step 12). This timing constraint ensures the
-certified EB has had sufficient time to diffuse throughout the network.
+at least $L_\text{equi} + L_\text{vote} + L_\text{diff}$ slots have elapsed
+since the slot of the RB that announced the EB (step 12). This timing constraint
+ensures the certified EB has had sufficient time to diffuse throughout the
+network.
 
-**Transaction Selection**: RB producers follow the content constraints
-detailed in [Step 5: Chain Inclusion](#step-5-chain-inclusion).
+**Transaction Selection**: RB producers follow the content constraints detailed
+in [Step 5: Chain Inclusion](#step-5-chain-inclusion).
 
 #### Ledger Management
 
@@ -959,13 +962,13 @@ types required for EB distribution, voting, and certificate construction.
 <div align="center">
 <a name="table-4" id="table-4"></a>
 
-|   **Protocol**    | **Purpose**                                        | **Timing Constraint**                      |
-| :---------------: | -------------------------------------------------- | ------------------------------------------ |
-| **RbHeaderRelay** | Diffuse RB headers for equivocation detection      | Must achieve $\Delta_\text{hdr}$ diffusion |
-|    **EbRelay**    | Diffuse fresh EBs to enable timely validation      | Must reach voters within $L_\text{equi} + L_\text{vote}$   |
-|   **VoteRelay**   | Diffuse valid votes for certificate aggregation    | Must diffuse within $L_\text{diff}$        |
-|    **EbFetch**    | Retrieve certified EBs for chain reconstruction    | On-demand after certificate inclusion      |
-|    **TxFetch**    | Retrieve referenced transactions for EB validation | Before EB validation completes             |
+|   **Protocol**    | **Purpose**                                        | **Timing Constraint**                                    |
+| :---------------: | -------------------------------------------------- | -------------------------------------------------------- |
+| **RbHeaderRelay** | Diffuse RB headers for equivocation detection      | Must achieve $\Delta_\text{hdr}$ diffusion               |
+|    **EbRelay**    | Diffuse fresh EBs to enable timely validation      | Must reach voters within $L_\text{equi} + L_\text{vote}$ |
+|   **VoteRelay**   | Diffuse valid votes for certificate aggregation    | Must diffuse within $L_\text{diff}$                      |
+|    **EbFetch**    | Retrieve certified EBs for chain reconstruction    | On-demand after certificate inclusion                    |
+|    **TxFetch**    | Retrieve referenced transactions for EB validation | Before EB validation completes                           |
 
 <em>Table 4: Leios Mini-Protocols</em>>
 
@@ -1282,14 +1285,14 @@ future implementations of Leios can be assessed in these terms.
 <div align="center">
 <a name="table-5" id="table-5"></a>
 
-| Category   | Metric                                             | Measurement                                                                                           |
+|  Category  | Metric                                             | Measurement                                                                                           |
 | :--------: | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | Efficiency | Spatial efficiency, $\epsilon_\text{spatial}$      | Ratio of total transactions size to persistent storage                                                |
 |            | Temporal efficiency, $\epsilon_\text{temporal}(s)$ | Time to include transaction on ledger                                                                 |
 |            | Network efficiency, $\epsilon_\text{network}$      | Ratio of total transaction size to node-averaged network usage                                        |
-| Protocol   | TX inclusion, $\tau_\text{inclusion}$              | Mean number of slots for a transaction being included in any EB                                       |
+|  Protocol  | TX inclusion, $\tau_\text{inclusion}$              | Mean number of slots for a transaction being included in any EB                                       |
 |            | Voting failure, $p_\text{noquorum}$                | Probability of sortition failure to elect sufficient voters for a quorum                              |
-| Resource   | Network egress, $q_\text{egress}$                  | Rate of bytes transmitted by a node                                                                   |
+|  Resource  | Network egress, $q_\text{egress}$                  | Rate of bytes transmitted by a node                                                                   |
 |            | Disk usage, $q_\text{disk}$                        | Rate of persistent bytes stored by a node                                                             |
 |            | I/O operations, $\bar{q}_\text{iops}(b)$           | Mean number of I/O operations per second, where each operation writes a filesystem block of $b$ bytes |
 |            | Mean CPU usage, $\bar{q}_\text{vcpu}$              | Mean virtual CPU cores used by a node                                                                 |
@@ -1444,20 +1447,21 @@ The simulation results in the remainder of this section use the Rust simulator
 with a set of protocol parameters suitable for running Linear Leios at 200 kB/s
 of transactions, which corresponds to approximately 150 tx/s of transactions of
 sizes typical on the Cardano mainnet. The maximum size of transactions
-referenced by an EB is 12 MB and the stage lengths are
-$L_\text{equi} = 3$, $L_\text{vote} = 4$, and $L_\text{diff} = 7 \text{ slots}$. In order to illustrate the
-minimal infrastructure resources used by Leios at these throughputs, we have
-limited nodes to 4 virtual CPUs each and limited inter-node bandwidth to 10
-Mb/s. We vary the throughput to illustrate the protocol's behavior in light vs
-congested transaction loads, and inject transaction from the 60th through 960th
-slots of the simulation; the simulation continues until the 1500th slot, so that
-the effects of clearing the memory pool are apparent. The table below summarizes
-the results of the simulation experiment. We see that a transaction at the front
-of the memory pool can become referenced by an EB in as few as 20 seconds when
-the system is lightly or moderately loaded and that it can reach certification
-on the ledger in about one minute. These times can double under congested
-conditions. In all cases there is little overhead, relative to the total bytes
-of transactions, in data that must be stored permanently as the ledger history.
+referenced by an EB is 12 MB and the stage lengths are $L_\text{equi} = 3$,
+$L_\text{vote} = 4$, and $L_\text{diff} = 7 \text{ slots}$. In order to
+illustrate the minimal infrastructure resources used by Leios at these
+throughputs, we have limited nodes to 4 virtual CPUs each and limited inter-node
+bandwidth to 10 Mb/s. We vary the throughput to illustrate the protocol's
+behavior in light vs congested transaction loads, and inject transaction from
+the 60th through 960th slots of the simulation; the simulation continues until
+the 1500th slot, so that the effects of clearing the memory pool are apparent.
+The table below summarizes the results of the simulation experiment. We see that
+a transaction at the front of the memory pool can become referenced by an EB in
+as few as 20 seconds when the system is lightly or moderately loaded and that it
+can reach certification on the ledger in about one minute. These times can
+double under congested conditions. In all cases there is little overhead,
+relative to the total bytes of transactions, in data that must be stored
+permanently as the ledger history.
 
 <div align="center">
 <a name="table-6" id="table-6"></a>
@@ -1484,19 +1488,20 @@ The variability arises from the randomness of the RB production scheduled.
 First, a transaction may has to wait for an RB to be forged; second, a
 transaction referenced by an EB has to wait for the following RB to be forged.
 The EB is discarded, however, if the second RB is produced in fewer than
-$L_\text{equi} + L_\text{vote} + L_\text{diff}$ slots after the first RB. Thus, both the time to the
-next RB and the RB following that introduce unpredictability in a transaction
-reaching the ledger under even lightly loaded conditions. When the sortition
-happens to produce RBs too close together, transactions will accumulate in the
-memory pool, awaiting favorable sortition conditions. If too many accumulate,
-there is not room for all of them to be included in the next EB. The second plot
-below illustrates that all transactions eventually do arrive on the ledger, but
-that they may have to wait long during congestion. During light load a
-transaction takes one or two minutes to reach the ledger, but in heavier load it
-might take three minutes or even longer. The capacity parameter $S_\text{EB-tx}$
-(12 MB/EB in these simulations) fundamentally limits the amortized maximum
-throughput of Linear Leios: furthermore, it affects how long it takes
-transactions to reach the ledger as the throughput approaches the capacity.
+$L_\text{equi} + L_\text{vote} + L_\text{diff}$ slots after the first RB. Thus,
+both the time to the next RB and the RB following that introduce
+unpredictability in a transaction reaching the ledger under even lightly loaded
+conditions. When the sortition happens to produce RBs too close together,
+transactions will accumulate in the memory pool, awaiting favorable sortition
+conditions. If too many accumulate, there is not room for all of them to be
+included in the next EB. The second plot below illustrates that all transactions
+eventually do arrive on the ledger, but that they may have to wait long during
+congestion. During light load a transaction takes one or two minutes to reach
+the ledger, but in heavier load it might take three minutes or even longer. The
+capacity parameter $S_\text{EB-tx}$ (12 MB/EB in these simulations)
+fundamentally limits the amortized maximum throughput of Linear Leios:
+furthermore, it affects how long it takes transactions to reach the ledger as
+the throughput approaches the capacity.
 
 <div align="center">
 <a name="figure-7" id="figure-7"></a>
