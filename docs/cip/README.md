@@ -241,12 +241,7 @@ Blocks, Endorser Blocks, and Certificates</em>
 
 </div>
 
-Figure 3 illustrates the high-level Leios chain structure. When block producers
-create Ranking Blocks (RBs), they may also announce Endorser Blocks (EBs)
-containing references to additional transactions. These EBs undergo committee
-validation, and if successful, their certificates appear in subsequent RBs.
-
-Notice the key timing constraint visible here: some EBs get certified and are
+Notice the timing constraint visible in Figure 3: some EBs get certified and are
 included in the chain (green), while others cannot be certified in time (gray).
 This happens because the protocol requires sufficient time between an EB's
 announcement and the next RB that could potentially include its certificate to
