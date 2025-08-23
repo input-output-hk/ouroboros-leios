@@ -2651,10 +2651,13 @@ requirements to ensure security, efficiency, and practical deployability:
    on Leios voting rounds and the key rotation already present in Praos secure
    the protocol against attacks such as replay and key compromise.
 
-3. **Deterministic signatures:** Deterministic signatures can guard against
-   attacks that weaken key security.
+3. **Deterministic signatures:** While deterministic signatures can provide
+   additional protection against attacks that exploit weak randomness in
+   signature generation, they are not strictly required for protocol security.
+   The main requirement for deterministic randomness is in the lottery
+   mechanism, which is satisfied by the use of VRFs.
 
-4. **Local sortition:** Selection of the voting committee should not be so
+4. **Local lottery:** Selection of the voting committee should not be so
    deterministic and public as to open attack avenues such as denial-of-service
    or subversion.
 
@@ -2681,7 +2684,7 @@ requirements to ensure security, efficiency, and practical deployability:
 The aggregate signature scheme implementation specified in this document (using
 BLS as an example) satisfies all these requirements, as evidenced by the
 performance characteristics and certificate sizes documented in the
-[Specification for votes and certificates](#specification-for-votes-and-certificates)
+[Votes and Certificates](#votes-and-certificates)
 section.
 
 <h3 id="appendix-b-cddl">Appendix B: Wire Format Specifications (CDDL)</h2>
