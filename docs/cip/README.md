@@ -246,13 +246,14 @@ Blocks, Endorser Blocks, and Certificates</em>
 
 </div>
 
-The horizontal spacing in Figure 3 reflects the opportunistic nature of EB inclusion: some EBs get certified and are
-included in the chain (green), while others cannot be certified in time (gray).
-This happens because Praos block production is probabilistic - some RBs will
-naturally occur before there has been sufficient time for the preceding EB to
-gather the necessary votes and certification. EB inclusion is therefore
-opportunistic rather than guaranteed, depending on the random timing of block
-production relative to the certification process. The precise timing mechanism is detailed in the following section.
+The horizontal spacing in Figure 3 reflects the opportunistic nature of EB
+inclusion: some EBs get certified and are included in the chain (green), while
+others cannot be certified in time (gray). This happens because Praos block
+production is probabilistic - some RBs will naturally occur before there has
+been sufficient time for the preceding EB to gather the necessary votes and
+certification. EB inclusion is therefore opportunistic rather than guaranteed,
+depending on the random timing of block production relative to the certification
+process. The precise timing mechanism is detailed in the following section.
 
 ### Protocol Flow
 
@@ -275,8 +276,8 @@ certification</em>
 #### Step 1: Block Production
 
 Leios preserves the existing Praos chain structure while adding additional
-transaction capacity through EBs. When a stake pool wins block leadership, it may
-create two entities:
+transaction capacity through EBs. When a stake pool wins block leadership, it
+may create two entities:
 
 1. **[Ranking Block (RB)](#ranking-blocks-rbs)** A standard Praos block with
    extended header fields to optionally certify one previously announced EB and
@@ -286,12 +287,16 @@ create two entities:
    references to additional transactions.
 
 The RB chain continues to be distributed exactly as in Praos, while Leios
-introduces separate distribution mechanisms for EB headers (for rapid discovery and
-<a id="equivocation" href="#equivocation-detection">equivocation detection</a>), EB bodies, and their referenced transactions.
+introduces separate distribution mechanisms for EB headers (for rapid discovery
+and <a id="equivocation" href="#equivocation-detection">equivocation
+detection</a>), EB bodies, and their referenced transactions.
 
 Due to the voting overhead per EB, EBs should only be announced if the base RB
 is full or when sufficient transaction content justifies the voting costs. Empty
-EBs should not be announced in the network as they induce a non-zero cost. Note that whether an RB is full is not solely determined by its byte size; in particular, the per-block Plutus limits could be the reason a full RB cannot contain additional transactions.
+EBs should not be announced in the network as they induce a non-zero cost. Note
+that whether an RB is full is not solely determined by its byte size; in
+particular, the per-block Plutus limits could be the reason a full RB cannot
+contain additional transactions.
 
 #### Step 2: EB Distribution
 
@@ -313,7 +318,8 @@ RB that announced the EB. A committee member votes for an EB only if:
 1. The RB header arrived within $\Delta_\text{hdr}$,
 2. It has **not** detected any equivocating RB header for the same slot within
    $L_\text{equi}$ slots of the original RB's slot,
-3. It finished validating the EB before $L_\text{equi} + L_\text{vote}$ slots after the start of the EB's slot,
+3. It finished validating the EB before $L_\text{equi} + L_\text{vote}$ slots
+   after the start of the EB's slot,
 4. The EB is the one announced by the latest RB in the voter's current chain,
 5. The EB's transactions form a **valid** extension of the RB that announced it,
 6. For non-persistent voters, it is eligible to vote based on sortition using
@@ -371,7 +377,9 @@ Additionally, all RBs must follow these content constraints:
    **not** both.
 2. All transactions must be valid against the complete ledger state (including
    certified EBs).
-3. If a node lacks some EB data certified by the chain it is extending, it should issue an RB with no transactions so that the honest chain still definitely gains length.
+3. If a node lacks some EB data certified by the chain it is extending, it
+   should issue an RB with no transactions so that the honest chain still
+   definitely gains length.
 
 #### Timing Constraints
 
@@ -414,10 +422,12 @@ headers must propagate within $\Delta_\text{hdr}$ to maintain Praos security
 assumptions.
 
 **Security Guarantee**: By waiting $L_\text{equi}$ slots before voting begins,
-the protocol ensures that if any equivocation occurred soon enough to matter, all honest nodes will have detected it and will refuse to vote for any EB from the equivocating issuer. This
-prevents adversaries from exploiting network partitions to gain unfair
-advantages in the voting process, as honest nodes will only vote for EBs where
-no equivocation was detected during the detection period.
+the protocol ensures that if any equivocation occurred soon enough to matter,
+all honest nodes will have detected it and will refuse to vote for any EB from
+the equivocating issuer. This prevents adversaries from exploiting network
+partitions to gain unfair advantages in the voting process, as honest nodes will
+only vote for EBs where no equivocation was detected during the detection
+period.
 
 > [!NOTE]
 >
@@ -485,7 +495,9 @@ their headers and embedding EB certificates in their bodies.
 1. **Header additions**:
    - `announced_eb` (optional): Hash of the EB created by this block producer
    - `announced_eb_size` (optional): Size in bytes of the announced EB (4 bytes)
-   - `certified_eb` (optional): Single bit indicating whether this RB certifies the EB announced by the previous RB (the EB hash is already available via the previous header's `announced_eb` field)
+   - `certified_eb` (optional): Single bit indicating whether this RB certifies
+     the EB announced by the previous RB (the EB hash is already available via
+     the previous header's `announced_eb` field)
 
 2. **Body additions**:
    - `eb_certificate` (optional): aggregated certificate proving EB validity
@@ -516,9 +528,9 @@ period begins as described in [Votes and Certificates](#votes-and-certificates).
 The EB certificate inclusion follows the timing constraints and rules detailed
 in [Step 5: Chain Inclusion](#step-5-chain-inclusion).
 
-The hash referenced in RB headers (`announced_eb` field) is computed from the 
-complete EB structure and serves as the unique identifier for the EB. The 
-`certified_eb` field is a boolean that references the EB announced by the 
+The hash referenced in RB headers (`announced_eb` field) is computed from the
+complete EB structure and serves as the unique identifier for the EB. The
+`certified_eb` field is a boolean that references the EB announced by the
 previous RB in the chain.
 
 #### Votes and Certificates
