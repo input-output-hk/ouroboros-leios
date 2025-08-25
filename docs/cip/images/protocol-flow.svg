@@ -172,28 +172,21 @@
       </g>
     </a>
     
-    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#delta-rb" class="timing-link">
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#delta-applytxs" class="timing-link">
       <g id="tx-processing">
         <line x1="775" y1="425" x2="775" y2="435" stroke="#b8860b" stroke-width="2"/>
         <line x1="775" y1="430" x2="855" y2="430" stroke="#b8860b" stroke-width="2" stroke-dasharray="4,2"/>
         <line x1="855" y1="425" x2="855" y2="435" stroke="#b8860b" stroke-width="2"/>
-        <text x="815" y="415" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#b8860b">Δ<tspan font-size="14" baseline-shift="sub">TX</tspan></text>
+        <text x="815" y="415" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#b8860b">Δ<tspan font-size="14" baseline-shift="sub">applyTxs</tspan><tspan font-size="12" baseline-shift="super">A</tspan></text>
       </g>
     </a>
     
     <g id="network-chars-vote">
       <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#delta-eb-H" class="delta-link">
         <line x1="250" y1="425" x2="250" y2="435" stroke="#4caf50" stroke-width="2"/>
-        <line x1="250" y1="430" x2="350" y2="430" stroke="#4caf50" stroke-width="2" stroke-dasharray="4,2"/>
-        <line x1="350" y1="425" x2="350" y2="435" stroke="#4caf50" stroke-width="2"/>
-        <text x="300" y="415" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#4caf50">Δ<tspan font-size="14" baseline-shift="sub">EB</tspan><tspan font-size="12" baseline-shift="super">H</tspan></text>
-      </a>
-      
-      <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#delta-cpu" class="delta-link">
-        <line x1="355" y1="425" x2="355" y2="435" stroke="#9c27b0" stroke-width="2"/>
-        <line x1="355" y1="430" x2="455" y2="430" stroke="#9c27b0" stroke-width="2" stroke-dasharray="4,2"/>
-        <line x1="455" y1="425" x2="455" y2="435" stroke="#9c27b0" stroke-width="2"/>
-        <text x="405" y="415" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#9c27b0">Δ<tspan font-size="14" baseline-shift="sub">CPU</tspan><tspan font-size="12" baseline-shift="super">H</tspan></text>
+        <line x1="250" y1="430" x2="460" y2="430" stroke="#4caf50" stroke-width="2" stroke-dasharray="4,2"/>
+        <line x1="460" y1="425" x2="460" y2="435" stroke="#4caf50" stroke-width="2"/>
+        <text x="355" y="415" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#4caf50">Δ<tspan font-size="14" baseline-shift="sub">EB</tspan><tspan font-size="12" baseline-shift="super">H</tspan></text>
       </a>
     </g>
     
@@ -201,17 +194,17 @@
       <!-- Delta EB wc (extends beyond RB' creation) -->
       <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#delta-eb-A" class="delta-link">
         <line x1="250" y1="465" x2="250" y2="475" stroke="#ff5722" stroke-width="2"/>
-        <line x1="250" y1="470" x2="750" y2="470" stroke="#ff5722" stroke-width="2" stroke-dasharray="4,2"/>
-        <line x1="750" y1="465" x2="750" y2="475" stroke="#ff5722" stroke-width="2"/>
-        <text x="500" y="455" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#ff5722">Δ<tspan font-size="14" baseline-shift="sub">EB</tspan><tspan font-size="12" baseline-shift="super">A</tspan></text>
+        <line x1="250" y1="470" x2="810" y2="470" stroke="#ff5722" stroke-width="2" stroke-dasharray="4,2"/>
+        <line x1="810" y1="465" x2="810" y2="475" stroke="#ff5722" stroke-width="2"/>
+        <text x="530" y="455" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#ff5722">Δ<tspan font-size="14" baseline-shift="sub">EB</tspan><tspan font-size="12" baseline-shift="super">A</tspan></text>
       </a>
       
       <!-- Delta reapply (after EB wc with small gap, same y-position) -->
       <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#delta-reapply" class="delta-link">
-        <line x1="755" y1="465" x2="755" y2="475" stroke="#2196F3" stroke-width="2"/>
-        <line x1="755" y1="470" x2="820" y2="470" stroke="#2196F3" stroke-width="2" stroke-dasharray="4,2"/>
-        <line x1="820" y1="465" x2="820" y2="475" stroke="#2196F3" stroke-width="2"/>
-        <text x="790" y="455" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#2196F3">Δ<tspan font-size="14" baseline-shift="sub">reapply</tspan><tspan font-size="12" baseline-shift="super">A</tspan></text>
+        <line x1="815" y1="465" x2="815" y2="475" stroke="#2196F3" stroke-width="2"/>
+        <line x1="815" y1="470" x2="855" y2="470" stroke="#2196F3" stroke-width="2" stroke-dasharray="4,2"/>
+        <line x1="855" y1="465" x2="855" y2="475" stroke="#2196F3" stroke-width="2"/>
+        <text x="835" y="455" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#2196F3">Δ<tspan font-size="14" baseline-shift="sub">reapply</tspan><tspan font-size="12" baseline-shift="super">A</tspan></text>
       </a>
     </g>
     
