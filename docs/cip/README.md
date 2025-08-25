@@ -385,8 +385,8 @@ Additionally, all RBs must follow these content constraints:
 
 #### Protocol Phases
 
-The timing constraints work together to maintain Praos's security assumptions
-while enabling higher throughput. These constraints prevent scenarios where
+The protocol phases work together to maintain Praos's security assumptions
+while enabling higher throughput. These phases prevent scenarios where
 honest nodes would be forced to delay chain adoption due to missing data.
 
 The certificate inclusion process (Steps 3-5) involves three sequential timing
@@ -522,7 +522,7 @@ simplified structure:
 
 When an EB is announced in an RB header via the `announced_eb` field, a voting
 period begins as described in [Votes and Certificates](#votes-and-certificates).
-The EB certificate inclusion follows the timing constraints and rules detailed
+The EB certificate inclusion follows the protocol phases and rules detailed
 in [Step 5: Chain Inclusion](#step-5-chain-inclusion).
 
 The hash referenced in RB headers (`announced_eb` field) is computed from the
