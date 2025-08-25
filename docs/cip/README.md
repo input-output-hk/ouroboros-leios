@@ -504,6 +504,7 @@ RBs are Praos blocks extended to support Leios by optionally announcing EBs in
 their headers and embedding EB certificates in their bodies.
 
 1. **Header additions**:
+
    - `announced_eb` (optional): Hash of the EB created by this block producer
    - `announced_eb_size` (optional): Size in bytes of the announced EB (4 bytes)
    - `certified_eb` (optional): Single bit indicating whether this RB certifies
@@ -1734,17 +1735,18 @@ The [Leios paper][leios-paper] provides a rigorous theoretical analysis of the
 safety and throughput of the protocol. That has been reinforced and demonstrated
 by prototype simulations written in Haskell and Rust.
 
-The simulation results use a [mainnet-like topology][mainnet-topology] that accurately
-reflects the characteristics of the Cardano mainnet. This includes a realistic
-distribution of stake and a representative number of stake pools. The network is
-designed with a total of 10,000 nodes [pseudo-mainnet][pseudo-mainnet] or 750 nodes
-[mini-mainnet][mini-mainnet], where each block producer is connected exclusively to
-two dedicated relays. Furthermore, the topology incorporates realistic latencies
-based on the [RIPE Atlas][ripe-atlas] ping dataset and bandwidth that aligns with the
-lower end of what is typically found in cloud data centers. The node
-connectivity and geographic distribution (across various countries and
-autonomous systems) are also consistent with real-world measurements. [A
-simulation study][topology-comparison] has demonstrated that analysis conclusions deriving
+The simulation results use a [mainnet-like topology][mainnet-topology] that
+accurately reflects the characteristics of the Cardano mainnet. This includes a
+realistic distribution of stake and a representative number of stake pools. The
+network is designed with a total of 10,000 nodes
+[pseudo-mainnet][pseudo-mainnet] or 750 nodes [mini-mainnet][mini-mainnet],
+where each block producer is connected exclusively to two dedicated relays.
+Furthermore, the topology incorporates realistic latencies based on the [RIPE
+Atlas][ripe-atlas] ping dataset and bandwidth that aligns with the lower end of
+what is typically found in cloud data centers. The node connectivity and
+geographic distribution (across various countries and autonomous systems) are
+also consistent with real-world measurements. [A simulation
+study][topology-comparison] has demonstrated that analysis conclusions deriving
 from the `mini-mainnet` topology are also valid for the `pseudo-mainnet`
 topology; the advantage of using the former is that simulations run much more
 quickly. Simulated RB diffusion is consistent with the [Praos performance
@@ -1960,11 +1962,10 @@ suggests that the per-transaction and/or per-block Plutus budget could be
 significantly increased under Leios: either every transaction could have a
 modestly higher budget, or some transactions could use an order of magnitude
 more Plutus execution units. Statistical analysis of [CPU usage in ledger
-operations][timings] using the [db-analyser tool][dbanalyser] on Cardano
-mainnet from epoch 350 through 573 yields the following simple models of the CPU
-cost of validating signatures and executing Plutus in the transactions of a
-block. Because of the noisiness in the raw mainnet data, these estimates are
-uncertain.
+operations][timings] using the [db-analyser tool][dbanalyser] on Cardano mainnet
+from epoch 350 through 573 yields the following simple models of the CPU cost of
+validating signatures and executing Plutus in the transactions of a block.
+Because of the noisiness in the raw mainnet data, these estimates are uncertain.
 
 - Ledger "apply" operation, consisting of phase 1 & 2 validation along with
   updating the current ledger state:
@@ -2160,10 +2161,10 @@ testnet.
 The analysis [Committee size and quorum requirement][committee-size-analysis] in
 the first Leios Technical Report indicates that the Leios committee size should
 be no smaller than 500 votes and the quorum should be at least 60% of those
-votes. However, the proposed [Fait Accompli][fait-accompli-sortition]
-scheme wFA<sup>LS</sup> achieves compact certificates that do not become larger
-as the number of voters increases, so larger committee sizes might be permitted
-for broader SPO participation and higher security. The committee size should be
+votes. However, the proposed [Fait Accompli][fait-accompli-sortition] scheme
+wFA<sup>LS</sup> achieves compact certificates that do not become larger as the
+number of voters increases, so larger committee sizes might be permitted for
+broader SPO participation and higher security. The committee size should be
 large enough that fluctuations in committee membership do not create an
 appreciable probability of an adversarial quorum when the adversarial stake is
 just under 50%. The quorum size should be kept large enough above 50% so that
@@ -2521,7 +2522,8 @@ protocol.
 
 **Technical Reports**
 
-- **Committee size and quorum requirement** - [Analysis][committee-size-analysis]
+- **Committee size and quorum requirement** -
+  [Analysis][committee-size-analysis]
 - **Threat model** - [Report #1][threat-model]
 - **Leios attack surface** - [Report #2][threat-model-report2]
 - **Node operating costs** - [Cost estimate][cost-estimate]
@@ -2536,15 +2538,18 @@ protocol.
 - **Synthetic mainnet** - [Mainnet-like topologies for Leios][mainnet-topology]
 - **10k-node network** - [Leios pseudo-mainnet topology][pseudo-mainnet]
 - **750-node network** - [Leios mini-mainnet topology][mini-mainnet]
-- **Comparison of 10k-node and 750-node networks** - [Mainnet comparison study][topology-comparison]
-- **Validation times** -  [Analysis of mainnet transaction validation times][timings]
+- **Comparison of 10k-node and 750-node networks** - [Mainnet comparison
+  study][topology-comparison]
+- **Validation times** - [Analysis of mainnet transaction validation
+  times][timings]
 
 **External**
 
 - **RIPE Atlas** - [Network measurements][ripe-atlas]
 - **Ledger analyser tool** - [db-analyser][dbanalyser]
 - **UTXO-HD** - [Cardano Node 10.5.1][utxohd]
-- **SPO hardware requirements** - [Minimmum hardware requirements to run a stake pool][spohw]
+- **SPO hardware requirements** - [Minimmum hardware requirements to run a stake
+  pool][spohw]
 
 <!-- Reference Index - DO NOT REMOVE -->
 <!-- The following reference definitions enable consistent linking throughout the document -->
