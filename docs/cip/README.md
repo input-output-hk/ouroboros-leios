@@ -637,7 +637,8 @@ Three constraints underpin this argument:
 
 **1. EB Diffusion Constraint**
 
-Honest EBs must diffuse completely (transmission + processing) within the time available for [equivocation detection](#equivocation-detection) and voting.
+Honest EBs must diffuse completely (transmission + processing) within the time
+available for [equivocation detection](#equivocation-detection) and voting.
 
 $$L_\text{equi} + L_\text{vote} > \Delta_\text{EB}^{\text{H}}$$
 
@@ -649,7 +650,8 @@ $$\Delta_\text{reapply} < \Delta_\text{applyTxs}$$
 
 **3. Certified EB Transmission Constraint**
 
-Any certified EB referenced by an RB must transmit (not process) before that RB needs processing.
+Any certified EB referenced by an RB must transmit (not process) before that RB
+needs processing.
 
 $$\Delta_\text{EB}^{\text{A}} < L_\text{equi} + L_\text{vote} + L_\text{diff} + (\Delta_\text{RB} - \Delta_\text{applyTxs})$$
 
