@@ -155,10 +155,10 @@
     </g>
     
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#l-diff" class="param-link">
-      <line x1="460" y1="340" x2="580" y2="340" stroke="#4caf50" stroke-width="1" stroke-dasharray="2,2"/>
-      <path d="M 460 340 L 460 345 Q 460 350 465 350 L 515 350 L 520 357 L 525 350 L 575 350 Q 580 350 580 345 L 580 340" 
+      <line x1="460" y1="340" x2="670" y2="340" stroke="#4caf50" stroke-width="1" stroke-dasharray="2,2"/>
+      <path d="M 460 340 L 460 345 Q 460 350 465 350 L 560 350 L 565 357 L 570 350 L 665 350 Q 670 350 670 345 L 670 340" 
             stroke="#4caf50" stroke-width="2" fill="none"/>
-      <text x="520" y="375" font-size="18" text-anchor="middle" fill="#4caf50">
+      <text x="565" y="375" font-size="18" text-anchor="middle" fill="#4caf50">
         <tspan font-family="serif" font-style="italic" font-size="24">L</tspan><tspan font-family="Arial, sans-serif" font-size="16" baseline-shift="sub">diff</tspan>
       </text>
     </a>
