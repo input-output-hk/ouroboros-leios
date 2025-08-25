@@ -177,7 +177,7 @@
         <line x1="775" y1="425" x2="775" y2="435" stroke="#b8860b" stroke-width="2"/>
         <line x1="775" y1="430" x2="855" y2="430" stroke="#b8860b" stroke-width="2" stroke-dasharray="4,2"/>
         <line x1="855" y1="425" x2="855" y2="435" stroke="#b8860b" stroke-width="2"/>
-        <text x="815" y="415" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#b8860b">Δ<tspan x="837" font-size="14" baseline-shift="sub">TX</tspan><tspan font-size="12" baseline-shift="super">A</tspan></text>
+        <text x="815" y="415" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#b8860b">Δ<tspan font-size="14" baseline-shift="sub">TX</tspan></text>
       </g>
     </a>
     
