@@ -257,10 +257,10 @@ process. The precise timing mechanism is detailed in the following section.
 
 ### Protocol Flow
 
-The protocol operates through the following steps. Figure 4 visualizes the
-precise timing mechanism that governs when certificates can be safely included
-in the chain, showing both the protocol phases and the underlying network
-characteristics that inform their design.
+The protocol operates through five sequential steps that span three critical
+timing phases. Figure 4 visualizes the precise timing mechanism that governs
+when certificates can be safely included in the chain, showing both the protocol
+phases and the underlying network characteristics that inform their design.
 
 <div align="center">
   <a name="figure-4" id="figure-4"></a>
@@ -307,11 +307,10 @@ peers.
 
 #### Step 3: Committee Validation
 
-A voting committee of stake pools validates the EB. As depicted in Figure 4,
-votes are collected during the $L_\text{vote}$ period following the EB
-announcement, with voting beginning $L_\text{equi}$ slots after the slot of the
-RB that announced the EB to ensure sufficient time for
-<a href="#equivocation">equivocation detection</a>. Committee members are
+After **[Phase 1: Equivocation Detection](#equivocation-detection)**
+($L_\text{equi}$) completes to ensure network security, a voting committee of
+stake pools validates the EB during **[Phase 2: Voting Period](#voting-period)**
+(shown in Figure 4 as $L_\text{vote}$). Committee members are
 [selected via sortition](#committee-structure) based on the slot number of the
 RB that announced the EB. A committee member votes for an EB only if:
 
@@ -331,28 +330,30 @@ and network characteristics</a> represented by a number of slots.
 
 #### Step 4: Certification
 
-If enough committee votes are collected such that the total stake exceeds a
-**high threshold** parameter ($\tau$), for example 75%, the EB becomes
-**certified**:
+During the voting period, if enough committee votes are collected such that the
+total stake exceeds a **high threshold** parameter ($\tau$), for example 75%,
+the EB becomes **certified**:
 
 $$
 \sum_{v \in \text{votes}} \text{stake}(v) \geq \tau \times \text{stake}_{\text{total-active}}
 $$
 
-When this threshold is met, the EB becomes **certified**. The **high voting
-threshold** (e.g., 75%) ensures that any certified EB is already known to a
-large portion of the network (>25% even with 50% adversarial stake) by the end
-of the voting period. This widespread initial knowledge enables the network
-assumption that the EB will reach all honest parties within the additional
-diffusion period $L_\text{diff}$. See [timing constraints](#timing-constraints)
-for details. A ranking block (RB) producer can then construct a compact
-**certificate** proving the EB's validity by aggregating the collected votes.
+The **high voting threshold** (e.g., 75%) ensures that any certified EB is
+already known to a large portion of the network (>25% even with 50% adversarial
+stake) by the end of the voting period. This widespread initial knowledge
+enables the network assumption that the EB will reach all honest parties within
+the additional diffusion period $L_\text{diff}$. See
+[timing constraints](#timing-constraints) for details. A ranking block (RB)
+producer can then construct a compact **certificate** proving the EB's validity
+by aggregating the collected votes.
 
 #### Step 5: Chain Inclusion
 
-When an RB producer creates a new ranking block `RB'`, they must decide whether
-to include a certificate for the EB announced by the preceding RB. This
-inclusion decision follows these rules:
+After **[Phase 3: Diffusion Period](#diffusion-period)** ($L_\text{diff}$)
+completes, an RB producer creating a new ranking block `RB'` may include a
+certificate for the EB announced by the preceding RB. As shown in Figure 4, this
+occurs only after the complete timing sequence has elapsed. The inclusion
+decision follows these rules:
 
 1. `RB'` directly extends the RB which announced the EB (as illustrated in
    Figure 4 where `RB'` contains the certificate for the EB announced by the
@@ -385,9 +386,16 @@ Additionally, all RBs must follow these content constraints:
 
 The timing constraints work together to maintain Praos's security assumptions
 while enabling higher throughput. These constraints prevent scenarios where
-honest nodes would be forced to delay chain adoption due to missing data. The
-certificate inclusion process (Steps 3-5) involves three sequential timing
-phases:
+honest nodes would be forced to delay chain adoption due to missing data.
+
+The certificate inclusion process (Steps 3-5) involves three sequential timing
+phases that are visible in Figure 4:
+
+- **Phase 1** ($L_\text{equi}$): Equivocation detection occurs immediately after
+  EB announcement
+- **Phase 2** ($L_\text{vote}$): Committee voting takes place during Step 3
+- **Phase 3** ($L_\text{diff}$): Network-wide diffusion ensures availability
+  before Step 5
 
 <a id="equivocation-detection"></a>
 
