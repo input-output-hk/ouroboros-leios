@@ -56,12 +56,12 @@ sustainability and reduced complexity through fewer new protocol elements.
     - [Step 3: Committee Validation](#step-3-committee-validation)
     - [Step 4: Certification](#step-4-certification)
     - [Step 5: Chain Inclusion](#step-5-chain-inclusion)
-    - [Timing Constraints](#timing-constraints)
+    - [Protocol Phases](#protocol-phases)
   - [Protocol Entities](#protocol-entities)
     - [Ranking Blocks (RBs)](#ranking-blocks-rbs)
     - [Endorser Blocks (EBs)](#endorser-blocks-ebs)
     - [Votes and Certificates](#votes-and-certificates)
-  - [Security Analysis](#security-analysis)
+  - [Security Argument](#security-argument)
   - [Network Characteristics and Protocol Parameters](#network-characteristics-and-protocol-parameters)
   - [Node Behavior](#node-behavior)
     - [Transaction Diffusion](#transaction-diffusion)
@@ -344,7 +344,7 @@ already known to a large portion of the network (>25% even with 50% adversarial
 stake) by the end of the voting period. This widespread initial knowledge
 enables the network assumption that the EB will reach all honest parties within
 the additional diffusion period $L_\text{diff}$. See
-[timing constraints](#timing-constraints) for details. A ranking block (RB)
+[protocol phases](#protocol-phases) for details. A ranking block (RB)
 producer can then construct a compact **certificate** proving the EB's validity
 by aggregating the collected votes.
 
@@ -383,7 +383,7 @@ Additionally, all RBs must follow these content constraints:
    issues an RB with no transactions so that the honest chain still definitely
    gains length.
 
-#### Timing Constraints
+#### Protocol Phases
 
 The timing constraints work together to maintain Praos's security assumptions
 while enabling higher throughput. These constraints prevent scenarios where
@@ -453,12 +453,11 @@ period.
 
 **Phase 2: Voting Period ($L_\text{vote}$)**
 
-The voting period must accommodate both EB propagation and validation:
+The voting period must accommodate EB diffusion (transmission and processing):
 
-$$L_\text{vote} > \Delta_\text{EB}^{\text{H}} + \Delta_\text{CPU}$$
+$$L_\text{equi} + L_\text{vote} > \Delta_\text{EB}^{\text{H}}$$
 
-where $\Delta_\text{EB}^{\text{H}}$ (honest EB propagation time), and
-$\Delta_\text{CPU}$ (validation time) are defined in the
+where $\Delta_\text{EB}^{\text{H}}$ (honest EB diffusion time including transmission and processing) is defined in the
 [network characteristics](#network-characteristics) section.
 
 This ensures all honest committee members can participate by having sufficient
@@ -622,36 +621,33 @@ certificates specification][bls-spec].
 > However, this only applies when EB production is decoupled from RBs, which is
 > not the case in this specification where each EB is announced by an RB.
 
-### Security Analysis
+### Security Argument
 
-The protocol's security reduces to Praos security through careful timing
-constraints that preserve Praos assumptions while enabling higher throughput.
+Leios security reduces to Praos security. The key insight is ensuring that any RB containing an EB certificate processes within the same $\Delta_\text{RB}$ time bound as standard Praos blocks.
 
-In Praos analysis, new RBs are assumed to be diffused and processed within
-$\Delta_\text{RB}$ slots. This total time decomposes into:
+The protocol relies on a 75% voting threshold. This means any certified EB is already known to at least 25% of honest nodes by the end of voting, even with 50% adversarial stake. Once an EB has this level of initial distribution, it can reach the remaining honest parties within the diffusion period $L_\text{diff}$.
 
-1. **Diffusion time**: $\Delta_\text{RB} - \Delta_\text{TX}$ slots for network
-   propagation
-2. **Processing time**: $\Delta_\text{TX}$ slots for transaction validation and
-   ledger updates
+Three constraints underpin this argument:
 
-The following constraint ensures that any certified EB required for RB
-validation arrives before the RB needs processing:
+**1. EB Diffusion Constraint**
+$$L_\text{equi} + L_\text{vote} > \Delta_\text{EB}^{\text{H}}$$
+Honest EBs must diffuse completely (transmission + processing) within the time available for [equivocation detection](#equivocation-detection) and voting.
 
-$$L_\text{equi} + L_\text{vote} + L_\text{diff} + \Delta_\text{RB'} > \Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply}$$
+**2. EB Reapplication Constraint**
+$$\Delta_\text{reapply} < \Delta_\text{applyTxs}$$
+Reapplying a certified EB cannot cost more than standard transaction processing.
 
-where `RB'` refers to the second ranking block in [Figure 4](#figure-4) that
-includes the certificate for the EB announced by the preceding RB. Since
-applying a certified EB is part of RB validation, the reapplication cost must
-not exceed standard transaction processing:
+**3. Certified EB Transmission Constraint**
+$$\Delta_\text{EB}^{\text{A}} < L_\text{equi} + L_\text{vote} + L_\text{diff} + (\Delta_\text{RB} - \Delta_\text{applyTxs})$$
+Any certified EB referenced by an RB must transmit (not process) before that RB needs processing.
 
-$$\Delta_\text{reapply} < \Delta_\text{TX}$$
+> [!Note]
+> 
+>  $\Delta_\text{EB}^{\text{H}}$ includes both transmission and processing since nodes receive fresh EBs. $\Delta_\text{EB}^{\text{A}}$ is transmission-only since certified EBs were already processed during voting by ≥75% of the network.
 
-Combined, these constraints ensure that:
+These constraints ensure that any RB with an EB certificate processes within $\Delta_\text{RB}$ slots, just like standard Praos blocks. The RB transmits within $\Delta_\text{RB} - \Delta_\text{applyTxs}$ slots. Constraint 3 ensures required EBs transmit by then. Constraint 2 ensures EB reapplication adds <$\Delta_\text{applyTxs}$ processing time. Therefore: total time < $\Delta_\text{RB}$.
 
-- Certified EBs propagate within available diffusion time
-- RB processing (including EB reapplication) completes within $\Delta_\text{TX}$
-- Praos timing assumptions remain valid, preserving safety and liveness
+This preserves Praos safety and liveness while maintaining transaction validity in all RBs.
 
 ### Network Characteristics and Protocol Parameters
 
@@ -674,8 +670,8 @@ availability:
 | ------------------------------------------------------------------ | :---------------------------: | ------------------------------------------------------------------------ | :---------------------------: |
 | <a id="delta-hdr" href="#delta-hdr"></a>Header propagation         |      $\Delta_\text{hdr}$      | Time for constant size headers (< 1,500 bytes) to propagate network-wide |            <1 slot            |
 | <a id="delta-rb" href="#delta-rb"></a>RB diffusion                 |      $\Delta_\text{RB}$       | Complete ranking block propagation and adoption time                     |           <5 slots            |
-| <a id="delta-eb-H" href="#delta-eb-H"></a>EB honest diffusion      | $\Delta_\text{EB}^{\text{H}}$ | EB propagation time when released on schedule with no fresher EB         |          7-10 slots           |
-| <a id="delta-eb-A" href="#delta-eb-A"></a>EB adversarial diffusion | $\Delta_\text{EB}^{\text{A}}$ | EB propagation time starting from >25% network coverage after voting     |          15-20 slots          |
+| <a id="delta-eb-H" href="#delta-eb-H"></a>EB honest diffusion      | $\Delta_\text{EB}^{\text{H}}$ | EB **diffusion** time (transmission + processing) when released on schedule with no fresher EB         |          7-10 slots           |
+| <a id="delta-eb-A" href="#delta-eb-A"></a>EB adversarial transmission | $\Delta_\text{EB}^{\text{A}}$ | EB **transmission** time for certified EBs starting from >25% network coverage (processing already completed during voting)     |          15-20 slots          |
 
 <em>Table 1: Network Characteristics</em>
 
@@ -686,9 +682,8 @@ availability:
 
 | Characteristic                                                   |         Symbol          | Description                                                         | Observed Range by Simulations |
 | ---------------------------------------------------------------- | :---------------------: | ------------------------------------------------------------------- | :---------------------------: |
-| <a id="delta-cpu" href="#delta-cpu"></a>EB validation            |   $\Delta_\text{CPU}$   | Full EB validation including signatures, scripts, and state updates |           2-4 slots           |
 | <a id="delta-reapply" href="#delta-reapply"></a>EB reapplication | $\Delta_\text{reapply}$ | Certified EB reapplication with minimal checks and UTxO updates     |            <1 slot            |
-| <a id="delta-tx" href="#delta-tx"></a>Transaction validation     |   $\Delta_\text{TX}$    | Standard Praos transaction validation time for RB processing        |            ~1 slot            |
+| <a id="delta-applytxs" href="#delta-applytxs"></a>Transaction validation     |   $\Delta_\text{applyTxs}$    | Standard Praos transaction validation time for RB processing        |            ~1 slot            |
 
 <em>Table 2: Ledger Characteristics</em>
 
@@ -2068,10 +2063,9 @@ consider the following example based on simulated network measurements:
 
 - $\Delta_\text{hdr} = 1$ slot, $\Delta_\text{RB} = 5$ slots (Cardano Mainnet
   assumption for Praos security)
-- $\Delta_\text{EB}^{\text{H}} = 7$ slots, $\Delta_\text{EB}^{\text{A}} = 15$
-  slots (EB diffusion times)
-- $\Delta_\text{CPU} = 3$ slots, $\Delta_\text{reapply} = 1$ slot (validation
-  times)
+- $\Delta_\text{EB}^{\text{H}} = 7$ slots (EB diffusion: transmission + processing), $\Delta_\text{EB}^{\text{A}} = 15$
+  slots (EB transmission time for certified EBs)
+- $\Delta_\text{reapply} = 1$ slot (EB reapplication time)
 
 **Timing Parameter Calibration:**
 
@@ -2311,15 +2305,15 @@ ecosystem compatibility.
 
 **Security Considerations:**
 
-The proposed specification maintains Praos security properties while introducing
-minimal new attack vectors. New threats include equivocation by EB
-producers/voters, transaction availability attacks, and denial-of-service
-through invalid transactions. These are mitigated through cryptographic
-validation, equivocation detection, redundant connections, and economic
-disincentives. Comprehensive analysis is documented in the
-[threat model](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/threat-model.md)
-and
-[technical reports](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-2.md).
+The proposed specification maintains Praos security properties through formal
+timing constraints that ensure RB processing stays within Praos bounds. The
+high-participation design (75% voting threshold) eliminates invalid transactions
+in RBs and provides strong network assumptions for certified EB propagation.
+New threats include equivocation by EB producers/voters and transaction
+availability attacks, mitigated through cryptographic validation, equivocation
+detection, and the high voting threshold requirement. Comprehensive analysis is
+documented in the [Security Analysis](#security-analysis) section and
+[threat model](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/threat-model.md).
 
 ### Alternatives & Extensions
 
