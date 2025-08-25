@@ -493,6 +493,7 @@ RBs are Praos blocks extended to support Leios by optionally announcing EBs in
 their headers and embedding EB certificates in their bodies.
 
 1. **Header additions**:
+
    - `announced_eb` (optional): Hash of the EB created by this block producer
    - `announced_eb_size` (optional): Size in bytes of the announced EB (4 bytes)
    - `certified_eb` (optional): Single bit indicating whether this RB certifies
@@ -957,20 +958,16 @@ mempool capacity to support both RB and EB transaction pools.
 
 #### Leios Mini-Protocols
 
-Leios will introduce new mini-protocols to handle the additional message types
-required for EB distribution, voting, and certificate construction.
+Leios must introduce new mini-protocols to handle the additional message types
+required for EB distribution, voting, and certificate construction. Despite the
+precedent for some CIPs to leave those concrete details for implementors to
+decide, the diffculty of satisfying all of the requirements on a Leios
+implementation motivates including a concrete proposal in this CIP.
 
-This CIP does not specify how exactly Leios nodes exchange messages. Those
-details must eventually be specified so that different node implementations can
-interoperate, but that standardization can be deferred to a follow-up CIP. The
-present CIP is only obligated to list key requirements and demonstrate they're
-satisfiable—that some implementation is feasible and not prohibitively
-complicated.
-
-To that end, this CIP does include an example concrete message exchange scheme
-and an argument its resource utilization is sufficiently bounded. But these
-details do not necessarily constrain the Leios implementation. (TODO relegate
-this to an appendix?)
+In addition, this section summarizes the requirements for the proposed
+mini-protocols and why they're satisfied. This demonstrates the collective
+requirements are satisfiable---that some implementation is feasible and not
+prohibitively complicated.
 
 **Requirements**
 
@@ -995,7 +992,7 @@ The implementation of the Leios overlay must satisfy the following requirements.
   exceptions. The necessary resources already exist; Praos just can't utilize
   them all.
 - **Tolerable Implementation Complexity**. The above requirements must admit an
-  implementation without incurring prohibitive costs for construction and future
+  implementation without incurring prohibitive costs for development and future
   maintenance.
 
 **Discussion**
@@ -1006,10 +1003,10 @@ Praos; the currently unutilized resources are sufficient for Leios. More
 aggressive Leios deployments/extensions in the future will have to navigate that
 trade-off, but simulations indicate that it's not already required by this CIP,
 with two possible exceptions. First, nodes might require additional disk
-capacity as a direct result of the increased throughput (TODO link to CPS for
-archival nodes). Second, a party with significant stake might need to provision
-more resources across their relays since each of the hundreds of downstream
-peers is now more demanding on average.
+capacity as a direct result of the increased throughput, until Cardano perhaps
+relegates historical data to some dedicated archival nodes. Second, a party with
+significant stake might need to provision more resources across their relays
+since each of the hundreds of downstream peers is now more demanding on average.
 
 **Praos Independence**.To prevent Leios from accidentally depriving Praos of
 resources, the node implementation must prioritize Praos over Leios. For
@@ -1020,9 +1017,9 @@ strictly more urgent than that EB.
 _Remark_. In contrast, the EB certified by a RB that also includes some
 transactions is exactly as urgent as that RB, because the RB cannot be selected
 without the EB. The $L_\text{diff}$ parameter prevents such urgency inversion
-from occurring enough to matter, as explained in the Leios security argument
-(TODO link section), but that is assuming nodes automatically eventually recover
-when it does happen.
+from occurring enough to matter (see the
+[Timing Constraints](#timing-constraints) section), but that is assuming nodes
+automatically eventually recover when it does happen.
 
 In reality, the prioritization of Praos over Leios does not need to be perfectly
 strict (and in fact could never be on hardware and software infrastructure that
@@ -1128,7 +1125,7 @@ one-to-one.
 | ------- | ------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Client→ | MsgLeiosNotificationRequestNext | $\emptyset$                                                  | Requests one Leios notifications, the announcement of an EB or delivery offers for blocks, transactions, and votes.                                                                                                                   |
 | ←Server | MsgLeiosBlockAnnouncement       | RB header that announces an EB                               | The server has seen this EB announcement.                                                                                                                                                                                             |
-| ←Server | MsgLeiosBlockOffer              | slot and Leios hash                                          | The server could immediately deliver this block.                                                                                                                                                                                      |
+| ←Server | MsgLeiosBlockOffer              | slot, Leios hash, and byte size                              | The server could immediately deliver this block.                                                                                                                                                                                      |
 | ←Server | MsgLeiosBlockTxsOffer           | slot and Leios hash                                          | The server could immediately deliver any transaction referenced by this block.                                                                                                                                                        |
 | ←Server | MsgLeiosVotesOffer              | list of slot and vote-issuer-id pairs                        | The server could immediately deliver votes with these identifiers.                                                                                                                                                                    |
 | Client→ | MsgLeiosBlockRequest            | slot and Leios hash                                          | The server must now send deliver this block.                                                                                                                                                                                          |
@@ -1193,11 +1190,11 @@ This mini-protocol pair satisfies the above requirements in the following ways.
   Devoted BlockFetch variant can be easily copied for MsgLeiosBlockRangeRequest
   if Ouroboros Genesis is enabled.
 - MsgLeiosBlockRangeRequest also allows the unfortunate node that suffers from a
-  $\Delta_{EB}$ violation to recover, i.e. when it didn't receive a certified EB
-  before receiving the RB that certifies it. The protocol design requires that
-  that event is rare or at least confined to a small portion of honest stake at
-  a time. But it will occasionally happen to some honest nodes, and they must be
-  able to recover automatically and with minimal disruption.
+  $\Delta^\text{A}_\text{EB}$ violation to recover, i.e. when it didn't receive
+  a certified EB before receiving the RB that certifies it. The protocol design
+  requires that that event is rare or at least confined to a small portion of
+  honest stake at a time. But it will occasionally happen to some honest nodes,
+  and they must be able to recover automatically and with minimal disruption.
 - Every Leios object is associated with the slot of an EB, and so has an
   explicit age. This enables freshest-first delivery prioritization. In
   addition, objects of a certain age should no longer diffuse, or at least can
@@ -1212,7 +1209,8 @@ This mini-protocol pair satisfies the above requirements in the following ways.
   is low enough to admit existing Cardano infrastructure.
 
 The mini-protocol pair does not already address the following challenges, but
-the corresponding enrichments---if necessary---seem tractable.
+the corresponding enrichments---if necessary---would not contradict the
+Tolerable Implementation Complexity requirement.
 
 - Depending on how severely the node must prioritize younger Leios traffic over
   older, the mini-protocols' states might need to be less granular. Because
@@ -1235,9 +1233,9 @@ the corresponding enrichments---if necessary---seem tractable.
   single mini-protocol with granular states incurs head-of-line blocking. That
   risks occasionally increasing some key latencies, thereby threatening
   freshest-first delivery or even motivating inflations of $L_\text{vote}$
-  and/or $L_\text{diff}$. One possible mitigation would run two instances of
+  and/or $L_\text{diff}$. One easy mitigation would run two instances of
   LeiosFetch and reserve one for requests that are small and urgent (e.g., small
-  blocks, a few missing transactions, or perhaps all votes); the existing
+  blocks, a few missing transactions, or perhaps any vote); the existing
   infrastructure would naturally interleave those with the larger and/or less
   urgent requests.
 
@@ -1246,8 +1244,9 @@ clarification regarding feasibility that is more involved than the above
 discussion. The Leios protocol requires that each server must send at most two
 MsgLeiosBlockAnnouncement notifications that equivocate the same Praos election.
 This would be trivial to enforce on both the client and the server, if it were
-not for operational certificates (TODO link), which complicate the notion of
-which sets of headers qualify as equivocating.
+not for
+[operational certificates](https://docs.cardano.org/stake-pool-operators/creating-keys-and-certificates#creating-an-operational-certificate-and-registering-a-stake-pool),
+which complicate the notion of which sets of headers qualify as equivocating.
 
 With the current Praos system, a SPO is free to issue an arbitrary OCIN every
 time they issue an RB header, but honest SPOs will only increment their OCIN
@@ -1750,7 +1749,6 @@ model.[^praosp]
     [Leios mini-mainnet topology](https://github.com/input-output-hk/ouroboros-leios/blob/6d8619c53cc619a25b52eac184e7f1ff3c31b597/data/simulation/pseudo-mainnet/topology-v2.md)
 
 [^ripe]: [RIPE Atlas](https://atlas.ripe.net/)
-
 [^mncp]:
     https://github.com/input-output-hk/ouroboros-leios/blob/6d8619c53cc619a25b52eac184e7f1ff3c31b597/analysis/sims/2025w30b/analysis.ipynb
 
@@ -2642,9 +2640,7 @@ documentation_
 <!-- Footnotes -->
 
 [^fasort]: The Fait Accompli sortition scheme
-
 [^2]: Leios: Dynamic Availability for Blockchain Sharding (2025)
-
 [^leioscrypto]: Leios cryptography prototype implementation
 
 [praos-delta-q]:
