@@ -259,7 +259,7 @@ process. The precise timing mechanism is detailed in the following section.
 ### Protocol Flow
 
 The protocol operates through five sequential steps that span three critical
-timing phases. Figure 4 visualizes the precise timing mechanism that governs
+protocol phases. Figure 4 visualizes the precise timing mechanism that governs
 when certificates can be safely included in the chain, showing both the protocol
 phases and the underlying network characteristics that inform their design.
 
@@ -385,9 +385,9 @@ Additionally, all RBs must follow these content constraints:
 
 #### Protocol Phases
 
-The protocol phases work together to maintain Praos's security assumptions
-while enabling higher throughput. These phases prevent scenarios where
-honest nodes would be forced to delay chain adoption due to missing data.
+The protocol phases work together to maintain Praos's security assumptions while
+enabling higher throughput. These phases prevent scenarios where honest nodes
+would be forced to delay chain adoption due to missing data.
 
 The certificate inclusion process (Steps 3-5) involves three sequential timing
 phases that are visible in Figure 4:
@@ -522,8 +522,8 @@ simplified structure:
 
 When an EB is announced in an RB header via the `announced_eb` field, a voting
 period begins as described in [Votes and Certificates](#votes-and-certificates).
-The EB certificate inclusion follows the protocol phases and rules detailed
-in [Step 5: Chain Inclusion](#step-5-chain-inclusion).
+The EB certificate inclusion follows the protocol phases and rules detailed in
+[Step 5: Chain Inclusion](#step-5-chain-inclusion).
 
 The hash referenced in RB headers (`announced_eb` field) is computed from the
 complete EB structure and serves as the unique identifier for the EB. The
