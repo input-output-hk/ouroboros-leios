@@ -466,8 +466,8 @@ fully within this period. The diffusion period must satisfy:
 
 $$L_\text{diff} \geq \Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply} - \Delta_\text{RB'} - L_\text{equi} - L_\text{vote}$$
 
-This ensures certified EBs reach all honest parties before any RB' that
-includes their certificate needs processing.
+This ensures certified EBs reach all honest parties before any RB' that includes
+their certificate needs processing.
 
 ### Protocol Entities
 
@@ -616,19 +616,21 @@ certificates specification][bls-spec].
 The protocol's security reduces to Praos security through careful timing
 constraints that preserve Praos assumptions while enabling higher throughput.
 
-In Praos analysis, new RBs are assumed to be diffused and processed within $\Delta_\text{RB}$ slots. This total time
-decomposes into:
+In Praos analysis, new RBs are assumed to be diffused and processed within
+$\Delta_\text{RB}$ slots. This total time decomposes into:
 
 1. **Diffusion time**: $\Delta_\text{RB} - \Delta_\text{TX}$ slots for network
    propagation
 2. **Processing time**: $\Delta_\text{TX}$ slots for transaction validation and
    ledger updates
 
-The following constraint ensures that any certified EB required for RB validation arrives before the RB needs processing:
+The following constraint ensures that any certified EB required for RB
+validation arrives before the RB needs processing:
 
 $$L_\text{equi} + L_\text{vote} + L_\text{diff} + \Delta_\text{RB'} > \Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply}$$
 
-where `RB'` refers to the second ranking block in [Figure 4](#figure-4) that includes the certificate for the EB announced by the preceding RB.
+where `RB'` refers to the second ranking block in [Figure 4](#figure-4) that
+includes the certificate for the EB announced by the preceding RB.
 
 **EB Reapplication Bound**: Since applying a certified EB is part of RB
 validation, the reapplication cost must not exceed standard transaction
@@ -637,6 +639,7 @@ processing:
 $$\Delta_\text{reapply} < \Delta_\text{TX}$$
 
 Combined, these constraints ensure that:
+
 - Certified EBs propagate within available diffusion time
 - RB processing (including EB reapplication) completes within $\Delta_\text{TX}$
 - Praos timing assumptions remain valid, preserving safety and liveness
