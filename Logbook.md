@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2025-08-25
+
+### Bandwidth experiment
+
+The Jupyter notebook [analysis/sims/bandwidth/analysis.ipynb](analysis/sims/bandwidth/analysis.ipynb) contains the results of an experiment where the inter-node bandwidth was reduced to values as low as 1 Mb/s. Leios operates successfully at a throughput of 0.250 TxkB/s even at a 2 Mb/s bandwidth but breaks down at 1 Mb/s.
+
 ## 2025-08-23
 
 ### Re-ran late-release attack experiment
