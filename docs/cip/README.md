@@ -699,24 +699,12 @@ availability:
 | Ranking block max size                                                 |  $S_\text{RB}$   | bytes | Maximum size of a ranking block                                                | Limits RB size to ensure timely diffusion                                                                                                                                                      |
 | Endorser-block referenceable transaction size                          | $S_\text{EB-tx}$ | bytes | Maximum total size of transactions that can be referenced by an endorser block | Limits total transaction payload to ensure timely diffusion within stage length                                                                                                                |
 | Endorser block max size                                                |  $S_\text{EB}$   | bytes | Maximum size of an endorser block itself                                       | Limits EB size to ensure timely diffusion; prevents issues with many small transactions                                                                                                        |
-
-| Mean committee size | $n$ | parties | Average number of stake pools selected
-for voting | Ensures sufficient decentralization and security | | Quorum size |
-$\tau$ | fraction | Minimum fraction of committee votes required for
-certification | High threshold ensures certified EBs are known to >25% of honest
-nodes even with 50% adversarial stake. This widespread initial knowledge enables
-the network assumption that certified EBs will reach all honest parties within
-$L_\text{diff}$ | | Maximum Plutus steps per endorser block | - | step units |
-Maximum computational steps allowed for Plutus scripts in a single endorser
-block | Limits computational resources per EB to ensure timely validation | |
-Maximum Plutus memory per endorser block | - | memory units | Maximum memory
-allowed for Plutus scripts in a single endorser block | Limits memory resources
-per EB to ensure timely validation | | Maximum Plutus steps per transaction | -
-| step units | Maximum computational steps allowed for Plutus scripts in a
-single transaction | Limits computational resources per transaction to enable
-higher throughput | | Maximum Plutus memory per transaction | - | memory units |
-Maximum memory allowed for Plutus scripts in a single transaction | Limits
-memory resources per transaction to enable higher throughput |
+| Mean committee size                                                    |       $n$        | parties | Average number of stake pools selected for voting                                 | Ensures sufficient decentralization and security                                                                                                                                                                                                 |
+| Quorum size                                                            |      $\tau$      | fraction | Minimum fraction of committee votes required for certification                    | High threshold ensures certified EBs are known to >25% of honest nodes even with 50% adversarial stake. This widespread initial knowledge enables the network assumption that certified EBs will reach all honest parties within $L_\text{diff}$ |
+| Maximum Plutus steps per endorser block                                |        -         | step units | Maximum computational steps allowed for Plutus scripts in a single endorser block | Limits computational resources per EB to ensure timely validation                                                                                                                                                                                |
+| Maximum Plutus memory per endorser block                               |        -         | memory units | Maximum memory allowed for Plutus scripts in a single endorser block              | Limits memory resources per EB to ensure timely validation                                                                                                                                                                                       |
+| Maximum Plutus steps per transaction                                   |        -         | step units | Maximum computational steps allowed for Plutus scripts in a single transaction    | Limits computational resources per transaction to enable higher throughput                                                                                                                                                                       |
+| Maximum Plutus memory per transaction                                  |        -         | memory units | Maximum memory allowed for Plutus scripts in a single transaction                 | Limits memory resources per transaction to enable higher throughput                                                                                                                                                                              |
 
 <em>Table 3: Protocol Parameters</em>
 
