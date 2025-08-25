@@ -630,11 +630,9 @@ validation arrives before the RB needs processing:
 $$L_\text{equi} + L_\text{vote} + L_\text{diff} + \Delta_\text{RB'} > \Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply}$$
 
 where `RB'` refers to the second ranking block in [Figure 4](#figure-4) that
-includes the certificate for the EB announced by the preceding RB.
-
-**EB Reapplication Bound**: Since applying a certified EB is part of RB
-validation, the reapplication cost must not exceed standard transaction
-processing:
+includes the certificate for the EB announced by the preceding RB. Since
+applying a certified EB is part of RB validation, the reapplication cost must
+not exceed standard transaction processing:
 
 $$\Delta_\text{reapply} < \Delta_\text{TX}$$
 
