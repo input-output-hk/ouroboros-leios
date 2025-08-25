@@ -778,7 +778,7 @@ When a stake pool wins block leadership (step 1), they create a Ranking Block
 (RB) and **optionally** an Endorser Block (EB) based on the
 [adaptive EB production](#adaptive-eb-production) criteria. The RB is a standard
 Praos block with extended header fields to reference one EB and announce another
-EB when created. The optional EB is a larger block containing references to
+EB when such is created. The optional EB is a larger block containing references to
 additional transactions. The RB chain continues to be distributed exactly as in
 Praos, while Leios introduces a separate mechanism to distribute the same
 headers for rapid EB discovery and <a href="#equivocation">equivocation
@@ -1002,7 +1002,7 @@ The implementation of the Leios overlay must satisfy the following requirements.
   violation, even more so than in Praos.
 - **Praos Independence**. The Cardano network must grow RB chains—both
   adversarial and honest—of the same shape (i.e., forks and their lengths)
-  regardless of whether it's executing the Leios overlay. In other words, the
+  regardless of whether it is executing the Leios overlay. In other words, the
   shape of all RB forks that exist at some instant would ideally not provide any
   indication whether the Leios overlay is being executed. Moreover, the honest
   majority must still have the same control over which transactions are included
@@ -1023,7 +1023,7 @@ The implementation of the Leios overlay must satisfy the following requirements.
 Cardano infrastructure, this CIP can increase utilization without disrupting
 Praos; the currently unutilized resources are sufficient for Leios. More
 aggressive Leios deployments/extensions in the future will have to navigate that
-trade-off, but simulations indicate that it's not already required by this CIP,
+trade-off, but simulations indicate that it is not already required by this CIP,
 with two possible exceptions. First, nodes might require additional disk
 capacity as a direct result of the increased throughput (TODO link to CPS for
 archival nodes). Second, a party with significant stake might need to provision
@@ -1231,14 +1231,14 @@ This mini-protocol pair satisfies the above requirements in the following ways.
   is low enough to admit existing Cardano infrastructure.
 
 The mini-protocol pair does not already address the following challenges, but
-the corresponding enrichments---if necessary---seem tractable.
+the corresponding enrichments - if necessary - seem tractable.
 
 - Depending on how severely the node must prioritize younger Leios traffic over
   older, the mini-protocols' states might need to be less granular. Because
   distinct client requests transition to distinct cyan states, the server is
   unable to reply to the client's requests in a different order than the client
   sent them. If a client pipelined several requests and then learned of a new
-  youngest EB and requested it, the server---if timing allows---could
+  youngest EB and requested it, the server - if timing allows - could
   conceptually reply to that last request before the others, for the sake of
   freshest-first delivery. But it cannot do so if the mini-protocol's structure
   prevents those replies, as the existing granular states do. The existing
@@ -1299,13 +1299,13 @@ any way for the adversary to have revealed incremented OCINs to some nodes but
 definitely not all, then the worst-case diffusion behavior of adversarial EBs
 might be worse than that of honest EBs, which would complicate the acceptable
 lower bound on $L_\text{diff}$, for example. On the other hand, if every OCIN
-increment---even those disallowed by Praos---is always eventually relayed to all
+increment - even those disallowed by Praos - is always eventually relayed to all
 nodes, then an adversary can create unbounded work by constantly incrementing
-their OCINs---without the context provided by forks, there's no bound on the
+their OCINs - without the context provided by forks, there's no bound on the
 OCINs the Leios mini-protocols would relay.
 
 Thus, the diffusion of EB announcements (regardless of who issued them) is only
-tractable and robust if it's restricted to a bounded set of OCINs that all
+tractable and robust if it is restricted to a bounded set of OCINs that all
 honest nodes almost certainly agree on. For this reason, the Leios node should
 ignore an EB announcement that is less than the OCIN on its settled ledger state
 or more than one greater than that OCIN. After not ignoring two announcements
@@ -1316,15 +1316,15 @@ all of its clients; it does not have to track any extra state per-client.
 
 With this rule, a client will crucially disconnect if and only if a server sends
 more than two announcements with the same election. It will also ignore headers
-from leaked hot keys once the SPO increments their OCIN, but unfortunately---and
-in contrast to Praos---not immediately. The Leios node will only ignore
+from leaked hot keys once the SPO increments their OCIN, but unfortunately - and
+in contrast to Praos - not immediately. The Leios node will only ignore
 unincremented OCINs after the increment has settled on the chain. With Ouroboros
-Peras, that could be a matter of minutes. Without Peras, it's typically 12 hr
+Peras, that could be a matter of minutes. Without Peras, it is typically 12 hr
 under normal conditions and would take at most 36 hr before Cardano would
 consider it to be a disaster scenario. Thus, if an SPO leaks their hot key, the
 network would not diffuse their EBs until up to 36 hr later (usually 12 hr, and
 much sooner with Ouroboros Peras). SPOs should not leak their hot keys that
-frequently, and even if they do, it's still much sooner than waiting for the
+frequently, and even if they do, it is still much sooner than waiting for the
 full 90 days.
 
 ### Incentives
