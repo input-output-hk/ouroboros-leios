@@ -2220,11 +2220,11 @@ increase each month as the ledger becomes larger.
 
 | Throughput | Average-size transactions | Small transactions | Per-node operation |   Per-node storage | 10k-node network<br/>(first year) | 10k-node network<br/>(first year) |
 | ---------: | ------------------------: | -----------------: | -----------------: | -----------------: | --------------------------------: | --------------------------------: |
-| 100 TxkB/s |                   67 Tx/s |           333 Tx/s |      $112.99/month | $17.85/month/month |                            $14.6M |                       $200k/epoch |
-| 150 TxkB/s |                  100 Tx/s |           500 Tx/s |      $119.51/month | $26.80/month/month |                            $15.9M |                       $218k/epoch |
-| 200 TxkB/s |                  133 Tx/s |           667 Tx/s |      $128.35/month | $38.35/month/month |                            $17.7M |                       $242k/epoch |
-| 250 TxkB/s |                  167 Tx/s |           833 Tx/s |      $133.07/month | $44.61/month/month |                            $18.6M |                       $255k/epoch |
-| 300 TxkB/s |                  200 Tx/s |          1000 Tx/s |      $139.18/month | $53.20/month/month |                            $19.9M |                       $272k/epoch |
+| 100 TxkB/s |                   67 Tx/s |           333 Tx/s |      $112.99/month |     $17.85/month² |                            $14.6M |                       $200k/epoch |
+| 150 TxkB/s |                  100 Tx/s |           500 Tx/s |      $119.51/month |     $26.80/month² |                            $15.9M |                       $218k/epoch |
+| 200 TxkB/s |                  133 Tx/s |           667 Tx/s |      $128.35/month |     $38.35/month² |                            $17.7M |                       $242k/epoch |
+| 250 TxkB/s |                  167 Tx/s |           833 Tx/s |      $133.07/month |     $44.61/month² |                            $18.6M |                       $255k/epoch |
+| 300 TxkB/s |                  200 Tx/s |          1000 Tx/s |      $139.18/month |     $53.20/month² |                            $19.9M |                       $272k/epoch |
 
 <em>Table 8: Operating Costs by Transaction Throughput</em>
 
