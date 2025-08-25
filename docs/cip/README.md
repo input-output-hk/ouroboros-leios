@@ -379,8 +379,8 @@ Additionally, all RBs must follow these content constraints:
 2. All transactions must be valid against the complete ledger state (including
    certified EBs).
 3. If a node lacks some EB data certified by the chain it is extending, it
-   issues an RB with no transactions so that the honest chain still
-   definitely gains length.
+   issues an RB with no transactions so that the honest chain still definitely
+   gains length.
 
 #### Timing Constraints
 
@@ -691,21 +691,32 @@ availability:
 <div align="center">
 <a name="table-3" id="table-3"></a>
 
-| Parameter                                                              |      Symbol      |    Units     | Description                                                                       | Rationale                                                                                                                                                                                                                                        |
-| ---------------------------------------------------------------------- | :--------------: | :----------: | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| <a id="l-equi" href="#l-equi"></a>Equivocation detection period length | $L_\text{equi}$  |     slot     | Duration for detecting conflicting blocks before voting begins                    | Per [equivocation detection](#equivocation-detection): must accommodate worst-case equivocation scenario. Prevents adversaries from sending different EBs to different network parts                                                             |
-| <a id="l-vote" href="#l-vote"></a>Voting period length                 | $L_\text{vote}$  |     slot     | Duration during which committee members can vote on endorser blocks               | Per [voting period](#voting-period): must accommodate EB propagation and validation time. Set to minimum value that ensures honest parties can participate in voting                                                                             |
-| <a id="l-diff" href="#l-diff"></a>Diffusion period length              | $L_\text{diff}$  |     slot     | Additional period after voting to ensure network-wide EB availability             | Per [diffusion period](#diffusion-period): derived from the fundamental safety constraint. Leverages the network assumption that data known to >25% of nodes propagates fully within this time                                                   |
-| Ranking block max size                                                 |  $S_\text{RB}$   |    bytes     | Maximum size of a ranking block                                                   | Limits RB size to ensure timely diffusion                                                                                                                                                                                                        |
-| Endorser-block referenceable transaction size                          | $S_\text{EB-tx}$ |    bytes     | Maximum total size of transactions that can be referenced by an endorser block    | Limits total transaction payload to ensure timely diffusion within stage length                                                                                                                                                                  |
-| Endorser block max size                                                |  $S_\text{EB}$   |    bytes     | Maximum size of an endorser block itself                                          | Limits EB size to ensure timely diffusion; prevents issues with many small transactions                                                                                                                                                          |
+| Parameter                                                              |      Symbol      | Units | Description                                                                    | Rationale                                                                                                                                                                                      |
+| ---------------------------------------------------------------------- | :--------------: | :---: | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <a id="l-equi" href="#l-equi"></a>Equivocation detection period length | $L_\text{equi}$  | slot  | Duration for detecting conflicting blocks before voting begins                 | Per [equivocation detection](#equivocation-detection): must accommodate worst-case equivocation scenario. Prevents adversaries from sending different EBs to different network parts           |
+| <a id="l-vote" href="#l-vote"></a>Voting period length                 | $L_\text{vote}$  | slot  | Duration during which committee members can vote on endorser blocks            | Per [voting period](#voting-period): must accommodate EB propagation and validation time. Set to minimum value that ensures honest parties can participate in voting                           |
+| <a id="l-diff" href="#l-diff"></a>Diffusion period length              | $L_\text{diff}$  | slot  | Additional period after voting to ensure network-wide EB availability          | Per [diffusion period](#diffusion-period): derived from the fundamental safety constraint. Leverages the network assumption that data known to >25% of nodes propagates fully within this time |
+| Ranking block max size                                                 |  $S_\text{RB}$   | bytes | Maximum size of a ranking block                                                | Limits RB size to ensure timely diffusion                                                                                                                                                      |
+| Endorser-block referenceable transaction size                          | $S_\text{EB-tx}$ | bytes | Maximum total size of transactions that can be referenced by an endorser block | Limits total transaction payload to ensure timely diffusion within stage length                                                                                                                |
+| Endorser block max size                                                |  $S_\text{EB}$   | bytes | Maximum size of an endorser block itself                                       | Limits EB size to ensure timely diffusion; prevents issues with many small transactions                                                                                                        |
 
-| Mean committee size                                                    |       $n$        |   parties    | Average number of stake pools selected for voting                                 | Ensures sufficient decentralization and security                                                                                                                                                                                                 |
-| Quorum size                                                            |      $\tau$      |   fraction   | Minimum fraction of committee votes required for certification                    | High threshold ensures certified EBs are known to >25% of honest nodes even with 50% adversarial stake. This widespread initial knowledge enables the network assumption that certified EBs will reach all honest parties within $L_\text{diff}$ |
-| Maximum Plutus steps per endorser block                                |        -         |  step units  | Maximum computational steps allowed for Plutus scripts in a single endorser block | Limits computational resources per EB to ensure timely validation                                                                                                                                                                                |
-| Maximum Plutus memory per endorser block                               |        -         | memory units | Maximum memory allowed for Plutus scripts in a single endorser block              | Limits memory resources per EB to ensure timely validation                                                                                                                                                                                       |
-| Maximum Plutus steps per transaction                                   |        -         |  step units  | Maximum computational steps allowed for Plutus scripts in a single transaction    | Limits computational resources per transaction to enable higher throughput                                                                                                                                                                       |
-| Maximum Plutus memory per transaction                                  |        -         | memory units | Maximum memory allowed for Plutus scripts in a single transaction                 | Limits memory resources per transaction to enable higher throughput                                                                                                                                                                              |
+| Mean committee size | $n$ | parties | Average number of stake pools selected
+for voting | Ensures sufficient decentralization and security | | Quorum size |
+$\tau$ | fraction | Minimum fraction of committee votes required for
+certification | High threshold ensures certified EBs are known to >25% of honest
+nodes even with 50% adversarial stake. This widespread initial knowledge enables
+the network assumption that certified EBs will reach all honest parties within
+$L_\text{diff}$ | | Maximum Plutus steps per endorser block | - | step units |
+Maximum computational steps allowed for Plutus scripts in a single endorser
+block | Limits computational resources per EB to ensure timely validation | |
+Maximum Plutus memory per endorser block | - | memory units | Maximum memory
+allowed for Plutus scripts in a single endorser block | Limits memory resources
+per EB to ensure timely validation | | Maximum Plutus steps per transaction | -
+| step units | Maximum computational steps allowed for Plutus scripts in a
+single transaction | Limits computational resources per transaction to enable
+higher throughput | | Maximum Plutus memory per transaction | - | memory units |
+Maximum memory allowed for Plutus scripts in a single transaction | Limits
+memory resources per transaction to enable higher throughput |
 
 <em>Table 3: Protocol Parameters</em>
 
@@ -760,7 +771,8 @@ detection mechanisms.
 
 <a id="mempool-design" href="#mempool-design"></a>**Mempool Design**: The
 mempool follows the same design as current Praos deployment with increased
-capacity to support both RB and EB production. A node's mempool capacity must accommodates expanded transaction volume:
+capacity to support both RB and EB production. A node's mempool capacity must
+accommodates expanded transaction volume:
 
 <div align="center">
 
@@ -778,9 +790,9 @@ When a stake pool wins block leadership (step 1), they create a Ranking Block
 (RB) and **optionally** an Endorser Block (EB) based on the
 [adaptive EB production](#adaptive-eb-production) criteria. The RB is a standard
 Praos block with extended header fields to reference one EB and announce another
-EB when such is created. The optional EB is a larger block containing references to
-additional transactions. The RB chain continues to be distributed exactly as in
-Praos, while Leios introduces a separate mechanism to distribute the same
+EB when such is created. The optional EB is a larger block containing references
+to additional transactions. The RB chain continues to be distributed exactly as
+in Praos, while Leios introduces a separate mechanism to distribute the same
 headers for rapid EB discovery and <a href="#equivocation">equivocation
 detection</a>.
 
@@ -944,8 +956,8 @@ epoch using the [Fait Accompli scheme][fait-accompli-sortition]. This
 computation uses the stake distribution that becomes available at the epoch
 boundary and represents a minimal computational overhead based on current
 [BLS certificates benchmarks](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#benchmarks-in-rust).
-Nodes complete this computation well before voting begins in the new
-epoch to ensure seamless participation.
+Nodes complete this computation well before voting begins in the new epoch to
+ensure seamless participation.
 
 ### Network
 
@@ -1212,11 +1224,11 @@ This mini-protocol pair satisfies the above requirements in the following ways.
   Devoted BlockFetch variant can be easily copied for MsgLeiosBlockRangeRequest
   if Ouroboros Genesis is enabled.
 - MsgLeiosBlockRangeRequest also allows the unfortunate node that suffers from a
-  $\Delta_{EB}$ violation to recover, i.e. when it did not receive a certified EB
-  before receiving the RB that certifies it. The protocol design requires that
-  that event is rare or at least confined to a small portion of honest stake at
-  a time. But it will occasionally happen to some honest nodes, and they must be
-  able to recover automatically and with minimal disruption.
+  $\Delta_{EB}$ violation to recover, i.e. when it did not receive a certified
+  EB before receiving the RB that certifies it. The protocol design requires
+  that that event is rare or at least confined to a small portion of honest
+  stake at a time. But it will occasionally happen to some honest nodes, and
+  they must be able to recover automatically and with minimal disruption.
 - Every Leios object is associated with the slot of an EB, and so has an
   explicit age. This enables freshest-first delivery prioritization. In
   addition, objects of a certain age should no longer diffuse, or at least can
@@ -2118,22 +2130,26 @@ consideration of tradeoffs.
 <div align="center">
 <a name="table-7" id="table-7"></a>
 
-| Parameter                                     |       Symbol        |   Feasible value   | Justification                                                                                                                                                                          |
-| --------------------------------------------- | :-----------------: | :----------------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| RB header diffusion bound                     | $\Delta_\text{hdr}$ |       1 slot       | Must be faster than full RB diffusion for equivocation detection; simulations show headers reach all nodes within 1 slot due to smaller size.                                          |
-| Equivocation detection period length          |   $L_\text{equi}$   |      3 slots       | Per [equivocation detection](#equivocation-detection): accommodates worst-case equivocation scenario with reliable detection before voting begins.                                     |
-| Voting period length                          |   $L_\text{vote}$   |      4 slots       | Per [voting period](#voting-period): accommodates EB propagation and validation time, with equivocation detection handled separately by $L_\text{equi}$.                               |
-| Diffusion period length                       |   $L_\text{diff}$   |      7 slots       | Per [diffusion period](#diffusion-period): minimum calculated as 4 slots with typical network values, use 7 for safety margin.                                                         |
-| Endorser-block referenceable transaction size |  $S_\text{EB-tx}$   |       12 MB        | Simulations indicate that 200 kB/s throughput is feasible at this block size.                                                                                                          |
-| Endorser block max size                       |    $S_\text{EB}$    |       512 kB       | Endorser blocks must be small enough to diffuse and be validated within the voting period $L_\text{vote}$.                                                                             |
-| Maximum Plutus steps per endorser block       |          -          |  2000G step units  | Simulations at high transaction-validation CPU usage, but an even higher limit may be possible.                                                                                        |
-| Maximum Plutus memory per endorser block      |          -          | 7000M memory units | Simulations at high transaction-validation CPU usage, but an even higher limit may be possible.                                                                                        |
-| Maximum Plutus steps per transaction          |          -          |  100G step units   | Raise per-transaction limit by a factor of twenty relative to Praos.                                                                                                                   |
-| Maximum Plutus memory per transaction         |          -          | 350M memory units  | Raise per-transaction limit by a factor of twenty relative to Praos.                                                                                                                   |
-| Ranking block max size                        |    $S_\text{RB}$    |    90,112 bytes    | This is the current value on the Cardano mainnet.                                                                                                                                      |
+| Parameter                                     |       Symbol        |   Feasible value   | Justification                                                                                                                                            |
+| --------------------------------------------- | :-----------------: | :----------------: | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RB header diffusion bound                     | $\Delta_\text{hdr}$ |       1 slot       | Must be faster than full RB diffusion for equivocation detection; simulations show headers reach all nodes within 1 slot due to smaller size.            |
+| Equivocation detection period length          |   $L_\text{equi}$   |      3 slots       | Per [equivocation detection](#equivocation-detection): accommodates worst-case equivocation scenario with reliable detection before voting begins.       |
+| Voting period length                          |   $L_\text{vote}$   |      4 slots       | Per [voting period](#voting-period): accommodates EB propagation and validation time, with equivocation detection handled separately by $L_\text{equi}$. |
+| Diffusion period length                       |   $L_\text{diff}$   |      7 slots       | Per [diffusion period](#diffusion-period): minimum calculated as 4 slots with typical network values, use 7 for safety margin.                           |
+| Endorser-block referenceable transaction size |  $S_\text{EB-tx}$   |       12 MB        | Simulations indicate that 200 kB/s throughput is feasible at this block size.                                                                            |
+| Endorser block max size                       |    $S_\text{EB}$    |       512 kB       | Endorser blocks must be small enough to diffuse and be validated within the voting period $L_\text{vote}$.                                               |
+| Maximum Plutus steps per endorser block       |          -          |  2000G step units  | Simulations at high transaction-validation CPU usage, but an even higher limit may be possible.                                                          |
+| Maximum Plutus memory per endorser block      |          -          | 7000M memory units | Simulations at high transaction-validation CPU usage, but an even higher limit may be possible.                                                          |
+| Maximum Plutus steps per transaction          |          -          |  100G step units   | Raise per-transaction limit by a factor of twenty relative to Praos.                                                                                     |
+| Maximum Plutus memory per transaction         |          -          | 350M memory units  | Raise per-transaction limit by a factor of twenty relative to Praos.                                                                                     |
+| Ranking block max size                        |    $S_\text{RB}$    |    90,112 bytes    | This is the current value on the Cardano mainnet.                                                                                                        |
 
-| Mean committee size                           |         $n$         |   600 stakepools   | Modeling of the proposed certificate scheme indicates that certificates reach their minimum size of ~8 kB at this committee size, given a realistic distribution of stake among pools. |
-| Quorum size                                   |       $\tau$        |        75%         | High threshold ensures certified EBs are known to >25% of honest nodes even with 50% adversarial stake. This enables the network assumption for safe diffusion within L_diff.          |
+| Mean committee size | $n$ | 600 stakepools | Modeling of the proposed
+certificate scheme indicates that certificates reach their minimum size of ~8 kB
+at this committee size, given a realistic distribution of stake among pools. | |
+Quorum size | $\tau$ | 75% | High threshold ensures certified EBs are known
+to >25% of honest nodes even with 50% adversarial stake. This enables the
+network assumption for safe diffusion within L_diff. |
 
 <em>Table 7: Feasible Protocol Parameters</em>
 
@@ -2218,13 +2234,13 @@ increase each month as the ledger becomes larger.
 <div align="center">
 <a name="table-8" id="table-8"></a>
 
-| Throughput | Average-size transactions | Small transactions | Per-node operation |   Per-node storage | 10k-node network<br/>(first year) | 10k-node network<br/>(first year) |
-| ---------: | ------------------------: | -----------------: | -----------------: | -----------------: | --------------------------------: | --------------------------------: |
-| 100 TxkB/s |                   67 Tx/s |           333 Tx/s |      $112.99/month |     $17.85/month² |                            $14.6M |                       $200k/epoch |
-| 150 TxkB/s |                  100 Tx/s |           500 Tx/s |      $119.51/month |     $26.80/month² |                            $15.9M |                       $218k/epoch |
-| 200 TxkB/s |                  133 Tx/s |           667 Tx/s |      $128.35/month |     $38.35/month² |                            $17.7M |                       $242k/epoch |
-| 250 TxkB/s |                  167 Tx/s |           833 Tx/s |      $133.07/month |     $44.61/month² |                            $18.6M |                       $255k/epoch |
-| 300 TxkB/s |                  200 Tx/s |          1000 Tx/s |      $139.18/month |     $53.20/month² |                            $19.9M |                       $272k/epoch |
+| Throughput | Average-size transactions | Small transactions | Per-node operation | Per-node storage | 10k-node network<br/>(first year) | 10k-node network<br/>(first year) |
+| ---------: | ------------------------: | -----------------: | -----------------: | ---------------: | --------------------------------: | --------------------------------: |
+| 100 TxkB/s |                   67 Tx/s |           333 Tx/s |      $112.99/month |    $17.85/month² |                            $14.6M |                       $200k/epoch |
+| 150 TxkB/s |                  100 Tx/s |           500 Tx/s |      $119.51/month |    $26.80/month² |                            $15.9M |                       $218k/epoch |
+| 200 TxkB/s |                  133 Tx/s |           667 Tx/s |      $128.35/month |    $38.35/month² |                            $17.7M |                       $242k/epoch |
+| 250 TxkB/s |                  167 Tx/s |           833 Tx/s |      $133.07/month |    $44.61/month² |                            $18.6M |                       $255k/epoch |
+| 300 TxkB/s |                  200 Tx/s |          1000 Tx/s |      $139.18/month |    $53.20/month² |                            $19.9M |                       $272k/epoch |
 
 <em>Table 8: Operating Costs by Transaction Throughput</em>
 
