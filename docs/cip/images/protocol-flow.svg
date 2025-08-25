@@ -193,7 +193,7 @@
         <line x1="355" y1="425" x2="355" y2="435" stroke="#9c27b0" stroke-width="2"/>
         <line x1="355" y1="430" x2="455" y2="430" stroke="#9c27b0" stroke-width="2" stroke-dasharray="4,2"/>
         <line x1="455" y1="425" x2="455" y2="435" stroke="#9c27b0" stroke-width="2"/>
-        <text x="405" y="415" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#9c27b0">Δ<tspan font-size="14" baseline-shift="sub">cpu</tspan><tspan font-size="12" baseline-shift="super">H</tspan></text>
+        <text x="405" y="415" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#9c27b0">Δ<tspan font-size="14" baseline-shift="sub">CPU</tspan><tspan font-size="12" baseline-shift="super">H</tspan></text>
       </a>
     </g>
     
