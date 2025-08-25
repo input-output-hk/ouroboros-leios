@@ -965,7 +965,7 @@ required for EB distribution, voting, and certificate construction.
 This CIP does not specify how exactly Leios nodes exchange messages. Those
 details must eventually be specified so that different node implementations can
 interoperate, but that standardization can be deferred to a follow-up CIP. The
-present CIP is only obligated to list key requirements and demonstrate they're
+present CIP is only obligated to list key requirements and demonstrate they are
 satisfiable—that some implementation is feasible and not prohibitively
 complicated.
 
@@ -1203,9 +1203,9 @@ This mini-protocol pair satisfies the above requirements in the following ways.
 - Every Leios object is associated with the slot of an EB, and so has an
   explicit age. This enables freshest-first delivery prioritization. In
   addition, objects of a certain age should no longer diffuse, or at least can
-  diffuse less aggressively. Votes are no longer relevant once they're somewhat
+  diffuse less aggressively. Votes are no longer relevant once they are somewhat
   older than $L_\text{vote}$, for example. EBs and their transactions could be
-  restricted to MsgLeiosBlockRangeRequest once they're somewhat older than a
+  restricted to MsgLeiosBlockRangeRequest once they are somewhat older than a
   reasonable value of $\Delta_{EB}$. These age restrictions ensure that the
   amount of data any honest client could request _with urgency_ is always
   bounded, and so the server's memory requirements are also bounded. Because
@@ -1251,7 +1251,7 @@ This would be trivial to enforce on both the client and the server, if it were
 not for operational certificates (TODO link), which complicate the notion of
 which sets of headers qualify as equivocating.
 
-With the current Praos system, a SPO is free to issue an arbitrary OCIN every
+With the current Praos system, an SPO is free to issue an arbitrary OCIN every
 time they issue an RB header, but honest SPOs will only increment their OCIN
 when they need to. Whether the OCIN carried by some header is valid depends on
 the chain it extends, because the Praos protocol rules along a single chain only
@@ -1259,7 +1259,7 @@ allow an SPO's OCIN to be incremented at most once per header issued by that
 SPO.
 
 The Leios mini-protocols, in contrast, are expected to diffuse contemporary EBs
-regardless of which chain they're on, and so cannot assume that it has seen the
+regardless of which chain they are on, and so cannot assume that it has seen the
 predecessor header of every MsgLeiosBlockAnnouncement. It also cannot simply
 require that it has seen them all, because that would complicate the timing
 restrictions and require tracking a potentially unbounded number of forks. Thus,
