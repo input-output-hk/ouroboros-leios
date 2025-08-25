@@ -1751,38 +1751,22 @@ The [Leios paper][leios-paper] provides a rigorous theoretical analysis of the
 safety and throughput of the protocol. That has been reinforced and demonstrated
 by prototype simulations written in Haskell and Rust.
 
-The simulation results use a mainnet-like topology[^mnrm] that accurately
-reflects the characteristics of the Cardano mainnet. This includes a realistic
-distribution of stake and a representative number of stake pools. The network is
-designed with a total of 10,000 nodes (`pseudo-mainnet`)[^pseudo] or 750 nodes
-(`mini-mainnet`)[^mini], where each block producer is connected exclusively to
-two dedicated relays. Furthermore, the topology incorporates realistic latencies
-based on the RIPE Atlas[^ripe] ping dataset and bandwidth that aligns with the
-lower end of what is typically found in cloud data centers. The node
-connectivity and geographic distribution (across various countries and
-autonomous systems) are also consistent with real-world measurements. A
-simulation study [^mncp] has demonstrated that analysis conclusions deriving
+The simulation results use a [mainnet-like topology][mainnet-topology] that
+accurately reflects the characteristics of the Cardano mainnet. This includes a
+realistic distribution of stake and a representative number of stake pools. The
+network is designed with a total of 10,000 nodes
+[pseudo-mainnet][pseudo-mainnet] or 750 nodes [mini-mainnet][mini-mainnet],
+where each block producer is connected exclusively to two dedicated relays.
+Furthermore, the topology incorporates realistic latencies based on the [RIPE
+Atlas][ripe-atlas] ping dataset and bandwidth that aligns with the lower end of
+what is typically found in cloud data centers. The node connectivity and
+geographic distribution (across various countries and autonomous systems) are
+also consistent with real-world measurements. [A simulation
+study][topology-comparison] has demonstrated that analysis conclusions deriving
 from the `mini-mainnet` topology are also valid for the `pseudo-mainnet`
 topology; the advantage of using the former is that simulations run much more
-quickly. Simulated RB diffusion is consistent with the Praos performance
-model.[^praosp]
-
-[^mnrm]:
-    [Mainnet-like topologies for Leios](https://github.com/input-output-hk/ouroboros-leios/blob/6d8619c53cc619a25b52eac184e7f1ff3c31b597/data/simulation/pseudo-mainnet/ReadMe.md)
-
-[^pseudo]:
-    [Leios pseudo-mainnet topology](https://github.com/input-output-hk/ouroboros-leios/blob/6d8619c53cc619a25b52eac184e7f1ff3c31b597/data/simulation/pseudo-mainnet/topology-v1.md)
-
-[^mini]:
-    [Leios mini-mainnet topology](https://github.com/input-output-hk/ouroboros-leios/blob/6d8619c53cc619a25b52eac184e7f1ff3c31b597/data/simulation/pseudo-mainnet/topology-v2.md)
-
-[^ripe]: [RIPE Atlas](https://atlas.ripe.net/)
-
-[^mncp]:
-    https://github.com/input-output-hk/ouroboros-leios/blob/6d8619c53cc619a25b52eac184e7f1ff3c31b597/analysis/sims/2025w30b/analysis.ipynb
-
-[^praosp]:
-    https://github.com/IntersectMBO/cardano-formal-specifications/blob/6d4e5cfc224a24972162e39a6017c273cea45321/src/performance/README.md
+quickly. Simulated RB diffusion is consistent with the [Praos performance
+model][praos-performance].
 
 The simulation results in the remainder of this section use the Rust simulator
 with a set of protocol parameters suitable for running Linear Leios at 200 kB/s
@@ -1946,8 +1930,8 @@ lower right)</em>
 
 The resource requirements for operating Leios nodes have been estimated from
 benchmarking and simulation studies. The assumed values for various Leios
-operations come either from measurements of the cryptography
-prototype[^leioscrypto], from the IOG benchmarking cluster for the Cardano node,
+operations come either from measurements of the [cryptography
+prototype][leioscrypto], from the IOG benchmarking cluster for the Cardano node,
 or analysis of the Cardano mainnet ledger using the `db-analyser` tool. These
 were input to the Haskell and Rust simulators for Leios to make holistic
 estimates of resource usage of operating nodes.
@@ -1993,18 +1977,11 @@ time-averaged CPU usage in the simulations (i.e., less than 15% of a vCPU)
 suggests that the per-transaction and/or per-block Plutus budget could be
 significantly increased under Leios: either every transaction could have a
 modestly higher budget, or some transactions could use an order of magnitude
-more Plutus execution units. Statistical analysis of CPU usage in ledger
-operations[^timings] using the `db-analyser` tool[^dbanalyser] on Cardano
-mainnet from epoch 350 through 573 yields the following simple models of the CPU
-cost of validating signatures and executing Plutus in the transactions of a
-block. Because of the noisiness in the raw mainnet data, these estimates are
-uncertain.
-
-[^timings]:
-    [Analysis of mainnet transaction validation times](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/timings/ReadMe.ipynb)
-
-[^dbanalyser]:
-    [Cardano instantiation of the Consensus Layer: db-analyser](https://github.com/IntersectMBO/ouroboros-consensus/blob/main/ouroboros-consensus-cardano/README.md#db-analyser)
+more Plutus execution units. Statistical analysis of [CPU usage in ledger
+operations][timings] using the [db-analyser tool][dbanalyser] on Cardano mainnet
+from epoch 350 through 573 yields the following simple models of the CPU cost of
+validating signatures and executing Plutus in the transactions of a block.
+Because of the noisiness in the raw mainnet data, these estimates are uncertain.
 
 - Ledger "apply" operation, consisting of phase 1 & 2 validation along with
   updating the current ledger state:
@@ -2057,23 +2034,17 @@ to more precisely quantify how much the Plutus budget could safely be increased.
 
 </div>
 
-In summary, Leios will require a modest increase of the recommended hardware
-requirements[^spohw]: a four-core machine will be required, but a network
+In summary, Leios will require a modest increase of the [recommended hardware
+requirements][spohw]: a four-core machine will be required, but a network
 upgrade will not be needed, as 10 Mb/s is well below the bandwidth of standard
 network connections. At throughput much higher than 200 kB/s, network egress can
 become a significant cost for nodes hosted on some cloud-computing providers.
 The Leios simulations do not model memory or disk. With the advent of
-UTxO-HD[^utxohd], 16 GB of memory will remain be sufficient for Leios if the
+[UTxO-HD][utxohd], 16 GB of memory will remain be sufficient for Leios if the
 `OnDisk` option is used for the UTxO set. Disk requirements depend upon the
 growth of the ledger, but a sustained 0.150 MB/s throughput amounts to ledger
 size increasing by 4.7 TB each year: see the section below on Operating Costs
 for further discussion.
-
-[^spohw]:
-    [Minimum hardware requirements to run a stake pool](https://developers.cardano.org/docs/operate-a-stake-pool/hardware-requirements/)
-
-[^utxohd]:
-    [Cardano Node 10.5.1 release notes](https://github.com/IntersectMBO/cardano-node/releases/tag/10.5.1)
 
 ### Feasible Protocol Parameters
 
@@ -2206,10 +2177,10 @@ testnet.
 The analysis [Committee size and quorum requirement][committee-size-analysis] in
 the first Leios Technical Report indicates that the Leios committee size should
 be no smaller than 500 votes and the quorum should be at least 60% of those
-votes. However, the proposed [Fait Accompli][fait-accompli-sortition][^fasort]
-scheme wFA<sup>LS</sup> achieves compact certificates that do not become larger
-as the number of voters increases, so larger committee sizes might be permitted
-for broader SPO participation and higher security. The committee size should be
+votes. However, the proposed [Fait Accompli][fait-accompli-sortition] scheme
+wFA<sup>LS</sup> achieves compact certificates that do not become larger as the
+number of voters increases, so larger committee sizes might be permitted for
+broader SPO participation and higher security. The committee size should be
 large enough that fluctuations in committee membership do not create an
 appreciable probability of an adversarial quorum when the adversarial stake is
 just under 50%. The quorum size should be kept large enough above 50% so that
@@ -2557,6 +2528,7 @@ protocol.
 - **Leios Discord channel** - [IOG Discord][leios-discord]
 - **Leios R&D repository** - [GitHub][leios-github]
 - **Leios formal specification** - [GitHub][leios-formal-spec]
+- **Leios cryptography prototype** - [GitHub][leioscrypto]
 
 **Technical Specifications**
 
@@ -2579,12 +2551,21 @@ protocol.
 
 **Simulation Resources**
 
-_See footnotes in the Simulation Results section for detailed topology
-documentation_
+- **Synthetic mainnet** - [Mainnet-like topologies for Leios][mainnet-topology]
+- **10k-node network** - [Leios pseudo-mainnet topology][pseudo-mainnet]
+- **750-node network** - [Leios mini-mainnet topology][mini-mainnet]
+- **Comparison of 10k-node and 750-node networks** - [Mainnet comparison
+  study][topology-comparison]
+- **Validation times** - [Analysis of mainnet transaction validation
+  times][timings]
 
 **External**
 
 - **RIPE Atlas** - [Network measurements][ripe-atlas]
+- **Ledger analyser tool** - [db-analyser][dbanalyser]
+- **UTXO-HD** - [Cardano Node 10.5.1][utxohd]
+- **SPO hardware requirements** - [Minimmum hardware requirements to run a stake
+  pool][spohw]
 
 <!-- Reference Index - DO NOT REMOVE -->
 <!-- The following reference definitions enable consistent linking throughout the document -->
@@ -2647,7 +2628,7 @@ documentation_
   https://github.com/IntersectMBO/cardano-formal-specifications/blob/6d4e5cfc224a24972162e39a6017c273cea45321/src/performance/README.md
   "Praos performance model"
 
-<!-- Simulation topology references -->
+<!-- Simulation topology -->
 
 [mainnet-topology]:
   https://github.com/input-output-hk/ouroboros-leios/blob/6d8619c53cc619a25b52eac184e7f1ff3c31b597/data/simulation/pseudo-mainnet/ReadMe.md
@@ -2661,27 +2642,34 @@ documentation_
 [topology-comparison]:
   https://github.com/input-output-hk/ouroboros-leios/blob/6d8619c53cc619a25b52eac184e7f1ff3c31b597/analysis/sims/2025w30b/analysis.ipynb
   "Topology comparison study"
+[praos-simulations]:
+  https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w26/analysis-praos.ipynb
+[leioscrypto]:
+  https://github.com/input-output-hk/ouroboros-leios/tree/19990728e09fd1d863f888a494d1930b59e5a0d7/crypto-benchmarks.rs
+  "Leios cryptography prototype implementation"
+[timings]:
+  https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/timings/ReadMe.ipynb
+  "Analysis of mainnet transaction validation times"
 
 <!-- External resources -->
 
 [ripe-atlas]: https://atlas.ripe.net/ "RIPE Atlas"
+[spohw]:
+  https://developers.cardano.org/docs/operate-a-stake-pool/hardware-requirements
+  "Minimum hardware requirements to run a stake pool"
+[utxohd]:
+  https://github.com/IntersectMBO/cardano-node/releases/tag/10.5.1
+  "Cardano Node 10.5.1 release notes"
+[dbanalyser]:
+  https://github.com/IntersectMBO/ouroboros-consensus/blob/main/ouroboros-consensus-cardano/README.md#db-analyser
+  "Cardano instantiation of the Consensus Layer: db-analyser"
+[praos-delta-q]:
+  https://github.com/IntersectMBO/cardano-formal-specifications/tree/main?tab=readme-ov-file#performance-model
+  "Praos performance model"
 
 <!-- License -->
 
 [apache-2.0]: http://www.apache.org/licenses/LICENSE-2.0 "Apache License 2.0"
-
-<!-- Footnotes -->
-
-[^fasort]: The Fait Accompli sortition scheme
-
-[^2]: Leios: Dynamic Availability for Blockchain Sharding (2025)
-
-[^leioscrypto]: Leios cryptography prototype implementation
-
-[praos-delta-q]:
-  https://github.com/IntersectMBO/cardano-formal-specifications/tree/main?tab=readme-ov-file#performance-model
-[praos-simulations]:
-  https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w26/analysis-praos.ipynb
 
 ## Appendix
 
