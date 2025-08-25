@@ -391,7 +391,8 @@ phases:
 
 <a id="equivocation-detection"></a>
 
-**Phase 1: Equivocation Detection ($L_\text{equi}$)**  
+**Phase 1: Equivocation Detection ($L_\text{equi}$)**
+
 This phase occurs immediately when an RB announces an EB. During this period,
 the network detects any attempts by adversaries to create multiple conflicting
 blocks for the same slot. The equivocation detection mechanism ensures that
@@ -441,7 +442,8 @@ period.
 
 <a id="voting-period"></a>
 
-**Phase 2: Voting Period ($L_\text{vote}$)**  
+**Phase 2: Voting Period ($L_\text{vote}$)**
+
 The voting period must accommodate both EB propagation and validation:
 
 $$L_\text{vote} > \Delta_\text{EB}^{\text{H}} + \Delta_\text{cpu}$$
@@ -458,7 +460,8 @@ time to:
 
 <a id="diffusion-period"></a>
 
-**Phase 3: Diffusion Period ($L_\text{diff}$)**  
+**Phase 3: Diffusion Period ($L_\text{diff}$)**
+
 Ensures network-wide EB availability by leveraging the assumption that data
 known to >25% of the network (guaranteed by the voting threshold) propagates
 fully within this period.
@@ -740,8 +743,7 @@ detection mechanisms.
 
 <a id="mempool-design" href="#mempool-design"></a>**Mempool Design**: The
 mempool follows the same design as current Praos deployment with increased
-capacity to support both RB and EB production. Mempool capacity
-accommodates expanded transaction volume:
+capacity to support both RB and EB production. A node's mempool capacity must accommodates expanded transaction volume:
 
 <div align="center">
 
