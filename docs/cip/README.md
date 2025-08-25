@@ -56,7 +56,7 @@ sustainability and reduced complexity through fewer new protocol elements.
     - [Step 3: Committee Validation](#step-3-committee-validation)
     - [Step 4: Certification](#step-4-certification)
     - [Step 5: Chain Inclusion](#step-5-chain-inclusion)
-    - [Protocol Phases](#protocol-phases)
+  - [Protocol Phases](#protocol-phases)
   - [Protocol Entities](#protocol-entities)
     - [Ranking Blocks (RBs)](#ranking-blocks-rbs)
     - [Endorser Blocks (EBs)](#endorser-blocks-ebs)
@@ -383,7 +383,7 @@ Additionally, all RBs must follow these content constraints:
    issues an RB with no transactions so that the honest chain still definitely
    gains length.
 
-#### Protocol Phases
+### Protocol Phases
 
 The protocol phases work together to maintain Praos's security assumptions while
 enabling higher throughput. These phases prevent scenarios where honest nodes
