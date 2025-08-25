@@ -636,15 +636,18 @@ reach the remaining honest parties within the diffusion period $L_\text{diff}$.
 Three constraints underpin this argument:
 
 **1. EB Diffusion Constraint**
+
 $$L_\text{equi} + L_\text{vote} > \Delta_\text{EB}^{\text{H}}$$ Honest EBs must
 diffuse completely (transmission + processing) within the time available for
 [equivocation detection](#equivocation-detection) and voting.
 
 **2. EB Reapplication Constraint**
+
 $$\Delta_\text{reapply} < \Delta_\text{applyTxs}$$ Reapplying a certified EB
 cannot cost more than standard transaction processing.
 
 **3. Certified EB Transmission Constraint**
+
 $$\Delta_\text{EB}^{\text{A}} < L_\text{equi} + L_\text{vote} + L_\text{diff} + (\Delta_\text{RB} - \Delta_\text{applyTxs})$$
 Any certified EB referenced by an RB must transmit (not process) before that RB
 needs processing.
