@@ -164,8 +164,8 @@ and bandwidth resources of individual nodes often remain significantly
 underutilized.
 
 To transcend these inherent scaling barriers and unlock the latent capacity of
-the Cardano network, a fundamental evolution of the core consensus algorithm is
-imperative. Ouroboros Leios maintains Praos' sequential transaction processing
+the Cardano network, a fundamental systematic of the core consensus algorithm is
+imperative. Ouroboros Leios maintains Praos's sequential transaction processing
 model while introducing mechanisms for additional transaction capacity through
 Endorser Blocks, parallel validation workflows, and more efficient aggregation
 of transaction data. By reorganizing how transactions are proposed, validated,
@@ -232,7 +232,7 @@ transactions that would otherwise wait for the standard Praos blocks (called
 ensure safety, these blocks undergo committee validation before their
 transactions become part of the permanent ledger.
 
-The key insight is that we can maintain Praos' security guarantees while
+The key insight is that we can maintain Praos's security guarantees while
 processing more transactions by carefully managing when and how these additional
 blocks are validated and included in the chain.
 
@@ -379,12 +379,12 @@ Additionally, all RBs must follow these content constraints:
 2. All transactions must be valid against the complete ledger state (including
    certified EBs).
 3. If a node lacks some EB data certified by the chain it is extending, it
-   should issue an RB with no transactions so that the honest chain still
+   issues an RB with no transactions so that the honest chain still
    definitely gains length.
 
 #### Timing Constraints
 
-The timing constraints work together to maintain Praos' security assumptions
+The timing constraints work together to maintain Praos's security assumptions
 while enabling higher throughput. These constraints prevent scenarios where
 honest nodes would be forced to delay chain adoption due to missing data. The
 certificate inclusion process (Steps 3-5) involves three sequential timing
@@ -696,7 +696,7 @@ availability:
 | Ranking block max size                                                 |  $S_\text{RB}$   |    bytes     | Maximum size of a ranking block                                                   | Limits RB size to ensure timely diffusion                                                                                                                                                                                                        |
 | Endorser-block referenceable transaction size                          | $S_\text{EB-tx}$ |    bytes     | Maximum total size of transactions that can be referenced by an endorser block    | Limits total transaction payload to ensure timely diffusion within stage length                                                                                                                                                                  |
 | Endorser block max size                                                |  $S_\text{EB}$   |    bytes     | Maximum size of an endorser block itself                                          | Limits EB size to ensure timely diffusion; prevents issues with many small transactions                                                                                                                                                          |
-| Praos active slot coefficient                                          |  $f_\text{RB}$   |    1/slot    | Probability that a party will be the slot leader for a particular slot            | Blocks must not be produced faster than network delay                                                                                                                                                                                            |
+
 | Mean committee size                                                    |       $n$        |   parties    | Average number of stake pools selected for voting                                 | Ensures sufficient decentralization and security                                                                                                                                                                                                 |
 | Quorum size                                                            |      $\tau$      |   fraction   | Minimum fraction of committee votes required for certification                    | High threshold ensures certified EBs are known to >25% of honest nodes even with 50% adversarial stake. This widespread initial knowledge enables the network assumption that certified EBs will reach all honest parties within $L_\text{diff}$ |
 | Maximum Plutus steps per endorser block                                |        -         |  step units  | Maximum computational steps allowed for Plutus scripts in a single endorser block | Limits computational resources per EB to ensure timely validation                                                                                                                                                                                |
@@ -757,8 +757,8 @@ detection mechanisms.
 
 <a id="mempool-design" href="#mempool-design"></a>**Mempool Design**: The
 mempool follows the same design as current Praos deployment with increased
-capacity to support both RB and EB production. Mempool capacity should
-accommodate expanded transaction volume:
+capacity to support both RB and EB production. Mempool capacity
+accommodates expanded transaction volume:
 
 <div align="center">
 
@@ -942,7 +942,7 @@ epoch using the [Fait Accompli scheme][fait-accompli-sortition]. This
 computation uses the stake distribution that becomes available at the epoch
 boundary and represents a minimal computational overhead based on current
 [BLS certificates benchmarks](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#benchmarks-in-rust).
-Nodes should complete this computation well before voting begins in the new
+Nodes complete this computation well before voting begins in the new
 epoch to ensure seamless participation.
 
 ### Network
@@ -956,7 +956,7 @@ generated. As a remedy, RBs are allowed to directly contain transactions,
 ensuring basic liveness even when EB certification fails.
 
 Unlike Ouroboros Praos where the RB chain contains all necessary data, Leios
-nodes require additional message types to:
+requires additional message types to:
 
 - **Reconstruct ledger state**: EBs containing certified transactions
 - **Participate in consensus**: Vote on EBs and construct certificates
@@ -1009,7 +1009,7 @@ The implementation of the Leios overlay must satisfy the following requirements.
   utilization of existing resources. The Leios overlay will use more resources
   than Praos does, but it simultaneously will not inherently require today's
   Cardano SPOs or users to provision additional resources, beyond some minor
-  exceptions. The necessary resources already exist; Praos just can't utilize
+  exceptions. The necessary resources already exist; Praos just cannot utilize
   them all.
 - **Tolerable Implementation Complexity**. The above requirements must admit an
   implementation without incurring prohibitive costs for construction and future
@@ -1197,7 +1197,7 @@ This mini-protocol pair satisfies the above requirements in the following ways.
 - The client can request multiple votes at once, which avoids wasting resources
   on overhead due to the hundreds of votes exchanged per EB. Because the first
   vote in a bundle could have arrived sooner than the last vote in a bundle if
-  it hadn't been bundled, maximal bundling risks unnecessary increases in
+  it had not been bundled, maximal bundling risks unnecessary increases in
   latency. Some heuristic will balance the overhead decrease and latency
   increase, such as the client gradually stopps bundling its vote requests as
   its set of received votes approaches a quorum.
@@ -1210,7 +1210,7 @@ This mini-protocol pair satisfies the above requirements in the following ways.
   Devoted BlockFetch variant can be easily copied for MsgLeiosBlockRangeRequest
   if Ouroboros Genesis is enabled.
 - MsgLeiosBlockRangeRequest also allows the unfortunate node that suffers from a
-  $\Delta_{EB}$ violation to recover, i.e. when it didn't receive a certified EB
+  $\Delta_{EB}$ violation to recover, i.e. when it did not receive a certified EB
   before receiving the RB that certifies it. The protocol design requires that
   that event is rare or at least confined to a small portion of honest stake at
   a time. But it will occasionally happen to some honest nodes, and they must be
@@ -1275,7 +1275,7 @@ SPO.
 
 The Leios mini-protocols, in contrast, are expected to diffuse contemporary EBs
 regardless of which chain they're on, and so cannot assume that it has seen the
-predecessor header of every MsgLeiosBlockAnnouncement. It also can't simply
+predecessor header of every MsgLeiosBlockAnnouncement. It also cannot simply
 require that it has seen them all, because that would complicate the timing
 restrictions and require tracking a potentially unbounded number of forks. Thus,
 neither of the following simple extremes would be acceptable for Leios.
@@ -1310,7 +1310,7 @@ or more than one greater than that OCIN. After not ignoring two announcements
 with the same election, the Leios node should ignore (including not relaying)
 any subsequent announcements for that election. An intended implication of this
 rule is that an honest server would send the same one or two announcements to
-all of its clients; it doesn't have to track any extra state per-client.
+all of its clients; it does not have to track any extra state per-client.
 
 With this rule, a client will crucially disconnect if and only if a server sends
 more than two announcements with the same election. It will also ignore headers
@@ -2129,7 +2129,7 @@ consideration of tradeoffs.
 | Maximum Plutus steps per transaction          |          -          |  100G step units   | Raise per-transaction limit by a factor of twenty relative to Praos.                                                                                                                   |
 | Maximum Plutus memory per transaction         |          -          | 350M memory units  | Raise per-transaction limit by a factor of twenty relative to Praos.                                                                                                                   |
 | Ranking block max size                        |    $S_\text{RB}$    |    90,112 bytes    | This is the current value on the Cardano mainnet.                                                                                                                                      |
-| Praos active slot coefficient                 |    $f_\text{RB}$    |     0.05 /slot     | This is the current value on the Cardano mainnet.                                                                                                                                      |
+
 | Mean committee size                           |         $n$         |   600 stakepools   | Modeling of the proposed certificate scheme indicates that certificates reach their minimum size of ~8 kB at this committee size, given a realistic distribution of stake among pools. |
 | Quorum size                                   |       $\tau$        |        75%         | High threshold ensures certified EBs are known to >25% of honest nodes even with 50% adversarial stake. This enables the network assumption for safe diffusion within L_diff.          |
 
@@ -2372,7 +2372,7 @@ better user experience through reduced transaction confirmation times.
 
 The current design requires $\Delta_\text{EB}^A$ (worst case) to be fairly small
 to enable selection of reasonable $L_\text{diff}$ values that ensure certified
-EBs don't impact Praos safety while maintaining frequent enough certification
+EBs do not impact Praos safety while maintaining frequent enough certification
 for high throughput. Should worst-case EB diffusion prove much larger than
 average or honest cases, introducing an additional recovery period
 $L_\text{recover}$ after certificate inclusion could allow EBs to remain
