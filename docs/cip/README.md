@@ -508,7 +508,7 @@ their headers and embedding EB certificates in their bodies.
 - When an RB header sets `certified_eb` to true, the corresponding body must
   include a matching `eb_certificate`
 - The content rules for RBs are detailed as part of
-  [Step 5: Chain Inclusion](#rb-content-rules)
+  [Step 5: Chain Inclusion](#step-5-chain-inclusion)
 
 #### Endorser Blocks (EBs)
 
