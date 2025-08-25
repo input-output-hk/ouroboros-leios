@@ -236,4 +236,12 @@
     <path d="M 670 140 L 280 140" stroke="#595959" stroke-width="2" marker-end="url(#arrowhead)"/>
     <path d="M 900 140 L 730 140" stroke="#595959" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrowhead)"/>
   </g>
+  
+  <!-- Legend -->
+  <g id="legend">
+    <rect x="20" y="500" width="120" height="58" fill="#f8f8f8" stroke="#ddd" stroke-width="1" rx="4"/>
+    <text x="30" y="520" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#333">Superscripts:</text>
+    <text x="30" y="535" font-family="Arial, sans-serif" font-size="11" fill="#333">A = Adversarial</text>
+    <text x="30" y="548" font-family="Arial, sans-serif" font-size="11" fill="#333">H = Honest</text>
+  </g>
 </svg>
