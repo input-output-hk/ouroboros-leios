@@ -854,7 +854,7 @@ Upon receiving an EB, included transactions are added to $S$ with validation
 flags initially set to false. When validating an EB or observing a certificate
 for the EB, the validation flags for related transactions in $S$ are set to
 true. During transaction submission, if space permits and the transaction is
-valid, it is added to the mempool end; if the transaction exists in $S$, the
+valid, it is added to the mempool's end; if the transaction exists in $S$, the
 node avoids redownloading or revalidating to optimize performance. Upon ledger
 state changes, the mempool is revalidated against the new state. When processing
 transactions in EBs or RBs, nodes check $S$ first to avoid redundant download
