@@ -320,10 +320,9 @@ committee.
 
 #### Step 3: Committee Validation
 
-After **[Phase 1: Equivocation Detection](#equivocation-detection)**
-($L_\text{equi}$) completes to ensure network security, a voting committee of
-stake pools validates the EB during **[Phase 2: Voting Period](#voting-period)**
-(shown in Figure 4 as $L_\text{vote}$). Committee members are
+If no [equivocations](#equivocation-detection) were detected within
+$L_\text{equi}$, a voting committee of stake pools validates the EB and votes
+within a [voting period](#voting-period) $L_\text{vote}$. Committee members are
 [selected via sortition](#committee-structure) based on the slot number of the
 RB that announced the EB. A committee member votes for an EB only if:
 
