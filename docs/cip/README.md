@@ -608,8 +608,9 @@ their headers and embedding EB certificates in their bodies.
 - The `certified_eb` bit enables syncing nodes to predict the total size of
   valid responses to their requests for batches of EBs certified on the
   historical chain.
-- If the `announced_eb_size` field of an RB header is incorrect, then neither the RB header nor the RB are invalid.
-  But no honest node should vote for the EB.
+- If the `announced_eb_size` field of an RB header is incorrect, then neither
+  the RB header nor the RB are invalid. But no honest node should vote for the
+  EB.
 
 #### Endorser Blocks (EBs)
 
@@ -689,8 +690,10 @@ include the `endorser_block_hash` field that uniquely identifies the target EB:
   - `endorser_block_hash`: Hash of the RB header that announced the target EB
   - `vote_signature`: Cryptographic signature (BLS in this implementation)
 
-The `endorser_block_hash` identifies the header that announces the EB instead of identifying the EB's hash directly.
-This ensures the voters validated the EB against the same ledger state that it extends when certfied on chain; recall that multiple RB headers could announce the same EB.
+The `endorser_block_hash` identifies the header that announces the EB instead of
+identifying the EB's hash directly. This ensures the voters validated the EB
+against the same ledger state that it extends when certfied on chain; recall
+that multiple RB headers could announce the same EB.
 
 The precise structure is defined in the <a href="#votes-certificates-cddl">Votes
 and Certificates CDDL specification</a> in Appendix B.
