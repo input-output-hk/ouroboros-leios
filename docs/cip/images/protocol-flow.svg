@@ -118,10 +118,10 @@
     </a>
     
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#l-equi" class="param-link">
-      <line x1="250" y1="300" x2="340" y2="300" stroke="#9c27b0" stroke-width="1" stroke-dasharray="2,2"/>
+      <line x1="250" y1="300" x2="340" y2="300" stroke="#f57c00" stroke-width="1" stroke-dasharray="2,2"/>
       <path d="M 250 300 L 250 305 Q 250 310 255 310 L 290 310 L 295 317 L 300 310 L 335 310 Q 340 310 340 305 L 340 300" 
-            stroke="#9c27b0" stroke-width="2" fill="none"/>
-      <text x="295" y="335" font-size="18" text-anchor="middle" fill="#9c27b0">
+            stroke="#f57c00" stroke-width="2" fill="none"/>
+      <text x="295" y="335" font-size="18" text-anchor="middle" fill="#f57c00">
         <tspan font-family="serif" font-style="italic" font-size="24">L</tspan><tspan font-family="Arial, sans-serif" font-size="16" baseline-shift="sub">equi</tspan>
       </text>
     </a>
@@ -155,56 +155,56 @@
     </g>
     
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#l-diff" class="param-link">
-      <line x1="460" y1="340" x2="670" y2="340" stroke="#4caf50" stroke-width="1" stroke-dasharray="2,2"/>
+      <line x1="460" y1="340" x2="670" y2="340" stroke="#ffb74d" stroke-width="1" stroke-dasharray="2,2"/>
       <path d="M 460 340 L 460 345 Q 460 350 465 350 L 560 350 L 565 357 L 570 350 L 665 350 Q 670 350 670 345 L 670 340" 
-            stroke="#4caf50" stroke-width="2" fill="none"/>
-      <text x="565" y="375" font-size="18" text-anchor="middle" fill="#4caf50">
+            stroke="#ffb74d" stroke-width="2" fill="none"/>
+      <text x="565" y="375" font-size="18" text-anchor="middle" fill="#ffb74d">
         <tspan font-family="serif" font-style="italic" font-size="24">L</tspan><tspan font-family="Arial, sans-serif" font-size="16" baseline-shift="sub">diff</tspan>
       </text>
     </a>
     
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#delta-rb" class="timing-link">
       <g id="rb-diffusion">
-        <line x1="700" y1="385" x2="700" y2="395" stroke="#783f04" stroke-width="2"/>
-        <line x1="700" y1="390" x2="850" y2="390" stroke="#783f04" stroke-width="2" stroke-dasharray="4,2"/>
-        <line x1="850" y1="385" x2="850" y2="395" stroke="#783f04" stroke-width="2"/>
-        <text x="777" y="375" font-family="Arial, sans-serif" font-size="20" text-anchor="middle" fill="#783f04">Δ<tspan font-size="16" baseline-shift="sub">RB</tspan><tspan font-size="14" baseline-shift="super">A</tspan></text>
+        <line x1="700" y1="385" x2="700" y2="395" stroke="#607d8b" stroke-width="2"/>
+        <line x1="700" y1="390" x2="850" y2="390" stroke="#607d8b" stroke-width="2" stroke-dasharray="4,2"/>
+        <line x1="850" y1="385" x2="850" y2="395" stroke="#607d8b" stroke-width="2"/>
+        <text x="777" y="375" font-family="Arial, sans-serif" font-size="20" text-anchor="middle" fill="#607d8b">Δ<tspan font-size="16" baseline-shift="sub">RB</tspan><tspan font-size="14" baseline-shift="super">W</tspan></text>
       </g>
     </a>
     
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#delta-applytxs" class="timing-link">
       <g id="tx-processing">
-        <line x1="775" y1="425" x2="775" y2="435" stroke="#b8860b" stroke-width="2"/>
-        <line x1="775" y1="430" x2="850" y2="430" stroke="#b8860b" stroke-width="2" stroke-dasharray="4,2"/>
-        <line x1="850" y1="425" x2="850" y2="435" stroke="#b8860b" stroke-width="2"/>
-        <text x="815" y="415" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#b8860b">Δ<tspan font-size="14" baseline-shift="sub">applyTxs</tspan><tspan font-size="12" baseline-shift="super">A</tspan></text>
+        <line x1="775" y1="425" x2="775" y2="435" stroke="#607d8b" stroke-width="2"/>
+        <line x1="775" y1="430" x2="850" y2="430" stroke="#607d8b" stroke-width="2" stroke-dasharray="4,2"/>
+        <line x1="850" y1="425" x2="850" y2="435" stroke="#607d8b" stroke-width="2"/>
+        <text x="815" y="415" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#607d8b">Δ<tspan font-size="14" baseline-shift="sub">applyTxs</tspan><tspan font-size="12" baseline-shift="super">W</tspan></text>
       </g>
     </a>
     
     <g id="network-chars-vote">
       <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#delta-eb-H" class="delta-link">
-        <line x1="250" y1="425" x2="250" y2="435" stroke="#4caf50" stroke-width="2"/>
-        <line x1="250" y1="430" x2="460" y2="430" stroke="#4caf50" stroke-width="2" stroke-dasharray="4,2"/>
-        <line x1="460" y1="425" x2="460" y2="435" stroke="#4caf50" stroke-width="2"/>
-        <text x="355" y="415" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#4caf50">Δ<tspan font-size="14" baseline-shift="sub">EB</tspan><tspan font-size="12" baseline-shift="super">H</tspan></text>
+        <line x1="250" y1="425" x2="250" y2="435" stroke="#8bc34a" stroke-width="2"/>
+        <line x1="250" y1="430" x2="460" y2="430" stroke="#8bc34a" stroke-width="2" stroke-dasharray="4,2"/>
+        <line x1="460" y1="425" x2="460" y2="435" stroke="#8bc34a" stroke-width="2"/>
+        <text x="355" y="415" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#8bc34a">Δ<tspan font-size="14" baseline-shift="sub">EB</tspan><tspan font-size="12" baseline-shift="super">O</tspan></text>
       </a>
     </g>
     
     <g id="network-chars-after">
       <!-- Delta EB wc (extends beyond RB' creation) -->
       <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#delta-eb-A" class="delta-link">
-        <line x1="250" y1="465" x2="250" y2="475" stroke="#ff5722" stroke-width="2"/>
-        <line x1="250" y1="470" x2="810" y2="470" stroke="#ff5722" stroke-width="2" stroke-dasharray="4,2"/>
-        <line x1="810" y1="465" x2="810" y2="475" stroke="#ff5722" stroke-width="2"/>
-        <text x="530" y="455" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#ff5722">Δ<tspan font-size="14" baseline-shift="sub">EB</tspan><tspan font-size="12" baseline-shift="super">A</tspan></text>
+        <line x1="250" y1="465" x2="250" y2="475" stroke="#607d8b" stroke-width="2"/>
+        <line x1="250" y1="470" x2="810" y2="470" stroke="#607d8b" stroke-width="2" stroke-dasharray="4,2"/>
+        <line x1="810" y1="465" x2="810" y2="475" stroke="#607d8b" stroke-width="2"/>
+        <text x="530" y="455" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#607d8b">Δ<tspan font-size="14" baseline-shift="sub">EB</tspan><tspan font-size="12" baseline-shift="super">W</tspan></text>
       </a>
       
       <!-- Delta reapply (after EB wc with small gap, same y-position) -->
       <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#delta-reapply" class="delta-link">
-        <line x1="815" y1="465" x2="815" y2="475" stroke="#2196F3" stroke-width="2"/>
-        <line x1="815" y1="470" x2="850" y2="470" stroke="#2196F3" stroke-width="2" stroke-dasharray="4,2"/>
-        <line x1="850" y1="465" x2="850" y2="475" stroke="#2196F3" stroke-width="2"/>
-        <text x="835" y="455" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#2196F3">Δ<tspan font-size="14" baseline-shift="sub">reapply</tspan><tspan font-size="12" baseline-shift="super">A</tspan></text>
+        <line x1="815" y1="465" x2="815" y2="475" stroke="#607d8b" stroke-width="2"/>
+        <line x1="815" y1="470" x2="850" y2="470" stroke="#607d8b" stroke-width="2" stroke-dasharray="4,2"/>
+        <line x1="850" y1="465" x2="850" y2="475" stroke="#607d8b" stroke-width="2"/>
+        <text x="835" y="455" font-family="Arial, sans-serif" font-size="18" text-anchor="middle" fill="#607d8b">Δ<tspan font-size="14" baseline-shift="sub">reapply</tspan><tspan font-size="12" baseline-shift="super">W</tspan></text>
       </a>
     </g>
     
@@ -248,7 +248,7 @@
     <text x="65" y="480" font-family="Arial, sans-serif" font-size="11" fill="#333">Vote</text>
     
     <text x="30" y="500" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#333">Superscripts</text>
-    <text x="30" y="515" font-family="Arial, sans-serif" font-size="11" fill="#333">A = Adversarial (worst-case)</text>
-    <text x="30" y="528" font-family="Arial, sans-serif" font-size="11" fill="#333">H = Honest (optimistic)</text>
+    <text x="30" y="515" font-family="Arial, sans-serif" font-size="11" fill="#333">O = Optimistic</text>
+    <text x="30" y="528" font-family="Arial, sans-serif" font-size="11" fill="#333">W = Worst-case</text>
   </g>
 </svg>
