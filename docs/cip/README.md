@@ -1100,10 +1100,9 @@ not need to be perfect. The prioritization of young over old merely needs to be
 robust enough to justify the chosen values of $L_\text{vote}$ and
 $L_\text{diff}$ even during a burst of withheld-but-valid messages.
 
-**Feasbility Sketch**
+**Concrete Proposal and its Feasibility**
 
-The following two new mini-protocols would be feasible and tractable for a Leios
-implementation.
+The following two new mini-protocols are proposed for the Leios implementation.
 
 If the general structure and semantics of mini-protocols is not already
 familiar, see the Chapter 2 "Multiplexing mini-protocols" and Chapter 3
