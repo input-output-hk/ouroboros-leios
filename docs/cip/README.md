@@ -241,6 +241,14 @@ The key insight is that we can maintain Praos's security guarantees while
 processing more transactions by carefully managing when and how these additional
 blocks are validated and included in the chain.
 
+> [!NOTE]
+>
+> **Formal Specification**: A complete formal specification of the Linear Leios
+> protocol described in this CIP is available in Agda at the [Linear Leios
+> formal specification][linear-leios-formal-spec]. This formal specification
+> provides mathematical definitions and proofs of the protocol's safety and
+> liveness properties.
+
 <div align="center">
   <a name="figure-3" id="figure-3"></a>
   <p name="protocol-overview">
@@ -748,7 +756,9 @@ RB containing an EB certificate is processed within the same $\Delta_\text{RB}$
 time bound as standard Praos blocks.
 
 This section provides a high-level view of the security argument, starting with
-the main assumptions involved.
+the main assumptions involved. For complete formal proofs of safety and liveness
+properties, refer to the [Linear Leios formal
+specification][linear-leios-formal-spec].
 
 <a id="eb-reapplication-constraint"></a>
 
@@ -841,8 +851,8 @@ block with extended header fields to reference one EB and announce another EB
 when such is created. The optional EB is a larger block containing references to
 additional transactions. The RB chain continues to be distributed exactly as in
 Praos, while Leios introduces a separate mechanism to distribute the same
-headers for rapid EB discovery and <a href="#equivocation">equivocation
-detection</a>.
+headers for rapid EB discovery and
+<a href="#equivocation-detection">equivocation detection</a>.
 
 <a id="rb-header-diffusion" href="#rb-header-diffusion"></a>**RB Header
 Diffusion**: RB headers diffuse independently of standard ChainSync (steps 2a
@@ -925,12 +935,13 @@ $S$ to prevent unbounded growth.
 
 <a id="VotingEB" href="#VotingEB"></a>**Voting Process**: Committee members
 [selected through a lottery process](#votes-and-certificates) vote on EBs as
-soon as vote requirements are met according to protocol (step 9). An honest node
-casts only one vote for the EB extending its current longest chain.
+soon as [vote requirements](#step-3-committee-validation) are met according to
+protocol (step 9). An honest node casts only one vote for the EB extending its
+current longest chain.
 
 <a id="VoteDiffusion" href="#VoteDiffusion"></a>**Vote Propagation**: Votes
-propagate through the network during the vote diffusion period ($L_\text{diff}$
-slots) (steps 10 and 10a). While nodes forward votes on EBs across all candidate
+propagate through the network during the vote diffusion period $L_\text{diff}$
+slots (steps 10 and 10a). While nodes forward votes on EBs across all candidate
 chains, they only forward at most one vote per committee member per slot.
 
 Nodes maintain and relay votes for a bounded duration to limit resource usage.
@@ -943,11 +954,11 @@ allowing nodes to discard votes that are no longer relevant.
 Construction**: All nodes receive votes from upstream peers, maintaining a
 running tally for each EB to track progress toward the quorum threshold (step
 11). However, only RB producers create certificates when they are about to
-produce a new ranking block. Stakepool nodes know the leadership schedule, so
-they know when they are eligible to construct a certificate for an upcoming RB
-they will produce. When enough votes are collected during the vote diffusion
-period, the RB producer aggregates them into a compact certificate. This
-certificate is embedded directly in the RB body and serves as cryptographic
+produce a new ranking block. Block producing nodes know their ownleadership
+schedule, so they know when they are eligible to construct a certificate for an
+upcoming RB they will produce. When enough votes are collected during the vote
+diffusion period, the RB producer aggregates them into a compact certificate.
+This certificate is embedded directly in the RB body and serves as cryptographic
 proof that the EB has received sufficient committee approval.
 
 #### Next Block Production
@@ -2430,6 +2441,8 @@ The proposal will be considered active once the following criteria are met:
       [Cardano blueprint](https://cardano-scaling.github.io/cardano-blueprint/)
       including conformance tests.
 - [ ] Formal specification of the consensus and ledger changes is available.
+      (Note: [Linear Leios formal specification][linear-leios-formal-spec]
+      provides the mathematical foundation)
 - [ ] ΔQSD model available for Leios parameter selection.
 - [ ] Community agreement on initial Leios protocol parameters.
 - [ ] A peer-reviewed implementation of a Leios-enabled node is available.
@@ -2504,6 +2517,8 @@ protocol.
 - **Leios Discord channel** - [IOG Discord][leios-discord]
 - **Leios R&D repository** - [GitHub][leios-github]
 - **Leios formal specification** - [GitHub][leios-formal-spec]
+- **Leios Agfa formal specification** - [Agda
+  specification][linear-leios-formal-spec]
 - **Leios cryptography prototype** - [GitHub][leioscrypto]
 
 **Technical Specifications**
@@ -2570,6 +2585,9 @@ protocol.
 [leios-formal-spec]:
   https://github.com/input-output-hk/ouroboros-leios-formal-spec
   "Github repository for Leios formal specification"
+[linear-leios-formal-spec]:
+  https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/V1.0/formal-spec/Leios/Linear.lagda.md
+  "Linear Leios formal specification in Agda"
 
 <!-- Technical specifications and benchmarks -->
 
