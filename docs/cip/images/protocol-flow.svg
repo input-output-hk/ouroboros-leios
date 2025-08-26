@@ -232,9 +232,23 @@
   
   <!-- Legend -->
   <g id="legend">
-    <rect x="20" y="500" width="180" height="58" fill="#f8f8f8" stroke="#ddd" stroke-width="1" rx="4"/>
-    <text x="30" y="520" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#333">Superscripts:</text>
-    <text x="30" y="535" font-family="Arial, sans-serif" font-size="11" fill="#333">A = Adversarial (worst-case)</text>
-    <text x="30" y="548" font-family="Arial, sans-serif" font-size="11" fill="#333">H = Honest (optimistic)</text>
+    <rect x="20" y="420" width="220" height="118" fill="#f8f8f8" stroke="#ddd" stroke-width="1" rx="4"/>
+    <text x="30" y="440" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#333">Legend</text>
+    
+    <!-- Certificate shape -->
+    <g transform="translate(45, 455)">
+      <polygon points="0,-8 8,-4 8,4 0,8 -8,4 -8,-4" fill="#fff2cc" stroke="#f9a825" stroke-width="1"/>
+    </g>
+    <text x="65" y="460" font-family="Arial, sans-serif" font-size="11" fill="#333">Certificate</text>
+    
+    <!-- Vote shape -->
+    <g transform="translate(45, 475)">
+      <rect x="-3" y="-3" width="6" height="6" fill="#f9a825" transform="rotate(45)"/>
+    </g>
+    <text x="65" y="480" font-family="Arial, sans-serif" font-size="11" fill="#333">Vote</text>
+    
+    <text x="30" y="500" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#333">Superscripts</text>
+    <text x="30" y="515" font-family="Arial, sans-serif" font-size="11" fill="#333">A = Adversarial (worst-case)</text>
+    <text x="30" y="528" font-family="Arial, sans-serif" font-size="11" fill="#333">H = Honest (optimistic)</text>
   </g>
 </svg>
