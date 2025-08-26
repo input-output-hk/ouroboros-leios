@@ -678,22 +678,22 @@ impl LinearLeiosNode {
     }
 
     fn receive_request_rb_header(&mut self, from: NodeId, id: BlockId) {
-        if let Some(rb) = self.praos.blocks.get(&id) {
-            if let Some(header) = rb.header() {
-                // If we already have this RB's body,
-                // let the requester know that it's ready to fetch.
-                let have_body = matches!(rb, RankingBlockView::Received { .. });
-                // If we already have the EB announced by this RB,
-                // let the requester know that they can fetch it.
-                // But if we are maliciously withholding the EB, do not let them know.
-                let have_eb = matches!(
-                    self.leios.ebs.get(&header.eb_announcement),
-                    Some(EndorserBlockView::Received { .. })
-                ) && !self.should_withhold_ebs();
-                self.queued
-                    .send_to(from, Message::RBHeader(header.clone(), have_body, have_eb));
-            };
-        };
+        if let Some(rb) = self.praos.blocks.get(&id)
+            && let Some(header) = rb.header()
+        {
+            // If we already have this RB's body,
+            // let the requester know that it's ready to fetch.
+            let have_body = matches!(rb, RankingBlockView::Received { .. });
+            // If we already have the EB announced by this RB,
+            // let the requester know that they can fetch it.
+            // But if we are maliciously withholding the EB, do not let them know.
+            let have_eb = matches!(
+                self.leios.ebs.get(&header.eb_announcement),
+                Some(EndorserBlockView::Received { .. })
+            ) && !self.should_withhold_ebs();
+            self.queued
+                .send_to(from, Message::RBHeader(header.clone(), have_body, have_eb));
+        }
     }
 
     fn receive_rb_header(
@@ -725,10 +725,9 @@ impl LinearLeiosNode {
                 // Forget we ever saw that other block
                 if let Some(RankingBlockView::Received { rb, .. }) =
                     self.praos.blocks.remove(old_block_id)
+                    && let Some(endorsement) = &rb.endorsement
                 {
-                    if let Some(endorsement) = &rb.endorsement {
-                        self.leios.incomplete_onchain_ebs.remove(&endorsement.eb);
-                    }
+                    self.leios.incomplete_onchain_ebs.remove(&endorsement.eb);
                 }
             }
         }
@@ -850,10 +849,10 @@ impl LinearLeiosNode {
                 header_seen,
             },
         );
-        if let Some(endorsement) = &rb.endorsement {
-            if !self.is_eb_validated(endorsement.eb) {
-                self.leios.incomplete_onchain_ebs.insert(endorsement.eb);
-            }
+        if let Some(endorsement) = &rb.endorsement
+            && !self.is_eb_validated(endorsement.eb)
+        {
+            self.leios.incomplete_onchain_ebs.insert(endorsement.eb);
         }
 
         self.publish_rb(rb, true);
@@ -1391,12 +1390,11 @@ impl LinearLeiosNode {
 
     fn remove_rb_txs_from_mempool(&mut self, rb: &RankingBlock) {
         let mut txs = rb.transactions.clone();
-        if let Some(endorsement) = &rb.endorsement {
-            if let Some(EndorserBlockView::Received { eb, .. }) =
+        if let Some(endorsement) = &rb.endorsement
+            && let Some(EndorserBlockView::Received { eb, .. }) =
                 self.leios.ebs.get(&endorsement.eb)
-            {
-                txs.extend(eb.txs.iter().cloned());
-            }
+        {
+            txs.extend(eb.txs.iter().cloned());
         }
         self.remove_txs_from_mempool(&txs);
     }

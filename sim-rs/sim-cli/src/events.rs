@@ -114,10 +114,10 @@ impl EventMonitor {
             remove_zero_decimal: Some(true),
         });
 
-        if let Some(path) = &self.output_path {
-            if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent).await?;
-            }
+        if let Some(path) = &self.output_path
+            && let Some(parent) = path.parent()
+        {
+            fs::create_dir_all(parent).await?;
         }
 
         let mut output = match self.output_path.as_mut() {

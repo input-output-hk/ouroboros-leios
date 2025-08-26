@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Other
+
+- Fix linter warnings from newer rust version
+
 ## v1.2.0
 
 ### All Leios variants

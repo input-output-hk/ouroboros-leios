@@ -583,8 +583,8 @@ impl StracciatellaLeiosNode {
 
     fn select_txs_for_eb(&mut self, shard: u64, pipeline: u64) -> Vec<Arc<Transaction>> {
         let mut txs = vec![];
-        if self.sim_config.eb_include_txs_from_previous_stage {
-            if let Some(eb_from_last_pipeline) =
+        if self.sim_config.eb_include_txs_from_previous_stage
+            && let Some(eb_from_last_pipeline) =
                 self.leios.ebs_by_pipeline.get(&pipeline).and_then(|ebs| {
                     ebs.iter()
                         .find_map(|eb_id| match self.leios.ebs.get(eb_id) {
@@ -592,12 +592,11 @@ impl StracciatellaLeiosNode {
                             _ => None,
                         })
                 })
-            {
-                // include TXs from the first EB in the last pipeline
-                for tx in &eb_from_last_pipeline.txs {
-                    if matches!(self.txs.get(&tx.id), Some(TransactionView::Received(_))) {
-                        txs.push(tx.clone());
-                    }
+        {
+            // include TXs from the first EB in the last pipeline
+            for tx in &eb_from_last_pipeline.txs {
+                if matches!(self.txs.get(&tx.id), Some(TransactionView::Received(_))) {
+                    txs.push(tx.clone());
                 }
             }
         }
@@ -1088,12 +1087,11 @@ impl StracciatellaLeiosNode {
 
     fn remove_rb_txs_from_mempools(&mut self, rb: &RankingBlock) {
         let mut txs = rb.transactions.clone();
-        if let Some(endorsement) = &rb.endorsement {
-            if let Some(EndorserBlockView::Received { eb, .. }) =
+        if let Some(endorsement) = &rb.endorsement
+            && let Some(EndorserBlockView::Received { eb, .. }) =
                 self.leios.ebs.get(&endorsement.eb)
-            {
-                txs.extend(eb.txs.iter().cloned());
-            }
+        {
+            txs.extend(eb.txs.iter().cloned());
         }
         self.remove_txs_from_mempools(&txs);
     }
