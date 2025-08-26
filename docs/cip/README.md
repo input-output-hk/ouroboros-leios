@@ -244,7 +244,8 @@ blocks are validated and included in the chain.
 
 > [!NOTE]
 >
-> The Agda formal specification for the proposed Leios protocol is available [here][linear-leios-formal-spec].
+> The Agda formal specification for the proposed Leios protocol is available
+> [here][linear-leios-formal-spec].
 
 <div align="center">
   <a name="figure-3" id="figure-3"></a>
@@ -1735,8 +1736,8 @@ model.[^praosp]
     https://github.com/IntersectMBO/cardano-formal-specifications/blob/6d4e5cfc224a24972162e39a6017c273cea45321/src/performance/README.md
 
 The simulation results in the remainder of this section use the Rust simulator
-with a set of protocol parameters suitable for running Leios at 200 kB/s
-of transactions, which corresponds to approximately 150 tx/s of transactions of
+with a set of protocol parameters suitable for running Leios at 200 kB/s of
+transactions, which corresponds to approximately 150 tx/s of transactions of
 sizes typical on the Cardano mainnet. The maximum size of transactions
 referenced by an EB is 12 MB and the stage lengths are
 $3 \times L_\text{hdr} = 3$, $L_\text{vote} = 4$, and
@@ -2415,8 +2416,8 @@ The proposal will be considered active once the following criteria are met:
       [Cardano blueprint](https://cardano-scaling.github.io/cardano-blueprint/)
       including conformance tests.
 - [ ] Formal specification of the consensus and ledger changes is available.
-      (Note: [Leios formal specification][linear-leios-formal-spec]
-      provides the mathematical foundation)
+      (Note: [Leios formal specification][linear-leios-formal-spec] provides the
+      mathematical foundation)
 - [ ] ΔQSD model available for Leios parameter selection.
 - [ ] Community agreement on initial Leios protocol parameters.
 - [ ] A peer-reviewed implementation of a Leios-enabled node is available.
