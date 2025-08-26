@@ -202,8 +202,8 @@ vary considerably.
 
 Ouroboros Praos cannot support the high transaction volume needed to generate
 the fees that will eventually be needed to offset the diminishing rewards.
-However, as sustained throughput of transactions grows beyond 50 transactions
-per second, there is more opportunity for simultaneously reducing fees,
+However, as sustained throughput of transactions grows beyond [50 transactions
+per second](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/cost-estimate/README.md#required-tps-for-current-reward-maintenance), there is more opportunity for simultaneously reducing fees,
 augmenting the Treasury, and increasing SPO and delegator rewards.
 
 <div align="center">
