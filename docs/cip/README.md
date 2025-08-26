@@ -303,7 +303,10 @@ is full or when sufficient transaction content justifies the voting costs. Empty
 EBs should not be announced in the network as they induce a non-zero cost. Note
 that whether an RB is full is not solely determined by its byte size; in
 particular, the per-block Plutus limits could be the reason a full RB cannot
-contain additional transactions.
+contain additional transactions. Additionally, transactions requiring higher
+size or Plutus execution limits available through proposed Leios may necessitate
+placement in EBs rather than RBs. The lower latency provided by RBs naturally
+incentivizes their use first, enabling gradual adoption of Leios capabilities.
 
 #### Step 2: EB Distribution
 
