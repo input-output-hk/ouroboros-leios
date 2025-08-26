@@ -1235,7 +1235,8 @@ This mini-protocol pair satisfies the above requirements in the following ways.
   exchanged per EB. (Most EBs' transactions will usually have already arrived
   via the Mempool, but the adversary can prevent that for their EBs.) The
   bitmap-based addressing scheme allows for compact requests for even thousands
-  of transactions.
+  of transactions: a few hundred bytes of MsgLeiosBlockTxsRequest can request every transaction in even the largest EB, while a MsgLeiosBlockTxsRequest for a single transaction would old cost tens of bytes.
+  Without a compact addressing scheme, a node that requires every transaction for some EB would essentially need to send a request that's the same size as the EB itself, which is large enough to be considered an unnecessary risk of increased latency.
 - The client can request multiple votes at once, which avoids wasting resources
   on overhead due to the hundreds of votes exchanged per EB. Because the first
   vote in a bundle could have arrived sooner than the last vote in a bundle if
