@@ -1158,7 +1158,7 @@ graph LR
    style StBlockRange color:cyan;
 
    StIdle -->|MsgLeiosBlockRequest| StBlock -->|MsgLeiosBlock| StIdle
-   StIdle -->|MsgLeiosBlockTxsRequest| StBlockTxs -->|MsgLeiosSomeBlockTxs| StIdle
+   StIdle -->|MsgLeiosBlockTxsRequest| StBlockTxs -->|MsgLeiosBlockTxs| StIdle
    StIdle -->|MsgLeiosVotesRequest| StVotes -->|MsgLeiosVotes| StIdle
    StIdle -->|MsgLeiosBlockRangeRequest| StBlockRange -->|MsgLeiosNextBlockAndTxsInRange| StBlockRange -->|MsgLeiosLastBlockAndTxsInRange| StIdle
 
@@ -1176,9 +1176,9 @@ secondary messages, eg indicating when the peer is first able to send the block.
 
 The required exchanges between two neighboring nodes is captured by the
 following Information Exchange Requirements table (IER table). For the sake of
-minimizing this demonstration of feasibility, each row is a mini-protocol
-message, but that correspondence in the follow-up CIP does not need to be
-one-to-one.
+minimizing this proposal, each row is a mini-protocol
+message, but that correspondence does not need to remain
+one-to-one as the mini-protocols evolve over time.
 
 <div align="center">
 <a name="table-4" id="table-4"></a>
@@ -1190,7 +1190,7 @@ one-to-one.
 | ←Server | MsgLeiosBlockOffer              | slot and Leios hash                                          | The server can immediately deliver this block.                                                                                                                                                                                        |
 | ←Server | MsgLeiosBlockTxsOffer           | slot and Leios hash                                          | The server can immediately deliver any transaction referenced by this block.                                                                                                                                                          |
 | ←Server | MsgLeiosVotesOffer              | list of slot and vote-issuer-id pairs                        | The server can immediately deliver votes with these identifiers.                                                                                                                                                                      |
-| Client→ | MsgLeiosBlockRequest            | slot and Leios hash                                          | The server must now send deliver this block.                                                                                                                                                                                          |
+| Client→ | MsgLeiosBlockRequest            | slot and Leios hash                                          | The server must now deliver this block.                                                                                                                                                                                          |
 | ←Server | MsgLeiosBlock                   | EB block                                                     | The block from an earlier MsgLeiosBlockRequest.                                                                                                                                                                                       |
 | Client→ | MsgLeiosBlockTxsRequest         | slot, Leios hash, and map from 16-bit index to 64-bit bitmap | The server must now deliver these transactions. The given bitmap identifies which of 64 contiguous transactions are requested, and the offset of the transaction corresponding to the bitmap's first bit is 64 times the given index. |
 | ←Server | MsgLeiosBlockTxs                | list of transactions                                         | The transactions from an earlier MsgLeiosBlockTxsRequest.                                                                                                                                                                             |
@@ -1247,7 +1247,7 @@ This mini-protocol pair satisfies the above requirements in the following ways.
   conservative, in case the client is already closer to a quorum than it is.
 - MsgLeiosBlockRangeRequest lets syncing nodes avoid wasting resources on
   overhead due to the (hopefully) high rate of EBs per RB. BlockFetch already
-  bundles its RB requests, and this message lets LeiosFetch do the same. The
+  bundles its RB requests when syncing, and this message lets LeiosFetch do the same. The
   starvation detection and avoidance mechanism used by Ouroboros Genesis's
   Devoted BlockFetch variant can be easily copied for MsgLeiosBlockRangeRequest
   if Ouroboros Genesis is enabled.
