@@ -330,7 +330,7 @@ RB that announced the EB. A committee member votes for an EB only if:
 2. It has **not** detected any equivocating RB header for the same slot within
    $L_\text{equi}$ slots of the EB slot,
 3. It finished validating the EB before $L_\text{equi} + L_\text{vote}$ slots
-   after the start of the EB's slot,
+   after the EB slot,
 4. The EB is the one announced by the latest RB in the voter's current chain,
 5. The EB's transactions form a **valid** extension of the RB that announced it,
 6. For non-persistent voters, it is eligible to vote based on sortition using
