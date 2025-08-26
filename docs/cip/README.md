@@ -1408,14 +1408,9 @@ With this rule, a client will crucially disconnect if and only if a server sends
 more than two announcements with the same election. It will also ignore headers
 from leaked hot keys once the SPO increments their OCIN, but unfortunately - and
 in contrast to Praos - not immediately. The Leios node will only ignore
-unincremented OCINs after the increment has settled on the chain. With Ouroboros
-Peras, that could be a matter of minutes. Without Peras, it is typically 12 hr
-under normal conditions and would take at most 36 hr before Cardano would
-consider it to be a disaster scenario. Thus, if an SPO leaks their hot key, the
-network would not diffuse their EBs until up to 36 hr later (usually 12 hr, and
-much sooner with Ouroboros Peras). SPOs should not leak their hot keys that
-frequently, and even if they do, it is still much sooner than waiting for the
-full 90 days.
+unincremented OCINs after all honest nodes necessarily agree that the SPO incremented their OCIN.
+In the strictest case, that could require the increment to be at least 36 hr old before Leios ignores the unincremented OCIN.
+It seems plausible that the agreement could be assumed opportunistically sooner (e.g., after a certificate includes the incremented OCIN), but that is beyond this scope of this CIP; 36 hr is already an acceptable improvement over 90 days, and SPOs already must not frequently leak their hot keys.
 
 ### Incentives
 
