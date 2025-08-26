@@ -1106,6 +1106,7 @@ $L_\text{diff}$ even during a burst of withheld-but-valid messages.
 **Concrete Proposal and its Feasibility**
 
 The following two new mini-protocols are proposed for the Leios implementation.
+This is not the only feasible solution, but this CIP should be amended as implementors refine these mini-protocols.
 
 If the general structure and semantics of mini-protocols is not already
 familiar, see the Chapter 2 "Multiplexing mini-protocols" and Chapter 3
