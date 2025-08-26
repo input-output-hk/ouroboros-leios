@@ -1517,24 +1517,34 @@ Achieving this capacity increase requires trade-offs, as detailed below.
 <a name="time-to-market"></a>**2. Reasonable time to market: Complexity
 trade-offs**
 
-The linearization approach avoids complex distributed systems problems around
-transaction sharding and sophisticated mempool coordination that could delay
-deployment by years. Critically, this linearization approach also simplifies
-conflict resolution compared to highly concurrent variants. In the proposed
-protocol, invalid transactions typically arise only in circumstances where most
-honest stake immediately recognizes them as invalid and can treat them as such
-without ambiguity. In contrast, highly concurrent variants like Input
-Block-based protocols or more generally protocol with additional decoupled block
-production create scenarios where honest nodes become helpless when conflicts
-arise between valid transactions created simultaneously by honest participants,
-requiring more sophisticated resolution mechanisms.
+The research protocol design is optimal in its usage of available network and
+compute resources. However, it comes at the cost of significantly increased
+inclusion latency and a high level of concurrency. Both of which are undesirable
+in a real-world deployment onto the Cardano mainnet and need to be carefully
+weighed against the throughput increase.
 
-This simplified approach enables deterministic conflict resolution through
-transaction execution bitmaps and rolling window corrections, avoiding complex
-distributed coordination problems that could delay deployment significantly. The
-protocol also maintains familiar transaction semantics, deterministic ordering,
-and predictable finality patterns that existing dApps and infrastructure depend
-on today.
+High concurrency allows for higher throughput by doing more transaction
+processing at the same time. In the published design and otherwise discussed
+variants concurrency is introduced by allowing agreement on sequences of
+transactions independently of the Proas block production. This is the case for
+when endorser blocks would be announced separately from Praos blocks or input
+blocks be produced on a completely separate schedule. While such protocol
+designs often result in higher latency due to more rounds, concurrency in itself
+gives rise to the dedicated problem of _conflicting transactions_.
+
+While some level of conflicting transactions and the network/compute waste
+coming with it may be handled by the consensus protocol without giving
+adversaries an edge, perpetually storing transactions that do not execute (only
+one of multiple conflicting transactions can be applied), is a significant cost
+factor. Techniques for minimizing conflicts arising through concurrent block
+production like sharding, collateralization or sophisticated mempool
+coordination have massive impacts on the ecosystem and could delay deployment by
+years.
+
+The proposed variant without concurrency and linearized processing, achieves
+high enough throughput without changing transaction semantics, deterministic
+ordering, and predictable finality patterns that existing dApps and
+infrastructure depend on today.
 
 <a name="downstream-impact"></a>**3. Minimal downstream impact: Ecosystem
 preservation**
