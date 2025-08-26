@@ -80,6 +80,7 @@ elements.
 - [Rationale](#rationale)
   - [How Leios addresses CPS-18](#how-leios-addresses-cps-18)
   - [Evidence](#evidence)
+    - [Simulation Results](#simulation-results)
   - [Feasible Protocol Parameters](#feasible-protocol-parameters)
   - [Trade-offs \& Limitations](#trade-offs--limitations)
   - [Alternatives \& Extensions](#alternatives--extensions)
@@ -1694,7 +1695,7 @@ $$
 \eta_\text{adversary}(s) = \frac{\text{bytes of transactions reaching the ledger without adversarial activity}}{\text{bytes of transactions reaching the ledger with adversarial activity given fraction } s \text{ of the total stake}}
 $$
 
-<a name="simulation-results"></a>**Simulation results**
+#### Simulation Results
 
 The [Leios paper][leios-paper] provides a rigorous theoretical analysis of the
 safety and throughput of the protocol. That has been reinforced and demonstrated
