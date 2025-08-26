@@ -1056,8 +1056,11 @@ improvements.
   them all.
 - **Tolerable Implementation Complexity**: The above requirements must admit an
   implementation without incurring prohibitive costs for development and future
-  maintenance. For example, at least the centralized logic to choose when to send each request in this mini-protocol will be very similar to TxSubmission, Peras vote requests, Mithril's Decentralized Message Queue, and likely additional protocols in the future.
-  There is opportunity for significant code reuse even if the mini-protocols themselves are separate.
+  maintenance. For example, at least the centralized logic to choose when to
+  send each request in this mini-protocol will be very similar to TxSubmission,
+  Peras vote requests, Mithril's Decentralized Message Queue, and likely
+  additional protocols in the future. There is opportunity for significant code
+  reuse even if the mini-protocols themselves are separate.
 
 **Discussion**
 
@@ -1176,9 +1179,9 @@ secondary messages, eg indicating when the peer is first able to send the block.
 
 The required exchanges between two neighboring nodes is captured by the
 following Information Exchange Requirements table (IER table). For the sake of
-minimizing this proposal, each row is a mini-protocol
-message, but that correspondence does not need to remain
-one-to-one as the mini-protocols evolve over time.
+minimizing this proposal, each row is a mini-protocol message, but that
+correspondence does not need to remain one-to-one as the mini-protocols evolve
+over time.
 
 <div align="center">
 <a name="table-4" id="table-4"></a>
@@ -1190,7 +1193,7 @@ one-to-one as the mini-protocols evolve over time.
 | ←Server | MsgLeiosBlockOffer              | slot and Leios hash                                          | The server can immediately deliver this block.                                                                                                                                                                                        |
 | ←Server | MsgLeiosBlockTxsOffer           | slot and Leios hash                                          | The server can immediately deliver any transaction referenced by this block.                                                                                                                                                          |
 | ←Server | MsgLeiosVotesOffer              | list of slot and vote-issuer-id pairs                        | The server can immediately deliver votes with these identifiers.                                                                                                                                                                      |
-| Client→ | MsgLeiosBlockRequest            | slot and Leios hash                                          | The server must now deliver this block.                                                                                                                                                                                          |
+| Client→ | MsgLeiosBlockRequest            | slot and Leios hash                                          | The server must now deliver this block.                                                                                                                                                                                               |
 | ←Server | MsgLeiosBlock                   | EB block                                                     | The block from an earlier MsgLeiosBlockRequest.                                                                                                                                                                                       |
 | Client→ | MsgLeiosBlockTxsRequest         | slot, Leios hash, and map from 16-bit index to 64-bit bitmap | The server must now deliver these transactions. The given bitmap identifies which of 64 contiguous transactions are requested, and the offset of the transaction corresponding to the bitmap's first bit is 64 times the given index. |
 | ←Server | MsgLeiosBlockTxs                | list of transactions                                         | The transactions from an earlier MsgLeiosBlockTxsRequest.                                                                                                                                                                             |
@@ -1235,8 +1238,13 @@ This mini-protocol pair satisfies the above requirements in the following ways.
   exchanged per EB. (Most EBs' transactions will usually have already arrived
   via the Mempool, but the adversary can prevent that for their EBs.) The
   bitmap-based addressing scheme allows for compact requests for even thousands
-  of transactions: a few hundred bytes of MsgLeiosBlockTxsRequest can request every transaction in even the largest EB, while a MsgLeiosBlockTxsRequest for a single transaction would old cost tens of bytes.
-  Without a compact addressing scheme, a node that requires every transaction for some EB would essentially need to send a request that's the same size as the EB itself, which is large enough to be considered an unnecessary risk of increased latency.
+  of transactions: a few hundred bytes of MsgLeiosBlockTxsRequest can request
+  every transaction in even the largest EB, while a MsgLeiosBlockTxsRequest for
+  a single transaction would old cost tens of bytes. Without a compact
+  addressing scheme, a node that requires every transaction for some EB would
+  essentially need to send a request that's the same size as the EB itself,
+  which is large enough to be considered an unnecessary risk of increased
+  latency.
 - The client can request multiple votes at once, which avoids wasting resources
   on overhead due to the hundreds of votes exchanged per EB. Because the first
   vote in a bundle could have arrived sooner than the last vote in a bundle if
@@ -1248,27 +1256,35 @@ This mini-protocol pair satisfies the above requirements in the following ways.
   conservative, in case the client is already closer to a quorum than it is.
 - MsgLeiosBlockRangeRequest lets syncing nodes avoid wasting resources on
   overhead due to the (hopefully) high rate of EBs per RB. BlockFetch already
-  bundles its RB requests when syncing, and this message lets LeiosFetch do the same. The
-  starvation detection and avoidance mechanism used by Ouroboros Genesis's
-  Devoted BlockFetch variant can be easily copied for MsgLeiosBlockRangeRequest
-  if Ouroboros Genesis is enabled.
-- A server should disconnect if the client requests an EB (or its transactions) the server does not have.
-  For young EBs, a client can avoid this by waiting for MsgLeiosBlockOffer (or MsgLeiosBlockTxsOffer) before sending a request.
-  For old EBs, a ChainSync MsgRollForward for an RB that certifies its predecessor's EB would also imply the server has selected that EB, and so must be able to serve it.
-  Whether additional restrictions would be useful is not yet clear.
-  For example, it seems natural to restrict MsgLeiosBlockRequest and MsgLeiosBlockTxsRequest to young EBs (and perhaps also MsgLeiosBlockRangeRequest to old EBs), but it's not already clear what the benefit would be.
-- If MsgLeiosBlockRequest and MsgLeiosBlockTxsRequest were restricted to young EBs, then MsgLeiosBlockRangeRequest would not only enable syncing nodes but also the unfortunate node that suffers from a
-  $\Delta^\text{A}_\text{EB}$ violation. The protocol design
-  requires that that event is rare or at least confined to a small portion of
-  honest stake at a time. But it will occasionally happen to some honest nodes,
-  and they must be able to recover automatically and with minimal disruption.
+  bundles its RB requests when syncing, and this message lets LeiosFetch do the
+  same. The starvation detection and avoidance mechanism used by Ouroboros
+  Genesis's Devoted BlockFetch variant can be easily copied for
+  MsgLeiosBlockRangeRequest if Ouroboros Genesis is enabled.
+- A server should disconnect if the client requests an EB (or its transactions)
+  the server does not have. For young EBs, a client can avoid this by waiting
+  for MsgLeiosBlockOffer (or MsgLeiosBlockTxsOffer) before sending a request.
+  For old EBs, a ChainSync MsgRollForward for an RB that certifies its
+  predecessor's EB would also imply the server has selected that EB, and so must
+  be able to serve it. Whether additional restrictions would be useful is not
+  yet clear. For example, it seems natural to restrict MsgLeiosBlockRequest and
+  MsgLeiosBlockTxsRequest to young EBs (and perhaps also
+  MsgLeiosBlockRangeRequest to old EBs), but it's not already clear what the
+  benefit would be.
+- If MsgLeiosBlockRequest and MsgLeiosBlockTxsRequest were restricted to young
+  EBs, then MsgLeiosBlockRangeRequest would not only enable syncing nodes but
+  also the unfortunate node that suffers from a $\Delta^\text{A}_\text{EB}$
+  violation. The protocol design requires that that event is rare or at least
+  confined to a small portion of honest stake at a time. But it will
+  occasionally happen to some honest nodes, and they must be able to recover
+  automatically and with minimal disruption.
 - Every Leios object is associated with the slot of an EB, and so has an
   explicit age. This enables freshest-first delivery prioritization. In
-  addition, votes of a certain age should no longer diffuse; they are no longer relevant once they are somewhat
-  older than $L_\text{vote}$. Similarly, EBs above some age are no longer relevant unless they're on the historical chain. Because
-  equivocation detection limits the amount of Leios traffic per Praos election
-  and Praos elections have a stochastically low arrival rate, this memory bound
-  is low enough to admit existing Cardano infrastructure.
+  addition, votes of a certain age should no longer diffuse; they are no longer
+  relevant once they are somewhat older than $L_\text{vote}$. Similarly, EBs
+  above some age are no longer relevant unless they're on the historical chain.
+  Because equivocation detection limits the amount of Leios traffic per Praos
+  election and Praos elections have a stochastically low arrival rate, this
+  memory bound is low enough to admit existing Cardano infrastructure.
 
 The mini-protocol pair does not already address the following challenges, but
 the corresponding enrichments - if necessary - would not contradict the
