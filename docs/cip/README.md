@@ -614,11 +614,13 @@ announcing RB and reference additional transactions to increase throughput
 beyond what is permitted to be included directly in the RB.
 
 <a id="eb-structure" href="#eb-structure"></a>**EB Structure**: EBs have a
-simplified structure:
+simple structure:
 
 - `transaction_references`: Ordered list of transaction references, where each
   reference includes the hash of the complete transaction bytes and the
   transaction size in bytes
+
+The precise structure is defined in the <a href="#endorser-block-cddl">Endorser Block CDDL specification</a> in Appendix B.
 
 When an EB is announced in an RB header via the `announced_eb` field, a voting
 period begins as described in [Votes and Certificates](#votes-and-certificates).
@@ -682,13 +684,15 @@ include the `endorser_block_hash` field that uniquely identifies the target EB:
   - `endorser_block_hash`: Hash of the target EB
   - `vote_signature`: Cryptographic signature (BLS in this implementation)
 
+The precise structure is defined in the <a href="#votes-certificates-cddl">Votes and Certificates CDDL specification</a> in Appendix B.
+
 <a id="certificate-validation" href="#certificate-validation"></a>**Certificate
 Validation**: When an RB includes an EB certificate, nodes must validate the
 following before accepting the block:
 
 1. **CDDL Format Compliance**: Certificate structure matches the specification
-   format defined in <a href="#votes-certificates-cddl">Appendix B: Votes and
-   Certificates CDDL</a>
+   format defined in the <a href="#votes-certificates-cddl">Votes and
+   Certificates CDDL specification</a> in Appendix B
 2. **Cryptographic Signatures**: All cryptographic signatures are valid (BLS
    signatures in this implementation)
 
