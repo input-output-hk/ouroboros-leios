@@ -887,10 +887,10 @@ forwarded before complete validity checks are performed.
 
 <a id="transaction-retrieval" href="#transaction-retrieval"></a>**Transaction
 Retrieval**: Nodes check transaction availability for the EB and fetch any
-missing transactions from peers (steps 6a and 7a). Once all transactions are available,
-nodes can serve EBs to downstream peers (step 7). This guarantees that when a
-node announces an EB its downstream peers can trust it has all EB transactions
-available.
+missing transactions from peers (steps 6a and 7a). Once all transactions are
+available, nodes can serve EBs to downstream peers (step 7). This guarantees
+that when a node announces an EB its downstream peers can trust it has all EB
+transactions available.
 
 <a id="eb-transaction-validation" href="#eb-transaction-validation"></a>**Transaction
 Validation**: With all transactions available, nodes validate the endorsed
