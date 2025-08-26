@@ -58,6 +58,7 @@ elements.
     - [Step 4: Certification](#step-4-certification)
     - [Step 5: Chain Inclusion](#step-5-chain-inclusion)
   - [Protocol Parameters](#protocol-parameters)
+      - [EB size constraints](#eb-size-constraints)
   - [Protocol Entities](#protocol-entities)
     - [Ranking Blocks (RBs)](#ranking-blocks-rbs)
     - [Endorser Blocks (EBs)](#endorser-blocks-ebs)
@@ -579,21 +580,19 @@ $$L_\text{diff} \geq \Delta_\text{EB}^{\text{W}} + \Delta_\text{reapply} - \Delt
 This ensures certified EBs reach all honest parties before any RB' that includes
 their certificate needs processing.
 
-> [!NOTE]
->
-> **EB Size Constraints**
->
-> Two separate parameters control EB sizes:
->
-> - $S_\text{EB}$ limits the size of the EB data structure itself, preventing
->   issues when many small transactions create large numbers of transaction
->   references (32 bytes each)
-> - $S_\text{EB-tx}$ limits the total size of transactions that can be
->   referenced, controlling the actual transaction payload
->
-> For example, an EB referencing 10,000 transactions of 100 bytes each would
-> have $S_\text{EB-tx} = 1$ MB but the EB itself would be at least 320 KB for
-> the transaction hashes alone.
+##### EB size constraints
+
+Two separate parameters control EB sizes:
+
+- $S_\text{EB}$ limits the size of the EB data structure itself, preventing
+  issues when many small transactions create large numbers of transaction
+  references (32 bytes each)
+- $S_\text{EB-tx}$ limits the total size of transactions that can be referenced,
+  controlling the actual transaction payload
+
+For example, an EB referencing 10,000 transactions of 100 bytes each would have
+$S_\text{EB-tx} = 1$ MB but the EB itself would be at least 320 KB for the
+transaction hashes alone.
 
 ### Protocol Entities
 
