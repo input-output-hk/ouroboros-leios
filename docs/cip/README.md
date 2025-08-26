@@ -1005,8 +1005,8 @@ improvements.
   assumption. Because Leios is about improved resource utilization, wasting
   resources via unnecessary overhead/latency/etc can be considered a correctness
   violation, even more so than in Praos.
-- **Praos Independence**: The Cardano network must grow RB chains—both
-  adversarial and honest—of the same shape (i.e., forks and their lengths)
+- **Praos Independence**. The Cardano network must grow RB chains — both
+  adversarial and honest — of the same shape (i.e., forks and their lengths)
   regardless of whether it is executing the Leios overlay. In other words, the
   shape of all RB forks that exist at some instant would ideally not provide any
   indication whether the Leios overlay is being executed. Moreover, the honest
@@ -1034,7 +1034,7 @@ direct result of the increased throughput. Second, parties with significant
 stake will need to provision more resources across their relays since each of
 the hundreds of downstream peers becomes more demanding on average.
 
-**Praos Independence**: To prevent Leios from accidentally depriving Praos of
+**Praos Independence**. To prevent Leios from accidentally depriving Praos of
 resources, the node implementation must prioritize Praos over Leios. For
 example, when a node simultaneously issues an RB and the EB it announces, the
 diffusion of the EB should not delay the diffusion of the RB; that RB is
@@ -1050,7 +1050,7 @@ In reality, the prioritization of Praos over Leios does not need to be perfectly
 strict (and in fact could never be on hardware and software infrastructure that
 is mostly commodity and partly public). The fundamental requirement is that the
 network assumptions that were originally used to parametrize Praos must still be
-valid—up to some tolerated error probability—when the same nodes are
+valid — up to some tolerated error probability — when the same nodes are
 simultaneously executing the Leios overlay. Concretely, the worst case delay
 between an honest block producer issuing a uniquely best RB and the last honest
 block producer selecting that RB (i.e., Praos's $\Delta$) must not be protracted
