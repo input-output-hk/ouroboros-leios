@@ -1408,9 +1408,13 @@ With this rule, a client will crucially disconnect if and only if a server sends
 more than two announcements with the same election. It will also ignore headers
 from leaked hot keys once the SPO increments their OCIN, but unfortunately - and
 in contrast to Praos - not immediately. The Leios node will only ignore
-unincremented OCINs after all honest nodes necessarily agree that the SPO incremented their OCIN.
-In the strictest case, that could require the increment to be at least 36 hr old before Leios ignores the unincremented OCIN.
-It seems plausible that the agreement could be assumed opportunistically sooner (e.g., after a certificate includes the incremented OCIN), but that is beyond this scope of this CIP; 36 hr is already an acceptable improvement over 90 days, and SPOs already must not frequently leak their hot keys.
+unincremented OCINs after all honest nodes necessarily agree that the SPO
+incremented their OCIN. In the strictest case, that could require the increment
+to be at least 36 hr old before Leios ignores the unincremented OCIN. It seems
+plausible that the agreement could be assumed opportunistically sooner (e.g.,
+after a certificate includes the incremented OCIN), but that is beyond this
+scope of this CIP; 36 hr is already an acceptable improvement over 90 days, and
+SPOs already must not frequently leak their hot keys.
 
 ### Incentives
 
