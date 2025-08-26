@@ -57,7 +57,7 @@ elements.
     - [Step 3: Committee Validation](#step-3-committee-validation)
     - [Step 4: Certification](#step-4-certification)
     - [Step 5: Chain Inclusion](#step-5-chain-inclusion)
-  - [Network Characteristics and Protocol Parameters](#network-characteristics-and-protocol-parameters)
+  - [Protocol Parameters](#protocol-parameters)
   - [Protocol Entities](#protocol-entities)
     - [Ranking Blocks (RBs)](#ranking-blocks-rbs)
     - [Endorser Blocks (EBs)](#endorser-blocks-ebs)
@@ -339,7 +339,7 @@ RB that announced the EB. A committee member votes for an EB only if:
    the announcing RB's slot number as the election identifier.
 
 where $L_\text{hdr}$ and $L_\text{vote}$ are
-<a href="#network-characteristics-and-protocol-parameters">protocol
+<a href="#protocol-parameters">protocol
 parameters</a> represented by a number of slots.
 
 While not strictly a required check, honest nodes should not vote on empty EBs
@@ -360,7 +360,7 @@ already known to a large portion of the network (>25% even with 50% adversarial
 stake) by the end of the voting period. This widespread initial knowledge
 enables the network assumption that the EB will reach all honest parties within
 the additional diffusion period $L_\text{diff}$. See
-[Network Characteristics and Protocol Parameters](#network-characteristics-and-protocol-parameters)
+[Protocol Parameters](#protocol-parameters)
 for details. A ranking block (RB) producer can then construct a compact
 certificate proving the EB's validity by aggregating the collected votes.
 
@@ -384,7 +384,7 @@ valid chain inclusion are:
    $3 \times L_\text{hdr} + L_\text{vote} + L_\text{diff}$ slots after `RB`.
 
 where $L_\text{hdr}$, $L_\text{vote}$ and $L_\text{diff}$ are
-<a href="#network-characteristics-and-protocol-parameters">protocol
+<a href="#protocol-parameters">protocol
 parameters</a> represented by a number of slots.
 
 This **certificate inclusion delay** ensures certified EBs have sufficient time
@@ -392,7 +392,7 @@ to diffuse throughout the network before their transactions are included in the
 ledger. If the next RB is produced before this minimum delay has elapsed, the EB
 certificate cannot be included and the EB is discarded.
 
-### Network Characteristics and Protocol Parameters
+### Protocol Parameters
 
 The protocol parameters are tunable values that can be adjusted via governance.
 These parameters fall into two categories: timing parameters derived from the
