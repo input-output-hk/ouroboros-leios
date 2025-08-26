@@ -372,13 +372,16 @@ the EB announced by the preceding block `RB`. As shown in Figure 4, this occurs
 only after the complete timing sequence has elapsed. The inclusion rules for
 valid chain inclusion are:
 
-1. `RB'` directly extends the RB which announced the EB (as illustrated in
-   Figure 4 where `RB'` contains the certificate for the EB announced by the
-   preceding RB).
-2. The certificate is valid as defined in
+1. `RB'` contains **either**
+
+   a. a certificate for the EB announced in `RB`, **or**
+
+   b. a list of transactions forming a valid extension of `RB`.
+
+2. The included certificate is valid as defined in
    [Certificate Validation](#certificate-validation).
-3. At least $3 \times L_\text{hdr} + L_\text{vote} + L_\text{diff}$ slots have
-   elapsed since the slot of the RB that announced the EB.
+3. A certificate may only be included if `RB'` is at least
+   $3 \times L_\text{hdr} + L_\text{vote} + L_\text{diff}$ slots after `RB`.
 
 where $L_\text{hdr}$, $L_\text{vote}$ and $L_\text{diff}$ are
 <a href="#network-characteristics-and-protocol-parameters">protocol
@@ -388,16 +391,6 @@ This **certificate inclusion delay** ensures certified EBs have sufficient time
 to diffuse throughout the network before their transactions are included in the
 ledger. If the next RB is produced before this minimum delay has elapsed, the EB
 certificate cannot be included and the EB is discarded.
-
-Additionally, all RBs must follow these content constraints:
-
-1. RBs contain either an EB certificate **or** transactions directly, but
-   **not** both.
-2. All transactions must be valid against the complete ledger state (including
-   certified EBs).
-3. If a node lacks some EB data certified by the chain it is extending, it
-   issues an RB with no transactions so that the honest chain still definitely
-   gains length.
 
 ### Network Characteristics and Protocol Parameters
 
