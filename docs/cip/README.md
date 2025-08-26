@@ -58,7 +58,6 @@ elements.
     - [Step 4: Certification](#step-4-certification)
     - [Step 5: Chain Inclusion](#step-5-chain-inclusion)
   - [Protocol Parameters](#protocol-parameters)
-      - [EB size constraints](#eb-size-constraints)
   - [Protocol Entities](#protocol-entities)
     - [Ranking Blocks (RBs)](#ranking-blocks-rbs)
     - [Endorser Blocks (EBs)](#endorser-blocks-ebs)
@@ -856,12 +855,13 @@ headers for rapid EB discovery and
 <a id="rb-header-diffusion" href="#rb-header-diffusion"></a>**RB Header
 Diffusion**: RB headers diffuse independently of standard ChainSync (steps 2a
 and 2b). This separate mechanism enables rapid EB discovery within the strict
-timing bound $\Delta_\text{hdr}$. Headers are diffused freshest-first to
-facilitate timely EB delivery, with nodes propagating at most two headers per
-(slot, issuer) pair to detect <a href="#equivocation">equivocation</a> - where
-an attacker creates multiple EBs for the same block generation opportunity -
-while limiting network overhead. The header contains the EB hash when the block
-producer created an EB, allowing peers to discover the corresponding EB.
+timing bound $\Delta_\text{hdr}$. EBs are diffused freshest-first to facilitate
+timely EB delivery, with nodes propagating at most two headers per (slot,
+issuer) pair to detect <a href="#equivocation-detection">equivocation</a> -
+where an attacker creates multiple EBs for the same block generation
+opportunity - while limiting network overhead. The header contains the EB hash
+when the block producer created an EB, allowing peers to discover the
+corresponding EB.
 
 <a id="rb-body-diffusion" href="#rb-body-diffusion"></a>**RB Body Diffusion**:
 After receiving headers, nodes fetch RB bodies via standard BlockFetch protocol
