@@ -606,7 +606,9 @@ their headers and embedding EB certificates in their bodies.
   include a matching `eb_certificate`
 - The content rules for RBs are detailed as part of
   [Step 5: Chain Inclusion](#step-5-chain-inclusion)
-- The `certified_eb` bit enables syncing nodes to predict the total size of valid responses to their requests for batches of EBs certified on the historical chain.
+- The `certified_eb` bit enables syncing nodes to predict the total size of
+  valid responses to their requests for batches of EBs certified on the
+  historical chain.
 
 #### Endorser Blocks (EBs)
 
@@ -1269,8 +1271,10 @@ This mini-protocol pair satisfies the above requirements in the following ways.
   same. The starvation detection and avoidance mechanism used by Ouroboros
   Genesis's Devoted BlockFetch variant can be easily copied for
   MsgLeiosBlockRangeRequest if Ouroboros Genesis is enabled.
-- Recall that the `certified_eb` bit enables the client to correctly predict the total payload size of the valid replies to a MsgLeiosBlockRangeRequest.
-  This enables the client to manage its receive buffers, balance load across peers, etc.
+- Recall that the `certified_eb` bit enables the client to correctly predict the
+  total payload size of the valid replies to a MsgLeiosBlockRangeRequest. This
+  enables the client to manage its receive buffers, balance load across peers,
+  etc.
 - A server should disconnect if the client requests an EB (or its transactions)
   the server does not have. For young EBs, a client can avoid this by waiting
   for MsgLeiosBlockOffer (or MsgLeiosBlockTxsOffer) before sending a request.
