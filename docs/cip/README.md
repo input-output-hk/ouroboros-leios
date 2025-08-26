@@ -919,16 +919,9 @@ received EBs. Each entry in $S$ contains:
 2. A validation flag indicating whether the transaction has been verified
    (signatures, scripts, etc.)
 
-Upon receiving an EB, included transactions are added to $S$ with validation
-flags initially set to false. When validating an EB or observing a certificate
-for the EB, the validation flags for related transactions in $S$ are set to
-true. During transaction submission, if space permits and the transaction is
-valid, it is added to the mempool's end; if the transaction exists in $S$, the
-node avoids redownloading or revalidating to optimize performance. Upon ledger
-state changes, the mempool is revalidated against the new state. When processing
-transactions in EBs or RBs, nodes check $S$ first to avoid redundant download
-and validation work. Finally, older transactions are periodically removed from
-$S$ to prevent unbounded growth.
+Transactions are only validated when they are seen the first time, either in the
+mempool or as part of an EB, and validity information is retained to avoid
+redundant fetching and validation.
 
 #### Voting & Certification
 
@@ -996,11 +989,6 @@ serving only as inclusion proofs for transaction content. The
 [EB propagation for chain selection](#eb-chain-selection) requirement ensures
 that nodes already possess all necessary EBs from alternative forks, eliminating
 additional propagation delays during fork switches.
-
-<a id="mempool-capacity" href="#mempool-capacity"></a>**Mempool Capacity
-Requirements**: The mempool must accommodate both RB and EB transaction
-production. The capacity requirements are significantly increased compared to
-Praos to handle the additional transaction volume expected from EB production.
 
 #### Epoch Boundary
 
