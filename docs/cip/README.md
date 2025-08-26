@@ -36,7 +36,8 @@ validation before ledger inclusion, enabling significantly higher throughput.
 
 This specification presents the first version of the Ouroboros Leios protocol
 family, designed to deliver substantial throughput improvements with economic
-sustainability and reduced complexity through fewer new protocol elements.
+sustainability and minimal added complexity through only few new protocol
+elements.
 
 > [!NOTE]
 >
@@ -258,7 +259,7 @@ process. The precise timing mechanism is detailed in the following section.
 ### Protocol Flow
 
 The protocol operates through five sequential steps that span three critical
-protocol phases. Figure 4 visualizes the precise timing mechanism that governs
+timing phases. Figure 4 visualizes the precise timing mechanism that governs
 when certificates can be safely included in the chain, showing both the protocol
 phases and the underlying network characteristics that inform their design.
 
