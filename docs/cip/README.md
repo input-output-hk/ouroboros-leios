@@ -80,6 +80,7 @@ elements.
 - [Rationale](#rationale)
   - [How Leios addresses CPS-18](#how-leios-addresses-cps-18)
   - [Evidence](#evidence)
+    - [Performance Metrics](#performance-metrics)
     - [Simulation Results](#simulation-results)
   - [Feasible Protocol Parameters](#feasible-protocol-parameters)
   - [Trade-offs \& Limitations](#trade-offs--limitations)
@@ -1550,7 +1551,8 @@ assumptions and lack sufficient scalability for long-term viability.
 Additionally, Praos blocks larger than approximately 3 MB would pose security
 risks by increasing the frequency of short forks that adversaries could exploit
 to compromise the common prefix property and enable attacks such as
-double-spending.
+double-spending. Nonetheless, improved Praos block times would be an improvement
+also benefiting [Leios](#alternatives--extensions).
 
 <a name="competitiveness"></a>**4. Competitive positioning**
 
@@ -1558,14 +1560,15 @@ The coupled block production design can be extended towards higher concurrency
 models, as demonstrated in simulation results. It maintains compatibility with
 more aggressive scaling approaches including full Leios variants, EB and IB
 (input block) decoupling, and sharding extensions, ensuring current throughput
-gains do not preclude 100x+ improvements when chain growth solutions mature.
+gains do not preclude 100x+ improvements when chain growth solutions mature and
+once the ecosystem is ready to tackle the complexity coming with it.
 
 <a name="optimal-tradeoffs"></a>**Conclusion**
 
 This linearization proposal balances all four priorities. A delivered 30-65x
 improvement provides substantially more value than the research paper's
-higher-concurrency variants, which would impose costs on existing dApps,
-wallets, and infrastructure while taking significantly longer to build.
+higher-concurrency variants, which would impose major changes on the ecosystem
+and take significantly longer to build.
 
 The following evidence section shall provide quantitative support for these
 trade-offs and validate the protocol's performance under realistic network
@@ -1577,7 +1580,7 @@ This section provides protocol simulation results, feasible protocol parameters
 with justifications, node-level simulation results, and operating cost analysis
 that support the design decisions outlined in the rationale.
 
-<a name="performance-metrics"></a>**Performance metrics**
+#### Performance Metrics
 
 The performance of a protocol like Leios can be characterized in terms of its
 efficient use of resources, its total use of resources, the probabilities of
@@ -1623,14 +1626,14 @@ $$
 **_Temporal efficiency:_** As is true for Praos, there is a delay between
 submitting a transaction and its being included in the ledger and there is a
 finite chance that it never is included in the ledger. Before a transaction is
-eligible to be included in a new IB, it must be validated and placed in the
-memory pool. It is cleanest to measure the time from the transaction reaching
-the local memory pool of the node where it was submitted to the time when it is
-included in the ledger, via a Praos block. The same metric applies both to Praos
-and to Leios. In aggregate, we measure the temporal efficiency as the fraction
-of transactions that reach the ledger, as function of the number of slots
-elapsed. The quantity $\epsilon_\text{temporal}(\infty)$ is the fraction of
-submitted transactions that ever reach the ledger.
+endorsed, it must be validated and placed in the memory pool. It is cleanest to
+measure the time from the transaction reaching the local memory pool of the node
+where it was submitted to the time when it is included in the ledger, via a
+Praos block. The same metric applies both to Praos and to Leios. In aggregate,
+we measure the temporal efficiency as the fraction of transactions that reach
+the ledger, as function of the number of slots elapsed. The quantity
+$\epsilon_\text{temporal}(\infty)$ is the fraction of submitted transactions
+that ever reach the ledger.
 
 $$
 \epsilon_\text{temporal}(s) = \text{fraction of transactions included in the ledger within } s \text{ slots of their inclusion in a local memory pool}
