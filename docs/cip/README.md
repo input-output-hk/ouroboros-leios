@@ -340,6 +340,9 @@ where $L_\text{equi}$, $L_\text{vote}$ and $\Delta_\text{hdr}$ are
 <a href="#network-characteristics-and-protocol-parameters">protocol
 parameters</a> represented by a number of slots.
 
+While not strictly a required check, honest nodes should not vote on empty EBs
+as that is obviously pointless and wasteful.
+
 #### Step 4: Certification
 
 During the voting period, if enough committee votes are collected such that the
@@ -825,14 +828,13 @@ reuse, with detailed processing rules specified in the
 #### RB Block Production and Diffusion
 
 When a stake pool wins block leadership (step 1), they create a Ranking Block
-(RB) and **optionally** an Endorser Block (EB) based on the
-[adaptive EB production](#adaptive-eb-production) criteria. The RB is a standard
-Praos block with extended header fields to reference one EB and announce another
-EB when such is created. The optional EB is a larger block containing references
-to additional transactions. The RB chain continues to be distributed exactly as
-in Praos, while Leios introduces a separate mechanism to distribute the same
-headers for rapid EB discovery and <a href="#equivocation">equivocation
-detection</a>.
+(RB) and **optionally** an Endorser Block (EB) based on the [chain inclusion
+rules](#step-5-chain-inclusion). The RB is a standard Praos block with extended
+header fields to reference one EB and announce another EB when such is created.
+The optional EB is a larger block containing references to additional
+transactions. The RB chain continues to be distributed exactly as in Praos,
+while Leios introduces a separate mechanism to distribute the same headers for
+rapid EB discovery and <a href="#equivocation">equivocation detection</a>.
 
 <a id="rb-header-diffusion" href="#rb-header-diffusion"></a>**RB Header
 Diffusion**: RB headers diffuse independently of standard ChainSync (steps 2a
@@ -1402,164 +1404,43 @@ full 90 days.
 
 ### Incentives
 
-<a id="incentive-structure" href="#incentive-structure"></a>The Leios incentive
-structure builds upon the existing Ouroboros Praos reward mechanism while
-introducing new considerations for EB production, voting participation, and
-dual-block production scenarios. The design aims to maintain economic security
-while optimizing for throughput efficiency.
+Leios does not require any changes to incentives in Cardano.
 
-**Reward Function Evolution**
+The current reward structure used on Cardano tracks the number of blocks created
+by each SPO compared to the expected number of blocks they should have created.
+It does not directly track the number of transactions in a block and empty
+blocks count the same. The intent is to detect whether a party is offline or
+not. Block producers are further incentivized to fill blocks with transactions,
+for it increases fees flowing into the overall reward and thus their individual
+rewards.
 
-<a id="current-reward-function" href="#current-reward-function"></a>The current
-Praos reward function tracks the number of RBs created by each SPO compared to
-their expected production, using this performance metric (β) to determine
-rewards proportional to stake. This mechanism detects offline behavior and
-incentivizes consistent participation without directly measuring transaction
-inclusion - empty blocks count equally toward the performance factor.
+This indirect incentive to fill blocks holds the same with Leios, where
+endorsing and voting would be equally incentivized by having more fee paying
+transactions reach the ledger.
 
-<a id="performance-based-rewards" href="#performance-based-rewards"></a>**Performance-Based
-Rewards**: Leios extends this approach by refining the performance calculation
-to account for block validity in enhanced throughput scenarios. When operating
-within the rolling window (certificate-active periods), RBs containing invalid
-transactions due to incomplete ledger state knowledge should not negatively
-impact the producer's performance factor.
+The current and unchanged specification of rewards is part of the [ledger
+specification](https://intersectmbo.github.io/formal-ledger-specifications/site/Ledger.Conway.Specification.Rewards.html)
+and more details on the [design of incentives can be found
+here](https://github.com/intersectmbo/cardano-ledger/releases/latest/download/shelley-delegation.pdf#section.5).
 
-**Invalid Transaction Disincentives**: The protocol implements specific
-mechanisms to disincentivize RB producers from including invalid transactions
-while protecting honest participants.
+#### Adaptive EB production
 
-> [!Note]
->
-> **Design Rationale**
->
-> EBs are at least an order of magnitude larger than Praos blocks/RBs, making it
-> more common that an EB is served late to some parties. By naively waiting for
-> the EB before processing the relevant RB (and related chain), a **new source
-> of delays** would be introduced that may affect the security of Praos (as it
-> increases Δ for the relevant delivery assumption). By allowing transactions
-> with potential UTXO conflicts in RBs (while maintaining all other validation
-> guarantees), this threat is mitigated by enabling adoption of chains without
-> having the relevant EBs.
+In time of low-traffic demand, the protocol will naturally incentivize usage of
+RBs over EBs due to the lower inclusion latency. Only transactions which would
+not fit into an RB (in terms of size or plutus budgets) would be processed
+through Leios via an EB. When traffic levels can be adequately served by RBs
+alone within both size and computational constraints, no EBs are announced,
+reducing operational costs to Praos levels. This mechanism ensures that cost
+structure scales with actual throughput demand rather than imposing fixed
+overhead regardless of network utilization.
 
-Rather than counting all RBs toward the performance factor β (the fraction of
-all blocks within an epoch that a stake pool created), the enhanced reward
-calculation counts only RBs containing exclusively valid transactions. This
-modification ensures that:
+#### Hardware upgrade
 
-1. **Honest party protection**: SPOs operating with incomplete ledger state can
-   always produce valid empty RBs, maintaining their performance factor even
-   when lacking complete EB synchronization
-2. **Invalid transaction penalty**: RBs containing any invalid transactions are
-   excluded from the β calculation, directly reducing the producer's reward
-   proportional to their stake
-3. **Maintained incentive structure**: The existing reward mechanism remains
-   intact while adding precision to performance measurement
-
-For detailed information about the current reward formula, see the
-[Cardano documentation on pledging and rewards](https://docs.cardano.org/about-cardano/learn/pledging-rewards).
-
-<a id="voting-participation-rewards" href="#voting-participation-rewards"></a>**Voting
-Participation Rewards**: A second extension incorporates committee votes in
-certified EBs into reward calculations. Since votes occur more frequently than
-RB production, this significantly reduces reward variance for participating
-SPOs.
-
-**Vote Counting Mechanism**: The reward calculation counts valid votes cast by
-SPOs on certified EBs as part of their performance assessment. This provides a
-more granular and frequent measure of participation compared to RB production
-alone. However, similar anti-gaming principles apply:
-
-1. **Strategic vote exclusion risks**: While malicious parties might attempt to
-   ignore votes from non-preferred parties to manipulate chain selection, such
-   behavior carries significant costs
-2. **Publication delay consequences**: Excluding valid votes may delay the
-   release of the malicious party's own RBs, reducing their probability of main
-   chain inclusion
-3. **Natural counter-incentives**: The economic cost of delayed block
-   publication provides a built-in mechanism against vote manipulation
-
-This voting reward mechanism maintains the same principle as RB rewards - honest
-participation is rewarded while strategic manipulation carries inherent economic
-penalties.
-
-**Alternative Approaches and Limitations**
-
-**Online State Detection**: An alternative approach to performance measurement
-would involve detecting whether a party is online and maintaining current ledger
-state. However, this presents significant implementation challenges:
-
-1. **Ambiguous indicators**: SPOs can fill RBs and EBs with transactions while
-   operating with outdated UTxO state, particularly when consuming their own
-   known-valid UTxOs
-2. **False positives**: Transaction inclusion alone cannot reliably indicate
-   current state synchronization, as parties may strategically avoid
-   double-spend conflicts without full state knowledge
-3. **Implementation complexity**: Direct state synchronization measurement would
-   require additional protocol mechanisms and verification overhead
-
-The current approach of excluding blocks with invalid transactions provides a
-more implementable and verifiable mechanism while achieving the same fundamental
-goal of incentivizing proper participation.
-
-**Fee Structure Considerations**
-
-<a id="single-vs-dual-pricing" href="#single-vs-dual-pricing"></a>**Single vs.
-Dual Pricing**: The protocol maintains a unified fee structure for transactions
-regardless of inclusion method (RB versus EB). While separate pricing could
-theoretically reduce off-chain bribing incentives (since RB inclusion offers
-superior service guarantees), the implementation complexity and ecosystem
-disruption costs outweigh the benefits. The existing single-price model already
-experiences potential bribing pressures for mempool queue jumping, and Leios
-does not fundamentally alter this dynamic.
-
-<a id="service-quality-differentiation" href="#service-quality-differentiation"></a>**Service
-Quality Differentiation**: The inherent service difference between RB and EB
-inclusion (immediate vs. certificate-dependent confirmation) creates natural
-economic incentives without requiring protocol-level price differentiation.
-Applications requiring immediate confirmation can adjust their fee strategies
-accordingly within the existing framework.
-
-**Operational Cost Optimization**
-
-<a id="adaptive-eb-production" href="#adaptive-eb-production"></a>**Adaptive EB
-Production**: To address concerns about operational costs during low-traffic
-periods, the protocol implements adaptive EB announcement based on transaction
-availability and resource constraints. SPOs should announce EBs when **either**
-condition is met:
-
-1. **Capacity utilization**: EB contains sufficient transactions (for example,
-   10% capacity utilization) to justify voting overhead costs
-2. **Resource constraints**: RB is considered "full" due to **either** size or
-   computational limits being reached:
-   - **Size constraint**: RB approaches $S_\text{RB}$ byte limit
-   - **Plutus constraint**: Remaining RB Plutus budget cannot accommodate
-     transactions in mempool that would fit in EB Plutus budget
-
-This ensures transactions requiring higher Plutus execution limits can be
-included in EBs without waiting for byte-based RB saturation. When traffic
-levels can be adequately served by RBs alone within both size and computational
-constraints, no EBs are announced, reducing operational costs to Praos levels.
-
-<a id="cost-scaling-mechanism" href="#cost-scaling-mechanism"></a>This adaptive
-mechanism ensures the protocol's cost structure scales with actual throughput
-demand rather than imposing fixed overhead regardless of network utilization.
-
-<a id="hardware-upgrade-incentives" href="#hardware-upgrade-incentives"></a>**Hardware
-Upgrade Incentives**: The increased computational and bandwidth requirements for
-Leios operation are offset by higher potential rewards from increased
-transaction throughput. As demonstrated in the
-[operating costs analysis](#operating-costs), SPO profitability improves
-significantly once sustained throughput exceeds 30-50 TPS, providing clear
-economic incentives for infrastructure upgrades.
-
-**Reserve Contribution Adjustments**
-
-<a id="reserve-contribution-adjustments" href="#reserve-contribution-adjustments"></a>During
-low-traffic periods when EB production is minimal, the protocol maintains
-current Reserve contribution patterns without artificial inflation. The adaptive
-production mechanism ensures that enhanced infrastructure costs are only
-incurred when corresponding revenue opportunities exist through increased
-transaction processing.
+The increased computational and bandwidth requirements for Leios operation are
+offset by higher potential rewards from increased transaction throughput. As
+demonstrated in the [operating costs analysis](#operating-costs), SPO
+profitability improves significantly once sustained throughput exceeds 30-50
+TPS, providing clear economic incentives for infrastructure upgrades.
 
 ## Rationale
 
