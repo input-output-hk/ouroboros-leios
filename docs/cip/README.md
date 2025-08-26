@@ -58,6 +58,7 @@ elements.
     - [Step 4: Certification](#step-4-certification)
     - [Step 5: Chain Inclusion](#step-5-chain-inclusion)
   - [Protocol Parameters](#protocol-parameters)
+      - [EB Size Constraints](#eb-size-constraints)
   - [Protocol Entities](#protocol-entities)
     - [Ranking Blocks (RBs)](#ranking-blocks-rbs)
     - [Endorser Blocks (EBs)](#endorser-blocks-ebs)
@@ -1507,8 +1508,6 @@ benefits once sustained throughput exceeds 50-70 TxkB/s (36-50 TPS
 equivalent)</em>
 
 </div>
-
-Achieving this capacity increase requires trade-offs, as detailed below.
 
 <a name="time-to-market"></a>**2. Reasonable time to market: Complexity
 trade-offs**
