@@ -244,11 +244,7 @@ blocks are validated and included in the chain.
 
 > [!NOTE]
 >
-> **Formal Specification**: A complete formal specification of the Linear Leios
-> protocol described in this CIP is available in Agda at the [Linear Leios
-> formal specification][linear-leios-formal-spec]. This formal specification
-> provides mathematical definitions and proofs of the protocol's safety and
-> liveness properties.
+> The Agda formal specification for the proposed Leios protocol is available [here][linear-leios-formal-spec].
 
 <div align="center">
   <a name="figure-3" id="figure-3"></a>
@@ -753,11 +749,6 @@ certificates specification][bls-spec].
 Leios security reduces to Praos security. The key insight is ensuring that any
 RB containing an EB certificate is processed within the same $\Delta_\text{RB}$
 time bound as standard Praos blocks.
-
-This section provides a high-level view of the security argument, starting with
-the main assumptions involved. For complete formal proofs of safety and liveness
-properties, refer to the [Linear Leios formal
-specification][linear-leios-formal-spec].
 
 <a id="eb-reapplication-constraint"></a>
 
@@ -1744,7 +1735,7 @@ model.[^praosp]
     https://github.com/IntersectMBO/cardano-formal-specifications/blob/6d4e5cfc224a24972162e39a6017c273cea45321/src/performance/README.md
 
 The simulation results in the remainder of this section use the Rust simulator
-with a set of protocol parameters suitable for running Linear Leios at 200 kB/s
+with a set of protocol parameters suitable for running Leios at 200 kB/s
 of transactions, which corresponds to approximately 150 tx/s of transactions of
 sizes typical on the Cardano mainnet. The maximum size of transactions
 referenced by an EB is 12 MB and the stage lengths are
@@ -2424,7 +2415,7 @@ The proposal will be considered active once the following criteria are met:
       [Cardano blueprint](https://cardano-scaling.github.io/cardano-blueprint/)
       including conformance tests.
 - [ ] Formal specification of the consensus and ledger changes is available.
-      (Note: [Linear Leios formal specification][linear-leios-formal-spec]
+      (Note: [Leios formal specification][linear-leios-formal-spec]
       provides the mathematical foundation)
 - [ ] ΔQSD model available for Leios parameter selection.
 - [ ] Community agreement on initial Leios protocol parameters.
@@ -2570,7 +2561,7 @@ protocol.
   "Github repository for Leios formal specification"
 [linear-leios-formal-spec]:
   https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/V1.0/formal-spec/Leios/Linear.lagda.md
-  "Linear Leios formal specification in Agda"
+  "Leios formal specification in Agda"
 
 <!-- Technical specifications and benchmarks -->
 
