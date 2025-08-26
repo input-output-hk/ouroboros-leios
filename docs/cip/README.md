@@ -339,8 +339,8 @@ RB that announced the EB. A committee member votes for an EB only if:
    the announcing RB's slot number as the election identifier.
 
 where $L_\text{hdr}$ and $L_\text{vote}$ are
-<a href="#protocol-parameters">protocol
-parameters</a> represented by a number of slots.
+<a href="#protocol-parameters">protocol parameters</a> represented by a number
+of slots.
 
 While not strictly a required check, honest nodes should not vote on empty EBs
 as that is obviously pointless and wasteful.
@@ -360,9 +360,9 @@ already known to a large portion of the network (>25% even with 50% adversarial
 stake) by the end of the voting period. This widespread initial knowledge
 enables the network assumption that the EB will reach all honest parties within
 the additional diffusion period $L_\text{diff}$. See
-[Protocol Parameters](#protocol-parameters)
-for details. A ranking block (RB) producer can then construct a compact
-certificate proving the EB's validity by aggregating the collected votes.
+[Protocol Parameters](#protocol-parameters) for details. A ranking block (RB)
+producer can then construct a compact certificate proving the EB's validity by
+aggregating the collected votes.
 
 #### Step 5: Chain Inclusion
 
@@ -384,8 +384,8 @@ valid chain inclusion are:
    $3 \times L_\text{hdr} + L_\text{vote} + L_\text{diff}$ slots after `RB`.
 
 where $L_\text{hdr}$, $L_\text{vote}$ and $L_\text{diff}$ are
-<a href="#protocol-parameters">protocol
-parameters</a> represented by a number of slots.
+<a href="#protocol-parameters">protocol parameters</a> represented by a number
+of slots.
 
 This **certificate inclusion delay** ensures certified EBs have sufficient time
 to diffuse throughout the network before their transactions are included in the
