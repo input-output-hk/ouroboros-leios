@@ -36,7 +36,7 @@ validation before ledger inclusion, enabling significantly higher throughput.
 
 This specification presents the first version of the Ouroboros Leios protocol
 family, designed to deliver substantial throughput improvements with economic
-sustainability and reduced complexity through fewer new protocol elements.
+sustainability and minimal added complexity through only few new protocol elements.
 
 > [!NOTE]
 >
