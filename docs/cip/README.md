@@ -58,6 +58,7 @@ elements.
     - [Step 4: Certification](#step-4-certification)
     - [Step 5: Chain Inclusion](#step-5-chain-inclusion)
   - [Protocol Parameters](#protocol-parameters)
+      - [EB Size Constraints](#eb-size-constraints)
   - [Protocol Entities](#protocol-entities)
     - [Ranking Blocks (RBs)](#ranking-blocks-rbs)
     - [Endorser Blocks (EBs)](#endorser-blocks-ebs)
@@ -579,7 +580,7 @@ $$L_\text{diff} \geq \Delta_\text{EB}^{\text{W}} + \Delta_\text{reapply} - \Delt
 This ensures certified EBs reach all honest parties before any RB' that includes
 their certificate needs processing.
 
-##### EB size constraints
+##### EB Size Constraints
 
 Two separate parameters control EB sizes:
 
