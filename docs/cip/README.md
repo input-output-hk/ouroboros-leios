@@ -418,7 +418,7 @@ availability:
 | -------------------------------------------------------------------- | :---------------------------: | --------------------------------------------------------------------------------------------------------------------------- | :---------------------------: |
 | <a id="delta-hdr" href="#delta-hdr"></a>Header propagation           |      $\Delta_\text{hdr}$      | Time for constant size headers (< 1,500 bytes) to propagate network-wide                                                    |            <1 slot            |
 | <a id="delta-rb" href="#delta-rb"></a>RB diffusion                   |      $\Delta_\text{RB}$       | Complete ranking block propagation and adoption time                                                                        |           <5 slots            |
-| <a id="delta-eb-H" href="#delta-eb-H"></a>EB optimistic diffusion    | $\Delta_\text{EB}^{\text{O}}$ | EB **diffusion** time (transmission + processing) under favorable network conditions                                        |          7-10 slots           |
+| <a id="delta-eb-H" href="#delta-eb-H"></a>EB optimistic diffusion    | $\Delta_\text{EB}^{\text{O}}$ | EB **diffusion** time (transmission + processing) under favorable network conditions                                        |          1-3 slots           |
 | <a id="delta-eb-A" href="#delta-eb-A"></a>EB worst-case transmission | $\Delta_\text{EB}^{\text{W}}$ | EB **transmission** time for certified EBs starting from >25% network coverage (processing already completed during voting) |          15-20 slots          |
 
 <em>Table 1: Network Characteristics</em>

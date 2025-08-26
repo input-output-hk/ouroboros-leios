@@ -8,27 +8,27 @@
     
     <!-- Arrow markers -->
     <marker id="arrowhead" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto">
-      <polygon points="0 0, 6 2, 0 4" fill="#595959"/>
+      <polygon points="0 0, 6 2, 0 4" fill="#333333"/>
     </marker>
     
     <!-- Transaction arrow marker -->
     <marker id="txarrowhead" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto">
-      <polygon points="0 0, 6 2, 0 4" fill="#2196f3"/>
+      <polygon points="0 0, 6 2, 0 4" fill="#333333"/>
     </marker>
     
     <!-- RB arrow marker -->
     <marker id="rbarrowhead" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto">
-      <polygon points="0 0, 6 2, 0 4" fill="#ff9800"/>
+      <polygon points="0 0, 6 2, 0 4" fill="#333333"/>
     </marker>
     
     <!-- EB arrow marker -->
     <marker id="ebarrowhead" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto">
-      <polygon points="0 0, 6 2, 0 4" fill="#274e13"/>
+      <polygon points="0 0, 6 2, 0 4" fill="#333333"/>
     </marker>
     
     <!-- Vote arrow marker -->
     <marker id="votearrowhead" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto">
-      <polygon points="0 0, 6 2, 0 4" fill="#f9a825"/>
+      <polygon points="0 0, 6 2, 0 4" fill="#333333"/>
     </marker>
     
     <!-- Hover effects -->
@@ -70,59 +70,55 @@
   <rect width="1400" height="1150" fill="#ffffff"/>
   
   <!-- Timeline background -->
-  <rect x="50" y="50" width="1300" height="1070" fill="url(#bgPattern)" stroke="#ddd" stroke-width="0.5"/>
+  <rect x="50" y="50" width="1300" height="1070" fill="#fafafa" stroke="#ddd" stroke-width="1"/>
   
   <!-- Actor columns -->
   <g id="actors">
     <!-- Upstream node -->
-    <rect x="125" y="80" width="200" height="60" fill="#e3f2fd" stroke="#1976d2" stroke-width="2" rx="8"/>
-    <text x="225" y="105" font-family="Arial, sans-serif" font-size="18" font-weight="bold" text-anchor="middle" fill="#1976d2">Upstream</text>
-    <text x="225" y="125" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#1976d2">previous block (RB) producer</text>
+    <rect x="125" y="80" width="200" height="60" fill="#e8f4f8" stroke="#333333" stroke-width="2" rx="8"/>
+    <text x="225" y="105" font-family="Arial, sans-serif" font-size="16" font-weight="bold" text-anchor="middle" fill="#333333">Upstream</text>
+    <text x="225" y="125" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#666666">previous block (RB) producer</text>
     
     <!-- Block Producer (current node) -->
-    <rect x="575" y="80" width="200" height="60" fill="#fff3e0" stroke="#f57c00" stroke-width="2" rx="8"/>
-    <text x="675" y="105" font-family="Arial, sans-serif" font-size="18" font-weight="bold" text-anchor="middle" fill="#f57c00">Block Producer</text>
-    <text x="675" y="125" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#f57c00">current node</text>
+    <rect x="575" y="80" width="200" height="60" fill="#f0f0f0" stroke="#333333" stroke-width="2" rx="8"/>
+    <text x="675" y="105" font-family="Arial, sans-serif" font-size="16" font-weight="bold" text-anchor="middle" fill="#333333">Block Producer</text>
+    <text x="675" y="125" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#666666">current node</text>
     
     <!-- Downstream node -->
-    <rect x="1025" y="80" width="200" height="60" fill="#e8f5e8" stroke="#388e3c" stroke-width="2" rx="8"/>
-    <text x="1125" y="105" font-family="Arial, sans-serif" font-size="18" font-weight="bold" text-anchor="middle" fill="#388e3c">Downstream</text>
-    <text x="1125" y="125" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#388e3c">subsequent node(s)</text>
+    <rect x="1025" y="80" width="200" height="60" fill="#f8f0e8" stroke="#333333" stroke-width="2" rx="8"/>
+    <text x="1125" y="105" font-family="Arial, sans-serif" font-size="16" font-weight="bold" text-anchor="middle" fill="#333333">Downstream</text>
+    <text x="1125" y="125" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#666666">subsequent node(s)</text>
     
     <!-- Lifelines -->
-    <line x1="225" y1="140" x2="225" y2="1120" stroke="#1976d2" stroke-width="2" stroke-dasharray="5,5"/>
-    <line x1="675" y1="140" x2="675" y2="1120" stroke="#f57c00" stroke-width="2" stroke-dasharray="5,5"/>
-    <line x1="1125" y1="140" x2="1125" y2="1120" stroke="#388e3c" stroke-width="2" stroke-dasharray="5,5"/>
+    <line x1="225" y1="140" x2="225" y2="1120" stroke="#666666" stroke-width="2" stroke-dasharray="5,5"/>
+    <line x1="675" y1="140" x2="675" y2="1120" stroke="#666666" stroke-width="2" stroke-dasharray="5,5"/>
+    <line x1="1125" y1="140" x2="1125" y2="1120" stroke="#666666" stroke-width="2" stroke-dasharray="5,5"/>
   </g>
   
   <!-- Section headers with links -->
   <g id="section-headers">
     <!-- Transaction Propagation Section - spans all three actors -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#transaction-diffusion" class="section-link">
-      <rect x="200" y="170" width="950" height="30" fill="url(#bgPattern)" stroke="#2196f3" stroke-width="1" rx="4"/>
-      <rect x="200" y="170" width="950" height="30" fill="#e3f2fd" fill-opacity="0.3" stroke="#2196f3" stroke-width="1" rx="4"/>
-      <text x="675" y="190" font-family="Arial, sans-serif" font-size="16" font-weight="bold" text-anchor="middle" fill="#2196f3">Transaction Propagation</text>
+      <rect x="200" y="170" width="950" height="30" fill="#f5f5f5" stroke="#333333" stroke-width="1" rx="4"/>
+      <text x="675" y="190" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#333333">Transaction Propagation</text>
     </a>
     
     <!-- Block Production Section - spans all three actors -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#rb-block-production-and-diffusion" class="section-link">
-      <rect x="200" y="360" width="950" height="30" fill="url(#bgPattern)" stroke="#ff9800" stroke-width="1" rx="4"/>
-      <rect x="200" y="360" width="950" height="30" fill="#fff3e0" fill-opacity="0.3" stroke="#ff9800" stroke-width="1" rx="4"/>
-      <text x="675" y="380" font-family="Arial, sans-serif" font-size="16" font-weight="bold" text-anchor="middle" fill="#ff9800">Block Production</text>
+      <rect x="200" y="360" width="950" height="30" fill="#f5f5f5" stroke="#333333" stroke-width="1" rx="4"/>
+      <text x="675" y="380" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#333333">Block Production</text>
     </a>
     
     <!-- EB Diffusion Section - spans all three actors -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#eb-diffusion" class="section-link">
-      <rect x="200" y="600" width="950" height="30" fill="url(#bgPattern)" stroke="#274e13" stroke-width="1" rx="4"/>
-      <rect x="200" y="600" width="950" height="30" fill="#e8f5e8" fill-opacity="0.3" stroke="#274e13" stroke-width="1" rx="4"/>
-      <text x="675" y="620" font-family="Arial, sans-serif" font-size="16" font-weight="bold" text-anchor="middle" fill="#274e13">EB Diffusion</text>
+      <rect x="200" y="600" width="950" height="30" fill="#f5f5f5" stroke="#333333" stroke-width="1" rx="4"/>
+      <text x="675" y="620" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#333333">EB Diffusion</text>
     </a>
     
     <!-- Voting & Certification Section - spans all three actors -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#voting--certification" class="section-link">
-      <rect x="200" y="780" width="950" height="30" fill="url(#bgPattern)" stroke="#f9a825" stroke-width="1" rx="4"/>
-      <rect x="200" y="780" width="950" height="30" fill="#fff8e1" fill-opacity="0.3" stroke="#f9a825" stroke-width="1" rx="4"/>
-      <text x="675" y="800" font-family="Arial, sans-serif" font-size="16" font-weight="bold" text-anchor="middle" fill="#f9a825">Voting &amp; Certification</text>
+      <rect x="200" y="780" width="950" height="30" fill="#f5f5f5" stroke="#333333" stroke-width="1" rx="4"/>
+      <text x="675" y="800" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#333333">Voting &amp; Certification</text>
     </a>
   </g>
   
@@ -130,26 +126,26 @@
   <g id="transaction-steps">
     <!-- Step: Diffuse Transaction (D->BP) -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#transaction-propagation" class="step-link">
-      <line x1="1125" y1="230" x2="675" y2="230" stroke="#2196f3" stroke-width="2" marker-end="url(#txarrowhead)"/>
-      <text x="900" y="225" font-family="Arial, sans-serif" font-size="16" text-anchor="middle" fill="#2196f3">Diffuse Transaction</text>
+      <line x1="1125" y1="230" x2="675" y2="230" stroke="#333333" stroke-width="2" marker-end="url(#arrowhead)"/>
+      <text x="900" y="225" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#333333">Diffuse Transaction</text>
     </a>
     
     <!-- Step: Add to Mempool (BP) -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#mempool-design" class="step-link">
-      <rect x="595" y="250" width="160" height="25" fill="#e3f2fd" stroke="#2196f3" stroke-width="1" rx="4"/>
-      <text x="675" y="267" font-family="Arial, sans-serif" font-size="16" text-anchor="middle" fill="#2196f3">Add to Mempool</text>
+      <rect x="595" y="250" width="160" height="25" fill="#f5f5f5" stroke="#333333" stroke-width="1" rx="4"/>
+      <text x="675" y="267" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#333333">Add to Mempool</text>
     </a>
     
     <!-- Step: Diffuse Transaction (BP->U) -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#transaction-propagation" class="step-link">
-      <line x1="675" y1="290" x2="225" y2="290" stroke="#2196f3" stroke-width="2" marker-end="url(#txarrowhead)"/>
-      <text x="450" y="285" font-family="Arial, sans-serif" font-size="16" text-anchor="middle" fill="#2196f3">Diffuse Transaction</text>
+      <line x1="675" y1="290" x2="225" y2="290" stroke="#333333" stroke-width="2" marker-end="url(#arrowhead)"/>
+      <text x="450" y="285" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#333333">Diffuse Transaction</text>
     </a>
     
     <!-- Step: Add to Mempool (U) -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#mempool-design" class="step-link">
-      <rect x="145" y="310" width="160" height="25" fill="#e3f2fd" stroke="#2196f3" stroke-width="1" rx="4"/>
-      <text x="225" y="327" font-family="Arial, sans-serif" font-size="16" text-anchor="middle" fill="#2196f3">Add to Mempool</text>
+      <rect x="145" y="310" width="160" height="25" fill="#f5f5f5" stroke="#333333" stroke-width="1" rx="4"/>
+      <text x="225" y="327" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#333333">Add to Mempool</text>
     </a>
   </g>
   
@@ -157,39 +153,39 @@
   <g id="block-steps">
     <!-- Step 1: Create RB & announce EB -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#rb-block-production-and-diffusion" class="step-link">
-      <rect x="150" y="410" width="150" height="40" fill="#fff3e0" stroke="#ff9800" stroke-width="1" rx="4"/>
-      <text x="225" y="427" font-family="Arial, sans-serif" font-size="16" font-weight="bold" text-anchor="middle" fill="#ff9800">1. Create RB</text>
-      <text x="225" y="442" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#ff9800">&amp; announce EB</text>
+      <rect x="150" y="410" width="150" height="40" fill="#f5f5f5" stroke="#333333" stroke-width="1" rx="4"/>
+      <text x="225" y="427" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#333333">1. Create RB</text>
+      <text x="225" y="442" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#666666">&amp; announce EB</text>
     </a>
     
     <!-- Step 2a: Sync chain + relay headers (U->BP) -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#rb-header-diffusion" class="step-link">
-      <line x1="225" y1="470" x2="675" y2="470" stroke="#ff9800" stroke-width="2" marker-end="url(#rbarrowhead)"/>
-      <text x="450" y="465" font-family="Arial, sans-serif" font-size="16" text-anchor="middle" fill="#ff9800">2a. Sync chain + relay headers</text>
+      <line x1="225" y1="470" x2="675" y2="470" stroke="#333333" stroke-width="2" marker-end="url(#arrowhead)"/>
+      <text x="450" y="465" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#333333">2a. Sync chain + relay headers</text>
     </a>
     
     <!-- Step 2b: Sync chain + relay headers (BP->D) -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#rb-header-diffusion" class="step-link">
-      <line x1="675" y1="490" x2="1125" y2="490" stroke="#ff9800" stroke-width="2" marker-end="url(#rbarrowhead)"/>
-      <text x="900" y="485" font-family="Arial, sans-serif" font-size="16" text-anchor="middle" fill="#ff9800">2b. Sync chain + relay headers</text>
+      <line x1="675" y1="490" x2="1125" y2="490" stroke="#333333" stroke-width="2" marker-end="url(#arrowhead)"/>
+      <text x="900" y="485" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#333333">2b. Sync chain + relay headers</text>
     </a>
     
     <!-- Step 3: Fetch RB Body -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#rb-body-diffusion" class="step-link">
-      <line x1="225" y1="510" x2="675" y2="510" stroke="#ff9800" stroke-width="2" marker-end="url(#rbarrowhead)"/>
-      <text x="450" y="505" font-family="Arial, sans-serif" font-size="16" text-anchor="middle" fill="#ff9800">3. Fetch RB Body</text>
+      <line x1="225" y1="510" x2="675" y2="510" stroke="#333333" stroke-width="2" marker-end="url(#arrowhead)"/>
+      <text x="450" y="505" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#333333">3. Fetch RB Body</text>
     </a>
     
     <!-- Step 4: Validate and adopt RB -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#rb-validation-adoption" class="step-link">
-      <rect x="580" y="530" width="190" height="25" fill="#fff3e0" stroke="#ff9800" stroke-width="1" rx="4"/>
-      <text x="675" y="547" font-family="Arial, sans-serif" font-size="15" text-anchor="middle" fill="#ff9800">4. Validate and adopt RB</text>
+      <rect x="580" y="530" width="190" height="25" fill="#f5f5f5" stroke="#333333" stroke-width="1" rx="4"/>
+      <text x="675" y="547" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#333333">4. Validate and adopt RB</text>
     </a>
     
     <!-- Step 5: Serve RB -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#rb-validation-adoption" class="step-link">
-      <line x1="675" y1="570" x2="1125" y2="570" stroke="#ff9800" stroke-width="2" marker-end="url(#rbarrowhead)"/>
-      <text x="900" y="565" font-family="Arial, sans-serif" font-size="16" text-anchor="middle" fill="#ff9800">5. Serve RB</text>
+      <line x1="675" y1="570" x2="1125" y2="570" stroke="#333333" stroke-width="2" marker-end="url(#arrowhead)"/>
+      <text x="900" y="565" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#333333">5. Serve RB</text>
     </a>
   </g>
   
@@ -197,39 +193,39 @@
   <g id="eb-steps">
     <!-- Step 6: Fetch EB -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#eb-diffusion" class="step-link">
-      <line x1="225" y1="650" x2="675" y2="650" stroke="#274e13" stroke-width="2" marker-end="url(#ebarrowhead)"/>
-      <text x="450" y="645" font-family="Arial, sans-serif" font-size="16" text-anchor="middle" fill="#274e13">6. Fetch EB</text>
+      <line x1="225" y1="650" x2="675" y2="650" stroke="#333333" stroke-width="2" marker-end="url(#arrowhead)"/>
+      <text x="450" y="645" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#333333">6. Fetch EB</text>
     </a>
     
     <!-- Step 6a: Fetch missing transactions -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#transaction-retrieval" class="step-link">
-      <line x1="225" y1="670" x2="675" y2="670" stroke="#274e13" stroke-width="2" stroke-dasharray="3,3" marker-end="url(#ebarrowhead)"/>
-      <text x="450" y="665" font-family="Arial, sans-serif" font-size="16" text-anchor="middle" fill="#274e13">6a. Fetch missing transactions</text>
+      <line x1="225" y1="670" x2="675" y2="670" stroke="#333333" stroke-width="2" marker-end="url(#arrowhead)"/>
+      <text x="450" y="665" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#333333">6a. Fetch missing transactions</text>
     </a>
     
     <!-- Step 6b: Validate EB body (fast) -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#eb-diffusion" class="step-link">
-      <rect x="580" y="690" width="190" height="25" fill="#e8f5e8" stroke="#274e13" stroke-width="1" rx="4"/>
-      <text x="675" y="707" font-family="Arial, sans-serif" font-size="15" text-anchor="middle" fill="#274e13">6b. Validate EB body (fast)</text>
+      <rect x="580" y="690" width="190" height="25" fill="#f5f5f5" stroke="#333333" stroke-width="1" rx="4"/>
+      <text x="675" y="707" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#333333">6b. Validate EB body (fast)</text>
     </a>
     
     <!-- Step 7: Serve EB -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#eb-diffusion" class="step-link">
-      <line x1="675" y1="730" x2="1125" y2="730" stroke="#274e13" stroke-width="2" marker-end="url(#ebarrowhead)"/>
-      <text x="900" y="725" font-family="Arial, sans-serif" font-size="16" text-anchor="middle" fill="#274e13">7. Serve EB</text>
+      <line x1="675" y1="730" x2="1125" y2="730" stroke="#333333" stroke-width="2" marker-end="url(#arrowhead)"/>
+      <text x="900" y="725" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#333333">7. Serve EB</text>
     </a>
     
     <!-- Step 7a: Fetch missing transactions -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#transaction-retrieval" class="step-link">
-      <line x1="675" y1="750" x2="1125" y2="750" stroke="#274e13" stroke-width="2" stroke-dasharray="3,3" marker-end="url(#ebarrowhead)"/>
-      <text x="900" y="745" font-family="Arial, sans-serif" font-size="16" text-anchor="middle" fill="#274e13">7a. Fetch missing transactions</text>
+      <line x1="675" y1="750" x2="1125" y2="750" stroke="#333333" stroke-width="2" marker-end="url(#arrowhead)"/>
+      <text x="900" y="745" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#333333">7a. Fetch missing transactions</text>
     </a>
     
     <!-- Step 8: Validate endorsed transactions (slow) -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#eb-transaction-validation" class="step-link">
-      <rect x="580" y="820" width="190" height="30" fill="#e8f5e8" stroke="#274e13" stroke-width="1" rx="4"/>
-      <text x="675" y="833" font-family="Arial, sans-serif" font-size="15" text-anchor="middle" fill="#274e13">8. Validate endorsed</text>
-      <text x="675" y="846" font-family="Arial, sans-serif" font-size="15" text-anchor="middle" fill="#274e13">transactions (slow)</text>
+      <rect x="580" y="820" width="190" height="30" fill="#f5f5f5" stroke="#333333" stroke-width="1" rx="4"/>
+      <text x="675" y="833" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#333333">8. Validate endorsed</text>
+      <text x="675" y="846" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#666666">transactions (slow)</text>
     </a>
   </g>
   
@@ -237,21 +233,21 @@
   <g id="voting-steps">
     <!-- Step 9: Vote on EB -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#VotingEB" class="step-link">
-      <rect x="580" y="890" width="190" height="35" fill="#fff8e1" stroke="#f9a825" stroke-width="1" rx="4"/>
-      <text x="675" y="905" font-family="Arial, sans-serif" font-size="15" text-anchor="middle" fill="#f9a825">9. Vote on EB</text>
-      <text x="675" y="920" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#f9a825">(if eligible)</text>
+      <rect x="580" y="890" width="190" height="35" fill="#f5f5f5" stroke="#333333" stroke-width="1" rx="4"/>
+      <text x="675" y="905" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#333333">9. Vote on EB</text>
+      <text x="675" y="920" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#666666">(if eligible)</text>
     </a>
     
     <!-- Step 10: Relay votes -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#VoteDiffusion" class="step-link">
-      <line x1="225" y1="950" x2="675" y2="950" stroke="#f9a825" stroke-width="2" marker-end="url(#votearrowhead)"/>
-      <text x="450" y="945" font-family="Arial, sans-serif" font-size="16" text-anchor="middle" fill="#f9a825">10. Relay votes</text>
+      <line x1="225" y1="950" x2="675" y2="950" stroke="#333333" stroke-width="2" marker-end="url(#arrowhead)"/>
+      <text x="450" y="945" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#333333">10. Relay votes</text>
     </a>
     
     <!-- Step 10a: Relay votes (+ own vote) -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#VoteDiffusion" class="step-link">
-      <line x1="675" y1="970" x2="1125" y2="970" stroke="#f9a825" stroke-width="2" marker-end="url(#votearrowhead)"/>
-      <text x="900" y="965" font-family="Arial, sans-serif" font-size="16" text-anchor="middle" fill="#f9a825">10a. Relay votes (+ own vote)</text>
+      <line x1="675" y1="970" x2="1125" y2="970" stroke="#333333" stroke-width="2" marker-end="url(#arrowhead)"/>
+      <text x="900" y="965" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#333333">10a. Relay votes (+ own vote)</text>
     </a>
   </g>
   
@@ -259,17 +255,17 @@
   <g id="final-steps">
     <!-- Step 11: Aggregate certificate -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#CertificateAggregation" class="step-link">
-      <rect x="580" y="1000" width="190" height="40" fill="#f3e5f5" stroke="#7b1fa2" stroke-width="1" rx="4"/>
-      <text x="675" y="1017" font-family="Arial, sans-serif" font-size="15" text-anchor="middle" fill="#7b1fa2">11. Aggregate certificate</text>
-      <text x="675" y="1032" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#7b1fa2">from votes</text>
+      <rect x="580" y="1000" width="190" height="40" fill="#f5f5f5" stroke="#333333" stroke-width="1" rx="4"/>
+      <text x="675" y="1017" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#333333">11. Aggregate certificate</text>
+      <text x="675" y="1032" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#666666">from votes</text>
     </a>
     
     <!-- Step 12: Create next RB -->
     <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#certificate-inclusion" class="step-link">
-      <rect x="580" y="1060" width="190" height="55" fill="#e8f5e8" stroke="#2e7d32" stroke-width="1" rx="4"/>
-      <text x="675" y="1077" font-family="Arial, sans-serif" font-size="15" text-anchor="middle" fill="#2e7d32">12. Create next RB</text>
-      <text x="675" y="1092" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#2e7d32">certifying EB &amp;</text>
-      <text x="675" y="1107" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#2e7d32">announcing next EB</text>
+      <rect x="580" y="1060" width="190" height="55" fill="#f5f5f5" stroke="#333333" stroke-width="1" rx="4"/>
+      <text x="675" y="1077" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#333333">12. Create next RB</text>
+      <text x="675" y="1092" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#666666">certifying EB &amp;</text>
+      <text x="675" y="1107" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#666666">announcing next EB</text>
     </a>
   </g>
   
