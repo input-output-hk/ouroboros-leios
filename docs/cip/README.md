@@ -994,6 +994,69 @@ boundary and represents a minimal computational overhead based on current
 Nodes complete this computation well before voting begins in the new epoch to
 ensure seamless participation.
 
+#### Operational certficate issue numbers
+
+Each node must relay at most two EB announcements that equivocate the same
+Praos election. This would be trivial for senders and receivers to enforce, if
+it were not for [operational
+certificates](https://docs.cardano.org/stake-pool-operators/creating-keys-and-certificates#creating-an-operational-certificate-and-registering-a-stake-pool),
+which complicate the notion of which sets of headers qualify as equivocating.
+
+With the current Praos system, an SPO is free to issue an arbitrary operational certficate issue numbers (OCIN) every
+time they issue an RB header, but honest SPOs will only increment their OCIN
+when they need to. Whether the OCIN carried by some header is valid depends on
+the chain it extends, because the Praos protocol rules along a single chain only
+allow an SPO's OCIN to be incremented at most once per header issued by that
+SPO.
+
+The Leios protocol, in contrast, is expected to diffuse contemporary EBs
+regardless of which chain they are on, and so cannot assume that it has seen the
+predecessor header of every EB announcement. It also cannot simply
+require that it has seen all headers, because that would complicate the timing
+restrictions and require tracking a potentially unbounded number of forks. Thus,
+neither of the following simple extremes would be acceptable for Leios.
+
+- If Leios ignores OCINs, then a leaked hot key would let the adversary issue
+  impersonating EBs whenever the stake pool is elected until that KES period
+  expires, which can be up to 90 days later on Cardano mainnet. That's
+  unacceptably long. (Significantly shortening the KES period is not an
+  option, because that would excessively burden SPOs by forcing them to utilize
+  their cold key more often.)
+- If Leios instead over-interprets distinct OCINs as separate elections, then
+  any adversary can diffuse any number of EB announcements per actual election,
+  with arbitrary OCINs. Those announcements would be an unacceptable unbounded
+  burst of work for honest nodes to relay throughout the entire network, even if
+  they still only relayed at most one EB body per actual election.
+
+There is no simple compromise between those extrema. In particular, if there's
+any way for the adversary to have revealed incremented OCINs to some nodes but
+definitely not all, then the worst-case diffusion behavior of adversarial EBs
+might be worse than that of honest EBs, which would complicate the acceptable
+lower bound on $L_\text{diff}$, for example. On the other hand, if every OCIN
+increment - even those disallowed by Praos - is always eventually relayed to all
+nodes, then an adversary can create unbounded work by constantly incrementing
+their OCINs. In the absence of the context provided by forks, there's no bound on the
+OCINs the Leios protocol would relay.
+
+Thus, the diffusion of EB announcements (regardless of who issued them) is only
+tractable and robust if it is restricted to a bounded set of OCINs that all
+honest nodes almost certainly agree on. For this reason, the Leios node should
+ignore an EB announcement that is less than the OCIN on its settled ledger state
+or more than one greater than that OCIN. After not ignoring two announcements
+with the same election, the Leios node should ignore (including not relaying)
+any subsequent announcements for that election.
+
+With this rule, a node will crucially disconnect if and only if a peer sends
+more than two announcements with the same election. It will also ignore headers
+from leaked hot keys once the SPO increments their OCIN, but unfortunately - and
+in contrast to Praos - not immediately. The Leios node will only ignore
+unincremented OCINs after all honest nodes necessarily agree that the SPO
+incremented their OCIN. In the strictest case, that could require the increment
+to be at least 36 hr old on Cardano mainnet before Leios ignores the unincremented OCIN. It seems
+plausible that the agreement could sometimes be assumed sooner (e.g.,
+after a certificate includes the incremented OCIN), but further details are not a blocker for this CIP; 36 hr is already an acceptable improvement over 90 days, and
+SPOs already must not frequently leak their hot keys.
+
 ### Network
 
 Unlike Ouroboros Praos, where the RB chain contains all necessary data, Leios
@@ -1319,73 +1382,6 @@ Tolerable Implementation Complexity requirement.
   blocks, a few missing transactions, or perhaps any vote); the existing
   infrastructure would naturally interleave those with the larger and/or less
   urgent requests.
-
-**Operational certficate issue numbers (OCINs)**. There is one last
-clarification regarding feasibility that is more involved than the above
-discussion. The Leios protocol requires that each server must send at most two
-MsgLeiosBlockAnnouncement notifications that equivocate the same Praos election.
-This would be trivial to enforce on both the client and the server, if it were
-not for
-[operational certificates](https://docs.cardano.org/stake-pool-operators/creating-keys-and-certificates#creating-an-operational-certificate-and-registering-a-stake-pool),
-which complicate the notion of which sets of headers qualify as equivocating.
-
-With the current Praos system, an SPO is free to issue an arbitrary OCIN every
-time they issue an RB header, but honest SPOs will only increment their OCIN
-when they need to. Whether the OCIN carried by some header is valid depends on
-the chain it extends, because the Praos protocol rules along a single chain only
-allow an SPO's OCIN to be incremented at most once per header issued by that
-SPO.
-
-The Leios mini-protocols, in contrast, are expected to diffuse contemporary EBs
-regardless of which chain they are on, and so cannot assume that it has seen the
-predecessor header of every MsgLeiosBlockAnnouncement. It also cannot simply
-require that it has seen them all, because that would complicate the timing
-restrictions and require tracking a potentially unbounded number of forks. Thus,
-neither of the following simple extremes would be acceptable for Leios.
-
-- If Leios ignores OCINs, then a leaked hot key would let the adversary issue
-  impersonating EBs whenever the stake pool is elected until that KES period
-  expires, which can be up to 90 days later on Cardano mainnet. That's
-  unacceptably long. (Significantly shortening the 90 day period is not an
-  option, because that would excessively burden SPOs by forcing them to utilize
-  their cold key more often.)
-- If Leios instead over-interprets distinct OCINs as separate elections, then
-  any adversary can diffuse any number of EB announcements per actual election,
-  with arbitrary OCINs. Those announcements would be an unacceptable unbounded
-  burst of work for honest nodes to relay throughout the entire network, even if
-  they still only relayed at most one EB body per actual election.
-
-There is no simple compromise between those extrema. In particular, if there's
-any way for the adversary to have revealed incremented OCINs to some nodes but
-definitely not all, then the worst-case diffusion behavior of adversarial EBs
-might be worse than that of honest EBs, which would complicate the acceptable
-lower bound on $L_\text{diff}$, for example. On the other hand, if every OCIN
-increment - even those disallowed by Praos - is always eventually relayed to all
-nodes, then an adversary can create unbounded work by constantly incrementing
-their OCINs - without the context provided by forks, there's no bound on the
-OCINs the Leios mini-protocols would relay.
-
-Thus, the diffusion of EB announcements (regardless of who issued them) is only
-tractable and robust if it is restricted to a bounded set of OCINs that all
-honest nodes almost certainly agree on. For this reason, the Leios node should
-ignore an EB announcement that is less than the OCIN on its settled ledger state
-or more than one greater than that OCIN. After not ignoring two announcements
-with the same election, the Leios node should ignore (including not relaying)
-any subsequent announcements for that election. An intended implication of this
-rule is that an honest server would send the same one or two announcements to
-all of its clients; it does not have to track any extra state per-client.
-
-With this rule, a client will crucially disconnect if and only if a server sends
-more than two announcements with the same election. It will also ignore headers
-from leaked hot keys once the SPO increments their OCIN, but unfortunately - and
-in contrast to Praos - not immediately. The Leios node will only ignore
-unincremented OCINs after all honest nodes necessarily agree that the SPO
-incremented their OCIN. In the strictest case, that could require the increment
-to be at least 36 hr old before Leios ignores the unincremented OCIN. It seems
-plausible that the agreement could be assumed opportunistically sooner (e.g.,
-after a certificate includes the incremented OCIN), but that is beyond this
-scope of this CIP; 36 hr is already an acceptable improvement over 90 days, and
-SPOs already must not frequently leak their hot keys.
 
 ### Incentives
 
