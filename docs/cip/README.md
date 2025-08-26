@@ -232,8 +232,8 @@ producers to create additional blocks alongside the regular Praos chain. These
 supplementary blocks, called **Endorser Blocks (EBs)**, reference extra
 transactions that would otherwise wait for the standard Praos blocks (called
 **Ranking Blocks** or **RBs** in this protocol) in future active slots. To
-ensure data availability and correctness, these blocks undergo committee validation before their
-transactions become part of the permanent ledger.
+ensure data availability and correctness, these blocks undergo committee
+validation before their transactions become part of the permanent ledger.
 
 The key insight is that we can maintain Praos's security guarantees while
 processing more transactions by carefully managing when and how these additional
