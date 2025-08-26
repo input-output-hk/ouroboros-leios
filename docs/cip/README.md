@@ -608,6 +608,8 @@ their headers and embedding EB certificates in their bodies.
 - The `certified_eb` bit enables syncing nodes to predict the total size of
   valid responses to their requests for batches of EBs certified on the
   historical chain.
+- If the `announced_eb_size` field of an RB header is incorrect, then neither the RB header nor the RB are invalid.
+  But no honest node should vote for the EB.
 
 #### Endorser Blocks (EBs)
 
