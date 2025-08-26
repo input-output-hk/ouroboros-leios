@@ -99,7 +99,7 @@ elements.
 - [Figure 1: Forecast of rewards on Cardano mainnet](#figure-1)
 - [Figure 2: SPO profitability under Praos, as a function of transaction volume](#figure-2)
 - [Figure 3: Leios chain structure showing the relationship between Ranking Blocks, Endorser Blocks, and Certificates](#figure-3)
-- [Figure 4: Detailed timing mechanism showing the three critical phases for EB certification](#figure-4)
+- [Figure 4: Detailed timing mechanism showing the three critical timing constraints for EB certification](#figure-4)
 - [Figure 5: Up- and downstream interactions of a node (simplified)](#figure-5)
 - [Figure 6: LeiosNotify mini-protocol state machine](#figure-6)
 - [Figure 7: LeiosFetch mini-protocol state machine](#figure-7)
@@ -265,11 +265,11 @@ precise timing mechanism is detailed in the following section.
 
 ### Protocol Flow
 
-The protocol operates through five sequential steps that span three critical
-timing phases. Figure 4 visualizes the precise timing mechanism that governs
-when certificates can be safely included in the chain, showing both the protocol
-parameters and the underlying network characteristics ($\Delta$ parameters) and
-protocol parameters ($L$ parameters) that inform their design.
+The protocol operates through five sequential steps that involve three critical
+timing constraints. Figure 4 visualizes the precise timing mechanism that
+governs when certificates can be safely included in the chain, showing both the
+protocol parameters and the underlying network characteristics ($\Delta$
+parameters) and protocol parameters ($L$ parameters) that inform their design.
 
 <div align="center">
   <a name="figure-4" id="figure-4"></a>
@@ -277,8 +277,8 @@ protocol parameters ($L$ parameters) that inform their design.
     <img src="images/protocol-flow.svg" alt="Leios Protocol Flow">
   </p>
 
-<em>Figure 4: Detailed timing mechanism showing the three critical phases for EB
-certification</em>
+<em>Figure 4: Detailed timing mechanism showing the three critical timing
+constraints for EB certification</em>
 
 </div>
 
@@ -399,10 +399,10 @@ These parameters fall into two categories: timing parameters derived from the
 network characteristics below and timing constraints, and size/resource
 parameters that manage throughput.
 
-The certificate inclusion process (Steps 3-5) involves three sequential timing
-phases that work together to maintain Praos's security assumptions while
-enabling higher throughput. These phases prevent scenarios where honest nodes
-would be forced to delay chain adoption due to missing data.
+The certificate inclusion process (Steps 3-5) involves three timing constraints
+that work together to maintain Praos's security assumptions while enabling
+higher throughput. These constraints prevent scenarios where honest nodes would
+be forced to delay chain adoption due to missing data.
 
 <a id="network-characteristics"></a>**Network Characteristics**
 
@@ -448,15 +448,17 @@ availability:
 
 </div>
 
-**Protocol Parameters and Timing Phases**
+**Protocol Parameters and Timing Constraints**
 
-The three critical timing phases that are visible in [Figure 4](#figure-4) are:
+The three critical timing constraints that are visible in [Figure 4](#figure-4)
+are:
 
-- **Phase 1** ($3 \times L_\text{hdr}$): Equivocation detection occurs
-  immediately after EB announcement
-- **Phase 2** ($L_\text{vote}$): Committee voting takes place during Step 3
-- **Phase 3** ($L_\text{diff}$): Network-wide diffusion ensures availability
-  before Step 5
+- **Equivocation Detection** ($3 \times L_\text{hdr}$): Equivocation detection
+  occurs immediately after EB announcement
+- **Voting Period** ($L_\text{vote}$): Committee voting takes place during Step
+  3
+- **Diffusion Period** ($L_\text{diff}$): Network-wide diffusion ensures
+  availability before Step 5
 
 <div align="center">
 <a name="table-3" id="table-3"></a>
@@ -482,10 +484,10 @@ The three critical timing phases that are visible in [Figure 4](#figure-4) are:
 
 <a id="equivocation-detection"></a>
 
-**Phase 1: Equivocation Detection ($3 L_\text{hdr}$)**
+**Equivocation Detection ($3 L_\text{hdr}$)**
 
-This phase occurs immediately when an RB announces an EB. During this period,
-the network detects any attempts by adversaries to create multiple conflicting
+This period occurs immediately when an RB announces an EB. During this time, the
+network detects any attempts by adversaries to create multiple conflicting
 blocks for the same slot. The equivocation detection mechanism ensures that
 honest nodes can reliably identify and reject equivocating behavior before
 participating in voting. The equivocation detection period is $3 L_\text{hdr}$,
@@ -534,7 +536,7 @@ period.
 
 <a id="voting-period"></a>
 
-**Phase 2: Voting Period ($L_\text{vote}$)**
+**Voting Period ($L_\text{vote}$)**
 
 The voting period must accommodate EB diffusion (transmission and processing):
 
@@ -552,11 +554,13 @@ time to:
 
 <a id="diffusion-period"></a>
 
-**Phase 3: Diffusion Period ($L_\text{diff}$)**
+**Diffusion Period ($L_\text{diff}$)**
 
-Ensures network-wide EB availability by leveraging the assumption that data
-known to >25% of the network (guaranteed by the voting threshold) propagates
-fully within this period. The diffusion period must satisfy:
+The diffusion period ensures network-wide EB availability through a combination
+of factors: the high quorum threshold ensures certified EBs are initially known
+to >25% of honest nodes, and the network assumption that data with such
+widespread initial knowledge propagates fully within this period. The diffusion
+period must satisfy:
 
 $$L_\text{diff} \geq \Delta_\text{EB}^{\text{W}} + \Delta_\text{reapply} - \Delta_\text{RB'} - 3 \times L_\text{hdr} - L_\text{vote}$$
 
