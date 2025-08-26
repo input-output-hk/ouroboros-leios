@@ -357,7 +357,7 @@ enables the network assumption that the EB will reach all honest parties within
 the additional diffusion period $L_\text{diff}$. See
 [Network Characteristics and Protocol Parameters](#network-characteristics-and-protocol-parameters)
 for details. A ranking block (RB) producer can then construct a compact
-**certificate** proving the EB's validity by aggregating the collected votes.
+certificate proving the EB's validity by aggregating the collected votes.
 
 #### Step 5: Chain Inclusion
 
