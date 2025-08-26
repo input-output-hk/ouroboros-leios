@@ -524,6 +524,8 @@ partitions to gain unfair advantages in the voting process, as honest nodes will
 only vote for EBs where no equivocation was detected during the detection
 period.
 
+Note that EB diffusion (but not voting) continues to happen during this phase.
+
 > [!NOTE]
 >
 > **Comparison with Research Paper**: The [Leios research paper][leios-paper]
@@ -1712,7 +1714,6 @@ also consistent with real-world measurements. [A simulation
 study][topology-comparison] has demonstrated that analysis conclusions deriving
 from the `mini-mainnet` topology are also valid for the `pseudo-mainnet`
 topology; the advantage of using the former is that simulations run much more
-
 quickly. Simulated RB diffusion is consistent with the Praos performance
 model.[^praosp]
 
@@ -2063,25 +2064,20 @@ consideration of tradeoffs.
 <div align="center">
 <a name="table-7" id="table-7"></a>
 
-| Parameter                                     |      Symbol      |   Feasible value   | Justification                                                                                                                                                                |
-| --------------------------------------------- | :--------------: | :----------------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Header diffusion period length                |  $L_\text{hdr}$  |       1 slot       | Per [equivocation detection](#equivocation-detection): accommodates header propagation for equivocation detection. Equivocation detection period is $3 \times L_\text{hdr}$. |
-| Voting period length                          | $L_\text{vote}$  |      4 slots       | Per [voting period](#voting-period): accommodates EB propagation and validation time, with equivocation detection handled separately by $3 \times L_\text{hdr}$.             |
-| Diffusion period length                       | $L_\text{diff}$  |      7 slots       | Per [diffusion period](#diffusion-period): minimum calculated as 4 slots with typical network values, use 7 for safety margin.                                               |
-| Endorser-block referenceable transaction size | $S_\text{EB-tx}$ |       12 MB        | Simulations indicate that 200 kB/s throughput is feasible at this block size.                                                                                                |
-| Endorser block max size                       |  $S_\text{EB}$   |       512 kB       | Endorser blocks must be small enough to diffuse and be validated within the voting period $L_\text{vote}$.                                                                   |
-| Maximum Plutus steps per endorser block       |        -         |  2000G step units  | Simulations at high transaction-validation CPU usage, but an even higher limit may be possible.                                                                              |
-| Maximum Plutus memory per endorser block      |        -         | 7000M memory units | Simulations at high transaction-validation CPU usage, but an even higher limit may be possible.                                                                              |
-| Maximum Plutus steps per transaction          |        -         |  100G step units   | Raise per-transaction limit by a factor of twenty relative to Praos.                                                                                                         |
-| Maximum Plutus memory per transaction         |        -         | 350M memory units  | Raise per-transaction limit by a factor of twenty relative to Praos.                                                                                                         |
-| Ranking block max size                        |  $S_\text{RB}$   |    90,112 bytes    | This is the current value on the Cardano mainnet.                                                                                                                            |
-
-| Mean committee size | $n$ | 600 stakepools | Modeling of the proposed
-certificate scheme indicates that certificates reach their minimum size of ~8 kB
-at this committee size, given a realistic distribution of stake among pools. | |
-Quorum size | $\tau$ | 75% | High threshold ensures certified EBs are known
-to >25% of honest nodes even with 50% adversarial stake. This enables the
-network assumption for safe diffusion within L_diff. |
+| Parameter                                     |      Symbol      |   Feasible value   | Justification                                                                                                                                                                          |
+| --------------------------------------------- | :--------------: | :----------------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Header diffusion period length                |  $L_\text{hdr}$  |       1 slot       | Per [equivocation detection](#equivocation-detection): accommodates header propagation for equivocation detection. Equivocation detection period is $3 \times L_\text{hdr}$.           |
+| Voting period length                          | $L_\text{vote}$  |      4 slots       | Per [voting period](#voting-period): accommodates EB propagation and validation time, with equivocation detection handled separately by $3 \times L_\text{hdr}$.                       |
+| Diffusion period length                       | $L_\text{diff}$  |      7 slots       | Per [diffusion period](#diffusion-period): minimum calculated as 4 slots with typical network values, use 7 for safety margin.                                                         |
+| Endorser-block referenceable transaction size | $S_\text{EB-tx}$ |       12 MB        | Simulations indicate that 200 kB/s throughput is feasible at this block size.                                                                                                          |
+| Endorser block max size                       |  $S_\text{EB}$   |       512 kB       | Endorser blocks must be small enough to diffuse and be validated within the voting period $L_\text{vote}$.                                                                             |
+| Maximum Plutus steps per endorser block       |        -         |  2000G step units  | Simulations at high transaction-validation CPU usage, but an even higher limit may be possible.                                                                                        |
+| Maximum Plutus memory per endorser block      |        -         | 7000M memory units | Simulations at high transaction-validation CPU usage, but an even higher limit may be possible.                                                                                        |
+| Maximum Plutus steps per transaction          |        -         |  100G step units   | Raise per-transaction limit by a factor of twenty relative to Praos.                                                                                                                   |
+| Maximum Plutus memory per transaction         |        -         | 350M memory units  | Raise per-transaction limit by a factor of twenty relative to Praos.                                                                                                                   |
+| Ranking block max size                        |  $S_\text{RB}$   |    90,112 bytes    | This is the current value on the Cardano mainnet.                                                                                                                                      |
+| Mean committee size                           |       $n$        |   600 stakepools   | Modeling of the proposed certificate scheme indicates that certificates reach their minimum size of ~8 kB at this committee size, given a realistic distribution of stake among pools. |
+| Quorum size                                   |      $\tau$      |        75%         | High threshold ensures certified EBs are known to >25% of honest nodes even with 50% adversarial stake. This enables the network assumption for safe diffusion within L_diff.          |
 
 <em>Table 7: Feasible Protocol Parameters</em>
 
