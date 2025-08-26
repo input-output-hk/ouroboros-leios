@@ -261,7 +261,8 @@ process. The precise timing mechanism is detailed in the following section.
 The protocol operates through five sequential steps that span three critical
 timing phases. Figure 4 visualizes the precise timing mechanism that governs
 when certificates can be safely included in the chain, showing both the protocol
-phases and the underlying network characteristics that inform their design.
+phases and the underlying network characteristics ($\Delta$ parameters) and
+protocol parameters ($L$ parameters) that inform their design.
 
 <div align="center">
   <a name="figure-4" id="figure-4"></a>
