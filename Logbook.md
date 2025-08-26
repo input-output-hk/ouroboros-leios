@@ -2,6 +2,16 @@
 
 ## 2025-08-26
 
+### Quantile regressions for ledger "apply" and "reapply" operations
+
+The [analysis of the ledger "apply" and "reapply"](analysis/timings/ReadMe.ipynb) has been extended with quantile regressions at the 50th, 95th, and 99th percentiles. There was a concern that the validation time spent on reapplying transactions to EB could interfere with the release of Praos blocks. The following table shows predictions for full EBs with various intensities of Plutus scripts. Note that the "apply" operation occurs in Leios as transactions arrive and is spread out over many slots and computational threads. The "reapply" operation starts as soon as an EB is received and must be completed before a new RB and EB are built upon that EB when it is newly certified.
+
+| Tx count | Tx size [kB] | Tx exec [Gstep] | 50th %tile of Apply [ms] | 95th %tile of Apply [ms] | 99th %tile of Apply [ms] | 50th %tile of Repply [ms] | 95th %tile of Reapply [ms] | 99th %tile of Reapply [ms] |
+|---------:|-------------:|----------------:|-------------------------:|-------------------------:|-------------------------:|--------------------------:|---------------------------:|---------------------------:|
+|     8000 |       12,000 |               0 |                 1940.058 |                 3039.944 |                 4154.505 |                  183.0863 |                   374.7629 |                   661.7723 |
+|     8000 |       12,000 |              20 |                 1962.509 |                 3082.334 |                 4210.954 |                  183.7547 |                   376.0958 |                   661.8747 |
+|     8000 |       12,000 |            2000 |                 4185.128 |                 7278.955 |                 9799.408 |                  249.9268 |                   508.0527 |                   672.0193 |
+
 ### Network degradation experiment
 
 The simulation experiment [analysis/sims/degraded/](analysis/sims/degraded/) studied Leios's behavior when network topology is thinned. The number of connections to/from each node was randomly thinned by up to 87% of its original mainnet-like topology. Beyond that level (i.e., more than 88% of connections lost), the network topology splits into disconnected regions where some nodes can no longer communicate with each other. That degradation resulted in the diameter of the network increasing from 5 hops to 8 hops and the number of connections per node dropping form 23.5 to 6.0. Both honest cases and cases where adversaries delay the release or transactions and EBs were studied. The experiment was inconclusive, in that the protocol operated properly when 87% of connections where lost.
