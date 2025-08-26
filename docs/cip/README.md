@@ -715,9 +715,9 @@ time bound as standard Praos blocks.
 This section provides a high-level view of the security argument, starting with
 the main assumptions involved.
 
- <a id="eb-reapplication-constraint"></a> 
- 
- **1. EB Reapplication Constraint**
+<a id="eb-reapplication-constraint"></a>
+
+**1. EB Reapplication Constraint**
 
 Reapplying a certified EB cannot cost more than standard transaction processing.
 
@@ -727,27 +727,29 @@ $$\Delta_\text{reapply} < \Delta_\text{applyTxs}$$
 
 **2. Certified EB Transmission Constraint**
 
-Any certified EB referenced by an RB must be transmitted (but not necessarily be processed)
-before that RB needs to be processed.
+Any certified EB referenced by an RB must be transmitted (but not necessarily be
+processed) before that RB needs to be processed.
 
 $$\Delta_\text{EB}^{\text{A}} < L_\text{equi} + L_\text{vote} + L_\text{diff} + (\Delta_\text{RB} - \Delta_\text{applyTxs})$$
 
 The security argument can now be described. For simplicity, the analysis focuses
-on the case where a single RB (referencing an EB) is diffused, and nodes have already computed
-the ledger state that this RB extends.
+on the case where a single RB (referencing an EB) is diffused, and nodes have
+already computed the ledger state that this RB extends.
 
-The argument proceeds as follows: (i) The certified EB that the RB references will be received
-within $\Delta_\text{RB} - \Delta_\text{applyTxs}$ from the initial diffusion time of the
-RB. This follows directly from [Constraint 2](#certified-eb-transmission-constraint) and
-the fact that the RB was generated at least $L_\text{equi} + L_\text{vote} + L_\text{diff}$
-slots after the EB was generated. (ii) The RB will be
-processed within $\Delta_\text{RB}$ slots, due to the fact that it is received
-within $\Delta_\text{RB} - \Delta_\text{applyTxs}$ from its initial diffusion time,
-and processing in the worst-case takes $\Delta_\text{reapply} (< \Delta_\text{applyTxs})$
-slots according to [Constraint 1](#eb-reapplication-constraint).
+The argument proceeds as follows: (i) The certified EB that the RB references
+will be received within $\Delta_\text{RB} - \Delta_\text{applyTxs}$ from the
+initial diffusion time of the RB. This follows directly from
+[Constraint 2](#certified-eb-transmission-constraint) and the fact that the RB
+was generated at least $L_\text{equi} + L_\text{vote} + L_\text{diff}$ slots
+after the EB was generated. (ii) The RB will be processed within
+$\Delta_\text{RB}$ slots, due to the fact that it is received within
+$\Delta_\text{RB} - \Delta_\text{applyTxs}$ from its initial diffusion time, and
+processing in the worst-case takes
+$\Delta_\text{reapply} (< \Delta_\text{applyTxs})$ slots according to
+[Constraint 1](#eb-reapplication-constraint).
 
-Given that nodes are caught up when they are about to produce
-or process an RB, Praos safety and liveness is thus preserved.
+Given that nodes are caught up when they are about to produce or process an RB,
+Praos safety and liveness is thus preserved.
 
 ### Node Behavior
 
