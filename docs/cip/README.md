@@ -322,15 +322,14 @@ committee.
 
 #### Step 3: Committee Validation
 
-If no [equivocations](#equivocation-detection) were detected within
-$3 L_\text{hdr}$, a voting committee of stake pools validates the EB and votes
+After the [equivocation detection period](#equivocation-detection) of
+$3 L_\text{hdr}$ slots, a voting committee of stake pools validates the EB and votes
 within a [voting period](#voting-period) $L_\text{vote}$. Committee members are
 [selected via sortition](#committee-structure) based on the slot number of the
 RB that announced the EB. A committee member votes for an EB only if:
 
 1. The RB header arrived within $L_\text{hdr}$,
-2. It has **not** detected any equivocating RB header for the same slot within
-   $3 \times L_\text{hdr}$ slots of the EB slot,
+2. It has **not** detected any equivocating RB header for the same slot,
 3. It finished validating the EB before $3 \times L_\text{hdr} + L_\text{vote}$
    slots after the EB slot,
 4. The EB is the one announced by the latest RB in the voter's current chain,
