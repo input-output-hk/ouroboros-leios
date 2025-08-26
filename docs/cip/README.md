@@ -337,8 +337,8 @@ RB that announced the EB. A committee member votes for an EB only if:
    the announcing RB's slot number as the election identifier.
 
 where $L_\text{equi}$, $L_\text{vote}$ and $\Delta_\text{hdr}$ are
-<a href="#network-characteristics-and-protocol-parameters">protocol parameters
-and network characteristics</a> represented by a number of slots.
+<a href="#network-characteristics-and-protocol-parameters">protocol
+parameters</a> represented by a number of slots.
 
 #### Step 4: Certification
 
