@@ -321,22 +321,22 @@ committee.
 #### Step 3: Committee Validation
 
 If no [equivocations](#equivocation-detection) were detected within
-$L_\text{equi}$, a voting committee of stake pools validates the EB and votes
+$3 L_\text{hdr}$, a voting committee of stake pools validates the EB and votes
 within a [voting period](#voting-period) $L_\text{vote}$. Committee members are
 [selected via sortition](#committee-structure) based on the slot number of the
 RB that announced the EB. A committee member votes for an EB only if:
 
-1. The RB header arrived within $\Delta_\text{hdr}$,
+1. The RB header arrived within $L_\text{hdr}$,
 2. It has **not** detected any equivocating RB header for the same slot within
-   $L_\text{equi}$ slots of the EB slot,
-3. It finished validating the EB before $L_\text{equi} + L_\text{vote}$ slots
+   $3 \times L_\text{hdr}$ slots of the EB slot,
+3. It finished validating the EB before $3 \times L_\text{hdr} + L_\text{vote}$ slots
    after the EB slot,
 4. The EB is the one announced by the latest RB in the voter's current chain,
 5. The EB's transactions form a **valid** extension of the RB that announced it,
 6. For non-persistent voters, it is eligible to vote based on sortition using
    the announcing RB's slot number as the election identifier.
 
-where $L_\text{equi}$, $L_\text{vote}$ and $\Delta_\text{hdr}$ are
+where $L_\text{hdr}$ and $L_\text{vote}$ are
 <a href="#network-characteristics-and-protocol-parameters">protocol
 parameters</a> represented by a number of slots.
 
@@ -375,10 +375,10 @@ valid chain inclusion are:
    preceding RB).
 2. The certificate is valid as defined in
    [Certificate Validation](#certificate-validation).
-3. At least $L_\text{equi} + L_\text{vote} + L_\text{diff}$ slots have elapsed
+3. At least $3 \times L_\text{hdr} + L_\text{vote} + L_\text{diff}$ slots have elapsed
    since the slot of the RB that announced the EB.
 
-where $L_\text{equi}$, $L_\text{vote}$ and $L_\text{diff}$ are
+where $L_\text{hdr}$, $L_\text{vote}$ and $L_\text{diff}$ are
 <a href="#network-characteristics-and-protocol-parameters">protocol
 parameters</a> represented by a number of slots.
 
@@ -457,7 +457,7 @@ availability:
 
 The three critical timing phases that are visible in [Figure 4](#figure-4) are:
 
-- **Phase 1** ($L_\text{equi}$): Equivocation detection occurs immediately after
+- **Phase 1** ($3 \times L_\text{hdr}$): Equivocation detection occurs immediately after
   EB announcement
 - **Phase 2** ($L_\text{vote}$): Committee voting takes place during Step 3
 - **Phase 3** ($L_\text{diff}$): Network-wide diffusion ensures availability
@@ -468,7 +468,7 @@ The three critical timing phases that are visible in [Figure 4](#figure-4) are:
 
 | Parameter                                                              |      Symbol      |    Units     | Description                                                                       | Rationale                                                                                                                                                                                                                                        |
 | ---------------------------------------------------------------------- | :--------------: | :----------: | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| <a id="l-equi" href="#l-equi"></a>Equivocation detection period length | $L_\text{equi}$  |     slot     | Duration for detecting conflicting blocks before voting begins                    | Per [equivocation detection](#equivocation-detection): must accommodate worst-case equivocation scenario. Prevents adversaries from sending different EBs to different network parts                                                             |
+| <a id="l-hdr" href="#l-hdr"></a>Header diffusion period length | $L_\text{hdr}$  |     slot     | Duration for RB headers to propagate network-wide                    | Per [equivocation detection](#equivocation-detection): must accommodate header propagation for equivocation detection.                                                             |
 | <a id="l-vote" href="#l-vote"></a>Voting period length                 | $L_\text{vote}$  |     slot     | Duration during which committee members can vote on endorser blocks               | Per [voting period](#voting-period): must accommodate EB propagation and validation time. Set to minimum value that ensures honest parties can participate in voting                                                                             |
 | <a id="l-diff" href="#l-diff"></a>Diffusion period length              | $L_\text{diff}$  |     slot     | Additional period after voting to ensure network-wide EB availability             | Per [diffusion period](#diffusion-period): derived from the fundamental safety constraint. Leverages the network assumption that data known to >25% of nodes propagates fully within this time                                                   |
 | Ranking block max size                                                 |  $S_\text{RB}$   |    bytes     | Maximum size of a ranking block                                                   | Limits RB size to ensure timely diffusion                                                                                                                                                                                                        |
@@ -487,13 +487,13 @@ The three critical timing phases that are visible in [Figure 4](#figure-4) are:
 
 <a id="equivocation-detection"></a>
 
-**Phase 1: Equivocation Detection ($L_\text{equi}$)**
+**Phase 1: Equivocation Detection ($3 L_\text{hdr}$)**
 
 This phase occurs immediately when an RB announces an EB. During this period,
 the network detects any attempts by adversaries to create multiple conflicting
 blocks for the same slot. The equivocation detection mechanism ensures that
 honest nodes can reliably identify and reject equivocating behavior before
-participating in voting.
+participating in voting. The equivocation detection period is $3 L_\text{hdr}$, derived from the header diffusion parameter $L_\text{hdr}$.
 
 **Equivocation Attack Model**: An adversary controlling a block production slot
 may attempt to create multiple conflicting EBs and distribute different versions
@@ -505,20 +505,20 @@ adversarial EB if honest nodes vote on different versions.
 multi-step detection process that must accommodate the worst-case propagation
 scenario:
 
-1. **$\Delta_\text{hdr}$**: Initial header propagation - the first (honest or
+1. **$L_\text{hdr}$**: Initial header propagation - the first (honest or
    adversarial) RB header reaches all honest nodes
-2. **$\Delta_\text{hdr}$**: Conflicting header propagation - any equivocating
+2. **$L_\text{hdr}$**: Conflicting header propagation - any equivocating
    header from the same slot reaches honest nodes
-3. **$\Delta_\text{hdr}$**: Equivocation evidence propagation - proof of
+3. **$L_\text{hdr}$**: Equivocation evidence propagation - proof of
    conflicting headers propagates network-wide, allowing all honest nodes to
    detect the equivocation
 
-Therefore, $L_\text{equi} \geq 3\Delta_\text{hdr}$ to ensure reliable detection
+Therefore, the equivocation detection period is $3 L_\text{hdr}$ to ensure reliable detection
 before voting begins. This constraint is derived from the network model where
-headers must propagate within $\Delta_\text{hdr}$ to maintain Praos security
+headers must propagate within $L_\text{hdr}$ to maintain Praos security
 assumptions.
 
-**Security Guarantee**: By waiting $L_\text{equi}$ slots before voting begins,
+**Security Guarantee**: By waiting $3 L_\text{hdr}$ slots before voting begins,
 the protocol ensures that if any equivocation occurred soon enough to matter,
 all honest nodes will have detected it and will refuse to vote for any EB from
 the equivocating issuer. This prevents adversaries from exploiting network
@@ -542,7 +542,7 @@ period.
 
 The voting period must accommodate EB diffusion (transmission and processing):
 
-$$L_\text{equi} + L_\text{vote} > \Delta_\text{EB}^{\text{O}}$$
+$$3 \times L_\text{hdr} + L_\text{vote} > \Delta_\text{EB}^{\text{O}}$$
 
 where $\Delta_\text{EB}^{\text{O}}$ (optimistic EB diffusion time including
 transmission and processing) is defined in the
@@ -562,7 +562,7 @@ Ensures network-wide EB availability by leveraging the assumption that data
 known to >25% of the network (guaranteed by the voting threshold) propagates
 fully within this period. The diffusion period must satisfy:
 
-$$L_\text{diff} \geq \Delta_\text{EB}^{\text{W}} + \Delta_\text{reapply} - \Delta_\text{RB'} - L_\text{equi} - L_\text{vote}$$
+$$L_\text{diff} \geq \Delta_\text{EB}^{\text{W}} + \Delta_\text{reapply} - \Delta_\text{RB'} - 3 \times L_\text{hdr} - L_\text{vote}$$
 
 This ensures certified EBs reach all honest parties before any RB' that includes
 their certificate needs processing.
@@ -758,7 +758,7 @@ $$\Delta_\text{reapply} < \Delta_\text{applyTxs}$$
 Any certified EB referenced by an RB must be transmitted (but not necessarily be
 processed) before that RB needs to be processed.
 
-$$\Delta_\text{EB}^{\text{W}} < L_\text{equi} + L_\text{vote} + L_\text{diff} + (\Delta_\text{RB} - \Delta_\text{applyTxs})$$
+$$\Delta_\text{EB}^{\text{W}} < 3 \times L_\text{hdr} + L_\text{vote} + L_\text{diff} + (\Delta_\text{RB} - \Delta_\text{applyTxs})$$
 
 The security argument can now be described. For simplicity, the analysis focuses
 on the case where a single RB (referencing an EB) is diffused, and nodes have
@@ -768,7 +768,7 @@ The argument proceeds as follows: (i) The certified EB that the RB references
 will be received within $\Delta_\text{RB} - \Delta_\text{applyTxs}$ from the
 initial diffusion time of the RB. This follows directly from
 [Constraint 2](#certified-eb-transmission-constraint) and the fact that the RB
-was generated at least $L_\text{equi} + L_\text{vote} + L_\text{diff}$ slots
+was generated at least $3 \times L_\text{hdr} + L_\text{vote} + L_\text{diff}$ slots
 after the EB was generated. (ii) The RB will be processed within
 $\Delta_\text{RB}$ slots, due to the fact that it is received within
 $\Delta_\text{RB} - \Delta_\text{applyTxs}$ from its initial diffusion time, and
@@ -865,7 +865,7 @@ which are permitted to include diffusion pipelining with delayed validation.
 
 Whenever an EB is announced through an RB header, nodes must fetch the EB
 content promptly (step 6), such that they receive it within
-$L_\text{equi} + L_\text{vote}$ and consequently enables them to vote. EBs are
+$3 \times L_\text{hdr} + L_\text{vote}$ and consequently enables them to vote. EBs are
 fetched freshest-first to ensure timely delivery within the voting window. Only
 the EB body corresponding to the first EB announcement/RB header received for a
 given RB creation opportunity shall be downloaded. The EB contains references to
@@ -949,7 +949,7 @@ proof that the EB has received sufficient committee approval.
 
 <a id="certificate-inclusion" href="#certificate-inclusion"></a>**Certificate
 Inclusion**: Block producers creating new RBs include certificates for EBs where
-at least $L_\text{equi} + L_\text{vote} + L_\text{diff}$ slots have elapsed
+at least $3 \times L_\text{hdr} + L_\text{vote} + L_\text{diff}$ slots have elapsed
 since the slot of the RB that announced the EB (step 12). This timing constraint
 ensures the certified EB has had sufficient time to diffuse throughout the
 network.
@@ -1736,7 +1736,7 @@ The simulation results in the remainder of this section use the Rust simulator
 with a set of protocol parameters suitable for running Linear Leios at 200 kB/s
 of transactions, which corresponds to approximately 150 tx/s of transactions of
 sizes typical on the Cardano mainnet. The maximum size of transactions
-referenced by an EB is 12 MB and the stage lengths are $L_\text{equi} = 3$,
+referenced by an EB is 12 MB and the stage lengths are $3 \times L_\text{hdr} = 3$,
 $L_\text{vote} = 4$, and $L_\text{diff} = 7 \text{ slots}$. In order to
 illustrate the minimal infrastructure resources used by Leios at these
 throughputs, we have limited nodes to 4 virtual CPUs each and limited inter-node
@@ -1777,7 +1777,7 @@ The variability arises from the randomness of the RB production scheduled.
 First, a transaction may has to wait for an RB to be forged; second, a
 transaction referenced by an EB has to wait for the following RB to be forged.
 The EB is discarded, however, if the second RB is produced in fewer than
-$L_\text{equi} + L_\text{vote} + L_\text{diff}$ slots after the first RB. Thus,
+$3 \times L_\text{hdr} + L_\text{vote} + L_\text{diff}$ slots after the first RB. Thus,
 both the time to the next RB and the RB following that introduce
 unpredictability in a transaction reaching the ledger under even lightly loaded
 conditions. When the sortition happens to produce RBs too close together,
@@ -2039,17 +2039,17 @@ consider the following example based on simulated network measurements:
 
 **Timing Parameter Calibration:**
 
-- $L_\text{equi} = 3\Delta_\text{hdr} = 3 \times 1 = 3$ slots (per
+- $L_\text{hdr} = 1$ slot: Header diffusion period, where equivocation detection period is $3 \times L_\text{hdr} = 3$ slots (per
   [equivocation detection](#equivocation-detection))
-- $L_\text{vote} = 4$ slots: Since voting begins after $L_\text{equi}$, and EB
+- $L_\text{vote} = 4$ slots: Since voting begins after $3 \times L_\text{hdr}$, and EB
   propagation can occur during equivocation detection, nodes only need 4
-  additional slots after $L_\text{equi}$ for validation plus margin (per
+  additional slots after $3 \times L_\text{hdr}$ for validation plus margin (per
   [voting period](#voting-period))
 - $L_\text{diff} = 7$ slots: Using the [diffusion period](#diffusion-period)
   constraint with typical values gives minimum of 4 slots, we use 7 for safety
   margin
 - **Total certificate inclusion delay:**
-  $L_\text{equi} + L_\text{vote} + L_\text{diff} = 3 + 4 + 7 = 14$ slots
+  $3 \times L_\text{hdr} + L_\text{vote} + L_\text{diff} = 3 + 4 + 7 = 14$ slots
 
 **Simulation-Tested Parameters**
 
@@ -2063,9 +2063,8 @@ consideration of tradeoffs.
 
 | Parameter                                     |       Symbol        |   Feasible value   | Justification                                                                                                                                            |
 | --------------------------------------------- | :-----------------: | :----------------: | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| RB header diffusion bound                     | $\Delta_\text{hdr}$ |       1 slot       | Must be faster than full RB diffusion for equivocation detection; simulations show headers reach all nodes within 1 slot due to smaller size.            |
-| Equivocation detection period length          |   $L_\text{equi}$   |      3 slots       | Per [equivocation detection](#equivocation-detection): accommodates worst-case equivocation scenario with reliable detection before voting begins.       |
-| Voting period length                          |   $L_\text{vote}$   |      4 slots       | Per [voting period](#voting-period): accommodates EB propagation and validation time, with equivocation detection handled separately by $L_\text{equi}$. |
+| Header diffusion period length          |   $L_\text{hdr}$   |      1 slot       | Per [equivocation detection](#equivocation-detection): accommodates header propagation for equivocation detection. Equivocation detection period is $3 \times L_\text{hdr}$.       |
+| Voting period length                          |   $L_\text{vote}$   |      4 slots       | Per [voting period](#voting-period): accommodates EB propagation and validation time, with equivocation detection handled separately by $3 \times L_\text{hdr}$. |
 | Diffusion period length                       |   $L_\text{diff}$   |      7 slots       | Per [diffusion period](#diffusion-period): minimum calculated as 4 slots with typical network values, use 7 for safety margin.                           |
 | Endorser-block referenceable transaction size |  $S_\text{EB-tx}$   |       12 MB        | Simulations indicate that 200 kB/s throughput is feasible at this block size.                                                                            |
 | Endorser block max size                       |    $S_\text{EB}$    |       512 kB       | Endorser blocks must be small enough to diffuse and be validated within the voting period $L_\text{vote}$.                                               |
