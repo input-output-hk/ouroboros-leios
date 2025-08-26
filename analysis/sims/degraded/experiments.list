@@ -10,3 +10,5 @@ experiments/0.75,0.0,0/run.sh
 experiments/0.75,7.0,1/run.sh
 experiments/0.90,0.0,0/run.sh
 experiments/0.90,7.0,1/run.sh
+experiments/0.13,0.0,0/run.sh
+experiments/0.13,7.0,1/run.sh

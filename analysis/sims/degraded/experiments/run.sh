@@ -6,8 +6,8 @@ set -eo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
 TX_START=60
-TX_STOP=360
-SIM_STOP=600
+TX_STOP=960
+SIM_STOP=1200
 BW=10
 CPU_COUNT=4
 NETWORK=topology-v2
