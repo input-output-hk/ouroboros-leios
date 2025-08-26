@@ -709,52 +709,45 @@ certificates specification][bls-spec].
 ### Security Argument
 
 Leios security reduces to Praos security. The key insight is ensuring that any
-RB containing an EB certificate processes within the same $\Delta_\text{RB}$
+RB containing an EB certificate is processed within the same $\Delta_\text{RB}$
 time bound as standard Praos blocks.
 
-The protocol relies on a 75% voting threshold. This means any certified EB is
-already known to at least 25% of honest nodes by the end of voting, even with
-50% adversarial stake. Once an EB has this level of initial distribution, it can
-reach the remaining honest parties within the diffusion period $L_\text{diff}$.
+This section provides a high-level view of the security argument, starting with
+the main assumptions involved.
 
-Three constraints underpin this argument:
-
-**1. EB Diffusion Constraint**
-
-Honest EBs must diffuse completely (transmission + processing) within the time
-available for [equivocation detection](#equivocation-detection) and voting.
-
-$$L_\text{equi} + L_\text{vote} > \Delta_\text{EB}^{\text{H}}$$
-
-**2. EB Reapplication Constraint**
+ <a id="eb-reapplication-constraint"></a> 
+ 
+ **1. EB Reapplication Constraint**
 
 Reapplying a certified EB cannot cost more than standard transaction processing.
 
 $$\Delta_\text{reapply} < \Delta_\text{applyTxs}$$
 
-**3. Certified EB Transmission Constraint**
+<a id="certified-eb-transmission-constraint"></a>
 
-Any certified EB referenced by an RB must transmit (not process) before that RB
-needs processing.
+**2. Certified EB Transmission Constraint**
+
+Any certified EB referenced by an RB must be transmitted (but not necessarily be processed)
+before that RB needs to be processed.
 
 $$\Delta_\text{EB}^{\text{A}} < L_\text{equi} + L_\text{vote} + L_\text{diff} + (\Delta_\text{RB} - \Delta_\text{applyTxs})$$
 
-> [!Note]
->
-> $\Delta_\text{EB}^{\text{H}}$ includes both transmission and processing since
-> nodes receive fresh EBs. $\Delta_\text{EB}^{\text{A}}$ is transmission-only
-> since certified EBs were already processed during voting by ≥75% of the
-> network.
+The security argument can now be described. For simplicity, the analysis focuses
+on the case where a single RB (referencing an EB) is diffused, and nodes have already computed
+the ledger state that this RB extends.
 
-These constraints ensure that any RB with an EB certificate processes within
-$\Delta_\text{RB}$ slots, just like standard Praos blocks. The RB transmits
-within $\Delta_\text{RB} - \Delta_\text{applyTxs}$ slots. Constraint 3 ensures
-required EBs transmit by then. Constraint 2 ensures EB reapplication adds
-<$\Delta_\text{applyTxs}$ processing time. Therefore: total time <
-$\Delta_\text{RB}$.
+The argument proceeds as follows: (i) The certified EB that the RB references will be received
+within $\Delta_\text{RB} - \Delta_\text{applyTxs}$ from the initial diffusion time of the
+RB. This follows directly from [Constraint 2](#certified-eb-transmission-constraint) and
+the fact that the RB was generated at least $L_\text{equi} + L_\text{vote} + L_\text{diff}$
+slots after the EB was generated. (ii) The RB will be
+processed within $\Delta_\text{RB}$ slots, due to the fact that it is received
+within $\Delta_\text{RB} - \Delta_\text{applyTxs}$ from its initial diffusion time,
+and processing in the worst-case takes $\Delta_\text{reapply} (< \Delta_\text{applyTxs})$
+slots according to [Constraint 1](#eb-reapplication-constraint).
 
-This preserves Praos safety and liveness while maintaining transaction validity
-in all RBs.
+Given that nodes are caught up when they are about to produce
+or process an RB, Praos safety and liveness is thus preserved.
 
 ### Node Behavior
 
