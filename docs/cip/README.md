@@ -1252,22 +1252,21 @@ This mini-protocol pair satisfies the above requirements in the following ways.
   starvation detection and avoidance mechanism used by Ouroboros Genesis's
   Devoted BlockFetch variant can be easily copied for MsgLeiosBlockRangeRequest
   if Ouroboros Genesis is enabled.
-- MsgLeiosBlockRangeRequest also allows the unfortunate node that suffers from a
-  $\Delta^\text{A}_\text{EB}$ violation to recover, i.e. when it didn't receive
-  a certified EB before receiving the RB that certifies it. The protocol design
+- A server should disconnect if the client requests an EB (or its transactions) the server does not have.
+  For young EBs, a client can avoid this by waiting for MsgLeiosBlockOffer (or MsgLeiosBlockTxsOffer) before sending a request.
+  For old EBs, a ChainSync MsgRollForward for an RB that certifies its predecessor's EB would also imply the server has selected that EB, and so must be able to serve it.
+  Whether additional restrictions would be useful is not yet clear.
+  For example, it seems natural to restrict MsgLeiosBlockRequest and MsgLeiosBlockTxsRequest to young EBs (and perhaps also MsgLeiosBlockRangeRequest to old EBs), but it's not already clear what the benefit would be.
+- If MsgLeiosBlockRequest and MsgLeiosBlockTxsRequest were restricted to young EBs, then MsgLeiosBlockRangeRequest would not only enable syncing nodes but also the unfortunate node that suffers from a
+  $\Delta^\text{A}_\text{EB}$ violation. The protocol design
   requires that that event is rare or at least confined to a small portion of
   honest stake at a time. But it will occasionally happen to some honest nodes,
   and they must be able to recover automatically and with minimal disruption.
 - Every Leios object is associated with the slot of an EB, and so has an
   explicit age. This enables freshest-first delivery prioritization. In
-  addition, objects of a certain age should no longer diffuse, or at least can
-  diffuse less aggressively. Votes are no longer relevant once they are somewhat
-  older than $L_\text{vote}$, for example. EBs and their transactions could be
-  restricted to MsgLeiosBlockRangeRequest once they are somewhat older than a
-  reasonable value of $\Delta_{EB}$. These age restrictions ensure that the
-  amount of data any honest client could request _with urgency_ is always
-  bounded, and so the server's memory requirements are also bounded. Because
-  equivocation detection limits the amount of Leios traffic per Praos election,
+  addition, votes of a certain age should no longer diffuse; they are no longer relevant once they are somewhat
+  older than $L_\text{vote}$. Similarly, EBs above some age are no longer relevant unless they're on the historical chain. Because
+  equivocation detection limits the amount of Leios traffic per Praos election
   and Praos elections have a stochastically low arrival rate, this memory bound
   is low enough to admit existing Cardano infrastructure.
 
