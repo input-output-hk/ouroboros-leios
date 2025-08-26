@@ -313,7 +313,10 @@ incentivizes their use first, enabling gradual adoption of Leios capabilities.
 Nodes receiving the RB header discover the announced EB and fetch its body. The
 EB body contains references to transactions. If a node does not already possess
 a transaction referenced in the EB, it explicitly requests that transaction from
-peers.
+peers. The whole process of propagating EBs and referenced transactions is
+called EB diffusion. Only minimal validation is done before forwarding this data
+to ensure rapid dissemination while full validity is determined by the voting
+committee.
 
 #### Step 3: Committee Validation
 
