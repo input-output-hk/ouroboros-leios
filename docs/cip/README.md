@@ -887,10 +887,7 @@ forwarded before complete validity checks are performed.
 
 <a id="transaction-retrieval" href="#transaction-retrieval"></a>**Transaction
 Retrieval**: Nodes check transaction availability for the EB and fetch any
-missing transactions from peers (steps 6a and 7a). After receiving the EB body,
-nodes perform fast validation (step 6b) with only lightweight verification (hash
-consistency, basic structure validation) to prevent DoS attacks before
-proceeding with transaction retrieval. Once all transactions are available,
+missing transactions from peers (steps 6a and 7a). Once all transactions are available,
 nodes can serve EBs to downstream peers (step 7). This guarantees that when a
 node announces an EB its downstream peers can trust it has all EB transactions
 available.
