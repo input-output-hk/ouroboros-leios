@@ -517,7 +517,12 @@ impl LinearLeiosNode {
 
         let parent = self.latest_rb_id();
         let endorsement = parent.and_then(|rb_id| {
-            if rb_id.slot + self.sim_config.linear_diffuse_stage_length > slot {
+            let earliest_endorse_time = Timestamp::from_secs(rb_id.slot)
+                + (self.sim_config.header_diffusion_time * 3)
+                + Duration::from_secs(self.sim_config.linear_vote_stage_length)
+                + Duration::from_secs(self.sim_config.linear_diffuse_stage_length);
+
+            if earliest_endorse_time > Timestamp::from_secs(slot) {
                 // This RB was generated too quickly after another; hasn't been time to gather all the votes.
                 // No endorsement.
                 return None;
@@ -1221,8 +1226,9 @@ impl LinearLeiosNode {
     }
 
     fn should_vote_for(&self, eb: &EndorserBlock, seen: Timestamp) -> Result<(), NoVoteReason> {
-        let eb_must_be_received_by =
-            Timestamp::from_secs(eb.slot + self.sim_config.linear_vote_stage_length);
+        let eb_must_be_received_by = Timestamp::from_secs(eb.slot)
+            + (self.sim_config.header_diffusion_time * 3)
+            + Duration::from_secs(self.sim_config.linear_vote_stage_length);
         if seen > eb_must_be_received_by {
             // An EB must be received within L_vote slots of its creation.
             return Err(NoVoteReason::LateEB);

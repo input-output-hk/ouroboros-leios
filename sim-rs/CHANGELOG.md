@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Linear Leios
+
+- Respect timings according to the latest CIP draft:
+	- RB headers must be received within `Delta_header`
+	- Voting must wait until `3 * Delta_header`
+	- Voting must finish by `3 * Delta_header + L_vote`
+	- EB cannot be referenced until after `3 * Delta_header + L_vote + L_diff`
+
 ### Other
 
 - Fix linter warnings from newer rust version
