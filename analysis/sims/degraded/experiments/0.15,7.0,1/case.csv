@@ -1,0 +1,2 @@
+Connectivity,Adversary,EB delay,Tx attack,Tx size,Throughput,Tx start [s],Tx stop [s],Sim stop [s]
+0.15,33% adversary,EB attack: 7.0 s/EB,Tx attack: 100%,1500 B/Tx,0.150 TxMB/s,60,960,1200

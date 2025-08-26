@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2025-08-26
+
+### Network degradation experiment
+
+The simulation experiment [analysis/sims/degraded/](analysis/sims/degraded/) studied Leios's behavior when network topology is thinned. The number of connections to/from each node was randomly thinned by up to 87% of its original mainnet-like topology. Beyond that level (i.e., more than 88% of connections lost), the network topology splits into disconnected regions where some nodes can no longer communicate with each other. That degradation resulted in the diameter of the network increasing from 5 hops to 8 hops and the number of connections per node dropping form 23.5 to 6.0. Both honest cases and cases where adversaries delay the release or transactions and EBs were studied. The experiment was inconclusive, in that the protocol operated properly when 87% of connections where lost.
+
 ## 2025-08-25
 
 ### Bandwidth experiment
