@@ -48,44 +48,19 @@ elements.
 <details>
   <summary><h2>Table of contents</h2></summary>
 
-- [Abstract](#abstract)
-- [Motivation](#motivation)
-- [Specification](#specification)
-  - [Protocol Flow](#protocol-flow)
-    - [Step 1: Block Production](#step-1-block-production)
-    - [Step 2: EB Distribution](#step-2-eb-distribution)
-    - [Step 3: Committee Validation](#step-3-committee-validation)
-    - [Step 4: Certification](#step-4-certification)
-    - [Step 5: Chain Inclusion](#step-5-chain-inclusion)
-  - [Network Characteristics and Protocol Parameters](#network-characteristics-and-protocol-parameters)
-  - [Protocol Entities](#protocol-entities)
-    - [Ranking Blocks (RBs)](#ranking-blocks-rbs)
-    - [Endorser Blocks (EBs)](#endorser-blocks-ebs)
-    - [Votes and Certificates](#votes-and-certificates)
-  - [Security Argument](#security-argument)
-  - [Node Behavior](#node-behavior)
-    - [Transaction Diffusion](#transaction-diffusion)
-    - [RB Block Production and Diffusion](#rb-block-production-and-diffusion)
-    - [EB Diffusion](#eb-diffusion)
-    - [Voting \& Certification](#voting--certification)
-    - [Next Block Production](#next-block-production)
-    - [Ledger Management](#ledger-management)
-    - [Epoch Boundary](#epoch-boundary)
-  - [Network](#network)
-    - [Praos Mini-Protocols](#praos-mini-protocols)
-    - [Leios Mini-Protocols](#leios-mini-protocols)
-  - [Incentives](#incentives)
-- [Rationale](#rationale)
-  - [How Leios addresses CPS-18](#how-leios-addresses-cps-18)
-  - [Evidence](#evidence)
-  - [Feasible Protocol Parameters](#feasible-protocol-parameters)
-  - [Trade-offs \& Limitations](#trade-offs--limitations)
-  - [Alternatives \& Extensions](#alternatives--extensions)
-- [Path to active](#path-to-active)
-- [Versioning](#versioning)
-- [References](#references)
-- [Appendix](#appendix)
-- [Copyright](#copyright)
+- [| ←Server | MsgLeiosVotesOffer              | list of slot and vote-issuer-id pairs                        | The server could immediately deliver votes with these identifiers.                                                                                                                                                                    |](#-server--msgleiosvotesoffer---------------list-of-slot-and-vote-issuer-id-pairs-------------------------the-server-could-immediately-deliver-votes-with-these-identifiers--------------------------------------------------------------------------------------------------------------------------------------------------------------------)
+    - [Incentives](#incentives)
+  - [Rationale](#rationale)
+    - [How Leios addresses CPS-18](#how-leios-addresses-cps-18)
+    - [Evidence](#evidence)
+    - [Feasible Protocol Parameters](#feasible-protocol-parameters)
+    - [Trade-offs \& Limitations](#trade-offs--limitations)
+    - [Alternatives \& Extensions](#alternatives--extensions)
+  - [Path to active](#path-to-active)
+  - [Versioning](#versioning)
+  - [References](#references)
+  - [Appendix](#appendix)
+  - [Copyright](#copyright)
 
 </details>
 
@@ -1015,49 +990,51 @@ implementation motivates including a concrete proposal in this CIP.
 
 In addition, this section summarizes the requirements for the proposed
 mini-protocols and why they're satisfied. This demonstrates the collective
-requirements are satisfiable---that some implementation is feasible and not
+requirements are satisfiable - that some implementation is feasible and not
 prohibitively complicated.
 
 **Requirements**
 
-The implementation of the Leios overlay must satisfy the following requirements.
+Any Leios implementation must satisfy the following requirements. Alternative
+message exchange designs that meet these requirements may be considered as the
+protocol evolves, with updates to this specification reflecting proven
+improvements.
 
-- **Leios Correctness**. The nodes must exchange the Leios data while
+- **Leios Correctness**: The nodes must exchange the Leios data while
   prioritizing younger over older as implied by Leios's freshest-first delivery
   assumption. Because Leios is about improved resource utilization, wasting
   resources via unnecessary overhead/latency/etc can be considered a correctness
   violation, even more so than in Praos.
-- **Praos Independence**. The Cardano network must grow RB chains—both
+- **Praos Independence**: The Cardano network must grow RB chains—both
   adversarial and honest—of the same shape (i.e., forks and their lengths)
   regardless of whether it is executing the Leios overlay. In other words, the
   shape of all RB forks that exist at some instant would ideally not provide any
   indication whether the Leios overlay is being executed. Moreover, the honest
   majority must still have the same control over which transactions are included
   by the RBs on the best chain.
-- **Existing Resources.** The Leios overlay enables Cardano to increase
+- **Existing Resources**: The Leios overlay enables Cardano to increase
   utilization of existing resources. The Leios overlay will use more resources
   than Praos does, but it simultaneously will not inherently require today's
   Cardano SPOs or users to provision additional resources, beyond some minor
   exceptions. The necessary resources already exist; Praos just cannot utilize
   them all.
-- **Tolerable Implementation Complexity**. The above requirements must admit an
+- **Tolerable Implementation Complexity**: The above requirements must admit an
   implementation without incurring prohibitive costs for development and future
   maintenance.
 
 **Discussion**
 
-**Existing Resources**. Because Praos cannot already fully utilize the existing
+**Existing Resources**: Because Praos cannot already fully utilize the existing
 Cardano infrastructure, this CIP can increase utilization without disrupting
 Praos; the currently unutilized resources are sufficient for Leios. More
 aggressive Leios deployments/extensions in the future will have to navigate that
 trade-off, but simulations indicate that it is not already required by this CIP,
-with two possible exceptions. First, nodes might require additional disk
-capacity as a direct result of the increased throughput, until Cardano perhaps
-relegates historical data to some dedicated archival nodes. Second, a party with
-significant stake might need to provision more resources across their relays
-since each of the hundreds of downstream peers is now more demanding on average.
+with two exceptions. First, nodes will require additional disk capacity as a
+direct result of the increased throughput. Second, parties with significant
+stake will need to provision more resources across their relays since each of
+the hundreds of downstream peers becomes more demanding on average.
 
-**Praos Independence**.To prevent Leios from accidentally depriving Praos of
+**Praos Independence**: To prevent Leios from accidentally depriving Praos of
 resources, the node implementation must prioritize Praos over Leios. For
 example, when a node simultaneously issues an RB and the EB it announces, the
 diffusion of the EB should not delay the diffusion of the RB; that RB is
@@ -1066,9 +1043,8 @@ strictly more urgent than that EB.
 _Remark_. In contrast, the EB certified by a RB that also includes some
 transactions is exactly as urgent as that RB, because the RB cannot be selected
 without the EB. The $L_\text{diff}$ parameter prevents such urgency inversion
-from occurring enough to matter (see the
-[Timing Constraints](#timing-constraints) section), but that is assuming nodes
-automatically eventually recover when it does happen.
+from occurring enough to matter, as explained in the [Security Argument](#security-argument)
+section, assuming nodes automatically eventually recover when it does happen.
 
 In reality, the prioritization of Praos over Leios does not need to be perfectly
 strict (and in fact could never be on hardware and software infrastructure that
@@ -1081,7 +1057,7 @@ block producer selecting that RB (i.e., Praos's $\Delta$) must not be protracted
 by Leios so much that the existing Praos parameter values (e.g., the stability
 window of 36 hr) are no longer sufficient.
 
-**Leios Correctness**. The implementation of freshest-first delivery also does
+**Leios Correctness**: The implementation of freshest-first delivery also does
 not need to be perfect. The prioritization of young over old merely needs to be
 robust enough to justify the chosen values of $L_\text{vote}$ and
 $L_\text{diff}$ even during a burst of withheld-but-valid messages.
@@ -1174,9 +1150,9 @@ one-to-one.
 | ------- | ------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Client→ | MsgLeiosNotificationRequestNext | $\emptyset$                                                  | Requests one Leios notifications, the announcement of an EB or delivery offers for blocks, transactions, and votes.                                                                                                                   |
 | ←Server | MsgLeiosBlockAnnouncement       | RB header that announces an EB                               | The server has seen this EB announcement.                                                                                                                                                                                             |
-| ←Server | MsgLeiosBlockOffer              | slot, Leios hash, and byte size                              | The server could immediately deliver this block.                                                                                                                                                                                      |
-| ←Server | MsgLeiosBlockTxsOffer           | slot and Leios hash                                          | The server could immediately deliver any transaction referenced by this block.                                                                                                                                                        |
-| ←Server | MsgLeiosVotesOffer              | list of slot and vote-issuer-id pairs                        | The server could immediately deliver votes with these identifiers.                                                                                                                                                                    |
+| ←Server | MsgLeiosBlockOffer              | slot and Leios hash                                          | The server can immediately deliver this block.                                                                                                                                                                                      |
+| ←Server | MsgLeiosBlockTxsOffer           | slot and Leios hash                                          | The server can immediately deliver any transaction referenced by this block.                                                                                                                                                        |
+| ←Server | MsgLeiosVotesOffer              | list of slot and vote-issuer-id pairs                        | The server can immediately deliver votes with these identifiers.                                                                                                                                                                    |
 | Client→ | MsgLeiosBlockRequest            | slot and Leios hash                                          | The server must now send deliver this block.                                                                                                                                                                                          |
 | ←Server | MsgLeiosBlock                   | EB block                                                     | The block from an earlier MsgLeiosBlockRequest.                                                                                                                                                                                       |
 | Client→ | MsgLeiosBlockTxsRequest         | slot, Leios hash, and map from 16-bit index to 64-bit bitmap | The server must now deliver these transactions. The given bitmap identifies which of 64 contiguous transactions are requested, and the offset of the transaction corresponding to the bitmap's first bit is 64 times the given index. |
