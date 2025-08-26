@@ -628,11 +628,6 @@ simple structure:
 The precise structure is defined in the <a href="#endorser-block-cddl">Endorser
 Block CDDL specification</a> in Appendix B.
 
-When an EB is announced in an RB header via the `announced_eb` field, a voting
-period begins as described in [Votes and Certificates](#votes-and-certificates).
-The EB certificate inclusion follows the protocol phases and rules detailed in
-[Step 5: Chain Inclusion](#step-5-chain-inclusion).
-
 The hash referenced in RB headers (`announced_eb` field) is computed from the
 complete EB structure and serves as the unique identifier for the EB. The
 `certified_eb` field is a boolean that references the EB announced by the
