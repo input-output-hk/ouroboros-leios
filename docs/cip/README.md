@@ -996,14 +996,6 @@ ensure seamless participation.
 
 ### Network
 
-As outlined above, Leios splits transactions between RBs and EBs, with EB
-inclusion dependent on committee voting and certification. **Transactions in
-RBs**: EB certificate generation requires an absolute stake majority. Given that
-this may not always be the case, if transactions were only included in EBs, the
-protocol would risk **losing liveness** due to no EB certificate being
-generated. As a remedy, RBs are allowed to directly contain transactions,
-ensuring basic liveness even when EB certification fails.
-
 Unlike Ouroboros Praos, where the RB chain contains all necessary data, Leios
 requires additional message types to:
 
