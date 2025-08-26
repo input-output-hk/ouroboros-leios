@@ -1489,7 +1489,8 @@ contributes more than 85% of epoch rewards, with less than 15% coming from
 transaction fees. By 2029, to compensate for Reserve depletion, the network
 requires approximately 36-50 TPS with average-sized transactions - roughly 10
 times current mainnet throughput. This conservative lower bound represents the
-breakeven point for running the protocol sustainably.
+breakeven point for running the protocol sustainably while maintaining the same
+level of decentralization.
 
 However, TPS is not an appropriate metric for defining these bounds. To properly
 assess economic breakeven points, we measure throughput in Transaction Bytes per
