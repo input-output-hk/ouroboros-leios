@@ -361,11 +361,11 @@ certificate proving the EB's validity by aggregating the collected votes.
 
 #### Step 5: Chain Inclusion
 
-After **[Phase 3: Diffusion Period](#diffusion-period)** ($L_\text{diff}$)
-completes, an RB producer creating a new ranking block `RB'` may include a
-certificate for the EB announced by the preceding RB. As shown in Figure 4, this
-occurs only after the complete timing sequence has elapsed. The inclusion
-decision follows these rules:
+If an RB opportunity is after the [diffusion period](#diffusion-period)
+$L_\text{diff}$, a block producer may include in block `RB'` a certificate for
+the EB announced by the preceding block `RB`. As shown in Figure 4, this occurs
+only after the complete timing sequence has elapsed. The inclusion rules for
+valid chain inclusion are:
 
 1. `RB'` directly extends the RB which announced the EB (as illustrated in
    Figure 4 where `RB'` contains the certificate for the EB announced by the
