@@ -854,9 +854,10 @@ Chain Selection**: To support efficient chain selection, nodes must receive
 **all EBs from competing forks**, not only those in their current preferred
 chain. This ensures that when a node switches to a different fork due to the
 longest-chain rule, it can immediately validate the new chain without additional
-EB propagation delays. EBs are forwarded before complete validity checks, with
-only lightweight verification (hash consistency, basic structure validation)
-performed initially to prevent DoS attacks.
+EB propagation delays. However, nodes do not need to fetch EBs from forks that
+have diverged from the locally preferred chain older than the Praos security
+parameter, as such forks cannot affect chain selection decisions. EBs are
+forwarded before complete validity checks are performed.
 
 <a id="transaction-retrieval" href="#transaction-retrieval"></a>**Transaction
 Retrieval**: Nodes check transaction availability for the EB and fetch any
