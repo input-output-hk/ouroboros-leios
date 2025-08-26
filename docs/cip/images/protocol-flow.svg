@@ -117,12 +117,12 @@
       <text x="250" y="268" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#274e13">[TxRefs]</text>
     </a>
     
-    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#l-equi" class="param-link">
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/v2/docs/cip/README.md#l-hdr" class="param-link">
       <line x1="250" y1="300" x2="340" y2="300" stroke="#f57c00" stroke-width="1" stroke-dasharray="2,2"/>
       <path d="M 250 300 L 250 305 Q 250 310 255 310 L 290 310 L 295 317 L 300 310 L 335 310 Q 340 310 340 305 L 340 300" 
             stroke="#f57c00" stroke-width="2" fill="none"/>
       <text x="295" y="335" font-size="18" text-anchor="middle" fill="#f57c00">
-        <tspan font-family="serif" font-style="italic" font-size="24">L</tspan><tspan font-family="Arial, sans-serif" font-size="16" baseline-shift="sub">equi</tspan>
+        <tspan font-family="serif" font-size="24">3</tspan><tspan font-family="serif" font-style="italic" font-size="24">L</tspan><tspan font-family="Arial, sans-serif" font-size="16" baseline-shift="sub">hdr</tspan>
       </text>
     </a>
     
