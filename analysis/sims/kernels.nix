@@ -32,6 +32,7 @@ in
       igraph
       lubridate
       mongolite
+      quantreg
       RPostgres
       R_utils
       stringr
