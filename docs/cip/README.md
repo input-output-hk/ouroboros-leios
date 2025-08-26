@@ -1056,7 +1056,8 @@ improvements.
   them all.
 - **Tolerable Implementation Complexity**: The above requirements must admit an
   implementation without incurring prohibitive costs for development and future
-  maintenance.
+  maintenance. For example, at least the centralized logic to choose when to send each request in this mini-protocol will be very similar to TxSubmission, Peras vote requests, Mithril's Decentralized Message Queue, and likely additional protocols in the future.
+  There is opportunity for significant code reuse even if the mini-protocols themselves are separate.
 
 **Discussion**
 
