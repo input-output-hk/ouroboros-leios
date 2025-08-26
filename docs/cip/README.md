@@ -48,19 +48,44 @@ elements.
 <details>
   <summary><h2>Table of contents</h2></summary>
 
-- [| ←Server | MsgLeiosVotesOffer              | list of slot and vote-issuer-id pairs                        | The server could immediately deliver votes with these identifiers.                                                                                                                                                                    |](#-server--msgleiosvotesoffer---------------list-of-slot-and-vote-issuer-id-pairs-------------------------the-server-could-immediately-deliver-votes-with-these-identifiers--------------------------------------------------------------------------------------------------------------------------------------------------------------------)
-    - [Incentives](#incentives)
-  - [Rationale](#rationale)
-    - [How Leios addresses CPS-18](#how-leios-addresses-cps-18)
-    - [Evidence](#evidence)
-    - [Feasible Protocol Parameters](#feasible-protocol-parameters)
-    - [Trade-offs \& Limitations](#trade-offs--limitations)
-    - [Alternatives \& Extensions](#alternatives--extensions)
-  - [Path to active](#path-to-active)
-  - [Versioning](#versioning)
-  - [References](#references)
-  - [Appendix](#appendix)
-  - [Copyright](#copyright)
+- [Abstract](#abstract)
+- [Motivation](#motivation)
+- [Specification](#specification)
+  - [Protocol Flow](#protocol-flow)
+    - [Step 1: Block Production](#step-1-block-production)
+    - [Step 2: EB Distribution](#step-2-eb-distribution)
+    - [Step 3: Committee Validation](#step-3-committee-validation)
+    - [Step 4: Certification](#step-4-certification)
+    - [Step 5: Chain Inclusion](#step-5-chain-inclusion)
+  - [Network Characteristics and Protocol Parameters](#network-characteristics-and-protocol-parameters)
+  - [Protocol Entities](#protocol-entities)
+    - [Ranking Blocks (RBs)](#ranking-blocks-rbs)
+    - [Endorser Blocks (EBs)](#endorser-blocks-ebs)
+    - [Votes and Certificates](#votes-and-certificates)
+  - [Security Argument](#security-argument)
+  - [Node Behavior](#node-behavior)
+    - [Transaction Diffusion](#transaction-diffusion)
+    - [RB Block Production and Diffusion](#rb-block-production-and-diffusion)
+    - [EB Diffusion](#eb-diffusion)
+    - [Voting \& Certification](#voting--certification)
+    - [Next Block Production](#next-block-production)
+    - [Ledger Management](#ledger-management)
+    - [Epoch Boundary](#epoch-boundary)
+  - [Network](#network)
+    - [Praos Mini-Protocols](#praos-mini-protocols)
+    - [Leios Mini-Protocols](#leios-mini-protocols)
+  - [Incentives](#incentives)
+- [Rationale](#rationale)
+  - [How Leios addresses CPS-18](#how-leios-addresses-cps-18)
+  - [Evidence](#evidence)
+  - [Feasible Protocol Parameters](#feasible-protocol-parameters)
+  - [Trade-offs \& Limitations](#trade-offs--limitations)
+  - [Alternatives \& Extensions](#alternatives--extensions)
+- [Path to active](#path-to-active)
+- [Versioning](#versioning)
+- [References](#references)
+- [Appendix](#appendix)
+- [Copyright](#copyright)
 
 </details>
 
@@ -177,9 +202,10 @@ vary considerably.
 
 Ouroboros Praos cannot support the high transaction volume needed to generate
 the fees that will eventually be needed to offset the diminishing rewards.
-However, as sustained throughput of transactions grows beyond [50 transactions
-per second](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/cost-estimate/README.md#required-tps-for-current-reward-maintenance), there is more opportunity for simultaneously reducing fees,
-augmenting the Treasury, and increasing SPO and delegator rewards.
+However, as sustained throughput of transactions grows beyond
+[50 transactions per second](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/cost-estimate/README.md#required-tps-for-current-reward-maintenance),
+there is more opportunity for simultaneously reducing fees, augmenting the
+Treasury, and increasing SPO and delegator rewards.
 
 <div align="center">
 <a name="figure-2" id="figure-2"></a>
@@ -548,7 +574,6 @@ RBs are Praos blocks extended to support Leios by optionally announcing EBs in
 their headers and embedding EB certificates in their bodies.
 
 1. **Header additions**:
-
    - `announced_eb` (optional): Hash of the EB created by this block producer
    - `announced_eb_size` (optional): Size in bytes of the announced EB (4 bytes)
    - `certified_eb` (optional): Single bit indicating whether this RB certifies
@@ -1043,8 +1068,9 @@ strictly more urgent than that EB.
 _Remark_. In contrast, the EB certified by a RB that also includes some
 transactions is exactly as urgent as that RB, because the RB cannot be selected
 without the EB. The $L_\text{diff}$ parameter prevents such urgency inversion
-from occurring enough to matter, as explained in the [Security Argument](#security-argument)
-section, assuming nodes automatically eventually recover when it does happen.
+from occurring enough to matter, as explained in the
+[Security Argument](#security-argument) section, assuming nodes automatically
+eventually recover when it does happen.
 
 In reality, the prioritization of Praos over Leios does not need to be perfectly
 strict (and in fact could never be on hardware and software infrastructure that
@@ -1150,9 +1176,9 @@ one-to-one.
 | ------- | ------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Client→ | MsgLeiosNotificationRequestNext | $\emptyset$                                                  | Requests one Leios notifications, the announcement of an EB or delivery offers for blocks, transactions, and votes.                                                                                                                   |
 | ←Server | MsgLeiosBlockAnnouncement       | RB header that announces an EB                               | The server has seen this EB announcement.                                                                                                                                                                                             |
-| ←Server | MsgLeiosBlockOffer              | slot and Leios hash                                          | The server can immediately deliver this block.                                                                                                                                                                                      |
-| ←Server | MsgLeiosBlockTxsOffer           | slot and Leios hash                                          | The server can immediately deliver any transaction referenced by this block.                                                                                                                                                        |
-| ←Server | MsgLeiosVotesOffer              | list of slot and vote-issuer-id pairs                        | The server can immediately deliver votes with these identifiers.                                                                                                                                                                    |
+| ←Server | MsgLeiosBlockOffer              | slot and Leios hash                                          | The server can immediately deliver this block.                                                                                                                                                                                        |
+| ←Server | MsgLeiosBlockTxsOffer           | slot and Leios hash                                          | The server can immediately deliver any transaction referenced by this block.                                                                                                                                                          |
+| ←Server | MsgLeiosVotesOffer              | list of slot and vote-issuer-id pairs                        | The server can immediately deliver votes with these identifiers.                                                                                                                                                                      |
 | Client→ | MsgLeiosBlockRequest            | slot and Leios hash                                          | The server must now send deliver this block.                                                                                                                                                                                          |
 | ←Server | MsgLeiosBlock                   | EB block                                                     | The block from an earlier MsgLeiosBlockRequest.                                                                                                                                                                                       |
 | Client→ | MsgLeiosBlockTxsRequest         | slot, Leios hash, and map from 16-bit index to 64-bit bitmap | The server must now deliver these transactions. The given bitmap identifies which of 64 contiguous transactions are requested, and the offset of the transaction corresponding to the bitmap's first bit is 64 times the given index. |
@@ -1776,6 +1802,7 @@ model.[^praosp]
     [Leios mini-mainnet topology](https://github.com/input-output-hk/ouroboros-leios/blob/6d8619c53cc619a25b52eac184e7f1ff3c31b597/data/simulation/pseudo-mainnet/topology-v2.md)
 
 [^ripe]: [RIPE Atlas](https://atlas.ripe.net/)
+
 [^mncp]:
     https://github.com/input-output-hk/ouroboros-leios/blob/6d8619c53cc619a25b52eac184e7f1ff3c31b597/analysis/sims/2025w30b/analysis.ipynb
 
@@ -2688,7 +2715,9 @@ protocol.
 <!-- Footnotes -->
 
 [^fasort]: The Fait Accompli sortition scheme
+
 [^2]: Leios: Dynamic Availability for Blockchain Sharding (2025)
+
 [^leioscrypto]: Leios cryptography prototype implementation
 
 [praos-delta-q]:
