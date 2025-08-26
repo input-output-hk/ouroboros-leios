@@ -411,16 +411,27 @@ availability:
 <div align="center">
 <a name="table-1" id="table-1"></a>
 
-| Characteristic                                                        |            Symbol             | Description                                                                                                                 | Observed Range by Simulations |
-| --------------------------------------------------------------------- | :---------------------------: | --------------------------------------------------------------------------------------------------------------------------- | :---------------------------: |
-| <a id="delta-hdr" href="#delta-hdr"></a>Header propagation            |      $\Delta_\text{hdr}$      | Time for constant size headers (< 1,500 bytes) to propagate network-wide                                                    |            <1 slot            |
-| <a id="delta-rb" href="#delta-rb"></a>RB diffusion                    |      $\Delta_\text{RB}$       | Complete ranking block propagation and adoption time                                                                        |           <5 slots            |
-| <a id="delta-eb-H" href="#delta-eb-H"></a>EB honest diffusion         | $\Delta_\text{EB}^{\text{H}}$ | EB **diffusion** time (transmission + processing) when released on schedule with no fresher EB                              |          7-10 slots           |
-| <a id="delta-eb-A" href="#delta-eb-A"></a>EB adversarial transmission | $\Delta_\text{EB}^{\text{A}}$ | EB **transmission** time for certified EBs starting from >25% network coverage (processing already completed during voting) |          15-20 slots          |
+| Characteristic                                                       |            Symbol             | Description                                                                                                                 | Observed Range by Simulations |
+| -------------------------------------------------------------------- | :---------------------------: | --------------------------------------------------------------------------------------------------------------------------- | :---------------------------: |
+| <a id="delta-hdr" href="#delta-hdr"></a>Header propagation           |      $\Delta_\text{hdr}$      | Time for constant size headers (< 1,500 bytes) to propagate network-wide                                                    |            <1 slot            |
+| <a id="delta-rb" href="#delta-rb"></a>RB diffusion                   |      $\Delta_\text{RB}$       | Complete ranking block propagation and adoption time                                                                        |           <5 slots            |
+| <a id="delta-eb-H" href="#delta-eb-H"></a>EB optimistic diffusion    | $\Delta_\text{EB}^{\text{O}}$ | EB **diffusion** time (transmission + processing) under favorable network conditions                                        |          7-10 slots           |
+| <a id="delta-eb-A" href="#delta-eb-A"></a>EB worst-case transmission | $\Delta_\text{EB}^{\text{W}}$ | EB **transmission** time for certified EBs starting from >25% network coverage (processing already completed during voting) |          15-20 slots          |
 
 <em>Table 1: Network Characteristics</em>
 
 </div>
+
+> [!NOTE]
+>
+> **Network Condition**
+>
+> The exact definition of "optimistic" and "worst-case" network conditions may
+> be refined based on empirical measurements and deployment experience. For
+> example, optimistic conditions might be defined as "no fresher RB" or "at most
+> 2 fresher RBs", depending on how these conditions impact throughput and
+> $\Delta_\text{EB}^{\text{W}}$. The specific thresholds should be determined
+> through testnet validation and performance analysis.
 
 <div align="center">
 <a name="table-2" id="table-2"></a>
@@ -523,9 +534,9 @@ period.
 
 The voting period must accommodate EB diffusion (transmission and processing):
 
-$$L_\text{equi} + L_\text{vote} > \Delta_\text{EB}^{\text{H}}$$
+$$L_\text{equi} + L_\text{vote} > \Delta_\text{EB}^{\text{O}}$$
 
-where $\Delta_\text{EB}^{\text{H}}$ (honest EB diffusion time including
+where $\Delta_\text{EB}^{\text{O}}$ (optimistic EB diffusion time including
 transmission and processing) is defined in the
 [network characteristics](#network-characteristics) section.
 
@@ -543,7 +554,7 @@ Ensures network-wide EB availability by leveraging the assumption that data
 known to >25% of the network (guaranteed by the voting threshold) propagates
 fully within this period. The diffusion period must satisfy:
 
-$$L_\text{diff} \geq \Delta_\text{EB}^{\text{A}} + \Delta_\text{reapply} - \Delta_\text{RB'} - L_\text{equi} - L_\text{vote}$$
+$$L_\text{diff} \geq \Delta_\text{EB}^{\text{W}} + \Delta_\text{reapply} - \Delta_\text{RB'} - L_\text{equi} - L_\text{vote}$$
 
 This ensures certified EBs reach all honest parties before any RB' that includes
 their certificate needs processing.
@@ -730,7 +741,7 @@ $$\Delta_\text{reapply} < \Delta_\text{applyTxs}$$
 Any certified EB referenced by an RB must be transmitted (but not necessarily be
 processed) before that RB needs to be processed.
 
-$$\Delta_\text{EB}^{\text{A}} < L_\text{equi} + L_\text{vote} + L_\text{diff} + (\Delta_\text{RB} - \Delta_\text{applyTxs})$$
+$$\Delta_\text{EB}^{\text{W}} < L_\text{equi} + L_\text{vote} + L_\text{diff} + (\Delta_\text{RB} - \Delta_\text{applyTxs})$$
 
 The security argument can now be described. For simplicity, the analysis focuses
 on the case where a single RB (referencing an EB) is diffused, and nodes have
@@ -2104,8 +2115,8 @@ consider the following example based on simulated network measurements:
 
 - $\Delta_\text{hdr} = 1$ slot, $\Delta_\text{RB} = 5$ slots (Cardano Mainnet
   assumption for Praos security)
-- $\Delta_\text{EB}^{\text{H}} = 7$ slots (EB diffusion: transmission +
-  processing), $\Delta_\text{EB}^{\text{A}} = 15$ slots (EB transmission time
+- $\Delta_\text{EB}^{\text{O}} = 7$ slots (EB diffusion: transmission +
+  processing), $\Delta_\text{EB}^{\text{W}} = 15$ slots (EB transmission time
   for certified EBs)
 - $\Delta_\text{reapply} = 1$ slot (EB reapplication time)
 
@@ -2391,12 +2402,12 @@ better user experience through reduced transaction confirmation times.
 
 **Relax EB diffusion constraints**
 
-The current design requires $\Delta_\text{EB}^A$ (worst case) to be fairly small
-to enable selection of reasonable $L_\text{diff}$ values that ensure certified
-EBs do not impact Praos safety while maintaining frequent enough certification
-for high throughput. Should worst-case EB diffusion prove much larger than
-average or honest cases, introducing an additional recovery period
-$L_\text{recover}$ after certificate inclusion could allow EBs to remain
+The current design requires $\Delta_\text{EB}^{\text{W}}$ (worst case) to be
+fairly small to enable selection of reasonable $L_\text{diff}$ values that
+ensure certified EBs do not impact Praos safety while maintaining frequent
+enough certification for high throughput. Should worst-case EB diffusion prove
+much larger than average or optimistic cases, introducing an additional recovery
+period $L_\text{recover}$ after certificate inclusion could allow EBs to remain
 unavailable for extended periods.
 
 This approach provides greater freedom in selecting $L_\text{diff}$ parameters,
