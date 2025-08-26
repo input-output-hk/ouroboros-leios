@@ -21,7 +21,7 @@
              fill="rgba(255, 165, 0, 0.3)" 
              stroke="#cc7a00" 
              stroke-width="2"/>
-    <polygon points="0,-135 65,0 0,42 -60,0" 
+    <polygon points="0,-135 65,0 0,42 -80,0" 
              fill="rgba(75, 192, 192, 0.3)" 
              stroke="#2e8b8b" 
              stroke-width="2"/>
@@ -39,7 +39,7 @@
       <circle cx="0" cy="-135" r="4"/>
       <circle cx="65" cy="0" r="4"/>
       <circle cx="0" cy="42" r="4"/>
-      <circle cx="-60" cy="0" r="4"/>
+      <circle cx="-80" cy="0" r="4"/>
     </g>
     <g fill="rgba(220, 53, 69, 0.9)" stroke="#a71d2a" stroke-width="2">
       <circle cx="0" cy="-42" r="4"/>
