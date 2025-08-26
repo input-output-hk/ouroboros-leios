@@ -874,7 +874,7 @@ and Adoption**: Nodes validate the RB and any included EB certificate before
 adopting the block (step 4). This includes cryptographic verification of
 certificates and ensuring they correspond to properly announced EBs. The
 complete validation procedure is detailed in
-[certificate validation](#certificate-validation). The node serves RBs to
+[Step 5: Chain Inclusion](#step-5-chain-inclusion). The node serves RBs to
 downstream peers using standard Praos block distribution mechanisms (step 5),
 which are permitted to include diffusion pipelining with delayed validation.
 
@@ -906,9 +906,9 @@ that when a node announces an EB its downstream peers can trust it has all EB
 transactions available.
 
 <a id="eb-transaction-validation" href="#eb-transaction-validation"></a>**Transaction
-Validation**: With all transactions available, nodes validate the endorsed
-transaction sequence against the appropriate ledger state (step 8), ensuring the
-transactions form a valid extension of the announcing RB and meet size
+Validation**: As endorsed transactions become available, nodes validate them in
+the endorsed sequence against the appropriate ledger state (step 8), ensuring
+the transactions form a valid extension of the announcing RB and meet size
 constraints.
 
 <a id="eb-transaction-handling" href="#eb-transaction-handling"></a> To optimize
@@ -967,10 +967,8 @@ Inclusion**: Block producers creating new RBs include certificates for EBs where
 at least $3 \times L_\text{hdr} + L_\text{vote} + L_\text{diff}$ slots have
 elapsed since the slot of the RB that announced the EB (step 12). This timing
 constraint ensures the certified EB has had sufficient time to diffuse
-throughout the network.
-
-**Transaction Selection**: RB producers follow the content constraints detailed
-in [Step 5: Chain Inclusion](#step-5-chain-inclusion).
+throughout the network. See the protocol flow section for detailed
+[block production and inclusion rules](#step-5-chain-inclusion).
 
 #### Ledger Management
 
