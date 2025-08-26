@@ -300,8 +300,8 @@ introduces separate distribution mechanisms for EB headers (for rapid discovery
 and <a id="equivocation" href="#equivocation-detection">equivocation
 detection</a>), EB bodies, and their referenced transactions.
 
-Due to the voting overhead per EB, EBs should only be announced if the base RB
-is full or when sufficient transaction content justifies the voting costs. Empty
+Due to the voting overhead per EB, EBs should only be announced if
+a transaction cannot be included in the base RB. Empty
 EBs should not be announced in the network as they induce a non-zero cost. Note
 that whether an RB is full is not solely determined by its byte size; in
 particular, the per-block Plutus limits could be the reason a full RB cannot
