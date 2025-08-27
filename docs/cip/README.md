@@ -211,7 +211,7 @@ vary considerably.
 Ouroboros Praos cannot support the high transaction volume needed to generate
 the fees that will eventually be needed to offset the diminishing rewards.
 However, as sustained throughput of transactions grows beyond
-[50 transactions per second](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/cost-estimate/README.md#required-tps-for-current-reward-maintenance),
+[50 transactions per second](https://github.com/input-output-hk/ouroboros-leios/blob/d5f1a9bc940e69f406c3e25c0d7d9aa58cf701f8/docs/cost-estimate/README.md#required-tps-for-current-reward-maintenance),
 there is more opportunity for simultaneously reducing fees, augmenting the
 Treasury, and increasing SPO and delegator rewards.
 
@@ -993,7 +993,7 @@ Voter Computation**: Nodes must compute the set of persistent voters for each
 epoch using the [Fait Accompli scheme][fait-accompli-sortition]. This
 computation uses the stake distribution that becomes available at the epoch
 boundary and represents a minimal computational overhead based on current
-[BLS certificates benchmarks](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#benchmarks-in-rust).
+[BLS certificates benchmarks](https://github.com/input-output-hk/ouroboros-leios/blob/d5f1a9bc940e69f406c3e25c0d7d9aa58cf701f8/crypto-benchmarks.rs/Specification.md#benchmarks-in-rust).
 Nodes complete this computation well before voting begins in the new epoch to
 ensure seamless participation.
 
@@ -2274,7 +2274,7 @@ threats include equivocation by EB producers/voters and transaction availability
 attacks, mitigated through cryptographic validation, equivocation detection, and
 the high voting threshold requirement. Comprehensive analysis is documented in
 the [Security Analysis](#security-analysis) section and
-[threat model](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/threat-model.md).
+[threat model](https://github.com/input-output-hk/ouroboros-leios/blob/d5f1a9bc940e69f406c3e25c0d7d9aa58cf701f8/docs/threat-model.md).
 
 ### Alternatives & Extensions
 
@@ -2531,7 +2531,7 @@ protocol.
   https://eprint.iacr.org/2025/1115.pdf
   "Ouroboros Leios: Design Goals and Concepts"
 [fait-accompli-sortition]:
-  https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#sortition
+  https://github.com/input-output-hk/ouroboros-leios/blob/d5f1a9bc940e69f406c3e25c0d7d9aa58cf701f8/crypto-benchmarks.rs/Specification.md#sortition
   "Fait Accompli sortition specification"
 
 <!-- Project resources -->
@@ -2553,25 +2553,25 @@ protocol.
 <!-- Technical specifications and benchmarks -->
 
 [bls-spec]:
-  https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md
+  https://github.com/input-output-hk/ouroboros-leios/blob/d5f1a9bc940e69f406c3e25c0d7d9aa58cf701f8/crypto-benchmarks.rs/Specification.md
   "BLS certificates specification"
 [bls-benchmarks]:
-  https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#benchmarks-in-rust
+  https://github.com/input-output-hk/ouroboros-leios/blob/d5f1a9bc940e69f406c3e25c0d7d9aa58cf701f8/crypto-benchmarks.rs/Specification.md#benchmarks-in-rust
   "BLS certificates benchmarks"
 
 <!-- Technical reports and documentation -->
 
 [committee-size-analysis]:
-  https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-1.md#committee-size-and-quorum-requirement
+  https://github.com/input-output-hk/ouroboros-leios/blob/d5f1a9bc940e69f406c3e25c0d7d9aa58cf701f8/docs/technical-report-1.md#committee-size-and-quorum-requirement
   "Committee size and quorum requirement"
 [threat-model]:
-  https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-1.md#threat-model
+  https://github.com/input-output-hk/ouroboros-leios/blob/d5f1a9bc940e69f406c3e25c0d7d9aa58cf701f8/docs/technical-report-1.md#threat-model
   "Threat model"
 [threat-model-report2]:
-  https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-2.md#notes-on-the-leios-attack-surface
+  https://github.com/input-output-hk/ouroboros-leios/blob/d5f1a9bc940e69f406c3e25c0d7d9aa58cf701f8/docs/technical-report-2.md#notes-on-the-leios-attack-surface
   "Comments on Leios attack surface"
 [cost-estimate]:
-  https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/cost-estimate/README.md
+  https://github.com/input-output-hk/ouroboros-leios/blob/d5f1a9bc940e69f406c3e25c0d7d9aa58cf701f8/docs/cost-estimate/README.md
   "Leios node operating costs"
 
 <!-- Other protocol references -->
@@ -2598,12 +2598,12 @@ protocol.
   https://github.com/input-output-hk/ouroboros-leios/blob/6d8619c53cc619a25b52eac184e7f1ff3c31b597/analysis/sims/2025w30b/analysis.ipynb
   "Topology comparison study"
 [praos-simulations]:
-  https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w26/analysis-praos.ipynb
+  https://github.com/input-output-hk/ouroboros-leios/blob/d5f1a9bc940e69f406c3e25c0d7d9aa58cf701f8/analysis/sims/2025w26/analysis-praos.ipynb
 [leioscrypto]:
   https://github.com/input-output-hk/ouroboros-leios/tree/19990728e09fd1d863f888a494d1930b59e5a0d7/crypto-benchmarks.rs
   "Leios cryptography prototype implementation"
 [timings]:
-  https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/timings/ReadMe.ipynb
+  https://github.com/input-output-hk/ouroboros-leios/blob/d5f1a9bc940e69f406c3e25c0d7d9aa58cf701f8/analysis/timings/ReadMe.ipynb
   "Analysis of mainnet transaction validation times"
 
 <!-- External resources -->
@@ -2637,7 +2637,7 @@ protocol.
 [praos-delta-q]:
   https://github.com/IntersectMBO/cardano-formal-specifications/tree/main?tab=readme-ov-file#performance-model
 [praos-simulations]:
-  https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w26/analysis-praos.ipynb
+  https://github.com/input-output-hk/ouroboros-leios/blob/d5f1a9bc940e69f406c3e25c0d7d9aa58cf701f8/analysis/sims/2025w26/analysis-praos.ipynb
 
 ## Appendix
 
