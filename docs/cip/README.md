@@ -58,12 +58,13 @@ elements.
     - [Step 4: Certification](#step-4-certification)
     - [Step 5: Chain Inclusion](#step-5-chain-inclusion)
   - [Protocol Parameters](#protocol-parameters)
-    - [EB Size Constraints](#eb-size-constraints)
+    - [Timing parameters](#timing-parameters)
+    - [Size parameters](#size-parameters)
+  - [Protocol Security](#protocol-security)
   - [Protocol Entities](#protocol-entities)
     - [Ranking Blocks (RBs)](#ranking-blocks-rbs)
     - [Endorser Blocks (EBs)](#endorser-blocks-ebs)
     - [Votes and Certificates](#votes-and-certificates)
-  - [Security Argument](#security-argument)
   - [Node Behavior](#node-behavior)
     - [Transaction Diffusion](#transaction-diffusion)
     - [RB Block Production and Diffusion](#rb-block-production-and-diffusion)
@@ -279,8 +280,8 @@ precise timing mechanism is detailed in the following section.
 The protocol operates through five sequential steps that involve three critical
 timing constraints. Figure 4 visualizes the precise timing mechanism that
 governs when certificates can be safely included in the chain, showing both the
-protocol parameters and the underlying network characteristics ($\Delta$
-parameters) and protocol parameters ($L$ parameters) that inform their design.
+protocol parameters and the underlying network characteristics ($\Delta$ values)
+and protocol parameters ($L$ values) that inform their design.
 
 <div align="center">
   <a name="figure-4" id="figure-4"></a>
@@ -459,17 +460,7 @@ availability:
 
 </div>
 
-**Protocol Parameters and Timing Constraints**
-
-The three critical timing constraints that are visible in [Figure 4](#figure-4)
-are:
-
-- **Equivocation Detection** ($3 \times L_\text{hdr}$): Equivocation detection
-  occurs immediately after EB announcement
-- **Voting Period** ($L_\text{vote}$): Committee voting takes place during Step
-  3
-- **Diffusion Period** ($L_\text{diff}$): Network-wide diffusion ensures
-  availability before Step 5
+**Protocol Parameters**
 
 <div align="center">
 <a name="table-3" id="table-3"></a>
@@ -492,6 +483,12 @@ are:
 <em>Table 3: Protocol Parameters</em>
 
 </div>
+
+#### Timing parameters
+
+There are three key parameters related to time, which are important for
+[protocol security](#protocol-security). All relevant quantities are depdicted
+in [Figure 4](#figure-4).
 
 <a id="equivocation-detection"></a>
 
@@ -580,7 +577,7 @@ $$L_\text{diff} \geq \Delta_\text{EB}^{\text{W}} + \Delta_\text{reapply} - \Delt
 This ensures certified EBs reach all honest parties before any RB' that includes
 their certificate needs processing.
 
-#### EB Size Constraints
+#### Size parameters
 
 Two separate parameters control EB sizes:
 
@@ -594,9 +591,53 @@ For example, an EB referencing 10,000 transactions of 100 bytes each would have
 $S_\text{EB-tx} = 1$ MB but the EB itself would be at least 320 KB for the
 transaction hashes alone.
 
+### Protocol Security
+
+Leios security reduces to Praos security. The key insight is ensuring that any
+RB containing an EB certificate is processed within the same $\Delta_\text{RB}$
+time bound as standard Praos blocks.
+
+<a id="eb-reapplication-constraint"></a>
+
+**1. EB Reapplication Constraint**
+
+Reapplying a certified EB cannot cost more than standard transaction processing.
+
+$$\Delta_\text{reapply} < \Delta_\text{applyTxs}$$
+
+<a id="certified-eb-transmission-constraint"></a>
+
+**2. Certified EB Transmission Constraint**
+
+Any certified EB referenced by an RB must be transmitted (but not necessarily be
+processed) before that RB needs to be processed.
+
+$$\Delta_\text{EB}^{\text{W}} < 3 \times L_\text{hdr} + L_\text{vote} + L_\text{diff} + (\Delta_\text{RB} - \Delta_\text{applyTxs})$$
+
+The security argument can now be described. For simplicity, the analysis focuses
+on the case where a single RB (referencing an EB) is diffused, and nodes have
+already computed the ledger state that this RB extends.
+
+The argument proceeds as follows: (i) The certified EB that the RB references
+will be received within $\Delta_\text{RB} - \Delta_\text{applyTxs}$ from the
+initial diffusion time of the RB. This follows directly from
+[Constraint 2](#certified-eb-transmission-constraint) and the fact that the RB
+was generated at least $3 \times L_\text{hdr} + L_\text{vote} + L_\text{diff}$
+slots after the EB was generated. (ii) The RB will be processed within
+$\Delta_\text{RB}$ slots, due to the fact that it is received within
+$\Delta_\text{RB} - \Delta_\text{applyTxs}$ from its initial diffusion time, and
+processing in the worst-case takes
+$\Delta_\text{reapply} (< \Delta_\text{applyTxs})$ slots according to
+[Constraint 1](#eb-reapplication-constraint).
+
+Given that nodes are caught up when they are about to produce or process an RB,
+Praos safety and liveness is thus preserved.
+
 ### Protocol Entities
 
-The protocol extends Praos with three main entities:
+The protocol extends Praos blocks, introduces endorser blocks, Leios votes and
+certificates. While already introduced briefly, this section specifies these
+entities in more detail.
 
 #### Ranking Blocks (RBs)
 
@@ -604,6 +645,7 @@ RBs are Praos blocks extended to support Leios by optionally announcing EBs in
 their headers and embedding EB certificates in their bodies.
 
 1. **Header additions**:
+
    - `announced_eb` (optional): Hash of the EB created by this block producer
    - `announced_eb_size` (optional): Size in bytes of the announced EB (4 bytes)
    - `certified_eb` (optional): Single bit indicating whether this RB certifies
@@ -613,6 +655,8 @@ their headers and embedding EB certificates in their bodies.
 2. **Body additions**:
    - `eb_certificate` (optional): aggregated certificate proving EB validity
    - Transactions (when no certificate is included)
+
+A [CDDL for ranking blocks](#ranking-block-cddl) is available in Appendix B.
 
 <a id="rb-inclusion-rules" href="#rb-inclusion-rules"></a>**Inclusion Rules**:
 
@@ -640,8 +684,7 @@ simple structure:
   reference includes the hash of the complete transaction bytes and the
   transaction size in bytes
 
-The precise structure is defined in the <a href="#endorser-block-cddl">Endorser
-Block CDDL specification</a> in Appendix B.
+A [CDDL for endorser blocks](#endorser-block-cddl) is available in Appendix B.
 
 The hash referenced in RB headers (`announced_eb` field) is computed from the
 complete EB structure and serves as the unique identifier for the EB. The
@@ -705,8 +748,8 @@ identifying the EB's hash directly. This ensures the voters validated the EB
 against the same ledger state that it extends when certfied on chain; recall
 that multiple RB headers could announce the same EB.
 
-The precise structure is defined in the <a href="#votes-certificates-cddl">Votes
-and Certificates CDDL specification</a> in Appendix B.
+A [CDDL for votes and certificates](#votes-certificates-cddl) is available in
+Appendix B.
 
 <a id="certificate-validation" href="#certificate-validation"></a>**Certificate
 Validation**: When an RB includes an EB certificate, nodes must validate the
@@ -747,48 +790,6 @@ certificates specification][bls-spec].
 > The linked BLS specification mentions vote bundling as an optimization.
 > However, this only applies when EB production is decoupled from RBs, which is
 > not the case in this specification where each EB is announced by an RB.
-
-### Security Argument
-
-Leios security reduces to Praos security. The key insight is ensuring that any
-RB containing an EB certificate is processed within the same $\Delta_\text{RB}$
-time bound as standard Praos blocks.
-
-<a id="eb-reapplication-constraint"></a>
-
-**1. EB Reapplication Constraint**
-
-Reapplying a certified EB cannot cost more than standard transaction processing.
-
-$$\Delta_\text{reapply} < \Delta_\text{applyTxs}$$
-
-<a id="certified-eb-transmission-constraint"></a>
-
-**2. Certified EB Transmission Constraint**
-
-Any certified EB referenced by an RB must be transmitted (but not necessarily be
-processed) before that RB needs to be processed.
-
-$$\Delta_\text{EB}^{\text{W}} < 3 \times L_\text{hdr} + L_\text{vote} + L_\text{diff} + (\Delta_\text{RB} - \Delta_\text{applyTxs})$$
-
-The security argument can now be described. For simplicity, the analysis focuses
-on the case where a single RB (referencing an EB) is diffused, and nodes have
-already computed the ledger state that this RB extends.
-
-The argument proceeds as follows: (i) The certified EB that the RB references
-will be received within $\Delta_\text{RB} - \Delta_\text{applyTxs}$ from the
-initial diffusion time of the RB. This follows directly from
-[Constraint 2](#certified-eb-transmission-constraint) and the fact that the RB
-was generated at least $3 \times L_\text{hdr} + L_\text{vote} + L_\text{diff}$
-slots after the EB was generated. (ii) The RB will be processed within
-$\Delta_\text{RB}$ slots, due to the fact that it is received within
-$\Delta_\text{RB} - \Delta_\text{applyTxs}$ from its initial diffusion time, and
-processing in the worst-case takes
-$\Delta_\text{reapply} (< \Delta_\text{applyTxs})$ slots according to
-[Constraint 1](#eb-reapplication-constraint).
-
-Given that nodes are caught up when they are about to produce or process an RB,
-Praos safety and liveness is thus preserved.
 
 ### Node Behavior
 
@@ -1149,7 +1150,7 @@ _Remark_. In contrast, the EB certified by a RB that also includes some
 transactions is exactly as urgent as that RB, because the RB cannot be selected
 without the EB. The $L_\text{diff}$ parameter prevents such urgency inversion
 from occurring enough to matter, as explained in the
-[Security Argument](#security-argument) section, assuming nodes automatically
+[Security Argument](#protocol-security) section, assuming nodes automatically
 eventually recover when it does happen.
 
 In reality, the prioritization of Praos over Leios does not need to be perfectly
@@ -2208,7 +2209,7 @@ _Required TPS for Current Reward Maintenance:_ To maintain current reward levels
 <em>Table 10: Required TPS for Current Reward Maintenance</em>
 
 </div>
- 
+
 Note that by 2029, to compensate for Reserve depletion, the network would need
 to process approximately 36 TPS with average-sized transactions, requiring a
 transaction throughput of around 51 TxkB/s, roughly 20 times the current mainnet
@@ -2402,8 +2403,6 @@ The proposal will be considered active once the following criteria are met:
       [Cardano blueprint](https://cardano-scaling.github.io/cardano-blueprint/)
       including conformance tests.
 - [ ] Formal specification of the consensus and ledger changes is available.
-      (Note: [Leios formal specification][linear-leios-formal-spec] provides the
-      mathematical foundation)
 - [ ] ΔQSD model available for Leios parameter selection.
 - [ ] Community agreement on initial Leios protocol parameters.
 - [ ] A peer-reviewed implementation of a Leios-enabled node is available.
@@ -2424,8 +2423,8 @@ are:
 - [ ] Detailed node-level (as opposed to this protocol-level) technical
       specification.
 - [ ] Complete ΔQSD analysis of new/changed network interactions.
-- [ ] Complete formal protocol specification in Agda of ledger and consensus
-      changes.
+- [ ] [Complete formal protocol specification in Agda][linear-leios-formal-spec]
+      of ledger and consensus changes.
 - [ ] Create network prototypes and conduct large scale experiments.
   - Load tests in a controlled topology
   - Validate protocol parameters
@@ -2442,28 +2441,12 @@ are:
 
 ## Versioning
 
-> [!NOTE]
->
-> if Versioning is not addressed in Specification
->
-> CIPs must indicate how the defined Specification is versioned. **Note** this
-> does not apply to the CIP text, for which annotated change logs are
-> automatically generated and
-> [available through the GitHub UI](https://docs.github.com/en/pull-requests/committing-changes-to-your-project/viewing-and-comparing-commits/differences-between-commit-views)
-> as a history of CIP files and directories.
->
-> Authors are free to describe any approach to versioning that allows versioned
-> alterations to be added without author oversight. Stipulating that the
-> proposal must be superseded by another is also considered to be valid
-> versioning.
->
-> A single Versioning scheme can be placed either as a subsection of the
-> Specification section or in an optional Versioning top-level section near the
-> end. If the Specification contains multiple specification subsections, each of
-> these can have a Versioning subsection within it.
-
-Leios will be versioned via the major and minor version numbers of the Cardano
-protocol.
+Leios changes the consensus algorithm used to create a valid chain on Cardano
+and thus requires a new major protocol version. As the block format will change,
+a new ledger era is also required and
+[CIP-84](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0084)
+applies. A hard-fork event will enable Leios on the Cardano network and the
+usual mechanisms of governing a hard-fork will be employed.
 
 ## References
 
