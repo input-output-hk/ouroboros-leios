@@ -8,6 +8,42 @@ Completed the Ouroboros Leios CIP proposal.
 
 - **CIP**: [docs/cip/README.md](https://github.com/input-output-hk/ouroboros-leios/blob/d5f1a9bc940e69f406c3e25c0d7d9aa58cf701f8/docs/cip/README.md)
 
+### Additional inter-datacenter bandwidth measurements
+
+Because bandwidth between nodes has been identified as a critical resource that limits Leios throughput, we conducted an unscientific experiment, using `iperf3` for bidirectional measurements between locations in North America and Europe:
+
+| Client                   | Server             | Send Mbps | Receive Mbps |
+|:-------------------------|:-------------------|----------:|-------------:|
+| OVH Canada               | OVH Poland         |       219 |          217 |
+| OVH Canada               | OVH Oregon USA     |       363 |          360 |
+| OVH Oregon USA           | OVH Poland         |       142 |          144 |
+| CenturyLink Colorado USA | OVH Poland         |       147 |          145 |
+| CenturyLink Colorado USA | OVH Oregon USA     |       418 |          412 |
+| CenturyLink Colorado USA | OVH Canada         |        97 |           95 |
+| CenturyLink Colorado USA | OVH Virginia       |       311 |          309 |
+| CenturyLink Colorado USA | AWS Oregon USA     |       826 |          824 |
+| AWS Oregon USA           | OVH Oregon USA     |       973 |          972 |
+| AWS Oregon USA           | OVH Poland         |       141 |          138 |
+| AWS Oregon USA           | OVH Canada         |       329 |          327 |
+| OVH Virginia USA         | OVH Oregon USA     |       369 |          367 |
+| OVH Virginia USA         | OVH Poland         |       231 |          229 |
+| OVH Virginia USA         | OVH Canada         |       469 |          467 |
+| CenturyLink Colorado USA | OVH United Kingdom |       183 |          181 |
+| AWS Oregon USA           | OVH United Kingdom |       153 |          150 |
+| OVH Oregon USA           | OVH United Kingdom |       164 |          162 |
+| OVH Virginia USA         | OVH United Kingdom |       310 |          308 |
+| OVH Poland               | OVH United Kingdom |       355 |          352 |
+| OVH Canada               | OVH United Kingdom |       307 |          305 |
+| OVH France               | OVH United Kingdom |       373 |          371 |
+| CenturyLink Colorado USA | OVH United Kingdom |       166 |          163 |
+| AWS Oregon USA           | OVH France         |       138 |          136 |
+| OVH Oregon USA           | OVH France         |       182 |          179 |
+| OVH Virginia USA         | OVH France         |       290 |          288 |
+| OVH Poland               | OVH France         |       918 |          915 |
+| OVH Canada               | OVH France         |       304 |          301 |
+
+The OVH machines are inexpensive instances, the AWS is a `r5a.4xlarge`, and CenturyLink is a local ISP. Overall, it looks like 100 Mbps is a conservative lower bound.
+
 ## 2025-08-26
 
 ### Quantile regressions for ledger "apply" and "reapply" operations
