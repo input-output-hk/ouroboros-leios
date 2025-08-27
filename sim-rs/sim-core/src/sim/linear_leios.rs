@@ -554,7 +554,7 @@ impl LinearLeiosNode {
         let produce_empty_block = !self.leios.incomplete_onchain_ebs.is_empty();
 
         let mut rb_transactions = vec![];
-        if !produce_empty_block && self.sim_config.praos_fallback {
+        if !produce_empty_block && self.sim_config.praos_fallback && endorsement.is_none() {
             if let TransactionConfig::Mock(config) = &self.sim_config.transactions {
                 // Add one transaction, the right size for the extra RB payload
                 let tx = config.mock_tx(config.rb_size);
