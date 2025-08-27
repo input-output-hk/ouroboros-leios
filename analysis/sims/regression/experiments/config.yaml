@@ -4,8 +4,8 @@ cleanup-policies:
 - cleanup-expired-vote
 leios-variant: linear-with-tx-references
 linear-eb-propagation-criteria: eb-received
-linear-vote-stage-length-slots: 5
-linear-diffuse-stage-length-slots: 2
+linear-vote-stage-length-slots: 4
+linear-diffuse-stage-length-slots: 7
 praos-fallback-enabled: true
 leios-stage-active-voting-slots: 1
 leios-mempool-sampling-strategy: ordered-by-id
@@ -15,7 +15,7 @@ eb-diffusion-strategy: peer-order
 eb-referenced-txs-max-size-bytes: 12000000
 eb-size-bytes-constant: 240
 eb-size-bytes-per-ib: 32
-leios-header-diffusion-time-ms: 1500.0
+leios-header-diffusion-time-ms: 1000.0
 tx-start-time: 60
 tx-stop-time: 960
 tx-generation-distribution:
@@ -57,5 +57,5 @@ cert-generation-cpu-time-ms-constant: 92.5
 cert-generation-cpu-time-ms-per-node: 0
 cert-validation-cpu-time-ms-constant: 157.2
 cert-validation-cpu-time-ms-per-node: 0
-leios-stage-length-slots: 5
+leios-stage-length-slots: 4
 eb-body-avg-size-bytes: 12000000
