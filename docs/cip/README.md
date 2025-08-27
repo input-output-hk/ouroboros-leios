@@ -605,7 +605,8 @@ their headers and embedding EB certificates in their bodies.
 
 1. **Header additions**:
    - `announced_eb` (optional): Hash of the EB created by this block producer
-   - `announced_eb_size` (optional): Size in bytes of the announced EB's referenced transactions (4 bytes)
+   - `announced_eb_size` (optional): Size in bytes of the announced EB's
+     referenced transactions (4 bytes)
    - `certified_eb` (optional): Single bit indicating whether this RB certifies
      the EB announced by the previous RB (the EB hash is already available via
      the previous header's `announced_eb` field)
