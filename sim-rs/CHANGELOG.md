@@ -10,6 +10,7 @@
 	- Voting must finish by `3 * Delta_header + L_vote`
 	- EB cannot be referenced until after `3 * Delta_header + L_vote + L_diff`
 - Don't include transactions directly in an RB if it also includes an endorsement
+- Don't produce empty EBs
 
 ### Other
 

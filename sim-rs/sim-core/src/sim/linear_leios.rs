@@ -118,7 +118,7 @@ pub enum CpuTask {
     /// A transaction has been received and validated, and is ready to propagate
     TransactionValidated(NodeId, Arc<Transaction>),
     /// A ranking block has been generated and is ready to propagate
-    RBBlockGenerated(RankingBlock, EndorserBlock, Vec<Arc<Transaction>>),
+    RBBlockGenerated(RankingBlock, Option<(EndorserBlock, Vec<Arc<Transaction>>)>),
     /// An RB header has been received and validated, and ready to propagate
     RBHeaderValidated(NodeId, RankingBlockHeader, bool, bool),
     /// A ranking block has been received and validated, and is ready to propagate
@@ -137,7 +137,7 @@ impl SimCpuTask for CpuTask {
     fn name(&self) -> String {
         match self {
             Self::TransactionValidated(_, _) => "ValTX",
-            Self::RBBlockGenerated(_, _, _) => "GenRB",
+            Self::RBBlockGenerated(_, _) => "GenRB",
             Self::RBHeaderValidated(_, _, _, _) => "ValRH",
             Self::RBBlockValidated(_) => "ValRB",
             Self::EBHeaderValidated(_, _) => "ValEH",
@@ -151,7 +151,7 @@ impl SimCpuTask for CpuTask {
     fn extra(&self) -> String {
         match self {
             Self::TransactionValidated(_, _) => "".to_string(),
-            Self::RBBlockGenerated(_, _, _) => "".to_string(),
+            Self::RBBlockGenerated(_, _) => "".to_string(),
             Self::RBHeaderValidated(_, _, _, _) => "".to_string(),
             Self::RBBlockValidated(_) => "".to_string(),
             Self::EBHeaderValidated(_, _) => "".to_string(),
@@ -166,7 +166,7 @@ impl SimCpuTask for CpuTask {
             Self::TransactionValidated(_, tx) => vec![
                 config.tx_validation_constant + config.tx_validation_per_byte * tx.bytes as u32,
             ],
-            Self::RBBlockGenerated(rb, eb, _) => {
+            Self::RBBlockGenerated(rb, eb) => {
                 let mut rb_time = config.rb_generation + config.rb_body_validation_constant;
                 let rb_bytes: u64 = rb.transactions.iter().map(|tx| tx.bytes).sum();
                 rb_time += config.rb_validation_per_byte * (rb_bytes as u32);
@@ -175,12 +175,15 @@ impl SimCpuTask for CpuTask {
                     rb_time += config.cert_generation_constant
                         + (config.cert_generation_per_node * nodes as u32);
                 }
+                let mut times = vec![rb_time];
 
-                let mut eb_time = config.eb_generation + config.eb_body_validation_constant;
-                let eb_bytes: u64 = eb.txs.iter().map(|tx| tx.bytes).sum();
-                eb_time += config.eb_body_validation_per_byte * (eb_bytes as u32);
-
-                vec![rb_time, eb_time]
+                if let Some((eb, _)) = eb {
+                    let mut eb_time = config.eb_generation + config.eb_body_validation_constant;
+                    let eb_bytes: u64 = eb.txs.iter().map(|tx| tx.bytes).sum();
+                    eb_time += config.eb_body_validation_per_byte * (eb_bytes as u32);
+                    times.push(eb_time);
+                }
+                times
             }
             Self::RBHeaderValidated(_, _, _, _) => vec![config.rb_head_validation],
             Self::RBBlockValidated(rb) => {
@@ -399,9 +402,7 @@ impl NodeImpl for LinearLeiosNode {
     fn handle_cpu_task(&mut self, task: Self::Task) -> EventResult {
         match task {
             CpuTask::TransactionValidated(from, tx) => self.propagate_tx(from, tx),
-            CpuTask::RBBlockGenerated(rb, eb, withheld_txs) => {
-                self.finish_generating_rb(rb, eb, withheld_txs)
-            }
+            CpuTask::RBBlockGenerated(rb, eb) => self.finish_generating_rb(rb, eb),
             CpuTask::RBHeaderValidated(from, header, has_body, has_eb) => {
                 self.finish_validating_rb_header(from, header, has_body, has_eb)
             }
@@ -569,12 +570,6 @@ impl LinearLeiosNode {
             }
         }
 
-        let eb_id = EndorserBlockId {
-            slot,
-            pipeline: 0,
-            producer: self.id,
-        };
-
         let mut eb_transactions = vec![];
         let mut withheld_txs = vec![];
         if !produce_empty_block {
@@ -596,6 +591,22 @@ impl LinearLeiosNode {
                 self.sample_from_mempool(&mut eb_transactions, self.sim_config.max_eb_size, false);
             }
         }
+        let (eb_announcement, eb) = if eb_transactions.is_empty() {
+            (None, None)
+        } else {
+            let eb_id = EndorserBlockId {
+                slot,
+                pipeline: 0,
+                producer: self.id,
+            };
+            let eb = EndorserBlock {
+                slot,
+                producer: self.id,
+                bytes: self.sim_config.sizes.linear_eb(&eb_transactions),
+                txs: eb_transactions,
+            };
+            (Some(eb_id), Some((eb, withheld_txs)))
+        };
 
         let rb = RankingBlock {
             header: RankingBlockHeader {
@@ -606,32 +617,28 @@ impl LinearLeiosNode {
                 vrf,
                 parent,
                 bytes: self.sim_config.sizes.block_header,
-                eb_announcement: eb_id,
+                eb_announcement,
             },
             transactions: rb_transactions,
             endorsement,
         };
 
-        let eb = EndorserBlock {
-            slot,
-            producer: self.id,
-            bytes: self.sim_config.sizes.linear_eb(&eb_transactions),
-            txs: eb_transactions,
-        };
         self.tracker.track_praos_block_lottery_won(rb.header.id);
         self.queued
-            .schedule_cpu_task(CpuTask::RBBlockGenerated(rb, eb, withheld_txs));
+            .schedule_cpu_task(CpuTask::RBBlockGenerated(rb, eb));
     }
 
     fn finish_generating_rb(
         &mut self,
         rb: RankingBlock,
-        eb: EndorserBlock,
-        withheld_txs: Vec<Arc<Transaction>>,
+        eb: Option<(EndorserBlock, Vec<Arc<Transaction>>)>,
     ) {
-        self.tracker.track_linear_rb_generated(&rb, &eb);
+        self.tracker.track_linear_rb_generated(&rb);
         self.publish_rb(Arc::new(rb), false);
-        self.finish_generating_eb(eb, withheld_txs);
+        if let Some((eb, withheld_txs)) = eb {
+            self.tracker.track_linear_eb_generated(&eb);
+            self.finish_generating_eb(eb, withheld_txs);
+        }
     }
 
     fn publish_rb(&mut self, rb: Arc<RankingBlock>, already_sent_header: bool) {
@@ -658,9 +665,9 @@ impl LinearLeiosNode {
             .get(&rb.header.id)
             .and_then(|rb| rb.header_seen())
             .unwrap_or(self.clock.now());
-        self.leios
-            .ebs_by_rb
-            .insert(rb.header.id, rb.header.eb_announcement);
+        if let Some(eb_id) = rb.header.eb_announcement {
+            self.leios.ebs_by_rb.insert(rb.header.id, eb_id);
+        }
         self.praos
             .blocks
             .insert(rb.header.id, RankingBlockView::Received { rb, header_seen });
@@ -692,10 +699,12 @@ impl LinearLeiosNode {
             // If we already have the EB announced by this RB,
             // let the requester know that they can fetch it.
             // But if we are maliciously withholding the EB, do not let them know.
-            let have_eb = matches!(
-                self.leios.ebs.get(&header.eb_announcement),
-                Some(EndorserBlockView::Received { .. })
-            ) && !self.should_withhold_ebs();
+            let have_eb = header.eb_announcement.is_some_and(|eb_id| {
+                matches!(
+                    self.leios.ebs.get(&eb_id),
+                    Some(EndorserBlockView::Received { .. })
+                )
+            }) && !self.should_withhold_ebs();
             self.queued
                 .send_to(from, Message::RBHeader(header.clone(), have_body, have_eb));
         }
@@ -763,7 +772,9 @@ impl LinearLeiosNode {
         }
 
         // Get ready to fetch the announced EB (if we don't have it already)
-        let eb_id = header.eb_announcement;
+        let Some(eb_id) = header.eb_announcement else {
+            return;
+        };
         if matches!(
             self.leios.ebs.get(&eb_id),
             Some(EndorserBlockView::Received { .. })
@@ -1237,7 +1248,7 @@ impl LinearLeiosNode {
             // We only vote for whichever EB we was referenced by the head of the current chain.
             return Err(NoVoteReason::WrongEB);
         };
-        if rb.header.eb_announcement != eb.id() {
+        if rb.header.eb_announcement != Some(eb.id()) {
             // We only vote for whichever EB we was referenced by the head of the current chain.
             return Err(NoVoteReason::WrongEB);
         }

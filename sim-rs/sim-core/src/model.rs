@@ -90,7 +90,7 @@ pub struct LinearRankingBlockHeader {
     pub vrf: u64,
     pub parent: Option<BlockId>,
     pub bytes: u64,
-    pub eb_announcement: EndorserBlockId,
+    pub eb_announcement: Option<EndorserBlockId>,
 }
 
 #[derive(Clone, Debug)]
