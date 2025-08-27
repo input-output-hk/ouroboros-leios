@@ -1,7 +1,7 @@
 ---
 CIP: "?"
 Title: Ouroboros Leios - Greater transaction throughput
-Status: Active
+Status: Proposed
 Category: Consensus
 Authors:
   - William Wolff <william.wolff@iohk.io>
