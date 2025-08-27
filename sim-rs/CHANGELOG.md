@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.3.0
+
+### Linear Leios
+
+- Respect timings according to the latest CIP draft:
+	- RB headers must be received within `Delta_header`
+	- Voting must wait until `3 * Delta_header`
+	- Voting must finish by `3 * Delta_header + L_vote`
+	- EB cannot be referenced until after `3 * Delta_header + L_vote + L_diff`
+- Don't include transactions directly in an RB if it also includes an endorsement
+- Don't produce empty EBs
+
+### Other
+
+- Fix linter warnings from newer rust version
+
 ## v1.2.0
 
 ### All Leios variants

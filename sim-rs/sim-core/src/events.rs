@@ -8,9 +8,8 @@ use crate::{
     clock::{Clock, Timestamp},
     config::{NodeConfiguration, NodeId},
     model::{
-        Block, BlockId, CpuTaskId, EndorserBlockId, InputBlockId, LinearEndorserBlock,
-        LinearRankingBlock, NoVoteReason, Transaction, TransactionId, TransactionLostReason,
-        VoteBundle, VoteBundleId,
+        Block, BlockId, CpuTaskId, EndorserBlockId, InputBlockId, LinearRankingBlock, NoVoteReason,
+        Transaction, TransactionId, TransactionLostReason, VoteBundle, VoteBundleId,
     },
 };
 
@@ -44,7 +43,7 @@ impl Eq for Node {}
 
 impl PartialOrd for Node {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.id.cmp(&other.id))
+        Some(self.cmp(other))
     }
 }
 
@@ -407,7 +406,7 @@ impl EventTracker {
         });
     }
 
-    pub fn track_linear_rb_generated(&self, rb: &LinearRankingBlock, eb: &LinearEndorserBlock) {
+    pub fn track_linear_rb_generated(&self, rb: &LinearRankingBlock) {
         self.send(Event::RBGenerated {
             id: self.to_block(rb.header.id),
             slot: rb.header.id.slot,
@@ -430,17 +429,6 @@ impl EventTracker {
                     .collect(),
             }),
             transactions: rb.transactions.iter().map(|tx| tx.id).collect(),
-        });
-        self.send(Event::EBGenerated {
-            id: self.to_endorser_block(eb.id()),
-            slot: eb.slot,
-            pipeline: 0,
-            producer: self.to_node(eb.producer),
-            shard: 0,
-            size_bytes: eb.bytes,
-            transactions: eb.txs.iter().map(|tx| BlockRef { id: tx.id }).collect(),
-            input_blocks: vec![],
-            endorser_blocks: vec![],
         });
     }
 
@@ -646,6 +634,20 @@ impl EventTracker {
                     id: self.to_endorser_block(*id),
                 })
                 .collect(),
+        });
+    }
+
+    pub fn track_linear_eb_generated(&self, block: &crate::model::LinearEndorserBlock) {
+        self.send(Event::EBGenerated {
+            id: self.to_endorser_block(block.id()),
+            slot: block.slot,
+            pipeline: 0,
+            producer: self.to_node(block.producer),
+            shard: 0,
+            size_bytes: block.bytes,
+            transactions: block.txs.iter().map(|tx| BlockRef { id: tx.id }).collect(),
+            input_blocks: vec![],
+            endorser_blocks: vec![],
         });
     }
 

@@ -7,7 +7,7 @@ The log file schema is currently identical to every other variant (though `pipel
 
 ## Description
 
-Whenever a node creates an RB, it also creates an EB. The RB header contains a reference to this new EB. If the RB producer has a certificate for the parent RB’s EB, it will include that certificate in the RB body.
+Whenever a node creates an RB, it also has an opportunity to create an EB (though it will not produce empty EBs). The RB header contains a reference to this new EB. If the RB producer has a certificate for the parent RB’s EB, and at least `3 * Δhdr + L_vote + L_diff` has passed since that RB was created, it will include that certificate in the RB body.
 
 RB headers are diffused separately from bodies. When a node receives an RB header, it checks whether that RB should be the new head of its chain. If so, it will request the RB body and the referenced EB (from the first peer which announces them).
 
@@ -36,17 +36,17 @@ A node will wait at least `3 * Δhdr` after an EB was created before voting for 
 For a node to vote for an EB, all of the following must be true.
 - The RB which announced that EB is currently the head of that node's chain.
 - The node received the relevant RB header at most `Δhdr` after it was created.
-- The node received the EB body itself at most `L_vote` after it was created.
+- The node finished validating the EB body itself at most `3 * Δhdr` + `L_vote` after it was created.
 
 ## Mempool behavior
 
 When a node creates an RB, it will follow these steps in order:
 1. Try to produce a cert for the parent RB's EB.
     1. If this succeeds, remove all of this EB's transactions from its mempool.
-2. Create an empty RB and empty EB.
+2. Create an empty RB.
 3. If we have received and fully validated the RB, along with all referenced transactions,
     1. Fill the RB body with transactions from our mempool
-    2. Fill the EB with transactions from our mempool WITHOUT removing those transactions from the mempool.
+    2. Build an EB with transactions from our mempool WITHOUT removing those transactions from the mempool.
 
 When a node receives an RB body, it immediately removes all referenced/conflicting transactions from its mempool. If the RB has an EB certificate, it also removes that EB’s transactions from its mempool. If the certified EB arrives after the RB body, we remove its TXs from the mempool once it arrives.
 
