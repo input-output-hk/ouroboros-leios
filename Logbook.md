@@ -1,5 +1,13 @@
 # Leios logbook
 
+## 2025-08-27
+
+### CIP draft completion
+
+Completed the Ouroboros Leios CIP proposal.
+
+- **CIP**: [docs/cip/README.md](https://github.com/input-output-hk/ouroboros-leios/blob/d5f1a9bc940e69f406c3e25c0d7d9aa58cf701f8/docs/cip/README.md)
+
 ## 2025-08-26
 
 ### Quantile regressions for ledger "apply" and "reapply" operations
