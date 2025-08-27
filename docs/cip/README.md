@@ -88,6 +88,8 @@ elements.
   - [Trade-offs \& Limitations](#trade-offs--limitations)
   - [Alternatives \& Extensions](#alternatives--extensions)
 - [Path to active](#path-to-active)
+  - [Acceptance criteria](#acceptance-criteria)
+  - [Implementation plan](#implementation-plan)
 - [Versioning](#versioning)
 - [References](#references)
 - [Appendix](#appendix)
