@@ -2389,14 +2389,7 @@ incentives and conflict resolution trade-offs.
 
 ## Path to active
 
-> [!NOTE]
->
-> Organised in two sub-sections:
-
-- [ ] Clear evidence of stakeholder use cases that require the high transaction
-      throughput that Leios provides.
-
-**Acceptance criteria**
+### Acceptance criteria
 
 The proposal will be considered active once the following criteria are met:
 
@@ -2417,7 +2410,7 @@ The proposal will be considered active once the following criteria are met:
 - [ ] Key infrastructure signalled readiness for Leios-enhanced throughput.
 - [ ] Hard-fork enabling Leios is successfully executed on mainnet.
 
-**Implementation plan**
+### Implementation plan
 
 Key steps on the roadmap to realize Leios, somewhat ordered but not sequential,
 are:
