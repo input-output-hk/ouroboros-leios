@@ -974,13 +974,13 @@ Potential next steps:
 
 ### Performance analysis of sharding
 
-The Jupyter notebook [analysis/shard-performance.ipynb](../analysis/shard-performance.ipynb) presents computations that elucidate the relation between the fraction of shards without an IB vs the expected number of extra IBs for the shard, for the simplest sharding scheme.
+The Jupyter notebook [../analysis/shard-performance.ipynb](../analysis/shard-performance.ipynb) presents computations that elucidate the relation between the fraction of shards without an IB vs the expected number of extra IBs for the shard, for the simplest sharding scheme.
 
 ![Performance analysis of simple sharding](app://332d877b12d0e40980939095f3b3843a7b85/extra/iohk/ouroboros-leios/analysis/shard-performance.svg?1744809022043)
 
 ## Miscellaneous observations
 
-### Observations on conflicts, ledger, and incentives
+### Conflicts, ledger, and incentives
 
 Here are a few observations, reflections, and conclusions on transaction conflicts, ledger design, memory pool, and fees/incentives.
 
@@ -1006,9 +1006,39 @@ Here are a few observations, reflections, and conclusions on transaction conflic
 5. It appears that front running can best be eliminated (at the ledger level, but not at the mempool level) by strictly ordering transactions by their IB's slot and VRF.
     - Other IB and EB ordering proposals create complexity in the ledger rules and would be difficult to fully analyze for vulnerabilities.
 
-### Catalog of conformance tests
+### Catalog of possible conformance tests
 
-The [Potential Conformance Tests](../leios-trace-verifier/conformance-coverage.md) have been cataloged in order to assess how much positive and negative test coverage is possible for traces from the Leios simulator and (eventually) from the Leios node. This table provides guidance on property-based and other tests that will be added to the test suite.
+The table below catalogs conformance tests in order to assess how much positive and negative test coverage is possible for traces from the Leios simulator and (eventually) from the Leios node.
+
+| Test                                                                                         | Currently<br/>in Agda spec | Potentially<br/>in Agda spec |
+| -------------------------------------------------------------------------------------------- | :------------------------: | :--------------------------: |
+| Node either produces an IB or declares not                                                   |             ✔              |                              |
+| Node either produces and EB or declares not                                                  |             ✔              |                              |
+| Node either votes or declares not                                                            |             ✔              |                              |
+| Node produces IB iff sortition requires                                                      |             ✘              |              ✔               |
+| Node produces EB iff sortition requires                                                      |             ✘              |              ✔               |
+| Node produces a maximum of one IB per slot                                                   |           **?**            |                              |
+| Node produces a maximum of one EB per stage                                                  |           **?**            |                              |
+| Node produces a maximum of one vote per stage                                                |           **?**            |                              |
+| Node votes iff sortition requires                                                            |             ✘              |              ✔               |
+| Node votes on EB iff it is in the same pipeline as the voting                                |           **?**            |                              |
+| Node diffuses non-expired IBs iff not equivocated twice or more                              |           **?**            |                              |
+| Node diffuses non-expired EBs iff not equivocated twice or more                              |           **?**            |                              |
+| Node does not diffuse expired IBs                                                            |           **?**            |                              |
+| Node does not reference expired IBs in EBs                                                   |           **?**            |                              |
+| Node does not diffuse expired EBs                                                            |           **?**            |                              |
+| Node does not reference expired EBs in EBs                                                   |           **?**            |                              |
+| Node does not reference expired EBs in RB certificates                                       |           **?**            |                              |
+| Nodes does not reference an IB by a new EB if the IB is known to be referenced by another EB |           **?**            |                              |
+| Node's produced EB references the most recent RB known to it                                 |           **?**            |                              |
+| Node's produced EB includes IBs from current pipeline iff the IB has arrived in time         |           **?**            |                              |
+| Node's produced EB includes IBs from prior pipelines iff the IBs are eligible                |           **?**            |                              |
+| Node certifies EB and includes it in RB iff there is a quorum of votes                       |           **?**            |                              |
+| Node diffuses IBs in freshest-first order                                                    |           **?**            |                              |
+| Node diffuses EBs in freshest-first order                                                    |           **?**            |                              |
+| Node diffuses votes in freshest-first order                                                  |           **?**            |                              |
+| Node includes txs in IB iff the IB has the correct shard                                     |             ✘              |                              |
+| Node does not include txs in IB if it has seen a conflicting tx in an IB                     |             ✘              |                              |
 
 ---
 
