@@ -589,6 +589,45 @@ The security-related impacts of adversarial behavior upon Leios fall into three 
 2. Perform simulation experiments to measure the resource and voting impact of equivocated IBs, EBs, and votes.
 3. Analytically compute probabilities of conflict attacks succeeding, as a function of adversarial stake, and compare to simulation results.
 
+## Empirical data
+
+### Inter-datacenter bandwidth measurements
+
+Because bandwidth between nodes has been identified as a critical resource that limits Leios throughput, we conducted an unscientific experiment, using `iperf3` for bidirectional measurements between locations in North America and Europe:
+
+|Client|Server|Send Mbps|Receive Mbps|
+|:--|:--|--:|--:|
+|AWS Oregon USA|OVH Canada|329|327|
+|AWS Oregon USA|OVH France|138|136|
+|AWS Oregon USA|OVH Oregon USA|973|972|
+|AWS Oregon USA|OVH Poland|141|138|
+|AWS Oregon USA|OVH United Kingdom|153|150|
+|CenturyLink Colorado USA|AWS Oregon USA|826|824|
+|CenturyLink Colorado USA|OVH Canada|97|95|
+|CenturyLink Colorado USA|OVH Oregon USA|418|412|
+|CenturyLink Colorado USA|OVH Poland|147|145|
+|CenturyLink Colorado USA|OVH United Kingdom|166|163|
+|CenturyLink Colorado USA|OVH United Kingdom|183|181|
+|CenturyLink Colorado USA|OVH Virginia|311|309|
+|OVH Canada|OVH France|304|301|
+|OVH Canada|OVH Oregon USA|363|360|
+|OVH Canada|OVH Poland|219|217|
+|OVH Canada|OVH United Kingdom|307|305|
+|OVH France|OVH United Kingdom|373|371|
+|OVH Oregon USA|OVH France|182|179|
+|OVH Oregon USA|OVH Poland|142|144|
+|OVH Oregon USA|OVH United Kingdom|164|162|
+|OVH Poland|OVH France|918|915|
+|OVH Poland|OVH United Kingdom|355|352|
+|OVH Virginia USA|OVH Canada|469|467|
+|OVH Virginia USA|OVH France|290|288|
+|OVH Virginia USA|OVH Oregon USA|369|367|
+|OVH Virginia USA|OVH Poland|231|229|
+|OVH Virginia USA|OVH United Kingdom|310|308|
+
+The OVH machines are inexpensive instances, the AWS is a `r5a.4xlarge`, and CenturyLink is a local ISP. Overall, it looks like 100 Mbps is a conservative lower bound for use in Leios network simulations.
+
+---
 ## Footnotes
 
 [^network-spec]: <https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf#chapter.3>
