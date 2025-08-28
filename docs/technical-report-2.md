@@ -901,9 +901,9 @@ The Linear Leios variant's formulation is straightforward enough that its probab
 
 The plots below show the _throughput_ (defined as the size of the RBs and of the RB-certified EBs) relative to Praos (left) and the _throughput efficiency_ (defined as the size of the RBs and of the RB-certified EBs, divided by the size of all RBs and of all EBs). Recall that not all EBs have their certificates appear in Praos blocks. Any inefficiency affects throughput and network costs but not permanent-storage costs. These results show that Linear Leios could achieve approximately 500 times the throughput of Praos at an over 50% efficiency in use of network resources. (That 500 times the throughput of Praos would exceed 1000 historically typical transactions per second.)
 
-|Throughput|Throughput efficiency|
-|---|---|
-|![Throughput of Linear Leios](app://332d877b12d0e40980939095f3b3843a7b85/extra/iohk/ouroboros-leios/analysis/linear-leios-throughput.svg?1756213796649)|![Throughput efficiency of Linear Leios](app://332d877b12d0e40980939095f3b3843a7b85/extra/iohk/ouroboros-leios/analysis/linear-leios-efficiency.svg?1756213796648)|
+|                                                                               |                                                                                          |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| ![Throughput of Linear Leios](technical-report-2/linear-leios-throughput.svg) | ![Throughput efficiency of Linear Leios](technical-report-2/linear-leios-efficiency.svg) |
 
 ### Analysis of an overcollateralization scheme
 
