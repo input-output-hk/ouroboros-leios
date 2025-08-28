@@ -18,7 +18,7 @@ TX_SIZE=1500
 LABEL=$(basename "$PWD")
 PROPAGATION=eb-received
 STAGE_LENGTH_DIFF=7
-STAGE_LENGTH_VOTE=7
+STAGE_LENGTH_VOTE=4
 PLUTUS=$(echo -n "$LABEL" | sed -e 's/^\(.*\),\(.*\)/\1/')
 THROUGHPUT=$(echo -n "$LABEL" | sed -e 's/^\(.*\),\(.*\)/\2/')
 TX_SPACING_HONEST=$(echo "scale=3; $TX_SIZE / $THROUGHPUT / 1000" | bc)
