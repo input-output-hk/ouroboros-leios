@@ -750,10 +750,10 @@ The Jupyter notebook [analysis/delta-header/analysis.ipynb](../analysis/delta-h
 | 80%      |                         508 |
 | 85%      |                         561 |
 | 90%      |                         675 |
-| 95%      |                        1169 |
-| 99%      |                        3108 |
-| 99.5%    |                        3643 |
-| 99.9%    |                       13970 |
+| 95%      |                       1 169 |
+| 99%      |                       3 108 |
+| 99.5%    |                       3 643 |
+| 99.9%    |                      13 970 |
 
 |                                                                                |                                                                                             |
 | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
@@ -771,8 +771,128 @@ Findings:
 5. The noise in the data and the uncertainty in predictions make the above values unsuitable for estimating individual transactions but suitable for bulk estimates of many blocks.
 6. A more sophisticated double general linear model could be used to generate artificial transaction workloads.
 
-See [the Jupyter notebook](../analysis/timings/preliminary.ipynb) for evidence and details.
+| Metric          | Median CPU [ms/tx] | Median CPU [ms/kB] |
+| --------------- | -----------------: | -----------------: |
+| Apply           |         0.51383333 |          0.2525710 |
+| Reapply         |         0.06753333 |          0.0376423 |
+| Apply - Reapply |         0.42842308 |          0.2115483 |
 
+|                                                                                                       |                                                                                                |
+| ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| ![CPU time per transaction using `db-analyser` on Cardano mainnet](technical-report-2/cpu-per-tx.png) | ![CPU time per byte using `db-analyser` on Cardano mainnet](technical-report-2/cpu-per-kb.png) |
+
+Below are listed the linear models suggested for use in the Leios simulators. Note that some of these fits are inadequate due to the highly noisy raw data from `db-analyser`. See [the Jupyter notebook](../analysis/timings/preliminary.ipynb) for details.
+
+#### Linear model for `Apply` operation
+
+##### Without explicitly accounting for Plutus
+
+```console
+lm(formula = `Apply CPU [ms]`/`Tx count` ~ 1, data = timings[`Tx count` > 0 & `Apply CPU [ms]` <= timeLimit])
+
+Residuals:
+   Min     1Q Median     3Q    Max 
+-0.539 -0.240 -0.101  0.114 31.807 
+
+Coefficients:
+            Estimate Std. Error t value Pr(>|t|)    
+(Intercept) 0.620105   0.000201    3084   <2e-16 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.4189 on 4342018 degrees of freedom
+```
+
+##### Explicitly accounting for Plutus
+
+```console
+lm(formula = `Apply CPU [ms]` ~ 0 + `Tx count` + `Tx exec [step]`, data = timings[`Tx count` > 0 & `Apply CPU [ms]` <= timeLimit])
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-54.793  -0.366   0.428   1.682  31.886 
+
+Coefficients:
+                  Estimate Std. Error t value Pr(>|t|)    
+`Tx count`       2.624e-01  1.318e-04    1991   <2e-16 ***
+`Tx exec [step]` 9.487e-10  5.400e-13    1757   <2e-16 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 3.003 on 4342017 degrees of freedom
+Multiple R-squared:  0.9077,	Adjusted R-squared:  0.9077 
+F-statistic: 2.136e+07 on 2 and 4342017 DF,  p-value: < 2.2e-16
+```
+
+#### Linear model for `Reapply` operation
+
+> [!WARNING]
+> 
+> The linear models below have poor predictive power, but they may be adequate when used in the aggregate for many blocks or transactions. In spite of this, they are consistent with the 50th percentile of the quantile regressions discussed at the end of this section.
+
+##### Without explicitly accounting for Plutus
+
+```console
+lm(formula = `Reapply CPU [ms]` ~ `Tx size [kB]`, data = timings[`Tx count` > 0 & `Apply CPU [ms]` <= timeLimit])
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+  -2.00   -0.31   -0.13    0.10 1505.28 
+
+Coefficients:
+                Estimate Std. Error t value Pr(>|t|)    
+(Intercept)    3.539e-01  3.181e-03   111.2   <2e-16 ***
+`Tx size [kB]` 2.151e-02  7.451e-05   288.7   <2e-16 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 4.449 on 4342017 degrees of freedom
+Multiple R-squared:  0.01883,	Adjusted R-squared:  0.01883 
+F-statistic: 8.335e+04 on 1 and 4342017 DF,  p-value: < 2.2e-16
+```
+
+##### Explicitly accounting for Plutus
+
+```console
+lm(formula = `Reapply CPU [ms]` ~ `Tx size [kB]` + `Tx exec [step]`, data = timings[`Tx count` > 0 & `Apply CPU [ms]` <= timeLimit])
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+  -2.03   -0.30   -0.12    0.10 1505.17 
+
+Coefficients:
+                  Estimate Std. Error t value Pr(>|t|)    
+(Intercept)      3.478e-01  3.195e-03  108.87   <2e-16 ***
+`Tx size [kB]`   1.943e-02  1.256e-04  154.71   <2e-16 ***
+`Tx exec [step]` 2.127e-11  1.033e-12   20.59   <2e-16 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 4.449 on 4342016 degrees of freedom
+Multiple R-squared:  0.01893,	Adjusted R-squared:  0.01893 
+F-statistic: 4.189e+04 on 2 and 4342016 DF,  p-value: < 2.2e-16
+```
+
+#### Quantile regressions
+
+Because of the noisy `db-analyser` data, quantile regressions may be more reliable than linear models. Note that these are block-level regressions and that the models are formulated to be suitable for input into the Rust and Haskell simulators for Leios.
+
+| Dependent variable | Quantile |  Intercept | Coefficient of transaction count | Coefficient of block size | Coefficient of Plutus steps |
+| ------------------ | -------: | ---------: | -------------------------------: | ------------------------: | --------------------------: |
+| `Apply`            |   50%ile |        n/a |                    0.24251 ms/tx |                       n/a |            1.12254 ms/Gstep |
+|                    |   95%ile |        n/a |                    0.37999 ms/tx |                       n/a |            2.11951 ms/Gstep |
+|                    |   99%ile |        n/a |                    0.51931 ms/tx |                       n/a |            2.82245 ms/Gstep |
+| `Reapply`          |   50%ile | 0.29582 ms |                              n/a |             0.01523 ms/kB |            0.03342 ms/Gstep |
+|                    |   95%ile | 1.07420 ms |                              n/a |             0.03114 ms/kB |            0.06664 ms/Gstep |
+|                    |   99%ile | 1.40127 ms |                              n/a |             0.05503 ms/kB |            0.00512 ms/Gstep |
+
+The aforementioned Jupyter notebook details these. For illustrative purposes, example predictions are given below.
+
+| Tx count | Tx size [kB] | Tx exec [Gstep] | 50%ile of `Apply` [ms] | 95%ile of `Apply` [ms] | 99%ile of `Apply` [ms] | 50%ile of `Reapply` [ms] | 95%ile of `Reapply` [ms] | 99%ile of `Reapply` [ms] |
+| -------: | -----------: | --------------: | ---------------------: | ---------------------: | ---------------------: | -----------------------: | -----------------------: | -----------------------: |
+|     8000 |        12000 |               0 |               1940.058 |               3039.944 |               4154.505 |                 183.0863 |                 374.7629 |                 661.7723 |
+|     8000 |        12000 |              20 |               1962.509 |               3082.334 |               4210.954 |                 183.7547 |                 376.0958 |                 661.8747 |
+|     8000 |        12000 |            2000 |               4185.128 |               7278.955 |               9799.408 |                 249.9268 |                 508.0527 |                 672.0193 |
 ## Analytic studies
 
 ### Throughput efficiency of Linear Leios
