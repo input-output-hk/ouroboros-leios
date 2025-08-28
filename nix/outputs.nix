@@ -3,8 +3,8 @@
 let
 
   project = repoRoot.nix.project;
-  agda = import ./agda.nix {inherit pkgs lib inputs;};
-  artifacts = import ./artifacts.nix {inherit pkgs;};
+  agda = import ./agda.nix { inherit pkgs lib inputs; };
+  artifacts = import ./artifacts.nix { inherit pkgs; };
 
 in
 
@@ -12,5 +12,12 @@ in
   (project.flake)
   {
     packages = agda // artifacts;
+
+    devShells.docs = pkgs.mkShell {
+      packages = [
+        # To format *.md files
+        pkgs.nodePackages.prettier
+      ];
+    };
   }
 ]
