@@ -733,6 +733,12 @@ Because bandwidth between nodes has been identified as a critical resource that 
 
 The OVH machines are inexpensive instances, the AWS is a `r5a.4xlarge`, and CenturyLink is a local ISP. Overall, it looks like 100 Mbps is a conservative lower bound for use in Leios network simulations.
 
+### Internet latencies
+
+In support of building a more realistic topology and latency graph for the pseudo-mainnet simulations, we have processed 2.6 billion `ping` measurements from the [RIPE Atlas](https://www.ripe.net/analyse/internet-measurements/ripe-atlas/). When combined with Cardano mainnet node-location telemetry, this can be used to have realistic network delays in the simulation network topology.
+
+![ASN to ASN RTT statistics](technical-report-2/asn-to-asn.svg)
+
 ### Analysis of diffusion of empty blocks on Cardano mainnet
 
 The Jupyter notebook [analysis/delta-header/analysis.ipynb](../analysis/delta-header/analysis.ipynb) analyzes diffusion data obtained from [https://pooltool.io/](https://pooltool.io/) for empty blocks in each epoch of Cardano mainnet. This data is used to inform estimates of the value of  required by the Leios protocol. Based on this data, 94.0% of empty Praos blocks arrive at nodes in less than one second after the start of the block's slot.
@@ -753,55 +759,19 @@ The Jupyter notebook [analysis/delta-header/analysis.ipynb](../analysis/delta-h
 | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
 | ![Histogram of block arrival times](technical-report-2/empty-rb-histogram.svg) | ![Diffusion of empty Praos blocks on Cardano mainnet](technical-report-2/empty-rb-ecdf.svg) |
 
-### Additional regressions on mainnet validation data
+### Analysis of block and transaction validation times
 
-The Jupyter notebook [analysis/timings/ReadMe.ipynb](../analysis/timings/ReadMe.ipynb) has been augmented to include linear statistical models aimed at predicting the `Apply` and `Reapply` phases of the ledger update. These regressions are being used in the studies of Leios performance in the CIP, especially where higher Plutus limits are considered.
-
-### Revised analysis of block and transaction validation times
-
-We completed the basic analysis of block and transaction validation times for Cardano `mainnet` since Epoch 350. Results differ significantly from the preliminary results because it was discovered that `db-analyser` output is not reliable when it is run on a machine that has other CPU load: the new analysis is based on a clean dataset that was run on an otherwise idle machine.
-
-Findings:
-
-1. The `db-analyser` tool can be used to measure the Cardno block-application time, either including or not including verifying transaction signatures and running Plutus scripts.
-2. Ideally, `db-analyser` could be modified to report CPU times for phase 1 and phase 2 validation on a per-transaction basis.
-3. The output of this tool is quite noisy and does not include enough of the explanatory variable for predicting CPU times for transactions or blocks.
-4. The missing explanatory variables (size of UTxO set, number of inputs, number of outputs, etc.) can be extracted from the ledger or `cardano-db-sync`.
-5. For transaction signature verification and Plutus script execution, the median times for blocks are . . .
-    - 428.4 μs/tx
-    - 211.5 μs/kB
-    - Jointly via a linear model, 148.1 μs/tx plus 114.1 μs/kB.
-    - Jointly via a linear model, 137.5 μs/tx plus 60.2 μs/kB plus 585.2 μs/Gstep, with a Lapace-distributed error having location 0 μs and scale 1250 μs.
-6. The results above are not very good fits and are quite sensitive to the cutoff for discarding outliers.
-7. The noise in the data and the uncertainty in predictions make the above values unsuitable for estimating individual transactions but suitable for bulk estimates of many blocks.
-8. A more sophisticated double general linear model could be used to generate artificial transaction workloads.
-9. The CPU-timing parameters in the default configuration for Leios simulations could be reduced based on this work.
-
-See [the Jupyter notebook](../analysis/timings/ReadMe.ipynb) for evidence and details.
-
-### Preliminary analysis of block and transaction validation times
-
-We undertook basic preliminary analysis of block and transaction validation times for Cardano `mainnet` since Epoch 350.
+We undertook basic analysis of block and transaction validation times for Cardano `mainnet` since Epoch 350.
 
 Findings:
 
 1. The `db-analyser` tool can be used to measure the Cardno block-application time, either including or not including verifying transaction signatures and running Plutus scripts.
 2. The output of this tool is quite noisy and does not include enough of the explanatory variable for predicting CPU times for transactions or blocks.
 3. The missing explanatory variables (size of UTxO set, number of inputs, number of outputs, etc.) can be extracted from the ledger or `cardano-db-sync`.
-4. For transaction signature verification and Plutus script execution, the median times are . . .
-    - 0.53 ms/tx
-    - 0.29 ms/kB
-    - Jointly via a linear model, 0.066 ms/tx plus 0.221 ms/kB.
 5. The noise in the data and the uncertainty in predictions make the above values unsuitable for estimating individual transactions but suitable for bulk estimates of many blocks.
 6. A more sophisticated double general linear model could be used to generate artificial transaction workloads.
 
 See [the Jupyter notebook](../analysis/timings/preliminary.ipynb) for evidence and details.
-
-### Internet latencies
-
-In support of building a more realistic topology and latency graph for the pseudo-mainnet simulations, we have processed 2.6 billion `ping` measurements from the [RIPE Atlas](https://www.ripe.net/analyse/internet-measurements/ripe-atlas/). When combined with Cardano mainnet node-location telemetry, this can be used to have realistic network delays in the simulation network topology.
-
-![ASN to ASN RTT statistics](app://332d877b12d0e40980939095f3b3843a7b85/extra/iohk/ouroboros-leios/data/internet/asn-to-asn.svg?1747778045513)
 
 ## Analytic studies
 
