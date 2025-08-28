@@ -78,7 +78,6 @@ impl MockClockCoordinator {
         );
 
         self.time.store(until, std::sync::atomic::Ordering::Release);
-        let mut something_happened = false;
         self.waiters = std::mem::take(&mut self.waiters)
             .into_iter()
             .filter_map(|(actor, waiter)| {
@@ -88,14 +87,12 @@ impl MockClockCoordinator {
                     }
                     if *t == until {
                         let _ = waiter.done.send(());
-                        something_happened = true;
                         return None;
                     }
                 }
                 Some((actor, waiter))
             })
             .collect();
-        assert!(something_happened, "no actors were waiting for {until:?}");
     }
 }
 

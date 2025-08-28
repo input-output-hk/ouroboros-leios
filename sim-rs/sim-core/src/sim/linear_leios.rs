@@ -32,7 +32,7 @@ use crate::{
     },
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Message {
     // TX propagation
     AnnounceTx(TransactionId),
@@ -114,6 +114,7 @@ impl SimMessage for Message {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CpuTask {
     /// A transaction has been received and validated, and is ready to propagate
     TransactionValidated(NodeId, Arc<Transaction>),

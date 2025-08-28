@@ -28,6 +28,8 @@ mod linear_leios;
 mod lottery;
 mod slot;
 mod stracciatella;
+#[cfg(test)]
+mod tests;
 mod tx;
 
 enum NetworkWrapper {
@@ -304,6 +306,13 @@ impl<N: NodeImpl> Default for EventResult<N> {
 }
 
 impl<N: NodeImpl> EventResult<N> {
+    #[cfg(test)]
+    pub fn merge(&mut self, mut other: EventResult<N>) {
+        self.messages.append(&mut other.messages);
+        self.tasks.append(&mut other.tasks);
+        self.timed_events.append(&mut other.timed_events);
+    }
+
     pub fn send_to(&mut self, to: NodeId, msg: N::Message) {
         self.messages.push((to, msg));
     }

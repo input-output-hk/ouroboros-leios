@@ -21,4 +21,5 @@ tokio-util = "0.7"
 tracing = "0.1"
 
 [dev-dependencies]
+serde_yaml = "0.9"
 tokio = { version = "1", features = ["macros", "rt"] }
