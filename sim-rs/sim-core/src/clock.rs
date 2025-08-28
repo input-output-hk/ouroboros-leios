@@ -10,11 +10,13 @@ use std::{
 pub use coordinator::ClockCoordinator;
 use coordinator::ClockEvent;
 use futures::FutureExt;
+pub use mock::MockClockCoordinator;
 use timestamp::AtomicTimestamp;
 pub use timestamp::Timestamp;
 use tokio::sync::{mpsc, oneshot};
 
 mod coordinator;
+mod mock;
 mod timestamp;
 
 // wrapper struct which holds a SimulationEvent,
