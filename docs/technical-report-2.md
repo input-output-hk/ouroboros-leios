@@ -13,14 +13,14 @@ Ouroboros Leios introduces new types of blocks with novel diffusion patterns and
 
 ### Mini protocols
 
-For background information on mini protocols see sections 3.1-3.4 of the *Ouroboros Network Specification*[^3], and rest of that chapter for the mini protocols already in use. Here we will present the additional node-to-node mini protocols needed for Leios.
+For background information on mini protocols see sections 3.1-3.4 of the *Ouroboros Network Specification*[^network-spec], and rest of that chapter for the mini protocols already in use. Here we will present the additional node-to-node mini protocols needed for Leios.
 
 > [!NOTE]
 > Perhaps this mini-protocol section should be moved into the CIP?
 
 #### `Relay` mini-protocol
 
-The `Relay` protocol presented here is a generalization of the tx submission protocol used to transfer transactions between full nodes. We will use the term *datum* as a generic term for the payloads being diffused, which we expect to be generally small: transactions, input block headers, endorse block headers[^4], vote bundles for a single pipeline and voter.
+The `Relay` protocol presented here is a generalization of the tx submission protocol used to transfer transactions between full nodes. We will use the term *datum* as a generic term for the payloads being diffused, which we expect to be generally small: transactions, input block headers, endorse block headers[^network-split], vote bundles for a single pipeline and voter.
 
 The protocol follows a pull-based strategy where the consumer asks for new ids/datums and the producer sends them back. It is designed to be suitable for a trustless setting where both sides need to guard against resource consumption attacks from the other side.
 
@@ -38,7 +38,7 @@ A instance is specified by these options and parameters.
 
 ##### Instances
 
-`Relay` protocol instances are listed in the table below. Tx-submission is further parameterized by the maximum window size allowed. IB-relay, EB-relay, and Vote-relay are each parametrized by the maximum age beyond which a datum is no longer relayed[^5]. IB-relay and EB-relay rely on to let consumers know when block bodies are available as well. Consumers request IB and EB bodies through the corresponding mini protocol. For EB-relay we specify the to be eb-header, by which we mean the constant size part of an Endorse block, while the references (to IBs and EBs) are considered the body.
+`Relay` protocol instances are listed in the table below. Tx-submission is further parameterized by the maximum window size allowed. IB-relay, EB-relay, and Vote-relay are each parametrized by the maximum age beyond which a datum is no longer relayed[^eb-ib-relayed]. IB-relay and EB-relay rely on to let consumers know when block bodies are available as well. Consumers request IB and EB bodies through the corresponding mini protocol. For EB-relay we specify the to be eb-header, by which we mean the constant size part of an Endorse block, while the references (to IBs and EBs) are considered the body.
 
 > [!NOTE]
 > For IB, EB, and Vote the info could actually be unit as we do not need to apply prioritization to headers. How- ever the slot might provide useful filtering, such as avoid downloading any more votes of a pipeline once we have a certificate for a seen EB
@@ -121,7 +121,7 @@ A mini protocol instance that does not make use of `BoundedWindow` will want to 
 
 ###### Equivocation handling
 
-IB-relay, EB-relay, and Vote-relay must guard against the possibility of equivocations, i.e. the reuse of a generation opportunity for multiple different blocks. The *message identifier* of an header is the pair of its generating node id and the slot it was generated for[^6]. Two headers with the same message identifier constitute a *proof of equivocation*, and the first header received with a given message identifier is the *preferred header*. For headers with the same message identifier, only the first two should be relayed, furthermore only the body of the preferred header should be fetched.
+IB-relay, EB-relay, and Vote-relay must guard against the possibility of equivocations, i.e. the reuse of a generation opportunity for multiple different blocks. The *message identifier* of an header is the pair of its generating node id and the slot it was generated for[^subslot]. Two headers with the same message identifier constitute a *proof of equivocation*, and the first header received with a given message identifier is the *preferred header*. For headers with the same message identifier, only the first two should be relayed, furthermore only the body of the preferred header should be fetched.
 
 #### `Fetch` mini-protocol
 
@@ -200,7 +200,7 @@ The protocol should allow the consumer to divide the requests between different 
 ##### Requests
 
 - *EBs by RB:* given an RB from its chain, the producer should reply with all EBs which are (i) transitively referenced by RBs in that range, (ii) not referenced by earlier RBs.
-- *Recent certified EBs by range:* given a slot range, the producer should reply with all certified EBs which are (i) generated in the slot range, (ii) not referenced by RBs[^7]. The start of the slot range should be no earlier than the oldest slot an EB could be generated in and still referenced in a future RB.
+- *Recent certified EBs by range:* given a slot range, the producer should reply with all certified EBs which are (i) generated in the slot range, (ii) not referenced by RBs[^rb-referenced]. The start of the slot range should be no earlier than the oldest slot an EB could be generated in and still referenced in a future RB.
 - *Certificate by EB:* given the of a certified EB not referenced by the chain, the producer should reply with a certificate for it. Needed for inclusion of the EB into a future RB produced by the consumer.
 - *IBs by EB , and range:*  given a for a certified EB, the producer should reply with all the IBs which are (i) generated in the given slot range, (ii) directly referenced by the EB. The slot range allows for partitioning request about the same EB across different peers.
 
@@ -591,12 +591,12 @@ The security-related impacts of adversarial behavior upon Leios fall into three 
 
 ## Footnotes
 
-[^3]: <https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf#chapter.3>
+[^network-spec]: <https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf#chapter.3>
 
-[^4]: at the network layer we split an endorse block into header and body, where the latter contains the references to other blocks
+[^network-split]: at the network layer we split an endorse block into header and body, where the latter contains the references to other blocks
 
-[^5]: older EBs and IBs referenced by the blockchain can be accessed from the mini protocol
+[^eb-ib-relayed]: older EBs and IBs referenced by the blockchain can be accessed from the mini protocol
 
-[^6]: for IBs/EBs also its subslot, in case generation frequency is greater than $`1/\text{slot}`$.
+[^subslot]: for IBs/EBs also its subslot, in case generation frequency is greater than $`1/\text{slot}`$.
 
-[^7]: Restriction (ii) is to avoid overlap with an RB range query, but could be dropped to save on complexity if not worth the saved bandwidth
+[^rb-referenced]: Restriction (ii) is to avoid overlap with an RB range query, but could be dropped to save on complexity if not worth the saved bandwidth
