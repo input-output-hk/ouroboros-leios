@@ -522,9 +522,9 @@ As we will be mostly looking at IB diffusion, the next figure shows adoption for
 
 |                                                                                                       |                                                                                                        |
 | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| ![IB diffusion to 0.50 stake](scenario6/IB-0.5-oldest-vs-freshest.svg)<br/>IB diffusion to 0.50 stake | ![IB diffusion to 0.60 stake](scenario6/IB-0.6-oldest-vs-freshest.svg)<br/>IB diffusion to 0.60 stake  |
-| ![IB diffusion to 0.70 stake](scenario6/IB-0.7-oldest-vs-freshest.svg)<br/>IB diffusion to 0.70 stake | ![IB diffusion to 0.80 stake](scenario6/IB-0.8-oldest-vs-freshest.svg)<br/>IB diffusion to 0.80 stake  |
-| ![IB diffusion to 0.90 stake](scenario6/IB-0.9-oldest-vs-freshest.svg)<br/>IB diffusion to 0.90 stake | ![IB diffusion to 0.98 stake](scenario6/IB-0.98-oldest-vs-freshest.svg)<br/>IB diffusion to 0.98 stake |
+| ![IB diffusion to 0.50 stake](technical-report-2/scenario6/IB-0.5-oldest-vs-freshest.svg)<br/>IB diffusion to 0.50 stake | ![IB diffusion to 0.60 stake](technical-report-2/scenario6/IB-0.6-oldest-vs-freshest.svg)<br/>IB diffusion to 0.60 stake  |
+| ![IB diffusion to 0.70 stake](technical-report-2/scenario6/IB-0.7-oldest-vs-freshest.svg)<br/>IB diffusion to 0.70 stake | ![IB diffusion to 0.80 stake](technical-report-2/scenario6/IB-0.8-oldest-vs-freshest.svg)<br/>IB diffusion to 0.80 stake  |
+| ![IB diffusion to 0.90 stake](technical-report-2/scenario6/IB-0.9-oldest-vs-freshest.svg)<br/>IB diffusion to 0.90 stake | ![IB diffusion to 0.98 stake](technical-report-2/scenario6/IB-0.98-oldest-vs-freshest.svg)<br/>IB diffusion to 0.98 stake |
 
 The next figure shows same comparison but with 10 cpus per node. Diffusion for the 0.98 stake fraction improves, but we still see no differences between the diffusion strategies.
 
