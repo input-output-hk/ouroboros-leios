@@ -28,11 +28,11 @@ use crate::{
     sim::{
         MiniProtocol, NodeImpl, SimCpuTask, SimMessage,
         linear_leios::attackers::{EBWithholdingEvent, EBWithholdingSender},
-        lottery,
+        lottery::{LotteryConfig, LotteryKind, MockLotteryResults, vrf_probabilities},
     },
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Message {
     // TX propagation
     AnnounceTx(TransactionId),
@@ -114,6 +114,7 @@ impl SimMessage for Message {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CpuTask {
     /// A transaction has been received and validated, and is ready to propagate
     TransactionValidated(NodeId, Arc<Transaction>),
@@ -306,7 +307,7 @@ pub struct LinearLeiosNode {
     tracker: EventTracker,
     rng: ChaChaRng,
     clock: Clock,
-    stake: u64,
+    lottery: LotteryConfig,
     consumers: Vec<NodeId>,
     txs: HashMap<TransactionId, TransactionView>,
     ledger_states: BTreeMap<BlockId, Arc<LedgerState>>,
@@ -333,6 +334,11 @@ impl NodeImpl for LinearLeiosNode {
         rng: ChaChaRng,
         clock: Clock,
     ) -> Self {
+        let lottery = LotteryConfig::Random {
+            stake: config.stake,
+            total_stake: sim_config.total_stake,
+        };
+
         Self {
             id: config.id,
             sim_config,
@@ -340,7 +346,7 @@ impl NodeImpl for LinearLeiosNode {
             tracker,
             rng,
             clock,
-            stake: config.stake,
+            lottery,
             consumers: config.consumers.clone(),
             txs: HashMap::new(),
             ledger_states: BTreeMap::new(),
@@ -512,7 +518,10 @@ impl LinearLeiosNode {
 // Ranking block propagation
 impl LinearLeiosNode {
     fn try_generate_rb(&mut self, slot: u64) {
-        let Some(vrf) = self.run_vrf(self.sim_config.block_generation_probability) else {
+        let Some(vrf) = self.run_vrf(
+            LotteryKind::GenerateRB,
+            self.sim_config.block_generation_probability,
+        ) else {
             return;
         };
 
@@ -995,7 +1004,7 @@ impl LinearLeiosNode {
 
         if missing_txs.is_empty() {
             self.queued
-                .schedule_cpu_task(CpuTask::EBBlockValidated(eb, seen));
+                .schedule_cpu_task(CpuTask::EBBlockValidated(eb.clone(), seen));
         } else {
             for tx_id in missing_txs {
                 self.leios
@@ -1003,6 +1012,23 @@ impl LinearLeiosNode {
                     .entry(tx_id)
                     .or_default()
                     .push(eb.id());
+            }
+        }
+
+        if matches!(
+            self.sim_config.variant,
+            LeiosVariant::LinearWithTxReferences
+        ) {
+            // If the EB references any TXs which we already have, but are not in our mempool,
+            // we must have failed to add them to the mempool due to conflicts.
+            // Announce those TXs to our peers, since we didn't before.
+            for tx in &eb.txs {
+                if !self.has_tx(tx.id) || self.praos.mempool.contains_key(&tx.id) {
+                    continue;
+                }
+                for peer in &self.consumers {
+                    self.queued.send_to(*peer, Message::AnnounceTx(tx.id));
+                }
             }
         }
     }
@@ -1204,8 +1230,8 @@ impl LinearLeiosNode {
     }
 
     fn try_vote_for_endorser_block(&mut self, eb: &Arc<EndorserBlock>, seen: Timestamp) -> bool {
-        let vrf_wins = lottery::vrf_probabilities(self.sim_config.vote_probability)
-            .filter_map(|f| self.run_vrf(f))
+        let vrf_wins = vrf_probabilities(self.sim_config.vote_probability)
+            .filter_map(|f| self.run_vrf(LotteryKind::GenerateVote, f))
             .count();
         if vrf_wins == 0 {
             return false;
@@ -1487,18 +1513,12 @@ impl LinearLeiosNode {
 
 // Common utilities
 impl LinearLeiosNode {
+    #[allow(unused)]
+    pub fn mock_lottery(&mut self, results: Arc<MockLotteryResults>) {
+        self.lottery = LotteryConfig::Mock { results };
+    }
     // Simulates the output of a VRF using this node's stake (if any).
-    fn run_vrf(&mut self, success_rate: f64) -> Option<u64> {
-        let target_vrf_stake = lottery::compute_target_vrf_stake(
-            self.stake,
-            self.sim_config.total_stake,
-            success_rate,
-        );
-        let result = self.rng.random_range(0..self.sim_config.total_stake);
-        if result < target_vrf_stake {
-            Some(result)
-        } else {
-            None
-        }
+    fn run_vrf(&mut self, kind: LotteryKind, success_rate: f64) -> Option<u64> {
+        self.lottery.run(kind, success_rate, &mut self.rng)
     }
 }

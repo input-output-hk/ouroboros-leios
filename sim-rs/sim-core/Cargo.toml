@@ -7,6 +7,7 @@ rust-version = "1.88"
 [dependencies]
 anyhow = "1"
 async-stream = "0.3"
+dashmap = "6"
 futures = "0.3"
 netsim-async = { git = "https://github.com/input-output-hk/ce-netsim.git", rev = "9d1e26c" }
 num-traits = "0.2"
@@ -20,4 +21,5 @@ tokio-util = "0.7"
 tracing = "0.1"
 
 [dev-dependencies]
+serde_yaml = "0.9"
 tokio = { version = "1", features = ["macros", "rt"] }
