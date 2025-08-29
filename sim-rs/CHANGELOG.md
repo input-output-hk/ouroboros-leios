@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Linear Leios
+- Add some protocol-level tests
+- Fix bug; transactions with conflicts referenced by EBs did not propagate far enough
+
 ## v1.3.0
 
 ### Linear Leios

@@ -1004,7 +1004,7 @@ impl LinearLeiosNode {
 
         if missing_txs.is_empty() {
             self.queued
-                .schedule_cpu_task(CpuTask::EBBlockValidated(eb, seen));
+                .schedule_cpu_task(CpuTask::EBBlockValidated(eb.clone(), seen));
         } else {
             for tx_id in missing_txs {
                 self.leios
@@ -1012,6 +1012,23 @@ impl LinearLeiosNode {
                     .entry(tx_id)
                     .or_default()
                     .push(eb.id());
+            }
+        }
+
+        if matches!(
+            self.sim_config.variant,
+            LeiosVariant::LinearWithTxReferences
+        ) {
+            // If the EB references any TXs which we already have, but are not in our mempool,
+            // we must have failed to add them to the mempool due to conflicts.
+            // Announce those TXs to our peers, since we didn't before.
+            for tx in &eb.txs {
+                if !self.has_tx(tx.id) || self.praos.mempool.contains_key(&tx.id) {
+                    continue;
+                }
+                for peer in &self.consumers {
+                    self.queued.send_to(*peer, Message::AnnounceTx(tx.id));
+                }
             }
         }
     }

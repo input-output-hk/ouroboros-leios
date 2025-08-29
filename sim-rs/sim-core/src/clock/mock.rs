@@ -51,6 +51,10 @@ impl MockClockCoordinator {
         )
     }
 
+    pub fn now(&self) -> Timestamp {
+        self.time.load(std::sync::atomic::Ordering::Acquire)
+    }
+
     pub fn advance_time(&mut self, until: Timestamp) {
         while let Ok(event) = self.rx.try_recv() {
             match event {
