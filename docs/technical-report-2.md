@@ -1043,11 +1043,22 @@ See [analysis/overcollateralization-v1.ipynb](../overcollateralization-v1.ipynb)
 
 ### Expected transaction lifecycle
 
-The Jupyter notebooks [analysis/tx-to-block.ipynb](../analysis/tx-to-block.ipynb) and [analysis/blog-figures.ipynb](../analysis/blog-figures.ipynb) estimate the time it takes in Full Short Leios for a transaction to reach the ledger from the memory pool. Additionally, an experimental Delta-QSD expression was created for computing the delay between transaction submission and its referencing by a Praos block: see [analysis/deltaq/tx-lifecycle.ipynb](../analysis/deltaq/tx-lifecycle.ipynb).
+The Jupyter notebook [analysis/blog-figures.ipynb](../analysis/blog-figures.ipynb) estimate the time it takes in Full Short Leios for a transaction to reach the ledger from the memory pool. Additionally, an experimental Delta-QSD expression was created for computing the delay between transaction submission and its referencing by a Praos block: see [analysis/deltaq/tx-lifecycle.ipynb](../analysis/deltaq/tx-lifecycle.ipynb).
 
 |   |   |
 |---|---|
 | ![Cumulative probability of transaction reaching ledger](technical-report-2/tx-to-block-cum-slots-fig.svg) | ![Transaction lifecycle for Praos vs Leios](technical-report-2/tx-to-block-fig.svg) |
+
+Furthermore, the Jupyter notebook [Analysis of transaction lifecycle](../analysis/tx-to-block.ipynb) estimates the delay imposed by each of the seven stages of Full Leios as a transaction moves from memory pool to being referenced by a Praos block.
+
+![Probability of delay from transaction submission to its being referenced by an RB](technical-report-2/tx-to-block.svg)
+
+The plot hints at the following:
+
+1. There seems little advantage to moving to stage lengths less than 10 slots.
+2. The number of shards should be kept small enough so that the IB rate per shard is high relative to the stage length.
+3. Low EB rates result in many orphaned IBs.
+4. Realistic parameter settings result in an approximately two-minute delay between transaction submission and its referencing by an RB.
 
 ### Leios profitability
 
@@ -1062,25 +1073,6 @@ Using previously computed infrastructure expenses and "business as usual" assump
 We have forecast the diminishing rewards that would occur if the current TPS persists. See [analysis/reward-forecast.ipynb](../analysis/reward-forecast.ipynb) for methods and details.
 
 ![Forecast of future Cardano mainnet rewards](technical-report-2/reward-forecast-bau.svg)
-
-### Analysis of transaction lifecycle
-
-The Jupyter notebook [Analysis of transaction lifecycle](../analysis/tx-to-block.ipynb) estimates the delay imposed by each of the seven stages of Full Leios as a transaction moves from memory pool to being referenced by a Praos block.
-
-![Probability of delay from transaction submission to its being referenced by an RB](app://332d877b12d0e40980939095f3b3843a7b85/extra/iohk/ouroboros-leios/analysis/tx-to-block.svg?1747778045513)
-
-The plot hints at the following:
-
-1. There seems little advantage to moving to stage lengths less than 10 slots.
-2. The number of shards should be kept small enough so that the IB rate per shard is high relative to the stage length.
-3. Low EB rates result in many orphaned IBs.
-4. Realistic parameter settings result in an approximately two-minute delay between transaction submission and its referencing by an RB.
-
-Potential next steps:
-
-- Translating this model into Delta QSD, so that network effects can be included.
-- Compare this model's results to output of the Rust simulator.
-- Elaborate the model in order to represent the memory-pool and ledger variants under consideration.
 
 ## Miscellaneous observations
 
