@@ -8,7 +8,7 @@ cleanup-policies:
 # Protocol parameters for Linear Leios.
 leios-variant: linear-with-tx-references
 linear-eb-propagation-criteria: eb-received
-linear-vote-stage-length-slots: 7
+linear-vote-stage-length-slots: 4
 linear-diffuse-stage-length-slots: 7
 praos-fallback-enabled: true      
 leios-stage-active-voting-slots: 1
@@ -22,7 +22,7 @@ eb-size-bytes-per-ib: 32
 
 # A conservative upper bound based on empiricial data of empty Praos blocks on
 # Cardano mainnet.
-leios-header-diffusion-time-ms: 2000.0
+leios-header-diffusion-time-ms: 1000.0
 
 # Scenario-specific parameters for transaction generation.
 tx-start-time: 60                                               
