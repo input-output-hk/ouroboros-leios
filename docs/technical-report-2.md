@@ -55,7 +55,7 @@ per second (TPS) and overall cost effectiveness of Leios.
     - [Mini-mainnet](#mini-mainnet)
 - [Empirical data](#empirical-data)
     - [Inter-datacenter bandwidth measurements](#inter-datacenter-bandwidth-measurements)
-    - [Internet latencies](#internet latencies)
+    - [Internet latencies](#internet-latencies)
     - [Analysis of diffusion of empty blocks on Cardano mainnet](#analysis-of-diffusion-of-empty-blocks-on-cardano-mainnet)
     - [Analsysi of block and transaction validation times](#analysis-of-block-and-transaction-validation-times)
 - [Analytic studies](#analytic-studies)
@@ -68,6 +68,11 @@ per second (TPS) and overall cost effectiveness of Leios.
 - [Miscellaneous observations](#miscellaneous-observations)
     - [Conflicts, ledger, and incentives](#conflicts-ledger-and-incentives)
     - [Catalog of possible conformance tests](#catalog-of-possible-conformance-tests)
+- [Other resources](#other-resources)
+    - [First technical report](./technical-report-1.md)
+    - [Threat model](./threat-model.md)
+    - [Cost estimate](./cost-estimate/README.md)
+    - [Draft CIP](./cip/README.md)
 
 </details>
 
@@ -1268,6 +1273,13 @@ The table below catalogs conformance tests in order to assess how much positive
 | Node diffuses votes in freshest-first order                                                  |           **?**            |                              |
 | Node includes txs in IB iff the IB has the correct shard                                     |             ✘              |                              |
 | Node does not include txs in IB if it has seen a conflicting tx in an IB                     |             ✘              |                              |
+
+## Other resources
+
+- [First technical report](./technical-report-1.md)
+- [Threat model](./threat-model.md)
+- [Cost estimate](./cost-estimate/README.md)
+- [Draft CIP](./cip/README.md)
 
 ---
 
