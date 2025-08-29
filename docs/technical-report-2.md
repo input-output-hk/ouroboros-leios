@@ -1,11 +1,142 @@
-<strong><font color="red">DRAFT: WORK IN PROGRESS</font></strong>
-
 # Leios technical report #2
+
+> [!IMPORTANT]
+>
+> Information in this report is superceded by the [Leios CIP](https://github.com/cardano-foundation/CIPs/pull/1078).
 
 ## Executive summary
 
+This report captures a snapshot of the modeling, simulation, and analysis of the
+Leios protocol as of August 2025, approximately. Given that the Leios protocol
+design is still evolving, the observations, findings, and conclusions documented
+here are provisional and subject to future revision and contradiction. The
+report digs into the following topics:
+
+- Formal and informal specification of the Leios protocol
+- Models and simulations of Leios
+  - Delta QSD
+  - A high-performance simulation written in the Rust language
+  - A high-fidelity prototype written in the Haskell language
+- Analyses of sortition, voting, committee sizing, and certificate construction
+- Techno-economic estimates of the cost of running Leios nodes, under various
+  levels of transaction throughput
+- Quantification of the characteristics of the Cardano mainnet that are relevant
+  to Leios
+- Threat model for Leios
+
+Results so far indicate that Leios can achieve cost-effective throughput at 10
+input blocks per second or more, using affordable hardware or cloud
+provisioning. Further design and analysis of transaction sharding, memory pool
+management, and fee schedules are needed to estimate the effective transactions
+per second (TPS) and overall cost effectiveness of Leios.
+
+<details>
+  <summary><h2>Table of contents</h2></summary>
+
+- [Executive summary](#executive-summary)
+- [Introduction](#introduction)
+- [Network specification](#network-specification)
+    - [Mini protocols](#mini-protocols)
+- [Haskell simulation realism](#haskell-simulation-realism)
+    - [Scenario 1](#scenario-1)
+    - [Scenario 2](#scenario-2)
+    - [Scenario 3](#scenario-3)
+    - [Scenario 4](#scenario-4)
+    - [Scenario 5](#scenario-5)
+    - [Scenario 6](#scenario-6)
+- [Notes on the Leios attack surface](#notes-on-the-leios-attack-surface)
+    - [Terminology and notes](#terminology-and-notes)
+    - [Taxonomy of negative impacts](#taxonomy-of-negative-impacts)
+    - [Specific attacks](#specific-attacks)
+    - [Recommendations](#recommendations)
+- [Simlation experiments](#simulation-experiments)
+- [Test networks](#test-networks)
+    - [Pseudo-mainnet](#pseudo-mainnet)
+    - [Mini-mainnet](#mini-mainnet)
+- [Empirical data](#empirical-data)
+    - [Inter-datacenter bandwidth measurements](#inter-datacenter-bandwidth-measurements)
+    - [Internet latencies](#internet latencies)
+    - [Analysis of diffusion of empty blocks on Cardano mainnet](#analysis-of-diffusion-of-empty-blocks-on-cardano-mainnet)
+    - [Analsysi of block and transaction validation times](#analysis-of-block-and-transaction-validation-times)
+- [Analytic studies](#analytic-studies)
+    - [Throughput efficiency of Linear Leios](#throughput-efficiency-of-linear-leios)
+    - [Performance analysis of sharding](#performance-analysis-of-sharding)
+    - [Overcollateralization scheme](#overcollateralization-scheme)
+    - [Expected transaction lifecycle](#expected-transaction-lifecycle)
+    - [Leios profitability](#leios-profitability)
+    - [Forecast of mainnet rewards](#forecast-of-mainnet-rewards)
+- [Miscellaneous observations](#miscellaneous-observations)
+    - [Conflicts, ledger, and incentives](#conflicts-ledger-and-incentives)
+    - [Catalog of possible conformance tests](#catalog-of-possible-conformance-tests)
+
+</details>
+
+## Introduction
+
+The Leios protocol represents a significant advancement in blockchain
+technology, building upon the foundations of the Ouroboros consensus protocol.
+This technical report aims to provide a comprehensive analysis of the Leios
+protocol, focusing on its design, implementation, and potential impact on the
+Cardano ecosystem.
+
+### Purpose
+
+The primary purpose of this report is to document the technical specifications
+and economic implications of the Leios protocol. It serves as a resource for
+developers, researchers, and stakeholders interested in understanding the
+intricacies of Leios and its role within the broader Cardano network.
+
+### Scope
+
+This report covers various aspects of the Leios protocol, including its formal
+specifications, simulation results, economic analysis, and threat model. It also
+explores the interactions between Leios and existing Cardano components, such as
+Praos and Mithril.
+
+### Context
+
+Leios is designed to enhance the scalability and efficiency of the Cardano
+blockchain by introducing innovative mechanisms for block production and
+validation. By leveraging probabilistic sortition and advanced cryptographic
+techniques, Leios aims to achieve high throughput and low latency while
+maintaining robust security guarantees.
+
 > [!NOTE]
-> Draft the executive summary after the rest of the report is complete.
+>
+> **Roadmap and Methodology**
+>
+> The development of the Leios protocol is currently focused on comparing
+> outputs from various simulations to gain deeper insights into its performance
+> and potential optimizations. This involves exploring the spectrum of
+> configuration parameters to identify optimal settings and understand potential
+> constraints and attack vectors.
+>
+> Key areas of ongoing research include:
+>
+> - **Sharded Mempool Design**: Investigating designs that minimize transaction
+>   duplicates across different Input Blocks (IBs) and determining the
+>   transaction fee structure.
+> - **Voting Schemes**: Early work has begun on voting mechanisms, but further
+>   exploration is needed to finalize these schemes.
+> - **Cost Analysis**: Estimating the cost of running a Leios node compared to
+>   the expected increase in throughput. This analysis will be crucial for
+>   community feedback and engagement.
+>
+> In the near future, the team aims to draft a Cardano Improvement Proposal
+> (CIP) for Leios. This proposal will detail the requirements for building a
+> reference implementation, informed by the data and insights gathered from
+> ongoing research and simulations.
+>
+> The roadmap includes engaging with the community to gather feedback and
+> iterating on the protocol design based on this input. The goal is to ensure
+> that Leios not only meets technical specifications but also aligns with the
+> needs and expectations of the Cardano ecosystem.
+
+### Audience
+
+This report is intended for a technical audience, including blockchain
+developers, researchers, and Cardano stakeholders. It assumes a foundational
+understanding of blockchain concepts and the Cardano ecosystem.
 
 ## Network Specification
 
@@ -75,6 +206,7 @@ $$`
 | `StIdsBlocking`    | Producer |
 | `StIdsNonBlocking` | Producer |
 | `StData`           | Producer |
+
 ##### Protocol messages
 
 - **`MsgInit`**: initial message of the protocol
@@ -186,7 +318,6 @@ A instance is specified by these parameters
 The high-level description of the Leios protocol specifies freshest-first delivery for IB bodies, to circumvent attacks where a large amount of old IBs gets released by an adversary. The mini protocol already takes a parameter that specifies which IBs are still new enough to be diffused, so older IBs are already deprioritized to only be accessible through the `CatchUp` protocol, and only if referenced by other blocks. Nevertheless consumers should take care to send approximately just enough body requests to utilize the available bandwidth, so that they have more choices, and more up to date information, when deciding which blocks to request from which peers.
 
 ####  `CatchUp` mini-protocol
-
 
 The `CatchUp` mini protocol allows for nodes to obtain IB and EB blocks referenced by the chain. These will typically be too old to be diffused by the `Relay` and `Fetch` mini protocols, but are still relevant to reconstruct the ledger state. Additionally it covers certified EBs not yet in the chain but which are still recent enough for inclusion in a future ranking block, and any blocks they reference. 
 
@@ -473,6 +604,7 @@ In the next figure we see that 15 IB per second do not diffuse quite as well whe
 | ![EB diffusion to 0.50 stake](technical-report-2/scenario4-20IB-small/EB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.50 stake | ![EB diffusion to 0.98 stake](technical-report-2/scenario4-20IB-small/EB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.98 stake |
 | ![VT diffusion to 0.50 stake](technical-report-2/scenario4-20IB-small/VT-0.5-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.50 stake | ![VT diffusion to 0.98 stake](technical-report-2/scenario4-20IB-small/VT-0.98-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.98 stake |
 | ![RB diffusion to 0.50 stake](technical-report-2/scenario4-20IB-small/RB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.50 stake | ![RB diffusion to 0.98 stake](technical-report-2/scenario4-20IB-small/RB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.98 stake |
+
 ### Scenario 5
 
 As mentioned before, we see in the next figure that just using 5 cores per node, instead of unbounded, improves diffusion by a good amount, without need for higher traffic. Presumably the limits on CPU make it so traffic is more spread out and keeps the tcp window open.
@@ -695,6 +827,7 @@ Because the 10,000 [pseudo-mainnet](../data/simulation/pseudo-mainnet/topology-
 | Stake-weighted latency       | 0.0ms ms   |
 | Bidirectional connections    | 1463       |
 | Asymmetry ratio              | 84.85%     |
+
 ## Empirical data
 
 ### Inter-datacenter bandwidth measurements
