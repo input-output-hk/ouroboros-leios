@@ -1,5 +1,23 @@
 # Leios logbook
 
+## 2025-08-29
+
+### Second technical report
+
+[The second technical report](docs/technical-report-2.md) captures a snapshot of the modeling, simulation, and analysis of the
+Leios protocol from March to August 2025, approximately. Given that the Leios protocol
+design was still evolving, the observations, findings, and conclusions documented
+here are provisional and subject to future revision and contradiction. The
+report digs into the following topics:
+
+- Network protocols
+- Threat model
+- Simulation experiments
+- Test network topologies
+- Empirical measurements of the Cardano network and blockchain
+- Analytic studies of Leios behavior and performance
+- Miscellaneous observations and links to other technical documents
+
 ## 2025-08-27
 
 ### CIP draft completion
