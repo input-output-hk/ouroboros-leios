@@ -38,7 +38,7 @@ wait
 
 cat << EOI > case.csv
 sim-cli,Tx start [s],Tx stop [s],Sim stop [s]
-$SIM,60,660,1200
+$SIM,60,960,1200
 EOI
 
 zcat sim.log.gz \
