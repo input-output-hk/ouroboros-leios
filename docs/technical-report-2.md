@@ -900,6 +900,26 @@ The aforementioned Jupyter notebook details these. For illustrative purposes, ex
 
 The Linear Leios variant's formulation is straightforward enough that its probability of including a certified EB on chain can be computed analytically.
 
+Let $f$ be the active slot coefficient for Praos. By definition, this is the probability that at least one RB is created in a given slot.
+
+Let $p_\text{cert}$ be the probability that a new Praos block contains an certificate for the EB referenced in the previous block. Linear Leios requires that a certificate may only be included in an RB if the previous $L_\text{vote} + L_\text{diff}$ slots did not contain an RB. Assuming that all nodes are following the same fork, this implies
+
+$$
+p_\text{cert} = (1 - f) ^ {(L_\text{vote} + L_\text{diff})} .
+$$
+
+Let $\rho$ be the ratio of the maximum size of an EB to the maximum size of an RB. Also let $\digamma$ be the ratio of Leios throughput to Praos throughput. One computes this as
+
+$$
+\digamma = (1 - p_\text{cert}) + p_\text{cert} \cdot (1 + \rho) = 1 + \rho \cdot (1 - f) ^ {(L_\text{vote} + L_\text{diff})}
+$$
+
+We define *throughput efficiency* as the ratio of the size of RBs and RB-certified EBs all divided by the size of all RBs and EBs.
+
+$$
+\varepsilon = \frac{1 + \rho \cdot (1 - f) ^ {(L_\text{vote} + L_\text{diff})}}{1 + \rho}
+$$
+
 The plots below show the _throughput_ (defined as the size of the RBs and of the RB-certified EBs) relative to Praos (left) and the _throughput efficiency_ (defined as the size of the RBs and of the RB-certified EBs, divided by the size of all RBs and of all EBs). Recall that not all EBs have their certificates appear in Praos blocks. Any inefficiency affects throughput and network costs but not permanent-storage costs. These results show that Linear Leios could achieve approximately 500 times the throughput of Praos at an over 50% efficiency in use of network resources. (That 500 times the throughput of Praos would exceed 1000 historically typical transactions per second.)
 
 |                                                                               |                                                                                          |
