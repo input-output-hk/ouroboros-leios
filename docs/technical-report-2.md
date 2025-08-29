@@ -135,9 +135,6 @@ A instance is specified by these options and parameters.
 
 `Relay` protocol instances are listed in the table below. Tx-submission is further parameterized by the maximum window size allowed. IB-relay, EB-relay, and Vote-relay are each parametrized by the maximum age beyond which a datum is no longer relayed[^eb-ib-relayed]. IB-relay and EB-relay rely on to let consumers know when block bodies are available as well. Consumers request IB and EB bodies through the corresponding mini protocol. For EB-relay we specify the to be eb-header, by which we mean the constant size part of an Endorse block, while the references (to IBs and EBs) are considered the body.
 
-> [!NOTE]
-> For IB, EB, and Vote the info could actually be unit as we do not need to apply prioritization to headers. How- ever the slot might provide useful filtering, such as avoid downloading any more votes of a pipeline once we have a certificate for a seen EB
-
 > Table: `Relay` mini-protocol instances.
 
 | `instance`    | `BoundedWindow` | `Announcements` | `id` | `info` | `datum`     | `Ann. Condition` | `ann` |
@@ -223,9 +220,6 @@ IB-relay, EB-relay, and Vote-relay must guard against the possibility of equivoc
 
 The `Fetch` mini protocol enables a node to download block bodies. It is a generalization of the `BlockFetch` mini protocol used for base blocks: IBs and EBs do not have a notion of range, so they are requested by individual identifiers.
 
-> [!NOTE]
-> Generalizing from BlockFetch means we deliver bodies in a streaming fashion, is that appropriate for IBs and EBs?
-
 ##### Parameters
 
 A instance is specified by these parameters
@@ -285,9 +279,6 @@ The high-level description of the Leios protocol specifies freshest-first delive
 
 The `CatchUp` mini protocol allows for nodes to obtain IB and EB blocks referenced by the chain. These will typically be too old to be diffused by the `Relay` and `Fetch` mini protocols, but are still relevant to reconstruct the ledger state. Additionally it covers certified EBs not yet in the chain but which are still recent enough for inclusion in a future ranking block, and any blocks they reference. 
 
-> [!NOTE]
-> Unless we specify recent certified EBs are to be offered through the `Relay` protocol still, in which case request 1.4.1 can be dropped.
-
 This data, together with the base chain, is what is needed for a node to participate in future pipelines.
 
 The protocol should allow the consumer to divide the requests between different producers, and for the producer to have an efficient way to retrieve the requested blocks. The consumer should be able to retrieve the base chain through the other mini protocols, and so the EB references within. However, the slots of those EBs are unknown, as well as any indirect references.
@@ -298,12 +289,6 @@ The protocol should allow the consumer to divide the requests between different 
 - *Recent certified EBs by range:* given a slot range, the producer should reply with all certified EBs which are (i) generated in the slot range, (ii) not referenced by RBs[^rb-referenced]. The start of the slot range should be no earlier than the oldest slot an EB could be generated in and still referenced in a future RB.
 - *Certificate by EB:* given the of a certified EB not referenced by the chain, the producer should reply with a certificate for it. Needed for inclusion of the EB into a future RB produced by the consumer.
 - *IBs by EB , and range:*  given a for a certified EB, the producer should reply with all the IBs which are (i) generated in the given slot range, (ii) directly referenced by the EB. The slot range allows for partitioning request about the same EB across different peers.
-
-> [!NOTE]
-> The IBs by EB point, and slot range request could be replaced by just a list of IB points, if IB references in EB bodies are augmented with the IB slot. Maybe size of request could become a consideration: by EB point and slot range the request size is 56 bytes for possibly all the referenced IBs at once, while by IB point the size is 40 bytes each, and there could be double digits of them. If expect to always fragment requests to just a few IBs at a time the difference is perhaps not important.
-
-> [!NOTE]
-> The EBs by RB range request could similarly be replaced by a list of EB points, if EB references in RBs and EBs are augmented with the EB slot. In this case, the consumer would be in charge of discovering needed referenced EBs as it fetches the ones it knows about.
 
 ##### Definition
 
@@ -344,9 +329,6 @@ Scenarios proceed from most idealized and gradually turn one more realism featur
 4. network layer more closely models TCP, in particular acks and congestion window collapse/restart.
 5. nodes simulate CPU tasks with a finite number of worker threads.
 6. request IB bodies in oldest-first order.
-
-> [!NOTE]
-> move Scenario 6 out of ordered list and into a “variants” list
 
 The last scenario is not strictly about realism, but we rather want to investigate the impact of deviating from the freshest-first default.
 
@@ -408,9 +390,6 @@ The diffusion latencies, in the next two figures, are collected for votes set to
 
 ### Scenario 2
 
-> [!NOTE]
-> compare to previous plot rather than ideal? Same for later sections.
-
 Figure below illustrate the effect of nodes request block bodies from first peer available.
 
 > Figure: Scenario 2, diffusion latencies from slot start (300s run with default seed).
@@ -440,9 +419,6 @@ Note that multiplexing in the simulation happens at the level of whole mini-prot
 ### Scenario 4
 
 The figure below shows the introduction of the tcp congestion window having a quite dramatic effect on diffusion times.
-
-> [!NOTE]
-> do IBs which do not reference RBs do better?
 
 > Figure: Scenario 4 *baseline*, diffusion latencies from slot start (300s run with default seed).
 
@@ -518,9 +494,6 @@ In the next figure we bring stage length back to the default 20, and we see diff
 
 A possibility is that IBs are not fully diffusing because nodes are unable to reconstruct the ledger state to validate them in. In the next figure we try to see what happens when we require too many votes for EBs to certify, so the actual ledger state stays at Genesis. However IBs will still reference the most recent RB with a ledger state on the generating node, so other nodes will have to have adopted the same RB at some point.
 
-> [!NOTE]
-> try setting the reference RB as always Genesis
-
 > Figure: Scenario 4 *higher IB rate with uniform voting and short stages but no certificate*, diffusion latencies from slot start (300s run with default seed).
 
 |                                                                                                                                                                           |                                                                                                                                                                            |
@@ -531,10 +504,6 @@ A possibility is that IBs are not fully diffusing because nodes are unable to re
 | ![RB diffusion to 0.50 stake](technical-report-2/scenario4-higher-IB-rate-send-recv-short-stage-no-cert/RB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.50 stake | ![RB diffusion to 0.98 stake](technical-report-2/scenario4-higher-IB-rate-send-recv-short-stage-no-cert/RB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.98 stake |
 
 Even with that caveat we see IB diffusion improve, getting quite close to the one with 60 slot stage length. Ledger state reconstruction does seem a significant factor, since when EBs are 3 times rarer (two figure previous), or here where they do not get certified, diffusion does better. Inspecting the logs we can further note that most IBs are validated immediately upon reception, meaning the ledger state was already available, and only a tiny fraction waits up to 3 seconds, meaning that the real impediment is that EBs can get certified even if a good percentage of nodes has not and will not validate some of the referenced IBs, because they lack the corresponding RB/ledger state.
-
-> [!NOTE]
-> Keep ledger-state only for the preferred chain
-
 
 The next figure confirms the above with the bounded cpu worker pool, with a much larger than needed bound.
 
@@ -582,9 +551,6 @@ As mentioned before, we see in the next figure that just using 5 cores per node,
 | ![VT diffusion to 0.50 stake](technical-report-2/scenario5/VT-0.5-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.50 stake | ![VT diffusion to 0.98 stake](technical-report-2/scenario5/VT-0.98-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.98 stake |
 | ![RB diffusion to 0.50 stake](technical-report-2/scenario5/RB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.50 stake | ![RB diffusion to 0.98 stake](technical-report-2/scenario5/RB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.98 stake |
 
-> [!NOTE]
-> try the higher traffic variations above, the sweet spot presumably shifted
-
 In the next figure we show results for 10 cpu cores per node. Here we see all IBs making it to 0.98 stake diffusion.
 
 > Figure: Scenario 5 *with bounded CPU*, diffusion latencies from slot start (300s run with default seed).
@@ -608,9 +574,6 @@ The next figure shows the effect of oldest-first diffusion for IBs, which is nul
 | ![EB diffusion to 0.50 stake](technical-report-2/scenario6/EB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.50 stake | ![EB diffusion to 0.98 stake](technical-report-2/scenario6/EB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.98 stake |
 | ![VT diffusion to 0.50 stake](technical-report-2/scenario6/VT-0.5-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.50 stake | ![VT diffusion to 0.98 stake](technical-report-2/scenario6/VT-0.98-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.98 stake |
 | ![RB diffusion to 0.50 stake](technical-report-2/scenario6/RB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.50 stake | ![RB diffusion to 0.98 stake](technical-report-2/scenario6/RB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.98 stake |
-
-> [!NOTE]
-> try with higher traffic
 
 As we will be mostly looking at IB diffusion, the next figure shows adoption for only IBs but for more stake fractions.
 
