@@ -7,34 +7,31 @@
 ## Executive summary
 
 This report captures a snapshot of the modeling, simulation, and analysis of the
-Leios protocol as of August 2025, approximately. Given that the Leios protocol
-design is still evolving, the observations, findings, and conclusions documented
+Leios protocol from March to August 2025, approximately. Given that the Leios protocol
+design was still evolving, the observations, findings, and conclusions documented
 here are provisional and subject to future revision and contradiction. The
 report digs into the following topics:
 
-- Formal and informal specification of the Leios protocol
-- Models and simulations of Leios
-  - Delta QSD
-  - A high-performance simulation written in the Rust language
-  - A high-fidelity prototype written in the Haskell language
-- Analyses of sortition, voting, committee sizing, and certificate construction
-- Techno-economic estimates of the cost of running Leios nodes, under various
-  levels of transaction throughput
-- Quantification of the characteristics of the Cardano mainnet that are relevant
-  to Leios
-- Threat model for Leios
+- Network protocols
+- Threat model
+- Simulation experiments
+- Test network topologies
+- Empirical measurements of the Cardano network and blockchain
+- Analytic studies of Leios behavior and performance
+- Miscellaneous observations and links to other technical documents
 
-Results so far indicate that Leios can achieve cost-effective throughput at 10
-input blocks per second or more, using affordable hardware or cloud
-provisioning. Further design and analysis of transaction sharding, memory pool
-management, and fee schedules are needed to estimate the effective transactions
-per second (TPS) and overall cost effectiveness of Leios.
+Results so far indicate that the Linear Leios variant of the protocol can achieve cost-effective throughput at
+100 TPS of historical typical transactions but near 1000 TPS of small (non-Plutus) transactions.
 
 <details>
   <summary><h2>Table of contents</h2></summary>
 
 - [Executive summary](#executive-summary)
 - [Introduction](#introduction)
+    - [Purpose](#purpose)
+    - [Scope](#scope)
+    - [Context](#context)
+    - [Audience](#audience)
 - [Network specification](#network-specification)
     - [Mini protocols](#mini-protocols)
 - [Haskell simulation realism](#haskell-simulation-realism)
@@ -57,7 +54,7 @@ per second (TPS) and overall cost effectiveness of Leios.
     - [Inter-datacenter bandwidth measurements](#inter-datacenter-bandwidth-measurements)
     - [Internet latencies](#internet-latencies)
     - [Analysis of diffusion of empty blocks on Cardano mainnet](#analysis-of-diffusion-of-empty-blocks-on-cardano-mainnet)
-    - [Analsysi of block and transaction validation times](#analysis-of-block-and-transaction-validation-times)
+    - [Analysis of block and transaction validation times](#analysis-of-block-and-transaction-validation-times)
 - [Analytic studies](#analytic-studies)
     - [Throughput efficiency of Linear Leios](#throughput-efficiency-of-linear-leios)
     - [Performance analysis of sharding](#performance-analysis-of-sharding)
@@ -80,9 +77,7 @@ per second (TPS) and overall cost effectiveness of Leios.
 
 The Leios protocol represents a significant advancement in blockchain
 technology, building upon the foundations of the Ouroboros consensus protocol.
-This technical report aims to provide a comprehensive analysis of the Leios
-protocol, focusing on its design, implementation, and potential impact on the
-Cardano ecosystem.
+This technical report aims to provide analytic support for the refinement of the Leios protocol's design.
 
 ### Purpose
 
@@ -93,10 +88,8 @@ intricacies of Leios and its role within the broader Cardano network.
 
 ### Scope
 
-This report covers various aspects of the Leios protocol, including its formal
-specifications, simulation results, economic analysis, and threat model. It also
-explores the interactions between Leios and existing Cardano components, such as
-Praos and Mithril.
+This report covers various aspects of the Leios protocol, including its network
+specifications, analytic studies, simulation results, economic analysis, and threat model.
 
 ### Context
 
@@ -105,37 +98,6 @@ blockchain by introducing innovative mechanisms for block production and
 validation. By leveraging probabilistic sortition and advanced cryptographic
 techniques, Leios aims to achieve high throughput and low latency while
 maintaining robust security guarantees.
-
-> [!NOTE]
->
-> **Roadmap and Methodology**
->
-> The development of the Leios protocol is currently focused on comparing
-> outputs from various simulations to gain deeper insights into its performance
-> and potential optimizations. This involves exploring the spectrum of
-> configuration parameters to identify optimal settings and understand potential
-> constraints and attack vectors.
->
-> Key areas of ongoing research include:
->
-> - **Sharded Mempool Design**: Investigating designs that minimize transaction
->   duplicates across different Input Blocks (IBs) and determining the
->   transaction fee structure.
-> - **Voting Schemes**: Early work has begun on voting mechanisms, but further
->   exploration is needed to finalize these schemes.
-> - **Cost Analysis**: Estimating the cost of running a Leios node compared to
->   the expected increase in throughput. This analysis will be crucial for
->   community feedback and engagement.
->
-> In the near future, the team aims to draft a Cardano Improvement Proposal
-> (CIP) for Leios. This proposal will detail the requirements for building a
-> reference implementation, informed by the data and insights gathered from
-> ongoing research and simulations.
->
-> The roadmap includes engaging with the community to gather feedback and
-> iterating on the protocol design based on this input. The goal is to ensure
-> that Leios not only meets technical specifications but also aligns with the
-> needs and expectations of the Cardano ecosystem.
 
 ### Audience
 
@@ -150,9 +112,6 @@ Ouroboros Leios introduces new types of blocks with novel diffusion patterns and
 ### Mini protocols
 
 For background information on mini protocols see sections 3.1-3.4 of the *Ouroboros Network Specification*[^network-spec], and rest of that chapter for the mini protocols already in use. Here we will present the additional node-to-node mini protocols needed for Leios.
-
-> [!NOTE]
-> Perhaps this mini-protocol section should be moved into the CIP?
 
 #### `Relay` mini-protocol
 
