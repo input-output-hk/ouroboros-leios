@@ -928,9 +928,9 @@ The plots below show the _throughput_ (defined as the size of the RBs and of t
 
 ### Performance analysis of sharding
 
-The Jupyter notebook [../analysis/shard-performance.ipynb](../analysis/shard-performance.ipynb) presents computations that elucidate the relation between the fraction of shards without an IB vs the expected number of extra IBs for the shard, for the simplest sharding scheme.
+The Jupyter notebook [analysis/shard-performance.ipynb](../analysis/shard-performance.ipynb) presents computations that elucidate the relation between the fraction of shards without an IB vs the expected number of extra IBs for the shard, for the simplest sharding scheme.
 
-![Performance analysis of simple sharding](app://332d877b12d0e40980939095f3b3843a7b85/extra/iohk/ouroboros-leios/analysis/shard-performance.svg?1744809022043)
+![Performance analysis of simple sharding](technical-report-2/shard-performance.svg)
 
 ### Overcollateralization scheme
 
