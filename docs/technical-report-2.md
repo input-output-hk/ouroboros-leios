@@ -150,13 +150,13 @@ A instance is specified by these options and parameters.
 
 ###### Grammar
 
-$$`
+$$
 \begin{array}{l c l l}
 \text{ack}{} & ::= & \text{number} & \text{if}\,\text{BoundedWindow}{}\\
        & |  & \text{unit} & \text{otherwise}\\
 \text{req}{} & ::= & \text{number} \\
 \end{array}
-`$$
+$$
 
 > Table: Relay state agencies
 
@@ -294,7 +294,7 @@ The protocol should allow the consumer to divide the requests between different 
 
 The `CatchUp` protocol is defined as a new instance of the `Fetch` protocol. We give the parameters as a grammar
 
-$$`
+$$
 \begin{array}{l c l l}
 \text{request}{}_{\text{CatchUp}{}} & ::= & \text{ebs-by-rb-range}(\text{range}{})\\
        & \mid  & \text{ebs-by-slot-range}(\text{slot}{},\text{slot}{})\\
@@ -303,7 +303,7 @@ $$`
         & \mid & \text{eb-block}(\text{eb-header}, \text{eb-body})\\
         & \mid & \text{eb-certificate}(\text{certificate})\\
 \end{array}
-`$$
+$$
 
 alternatively there could be separate mini protocols for IB, EB, and Certificate `CatchUp`, so that there cannot be a format mismatch between requests and replies.
 
