@@ -1,9 +1,13 @@
 # Leios technical report #1
 
+> [!IMPORTANT]
+>
+> Information in this report is superceded by the [Leios CIP](https://github.com/cardano-foundation/CIPs/pull/1078).
+
 ## Executive summary
 
 This report captures a snapshot of the modeling, simulation, and analysis of the
-Leios protocol as of February 2024, approximately. Given that the Leios protocol
+Leios protocol as of February 2025, approximately. Given that the Leios protocol
 design is still evolving, the observations, findings, and conclusions documented
 here are provisional and subject to future revision and contradiction. The
 report digs into the following topics:
@@ -25,6 +29,59 @@ input blocks per second or more, using affordable hardware or cloud
 provisioning. Further design and analysis of transaction sharding, memory pool
 management, and fee schedules are needed to estimate the effective transactions
 per second (TPS) and overall cost effectiveness of Leios.
+
+<details>
+  <summary><h2>Table of contents</h2></summary>
+
+- [Executive summary](#executive-summary)
+- [Introduction](#introduction)
+    - [Purpose](###purpose)
+    - [Scope](###scope)
+    - [Context](###context)
+    - [Audience](###audience)
+- [Informal description of Short Leios](#informal-description-of-short-leios)
+- [Formal specifiication for Short Leios](#formal-specification-for-short-leios)
+- [Delta QSD network performance model](#delta-qsd-network-performance-model)
+- [Simulations](#simulations)
+    - [Configuration parameters](#configuration-parameters)
+    - [Rust simulation](#rust-simulation)
+    - [Haskell prototype](#haskell-prototype)
+- [Sortition](#sortition)
+    - [Votes](#votes)
+    - [Regarding the advantage gained by splitting stake among nodes](#regarding-the-advantage-gained-by-splitting-stake-among-nodes)
+    - [Input blocks](#input-blocks)
+    - [Endorser blocks](#endorser-blocks)
+    - [Insights regarding sortition](#insights-regarding-sortition)
+- [Voting and certificates](#voting-and-certificates)
+    - [Structure of votes](#structure-of-votes)
+    - [Number of unique SPOs voting](#number-of-unique-spos-voting)
+    - [Committee size and quorum requirements](#committee-size-and-quorum-requirements)
+    - [Certificate scheme](#certificate-scheme)
+- [Cost analyses](#cost-analyses)
+    - [Simulation of transaction volume on Cardano](#simulation-of-transaction-volume-on-cardano)
+    - [Estimation of costs for a Leios SPO](#estimation-of-costs-for-a-leios-spo)
+    - [Cost of storage](#cost-of-storage)
+    - [Break-even cost for perpetual storage of blocks](#break-even-cost-for-perpetual-storage-of-blocks)
+    - [Compressed storage of Praos blocks](#compressed-storage-of-praos-blocks)
+    - [Rewards received](#rewards-received)
+    - [Importance of the Cardano Reserves](#importance-of-the-cardano-reserves)
+    - [Insights for Leios techno-economics](#insights-for-leios-techno-economics)
+- [Approximate models of Cardano mainnet characteristics](#approximate-models-of-cardano-mainnet-characteristics)
+    - [Transaction sizes and frequencies](#transaction-sizes-and-frequencies)
+    - [Stake distribution](#stake-distribution)
+    - [Insights into mainnet characteristics](#insights-into-mainnet-characteristics)
+- [Thread model](#threat-model)
+    - [Grinding and other threats to Praos](#grinding-and-other-threats-to-praos)
+    - [Equivocation](#equivocation)
+    - [Inaction and nuisance](#inaction-and-nuisance)
+    - [Omission and manipulation](#omission-and-manipulation)
+    - [Network interference](#network-interference)
+    - [Denial of service](#denial-of-service)
+    - [Insights regarding threats](#insights-regarding-threats)
+- [Findings and conclusions](#findings-and-conclusions)
+- [Appendix A: Glossary](#appendix-a-glossary)
+
+</details>
 
 ## Introduction
 
