@@ -18,6 +18,14 @@ report digs into the following topics:
 - Analytic studies of Leios behavior and performance
 - Miscellaneous observations and links to other technical documents
 
+### Regenerated figures for CIP
+
+The jupyter notebook [analysis/sims/cip/analysis.ipynb](analysis/sims/cip/analysis.ipynb) contains a regenerated set of figures for use in the Leios CIP: `sim-cli` was upgraded to version 1.3.0 and the diffusion and voting durations in `config.yaml` were updated. Depending upon the result of the ongoing parameter study, further updates to `config.yaml` may be made before the CIP figures and text are updated. The [Cardano Scaling PR#14](https://github.com/cardano-scaling/CIPs/pull/14/files) shows side-by-side comparisons of these new figures against the ones currently in the CIP.
+
+### Regression experiment on `sim-cli`
+
+The juypter notebook [analysis/sims/regression/analysis.ipynb](analysis/sims/regression/analysis.ipynb) contains the results of comparing `sim-cli` version 1.3.0 to previous tags, for an updated `config.yaml`. Discrepancies are minimal, but the performance of Leios with 1.3.0 is somewhat less than with previous versions. However, protocol parameters may be further tweaked in the future.
+
 ## 2025-08-27
 
 ### CIP draft completion
