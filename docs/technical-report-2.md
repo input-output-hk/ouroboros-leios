@@ -926,6 +926,12 @@ The plots below show the _throughput_ (defined as the size of the RBs and of t
 | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | ![Throughput of Linear Leios](technical-report-2/linear-leios-throughput.svg) | ![Throughput efficiency of Linear Leios](technical-report-2/linear-leios-efficiency.svg) |
 
+### Performance analysis of sharding
+
+The Jupyter notebook [../analysis/shard-performance.ipynb](../analysis/shard-performance.ipynb) presents computations that elucidate the relation between the fraction of shards without an IB vs the expected number of extra IBs for the shard, for the simplest sharding scheme.
+
+![Performance analysis of simple sharding](app://332d877b12d0e40980939095f3b3843a7b85/extra/iohk/ouroboros-leios/analysis/shard-performance.svg?1744809022043)
+
 ### Overcollateralization scheme
 
 We computed shardless overcollateratization where transactions are randomly sampled from the memory pool and nodes operate independently over the concurrency period.
@@ -1055,7 +1061,7 @@ Using previously computed infrastructure expenses and "business as usual" assump
 
 We have forecast the diminishing rewards that would occur if the current TPS persists. See [analysis/reward-forecast.ipynb](../analysis/reward-forecast.ipynb) for methods and details.
 
-![Forecast of future Cardano mainnet rewards](app://332d877b12d0e40980939095f3b3843a7b85/extra/iohk/ouroboros-leios/analysis/reward-forecast-bau.svg?1747778045462)
+![Forecast of future Cardano mainnet rewards](technical-report-2/reward-forecast-bau.svg)
 
 ### Analysis of transaction lifecycle
 
@@ -1075,12 +1081,6 @@ Potential next steps:
 - Translating this model into Delta QSD, so that network effects can be included.
 - Compare this model's results to output of the Rust simulator.
 - Elaborate the model in order to represent the memory-pool and ledger variants under consideration.
-
-### Performance analysis of sharding
-
-The Jupyter notebook [../analysis/shard-performance.ipynb](../analysis/shard-performance.ipynb) presents computations that elucidate the relation between the fraction of shards without an IB vs the expected number of extra IBs for the shard, for the simplest sharding scheme.
-
-![Performance analysis of simple sharding](app://332d877b12d0e40980939095f3b3843a7b85/extra/iohk/ouroboros-leios/analysis/shard-performance.svg?1744809022043)
 
 ## Miscellaneous observations
 
