@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaChaRng;
@@ -8,10 +11,10 @@ use crate::{
     clock::{Clock, MockClockCoordinator, Timestamp},
     config::{NodeId, RawLinkInfo, RawNode, RawTopology, SimConfiguration, TransactionConfig},
     events::{Event, EventTracker},
-    model::{LinearEndorserBlock, LinearRankingBlock, Transaction},
+    model::{LinearEndorserBlock, LinearRankingBlock, Transaction, VoteBundle},
     sim::{
         EventResult, NodeImpl,
-        linear_leios::{CpuTask, LinearLeiosNode, Message},
+        linear_leios::{CpuTask, LinearLeiosNode, Message, TimedEvent},
         lottery::{LotteryKind, MockLotteryResults},
     },
 };
@@ -98,50 +101,56 @@ fn new_node(stake: Option<u64>, producers: Vec<&'static str>) -> RawNode {
 }
 
 struct TestDriver {
-    sim_config: Arc<SimConfiguration>,
+    pub config: Arc<SimConfiguration>,
     rng: ChaChaRng,
     slot: u64,
     time: MockClockCoordinator,
     nodes: HashMap<NodeId, LinearLeiosNode>,
     lottery: HashMap<NodeId, Arc<MockLotteryResults>>,
     queued: HashMap<NodeId, EventResult<LinearLeiosNode>>,
+    events: BTreeMap<Timestamp, Vec<(NodeId, TimedEvent)>>,
 }
 
 impl TestDriver {
     fn new(topology: RawTopology) -> Self {
-        let sim_config = new_sim_config(topology);
-        let rng = ChaChaRng::seed_from_u64(sim_config.seed);
+        let config = new_sim_config(topology);
+        let rng = ChaChaRng::seed_from_u64(config.seed);
         let slot = 0;
         let time = MockClockCoordinator::new();
         let (event_tx, _event_rx) = mpsc::unbounded_channel();
-        let (nodes, lottery) = new_sim(sim_config.clone(), event_tx, time.clock());
+        let (nodes, lottery) = new_sim(config.clone(), event_tx, time.clock());
         Self {
-            sim_config,
+            config,
             rng,
             slot,
             time,
             nodes,
             lottery,
             queued: HashMap::new(),
+            events: BTreeMap::new(),
         }
     }
 
     pub fn id_for(&self, name: &str) -> NodeId {
-        self.sim_config
+        self.config
             .nodes
             .iter()
             .find_map(|n| if n.name == name { Some(n.id) } else { None })
             .unwrap()
     }
 
+    pub fn now(&self) -> Timestamp {
+        self.time.now()
+    }
+
     pub fn produce_tx(&mut self, node_id: NodeId, conflict: bool) -> Arc<Transaction> {
-        let TransactionConfig::Real(tx_config) = &self.sim_config.transactions else {
+        let TransactionConfig::Real(tx_config) = &self.config.transactions else {
             panic!("unexpected TX config")
         };
         let tx = Arc::new(tx_config.new_tx(&mut self.rng, Some(if conflict { 1.0 } else { 0.0 })));
         let node = self.nodes.get_mut(&node_id).unwrap();
         let events = node.handle_new_tx(tx.clone());
-        self.queued.entry(node_id).or_default().merge(events);
+        self.process_events(node_id, events);
         tx
     }
 
@@ -152,12 +161,48 @@ impl TestDriver {
             .configure_win(LotteryKind::GenerateRB, result);
     }
 
+    pub fn win_next_vote_lottery(&mut self, node_id: NodeId, result: u64) {
+        self.lottery
+            .get(&node_id)
+            .unwrap()
+            .configure_win(LotteryKind::GenerateVote, result);
+    }
+
     pub fn next_slot(&mut self) {
-        self.slot += 1;
-        self.time.advance_time(Timestamp::from_secs(self.slot));
-        for (node_id, node) in self.nodes.iter_mut() {
-            let events = node.handle_new_slot(self.slot);
-            self.queued.entry(*node_id).or_default().merge(events);
+        self.advance_time_to(Timestamp::from_secs(self.slot + 1));
+    }
+
+    pub fn advance_time_to(&mut self, timestamp: Timestamp) {
+        let mut now = self.time.now();
+        while now < timestamp {
+            let next_slot = self.slot + 1;
+            let next_slot_time = Timestamp::from_secs(next_slot);
+            let mut next_event = timestamp.min(next_slot_time);
+            if let Some((event_time, _)) = self.events.first_key_value() {
+                next_event = next_event.min(*event_time);
+            }
+            self.time.advance_time(next_event);
+            now = next_event;
+
+            let mut updates: HashMap<NodeId, EventResult<LinearLeiosNode>> = HashMap::new();
+            if now == next_slot_time {
+                for (node_id, node) in &mut self.nodes {
+                    let events = node.handle_new_slot(next_slot);
+                    updates.entry(*node_id).or_default().merge(events);
+                }
+                self.slot = next_slot;
+            }
+            if let Some(events) = self.events.remove(&next_event) {
+                for (node_id, event) in events {
+                    let node = self.nodes.get_mut(&node_id).unwrap();
+                    let events = node.handle_timed_event(event);
+                    updates.entry(node_id).or_default().merge(events);
+                }
+            }
+
+            for (node, events) in updates {
+                self.process_events(node, events);
+            }
         }
     }
 
@@ -234,7 +279,7 @@ impl TestDriver {
             .get_mut(&to)
             .unwrap()
             .handle_message(from, message);
-        self.queued.entry(to).or_default().merge(events);
+        self.process_events(to, events);
     }
 
     pub fn expect_no_message(
@@ -261,14 +306,14 @@ impl TestDriver {
     {
         let queued = self.queued.entry(node).or_default();
         let mut result = None;
-        let mut new_queued = EventResult::default();
+        let mut events = EventResult::default();
         queued.tasks.retain(|t| {
             if result.is_some() {
                 return true;
             }
             result = matcher(t);
             if result.is_some() {
-                new_queued = self
+                events = self
                     .nodes
                     .get_mut(&node)
                     .unwrap()
@@ -276,8 +321,18 @@ impl TestDriver {
             }
             result.is_none()
         });
-        queued.merge(new_queued);
+        self.process_events(node, events);
         result.expect("no CPU tasks matching filter")
+    }
+
+    fn process_events(&mut self, node: NodeId, mut events: EventResult<LinearLeiosNode>) {
+        for (timestamp, event) in events.timed_events.drain(..) {
+            self.events
+                .entry(timestamp)
+                .or_default()
+                .push((node, event));
+        }
+        self.queued.entry(node).or_default().merge(events);
     }
 }
 
@@ -293,8 +348,15 @@ fn is_new_rb_task(
     }
 }
 
+fn is_new_vote_task(task: &CpuTask) -> Option<Arc<VoteBundle>> {
+    match task {
+        CpuTask::VTBundleGenerated(vote, _) => Some(Arc::new(vote.clone())),
+        _ => None,
+    }
+}
+
 #[test]
-fn should_propagate_transactions() {
+fn should_produce_rbs_without_ebs() {
     let topology = new_topology(vec![
         ("node-1", new_node(Some(1000), vec!["node-2"])),
         ("node-2", new_node(Some(1000), vec!["node-1"])),
@@ -317,6 +379,37 @@ fn should_propagate_transactions() {
     let (new_rb, new_eb) = sim.expect_cpu_task_matching(node1, is_new_rb_task);
     assert_eq!(new_rb.transactions, vec![tx1, tx2]);
     assert_eq!(new_eb, None);
+
+    sim.expect_rb_and_eb_sent(node1, node2, new_rb, None);
+}
+
+#[test]
+fn should_produce_rbs_and_ebs() {
+    let topology = new_topology(vec![
+        ("node-1", new_node(Some(1000), vec!["node-2"])),
+        ("node-2", new_node(Some(1000), vec!["node-1"])),
+    ]);
+    let mut sim = TestDriver::new(topology);
+    let node1 = sim.id_for("node-1");
+    let node2 = sim.id_for("node-2");
+
+    // Node 1 produces three transactions, Node 2 should request them all
+    let tx1_1 = sim.produce_tx(node1, false);
+    sim.expect_tx_sent(node1, node2, tx1_1.clone());
+    let tx1_2 = sim.produce_tx(node1, false);
+    sim.expect_tx_sent(node1, node2, tx1_2.clone());
+    let tx1_3 = sim.produce_tx(node1, false);
+    sim.expect_tx_sent(node1, node2, tx1_3.clone());
+
+    sim.win_next_rb_lottery(node1, 0);
+    sim.next_slot();
+    let (new_rb, new_eb) = sim.expect_cpu_task_matching(node1, is_new_rb_task);
+    assert_eq!(new_rb.transactions, vec![tx1_1, tx1_2]);
+    let new_eb = new_eb.expect("no EB produced");
+    assert_eq!(new_eb.txs, vec![tx1_3]);
+
+    sim.expect_rb_and_eb_sent(node1, node2, new_rb, Some(new_eb.clone()));
+    sim.expect_eb_validated(node2, new_eb);
 }
 
 #[test]
@@ -396,4 +489,35 @@ fn should_repropagate_conflicting_transactions_from_eb() {
     // and NOW Node 2 will tell Node 3 about the EB's conflicting TX
     sim.expect_tx_sent(node2, node3, tx1_3);
     sim.expect_eb_validated(node3, eb);
+}
+
+#[test]
+fn should_vote_for_eb() {
+    let topology = new_topology(vec![
+        ("node-1", new_node(Some(1000), vec!["node-2"])),
+        ("node-2", new_node(Some(1000), vec!["node-1"])),
+    ]);
+    let mut sim = TestDriver::new(topology);
+    let node1 = sim.id_for("node-1");
+    let node2 = sim.id_for("node-2");
+
+    let txs = (0..3)
+        .map(|_| sim.produce_tx(node1, false))
+        .collect::<Vec<_>>();
+    for tx in &txs {
+        sim.expect_tx_sent(node1, node2, tx.clone());
+    }
+
+    sim.win_next_rb_lottery(node1, 0);
+    sim.next_slot();
+    let (rb, eb) = sim.expect_cpu_task_matching(node1, is_new_rb_task);
+    let eb = eb.expect("node did not produce EB");
+
+    sim.expect_rb_and_eb_sent(node1, node2, rb.clone(), Some(eb.clone()));
+    sim.expect_eb_validated(node2, eb.clone());
+
+    sim.win_next_vote_lottery(node2, 0);
+    sim.advance_time_to(sim.now() + (sim.config.header_diffusion_time * 3));
+    let vote = sim.expect_cpu_task_matching(node2, is_new_vote_task);
+    assert_eq!(*vote.ebs.first_key_value().unwrap().0, eb.id());
 }
