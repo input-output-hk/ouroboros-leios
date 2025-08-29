@@ -1017,13 +1017,11 @@ See [analysis/overcollateralization-v1.ipynb](../overcollateralization-v1.ipynb)
 
 ### Expected transaction lifecycle
 
-For the draft blog post we computed the cumulative probability of a transaction reaching the ledger as a function of IB production rate and stage length.
+The Jupyter notebooks [analysis/tx-to-block.ipynb](../analysis/tx-to-block.ipynb) and [analysis/blog-figures.ipynb](../analysis/blog-figures.ipynb) estimate the time it takes in Full Short Leios for a transaction to reach the ledger from the memory pool. Additionally, an experimental Delta-QSD expression was created for computing the delay between transaction submission and its referencing by a Praos block: see [analysis/deltaq/tx-lifecycle.ipynb](../analysis/deltaq/tx-lifecycle.ipynb).
 
-![Cumulative probability of transaction reaching ledger](app://332d877b12d0e40980939095f3b3843a7b85/extra/iohk/ouroboros-leios/analysis/tx-to-block-cum-slots-fig.svg?1747778059334)
-
-#### Transaction lifecycle for Praos vs Leios
-
-![Transaction lifecycle for Praos vs Leios](app://332d877b12d0e40980939095f3b3843a7b85/extra/iohk/ouroboros-leios/analysis/tx-to-block-fig.svg?1747778059335)
+|   |   |
+|---|---|
+| ![Cumulative probability of transaction reaching ledger](technical-report-2/tx-to-block-cum-slots-fig.svg) | ![Transaction lifecycle for Praos vs Leios](technical-report-2/tx-to-block-fig.svg) |
 
 ### Computation of Leios profitability
 
@@ -1042,10 +1040,6 @@ Annotations were added to the figure of Praos profitablity, so that it highlight
 We have forecast the diminishing rewards that would occur if the current TPS persists. See [analysis/reward-forecast.ipynb](../analysis/reward-forecast.ipynb) for methods and details.
 
 ![Forecast of future Cardano mainnet rewards](app://332d877b12d0e40980939095f3b3843a7b85/extra/iohk/ouroboros-leios/analysis/reward-forecast-bau.svg?1747778045462)
-
-### Delta-QSD analysis of transaction lifecycle
-
-An experimental Delta-QSD expression was created for computing the delay between transaction submission and its referencing by a Praos block: see [analysis/deltaq/tx-lifecycle.ipynb](../analysis/deltaq/tx-lifecycle.ipynb).
 
 ### Analysis of transaction lifecycle
 
