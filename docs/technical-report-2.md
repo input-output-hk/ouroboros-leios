@@ -991,6 +991,33 @@ The plots below show the _throughput_ (defined as the size of the RBs and of t
 
 The Jupyter notebook [analysis/shard-performance.ipynb](../analysis/shard-performance.ipynb) presents computations that elucidate the relation between the fraction of shards without an IB vs the expected number of extra IBs for the shard, for the simplest sharding scheme.
 
+Consider the situation where protocol parameters are set to generate a mean of $m$ IBs for each shard, during the interval before transactions in IBs are temporarily blacklisted.
+
+The probability of having $k$ IBs generated for the shard follows a Poisson distribution with mean $m$ is
+
+$$
+\mathcal{P}(k) = \frac{m^k}{k!} e^{-m} \; .
+$$
+
+We're interested in two types of inefficiency:
+
+1. *No IB is generated for the shard:* there will be no opportunity for transactions to be included in their assigned shard.
+2. *More than one IB is generated for the shard:* there will be several candidate IBs for the transaction, so (a) the transaction might appear in several IBs and/or (b) IBs would be smaller than if there were just a single one for the shard.
+
+The expected fraction of cases where there is no IB for the shard is 
+
+$$
+\mathbf{E}[1 | k = 0] = e^{- m} \; .
+$$
+
+Similarly, the expected number of extra IBs for the shard is
+
+$$
+\mathbf{E}[k - 1 | k \geq 2] = m - 1 + e^{-m} \; .
+$$
+
+We can plot these quantities.
+
 ![Performance analysis of simple sharding](technical-report-2/shard-performance.svg)
 
 ### Overcollateralization scheme
