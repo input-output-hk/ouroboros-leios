@@ -1043,17 +1043,13 @@ The Jupyter notebooks [analysis/tx-to-block.ipynb](../analysis/tx-to-block.ipynb
 |---|---|
 | ![Cumulative probability of transaction reaching ledger](technical-report-2/tx-to-block-cum-slots-fig.svg) | ![Transaction lifecycle for Praos vs Leios](technical-report-2/tx-to-block-fig.svg) |
 
-### Computation of Leios profitability
+### Leios profitability
 
 Using previously computed infrastructure expenses and "business as usual" assumptions, we have estimated the profitiability of Leios SPOs (hosted either on premium or value cloud providers) as a function of transaction throughput. See [analysis/profitability-leios.ipynb](../analysis/profitability-leios.ipynb) for details.
 
-![Profitability of Leios without rewards from the Reserve](app://332d877b12d0e40980939095f3b3843a7b85/extra/iohk/ouroboros-leios/analysis/leios-forecast-sqrt-fill.svg?1754666293564)
-
-### Revised figure of Praos profitability
-
-Annotations were added to the figure of Praos profitablity, so that it highlights potential uses of the economic surplus that is present at high throughput and so that it emphasizes that Praos cannot support high throughput.
-
-![Profitability of Praos without rewards from the Reserve](app://332d877b12d0e40980939095f3b3843a7b85/extra/iohk/ouroboros-leios/analysis/spo-profitability.svg?1747778059334)
+| Praos | Leios |
+|---|---|
+| ![Profitability of Praos without rewards from the Reserve](technical-report-2/spo-profitability.svg) | ![Profitability of Leios without rewards from the Reserve](technical-report-2/leios-forecast-sqrt-fill.svg) |
 
 ### Forecast of mainnet rewards
 
