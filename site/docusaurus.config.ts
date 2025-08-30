@@ -98,6 +98,7 @@ const config: Config = {
                     label: "Formal Specification",
                     position: "left",
                 },
+                { to: "/docs/roadmap", label: "Roadmap", position: "right" },
                 { to: "/news", label: "Weekly updates", position: "right" },
                 {
                     type: "dropdown",
