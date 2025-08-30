@@ -1,7 +1,7 @@
 #!/usr/bin/env nix-shell
 #!nix-shell -i bash -p ansifilter gnugrep gnused gzip pigz bc
 
-set -veuo pipefail
+set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
@@ -79,7 +79,7 @@ esac
 wait
 
 cat << EOI > case.csv
-Network,Bandwidth,CPU,Diffusion duration,Delta header,Voting duration,Max EB size,Tx size,Throughput,Plutus,Tx start [s],Tx stop [s],Sim stop [s]
+Network,Bandwidth,CPU,Delta header,Diffusion duration,Voting duration,Max EB size,Tx size,Throughput,Plutus,Tx start [s],Tx stop [s],Sim stop [s]
 $NETWORK,$BW Mb/s,$CPU_COUNT vCPU/node,Δ_hdr = $DELTA_HEADER ms,L_diff = $STAGE_LENGTH_DIFF slots,L_vote = $STAGE_LENGTH_VOTE slots,$BLOCK_SIZE MB/EB,$TX_SIZE B/Tx,$THROUGHPUT TxMB/s,,$TX_START,$TX_STOP,$SIM_STOP
 EOI
 
