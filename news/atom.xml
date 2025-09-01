@@ -54,6 +54,28 @@
         <category label="simulation-analysis" term="simulation-analysis"/>
     </entry>
     <entry>
+        <title type="html"><![CDATA[Monthly Review – August 2025]]></title>
+        <id>https://leios.cardano-scaling.org/news/2025/08/31/monthly-review</id>
+        <link href="https://leios.cardano-scaling.org/news/2025/08/31/monthly-review"/>
+        <updated>2025-08-31T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[Watch our August 2025 monthly review livestream covering the latest Leios progress, including the CIP proposal publication and second technical report release.]]></summary>
+        <content type="html"><![CDATA[<p>Watch our August 2025 monthly review livestream covering the latest Leios progress, including the CIP proposal publication and second technical report release.</p>
+<iframe width="560" height="315" src="https://www.youtube.com/embed/hq_8fBotF_E" title="Leios Monthly Review - August 2025" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"></iframe>
+<p><strong>Resources:</strong></p>
+<ul>
+<li><a href="https://drive.google.com/file/d/1VX3_ehv_LJKSfDrItJX6nvF-4ksPsXoN/view?usp=sharing" target="_blank" rel="noopener noreferrer">Google Meet Backup</a></li>
+<li><a href="https://docs.google.com/presentation/d/13b0VONN8QEMlU2tEcfBIsBZrRCGgTDrE-Hg7lfy_WhE/edit?usp=sharing" target="_blank" rel="noopener noreferrer">Slides</a></li>
+<li><a href="https://docs.google.com/document/d/1CR9rb5kjqjgFuTiAxKoMcGzChVkZj8RIE22KSnM3w7w/edit?usp=sharing" target="_blank" rel="noopener noreferrer">Summary</a></li>
+</ul>]]></content>
+        <author>
+            <name>William Wolff</name>
+            <uri>https://github.com/will-break-it</uri>
+        </author>
+        <category label="monthly-review" term="monthly-review"/>
+        <category label="livestream" term="livestream"/>
+        <category label="community" term="community"/>
+    </entry>
+    <entry>
         <title type="html"><![CDATA[Weekly Summary – August 25, 2025]]></title>
         <id>https://leios.cardano-scaling.org/news/2025/08/25/weekly-progress-summary</id>
         <link href="https://leios.cardano-scaling.org/news/2025/08/25/weekly-progress-summary"/>
@@ -1212,84 +1234,5 @@
         <category label="visualization" term="visualization"/>
         <category label="plutus" term="plutus"/>
         <category label="benchmarking" term="benchmarking"/>
-    </entry>
-    <entry>
-        <title type="html"><![CDATA[Weekly Summary – April 21, 2025]]></title>
-        <id>https://leios.cardano-scaling.org/news/2025/04/21/weekly-progress-summary</id>
-        <link href="https://leios.cardano-scaling.org/news/2025/04/21/weekly-progress-summary"/>
-        <updated>2025-04-21T00:00:00.000Z</updated>
-        <summary type="html"><![CDATA[This week, the Leios team made significant progress in protocol development, focusing on simulation improvements, network protocol design, and economic analysis. The team completed extensive simulations across 648 scenarios, implemented new mini-protocols for Leios diffusion, and conducted important economic analysis regarding future reward sustainability.]]></summary>
-        <content type="html"><![CDATA[<p>This week, the Leios team made significant progress in protocol development, focusing on simulation improvements, network protocol design, and economic analysis. The team completed extensive simulations across 648 scenarios, implemented new mini-protocols for Leios diffusion, and conducted important economic analysis regarding future reward sustainability.</p>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-and-analysis">Simulation and analysis<a class="hash-link" aria-label="Direct link to Simulation and analysis" title="Direct link to Simulation and analysis" href="https://leios.cardano-scaling.org/news/2025/04/21/weekly-progress-summary#simulation-and-analysis">​</a></h2>
-<ul>
-<li>Completed comprehensive simulation of 648 scenarios for Full and Short Leios at tag <a href="https://github.com/input-output-hk/ouroboros-leios/releases/tag/leios-2025w16" target="_blank" rel="noopener noreferrer"><code>leios-2025w16</code></a></li>
-<li>Generated new analysis outputs:<!-- -->
-<ul>
-<li>Network, disk, and CPU resource usage summaries</li>
-<li>Interactive "Leios graph" visualization showing transaction, IB, EB, RB, and vote linkages</li>
-</ul>
-</li>
-<li>Key findings from simulations:<!-- -->
-<ul>
-<li>Strong agreement between Rust and Haskell implementations</li>
-<li>Haskell simulation shows network congestion at 16 IB/s</li>
-<li>Rust simulation demonstrates higher CPU usage at elevated IB rates</li>
-<li>Identified voting certification issues in Rust implementation.</li>
-</ul>
-</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="protocol-development">Protocol development<a class="hash-link" aria-label="Direct link to Protocol development" title="Direct link to Protocol development" href="https://leios.cardano-scaling.org/news/2025/04/21/weekly-progress-summary#protocol-development">​</a></h2>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="haskell-implementation">Haskell implementation<a class="hash-link" aria-label="Direct link to Haskell implementation" title="Direct link to Haskell implementation" href="https://leios.cardano-scaling.org/news/2025/04/21/weekly-progress-summary#haskell-implementation">​</a></h3>
-<ul>
-<li>Completed first draft of new mini-protocols for Leios diffusion:<!-- -->
-<ul>
-<li>IB-relay, EB-relay, Vote-relay for header diffusion</li>
-<li>IB-fetch, EB-fetch for body diffusion</li>
-<li>CatchUp protocol for historical blocks</li>
-</ul>
-</li>
-<li>Renamed <code>short-leios</code> command to <code>leios</code> to reflect full variant support.</li>
-</ul>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="rust-implementation">Rust implementation<a class="hash-link" aria-label="Direct link to Rust implementation" title="Direct link to Rust implementation" href="https://leios.cardano-scaling.org/news/2025/04/21/weekly-progress-summary#rust-implementation">​</a></h3>
-<ul>
-<li>Fixed conformance with shared trace format</li>
-<li>Resolved voting logic bug affecting EB certification</li>
-<li>Updated visualization system for documentation site integration.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="economic-analysis">Economic analysis<a class="hash-link" aria-label="Direct link to Economic analysis" title="Direct link to Economic analysis" href="https://leios.cardano-scaling.org/news/2025/04/21/weekly-progress-summary#economic-analysis">​</a></h2>
-<p>The team conducted a detailed analysis of transaction lifecycle and future reward sustainability:</p>
-<ul>
-<li>Analyzed seven stages of Full Leios transaction processing</li>
-<li>Identified optimal stage lengths and shard configurations</li>
-<li>Estimated two-minute average delay from transaction submission to RB reference</li>
-<li>Projected future IB rates needed to maintain current reward levels:<!-- -->
-<ul>
-<li>Current Reserve depletion rate: 12.8% per year</li>
-<li>Required IB rates increase from 0.008 to 0.634 blocks/slot by 2035</li>
-<li>Analysis assumes constant fee-related protocol parameters.</li>
-</ul>
-</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="next-steps">Next steps<a class="hash-link" aria-label="Direct link to Next steps" title="Direct link to Next steps" href="https://leios.cardano-scaling.org/news/2025/04/21/weekly-progress-summary#next-steps">​</a></h2>
-<ul>
-<li>Translate transaction lifecycle model to Delta QSD for network effects analysis</li>
-<li>Compare model results with Rust simulator output</li>
-<li>Develop memory-pool and ledger variant models</li>
-<li>Continue investigation of voting certification issues in Rust implementation.</li>
-</ul>]]></content>
-        <author>
-            <name>William Wolff</name>
-            <uri>https://github.com/will-break-it</uri>
-        </author>
-        <category label="progress" term="progress"/>
-        <category label="update" term="update"/>
-        <category label="weekly" term="weekly"/>
-        <category label="simulation-analysis" term="simulation-analysis"/>
-        <category label="protocol-development" term="protocol-development"/>
-        <category label="economic-analysis" term="economic-analysis"/>
-        <category label="full-leios" term="full-leios"/>
-        <category label="mini-protocols" term="mini-protocols"/>
-        <category label="reward-sustainability" term="reward-sustainability"/>
-        <category label="visualization" term="visualization"/>
     </entry>
 </feed>
