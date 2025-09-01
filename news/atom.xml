@@ -2,11 +2,177 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
     <id>https://leios.cardano-scaling.org/news</id>
     <title>Ouroboros Leios Blog</title>
-    <updated>2025-08-04T00:00:00.000Z</updated>
+    <updated>2025-09-01T00:00:00.000Z</updated>
     <generator>https://github.com/jpmonette/feed</generator>
     <link rel="alternate" href="https://leios.cardano-scaling.org/news"/>
     <subtitle>Ouroboros Leios Blog</subtitle>
     <icon>https://leios.cardano-scaling.org/img/wave-logo.ico</icon>
+    <entry>
+        <title type="html"><![CDATA[Weekly Summary – September 1, 2025]]></title>
+        <id>https://leios.cardano-scaling.org/news/2025/09/01/weekly-progress-summary</id>
+        <link href="https://leios.cardano-scaling.org/news/2025/09/01/weekly-progress-summary"/>
+        <updated>2025-09-01T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[This week marked a significant milestone with the formal publication of the Ouroboros Leios CIP proposal, complemented by the release of the second comprehensive technical report and extensive network performance analysis. The team successfully delivered the definitive protocol specification and supporting evidence to the Cardano Foundation for formal review.]]></summary>
+        <content type="html"><![CDATA[<p>This week marked a significant milestone with the formal publication of the Ouroboros Leios CIP proposal, complemented by the release of the second comprehensive technical report and extensive network performance analysis. The team successfully delivered the definitive protocol specification and supporting evidence to the Cardano Foundation for formal review.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="major-milestone-achievement">Major milestone achievement<a class="hash-link" aria-label="Direct link to Major milestone achievement" title="Direct link to Major milestone achievement" href="https://leios.cardano-scaling.org/news/2025/09/01/weekly-progress-summary#major-milestone-achievement">​</a></h2>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="cip-proposal-publication">CIP proposal publication<a class="hash-link" aria-label="Direct link to CIP proposal publication" title="Direct link to CIP proposal publication" href="https://leios.cardano-scaling.org/news/2025/09/01/weekly-progress-summary#cip-proposal-publication">​</a></h3>
+<p>The team published the <a href="https://github.com/cardano-foundation/CIPs/pull/1078" target="_blank" rel="noopener noreferrer">Ouroboros Leios CIP proposal</a> to the Cardano Foundation CIPs repository, representing the culmination of extensive research, analysis, and specification development. The proposal has been submitted for formal review and is pending CIP number assignment at the next CIP meeting. This submission provides the definitive technical specification for the proposed Leios protocol implementation, establishing the foundation for community review and potential integration into the Cardano ecosystem.</p>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="second-technical-report-release">Second technical report release<a class="hash-link" aria-label="Direct link to Second technical report release" title="Direct link to Second technical report release" href="https://leios.cardano-scaling.org/news/2025/09/01/weekly-progress-summary#second-technical-report-release">​</a></h3>
+<p>The team completed and released the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-2.md" target="_blank" rel="noopener noreferrer">second technical report</a>, capturing comprehensive modeling, simulation, and analysis findings from March to August 2025. This substantial document covers network protocols, threat model analysis, simulation experiments, test network topologies, empirical Cardano network measurements, analytic studies of proposed Leios behavior and performance, and extensive technical observations. The report provides provisional findings and conclusions acknowledging the evolving nature of the protocol design during the study period.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="network-infrastructure-analysis">Network infrastructure analysis<a class="hash-link" aria-label="Direct link to Network infrastructure analysis" title="Direct link to Network infrastructure analysis" href="https://leios.cardano-scaling.org/news/2025/09/01/weekly-progress-summary#network-infrastructure-analysis">​</a></h2>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="inter-datacenter-bandwidth-measurements">Inter-datacenter bandwidth measurements<a class="hash-link" aria-label="Direct link to Inter-datacenter bandwidth measurements" title="Direct link to Inter-datacenter bandwidth measurements" href="https://leios.cardano-scaling.org/news/2025/09/01/weekly-progress-summary#inter-datacenter-bandwidth-measurements">​</a></h3>
+<p>The team conducted extensive inter-datacenter bandwidth measurements using <code>iperf3</code> for bidirectional testing between locations across North America and Europe. The comprehensive analysis examined bandwidth between OVH, AWS, and CenturyLink infrastructure across multiple geographic regions, establishing empirical baselines for network performance expectations in distributed deployment scenarios.</p>
+<p>Key findings from the bandwidth analysis indicate that 100 Mbps represents a conservative lower bound for inter-datacenter connectivity, with significant variation based on geographic distance and infrastructure provider combinations. The measurements revealed bandwidth ranges from 95 Mbps (CenturyLink Colorado to OVH Canada) to 973 Mbps (AWS Oregon to OVH Oregon), providing critical input for proposed Leios deployment planning and parameter optimization.</p>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="network-degradation-resilience-analysis">Network degradation resilience analysis<a class="hash-link" aria-label="Direct link to Network degradation resilience analysis" title="Direct link to Network degradation resilience analysis" href="https://leios.cardano-scaling.org/news/2025/09/01/weekly-progress-summary#network-degradation-resilience-analysis">​</a></h3>
+<p>The team completed comprehensive <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/degraded/" target="_blank" rel="noopener noreferrer">network degradation experiments</a> examining proposed Leios behavior under severely constrained network topologies. The analysis systematically reduced network connections by up to 87% from original mainnet-like topology configurations, testing protocol resilience under extreme network degradation scenarios.</p>
+<p>The degradation experiments demonstrated that proposed Leios continues operating correctly even when 87% of network connections are lost, with network diameter increasing from 5 to 8 hops and average connections per node dropping from 23.5 to 6.0. The protocol maintained functionality under both honest scenarios and adversarial conditions where attackers delay transaction and EB releases, indicating robust operation under degraded network conditions.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="validation-performance-analysis">Validation performance analysis<a class="hash-link" aria-label="Direct link to Validation performance analysis" title="Direct link to Validation performance analysis" href="https://leios.cardano-scaling.org/news/2025/09/01/weekly-progress-summary#validation-performance-analysis">​</a></h2>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="quantile-regression-analysis">Quantile regression analysis<a class="hash-link" aria-label="Direct link to Quantile regression analysis" title="Direct link to Quantile regression analysis" href="https://leios.cardano-scaling.org/news/2025/09/01/weekly-progress-summary#quantile-regression-analysis">​</a></h3>
+<p>The team extended <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/timings/ReadMe.ipynb" target="_blank" rel="noopener noreferrer">ledger operation analysis</a> with comprehensive quantile regressions at 50th, 95th, and 99th percentiles for ledger "apply" and "reapply" operations. This analysis addressed concerns about validation time interference between EB reapplication and Praos block release timing.</p>
+<p>The quantile analysis provides predictions for full EBs with varying Plutus script intensities, demonstrating that "apply" operations occur distributed across multiple slots and computational threads, while "reapply" operations must complete before new Reference Blocks (RBs) and EBs can build upon newly certified EBs.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="cip-documentation-enhancements">CIP documentation enhancements<a class="hash-link" aria-label="Direct link to CIP documentation enhancements" title="Direct link to CIP documentation enhancements" href="https://leios.cardano-scaling.org/news/2025/09/01/weekly-progress-summary#cip-documentation-enhancements">​</a></h2>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="updated-figures-and-regression-validation">Updated figures and regression validation<a class="hash-link" aria-label="Direct link to Updated figures and regression validation" title="Direct link to Updated figures and regression validation" href="https://leios.cardano-scaling.org/news/2025/09/01/weekly-progress-summary#updated-figures-and-regression-validation">​</a></h3>
+<p>The team regenerated comprehensive figures for CIP inclusion using the upgraded <code>sim-cli</code> version 1.3.0 with updated diffusion and voting duration configurations. The <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/regression/analysis.ipynb" target="_blank" rel="noopener noreferrer">regression experiment analysis</a> compared performance across simulator versions, revealing minimal discrepancies but slightly reduced performance with version 1.3.0 compared to previous versions.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="next-steps">Next steps<a class="hash-link" aria-label="Direct link to Next steps" title="Direct link to Next steps" href="https://leios.cardano-scaling.org/news/2025/09/01/weekly-progress-summary#next-steps">​</a></h2>
+<ul>
+<li>Monitor CIP review process and respond to community feedback</li>
+<li>Continue protocol parameter refinement based on ongoing analysis</li>
+<li>Extend network analysis to additional deployment scenarios</li>
+<li>Develop implementation guidelines based on technical report findings.</li>
+</ul>]]></content>
+        <author>
+            <name>William Wolff</name>
+            <uri>https://github.com/will-break-it</uri>
+        </author>
+        <category label="progress" term="progress"/>
+        <category label="update" term="update"/>
+        <category label="weekly" term="weekly"/>
+        <category label="cip-publication" term="cip-publication"/>
+        <category label="technical-report" term="technical-report"/>
+        <category label="network-analysis" term="network-analysis"/>
+        <category label="proposed-leios" term="proposed-leios"/>
+        <category label="simulation-analysis" term="simulation-analysis"/>
+    </entry>
+    <entry>
+        <title type="html"><![CDATA[Weekly Summary – August 25, 2025]]></title>
+        <id>https://leios.cardano-scaling.org/news/2025/08/25/weekly-progress-summary</id>
+        <link href="https://leios.cardano-scaling.org/news/2025/08/25/weekly-progress-summary"/>
+        <updated>2025-08-25T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[This week, the Leios team refined attack analysis methodologies, conducted critical bandwidth limitation experiments, and updated simulation components for CIP documentation. The team successfully demonstrated proposed Leios behavior under constrained network conditions and validated attack experiment findings with improved simulation models.]]></summary>
+        <content type="html"><![CDATA[<p>This week, the Leios team refined attack analysis methodologies, conducted critical bandwidth limitation experiments, and updated simulation components for CIP documentation. The team successfully demonstrated proposed Leios behavior under constrained network conditions and validated attack experiment findings with improved simulation models.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="attack-analysis-refinement">Attack analysis refinement<a class="hash-link" aria-label="Direct link to Attack analysis refinement" title="Direct link to Attack analysis refinement" href="https://leios.cardano-scaling.org/news/2025/08/25/weekly-progress-summary#attack-analysis-refinement">​</a></h2>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="late-release-attack-validation">Late-release attack validation<a class="hash-link" aria-label="Direct link to Late-release attack validation" title="Direct link to Late-release attack validation" href="https://leios.cardano-scaling.org/news/2025/08/25/weekly-progress-summary#late-release-attack-validation">​</a></h3>
+<p>The team completed validation of the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/attack" target="_blank" rel="noopener noreferrer">late-release attack experiment</a> using the latest version of the Rust simulation infrastructure. The rerun confirmed previous findings regarding adversarial impact on proposed Leios throughput, strengthening confidence in the protocol's characterized attack resistance properties under the tested scenarios.</p>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="enhanced-cip-simulation-experiments">Enhanced CIP simulation experiments<a class="hash-link" aria-label="Direct link to Enhanced CIP simulation experiments" title="Direct link to Enhanced CIP simulation experiments" href="https://leios.cardano-scaling.org/news/2025/08/25/weekly-progress-summary#enhanced-cip-simulation-experiments">​</a></h3>
+<p>The <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/cip/" target="_blank" rel="noopener noreferrer">simulation experiment for CIP figures</a> received comprehensive updates with the latest Rust simulation version, incorporating several critical improvements. The enhanced experiments feature semi-optimal protocol parameter settings, improved assumptions for validation costs, and expanded exploration of increased Plutus execution step effects. These refinements provide more accurate performance predictions for CIP documentation.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="network-performance-analysis">Network performance analysis<a class="hash-link" aria-label="Direct link to Network performance analysis" title="Direct link to Network performance analysis" href="https://leios.cardano-scaling.org/news/2025/08/25/weekly-progress-summary#network-performance-analysis">​</a></h2>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="bandwidth-limitation-experiments">Bandwidth limitation experiments<a class="hash-link" aria-label="Direct link to Bandwidth limitation experiments" title="Direct link to Bandwidth limitation experiments" href="https://leios.cardano-scaling.org/news/2025/08/25/weekly-progress-summary#bandwidth-limitation-experiments">​</a></h3>
+<p>The team conducted comprehensive <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/bandwidth/analysis.ipynb" target="_blank" rel="noopener noreferrer">bandwidth constraint analysis</a> examining proposed Leios operation under severely constrained network conditions. The experiments systematically reduced inter-node bandwidth to values as low as 1 Mb/s to determine minimum network requirements for protocol viability.</p>
+<p>Key findings demonstrate that proposed Leios operates successfully at 0.250 TxkB/s throughput even with constrained 2 Mb/s bandwidth between nodes. However, the protocol experiences breakdown at 1 Mb/s bandwidth limitations, establishing critical minimum network requirements for deployment scenarios. These results provide essential constraints for infrastructure planning and protocol parameter optimization.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-infrastructure-enhancements">Simulation infrastructure enhancements<a class="hash-link" aria-label="Direct link to Simulation infrastructure enhancements" title="Direct link to Simulation infrastructure enhancements" href="https://leios.cardano-scaling.org/news/2025/08/25/weekly-progress-summary#simulation-infrastructure-enhancements">​</a></h2>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="cross-simulation-validation-framework">Cross-simulation validation framework<a class="hash-link" aria-label="Direct link to Cross-simulation validation framework" title="Direct link to Cross-simulation validation framework" href="https://leios.cardano-scaling.org/news/2025/08/25/weekly-progress-summary#cross-simulation-validation-framework">​</a></h3>
+<p>The team expanded the regression analysis framework to systematically compare all tagged versions of the Rust simulator against consistent network topology and configuration parameters. This approach accelerates detection of behavioral changes across simulator versions and ensures consistent experimental foundations for protocol analysis.</p>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="updated-validation-models">Updated validation models<a class="hash-link" aria-label="Direct link to Updated validation models" title="Direct link to Updated validation models" href="https://leios.cardano-scaling.org/news/2025/08/25/weekly-progress-summary#updated-validation-models">​</a></h3>
+<p>Simulation infrastructure received updated transaction validation CPU models that improve accuracy of computational cost predictions. These enhanced models provide more reliable estimates for proposed Leios performance under various workload scenarios and support more precise parameter optimization for different deployment environments.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="next-steps">Next steps<a class="hash-link" aria-label="Direct link to Next steps" title="Direct link to Next steps" href="https://leios.cardano-scaling.org/news/2025/08/25/weekly-progress-summary#next-steps">​</a></h2>
+<ul>
+<li>Conduct comprehensive network topology degradation experiments</li>
+<li>Extend bandwidth analysis to examine intermediate constraint levels</li>
+<li>Integrate improved validation models into CIP performance projections</li>
+<li>Finalize attack resistance documentation for formal CIP submission.</li>
+</ul>]]></content>
+        <author>
+            <name>William Wolff</name>
+            <uri>https://github.com/will-break-it</uri>
+        </author>
+        <category label="progress" term="progress"/>
+        <category label="update" term="update"/>
+        <category label="weekly" term="weekly"/>
+        <category label="attack-experiments" term="attack-experiments"/>
+        <category label="bandwidth-analysis" term="bandwidth-analysis"/>
+        <category label="cip-figures" term="cip-figures"/>
+        <category label="proposed-leios" term="proposed-leios"/>
+        <category label="network-analysis" term="network-analysis"/>
+    </entry>
+    <entry>
+        <title type="html"><![CDATA[Weekly Summary – August 18, 2025]]></title>
+        <id>https://leios.cardano-scaling.org/news/2025/08/18/weekly-progress-summary</id>
+        <link href="https://leios.cardano-scaling.org/news/2025/08/18/weekly-progress-summary"/>
+        <updated>2025-08-18T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[This week, the Leios team conducted comprehensive attack parameter analysis, released updated simulation tools, and performed detailed analysis of Cardano mainnet validation performance. The team successfully characterized the effectiveness of late-release attacks across different parameter ranges and established baseline performance metrics for ledger operations critical to proposed Leios implementation.]]></summary>
+        <content type="html"><![CDATA[<p>This week, the Leios team conducted comprehensive attack parameter analysis, released updated simulation tools, and performed detailed analysis of Cardano mainnet validation performance. The team successfully characterized the effectiveness of late-release attacks across different parameter ranges and established baseline performance metrics for ledger operations critical to proposed Leios implementation.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="attack-analysis-and-parameter-optimization">Attack analysis and parameter optimization<a class="hash-link" aria-label="Direct link to Attack analysis and parameter optimization" title="Direct link to Attack analysis and parameter optimization" href="https://leios.cardano-scaling.org/news/2025/08/18/weekly-progress-summary#attack-analysis-and-parameter-optimization">​</a></h2>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="parameter-sweep-experiment-for-late-eb-attacks">Parameter-sweep experiment for late-EB attacks<a class="hash-link" aria-label="Direct link to Parameter-sweep experiment for late-EB attacks" title="Direct link to Parameter-sweep experiment for late-EB attacks" href="https://leios.cardano-scaling.org/news/2025/08/18/weekly-progress-summary#parameter-sweep-experiment-for-late-eb-attacks">​</a></h3>
+<p>The team conducted a <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w33b/analysis.ipynb" target="_blank" rel="noopener noreferrer">comprehensive parameter-sweep experiment</a> to determine optimal adversarial strategies for late Endorser Block (EB) attacks. The experiment systematically varied EB delay timing from six to eight seconds with adversaries controlling 33% of stake, examining both diffusion parameter configurations (L_diff on/off) under the <code>txs-received</code> propagation scheme.</p>
+<p>Critical findings from the parameter sweep analysis demonstrate that efficiency degradation begins when EBs and transactions are delayed 6.5 seconds, with minimal additional impact beyond 7-second delays. The analysis revealed that L_diff = 0s configurations perform better than L_diff = 7s under adversarial conditions. Importantly, none of the tested scenarios using <code>txs-received</code> propagation resulted in transaction loss or protocol breakdown, indicating robust behavior under these attack conditions.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-infrastructure-improvements">Simulation infrastructure improvements<a class="hash-link" aria-label="Direct link to Simulation infrastructure improvements" title="Direct link to Simulation infrastructure improvements" href="https://leios.cardano-scaling.org/news/2025/08/18/weekly-progress-summary#simulation-infrastructure-improvements">​</a></h2>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation-releases">Rust simulation releases<a class="hash-link" aria-label="Direct link to Rust simulation releases" title="Direct link to Rust simulation releases" href="https://leios.cardano-scaling.org/news/2025/08/18/weekly-progress-summary#rust-simulation-releases">​</a></h3>
+<p>The team released versions 1.1.0 and 1.2.0 of the Rust simulation infrastructure, incorporating updated transaction validation CPU models that improve accuracy of performance predictions. These releases enhance the fidelity of proposed Leios simulations and provide more reliable computational cost estimates for protocol analysis.</p>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="regression-analysis-framework">Regression analysis framework<a class="hash-link" aria-label="Direct link to Regression analysis framework" title="Direct link to Regression analysis framework" href="https://leios.cardano-scaling.org/news/2025/08/18/weekly-progress-summary#regression-analysis-framework">​</a></h3>
+<p>The team implemented a comprehensive <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/regression/" target="_blank" rel="noopener noreferrer">regression analysis framework</a> comparing behavior across all tagged versions of the Rust simulator <code>sim-cli</code>. This systematic approach enables rapid detection of behavioral changes in the simulator across development iterations, ensuring consistency and reliability in experimental results.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="mainnet-performance-analysis">Mainnet performance analysis<a class="hash-link" aria-label="Direct link to Mainnet performance analysis" title="Direct link to Mainnet performance analysis" href="https://leios.cardano-scaling.org/news/2025/08/18/weekly-progress-summary#mainnet-performance-analysis">​</a></h2>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="cardano-mainnet-validation-timing-analysis">Cardano mainnet validation timing analysis<a class="hash-link" aria-label="Direct link to Cardano mainnet validation timing analysis" title="Direct link to Cardano mainnet validation timing analysis" href="https://leios.cardano-scaling.org/news/2025/08/18/weekly-progress-summary#cardano-mainnet-validation-timing-analysis">​</a></h3>
+<p>The team extended the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/timings/ReadMe.ipynb" target="_blank" rel="noopener noreferrer">analysis of ledger operations</a> with comprehensive linear statistical models predicting <code>Apply</code> and <code>Reapply</code> phases of ledger updates. These regressions provide crucial input for proposed Leios performance studies, particularly scenarios involving higher Plutus execution limits.</p>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="empty-block-diffusion-analysis">Empty block diffusion analysis<a class="hash-link" aria-label="Direct link to Empty block diffusion analysis" title="Direct link to Empty block diffusion analysis" href="https://leios.cardano-scaling.org/news/2025/08/18/weekly-progress-summary#empty-block-diffusion-analysis">​</a></h3>
+<p>The team completed <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/delta-header/analysis.ipynb" target="_blank" rel="noopener noreferrer">analysis of empty block diffusion</a> on Cardano mainnet using data from pooltool.io. This analysis establishes empirical estimates for the Δ_hdr parameter required by the proposed Leios protocol. The findings demonstrate that 94.0% of empty Praos blocks arrive at nodes within one second of their slot start time, providing critical timing constraints for protocol parameter selection.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="next-steps">Next steps<a class="hash-link" aria-label="Direct link to Next steps" title="Direct link to Next steps" href="https://leios.cardano-scaling.org/news/2025/08/18/weekly-progress-summary#next-steps">​</a></h2>
+<ul>
+<li>Continue refinement of attack resistance analysis based on parameter sweep findings</li>
+<li>Integrate updated CPU models into comprehensive protocol performance evaluations</li>
+<li>Extend mainnet analysis to inform proposed Leios parameter optimization</li>
+<li>Prepare comprehensive attack analysis documentation for CIP inclusion.</li>
+</ul>]]></content>
+        <author>
+            <name>William Wolff</name>
+            <uri>https://github.com/will-break-it</uri>
+        </author>
+        <category label="progress" term="progress"/>
+        <category label="update" term="update"/>
+        <category label="weekly" term="weekly"/>
+        <category label="attack-analysis" term="attack-analysis"/>
+        <category label="parameter-sweep" term="parameter-sweep"/>
+        <category label="rust-simulation" term="rust-simulation"/>
+        <category label="proposed-leios" term="proposed-leios"/>
+        <category label="mainnet-analysis" term="mainnet-analysis"/>
+    </entry>
+    <entry>
+        <title type="html"><![CDATA[Weekly Summary – August 11, 2025]]></title>
+        <id>https://leios.cardano-scaling.org/news/2025/08/11/weekly-progress-summary</id>
+        <link href="https://leios.cardano-scaling.org/news/2025/08/11/weekly-progress-summary"/>
+        <updated>2025-08-11T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[This week, the Leios team advanced the Cardano Improvement Proposal (CIP) documentation, conducted comprehensive attack analysis experiments, and continued cross-validation between simulation implementations. The team successfully demonstrated resilience characteristics of proposed Leios under adversarial conditions and refined protocol specification components for the formal CIP submission.]]></summary>
+        <content type="html"><![CDATA[<p>This week, the Leios team advanced the Cardano Improvement Proposal (CIP) documentation, conducted comprehensive attack analysis experiments, and continued cross-validation between simulation implementations. The team successfully demonstrated resilience characteristics of proposed Leios under adversarial conditions and refined protocol specification components for the formal CIP submission.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="cip-development-progress">CIP development progress<a class="hash-link" aria-label="Direct link to CIP development progress" title="Direct link to CIP development progress" href="https://leios.cardano-scaling.org/news/2025/08/11/weekly-progress-summary#cip-development-progress">​</a></h2>
+<p>The team made substantial progress on the Ouroboros Leios CIP proposal. The draft specification section is now complete except for the network and incentives components. The motivation and abstract sections have been refined for clarity, enhancing the document's accessibility and technical precision. The first of four main rationale subsections has been fully drafted, providing evidence-based arguments for the necessity and viability of the proposed Leios protocol enhancement.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="attack-resistance-analysis">Attack resistance analysis<a class="hash-link" aria-label="Direct link to Attack resistance analysis" title="Direct link to Attack resistance analysis" href="https://leios.cardano-scaling.org/news/2025/08/11/weekly-progress-summary#attack-resistance-analysis">​</a></h2>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="initial-adversarial-simulation-experiments">Initial adversarial simulation experiments<a class="hash-link" aria-label="Direct link to Initial adversarial simulation experiments" title="Direct link to Initial adversarial simulation experiments" href="https://leios.cardano-scaling.org/news/2025/08/11/weekly-progress-summary#initial-adversarial-simulation-experiments">​</a></h3>
+<p>The team conducted the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w33/analysis.ipynb" target="_blank" rel="noopener noreferrer">first simulation experiment for attacks</a>, examining late Endorser Block (EB) and transaction diffusion scenarios where adversaries control timing of critical protocol messages. The experiment varied the diffusion parameter L_diff and EB propagation schemes to assess protocol robustness under different adversarial strategies.</p>
+<p>Key findings from the initial attack analysis include successful demonstration that late-release attacks can impact proposed Leios throughput under specific conditions. The analysis revealed that transaction loss occurred in some scenarios due to memory pool rule formulations in the simulator, leading to important insights for protocol hardening and implementation requirements.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="cross-simulation-validation">Cross-simulation validation<a class="hash-link" aria-label="Direct link to Cross-simulation validation" title="Direct link to Cross-simulation validation" href="https://leios.cardano-scaling.org/news/2025/08/11/weekly-progress-summary#cross-simulation-validation">​</a></h2>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="haskell-versus-rust-comparison">Haskell versus Rust comparison<a class="hash-link" aria-label="Direct link to Haskell versus Rust comparison" title="Direct link to Haskell versus Rust comparison" href="https://leios.cardano-scaling.org/news/2025/08/11/weekly-progress-summary#haskell-versus-rust-comparison">​</a></h3>
+<p>The team completed another comprehensive comparison between Haskell and Rust simulation implementations at <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/202532b" target="_blank" rel="noopener noreferrer">analysis/sims/202532b</a>. Results indicate successful resolution of previous discrepancies in vote diffusion behavior between the two simulation environments. This validation ensures both implementations produce consistent results for protocol analysis and strengthens confidence in the simulation-based evidence supporting the CIP.</p>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="cip-figure-preparation">CIP figure preparation<a class="hash-link" aria-label="Direct link to CIP figure preparation" title="Direct link to CIP figure preparation" href="https://leios.cardano-scaling.org/news/2025/08/11/weekly-progress-summary#cip-figure-preparation">​</a></h3>
+<p>The <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/cip/" target="_blank" rel="noopener noreferrer">experiment for draft figures for CIP</a> progressed with updated simulation runs designed to generate publication-quality performance charts and protocol behavior visualizations for inclusion in the formal CIP documentation.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="next-steps">Next steps<a class="hash-link" aria-label="Direct link to Next steps" title="Direct link to Next steps" href="https://leios.cardano-scaling.org/news/2025/08/11/weekly-progress-summary#next-steps">​</a></h2>
+<ul>
+<li>Complete the remaining network and incentives sections of the CIP specification</li>
+<li>Conduct follow-up analysis on attack experiment findings to refine protocol parameters</li>
+<li>Continue refinement of memory pool rules based on adversarial scenario insights</li>
+<li>Finalize CIP figures and supporting analysis for submission preparation.</li>
+</ul>]]></content>
+        <author>
+            <name>William Wolff</name>
+            <uri>https://github.com/will-break-it</uri>
+        </author>
+        <category label="progress" term="progress"/>
+        <category label="update" term="update"/>
+        <category label="weekly" term="weekly"/>
+        <category label="cip" term="cip"/>
+        <category label="attack-analysis" term="attack-analysis"/>
+        <category label="rust-simulation" term="rust-simulation"/>
+        <category label="haskell-simulation" term="haskell-simulation"/>
+        <category label="proposed-leios" term="proposed-leios"/>
+    </entry>
     <entry>
         <title type="html"><![CDATA[Weekly Summary – August 4, 2025]]></title>
         <id>https://leios.cardano-scaling.org/news/2025/08/04/weekly-progress-summary</id>
@@ -1125,296 +1291,5 @@
         <category label="mini-protocols" term="mini-protocols"/>
         <category label="reward-sustainability" term="reward-sustainability"/>
         <category label="visualization" term="visualization"/>
-    </entry>
-    <entry>
-        <title type="html"><![CDATA[Weekly Summary – April 14, 2025]]></title>
-        <id>https://leios.cardano-scaling.org/news/2025/04/14/weekly-progress-summary</id>
-        <link href="https://leios.cardano-scaling.org/news/2025/04/14/weekly-progress-summary"/>
-        <updated>2025-04-14T00:00:00.000Z</updated>
-        <summary type="html"><![CDATA[This week, the team made substantial progress in both the Haskell and Rust simulations, refined cost estimates, and carried out detailed analyses of the transaction lifecycle and Full Leios simulations.]]></summary>
-        <content type="html"><![CDATA[<p>This week, the team made substantial progress in both the Haskell and Rust simulations, refined cost estimates, and carried out detailed analyses of the transaction lifecycle and Full Leios simulations.</p>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-improvements">Simulation improvements<a class="hash-link" aria-label="Direct link to Simulation improvements" title="Direct link to Simulation improvements" href="https://leios.cardano-scaling.org/news/2025/04/14/weekly-progress-summary#simulation-improvements">​</a></h3>
-<h4 class="anchor anchorWithStickyNavbar_LWe7" id="haskell-simulation">Haskell simulation<a class="hash-link" aria-label="Direct link to Haskell simulation" title="Direct link to Haskell simulation" href="https://leios.cardano-scaling.org/news/2025/04/14/weekly-progress-summary#haskell-simulation">​</a></h4>
-<ul>
-<li>Completed the first draft of new mini protocols for Leios diffusion<!-- -->
-<ul>
-<li>Modeled protocols after block-fetch and node-to-node transaction submission from <code>ouroboros-network</code></li>
-<li>Included IB relay, EB relay, and vote relay for header diffusion and body announcements</li>
-<li>Included IB fetch and EB fetch for body diffusion</li>
-<li>Worked on the CatchUp protocol for older blocks</li>
-<li>See <code>simulation/docs/network-spec</code> for full protocol details</li>
-</ul>
-</li>
-<li>Renamed <code>short-leios</code> command to <code>leios</code> as it now covers the full variant as well<!-- -->
-<ul>
-<li><code>short-leios</code> is kept as alias for compatibility.</li>
-</ul>
-</li>
-</ul>
-<h4 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation">Rust simulation<a class="hash-link" aria-label="Direct link to Rust simulation" title="Direct link to Rust simulation" href="https://leios.cardano-scaling.org/news/2025/04/14/weekly-progress-summary#rust-simulation">​</a></h4>
-<ul>
-<li>Fixed conformance issues with the shared trace format</li>
-<li>Fixed a bug in the voting logic that prevented EBs from receiving enough votes to be included on-chain</li>
-<li>Updated visualizations to use smaller trace files in preparation for hosting on the documentation site.</li>
-</ul>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="revisions-to-the-cost-dashboard">Revisions to the cost dashboard<a class="hash-link" aria-label="Direct link to Revisions to the cost dashboard" title="Direct link to Revisions to the cost dashboard" href="https://leios.cardano-scaling.org/news/2025/04/14/weekly-progress-summary#revisions-to-the-cost-dashboard">​</a></h3>
-<p>The <a href="https://leios.cardano-scaling.org/cost-estimator/" target="_blank" rel="noopener noreferrer">cost dashboard</a> was updated with lower and more realistic IO estimates.</p>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="transaction-lifecycle-analysis">Transaction lifecycle analysis<a class="hash-link" aria-label="Direct link to Transaction lifecycle analysis" title="Direct link to Transaction lifecycle analysis" href="https://leios.cardano-scaling.org/news/2025/04/14/weekly-progress-summary#transaction-lifecycle-analysis">​</a></h3>
-<p>The Jupyter notebook <a href="https://github.com/input-output-hk/ouroboros-leios/blob/leios-2025w17/analysis/tx-to-block.ipynb" target="_blank" rel="noopener noreferrer">Analysis of transaction lifecycle</a> estimates the delay introduced at each of the seven stages of Full Leios as a transaction progresses from the memory pool to being referenced by a Praos block.</p>
-<p>Key findings from the analysis:</p>
-<ol>
-<li>Reducing stage lengths below 10 slots offers little benefit</li>
-<li>The number of shards should remain low enough to maintain a high IB rate per shard relative to the stage length</li>
-<li>Low EB rates result in many orphaned IBs</li>
-<li>With realistic parameters, the delay from transaction submission to its inclusion in an RB is approximately two minutes.</li>
-</ol>
-<p>Potential next steps:</p>
-<ul>
-<li>Translate the model into Delta QSD to capture network effects</li>
-<li>Compare the model's output with results from the Rust simulator</li>
-<li>Extend the model to account for different memory pool and ledger variants under evaluation.</li>
-</ul>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-and-analysis-of-full-leios">Simulation and analysis of Full Leios<a class="hash-link" aria-label="Direct link to Simulation and analysis of Full Leios" title="Direct link to Simulation and analysis of Full Leios" href="https://leios.cardano-scaling.org/news/2025/04/14/weekly-progress-summary#simulation-and-analysis-of-full-leios">​</a></h3>
-<p>The team conducted comprehensive simulations using both Haskell and Rust simulators at tag <a href="https://github.com/input-output-hk/ouroboros-leios/releases/tag/leios-2025w16" target="_blank" rel="noopener noreferrer">leios-2025w16</a>. The simulations covered 648 scenarios of Full and Short Leios with varied parameters:</p>
-<ul>
-<li>IB production rate</li>
-<li>IB size</li>
-<li>EB production rate</li>
-<li>Stage length</li>
-<li>CPU constraints.</li>
-</ul>
-<p>Two new output files were generated:</p>
-<ol>
-<li>A summary of network, disk, and CPU resource usage over the course of the simulation</li>
-<li>The vertices and edges of the Leios graph, showing linkages between transactions, IBs, EBs, RBs, and votes (can be visualized as an interactive web page).</li>
-</ol>
-<p>Key findings:</p>
-<ul>
-<li>The Rust and Haskell simulations show generally close agreement</li>
-<li>The Haskell simulation encounters network congestion at 16 IB/s, while the Rust simulation does not</li>
-<li>The Rust simulation consumes more CPU at high IB rates than the Haskell simulation</li>
-<li>In some cases, the Rust simulation does not produce enough votes to certify an EB.</li>
-</ul>
-<p>Detailed results are available in the Jupyter notebook <a href="https://github.com/input-output-hk/ouroboros-leios/blob/leios-2025w17/analysis/sims/2025w16/analysis.ipynb" target="_blank" rel="noopener noreferrer">analysis/sims/2025w16/analysis.ipynb</a>.</p>]]></content>
-        <author>
-            <name>William Wolff</name>
-            <uri>https://github.com/will-break-it</uri>
-        </author>
-        <category label="progress" term="progress"/>
-        <category label="update" term="update"/>
-        <category label="weekly" term="weekly"/>
-        <category label="haskell-simulation" term="haskell-simulation"/>
-        <category label="rust-simulation" term="rust-simulation"/>
-        <category label="mini-protocols" term="mini-protocols"/>
-        <category label="cost-dashboard" term="cost-dashboard"/>
-        <category label="transaction-lifecycle" term="transaction-lifecycle"/>
-        <category label="full-leios" term="full-leios"/>
-        <category label="network-protocols" term="network-protocols"/>
-    </entry>
-    <entry>
-        <title type="html"><![CDATA[Weekly Summary – April 7, 2025]]></title>
-        <id>https://leios.cardano-scaling.org/news/2025/04/07/weekly-progress-summary</id>
-        <link href="https://leios.cardano-scaling.org/news/2025/04/07/weekly-progress-summary"/>
-        <updated>2025-04-07T00:00:00.000Z</updated>
-        <summary type="html"><![CDATA[This week, the team continued refining the protocol and its simulation capabilities, making significant progress in addressing various topics.]]></summary>
-        <content type="html"><![CDATA[<p>This week, the team continued refining the protocol and its simulation capabilities, making significant progress in addressing various topics.</p>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-improvements">Simulation improvements<a class="hash-link" aria-label="Direct link to Simulation improvements" title="Direct link to Simulation improvements" href="https://leios.cardano-scaling.org/news/2025/04/07/weekly-progress-summary#simulation-improvements">​</a></h3>
-<h4 class="anchor anchorWithStickyNavbar_LWe7" id="haskell-simulation">Haskell simulation<a class="hash-link" aria-label="Direct link to Haskell simulation" title="Direct link to Haskell simulation" href="https://leios.cardano-scaling.org/news/2025/04/07/weekly-progress-summary#haskell-simulation">​</a></h4>
-<ul>
-<li>Started specifying a new relay protocol for IB header diffusion without the body</li>
-<li>Improved the shared log format by removing redundancies and harmonizing naming</li>
-<li>Added support for additional events required by conformance testing, including <code>SlotEvent</code> and <code>NoBlockEvent</code>
-<ul>
-<li>These events can be enabled using the <code>--conformance-events</code> flag with <code>--shared-log-format</code>.</li>
-</ul>
-</li>
-</ul>
-<h4 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation">Rust simulation<a class="hash-link" aria-label="Direct link to Rust simulation" title="Direct link to Rust simulation" href="https://leios.cardano-scaling.org/news/2025/04/07/weekly-progress-summary#rust-simulation">​</a></h4>
-<ul>
-<li>Updated traces to match the new standardized trace format</li>
-<li>Fixed a critical bug in CPU scheduling where nodes were using more cores than allocated.</li>
-</ul>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="analysis-of-workflow-optimization">Analysis of workflow optimization<a class="hash-link" aria-label="Direct link to Analysis of workflow optimization" title="Direct link to Analysis of workflow optimization" href="https://leios.cardano-scaling.org/news/2025/04/07/weekly-progress-summary#analysis-of-workflow-optimization">​</a></h3>
-<p>The team significantly improved the workflow for analyzing both Haskell and Rust simulations:</p>
-<ul>
-<li>Replaced MongoDB with more efficient <code>jq</code> queries using map-reduce operations</li>
-<li>Created reusable library functions for plotting with R</li>
-<li>Revised and streamlined scripts for creating, executing, and analyzing simulations</li>
-<li>Made the Jupyter notebook for analyses more generic and reusable</li>
-<li>Successfully tested the new workflow on tag <code>leios-2025w15</code>.</li>
-</ul>
-<p>These improvements will enable faster setup and execution of future simulation experiments, with quicker turnaround times for analysis. During this optimization work, several discrepancies between the Haskell and Rust simulations were identified and documented as GitHub issues for future investigation.</p>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="edinburgh-workshop-recaps">Edinburgh workshop recaps<a class="hash-link" aria-label="Direct link to Edinburgh workshop recaps" title="Direct link to Edinburgh workshop recaps" href="https://leios.cardano-scaling.org/news/2025/04/07/weekly-progress-summary#edinburgh-workshop-recaps">​</a></h3>
-<p>The Edinburgh workshop documentation has been made available, covering key discussions and decisions:</p>
-<h4 class="anchor anchorWithStickyNavbar_LWe7" id="day-1-highlights">Day 1 highlights<a class="hash-link" aria-label="Direct link to Day 1 highlights" title="Direct link to Day 1 highlights" href="https://leios.cardano-scaling.org/news/2025/04/07/weekly-progress-summary#day-1-highlights">​</a></h4>
-<ul>
-<li>Explored ledger design options comparing labeled UTXOs (explicit shards) vs accounts (implicit shards) approaches</li>
-<li>Discussed conformance testing strategies including QuickCheck dynamic and trace verification approaches</li>
-<li>Analyzed critical edge cases for user onboarding and system properties.</li>
-</ul>
-<h4 class="anchor anchorWithStickyNavbar_LWe7" id="day-2-highlights">Day 2 highlights<a class="hash-link" aria-label="Direct link to Day 2 highlights" title="Direct link to Day 2 highlights" href="https://leios.cardano-scaling.org/news/2025/04/07/weekly-progress-summary#day-2-highlights">​</a></h4>
-<ul>
-<li>Conducted a detailed analysis of Leios node costs across different TPS levels</li>
-<li>Key findings on resource usage:<!-- -->
-<ul>
-<li>At 10 TPS: 1.8x increase in egress and 6x increase in compute compared to Praos</li>
-<li>At 1K TPS: significant scaling improvements with better resource efficiency</li>
-</ul>
-</li>
-<li>Provided recommendations for potential integration with Peras, particularly to optimize the voting mechanism</li>
-<li>Discussed performance characteristics at both high and low throughput levels.</li>
-</ul>
-<h4 class="anchor anchorWithStickyNavbar_LWe7" id="day-3-highlights">Day 3 highlights<a class="hash-link" aria-label="Direct link to Day 3 highlights" title="Direct link to Day 3 highlights" href="https://leios.cardano-scaling.org/news/2025/04/07/weekly-progress-summary#day-3-highlights">​</a></h4>
-<ul>
-<li>Held an in-depth discussion on optimistic ledger state references, exploring three main approaches:<!-- -->
-<ol>
-<li>RB reference: highest security but highest latency</li>
-<li>EB reference: balanced approach with medium security and latency</li>
-<li>EB-DAG: advanced approach using directed acyclic graph structure</li>
-</ol>
-</li>
-<li>Key advantages of the EB-DAG approach:<!-- -->
-<ul>
-<li>Achieves low latency while maintaining security</li>
-<li>Provides strong inclusion guarantees for EBs</li>
-<li>Enables efficient state management and reconstruction</li>
-<li>Creates a complete, verifiable chain history</li>
-</ul>
-</li>
-<li>Discussed implementation considerations for state management and block ordering under the EB-DAG model.</li>
-</ul>
-<p>For more information, please see the full workshop recaps in the <a href="https://github.com/input-output-hk/ouroboros-leios/tree/main/docs/workshop" target="_blank" rel="noopener noreferrer">Leios documentation</a>.</p>]]></content>
-        <author>
-            <name>William Wolff</name>
-            <uri>https://github.com/will-break-it</uri>
-        </author>
-        <category label="progress" term="progress"/>
-        <category label="update" term="update"/>
-        <category label="weekly" term="weekly"/>
-        <category label="haskell-simulation" term="haskell-simulation"/>
-        <category label="rust-simulation" term="rust-simulation"/>
-        <category label="workflow" term="workflow"/>
-        <category label="optimization" term="optimization"/>
-        <category label="analysis" term="analysis"/>
-        <category label="workshop" term="workshop"/>
-        <category label="edinburgh" term="edinburgh"/>
-        <category label="conformance-testing" term="conformance-testing"/>
-    </entry>
-    <entry>
-        <title type="html"><![CDATA[Weekly Summary – March 31, 2025]]></title>
-        <id>https://leios.cardano-scaling.org/news/2025/03/31/weekly-progress-summary</id>
-        <link href="https://leios.cardano-scaling.org/news/2025/03/31/weekly-progress-summary"/>
-        <updated>2025-03-31T00:00:00.000Z</updated>
-        <summary type="html"><![CDATA[This week, the Leios team met for an in-person workshop in Edinburgh and continued their efforts in refining the protocol and its simulation capabilities. The team made significant progress in addressing various topics.]]></summary>
-        <content type="html"><![CDATA[<p>This week, the Leios team met for an in-person workshop in Edinburgh and continued their efforts in refining the protocol and its simulation capabilities. The team made significant progress in addressing various topics.</p>
-<p>On <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/workshop/day-1-recap.md" target="_blank" rel="noopener noreferrer">day one</a>, the team discussed topics such as ledger design and trade-offs, as well as two different ways to link the formal specification to the simulations. They explored various ledger design options, including <em>labeled UTXOs</em> and <em>accounts</em> approaches, with detailed consideration of fees, collateral, and conflict prevention mechanisms. The team also discussed conformance testing approaches, including <em>QuickCheck dynamic and trace verification</em> methods.</p>
-<p>On <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/workshop/day-2-recap.md" target="_blank" rel="noopener noreferrer">day two</a>, the team made significant progress towards estimating the cost of running a Leios node, considering different cost items such as network egress, CPU, and storage. They analyzed resource usage across different TPS levels, from 10 TPS to 1K TPS, and discovered that while there’s significant overhead at low throughput, the protocol becomes more efficient at higher TPS levels. The team hasn’t been able to finish all the cost items yet. The last two, IOPS and memory cost, will be added during this month.</p>
-<p>On the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/workshop/day-3-recap.md" target="_blank" rel="noopener noreferrer">last and third day</a>, the team consolidated their options for how optimistic validation of input blocks can be accomplished. They defined three candidates, with one being favored. The main goal was to support the chaining of transactions with Leios, which requires defining a 'point in time' or stage of the protocol at which a subsequent or chained transaction can be built on top of an already submitted transaction. This can be achieved by having the node optimistically compute prospective ledger states using its local knowledge of input blocks referenced in certified endorser blocks or possibly ranking blocks.</p>
-<ul>
-<li>
-<p><a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/workshop/day-1-recap.md" target="_blank" rel="noopener noreferrer">Day 1</a></p>
-</li>
-<li>
-<p><a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/workshop/day-2-recap.md" target="_blank" rel="noopener noreferrer">Day 2</a></p>
-</li>
-<li>
-<p><a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/workshop/day-3-recap.md" target="_blank" rel="noopener noreferrer">Day 3</a>.</p>
-</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-progress">Simulation progress<a class="hash-link" aria-label="Direct link to Simulation progress" title="Direct link to Simulation progress" href="https://leios.cardano-scaling.org/news/2025/03/31/weekly-progress-summary#simulation-progress">​</a></h2>
-<ul>
-<li><strong>Haskell simulation</strong>
-<ul>
-<li>Added support for dishonest nodes that diffuse an unbounded amount of old IBs, enabling further analysis of freshest-first and oldest-first vote delivery scenarios</li>
-<li>Identified and fixed a bug in configuration generation for simulation runs, which was causing inconsistencies in vote delivery between default and uniform/extended voting schemes</li>
-<li>Added an <code>adversarial</code> field to the network topology schema, allowing for the simulation of unbounded IB diffusion by dishonest nodes.</li>
-</ul>
-</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="ongoing-investigations">Ongoing investigations<a class="hash-link" aria-label="Direct link to Ongoing investigations" title="Direct link to Ongoing investigations" href="https://leios.cardano-scaling.org/news/2025/03/31/weekly-progress-summary#ongoing-investigations">​</a></h2>
-<ul>
-<li>Investigating the effects of unbounded IB diffusion on IB delivery reliability and protocol performance under such conditions</li>
-<li>Working on quantifying settlement times and their impact on protocol performance</li>
-<li>Exploring integration possibilities with Ouroboros Peras, mainly focusing on potentially reusing their voting mechanism to reduce resource consumption.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="additional-resources">Additional resources<a class="hash-link" aria-label="Direct link to Additional resources" title="Direct link to Additional resources" href="https://leios.cardano-scaling.org/news/2025/03/31/weekly-progress-summary#additional-resources">​</a></h2>
-<ul>
-<li><a href="https://github.com/input-output-hk/ouroboros-leios/discussions/243" target="_blank" rel="noopener noreferrer">GitHub discussions</a> – EB ledger states and 'history rewriting' effects</li>
-<li><a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w13/analysis.ipynb" target="_blank" rel="noopener noreferrer">The First Full Leios simulation analysis</a> – detailed analysis of the latest simulation results.</li>
-</ul>]]></content>
-        <author>
-            <name>William Wolff</name>
-            <uri>https://github.com/will-break-it</uri>
-        </author>
-        <category label="progress" term="progress"/>
-        <category label="update" term="update"/>
-        <category label="weekly" term="weekly"/>
-        <category label="workshop" term="workshop"/>
-        <category label="edinburgh" term="edinburgh"/>
-        <category label="ledger-design" term="ledger-design"/>
-        <category label="cost-analysis" term="cost-analysis"/>
-        <category label="optimistic-validation" term="optimistic-validation"/>
-        <category label="formal-methods" term="formal-methods"/>
-        <category label="haskell-simulation" term="haskell-simulation"/>
-        <category label="adversarial" term="adversarial"/>
-    </entry>
-    <entry>
-        <title type="html"><![CDATA[Weekly Summary – March 24, 2025]]></title>
-        <id>https://leios.cardano-scaling.org/news/2025/03/24/weekly-progress-summary</id>
-        <link href="https://leios.cardano-scaling.org/news/2025/03/24/weekly-progress-summary"/>
-        <updated>2025-03-24T00:00:00.000Z</updated>
-        <summary type="html"><![CDATA[This week, the Leios team continued working on various aspects of the protocol and its simulation capabilities. They made progress in implementing and testing the Haskell and Rust simulators, focusing on protocol behavior under different network conditions.]]></summary>
-        <content type="html"><![CDATA[<p>This week, the Leios team continued working on various aspects of the protocol and its simulation capabilities. They made progress in implementing and testing the Haskell and Rust simulators, focusing on protocol behavior under different network conditions.</p>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-progress">Simulation progress<a class="hash-link" aria-label="Direct link to Simulation progress" title="Direct link to Simulation progress" href="https://leios.cardano-scaling.org/news/2025/03/24/weekly-progress-summary#simulation-progress">​</a></h2>
-<ul>
-<li>
-<p><strong>Haskell simulation</strong></p>
-<ul>
-<li>Moved configuration and topology parsers to the <code>leios-trace-hs</code> package for reuse in formal methods</li>
-<li>Investigated differences in IBs referenced with Rust simulation: identified that inconsistencies were caused by the same sequence of random samples being used across different runs</li>
-<li>Simplified sortition code by using an external statistics package</li>
-<li>Tested Full Leios, resolving tension between <code>r_EB</code>/<code>eb-max-age-slots</code> and <code>praos-chain-quality</code>/<code>η</code></li>
-<li>Fixed <code>cabal run ols -- generate-topology close-and-random</code>, listing <code>producers</code> properly and decreasing variance in upstream peers.</li>
-</ul>
-</li>
-<li>
-<p><strong>Rust simulation</strong></p>
-<ul>
-<li>Investigated anomalies in simulation results: identified that earlier IB production failures were caused by low connectivity and lower CPU usage compared to the Haskell simulation</li>
-<li>Refined Full Leios implementation</li>
-<li>Added Full Leios support to the visualizer</li>
-<li>Migrated the visualizer from Next.js to Vite.</li>
-</ul>
-</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="analysis-of-simulations">Analysis of simulations<a class="hash-link" aria-label="Direct link to Analysis of simulations" title="Direct link to Analysis of simulations" href="https://leios.cardano-scaling.org/news/2025/03/24/weekly-progress-summary#analysis-of-simulations">​</a></h2>
-<ul>
-<li><strong>Tag <code>leios-2025w13</code>:</strong> simulated 198 Short Leios scenarios, varying IB production rate, IB size, network topology, CPU limits, and protocol flags</li>
-<li><strong>CPU limits:</strong> analyzed the impact of CPU constraints on IB propagation, finding that diffusion can be affected under stress conditions</li>
-<li><strong>Vote propagation:</strong> compared freshest-first and oldest-first vote propagation, with freshest-first potentially improving IB delivery reliability</li>
-<li><strong>Extended voting period:</strong> compared an extended voting period to a limited one in the Haskell simulation, observing minimal differences except for occasional improvements in reliable vote delivery.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="ongoing-investigations">Ongoing investigations<a class="hash-link" aria-label="Direct link to Ongoing investigations" title="Direct link to Ongoing investigations" href="https://leios.cardano-scaling.org/news/2025/03/24/weekly-progress-summary#ongoing-investigations">​</a></h2>
-<ul>
-<li>Investigating qualitative discrepancies between Haskell and Rust simulation results to determine whether they stem from differences in simulator resolution or simulation infidelities.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="additional-resources">Additional resources<a class="hash-link" aria-label="Direct link to Additional resources" title="Direct link to Additional resources" href="https://leios.cardano-scaling.org/news/2025/03/24/weekly-progress-summary#additional-resources">​</a></h2>
-<ul>
-<li><a href="https://www.youtube.com/watch?v=7K6qXiVsMXg" target="_blank" rel="noopener noreferrer">Monthly review meeting</a> – March 2025.</li>
-</ul>]]></content>
-        <author>
-            <name>William Wolff</name>
-            <uri>https://github.com/will-break-it</uri>
-        </author>
-        <category label="progress" term="progress"/>
-        <category label="update" term="update"/>
-        <category label="weekly" term="weekly"/>
-        <category label="haskell-simulation" term="haskell-simulation"/>
-        <category label="rust-simulation" term="rust-simulation"/>
-        <category label="full-leios" term="full-leios"/>
-        <category label="testing" term="testing"/>
-        <category label="visualization" term="visualization"/>
-        <category label="vite" term="vite"/>
-        <category label="monthly-review" term="monthly-review"/>
     </entry>
 </feed>
