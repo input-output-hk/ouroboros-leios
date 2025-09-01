@@ -2,6 +2,14 @@
 
 ## 2025-08-29
 
+### CIP proposal published
+
+Published the Ouroboros Leios CIP proposal to the Cardano Foundation CIPs repository.
+
+- **Pull Request**: [CIP-???? | Ouroboros Leios - Greater Transaction Throughput #1078](https://github.com/cardano-foundation/CIPs/pull/1078)
+
+The proposal has been submitted for formal review and is pending CIP number assignment at the next CIP meeting. The submission represents the definitive technical specification for the proposed Leios protocol implementation.
+
 ### Second technical report
 
 [The second technical report](docs/technical-report-2.md) captures a snapshot of the modeling, simulation, and analysis of the
