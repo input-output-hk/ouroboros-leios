@@ -1,5 +1,21 @@
 # Leios logbook
 
+## 2025-09-02
+
+### Parameter-sweep experiment
+
+Three protocol parameters and two throughputs were studied using the Rust simulator to determine which combination of parameters has the best performance characteristics while still being safe.
+
+- Delta header: 1000, 1500, or 2000 ms
+- Voting duration: 1, 2, 3, or 4 slots
+- Diffusion duration: 1, 3, 5, or 7 slots
+- Throughput: 150 or 200 TxkB/s
+
+The results will inform the recommended set of parameters in the CIP:
+
+- [Results at 150 Txkb/s](analysis/sims/params/ReadMe-150TxkBps.pdf)
+- [Results at 200 Txkb/s](analysis/sims/params/ReadMe-200TxkBps.pdf)
+
 ## 2025-08-29
 
 ### CIP proposal published
