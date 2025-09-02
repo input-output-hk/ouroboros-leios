@@ -23,8 +23,6 @@ STAGE_LENGTH_DIFF=$(echo -n "$LABEL" | sed -e 's/^\(.*\),\(.*\),\(.*\),\(.*\)/\3
 THROUGHPUT=$(echo -n "$LABEL" | sed -e 's/^\(.*\),\(.*\),\(.*\),\(.*\)/\4/')
 TX_SPACING_HONEST=$(echo "scale=3; $TX_SIZE / $THROUGHPUT / 1000" | bc)
 
-echo "H $DELTA_HEADER | V $STAGE_LENGTH_VOTE | D $STAGE_LENGTH_DIFF | T $THROUGHPUT"
-
 ulimit -S -m 64000000 -v 64000000
 
 if [[ -e sim.log ]]
