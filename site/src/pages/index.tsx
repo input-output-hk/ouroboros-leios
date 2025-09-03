@@ -111,7 +111,7 @@ function LeiosSpecificationSection() {
                         <p className={clsx("text--center", styles.subtitle)}>
                             The{" "}
                             <Link
-                                to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md"
+                                to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md"
                                 target="_blank"
                                 rel="noopener noreferrer"
                             >
@@ -567,7 +567,7 @@ function LeiosSpecificationSection() {
                                 <div style={{ marginTop: "1.5rem" }}>
                                     <Link
                                         className="button button--primary button--md"
-                                        to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md"
+                                        to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                     >
@@ -609,7 +609,7 @@ function HowLeiosWorksSection() {
                                     regular Praos chain. These supplementary
                                     blocks, called{" "}
                                     <Link
-                                        to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md#endorser-blocks-ebs"
+                                        to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#endorser-blocks-ebs"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                     >
@@ -618,7 +618,7 @@ function HowLeiosWorksSection() {
                                     would otherwise wait for the standard Praos
                                     blocks (called{" "}
                                     <Link
-                                        to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md#ranking-blocks-rbs"
+                                        to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#ranking-blocks-rbs"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                     >
@@ -631,7 +631,7 @@ function HowLeiosWorksSection() {
                                     To ensure data availability and correctness,
                                     these blocks undergo{" "}
                                     <Link
-                                        to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md#step-3-committee-validation"
+                                        to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#step-3-committee-validation"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                     >
@@ -657,7 +657,7 @@ function HowLeiosWorksSection() {
                                 <div style={{ marginTop: "1.5rem" }}>
                                     <Link
                                         className="button button--primary button--md"
-                                        to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md#specification"
+                                        to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#specification"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                     >
@@ -925,7 +925,7 @@ function HowLeiosWorksSection() {
 
                                         {/* RB Block */}
                                         <a
-                                            href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md#ranking-blocks-rbs"
+                                            href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#ranking-blocks-rbs"
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >
@@ -967,7 +967,7 @@ function HowLeiosWorksSection() {
 
                                         {/* EB Block */}
                                         <a
-                                            href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md#endorser-blocks-ebs"
+                                            href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#endorser-blocks-ebs"
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >
@@ -1009,7 +1009,7 @@ function HowLeiosWorksSection() {
 
                                         {/* RB' Block */}
                                         <a
-                                            href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md#ranking-blocks-rbs"
+                                            href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#ranking-blocks-rbs"
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >
@@ -1041,7 +1041,7 @@ function HowLeiosWorksSection() {
                                         {/* Certificate */}
                                         <g transform="translate(700, 185)">
                                             <a
-                                                href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md#votes-and-certificates"
+                                                href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#votes-and-certificates"
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                             >
@@ -1104,7 +1104,7 @@ function HowLeiosWorksSection() {
 
                                         {/* Parameter brackets */}
                                         <a
-                                            href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md#l-hdr"
+                                            href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#l-hdr"
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >
@@ -1147,7 +1147,7 @@ function HowLeiosWorksSection() {
                                         </a>
 
                                         <a
-                                            href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md#l-vote"
+                                            href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#l-vote"
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >
@@ -1184,7 +1184,7 @@ function HowLeiosWorksSection() {
                                         </a>
 
                                         <a
-                                            href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md#l-diff"
+                                            href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#l-diff"
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >
@@ -1222,7 +1222,7 @@ function HowLeiosWorksSection() {
 
                                         {/* Votes */}
                                         <a
-                                            href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md#votes-and-certificates"
+                                            href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#votes-and-certificates"
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >
@@ -1237,7 +1237,7 @@ function HowLeiosWorksSection() {
                                             />
                                         </a>
                                         <a
-                                            href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md#votes-and-certificates"
+                                            href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#votes-and-certificates"
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >
@@ -1252,7 +1252,7 @@ function HowLeiosWorksSection() {
                                             />
                                         </a>
                                         <a
-                                            href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md#votes-and-certificates"
+                                            href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#votes-and-certificates"
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >
@@ -1267,7 +1267,7 @@ function HowLeiosWorksSection() {
                                             />
                                         </a>
                                         <a
-                                            href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md#votes-and-certificates"
+                                            href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#votes-and-certificates"
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >
@@ -1282,7 +1282,7 @@ function HowLeiosWorksSection() {
                                             />
                                         </a>
                                         <a
-                                            href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md#votes-and-certificates"
+                                            href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#votes-and-certificates"
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >
@@ -1299,7 +1299,7 @@ function HowLeiosWorksSection() {
 
                                         {/* Delta network characteristics */}
                                         <a
-                                            href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md#delta-rb"
+                                            href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#delta-rb"
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >
@@ -1366,7 +1366,7 @@ function HowLeiosWorksSection() {
                                         </a>
 
                                         <a
-                                            href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md#delta-applytxs"
+                                            href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#delta-applytxs"
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >
@@ -1433,7 +1433,7 @@ function HowLeiosWorksSection() {
                                         </a>
 
                                         <a
-                                            href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md#delta-eb-H"
+                                            href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#delta-eb-H"
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >
@@ -1501,7 +1501,7 @@ function HowLeiosWorksSection() {
 
                                         <g id="network-chars-after">
                                             <a
-                                                href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md#delta-eb-A"
+                                                href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#delta-eb-A"
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                             >
@@ -1566,7 +1566,7 @@ function HowLeiosWorksSection() {
                                             </a>
 
                                             <a
-                                                href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md#delta-reapply"
+                                                href="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#delta-reapply"
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                             >
@@ -1762,7 +1762,7 @@ function HowLeiosWorksSection() {
                                         validation to certificate inclusion. Key
                                         parameters:{" "}
                                         <Link
-                                            to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md#l-hdr"
+                                            to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#l-hdr"
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >
@@ -1778,14 +1778,14 @@ function HowLeiosWorksSection() {
                                             <sub>hdr</sub>
                                         </Link>{" "}
                                         (<Link
-                                            to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md#equivocation-detection"
+                                            to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#equivocation-detection"
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >
                                             header diffusion
                                         </Link>),{" "}
                                         <Link
-                                            to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md#l-vote"
+                                            to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#l-vote"
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >
@@ -1801,14 +1801,14 @@ function HowLeiosWorksSection() {
                                             <sub>vote</sub>
                                         </Link>{" "}
                                         (<Link
-                                            to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md#voting-period"
+                                            to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#voting-period"
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >
                                             voting period
                                         </Link>),{" "}
                                         <Link
-                                            to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md#l-diff"
+                                            to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#l-diff"
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >
@@ -1824,7 +1824,7 @@ function HowLeiosWorksSection() {
                                             <sub>diff</sub>
                                         </Link>{" "}
                                         (<Link
-                                            to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md#diffusion-period"
+                                            to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#diffusion-period"
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >

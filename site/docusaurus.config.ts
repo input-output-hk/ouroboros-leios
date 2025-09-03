@@ -125,7 +125,7 @@ const config: Config = {
                 },
                 {
                     href:
-                        "https://github.com/cardano-scaling/CIPs/blob/leios/CIP-%3F%3F%3F%3F/README.md",
+                        "https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md",
                     label: "CIP",
                     position: "right",
                 },
