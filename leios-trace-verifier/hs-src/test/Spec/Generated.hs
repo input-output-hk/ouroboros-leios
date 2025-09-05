@@ -11,7 +11,7 @@ import Data.Text (Text)
 import LeiosConfig
 import LeiosEvents
 import LeiosTopology (nodeInfo, nodes, stake, unNodeName)
-import Lib (verifyTrace)
+import ShortLeiosLib (verifyTrace)
 import Spec.Transition
 import Test.Hspec
 import Test.Hspec.QuickCheck

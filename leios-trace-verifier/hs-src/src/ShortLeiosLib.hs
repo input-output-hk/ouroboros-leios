@@ -1,7 +1,7 @@
-module Lib (
+module ShortLeiosLib (
   module P,
   module V,
-  module Lib,
+  module ShortLeiosLib,
 ) where
 
 import MAlonzo.Code.Parser as P

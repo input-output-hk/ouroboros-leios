@@ -83,7 +83,9 @@ test-suite test-trace-verifier
 library
     import: globalOptions
     hs-source-dirs: src
-    exposed-modules: Lib
+    exposed-modules:
+      ShortLeiosLib
+      LinearLeiosLib
     build-depends:
       , base
       , bytestring

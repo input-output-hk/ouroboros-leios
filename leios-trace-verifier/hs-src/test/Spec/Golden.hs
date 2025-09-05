@@ -16,7 +16,7 @@ import Data.Yaml (decodeFileThrow)
 import LeiosConfig (Config (..))
 import LeiosEvents (decodeJSONL)
 import LeiosTopology (LocationKind (COORD2D), Node (..), NodeInfo (..), NodeName (..), Topology (..))
-import Lib (verifyTrace)
+import ShortLeiosLib (verifyTrace)
 import qualified Paths_trace_parser as Paths
 import System.Directory (listDirectory)
 import System.FilePath ((</>))
