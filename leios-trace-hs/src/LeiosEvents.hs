@@ -120,6 +120,7 @@ data Event where
     , bytes :: !Word64
     , input_blocks :: ![BlockRef]
     , endorser_blocks :: ![BlockRef]
+    , transactions :: ![Word64]
     } ->
     Event
   RBGenerated ::

@@ -5,4 +5,4 @@ module Lib (
 ) where
 
 import MAlonzo.Code.Parser as P
-import MAlonzo.Code.Verifier as V
+import MAlonzo.Code.ShortLeiosVerifier as V

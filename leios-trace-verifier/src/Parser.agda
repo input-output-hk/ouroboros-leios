@@ -80,7 +80,7 @@ data Event : Type where
   RBReceived : Maybe Node → Node → Maybe Bytes → Maybe Time → String → Maybe (List String) → Event
   IBEnteredState EBEnteredState VTBundleEnteredState RBEnteredState : String → String → Word64 → Event
   IBGenerated : String → String → SlotNo → PipelineNo → Bytes → Bytes → Maybe String → Event
-  EBGenerated : String → String → Word64 → PipelineNo → Word64 → List BlockRef → List BlockRef → Event
+  EBGenerated : String → String → Word64 → PipelineNo → Word64 → List BlockRef → List BlockRef → List Word64 → Event
   RBGenerated : String → String → Word64 → Word64 → Nullable Endorsement → Maybe (List Endorsement) → Word64 → Nullable BlockRef → Event
   VTBundleGenerated : String → String → Word64 → PipelineNo → Word64 → Map String Word64 → Event
 

@@ -16,7 +16,7 @@ open import Tactic.Derive.Show
 
 open import Parser
 
-module Verifier
+module ShortLeiosVerifier
   (numberOfParties : ℕ)
   (sutId : ℕ)
   (stakeDistr : List (Pair String ℕ))
@@ -91,7 +91,7 @@ module Verifier
     with p ≟ SUT
   ... | yes _ = just (IB , primWord64ToNat s)
   ... | no _  = nothing
-  winningSlot record { message = EBGenerated p _ s _ _ _ _ }
+  winningSlot record { message = EBGenerated p _ s _ _ _ _ _ }
     with p ≟ SUT
   ... | yes _ = just (EB , primWord64ToNat s)
   ... | no _  = nothing
@@ -145,7 +145,13 @@ module Verifier
       ∷ (quote InputBlock , Show-InputBlock)
       ∷ []
 
+    instance
+      Show-EBCert : Show (Maybe EBCert)
+      Show-EBCert .show (just _) = "EBCert"
+      Show-EBCert .show nothing = "no EBCert"
+
     unquoteDecl Show-EndorserBlockOSig = derive-Show [ (quote EndorserBlockOSig , Show-EndorserBlockOSig) ]
+    unquoteDecl Show-RankingBlock = derive-Show [ (quote RankingBlock , Show-RankingBlock) ]
     unquoteDecl Show-Blk = derive-Show [ (quote Blk , Show-Blk) ]
 
     blockRefToNat : AssocList String Blk → String → IBRef
@@ -221,13 +227,14 @@ module Verifier
         actions with p ≟ SUT
         ... | yes _ = (IB-Role-Action (primWord64ToNat s) , FFDT.SLOT) ∷ []
         ... | no _ = []
-    traceEvent→action l record { message = EBGenerated p i s _ _ ibs ebs } =
+    traceEvent→action l record { message = EBGenerated p i s _ _ ibs ebs _ } =
       let eb = record
                  { slotNumber = primWord64ToNat s
                  ; producerID = nodeId p
                  ; lotteryPf  = tt
                  ; ibRefs     = map (blockRefToNat (refs l) ∘ BlockRef.id) ibs
                  ; ebRefs     = map (blockRefToNat (refs l) ∘ BlockRef.id) ebs
+                 ; txs        = []
                  ; signature  = tt
                  }
       in record l { refs = (i , EB-Blk eb) ∷ refs l } , actions
