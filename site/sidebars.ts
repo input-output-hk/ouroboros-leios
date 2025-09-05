@@ -21,6 +21,7 @@ const sidebars: SidebarsConfig = {
         "how-it-works",
       ],
     },
+    "roadmap",
     "faq",
     "glossary",
     "resources",
