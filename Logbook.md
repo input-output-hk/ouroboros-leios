@@ -1,5 +1,13 @@
 # Leios logbook
 
+## 2025-09-05
+
+### Bandwidth measurements
+
+The Cardano Node benchmarking team kindly provided bandwidth measurements (using `iperf3`) for data centers on three continents. The results are consistent with previous measurements and with Leios requirements.
+
+![Bandwidth measurements form node benchmarking cluster](analysis/bandwidth/bm-bw.png)
+
 ## 2025-09-02
 
 ### Parameter-sweep experiment
