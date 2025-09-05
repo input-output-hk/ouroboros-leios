@@ -20,9 +20,7 @@ module LinearLeiosVerifier
   (numberOfParties : ℕ)
   (sutId : ℕ)
   (stakeDistr : List (Pair String ℕ))
-  (stageLength : ℕ)
-  (ledgerQuality : ℕ)
-  (lateIBInclusion : Bool) -- TODO: Pass config and topology instead
+  (Lhdr Lvote Ldiff validityCheckTimeValue : ℕ)
   where
 
   from-id : ℕ → Fin numberOfParties
@@ -38,11 +36,6 @@ module LinearLeiosVerifier
   SUT-id = from-id sutId
 
   instance
-    stageLength-NonZero : NonZero stageLength
-    stageLength-NonZero with stageLength ≟ 0
-    ... | yes _ = error "Stage length is 0"
-    ... | no ¬p = ≢-nonZero ¬p
-
     numberOfParties-NonZero : NonZero numberOfParties
     numberOfParties-NonZero with numberOfParties ≟ 0
     ... | yes _ = error "Number of parties is 0"
@@ -110,10 +103,10 @@ module LinearLeiosVerifier
         { networkParams =
             record
               { numberOfParties   = numberOfParties
-              ; ledgerQuality     = ledgerQuality
+              ; ledgerQuality     = 1 -- n/a in Linear Leios
               ; stakeDistribution = stakeDistribution
-              ; stageLength       = stageLength
-              ; lateIBInclusion   = lateIBInclusion
+              ; stageLength       = 1 -- n/a in Linear Leios
+              ; lateIBInclusion   = false -- n/a in Linear Leios
               }
         ; sutId         = SUT-id
         ; winning-slots = fromList ∘ L.catMaybes $ L.map winningSlot l
@@ -121,17 +114,11 @@ module LinearLeiosVerifier
 
     open import Leios.Linear.Trace.Verifier params
 
-    -- TODO: params
-    Lhdr Lvote Ldiff : ℕ
-    Lhdr = 0
-    Lvote = 0
-    Ldiff = 0
-
     splitTxs : List Tx → List Tx × List Tx
     splitTxs l = [] , l
 
     validityCheckTime : EndorserBlock → ℕ
-    validityCheckTime eb = 3
+    validityCheckTime eb = validityCheckTimeValue
 
     open Defaults Lhdr Lvote Ldiff splitTxs validityCheckTime renaming (verifyTrace to checkTrace)
 
