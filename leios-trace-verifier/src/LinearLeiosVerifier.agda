@@ -79,10 +79,7 @@ module LinearLeiosVerifier
   winningSlot record { message = EBEnteredState _ _ _ }         = nothing
   winningSlot record { message = VTBundleEnteredState _ _ _ }   = nothing
   winningSlot record { message = RBEnteredState _ _ _ }         = nothing
-  winningSlot record { message = IBGenerated p _ s _ _ _ _}
-    with p ≟ SUT
-  ... | yes _ = just (IB , primWord64ToNat s)
-  ... | no _  = nothing
+  winningSlot record { message = IBGenerated _ _ _ _ _ _ _}     = nothing
   winningSlot record { message = EBGenerated p _ s _ _ _ _ _ }
     with p ≟ SUT
   ... | yes _ = just (EB , primWord64ToNat s)
@@ -132,6 +129,13 @@ module LinearLeiosVerifier
       field refs : AssocList String Blk
             blks : List Blk
 
+      hasEB = ∃[ eb ] (EB-Blk eb) ∈ blks
+
+    open State
+    open Types params
+    open import CategoricalCrypto hiding (_∘_)
+    open import Leios.Defaults params using (isb; FFDBuffers)
+
     instance
       _ = Show-List
       _ = Show-×
@@ -145,57 +149,36 @@ module LinearLeiosVerifier
     unquoteDecl Show-EndorserBlockOSig = derive-Show [ (quote EndorserBlockOSig , Show-EndorserBlockOSig) ]
     unquoteDecl Show-Blk = derive-Show [ (quote Blk , Show-Blk) ]
 
-
-    open State
-    open Types params
-    open import CategoricalCrypto hiding (_∘_)
-    open import Leios.Defaults params using (isb; FFDBuffers)
-
     blksToHeaderAndBodyList : List Blk → List (FFDA.Header ⊎ FFDA.Body)
-    blksToHeaderAndBodyList [] = []
-    blksToHeaderAndBodyList (IB-Blk ib ∷ l) = inj₁ (GenFFD.ibHeader (InputBlock.header ib)) ∷ inj₂ (GenFFD.ibBody (InputBlock.body ib)) ∷ blksToHeaderAndBodyList l
+    blksToHeaderAndBodyList []                    = []
+    blksToHeaderAndBodyList (IB-Blk ib ∷ l)       = inj₁ (GenFFD.ibHeader (InputBlock.header ib)) ∷ inj₂ (GenFFD.ibBody (InputBlock.body ib)) ∷ blksToHeaderAndBodyList l
     blksToHeaderAndBodyList (EB-Blk (_ , eb) ∷ l) = inj₁ (GenFFD.ebHeader eb) ∷ blksToHeaderAndBodyList l
-    blksToHeaderAndBodyList (VT-Blk vt ∷ l) = inj₁ (GenFFD.vtHeader vt) ∷ blksToHeaderAndBodyList l
-    blksToHeaderAndBodyList (RB-Blk vt ∷ l) = blksToHeaderAndBodyList l
+    blksToHeaderAndBodyList (VT-Blk vt ∷ l)       = inj₁ (GenFFD.vtHeader vt) ∷ blksToHeaderAndBodyList l
+    blksToHeaderAndBodyList (RB-Blk vt ∷ l)       = blksToHeaderAndBodyList l
 
+    -- Negative {EB,VT} event, if there is no {EB,VT}Generated event
+    negative-events : State → Word64 → List (Action × (FFDT Out ⊎ BaseT Out ⊎ IOT In))
+    negative-events l s with (blks l)
+    ... | [] = (No-EB-Role-Action (primWord64ToNat s), inj₁ FFDT.SLOT) ∷ (No-VT-Role-Action (primWord64ToNat s), inj₁ FFDT.SLOT) ∷ []
+    ... | EB-Blk _ ∷ [] = (No-VT-Role-Action (primWord64ToNat s), inj₁ FFDT.SLOT) ∷ []
+    ... | VT-Blk _ ∷ [] = (No-EB-Role-Action (primWord64ToNat s), inj₁ FFDT.SLOT) ∷ []
+    ... | _ = []
 
     traceEvent→action : State → TraceEvent → State × List (Action × (FFDT Out ⊎ BaseT Out ⊎ IOT In))
     traceEvent→action l record { message = Slot p s }
       with p ≟ SUT
-    ... | yes _ = record l { blks = [] } , (Base₂-Action (primWord64ToNat s) , inj₁ FFDT.SLOT) ∷ (Slot₂-Action (primWord64ToNat s) , inj₁ (FFDT.FFD-OUT (blksToHeaderAndBodyList (blks l)))) ∷ []
+    ... | yes _ =
+      record l { blks = [] } ,
+        negative-events l s ++
+          (Base₂-Action (primWord64ToNat s) , inj₁ FFDT.SLOT)
+        ∷ (Slot₂-Action (primWord64ToNat s) , inj₁ (FFDT.FFD-OUT (blksToHeaderAndBodyList (blks l))))
+        ∷ []
     ... | no _  = l , []
-    traceEvent→action l record { message = Cpu _ _ _ _ } = l , []
-    traceEvent→action l record { message = NoIBGenerated p s } = l , []
-    traceEvent→action l record { message = NoEBGenerated p s }
-      with p ≟ SUT
-    ... | yes _ = l , (No-EB-Role-Action (primWord64ToNat s), inj₁ FFDT.SLOT) ∷ []
-    ... | no _  = l , []
-    traceEvent→action l record { message = NoVTBundleGenerated p s }
-      with p ≟ SUT
-    ... | yes _ = l , (No-VT-Role-Action (primWord64ToNat s), inj₁ FFDT.SLOT) ∷ []
-    ... | no _  = l , []
-    traceEvent→action l record { message = IBSent _ _ _ _ _ _ } = l , []
-    traceEvent→action l record { message = EBSent _ _ _ _ _ _ } = l , []
-    traceEvent→action l record { message = VTBundleSent _ _ _ _ _ _ } = l , []
-    traceEvent→action l record { message = RBSent _ _ _ _ _ _ } = l , []
-    traceEvent→action l record { message = IBReceived _ p _ _ i _ }
-      with p ≟ SUT | refs l ⁉ i
-    ... | yes _ | just ib = record l { blks = ib ∷ blks l } , []
-    ... | _ | _ = l , []
+
     traceEvent→action l record { message = EBReceived s p _ _ i _ }
       with p ≟ SUT | refs l ⁉ i
     ... | yes _ | just eb = record l { blks = eb ∷ blks l } , []
     ... | _ | _ = l , []
-    traceEvent→action l record { message = VTBundleReceived _ p _ _ i _ }
-      with p ≟ SUT | refs l ⁉ i
-    ... | yes _ | just vt = record l { blks = vt ∷ blks l } , []
-    ... | _ | _ = l , []
-    traceEvent→action l record { message = RBReceived _ _ _ _ _ _ } = l , []
-    traceEvent→action l record { message = IBEnteredState _ _ _ } = l , []
-    traceEvent→action l record { message = EBEnteredState _ _ _ } = l , []
-    traceEvent→action l record { message = VTBundleEnteredState _ _ _ } = l , []
-    traceEvent→action l record { message = RBEnteredState _ _ _ } = l , []
-    traceEvent→action l record { message = IBGenerated p i s _ _ _ _} = l , []
     traceEvent→action l record { message = EBGenerated p i s _ _ ibs ebs transactions } =
       let eb = record
                  { slotNumber = primWord64ToNat s
@@ -212,6 +195,10 @@ module LinearLeiosVerifier
         actions eb with p ≟ SUT
         ... | yes _ = (EB-Role-Action (primWord64ToNat s) eb , inj₁ FFDT.SLOT) ∷ []
         ... | no _  = []
+    traceEvent→action l record { message = VTBundleReceived _ p _ _ i _ }
+      with p ≟ SUT | refs l ⁉ i
+    ... | yes _ | just vt = record l { blks = vt ∷ blks l } , []
+    ... | _ | _ = l , []
     traceEvent→action l record { message = VTBundleGenerated p i s _ _ vts } =
       let vt = map (const tt) (elems vts)
       in record l { refs = (i , VT-Blk vt) ∷ refs l } , actions
@@ -227,32 +214,36 @@ module LinearLeiosVerifier
       with refs l ⁉ BlockRef.id (Endorsement.eb b)
     ... | nothing = l , []
     ... | just e = record l { refs = (i , e) ∷ refs l } , []
-
-    mapAccuml : {A B S : Set} → (S → A → S × B) → S → List A → S × List B
-    mapAccuml f s []       = s , []
-    mapAccuml f s (x ∷ xs) =
-      let (s' , y)   = f s x
-          (s'' , ys) = mapAccuml f s' xs
-      in s'' , y ∷ ys
-
-    result : ∀ {E A S : Type} → (f : A → S) → (g : E → S) → Result E A → S
-    result f g (Ok x) = f x
-    result f g (Err x) = g x
+    traceEvent→action l record { message = Cpu _ _ _ _ }                = l , []
+    traceEvent→action l record { message = IBReceived _ _ _ _ _ _ }     = l , []
+    traceEvent→action l record { message = IBGenerated _ _ _ _ _ _ _}   = l , []
+    traceEvent→action l record { message = NoIBGenerated _ _ }          = l , []
+    traceEvent→action l record { message = NoEBGenerated _ _ }          = l , []
+    traceEvent→action l record { message = NoVTBundleGenerated _ _ }    = l , []
+    traceEvent→action l record { message = IBSent _ _ _ _ _ _ }         = l , []
+    traceEvent→action l record { message = EBSent _ _ _ _ _ _ }         = l , []
+    traceEvent→action l record { message = VTBundleSent _ _ _ _ _ _ }   = l , []
+    traceEvent→action l record { message = RBSent _ _ _ _ _ _ }         = l , []
+    traceEvent→action l record { message = RBReceived _ _ _ _ _ _ }     = l , []
+    traceEvent→action l record { message = IBEnteredState _ _ _ }       = l , []
+    traceEvent→action l record { message = EBEnteredState _ _ _ }       = l , []
+    traceEvent→action l record { message = VTBundleEnteredState _ _ _ } = l , []
+    traceEvent→action l record { message = RBEnteredState _ _ _ }       = l , []
 
     instance
       Show-FFDBuffers : Show FFDBuffers
       Show-FFDBuffers .show _ = "ffd buffers"
 
       Show-Action : Show Action
-      Show-Action .show (EB-Role-Action x _)     = "EB-Role-Action " ◇ show x
-      Show-Action .show (VT-Role-Action x _ _)   = "VT-Role-Action " ◇ show x
-      Show-Action .show (No-EB-Role-Action x)    = "No-EB-Role-Action " ◇ show x
-      Show-Action .show (No-VT-Role-Action x)    = "No-VT-Role-Action " ◇ show x
-      Show-Action .show (Ftch-Action x)          = "Ftch-Action " ◇ show x
-      Show-Action .show (Slot₁-Action x)         = "Slot₁-Action " ◇ show x
-      Show-Action .show (Slot₂-Action x)         = "Slot₂-Action " ◇ show x
-      Show-Action .show (Base₁-Action x)         = "Base₁-Action " ◇ show x
-      Show-Action .show (Base₂-Action x)         = "Base₂-Action " ◇ show x
+      Show-Action .show (EB-Role-Action x _)   = "EB-Role-Action "    ◇ show x
+      Show-Action .show (VT-Role-Action x _ _) = "VT-Role-Action "    ◇ show x
+      Show-Action .show (No-EB-Role-Action x)  = "No-EB-Role-Action " ◇ show x
+      Show-Action .show (No-VT-Role-Action x)  = "No-VT-Role-Action " ◇ show x
+      Show-Action .show (Ftch-Action x)        = "Ftch-Action "       ◇ show x
+      Show-Action .show (Slot₁-Action x)       = "Slot₁-Action "       ◇ show x
+      Show-Action .show (Slot₂-Action x)       = "Slot₂-Action "       ◇ show x
+      Show-Action .show (Base₁-Action x)       = "Base₁-Action "       ◇ show x
+      Show-Action .show (Base₂-Action x)       = "Base₂-Action "       ◇ show x
 
     instance
       Show-NonZero : ∀ {n : ℕ} → Show (NonZero n)
@@ -315,6 +306,17 @@ module LinearLeiosVerifier
             αs = L.reverse (L.concat l')
             tr = checkTrace αs s
         in L.length αs , result (λ _ → ("ok" , "")) format-error tr
+        where
+          mapAccuml : {A B S : Set} → (S → A → S × B) → S → List A → S × List B
+          mapAccuml f s []       = s , []
+          mapAccuml f s (x ∷ xs) =
+            let (s' , y)   = f s x
+                (s'' , ys) = mapAccuml f s' xs
+            in s'' , y ∷ ys
+
+          result : ∀ {E A S : Type} → (f : A → S) → (g : E → S) → Result E A → S
+          result f g (Ok x) = f x
+          result f g (Err x) = g x
 
       verifyTrace : Pair ℕ (Pair String String)
       verifyTrace = verifyTrace' s₀
