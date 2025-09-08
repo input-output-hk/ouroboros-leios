@@ -129,8 +129,6 @@ module LinearLeiosVerifier
       field refs : AssocList String Blk
             blks : List Blk
 
-      hasEB = ∃[ eb ] (EB-Blk eb) ∈ blks
-
     open State
     open Types params
     open import CategoricalCrypto hiding (_∘_)
@@ -171,7 +169,7 @@ module LinearLeiosVerifier
       record l { blks = [] } ,
         negative-events l s ++
           (Base₂-Action (primWord64ToNat s) , inj₁ FFDT.SLOT)
-        ∷ (Slot₂-Action (primWord64ToNat s) , inj₁ (FFDT.FFD-OUT (blksToHeaderAndBodyList (blks l))))
+        ∷ (Slot₁-Action (primWord64ToNat s) , inj₁ (FFDT.FFD-OUT (blksToHeaderAndBodyList (blks l))))
         ∷ []
     ... | no _  = l , []
 
