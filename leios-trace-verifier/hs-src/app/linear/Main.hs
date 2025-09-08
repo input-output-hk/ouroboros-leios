@@ -36,7 +36,6 @@ main =
     let lvote = toInteger (linearVoteStageLengthSlots config)
     let ldiff = toInteger (linearDiffuseStageLengthSlots config)
     let validityCheckTime = 3 -- TODO: read from config
-
     result <-
       verifyTrace nrNodes idSut stakeDistribution lhdr lvote ldiff validityCheckTime
         . decodeJSONL

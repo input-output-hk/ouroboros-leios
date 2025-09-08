@@ -4,5 +4,5 @@ module LinearLeiosLib (
   module LinearLeiosLib,
 ) where
 
-import MAlonzo.Code.Parser as P
 import MAlonzo.Code.LinearLeiosVerifier as V
+import MAlonzo.Code.Parser as P
