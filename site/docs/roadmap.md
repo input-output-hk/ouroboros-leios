@@ -104,9 +104,8 @@ To measure the success of Leios and ensure alignment with our mission, we will t
 
 ## Objectives
 
-As also mentioned in the [introduction](./overview.md), Leios is about maturing
-a consensus protocol design from a research paper through multiple [software
-readiness
+Leios is about maturing a consensus protocol design from a research paper
+through multiple [software readiness
 levels](https://committees.docs.intersectmbo.org/intersect-technical-steering-committee/technical-roadmap/project-cards-explained/software-readiness-level)
 and ultimately deploy it as a consensus upgrade onto the Cardano network.
 
