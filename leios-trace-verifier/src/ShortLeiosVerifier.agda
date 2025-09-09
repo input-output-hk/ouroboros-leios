@@ -99,7 +99,7 @@ module ShortLeiosVerifier
     with p ≟ SUT
   ... | yes _ = just (VT , primWord64ToNat s)
   ... | no _  = nothing
-  winningSlot record { message = RBGenerated _ _ _ _ _ _ _ _ }  = nothing
+  winningSlot record { message = RBGenerated _ _ _ _ _ _ _ _ _ }  = nothing
 
   EventLog = List TraceEvent
 
@@ -251,7 +251,7 @@ module ShortLeiosVerifier
         actions with p ≟ SUT
         ... | yes _ = (VT-Role-Action (primWord64ToNat s) , FFDT.SLOT) ∷ []
         ... | no _  = []
-    traceEvent→action l record { message = RBGenerated p i s _ eb _ _ _ }
+    traceEvent→action l record { message = RBGenerated p i s _ eb _ _ _ _ }
       with (unwrap eb)
     ... | nothing = l , []
     ... | just b

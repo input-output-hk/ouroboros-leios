@@ -132,6 +132,7 @@ data Event where
     , endorsements :: !(Maybe [Endorsement])
     , payload_bytes :: !Word64
     , parent :: !(Nullable BlockRef)
+    , transactions :: ![Word64]
     } ->
     Event
   VTBundleGenerated ::

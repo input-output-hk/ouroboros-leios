@@ -81,7 +81,7 @@ data Event : Type where
   IBEnteredState EBEnteredState VTBundleEnteredState RBEnteredState : String → String → Word64 → Event
   IBGenerated : String → String → SlotNo → PipelineNo → Bytes → Bytes → Maybe String → Event
   EBGenerated : String → String → Word64 → PipelineNo → Word64 → List BlockRef → List BlockRef → List Word64 → Event
-  RBGenerated : String → String → Word64 → Word64 → Nullable Endorsement → Maybe (List Endorsement) → Word64 → Nullable BlockRef → Event
+  RBGenerated : String → String → Word64 → Word64 → Nullable Endorsement → Maybe (List Endorsement) → Word64 → Nullable BlockRef → List Word64 → Event
   VTBundleGenerated : String → String → Word64 → PipelineNo → Word64 → Map String Word64 → Event
 
 {-# COMPILE GHC Event = data Event (Slot | Cpu | NoIBGenerated | NoEBGenerated | NoVTBundleGenerated | IBSent | EBSent | VTBundleSent | RBSent | IBReceived | EBReceived | VTBundleReceived | RBReceived | IBEnteredState | EBEnteredState | VTBundleEnteredState | RBEnteredState | IBGenerated | EBGenerated | RBGenerated | VTBundleGenerated) #-}

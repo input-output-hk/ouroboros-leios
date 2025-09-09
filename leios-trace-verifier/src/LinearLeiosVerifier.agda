@@ -88,7 +88,7 @@ module LinearLeiosVerifier
     with p ≟ SUT
   ... | yes _ = just (VT , primWord64ToNat s)
   ... | no _  = nothing
-  winningSlot record { message = RBGenerated _ _ _ _ _ _ _ _ }  = nothing
+  winningSlot record { message = RBGenerated _ _ _ _ _ _ _ _ _ }  = nothing
 
   EventLog = List TraceEvent
 
@@ -123,11 +123,14 @@ module LinearLeiosVerifier
       IB-Blk : InputBlock → Blk
       EB-Blk : ℕ × EndorserBlock → Blk
       VT-Blk : List Vote → Blk
-      RB-Blk : EndorserBlock → Blk
+      RB-Blk : RankingBlock → Blk
 
     record State : Type where
-      field refs : AssocList String Blk
-            blks : List Blk
+      field EB-refs : AssocList String (ℕ × EndorserBlock)
+            VT-refs : AssocList String (List Vote)
+            RB-refs : AssocList String RankingBlock
+            FFD-blks : List Blk
+            B-blks : List Blk
 
     open State
     open Types params
@@ -144,7 +147,13 @@ module LinearLeiosVerifier
       ∷ (quote InputBlock , Show-InputBlock)
       ∷ []
 
+    instance
+      Show-EBCert : Show (Maybe EBCert)
+      Show-EBCert .show nothing  = "No EBCert"
+      Show-EBCert .show (just c) = show c
+
     unquoteDecl Show-EndorserBlockOSig = derive-Show [ (quote EndorserBlockOSig , Show-EndorserBlockOSig) ]
+    unquoteDecl Show-RankingBlock = derive-Show [ (quote RankingBlock , Show-RankingBlock) ]
     unquoteDecl Show-Blk = derive-Show [ (quote Blk , Show-Blk) ]
 
     blksToHeaderAndBodyList : List Blk → List (FFDA.Header ⊎ FFDA.Body)
@@ -156,7 +165,7 @@ module LinearLeiosVerifier
 
     -- Negative {EB,VT} event, if there is no {EB,VT}Generated event
     negative-events : State → Word64 → List (Action × (FFDT Out ⊎ BaseT Out ⊎ IOT In))
-    negative-events l s with (blks l)
+    negative-events l s with FFD-blks l
     ... | [] = (No-EB-Role-Action (primWord64ToNat s), inj₁ FFDT.SLOT) ∷ (No-VT-Role-Action (primWord64ToNat s), inj₁ FFDT.SLOT) ∷ []
     ... | EB-Blk _ ∷ [] = (No-VT-Role-Action (primWord64ToNat s), inj₁ FFDT.SLOT) ∷ []
     ... | VT-Blk _ ∷ [] = (No-EB-Role-Action (primWord64ToNat s), inj₁ FFDT.SLOT) ∷ []
@@ -166,17 +175,14 @@ module LinearLeiosVerifier
     traceEvent→action l record { message = Slot p s }
       with p ≟ SUT
     ... | yes _ =
-      record l { blks = [] } ,
+      record l { FFD-blks = [] } ,
         negative-events l s ++
           (Base₂-Action (primWord64ToNat s) , inj₁ FFDT.SLOT)
-        ∷ (Slot₁-Action (primWord64ToNat s) , inj₁ (FFDT.FFD-OUT (blksToHeaderAndBodyList (blks l))))
+        ∷ (Slot₁-Action (primWord64ToNat s) , inj₁ (FFDT.FFD-OUT (blksToHeaderAndBodyList (FFD-blks l))))
         ∷ []
     ... | no _  = l , []
 
-    traceEvent→action l record { message = EBReceived s p _ _ i _ }
-      with p ≟ SUT | refs l ⁉ i
-    ... | yes _ | just eb = record l { blks = eb ∷ blks l } , []
-    ... | _ | _ = l , []
+    -- EBs
     traceEvent→action l record { message = EBGenerated p i s _ _ ibs ebs transactions } =
       let eb = record
                  { slotNumber = primWord64ToNat s
@@ -187,31 +193,48 @@ module LinearLeiosVerifier
                  ; ebRefs     = []
                  ; signature  = tt
                  }
-      in record l { refs = (i , EB-Blk (primWord64ToNat s , eb)) ∷ refs l } , actions eb
+      in record l { EB-refs = (i , (primWord64ToNat s , eb)) ∷ EB-refs l } , actions eb
       where
         actions : EndorserBlock → List (Action × (FFDT Out ⊎ BaseT Out ⊎ IOT In))
         actions eb with p ≟ SUT
         ... | yes _ = (EB-Role-Action (primWord64ToNat s) eb , inj₁ FFDT.SLOT) ∷ []
         ... | no _  = []
-    traceEvent→action l record { message = VTBundleReceived _ p _ _ i _ }
-      with p ≟ SUT | refs l ⁉ i
-    ... | yes _ | just vt = record l { blks = vt ∷ blks l } , []
-    ... | _ | _ = l , []
+    traceEvent→action l record { message = EBReceived s p _ _ i _ }
+      with p ≟ SUT | EB-refs l ⁉ i | RB-refs l ⁉ i
+    ... | yes _ | just eb | just rb =
+      record l { FFD-blks = EB-Blk eb ∷ FFD-blks l
+               ; B-blks   = RB-Blk (record rb { announcedEB = just (hash (proj₂ eb)) }) ∷ B-blks l
+               } , []
+    ... | _ | _ | _ = l , []
+
+    -- VTs
     traceEvent→action l record { message = VTBundleGenerated p i s _ _ vts } =
       let vt = map (const tt) (elems vts)
-      in record l { refs = (i , VT-Blk vt) ∷ refs l } , actions
+      in record l { VT-refs = (i , vt) ∷ VT-refs l } , actions
       where
         actions : List (Action × (FFDT Out ⊎ BaseT Out ⊎ IOT In))
-        actions with p ≟ SUT | refs l ⁉ i
-        ... | yes _ | just (EB-Blk (slot' , eb)) = (VT-Role-Action (primWord64ToNat s) eb slot' , inj₁ FFDT.SLOT) ∷ []
+        actions with p ≟ SUT | EB-refs l ⁉ i
+        ... | yes _ | just (slot' , eb) = (VT-Role-Action (primWord64ToNat s) eb slot' , inj₁ FFDT.SLOT) ∷ []
         ... | _ | _ = []
-    traceEvent→action l record { message = RBGenerated p i s _ eb _ _ _ }
-      with (unwrap eb)
-    ... | nothing = l , []
-    ... | just b
-      with refs l ⁉ BlockRef.id (Endorsement.eb b)
-    ... | nothing = l , []
-    ... | just e = record l { refs = (i , e) ∷ refs l } , []
+    traceEvent→action l record { message = VTBundleReceived _ p _ _ i _ }
+      with p ≟ SUT | VT-refs l ⁉ i
+    ... | yes _ | just vt = record l { FFD-blks = VT-Blk vt ∷ FFD-blks l } , []
+    ... | _ | _ = l , []
+
+    -- RBs
+    traceEvent→action l record { message = RBGenerated p i s _ eb _ _ _ txs } =
+      let rb = record
+                 { txs = map primWord64ToNat txs
+                 ; announcedEB = nothing
+                 ; ebCert = unwrap eb >>= λ b → EB-refs l ⁉ BlockRef.id (Endorsement.eb b) >>= λ (_ , eb') → return (hash eb')
+                 }
+      in record l { RB-refs = (i , rb) ∷ RB-refs l } , (Slot₂-Action (primWord64ToNat s) , inj₂ (inj₁ (BaseT.BASE-LDG (rb ∷ [])))) ∷ []
+
+    traceEvent→action l record { message = RBReceived s p _ _ i _ }
+      with p ≟ SUT | RB-refs l ⁉ i
+    ... | yes _ | just rb = record l { B-blks = RB-Blk rb ∷ B-blks l } , []
+    ... | _ | _ = l , []
+
     traceEvent→action l record { message = Cpu _ _ _ _ }                = l , []
     traceEvent→action l record { message = IBReceived _ _ _ _ _ _ }     = l , []
     traceEvent→action l record { message = IBGenerated _ _ _ _ _ _ _}   = l , []
@@ -222,7 +245,6 @@ module LinearLeiosVerifier
     traceEvent→action l record { message = EBSent _ _ _ _ _ _ }         = l , []
     traceEvent→action l record { message = VTBundleSent _ _ _ _ _ _ }   = l , []
     traceEvent→action l record { message = RBSent _ _ _ _ _ _ }         = l , []
-    traceEvent→action l record { message = RBReceived _ _ _ _ _ _ }     = l , []
     traceEvent→action l record { message = IBEnteredState _ _ _ }       = l , []
     traceEvent→action l record { message = EBEnteredState _ _ _ }       = l , []
     traceEvent→action l record { message = VTBundleEnteredState _ _ _ } = l , []
@@ -260,9 +282,6 @@ module LinearLeiosVerifier
       Show-⊥ : Show ⊥
       Show-⊥ .show _ = "⊥"
 
-      Show-RB : Show RankingBlock
-      Show-RB .show _ = "RB" -- TODO
-
       Show-BaseT-Out : Show (BaseT Out)
       Show-BaseT-Out .show _ = "BaseT-Out" -- TODO
 
@@ -299,7 +318,7 @@ module LinearLeiosVerifier
 
       verifyTrace' : LeiosState → Pair ℕ (Pair String String)
       verifyTrace' s =
-        let n₀ = record { refs = [] ; blks = [] }
+        let n₀ = record { EB-refs = [] ; VT-refs = [] ; RB-refs = [] ; FFD-blks = [] ; B-blks = [] }
             l' = proj₂ $ mapAccuml traceEvent→action n₀ l
             αs = L.reverse (L.concat l')
             tr = checkTrace αs s
