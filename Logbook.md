@@ -1,5 +1,14 @@
 # Leios logbook
 
+## 2025-09-09
+
+### SN on website updates
+
+- Need to update the next monthly review meeting to be on Oct 1st (shifted due to the node diversity workshop)
+- The website computes when the next meeting is (last wednesday of the month)
+- Needed to add some logic to consider exceptions to that rule
+- Also, the website recently got updated with a more elaborate overview and how Leios works on the landing page, so we should be able to supersede outdated information in the "Documentation" section.
+
 ## 2025-09-05
 
 ### Bandwidth measurements
