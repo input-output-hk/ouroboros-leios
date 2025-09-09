@@ -55,10 +55,26 @@ function getLastWednesdayOfMonth(date = new Date()) {
     return lastWednesday;
 }
 
+function UTCDateTime(year, month, day, hour, minute = 0, second = 0) {
+    // NOTE: Not use constructor directly as it uses local time
+    const date = new Date(year, month, day, hour, minute, second);
+    date.setUTCHours(hour, minute, second);
+    return date;
+}
+
+let exceptions = {
+    "2025-9": UTCDateTime(2025, 9, 1, 14)
+};
+
 function getNextMeeting(now = new Date()) {
-    const currentMonthMeeting = getLastWednesdayOfMonth(now);
+    let nextMeeting = getLastWednesdayOfMonth(now);
+    const exception = exceptions[`${now.getFullYear()}-${now.getMonth()+1}`];
+    if (exception) {
+       console.warn("Exceptional next meeting date:", exception);
+       nextMeeting = exception;
+    }
     const meetingEndTime = new Date(
-        currentMonthMeeting.getTime() + 60 * 60 * 1000,
+        nextMeeting.getTime() + 60 * 60 * 1000,
     ); // 1 hour after start
 
     // If we're past the current month's meeting end time, get next month's meeting
@@ -67,12 +83,12 @@ function getNextMeeting(now = new Date()) {
         return getLastWednesdayOfMonth(nextMonth);
     }
 
-    return currentMonthMeeting;
+    return nextMeeting;
 }
 
 function isLiveTime(now = new Date()) {
-    const currentMonthMeeting = getLastWednesdayOfMonth(now);
-    const meetingStartTime = currentMonthMeeting.getTime();
+    const nextMeeting = getNextMeeting(now);
+    const meetingStartTime = nextMeeting.getTime();
     const meetingEndTime = meetingStartTime + 60 * 60 * 1000; // 1 hour after start
     const currentTime = now.getTime();
 
@@ -1943,7 +1959,7 @@ function MonthlyReviewsSection() {
                                             fontWeight: 500,
                                         }}
                                     >
-                                        Next update: {nextDate}
+                                        Next review meeting: {nextDate}
                                     </div>
                                 )}
                             </div>

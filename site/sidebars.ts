@@ -12,15 +12,6 @@ import type { SidebarsConfig } from "@docusaurus/plugin-content-docs";
  */
 const sidebars: SidebarsConfig = {
   documentationSidebar: [
-    {
-      type: "category",
-      label: "Overview",
-      items: [
-        "overview",
-        "protocol-overview",
-        "how-it-works",
-      ],
-    },
     "faq",
     "glossary",
     "resources",
