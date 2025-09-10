@@ -11,12 +11,7 @@ import type { SidebarsConfig } from "@docusaurus/plugin-content-docs";
  Create as many sidebars as you want.
  */
 const sidebars: SidebarsConfig = {
-  documentationSidebar: [
-    "roadmap",
-    "resources",
-    "faq",
-    "glossary",
-  ],
+  documentationSidebar: ["roadmap", "strategy", "resources", "faq", "glossary"],
   developmentSidebar: [
     {
       type: "category",
