@@ -20,11 +20,6 @@ on:
       - "leios-trace-verifier/**"
 
 jobs:
-  sim-rs-check:
-    name: "Test"
-    runs-on: ubuntu-22.04
-
-jobs:
   linear-trace-verifier:
     name: Linear Leios trace verifier
     runs-on: ubuntu-latest
