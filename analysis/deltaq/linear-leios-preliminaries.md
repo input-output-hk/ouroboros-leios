@@ -37,6 +37,118 @@ Linear Leios has three protocol parameters related to time-bounds on some networ
 
 Furthermore, EB validation (the `Reapply` operation) cannot be completed until all of its transactions are validated (the `Apply` operation) after receipt.
 
+### Transitions
+
+#### Ledger update
+
+The following Petri net illustrates network and CPU operations from the arrival of a new RB header to the complete update of the ledger state, where there are $m$ transactions in the RB and $n$ transactions in the EB. The choice between the `Apply Tx` and `Reapply Tx` transition occurs depending upon whether the transaction is already present in the memory pool, `Check mempool`. The diagram approximates that as many as $c$ transactions may be fetched simultaneously. The diagram omits potential parallelism in updating the ledger.
+
+```mermaid
+graph LR
+
+    AwaitRH(("Awaiting
+    RB header"))
+    ArriveRH["RB header
+    arrives"]
+
+    AwaitRH --"1"--> ArriveRH
+
+    FetchRB((Fetching
+    RB body))
+    ArriveRH -."1".-> FetchRB
+
+    ArriveRB["RB body
+    arrives"]
+    FetchRB --"1"--> ArriveRB
+
+    UnvalidatedRbTx(("Awaiting Tx
+    application"))
+    ArriveRB -."m".-> UnvalidatedRbTx
+
+    CheckRbTx["Check
+    mempool"]
+    UnvalidatedRbTx --"1"--> CheckRbTx
+
+    ReadyRbTx(("Ready to
+    (re)apply Tx"))
+    CheckRbTx -."1".-> ReadyRbTx
+
+    ApplyRbTx["Apply Tx"]
+    ReadyRbTx --"1"--> ApplyRbTx
+
+    ReapplyRbTx["Reapply Tx"]
+    ReadyRbTx --"1"--> ReapplyRbTx
+
+    LedgerRbTx(("Ledger
+    updated"))
+    ApplyRbTx -."1".-> LedgerRbTx
+    ReapplyRbTx -."1".-> LedgerRbTx
+
+    ApplyRb["RB applied"]
+    LedgerRbTx --"m"--> ApplyRb
+
+    ReadyLedger(("Ledger ready
+    for EB"))
+    ApplyRb -."1".-> ReadyLedger
+
+    FetchEH(("Fetching
+    EB header"))
+    ArriveRH -."1".-> FetchEH
+
+    ArriveEH["EB header
+    arrives"]
+    FetchEH --"1"--> ArriveEH
+
+    FetchEB(("Fetching
+    EB body"))
+    ArriveEH -."1".-> FetchEB
+
+    ArriveEB["EB body
+    arrives"]
+    FetchEB --"1"--> ArriveEB
+
+    AwaitTx(("Awaiting Tx"))
+    ArriveEB -."n".-> AwaitTx
+
+    FetchTx["Fetching Tx"]
+    AwaitTx --"k ∈ [1, min(c, n)]"--> FetchTx
+
+    UnvalidatedEbTx(("Awaiting Tx
+    application"))
+    FetchTx -."k".-> UnvalidatedEbTx
+
+    CheckEbTx["Check
+    mempool"]
+    UnvalidatedEbTx --"1"--> CheckEbTx
+    ReadyLedger --"1"--> CheckEbTx
+
+    ReadyEbTx(("Ready to
+    (re)apply Tx"))
+    CheckEbTx -."1".-> ReadyEbTx
+
+    ApplyEbTx["Apply Tx"]
+    ReadyEbTx --"1"--> ApplyEbTx
+    ApplyEbTx -."1".-> ReadyLedger
+
+    ReapplyEbTx["Reapply Tx"]
+    ReadyEbTx --"1"--> ReapplyEbTx
+    ReapplyEbTx -."1".-> ReadyLedger
+
+    LedgerEbTx(("Ledger
+    updated"))
+    ApplyEbTx -."1".-> LedgerEbTx
+    ReapplyEbTx -."1".-> LedgerEbTx
+
+    ApplyEb["EB applied"]
+    LedgerEbTx --"n"--> ApplyEb
+    ReadyLedger --"1"--> ApplyEb
+
+    FinalLedger(("Ledger
+    completely
+    updated"))
+    ApplyEb -."1".-> FinalLedger
+```
+
 ## Approximate models of Cardano mainnet characteristics
 
 ### Stake distribution
