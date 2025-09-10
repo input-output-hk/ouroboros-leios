@@ -39,15 +39,16 @@ Furthermore, EB validation (the `Reapply` operation) cannot be completed until a
 
 ### Transitions
 
-#### Ledger update
+#### Updating the ledger after receiving an RB header
 
-The following Petri net illustrates network and CPU operations from the arrival of a new RB header to the complete update of the ledger state, where there are $m$ transactions in the RB and $n$ transactions in the EB. The choice between the `Apply Tx` and `Reapply Tx` transition occurs depending upon whether the transaction is already present in the memory pool, `Check mempool`. The diagram approximates that as many as $c$ transactions may be fetched simultaneously. The diagram omits potential parallelism in updating the ledger.
+The following Petri net illustrates network and CPU operations from the arrival of a new RB header to the complete update of the ledger state, where there are $m$ transactions in the RB and $n$ transactions in the EB: for simplicity in the diagram we assume $m >0$ and $n > 0$. The choice between the `Apply Tx` and `Reapply Tx` transition occurs depending upon whether the transaction is already present in the memory pool, `Check mempool`. The diagram approximates that as many as $c$ transactions may be fetched simultaneously. It omits potential parallelism in updating the ledger.
 
 ```mermaid
 graph LR
 
     AwaitRH(("Awaiting
-    RB header"))
+    RB header
+    ⬤"))
     ArriveRH["RB header
     arrives"]
 
@@ -84,12 +85,12 @@ graph LR
     ApplyRbTx -."1".-> LedgerRbTx
     ReapplyRbTx -."1".-> LedgerRbTx
 
-    ApplyRb["RB applied"]
-    LedgerRbTx --"m"--> ApplyRb
+    ApplyRB["RB applied"]
+    LedgerRbTx --"m"--> ApplyRB
 
     ReadyLedger(("Ledger ready
     for EB"))
-    ApplyRb -."1".-> ReadyLedger
+    ApplyRB -."1".-> ReadyLedger
 
     FetchEH(("Fetching
     EB header"))
@@ -139,14 +140,71 @@ graph LR
     ApplyEbTx -."1".-> LedgerEbTx
     ReapplyEbTx -."1".-> LedgerEbTx
 
-    ApplyEb["EB applied"]
-    LedgerEbTx --"n"--> ApplyEb
-    ReadyLedger --"1"--> ApplyEb
+    ApplyEB["EB applied"]
+    LedgerEbTx --"n"--> ApplyEB
+    ReadyLedger --"1"--> ApplyEB
 
-    FinalLedger(("Ledger
-    completely
-    updated"))
-    ApplyEb -."1".-> FinalLedger
+    ApplyEB -."1".-> AwaitRH
+```
+
+### Updating the memory pool
+
+The Petri net below illustrates a simplified version of transaction mini-protocol and application of transactions to the memory pool. In it $m$ transactions IDs are received and the transaction bodies for the previously unseen $n$ of them are fetched. The diagram approximates that as many as $c$ transactions may be fetched simultaneously. Transactions are only added to memory pool if they are successfully applied.
+
+```mermaid
+graph LR
+
+    ReadyTxId(("Ready for
+    TxIds ⬤"))
+
+    AnnounceTx["TxIds 
+    announced"]
+    ReadyTxId --"1"--> AnnounceTx
+
+    UncheckTx(("Candidate
+    Txs"))
+    AnnounceTx -."m".-> UncheckTx
+
+    CheckTx["Check
+    mempool"]
+    UncheckTx --"m"--> CheckTx
+
+    FetchTx(("Fetching
+    Txs"))
+    CheckTx -."n".-> FetchTx
+    CheckTx -."1".-> ReadyTxId
+
+    AnyTxs["Any Txs
+    to fetch"]
+    FetchTx --"n"--> AnyTxs
+    ReadyTxs --"1"--> AnyTxs
+
+    FetchTxs(("Txs to
+    fetch"))
+    AnyTxs -."n".-> FetchTxs
+
+    ArriveTx["Txs 
+    arrive"]
+    FetchTxs --"k ∈ [1, min(c, n)]"--> ArriveTx
+
+    ReadyTx(("Ready to
+    apply Tx"))
+    ArriveTx -."k".-> ReadyTx
+
+    ApplyTx["Apply Tx"]
+    ReadyTx --"1"--> ApplyTx
+
+    AppliedTx(("Applied
+    Txs"))
+    ApplyTx -."1".-> AppliedTx
+
+    UpdateMempool["Update
+    mempool"]
+    AppliedTx --"n"--> UpdateMempool
+
+    ReadyTxs(("Ready for
+    Txs ⬤"))
+    UpdateMempool -."1".-> ReadyTxs
 ```
 
 ## Approximate models of Cardano mainnet characteristics
