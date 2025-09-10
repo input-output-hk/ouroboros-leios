@@ -3,6 +3,8 @@
 
 ## Synopsis of Linear Leios
 
+This section summarizes the quantities, processes, and constraints that are key to modeling Linear Leios using a technique like DeltaQSD.
+
 ### Timings
 
 Linear Leios has three protocol parameters related to time-bounds on some network operations. Its security analysis employs several additional time-related parameters. See the [Protocol Parameters](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#protocol-parameters) and the [Protocol Security](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#protocol-security) sections of the proposed [CIP-0164](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md) for a detailed discussion.
@@ -35,7 +37,7 @@ Linear Leios has three protocol parameters related to time-bounds on some networ
 | Time to next RB     | certification | $\leq 3 L_\text{hdr} + L_\text{vote} + L_\text{diff}$ |                                        |
 | Weight of votes     | certification | $\geq \tau \cdot \text{total stake}$                  | $½ < \tau \, \land \, \tau \lesssim ¾$ |
 
-Furthermore, EB validation (the `Reapply` operation) cannot be completed until all of its transactions are validated (the `Apply` operation) after receipt.
+Furthermore, EB validation (the `Reapply` operation) cannot be completed until all of its transactions are validated (the `Apply` operation) after receipt. Certification is irrelevant if not completed before the next RB is forged.
 
 ### Transitions
 
@@ -49,9 +51,9 @@ graph LR
     AwaitRH(("Awaiting
     RB header
     ⬤"))
-    ArriveRH["RB header
-    arrives"]
-
+    
+    ArriveRH["<strong>RB header
+    arrives</strong>"]
     AwaitRH --"1"--> ArriveRH
 
     FetchRB((Fetching
@@ -140,12 +142,14 @@ graph LR
     ApplyEbTx -."1".-> LedgerEbTx
     ReapplyEbTx -."1".-> LedgerEbTx
 
-    ApplyEB["EB applied"]
+    ApplyEB["<strong>EB validated</strong>"]
     LedgerEbTx --"n"--> ApplyEB
     ReadyLedger --"1"--> ApplyEB
 
     ApplyEB -."1".-> AwaitRH
 ```
+
+The timing inputs to the two critical voting constraints, `RB header arrives` and `EB validated`, are highlighted above.
 
 ### Updating the memory pool
 
