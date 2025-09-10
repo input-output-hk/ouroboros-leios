@@ -270,21 +270,12 @@ Measurements of ledger operations on Cardano mainnet are extremely noisy. One ca
 
 | Dependent variable | Quantile | Intercept | Coefficient of transaction count | Coefficient of block size | Coefficient of Plutus steps |
 | ------------------ | -------: | --------: | -------------------------------: | ------------------------: | --------------------------: |
-| `Apply`            |   50%ile |       n/a |                      0.243 ms/tx |                       n/a |             1.1225 ms/Gstep |
-|                    |   95%ile |       n/a |                      0.380 ms/tx |                       n/a |             2.1195 ms/Gstep |
-|                    |   99%ile |       n/a |                      0.519 ms/tx |                       n/a |             2.8225 ms/Gstep |
-| `Reapply`          |   50%ile |  0.296 ms |                              n/a |              0.0152 ms/kB |             0.0334 ms/Gstep |
-|                    |   95%ile |  1.074 ms |                              n/a |              0.0311 ms/kB |             0.0666 ms/Gstep |
-|                    |   99%ile |  1.401 ms |                              n/a |              0.0550 ms/kB |             0.0051 ms/Gstep |
-
-| Dependent variable | Quantile | Intercept | Coefficient of transaction count | Coefficient of block size | Coefficient of Plutus steps |
-| ------------------ | -------: | --------: | -------------------------------: | ------------------------: | --------------------------: |
-| `Apply`            |   50%ile |       n/a |                      0.243 ms/tx |                       n/a |             1.1225 ms/Gstep |
-|                    |   95%ile |       n/a |                      0.380 ms/tx |                       n/a |             2.1195 ms/Gstep |
-|                    |   99%ile |       n/a |                      0.519 ms/tx |                       n/a |             2.8225 ms/Gstep |
-| `Reapply`          |   50%ile |  0.296 ms |                              n/a |              0.0152 ms/kB |             0.0334 ms/Gstep |
-|                    |   95%ile |  1.074 ms |                              n/a |              0.0311 ms/kB |             0.0666 ms/Gstep |
-|                    |   99%ile |  1.401 ms |                              n/a |              0.0550 ms/kB |             0.0051 ms/Gstep |
+| `Apply`            |   50%ile |       n/a |                      0.243 ms/tx |                       n/a |              1.123 ms/Gstep |
+|                    |   95%ile |       n/a |                      0.380 ms/tx |                       n/a |              2.120 ms/Gstep |
+|                    |   99%ile |       n/a |                      0.519 ms/tx |                       n/a |              2.823 ms/Gstep |
+| `Reapply`          |   50%ile |  0.144 ms |                     0.0441 ms/tx |              0.0005 ms/kB |             0.0198 ms/Gstep |
+|                    |   95%ile |  0.992 ms |                     0.0510 ms/tx |              0.0045 ms/kB |             0.0527 ms/Gstep |
+|                    |   99%ile |  1.276 ms |                     0.0353 ms/tx |              0.0321 ms/kB |             0.0203 ms/Gstep |
 
 ## Inferred mainnet topology
 
