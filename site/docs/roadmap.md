@@ -29,6 +29,18 @@ project](https://github.com/orgs/input-output-hk/projects/167).
 
 Create a Cardano Improvement Proposal (CIP) that addresses the [Cardano Problem Statement (CPS) about Greater Transaction Throughput (CPS-18)](https://github.com/cardano-scaling/CIPs/blob/master/CPS-0018/README.md). The proposed protocol design shall be applicable to Cardano and feasibility is proven by relevant analysis and simulations.
 
+Creating a CIP is standard procedure to disseminate and discuss protocol changes on Cardano. It will clearly motivate, specify and provide rationale of a concrete change to the Cardano consensus. The discussion will uncover potential blind spots and allow a broad audience to raise their concerns or signal agreement with the changes. The provided evidence in the form of simulation results and cost analysis will build early confidence about the feasibility of the proposed change and pave the way for required governance decisions to rollout the protocol update in a [hard-fork](#hard-fork).
+
+#### Scope
+
+- Refine the protocol design from what was [published by research](https://eprint.iacr.org/2025/1115.pdf) into possible variants
+- Create simulators to empirically explore protocol variants and trade-offs
+- Cost analysis and threat modeling
+- Propose a CIP to solve CPS-18 on [cardano-foundatios/CIPs](https://github.com/cardano-foundation/CIPs)
+- Discuss and incorporate feedback into the CIP
+
+This is a joint effort between innovation and engineering teams from Input Output Research (IOR) and Input Output Engineering (IOE) respectively.
+
 ### Technical specification
 
 > As a node developer, I want to understand in detail how the Leios protocol works and whether my node implementation is correct.
