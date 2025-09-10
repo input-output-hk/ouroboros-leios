@@ -5,6 +5,8 @@ through multiple [software readiness
 levels](https://committees.docs.intersectmbo.org/intersect-technical-steering-committee/technical-roadmap/project-cards-explained/software-readiness-level)
 and ultimately deploy it as a consensus upgrade onto the Cardano network.
 
+## Objectives
+
 Following our [strategy](./strategy.md), we identified several key objectives
 along the way which are roughly in order, but not strictly sequential. Instead,
 each will give rise to a list of _marketable features_, which we going to
@@ -12,6 +14,12 @@ identify, progress and deliver throughout the whole lifecycle of this project.
 These objectives and features make up the actual product roadmap, which we are
 going to update and report on every month via [this github
 project](https://github.com/orgs/input-output-hk/projects/167).
+
+<a href="https://github.com/orgs/input-output-hk/projects/167">
+
+![](./roadmap-preview.png)
+
+</a>
 
 <!-- TODO: go into more detail on why each objective is important and also what's in scope -->
 
