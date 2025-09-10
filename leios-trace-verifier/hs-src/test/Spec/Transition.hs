@@ -173,6 +173,7 @@ transition GenerateRB =
     (block_id, parent) <- genRB =<< use idSut
     size_bytes <- lift arbitrary
     payload_bytes <- lift arbitrary
+    let transactions = []
     pure [RBGenerated{..}]
 transition ReceiveRB =
   do
