@@ -9,6 +9,7 @@ open import Data.Bool using (if_then_else_)
 import Data.Nat.Show as S
 import Data.String as S
 open import Agda.Builtin.Word using (Word64; primWord64ToNat)
+open import Agda.Builtin.Char using (primCharToNat)
 open import Foreign.Haskell.Pair
 
 open import Tactic.Defaults
@@ -80,6 +81,8 @@ module LinearLeiosVerifier
   winningSlot record { message = VTBundleEnteredState _ _ _ }   = nothing
   winningSlot record { message = RBEnteredState _ _ _ }         = nothing
   winningSlot record { message = IBGenerated _ _ _ _ _ _ _}     = nothing
+  winningSlot record { message = TXReceived _ _ _ }             = nothing
+  winningSlot record { message = TXGenerated _ _ }              = nothing
   winningSlot record { message = EBGenerated p _ s _ _ _ _ _ }
     with p ≟ SUT
   ... | yes _ = just (EB , primWord64ToNat s)
@@ -188,6 +191,16 @@ module LinearLeiosVerifier
     isVT? (VT-Blk x) = yes tt
     isVT? (RB-Blk x) = no λ ()
 
+    concatList : List ℕ → ℕ
+    concatList = foldl addDigit 0
+      where
+        addDigit : ℕ → ℕ → ℕ
+        addDigit n d = 10 * n + d
+
+    private
+      test₁ : concatList (1 ∷ 7 ∷ 3 ∷ []) ≡ 173
+      test₁ = refl
+
     -- Negative {EB,VT} event, if there is no {EB,VT}Generated event
     negative-events-EB : List Blk → Word64 → List (Action × (FFDT Out ⊎ BaseT Out ⊎ IOT In))
     negative-events-EB l s
@@ -258,6 +271,13 @@ module LinearLeiosVerifier
       with p ≟ SUT | RB-refs l ⁉ i
     ... | yes _ | just rb = l , (Slot₂-Action (currentSlot l) , inj₂ (inj₁ (BaseT.BASE-LDG (rb ∷ [])))) ∷ []
     ... | _ | _ = l , []
+
+    -- TXs
+    traceEvent→action l record { message = TXGenerated _ _ } = l , []
+    traceEvent→action l record { message = TXReceived i _ p }
+      with p ≟ SUT
+    ... | yes _ = l , (Base₁-Action (currentSlot l) , inj₂ (inj₂ (SubmitTxs (concatList (map primCharToNat (S.toList i)) ∷ [])))) ∷ []
+    ... | _     = l , []
 
     traceEvent→action l record { message = Cpu _ _ _ _ }                = l , []
     traceEvent→action l record { message = IBReceived _ _ _ _ _ _ }     = l , []

@@ -87,6 +87,8 @@ module ShortLeiosVerifier
   winningSlot record { message = EBEnteredState _ _ _ }         = nothing
   winningSlot record { message = VTBundleEnteredState _ _ _ }   = nothing
   winningSlot record { message = RBEnteredState _ _ _ }         = nothing
+  winningSlot record { message = TXReceived _ _ _ }             = nothing
+  winningSlot record { message = TXGenerated _ _ }              = nothing
   winningSlot record { message = IBGenerated p _ s _ _ _ _}
     with p ≟ SUT
   ... | yes _ = just (IB , primWord64ToNat s)
@@ -258,6 +260,8 @@ module ShortLeiosVerifier
       with refs l ⁉ BlockRef.id (Endorsement.eb b)
     ... | nothing = l , []
     ... | just e = record l { refs = (i , e) ∷ refs l } , []
+    traceEvent→action l record { message = TXReceived _ _ _ } = l , []
+    traceEvent→action l record { message = TXGenerated _ _ } = l , []
 
     mapAccuml : {A B S : Set} → (S → A → S × B) → S → List A → S × List B
     mapAccuml f s []       = s , []
