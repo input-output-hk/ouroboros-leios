@@ -318,6 +318,7 @@ sharedEvent leios nodeNames e = case e of
               , parent = Shared.Nullable $ do
                   h@BlockHash{} <- pure $ blockPrevHash blk
                   Just $! Shared.BlockRef{id = rbRef h}
+              , transactions = []
               , ..
               }
       PraosNodeEventReceived blk ->
