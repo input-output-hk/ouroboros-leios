@@ -50,14 +50,15 @@ jobs:
       run: |
         cargo run --release -- \
           --conformance-events \
+          --slots 3600 \
           --parameters parameters/linear-with-tx-references.yaml \
-          ../data/simulation/topo-default-100.yaml \
+          test_data/small.yaml \
           output/sim.log \
     - name: 🔬 Check example trace
       run: |
         nix run .#linear-leios-trace-verifier -- \
           --config-file sim-rs/parameters/linear.yaml \
-          --topology-file data/simulation/topo-default-100.yaml \
+          --topology-file sim-rs/test_data/small.yaml \
           --trace-file sim-rs/output/sim.log \
           --idSut 0 \
         || true   # FIXME: Remove when simulations conform to spec.
