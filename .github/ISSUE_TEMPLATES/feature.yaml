@@ -1,0 +1,46 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/SchemaStore/schemastore/refs/heads/master/src/schemas/json/github-issue-forms.json
+name: 'Feature'
+description: |
+  High level item that is marketable and takes us one step closer to our
+  objectives.
+labels: []
+type: Feature
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Thank you for contributing to our project!** 🌊🩵
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: Why do we want this feature
+      placeholder: |
+        Purpose of this work and how it takes us one step closer to our
+        objectives. Give context and describe the problem, challenge or
+        opportunity you see.
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What
+      description: What is this feature about
+      placeholder: |
+        What makes up the scope of this work and what is not part of it. When is
+        it done and are there any acceptance criteria?
+    validations:
+      required: true
+
+  - type: textarea
+    id: how
+    attributes:
+      label: How
+      description: How will this feature be done
+      placeholder: |
+        Which approach, technical solutions, systems should be used, which
+        components need to change? What are relevant tasks or steps to do this?
+    validations:
+      required: true
