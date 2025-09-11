@@ -1,5 +1,29 @@
 # Leios logbook
 
+## 2025-09-11
+
+### Compendium of data for Delta QSD modeling
+
+The document [Supporting information for modeling Linear Leios](analysis/deltaq/linear-leios-preliminaries.md) catalogs and presents the data and equations needed to model the Linear Leios protocol using techniques such as Delta QSD.
+
+- Protocol
+    - Parameters
+    - Constraints
+    - Transitions (represented as Petri nets)
+- Cardano mainnet
+    - Stake distribution
+    - Transaction size
+    - Transaction rate
+    - Ledger operations
+    - Topology
+    - Diffusion of block headers
+- Data centers
+    - Bandwidth
+    - Latency
+- Cryptography
+    - Voting
+    - Certificates
+
 ## 2025-09-09
 
 ### SN on website updates

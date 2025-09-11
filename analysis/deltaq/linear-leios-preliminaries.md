@@ -13,7 +13,7 @@ This document collects data that might be useful as input into models of Linear 
 |                 | [Ledger operations](#ledger-operations)                                     | Statistical models for CPU required for Apply and Reapply ledger operations                           |
 |                 | [Topology](#topology)                                                       | Synthetic topology for mainnet                                                                        |
 |                 | [Diffusion of block headers](#diffusion-of-block-headers)                   | Quantiles of arrival times of Praos block headers                                                     |
-| Internet        | [Bandwidth](#bandwidth)                                                     | Bandwidth between cloud data centers                                                                  |
+| Data centers    | [Bandwidth](#bandwidth)                                                     | Bandwidth between cloud data centers                                                                  |
 |                 | [Latency](#latency)                                                         | Latencies of pings to discoverable machines                                                           |
 | Cryptography    | [Timings for voting and certificates](#timings-for-voting-and-certificates) | Benchmarks for cryptographic operations                                                               |
 
