@@ -1,23 +1,28 @@
 # Supporting information for modeling Linear Leios
 
-| Category        | Item                                                                        | Description                                                                 |
-| --------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Protocol        | [Parameters](#parameters)                                                   | Definitions and approximate values for                                      |
-|                 | [Constraints](#constraints)                                                 | Security and protocol constraints on                                        |
-|                 | [Transitions](#transitions)                                                 |                                                                             |
-| Cardano mainnet | [Stake distribution](#stake-distribution)                                   | Statistical model for distribution of stake among SPOs                      |
-|                 | [Transaction size](#transaction-size)                                       | Statistical model for distribution of transaction sizes                     |
-|                 | [Transaction rate](#transaction-rate)                                       | Statistic model for rate of transaction submission                          |
-|                 | [Ledger operations](#ledger-operations)                                     | Statistical models for CPU required for Apply and Reapply ledger operations |
-|                 | [Topology](#topology)                                                       | Synthetic topology for mainnet                                              |
-|                 | [Diffusion of block headers](#diffusion-of-block-headers)                   | Quantiles of arrival times of Praos block headers                           |
-| Internet        | [Bandwidth](#bandwidth)                                                     | Bandwidth between cloud data centers                                        |
-|                 | [Latency](#latency)                                                         | Latencies of pings to discoverable machines                                 |
-| Cryptography    | [Timings for voting and certificates](#timings-for-voting-and-certificates) | Benchmarks for cryptographic operations                                     |
+This document collects data that might be useful as input into modeling Linear Leios. In particular it contains the requisite information for constructing a DeltaQSD model.
+
+| Category        | Item                                                                        | Description                                                                                           |
+| --------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Protocol        | [Parameters](#parameters)                                                   | Definitions and approximate values for Leios protocol parameters relevant to network and CPU modeling |
+|                 | [Constraints](#constraints)                                                 | Security and protocol constraints on network diffusion and CPU operations                             |
+|                 | [Transitions](#transitions)                                                 | Petri-net diagrams for ledger, memory pool, and voting processes                                      |
+| Cardano mainnet | [Stake distribution](#stake-distribution)                                   | Statistical model for distribution of stake among SPOs                                                |
+|                 | [Transaction size](#transaction-size)                                       | Statistical model for distribution of transaction sizes                                               |
+|                 | [Transaction rate](#transaction-rate)                                       | Statistic model for rate of transaction submission                                                    |
+|                 | [Ledger operations](#ledger-operations)                                     | Statistical models for CPU required for Apply and Reapply ledger operations                           |
+|                 | [Topology](#topology)                                                       | Synthetic topology for mainnet                                                                        |
+|                 | [Diffusion of block headers](#diffusion-of-block-headers)                   | Quantiles of arrival times of Praos block headers                                                     |
+| Internet        | [Bandwidth](#bandwidth)                                                     | Bandwidth between cloud data centers                                                                  |
+|                 | [Latency](#latency)                                                         | Latencies of pings to discoverable machines                                                           |
+| Cryptography    | [Timings for voting and certificates](#timings-for-voting-and-certificates) | Benchmarks for cryptographic operations                                                               |
 
 ## Synopsis of Linear Leios
 
 This section summarizes the quantities, processes, and constraints that are key to modeling Linear Leios using a technique like DeltaQSD.
+
+![Protocol flow for Linear Leios](https://raw.githubusercontent.com/cardano-scaling/CIPs/3616efcdd7455ba6a89053b0e56ff2b43dbe88fa/CIP-0164/images/protocol-flow.svg)
+![Protocol flow for Linear Leios](https://raw.githubusercontent.com/cardano-scaling/CIPs/3616efcdd7455ba6a89053b0e56ff2b43dbe88fa/CIP-0164/images/protocol-flow.svg)
 
 ### Parameters
 
@@ -34,8 +39,6 @@ Linear Leios has three protocol parameters related to time-bounds on some networ
 | ${\Delta_\text{RB}}^\text{W}$       | Complete ranking block propagation and adoption time                               |           5 slots |
 | ${\Delta_\text{applyTxs}}^\text{W}$ | Standard Praos transaction validation time for RB processing                       |            1 slot |
 | ${\Delta_\text{reapply}}^\text{W}$  | Certified EB reapplication with minimal checks and UTxO updates                    |          0.5 slot |
-
-![Protocol flow for Linear Leios](https://raw.githubusercontent.com/cardano-scaling/CIPs/3616efcdd7455ba6a89053b0e56ff2b43dbe88fa/CIP-0164/images/protocol-flow.svg)
 
 ### Constraints
 
