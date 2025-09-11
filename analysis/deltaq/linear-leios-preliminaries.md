@@ -41,7 +41,6 @@ Linear Leios has three protocol parameters related to time-bounds on some networ
 
 ### Constraints
 
-
 | Security constraint                                                                                                          | Description                                                                                                                          |
 | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | $\Delta_\text{reapply} < \Delta_\text{applyTxs}$                                                                             | Reapplying a certified EB cannot cost more than standard transaction processing.                                                     |
@@ -61,7 +60,7 @@ Furthermore, EB validation (the `Reapply` operation) cannot be completed until a
 In the next subsections Petri nets[^petri-nets] are used to represent three of the key processes that consume network and CPU resources in Linear Leios. These processes account for the majority of the delays in operating the protocol. The Petri nets are approximate and do not capture the full details of mini-protocols or all of the opportunities for parallelism.
 
 > [!WARNING]
-> The diagrams are mean to communicate the outlines of the process rather than to formally or precisely specify them.
+> The diagrams are notional and are mean to communicate the outlines of the process rather than to formally or precisely specify them.
 
 [^petri-nets]: https://en.wikipedia.org/wiki/Petri_net
 
@@ -235,7 +234,7 @@ graph LR
     UpdateMempool -."1".-> ReadyTxs
 ```
 
-#### Voting and certification
+#### Tallying and certifying votes
 
 In actuality votes would be transmitted as "bundles" of as many votes as fit in a single TCP MTU, and validated in parallel. The diagram below ignores the presence of bundles.
 
@@ -303,7 +302,7 @@ graph LR
 
   Cert(("Certificate"))
   GeneratedCert -."1".-> Cert
-  ```
+```
 
 ## Approximate models of Cardano mainnet characteristics
 
@@ -333,6 +332,7 @@ $$
 Using post-Byron `mainnet` data from `cardano-db-sync`, one can tally the transaction sizes[^transaction-size]. As a rough approximation, we can model the size distribution by a log-normal distribution with  $\mu = 6.93 \, \ln(\text{bytes})$ and $\sigma = 1.13 \, \ln(\text{bytes})$, truncated so that transactions constitute at least 55 bytes.
 
 [^transaction-size]: https://github.com/input-output-hk/ouroboros-leios/blob/e6ce0f0bfe23abfb860fe582741bbfd56c103f5e/analysis/tx.ipynb
+
 ### Transaction rate
 
 The transaction rate is well modeled as a Poisson point process[^transaction-size].
