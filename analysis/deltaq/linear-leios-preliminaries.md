@@ -58,7 +58,12 @@ Furthermore, EB validation (the `Reapply` operation) cannot be completed until a
 
 ### Transitions
 
+In the next subsections Petri nets[^petri-nets] are used to represent three of the key processes that consume network and CPU resources in Linear Leios. These processes account for the majority of the delays in operating the protocol. The Petri nets are approximate and do not capture the full details of mini-protocols or all of the opportunities for parallelism.
 
+> [!WARNING]
+> The diagrams are mean to communicate the outlines of the process rather than to formally or precisely specify them.
+
+[^petri-nets]: https://en.wikipedia.org/wiki/Petri_net
 
 #### Updating the ledger after receiving an RB header
 
@@ -230,9 +235,75 @@ graph LR
     UpdateMempool -."1".-> ReadyTxs
 ```
 
-#### Voting
+#### Voting and certification
 
+In actuality votes would be transmitted as "bundles" of as many votes as fit in a single TCP MTU, and validated in parallel. The diagram below ignores the presence of bundles.
 
+```mermaid
+graph LR
+
+  AwaitVote(("Awaiting
+  vote ⬤"))
+
+  ArriveVote["Vote
+  arrives"]
+  AwaitVote --"1"--> ArriveVote
+
+  UnvalidateVote(("Vote not
+  validated"))
+  ArriveVote -."1".-> UnvalidateVote
+
+  ValidateVote["Validating
+  vote"]
+  UnvalidateVote --"1"--> ValidateVote
+
+  EligibleCheck(("Check
+  committee
+  membership"))
+  ValidateVote -."1".-> EligibleCheck
+
+  SignatureCheck(("Verify
+  signature"))
+  ValidateVote -."1".-> SignatureCheck
+
+  Member["checked"]
+  EligibleCheck --"1"--> Member
+
+  Verified["verified"]
+  SignatureCheck --"1"--> Verified
+
+  VerifiedMember(("Checked and
+  verified"))
+  Member -."1".-> VerifiedMember
+  Verified -."1".-> VerifiedMember
+  
+  Valid["Validated"]
+  VerifiedMember --"2"--> Valid
+  Valid -."1".-> AwaitVote
+
+  ValidVotes(("Votes
+  validated"))
+  Valid -."1".-> ValidVotes
+
+  AwaitQuorum(("Awaiting
+  quorum ⬤"))
+
+  Quorum["Quorum
+  of stake"]
+  AwaitQuorum --"1"--> Quorum
+  ValidVotes --"τ"--> Quorum
+
+  GenerateCert(("Generating
+  certificate"))
+  Quorum -."1".-> GenerateCert
+
+  GeneratedCert["Generated
+  certificate"]
+  GenerateCert --"1"--> GeneratedCert
+
+  Cert(("Certificate"))
+  GeneratedCert -."1".-> Cert
+  ```
 
 ## Approximate models of Cardano mainnet characteristics
 
