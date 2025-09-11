@@ -1,6 +1,6 @@
 # Supporting information for modeling Linear Leios
 
-This document collects data that might be useful as input into modeling Linear Leios. In particular it contains the requisite information for constructing a DeltaQSD model.
+This document collects data that might be useful as input into models of Linear Leios. In particular it contains the requisite information for constructing a DeltaQSD model.
 
 | Category        | Item                                                                        | Description                                                                                           |
 | --------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
@@ -19,14 +19,13 @@ This document collects data that might be useful as input into modeling Linear L
 
 ## Synopsis of Linear Leios
 
-This section summarizes the quantities, processes, and constraints that are key to modeling Linear Leios using a technique like DeltaQSD.
+This section summarizes the quantities, processes, and constraints that are key to modeling Linear Leios using a technique like DeltaQSD. See  [CIP-0164](https://github.com/cardano-scaling/CIPs/tree/3616efcdd7455ba6a89053b0e56ff2b43dbe88fa/CIP-0164/README.md) for a detailed discussion.
 
-![Protocol flow for Linear Leios](https://raw.githubusercontent.com/cardano-scaling/CIPs/3616efcdd7455ba6a89053b0e56ff2b43dbe88fa/CIP-0164/images/protocol-flow.svg)
 ![Protocol flow for Linear Leios](https://raw.githubusercontent.com/cardano-scaling/CIPs/3616efcdd7455ba6a89053b0e56ff2b43dbe88fa/CIP-0164/images/protocol-flow.svg)
 
 ### Parameters
 
-Linear Leios has three protocol parameters related to time-bounds on some network operations. Its security analysis employs several additional time-related parameters. See the [Protocol Parameters](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#protocol-parameters) and the [Protocol Security](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#protocol-security) sections of the proposed [CIP-0164](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md) for a detailed discussion.
+Linear Leios has three protocol parameters related to time-bounds on some network operations. Its security analysis employs several additional time-related parameters. See the [Protocol Parameters](https://github.com/cardano-scaling/CIPs/tree/3616efcdd7455ba6a89053b0e56ff2b43dbe88fa/CIP-0164/README.md#protocol-parameters) and the [Protocol Security](https://github.com/cardano-scaling/CIPs/tree/3616efcdd7455ba6a89053b0e56ff2b43dbe88fa/CIP-0164/README.md#protocol-security) sections of the proposed CIP.
 
 | Symbol                              | Description                                                                        | Approximate value |
 | ----------------------------------- | ---------------------------------------------------------------------------------- | ----------------: |
@@ -41,6 +40,7 @@ Linear Leios has three protocol parameters related to time-bounds on some networ
 | ${\Delta_\text{reapply}}^\text{W}$  | Certified EB reapplication with minimal checks and UTxO updates                    |          0.5 slot |
 
 ### Constraints
+
 
 | Security constraint                                                                                                          | Description                                                                                                                          |
 | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
@@ -57,6 +57,8 @@ Linear Leios has three protocol parameters related to time-bounds on some networ
 Furthermore, EB validation (the `Reapply` operation) cannot be completed until all of its transactions are validated (the `Apply` operation) after receipt. Certification is irrelevant if not completed before the next RB is forged.
 
 ### Transitions
+
+
 
 #### Updating the ledger after receiving an RB header
 
@@ -228,16 +230,22 @@ graph LR
     UpdateMempool -."1".-> ReadyTxs
 ```
 
+#### Voting
+
+
+
 ## Approximate models of Cardano mainnet characteristics
 
 ### Stake distribution
 
 The stake distribution has an important influence on the number of unique SPOs
-involved in each round of Leios voting. It turns out that the cumulative
+involved in each round of Leios voting. It turns out[^stake-distribution] that the cumulative
 distribution function for the beta distribution (the
 [regularized incomplete beta function](https://en.wikipedia.org/wiki/Regularized_incomplete_beta_function))
 with parameters $\alpha = 11$ and $\beta = 1$ nicely fits the empirical distribution of
 stake pools at epoch 500, which is simply a power-law distribution.
+
+[^stake-distribution]: https://github.com/input-output-hk/ouroboros-leios/blob/e6ce0f0bfe23abfb860fe582741bbfd56c103f5e/analysis/fiat-accompli.ipynb
 
 $$
 \text{fraction of stake held by the fraction $x$ of pools with the least stake} = x^{10}
@@ -251,15 +259,18 @@ $$
 
 ### Transaction size
 
-Using post-Byron `mainnet` data from `cardano-db-sync`, one can tally the transaction sizes. As a rough approximation, we can model the size distribution by a log-normal distribution with  $\mu = 6.93 \, \ln(\text{bytes})$ and $\sigma = 1.13 \, \ln(\text{bytes})$, truncated so that transactions constitute at least 55 bytes.
+Using post-Byron `mainnet` data from `cardano-db-sync`, one can tally the transaction sizes[^transaction-size]. As a rough approximation, we can model the size distribution by a log-normal distribution with  $\mu = 6.93 \, \ln(\text{bytes})$ and $\sigma = 1.13 \, \ln(\text{bytes})$, truncated so that transactions constitute at least 55 bytes.
 
+[^transaction-size]: https://github.com/input-output-hk/ouroboros-leios/blob/e6ce0f0bfe23abfb860fe582741bbfd56c103f5e/analysis/tx.ipynb
 ### Transaction rate
 
-The transaction rate is well modeled as a Poisson point process.
+The transaction rate is well modeled as a Poisson point process[^transaction-size].
 
 ### Ledger operations
 
-Measurements of ledger operations on Cardano mainnet are extremely noisy. One can, however, use measurements from the `db-analyser` tool to develop quantile regressions that may be more reliable than linear models. Note that these are block-level regressions: the model for the `Apply` operation can be applied to individual transactions but the model for `Reapply` should be used for whole blocks. Note that the median number of Plutus execution steps per block is 2 Gstep but that can be ten times higher. Also note that it may be possible to build a heteroscedastic regression model for generating synthetic data.
+Measurements of ledger operations on Cardano mainnet are extremely noisy. One can, however, use measurements from the `db-analyser` tool to develop quantile regressions that may be more reliable than linear models.[^apply-reapply] Note that these are block-level regressions: the model for the `Apply` operation can be applied to individual transactions but the model for `Reapply` should be used for whole blocks. Note that the median number of Plutus execution steps per block is 2 Gstep but that can be ten times higher. Also note that it may be possible to build a heteroscedastic regression model for generating synthetic data.
+
+[^apply-reapply]: https://github.com/input-output-hk/ouroboros-leios/blob/e6ce0f0bfe23abfb860fe582741bbfd56c103f5e/analysis/timings/ReadMe.ipynb
 
 | Dependent variable | Quantile | Intercept | Coefficient of transaction count | Coefficient of block size | Coefficient of Plutus steps |
 | ------------------ | -------: | --------: | -------------------------------: | ------------------------: | --------------------------: |
@@ -272,7 +283,7 @@ Measurements of ledger operations on Cardano mainnet are extremely noisy. One ca
 
 ### Topology
 
-The aim of [the pseudo-mainnet topology](app://obsidian.md/data/simulation/pseudo-mainnet/) is to have a Leios network that is generally representative of the Cardano mainnet:
+The aim of the synthetic [pseudo-mainnet topology](https://github.com/input-output-hk/ouroboros-leios/blob/e6ce0f0bfe23abfb860fe582741bbfd56c103f5e/data/simulation/pseudo-mainnet/) is to have a Leios network that is generally representative of the Cardano mainnet:
 
 - Realistic stake distribution
 - Realistic number of stake pools
@@ -300,7 +311,9 @@ The aim of [the pseudo-mainnet topology](app://obsidian.md/data/simulation/pseu
 
 ### Diffusion of block headers
 
-An analysis of a subset of [PoolTool](https://pooltool.io/) diffusion data for empty Praos blocks (a surrogate for block headers) on Cardano mainnet yields the following quantiles for the fraction of headers that arrive up to a given time after the start of the slot in which the block was produced. These data were not fit to an analytic model, but they could be.
+An analysis of a subset of [PoolTool](https://pooltool.io/) diffusion data for empty Praos blocks (a surrogate for block headers) on Cardano mainnet yields the following quantiles for the fraction of headers that arrive up to a given time after the start of the slot in which the block was produced[^empty-header]. These data were not fit to an analytic model, but they could be.
+
+[^empty-header]: https://github.com/input-output-hk/ouroboros-leios/blob/e6ce0f0bfe23abfb860fe582741bbfd56c103f5e/analysis/delta-header/analysis.ipynb
 
 | Quantile | Milliseconds from slot time |
 | -------- | --------------------------: |
@@ -318,7 +331,9 @@ An analysis of a subset of [PoolTool](https://pooltool.io/) diffusion data for e
 
 ### Bandwidth
 
-Intra-datacenter bandwidth can safely be assumed to exceed 1 Gb/s (= 125 MB/s). Anecdotal measurements of inter-datacenter bandwidth indicate that 100 Mb/s (= 12.5 MB/s) is a conservative lower bound. Note that if a machine opens many sockets between datacenters, bandwidth appears only drop by about 25% due to packets from the different sockets taking different routes. Representative measurements are summarized below.
+Intra-datacenter bandwidth can safely be assumed to exceed 1 Gb/s (= 125 MB/s). Anecdotal measurements[^internet-bandwidth] of inter-datacenter bandwidth indicate that 100 Mb/s (= 12.5 MB/s) is a conservative lower bound. Note that if a machine opens many sockets between datacenters, bandwidth appears only drop by about 25% due to packets from the different sockets taking different routes. Representative measurements are summarized below.
+
+[^internet-bandwidth]: https://github.com/input-output-hk/ouroboros-leios/blob/e6ce0f0bfe23abfb860fe582741bbfd56c103f5e/docs/technical-report-2.md#inter-datacenter-bandwidth-measurements
 
 | Sender                   | AWS Oregon USA | CenturyLink Colorado USA | OVH Canada | OVH France | OVH Oregon USA | OVH Poland | OVH United Kingdom | OVH Virginia USA |
 | ------------------------ | -------------: | -----------------------: | ---------: | ---------: | -------------: | ---------: | -----------------: | ---------------: |
@@ -333,6 +348,10 @@ Intra-datacenter bandwidth can safely be assumed to exceed 1 Gb/s (= 125 MB/s). 
 
 ### Latency
 
+A data table of ASN-to-ASN round-trip times (RTT) for pings was computed[^internet-latency] from the [RIPE Atlas](https://www.ripe.net/analyse/internet-measurements/ripe-atlas/), which is one of the largest internet measurement networks.
+
+[^internet-latency]: https://github.com/input-output-hk/ouroboros-leios/blob/e6ce0f0bfe23abfb860fe582741bbfd56c103f5e/data/internet/graphics.ipynb
+
 |              | Country to country |   ASN to ASN | Intra-ASN |
 | ------------ | -----------------: | -----------: | --------: |
 | 1st quartile |            98.0 ms |      30.2 ms |           |
@@ -341,6 +360,10 @@ Intra-datacenter bandwidth can safely be assumed to exceed 1 Gb/s (= 125 MB/s). 
 | 3rd quartile |           248.2 ms |     173.2 ms |           |
 
 ## Timings for voting and certificates
+
+The Rust prototype reference implementation for Leios's voting and certificate cryptograph was used to benchmark the CPU resources required for the various operations[^crypto-benchmarks].
+
+[^crypto-benchmarks]: https://github.com/input-output-hk/ouroboros-leios/blob/e6ce0f0bfe23abfb860fe582741bbfd56c103f5e/crypto-benchmarks.rs/Specification.md
 
 - Sortition
     - _Input blocks:_ 230 µs
@@ -370,7 +393,7 @@ Intra-datacenter bandwidth can safely be assumed to exceed 1 Gb/s (= 125 MB/s). 
 
 As a general rule of thumb, assume that 80% of votes are persistent and 20% are non-persistent.
 
-Here are details for how certificate operations vary with committee size.
+Here are details for how certificate operations vary with committee size. Certificates typically comprise 8000 bytes.
 
 | Number of pools | Number of committee seats | Generate certificate | Verify certificate | Weigh certificate |
 | --------------: | ------------------------: | -------------------: | -----------------: | ----------------: |
