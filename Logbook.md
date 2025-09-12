@@ -10,9 +10,10 @@ Updated the Leios Slide Deck with reusable slides about this sim
 
 To accommodate the speed limitations of the Haskell simulation, an even smaller "micro-mainnet" has been created.
 
-- Methodology: [topology-v3.ipynb](../data/simulation/pseudo-mainnet/topology-v3.ipynb)
-- Network: [topology-v3.yaml](../data/simulation/pseudo-mainnet/topology-v3.yaml)
-- Metrics: [topology-v3.md](../data/simulation/pseudo-mainnet/topology-v3.md)
+- Methodology: [topology-v3.ipynb](data/simulation/pseudo-mainnet/topology-v3.ipynb)
+- Network: [topology-v3.yaml](data/simulation/pseudo-mainnet/topology-v3.yaml)
+- Metrics: [topology-v3.md](data/simulation/pseudo-mainnet/topology-v3.md)
+- Experiment comparing micro- vs mini-mainnet: [analysis.ipynb](analysis/sims/micro-mainnet/analysis.ipynb)
 
 | Metric                       | Value      |
 | ---------------------------: | ---------: |
