@@ -6,6 +6,27 @@
 
 Updated the Leios Slide Deck with reusable slides about this sim
 
+### Micro-mainnet
+
+To accommodate the speed limitations of the Haskell simulation, an even smaller "micro-mainnet" has been created.
+
+- Methodology: [topology-v3.ipynb](../data/simulation/pseudo-mainnet/topology-v3.ipynb)
+- Network: [topology-v3.yaml](../data/simulation/pseudo-mainnet/topology-v3.yaml)
+- Metrics: [topology-v3.md](../data/simulation/pseudo-mainnet/topology-v3.md)
+
+| Metric                       | Value      |
+| ---------------------------: | ---------: |
+| Total nodes                  | 100        |
+| Block producers              | 22         |
+| Relay nodes                  | 78         |
+| Total connections            | 2123       |
+| Network diameter             | 4 hops     |
+| Average connections per node | 21.23      |
+| Average latency              | 97.5 ms    |
+| Maximum latency              | 529.1 ms   |
+| Bidirectional connections    | 389        |
+| Asymmetry ratio              | 63.35%     |
+
 ## 2025-09-11
 
 ### Compendium of data for Delta QSD modeling

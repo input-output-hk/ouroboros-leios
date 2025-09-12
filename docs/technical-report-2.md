@@ -722,9 +722,8 @@ The aim of [the pseudo-mainnet topology](../data/simulation/pseudo-mainnet/) i
 |Network diameter|6 hops|
 |Average connections per node|29.88|
 |Clustering coefficient|0.122|
-|Average latency|77.0ms ms|
-|Maximum latency|636.8ms ms|
-|Stake-weighted latency|0.0ms ms|
+|Average latency|77.0ms|
+|Maximum latency|636.8ms|
 |Bidirectional connections|10800|
 |Asymmetry ratio|92.77%|
 
@@ -743,7 +742,7 @@ Because the 10,000 [pseudo-mainnet](../data/simulation/pseudo-mainnet/topology-
 - Metrics: [topology-v2.md](../data/simulation/pseudo-mainnet/topology-v2.md)
 
 | Metric                       | Value      |
-| ---------------------------- | ---------- |
+| ---------------------------- | ---------: |
 | Total nodes                  | 750        |
 | Block producers              | 216        |
 | Relay nodes                  | 534        |
@@ -751,9 +750,8 @@ Because the 10,000 [pseudo-mainnet](../data/simulation/pseudo-mainnet/topology-
 | Network diameter             | 5 hops     |
 | Average connections per node | 25.75      |
 | Clustering coefficient       | 0.332      |
-| Average latency              | 64.8ms ms  |
-| Maximum latency              | 578.3ms ms |
-| Stake-weighted latency       | 0.0ms ms   |
+| Average latency              | 64.8ms  |
+| Maximum latency              | 578.3ms |
 | Bidirectional connections    | 1463       |
 | Asymmetry ratio              | 84.85%     |
 
@@ -766,7 +764,7 @@ To accommodate the speed limitations of the Haskell simulation, an even smaller 
 - Metrics: [topology-v3.md](../data/simulation/pseudo-mainnet/topology-v3.md)
 
 | Metric                       | Value      |
-| ---------------------------- | ---------- |
+| ---------------------------- | ---------: |
 | Total nodes                  | 100        |
 | Block producers              | 22         |
 | Relay nodes                  | 78         |
@@ -774,9 +772,8 @@ To accommodate the speed limitations of the Haskell simulation, an even smaller 
 | Network diameter             | 4 hops     |
 | Average connections per node | 21.23      |
 | Clustering coefficient       | 0.841      |
-| Average latency              | 97.5ms ms  |
-| Maximum latency              | 529.1ms ms |
-| Stake-weighted latency       | 0.0ms ms   |
+| Average latency              | 97.5ms  |
+| Maximum latency              | 529.1ms |
 | Bidirectional connections    | 389        |
 | Asymmetry ratio              | 63.35%     |
 
