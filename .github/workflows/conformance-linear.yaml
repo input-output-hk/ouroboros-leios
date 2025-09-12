@@ -1,4 +1,4 @@
-name: "conformance"
+name: "conformance-linear"
 
 env:
   ALLOWED_URIS: "https://github.com https://api.github.com"
@@ -20,9 +20,8 @@ on:
       - "leios-trace-verifier/**"
 
 jobs:
-
-  trace-verifier:
-    name: Leios trace verifier
+  linear-trace-verifier:
+    name: Linear Leios trace verifier
     runs-on: ubuntu-latest
     steps:
     - name: 📥 Checkout repository
@@ -40,23 +39,26 @@ jobs:
           accept-flake-config = true
     - name: 🏗️ Build trace verifier
       run: |
-        nix build --show-trace .#short-leios-trace-verifier
-    - name: 🧪 Test trace verifier
+        nix build --show-trace .#linear-leios-trace-verifier
+    - uses: actions/checkout@v4
+    - uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        toolchain: "1.88.0"
+        cache-workspaces: sim-rs
+    - name: Generate example trace
+      working-directory: sim-rs
       run: |
-        nix run --show-trace .#test-trace-verifier
+        cargo run --release -- \
+          --conformance-events \
+          --slots 3600 \
+          --parameters parameters/linear-with-tx-references.yaml \
+          test_data/small.yaml \
+          output/sim.log \
     - name: 🔬 Check example trace
       run: |
-        nix run .#ols -- \
-          sim leios \
-          --leios-config-file data/simulation/config.default.yaml \
-          --topology-file data/simulation/topo-default-100.yaml \
-          --conformance-events \
-          --shared-log-format JSON \
-          --output-seconds 30 \
-          --output-file sim.log
-        nix run .#short-leios-trace-verifier -- \
-          --config-file data/simulation/config.default.yaml \
-          --topology-file data/simulation/topo-default-100.yaml \
-          --trace-file sim.log \
+        nix run .#linear-leios-trace-verifier -- \
+          --config-file sim-rs/parameters/linear.yaml \
+          --topology-file sim-rs/test_data/small.yaml \
+          --trace-file sim-rs/output/sim.log \
           --idSut 0 \
         || true   # FIXME: Remove when simulations conform to spec.

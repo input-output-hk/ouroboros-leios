@@ -318,6 +318,7 @@ sharedEvent leios nodeNames e = case e of
               , parent = Shared.Nullable $ do
                   h@BlockHash{} <- pure $ blockPrevHash blk
                   Just $! Shared.BlockRef{id = rbRef h}
+              , transactions = []
               , ..
               }
       PraosNodeEventReceived blk ->
@@ -385,6 +386,7 @@ sharedEvent leios nodeNames e = case e of
           { bytes = fromIntegral (messageSizeBytes eb)
           , input_blocks = map (Shared.BlockRef . T.pack . mkStringId) eb.inputBlocks
           , endorser_blocks = map (Shared.BlockRef . T.pack . mkStringId) eb.endorseBlocksEarlierPipeline
+          , transactions = []
           , pipeline = coerce $ endorseBlockPipeline leios eb
           , ..
           }
@@ -392,6 +394,7 @@ sharedEvent leios nodeNames e = case e of
         Shared.EBGenerated
           { bytes = fromIntegral (messageSizeBytes eb)
           , input_blocks = []
+          , transactions = []
           , endorser_blocks = []
           , pipeline = 0
           , ..

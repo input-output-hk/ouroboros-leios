@@ -37,9 +37,25 @@ common globalOptions
         -Wno-overlapping-patterns
         -Wunused-packages
 
-executable leios-trace-verifier
+executable short-leios-trace-verifier
     import: globalOptions
-    main-is: app/Main.hs
+    main-is: app/short/Main.hs
+    build-depends:
+      , base
+      , bytestring
+      , containers
+      , leios-trace-hs
+      , optparse-applicative
+      , text
+      , trace-parser
+      , yaml
+
+    default-language: Haskell2010
+    ghc-options:      -Wall -Werror -rtsopts
+
+executable linear-leios-trace-verifier
+    import: globalOptions
+    main-is: app/linear/Main.hs
     build-depends:
       , base
       , bytestring
@@ -83,7 +99,9 @@ test-suite test-trace-verifier
 library
     import: globalOptions
     hs-source-dirs: src
-    exposed-modules: Lib
+    exposed-modules:
+      ShortLeiosLib
+      LinearLeiosLib
     build-depends:
       , base
       , bytestring

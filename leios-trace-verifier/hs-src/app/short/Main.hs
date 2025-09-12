@@ -11,8 +11,8 @@ import Data.Yaml
 import LeiosConfig (Config (..))
 import LeiosEvents
 import LeiosTopology (LocationKind (..), Node (..), NodeInfo (..), NodeName (..), Topology (..))
-import Lib
 import Options.Applicative
+import ShortLeiosLib
 import System.Exit (exitFailure)
 import System.IO (hPutStrLn, stderr)
 

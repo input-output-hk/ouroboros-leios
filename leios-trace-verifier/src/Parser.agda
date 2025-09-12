@@ -80,11 +80,13 @@ data Event : Type where
   RBReceived : Maybe Node → Node → Maybe Bytes → Maybe Time → String → Maybe (List String) → Event
   IBEnteredState EBEnteredState VTBundleEnteredState RBEnteredState : String → String → Word64 → Event
   IBGenerated : String → String → SlotNo → PipelineNo → Bytes → Bytes → Maybe String → Event
-  EBGenerated : String → String → Word64 → PipelineNo → Word64 → List BlockRef → List BlockRef → Event
-  RBGenerated : String → String → Word64 → Word64 → Nullable Endorsement → Maybe (List Endorsement) → Word64 → Nullable BlockRef → Event
+  EBGenerated : String → String → Word64 → PipelineNo → Word64 → List BlockRef → List BlockRef → List Word64 → Event
+  RBGenerated : String → String → Word64 → Word64 → Nullable Endorsement → Maybe (List Endorsement) → Word64 → Nullable BlockRef → List Word64 → Event
   VTBundleGenerated : String → String → Word64 → PipelineNo → Word64 → Map String Word64 → Event
+  TXGenerated : String → Word64 → Event
+  TXReceived : String → Maybe Node → Node → Event
 
-{-# COMPILE GHC Event = data Event (Slot | Cpu | NoIBGenerated | NoEBGenerated | NoVTBundleGenerated | IBSent | EBSent | VTBundleSent | RBSent | IBReceived | EBReceived | VTBundleReceived | RBReceived | IBEnteredState | EBEnteredState | VTBundleEnteredState | RBEnteredState | IBGenerated | EBGenerated | RBGenerated | VTBundleGenerated) #-}
+{-# COMPILE GHC Event = data Event (Slot | Cpu | NoIBGenerated | NoEBGenerated | NoVTBundleGenerated | IBSent | EBSent | VTBundleSent | RBSent | IBReceived | EBReceived | VTBundleReceived | RBReceived | IBEnteredState | EBEnteredState | VTBundleEnteredState | RBEnteredState | IBGenerated | EBGenerated | RBGenerated | VTBundleGenerated | TXGenerated | TXReceived) #-}
 
 record TraceEvent : Type where
   field time_s : Time
