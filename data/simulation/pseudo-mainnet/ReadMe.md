@@ -13,7 +13,7 @@ The aim of the pseudo-mainnet topology is to have a Leios network that is genera
 - Geographic distribution (countries and autonomous systems) consistent with measurements by the [Cardano Foundation](https://cardanofoundation.org/)
 
 
-## Version 1
+## Version 1: "pseudo-mainnet"
 
 - Network: [topology-v1.yaml](topology-v1.yaml)
 - Results of [topology checker](../../../topology-checker): [topology-v1.md](topology-v1.md)
@@ -22,3 +22,19 @@ The aim of the pseudo-mainnet topology is to have a Leios network that is genera
 > [!WARNING]
 > 
 > This is the first cut at a realistic mainnet-scale topology for Leios, but it likely contain imperfections, but it likely contain imperfections because several compromises were made during its construction, so as to smooth out inconsistencies in source data. It does pass the topology checks, however, and approximately matches the marginal distributions of key network metrics.
+
+
+## Version 2: "mini-mainnet"
+
+- Network: [topology-v2.yaml](topology-v2.yaml)
+- Results of [topology checker](../../../topology-checker): [topology-v2.md](topology-v2.md)
+- Jupyter notebook used for creating the network: [topology-v2.ipynb](topology-v2.ipynb)
+
+
+## Version 3: "micro-mainnet"
+
+- Network: [topology-v3.yaml](topology-v3.yaml)
+- Results of [topology checker](../../../topology-checker): [topology-v3.md](topology-v3.md)
+- Jupyter notebook used for creating the network: [topology-v3.ipynb](topology-v3.ipynb)
+
+
