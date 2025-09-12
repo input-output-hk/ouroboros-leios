@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2025-09-12
+
+### Rust simulation
+
+Updated the Leios Slide Deck with reusable slides about this sim
+
 ## 2025-09-11
 
 ### Compendium of data for Delta QSD modeling
