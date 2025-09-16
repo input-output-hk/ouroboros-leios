@@ -1,6 +1,10 @@
 # Leios logbook
 
-## 2025-09-15
+## 2025-09-16
+
+### Updated DeltaQSD notebook
+
+We updated the Jupyter notebook and docker image for DeltaQSD in support of [#543](https://github.com/input-output-hk/ouroboros-leios/issues/543): https://hub.docker.com/r/bwbush/jupyter-deltaq/tags.
 
 ### Simulation figures in CIP
 
