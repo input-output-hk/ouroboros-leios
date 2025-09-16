@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2025-09-15
+
+### Simulation figures in CIP
+
+We added the 50 TxkB/s case to the simulation-results figures in the CIP and dropped the overly aggressive 300 TxkB/s case. The text and tables were revised accordingly. See [PR#14](https://github.com/cardano-scaling/CIPs/pull/14) for details.
+
 ## 2025-09-12
 
 ### Rust simulation
