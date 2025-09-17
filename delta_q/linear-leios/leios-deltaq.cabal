@@ -1,0 +1,22 @@
+cabal-version:      3.0
+name:               leios-deltaq
+version:            0.1.0.0
+license:            Apache-2.0
+license-file:       LICENSE
+author:             Yves Hauser
+maintainer:         yves.hauser@iohk.io
+build-type:         Simple
+extra-doc-files:    CHANGELOG.md
+
+common warnings
+    ghc-options: -Wall
+
+executable leios-deltaq
+    import:           warnings
+    main-is:          Main.hs
+    build-depends:    base ^>=4.20.0.0
+                    , deltaq
+                    , probability-polynomial
+                    , Chart >= 1.8 && < 2.0
+    hs-source-dirs:   app
+    default-language: Haskell2010
