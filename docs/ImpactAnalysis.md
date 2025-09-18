@@ -29,7 +29,7 @@ CIP-0164 implies the following functional requirements for the node.
 - *REQ-IssueLeiosVotes*.
   The node must vote for EBs exactly according to the handful of rules from the CIP.
 - *REQ-IncludeLeiosCertificates*.
-  The node must include a certificate in each RB it issues if it has seen a quorum of votes for the EB issued alongside the preceding RB.
+  The node must include a certificate in each RB it issues if it has seen enough votes supporting the EB announced by the preceding RB.
   (TODO excluding empty or very nearly empty EBs?)
 - *REQ-DiffuseLeiosBlocks*.
   The node must run the new Leios mini-protocols alongside Praos to acquire and diffuse EBs and their closures.
