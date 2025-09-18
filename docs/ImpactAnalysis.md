@@ -8,13 +8,13 @@ It is one of the next steps towards deriving an implementable design from [CIP-0
 # Vocabulary/Jargon
 
 - Recall from CIP-0164 that an _endorser block_ (EB) is a list of cryptographic hashes that uniquely identify (serialized) transactions (including their signatures).
-- Let an _EB's realization_ be the sequence of transactions referenced by an EB.
-  Note that reconstructing an EB from its realization is merely a matter of calculating hashes.
+- Let an _EB's closure_ be the sequence of transactions referenced by an EB.
+  Note that reconstructing an EB from its closure is merely a matter of calculating hashes.
 - Recall from CIP-0164 that a _ranking block_ (RB) is merely a Praos block with a couple extra header fields and possibly containing a Leios certificate instead of Cardano transactions.
 - The new RB header fields in particular include the hash of the EB issued alongside the RB, which _announces_ that EB.
 - Let a _TxRB_ be an RB containing transactions and no certificate.
 - Let a _CertRB_ be an RB containing a certificate and no transactions.
-- Let a _CertRB's realization_ be the realization of the EB that it certifies.
+- Let a _CertRB's closure_ be the closure of the EB that it certifies.
 - A vote _supports_ an RB header directly and its announced EB indirectly: if enough votes support the same RB header, then its announced EB can be included on chain.
 
 # Requirements
@@ -32,11 +32,11 @@ CIP-0164 implies the following functional requirements for the node.
   The node must include a certificate in each RB it issues if it has seen a quorum of votes for the EB issued alongside the preceding RB.
   (TODO excluding empty or very nearly empty EBs?)
 - *REQ-DiffuseLeiosBlocks*.
-  The node must run the new Leios mini-protocols alongside Praos to acquire and diffuse EBs and their realizations.
+  The node must run the new Leios mini-protocols alongside Praos to acquire and diffuse EBs and their closures.
 - *REQ-DiffuseLeiosVotes*.
   The node must diffuse votes at least until they're old enough that there remains only a negligible probability they could still enable an RB that was issued on-time to include a certificate for the EB they support.
 - *REQ-ArchiveLeiosBlocks*.
-  The node must retain each EB's realization indefinitely when the settled Praos chain certifies it.
+  The node must retain each EB's closure indefinitely when the settled Praos chain certifies it.
 
 CIP-0164 also implies the following resource-management requirements for the node.
 
@@ -61,9 +61,9 @@ It's not yet clear how priority relates Peras and Praos, but that's beyond the s
   In general, SPOs are indirectly incentivized to maximize the size of the EB, just like TxRBs---so that more fees are included in the epoch's reward calculation.
   Thus the Mempool's capacity should be increased so that it can hold enough valid transactions for the block producer to issue a full EB alongside a full RB.
 - *NEW-LeiosVoteProductionThread*, for REQ-IssueLeiosVotes.
-  A thread dedicated to Leios vote production will wake up when the realization of a EB is newly available.
+  A thread dedicated to Leios vote production will wake up when the closure of a EB is newly available.
   If the voting rules would require the stake pool to vote (now or soon) for this EB if it's valid, then this thread will begin validating it.
-  Note if multiple realizations arrive simultaneously, at most one of them could be eligible for a vote, since the voting rules require the EB to be announced by the tip of the node's current selection.
+  Note if multiple closures arrive simultaneously, at most one of them could be eligible for a vote, since the voting rules require the EB to be announced by the tip of the node's current selection.
   If the validation succeeds while the voting rules still require the stake pool to vote for this EB (TODO even if it has since switched its selection?), the thread will issue that vote.
 - *NEW-LeiosVoteStorage*, for REQ-DiffuseLeiosVotes and REQ-IncludeLeiosCertificates.
   A new storage component will store all votes received by a node, up to some conservative age (eg ten minutes).
@@ -73,22 +73,22 @@ It's not yet clear how priority relates Peras and Praos, but that's beyond the s
   This condition is very likely to be satisifed relatively soon on Cardano mainnet, unless its Praos growth is being disrupted, in which case reduced Leios throughput would be a less important problem.
   Therefore, the vote storage component can simply discard votes above some conservative age, which determines a stochastic upper bound the heap size of all sufficiently-young votes.
 - *NEW-LeiosEbStore*, for REQ-DiffuseLeiosBlocks and REQ-ArchiveLeiosBlocks.
-  Unlike votes, a node should retain the realizations of older EB, because Praos allows for occasional deep forks, the most extreme of which could require the realization of an EB that was announced by the youngest block in the Praos Common Prefix.
+  Unlike votes, a node should retain the closures of older EB, because Praos allows for occasional deep forks, the most extreme of which could require the closure of an EB that was announced by the youngest block in the Praos Common Prefix.
   On Cardano mainnet, that RB is usually 12 hours old, but could be up to 36 hours old before [CIP-0135 Disaster Recovery Plan](https://cips.cardano.org/cip/CIP-0135) is triggered.
-  Thus, EB realizations are not only large but also have a prohibitively long lifetime even when they're ultimately not immortalized by the historical chain.
+  Thus, EB closures are not only large but also have a prohibitively long lifetime even when they're ultimately not immortalized by the historical chain.
   This component therefore stores EBs on disk just as the ChainDB already does for RBs.
   The volatile and immutable dichotomy can even be managed the same way it is for RBs.
 - *NEW-LeiosCertRbStagingArea*, for REQ-DiffuseLeiosBlocks.
-  Each CertRB must be buffered in a staging area until its realization arrives, since the VolDB only contains RBs that are ready for ChainSel.
-  (Note that a CertRB's realization will usually have arrived before it did.)
-  (TODO Any disadvantages? For example, would it be beneficial to detect an invalid certificate before the realization arrives?)
-  (TODO a more surgical alternative: the VolDB index could be aware of which EB realizations have arrived, and the path-finding algorithm could incorporate that information.
+  Each CertRB must be buffered in a staging area until its closure arrives, since the VolDB only contains RBs that are ready for ChainSel.
+  (Note that a CertRB's closure will usually have arrived before it did.)
+  (TODO Any disadvantages? For example, would it be beneficial to detect an invalid certificate before the closure arrives?)
+  (TODO a more surgical alternative: the VolDB index could be aware of which EB closures have arrived, and the path-finding algorithm could incorporate that information.
    However, this means each EB arrival may need to re-trigger ChainSel.)
 - *UPD-LeiosRbBlockFetchClient*, for REQ-DiffuseLeiosBlocks.
-  Therefore, the BlockFetch client must only directly insert a CertRB into the VolDB if its realization has already arrived (which should be common due to L_diff).
+  Therefore, the BlockFetch client must only directly insert a CertRB into the VolDB if its closure has already arrived (which should be common due to L_diff).
   Otherwise, the CertRB must be deposited in the CertRB staging area instead.
 - *UPD-LeiosLedgerDb*, for REQ-DiffuseLeiosBlocks.
-  The LedgerDB will need to retrieve the certified EB's realization from the LeiosEbStore when applying a CertRB.
+  The LedgerDB will need to retrieve the certified EB's closure from the LeiosEbStore when applying a CertRB.
   Due to NEW-LeiosCertRbStagingArea, it should be impossible for that retrieval to fail.
 - *NEW-LeiosTxCache*, for REQ-DiffuseLeiosBlocks and (via NEW-LeiosVoteProductionThread) REQ-IssueLeiosVotes.
   A new storage component will store all transactions received when diffusing EBs as well as all transactions that successfully enter the Mempool, up to some conservative age (eg one hour).
@@ -107,11 +107,11 @@ It's not yet clear how priority relates Peras and Praos, but that's beyond the s
 There are multiple attack vectors against Leios, but one is particularly relevant to resource-management.
 
 - *ATK-LeiosProtocolBurst*.
-  In a protocol burst attack the adversary withholds a large number of EBs and/or their realizations over a significant duration and then releases them all at once.
+  In a protocol burst attack the adversary withholds a large number of EBs and/or their closures over a significant duration and then releases them all at once.
   This will lead to a sustained maximal load on the honest network for a smaller but still significant duration, a.k.a. a burst.
 
 The potential magnitude of that burst will depend on various factors, including at least the adversary's portion of stake, but the worst-case is more than a gigabyte of download.
-The cost to the victim is merely the work to acquire the realizations and to check the hashes of the received EB bodies and transaction bodies.
+The cost to the victim is merely the work to acquire the closures and to check the hashes of the received EB bodies and transaction bodies.
 In particular, at most one of the EBs in the burst could extend the tip of a victim node's current selection, and so that's the only EB the victim would attempt to fully parse and validate.
 
 # Risks Threatening the Resource-Management Requirements
@@ -170,7 +170,7 @@ The following experiments each pertain to several of the risks above.
   Both full validation (eg Leios voting) as well as mere reapplication (eg Mempool) should be separately analyzed.
   This experiment will record and summarize the observed behavior of the mutator time and various GC statistics, so as to inform futher consideration of risks as well as the design of other experiments (eg traffic shaping).
 - *EXP-LeiosDiffusionOnly*.
-  A minimally-patched Praos node can include only the Leios changes necessary to actually diffuse EBs and their realizations.
+  A minimally-patched Praos node can include only the Leios changes necessary to actually diffuse EBs and their closures.
   Notably, even the content of the transactions in the EBs need not be well-formed.
     - This patched node will assume every EB is worthy of certification but somehow never influences the ledger state.
     - In order for Praos headers to suffice, EBs in this patched system will list the "announcing" header's hash, which is fine since EBs are trustworthy in this experiment.
@@ -211,7 +211,7 @@ It is not already clear which new or updated mechanisms/components would mitigat
 - Note: if all possibly-relevant EBs needed to fit in the LeiosTxCache, its worst case size would approach 500 million transactions.
   Even the index would be tens of gigabytes.
   This is excessive, since almost all honest traffic will be younger than an hour---assuming FFD is actually enforced.
-- First version of LeiosFetch client can assemble the EB realization entirely on disk, one transaction at a time.
+- First version of LeiosFetch client can assemble the EB closure entirely on disk, one transaction at a time.
   Second version might want to batch the writes in a pinned mutable `ByteArray` and use `withMutableByteArrayContents` and `hPutBuf` to flush each batch.
   Again, the possible benefit of this low-level shape would be to avoid useless GC pressure.
 - First version of LeiosFetch client can wait for all transactions before starting to validate any.
@@ -219,7 +219,7 @@ It is not already clear which new or updated mechanisms/components would mitigat
 - First version of LeiosFetch server simply pulls serialized transactions from the LeiosEbStore, and only sends notifications to peers that are already expecting them when the noteworthy event happens.
   If notification requests and responses are decoupled in a separate mini protocol _or else_ requests can be reordered (TODO or every other request supports a "MsgOutOfOrderNotificationX" loopback alternative?), then it'll be trivial for the client to always maintain a significant buffer of outstanding notification requests.
 - Even the first version of LeiosFetch decision logic should consider EBs that are certified on peers' ChainSync candidates as available for request, as if that peer had sent both MsgLeiosBlockOffer and MsgLeiosBlockTxsOffer.
-  A MsgRollForward implies the peer has selected the block, and the peer couldn't do that for a CertRB if it didn't already have its realization.
+  A MsgRollForward implies the peer has selected the block, and the peer couldn't do that for a CertRB if it didn't already have its closure.
 - First version of LeiosEbStore can just be two bog standard key-value stores, one for immutable and one for volatile.
   Second version maybe instead integrates certified EBs into the existing ImmDB?
   That integration seems like a good fit.
