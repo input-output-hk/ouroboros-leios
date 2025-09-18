@@ -82,6 +82,17 @@ A key milestone in the development of Leios is to demonstrate that it can achiev
 
 A larger scale public network that can be used to validate parameter selection, continuous load tests and allow everyone to integrate with Leios changes.
 
+Although we believe that Leios is quite limited in structural changes, it is a consensus change nontheless and will benefit from having a dedicated testnet available as early as possible. A public network specifically for Leios will provide a realistic environment to validate the protocol under more realistic conditions and at a larger scale. It will allow SPOs, developers and other stakeholders to integrate with the changes introduced by Leios and ensure that their infrastructure can handle the increased throughput reliably. The testnet will also provide an opportunity to conduct large-scale experiments, repeated load tests and gather data on the performance of the protocol in a more realistic setting.
+
+### Scope
+
+- Bootstrap and advertise a public testnet dedicated to Leios
+- Provide one or more node implementations that work on the testnet
+- Create tools and documentation to help SPOs and developers integrate with Leios changes
+- Continuous load testing and performance measurements
+- Monitor community infrastructure compatibility
+- Run large-scale experiments with varying load and parameter settings
+
 ### Hard fork
 
 > As an SPO and dRep, we want to have a mature Cardano node implementation that enables Leios and have it made available to all users of Cardano.
