@@ -63,6 +63,19 @@ Leios is a novel consensus protocol and therefore requires a detailed technical 
 
 Demonstrate 200 TkB/s in a controlled environment using a network prototype, but also validate any assumptions and threat mitigations.
 
+A key milestone in the development of Leios is to demonstrate that it can achieve the order of magnitude higher throughput (200 TxkB/s) using real network of nodes albeit in a controlled environment. This will build confidence in the protocol design and its implementation, as well as provide a tangible demonstration of the capacity increase to the broader Cardano community. It also provides an opportunity to validate any assumptions made in the design process. In particular, having an early prototype that exercises the network layer will allow further studies of adversarial scenarios and their mitigations. It will also allow us to identify any potential blind spots or weaknesses in the protocol that need to be addressed before it can be deployed on a more public network.
+
+### Scope
+
+- Network prototype that can be deployed in a controlled environment
+- Visually demonstrate throughput increase over Praos
+- Early load testing and performance measurements
+- Early transaction validation benchmarks and optimizations
+- Test adversarial scenarios of stake-based and network-based attacks
+- ΔQ modeling and validating protocol parameter selection
+- Develop / integrate cryptographic primitives and prepare for audit
+- Validate understanding of required changes in key components
+
 ### Leios testnet
 
 > As an SPO and Cardano developer, we want a dedicated network for testing and measuring the perfomance of Leios, so that we can update relevant infrastructure and ensure it can handle increased throughput reliably without compromising security.
