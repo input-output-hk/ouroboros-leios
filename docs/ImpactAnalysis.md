@@ -43,7 +43,7 @@ CIP-0164 also implies the following resource-management requirements for the nod
 - *REQ-PrioritizePraosOverLeios*.
   The node must prioritize Praos traffic and computation over all Leios traffic and computation so that the diffusion and adoption of any RB is only negligibly slower.
 - *REQ-PrioritizeFreshOverStaleLeios* (aka _freshest first delivery_).
-  The node must prioritize Leios traffic and computation for younger EBs over Leios traffic and computation for older EBs so that a _protocol burst attack_ (see below) cannot significantly degrade Leios throughput.
+  The node must prioritize Leios traffic and computation for younger EBs over Leios traffic and computation for older EBs so that a _protocol burst attack_ (see ATK-LeiosProtocolBurst below) cannot significantly degrade Leios throughput.
 
 These two rules can be summarized as Praos &gt; fresh Leios &gt; stale Leios.
 
