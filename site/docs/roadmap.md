@@ -7,12 +7,13 @@ and ultimately deploy it as a consensus upgrade onto the Cardano network.
 
 ## Objectives
 
-Following our [strategy](./strategy.md), we identified several key objectives
-along the way which are roughly in order, but not strictly sequential. Instead,
-each will give rise to a list of _marketable features_, which we going to
-identify, progress and deliver throughout the whole lifecycle of this project.
-These objectives and features make up the actual product roadmap, which we are
-going to update and report on every month via [this github
+Following our [strategy](./strategy.md), we identified several key
+**objectives** along the way which are roughly in order, but not strictly
+sequential. Instead, each will give rise to a list of **marketable features**,
+which we going to identify, progress and deliver throughout the whole lifecycle
+of this project. These objectives and features make up the actual product
+roadmap, which we are going to update and [report on every
+month](./development/monthly-reviews.md) via [this github
 project](https://github.com/orgs/input-output-hk/projects/167).
 
 <a href="https://github.com/orgs/input-output-hk/projects/167">
@@ -20,8 +21,6 @@ project](https://github.com/orgs/input-output-hk/projects/167).
 ![](./roadmap-preview.png)
 
 </a>
-
-<!-- TODO: go into more detail on why each objective is important and also what's in scope -->
 
 ### Improvement Proposal (CIP)
 
@@ -65,7 +64,7 @@ Demonstrate 200 TkB/s in a controlled environment using a network prototype, but
 
 A key milestone in the development of Leios is to demonstrate that it can achieve the order of magnitude higher throughput (200 TxkB/s) using real network of nodes albeit in a controlled environment. This will build confidence in the protocol design and its implementation, as well as provide a tangible demonstration of the capacity increase to the broader Cardano community. It also provides an opportunity to validate any assumptions made in the design process. In particular, having an early prototype that exercises the network layer will allow further studies of adversarial scenarios and their mitigations. It will also allow us to identify any potential blind spots or weaknesses in the protocol that need to be addressed before it can be deployed on a more public network.
 
-### Scope
+#### Scope
 
 - Network prototype that can be deployed in a controlled environment
 - Visually demonstrate throughput increase over Praos
@@ -84,7 +83,7 @@ A larger scale public network that can be used to validate parameter selection, 
 
 Although we believe that Leios is quite limited in structural changes, it is a consensus change nontheless and will benefit from having a dedicated testnet available as early as possible. A public network specifically for Leios will provide a realistic environment to validate the protocol under more realistic conditions and at a larger scale. It will allow SPOs, developers and other stakeholders to integrate with the changes introduced by Leios and ensure that their infrastructure can handle the increased throughput reliably. The testnet will also provide an opportunity to conduct large-scale experiments, repeated load tests and gather data on the performance of the protocol in a more realistic setting.
 
-### Scope
+#### Scope
 
 - Bootstrap and advertise a public testnet dedicated to Leios
 - Provide one or more node implementations that work on the testnet
