@@ -50,7 +50,7 @@ These two rules can be summarized as Praos &gt; fresh Leios &gt; stale Leios.
 Looking forward, Peras should also be prioritized over Leios, since a single Peras failure is more disruptive (to Praos, even!) than a single Leios failure.
 It's not yet clear how priority relates Peras and Praos, but that's beyond the scope this document.
 
-# New and Updated Components for Functional Requirements
+# Consensus Changes for Functional Requirements
 
 - *UPD-LeiosAwareBlockProductionThread*, for REQ-IssueLeiosBlocks and REQ-IncludeLeiosCertificates.
   The existing block production thread must generate an EB at the same time it generates an RB.
@@ -98,7 +98,8 @@ It's not yet clear how priority relates Peras and Praos, but that's beyond the s
   This new component instead has a greater, unidimensional capacity and a simple Least Recently Used eviction policy.
 - *NEW-LeiosMiniProtocols*, for REQ-DiffuseLeiosBlocks, REQ-DiffuseLeiosVotes, and REQ-ArchiveLeiosBlocks.
   The node must include new mini-protocols to diffuse EB announcements, EBs themselves, EBs' transactions, and votes for EBs.
-  These mini-protocols will require new fetch decision logic, since the node should not necessarily simply download every such object from every peer that offers it.
+- *NEW-LeiosFetchDecisionLogic*, for REQ-DiffuseLeiosBlocks, REQ-DiffuseLeiosVotes, and REQ-ArchiveLeiosBlocks.
+  The Leios mini-protocols will require new fetch decision logic, since the node should not necessarily simply download every such object from every peer that offers it.
   Such fetch decision logic is also required for TxSubmission and for Peras votes; the Leios logic will likely be similar but not equivalent.
 
 # Protocol Burst Attack
@@ -113,99 +114,109 @@ The potential magnitude of that burst will depend on various factors, including 
 The cost to the victim is merely the work to acquire the realizations and to check the hashes of the received EB bodies and transaction bodies.
 In particular, at most one of the EBs in the burst could extend the tip of a victim node's current selection, and so that's the only EB the victim would attempt to fully parse and validate.
 
-# New and Updated Components for Resource-Management Requirements
+# Risks Threatening the Resource-Management Requirements
 
 The fundamental idea behind Leios has always been that the Praos protocol is inherently and necessarily bursty.
 Leios should be able to freely utilize the nodes' resources whenever Praos is not utilizing them, which directly motivates REQ-PrioritizePraosOverLeios.
 It is ultimately impossible to achieve such time-multiplexing perfectly, due to the various latencies and hystereses inherent to the commodity infrastructure (non real-time operating systems, public Internet, etc).
 On the other hand, it is also ultimately unnecessary to time-multiplex Praos and Leios perfectly, but which degree of imperfection is tolerable?
 
-There are two apparent resources that might unacceptably degrade the time-multiplexing via contention between Praos and Leios.
+Contention for the following primary node resources might unacceptably degrade the time-multiplexing via contention between Praos and Leios.
 
-- *RSK-LeiosPraosContentionGC*.
-  It is not obvious how to separate Peras and Leios into separate OS processes, since the ledger state is expensive to maintain and both protocols constantly read and update it.
-  When the Praos and Leios components both run within the same operating system process, they share a single instance of the GHC Runtime System (RTS), including eg thread scheduling and heap allocation.
-  The sharing of the heap in particular could result in contention, especially during a protocol burst attack (at least the transaction cache will be doing tens of thousands of allocations, in the worst-case).
-  Even if the thread scheduler could perfectly avoid delaying Praos threads, Leios work could still disrupt Praos work, since at least the heap exhibits hysteresis.
-  The developers of GHC Haskell have considered a separation mechanism called GHC Execution Domains intended to significantly mitigate this risk, but it has not yet matured past ideation.
-  See ["Erlang-style processes in the RTS"](https://gitlab.haskell.org/ghc/ghc/-/issues/21578) and ["Execution domains in GHC/Haskell" (HIW23 Lightning Talk)](https://www.youtube.com/watch?v=Ha7oIVrLwSI).
-- *RSK-LeiosPraosContentionDiskBandwidth*.
-  Praos and Leios components might also contend for disk bandwidth.
-  In particular, during a worst-case protocol burst, the Leios components would be writing more than a gigabyte to disk as quickly as the network is able to acquire the bytes (from multiple peers in parallel).
-  The Leios work for all-but-possibly-one of the attacker's blocks would not require transaction parsing and validation, merely tracking and hash checks.
-  Praos's disk bandwidth utilization depends on the leader schedule, fork depth, etc, as well as whether the node is using a non-memory backend for ledger storage (aka UTxO HD or Ledger HD).
-  For non-memory backends, the ledger's disk bandwidth varies drastically depending on the details of the transactions being validated and/or applied: a few bytes of transaction could require thousands of bytes of disk reads/writes.
-    - Note that the fundamental goals of Leios will imply a significant increase in the size of the UTxO.
-      In response, SPOs might prefer enabling UTxO HD/Ledger HD over buying more RAM.
+- *RSK-LeiosPraosContentionNetworkBandwidth*.
+  This is not anticipated to be a challenge, because time-multiplexing the bandwidth is relatively easy.
+  In factor, Leios traffic while Praos is idle could potentially even prevent the TCP Receive Window from contracting, thus avoiding a slow start when Praos traffic resumes.
 - *RSK-LeiosPraosContentionCPU*.
   This is not anticipated to be a challenge, because today's Praos node does not exhibit major CPU load on multi-core machines.
   Leios might have more power-to-weight ratio for parallelizing its most expensive task (EB validation), but that parallelization isn't yet obviously necessary.
   Thus, even Praos and Leios together do not obviously require careful orchestration on a machine with several cores.
+- *RSK-LeiosPraosContentionGC*.
+  It is not obvious how to separate Peras and Leios into separate OS processes, since the ledger state is expensive to maintain and both protocols frequently read and update it.
+  When the Praos and Leios components both run within the same operating system process, they share a single instance of the GHC Runtime System (RTS), including eg thread scheduling and heap allocation.
+  The sharing of the heap in particular could result in contention, especially during an ATK-LeiosProtocolBurst (at least the transaction cache will be doing tens of thousands of allocations, in the worst-case).
+  Even if the thread scheduler could perfectly avoid delaying Praos threads, Leios work could still disrupt Praos work, because some RTS components exhibit hysteresis, including the heap.
+- *RSK-LeiosPraosContentionDiskBandwidth*.
+  Praos and Leios components might contend for disk bandwidth.
+  In particular, during a worst-case ATK-LeiosProtocolBurst, the Leios components would be writing more than a gigabyte to disk as quickly as the network is able to acquire the bytes (from multiple peers in parallel).
+  Praos's disk bandwidth utilization depends on the leader schedule, fork depth, etc, as well as whether the node is using a non-memory backend for ledger storage (aka UTxO HD or Ledger HD).
+  For non-memory backends, the ledger's disk bandwidth varies drastically depending on the details of the transactions being validated and/or applied: a few bytes of transaction could require thousands of bytes of disk reads/writes.
+    - Note that the fundamental goals of Leios will imply a significant increase in the size of the UTxO.
+      In response, SPOs might prefer enabling UTxO HD/Ledger HD over buying more RAM.
 
 Both GC pressure and disk bandwidth are notoriously difficult to model and so were not amenable to the simulations that drove the first version of the CIP.
 Prototypes rather than simulations will be necessary to assess these risks with high confidence.
 
-The risks can also be viewed from an overlapping perspective, which is more actionable in terms of planning prototypes/experiements/etc: per major component of the node.
+The same risks can also be viewed from a different perspective, which is more actionable in terms of planning prototypes/experiements/etc: per major component of the node.
 
-- *RSK-LedgerOverheadLatency*.
-  Parsing a tx, checking it for validity, and updating the ledger state accordingly all utilize CPU and heap (and also disk bandwidth with UTxO/Ledger HD).
+- *RSK-LeiosLedgerOverheadLatency*.
+  Parsing a transaction, checking it for validity, and updating the ledger state accordingly all utilize CPU and heap (and also disk bandwidth with UTxO/Ledger HD).
   Frequent bursts of that resource consumption proportional to 15000% of a full Praos block might disrupt the caught-up node in heretofore unnoticed ways.
-  Only syncing nodes have processed so many/much txs in a short duration, and latency has never been a fundamental priority for a syncing node.
+  Only syncing nodes have processed so many/much transactions in a short duration, and latency has never been a fundamental priority for a syncing node.
   Disruption of the RTS is the main concern here, since there is plenty of CPU available—the ledger is not internally parallelized, and only ChainSel and the Mempool could invoke it simultaneously.
-- *RSK-NetworkingOverheadLatency*.
-  Same as RSK-DisruptiveLedgerOverhead, but for the Diffusion Layer components handling frequent 15000% bursts in a caught-up node.
-- *RSK-MempoolOverheadLatency*.
-  Same as RSK-DisruptiveLedgerOverhead, but for the Mempool frequently revalidating 15000% load in a caught-up node during congestion (ie 300x capacity of a Praos block, since the Leios Mempool capacity is now two EBs instead of two Praos blocks).
+- *RSK-LeiosNetworkingOverheadLatency*.
+  Same as RSK-LeiosLedgerOverheadLatency, but for the Diffusion Layer components handling frequent 15000% bursts in a caught-up node.
+- *RSK-LeiosMempoolOverheadLatency*.
+  Same as RSK-LeiosLedgerOverheadLatency, but for the Mempool frequently revalidating 15000% load in a caught-up node during congestion (ie 30000% the capacity of a Praos block, since the Leios Mempool capacity is now two EBs instead of two Praos blocks).
 - _Etc_
 
-It is not already clear which new or updated mechanisms/components would mitigate the resource-management risks, if the prototypes indicate mitigations are necessary.
+# Prototypes and Experiments for Derisking Resource-Management
+
+The first new code will be used to demonstrate and measure the contention underlying the above risks.
+The following experiments each pertain to several of the risks above.
+
+- *EXP-LeiosLedgerDbAnalyser*.
+  A new pass in [`db-analyser`](https://github.com/IntersectMBO/ouroboros-consensus/blob/main/ouroboros-consensus-cardano/README.md#db-analyser) will enable an experiment to analyse the CPU and GC costs of processing a sequence of realistic transactions that corresponds to the full capacity of an EB.
+  Ledger state snapshot files and contiguous blocks can be sliced from `mainnet`, P&T clusters, etc to assemble a sequence of transactions that could be collated by an EB.
+  Both full validation (eg Leios voting) as well as mere reapplication (eg Mempool) should be separately analyzed.
+  This experiment will record and summarize the observed behavior of the mutator time and various GC statistics, so as to inform futher consideration of risks as well as the design of other experiments (eg traffic shaping).
+- *EXP-LeiosDiffusionOnly*.
+  A minimally-patched Praos node can include only the Leios changes necessary to actually diffuse EBs and their realizations.
+  Notably, even the content of the transactions in the EBs need not be well-formed.
+    - This patched node will assume every EB is worthy of certification but somehow never influences the ledger state.
+    - In order for Praos headers to suffice, EBs in this patched system will list the "announcing" header's hash, which is fine since EBs are trustworthy in this experiment.
+    - In this experiment, EBs' transactions merely need to be diffused, hash checked, and stored---not even parsed.
+      Every transaction within an EB will be an opaque bytestring (with random contents to avoid accidental trivialities).
+      The complementary EXP-LeiosLedgerDbAnalyser experiment will characterize which resource consumption this choice avoids, which is useful for avoiding conflation.
+    - Each RB permitted to contain a certificate is blocked (in the NEW-LeiosCertRbStagingArea) by the arrival of its predecessor's announced EB, but Praos is otherwise unaffected.
+    - Mocked upstream peers will originate all blocks, and the node(s) under test will merely relay everything.
+      The incoming RBs could simply be copied from `mainnet`, a P&T cluster run, etc, with the EBs' fully mocked arrival times derived in some way from the original RBs' slot onsets.
+    - This experiment will analyze the GC stats and other event logs of the node(s) under test.
+    - TODO what about TxSubmission traffic?
+
+# Consensus Changes for Resource-Management Requirements
+
+It is not already clear which new or updated mechanisms/components would mitigate the resource-management risks, if the prototypes and experiment indicate mitigations are necessary.
 
 - For REQ-PrioritizePraosOverLeios, RSK-LeiosPraosContentionGC could possibly be mitigated via an adaptation of UTxO HD.
   Leios transaction parsing and processing could be isolated in a separate process which uses a UTxO HD-like interface in order to access the necessary UTxO from the Praos process.
   The additional overhead of transferring the relevant UTxO along IPC channels might be an acceptable cost for isolating the Leios GC pressure.
+    - The developers of GHC Haskell have considered a separation mechanism called GHC Execution Domains intended to significantly mitigate this class of risk, but it has not yet matured past ideation.
+      See ["Erlang-style processes in the RTS"](https://gitlab.haskell.org/ghc/ghc/-/issues/21578) and ["Execution domains in GHC/Haskell" (HIW23 Lightning Talk)](https://www.youtube.com/watch?v=Ha7oIVrLwSI).
 - RSK-LeiosPraosContentionDiskBandwidth could be mitigated by rate-limiting the Leios disk traffic, with back pressure to accordingly rate-limit the Leios network traffic.
 
-# Prototypes/Experiments to Derisk
-
-The first new code will be used to demonstrate and measure the contention in the above risks.
-
-- A `db-analyzer` experiment analyzing GC stats for RSK-LedgerOverheadLatency.
-
-- A hacked Praos node experiment analyzing GC stats and event latencies for RSK-NetworkingOverheadLatency, RSK-LeiosPraosContentionDiskBandwidth, and ATK-LeiosProtocolBurst.
-  This Praos node would incorporate a trivialized version of some the Leios components.
-  The node will assume every EB is worthy of certification but magically never influences the ledger state.
-  In order to not alter RB headers at all, EBs in this patched system can list the announcing RB header's hash---fine since EBs are trustworthy in this experiment.
-  Every tx within an EB will be an opaque bytestring with random contents, to avoid accidental trivialities.
-  EBs' txs merely need to be diffused, hash checked, and stored---not even parsed.
-  Each RB permitted to contain a certificate is blocked (in the NEW-LeiosCertRbStagingArea) by the arrival of its predecessor's announced EB, but Praos is otherwise unaffected.
-  Mocked upstream peers will originate all blocks with the node(s) under test merely relaying everything.
-  The incoming RBs could just be copied from mainnet, a P&T cluster run, etc, with the EBs fully mocked arrival times derived in some way from the RB timings.
-  The experiment will postprocess the GC stats and other event logs of the node(s) under test.
-  TODO what about TxSubmission traffic?
-
-# TODO some concrete details
+# TODO some concrete Consensus details
 
 - First version of LedgerDB need not explicitly store EB's ledger state; the CertRB's result ledger state will reflect the EB's contents.
   Second version could thunk the EB's reapplication alongside the announcing RB?
   That would only avoid reapplication of one EB on a chain switch (might be worth it for supporting tiebreakers?).
-- First version of LedgerDB can simply reapply the EB's txs before tick-then-applying a CertRB.
-  Second version should pass the EB's txs to the ledger function (or instead the thunk of reapplying the EB)?
+- First version of LedgerDB can simply reapply the EB's transactions before tick-then-applying a CertRB.
+  Second version should pass the EB's transactions to the ledger function (or instead the thunk of reapplying the EB)?
 - First version of the Mempool can be naive, the block production thread will handle everything.
-  Second version can try to pre-compute in order to avoid delays (ie discarding the certified EB's chunk of txs) when issuing a CertRB and its announced EB.
-- First version of LeiosTxCache should reliably cache all relevant txs that are less than an hour or so old---that age spans 180 active slots on average.
-  A tx is born when its oldest containing EB was announced or when it _entered_ the Mempool (if it hasn't yet been observed in an EB).
+  Second version can try to pre-compute in order to avoid delays (ie discarding the certified EB's chunk of transactions) when issuing a CertRB and its announced EB.
+- First version of LeiosTxCache should reliably cache all relevant transactions that are less than an hour or so old---that age spans 180 active slots on average.
+  A transaction is born when its oldest containing EB was announced or when it _entered_ the Mempool (if it hasn't yet been observed in an EB).
   (Note that that means some tx's age in the LeiosTxCache can increase when an older EB that contains it arrives.)
-  Simple index maintained as a pair of a priority queues (index and age) in manually managed fixed size bytearrays, backed by a double-buffered mmapped file for the txs' serializations.
-  Those implementation choices prevent the sheer number of txs from increasing GC pressure (adversarial load might lead to a ballpark number of 131000 transactions per hour), and persistence's only benefit here would be to slightly increase parallelism/simplify synchronization, since persistence would let readers release the lock before finishing their search.
-- Note: if all possibly-relevant EBs needed to fit in the LeiosTxCache, its worst case size would approach 500 million txs.
+  Simple index maintained as a pair of a priority queues (index and age) in manually managed fixed size bytearrays, backed by a double-buffered mmapped file for the transactions' serializations.
+  Those implementation choices prevent the sheer number of transactions from increasing GC pressure (adversarial load might lead to a ballpark number of 131000 transactions per hour), and persistence's only benefit here would be to slightly increase parallelism/simplify synchronization, since persistence would let readers release the lock before finishing their search.
+- Note: if all possibly-relevant EBs needed to fit in the LeiosTxCache, its worst case size would approach 500 million transactions.
   Even the index would be tens of gigabytes.
   This is excessive, since almost all honest traffic will be younger than an hour---assuming FFD is actually enforced.
-- First version of LeiosFetch client can assemble the EB realization entirely on disk, one tx at a time.
+- First version of LeiosFetch client can assemble the EB realization entirely on disk, one transaction at a time.
   Second version might want to batch the writes in a pinned mutable `ByteArray` and use `withMutableByteArrayContents` and `hPutBuf` to flush each batch.
   Again, the possible benefit of this low-level shape would be to avoid useless GC pressure.
-- First version of LeiosFetch client can wait for all txs before starting to validate any.
+- First version of LeiosFetch client can wait for all transactions before starting to validate any.
   Later version could eagerly validate as the prefix arrives---comparable to eliminating one hop in the topology, in the worst-case scenario.
-- First version of LeiosFetch server simply pulls serialized txs from the LeiosEbStore, and only sends notifications to peers that are already expecting them when the noteworthy event happens.
+- First version of LeiosFetch server simply pulls serialized transactions from the LeiosEbStore, and only sends notifications to peers that are already expecting them when the noteworthy event happens.
   If notification requests and responses are decoupled in a separate mini protocol _or else_ requests can be reordered (TODO or every other request supports a "MsgOutOfOrderNotificationX" loopback alternative?), then it'll be trivial for the client to always maintain a significant buffer of outstanding notification requests.
 - Even the first version of LeiosFetch decision logic should consider EBs that are certified on peers' ChainSync candidates as available for request, as if that peer had sent both MsgLeiosBlockOffer and MsgLeiosBlockTxsOffer.
   A MsgRollForward implies the peer has selected the block, and the peer couldn't do that for a CertRB if it didn't already have its realization.
