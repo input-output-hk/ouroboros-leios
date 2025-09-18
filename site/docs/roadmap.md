@@ -47,6 +47,16 @@ This is a joint effort between innovation and engineering teams from Input Outpu
 
 Create design documents, formal specifications and conformance test suites usable by developers of all relevant Cardano node implementations.
 
+Leios is a novel consensus protocol and therefore requires a detailed technical specification to ensure that it is implemented correctly by all relevant Cardano node implementations. This includes the `cardano-node` Haskell implementation, but also other emerging consensus nodes like `amaru`. Node diversity is crucial for the security and resilience of Cardano, and therefore it is important that all implementations can be verified against an understandable and precise specification using conformance test suites.
+
+#### Scope
+
+- Node-level design, architecture and impact analysis documents
+- Threat modeling and security analysis
+- Formal specifications using Agda or similar
+- Conformance test suites that can be used by node developers to verify their implementations
+- Participate in node diversity workshops and contribute to the `cardano-blueprint`
+
 ### Showcase 1k TPS
 
 > As a potential builder, I want to experience the capability of the proposed consensus upgrade and be convinced that it is as secure as claimed.
