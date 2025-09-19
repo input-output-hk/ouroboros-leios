@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2025-09-19
+
+### Antithesis configuration for Rust simulator
+
+The folder [antithesis/](antithesis/) contains scripts for building docker images for testing the threading behavior of the Rust simulation under the [Antithesis](https://antithesis.com/) test framework.
+
 ## 2025-09-16
 
 ### Updated DeltaQSD notebook
