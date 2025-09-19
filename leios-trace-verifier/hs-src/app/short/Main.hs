@@ -59,8 +59,8 @@ commandParser :: ParserInfo Command
 commandParser =
   info (com <**> helper) $
     fullDesc
-      <> progDesc "Leios trace verifier"
-      <> header "parser - a Leios trace verifier"
+      <> progDesc "Short Leios trace verifier"
+      <> header "Leios trace verifier"
  where
   com =
     Command
