@@ -1,5 +1,272 @@
 # Leios logbook
 
+## 2025-09-16
+
+### Updated DeltaQSD notebook
+
+We updated the Jupyter notebook and docker image for DeltaQSD in support of [#543](https://github.com/input-output-hk/ouroboros-leios/issues/543): https://hub.docker.com/r/bwbush/jupyter-deltaq/tags.
+
+### Simulation figures in CIP
+
+We added the 50 TxkB/s case to the simulation-results figures in the CIP and dropped the overly aggressive 300 TxkB/s case. The text and tables were revised accordingly. See [PR#14](https://github.com/cardano-scaling/CIPs/pull/14) for details.
+
+## 2025-09-12
+
+### Rust simulation
+
+Updated the Leios Slide Deck with reusable slides about this sim
+
+### Micro-mainnet
+
+To accommodate the speed limitations of the Haskell simulation, an even smaller "micro-mainnet" has been created.
+
+- Methodology: [topology-v3.ipynb](data/simulation/pseudo-mainnet/topology-v3.ipynb)
+- Network: [topology-v3.yaml](data/simulation/pseudo-mainnet/topology-v3.yaml)
+- Metrics: [topology-v3.md](data/simulation/pseudo-mainnet/topology-v3.md)
+- Experiment comparing micro- vs mini-mainnet: [analysis.ipynb](analysis/sims/micro-mainnet/analysis.ipynb)
+
+| Metric                       | Value      |
+| ---------------------------: | ---------: |
+| Total nodes                  | 100        |
+| Block producers              | 22         |
+| Relay nodes                  | 78         |
+| Total connections            | 2123       |
+| Network diameter             | 4 hops     |
+| Average connections per node | 21.23      |
+| Average latency              | 97.5 ms    |
+| Maximum latency              | 529.1 ms   |
+| Bidirectional connections    | 389        |
+| Asymmetry ratio              | 63.35%     |
+
+## 2025-09-11
+
+### Compendium of data for Delta QSD modeling
+
+The document [Supporting information for modeling Linear Leios](analysis/deltaq/linear-leios-preliminaries.md) catalogs and presents the data and equations needed to model the Linear Leios protocol using techniques such as Delta QSD.
+
+- Protocol
+    - Parameters
+    - Constraints
+    - Transitions (represented as Petri nets)
+- Cardano mainnet
+    - Stake distribution
+    - Transaction size
+    - Transaction rate
+    - Ledger operations
+    - Topology
+    - Diffusion of block headers
+- Data centers
+    - Bandwidth
+    - Latency
+- Cryptography
+    - Voting
+    - Certificates
+
+## 2025-09-09
+
+### SN on website updates
+
+- Need to update the next monthly review meeting to be on Oct 1st (shifted due to the node diversity workshop)
+- The website computes when the next meeting is (last wednesday of the month)
+- Needed to add some logic to consider exceptions to that rule
+- Also, the website recently got updated with a more elaborate overview and how Leios works on the landing page, so we should be able to supersede outdated information in the "Documentation" section.
+
+## 2025-09-05
+
+### Bandwidth measurements
+
+The Cardano Node benchmarking team kindly provided bandwidth measurements (using `iperf3`) for data centers on three continents. The results are consistent with previous measurements and with Leios requirements.
+
+![Bandwidth measurements form node benchmarking cluster](analysis/bandwidth/bm-bw.png)
+
+## 2025-09-02
+
+### Parameter-sweep experiment
+
+Three protocol parameters and two throughputs were studied using the Rust simulator to determine which combination of parameters has the best performance characteristics while still being safe.
+
+- Delta header: 1000, 1500, or 2000 ms
+- Voting duration: 1, 2, 3, or 4 slots
+- Diffusion duration: 1, 3, 5, or 7 slots
+- Throughput: 150 or 200 TxkB/s
+
+The results will inform the recommended set of parameters in the CIP:
+
+- [Results at 150 Txkb/s](analysis/sims/params/ReadMe-150TxkBps.pdf)
+- [Results at 200 Txkb/s](analysis/sims/params/ReadMe-200TxkBps.pdf)
+
+## 2025-08-29
+
+### CIP proposal published
+
+Published the Ouroboros Leios CIP proposal to the Cardano Foundation CIPs repository.
+
+- **Pull Request**: [CIP-???? | Ouroboros Leios - Greater Transaction Throughput #1078](https://github.com/cardano-foundation/CIPs/pull/1078)
+
+The proposal has been submitted for formal review and is pending CIP number assignment at the next CIP meeting. The submission represents the definitive technical specification for the proposed Leios protocol implementation.
+
+### Second technical report
+
+[The second technical report](docs/technical-report-2.md) captures a snapshot of the modeling, simulation, and analysis of the
+Leios protocol from March to August 2025, approximately. Given that the Leios protocol
+design was still evolving, the observations, findings, and conclusions documented
+here are provisional and subject to future revision and contradiction. The
+report digs into the following topics:
+
+- Network protocols
+- Threat model
+- Simulation experiments
+- Test network topologies
+- Empirical measurements of the Cardano network and blockchain
+- Analytic studies of Leios behavior and performance
+- Miscellaneous observations and links to other technical documents
+
+### Regenerated figures for CIP
+
+The jupyter notebook [analysis/sims/cip/analysis.ipynb](analysis/sims/cip/analysis.ipynb) contains a regenerated set of figures for use in the Leios CIP: `sim-cli` was upgraded to version 1.3.0 and the diffusion and voting durations in `config.yaml` were updated. Depending upon the result of the ongoing parameter study, further updates to `config.yaml` may be made before the CIP figures and text are updated. The [Cardano Scaling PR#14](https://github.com/cardano-scaling/CIPs/pull/14/files) shows side-by-side comparisons of these new figures against the ones currently in the CIP.
+
+### Regression experiment on `sim-cli`
+
+The juypter notebook [analysis/sims/regression/analysis.ipynb](analysis/sims/regression/analysis.ipynb) contains the results of comparing `sim-cli` version 1.3.0 to previous tags, for an updated `config.yaml`. Discrepancies are minimal, but the performance of Leios with 1.3.0 is somewhat less than with previous versions. However, protocol parameters may be further tweaked in the future.
+
+## 2025-08-27
+
+### CIP draft completion
+
+Completed the Ouroboros Leios CIP proposal.
+
+- **CIP**: [docs/cip/README.md](https://github.com/input-output-hk/ouroboros-leios/blob/d5f1a9bc940e69f406c3e25c0d7d9aa58cf701f8/docs/cip/README.md)
+
+### Additional inter-datacenter bandwidth measurements
+
+Because bandwidth between nodes has been identified as a critical resource that limits Leios throughput, we conducted an unscientific experiment, using `iperf3` for bidirectional measurements between locations in North America and Europe:
+
+| Client                   | Server             | Send Mbps | Receive Mbps |
+|:-------------------------|:-------------------|----------:|-------------:|
+| OVH Canada               | OVH Poland         |       219 |          217 |
+| OVH Canada               | OVH Oregon USA     |       363 |          360 |
+| OVH Oregon USA           | OVH Poland         |       142 |          144 |
+| CenturyLink Colorado USA | OVH Poland         |       147 |          145 |
+| CenturyLink Colorado USA | OVH Oregon USA     |       418 |          412 |
+| CenturyLink Colorado USA | OVH Canada         |        97 |           95 |
+| CenturyLink Colorado USA | OVH Virginia       |       311 |          309 |
+| CenturyLink Colorado USA | AWS Oregon USA     |       826 |          824 |
+| AWS Oregon USA           | OVH Oregon USA     |       973 |          972 |
+| AWS Oregon USA           | OVH Poland         |       141 |          138 |
+| AWS Oregon USA           | OVH Canada         |       329 |          327 |
+| OVH Virginia USA         | OVH Oregon USA     |       369 |          367 |
+| OVH Virginia USA         | OVH Poland         |       231 |          229 |
+| OVH Virginia USA         | OVH Canada         |       469 |          467 |
+| CenturyLink Colorado USA | OVH United Kingdom |       183 |          181 |
+| AWS Oregon USA           | OVH United Kingdom |       153 |          150 |
+| OVH Oregon USA           | OVH United Kingdom |       164 |          162 |
+| OVH Virginia USA         | OVH United Kingdom |       310 |          308 |
+| OVH Poland               | OVH United Kingdom |       355 |          352 |
+| OVH Canada               | OVH United Kingdom |       307 |          305 |
+| OVH France               | OVH United Kingdom |       373 |          371 |
+| CenturyLink Colorado USA | OVH United Kingdom |       166 |          163 |
+| AWS Oregon USA           | OVH France         |       138 |          136 |
+| OVH Oregon USA           | OVH France         |       182 |          179 |
+| OVH Virginia USA         | OVH France         |       290 |          288 |
+| OVH Poland               | OVH France         |       918 |          915 |
+| OVH Canada               | OVH France         |       304 |          301 |
+
+The OVH machines are inexpensive instances, the AWS is a `r5a.4xlarge`, and CenturyLink is a local ISP. Overall, it looks like 100 Mbps is a conservative lower bound.
+
+## 2025-08-26
+
+### Quantile regressions for ledger "apply" and "reapply" operations
+
+The [analysis of the ledger "apply" and "reapply"](analysis/timings/ReadMe.ipynb) has been extended with quantile regressions at the 50th, 95th, and 99th percentiles. There was a concern that the validation time spent on reapplying transactions to EB could interfere with the release of Praos blocks. The following table shows predictions for full EBs with various intensities of Plutus scripts. Note that the "apply" operation occurs in Leios as transactions arrive and is spread out over many slots and computational threads. The "reapply" operation starts as soon as an EB is received and must be completed before a new RB and EB are built upon that EB when it is newly certified.
+
+| Tx count | Tx size [kB] | Tx exec [Gstep] | 50th %tile of Apply [ms] | 95th %tile of Apply [ms] | 99th %tile of Apply [ms] | 50th %tile of Repply [ms] | 95th %tile of Reapply [ms] | 99th %tile of Reapply [ms] |
+|---------:|-------------:|----------------:|-------------------------:|-------------------------:|-------------------------:|--------------------------:|---------------------------:|---------------------------:|
+|     8000 |       12,000 |               0 |                 1940.058 |                 3039.944 |                 4154.505 |                  183.0863 |                   374.7629 |                   661.7723 |
+|     8000 |       12,000 |              20 |                 1962.509 |                 3082.334 |                 4210.954 |                  183.7547 |                   376.0958 |                   661.8747 |
+|     8000 |       12,000 |            2000 |                 4185.128 |                 7278.955 |                 9799.408 |                  249.9268 |                   508.0527 |                   672.0193 |
+
+### Network degradation experiment
+
+The simulation experiment [analysis/sims/degraded/](analysis/sims/degraded/) studied Leios's behavior when network topology is thinned. The number of connections to/from each node was randomly thinned by up to 87% of its original mainnet-like topology. Beyond that level (i.e., more than 88% of connections lost), the network topology splits into disconnected regions where some nodes can no longer communicate with each other. That degradation resulted in the diameter of the network increasing from 5 hops to 8 hops and the number of connections per node dropping form 23.5 to 6.0. Both honest cases and cases where adversaries delay the release or transactions and EBs were studied. The experiment was inconclusive, in that the protocol operated properly when 87% of connections where lost.
+
+## 2025-08-25
+
+### Bandwidth experiment
+
+The Jupyter notebook [analysis/sims/bandwidth/analysis.ipynb](analysis/sims/bandwidth/analysis.ipynb) contains the results of an experiment where the inter-node bandwidth was reduced to values as low as 1 Mb/s. Leios operates successfully at a throughput of 0.250 TxkB/s even at a 2 Mb/s bandwidth but breaks down at 1 Mb/s.
+
+## 2025-08-23
+
+### Re-ran late-release attack experiment
+
+The [late-release attack experiment](analysis/sims/attack) was rerun with the latest version of the Rust simulation. The findings remain unchanged.
+
+### Re-ran simulation experiment for CIP figures
+
+The [simulation experiment for the CIP figures](analysis/sims/cip/) was rerun with the latest version of the Rust simulation, and several improvements were made:
+
+- Semi-optimal settings for protocol parameters
+- Improved assumptions for validation costs
+- Explored effects of increased Plutus execution steps
+
+## 2025-08-22
+
+### Analysis for regressions in Rust simulator
+
+The experiment [analysis/sims/regression/](analysis/sims/regression/) compares the behavior of all of the tagged versions of the Rust simulator, `sim-cli`, against each other when the same network topology and configuration file is used. This speeds detection of changes in behavior of the simulator.
+
+### Rust simulation
+
+Released versions 1.1.0 and 1.2.0, with updated TX validation CPU models.
+
+## 2025-08-21
+
+### Analysis of diffusion of empty blocks on Cardano mainnet
+
+The Jupyter notebook [analysis/delta-header/analysis.ipynb](analysis/delta-header/analysis.ipynb) analyzes diffusion data obtained from https://pooltool.io/ for empty blocks in each epoch of Cardano mainnet. This data is used to inform estimates of the value of $\Delta_\text{hdr}$ required by the Leios protocol. Based on this data, 94.0% of empty Praos blocks arrive at nodes in less than one second after the start of the block's slot.
+
+### Additional regressions on mainnet validation data
+
+The Jupyter notebook [analysis/timings/ReadMe.ipynb](analysis/timings/ReadMe.ipynb) has been augmented to include linear statistical models aimed at predicting the `Apply` and `Reapply` phases of the ledger update. These regressions are being used in the studies of Leios performance in the CIP, especially where higher Plutus limits are considered.
+
+## 2025-08-15
+
+### Parameter-sweep experiment for late-EB attacks
+
+A follow-up experiment on the attack experiment earlier this week was conducted to determine for what EB delay the attack was strongest. For the promising `txs-received` propagation and with L<sub>diff</sub> on/off, the delay of adversaries releasing their EBs and transactions was varied from six to eight seconds. Note that L<sub>vote</sub> = 7s in this simulations and that the adversary controlled 33% of the stake.
+
+Findings:
+
+1. Efficiency starts dropping when EBs and transactions are delayed 6.5 seconds.
+2. Efficiency doesn’t continue dropping much after delays of 7 seconds.
+3. L<sub>diff</sub> = 0s performs better than L<sub>diff</sub> = 7s.
+4. None of the cases, using txs-received, loses transactions or bogs down.
+
+Artifacts:
+
+- [Slides](analysis/sims/2025w33b/ReadMe.pdf)
+- [Notebook](analysis/sims/2025w33b/analysis.ipynb)
+- [Configurations](analysis/sims/2025w33b/experiments/)
+
+### Rust simulation
+
+- Released version 1.0.0 (started tracking version numbers for reference in the CIP)
+- Removed the `L_vote` timing restriction when including a certificate in a Linear Leios RB
+- Fixed mempool behavior for TXs referenced by EBs
+- Allow selecting a fraction of attackers by stake
+
+## 2025-08-12
+
+### First simulation experiment for attacks
+
+An experiment invovling late EB and/or late transaction diffusion was run, where $L_\text{diff}$ and the EB propagation scheme were also varied. The attack successfully thwarts Leios throughput under some conditions.
+
+- [Slides](analysis/sims/2025w33/ReadMe.pdf)
+- [Notebook](analysis/sims/2025w33/analysis.ipynb)
+- [Configurations](analysis/sims/2025w33/experiments/)
+
+Follow-up analysis determined that transactions were lost in some cases due to a misformulation of the memory-pool rules in the simulator.
+
 ## 2025-08-08
 
 ## CIP Progress

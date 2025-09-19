@@ -14,7 +14,7 @@ import Control.Concurrent.MVar (MVar, takeMVar)
 import Control.Monad ((<=<))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.State.Strict (StateT, execStateT, gets, modify')
-import Data.Aeson (Value (Object), withObject, (.:))
+import Data.Aeson (Value (Object), withObject, (.:), (.:?))
 import Data.Aeson.Types (Parser, parseMaybe)
 import Data.Function (on)
 import Data.List (intercalate)
@@ -28,15 +28,13 @@ import qualified Data.Map.Strict as M (elems, fromList, insertWith, restrictKeys
 import qualified Data.Set as S (map, singleton)
 import qualified Data.Text as T (unpack)
 
-data ItemKey
-  = ItemKey
+data ItemKey = ItemKey
   { kind :: Text
   , item :: Text
   }
   deriving (Eq, Ord, Show)
 
-data ItemInfo
-  = ItemInfo
+data ItemInfo = ItemInfo
   { size :: Minimum Int
   , references :: Sum Int
   , created :: Minimum Double
@@ -137,7 +135,7 @@ parseMessage "EBGenerated" item created =
     do
       size <- message .: "size_bytes"
       let destination = mempty{toEB = created, inEBs = S.singleton item, references = Sum 1}
-      txs <- mapM (fmap ((,destination) . ItemKey "TX") . (.: "id")) =<< message .: "transactions"
+      txs <- maybe (pure []) (mapM (fmap ((,destination) . ItemKey "TX") . (.: "id"))) =<< message .:? "transactions"
       ibs <- mapM (fmap ((,destination) . ItemKey "IB") . (.: "id")) =<< message .: "input_blocks"
       ebs <- mapM (fmap ((,destination) . ItemKey "EB") . (.: "id")) =<< message .: "endorser_blocks"
       pure (ItemKey{kind = "EB", item}, mempty{size, created}, M.fromList $ txs <> ibs <> ebs)
@@ -150,7 +148,7 @@ parseMessage "RBGenerated" item created =
           (pure mempty)
           (fmap (pure . (,mempty{toRB = created, references = Sum 1}) . ItemKey "EB") . (.: "id") <=< (.: "eb"))
           =<< message .: "endorsement"
-      txs <- fmap ((,mempty{inRB = created, references = Sum 1}) . ItemKey "TX") <$> message .: "transactions"
+      txs <- maybe [] (fmap ((,mempty{inRB = created, references = Sum 1}) . ItemKey "TX")) <$> message .: "transactions"
       pure (ItemKey{kind = "RB", item}, mempty{size, created}, M.fromList $ ebs <> txs)
 parseMessage _ _ _ =
   const $ fail "Ignore"

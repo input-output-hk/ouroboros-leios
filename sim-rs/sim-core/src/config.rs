@@ -10,6 +10,7 @@ use rand::Rng;
 use rand_chacha::ChaCha20Rng;
 use rand_distr::Distribution;
 use serde::{Deserialize, Serialize};
+use tracing::info;
 
 use crate::{
     clock::Timestamp,
@@ -84,6 +85,7 @@ pub struct RawParameters {
     pub tx_size_bytes_distribution: DistributionConfig,
     pub tx_overcollateralization_factor_distribution: DistributionConfig,
     pub tx_validation_cpu_time_ms: f64,
+    pub tx_validation_cpu_time_ms_per_byte: f64,
     pub tx_max_size_bytes: u64,
     pub tx_conflict_fraction: Option<f64>,
     pub tx_start_time: Option<f64>,
@@ -206,12 +208,15 @@ pub struct RawLateTXAttackConfig {
     pub attackers: NodeSelection,
     pub attack_probability: f64,
     pub tx_generation_distribution: DistributionConfig,
+    pub tx_start_time: Option<f64>,
+    pub tx_stop_time: Option<f64>,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum NodeSelection {
     Nodes(HashSet<String>),
+    StakeFraction(f64),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -303,10 +308,7 @@ impl Topology {
         Ok(())
     }
 
-    pub fn select(
-        &mut self,
-        selection: &NodeSelection,
-    ) -> impl Iterator<Item = &mut NodeConfiguration> {
+    pub fn select(&mut self, selection: &NodeSelection) -> Vec<&mut NodeConfiguration> {
         let mut nodes = vec![];
         match selection {
             NodeSelection::Nodes(names) => {
@@ -316,8 +318,22 @@ impl Topology {
                         .filter(|node| names.contains(&node.name)),
                 );
             }
+            NodeSelection::StakeFraction(fraction) => {
+                let mut all_nodes = self.nodes.iter_mut().collect::<Vec<_>>();
+                all_nodes.sort_by_key(|n| std::cmp::Reverse(n.stake));
+                let total_stake = all_nodes.iter().map(|n| n.stake).sum::<u64>();
+                let target_stake = ((total_stake as f64) * *fraction) as u64;
+                let mut stake_so_far = 0;
+                for node in all_nodes {
+                    if stake_so_far >= target_stake {
+                        break;
+                    }
+                    stake_so_far += node.stake;
+                    nodes.push(node);
+                }
+            }
         }
-        nodes.into_iter()
+        nodes
     }
 }
 
@@ -378,7 +394,8 @@ impl From<RawTopology> for Topology {
 
 #[derive(Debug, Clone)]
 pub(crate) struct CpuTimeConfig {
-    pub tx_validation: Duration,
+    pub tx_validation_constant: Duration,
+    pub tx_validation_per_byte: Duration,
     pub rb_generation: Duration,
     pub rb_head_validation: Duration,
     pub rb_body_validation_constant: Duration,
@@ -404,7 +421,8 @@ pub(crate) struct CpuTimeConfig {
 impl CpuTimeConfig {
     fn new(params: &RawParameters) -> Self {
         Self {
-            tx_validation: duration_ms(params.tx_validation_cpu_time_ms),
+            tx_validation_constant: duration_ms(params.tx_validation_cpu_time_ms),
+            tx_validation_per_byte: duration_ms(params.tx_validation_cpu_time_ms_per_byte),
             rb_generation: duration_ms(params.rb_generation_cpu_time_ms),
             rb_head_validation: duration_ms(params.rb_head_validation_cpu_time_ms),
             rb_body_validation_constant: duration_ms(
@@ -617,7 +635,7 @@ impl AttackConfig {
             late_tx: params
                 .late_tx_attack
                 .as_ref()
-                .map(|raw| LateTXAttackConfig::build(raw, topology)),
+                .map(|raw| LateTXAttackConfig::build(raw, topology, params)),
         }
     }
 }
@@ -630,10 +648,12 @@ pub(crate) struct LateEBAttackConfig {
 
 impl LateEBAttackConfig {
     fn build(raw: &RawLateEBAttackConfig, topology: &mut Topology) -> Self {
-        let attackers = topology
-            .select(&raw.attackers)
-            .map(|node| node.id)
-            .collect();
+        let all_attackers = topology.select(&raw.attackers);
+        info!(
+            "Late EB attackers: {:?}",
+            all_attackers.iter().map(|n| &n.name).collect::<Vec<_>>()
+        );
+        let attackers = all_attackers.into_iter().map(|node| node.id).collect();
         Self {
             attackers,
             propagation_delay: duration_ms(raw.propagation_delay_ms),
@@ -645,16 +665,31 @@ impl LateEBAttackConfig {
 pub(crate) struct LateTXAttackConfig {
     pub(crate) probability: f64,
     pub(crate) txs_to_generate: FloatDistribution,
+    pub(crate) start_time: Option<Timestamp>,
+    pub(crate) stop_time: Option<Timestamp>,
 }
 
 impl LateTXAttackConfig {
-    fn build(raw: &RawLateTXAttackConfig, topology: &mut Topology) -> Self {
-        for attacker in topology.select(&raw.attackers) {
+    fn build(raw: &RawLateTXAttackConfig, topology: &mut Topology, params: &RawParameters) -> Self {
+        let all_attackers = topology.select(&raw.attackers);
+        info!(
+            "Late TX attackers: {:?}",
+            all_attackers.iter().map(|n| &n.name).collect::<Vec<_>>()
+        );
+        for attacker in all_attackers {
             attacker.behaviours.withhold_txs = true;
         }
         Self {
             probability: raw.attack_probability,
             txs_to_generate: raw.tx_generation_distribution.into(),
+            start_time: raw
+                .tx_start_time
+                .or(params.tx_start_time)
+                .map(|t| Timestamp::zero() + Duration::from_secs_f64(t)),
+            stop_time: raw
+                .tx_stop_time
+                .or(params.tx_stop_time)
+                .map(|t| Timestamp::zero() + Duration::from_secs_f64(t)),
         }
     }
 }

@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1200" height="300" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Pattern for certificate-active periods -->
+    <pattern id="activePattern" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+      <rect width="20" height="20" fill="#f0f8e8"/>
+      <line x1="0" y1="20" x2="20" y2="0" stroke="#d4edda" stroke-width="0.5"/>
+    </pattern>
+    
+    <!-- Pattern for standard validation periods -->
+    <pattern id="praosPattern" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+      <rect width="20" height="20" fill="#fce5cd"/>
+      <line x1="0" y1="20" x2="20" y2="0" stroke="#f6d3b4" stroke-width="0.5"/>
+    </pattern>
+    
+    <!-- Hover effects -->
+    <style>
+      .block-link, .param-link {
+        cursor: pointer;
+      }
+      .block-link:hover rect {
+        stroke-width: 2;
+        filter: brightness(1.1);
+      }
+      .block-link:hover polygon {
+        stroke-width: 2;
+        filter: brightness(1.1);
+      }
+      .param-link:hover line {
+        stroke-width: 3;
+        filter: brightness(1.1);
+      }
+      .param-link:hover rect {
+        filter: brightness(1.1);
+      }
+      .param-link:hover text {
+        font-weight: bold;
+      }
+    </style>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1200" height="300" fill="#ffffff"/>
+  
+  <!-- Timeline background showing certificate influence -->
+  <g id="timeline-bg">
+    <!-- Standard validation period 1 -->
+    <rect x="50" y="60" width="200" height="40" fill="url(#praosPattern)" fill-opacity="0.6" stroke="#783f04" stroke-width="0.5" stroke-opacity="0.3"/>
+    <text x="150" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#783f04">Standard Validation</text>
+    
+    <!-- Certificate-active period 1 (300 width) -->
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#l-recover" class="param-link">
+      <rect x="250" y="60" width="300" height="40" fill="url(#activePattern)" stroke="#7cb342" stroke-width="0.5" stroke-opacity="0.3"/>
+      <text x="400" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#5a8030">Certificate Active</text>
+    </a>
+    
+    <!-- Standard validation period 2 -->
+    <rect x="550" y="60" width="150" height="40" fill="url(#praosPattern)" fill-opacity="0.6" stroke="#783f04" stroke-width="0.5" stroke-opacity="0.3"/>
+    <text x="625" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#783f04">Standard Validation</text>
+    
+    <!-- Certificate-active period 2 (300 width) -->
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#l-recover" class="param-link">
+      <rect x="700" y="60" width="300" height="40" fill="url(#activePattern)" stroke="#7cb342" stroke-width="0.5" stroke-opacity="0.3"/>
+      <text x="850" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#5a8030">Certificate Active</text>
+    </a>
+    
+    <!-- Standard validation period 3 -->
+    <rect x="1000" y="60" width="100" height="40" fill="url(#praosPattern)" fill-opacity="0.6" stroke="#783f04" stroke-width="0.5" stroke-opacity="0.3"/>
+    <text x="1050" y="80" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#783f04">Std. Val.</text>
+    
+    <!-- ... continuation dots -->
+    <text x="1130" y="80" font-family="Arial, sans-serif" font-size="20" fill="#666" text-anchor="middle">...</text>
+  </g>
+  
+  <!-- L_recover window indicators (thin lines with dashed verticals) -->
+  <g id="window-indicators">
+    <!-- First window from RB3 certificate (center at x=250) -->
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#l-recover" class="param-link">
+      <line x1="250" y1="40" x2="250" y2="110" stroke="#7cb342" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>
+      <line x1="250" y1="45" x2="550" y2="45" stroke="#7cb342" stroke-width="3" opacity="0.8"/>
+      <line x1="550" y1="40" x2="550" y2="110" stroke="#7cb342" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>
+    </a>
+    
+    <!-- Second window from RB with cert (center at x=700) -->
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#l-recover" class="param-link">
+      <line x1="700" y1="40" x2="700" y2="110" stroke="#7cb342" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>
+      <line x1="700" y1="50" x2="1000" y2="50" stroke="#7cb342" stroke-width="3" opacity="0.8"/>
+      <line x1="1000" y1="40" x2="1000" y2="110" stroke="#7cb342" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>
+    </a>
+  </g>
+  
+  <!-- Block chain with RBs and EBs -->
+  <g id="block-chain">
+    <!-- Connection lines -->
+    <line x1="70" y1="160" x2="1080" y2="160" stroke="#999" stroke-width="1"/>
+    
+    <!-- Standard validation period 1 blocks -->
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
+      <rect x="75" y="145" width="20" height="30" fill="#fce5cd" stroke="#783f04" stroke-width="1" rx="2"/>
+    </a>
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
+      <rect x="115" y="145" width="20" height="30" fill="#fce5cd" stroke="#783f04" stroke-width="1" rx="2"/>
+    </a>
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
+      <rect x="155" y="145" width="20" height="30" fill="#fce5cd" stroke="#783f04" stroke-width="1" rx="2"/>
+    </a>
+    
+    <!-- RB announcing EB (still in standard period) -->
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
+      <rect x="190" y="145" width="20" height="30" fill="#fce5cd" stroke="#783f04" stroke-width="1" rx="2"/>
+    </a>
+    <!-- Vertical line to EB -->
+    <line x1="200" y1="175" x2="200" y2="195" stroke="#783f04" stroke-width="1"/>
+    <!-- EB below -->
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#endorser-blocks-ebs" class="block-link">
+      <rect x="185" y="195" width="30" height="25" fill="#d9ead3" stroke="#274e13" stroke-width="1" rx="2"/>
+    </a>
+    
+    <!-- RB with certificate (triggers certificate-active period) - centered at x=250 -->
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
+      <rect x="240" y="145" width="20" height="30" fill="#fce5cd" stroke="#ff6b6b" stroke-width="1.5" rx="2" stroke-dasharray="2,2"/>
+    </a>
+    <!-- Certificate pentagon -->
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="block-link">
+      <polygon points="250,165 258,170 258,178 250,183 242,178 242,170" fill="#fff2cc" stroke="#f9a825" stroke-width="1"/>
+    </a>
+    <!-- Curved line from cert to previous EB -->
+    <path d="M 250 183 Q 250 195 215 207" stroke="#f9a825" stroke-width="1" stroke-dasharray="2,2" fill="none"/>
+    
+    <!-- Certificate-active period 1 blocks (adjusted spacing) -->
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
+      <rect x="300" y="145" width="20" height="30" fill="#fce5cd" stroke="#ff6b6b" stroke-width="1.5" rx="2" stroke-dasharray="2,2"/>
+    </a>
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
+      <rect x="350" y="145" width="20" height="30" fill="#fce5cd" stroke="#ff6b6b" stroke-width="1.5" rx="2" stroke-dasharray="2,2"/>
+    </a>
+    
+    <!-- RB announcing EB in certificate-active period -->
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
+      <rect x="400" y="145" width="20" height="30" fill="#fce5cd" stroke="#ff6b6b" stroke-width="1.5" rx="2" stroke-dasharray="2,2"/>
+    </a>
+    <line x1="410" y1="175" x2="410" y2="195" stroke="#783f04" stroke-width="1"/>
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#endorser-blocks-ebs" class="block-link">
+      <rect x="395" y="195" width="30" height="25" fill="#d9ead3" stroke="#274e13" stroke-width="1" rx="2"/>
+    </a>
+    
+    <!-- RB WITHOUT certificate (removed per request) -->
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
+      <rect x="450" y="145" width="20" height="30" fill="#fce5cd" stroke="#ff6b6b" stroke-width="1.5" rx="2" stroke-dasharray="2,2"/>
+    </a>
+    
+    <!-- RB announcing EB -->
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
+      <rect x="500" y="145" width="20" height="30" fill="#fce5cd" stroke="#ff6b6b" stroke-width="1.5" rx="2" stroke-dasharray="2,2"/>
+    </a>
+    <line x1="510" y1="175" x2="510" y2="195" stroke="#783f04" stroke-width="1"/>
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#endorser-blocks-ebs" class="block-link">
+      <rect x="495" y="195" width="30" height="25" fill="#d9ead3" stroke="#274e13" stroke-width="1" rx="2"/>
+    </a>
+    
+    <!-- Standard validation period 2 blocks -->
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
+      <rect x="570" y="145" width="20" height="30" fill="#fce5cd" stroke="#783f04" stroke-width="1" rx="2"/>
+    </a>
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
+      <rect x="610" y="145" width="20" height="30" fill="#fce5cd" stroke="#783f04" stroke-width="1" rx="2"/>
+    </a>
+    
+    <!-- RB announcing EB -->
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
+      <rect x="650" y="145" width="20" height="30" fill="#fce5cd" stroke="#783f04" stroke-width="1" rx="2"/>
+    </a>
+    <line x1="660" y1="175" x2="660" y2="195" stroke="#783f04" stroke-width="1"/>
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#endorser-blocks-ebs" class="block-link">
+      <rect x="645" y="195" width="30" height="25" fill="#d9ead3" stroke="#274e13" stroke-width="1" rx="2"/>
+    </a>
+    
+    <!-- RB with certificate (triggers certificate-active 2) - centered at x=700 -->
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
+      <rect x="690" y="145" width="20" height="30" fill="#fce5cd" stroke="#ff6b6b" stroke-width="1.5" rx="2" stroke-dasharray="2,2"/>
+    </a>
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="block-link">
+      <polygon points="700,165 708,170 708,178 700,183 692,178 692,170" fill="#fff2cc" stroke="#f9a825" stroke-width="1"/>
+    </a>
+    <path d="M 700 183 Q 700 195 675 207" stroke="#f9a825" stroke-width="1" stroke-dasharray="2,2" fill="none"/>
+    
+    <!-- Certificate-active period 2 blocks (adjusted spacing) -->
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
+      <rect x="750" y="145" width="20" height="30" fill="#fce5cd" stroke="#ff6b6b" stroke-width="1.5" rx="2" stroke-dasharray="2,2"/>
+    </a>
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
+      <rect x="800" y="145" width="20" height="30" fill="#fce5cd" stroke="#ff6b6b" stroke-width="1.5" rx="2" stroke-dasharray="2,2"/>
+    </a>
+    
+    <!-- RB announcing EB -->
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
+      <rect x="850" y="145" width="20" height="30" fill="#fce5cd" stroke="#ff6b6b" stroke-width="1.5" rx="2" stroke-dasharray="2,2"/>
+    </a>
+    <line x1="860" y1="175" x2="860" y2="195" stroke="#783f04" stroke-width="1"/>
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#endorser-blocks-ebs" class="block-link">
+      <rect x="845" y="195" width="30" height="25" fill="#d9ead3" stroke="#274e13" stroke-width="1" rx="2"/>
+    </a>
+    
+    <!-- RB without certificate -->
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
+      <rect x="900" y="145" width="20" height="30" fill="#fce5cd" stroke="#ff6b6b" stroke-width="1.5" rx="2" stroke-dasharray="2,2"/>
+    </a>
+    
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
+      <rect x="950" y="145" width="20" height="30" fill="#fce5cd" stroke="#ff6b6b" stroke-width="1.5" rx="2" stroke-dasharray="2,2"/>
+    </a>
+    
+    <!-- Standard validation period 3 blocks -->
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
+      <rect x="1020" y="145" width="20" height="30" fill="#fce5cd" stroke="#783f04" stroke-width="1" rx="2"/>
+    </a>
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
+      <rect x="1060" y="145" width="20" height="30" fill="#fce5cd" stroke="#783f04" stroke-width="1" rx="2"/>
+    </a>
+  </g>
+  
+  <!-- Legend (centered horizontally) -->
+  <g id="legend" transform="translate(220, 250)">
+    <text x="380" y="0" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#333" text-anchor="middle">Legend</text>
+    
+    <!-- RB solid and dashed -->
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
+      <rect x="50" y="15" width="15" height="20" fill="#fce5cd" stroke="#783f04" stroke-width="1" rx="2"/>
+    </a>
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#ranking-blocks-rbs" class="block-link">
+      <rect x="70" y="15" width="15" height="20" fill="#fce5cd" stroke="#ff6b6b" stroke-width="1.5" rx="2" stroke-dasharray="2,2"/>
+    </a>
+    <text x="90" y="28" font-family="Arial, sans-serif" font-size="11" fill="#333">Ranking Block (RB)</text>
+    
+    <!-- EB -->
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#endorser-blocks-ebs" class="block-link">
+      <rect x="220" y="18" width="20" height="15" fill="#d9ead3" stroke="#274e13" stroke-width="1" rx="2"/>
+    </a>
+    <text x="245" y="28" font-family="Arial, sans-serif" font-size="11" fill="#333">Endorser Block (EB)</text>
+    
+    <!-- Certificate -->
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#votes-and-certificates" class="block-link">
+      <polygon points="370,15 378,20 378,28 370,33 362,28 362,20" fill="#fff2cc" stroke="#f9a825" stroke-width="1"/>
+    </a>
+    <text x="383" y="28" font-family="Arial, sans-serif" font-size="11" fill="#333">Certificate</text>
+    
+    <!-- L_recover window with dashed verticals -->
+    <a href="https://github.com/input-output-hk/ouroboros-leios/blob/cip/review/docs/cip/README.md#l-recover" class="param-link">
+      <line x1="480" y1="18" x2="480" y2="30" stroke="#7cb342" stroke-width="1" stroke-dasharray="2,2" opacity="0.8"/>
+      <line x1="480" y1="23" x2="510" y2="23" stroke="#7cb342" stroke-width="3" opacity="0.8"/>
+      <line x1="510" y1="18" x2="510" y2="30" stroke="#7cb342" stroke-width="1" stroke-dasharray="2,2" opacity="0.8"/>
+      <text x="515" y="28" font-family="Arial, sans-serif" font-size="11" fill="#333"><tspan font-family="Times New Roman, serif" font-style="italic" font-size="14">L</tspan><tspan font-size="8" baseline-shift="sub">recover</tspan> window</text>
+    </a>
+  </g>
+</svg>

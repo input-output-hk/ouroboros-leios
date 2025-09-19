@@ -23,6 +23,7 @@ in
     enable = true;
     extraRPackages = p: with p; [
       bit64
+      cowplot
       curl
       data_table
       dplyr
@@ -32,6 +33,7 @@ in
       igraph
       lubridate
       mongolite
+      quantreg
       RPostgres
       R_utils
       stringr

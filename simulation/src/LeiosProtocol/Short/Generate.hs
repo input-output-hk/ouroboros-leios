@@ -27,17 +27,22 @@ import LeiosProtocol.Common
 import LeiosProtocol.Config
 import LeiosProtocol.Short hiding (Stage (..))
 import qualified LeiosProtocol.Short as Short
+import qualified PraosProtocol.Common.Chain as Chain
 import STMCompat
 
 data BuffersView m = BuffersView
-  { newRBData :: STM m NewRankingBlockData
+  { newRBData :: STM m (SlotNo -> NewRankingBlockData)
   , newIBData :: STM m NewInputBlockData
   , ibs :: STM m InputBlocksSnapshot
   , ebs :: STM m EndorseBlocksSnapshot
   }
 
 data Role :: Type -> Type where
-  Base :: Role RankingBlock
+  Base ::
+    -- | For Linear Leios, we have two 'Base' roles: one for 'Left' and one for 'Right'.
+    --
+    -- In Short or Full Leios, it's only the 'Left' role.
+    Role (Either (Chain RankingBlock, RankingBlock) InputBlock)
   Propose :: {ibSlot :: Maybe SlotNo, delay :: Maybe DiffTime} -> Role InputBlock
   Endorse :: Role EndorseBlock
   Vote :: Role VoteMsg
@@ -70,17 +75,26 @@ leiosBlockGenerator LeiosGeneratorConfig{..} =
           actions <- concat <$> mapM (execute slot) roles
           lift $ submit actions
       , slotConfig
+      , initial = 0
       }
  where
   execute slot (SomeRole r, wins) = assert (wins >= 1) $ (map . second) (SomeAction r) <$> execute' slot r wins
   execute' :: SlotNo -> Role a -> Word64 -> StateT Int m [(DiffTime, a)]
   execute' slot Base _wins = do
-    rbData <- lift $ atomically buffers.newRBData
-    let meb = rbData.certifiedEBforRBAt slot
-    let body = mkRankingBlockBody leios nodeId meb rbData.txsPayload
-    let !rb = mkPartialBlock slot body
+    rbData <- fmap (\f -> f slot) $ lift $ atomically buffers.newRBData
+    let body = mkRankingBlockBody leios nodeId rbData.mbEbCert rbData.txsPayload
+    let !rb = fixSize leios $ fixupBlock (Chain.headAnchor rbData.prevChain) $ mkPartialBlock slot body
     let !task = leios.praos.blockGenerationDelay rb
-    return [(task, rb)]
+    case leios.variant of
+      Short -> return [(task, Left (rbData.prevChain, rb))]
+      Full -> return [(task, Left (rbData.prevChain, rb))]
+      Linear -> do
+        ibData <- lift $ atomically buffers.newIBData
+        i <- nextBlkId InputBlockId
+        let header = mkInputBlockHeader leios i slot (SubSlotNo 0) nodeId (BlockHash $ blockHash rb)
+        let !ib = mkInputBlock leios header ibData.txsPayload
+        let !task2 = leios.delays.linearEndorseBlockGeneration ib
+        return [(task, Left (rbData.prevChain, rb)), (task2, Right ib)]
   execute' slot Propose{ibSlot, delay} wins = do
     ibData <- lift $ atomically buffers.newIBData
     forM [toEnum $ fromIntegral sub | sub <- [0 .. wins - 1]] $ \sub -> do
@@ -94,6 +108,7 @@ leiosBlockGenerator LeiosGeneratorConfig{..} =
     ibs <- lift $ atomically buffers.ibs
     referencedEBs <- case leios.variant of
       Short -> pure []
+      Linear -> pure []
       Full -> do
         ebs <- lift $ atomically buffers.ebs
         let p = case leios of

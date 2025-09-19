@@ -93,6 +93,12 @@ data Event where
     -- ^ used by Haskell when sending more blocks in one message.
     } ->
     Event
+  TXReceived ::
+    { id :: !Text
+    , sender :: !(Maybe Node)
+    , recipient :: !Node
+    } ->
+    Event
   IBEnteredState
     , EBEnteredState
     , VTBundleEnteredState
@@ -120,6 +126,7 @@ data Event where
     , bytes :: !Word64
     , input_blocks :: ![BlockRef]
     , endorser_blocks :: ![BlockRef]
+    , transactions :: ![Word64]
     } ->
     Event
   RBGenerated ::
@@ -131,6 +138,7 @@ data Event where
     , endorsements :: !(Maybe [Endorsement])
     , payload_bytes :: !Word64
     , parent :: !(Nullable BlockRef)
+    , transactions :: ![Word64]
     } ->
     Event
   VTBundleGenerated ::
@@ -140,6 +148,11 @@ data Event where
     , pipeline :: !PipelineNo
     , bytes :: !Word64
     , votes :: !(Map Text Word64)
+    } ->
+    Event
+  TXGenerated ::
+    { publisher :: !Text
+    , input_id :: !Word64
     } ->
     Event
   deriving (Eq, Show)

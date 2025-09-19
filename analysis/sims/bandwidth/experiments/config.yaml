@@ -1,0 +1,110 @@
+
+# Simulation parameters.
+timestamp-resolution-ms: 0.1         
+simulate-transactions: true                    
+cleanup-policies:                        
+- cleanup-expired-vote           
+
+# Protocol parameters for Linear Leios.
+leios-variant: linear-with-tx-references
+linear-eb-propagation-criteria: eb-received
+linear-vote-stage-length-slots: 7
+linear-diffuse-stage-length-slots: 7
+praos-fallback-enabled: true      
+leios-stage-active-voting-slots: 1
+leios-mempool-sampling-strategy: ordered-by-id
+relay-strategy: request-from-first
+treat-blocks-as-full: false                       
+eb-diffusion-strategy: peer-order
+eb-referenced-txs-max-size-bytes: 12000000
+eb-size-bytes-constant: 240
+eb-size-bytes-per-ib: 32
+
+# A conservative upper bound based on empiricial data of empty Praos blocks on
+# Cardano mainnet.
+leios-header-diffusion-time-ms: 2000.0
+
+# Scenario-specific parameters for transaction generation.
+tx-start-time: 60                                               
+tx-stop-time: 960
+tx-generation-distribution:        
+  distribution: constant               
+  value: 10.0                             
+tx-size-bytes-distribution:        
+  distribution: constant      
+  value: 1500              
+tx-conflict-fraction: 0                   
+tx-overcollateralization-factor-distribution:
+  distribution: constant                   
+  value: 0                             
+
+# Based on a linear model fit from `db-analyser` measurements of mainnet blocks
+# for the `Apply` operation, either with or without a term for Plutus execution
+# steps.
+#
+# `Apply CPU [ms]` / `Tx count` ~ (0.6201 ms/tx)
+#
+# `Apply CPU [ms]` ~ 0 + (0.2624 ms/tx) * `Tx count`
+#                      + (0.9487 ms/Gstep) * `Tx exec [Gstep]`
+#
+tx-validation-cpu-time-ms: 0.6201
+
+# Inherited from Cardano mainnet protocol parameters for Praos.
+tx-max-size-bytes: 16384
+rb-generation-probability: 0.05
+rb-head-size-bytes: 1024
+rb-body-max-size-bytes: 90112
+
+# Worst case based on benchmark cluster "Forging: Slot start to announced".
+rb-generation-cpu-time-ms: 71.02
+
+# Based on `apply` statistics for empty blocks using `db-analyser` on blocks
+# from the Cardano mainnet.
+rb-head-validation-cpu-time-ms: 0.4438
+eb-header-validation-cpu-time-ms: 0.4438
+
+# Based on a linear model fit from `db-analyser` measurements of mainnet blocks
+# for the `Reapply` operation, either with or without a term for Plutus
+# execution steps.
+#
+# `Reapply CPU [ms]` ~ (0.3539 ms) + (0.02151 ms/kB) * `Block size [kB]`
+#
+# `Reapply CPU [ms]` ~ (0.3478 ms) + (0.01943 ms/kB) * `Block size [kB]`
+#                                  + (0.02127 ms/Gstep) * `Block exec [Gstep]`
+#
+rb-body-legacy-praos-payload-validation-cpu-time-ms-constant: 0.3539
+rb-body-legacy-praos-payload-validation-cpu-time-ms-per-byte: 0.00002151
+eb-body-validation-cpu-time-ms-constant: 0.3539
+eb-body-validation-cpu-time-ms-per-byte: 0.00002151
+
+# Based on analysis of wFA+LS sortition for realistic stake distribution similar
+# to that of Cardano mainnet, and on the security requirement.
+vote-generation-probability: 600
+vote-threshold: 450
+
+# Based on CDDL for votes, worst case for non-persistent voters.
+vote-bundle-size-bytes-constant: 0
+vote-bundle-size-bytes-per-eb: 164
+
+# Worst case based on benchmarks from cryptography prototype.
+vote-generation-cpu-time-ms-constant: 0.280
+vote-generation-cpu-time-ms-per-tx: 0
+vote-validation-cpu-time-ms: 2.9
+
+# Vote diffusion settings.
+vote-diffusion-strategy: peer-order
+vote-diffusion-max-bodies-to-request: 1
+vote-diffusion-max-headers-to-request: 100
+vote-diffusion-max-window-size: 100
+
+# Worst case based on CDDL for certificates and on empirical study of wFA+LS
+# sortition.
+cert-size-bytes-constant: 8000
+cert-size-bytes-per-node: 0
+
+# Worst case based on benchmarks from cryptography prototype.
+cert-generation-cpu-time-ms-constant: 92.5
+cert-generation-cpu-time-ms-per-node: 0
+cert-validation-cpu-time-ms-constant: 157.2
+cert-validation-cpu-time-ms-per-node: 0
+

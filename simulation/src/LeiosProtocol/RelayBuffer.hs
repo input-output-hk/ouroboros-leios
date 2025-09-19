@@ -22,8 +22,7 @@ import Data.Word (Word64)
 ---- Relay Buffer
 --------------------------------
 
-data RelayBuffer key value
-  = RelayBuffer
+data RelayBuffer key value = RelayBuffer
   { entries :: !(FingerTree TicketRange (EntryWithTicket key value))
   , index :: !(Map key Ticket)
   , nextTicket :: !Ticket

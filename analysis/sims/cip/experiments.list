@@ -1,0 +1,12 @@
+experiments/NA,0.050/run.sh
+experiments/NA,0.100/run.sh
+experiments/NA,0.150/run.sh
+experiments/NA,0.200/run.sh
+experiments/NA,0.250/run.sh
+experiments/NA,0.300/run.sh
+experiments/1000,0.150/run.sh
+experiments/2000,0.150/run.sh
+experiments/5000,0.150/run.sh
+experiments/10000,0.150/run.sh
+experiments/20000,0.150/run.sh
+experiments/50000,0.150/run.sh

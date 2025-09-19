@@ -139,6 +139,7 @@ library
     , io-classes
     , io-sim
     , kdt
+    , lens
     , leios-trace-hs
     , linear
     , mtl

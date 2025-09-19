@@ -98,6 +98,7 @@ const config: Config = {
                     label: "Formal Specification",
                     position: "left",
                 },
+                { to: "/docs/roadmap", label: "Roadmap", position: "right" },
                 { to: "/news", label: "Weekly updates", position: "right" },
                 {
                     type: "dropdown",
@@ -125,6 +126,12 @@ const config: Config = {
                 },
                 {
                     href:
+                        "https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md",
+                    label: "CIP",
+                    position: "right",
+                },
+                {
+                    href:
                         "https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md",
                     label: "CPS",
                     position: "right",
@@ -142,20 +149,12 @@ const config: Config = {
                     title: "Docs",
                     items: [
                         {
-                            label: "What is Ouroboros Leios?",
-                            to: "/docs/overview",
-                        },
-                        {
-                            label: "Protocol overview",
-                            to: "/docs/protocol-overview",
-                        },
-                        {
-                            label: "How it works",
-                            to: "/docs/how-it-works",
-                        },
-                        {
                             label: "Formal Specification",
                             to: "/formal-spec/",
+                        },
+                        {
+                            label: "Resources",
+                            to: "/docs/resources",
                         },
                         {
                             label: "FAQs",
@@ -165,23 +164,14 @@ const config: Config = {
                             label: "Glossary",
                             to: "/docs/glossary",
                         },
-                        {
-                            label: "Resources",
-                            to: "/docs/resources",
-                        },
-                        {
-                            label: "CPS",
-                            href:
-                                "https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md",
-                        },
                     ],
                 },
                 {
                     title: "Community",
                     items: [
                         {
-                            label: "Discord",
-                            href: "https://discord.gg/jm3WxeYT",
+                            label: "Monthly review meetings",
+                            to: "/docs/development/monthly-reviews",
                         },
                         {
                             label: "GitHub Discussions",

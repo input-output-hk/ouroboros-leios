@@ -61,6 +61,7 @@ tx-overcollateralization-factor-distribution:
   distribution: constant
   value: 0
 tx-validation-cpu-time-ms: 1.5
+tx-validation-cpu-time-ms-per-byte: 0
 tx-max-size-bytes: 16384
 tx-conflict-fraction: 0
 
@@ -141,7 +142,6 @@ eb-generation-probability: 1.5
 eb-size-bytes-constant: 240
 # IB hash
 eb-size-bytes-per-ib: 32
-eb-body-avg-size-bytes: 0
 # Collecting the IBs to reference and cryptography are the main tasks.
 # A comparable task is maybe mempool snapshotting.
 # Sec 2.3 Forging, of the benchmark cluster report, lists
@@ -181,6 +181,9 @@ eb-max-age-for-relay-slots: 40
 # The maximum size of transactions (in bytes) which an EB can reference.
 # Only relevant when running with the "full-without-ibs" variant.
 eb-referenced-txs-max-size-bytes: 16384000
+
+# For Linear Leios
+eb-body-avg-size-bytes: 2500000
 
 ################################################################################
 # Vote Configuration

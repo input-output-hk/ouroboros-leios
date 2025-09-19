@@ -85,7 +85,7 @@ instance Default CleanupPolicies where
 allCleanupPolicies :: CleanupPolicies
 allCleanupPolicies = CleanupPolicies $ Set.fromList [minBound .. maxBound]
 
-data LeiosVariant = Short | Full
+data LeiosVariant = Short | Full | Linear
   deriving (Show, Eq, Generic)
 
 data Config = Config
@@ -97,6 +97,8 @@ data Config = Config
   , simulateTransactions :: Bool
   , leiosStageLengthSlots :: Word
   , leiosStageActiveVotingSlots :: Word
+  , linearVoteStageLengthSlots :: Word
+  , linearDiffuseStageLengthSlots :: Word
   , leiosVoteSendRecvStages :: Bool
   , leiosVariant :: LeiosVariant
   , leiosLateIbInclusion :: Bool
@@ -132,6 +134,9 @@ data Config = Config
   , ebValidationCpuTimeMs :: DurationMs
   , ebSizeBytesConstant :: SizeBytes
   , ebSizeBytesPerIb :: SizeBytes
+  , ebBodyAvgSizeBytes :: SizeBytes
+  , ebBodyValidationCpuTimeMsConstant :: DurationMs
+  , ebBodyValidationCpuTimeMsPerByte :: DurationMs
   , ebDiffusionStrategy :: DiffusionStrategy
   , ebDiffusionMaxWindowSize :: Word16
   , ebDiffusionMaxHeadersToRequest :: Word16
@@ -141,6 +146,7 @@ data Config = Config
   , voteGenerationProbability :: Double
   , voteGenerationCpuTimeMsConstant :: DurationMs
   , voteGenerationCpuTimeMsPerIb :: DurationMs
+  , voteGenerationCpuTimeMsPerTx :: DurationMs
   , voteValidationCpuTimeMs :: DurationMs
   , voteThreshold :: Word
   , voteBundleSizeBytesConstant :: SizeBytes
@@ -170,6 +176,8 @@ instance Default Config where
       , simulateTransactions = True
       , leiosStageLengthSlots = 20
       , leiosStageActiveVotingSlots = 1
+      , linearVoteStageLengthSlots = 5
+      , linearDiffuseStageLengthSlots = 5
       , leiosVoteSendRecvStages = False
       , leiosVariant = Short
       , leiosLateIbInclusion = True
@@ -205,6 +213,9 @@ instance Default Config where
       , ebValidationCpuTimeMs = 1.0
       , ebSizeBytesConstant = 240
       , ebSizeBytesPerIb = 32
+      , ebBodyAvgSizeBytes = 2500000
+      , ebBodyValidationCpuTimeMsConstant = 50.0
+      , ebBodyValidationCpuTimeMsPerByte = 0.0005
       , ebDiffusionStrategy = PeerOrder
       , ebDiffusionMaxWindowSize = 100
       , ebDiffusionMaxHeadersToRequest = 100
@@ -214,6 +225,7 @@ instance Default Config where
       , voteGenerationProbability = 500.0
       , voteGenerationCpuTimeMsConstant = 0.164
       , voteGenerationCpuTimeMsPerIb = 0.0
+      , voteGenerationCpuTimeMsPerTx = 0.0
       , voteValidationCpuTimeMs = 0.816
       , voteThreshold = 300
       , voteBundleSizeBytesConstant = 0
@@ -282,6 +294,9 @@ configToKVsWith getter cfg =
     , get @"ebValidationCpuTimeMs" getter cfg
     , get @"ebSizeBytesConstant" getter cfg
     , get @"ebSizeBytesPerIb" getter cfg
+    , get @"ebBodyAvgSizeBytes" getter cfg
+    , get @"ebBodyValidationCpuTimeMsConstant" getter cfg
+    , get @"ebBodyValidationCpuTimeMsPerByte" getter cfg
     , get @"ebDiffusionStrategy" getter cfg
     , get @"ebDiffusionMaxWindowSize" getter cfg
     , get @"ebDiffusionMaxHeadersToRequest" getter cfg
@@ -291,6 +306,7 @@ configToKVsWith getter cfg =
     , get @"voteGenerationProbability" getter cfg
     , get @"voteGenerationCpuTimeMsConstant" getter cfg
     , get @"voteGenerationCpuTimeMsPerIb" getter cfg
+    , get @"voteGenerationCpuTimeMsPerTx" getter cfg
     , get @"voteValidationCpuTimeMs" getter cfg
     , get @"voteThreshold" getter cfg
     , get @"voteBundleSizeBytesConstant" getter cfg
@@ -339,6 +355,8 @@ instance FromJSON Config where
     leiosStageLengthSlots <- parseFieldOrDefault @Config @"leiosStageLengthSlots" obj
     leiosStageActiveVotingSlots <- parseFieldOrDefault @Config @"leiosStageActiveVotingSlots" obj
     leiosVoteSendRecvStages <- parseFieldOrDefault @Config @"leiosVoteSendRecvStages" obj
+    linearVoteStageLengthSlots <- parseFieldOrDefault @Config @"linearVoteStageLengthSlots" obj
+    linearDiffuseStageLengthSlots <- parseFieldOrDefault @Config @"linearDiffuseStageLengthSlots" obj
     txGenerationDistribution <- parseFieldOrDefault @Config @"txGenerationDistribution" obj
     txSizeBytesDistribution <- parseFieldOrDefault @Config @"txSizeBytesDistribution" obj
     txValidationCpuTimeMs <- parseFieldOrDefault @Config @"txValidationCpuTimeMs" obj
@@ -369,6 +387,9 @@ instance FromJSON Config where
     ebValidationCpuTimeMs <- parseFieldOrDefault @Config @"ebValidationCpuTimeMs" obj
     ebSizeBytesConstant <- parseFieldOrDefault @Config @"ebSizeBytesConstant" obj
     ebSizeBytesPerIb <- parseFieldOrDefault @Config @"ebSizeBytesPerIb" obj
+    ebBodyAvgSizeBytes <- parseFieldOrDefault @Config @"ebBodyAvgSizeBytes" obj
+    ebBodyValidationCpuTimeMsConstant <- parseFieldOrDefault @Config @"ebBodyValidationCpuTimeMsConstant" obj
+    ebBodyValidationCpuTimeMsPerByte <- parseFieldOrDefault @Config @"ebBodyValidationCpuTimeMsPerByte" obj
     ebDiffusionStrategy <- parseFieldOrDefault @Config @"ebDiffusionStrategy" obj
     ebDiffusionMaxWindowSize <- parseFieldOrDefault @Config @"ebDiffusionMaxWindowSize" obj
     ebDiffusionMaxHeadersToRequest <- parseFieldOrDefault @Config @"ebDiffusionMaxHeadersToRequest" obj
@@ -378,6 +399,7 @@ instance FromJSON Config where
     voteGenerationProbability <- parseFieldOrDefault @Config @"voteGenerationProbability" obj
     voteGenerationCpuTimeMsConstant <- parseFieldOrDefault @Config @"voteGenerationCpuTimeMsConstant" obj
     voteGenerationCpuTimeMsPerIb <- parseFieldOrDefault @Config @"voteGenerationCpuTimeMsPerIb" obj
+    voteGenerationCpuTimeMsPerTx <- parseFieldOrDefault @Config @"voteGenerationCpuTimeMsPerTx" obj
     voteValidationCpuTimeMs <- parseFieldOrDefault @Config @"voteValidationCpuTimeMs" obj
     voteThreshold <- parseFieldOrDefault @Config @"voteThreshold" obj
     voteBundleSizeBytesConstant <- parseFieldOrDefault @Config @"voteBundleSizeBytesConstant" obj

@@ -1,26 +1,26 @@
 .heroBanner {
-  padding: 4rem 0;
-  text-align: center;
-  position: relative;
-  overflow: hidden;
-  background-image: url("/static/img/wave-pattern-flipped.svg"),url("/static/img/wave-pattern.svg"); 
-  background-repeat: repeat-x, repeat-x;
-  background-position: top, bottom;
+    padding: 4rem 0;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    background-image: url("/static/img/wave-pattern-flipped.svg"), url("/static/img/wave-pattern.svg");
+    background-repeat: repeat-x, repeat-x;
+    background-position: top, bottom;
 
-  background-size: 50px 50px; 
+    background-size: 50px 50px;
 
 }
 
 @media screen and (max-width: 996px) {
-  .heroBanner {
-    padding: 2rem;
-  }
+    .heroBanner {
+        padding: 2rem;
+    }
 }
 
 .buttons {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .videoSection {
@@ -42,7 +42,8 @@
 
 .videoWrapper {
     position: relative;
-    padding-bottom: 56.25%; /* 16:9 aspect ratio */
+    padding-bottom: 56.25%;
+    /* 16:9 aspect ratio */
     height: 0;
     overflow: hidden;
     border-radius: 8px;
@@ -118,6 +119,7 @@ details[open] .faqQuestion::after {
         opacity: 0;
         transform: translateY(-10px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -130,14 +132,156 @@ details[open] .faqQuestion::after {
 }
 
 .underlineLink {
-  background: none;
-  color: var(--ifm-link-color);
-  text-decoration: underline;
-  text-underline-offset: 4px;
-  font-size: 1.1rem;
-  font-weight: 600;
-  padding: 0;
-  border: none;
-  box-shadow: none;
-  cursor: pointer;
+    background: none;
+    color: var(--ifm-link-color);
+    text-decoration: underline;
+    text-underline-offset: 4px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    padding: 0;
+    border: none;
+    box-shadow: none;
+    cursor: pointer;
+}
+
+.leiosSvg {
+    width: 100%;
+    height: auto;
+    max-width: 100%;
+    display: block;
+    transition: filter 0.3s ease;
+    background-color: transparent;
+    /* Ensure SVG scales properly maintaining aspect ratio */
+    object-fit: contain;
+    max-height: 500px;
+}
+
+.svgContainer {
+    /* Container that properly handles SVG aspect ratio */
+    overflow: visible;
+    position: relative;
+    padding: 1rem;
+    border-radius: 4px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Light theme - specific background color and SVG variables */
+[data-theme='light'] .svgContainer {
+    background-color: #f1f6f8;
+    --svg-bg-color: #f1f6f8;
+    --svg-border-color: #d0d0d0;
+    --svg-text-color: #333333;
+    --svg-text-secondary: #666666;
+    --svg-text-muted: #999999;
+    --svg-arrow-color: #595959;
+    --svg-legend-bg: #ffffff;
+}
+
+/* Dark theme - specific background color and SVG variables */
+[data-theme='dark'] .svgContainer {
+    background-color: #1b1b1d;
+    --svg-bg-color: #1b1b1d;
+    --svg-border-color: #555555;
+    --svg-text-color: #e0e0e0;
+    --svg-text-secondary: #cccccc;
+    --svg-text-muted: #aaaaaa;
+    --svg-arrow-color: #bbbbbb;
+    --svg-legend-bg: #2a2a2c;
+}
+
+/* Remove filters since we're using CSS variables for direct color control */
+[data-theme='light'] .leiosSvg {
+    filter: none;
+}
+
+[data-theme='dark'] .leiosSvg {
+    filter: none;
+}
+
+/* SVG Hover Effects */
+/* Remove default link underlines for all SVG links */
+.leiosSvg a {
+    text-decoration: none;
+}
+
+.leiosSvg a:hover {
+    text-decoration: none;
+}
+
+.leiosSvg a[href*="ranking-blocks"]:hover rect,
+.leiosSvg a[href*="endorser-blocks"]:hover rect,
+.leiosSvg a[href*="votes-and-certificates"]:hover polygon {
+    stroke-width: 3;
+    filter: brightness(1.1);
+}
+
+.leiosSvg a[href*="ranking-blocks"]:hover text,
+.leiosSvg a[href*="endorser-blocks"]:hover text,
+.leiosSvg a[href*="votes-and-certificates"]:hover text {
+    font-weight: bold;
+}
+
+.leiosSvg a[href*="votes-and-certificates"]:hover rect {
+    transform: scale(2.0);
+    filter: brightness(1.5) saturate(1.3);
+    stroke: #ff6b35;
+    stroke-width: 1;
+}
+
+.leiosSvg a[href*="l-hdr"]:hover path,
+.leiosSvg a[href*="l-vote"]:hover path,
+.leiosSvg a[href*="l-diff"]:hover path,
+.leiosSvg a[href*="delta-"]:hover line {
+    stroke-width: 4;
+    filter: brightness(1.1);
+}
+
+.leiosSvg a[href*="l-hdr"]:hover text,
+.leiosSvg a[href*="l-vote"]:hover text,
+.leiosSvg a[href*="l-diff"]:hover text,
+.leiosSvg a[href*="delta-"]:hover text {
+    font-weight: bold;
+}
+
+.svgCaption {
+    margin-top: 0.75rem;
+    font-size: 0.875rem;
+    color: var(--ifm-color-emphasis-700);
+    text-align: center;
+    font-style: italic;
+    line-height: 1.4;
+}
+
+.svgCaption a {
+    color: var(--ifm-link-color);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.svgCaption a:hover {
+    text-decoration: underline;
+}
+
+/* Responsive adjustments for SVG sizing */
+@media screen and (max-width: 996px) {
+    .leiosSvg {
+        max-height: 400px;
+    }
+
+    .svgContainer {
+        padding: 0.75rem;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .leiosSvg {
+        max-height: 350px;
+    }
+
+    .svgContainer {
+        padding: 0.5rem;
+    }
 }

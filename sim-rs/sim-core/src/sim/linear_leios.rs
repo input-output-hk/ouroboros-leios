@@ -28,11 +28,11 @@ use crate::{
     sim::{
         MiniProtocol, NodeImpl, SimCpuTask, SimMessage,
         linear_leios::attackers::{EBWithholdingEvent, EBWithholdingSender},
-        lottery,
+        lottery::{LotteryConfig, LotteryKind, MockLotteryResults, vrf_probabilities},
     },
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Message {
     // TX propagation
     AnnounceTx(TransactionId),
@@ -114,11 +114,12 @@ impl SimMessage for Message {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CpuTask {
     /// A transaction has been received and validated, and is ready to propagate
     TransactionValidated(NodeId, Arc<Transaction>),
     /// A ranking block has been generated and is ready to propagate
-    RBBlockGenerated(RankingBlock, EndorserBlock, Vec<Arc<Transaction>>),
+    RBBlockGenerated(RankingBlock, Option<(EndorserBlock, Vec<Arc<Transaction>>)>),
     /// An RB header has been received and validated, and ready to propagate
     RBHeaderValidated(NodeId, RankingBlockHeader, bool, bool),
     /// A ranking block has been received and validated, and is ready to propagate
@@ -137,7 +138,7 @@ impl SimCpuTask for CpuTask {
     fn name(&self) -> String {
         match self {
             Self::TransactionValidated(_, _) => "ValTX",
-            Self::RBBlockGenerated(_, _, _) => "GenRB",
+            Self::RBBlockGenerated(_, _) => "GenRB",
             Self::RBHeaderValidated(_, _, _, _) => "ValRH",
             Self::RBBlockValidated(_) => "ValRB",
             Self::EBHeaderValidated(_, _) => "ValEH",
@@ -151,7 +152,7 @@ impl SimCpuTask for CpuTask {
     fn extra(&self) -> String {
         match self {
             Self::TransactionValidated(_, _) => "".to_string(),
-            Self::RBBlockGenerated(_, _, _) => "".to_string(),
+            Self::RBBlockGenerated(_, _) => "".to_string(),
             Self::RBHeaderValidated(_, _, _, _) => "".to_string(),
             Self::RBBlockValidated(_) => "".to_string(),
             Self::EBHeaderValidated(_, _) => "".to_string(),
@@ -163,15 +164,38 @@ impl SimCpuTask for CpuTask {
 
     fn times(&self, config: &CpuTimeConfig) -> Vec<Duration> {
         match self {
-            Self::TransactionValidated(_, _) => vec![config.tx_validation],
-            Self::RBBlockGenerated(_, _, _) => {
-                vec![config.rb_generation, config.eb_generation]
+            Self::TransactionValidated(_, tx) => vec![
+                config.tx_validation_constant + config.tx_validation_per_byte * tx.bytes as u32,
+            ],
+            Self::RBBlockGenerated(rb, eb) => {
+                let mut rb_time = config.rb_generation + config.rb_body_validation_constant;
+                let rb_bytes: u64 = rb.transactions.iter().map(|tx| tx.bytes).sum();
+                rb_time += config.rb_validation_per_byte * (rb_bytes as u32);
+                if let Some(endorsement) = &rb.endorsement {
+                    let nodes = endorsement.votes.len();
+                    rb_time += config.cert_generation_constant
+                        + (config.cert_generation_per_node * nodes as u32);
+                }
+                let mut times = vec![rb_time];
+
+                if let Some((eb, _)) = eb {
+                    let mut eb_time = config.eb_generation + config.eb_body_validation_constant;
+                    let eb_bytes: u64 = eb.txs.iter().map(|tx| tx.bytes).sum();
+                    eb_time += config.eb_body_validation_per_byte * (eb_bytes as u32);
+                    times.push(eb_time);
+                }
+                times
             }
             Self::RBHeaderValidated(_, _, _, _) => vec![config.rb_head_validation],
             Self::RBBlockValidated(rb) => {
                 let mut time = config.rb_body_validation_constant;
                 let bytes: u64 = rb.transactions.iter().map(|tx| tx.bytes).sum();
                 time += config.rb_validation_per_byte * (bytes as u32);
+                if let Some(endorsement) = &rb.endorsement {
+                    let nodes = endorsement.votes.len();
+                    time += config.cert_validation_constant
+                        + (config.cert_validation_per_node * nodes as u32);
+                }
                 vec![time]
             }
             Self::EBHeaderValidated(_, _) => vec![config.eb_header_validation],
@@ -241,6 +265,7 @@ struct NodePraosState {
     block_ids_by_slot: BTreeMap<u64, BlockId>,
 }
 
+#[derive(Debug)]
 enum EndorserBlockView {
     Pending,
     Requested,
@@ -282,7 +307,7 @@ pub struct LinearLeiosNode {
     tracker: EventTracker,
     rng: ChaChaRng,
     clock: Clock,
-    stake: u64,
+    lottery: LotteryConfig,
     consumers: Vec<NodeId>,
     txs: HashMap<TransactionId, TransactionView>,
     ledger_states: BTreeMap<BlockId, Arc<LedgerState>>,
@@ -309,6 +334,11 @@ impl NodeImpl for LinearLeiosNode {
         rng: ChaChaRng,
         clock: Clock,
     ) -> Self {
+        let lottery = LotteryConfig::Random {
+            stake: config.stake,
+            total_stake: sim_config.total_stake,
+        };
+
         Self {
             id: config.id,
             sim_config,
@@ -316,7 +346,7 @@ impl NodeImpl for LinearLeiosNode {
             tracker,
             rng,
             clock,
-            stake: config.stake,
+            lottery,
             consumers: config.consumers.clone(),
             txs: HashMap::new(),
             ledger_states: BTreeMap::new(),
@@ -378,9 +408,7 @@ impl NodeImpl for LinearLeiosNode {
     fn handle_cpu_task(&mut self, task: Self::Task) -> EventResult {
         match task {
             CpuTask::TransactionValidated(from, tx) => self.propagate_tx(from, tx),
-            CpuTask::RBBlockGenerated(rb, eb, withheld_txs) => {
-                self.finish_generating_rb(rb, eb, withheld_txs)
-            }
+            CpuTask::RBBlockGenerated(rb, eb) => self.finish_generating_rb(rb, eb),
             CpuTask::RBHeaderValidated(from, header, has_body, has_eb) => {
                 self.finish_validating_rb_header(from, header, has_body, has_eb)
             }
@@ -455,32 +483,20 @@ impl LinearLeiosNode {
         {
             return;
         }
-        let referenced_by_eb = self.acknowledge_tx(&tx);
-        if !referenced_by_eb {
-            let rb_ref = self.latest_rb().map(|rb| rb.header.id);
-            let ledger_state = self.resolve_ledger_state(rb_ref);
-            if ledger_state.is_some_and(|ls| ls.spent_inputs.contains(&tx.input_id)) {
-                // Ignoring a TX which conflicts with something already onchain
-                return;
-            }
-            if self
-                .praos
-                .mempool
-                .values()
-                .any(|mempool_tx| mempool_tx.input_id == tx.input_id)
-            {
-                // Ignoring a TX which conflicts with the current mempool contents.
-                return;
-            }
-            self.praos.mempool.insert(tx.id, tx.clone());
-        }
 
+        let referenced_by_eb = self.acknowledge_tx(&tx);
+        let added_to_mempool = self.try_add_tx_to_mempool(&tx);
+
+        // If we added the TX to our mempool, we want to propagate it so our peers can as well.
+        // If it was referenced by an EB, we want to propagate it so our peers have the full EB.
         // TODO: should send to producers instead (make configurable)
-        for peer in &self.consumers {
-            if *peer == from {
-                continue;
+        if referenced_by_eb || added_to_mempool {
+            for peer in &self.consumers {
+                if *peer == from {
+                    continue;
+                }
+                self.queued.send_to(*peer, Message::AnnounceTx(id));
             }
-            self.queued.send_to(*peer, Message::AnnounceTx(id));
         }
     }
 
@@ -502,17 +518,21 @@ impl LinearLeiosNode {
 // Ranking block propagation
 impl LinearLeiosNode {
     fn try_generate_rb(&mut self, slot: u64) {
-        let Some(vrf) = self.run_vrf(self.sim_config.block_generation_probability) else {
+        let Some(vrf) = self.run_vrf(
+            LotteryKind::GenerateRB,
+            self.sim_config.block_generation_probability,
+        ) else {
             return;
         };
 
-        let parent = self.latest_rb().map(|rb| rb.header.id);
+        let parent = self.latest_rb_id();
         let endorsement = parent.and_then(|rb_id| {
-            if rb_id.slot
-                + self.sim_config.linear_vote_stage_length
-                + self.sim_config.linear_diffuse_stage_length
-                > slot
-            {
+            let earliest_endorse_time = Timestamp::from_secs(rb_id.slot)
+                + (self.sim_config.header_diffusion_time * 3)
+                + Duration::from_secs(self.sim_config.linear_vote_stage_length)
+                + Duration::from_secs(self.sim_config.linear_diffuse_stage_length);
+
+            if earliest_endorse_time > Timestamp::from_secs(slot) {
                 // This RB was generated too quickly after another; hasn't been time to gather all the votes.
                 // No endorsement.
                 return None;
@@ -544,7 +564,7 @@ impl LinearLeiosNode {
         let produce_empty_block = !self.leios.incomplete_onchain_ebs.is_empty();
 
         let mut rb_transactions = vec![];
-        if !produce_empty_block && self.sim_config.praos_fallback {
+        if !produce_empty_block && self.sim_config.praos_fallback && endorsement.is_none() {
             if let TransactionConfig::Mock(config) = &self.sim_config.transactions {
                 // Add one transaction, the right size for the extra RB payload
                 let tx = config.mock_tx(config.rb_size);
@@ -559,18 +579,12 @@ impl LinearLeiosNode {
             }
         }
 
-        let eb_id = EndorserBlockId {
-            slot,
-            pipeline: 0,
-            producer: self.id,
-        };
-
         let mut eb_transactions = vec![];
         let mut withheld_txs = vec![];
         if !produce_empty_block {
             // If we are performing a "withheld TX" attack, we will include a bunch of brand-new TXs in this EB.
             // They will get disseminated through the network at the same time as the EB.
-            withheld_txs = self.generate_withheld_txs();
+            withheld_txs = self.generate_withheld_txs(slot);
             eb_transactions.extend(withheld_txs.iter().cloned());
 
             if let TransactionConfig::Mock(config) = &self.sim_config.transactions {
@@ -586,6 +600,22 @@ impl LinearLeiosNode {
                 self.sample_from_mempool(&mut eb_transactions, self.sim_config.max_eb_size, false);
             }
         }
+        let (eb_announcement, eb) = if eb_transactions.is_empty() {
+            (None, None)
+        } else {
+            let eb_id = EndorserBlockId {
+                slot,
+                pipeline: 0,
+                producer: self.id,
+            };
+            let eb = EndorserBlock {
+                slot,
+                producer: self.id,
+                bytes: self.sim_config.sizes.linear_eb(&eb_transactions),
+                txs: eb_transactions,
+            };
+            (Some(eb_id), Some((eb, withheld_txs)))
+        };
 
         let rb = RankingBlock {
             header: RankingBlockHeader {
@@ -596,32 +626,28 @@ impl LinearLeiosNode {
                 vrf,
                 parent,
                 bytes: self.sim_config.sizes.block_header,
-                eb_announcement: eb_id,
+                eb_announcement,
             },
             transactions: rb_transactions,
             endorsement,
         };
 
-        let eb = EndorserBlock {
-            slot,
-            producer: self.id,
-            bytes: self.sim_config.sizes.linear_eb(&eb_transactions),
-            txs: eb_transactions,
-        };
         self.tracker.track_praos_block_lottery_won(rb.header.id);
         self.queued
-            .schedule_cpu_task(CpuTask::RBBlockGenerated(rb, eb, withheld_txs));
+            .schedule_cpu_task(CpuTask::RBBlockGenerated(rb, eb));
     }
 
     fn finish_generating_rb(
         &mut self,
         rb: RankingBlock,
-        eb: EndorserBlock,
-        withheld_txs: Vec<Arc<Transaction>>,
+        eb: Option<(EndorserBlock, Vec<Arc<Transaction>>)>,
     ) {
-        self.tracker.track_linear_rb_generated(&rb, &eb);
+        self.tracker.track_linear_rb_generated(&rb);
         self.publish_rb(Arc::new(rb), false);
-        self.finish_generating_eb(eb, withheld_txs);
+        if let Some((eb, withheld_txs)) = eb {
+            self.tracker.track_linear_eb_generated(&eb);
+            self.finish_generating_eb(eb, withheld_txs);
+        }
     }
 
     fn publish_rb(&mut self, rb: Arc<RankingBlock>, already_sent_header: bool) {
@@ -648,9 +674,9 @@ impl LinearLeiosNode {
             .get(&rb.header.id)
             .and_then(|rb| rb.header_seen())
             .unwrap_or(self.clock.now());
-        self.leios
-            .ebs_by_rb
-            .insert(rb.header.id, rb.header.eb_announcement);
+        if let Some(eb_id) = rb.header.eb_announcement {
+            self.leios.ebs_by_rb.insert(rb.header.id, eb_id);
+        }
         self.praos
             .blocks
             .insert(rb.header.id, RankingBlockView::Received { rb, header_seen });
@@ -673,22 +699,24 @@ impl LinearLeiosNode {
     }
 
     fn receive_request_rb_header(&mut self, from: NodeId, id: BlockId) {
-        if let Some(rb) = self.praos.blocks.get(&id) {
-            if let Some(header) = rb.header() {
-                // If we already have this RB's body,
-                // let the requester know that it's ready to fetch.
-                let have_body = matches!(rb, RankingBlockView::Received { .. });
-                // If we already have the EB announced by this RB,
-                // let the requester know that they can fetch it.
-                // But if we are maliciously withholding the EB, do not let them know.
-                let have_eb = matches!(
-                    self.leios.ebs.get(&header.eb_announcement),
+        if let Some(rb) = self.praos.blocks.get(&id)
+            && let Some(header) = rb.header()
+        {
+            // If we already have this RB's body,
+            // let the requester know that it's ready to fetch.
+            let have_body = matches!(rb, RankingBlockView::Received { .. });
+            // If we already have the EB announced by this RB,
+            // let the requester know that they can fetch it.
+            // But if we are maliciously withholding the EB, do not let them know.
+            let have_eb = header.eb_announcement.is_some_and(|eb_id| {
+                matches!(
+                    self.leios.ebs.get(&eb_id),
                     Some(EndorserBlockView::Received { .. })
-                ) && !self.should_withhold_ebs();
-                self.queued
-                    .send_to(from, Message::RBHeader(header.clone(), have_body, have_eb));
-            };
-        };
+                )
+            }) && !self.should_withhold_ebs();
+            self.queued
+                .send_to(from, Message::RBHeader(header.clone(), have_body, have_eb));
+        }
     }
 
     fn receive_rb_header(
@@ -720,10 +748,9 @@ impl LinearLeiosNode {
                 // Forget we ever saw that other block
                 if let Some(RankingBlockView::Received { rb, .. }) =
                     self.praos.blocks.remove(old_block_id)
+                    && let Some(endorsement) = &rb.endorsement
                 {
-                    if let Some(endorsement) = &rb.endorsement {
-                        self.leios.incomplete_onchain_ebs.remove(&endorsement.eb);
-                    }
+                    self.leios.incomplete_onchain_ebs.remove(&endorsement.eb);
                 }
             }
         }
@@ -753,7 +780,16 @@ impl LinearLeiosNode {
             self.queued.send_to(from, Message::RequestRB(header.id));
         }
 
-        let eb_id = header.eb_announcement;
+        // Get ready to fetch the announced EB (if we don't have it already)
+        let Some(eb_id) = header.eb_announcement else {
+            return;
+        };
+        if matches!(
+            self.leios.ebs.get(&eb_id),
+            Some(EndorserBlockView::Received { .. })
+        ) {
+            return;
+        }
 
         let eb_peer_announcements = self.leios.eb_peer_announcements.entry(eb_id).or_default();
         if has_eb {
@@ -838,23 +874,27 @@ impl LinearLeiosNode {
                 header_seen,
             },
         );
-        if let Some(endorsement) = &rb.endorsement {
-            if !self.is_eb_validated(endorsement.eb) {
-                self.leios.incomplete_onchain_ebs.insert(endorsement.eb);
-            }
+        if let Some(endorsement) = &rb.endorsement
+            && !self.is_eb_validated(endorsement.eb)
+        {
+            self.leios.incomplete_onchain_ebs.insert(endorsement.eb);
         }
 
         self.publish_rb(rb, true);
     }
 
-    fn latest_rb(&self) -> Option<&Arc<RankingBlock>> {
+    fn latest_rb(&self) -> Option<(&Arc<RankingBlock>, Timestamp)> {
         self.praos.blocks.iter().rev().find_map(|(_, rb)| {
-            if let RankingBlockView::Received { rb, .. } = rb {
-                Some(rb)
+            if let RankingBlockView::Received { rb, header_seen } = rb {
+                Some((rb, *header_seen))
             } else {
                 None
             }
         })
+    }
+
+    fn latest_rb_id(&self) -> Option<BlockId> {
+        self.latest_rb().map(|(rb, _)| rb.header.id)
     }
 }
 
@@ -964,7 +1004,7 @@ impl LinearLeiosNode {
 
         if missing_txs.is_empty() {
             self.queued
-                .schedule_cpu_task(CpuTask::EBBlockValidated(eb, seen));
+                .schedule_cpu_task(CpuTask::EBBlockValidated(eb.clone(), seen));
         } else {
             for tx_id in missing_txs {
                 self.leios
@@ -972,6 +1012,23 @@ impl LinearLeiosNode {
                     .entry(tx_id)
                     .or_default()
                     .push(eb.id());
+            }
+        }
+
+        if matches!(
+            self.sim_config.variant,
+            LeiosVariant::LinearWithTxReferences
+        ) {
+            // If the EB references any TXs which we already have, but are not in our mempool,
+            // we must have failed to add them to the mempool due to conflicts.
+            // Announce those TXs to our peers, since we didn't before.
+            for tx in &eb.txs {
+                if !self.has_tx(tx.id) || self.praos.mempool.contains_key(&tx.id) {
+                    continue;
+                }
+                for peer in &self.consumers {
+                    self.queued.send_to(*peer, Message::AnnounceTx(tx.id));
+                }
             }
         }
     }
@@ -1119,11 +1176,18 @@ impl LinearLeiosNode {
 // transactions, so that they cannot propagate in advance.
 // We implement this by generating the transactions at the same time as the EB itself.
 impl LinearLeiosNode {
-    fn generate_withheld_txs(&mut self) -> Vec<Arc<Transaction>> {
+    fn generate_withheld_txs(&mut self, slot: u64) -> Vec<Arc<Transaction>> {
         if !self.behaviours.withhold_txs {
             return vec![];
         }
         let withhold_tx_config = self.sim_config.attacks.late_tx.as_ref().unwrap();
+        let slot_ts = Timestamp::from_secs(slot);
+        if withhold_tx_config.start_time.is_some_and(|s| slot_ts < s) {
+            return vec![];
+        }
+        if withhold_tx_config.stop_time.is_some_and(|s| slot_ts > s) {
+            return vec![];
+        }
         if !self.rng.random_bool(withhold_tx_config.probability) {
             return vec![];
         }
@@ -1166,8 +1230,8 @@ impl LinearLeiosNode {
     }
 
     fn try_vote_for_endorser_block(&mut self, eb: &Arc<EndorserBlock>, seen: Timestamp) -> bool {
-        let vrf_wins = lottery::vrf_probabilities(self.sim_config.vote_probability)
-            .filter_map(|f| self.run_vrf(f))
+        let vrf_wins = vrf_probabilities(self.sim_config.vote_probability)
+            .filter_map(|f| self.run_vrf(LotteryKind::GenerateVote, f))
             .count();
         if vrf_wins == 0 {
             return false;
@@ -1199,18 +1263,26 @@ impl LinearLeiosNode {
     }
 
     fn should_vote_for(&self, eb: &EndorserBlock, seen: Timestamp) -> Result<(), NoVoteReason> {
-        let must_be_received_by =
-            Timestamp::from_secs(eb.slot + self.sim_config.linear_vote_stage_length);
-        if seen > must_be_received_by {
+        let eb_must_be_received_by = Timestamp::from_secs(eb.slot)
+            + (self.sim_config.header_diffusion_time * 3)
+            + Duration::from_secs(self.sim_config.linear_vote_stage_length);
+        if seen > eb_must_be_received_by {
             // An EB must be received within L_vote slots of its creation.
             return Err(NoVoteReason::LateEB);
         }
-        if self
-            .latest_rb()
-            .is_none_or(|rb| rb.header.eb_announcement != eb.id())
-        {
+        let Some((rb, header_seen)) = self.latest_rb() else {
             // We only vote for whichever EB we was referenced by the head of the current chain.
             return Err(NoVoteReason::WrongEB);
+        };
+        if rb.header.eb_announcement != Some(eb.id()) {
+            // We only vote for whichever EB we was referenced by the head of the current chain.
+            return Err(NoVoteReason::WrongEB);
+        }
+        let rb_header_must_be_received_by =
+            Timestamp::from_secs(eb.slot) + self.sim_config.header_diffusion_time;
+        if header_seen >= rb_header_must_be_received_by {
+            // The RB header must be received more quickly
+            return Err(NoVoteReason::LateRBHeader);
         }
 
         if self.sim_config.variant == LeiosVariant::LinearWithTxReferences {
@@ -1307,6 +1379,26 @@ impl LinearLeiosNode {
 
 // Ledger/mempool operations
 impl LinearLeiosNode {
+    fn try_add_tx_to_mempool(&mut self, tx: &Arc<Transaction>) -> bool {
+        let ledger_state = self.resolve_ledger_state(self.latest_rb_id());
+        if ledger_state.spent_inputs.contains(&tx.input_id) {
+            // This TX conflicts with something already on-chain
+            return false;
+        }
+
+        if self
+            .praos
+            .mempool
+            .values()
+            .any(|t| t.input_id == tx.input_id)
+        {
+            // This TX conflicts with something already in the mempool
+            return false;
+        }
+        self.praos.mempool.insert(tx.id, tx.clone());
+        true
+    }
+
     fn sample_from_mempool(
         &mut self,
         txs: &mut Vec<Arc<Transaction>>,
@@ -1341,12 +1433,11 @@ impl LinearLeiosNode {
 
     fn remove_rb_txs_from_mempool(&mut self, rb: &RankingBlock) {
         let mut txs = rb.transactions.clone();
-        if let Some(endorsement) = &rb.endorsement {
-            if let Some(EndorserBlockView::Received { eb, .. }) =
+        if let Some(endorsement) = &rb.endorsement
+            && let Some(EndorserBlockView::Received { eb, .. }) =
                 self.leios.ebs.get(&endorsement.eb)
-            {
-                txs.extend(eb.txs.iter().cloned());
-            }
+        {
+            txs.extend(eb.txs.iter().cloned());
         }
         self.remove_txs_from_mempool(&txs);
     }
@@ -1362,12 +1453,12 @@ impl LinearLeiosNode {
             .retain(|_, tx| !inputs.contains(&tx.input_id));
     }
 
-    fn resolve_ledger_state(&mut self, rb_ref: Option<BlockId>) -> Option<Arc<LedgerState>> {
+    fn resolve_ledger_state(&mut self, rb_ref: Option<BlockId>) -> Arc<LedgerState> {
         let Some(block_id) = rb_ref else {
-            return Some(Arc::new(LedgerState::default()));
+            return Arc::new(LedgerState::default());
         };
         if let Some(state) = self.ledger_states.get(&block_id) {
-            return Some(state.clone());
+            return state.clone();
         };
 
         let mut state = self
@@ -1377,6 +1468,7 @@ impl LinearLeiosNode {
             .unwrap_or_default();
 
         let mut block_queue = vec![block_id];
+        let mut complete = true;
         while let Some(block_id) = block_queue.pop() {
             if !state.seen_blocks.insert(block_id) {
                 continue;
@@ -1393,41 +1485,40 @@ impl LinearLeiosNode {
             }
 
             if let Some(endorsement) = &rb.endorsement {
-                let Some(EndorserBlockView::Received {
-                    eb,
-                    validated: true,
-                    ..
-                }) = self.leios.ebs.get(&endorsement.eb)
-                else {
-                    // We haven't validated the EB yet, so we don't know the ledger state
-                    return None;
-                };
-                for tx in &eb.txs {
-                    state.spent_inputs.insert(tx.input_id);
+                match self.leios.ebs.get(&endorsement.eb) {
+                    Some(EndorserBlockView::Received { eb, .. }) => {
+                        for tx in &eb.txs {
+                            if self.has_tx(tx.id) {
+                                state.spent_inputs.insert(tx.input_id);
+                            } else {
+                                complete = false;
+                            }
+                        }
+                    }
+                    _ => {
+                        // We haven't validated the EB yet, so we don't know the full ledger state
+                        complete = false;
+                    }
                 }
             }
         }
 
         let state = Arc::new(state);
-        self.ledger_states.insert(block_id, state.clone());
-        Some(state)
+        if complete {
+            self.ledger_states.insert(block_id, state.clone());
+        }
+        state
     }
 }
 
 // Common utilities
 impl LinearLeiosNode {
+    #[allow(unused)]
+    pub fn mock_lottery(&mut self, results: Arc<MockLotteryResults>) {
+        self.lottery = LotteryConfig::Mock { results };
+    }
     // Simulates the output of a VRF using this node's stake (if any).
-    fn run_vrf(&mut self, success_rate: f64) -> Option<u64> {
-        let target_vrf_stake = lottery::compute_target_vrf_stake(
-            self.stake,
-            self.sim_config.total_stake,
-            success_rate,
-        );
-        let result = self.rng.random_range(0..self.sim_config.total_stake);
-        if result < target_vrf_stake {
-            Some(result)
-        } else {
-            None
-        }
+    fn run_vrf(&mut self, kind: LotteryKind, success_rate: f64) -> Option<u64> {
+        self.lottery.run(kind, success_rate, &mut self.rng)
     }
 }

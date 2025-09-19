@@ -347,3 +347,84 @@ These variables maintain tasks blocked on some missing input.
 - `taskQueue`.
   A queue of tasks scheduled for the CPU, labeled according to what they model (eg "validate an RB").
   Tasks are only removed when they are executed.
+
+# Alternative Design: Linear Leios
+
+## Motivation
+
+In Linear Leios, every time any party issues an RB, they also issue an EB.
+In effect, the RB now consists of three parts: a header, a first body (the standard RB body), and a second body (the EB) that extends the first.
+The EB includes txs (either by value or by reference)---there are no IBs.
+When a (child) RB extends some (parent) RB, it will sometimes include a certificate that demonstrates a quorum of stake has already validated the parent RB's second body.
+If the child RB includes that certificate, then its first body extends the parent's second body.
+If the child RB excludes that certificate, then its first body instead extends the parent's first body---the parent's second body is irrevocably lost (except maybe on other chains extending that same parent RB).
+
+This variant is _linear_ because the txs that end up on some chain are never unordered: they are ordered in the mempools and they are ordered in the roughly-alternating chain of RBs and EBs.
+This is in crucial contrast to Short Leios and its extensions: there, txs included (directly or indirectly) via EBs are concurrent until an RB serializes them (at the latest possible moment).
+As a result, this variant is immediately compatible with today's ledger interface, as is---possibly other than reward calculations etc.
+
+## A Terse Interpretation of the Linear Leois Specification
+
+- A node should fetch EBs according to a FreshestFirst policy.
+- A node should validate an EB as soon as possible while both of the following are true.
+    - It has validated the EB's parent RB.
+      The node cannot validate the EB before validating its parent RB.
+    - The EB's parent RB is the tip of the best RB header chain it has validated, excluding RB header's whose body turned out to be invalid.
+      Any RB that extends the EB's parent RB either excludes the EB or else certifies its validity---in either case, the node no longer needs to validate the EB.
+      Note that this conjunct is non-monotonic, due to a relevant RB header being later disqualified when its RB body is recognized as invalid.
+      TODO for now, it's merely what the chain has selected, regardless of any better headers.
+- A node should vote for an EB as soon as possible within the following interval.
+    - The interval ends `L_vote` slots after the onset of the EB's slot (aka `linear-vote-stage-length-slots`).
+    - The interval begins either when the node validates the EB or three \Delta_hdr of the onset of the EB's slot, whichever happens last (ie combined the two times via `max`).
+      A node must not vote for an EB if it receives evidence of the issuer's equivocation within three \Delta_hdr of the EB's slot onset.
+- A node should include an EB certificate, if any, in a new RB that extends the EB's parent if the new RB is at least `L_vote + L_diff` slots younger than the EB's parent (aka `linear-vote-stage-length-slots + linear-diffuse-stage-length-slots`).
+  It is important to clarify that an RB remains valid if it excludes the certificate even when those constraints are satisfied.
+- A node should diffuse an EB even before it knows whether it's invalid (ie it should enable "EB diffusion pipelining").
+  TODO would it even be worth going one step further: _streaming_ the EB, ie diffusing its prefix before its suffix has been received (and therefore before the EB could have been parsed)?
+- A node should diffuse RB headers (at most two per election proof) even if it they're not on the best header chain, since such a header might still evidence equivocation.
+  We anticipate this happening separately (and redundantly) of ChainSync and BlockFetch.
+  TODO it can also abort validation of the EB, right?
+  TODO should it exclude the certificate of an equivocated EB if it issues the next RB?
+
+A node should acquire EBs from election opportunities even if they're on competing forks.
+That way, if the node switches chains, it will already have the necessary EBs.
+It won't have validated them, but that's fine, since it will only need to apply them when a certificate forces them to, so they can skip the validation checks.
+
+In order for the node to receive EBs for RB chains it doesn't necessarily have the RB headers for, RB headers will also be propogated via Relay in addition to and completely independently from their diffusion via ChainSync and BlockFetch.
+This is because the RB header announces not just the RB body but also the EB (via the new `EBannounced` field in the RB header from the Linear Leios spec).
+
+## Implementation Notes
+
+The Linear Leios specification indicates that an RB header names the EB that occurs on the chain before the RB, if any, the EB that occurs after the RB, if any, and an EB names the RB that it follows.
+However, in the absence of an attacker, the simulator can simply use the existing data types for Linear Leios even though the RB header type excludes those two fields.
+
+- The simulator does not currently have extensible data types for Praos headers, so it would not be trivial to add these header fields.
+- In the absence of an attacker within the simulation, the new RB header fields aren't _necessary_.
+- Despite being unnecessary, having the RB header announce its second body EB would plausibly decrease the average latency of the EBs.
+  But that decrease should be _very_ minor; with the current overly-coarse multiplexer logic (see [Issue 453](https://github.com/input-output-hk/ouroboros-leios/issues/453)), the EB's `RelayHeader` will arrive immediately after the ChainSync header (which are small), except perhaps during severe congestion.
+
+The Linear Leios simulator adds the following new variables, some of which also require new threads.
+
+- `relayLinearEBState`.
+  As a shortcut, the first Linear Leios simulator will instantiate `Relay` with `RelayHeader InputBlockId` and `InputBlock`.
+  This is because the IB specified in Short Leios has just a few small fields more than the EB specified in Linear Leios.
+    - It is remarkable that the Linear EB is added to the Relay buffer immediately, before its validated.
+      This is "EB Diffusion Pipelining", as indicated in the Linear Leios specification.
+- `linearLedgerStateVar`, `waitingForLinearLedgerStateVar`, and `waitingForWaitingForLinearLedgerStateVar`.
+  An RB that contains an EB cert canot be validated without the the certified EB's ledger state.
+  However, that EB is necessarily certified, so its ledger state can be built comparatively cheaply now, but still not for free.
+    - The arrival of a Linear EB populates `waitingForWaitingForLinearLedgerStateVar` (and also `waitingForTipVar`; see below).
+    - The arrival of an RB populates `waitingForLinearLedgerStateVar`, which triggers the `waitingForWaitingForLinearLedgerStateVar` action to populate `linearLedgerStateVar` via the comparatively cheap `reapply` task.
+- `waitingForTipVar`.
+  The Linear EB should be validated the first time that both it has arrived and its parent RB is the tip of the node's selection.
+- `linearEbsToVoteVar`.
+  Once a Linear EB has been validated, it should be voted for.
+  A new custom thread monitors this variable in addition to the clock, so that it can avoid issugin a vote too early or too late.
+- `linearEbOfRb`.
+  A mapping from RB to its announced Linear EB _that has been validated_, which is needed when issuing an RB.
+- `pruneExpiredLinearVotes`.
+  This thread prunes votes 30 seconds after the onset of their EB's slot.
+
+TODO RB Diffusion is not pipelined
+
+TODO RBs are so far only distributed by ChainSync and BlockFetch

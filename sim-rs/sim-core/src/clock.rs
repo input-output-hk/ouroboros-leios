@@ -10,11 +10,13 @@ use std::{
 pub use coordinator::ClockCoordinator;
 use coordinator::ClockEvent;
 use futures::FutureExt;
+pub use mock::MockClockCoordinator;
 use timestamp::AtomicTimestamp;
 pub use timestamp::Timestamp;
 use tokio::sync::{mpsc, oneshot};
 
 mod coordinator;
+mod mock;
 mod timestamp;
 
 // wrapper struct which holds a SimulationEvent,
@@ -116,15 +118,15 @@ impl ClockBarrier {
         self.tasks.clone()
     }
 
-    pub fn wait_until(&mut self, timestamp: Timestamp) -> Waiter {
+    pub fn wait_until(&mut self, timestamp: Timestamp) -> Waiter<'_> {
         self.wait(Some(timestamp.with_resolution(self.timestamp_resolution)))
     }
 
-    pub fn wait_forever(&mut self) -> Waiter {
+    pub fn wait_forever(&mut self) -> Waiter<'_> {
         self.wait(None)
     }
 
-    fn wait(&mut self, until: Option<Timestamp>) -> Waiter {
+    fn wait(&mut self, until: Option<Timestamp>) -> Waiter<'_> {
         let (tx, rx) = oneshot::channel();
         let done = until.is_some_and(|ts| ts == self.now())
             || self

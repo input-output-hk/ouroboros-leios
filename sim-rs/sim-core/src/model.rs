@@ -84,16 +84,16 @@ impl Block {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LinearRankingBlockHeader {
     pub id: BlockId,
     pub vrf: u64,
     pub parent: Option<BlockId>,
     pub bytes: u64,
-    pub eb_announcement: EndorserBlockId,
+    pub eb_announcement: Option<EndorserBlockId>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LinearRankingBlock {
     pub header: LinearRankingBlockHeader,
     pub transactions: Vec<Arc<Transaction>>,
@@ -227,7 +227,7 @@ impl StracciatellaEndorserBlock {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LinearEndorserBlock {
     pub slot: u64,
     pub producer: NodeId,
@@ -282,6 +282,7 @@ pub enum NoVoteReason {
     ExtraTX,
     MissingTX,
     UncertifiedEBReference,
+    LateRBHeader,
     LateEB,
     WrongEB,
 }
@@ -292,7 +293,7 @@ pub enum TransactionLostReason {
     EBExpired,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 pub struct Endorsement<Node: Display = NodeId> {
     pub eb: EndorserBlockId<Node>,
     pub size_bytes: u64,

@@ -23,14 +23,14 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Spec.Scenario as Scenario (config, idOther, idSut)
 
-data TracingContext
-  = TracingContext
+data TracingContext = TracingContext
   { _clock :: Time
   , _slotNo :: SlotNo
   , _rbs :: Map Text Text
   , _ibs :: Set Text
   , _ebs :: Set Text
   , _vts :: Set Text
+  , _txs :: Set Word64
   , _idSut :: Integer
   , _idOther :: Integer
   , _stageLength :: Word
@@ -42,6 +42,7 @@ instance Default TracingContext where
     TracingContext
       0
       0
+      mempty
       mempty
       mempty
       mempty
@@ -67,6 +68,9 @@ ebs = lens _ebs $ \ctx x -> ctx{_ebs = x}
 
 vts :: Lens' TracingContext (Set Text)
 vts = lens _vts $ \ctx x -> ctx{_vts = x}
+
+txs :: Lens' TracingContext (Set Word64)
+txs = lens _txs $ \ctx x -> ctx{_txs = x}
 
 idSut :: Getter TracingContext Integer
 idSut = to _idSut
@@ -169,6 +173,7 @@ transition GenerateRB =
     (block_id, parent) <- genRB =<< use idSut
     size_bytes <- lift arbitrary
     payload_bytes <- lift arbitrary
+    let transactions = []
     pure [RBGenerated{..}]
 transition ReceiveRB =
   do
@@ -215,6 +220,7 @@ transition GenerateEB =
     bytes <- lift arbitrary
     input_blocks <- lift . sublistOf =<< uses ibs (fmap BlockRef . S.toList)
     endorser_blocks <- lift . sublistOf =<< uses ebs (fmap BlockRef . S.toList)
+    transactions <- lift . sublistOf =<< uses txs S.toList
     pure [EBGenerated{..}]
 transition ReceiveEB =
   do

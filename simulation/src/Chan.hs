@@ -33,7 +33,7 @@ import Control.Monad.Class.MonadFork (MonadFork)
 import Control.Tracer (Contravariant (contramap), Tracer)
 import Data.Maybe (fromMaybe)
 import GHC.Generics
-import ModelTCP (kilobytes, mkTcpConnProps)
+import ModelTCP (kibibytes, lensTcpEvent, mkTcpConnProps)
 import TimeCompat (DiffTime, MonadDelay, MonadMonotonicTimeNSec, MonadTime)
 
 data ConnectionConfig = ConnectionConfig
@@ -47,7 +47,7 @@ mkConnectionConfig tcp mux tcpLatency maybeTcpBandwidth = ConnectionConfig{..}
   transportConfig
     | tcp = TransportTcp (mkTcpConnProps tcpLatency (fromMaybe defaultTcpBandwidth maybeTcpBandwidth))
     | otherwise = TransportSimple (SimpleConnProps tcpLatency maybeTcpBandwidth)
-  defaultTcpBandwidth = (kilobytes 1000)
+  defaultTcpBandwidth = (kibibytes 1000)
 
 data TransportConfig
   = TransportSimple !SimpleConnProps
@@ -64,14 +64,14 @@ newConnectionBundle tracer = \case
     newUnMuxedConnectionBundle $ \tofrom ->
       newConnectionSimple (traceAsBundleMsg @bundle tofrom tracer) simpleConnProps
   ConnectionConfig (TransportSimple simpleConnProps) _mux@True -> do
-    let tracer' = contramap ((fmap . fmap) fromBearerMsg) tracer
+    let tracer' = mapBearerTracer (lensLabelTcpDir . lensTcpEvent) tracer
     (mA, mB) <- newConnectionSimple tracer' simpleConnProps
     (,) <$> newMuxChan mA <*> newMuxChan mB
   ConnectionConfig (TransportTcp tcpConnProps) _mux@False ->
     newUnMuxedConnectionBundle $ \tofrom ->
       newConnectionTCP (traceAsBundleMsg @bundle tofrom tracer) tcpConnProps
   ConnectionConfig (TransportTcp tcpConnProps) _mux@True -> do
-    let tracer' = contramap ((fmap . fmap) fromBearerMsg) tracer
+    let tracer' = mapBearerTracer (lensLabelTcpDir . lensTcpEvent) tracer
     (mA, mB) <- newConnectionTCP tracer' tcpConnProps
     (,) <$> newMuxChan mA <*> newMuxChan mB
 

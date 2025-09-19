@@ -1,0 +1,2 @@
+Network,Bandwidth,CPU,Delta header,Diffusion duration,Voting duration,Max EB size,Tx size,Throughput,Plutus,Tx start [s],Tx stop [s],Sim stop [s]
+topology-v2,10 Mb/s,4 vCPU/node,Δ_hdr = 2000 ms,L_diff = 3 slots,L_vote = 2 slots,12 MB/EB,1500 B/Tx,0.200 TxMB/s,,60,960,1500

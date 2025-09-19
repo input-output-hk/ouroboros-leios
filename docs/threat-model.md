@@ -1,55 +1,54 @@
 ---
 Authors: Sebastian Nagel
 Status: Draft
-Version: 0.1
-Last Updated: 2025-07-17
-Next Review: 2025-09-10
+Version: 0.2
+Last Updated: 2025-08-05
+Next Review: 2025-10-05
 ---
+
 # Leios Consensus Upgrade - Threat Model
 
-A threat model for the Leios consensus change for Cardano. This was created by roughly following the [OWASP threat modeling process](https://owasp.org/www-community/Threat_Modeling_Process).
+A threat model for the Leios consensus change for Cardano. This reflects the simplified "Linear Leios" variant described in the CIP draft, which eliminates Input Blocks (IBs) and produces Endorser Blocks (EBs) alongside Ranking Blocks (RBs) by the same block producer.
 
 See also [the threat model section in Leios Technical Report #1](./technical-report-1.md#threat-model) and more [comments on attack surface in Leios Technical Report #2](./technical-report-2.md#notes-on-the-leios-attack-surface).
 
 ## System Overview
 
-> [!NOTE]
-> The described system here is the heavily simplified EB-only variant of Leios. Whenever we update this, reflect on existing assets, threats and mitigations, as well as add new ones accordingly.
-
 ### Description
-Leios is an overlay protocol on top of Ouroboros Praos that enhances transaction throughput by introducing Endorser Blocks (EBs) alongside regular Praos blocks (Ranking Blocks - RBs). The system maintains backward compatibility at the client interface while introducing new responsibilities for stake pools.
+
+Leios is an overlay protocol on top of Ouroboros Praos that enhances transaction throughput by allowing block producers to create larger Endorser Blocks (EBs) alongside standard Praos blocks (enhanced as Ranking Blocks - RBs). The system maintains backward compatibility while introducing new responsibilities for stake pools.
 
 ### Key Components
 
 #### Entities
-- **Mempool**: List of valid, pending transactions that could be added to the chain. Limited in size
-- **Ranking Block (RB)**: Standard Praos block enhanced with a Leios certificate. Limited in size
-- **Endorser Block (EB)**: New block type that references transactions for inclusion. May be substantially bigger than Praos blocks (currently on mainnet ~88 kB) with sizes around ~640 kB for 20k transaction references
+
+- **Mempool**: List of valid, pending transactions that could be added to the chain. Expanded capacity to support both RB and EB production
+- **Ranking Block (RB)**: Standard Praos block enhanced with Leios certificate and EB announcement fields. Limited to current mainnet size (~88 kB)
+- **Endorser Block (EB)**: New block type that references transactions for inclusion. May be substantially larger (~640 kB for 20k transaction references)
 - **Leios Certificate**: Cryptographic proof about aggregated stake-weighted votes on EB validity and transaction availability
-- **EB Lottery**: Separate (to Praos) VRF lottery for EB creation rights
 
 #### Network Protocols
-- **Transaction Submission Protocol**: Existing protocol to announce and fetch transactions, served upstream
+- **Transaction Submission Protocol**: Existing protocol, unchanged except for expanded mempool capacity, served upstream
 - **Chain Sync Protocol**: Existing protocol for tracking block headers of currently selected chain, served downstream
 - **Block Fetch Protocol**: Existing protocol for downloading blocks, served downstream
 - **EB Announcement Protocol**: New protocol to gossip EB existence, served downstream
-- **EB Fetch Protocol**: New protocol for retrieving EBs, served downstream
-- **Transaction Fetch Protocol**: New protocol for retrieving endorsed transactions, served downstream
+- **EB Fetch Protocol**: New protocol for retrieving EBs on-demand, served downstream
+- **Transaction Fetch Protocol**: New protocol for retrieving transactions referenced by EBs, served downstream
 - **Vote Diffusion Protocol**: New protocol for propagating votes on EBs, served downstream
 
 #### Roles
-- **Block Producers**: Produce blocks, now enhanced with EB creation and voting responsibilities
-- **Relays**: Participate in transaction and block diffusion
-- **Clients**: Submit transactions and observe the chain / ledger state evolving, ideally maintain backward compatibility and may largely unaware of Leios mechanics
+- **Block Producers**: Produce RBs and simultaneously create EBs, participate in voting
+- **Relays**: Participate in transaction, block, and vote diffusion
+- **Clients**: Submit transactions and observe ledger state, maintain backward compatibility
 
 #### System Flow
-1. Clients submit transactions, which get added to the mempool and diffuse through the Cardano network
-1. Stake pools create EBs based on VRF eligibility (parameterizable stage length)
-1. EBs are announced and propagated through the network
-1. A committee of nodes (> 500 by stake) vote on EB validity and transaction availability
-1. If a quorum of voting stake (> 60%) approves, a certificate is created
-1. Certificates are included in the next available RB (every ~20 seconds)
-1. Missing transactions are fetched on-demand when EBs are processed
+1. **Block Production**: When eligible, stake pools simultaneously create an RB (announcing an EB) and the corresponding EB
+2. **EB Distribution**: EBs are discovered via RB headers and fetched by nodes
+3. **Committee Validation**: Selected voting committee validates EBs
+4. **Certification**: EBs achieving quorum (>60% voting stake) become certified
+5. **Chain Inclusion**: Certificates are included in subsequent RBs, making referenced transactions part of the ledger
+
+See also the [CIP draft](https://github.com/input-output-hk/ouroboros-leios/pull/396) for a more detailed specification.
 
 ## Assets to Protect
 
@@ -117,8 +116,6 @@ For each asset we define what could be impacted in respect to its Confidentialit
 
 Notable threats to the system that could impact assets.
 
-### Network-Level Threats
-
 #### T1: Mempool Partitioning
 **Description**: Attacker deliberately partitions the mempools of block producing nodes by submitting conflicting transactions (spending the same inputs) to different network segments, creating inconsistent views of valid transactions across the network.
 
@@ -133,13 +130,15 @@ Notable threats to the system that could impact assets.
 2. Creates conflicting transaction pairs spending identical UTXOs
 3. Submits Transaction A to Network Segment 1, Transaction B to Network Segment 2
 4. Uses network position control (BGP, routing, eclipse techniques) to prevent cross-segment propagation
-5. SPOs in different segments create EBs endorsing different conflicting transactions
+5. Slot/height battling SPOs from different segments create RBs endorsing different, conflicting transactions
 6. Voting nodes must choose between conflicting EBs, potentially causing certification failures
 
-**Cost**: MEDIUM-HIGH - Requires significant network infrastructure, multiple nodes, and sustained coordination
+**Cost**: HIGH - Requires significant network infrastructure, multiple nodes, and sustained coordination
+
+**Likelihood**: LOW - Reduced attack surface due to coupled RB/EB production model, though possible when there are multiple eligible producers (slot / height battles).
 
 **Impact**:
-- **Throughput**: Different SPOs create conflicting EBs, causing vote splits and potential certification failures. This leads to throughput reduction when EBs fail certification, though system recovers in subsequent stages
+- **Throughput**: Different SPOs create conflicting EBs, causing vote splits and potential certification failures. This leads to throughput reduction when EBs fail certification, though system recovers in subsequent stages. This can occur both from deliberate mempool partitioning, but also naturally with "short forks" in the Praos chain where nodes select different chains.
 - **Resources**: SPO's network bandwidth and compute resources wasted on processing, propagating, and voting on conflicting EBs that cannot all be certified
 - **Trust**: Demonstrates network manipulation capability, though doesn't break core transaction guarantees
 
@@ -171,7 +170,7 @@ Notable threats to the system that could impact assets.
 
 **Assets Affected**: Blockchain Safety, High Throughput
 
-#### T3: Vote Flooding Attack
+#### T3: Vote Flooding
 **Description**: Malicious nodes flood the network with invalid or duplicate votes to overwhelm voting infrastructure and waste network resources.
 
 **Prerequisites**:
@@ -196,30 +195,26 @@ Notable threats to the system that could impact assets.
 
 **Assets Affected**: Operational Sustainability, High Throughput
 
-### Consensus-Level Threats
-
-#### T4: EB Withholding Attack
-**Description**: Eligible stake pools deliberately withhold EBs they are entitled to create, reducing network throughput and potentially enabling censorship.
+#### T4: EB Withholding
+**Description**: Eligible stake pools deliberately not announce or certify EBs when producing RBs they are entitled to create reducing network throughput.
 
 **Prerequisites**:
-- Stake pool eligibility for EB creation (via VRF lottery)
-- Economic incentive to withhold (e.g., competing EB producers, censorship goals)
+- Stake pool eligibility for block production
+- Economic incentive to withhold (e.g. censorship goals, reduced operational costs)
 
 **Attack Vector**:
-1. Win EB creation eligibility through normal VRF process or possibly enhanced by grinding
-2. Either create EB but not propagate it, or simply abstain from creation
-3. May selectively withhold EBs containing specific transactions (censorship)
-4. Could coordinate with other eligible pools to maximize impact
+1. Win EB creation eligibility through normal VRF process, possibly enhanced by grinding
+2. Create RB that does not announce an EB or don't include an already certified EB
 
-**Cost**: LOW - Opportunity cost of foregone rewards from EB creation
+**Cost**: LOW - No additional cost other than being a block producer, indirect opportunity cost of not included transaction fees
+
+**Likelihood**: HIGH - Every block producer gets two opportunities to ignore EBs
 
 **Impact**:
-- **Throughput**: Reduced transaction processing capacity when EBs are withheld
-- **Censorship**: Potential to delay specific transactions if coordinated
-- **Temporary**: System recovers with next EB opportunity or alternative producers
-- **Limited**: Cannot permanently block transactions due to multiple eligibility opportunities
+- **Throughput**: Reduced transaction processing capacity for this and next block opportunity. However, system may recover with next block production opportunity.
+- **Resources**: Bandwidth and compute spent on voting wasted and needs to be redone.
 
-**Assets Affected**: High Throughput, Decentralization
+**Assets Affected**: High Throughput
 
 #### T5: Double Voting
 **Description**: Nodes with delegated stake votes on multiple EBs that reference conflicting sets of transactions.
@@ -291,101 +286,55 @@ Notable threats to the system that could impact assets.
 
 **Assets Affected**: Decentralization
 
-#### T?: Honey Pot Contract
-
-**Description**: An attacker deliberately makes ADA available on-chain so anyone races to claim it with the goal of producing many conflicting transactions. This is very similar to T1, but uses cryptocurrency instead of network resources.
+#### T8: Transaction Withholding
+**Description**: Attacker creates EBs referencing non-existing transactions to waste network resources and disrupt certification.
 
 **Prerequisites**:
-- Knowledge of building a Cardano smart contract
-- Enough ADA to appeal to enough users
+- Block production eligibility (RB + EB creation)
+- Ability to generate valid, but non-existing transaction references
 
 **Attack Vector**:
-1. Lock a lot of ADA into a script that allows anyone to take `amount` while the remainder must be kept in the script.
-2. Advertise the honey pot and that `amount` of ADA is available for free.
-3. Race with everyone in claiming the output.
-    a. If attacker is successful, only transaction fees were spent and `amount` can go back into the honey pot.
-4. Continue until funds run out.
+1. Win EB creation eligibility through normal VRF process, possibly enhanced by grinding
+1. Create valid but non-existent transaction references
+1. Create EB referencing these unavailable transactions and announce it in RB
+1. Voting nodes cannot verify transaction availability, preventing certification
 
-**Cost**: HIGH - Enough ADA to appeal many concurrent users and keep the attack going. 
+**Cost**: LOW - No additional cost other than being a block producer, indirect opportunity cost of not included transaction fees
+
+**Likelihood**: MEDIUM - Requires block production eligibility but straightforward to execute
 
 **Impact**:
-- **Resource Waste**: Network processes all conflicting transactions trying to spend the honey pot output, but only one pays fees at a time. Highest costs are from perpetual storage when conflicting transactions are submitted concurrently.
-- **Throughput**: Reduces available throughput by amount of transactions attracted by the honey pot.
-- **Artifical traffic / low tps**: While this artifical traffic will account into the systems throughput, typically measured in transactions per second (tps), the attacker could require these transactions to be big and computationally costly, resulting in a relatively low tps addition.
+- **Resource Waste**: Network bandwidth consumed attempting to fetch non-existent transactions
+- **Throughput**: Temporary reduction when EBs fail certification due to unavailable transactions
+- **Operational**: SPO resources wasted on failed validation and fetching attempts
 
 **Assets Affected**: High Throughput, Operational Sustainability
 
-#### T?: Delayed Praos Blocks
-
-> [!WARN]
-> Is this a threat or rather part of the Blockchain Safety asset?
-
-**Description**: Delaying praos blocks due to long ledger state building (too many txs), impacting liveness and safety.
-
-**Impact**:
-- **Chain Quality**: Increased likelihood of chain forks and lower chain quality
-
-**Assets Affected**: Blockchain Safety
-
-#### T?: Excessive Chain Growth
-
-> [!WARN]
-> TODO and how do we describe threats that are not attacks?
-
-**Description**: Chain growing too much due to honest demand and too high capacity parameterization (as a threat, not an attack). When SPOs cannot add as much storage as is needed, they cannot validate the chain and decentralization is impacted.
-
-**Assets Affected**: Operational Sustainability, Decentralization
-
-### Transaction-Level Threats
-
-#### T8: Transaction Availability Attack
-**Description**: Attacker creates EBs referencing unavailable transactions to waste network resources and disrupt certification.
+#### T9: Front-Running
+**Description**: Block producers observe profitable transactions and reorder or insert their own transactions to extract value before the original transaction executes.
 
 **Prerequisites**:
-- EB creation eligibility (via VRF)
-- Control over transaction propagation to specific network segments
-- Coordination between transaction submission and EB creation
-
-**Attack Vector**:
-1. Submit transactions to limited network segments
-2. Create EB referencing these transactions before full propagation
-3. Voting nodes cannot verify transaction availability, preventing certification
-4. Forces futile transaction fetching attempts across network
-
-**Cost**: LOW - Minimal beyond normal EB creation costs
-
-**Impact**:
-- **Resource Waste**: Network bandwidth consumed fetching unavailable transactions
-- **Throughput**: Temporary reduction when EBs fail certification
-- **Operational**: SPO resources wasted on failed validation attempts
-
-**Assets Affected**: High Throughput, Operational Sustainability
-
-#### T9: Transaction Front-Running
-**Description**: EB producers observe profitable transactions and reorder or insert their own transactions to extract value before the original transaction executes.
-
-**Prerequisites**:
-- EB creation eligibility
+- Block production eligibility (RB + EB creation)
 - MEV (Maximal Extractable Value) opportunities in transaction sets
 - Knowledge of transaction dependencies and profitable patterns
 
 **Attack Vector**:
 1. Monitor mempool for profitable transaction patterns
-2. Create competing or parasitic transactions
-3. Include both in EB with favorable ordering for attacker
+2. Create front-running transactions
+3. Replace target transactions with front-running transactions in EB
 4. Extract value through arbitrage, sandwich attacks, or liquidations
 
-**Cost**: LOW - Opportunity cost only, plus normal EB creation requirements
+**Cost**: LOW - Opportunity cost only, since already producing the block
+
+**Likelihood**: MEDIUM-HIGH - Every RB producer gets EB opportunity with larger transaction capacity, creating more MEV opportunities, especially with lucky leader schedules
 
 **Impact**:
 - **Value Extraction**: Users receive worse execution prices
-- **Market Inefficiency**: Creates unfair advantages for EB producers
+- **Market Inefficiency**: Creates unfair advantages for block producers
+- **Increased Opportunity**: Larger EBs and frequent production create more MEV extraction opportunities (than with Praos already)
 - **Detectable**: Transaction patterns can reveal front-running behavior
-- **Existing Issue**: Already present with RB producers, Leios increases frequency
 
 **Assets Affected**: Transaction Validity/Availability/Determinism, Decentralization
-
-### Deployment-Level Threats
 
 #### T10: Hard Fork Coordination Attack
 **Description**: Disruption during the hard fork transition period to split the network, cause instability, or prevent the hard fork from succeeding.
@@ -437,25 +386,51 @@ Notable threats to the system that could impact assets.
 
 **Assets Affected**: Operational Sustainability, High Throughput
 
-## Risk Assessment Matrix
+#### T12: Honey Pot Contract
+
+**Description**: An attacker deliberately makes ADA available on-chain so anyone races to claim it with the goal of producing many conflicting transactions. This is very similar to T1, but uses cryptocurrency instead of network resources.
+
+**Prerequisites**:
+- Knowledge of building a Cardano smart contract
+- Enough ADA to appeal to enough users
+
+**Attack Vector**:
+1. Lock a lot of ADA into a script that allows anyone to take `amount` while the remainder must be kept in the script.
+2. Advertise the honey pot and that `amount` of ADA is available for free.
+3. Race with everyone in claiming the output.
+    a. If attacker is successful, only transaction fees were spent and `amount` can go back into the honey pot.
+4. Continue until funds run out.
+
+**Cost**: HIGH - Enough ADA to appeal many concurrent users and keep the attack going. 
+
+**Impact**:
+- **Resource Waste**: Network processes all conflicting transactions trying to spend the honey pot output, but only one pays fees at a time. Highest costs are from perpetual storage when conflicting transactions are submitted concurrently.
+- **Throughput**: Reduces available throughput by amount of transactions attracted by the honey pot.
+- **Artificial traffic / low tps**: While this artificial traffic will account into the systems throughput, typically measured in transactions per second (tps), the attacker could require these transactions to be big and computationally costly, resulting in a relatively low tps addition.
+
+**Assets Affected**: High Throughput, Operational Sustainability
+
+#### T13: Delayed Praos Blocks
 
 > [!WARN]
-> Incomplete and connection with threat content is vague. i.e. likelihood and
-> risk level are not directly related to anything.
+> Is this a threat or rather part of the Blockchain Safety asset?
 
-| Threat                        | Impact | Likelihood | Risk Level | Priority |
-|-------------------------------|--------|------------|------------|----------|
-| T1: Mempool Partitioning      | HIGH   | MEDIUM     | HIGH       | P1       |
-| T2: Eclipse Attack            | HIGH   | MEDIUM     | HIGH       | P1       |
-| T8: Transaction Availability  | HIGH   | MEDIUM     | HIGH       | P1       |
-| T10: Hard Fork Coordination   | HIGH   | MEDIUM     | HIGH       | P1       |
-| T3: Vote Flooding             | MEDIUM | HIGH       | MEDIUM     | P2       |
-| T5: Double Voting             | LOW    | LOW        | LOW        | P4       |
-| T6: VRF Manipulation          | HIGH   | LOW        | MEDIUM     | P2       |
-| T4: EB Withholding            | MEDIUM | MEDIUM     | MEDIUM     | P3       |
-| T9: Transaction Front-Running | MEDIUM | MEDIUM     | MEDIUM     | P3       |
-| T11: Backward Compatibility   | MEDIUM | MEDIUM     | MEDIUM     | P3       |
-| T7: Stake Grinding            | MEDIUM | LOW        | LOW        | P4       |
+**Description**: Delaying Praos blocks due to long ledger state building (too many txs), impacting liveness and safety.
+
+**Impact**:
+- **Chain Quality**: Increased likelihood of chain forks and lower chain quality
+
+**Assets Affected**: Blockchain Safety
+
+#### T14: Excessive Chain Growth
+
+> [!WARN]
+> TODO and how do we describe threats that are not attacks?
+
+**Description**: Chain growing too much due to honest demand and too high capacity parameterization (as a threat, not an attack). When SPOs cannot add as much storage as is needed, they cannot validate the chain and decentralization is impacted.
+
+**Assets Affected**: Operational Sustainability, Decentralization
+
 
 ## Mitigation Strategies
 
@@ -475,7 +450,7 @@ Notable threats to the system that could impact assets.
 
 **Validation**: Simulation testing with network partitions
 
-**Cost**: Medium - Protocol changes and monitoring infrastructure
+**Cost**: MEDIUM - Protocol changes and monitoring infrastructure
 
 **Accepted Impact**: Temporary throughput reduction and resource waste from conflicting transactions, as long as perpetual storage costs are contained
 
@@ -494,7 +469,7 @@ Notable threats to the system that could impact assets.
 
 **Validation**: Penetration testing and network analysis
 
-**Cost**: Medium - Monitoring infrastructure and operational procedures
+**Cost**: MEDIUM - Monitoring infrastructure and operational procedures
 
 #### M3: Vote Flooding Protection
 **Addressing threats**: T3
@@ -511,7 +486,7 @@ Notable threats to the system that could impact assets.
 
 **Validation**: Load testing with malicious vote patterns
 
-**Cost**: Low - Protocol design already provides protection
+**Cost**: LOW - Protocol design already provides protection
 
 #### M4: Transaction Availability Enforcement
 **Decision**: MITIGATE
@@ -526,12 +501,16 @@ Notable threats to the system that could impact assets.
 
 **Validation**: Testing with unavailable transaction scenarios and peer timeouts
 
-**Cost**: Low - Protocol enforcement mechanism
+**Cost**: LOW - Protocol enforcement mechanism
 
 **Addressing threats**: T8
 
 #### M5: Over-Parameterization
-**Addressing threats**: T4, T8
+
+> [!CAUTION]
+> This is not available anymore with Linear Leios.
+
+**Addressing threats**: T4, T8, T9
 
 **Decision**: MITIGATE
 
@@ -540,12 +519,12 @@ Notable threats to the system that could impact assets.
 **Implementation**:
 - Parameterize EB opportunities and sizes for adversarial stake assumptions
 - Example: Assume 30% adversarial stake, produce 2 EBs per stage on average
-- Size EBs 15% larger to compensate for potential withholding
+- Size EBs 15% larger to compensate for potential withholding or front-running
 - Bound throughput loss to guaranteed capacity levels
 
 **Validation**: Game-theoretic analysis and simulation with various adversarial stake percentages
 
-**Cost**: Low - Protocol parameterization only
+**Cost**: LOW - Protocol parameterization only
 
 #### M6: Double Voting Response
 **Addressing threats**: T5
@@ -577,10 +556,10 @@ Notable threats to the system that could impact assets.
 
 **Accepted Impact**: Prerequisites too high (cryptographic breakthrough or massive capital) and likelihood too low to justify mitigation effort
 
-#### M8: Front-Running Response
+#### M8: Front-Running Monitoring
 **Addressing threats**: T9
 
-**Decision**: ACCEPT + MITIGATE
+**Decision**: ACCEPT
 
 **Control type**: Detective
 
@@ -592,9 +571,11 @@ Notable threats to the system that could impact assets.
 
 **Validation**: Pattern analysis on historical transaction data
 
-**Cost**: Low - Monitoring and analysis infrastructure
+**Cost**: MEDIUM - Monitoring and analysis infrastructure
 
-**Accepted Impact**: Front-running will occur but detection helps maintain transparency and potential future governance responses
+**Accepted Impact**:
+  - Front-running will occur but detection helps maintain transparency and potential future governance responses
+  - Cannot mitigate because EB opportunities are tied to RB opportunities and cannot be parameterized separately
 
 #### M9: Hard Fork Coordination Protection
 **Addressing threats**: T10
@@ -613,7 +594,7 @@ Notable threats to the system that could impact assets.
 
 **Validation**: Stakeholder surveys, adoption metrics, testnet participation rates
 
-**Cost**: Medium - Extensive coordination and communication effort
+**Cost**: MEDIUM - Extensive coordination and communication effort
 
 #### M10: Backward Compatibility Protection
 **Addressing threats**: T11
@@ -630,7 +611,25 @@ Notable threats to the system that could impact assets.
 
 **Validation**: Integration testing with various client versions and protocol combinations
 
-**Cost**: Medium - Testing infrastructure and compatibility analysis
+**Cost**: MEDIUM - Testing infrastructure and compatibility analysis
+
+### M11: No Conflicting Transactions
+**Addressing threats**: T1, T12
+
+**Decision**: MITIGATE
+
+**Control type**: By design
+
+**Implementation**:
+- Protocol design inherently prevents conflicting transactions from reaching the chain
+- No permanent storage of conflicting transactions unlike concurrent variants
+- Ledger detects conflicts within an EB before voting
+- Endorsed transactions are used to update the mempool view
+- Data diffusion limits the number of conflicting transactions and does not amplify deliberately conflicting transaction propagation
+
+**Validation**: Ensure mempool and data diffusion behavior; integration tests using conflicting transactions confirm bounded load on network and compute
+
+**Cost**: NONE - Built into protocol design
 
 ## Review and Maintenance
 

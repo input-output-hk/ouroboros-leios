@@ -174,7 +174,9 @@ impl SimCpuTask for Task {
 
     fn times(&self, config: &crate::config::CpuTimeConfig) -> Vec<Duration> {
         match self {
-            Self::TransactionValidated(_, _) => vec![config.tx_validation],
+            Self::TransactionValidated(_, tx) => vec![
+                config.tx_validation_constant + config.tx_validation_per_byte * tx.bytes as u32,
+            ],
             Self::RBBlockGenerated(block) => {
                 let mut time = config.rb_generation;
                 if let Some(endorsement) = &block.endorsement {
@@ -1112,12 +1114,12 @@ impl LeiosNode {
     }
 
     fn receive_request_ib_header(&mut self, from: NodeId, id: InputBlockId) {
-        if let Some(ib) = self.leios.ibs.get(&id) {
-            if let Some(header) = ib.header() {
-                let have_body = matches!(ib, InputBlockState::Received { .. });
-                self.queued
-                    .send_to(from, SimulationMessage::IBHeader(header.clone(), have_body));
-            }
+        if let Some(ib) = self.leios.ibs.get(&id)
+            && let Some(header) = ib.header()
+        {
+            let have_body = matches!(ib, InputBlockState::Received { .. });
+            self.queued
+                .send_to(from, SimulationMessage::IBHeader(header.clone(), have_body));
         }
     }
 

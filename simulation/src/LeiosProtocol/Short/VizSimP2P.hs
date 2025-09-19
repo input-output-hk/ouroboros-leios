@@ -119,8 +119,7 @@ messageLegend =
 data MsgTag = RB | IB | EB | VT
   deriving (Show, Enum, Bounded)
 
-data LeiosP2PSimVizConfig
-  = LeiosP2PSimVizConfig
+data LeiosP2PSimVizConfig = LeiosP2PSimVizConfig
   { nodeMessageColor :: RankingBlockHeader -> (Double, Double, Double)
   , ibColor :: InputBlockHeader -> (Double, Double, Double)
   , ebColor :: EndorseBlock -> (Double, Double, Double)
@@ -668,6 +667,7 @@ isLeiosMessageControl msg0 =
         _ -> True
     RelayIB msg -> isRelayMessageControl msg
     RelayEB msg -> isRelayMessageControl msg
+    RelayLinearEB msg -> isRelayMessageControl msg
     RelayVote msg -> isRelayMessageControl msg
 
 isRelayMessageControl :: RelayMessage id header body -> Bool
@@ -700,9 +700,11 @@ defaultVizConfig voteSendStage stageLength numCores maxBandwidthPerNode =
           _ -> Nothing
       RelayIB msg -> (IB,) <$> relayMessageColor ibColor msg
       RelayEB msg -> (EB,) <$> relayMessageColor ebColor msg
+      RelayLinearEB msg -> (EB,) <$> relayMessageColor linearEbColor msg
       RelayVote msg -> (VT,) <$> relayMessageColor voteColor msg
   ibColor = pipelineColor Propose . (hash . (.id) &&& (.slot))
   ebColor = pipelineColor Endorse . (hash . (.id) &&& (.slot))
+  linearEbColor = pipelineColor Endorse . (hash . (.id) &&& (.slot))
   voteColor = pipelineColor voteSendStage . (hash . (.id) &&& (.slot))
   relayMessageColor :: (body -> Dia.Colour Double) -> RelayMessage id header body -> Maybe (Dia.Colour Double)
   relayMessageColor f (ProtocolMessage (SomeMessage msg)) = case msg of
@@ -783,6 +785,6 @@ example2
           ]
    where
     processingCores = maximum $ Map.elems p2pNodeCores
-    config = defaultVizConfig voteSendStage 5 processingCores (10 * kilobytes 1000) -- TODO: calculate from p2pLinks
+    config = defaultVizConfig voteSendStage 5 processingCores (10 * kibibytes 1000) -- TODO: calculate from p2pLinks
     modelConfig = config.model
     model = leiosSimVizModel modelConfig (exampleTrace2' rng leiosConfig p2pNetwork False)

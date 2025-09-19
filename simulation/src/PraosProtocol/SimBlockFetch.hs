@@ -78,7 +78,7 @@ traceRelayLink1 tcpprops =
       return ()
  where
   -- Soon-To-Be-Shared Chain
-  bchain = mkChainSimple (kilobytes 1) $ [BlockBody (BS.pack [i]) (kilobytes 95) | i <- [0 .. 10]]
+  bchain = mkChainSimple (kibibytes 1) $ [BlockBody (BS.pack [i]) (kibibytes 95) | i <- [0 .. 10]]
 
   -- Block-Fetch Controller & Consumer
   nodeA :: (MonadAsync m, MonadDelay m, MonadSTM m) => PraosConfig BlockBody -> Chan m (ProtocolMessage (BlockFetchState BlockBody)) -> m ()
@@ -93,8 +93,7 @@ traceRelayLink1 tcpprops =
     concurrently_ processingThread $
       concurrently_ (mapConcurrently_ id ts) $
         concurrently_
-          ( blockFetchController nullTracer praosConfig st
-          )
+          (blockFetchController nullTracer praosConfig st)
           ( runBlockFetchConsumer nullTracer praosConfig chan $
               initBlockFetchConsumerStateForPeerId nullTracer peerId st submitFetchedBlock
           )

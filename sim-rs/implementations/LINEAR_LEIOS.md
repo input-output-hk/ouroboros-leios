@@ -7,7 +7,7 @@ The log file schema is currently identical to every other variant (though `pipel
 
 ## Description
 
-Whenever a node creates an RB, it also creates an EB. The RB header contains a reference to this new EB. If the RB producer has a certificate for the parent RB’s EB, it will include that certificate in the RB body.
+Whenever a node creates an RB, it also has an opportunity to create an EB (though it will not produce empty EBs). The RB header contains a reference to this new EB. If the RB producer has a certificate for the parent RB’s EB, and at least `3 * Δhdr + L_vote + L_diff` has passed since that RB was created, it will include that certificate in the RB body.
 
 RB headers are diffused separately from bodies. When a node receives an RB header, it checks whether that RB should be the new head of its chain. If so, it will request the RB body and the referenced EB (from the first peer which announces them).
 
@@ -29,15 +29,24 @@ The sim can be configured to propagate EBs after validation at any of these leve
 
 Nodes will only vote for an EB after it has been fully validated.
 
+## Voting rules
+
+A node will wait at least `3 * Δhdr` after an EB was created before voting for that EB. It will also wait until it has fully validated the EB.
+
+For a node to vote for an EB, all of the following must be true.
+- The RB which announced that EB is currently the head of that node's chain.
+- The node received the relevant RB header at most `Δhdr` after it was created.
+- The node finished validating the EB body itself at most `3 * Δhdr` + `L_vote` after it was created.
+
 ## Mempool behavior
 
 When a node creates an RB, it will follow these steps in order:
 1. Try to produce a cert for the parent RB's EB.
     1. If this succeeds, remove all of this EB's transactions from its mempool.
-2. Create an empty RB and empty EB.
+2. Create an empty RB.
 3. If we have received and fully validated the RB, along with all referenced transactions,
     1. Fill the RB body with transactions from our mempool
-    2. Fill the EB with transactions from our mempool WITHOUT removing those transactions from the mempool.
+    2. Build an EB with transactions from our mempool WITHOUT removing those transactions from the mempool.
 
 When a node receives an RB body, it immediately removes all referenced/conflicting transactions from its mempool. If the RB has an EB certificate, it also removes that EB’s transactions from its mempool. If the certified EB arrives after the RB body, we remove its TXs from the mempool once it arrives.
 
@@ -56,10 +65,10 @@ When a node receives an RB body, it immediately removes all referenced/conflicti
 ## CPU model
 |Task name in logs|Task name in code|When does it run|What happens when it completes|CPU cost
 |---|---|---|---|---|
-|`ValTX`|`TransactionValidated`|After a transaction has been received from a peer.|That TX is announced to other peers.|`tx-validation-cpu-time-ms`|
-|`GenRB`|`RBBlockGenerated`|After a new ranking block has been generated.|That RB and its EB are announced to peers.|`rb-generation-cpu-time-ms` and `eb-generation-cpu-time-ms` (in parallel)|
+|`ValTX`|`TransactionValidated`|After a transaction has been received from a peer.|That TX is announced to other peers.|`tx-validation-cpu-time-ms` + `tx-validation-cpu-time-ms-per-byte` for each byte of TX|
+|`GenRB`|`RBBlockGenerated`|After a new ranking block has been generated.|That RB and its EB are announced to peers.|RB generation and EB generation run in parallel.</br>**RB generation**: `rb-generation-cpu-time-ms` + `cert-generation-cpu-time-ms-constant` + `cert-generation-cpu-time-ms-per-node` for each node that voted for the endorsed EB + `rb-body-legacy-praos-payload-validation-cpu-time-ms-constant` + `rb-body-legacy-praos-payload-validation-cpu-time-ms-per-byte` for each byte of TX<br/>**EB generation**: `eb-generation-cpu-time-ms` + the CPU time of `ValEB`|
 |`ValRH`|`RBHeaderValidated`|After a ranking block header has been received.|That RB is announced to peers.<br/>The referenced EB is queued to be downloaded when available.|`rb-head-validation-cpu-time-ms`|
-|`ValRB`|`RBBlockValidated`|After a ranking block body has been received.|That RB body is announced to peers and (potentially) accepted as the tip of the chain.|`rb-body-legacy-praos-payload-validation-cpu-time-ms-constant` + `rb-body-legacy-praos-payload-validation-cpu-time-ms-per-byte` for each byte of TX|
+|`ValRB`|`RBBlockValidated`|After a ranking block body has been received.|That RB body is announced to peers and (potentially) accepted as the tip of the chain.|`rb-body-legacy-praos-payload-validation-cpu-time-ms-constant` + `rb-body-legacy-praos-payload-validation-cpu-time-ms-per-byte` for each byte of TX + `cert-validation-cpu-time-ms-constant` + `cert-validation-cpu-time-ms-per-node` for each node that voted for the endorsed EB|
 |`ValEH`|`EBHeaderValidated`|After an EB header has been received and validated.|That EB is announced to peers, and body validation begins in the background.|`eb-header-validation-cpu-time-ms`|
 |`ValEB`|`EBBlockValidated`|After an EB's body has been validated.|If eligible, the node will vote for that EB.|`eb-body-validation-cpu-time-ms-constant` + `eb-body-validation-cpu-time-ms-per-byte` for each byte of TX|
 |`GenVote`|`VTBundleGenerated`|After a vote bundle has been generated.|That vote bundle is announced to peers.|`vote-generation-cpu-time-ms-constant` + `vote-generation-cpu-time-ms-per-tx` for each TX in the EB|
@@ -71,7 +80,7 @@ When a node receives an RB body, it immediately removes all referenced/conflicti
 
 A set of nodes can be configured to collude with each other, to distribute an EB close to the end of L_diff.
 
-Example config:
+Example config (with explicit list of attackers):
 ```yaml
 late-eb-attack:
   attackers:
@@ -85,7 +94,15 @@ late-eb-attack:
   propagation-delay-ms: 4500.0
 ```
 
-The `attackers` list controls which nodes are participating in the attack. (I will get around to letting you just choose a `stake` sometime soon). These nodes can communicate out of band, without taking latency or bandwidth into account.
+Example config (with fraction of stake):
+```yaml
+late-eb-attack:
+  attackers:
+    stake-fraction: 0.51
+  propagation-delay-ms: 4500.0
+```
+
+The `attackers` list controls which nodes are participating in the attack. These nodes can communicate out of band, without taking latency or bandwidth into account.
 
 When one of the attackers generates an EB, it will instantly and instantaneously send that EB to all other attackers. The attackers will all wait for `propagation-delay-ms` to elapse, and _then_ announce the EB to all peers.
 
@@ -93,7 +110,7 @@ When one of the attackers generates an EB, it will instantly and instantaneously
 
 A set of nodes can be configured to "withhold" some number of TXs until the moment they generate an EB.
 
-Example config:
+Example config (with explicit list of attackers):
 ```yaml
 late-tx-attack:
   attackers:
@@ -110,7 +127,18 @@ late-tx-attack:
     value: 3
 ```
 
-The `attackers` list controls which nodes are participating in the attack. (I will get around to letting you just choose a `stake` sometime soon).
+Example config (with fraction of stake):
+```yaml
+late-tx-attack:
+  attackers:
+    stake-fraction: 0.51
+  attack-probability: 1.0
+  tx-generation-distribution:
+    distribution: constant
+    value: 3
+```
+
+The `attackers` list controls which nodes are participating in the attack.
 
 When an attacker generates an EB, with probability `attack-probability` they will also generate `tx-generation-distribution` brand-new transactions. Both the EB and the transactions will be immediately announced to peers as normal.
 
