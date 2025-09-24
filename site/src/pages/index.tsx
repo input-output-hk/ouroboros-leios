@@ -49,15 +49,15 @@ function UTCDateTime(year, month, day, hour, minute = 0, second = 0) {
 }
 
 let exceptions = {
-    "2025-9": UTCDateTime(2025, 9, 1, 14)
+    "2025-9": UTCDateTime(2025, 9, 1, 14),
 };
 
 function getNextMeeting(now = new Date()) {
     let nextMeeting = getLastWednesdayOfMonth(now);
-    const exception = exceptions[`${now.getFullYear()}-${now.getMonth()+1}`];
+    const exception = exceptions[`${now.getFullYear()}-${now.getMonth() + 1}`];
     if (exception) {
-       console.warn("Exceptional next meeting date:", exception);
-       nextMeeting = exception;
+        console.warn("Exceptional next meeting date:", exception);
+        nextMeeting = exception;
     }
     const meetingEndTime = new Date(
         nextMeeting.getTime() + 60 * 60 * 1000,
@@ -1906,7 +1906,7 @@ function MonthlyReviewsSection() {
                             >
                                 <Link
                                     className="button button--primary button--lg"
-                                    to="https://youtube.com/live/hq_8fBotF_E"
+                                    to="https://www.youtube.com/watch?v=WEW3Ur2QGCg"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     style={{
