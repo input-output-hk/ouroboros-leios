@@ -103,7 +103,7 @@ function formatCountdown(ms, isLive = false) {
 
 function LeiosSpecificationSection() {
     return (
-        <section className={clsx(styles.videoSection, styles.borderTop)}>
+        <section id="specification" className={clsx(styles.videoSection, styles.borderTop)}>
             <div className="container">
                 <div className="row">
                     <div className="col col--10 col--offset-1">
@@ -587,7 +587,7 @@ function LeiosSpecificationSection() {
 
 function HowLeiosWorksSection() {
     return (
-        <section className={clsx(styles.videoSection, styles.borderTop)}>
+        <section id="how" className={clsx(styles.videoSection, styles.borderTop)}>
             <div className="container">
                 <div className="row">
                     <div className="col col--10 col--offset-1">
@@ -1874,7 +1874,7 @@ function MonthlyReviewsSection() {
     }, []);
 
     return (
-        <section className={clsx(styles.videoSection, styles.borderTop)}>
+        <section id="next" className={clsx(styles.videoSection, styles.borderTop)}>
             <div className="container">
                 <div className="row">
                     <div className="col col--8 col--offset-2">
