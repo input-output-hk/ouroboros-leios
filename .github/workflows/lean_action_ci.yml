@@ -1,9 +1,14 @@
 name: Lean Action CI
 
 on:
-  push:
   pull_request:
-  workflow_dispatch:
+    paths:
+      - "analysis/markov/**"
+  push:
+    branches:
+      - main
+    paths:
+      - "analysis/markov/**"
 
 jobs:
   build:
@@ -11,9 +16,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          lake-package-directory: analsys/markov
-
       - uses: leanprover/lean-action@v1
         with:
           lake-package-directory: analsys/markov
