@@ -1,11 +1,20 @@
+---
+Title: Leios impact analysis
+Authors:
+  - Nicolas Frisby <nick.frisby@iohk.io>
+  - Sebastian Nagel <sebastian.nagel@iohk.io>
+Status: Draft
+Version: 0.1
+---
+
 # Introduction
 
-This document is the first iteration of a high-level design for Linear Leios.
-It is one of the next steps towards deriving an implementable design from [CIP-0164](https://github.com/cardano-foundation/CIPs/pull/1078).
+This document is the first iteration of a high-level design document for the Leios consensus upgrade as also proposed in [CIP-0164](https://github.com/cardano-foundation/CIPs/pull/1078). It analyses the protocol-level design provided by the CIP and **derives requirements** (`REQ`) and **sketches changes** (`NEW` or `UPD`) onto the concrete system of the [`cardano-node`](https://github.com/IntersectMBO/cardano-node).
 
-(TODO This content is only for [the Consensus and Storage Layer](https://github.com/IntersectMBO/ouroboros-consensus) of [`cardano-node`](https://github.com/IntersectMBO/cardano-node) for now.)
+# Background
 
-# Vocabulary/Jargon
+> [!WARNING]
+> TODO: Introduce relevant concepts and terminology needed to comprehend the remainder of the document
 
 - Recall from CIP-0164 that an _endorser block_ (EB) is a list of cryptographic hashes that uniquely identify (serialized) transactions (including their signatures).
 - Let an _EB's closure_ be the sequence of transactions referenced by an EB.
@@ -17,7 +26,23 @@ It is one of the next steps towards deriving an implementable design from [CIP-0
 - Let a _CertRB's closure_ be the closure of the EB that it certifies.
 - A vote _supports_ an RB header directly and its announced EB indirectly: if enough votes support the same RB header, then its announced EB can be included on chain.
 
-# Requirements
+# Ecosystem
+
+> [!WARNING]
+> TODO: Introduce the "cardano node system" and its context 
+> - c4 landscape diagram
+> - characterize ecosystem / dependency graph 
+> - cover external interfaces of the cardano node
+> - ecosystem impact (onto relevant personas)
+
+# Consensus
+
+> [!WARNING]
+> TODO: Refine requirements and changes to the **Consensus components**
+
+This section is covering the anticipated impact onto [the Consensus and Storage Layer](https://github.com/IntersectMBO/ouroboros-consensus) of [`cardano-node`](https://github.com/IntersectMBO/cardano-node).
+
+## Requirements
 
 This high-level design incorporates the following requirements from CIP-0164 into the existing code's architecture.
 Subsequent sections will specify changes that satisfy these new requirements without introducing Denial of Service attack vectors, etc.
@@ -50,7 +75,7 @@ These two rules can be summarized as Praos &gt; fresh Leios &gt; stale Leios.
 Looking forward, Peras should also be prioritized over Leios, since a single Peras failure is more disruptive (to Praos, even!) than a single Leios failure.
 It's not yet clear how priority relates Peras and Praos, but that's beyond the scope this document.
 
-# Consensus Changes for Functional Requirements
+## Consensus Changes for Functional Requirements
 
 - *UPD-LeiosAwareBlockProductionThread*, for REQ-IssueLeiosBlocks and REQ-IncludeLeiosCertificates.
   The existing block production thread must generate an EB at the same time it generates an RB.
@@ -102,7 +127,7 @@ It's not yet clear how priority relates Peras and Praos, but that's beyond the s
   The Leios mini-protocols will require new fetch decision logic, since the node should not necessarily simply download every such object from every peer that offers it.
   Such fetch decision logic is also required for TxSubmission and for Peras votes; the Leios logic will likely be similar but not equivalent.
 
-# Protocol Burst Attack
+## Protocol Burst Attack
 
 There are multiple attack vectors against Leios, but one is particularly relevant to resource-management.
 
@@ -114,7 +139,7 @@ The potential magnitude of that burst will depend on various factors, including 
 The cost to the victim is merely the work to acquire the closures and to check the hashes of the received EB bodies and transaction bodies.
 In particular, at most one of the EBs in the burst could extend the tip of a victim node's current selection, and so that's the only EB the victim would attempt to fully parse and validate.
 
-# Risks Threatening the Resource-Management Requirements
+## Risks Threatening the Resource-Management Requirements
 
 The fundamental idea behind Leios has always been that the Praos protocol is inherently and necessarily bursty.
 Leios should be able to freely utilize the nodes' resources whenever Praos is not utilizing them, which directly motivates REQ-PrioritizePraosOverLeios.
@@ -125,7 +150,7 @@ Contention for the following primary node resources might unacceptably degrade t
 
 - *RSK-LeiosPraosContentionNetworkBandwidth*.
   This is not anticipated to be a challenge, because time-multiplexing the bandwidth is relatively easy.
-  In factor, Leios traffic while Praos is idle could potentially even prevent the TCP Receive Window from contracting, thus avoiding a slow start when Praos traffic resumes.
+  In fact, Leios traffic while Praos is idle could potentially even prevent the TCP Receive Window from contracting, thus avoiding a slow start when Praos traffic resumes.
 - *RSK-LeiosPraosContentionCPU*.
   This is not anticipated to be a challenge, because today's Praos node does not exhibit major CPU load on multi-core machines.
   Leios might have more power-to-weight ratio for parallelizing its most expensive task (EB validation), but that parallelization isn't yet obviously necessary.
@@ -159,7 +184,7 @@ The same risks can also be viewed from a different perspective, which is more ac
   Same as RSK-LeiosLedgerOverheadLatency, but for the Mempool frequently revalidating 15000% load in a caught-up node during congestion (ie 30000% the capacity of a Praos block, since the Leios Mempool capacity is now two EBs instead of two Praos blocks).
 - _Etc_
 
-# Prototypes and Experiments for Derisking Resource-Management
+## Prototypes and Experiments for Derisking Resource-Management
 
 The first new code will be used to demonstrate and measure the contention underlying the above risks.
 The following experiments each pertain to several of the risks above.
@@ -183,7 +208,7 @@ The following experiments each pertain to several of the risks above.
     - This experiment will analyze the GC stats and other event logs of the node(s) under test.
     - TODO what about TxSubmission traffic?
 
-# Consensus Changes for Resource-Management Requirements
+## Consensus Changes for Resource-Management Requirements
 
 It is not already clear which new or updated mechanisms/components would mitigate the resource-management risks, if the prototypes and experiment indicate mitigations are necessary.
 
@@ -194,7 +219,7 @@ It is not already clear which new or updated mechanisms/components would mitigat
       See ["Erlang-style processes in the RTS"](https://gitlab.haskell.org/ghc/ghc/-/issues/21578) and ["Execution domains in GHC/Haskell" (HIW23 Lightning Talk)](https://www.youtube.com/watch?v=Ha7oIVrLwSI).
 - RSK-LeiosPraosContentionDiskBandwidth could be mitigated by rate-limiting the Leios disk traffic, with back pressure to accordingly rate-limit the Leios network traffic.
 
-# TODO some concrete Consensus details
+## TODO Miscellaneous details
 
 - First version of LedgerDB need not explicitly store EB's ledger state; the CertRB's result ledger state will reflect the EB's contents.
   Second version could thunk the EB's reapplication alongside the announcing RB?
@@ -224,3 +249,24 @@ It is not already clear which new or updated mechanisms/components would mitigat
   Second version maybe instead integrates certified EBs into the existing ImmDB?
   That integration seems like a good fit.
   It has other benefits (eg saves a disk roundtrip and exhibits linear disk reads for driver prefetching/etc), but those seem unimportant so far.
+
+
+# Network
+
+> [!WARNING]
+> TODO: Describe requirements and changes to the **Network components**
+
+# Ledger
+
+> [!WARNING]
+> TODO: Describe requirements and changes to the **Ledger component**
+
+# Cryptography
+
+> [!WARNING]
+> TODO: Describe requirements and changes to the **Cryptography / Cardano base components**
+
+# Appendix
+
+> [!WARNING]
+> TODO: consider putting lengthy content here instead
