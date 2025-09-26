@@ -12,8 +12,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          path: analsys/markov
+          lake-package-directory: analsys/markov
 
       - uses: leanprover/lean-action@v1
         with:
-          path: analsys/markov
+          lake-package-directory: analsys/markov
