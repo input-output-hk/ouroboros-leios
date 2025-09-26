@@ -1967,8 +1967,8 @@ export default function Home(): React.ReactElement {
     const { siteConfig } = useDocusaurusContext();
     return (
         <Layout
-            title={`Hello from ${siteConfig.title}`}
-            description="Description will go into a meta tag in <head />"
+            title={siteConfig.title}
+            description="A high-throughput protocol for Cardano"
         >
             <HomepageHeader />
             <main>
