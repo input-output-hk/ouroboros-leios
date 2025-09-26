@@ -417,6 +417,8 @@ The following experiments each pertain to several of the risks above.
 
 # Cryptography
 
+The security of the votes cast and the certificates that Leios uses to accept EB blocks depends on the usage of the pairing-based BLS12-381 signature scheme (BLS). This scheme is useful, as it allows for aggregation of public keys and signatures, allowing a big group to signal their approval with one  compact artifact. Besides Leios, it is also likely that [Peras](https://github.com/tweag/cardano-peras/issues/128) will use this scheme.
+
 This section derives **requirements** for adding BLS signatures to `cardano-base` and sketches **changes** to satisfy them. The scope is limited to cryptographic primitives and their integration into existing classes; vote construction/logic is out of scope. This work should align with [this](https://www.ietf.org/archive/id/draft-irtf-cfrg-bls-signature-05.html) IETF draft.
 
 > Note that with the implementation of [CIP-0381](https://cips.cardano.org/cip/CIP-0381) `cardano-base` already contains basic utility functions needed to create these bindings; the work below is thus expanding on that.
