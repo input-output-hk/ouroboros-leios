@@ -444,9 +444,9 @@ Introduce opaque types for `SecretKey`, `PublicKey`, `Signature`, and `AggSignat
 - *REQ-BlsDSIGNIntegration*.
 Provide a `DSIGN` instance so consensus can use BLS via the existing `DSIGN` class, including aggregation-capable helpers where appropriate.
 - *REQ-BlsSerialisation*.
-Deterministic serialisation: `ToCBOR`/`FromCBOR` and raw-bytes for keys/signatures; strict length/subgroup/infinity checks; canonical compressed encodings as per the Zcash standard for BLS points.
+Deterministic serialisation: `ToCBOR`/`FromCBOR` and raw-bytes for keys/signatures; strict length/subgroup/infinity checks; canonical compressed encodings as per the [Zcash](https://github.com/zcash/librustzcash/blob/6e0364cd42a2b3d2b958a54771ef51a8db79dd29/pairing/src/bls12_381/README.md#serialization) standard for BLS points.
 - *REQ-BlsConformanceVectors*.
-Add conformance tests using test vectors from the Rust implementation to ensure cross-impl compatibility.
+Add conformance tests using test vectors from the [intial](https://github.com/input-output-hk/ouroboros-leios/tree/main/crypto-benchmarks.rs) Rust implementation to ensure cross-impl compatibility.
 
 ### Non-functional
 
