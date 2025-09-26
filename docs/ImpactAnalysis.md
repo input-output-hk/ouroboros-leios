@@ -417,8 +417,51 @@ The following experiments each pertain to several of the risks above.
 
 # Cryptography
 
-> [!WARNING]
-> TODO: Describe requirements and changes to the **Cryptography / Cardano base components**
+This section derives **requirements** for adding BLS signatures to `cardano-base` and sketches **changes** to satisfy them. The scope is limited to cryptographic primitives and their integration into existing classes; vote construction/logic is out of scope. This work should align with [this](https://www.ietf.org/archive/id/draft-irtf-cfrg-bls-signature-05.html) IETF draft.
+
+> Note that with the implementation of [CIP-0381](https://cips.cardano.org/cip/CIP-0381) `cardano-base` already contains basic utility functions needed to create these bindings; the work below is thus expanding on that.
+
+## Requirements
+
+### Functional
+
+- *REQ-BlsKeyGenSecure*.
+Provide secure key generation with strong randomness requirements, resistance to side-channel leakage.
+- *REQ-BlsVariantAbstraction*.
+Support both BLS variants—small public key and small signature—behind a single abstraction. Public APIs are variant-agnostic.
+- *REQ-BlsSkToPk*.
+Deterministic sk → pk derivation for the chosen variant.
+- *REQ-BlsSignVerify*.
+Signature generation and verification APIs, variant-agnostic and domain-separated (DST supplied by caller). Besides the DST, the interface should also implement a per message augmentation (as the hash to curve function also has in the IETF draft)
+- *REQ-BlsPoP*.
+Proof-of-Possession creation and verification to mitigate rogue-key attacks.
+- *REQ-BlsAggregateSignatures*.
+Aggregate a list of public keys and signatures into one
+- *REQ-BlsBatchVerify*.
+Batch verification API for efficient verification of many `(pk, msg, sig)` messages.
+- *REQ-BlsTypes*.
+Introduce opaque types for `SecretKey`, `PublicKey`, `Signature`, and `AggSignature` (if needed by consensus).
+- *REQ-BlsDSIGNIntegration*.
+Provide a `DSIGN` instance so consensus can use BLS via the existing `DSIGN` class, including aggregation-capable helpers where appropriate.
+- *REQ-BlsSerialisation*.
+Deterministic serialisation: `ToCBOR`/`FromCBOR` and raw-bytes for keys/signatures; strict length/subgroup/infinity checks; canonical compressed encodings as per the Zcash standard for BLS points.
+- *REQ-BlsConformanceVectors*.
+Add conformance tests using test vectors from the Rust implementation to ensure cross-impl compatibility.
+
+### Non-functional
+
+- *REQ-BlsPerfBenchmarks*.
+Benchmark single-verify, aggregate-verify, and batch-verify; report the impact of batching vs individual verification.
+- *REQ-BlsRustParity*.
+Compare performance against the Rust implementation; document gaps and ensure functional parity on vectors.
+- *REQ-BlsDeterminismPortability*.
+Deterministic results across platforms/architectures; outputs independent of CPU feature detection.
+
+### Remarks
+
+- Note that the PoP checks probably are done at the certificate level, and that the above-described API should not be responsible for this.
+- The current code on BLS12-381 already abstracts over both curves `G1`/`G2`, we should maintain this.
+- The `BLST` package also exposes fast verification over many messages and signatures + public keys by doing a combined pairing check. This might be helpful, though it's currently unclear if we can use this speedup. It might be the case, since we have *linear Leios, that this is never needed.
 
 # Performance & Tracing (P&T)
 
