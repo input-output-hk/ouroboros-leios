@@ -72,8 +72,7 @@ const config: Config = {
             content:
                 "Ouroboros Leios is a high-throughput protocol designed to scale Cardano by optimizing transaction processing and network resource utilization.",
         }],
-        // Replace with your project's social card
-        image: "img/docusaurus-social-card.jpg",
+        image: "img/social-preview.jpg",
         navbar: {
             title: "Leios",
             logo: {
