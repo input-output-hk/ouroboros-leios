@@ -1,0 +1,26 @@
+name = "linleios"
+version = "0.1.0"
+keywords = ["math"]
+defaultTargets = ["linleios"]
+
+[[lean_lib]]
+name = "Linleios"
+
+[[lean_exe]]
+name = "linleios"
+root = "Main"
+
+[leanOptions]
+pp.unicode.fun = true # pretty-prints `fun a ↦ b`
+autoImplicit = false
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+version = "git#v4.20.0"
+
+[lean]
+server-options = [
+  ["checkBinderAnnotations", "false"],
+  ["diagnostics", "true"]
+]
