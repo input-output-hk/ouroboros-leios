@@ -1,0 +1,19 @@
+name: Lean Action CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: analsys/markov
+
+      - uses: leanprover/lean-action@v1
+        with:
+          path: analsys/markov
