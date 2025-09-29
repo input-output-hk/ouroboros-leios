@@ -28,12 +28,58 @@ This document is the first iteration of a high-level design document for the Lei
 
 # Ecosystem
 
+Most users interact with the Cardano system through a wallet or a dApp. Both of these systems provide end-user interfaces and are directly or indirectly connected to the Cardano network. A varying number of services in between the Cardano network and those user-facing applications determines the impact of the Leios upgrade onto the Cardano ecosystem. The Cardano network itself is operated by so-called stake pool operators (SPOs). The following context diagram illustrates notable personas, a few example systems of the Cardano ecosystem and their interactions:
+
+![](./context-diagram.svg)
+
+## Impact on operations
+
+The Leios upgrade does not change the roles and responsibilities for SPOs and only small changes to their operations are expected. Besides a modest increase in compute and network requirements (see [resource requirements summary in the CIP](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#resource-requirements)), one additional step in the block producing node setup is required: One additional key pair is needed to sign votes for EBs.
+
+- **REQ-GenerateBLSKeys** SPOs must be able to generate BLS key pairs.
+- **REQ-RegisterBLSKeys** SPOs must be able to register their BLS public key to become part of the voting committee.
+- **REQ-RotateBLSKeys** SPOs must be able to rotate their BLS key and limit usage of compromised keys.
+
+Concretely, these BLS keys could be generated and managed alongside the existing VRF keys. The node configuration needs to be extended to include the BLS signing key and the public key will need to become part of the operational certificate. With the signing key available, the node will be able to automatically issue votes for EBs.
+  
+## Impact on user experience
+
+End-users are not expected to be impacted by the Leios upgrade. The transaction format and ledger semantics remain unchanged. Functionally, end-users will be able to use wallets and dApps as before, while dApp developers can continue to build on top of Cardano as before. However, throughput increases often come with a trade-off in latency. The proposed Leios upgrade only increases latency for transactions that need to be processed via EBs in times of higher than "Praos-only" load. The CIP provides more detail on expected latency under varying load [in the simulation results](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#simulation-results).
+
+- **REQ-LowLatency** End-users expect low inclusion latency of transactions.
+- **REQ-NoLostTransactions** Even under high load, end-users expect that transactions are eventually included on chain.
+
+While first inclusion latency might increase in high load situations, the fact that Leios certificates require a supermajority of votes could provide a stronger finality guarantee for transactions than a first inclusion in a Praos block. This does not give rise to a specific requirement at this point, but needs to be further investigated.
+
+## Impacted infrastructure
+
+The Leios consensus upgrade does "only" change the algorithm of how consensus on a transaction sequence is achieved. The currently proposed protocol does _not_ change the transaction format or ledger semantics. Therefore, the impact of the Leios upgrade onto the Cardano ecosystem is generally bounded by the client interfaces offered by the Cardano network system (its various node implementations). The following system diagram depicts the Cardano peer to peer network as a set of nodes in block producing, relay or data serving roles, as well as examples of key infrastructure applications:
+
+
+![](./system-diagram.svg)
+
+Block producing and relay nodes represent the backbone of the Cardano chain, are typically operated by SPOs, and only few implementations exist. On the other hand, there is an increasing number of implementations for data serving purposes, which are typical entry points into the Cardano network for major wallets and dApps. Interaction between nodes happens via the node-to-node network protocols and most node implementations also offer client interfaces to interact with the chain and create integrations with other systems. Most applications using the cardano network utilize indexers and other middleware to provide performant access to chain data - dbSync is one example for such a component. Hydra nodes are depicted as an example of a directly integrated dApp, which creates a so-called layer 2 - a ledger running on top of Cardano that is faster, cheaper, or has different functionality. Layer 2 infrastructure like Hydra or bridges to other chains are important systems to be considered when estimating the impact of the Leios upgrade. However, there are many more components in the Cardano ecosystem, and this document only captures a few relevant ones.
+
 > [!WARNING]
-> TODO: Introduce the "cardano node system" and its context 
-> - c4 landscape diagram
-> - characterize ecosystem / dependency graph 
-> - cover external interfaces of the cardano node
-> - ecosystem impact (onto relevant personas)
+> TODO: Write about
+>
+> - Client interfaces (vs. network protocols)
+>   - node to client
+>   - utxo-rpc
+> 
+> - Systems not impacted by Leios 
+>   - Direct usage of node-to-client interface
+>   - Indirect use of N2C interface
+>
+> - Systems impacted
+>   - directly contributing to consensus
+>   - interested in consensus/block structure
+>   - sensitive to longer inclusion latenc
+  
+A survey of various Cardano ecosystem components was conducted to estimate the impact of Leios in its base form in comparison to more complex variants (e.g., including sharding). Various projects across several categories in the Cardano ecosystem were considered, analysed and their creators interviewed for their expected impact (this was prior to publishing CIP-164). Find the results of this survey in [this spreadsheet](https://docs.google.com/spreadsheets/d/1NpXhfRl50xr4jYouk6aeXXQyeW4KVlKsELa3dpGBtVI).
+
+> [!WARNING]
+> TODO: Convert spreadsheet to markdown table in appendix
 
 # Consensus
 
