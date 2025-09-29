@@ -74,8 +74,11 @@ def evolve (transition : State → List (State × Probability)) : Probabilities 
     ∅
 
 def simulate (transition : State → List (State × Probability)) (start : Probabilities) : Nat → Probabilities
-| 0     => start
-| n + 1 => simulate transition (evolve transition start) n
+  | 0     => start
+  | n + 1 => simulate transition (evolve transition start) n
+
+def prune (ε : Float) : Probabilities → Probabilities :=
+  HashMap.filter (fun _ p => p ≥ ε)
 
 def totalProbability (states : Probabilities) : Probability :=
   states.values.sum
