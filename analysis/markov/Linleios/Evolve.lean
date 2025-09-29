@@ -49,7 +49,7 @@ def forge {env : Environment} (state : State) : List (State × Probability) :=
         state with
         rbCount := state.rbCount + 1
       }
-    , env.pSpacingOkay
+    , 1 - env.pSpacingOkay
     ⟩
   , ⟨
       {
@@ -72,3 +72,10 @@ def evolve (transition : State → List (State × Probability)) : Probabilities 
           $ transition state
     )
     ∅
+
+def simulate (transition : State → List (State × Probability)) (start : Probabilities) : Nat → Probabilities
+| 0     => start
+| n + 1 => simulate transition (evolve transition start) n
+
+def totalProbability (states : Probabilities) : Probability :=
+  states.values.sum

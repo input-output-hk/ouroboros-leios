@@ -5,7 +5,10 @@ import Linleios
 def env : Environment := makeEnvironment 0.05 1 4 7
 
 def s0 : Probabilities := default
-def s1 := evolve (@forge env) s0
+def sn := simulate (@forge env) s0 5
+def pn := totalProbability sn
 
 def main : IO Unit :=
-  IO.println $ (reprPrec s1 0).pretty
+  do
+    IO.println $ (reprPrec sn 0).pretty
+    IO.println $ (reprPrec pn 0).pretty
