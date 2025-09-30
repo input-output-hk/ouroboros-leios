@@ -245,11 +245,6 @@ It's not yet clear how priority relates Peras and Praos, but that's beyond the s
   That's not guaranteed, though, so the node must be able to fetch whichever transactions are missing, but in the absence of an attack that ought to be minimal.
   The Mempool is the natural inspiration for this optimization, but it's inappropriate as the actual cache for two reasons: it has a relatively small, multidimensional capacity and its eviction policy is determined by the distinct needs of block production.
   This new component instead has a greater, unidimensional capacity and a simple Least Recently Used eviction policy.
-- *NEW-LeiosMiniProtocols*, for REQ-DiffuseLeiosBlocks, REQ-DiffuseLeiosVotes, and REQ-ArchiveLeiosBlocks.
-  The node must include new mini-protocols to diffuse EB announcements, EBs themselves, EBs' transactions, and votes for EBs.
-- *NEW-LeiosFetchDecisionLogic*, for REQ-DiffuseLeiosBlocks, REQ-DiffuseLeiosVotes, and REQ-ArchiveLeiosBlocks.
-  The Leios mini-protocols will require new fetch decision logic, since the node should not necessarily simply download every such object from every peer that offers it.
-  Such fetch decision logic is also required for TxSubmission and for Peras votes; the Leios logic will likely be similar but not equivalent.
 
 ## Protocol Burst Attack
 
@@ -318,19 +313,7 @@ The following experiments each pertain to several of the risks above.
   Ledger state snapshot files and contiguous blocks can be sliced from `mainnet`, P&T clusters, etc to assemble a sequence of transactions that could be collated by an EB.
   Both full validation (eg Leios voting) as well as mere reapplication (eg Mempool) should be separately analyzed.
   This experiment will record and summarize the observed behavior of the mutator time and various GC statistics, so as to inform futher consideration of risks as well as the design of other experiments (eg traffic shaping).
-- *EXP-LeiosDiffusionOnly*.
-  A minimally-patched Praos node can include only the Leios changes necessary to actually diffuse EBs and their closures.
-  Notably, even the content of the transactions in the EBs need not be well-formed.
-    - This patched node will assume every EB is worthy of certification but somehow never influences the ledger state.
-    - In order for Praos headers to suffice, EBs in this patched system will list the "announcing" header's hash, which is fine since EBs are trustworthy in this experiment.
-    - In this experiment, EBs' transactions merely need to be diffused, hash checked, and stored---not even parsed.
-      Every transaction within an EB will be an opaque bytestring (with random contents to avoid accidental trivialities).
-      The complementary EXP-LeiosLedgerDbAnalyser experiment will characterize which resource consumption this choice avoids, which is useful for avoiding conflation.
-    - Each RB permitted to contain a certificate is blocked (in the NEW-LeiosCertRbStagingArea) by the arrival of its predecessor's announced EB, but Praos is otherwise unaffected.
-    - Mocked upstream peers will originate all blocks, and the node(s) under test will merely relay everything.
-      The incoming RBs could simply be copied from `mainnet`, a P&T cluster run, etc, with the EBs' fully mocked arrival times derived in some way from the original RBs' slot onsets.
-    - This experiment will analyze the GC stats and other event logs of the node(s) under test.
-    - TODO what about TxSubmission traffic?
+- TODO more
 
 ## Consensus Changes for Resource-Management Requirements
 
@@ -374,11 +357,58 @@ It is not already clear which new or updated mechanisms/components would mitigat
   That integration seems like a good fit.
   It has other benefits (eg saves a disk roundtrip and exhibits linear disk reads for driver prefetching/etc), but those seem unimportant so far.
 
-
 # Network
 
-> [!WARNING]
-> TODO: Describe requirements and changes to the **Network components**
+## Requirements and Risks
+
+The relevant requirements derived from the CIP for the Network component are a subset of those listed in the Consensus section above: REQ-DiffuseLeiosBlocks, REQ-DiffuseLeiosVotes, REQ-PrioritizePraosOverLeios, and REQ-PrioritizeFreshOverStaleLeios.
+
+Similarly, the RSK-LeiosPraosContentionNetworkBandwidth and RSK-LeiosNetworkingOverheadLatency risks from the above applies to the Network layer.
+Additionally, REQ-PrioritizeFreshOverStaleLeios suggests the following new risk.
+
+- *RSK-LeiosLeiosContentionNetworkBandwidth*.
+  Same as RSK-LeiosPraosContentionNetworkBandwidth, except between Leios traffic for fresh EBs and Leios traffic for stale EBs.
+
+## Network Changes for Functional Requirementrs
+
+- *NEW-LeiosMiniProtocols*, for REQ-DiffuseLeiosBlocks, REQ-DiffuseLeiosVotes, and REQ-ArchiveLeiosBlocks.
+  The node must include new mini-protocols to diffuse EB announcements, EBs themselves, EBs' transactions, and votes for EBs.
+- *NEW-LeiosFetchDecisionLogic*, for REQ-DiffuseLeiosBlocks, REQ-DiffuseLeiosVotes, and REQ-ArchiveLeiosBlocks.
+  The Leios mini-protocols will require new fetch decision logic, since the node should not necessarily simply download every such object from every peer that offers it.
+  Such fetch decision logic is also required for TxSubmission and for Peras votes; the Leios logic will likely be similar but not equivalent.
+
+## Network Changes for Resource-Management Requirements
+
+- *NEW-LeiosPraosMuxBias*.
+  The existing multiplexer is intentionally fair amongst the different mini-protocols.
+  In the current CIP, the Praos traffic and Leios traffic are carried by different mini-protocols.
+  Therefore, introducing a simple bias in the multiplexer to strongly (TODO fully?) prefer sending messages from Praos mini protocols over messages from Leios mini protocols would directly mitigate RSK-LeiosPraosContentionNetworkBandwidth.
+
+It is not yet clear how best to mitigate RSK-LeiosLeiosContentionNetworkBandwidth or, more generally, how to satisfy REQ-PrioritizeFreshOverStaleLeios (aka freshest first delivery) in the Network Layer.
+One notable option is to "rotate" the two proposed Leios mini-protocols into a less natural pair: one would send all requests and only requests and the other would send all replies and only replies.
+In that way, the server can---when it has received multiple outstanding requests, which seems likelying during ATK-LeiosProtocolBurst---reply to requests in a different order then the client sent them, which is inevitable since the client will commonly request an EB as soon it's offered, which means the client will request maximally fresh EBs after having requesting less fresh EBs.
+If the client were to avoid sending any request that requires a massive atomic reply (eg a MsgLeiosBlockTxsRequest for 10 megabytes), then the server can prioritize effectively even without needing to implement any kind of preemption mechanism.
+This option can be formulated in the existing mini protocol infrastructure, but another option would be to instead enrich the mini-protocol infrastructure to somehow directly allow for server-side reordering.
+
+## Prototypes and Experiments for Derisking Resource-Management
+
+The first new code will be used to demonstrate and measure the contention underlying the above risks.
+The following experiments each pertain to several of the risks above.
+
+- *EXP-LeiosDiffusionOnly*.
+  A minimally-patched Praos node can include only the Leios changes necessary to actually diffuse EBs and their closures.
+  Notably, even the content of the transactions in the EBs need not be well-formed.
+    - This patched node will assume every EB is worthy of certification but somehow never influences the ledger state.
+    - In order for Praos headers to suffice, EBs in this patched system will list the "announcing" header's hash, which is fine since EBs are trustworthy in this experiment.
+    - In this experiment, EBs' transactions merely need to be diffused, hash checked, and stored---not even parsed.
+      Every transaction within an EB will be an opaque bytestring (with random contents to avoid accidental trivialities).
+      The complementary EXP-LeiosLedgerDbAnalyser experiment will characterize which resource consumption this choice avoids, which is useful for avoiding conflation.
+    - Each RB permitted to contain a certificate is blocked (in the NEW-LeiosCertRbStagingArea) by the arrival of its predecessor's announced EB, but Praos is otherwise unaffected.
+    - Mocked upstream peers will originate all blocks, and the node(s) under test will merely relay everything.
+      The incoming RBs could simply be copied from `mainnet`, a P&T cluster run, etc, with the EBs' fully mocked arrival times derived in some way from the original RBs' slot onsets.
+    - This experiment will analyze the GC stats and other event logs of the node(s) under test.
+    - TODO what about TxSubmission traffic?
+- TODO more
 
 # Ledger
 
