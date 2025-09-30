@@ -67,3 +67,12 @@ def ebDistribution : Probabilities → HashMap Nat Probability :=
           $ singleton ⟨ state.ebCount , p ⟩
     )
     ∅
+
+def ebEfficiency (states : Probabilities) : Float :=
+  let rbCount := states.keys.head!.rbCount
+  let ebCount :=
+    HashMap.fold
+      (fun acc state p =>acc + state.ebCount.toFloat * p)
+      0
+      states
+  ebCount / (rbCount.toFloat - 1)
