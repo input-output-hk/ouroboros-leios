@@ -58,3 +58,12 @@ def simulate (env : Environment) (start : Probabilities) (ε : Float) : Nat → 
 
 def totalProbability (states : Probabilities) : Probability :=
   states.values.sum
+
+def ebDistribution : Probabilities → HashMap Nat Probability :=
+  HashMap.fold
+    (
+      fun acc state p =>
+        HashMap.mergeWith (fun _ => Add.add) acc
+          $ singleton ⟨ state.ebCount , p ⟩
+    )
+    ∅
