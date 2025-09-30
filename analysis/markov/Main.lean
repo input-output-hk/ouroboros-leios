@@ -2,10 +2,10 @@
 import Linleios
 
 
-def env : Environment := makeEnvironment 0.05 0.95 0.90 1 4 7
+def env : Environment := makeEnvironment 0.05 0.95 0.90 600 0.75 1 4 7
 
 def s0 : Probabilities := default
-def sn := simulate env s0 10
+def sn := simulate env s0 2
 def pn := totalProbability sn
 
 def main : IO Unit :=

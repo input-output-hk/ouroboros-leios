@@ -63,8 +63,6 @@ def pQuorum (pSuccessfulVote committeeSize τ : Float) : Float :=
   let ⟨ μ , σ ⟩ := committeeDistribution pSuccessfulVote committeeSize
   1 - cdfGaussian (τ * committeeSize) μ σ
 
-#eval pQuorum 0.90 600 0.75
-
 
 structure Environment where
   activeSlotCoefficient : Probability
@@ -72,18 +70,16 @@ structure Environment where
   Lvote : Nat
   Ldiff : Nat
   pSpacingOkay : Probability
-  pRbHeaderArrives : Probability
-  pEbValidates : Probability
+  pQuorum : Probability
 
-def makeEnvironment (activeSlotCoefficient pRbHeaderArrives pEbValidates : Float) (Lheader Lvote Ldiff : Nat) : Environment :=
+def makeEnvironment (activeSlotCoefficient pRbHeaderArrives pEbValidates committeeSize τ : Float) (Lheader Lvote Ldiff : Nat) : Environment :=
   {
     activeSlotCoefficient := activeSlotCoefficient
     Lheader := Lheader
     Lvote := Lvote
     Ldiff := Ldiff
     pSpacingOkay := (1 - activeSlotCoefficient).pow (3 * Lheader + Lvote + Ldiff - 1).toFloat
-    pRbHeaderArrives := pRbHeaderArrives
-    pEbValidates := pEbValidates
+    pQuorum := pQuorum (pRbHeaderArrives * pEbValidates) committeeSize τ
   }
 
 
@@ -93,9 +89,10 @@ structure State where
   canCertify : Bool
 deriving Repr, BEq, Hashable, Inhabited
 
-example : (default : State).rbCount = 0 := rfl
-
-example : (default : State).ebCount = 0 := rfl
+theorem genesis : (default : State).rbCount = 0 ∧ (default : State).ebCount = 0 := by
+  constructor
+  rfl
+  rfl
 
 
 def Probabilities := HashMap State Probability
@@ -108,7 +105,7 @@ instance : Inhabited Probabilities where
 abbrev Outcomes := List (State × Probability)
 
 
-def forge {env : Environment} (state : State) : Outcomes :=
+def certify {env : Environment} (state : State) : Outcomes :=
   let state' :=
     {
       state with
@@ -122,14 +119,14 @@ def forge {env : Environment} (state : State) : Outcomes :=
          ]
     else [(state', 1)]
 
-def validate {env : Environment} (state : State) : Outcomes :=
+def vote {env : Environment} (state : State) : Outcomes :=
   [
-    (state, env.pRbHeaderArrives * env.pEbValidates)
-  , ({state with canCertify := false}, 1 - env.pRbHeaderArrives * env.pEbValidates)
+    (state, env.pQuorum)
+  , ({state with canCertify := false}, 1 - env.pQuorum)
   ]
 
 def step {env : Environment} : List (State → Outcomes) :=
-  [@forge env, @validate env]
+  [@certify env, @vote env]
 
 
 def evolve (transition : State → Outcomes) : Probabilities → Probabilities :=
