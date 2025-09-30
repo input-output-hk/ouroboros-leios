@@ -5,16 +5,65 @@ import Batteries.Lean.HashMap
 open Std (HashMap)
 
 
+private partial def erf (x : Float) : Float :=
+  if x < 0
+    then - erf (- x)
+    else
+      let p := 0.3275911
+      let a₁ := 0.254829592
+      let a₂ := -0.284496736
+      let a₃ := 1.421413741
+      let a₄ := -1.453152027
+      let a₅ := 1.061405429
+      let t := 1 / (1 + p * x)
+      1 - (a₁ * t + a₂ * t^2 + a₃ * t^3 + a₄ * t^4 + a₅ * t^5) * Float.exp (- x^2)
+
+private def cdfGaussian (x μ σ : Float) : Float :=
+  (1 + erf ((x - μ) / σ / Float.sqrt 2)) / 2
+
+private def bisectionSearch (f : Float → Float) (low high : Float) (ε : Float) (maxIter : Nat) : Float :=
+  match maxIter with
+  | 0 => (low + high) / 2
+  | maxIter' + 1 =>
+    let mid := (low + high) / 2
+    let fmid := f mid
+    if high - low < ε || Float.abs fmid < ε then
+      mid
+    else if f low * fmid < 0 then
+      bisectionSearch f low mid ε maxIter'
+    else
+      bisectionSearch f mid high ε maxIter'
+termination_by maxIter
+
+
 abbrev Probability := Float
 
 
-def approxCommittee (committeeSize : Float) : Float × Float :=
-  let nPools : Nat := 2500
-  let stakes : List Float := (List.range nPools).map (fun k => ((k + 1).toFloat / nPools.toFloat)^10 - (k.toFloat / nPools.toFloat)^10)
-  let ps : List Float := stakes.map (fun s => 1 - Float.exp (- committeeSize * s))
-  let μ : Float := ps.sum
+def nPools : Nat := 2500
+
+def stakeDistribution (nPools : Nat) : List Float :=
+  (List.range nPools).map (fun k => ((k + 1).toFloat / nPools.toFloat)^10 - (k.toFloat / nPools.toFloat)^10)
+
+private def calibrateCommittee(committeeSize : Float) : Float :=
+  let stakes : List Float := stakeDistribution nPools
+  let f (m : Float) : Float :=
+    let ps : List Float := stakes.map (fun s => 1 - Float.exp (- m * s))
+    ps.sum - committeeSize
+  bisectionSearch f committeeSize nPools.toFloat 0.5 10
+
+private def committeeDistribution (pSuccessfulVote committeeSize : Float) : Float × Float :=
+  let stakes : List Float := stakeDistribution nPools
+  let m := calibrateCommittee committeeSize
+  let ps : List Float := stakes.map (fun s => pSuccessfulVote * (1 - Float.exp (- m * s)))
+  let μ := ps.sum
   let σ := (ps.map (fun p => p * (1 - p))).sum.sqrt
   ⟨ μ , σ ⟩
+
+def pQuorum (pSuccessfulVote committeeSize τ : Float) : Float :=
+  let ⟨ μ , σ ⟩ := committeeDistribution pSuccessfulVote committeeSize
+  1 - cdfGaussian (τ * committeeSize) μ σ
+
+#eval pQuorum 0.90 600 0.75
 
 
 structure Environment where
