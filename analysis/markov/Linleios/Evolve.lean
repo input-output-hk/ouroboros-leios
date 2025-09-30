@@ -129,6 +129,9 @@ def step {env : Environment} : List (State → Outcomes) :=
   [@certify env, @vote env]
 
 
+def prune (ε : Float) : Probabilities → Probabilities :=
+  HashMap.filter (fun _ p => p > ε)
+
 def evolve (transition : State → Outcomes) : Probabilities → Probabilities :=
   HashMap.fold
     (
@@ -145,13 +148,10 @@ def chain (transitions : List (State → Outcomes)) : Probabilities → Probabil
   | [] => id
   | (t :: ts) => chain ts ∘ evolve t
 
-def simulate (env : Environment) (start : Probabilities) : Nat → Probabilities
+def simulate (env : Environment) (start : Probabilities) (ε : Float) : Nat → Probabilities
 | 0     => start
-| n + 1 => let state' := chain (@step env) start
-           simulate env state' n
-
-def prune (ε : Float) : Probabilities → Probabilities :=
-  HashMap.filter (fun _ p => p > ε)
+| n + 1 => let state' := prune ε $ chain (@step env) start
+           simulate env state' ε n
 
 def totalProbability (states : Probabilities) : Probability :=
   states.values.sum
