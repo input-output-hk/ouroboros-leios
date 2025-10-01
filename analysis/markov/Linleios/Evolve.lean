@@ -1,10 +1,13 @@
 
 import Std.Data.HashMap
 import Batteries.Lean.HashMap
+import Lean.Data.Json.FromToJson
 
 import Linleios.Types
 
 
+open Lean (Json)
+open Lean.ToJson (toJson)
 open Std (HashMap)
 
 
@@ -67,6 +70,9 @@ def ebDistribution : Probabilities → HashMap Nat Probability :=
           $ singleton ⟨ state.ebCount , p ⟩
     )
     ∅
+
+def ebDistributionJson : Probabilities → Json :=
+  Json.mkObj ∘ List.map (fun ⟨k, v⟩ => ⟨toString k, toJson v⟩) ∘ HashMap.toList ∘ ebDistribution
 
 def ebEfficiency (states : Probabilities) : Float :=
   let rbCount := states.keys.head!.rbCount

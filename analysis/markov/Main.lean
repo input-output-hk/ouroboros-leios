@@ -5,6 +5,7 @@ import Parser.Char.Numeric
 import Parser.Stream
 
 open Cli
+open Lean (Json)
 
 
 instance : ParseableType Float where
@@ -28,31 +29,27 @@ def runMarkovCmd (p : Parsed) : IO UInt32 :=
     let rbCount : Nat := p.flag! "rb-count" |>.as! Nat
     let env := makeEnvironment activeSlotCoefficient pRbHeaderArrives pEbValidates committeeSize.toFloat τ Lheader Lvote Ldiff
     let sn := simulate env default ε rbCount
-    let print {α : Type} [Repr α] (x : α) : IO Unit := IO.println (reprPrec x 0).pretty
-    IO.println ""
-    print sn
-    IO.println ""
-    print $ ebDistribution sn
-    IO.println ""
-    print $ ebEfficiency sn
-    IO.println ""
-    print $ 1 - totalProbability sn
+    if p.hasFlag "output-file"
+      then IO.FS.writeFile (p.flag! "output-file" |>.as! String) (Json.pretty $ ebDistributionJson sn)
+    IO.println s!"Efficiency: {(reprPrec (ebEfficiency sn) 0).pretty}"
+    IO.eprintln s!"Missing probability: {1 - totalProbability sn}"
     pure 0
 
 def markovCmd : Cmd := `[Cli|
   markovCmd VIA runMarkovCmd; ["0.0.1"]
   "Run a Markov simulation of Linear Leios."
   FLAGS:
-    "active-slot-coefficient" : Float ; "The active slot coefficient for RBs, in probability per slot."
-    "l-header"                : Nat   ; "L_header protocol parameter, in slots."
-    "l-vote"                  : Nat   ; "L_vote protocol parameter, in slots."
-    "l-diff"                  : Nat   ; "L_diff protocol parameter, in slots."
-    "committee-size"          : Nat   ; "Expected number of voters in the committee."
-    "quorum-fraction"         : Float ; "τ protocol parameter, in %/100."
-    "p-rb-header-arrives"     : Float ; "Probability that the RB header arrives before L_header."
-    "p-eb-validates"          : Float ; "Probability that the EB is fully validated before 3 L_header + L_vote."
-    "tolerance"               : Float ; "Discard states with less than this probability."
-    "rb-count"                : Nat   ; "Number of RBs to simulate."
+    "active-slot-coefficient" : Float  ; "The active slot coefficient for RBs, in probability per slot."
+    "l-header"                : Nat    ; "L_header protocol parameter, in slots."
+    "l-vote"                  : Nat    ; "L_vote protocol parameter, in slots."
+    "l-diff"                  : Nat    ; "L_diff protocol parameter, in slots."
+    "committee-size"          : Nat    ; "Expected number of voters in the committee."
+    "quorum-fraction"         : Float  ; "τ protocol parameter, in %/100."
+    "p-rb-header-arrives"     : Float  ; "Probability that the RB header arrives before L_header."
+    "p-eb-validates"          : Float  ; "Probability that the EB is fully validated before 3 L_header + L_vote."
+    "tolerance"               : Float  ; "Discard states with less than this probability."
+    "rb-count"                : Nat    ; "Number of RBs to simulate."
+    "output-file"             : String ; "Path to the JSON output file for the EB distribution."
   EXTENSIONS:
     author "bwbush";
     defaultValues! #[
@@ -64,7 +61,7 @@ def markovCmd : Cmd := `[Cli|
     , ("quorum-fraction"        , "0.75")
     , ("p-rb-header-arrives"    , "0.95")
     , ("p-eb-validates"         , "0.90")
-    , ("tolerance"              , "1e-9")
+    , ("tolerance"              , "1e-8")
     , ("rb-count"               , "100" )
     ]
 ]
