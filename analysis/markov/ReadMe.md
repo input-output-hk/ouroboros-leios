@@ -1,18 +1,18 @@
 # Markov-model simulation for Linear Leios
 
+This Markovian model of Linear Leios computes the probability of EB certifications as RBs are produced.
+
 
 ## Example
 
+The `linleios` program executes the Markov model for EB production in Linear Leios. The protocol parameters and network characteristic are specified as flags on the command line. The program outputs the following information:
+
+- The efficiency of EB production, defined as the expected number of certified EBs per RB.
+- The "missing probability" resulting from the finite-resolution arithmetic of the computations.
+- Optionally, a JSON file containing the probabilities of the given number of certified EBs.
+
 ```console
-$ lake exe linleios \
-    --l-header 1 \
-    --l-vote 4 \
-    --l-diff 5 \
-    --committee-size 600 \
-    --quorum-fraction 0.80 \
-    --p-rb-header-arrives 0.95 \
-    --p-eb-validates 0.85 \
-    --output-file tmp.json                                         
+$ lake exe linleios --l-header 1 --l-vote 4 --l-diff 5 --committee-size 600 --quorum-fraction 0.80 --p-rb-header-arrives 0.95 --p-eb-validates 0.85 --rb-count 100 --output-file tmp.json                                         
 
 Efficiency: 0.358416
 Missing probability: 0.000001
