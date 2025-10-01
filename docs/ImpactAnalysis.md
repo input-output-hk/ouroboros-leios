@@ -424,14 +424,14 @@ The following experiments each pertain to several of the risks above.
 
 This outlines Leios impact on the node's tracing system and on dedicated Leios performance testing and benchmarks.
 
-Tracing:
+## Tracing
 - Leios will require a whole new set of _observables_ for a Cardano node, which do not exist for Praos. These observables will need to be exposed - just as the existing ones - via trace evidence and metrics.
 - A _specification document_ will need to be created and maintained, detailing the semantics of those new observables. Some might be specific to the Haskell implementation, some might be generic to any Leios implementation.
 - The work from R&D and the insights gained from Leios simulations will be the input to that document.
 - During Leios implementation process, P&T will need to oversee that traces are emitted at appropriate source locations wrt. their semantics, as well as properly serialized or captured in a metric in `cardano-node` itself.
 - P&T analysis tooling - mostly the `locli` package - will need significant adjustment to parse, process and extract meaningful performance data from raw trace evidence.
 
-Performance:
+## Performance
 - For a systematic approach to benchmarking, all Leios modes of operation and their respective configurations will need to be captured in P&T's benchmark profile library - the `cardano-profile` package.
 - P&T's `nix` & `Nomad` based automations need to be adjusted to deploy and execute Leios profiles as benchmarks from that library.
 - On a conceptual level, the challenge to benchmarking Leios - being built for high throughput - is putting it under a stable saturation workload for an extended period of time. By stable, I'm referring to maintaining equal submission pressure over the benchmark's entire duration.
