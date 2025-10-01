@@ -1,12 +1,12 @@
 ---
 Title: Leios impact analysis
+Status: Draft
+Version: 0.2
 Authors:
   - Michael Karg <michael.karg@iohk.io>
   - Nicolas Frisby <nick.frisby@iohk.io>
   - Sebastian Nagel <sebastian.nagel@iohk.io>
   - Thomas Vellekoop <thomas.vellekoop@iohk.io>
-Status: Draft
-Version: 0.1
 ---
 
 # Introduction
