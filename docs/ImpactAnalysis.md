@@ -421,28 +421,28 @@ The security of the votes cast and the certificates that Leios uses to accept EB
 
 This section derives **requirements** for adding BLS signatures to `cardano-base` and sketches **changes** to satisfy them. The scope is limited to cryptographic primitives and their integration into existing classes; vote construction/logic is out of scope. This work should align with [this](https://www.ietf.org/archive/id/draft-irtf-cfrg-bls-signature-05.html) IETF draft.
 
-> Note that with the implementation of [CIP-0381](https://cips.cardano.org/cip/CIP-0381) `cardano-base` already contains basic utility functions needed to create these bindings; the work below is thus expanding on that.
+> Note that with the implementation of [CIP-0381](https://cips.cardano.org/cip/CIP-0381) `cardano-base` already contains basic utility functions needed to create these bindings; the work below is thus expanding on that. The impact of the below requirements thus only extends to [this](https://github.com/IntersectMBO/cardano-base/blob/82e09945726a7650540e0656f01331d09018ac97/cardano-crypto-class/src/Cardano/Crypto/EllipticCurve/BLS12_381/Internal.hs) module and probably [this](https://github.com/IntersectMBO/cardano-base/blob/82e09945726a7650540e0656f01331d09018ac97/cardano-crypto-class/src/Cardano/Crypto/DSIGN/Class.hs) outward facing class.
 
 ## Requirements
 
 ### Functional
 
+- *REQ-BlsTypes*.
+Introduce opaque types for `SecretKey`, `PublicKey`, `Signature`, and `AggSignature` (if needed by consensus).
 - *REQ-BlsKeyGenSecure*.
 Provide secure key generation with strong randomness requirements, resistance to side-channel leakage.
 - *REQ-BlsVariantAbstraction*.
 Support both BLS variants—small public key and small signature—behind a single abstraction. Public APIs are variant-agnostic.
+- *REQ-BlsPoP*.
+Proof-of-Possession creation and verification to mitigate rogue-key attacks.
 - *REQ-BlsSkToPk*.
 Deterministic sk → pk derivation for the chosen variant.
 - *REQ-BlsSignVerify*.
 Signature generation and verification APIs, variant-agnostic and domain-separated (DST supplied by caller). Besides the DST, the interface should also implement a per message augmentation (as the hash to curve function also has in the IETF draft)
-- *REQ-BlsPoP*.
-Proof-of-Possession creation and verification to mitigate rogue-key attacks.
 - *REQ-BlsAggregateSignatures*.
 Aggregate a list of public keys and signatures into one
 - *REQ-BlsBatchVerify*.
 Batch verification API for efficient verification of many `(pk, msg, sig)` messages.
-- *REQ-BlsTypes*.
-Introduce opaque types for `SecretKey`, `PublicKey`, `Signature`, and `AggSignature` (if needed by consensus).
 - *REQ-BlsDSIGNIntegration*.
 Provide a `DSIGN` instance so consensus can use BLS via the existing `DSIGN` class, including aggregation-capable helpers where appropriate.
 - *REQ-BlsSerialisation*.
@@ -458,6 +458,8 @@ Benchmark single-verify, aggregate-verify, and batch-verify; report the impact o
 Compare performance against the Rust implementation; document gaps and ensure functional parity on vectors.
 - *REQ-BlsDeterminismPortability*.
 Deterministic results across platforms/architectures; outputs independent of CPU feature detection.
+- *REQ-BlsDocumentation*.
+Document the outward facing API in cardano-base and provide example usages. Additionally add a section do's and don'ts with regards to security of this scheme outside the context of Leios (so in general what to look out for).
 
 ### Remarks
 
