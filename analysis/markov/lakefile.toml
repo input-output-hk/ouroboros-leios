@@ -19,6 +19,16 @@ name = "mathlib"
 scope = "leanprover-community"
 version = "git#v4.20.0"
 
+[[require]]
+name = "Parser"
+git = "https://github.com/fgdorais/lean4-parser"
+rev = "26d5ce4d60195a869b1fdb100b442794ea63e1ad"
+
+[[require]]
+name = "Cli"
+git = "https://github.com/mhuisi/lean4-cli"
+rev = "v4.20.0"
+
 [lean]
 server-options = [
   ["checkBinderAnnotations", "false"],
