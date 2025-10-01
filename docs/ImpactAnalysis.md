@@ -44,12 +44,16 @@ Concretely, these BLS keys could be generated and managed alongside the existing
 
 ## Impact on user experience
 
-End-users are not expected to be impacted by the Leios upgrade. The transaction format and ledger semantics remain unchanged. Functionally, end-users will be able to use wallets and dApps as before, while dApp developers can continue to build on top of Cardano as before. However, throughput increases often come with a trade-off in latency. The proposed Leios upgrade only increases latency for transactions that need to be processed via EBs in times of higher than "Praos-only" load. The CIP provides more detail on expected latency under varying load [in the simulation results](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#simulation-results). Two key non-functional requirements for end-users are:
+Individual users are not expected to be impacted by the Leios upgrade. The transaction format and ledger semantics remain unchanged. Functionally, end-users will be able to use wallets and dApps as before, while dApp developers can continue to build on top of Cardano as before.
+
+Throughput increases often come with a trade-off in latency, as also stated in the published Leios research paper. However, when compared to Praos, the proposed Leios protocol does **not impact inclusion latency in practice**. For example, a subset of users wants to submit 12 megabytes worth of transactions to the chain. With today's consensus protocol (Praos), this would take around 12000 / 90 ~ 133 blocks to get all transactions included. Assuming the average block time, the latency for the last of those transactions would be around 133 * 20s / 60s ~ 44 minutes. In contrast, with Leios as proposed in CIP-164, it would take only one certified EB in an RB; which say happens after 5-10 ranking blocks, resulting in roughly 10 * 20s / 60s ~ 3 minutes inclusion latency. On the other hand, if the system has lower demand than Praos capacity, transaction inclusion latency is exactly the same. The CIP provides more detail on expected latency [in the simulation results](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#simulation-results).
+
+Two key non-functional requirements for end-users are:
 
 - **REQ-LowLatency** End-users expect low inclusion latency of transactions.
 - **REQ-NoLostTransactions** Even under high load, end-users expect that transactions are eventually included on chain.
 
-While first inclusion latency might increase in high load situations, the fact that Leios certificates require a supermajority of votes could provide a stronger finality guarantee for transactions than a first inclusion in a Praos block. This does not give rise to a specific requirement at this point, but needs to be further investigated.
+While individual transactions may take 50 seconds+ in high load situations to be included, the fact that Leios certificates require a supermajority of votes could provide a stronger finality guarantee for transactions than a first inclusion in a Praos block. This does not give rise to a specific requirement at this point, but needs to be further investigated.
 
 ## Impacted infrastructure
 
@@ -133,12 +137,14 @@ Ultimately, whether and how much of a change is required in these systems depend
 
 #### Latency sensitivity
 
-As the CIP points out, the Leios upgrade may increase transaction inclusion latency in times of high load. Some systems might be sensitive to this higher latency. This includes systems that need to perform conversions between assets on different chains or systems that need to react to on-chain events within a certain time frame. Examples of such systems are:
+As the CIP points out, even after the Leios upgrade individual transaction inclusion latency may become high at times of high load. In contrast to the (non-)impact on user experience (see above), some systems might be sensitive to generally longer inclusion times. This includes systems that need to perform conversions between assets on different chains or systems that need to react to on-chain events within a certain time frame. Examples of such systems are:
 
 * Bridges
 * DEXes
 * Algorithmic stablecoins
 * Layer 2 solutions
+
+Note that this sensitivity is not due to a change in the protocol itself, but always present when demand exceeds capacity. This is also true for the current Praos protocol and its corresponding capacity.
 
 #### Higher throughput
 
