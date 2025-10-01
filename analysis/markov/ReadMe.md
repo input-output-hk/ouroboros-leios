@@ -7,8 +7,8 @@ This Markovian model of Linear Leios computes the probability of EB certificatio
 
 The `linleios` program executes the Markov model for EB production in Linear Leios. The protocol parameters and network characteristic are specified as flags on the command line. The program outputs the following information:
 
-- The efficiency of EB production, defined as the expected number of certified EBs per RB.
-- The "missing probability" resulting from the finite-resolution arithmetic of the computations.
+- The efficiency of EB production, defined as the expected number of certified EBs per RB, on `/dev/stdout`.
+- The "missing probability" resulting from the finite-resolution arithmetic of the computations, on `/dev/stderr`.
 - Optionally, a JSON file containing the probabilities of the given number of certified EBs.
 
 ```console
