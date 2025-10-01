@@ -9,7 +9,7 @@ Version: 0.1
 
 # Introduction
 
-This document is the first iteration of a high-level design document for the Leios consensus upgrade as also proposed in [CIP-0164](https://github.com/cardano-foundation/CIPs/pull/1078). It analyses the protocol-level design provided by the CIP and **derives requirements** (`REQ`) and **sketches changes** (`NEW` or `UPD`) onto the concrete system of the [`cardano-node`](https://github.com/IntersectMBO/cardano-node).
+This document is the first iteration of a high-level design document for the Leios consensus upgrade as also proposed in [CIP-0164](https://github.com/cardano-foundation/CIPs/pull/1078). It analyses the protocol-level design provided by the CIP and **derives requirements** (`REQ`) and **sketches changes** (`NEW` or `UPD`) onto the concrete components of the [`cardano-node`](https://github.com/IntersectMBO/cardano-node).
 
 # Background
 
@@ -28,12 +28,136 @@ This document is the first iteration of a high-level design document for the Lei
 
 # Ecosystem
 
+Most users interact with the Cardano system through a wallet or a dApp. Both of these systems provide end-user interfaces and are directly or indirectly connected to the Cardano network. A varying number of services in between the Cardano network and those user-facing applications determines the impact of the Leios upgrade onto the Cardano ecosystem. The Cardano network itself is operated by so-called stake pool operators (SPOs). The following context diagram illustrates notable personas, a few example systems of the Cardano ecosystem and their interactions:
+
+![](./context-diagram.svg)
+
+## Impact on operations
+
+The Leios upgrade does not change the roles and responsibilities for SPOs and only small changes to their operations are expected. Besides a modest increase in compute and network requirements (see [resource requirements summary in the CIP](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#resource-requirements)), one additional step in the block producing node setup is required: One additional key pair is needed to sign votes for EBs.
+
+- **REQ-GenerateBLSKeys** SPOs must be able to generate BLS key pairs.
+- **REQ-RegisterBLSKeys** SPOs must be able to register their BLS public key to become part of the voting committee.
+- **REQ-RotateBLSKeys** SPOs must be able to rotate their BLS key and limit usage of compromised keys.
+
+Concretely, these BLS keys could be generated and managed alongside the existing VRF keys. The node configuration needs to be extended to include the BLS signing key and the public key will need to be known to the ledger. Making them part of the operational certificate would be one option here, but this would increase the block headers by at least 381 bits (BLS-381 is the proposed scheme). At the time of writing the maximum block header size (a protocol parameter) is 1100 Bytes and typical block headers are around 860 Bytes. With the signing key available, the node will be able to automatically issue votes for EBs.
+
+## Impact on user experience
+
+Individual users are not expected to be impacted by the Leios upgrade. The transaction format and ledger semantics remain unchanged. Functionally, end-users will be able to use wallets and dApps as before, while dApp developers can continue to build on top of Cardano as before.
+
+Throughput increases often come with a trade-off in latency, as also stated in the published Leios research paper. However, when compared to Praos, the proposed Leios protocol does **not impact inclusion latency in practice**. For example, a subset of users wants to submit 12 megabytes worth of transactions to the chain. With today's consensus protocol (Praos), this would take around 12000 / 90 ~ 133 blocks to get all transactions included. Assuming the average block time, the latency for the last of those transactions would be around 133 * 20s / 60s ~ 44 minutes. In contrast, with Leios as proposed in CIP-164, it would take only one certified EB in an RB; which say happens after 5-10 ranking blocks, resulting in roughly 10 * 20s / 60s ~ 3 minutes inclusion latency. On the other hand, if the system has lower demand than Praos capacity, transaction inclusion latency is exactly the same. The CIP provides more detail on expected latency [in the simulation results](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#simulation-results).
+
+Two key non-functional requirements for end-users are:
+
+- **REQ-LowLatency** End-users expect low inclusion latency of transactions.
+- **REQ-NoLostTransactions** Even under high load, end-users expect that transactions are eventually included on chain.
+
+While individual transactions may take 50 seconds+ in high load situations to be included, the fact that Leios certificates require a supermajority of votes could provide a stronger finality guarantee for transactions than a first inclusion in a Praos block. This does not give rise to a specific requirement at this point, but needs to be further investigated.
+
+## Impacted infrastructure
+
+The Leios consensus upgrade does "only" change the algorithm of how consensus on a transaction sequence is achieved. The currently proposed protocol does _not_ change the transaction format or ledger semantics. Therefore, the impact of the Leios upgrade onto the Cardano ecosystem is generally bounded by the client interfaces offered by the Cardano network system (its various node implementations). The following system diagram depicts the Cardano peer to peer network as a set of nodes in block producing, relay or data serving roles, as well as examples of key infrastructure applications:
+
+![](./system-diagram.svg)
+
+Block producing and relay nodes represent the backbone of the Cardano chain, are typically operated by SPOs, and only few implementations exist. On the other hand, there is an increasing number of implementations for data serving purposes, which are typical entry points into the Cardano network for major wallets and dApps. Interaction between nodes happens via the node-to-node network protocols and most node implementations also offer client interfaces to interact with the chain and create integrations with other systems. Most applications using the cardano network utilize indexers and other middleware to provide performant access to chain data - dbSync is one example for such a component. Hydra nodes are depicted as an example of a directly integrated dApp, which creates a so-called layer 2 - a ledger running on top of Cardano that is faster, cheaper, or has different functionality. Layer 2 infrastructure like Hydra or bridges to other chains are important systems to be considered when estimating the impact of the Leios upgrade. However, there are many more components in the Cardano ecosystem, and this document only captures a few relevant ones.
+
+### Client interfaces
+
+There are two major [client interfaces](https://cardano-scaling.github.io/cardano-blueprint/client/index.html) served by Cardano node: the node-to-client (N2C) protocol and the [UTxO-RPC](https://utxorpc.org/) interface. The N2C protocol follows the design used between nodes on the peer-to-peer network, but using a different set of mini-protocols that allow clients to query the ledger state, submit transactions, and conveniently follow the chain. The UTxO-RPC interface is a gRPC interface for UTxO blockchains that allows clients to query chain data and submit transactions. Both interfaces are abstracting away details of how consensus is achieved and therefore are only marginally impacted by the Leios consensus change.
+
 > [!WARNING]
-> TODO: Introduce the "cardano node system" and its context 
-> - c4 landscape diagram
-> - characterize ecosystem / dependency graph 
-> - cover external interfaces of the cardano node
-> - ecosystem impact (onto relevant personas)
+> TODO: Update cardano-blueprint for LocalChainSync and link it here or find another non-ogmios reference
+
+Both client interfaces provide access to the chain as a sequence of blocks: N2C via the `LocalChainSync` (see [ogmios API reference](https://ogmios.dev/mini-protocols/local-chain-sync/)) and UTxO-RPC via the [Sync Module](https://utxorpc.org/sync/intro/). As the Leios upgrade will change the block format, those APIs will need to be updated to reflect the new block structure. However, the fundamental concept of a block containing transactions remains unchanged and a backwards compatible representation of blocks is possible. For example, the `LocalChainSync` protocol is serving currently Praos blocks, whose body is basically a list of transactions (see the [Conway CDDL](https://github.com/IntersectMBO/cardano-ledger/blob/master/eras/conway/impl/cddl-files/conway.cddl)). With Leios, this would change to either a list of transactions or a certificate. However, a backwards compatible way would be to "inline" the transactions referenced via an EB in the block body, so that clients can continue to consume transactions directly from the block body. Two things need to be considered with this approach:
+
+1. The block body would grow significantly in size, as it would contain all transactions referenced by the EB. For example, client applications would need to handle up to 12.5 MB / 90 kB ~ 140x increase in block size.
+
+2. The block body hash in the header would not be a simple hash of the body bytes anymore. However if the certificate is also part of the body, block integrity can be verified, albeit requiring a slightly more complex procedure.
+
+In summary the following requirements arise for client interfaces:
+
+- **REQ-ClientInterfaceChainSync** Client interfaces for chain synchronization and accessing block data should be updated in a backwards compatible way.
+- **REQ-ClientInterfaceTransactionSubmission** Client interfaces for transaction submission should not change.
+- **REQ-ClientInterfaceTransactionMonitor** Client interfaces for monitoring the mempool should not change.
+- **REQ-ClientInterfaceLedgerStateQuery** Client interfaces for querying the ledger state may be extended to provide information about Leios specifics (e.g. the voting committee).
+
+### Systems not impacted by Leios
+
+Large parts of the Cardano ecosystem are not impacted by the Leios protocol as proposed in CIP-164 or are only marginally affected in the sense of updating dependencies and documentation.
+
+#### Direct usage of client interfaces
+
+If a system uses one of the client interfaces to communicate with a Cardano node and takes this functionality from specific libraries, it requires only updating of that library to stay compatible with Leios. For example:
+
+* Infrastructure like Ogmios (Haskell libraries), Oura (via Pallas, Rust)
+* Indexers like DBSync, Kupo (Haskell libraries)
+* Mithril (via Pallas, Rust)
+* Wallet API cardano-wallet (Haskell libraries)
+* L2 solutions like Hydra (Haskell libraries)
+
+#### Indirect usage of client interfaces
+
+Some systems do not even use the client interfaces directly, but other components like Ogmios, DBSync, or Oura as a middleware to interact with the Cardano network. In this case, a mere updating of these components is sufficient to continue operation. For example:
+
+* Chain data providers like Blockfrost, Koios, or Maestro (most via Ogmios and DBSync)
+* Wallet providers using Ogmios, Blockfrost, and cardano-wallet
+* Explorers like Cexplorer, AdaStat, or AdaPools (expected to use DBSync or other indexers)
+
+#### No dependency on consensus
+
+Several systems do not depend on consensus data structures and sementics at all. The proposed protocol does not require changes to the transaction format and thus there is no "Cardano API change" that could impact these systems. This includes all transaction building libraries, but also the majority of the Cardano dApp ecosystem. For example:
+
+* Cardano SDKs like lucid or mesh
+* L2 solutions like Hydra, Midgard, zkFold
+* Stablecoin systems like Djed, USDM
+* DApps built on top of Cardano
+
+### Systems impacted by Leios
+
+The closer a system is to the consensus layer, the more changes are required to stay compatible with Leios. Especially when applications are not "insulated" through client interfaces or other middleware components, more significant changes are required. Besides structural dependencies, changes to non-functional properties like increased throughput and latency may also impact certain systems.
+
+#### Network and consensus libraries
+
+Naturally, libraries implementing the Cardano network and consensus primitives going to be affected by changes to the protocol at this level. By extension, this also includes all validating and data node implementations and is futher covered in later sections. Besides the Haskell libraries examples of impacted projects are:
+
+* Pallas (Rust)
+* Gouroboros (Golang)
+* Acropolis, Amaru and Dingo
+
+#### Leios internals
+
+While many systems will be able to stay compatible by merely updating their clients to the Cardano network (see above), some components might want to provide Leios-specific information through their APIs and user interfaces. The amount of changes required depends on the individual system architecture and may range from merely indexing node-to-node communication via a data node or may result in change requests to the client interfaces. Examples of such systems are:
+
+* DBSync and other indexers
+* Cardano explorers
+
+Ultimately, whether and how much of a change is required in these systems depends on their respective end user requirements.
+
+#### Latency sensitivity
+
+As the CIP points out, even after the Leios upgrade individual transaction inclusion latency may become high at times of high load. In contrast to the (non-)impact on user experience (see above), some systems might be sensitive to generally longer inclusion times. This includes systems that need to perform conversions between assets on different chains or systems that need to react to on-chain events within a certain time frame. Examples of such systems are:
+
+* Bridges
+* DEXes
+* Algorithmic stablecoins
+* Layer 2 solutions
+
+Note that this sensitivity is not due to a change in the protocol itself, but always present when demand exceeds capacity. This is also true for the current Praos protocol and its corresponding capacity.
+
+#### Higher throughput
+
+Lastly, the mere increase in throughput may impact some systems. Currently, the Cardano network maximum data throughput capacity is 4.5 TxkB/s. The Leios protocol upgrade and proposed parameters may result in up to 250 TxkB/s - corresponding to a more than 50x increase. Besides transactional throughput, this also results in higher storage requirements for systems that index and provide access to chain data. While some system architectures may have been designed with an order of magnitude more throughput in mind, 50x would be significant enough to result in unexpected load and may require optimizations or architecture changes. A non-functional requirement to mitigate this risk is:
+
+- **REQ-EarlyTestnet** Provide access to a Leios testnet with high load as early as possible to allow infrastructure and dApp developers to test and optimize their systems.
+
+### Full survey
+
+A survey of various Cardano ecosystem components was conducted to estimate the impact of Leios in its base form in comparison to more complex variants (e.g., including sharding). Various projects across several categories in the Cardano ecosystem were considered, analysed and their creators interviewed for their expected impact (this was prior to publishing CIP-164). Find the results of this survey in [this spreadsheet](https://docs.google.com/spreadsheets/d/1NpXhfRl50xr4jYouk6aeXXQyeW4KVlKsELa3dpGBtVI).
+
+> [!WARNING]
+> TODO: Convert spreadsheet to markdown table in appendix
 
 # Consensus
 
