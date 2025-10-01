@@ -40,7 +40,7 @@ The Leios upgrade does not change the roles and responsibilities for SPOs and on
 - **REQ-RegisterBLSKeys** SPOs must be able to register their BLS public key to become part of the voting committee.
 - **REQ-RotateBLSKeys** SPOs must be able to rotate their BLS key and limit usage of compromised keys.
 
-Concretely, these BLS keys could be generated and managed alongside the existing VRF keys. The node configuration needs to be extended to include the BLS signing key and the public key will need to become part of the operational certificate. With the signing key available, the node will be able to automatically issue votes for EBs.
+Concretely, these BLS keys could be generated and managed alongside the existing VRF keys. The node configuration needs to be extended to include the BLS signing key and the public key will need to be known to the ledger. Making them part of the operational certificate would be one option here, but this would increase the block headers by at least 381 bits (BLS-381 is the proposed scheme). At the time of writing the maximum block header size (a protocol parameter) is 1100 Bytes and typical block headers are around 860 Bytes. With the signing key available, the node will be able to automatically issue votes for EBs.
 
 ## Impact on user experience
 
