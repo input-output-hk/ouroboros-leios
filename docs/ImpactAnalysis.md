@@ -72,13 +72,13 @@ There are two major [client interfaces](https://cardano-scaling.github.io/cardan
 
 Both client interfaces provide access to the chain as a sequence of blocks: N2C via the `LocalChainSync` (see [ogmios API reference](https://ogmios.dev/mini-protocols/local-chain-sync/)) and UTxO-RPC via the [Sync Module](https://utxorpc.org/sync/intro/). As the Leios upgrade will change the block format, those APIs will need to be updated to reflect the new block structure. However, the fundamental concept of a block containing transactions remains unchanged and a backwards compatible representation of blocks is possible. For example, the `LocalChainSync` protocol is serving currently Praos blocks, whose body is basically a list of transactions (see the [Conway CDDL](https://github.com/IntersectMBO/cardano-ledger/blob/master/eras/conway/impl/cddl-files/conway.cddl)). With Leios, this would change to either a list of transactions or a certificate. However, a backwards compatible way would be to "inline" the transactions referenced via an EB in the block body, so that clients can continue to consume transactions directly from the block body. Two things need to be considered with this approach:
 
-1. The block body would grow significantly in size, as it would contain all transactions referenced by the EB. Client applications need to be handle this 10x or more increase in block size.
+1. The block body would grow significantly in size, as it would contain all transactions referenced by the EB. For example, client applications would need to handle up to 12.5 MB / 90 kB ~ 140x increase in block size.
 
 2. The block body hash in the header would not be a simple hash of the body bytes anymore. However if the certificate is also part of the body, block integrity can be verified, albeit requiring a slightly more complex procedure.
 
 In summary the following requirements arise for client interfaces:
 
-- **REQ-ClientInterfaceChainSync** Client interfaces for chain synchronization and accessing block data should be updated in a backwards compatible.
+- **REQ-ClientInterfaceChainSync** Client interfaces for chain synchronization and accessing block data should be updated in a backwards compatible way.
 - **REQ-ClientInterfaceTransactionSubmission** Client interfaces for transaction submission should not change.
 - **REQ-ClientInterfaceTransactionMonitor** Client interfaces for monitoring the mempool should not change.
 - **REQ-ClientInterfaceLedgerStateQuery** Client interfaces for querying the ledger state may be extended to provide information about Leios specifics (e.g. the voting committee).
@@ -148,7 +148,7 @@ Note that this sensitivity is not due to a change in the protocol itself, but al
 
 #### Higher throughput
 
-Lastly, the mere increase in throughput may impact some systems. Currently, the Cardano network maximum data throughput capacity is 4.5 TxkB/s. The Leios protocol upgrade and proposed parameters may result in up to 250 TxkB/s - corresponding to a more than 50x increase. Besides transactional throughput, this also results in higher storage requirements for systems that index and provide access to chain data. While some system architecturs may have been designed with an order of magnitude more throughput in mind, 50x would be significant enough to result in unexpected load and may require optimizations or architecture changes. A non-functional requirement to mitigate this risk is:
+Lastly, the mere increase in throughput may impact some systems. Currently, the Cardano network maximum data throughput capacity is 4.5 TxkB/s. The Leios protocol upgrade and proposed parameters may result in up to 250 TxkB/s - corresponding to a more than 50x increase. Besides transactional throughput, this also results in higher storage requirements for systems that index and provide access to chain data. While some system architectures may have been designed with an order of magnitude more throughput in mind, 50x would be significant enough to result in unexpected load and may require optimizations or architecture changes. A non-functional requirement to mitigate this risk is:
 
 - **REQ-EarlyTestnet** Provide access to a Leios testnet with high load as early as possible to allow infrastructure and dApp developers to test and optimize their systems.
 
