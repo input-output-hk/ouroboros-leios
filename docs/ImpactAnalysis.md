@@ -417,8 +417,55 @@ The following experiments each pertain to several of the risks above.
 
 # Cryptography
 
-> [!WARNING]
-> TODO: Describe requirements and changes to the **Cryptography / Cardano base components**
+The security of the votes cast and the certificates that Leios uses to accept EB blocks depends on the usage of the pairing-based BLS12-381 signature scheme (BLS). This scheme is useful, as it allows for aggregation of public keys and signatures, allowing a big group to signal their approval with one  compact artifact. Besides Leios, it is also likely that [Peras](https://github.com/tweag/cardano-peras/issues/128) will use this scheme.
+
+This section derives **requirements** for adding BLS signatures to `cardano-base` and sketches **changes** to satisfy them. The scope is limited to cryptographic primitives and their integration into existing classes; vote construction/logic is out of scope. This work should align with [this](https://www.ietf.org/archive/id/draft-irtf-cfrg-bls-signature-05.html) IETF draft.
+
+> Note that with the implementation of [CIP-0381](https://cips.cardano.org/cip/CIP-0381) `cardano-base` already contains basic utility functions needed to create these bindings; the work below is thus expanding on that. The impact of the below requirements thus only extends to [this](https://github.com/IntersectMBO/cardano-base/blob/82e09945726a7650540e0656f01331d09018ac97/cardano-crypto-class/src/Cardano/Crypto/EllipticCurve/BLS12_381/Internal.hs) module and probably [this](https://github.com/IntersectMBO/cardano-base/blob/82e09945726a7650540e0656f01331d09018ac97/cardano-crypto-class/src/Cardano/Crypto/DSIGN/Class.hs) outward facing class.
+
+## Requirements
+
+### Functional
+
+- *REQ-BlsTypes*.
+Introduce opaque types for `SecretKey`, `PublicKey`, `Signature`, and `AggSignature` (if needed by consensus).
+- *REQ-BlsKeyGenSecure*.
+Provide secure key generation with strong randomness requirements, resistance to side-channel leakage.
+- *REQ-BlsVariantAbstraction*.
+Support both BLS variants—small public key and small signature—behind a single abstraction. Public APIs are variant-agnostic.
+- *REQ-BlsPoP*.
+Proof-of-Possession creation and verification to mitigate rogue-key attacks.
+- *REQ-BlsSkToPk*.
+Deterministic sk → pk derivation for the chosen variant.
+- *REQ-BlsSignVerify*.
+Signature generation and verification APIs, variant-agnostic and domain-separated (DST supplied by caller). Besides the DST, the interface should also implement a per message augmentation (as the hash to curve function also has in the IETF draft)
+- *REQ-BlsAggregateSignatures*.
+Aggregate a list of public keys and signatures into one
+- *REQ-BlsBatchVerify*.
+Batch verification API for efficient verification of many `(pk, msg, sig)` messages.
+- *REQ-BlsDSIGNIntegration*.
+Provide a `DSIGN` instance so consensus can use BLS via the existing `DSIGN` class, including aggregation-capable helpers where appropriate.
+- *REQ-BlsSerialisation*.
+Deterministic serialisation: `ToCBOR`/`FromCBOR` and raw-bytes for keys/signatures; strict length/subgroup/infinity checks; canonical compressed encodings as per the [Zcash](https://github.com/zcash/librustzcash/blob/6e0364cd42a2b3d2b958a54771ef51a8db79dd29/pairing/src/bls12_381/README.md#serialization) standard for BLS points.
+- *REQ-BlsConformanceVectors*.
+Add conformance tests using test vectors from the [intial](https://github.com/input-output-hk/ouroboros-leios/tree/main/crypto-benchmarks.rs) Rust implementation to ensure cross-impl compatibility.
+
+### Non-functional
+
+- *REQ-BlsPerfBenchmarks*.
+Benchmark single-verify, aggregate-verify, and batch-verify; report the impact of batching vs individual verification.
+- *REQ-BlsRustParity*.
+Compare performance against the Rust implementation; document gaps and ensure functional parity on vectors.
+- *REQ-BlsDeterminismPortability*.
+Deterministic results across platforms/architectures; outputs independent of CPU feature detection.
+- *REQ-BlsDocumentation*.
+Document the outward facing API in cardano-base and provide example usages. Additionally add a section do's and don'ts with regards to security of this scheme outside the context of Leios (so in general what to look out for).
+
+### Remarks
+
+- Note that the PoP checks probably are done at the certificate level, and that the above-described API should not be responsible for this.
+- The current code on BLS12-381 already abstracts over both curves `G1`/`G2`, we should maintain this.
+- The `BLST` package also exposes fast verification over many messages and signatures + public keys by doing a combined pairing check. This might be helpful, though it's currently unclear if we can use this speedup. It might be the case, since we have *linear Leios, that this is never needed.
 
 # Performance & Tracing (P&T)
 
