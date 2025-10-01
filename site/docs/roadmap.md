@@ -35,7 +35,7 @@ Creating a CIP is standard procedure to disseminate and discuss protocol changes
 - Refine the protocol design from what was [published by research](https://eprint.iacr.org/2025/1115.pdf) into possible variants
 - Create simulators to empirically explore protocol variants and trade-offs
 - Cost analysis and threat modeling
-- Propose a CIP to solve CPS-18 on [cardano-foundatios/CIPs](https://github.com/cardano-foundation/CIPs)
+- Propose a CIP to solve CPS-18 on [cardano-foundation/CIPs](https://github.com/cardano-foundation/CIPs)
 - Discuss and incorporate feedback into the CIP
 
 This is a joint effort between innovation and engineering teams from Input Output Research (IOR) and Input Output Engineering (IOE) respectively.
@@ -77,7 +77,7 @@ A key milestone in the development of Leios is to demonstrate that it can achiev
 
 ### Leios testnet
 
-> As an SPO and Cardano developer, we want a dedicated network for testing and measuring the perfomance of Leios, so that we can update relevant infrastructure and ensure it can handle increased throughput reliably without compromising security.
+> As an SPO and Cardano developer, we want a dedicated network for testing and measuring the performance of Leios, so that we can update relevant infrastructure and ensure it can handle increased throughput reliably without compromising security.
 
 A larger scale public network that can be used to validate parameter selection, continuous load tests and allow everyone to integrate with Leios changes.
 
