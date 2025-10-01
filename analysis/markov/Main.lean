@@ -35,8 +35,8 @@ def runMarkovCmd (p : Parsed) : IO UInt32 :=
     IO.eprintln s!"Missing probability: {1 - totalProbability sn}"
     pure 0
 
-def markovCmd : Cmd := `[Cli|
-  markovCmd VIA runMarkovCmd; ["0.0.1"]
+def markov : Cmd := `[Cli|
+  markov VIA runMarkovCmd; ["0.0.1"]
   "Run a Markov simulation of Linear Leios."
   FLAGS:
     "active-slot-coefficient" : Float  ; "The active slot coefficient for RBs, in probability per slot."
@@ -51,7 +51,6 @@ def markovCmd : Cmd := `[Cli|
     "rb-count"                : Nat    ; "Number of RBs to simulate."
     "output-file"             : String ; "Path to the JSON output file for the EB distribution."
   EXTENSIONS:
-    author "bwbush";
     defaultValues! #[
       ("active-slot-coefficient", "0.05")
     , ("l-header"               , "1"   )
@@ -67,4 +66,4 @@ def markovCmd : Cmd := `[Cli|
 ]
 
 def main (args : List String) : IO UInt32 :=
-  markovCmd.validate args
+  markov.validate args
