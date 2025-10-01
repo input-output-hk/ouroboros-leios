@@ -95,7 +95,8 @@ FLAGS:
     --l-diff : Nat                     L_diff protocol parameter, in slots.
                                        [Default: `7`]
     --committee-size : Nat             Expected number of voters in the
-                                       committee. [Default: `600`]
+                                       committee, out of 2500 stakepools total.
+                                       [Default: `600`]
     --quorum-fraction : Float          τ protocol parameter, in %/100. [Default:
                                        `0.75`]
     --p-rb-header-arrives : Float      Probability that the RB header arrives

@@ -43,7 +43,7 @@ def markov : Cmd := `[Cli|
     "l-header"                : Nat    ; "L_header protocol parameter, in slots."
     "l-vote"                  : Nat    ; "L_vote protocol parameter, in slots."
     "l-diff"                  : Nat    ; "L_diff protocol parameter, in slots."
-    "committee-size"          : Nat    ; "Expected number of voters in the committee."
+    "committee-size"          : Nat    ; "Expected number of voters in the committee, out of 2500 stakepools total."
     "quorum-fraction"         : Float  ; "τ protocol parameter, in %/100."
     "p-rb-header-arrives"     : Float  ; "Probability that the RB header arrives before L_header."
     "p-eb-validates"          : Float  ; "Probability that the EB is fully validated before 3 L_header + L_vote."
