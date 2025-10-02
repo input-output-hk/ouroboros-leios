@@ -2,6 +2,19 @@
 
 This Markovian model of Linear Leios computes the probability of EB certifications as RBs are produced.
 
+## Contents
+
+- [Approach](#approach)
+- [Parameters](#parameters)
+- [Example](#example)
+- [Usage](#usage)
+- [Building](#building)
+
+
+## Approach
+
+(to be written)
+
 
 ## Parameters
 
