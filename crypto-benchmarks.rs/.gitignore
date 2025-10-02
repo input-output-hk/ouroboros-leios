@@ -1,3 +1,13 @@
 target/
 *.cbor
 *.txt
+
+# Demo artifacts
+demo/**/*.pretty.json
+demo/**/*.png
+demo/**/*.csv
+demo/scripts/.env_cli
+
+# Python cache
+__pycache__/
+*.pyc
