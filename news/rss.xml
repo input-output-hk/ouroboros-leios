@@ -4,10 +4,27 @@
         <title>Ouroboros Leios Blog</title>
         <link>https://leios.cardano-scaling.org/news</link>
         <description>Ouroboros Leios Blog</description>
-        <lastBuildDate>Mon, 01 Sep 2025 00:00:00 GMT</lastBuildDate>
+        <lastBuildDate>Thu, 02 Oct 2025 00:00:00 GMT</lastBuildDate>
         <docs>https://validator.w3.org/feed/docs/rss2.html</docs>
         <generator>https://github.com/jpmonette/feed</generator>
         <language>en</language>
+        <item>
+            <title><![CDATA[Monthly Review – September 2025]]></title>
+            <link>https://leios.cardano-scaling.org/news/2025/10/02/monthly-review</link>
+            <guid>https://leios.cardano-scaling.org/news/2025/10/02/monthly-review</guid>
+            <pubDate>Thu, 02 Oct 2025 00:00:00 GMT</pubDate>
+            <description><![CDATA[Watch our September 2025 monthly review livestream covering the latest progress on Leios as the project is getting handed over from IOR to IOE. This month we cover a summary of the CIP-164 reception, early prototyping by Blink Labs, the impact analysis report we had been writing and a look on the roadmap on our journey to a public Leios testnet.]]></description>
+            <content:encoded><![CDATA[<p>Watch our September 2025 monthly review livestream covering the latest progress on Leios as the project is getting handed over from IOR to IOE. This month we cover a summary of the CIP-164 reception, early prototyping by Blink Labs, the impact analysis report we had been writing and a look on the roadmap on our journey to a public Leios testnet.</p>
+<p><strong>Resources:</strong></p>
+<ul>
+<li><a href="https://drive.google.com/file/d/1XWhYGH_wUq_pO5_WOLJnRiUQxE8ilUfv" target="_blank" rel="noopener noreferrer">Recording</a></li>
+<li><a href="https://docs.google.com/presentation/d/161ND3tJqr3kFsZbwIksGMsWQUKbflOtqyCR23EabH6w" target="_blank" rel="noopener noreferrer">Slides</a></li>
+<li><a href="https://docs.google.com/document/d/1ZPqGUggex_PaOgay4nqF-NI5YyeqO2SoLmbl4h6w0AM" target="_blank" rel="noopener noreferrer">Notes</a></li>
+</ul>]]></content:encoded>
+            <category>monthly-review</category>
+            <category>livestream</category>
+            <category>community</category>
+        </item>
         <item>
             <title><![CDATA[Weekly Summary – September 1, 2025]]></title>
             <link>https://leios.cardano-scaling.org/news/2025/09/01/weekly-progress-summary</link>
@@ -960,83 +977,6 @@
             <category>transaction-lifecycle</category>
             <category>data-processing</category>
             <category>optimization</category>
-        </item>
-        <item>
-            <title><![CDATA[Weekly Summary – May 19, 2025]]></title>
-            <link>https://leios.cardano-scaling.org/news/2025/05/19/weekly-progress-summary</link>
-            <guid>https://leios.cardano-scaling.org/news/2025/05/19/weekly-progress-summary</guid>
-            <pubDate>Mon, 19 May 2025 00:00:00 GMT</pubDate>
-            <description><![CDATA[This week, the Leios team focused on improving simulation capabilities, enhancing transaction processing, and expanding the test coverage. The team also made significant progress in addressing transaction inclusion rates and developing a comprehensive conformance testing framework.]]></description>
-            <content:encoded><![CDATA[<p>This week, the Leios team focused on improving simulation capabilities, enhancing transaction processing, and expanding the test coverage. The team also made significant progress in addressing transaction inclusion rates and developing a comprehensive conformance testing framework.</p>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-improvements">Simulation improvements<a class="hash-link" aria-label="Direct link to Simulation improvements" title="Direct link to Simulation improvements" href="https://leios.cardano-scaling.org/news/2025/05/19/weekly-progress-summary#simulation-improvements">​</a></h2>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation">Rust simulation<a class="hash-link" aria-label="Direct link to Rust simulation" title="Direct link to Rust simulation" href="https://leios.cardano-scaling.org/news/2025/05/19/weekly-progress-summary#rust-simulation">​</a></h3>
-<ul>
-<li>Investigated and addressed poor transaction inclusion rates</li>
-<li>Implemented 'late IB inclusion' extension to Full Leios, significantly improving transaction ledger inclusion odds</li>
-<li>Identified and addressed issues with non-sharded input transactions causing excessive duplication</li>
-<li>Made several key enhancements:<!-- -->
-<ul>
-<li>Enabled late IB inclusion by default</li>
-<li>Fixed the off-by-one error in late IB inclusion logic</li>
-<li>Added <code>praos-fallback-enabled</code> setting for throughput investigation</li>
-<li>Improved transaction deduplication in Praos blocks.</li>
-</ul>
-</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="testing-framework">Testing framework<a class="hash-link" aria-label="Direct link to Testing framework" title="Direct link to Testing framework" href="https://leios.cardano-scaling.org/news/2025/05/19/weekly-progress-summary#testing-framework">​</a></h2>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="conformance-testing">Conformance testing<a class="hash-link" aria-label="Direct link to Conformance testing" title="Direct link to Conformance testing" href="https://leios.cardano-scaling.org/news/2025/05/19/weekly-progress-summary#conformance-testing">​</a></h3>
-<ul>
-<li>Developed a comprehensive catalog of <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/leios-trace-verifier/conformance-coverage.md" target="_blank" rel="noopener noreferrer">potential conformance tests</a></li>
-<li>Implemented a property-based testing suite for trace verification</li>
-<li>Added both positive and negative test cases covering:<!-- -->
-<ul>
-<li>Genesis slot operations</li>
-<li>Block production (RB, IB, EB)</li>
-<li>Vote generation</li>
-<li>Various production patterns (sporadic, noisy)</li>
-<li>Invalid scenarios (equivocation, gaps)</li>
-</ul>
-</li>
-<li>Successfully verified golden traces against the Agda specification.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="documentation">Documentation<a class="hash-link" aria-label="Direct link to Documentation" title="Direct link to Documentation" href="https://leios.cardano-scaling.org/news/2025/05/19/weekly-progress-summary#documentation">​</a></h2>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="formal-specification">Formal specification<a class="hash-link" aria-label="Direct link to Formal specification" title="Direct link to Formal specification" href="https://leios.cardano-scaling.org/news/2025/05/19/weekly-progress-summary#formal-specification">​</a></h3>
-<ul>
-<li>Launched comprehensive web-based documentation for the Ouroboros Leios formal specification at <a href="https://leios.cardano-scaling.org/formal-spec/" target="_blank" rel="noopener noreferrer">leios.cardano-scaling.org/formal-spec</a></li>
-<li>Enhanced documentation features:<!-- -->
-<ul>
-<li>Interactive exploration of Leios modules</li>
-<li>Type linking between related components</li>
-<li>Full text search capabilities</li>
-<li>Improved accessibility of formal specification details.</li>
-</ul>
-</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="transaction-lifecycle-analysis">Transaction lifecycle analysis<a class="hash-link" aria-label="Direct link to Transaction lifecycle analysis" title="Direct link to Transaction lifecycle analysis" href="https://leios.cardano-scaling.org/news/2025/05/19/weekly-progress-summary#transaction-lifecycle-analysis">​</a></h2>
-<ul>
-<li>Conducted detailed analysis of transaction processing efficiency</li>
-<li>Generated a cumulative probability model for transaction ledger inclusion</li>
-<li>Analyzed the relationship between IB production rate and stage length</li>
-<li>Created visualization of <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/tx-to-block-cum-slots-fig.svg" target="_blank" rel="noopener noreferrer">transaction-to-block inclusion probabilities</a>.</li>
-</ul>
-<p><img decoding="async" loading="lazy" src="https://raw.githubusercontent.com/input-output-hk/ouroboros-leios/refs/heads/main/analysis/tx-to-block-cum-slots-fig.svg" alt="transaction-to-block inclusion probabilities" class="img_ev3q"></p>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="next-steps">Next steps<a class="hash-link" aria-label="Direct link to Next steps" title="Direct link to Next steps" href="https://leios.cardano-scaling.org/news/2025/05/19/weekly-progress-summary#next-steps">​</a></h2>
-<ul>
-<li>Continue monitoring and optimizing transaction inclusion rates</li>
-<li>Expand conformance test coverage as the Agda specification evolves</li>
-<li>Further investigate transaction sharding strategies</li>
-<li>Refine transaction lifecycle model based on simulation results.</li>
-</ul>]]></content:encoded>
-            <category>progress</category>
-            <category>update</category>
-            <category>weekly</category>
-            <category>rust-simulation</category>
-            <category>transaction-inclusion</category>
-            <category>conformance-testing</category>
-            <category>formal-specification</category>
-            <category>documentation</category>
-            <category>transaction-lifecycle</category>
-            <category>agda</category>
         </item>
     </channel>
 </rss>
