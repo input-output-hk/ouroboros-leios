@@ -17,8 +17,10 @@ structure Environment where
   Ldiff : Nat
   pSpacingOkay : Probability
   pQuorum : Probability
+  fAdversary : Float
+deriving Repr
 
-def makeEnvironment (activeSlotCoefficient pRbHeaderArrives pEbValidates committeeSize τ : Float) (Lheader Lvote Ldiff : Nat) : Environment :=
+def makeEnvironment (activeSlotCoefficient pRbHeaderArrives pEbValidates committeeSize τ fAdversary : Float) (Lheader Lvote Ldiff : Nat) : Environment :=
   {
     activeSlotCoefficient := activeSlotCoefficient
     Lheader := Lheader
@@ -26,16 +28,20 @@ def makeEnvironment (activeSlotCoefficient pRbHeaderArrives pEbValidates committ
     Ldiff := Ldiff
     pSpacingOkay := (1 - activeSlotCoefficient).pow (3 * Lheader + Lvote + Ldiff - 1).toFloat
     pQuorum := pQuorum (pRbHeaderArrives * pEbValidates) committeeSize τ
+    fAdversary := fAdversary
   }
 
 
 structure State where
+  clock : Nat
   rbCount : Nat
   ebCount : Nat
   canCertify : Bool
 deriving Repr, BEq, Hashable, Inhabited
 
-theorem genesis : (default : State).rbCount = 0 ∧ (default : State).ebCount = 0 := by
+theorem genesis : (default : State).clock = 0 ∧ (default : State).rbCount = 0 ∧ (default : State).ebCount = 0 := by
+  constructor
+  rfl
   constructor
   rfl
   rfl

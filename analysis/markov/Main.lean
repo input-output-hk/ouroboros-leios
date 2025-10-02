@@ -25,9 +25,10 @@ def runMarkovCmd (p : Parsed) : IO UInt32 :=
     let τ : Float := p.flag! "quorum-fraction" |>.as! Float
     let pRbHeaderArrives : Float := p.flag! "p-rb-header-arrives" |>.as! Float
     let pEbValidates : Float := p.flag! "p-eb-validates" |>.as! Float
+    let fAdversary : Float := p.flag! "adversary-fraction" |>.as! Float
     let ε : Float := p.flag! "tolerance" |>.as! Float
     let rbCount : Nat := p.flag! "rb-count" |>.as! Nat
-    let env := makeEnvironment activeSlotCoefficient pRbHeaderArrives pEbValidates committeeSize.toFloat τ Lheader Lvote Ldiff
+    let env := makeEnvironment activeSlotCoefficient pRbHeaderArrives pEbValidates committeeSize.toFloat τ fAdversary Lheader Lvote Ldiff
     let sn := simulate env default ε rbCount
     if p.hasFlag "output-file"
       then IO.FS.writeFile (p.flag! "output-file" |>.as! String) (Json.pretty $ ebDistributionJson sn)
@@ -47,8 +48,9 @@ def markov : Cmd := `[Cli|
     "quorum-fraction"         : Float  ; "τ protocol parameter, in %/100."
     "p-rb-header-arrives"     : Float  ; "Probability that the RB header arrives before L_header."
     "p-eb-validates"          : Float  ; "Probability that the EB is fully validated before 3 L_header + L_vote."
+    "adversary-fraction"      : Float  ; "Fraction of stake that is adversarial."
     "tolerance"               : Float  ; "Discard states with less than this probability."
-    "rb-count"                : Nat    ; "Number of RBs to simulate."
+    "rb-count"                : Nat    ; "Number of potential RBs to simulate."
     "output-file"             : String ; "Path to the JSON output file for the EB distribution."
   EXTENSIONS:
     defaultValues! #[
@@ -60,6 +62,7 @@ def markov : Cmd := `[Cli|
     , ("quorum-fraction"        , "0.75")
     , ("p-rb-header-arrives"    , "0.95")
     , ("p-eb-validates"         , "0.90")
+    , ("adversary-fraction"     , "0"   )
     , ("tolerance"              , "1e-8")
     , ("rb-count"               , "100" )
     ]
