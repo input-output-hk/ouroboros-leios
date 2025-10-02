@@ -1,5 +1,18 @@
 # Leios logbook
 
+## 2025-10-02
+
+### Markovian simulator for Linear Leios
+
+A new [Markovian simulation of Linear Leios](analysis/markov/ReadMe.md) computes the probability of EB certifications as RBs are produced. It probabilistically models four key transitions in Linear Leios and computes the efficiency of RB and EB production under potential adversarial conditions.
+
+1. *Forge RB:* create a new RB.
+2. *Certify:* include a certificate in the RB.
+3. *Forge EB:* create a new EB.
+4. *Vote:* cast votes to reach a quorum.
+
+![Example results](analysis/markov/example-results.png)
+
 ## 2025-09-19
 
 ### Antithesis configuration for Rust simulator
