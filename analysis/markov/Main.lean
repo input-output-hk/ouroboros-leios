@@ -25,10 +25,11 @@ def runMarkovCmd (p : Parsed) : IO UInt32 :=
     let τ : Float := p.flag! "quorum-fraction" |>.as! Float
     let pRbHeaderArrives : Float := p.flag! "p-rb-header-arrives" |>.as! Float
     let pEbValidates : Float := p.flag! "p-eb-validates" |>.as! Float
+    let pLateDiffusion : Float := p.flag! "p-late-diffusion" |>.as! Float
     let fAdversary : Float := p.flag! "adversary-fraction" |>.as! Float
     let ε : Float := p.flag! "tolerance" |>.as! Float
     let rbCount : Nat := p.flag! "rb-count" |>.as! Nat
-    let env := makeEnvironment activeSlotCoefficient pRbHeaderArrives pEbValidates committeeSize.toFloat τ fAdversary Lheader Lvote Ldiff
+    let env := makeEnvironment Lheader Lvote Ldiff activeSlotCoefficient committeeSize.toFloat τ pRbHeaderArrives pEbValidates pLateDiffusion fAdversary
     let sn := simulate env default ε rbCount
     if p.hasFlag "output-file"
       then IO.FS.writeFile (p.flag! "output-file" |>.as! String) (Json.pretty $ ebDistributionJson sn)
@@ -50,6 +51,7 @@ def markov : Cmd := `[Cli|
     "quorum-fraction"         : Float  ; "τ protocol parameter, in %/100."
     "p-rb-header-arrives"     : Float  ; "Probability that the RB header arrives before L_header."
     "p-eb-validates"          : Float  ; "Probability that the EB is fully validated before 3 L_header + L_vote."
+    "p-late-diffusion"        : Float  ; "Probability than a RB producer hasn't validated the previous EB."
     "adversary-fraction"      : Float  ; "Fraction of stake that is adversarial: the adversary never produces RBs or EBs and never votes."
     "tolerance"               : Float  ; "Discard states with less than this probability."
     "rb-count"                : Nat    ; "Number of potential RBs to simulate."
@@ -64,6 +66,7 @@ def markov : Cmd := `[Cli|
     , ("quorum-fraction"        , "0.75")
     , ("p-rb-header-arrives"    , "0.95")
     , ("p-eb-validates"         , "0.90")
+    , ("p-late-diffusion"       , "0.05")
     , ("adversary-fraction"     , "0"   )
     , ("tolerance"              , "1e-8")
     , ("rb-count"               , "100" )

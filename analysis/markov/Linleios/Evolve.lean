@@ -11,7 +11,7 @@ open Lean.ToJson (toJson)
 open Std (HashMap)
 
 
-def forge {env : Environment} (state : State) : Outcomes :=
+def forgeRb {env : Environment} (state : State) : Outcomes :=
   let state' :=
     {
       state with
@@ -19,28 +19,39 @@ def forge {env : Environment} (state : State) : Outcomes :=
     }
   let p := 1 - env.fAdversary
   [
-    ({state' with rbCount := state.rbCount + 1}, p)
-  , (state', 1 - p)
+    ({state' with hasRb := true, rbCount := state.rbCount + 1}, p)
+  , ({state' with hasRb := false, canCertify := false}, 1 - p)
   ]
 
 def certify {env : Environment} (state : State) : Outcomes :=
-  let p := env.pSpacingOkay * (1 - env.fAdversary)
-  if state.canCertify
-    then [
+  if state.hasRb && state.canCertify
+    then let p := env.pSpacingOkay
+         [
            ⟨{state with ebCount := state.ebCount + 1}, p⟩
          , ⟨state, 1 - p⟩
          ]
     else [(state, 1)]
 
+def forgeEb {env : Environment} (state : State) : Outcomes :=
+  if state.hasRb
+    then let p := 1 - env.pLate
+         [
+           ({state with canCertify := true}, p)
+         , ({state with canCertify := false}, 1 - p)
+         ]
+    else [(state, 1)]
+
 def vote {env : Environment} (state : State) : Outcomes :=
-  let p := env.pQuorum * (1 - env.fAdversary)
-  [
-    ({state with canCertify := true}, p)
-  , ({state with canCertify := false}, 1 - p)
-  ]
+  if state.hasRb
+    then let p := env.pQuorum
+         [
+           (state, p)
+         , ({state with canCertify := false}, 1 - p)
+         ]
+    else [(state, 1)]
 
 def step {env : Environment} : List (State → Outcomes) :=
-  [@forge env, @certify env, @vote env]
+  [@forgeRb env, @certify env, @forgeEb env, @vote env]
 
 
 def prune (ε : Float) : Probabilities → Probabilities :=
