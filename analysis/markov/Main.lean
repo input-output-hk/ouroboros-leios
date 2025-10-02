@@ -50,7 +50,7 @@ def markov : Cmd := `[Cli|
     "quorum-fraction"         : Float  ; "τ protocol parameter, in %/100."
     "p-rb-header-arrives"     : Float  ; "Probability that the RB header arrives before L_header."
     "p-eb-validates"          : Float  ; "Probability that the EB is fully validated before 3 L_header + L_vote."
-    "adversary-fraction"      : Float  ; "Fraction of stake that is adversarial."
+    "adversary-fraction"      : Float  ; "Fraction of stake that is adversarial: the adversary never produces RBs or EBs and never votes."
     "tolerance"               : Float  ; "Discard states with less than this probability."
     "rb-count"                : Nat    ; "Number of potential RBs to simulate."
     "output-file"             : String ; "Path to the JSON output file for the EB distribution."
