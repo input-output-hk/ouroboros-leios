@@ -49,9 +49,11 @@ Overall efficiency: 0.331256
 Missing probability: 0.000028
 ```
 
-```console
-$ jq 'to_entries | sort_by(.key | tonumber) | from_entries' tmp.json
+```bash
+jq 'to_entries | sort_by(.key | tonumber) | from_entries' tmp.json
+```
 
+```console
 {
   "8": 0,
   "9": 0.000001,
@@ -100,6 +102,8 @@ $ jq 'to_entries | sort_by(.key | tonumber) | from_entries' tmp.json
   "52": 0
 }
 ```
+
+![Example results](example-results.png)
 
 
 ## Usage
