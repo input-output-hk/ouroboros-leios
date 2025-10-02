@@ -3,6 +3,20 @@
 This Markovian model of Linear Leios computes the probability of EB certifications as RBs are produced.
 
 
+## Parameters
+
+| Symbol          | Flag                    | Default | Description                                                                         |
+|-----------------|-------------------------|--------:|-------------------------------------------------------------------------------------|
+| $L_\text{hdr}$  | `--l-header`            |       1 | Constraint on header diffusion time.                                                |
+| $L_\text{vote}$ | `--l-vote`              |       4 | Constraint on voting time.                                                          |
+| $L_\text{diff}$ | `--l-diff`              |       7 | Constraint on diffusion time.                                                       |
+| $m$             | `--committee-size`      |     600 | Number of members on the voting committee.                                          |
+| $\tau$          | `--quorum-fraction`     |    0.75 | Stake-weighted fraction of committee's votes required to produce a certificate.     |
+| $p_\text{rb}$   | `--p-rb-header-arrives` |    0.95 | Probability that the RB header arrives at the node before $L_\text{hdr}$ seconds.   |
+| $p_\text{eb}$   | `--p-eb-validates`      |    0.90 | Probability that the EB is fully validated before $3 L_\text{hdr} + L_\text{vote}$. |
+| $f_\text{adv}$  | `--adversary-fraction`  |    0.00 | Fraction of stake held by adversaries.                                              |
+
+
 ## Example
 
 The `linleios` program executes the Markov model for EB production in Linear Leios. The protocol parameters and network characteristic are specified as flags on the command line. The program outputs the following information:
@@ -35,11 +49,9 @@ Overall efficiency: 0.331256
 Missing probability: 0.000028
 ```
 
-```bash
-jq 'to_entries | sort_by(.key | tonumber) | from_entries' tmp.json
-```
+```console
+$ jq 'to_entries | sort_by(.key | tonumber) | from_entries' tmp.json
 
-```json
 {
   "8": 0,
   "9": 0.000001,
