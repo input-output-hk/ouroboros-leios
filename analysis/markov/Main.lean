@@ -32,7 +32,9 @@ def runMarkovCmd (p : Parsed) : IO UInt32 :=
     let sn := simulate env default ε rbCount
     if p.hasFlag "output-file"
       then IO.FS.writeFile (p.flag! "output-file" |>.as! String) (Json.pretty $ ebDistributionJson sn)
-    IO.println s!"Efficiency: {(reprPrec (ebEfficiency sn) 0).pretty}"
+    IO.println s!"RB efficiency: {(reprPrec (rbEfficiency sn) 0).pretty}"
+    IO.println s!"EB efficiency: {(reprPrec (ebEfficiency sn) 0).pretty}"
+    IO.println s!"Overall efficiency: {(reprPrec (efficiency sn) 0).pretty}"
     IO.eprintln s!"Missing probability: {1 - totalProbability sn}"
     pure 0
 

@@ -82,6 +82,15 @@ def ebDistribution : Probabilities → HashMap Nat Probability :=
 def ebDistributionJson : Probabilities → Json :=
   Json.mkObj ∘ List.map (fun ⟨k, v⟩ => ⟨toString k, toJson v⟩) ∘ HashMap.toList ∘ ebDistribution
 
+def rbEfficiency (states : Probabilities) : Float :=
+  let clock := states.keys.head!.clock
+  let rbCount :=
+    HashMap.fold
+      (fun acc state p =>acc + state.rbCount.toFloat * p)
+      0
+      states
+  rbCount / clock.toFloat
+
 def ebEfficiency (states : Probabilities) : Float :=
   let clock := states.keys.head!.clock
   let ebCount :=
@@ -90,3 +99,9 @@ def ebEfficiency (states : Probabilities) : Float :=
       0
       states
   ebCount / (clock.toFloat - 1)
+
+def efficiency (states : Probabilities) : Float :=
+  let rb := rbEfficiency states
+  let eb := ebEfficiency states
+  let ρ := 12.5 / 0.9
+  (rb + ρ * eb) / (1 + ρ)
