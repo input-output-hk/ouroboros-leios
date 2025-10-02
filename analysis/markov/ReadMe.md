@@ -62,8 +62,8 @@ Provided that an honest RB exists, an EB can be forged if the node has received 
 Obtaining a successful quorum of votes is distributed according to bernoulli trials where the expected number of successes is the mean committee size and the success probabilities of individual pools accord with the stake distribution. Those success probabilities are modified in several ways:
 
 - *Adversaries do not vote:* probability $f_\text{adv}$.
-- *RB header arrives within $L_\text{hdr}$ slots:* probability $p_\text{rb}$.
-- *EB is fully validated within $3 L_\text{hdr} + L_\text{vote}$ slots*: probability $p_\text{eb}$.
+- *RB header arrives within* $L_\text{hdr}$ *slots:* probability $p_\text{rb}$.
+- *EB is fully validated within* $3 L_\text{hdr} + L_\text{vote}$ *slots*: probability $p_\text{eb}$.
 
 
 ## Parameters
