@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Leios Certificate Viewer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script defer src="{{ url_for('static', filename='app.js') }}"></script>
+</head>
+
+<body>
+    <header>
+        <h1>Leios Certificate Viewer</h1>
+        <form id="run-form">
+            <label for="run-input">Run directory:</label>
+            <input id="run-input" value="run32" />
+            <button type="submit">Load</button>
+        </form>
+    </header>
+
+    <main>
+        <section class="card" id="summary">
+            <h2>Summary</h2>
+            <div class="grid two">
+                <div>
+                    <div><strong>EID</strong>
+                        <div id="eid">—</div>
+                    </div>
+                    <div><strong>Votes size</strong>
+                        <div id="votes_bytes">—</div>
+                    </div>
+                    <div class="gain"><strong>Compression gain</strong>
+                        <div id="compression_ratio">—</div>
+                    </div>
+                </div>
+                <div>
+                    <div><strong>EB hash</strong>
+                        <div id="eb">—</div>
+                    </div>
+                    <div><strong>Certificate size</strong>
+                        <div id="certificate_bytes">—</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="card">
+            <h2>Voters</h2>
+            <div class="grid two">
+                <div>
+                    <h3>Persistent (<span id="pv_count">0</span>)</h3>
+                    <table id="pv_table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Voter ID</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                    <div class="note" id="pv_note" hidden>(sample)</div>
+                </div>
+                <div>
+                    <h3>Non-persistent (<span id="npv_count">0</span>)</h3>
+                    <table id="npv_table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Voter ID</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                    <div class="note" id="npv_note" hidden>(sample)</div>
+                </div>
+            </div>
+        </section>
+    </main>
+</body>
+
+</html>
