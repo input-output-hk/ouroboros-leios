@@ -491,6 +491,48 @@ This outlines Leios impact on the node's tracing system and on dedicated Leios p
 - Comparative benchmarking will require a clearly structured process of integrating new features or changes into the implementation. When many changes are convoluted into one single benchmarkable, it gets increasingly difficult to attribute an observation to a single change - in the worst case, an optimization can obscure a regression when both are introduced in the same benchmarkable.
 - Finding a model / scaled Leios version is an iterative process which requires continuous validation. It will require P&T to be in constant, close coordination with both implementors and researchers.
 
+
+# End-to-end testing
+
+The [cardano-node-tests](https://github.com/IntersectMBO/cardano-node-tests) project offers test suites for end-to-end functional testing and mainnet synchronization testing.
+
+The **end-to-end functional test suite** checks existing functionalities. It operates on both locally deployed testnets and persistent testnets such as Preview and Preprod. With over 500 test cases, it covers a wide spectrum of features, including basic transactions, reward calculation, governance actions, Plutus scripts and chain rollback.
+
+**Linear Leios** primarily impacts the consensus component of `cardano-node`, leaving end-user experience and existing functionalities unchanged. Consequently, the current test suite can largely be used to verify `cardano-node`'s operation after the Leios upgrade, requiring only minor adjustments.
+
+## New end-to-end tests for Leios will focus on two areas
+
+- **Hard-fork testing** from the latest mainnet era to Leios
+- **Upgrading** from the latest mainnet `cardano-node` release to a Leios-enabled release
+
+## New automated upgrade testing test suite
+
+The suite will perform the following actions:
+
+1. **Initialize Testnet**
+   Spin up a local testnet, starting in the Byron era, using the latest mainnet `cardano-node` release.
+
+2. **Initial Functional Tests**
+   Run a subset of the functional tests.
+
+3. **Partial Node Upgrade**
+   Upgrade several block-producing nodes to a Leios-enabled release.
+
+4. **Mid-Upgrade Functional Tests**
+   Run another subset of the functional tests.
+
+5. **Cooperation Check**
+   Verify seamless cooperation between nodes running the latest mainnet `cardano-node` release and those running a Leios-enabled release on the same testnet.
+
+6. **Full Node Upgrade**
+   Upgrade the remaining nodes to a Leios-enabled release.
+
+7. **Leios Hard-Fork**
+   Perform the hard-fork to Leios.
+
+8. **Post-Hard-Fork Functional Tests**
+   Run a final subset of the functional tests.
+
 # Appendix
 > [!WARNING]
 > TODO: consider putting lengthy content here instead
