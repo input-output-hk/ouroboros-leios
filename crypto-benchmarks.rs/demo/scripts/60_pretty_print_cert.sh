@@ -1,43 +1,49 @@
 #!/usr/bin/env bash
 # 60_pretty_print_cert.sh
-# Wrapper that pretty-prints certificate & votes using an embedded Python helper.
-# Usage: ./60_pretty_print_cert.sh -d RUN_DIR
+# Pretty-print certificate & votes using a Python helper.
+# Usage:
+#   ./60_pretty_print_cert.sh -d RUN_DIR [--all-voters] [--max-ids N]
 set -euo pipefail
 
-usage() { echo "Usage: $0 -d RUN_DIR | --dir RUN_DIR"; exit 2; }
+usage() {
+  cat <<'EOF'
+Usage: 60_pretty_print_cert.sh -d RUN_DIR [--all-voters] [--max-ids N]
 
+Options:
+  -d, --dir RUN_DIR     Run directory containing certificate.cbor (and votes.cbor)
+      --all-voters      Include full lists of persistent and non-persistent voters
+      --max-ids N       When not using --all-voters, include at most N voter IDs (default 5)
+EOF
+  exit 2
+}
 
 # Defaults
 DIR=""
+ALL_VOTERS=0
+MAX_IDS="5"
 
-# Parse short options
-while getopts "d:" opt; do
-  case "$opt" in
-    d) DIR="$OPTARG" ;;
-    *) usage ;;
-  esac
-done
-shift $((OPTIND-1))
-
-# Parse long options (e.g., --dir RUN_DIR)
-while (( "$#" )); do
+# Single portable arg parser (handles both short and long flags)
+while [[ $# -gt 0 ]]; do
   case "$1" in
-    --dir)
-      DIR="${2:-}"
-      shift 2 ;;
+    -d|--dir)
+      [[ $# -ge 2 ]] || usage
+      DIR="$2"; shift 2 ;;
+    --all-voters)
+      ALL_VOTERS=1; shift ;;
+    --max-ids)
+      [[ $# -ge 2 ]] || usage
+      MAX_IDS="$2"; shift 2 ;;
     --)
       shift; break ;;
     -*)
       usage ;;
     *)
-      # ignore positional args
+      # ignore stray positional args
       shift ;;
   esac
 done
 
-if [[ -z "${DIR}" ]]; then
-  usage
-fi
+[[ -z "${DIR}" ]] && usage
 
 # Resolve absolute paths
 DIR_ABS="$(cd "${DIR}" 2>/dev/null && pwd || true)"
@@ -52,11 +58,11 @@ CERT="${DIR_ABS}/certificate.cbor"
 VOTES="${DIR_ABS}/votes.cbor"
 
 if [[ ! -f "${CERT}" ]]; then
-  echo "{ \"error\": \"certificate not found: ${CERT}\" }"
+  printf '{ "error": "certificate not found: %s" }\n' "${CERT}"
   exit 1
 fi
 
-# Prefer virtualenv python in demo/.venv if present, then $PYTHON, then python3, then python
+# Prefer venv python in demo/.venv if present, then $PYTHON, then python3, then python
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DEMO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 if [[ -x "${DEMO_ROOT}/.venv/bin/python" ]]; then
@@ -72,9 +78,11 @@ else
   exit 2
 fi
 
-# Run the Python helper, print to console, and also save to RUN_DIR/certificate.pretty.json
-OUTPUT="$("${PY_BIN}" "${SCRIPT_DIR}/pretty_cert.py" "${CERT}" "${VOTES}")"
+# Build args for the Python helper
+PY_ARGS=( "${CERT}" )
+[[ -f "${VOTES}" ]] && PY_ARGS+=( "${VOTES}" )
+PY_ARGS+=( --max-ids "${MAX_IDS}" )
+[[ "${ALL_VOTERS}" -eq 1 ]] && PY_ARGS+=( --all-voters )
 
-# Print to console and save to file
-echo "${OUTPUT}" | tee "${DIR_ABS}/certificate.pretty.json" >/dev/null
-echo "${OUTPUT}"
+# Run the Python helper and emit JSON to both console and file
+"${PY_BIN}" "${SCRIPT_DIR}/pretty_cert.py" "${PY_ARGS[@]}" | tee "${DIR_ABS}/certificate.pretty.json"
