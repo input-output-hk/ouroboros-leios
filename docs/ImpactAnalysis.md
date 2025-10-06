@@ -1,7 +1,7 @@
 ---
 Title: Leios impact analysis
 Status: Draft
-Version: 0.2
+Version: 0.3
 Authors:
   - Michael Karg <michael.karg@iohk.io>
   - Nicolas Frisby <nick.frisby@iohk.io>
@@ -414,8 +414,65 @@ The following experiments each pertain to several of the risks above.
 
 # Ledger
 
+The [Ledger](https://cardano-scaling.github.io/cardano-blueprint/ledger/index.html) is responsible for validating Blocks and represents the actual semantics of Cardano transactions. CIP-164 sketches a protocol design that does not change the semantics of Cardano transactions, does not propose any changes to the transaction structure and also not requires changes to reward calculation. However, the Ledger component usually does not validate individual transactions, but has two entry points:
+
+1. Validating entire block bodies via [BBODY](https://intersectmbo.github.io/formal-ledger-specifications/site/Ledger.Conway.Specification.BlockBody.html#block-body-transition)
+2. Updating rewards and other ledger state (primarily across epochs) via [TICK](https://intersectmbo.github.io/formal-ledger-specifications/site/Ledger.Conway.Specification.RewardUpdate.html#chain-tick-transition)
+
+Both of these entry points will need to be updated to handle the new block structure (ranking blocks not including transactions directly) and to be able to verify certificates (against the voting committee). Any change to the ledger demands a hard-fork and a change in formats or functionality are collected into [ledger eras](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0084#ledger-eras). The changes proposed by CIP-164 will need to go into new ledger era. Which era this will be, depends on when the functionality will be rolled out:
+
+- **REQ-LedgerNewEra**: The ledger must be prepared with a new era that includes all changes required by CIP-164.
+
+For the remainder of this document, let's assume the changes will go into the `Euler` era, where `Conway` is currently the latest and `Dijkstra` is in preparation at the time of writing.
+
+## New block structure
+
+In Praos, all transactions to be verified and applied to the ledger state are included directly in the block body. In Leios, ranking blocks (RB) may not include transactions directly, but instead certificate and reference to an endorsement block (EB) that further references the actual transactions. This gives rise to the following requirements:
+
+- **REQ-LedgerResolvedBlockValidation**: When validating a block body, the ledger must be provided with the endorsed transactions to be applied to the ledger state.
+- **REQ-LedgerTxValidationUnchanged**: The actual transaction validation logic should remain unchanged, i.e., the ledger must validate each transaction as it does today.
+
+The endorsement block itself does not contain any additional information besides a list of transaction identifiers (hashes of the full transaction bytes). Hence, the list of transactions is sufficient to reconstruct the EB body and verify the certificate contained in the RB. The actual transactions to be applied to the ledger state must be provided by the caller of the ledger interface, typically the storage layer or the mempool.
+
+## Certificate verification
+
+In order to verify certificates contained in ranking blocks, the ledger must be aware of the voting committee and able to access their public keys. As defined in by **REQ-RegisterBLSKeys**, SPOs must be able to register their BLS keys to become part of the voting committee. The ledger will need to be able to keep track of the registered keys and use them to do certificate verification. Besides verifiying certificates, individual votes must also be verifiable by other components (e.g. to avoid diffusing invalid votes). This gives rise to:
+
+- **REQ-LedgerStateVotingCommittee**: The Leios voting committee must be part of the ledger state, updated on epoch boundaries and queryable via the state query interface.
+
+Being part of the ledger state, the voting committee will be stored in ledger snapshots and hence on disk in course of Ledger-HD. Depending on how exactly keys will be registered, the ledger might need to be able to access block headers in order to read the BLS public keys from the operational certificate. As this is not the case today (only block bodies are processed by the ledger), this results in requirement:
+
+- **REQ-LedgerBlockHeaderAccess**: The ledger must be able to access block headers.
+
+The voting committee consists of persistent and non-persistent voters. The persistet voters are to be selected at epoch boundaries using a [Fait Accompli sortition scheme](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#votes-and-certificates). Hence:
+
+- **REQ-LedgerCommitteeSelection**: The ledger must select persistent voters in the voting committee at epoch boundaries using the Fait Accompli sortition scheme.
+
+Finally, block validation of the ledger can use the voting committee state to verify certificates contained in ranking blocks:
+
+- **REQ-LedgerCertificateVerification**: The ledger must verify certificates contained in ranking blocks using the voting committee state.
+
+## New protocol parameters
+
+CIP-164 introduces several new protocol parameters that may be updated via on-chain governance. The ledger component is responsible for storing, providing access and updating any protocol parameters. Unless some of the new parameters will be deemed constant (a.k.a globals to the ledger), the following requirements must be satisfied for all new parameters:
+
+- **REQ-LedgerProtocolParameterAccess**: The ledger must provide access to all new protocol parameters via existing interfaces.
+- **REQ-LedgerProtocolParameterUpdate**: The ledger must be able to update all new protocol parameters via on-chain governance.
+
+Concretely, this means defining the `PParams` and `PParamsUpdate` types for the `Euler` era to include the new parameters, as well as providing access via the `EulerPParams` and other type classes.
+
+## Serialization
+
+Traditionally, the ledger component defines the serialization format of blocks and transactions. CIP-164 introduces three new types that need to be serialized and deserialized:
+
+- **REQ-LedgerSerializationRB**: The ranking block body contents must be deterministically de-/serializable from/to bytes using CBOR encoding.
+- **REQ-LedgerSerializationEB**: The endorsement block structure must be deterministically de-/serializable from/to bytes using CBOR encoding.
+- **REQ-LedgerSerializationVote**: The vote structure must be deterministically de-/serializable from/to bytes using CBOR encoding.
+
 > [!WARNING]
-> TODO: Describe requirements and changes to the **Ledger component**
+> TODO: Serialization of votes a consensus component responsibility?
+
+Corresponding types with instances of `EncCBOR` and `DecCBOR` must be provided in the ledger component. The `cardano-ledger` package is a dependency to most of the Haskell codebase, hence these new types can be used in most other components.
 
 # Cryptography
 
