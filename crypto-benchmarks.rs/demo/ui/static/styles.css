@@ -139,3 +139,77 @@ tbody tr:hover {
 #summary .grid.two>div>div {
     margin-bottom: 12px;
 }
+
+.gain div {
+    color: var(--green);
+    font-weight: 700;
+}
+
+/* Wider left column for Committee section */
+.grid.two.wide-left {
+    display: grid;
+    grid-template-columns: 2fr 1.2fr;
+    gap: 16px 20px;
+}
+
+@media (max-width: 1100px) {
+    .grid.two.wide-left {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Extra vertical breathing room between stacked info lines */
+#summary .stack {
+    margin-top: 10px;
+}
+
+#summary .gain div {
+    color: var(--green);
+    font-weight: 700;
+}
+
+/* Make tables never run outside the card */
+.card table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+}
+
+/* Tighten the note under the sample tables */
+.note {
+    margin-top: 6px;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+/* Wider left column for Committee so 32-pool table has room */
+.grid.two.wide-left {
+    display: grid;
+    grid-template-columns: 1.6fr 1.2fr;
+    gap: 16px 20px;
+}
+
+@media (max-width: 1100px) {
+    .grid.two.wide-left {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* More vertical spacing between stacked lines */
+#certificate .stack {
+    margin-top: 10px;
+}
+
+#certificate .gain div {
+    color: var(--green);
+    font-weight: 700;
+}
+
+/* Prevent any table from spilling horizontally */
+.card table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+}

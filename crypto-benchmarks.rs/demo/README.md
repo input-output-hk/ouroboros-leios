@@ -45,7 +45,7 @@ You can run each script individually to understand and control each step of the 
 Initialize inputs for N voters:
 
 ```bash
-scripts/10_init_inputs.sh -d run32
+scripts/10_init_inputs.sh -d run64 --pools 200 --stake 100000 --alpha 8 --beta 1
 ```
 
 #### 20_make_registry.sh
@@ -53,7 +53,7 @@ scripts/10_init_inputs.sh -d run32
 Build the registry from initialized inputs:
 
 ```bash
-scripts/20_make_registry.sh -d run32 -n 32
+scripts/20_make_registry.sh -d run64 -n 64
 ```
 
 #### 30_cast_votes.sh
@@ -61,7 +61,7 @@ scripts/20_make_registry.sh -d run32 -n 32
 Cast votes with a specified fraction of voters voting (e.g., 1.0 means all vote):
 
 ```bash
-scripts/30_cast_votes.sh -d run32 -f 1.0
+scripts/30_cast_votes.sh -d run64 -f 0.75
 ```
 
 #### 40_make_certificate.sh
@@ -69,7 +69,7 @@ scripts/30_cast_votes.sh -d run32 -f 1.0
 Generate the aggregated certificate:
 
 ```bash
-scripts/40_make_certificate.sh -d run32
+scripts/40_make_certificate.sh -d run64
 ```
 
 #### 50_verify_certificate.sh
@@ -77,7 +77,7 @@ scripts/40_make_certificate.sh -d run32
 Verify the generated certificate:
 
 ```bash
-scripts/50_verify_certificate.sh -d run32
+scripts/50_verify_certificate.sh -d run64
 ```
 
 #### 60_pretty_print_cert.sh
@@ -85,13 +85,13 @@ scripts/50_verify_certificate.sh -d run32
 Pretty-print key metrics and statistics of the certificate:
 
 ```bash
-scripts/60_pretty_print_cert.sh -d run32
+scripts/60_pretty_print_cert.sh -d run64
 ```
 
 ### Run a Single End-to-End Demo
 
 ```bash
-scripts/70_run_one.sh -d run32 -n 32 -f 1.0
+scripts/70_run_one.sh -d run64 -n 64 -f 0.75
 ```
 
 This will:
@@ -103,7 +103,7 @@ This will:
 5. Verify the certificate (`50_verify_certificate.sh`)
 6. Pretty-print key metrics (`60_pretty_print_cert.sh`)
 
-All files are placed in `demo/run32/`.
+All files are placed in `demo/run64/`.
 
 ### Sweep Across Multiple N
 

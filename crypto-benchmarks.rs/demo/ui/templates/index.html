@@ -4,14 +4,14 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Leios Certificate Viewer</title>
+    <title>Leios Voting Demo</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <script defer src="{{ url_for('static', filename='app.js') }}"></script>
 </head>
 
 <body>
     <header>
-        <h1>Leios Certificate Viewer</h1>
+        <h1>Leios Voting Demo</h1>
         <form id="run-form">
             <label for="run-input">Run directory:</label>
             <input id="run-input" value="run32" />
@@ -20,32 +20,71 @@
     </header>
 
     <main>
-        <section class="card" id="summary">
-            <h2>Summary</h2>
+        <div id="error_banner" class="banner error" hidden>
+            <strong>Backend error:</strong>
+            <span id="error_text">—</span>
+        </div>
+        <!-- A) Election identifiers -->
+        <section class="card" id="identifiers">
+            <h2>Election identifiers</h2>
             <div class="grid two">
                 <div>
                     <div><strong>EID</strong>
                         <div id="eid">—</div>
-                    </div>
-                    <div><strong>Votes size</strong>
-                        <div id="votes_bytes">—</div>
-                    </div>
-                    <div class="gain"><strong>Compression gain</strong>
-                        <div id="compression_ratio">—</div>
                     </div>
                 </div>
                 <div>
                     <div><strong>EB hash</strong>
                         <div id="eb">—</div>
                     </div>
-                    <div><strong>Certificate size</strong>
-                        <div id="certificate_bytes">—</div>
-                    </div>
                 </div>
             </div>
         </section>
 
-        <section class="card">
+        <!-- B) Committee -->
+        <section class="card" id="committee">
+            <h2>Committee</h2>
+            <div class="grid two wide-left">
+                <!-- Selected pools (target N=32) -->
+                <div>
+                    <h3>Selected pools (<span id="selected_title_count">—</span>)</h3>
+                    <div class="note" id="committee_note">
+                        Derived strictly from <code>registry.cbor.info</code>, ordered by stake (desc), then pool id
+                        (tiebreaker).
+                    </div>
+                    <table id="committee_table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Pool ID</th>
+                                <th>Stake</th>
+                            </tr>
+                        </thead>
+                        <tbody id="selected_tbody"></tbody>
+                    </table>
+                </div>
+                <!-- Elected (derived from certificate for now) -->
+                <div>
+                    <h3>Elected (<span id="elected_title_count">0</span>)</h3>
+                    <div class="note" id="elected_note">
+                        Derived from the certificate voters. Types: <em>persistent</em> or <em>non-persistent</em>.
+                    </div>
+                    <table id="elected_table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Voter ID</th>
+                                <th>Type</th>
+                            </tr>
+                        </thead>
+                        <tbody id="elected_tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- C) Voters -->
+        <section class="card" id="voters">
             <h2>Voters</h2>
             <div class="grid two">
                 <div>
@@ -57,7 +96,7 @@
                                 <th>Voter ID</th>
                             </tr>
                         </thead>
-                        <tbody></tbody>
+                        <tbody id="pv_tbody"></tbody>
                     </table>
                     <div class="note" id="pv_note" hidden>(sample)</div>
                 </div>
@@ -70,12 +109,33 @@
                                 <th>Voter ID</th>
                             </tr>
                         </thead>
-                        <tbody></tbody>
+                        <tbody id="npv_tbody"></tbody>
                     </table>
                     <div class="note" id="npv_note" hidden>(sample)</div>
                 </div>
             </div>
         </section>
+
+        <!-- D) Certificate -->
+        <section class="card" id="certificate">
+            <h2>Certificate</h2>
+            <div class="grid two">
+                <div>
+                    <div class="stack"><strong>Votes size</strong>
+                        <div id="votes_bytes">—</div>
+                    </div>
+                    <div class="stack gain"><strong>Compression gain</strong>
+                        <div id="compression_ratio">—</div>
+                    </div>
+                </div>
+                <div>
+                    <div class="stack"><strong>Certificate size</strong>
+                        <div id="certificate_bytes">—</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
     </main>
 </body>
 
