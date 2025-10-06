@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Usage: demo/scripts/10_init_inputs.sh [-d DEMO_DIR] [--pools 3000] [--stake 100000] [--alpha 5] [--beta 1]
+# Usage: demo/scripts/10_init_inputs.sh [-d DEMO_DIR] [--pools 5000] [--stake 100000] [--alpha 5] [--beta 1]
 DIR_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$DIR_SCRIPT/.env_cli"
 
