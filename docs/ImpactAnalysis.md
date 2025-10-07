@@ -414,16 +414,34 @@ The following experiments each pertain to several of the risks above.
 
 # Ledger
 
-The [Ledger](https://cardano-scaling.github.io/cardano-blueprint/ledger/index.html) is responsible for validating Blocks and represents the actual semantics of Cardano transactions. CIP-164 sketches a protocol design that does not change the semantics of Cardano transactions, does not propose any changes to the transaction structure and also not requires changes to reward calculation. However, the Ledger component usually does not validate individual transactions, but has two entry points:
+The [Ledger](https://cardano-scaling.github.io/cardano-blueprint/ledger/index.html) is responsible for validating Blocks and represents the actual semantics of Cardano transactions. CIP-164 sketches a protocol design that does not change the semantics of Cardano transactions, does not propose any changes to the transaction structure and also not requires changes to reward calculation. The ledger component has three main entry points:
 
-1. Validating entire block bodies via [BBODY](https://intersectmbo.github.io/formal-ledger-specifications/site/Ledger.Conway.Specification.BlockBody.html#block-body-transition)
-2. Updating rewards and other ledger state (primarily across epochs) via [TICK](https://intersectmbo.github.io/formal-ledger-specifications/site/Ledger.Conway.Specification.RewardUpdate.html#chain-tick-transition)
+1. Validating individual transactions via [`LEDGER`](https://intersectmbo.github.io/formal-ledger-specifications/site/Ledger.Conway.Specification.Ledger.html#ledger-transition-system)
+2. Validating entire block bodies via [`BBODY`](https://intersectmbo.github.io/formal-ledger-specifications/site/Ledger.Conway.Specification.BlockBody.html#block-body-transition)
+3. Updating rewards and other ledger state (primarily across epochs) via [`TICK`](https://intersectmbo.github.io/formal-ledger-specifications/site/Ledger.Conway.Specification.RewardUpdate.html#chain-tick-transition)
 
-Both of these entry points will need to be updated to handle the new block structure (ranking blocks not including transactions directly) and to be able to verify certificates (against the voting committee). Any change to the ledger demands a hard-fork and a change in formats or functionality are collected into [ledger eras](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0084#ledger-eras). The changes proposed by CIP-164 will need to go into new ledger era. Which era this will be, depends on when the functionality will be rolled out:
+The first will not need to change functionally, while the latter two will need to be updated to handle the new block structure (ranking blocks not including transactions directly) and to track a voting committee for certificate verification. Any change to the ledger demands a hard-fork and a change in formats or functionality are collected into [ledger eras](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0084#ledger-eras). The changes proposed by CIP-164 will need to go into new ledger era. Which era this will be, depends on when the functionality will be rolled out:
 
 - **REQ-LedgerNewEra**: The ledger must be prepared with a new era that includes all changes required by CIP-164.
 
 For the remainder of this document, let's assume the changes will go into the `Euler` era, where `Conway` is currently the latest and `Dijkstra` is in preparation at the time of writing.
+
+## Transaction validation levels
+
+Validating individual transactions is currently done either via `applyTx` or `reapplyTx` functions. This corresponds to two levels of validation:
+
+- `applyTx` fully validates a transaction, including existence of inputs, checking balances, cryptographic hashes, signatures, evaluation of plutus scripts, etc.
+- `reapplyTx` only check whether a transaction applies to a ledger state. This does not include expensive checks like script evaluation (a.k.a phase-2 validation) or signature verification.
+
+Where possible, `reapplyTx` is used when we know that the transaction has been fully validated before. For example when refreshing the mempool after adopting a new block. With Leios, a third level of validation is introduced: 
+
+- **REQ-LedgerTxNoValidation** The ledger should provide a way to update the ledger state by just applying a transaction without validation.
+
+This third way of updating a ledger state would be used when we have a valid certificate about endorsed transactions in a ranking block. To avoid delaying diffusion of ranking blocks, we do want to do the minimal work necessary once an EB is certified and ease the [protocol security argument](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#protocol-security) with:
+
+- **REQ-LedgerCheapReapply** Updating the ledger state without validation must be significantly cheaper than reapplying a transaction.
+
+Note that this already anticipates that the new, third level `notValidateTx` will be even cheaper than `reapplyTx`. [Existing benchmarks](https://github.com/IntersectMBO/cardano-ledger/tree/master/libs/ledger-state) indicate that `reapplyTx` is already at least one order of magnitude cheaper than `applyTx` for transactions.
 
 ## New block structure
 
@@ -432,13 +450,13 @@ In Praos, all transactions to be verified and applied to the ledger state are in
 - **REQ-LedgerResolvedBlockValidation**: When validating a block body, the ledger must be provided with the endorsed transactions to be applied to the ledger state.
 - **REQ-LedgerTxValidationUnchanged**: The actual transaction validation logic should remain unchanged, i.e., the ledger must validate each transaction as it does today.
 
-The endorsement block itself does not contain any additional information besides a list of transaction identifiers (hashes of the full transaction bytes). Hence, the list of transactions is sufficient to reconstruct the EB body and verify the certificate contained in the RB. The actual transactions to be applied to the ledger state must be provided by the caller of the ledger interface, typically the storage layer or the mempool.
+The endorsement block itself does not contain any additional information besides a list of transaction identifiers (hashes of the full transaction bytes). Hence, the list of transactions is sufficient to reconstruct the EB body and verify the certificate contained in the RB. The actual transactions to be applied to the ledger state must be provided by the caller of the ledger interface, typically the storage layer.
 
 ## Certificate verification
 
 In order to verify certificates contained in ranking blocks, the ledger must be aware of the voting committee and able to access their public keys. As defined in by **REQ-RegisterBLSKeys**, SPOs must be able to register their BLS keys to become part of the voting committee. The ledger will need to be able to keep track of the registered keys and use them to do certificate verification. Besides verifiying certificates, individual votes must also be verifiable by other components (e.g. to avoid diffusing invalid votes). This gives rise to:
 
-- **REQ-LedgerStateVotingCommittee**: The Leios voting committee must be part of the ledger state, updated on epoch boundaries and queryable via the state query interface.
+- **REQ-LedgerStateVotingCommittee**: The Leios voting committee must be part of the ledger state, updated on epoch boundaries and queryable through existing interfaces.
 
 Being part of the ledger state, the voting committee will be stored in ledger snapshots and hence on disk in course of Ledger-HD. Depending on how exactly keys will be registered, the ledger might need to be able to access block headers in order to read the BLS public keys from the operational certificate. As this is not the case today (only block bodies are processed by the ledger), this results in requirement:
 
