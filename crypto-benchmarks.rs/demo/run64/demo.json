@@ -1,0 +1,1728 @@
+{
+  "params": {
+    "N": 64,
+    "pool_count": 199,
+    "total_stake": 100003
+  },
+  "universe": [
+    {
+      "pool_id": "297d513e8a16fface8ffb11d535e89d0f4ca996ece5a8c2dd7395372",
+      "stake": 4558,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "e7ca79019900d2ff1139d3fae05eff7fc474019386f101ffc7a413d1",
+      "stake": 4436,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "510000bd0d89608c5f480100db9abac7ad2c011e8891d8603704d8f1",
+      "stake": 3861,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "f640a7267abc27ff5399b59b783195003b59bd699c7de7b1a94b90e7",
+      "stake": 3666,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "2bffe13687b1d07dd6a5a8c0e4f64f7c565b6b07634bde1cf5cde490",
+      "stake": 3404,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "4014004f403600cc7835b95fa6597a1daf75ee91d2f8a489c4cc4621",
+      "stake": 3261,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "0caaf065c5e8e01e9c9b01ffee6d5d28166daf9e9f013e7c59f5eea0",
+      "stake": 3209,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "2e3fff190094ec4b1e555381f10132cd8503bcfab77ac69f31061f80",
+      "stake": 3208,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "be7f491f0142d68fbe5db88f81f3611a003e1860df76ff4c993bff55",
+      "stake": 3002,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "80576f0db3dd223800c04d529cec22a7a4e95685fb44b3248579d129",
+      "stake": 2818,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "6b33e699e62bb5e9a253e94001b2e0008928af07480180efacf19eff",
+      "stake": 2696,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "1fac9270dce82a31acdb0044ea2bc33001bccfa733a8343ab508f8db",
+      "stake": 2581,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "010000ea011f3b5f560000c3b7ff09099b00cee6c904ff8db5be05af",
+      "stake": 2563,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "ced712e76857ae0301394b9f80d9883aa915438f3a634948e561cb1c",
+      "stake": 2394,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "68ff8120d80176efacffac2b21455d940a19c1c9d7015715015a2ac1",
+      "stake": 2347,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "8ed5d017d237129da3415d93c29bf235b802fa0d1b326d0e00943e7d",
+      "stake": 2340,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "f1ffb84f6cd5961467690750815dc6fe4528e47c10b5029c62aa017d",
+      "stake": 2300,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "f9ffdfc4cfd3aeb25b759621d4dad6c8cbc6d330d3e865f6e2ccdccd",
+      "stake": 2265,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "2859011646cb69e9af2b00f8a6e99a5e98c315c30d3e0950e2f936d6",
+      "stake": 2160,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "ba2e466a8e04eae7d9601b280bff7730395b62f753fc4dc9daac6551",
+      "stake": 2140,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "55077dbd0017ac00133d4d451fee91ffd732ae0f0028ee91d1f4fe25",
+      "stake": 1950,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "71e9fdd001726ccdce084db3f5d19175c88d7a6ffe72fb7bc7ff9fca",
+      "stake": 1570,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "ff017f87e40030d332e3a201790cb4d191f77cff402359afbfc3f133",
+      "stake": 1412,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "2c01ff0bfee051d6f9a0542f83d86f8ace9400a0bbae83125124ad6a",
+      "stake": 1365,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "a6f18a62cd970f4101011eff07f2ab0924c682d95701a591b2703900",
+      "stake": 1358,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "01b517a3397cf1f2fcffb3de23e53b356cff3000ff8175ff15ce46b5",
+      "stake": 1283,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "2a0197eb60069d9b9674b36d01c05633c7fd9fd9ff62ac440101e1b4",
+      "stake": 1275,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "ab65112ee36236dfb0cbe04901dd8664aa53e14e3a2201e8ba43010f",
+      "stake": 1238,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "42ff05ff217a522a4d0157b811f728ee479ddeeeb6bb791fff00adb4",
+      "stake": 1209,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "4a0814a0d39aff838261015cd7696a86d5bc4893ff334d9011f05dff",
+      "stake": 1186,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "19168e8ba075a44ce41eaacc0ba82193fbfdff79adfaef8075e96c25",
+      "stake": 1179,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "b0a969ed896461627b2d580817d6b723ffdd5b57eff345d2ff0dcf1f",
+      "stake": 1153,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "811e1c4eb5acb7088b384601455e118c0501da7e579807ed6f1042cb",
+      "stake": 1126,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "ebe0eb00bf42788a8cd370e5260166436500a39210f516b5d9ebdc8b",
+      "stake": 1107,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "e534f8d3582a76a57f5c28003af6cdf1c3bcd2a977e27c3999f1f9f3",
+      "stake": 1091,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "73efe21dcd67fb690069dfbd0430002c993fe43d775ed60166b93b5b",
+      "stake": 1065,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "4e70a101cb06c0005072c580645652ff9d5e47f717004ccaba9582ad",
+      "stake": 1040,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "500385315cff8eb2e06b532fadaaa001928b08049da30ce6ff93b769",
+      "stake": 1018,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "d7fffa2e2dd3efe4ae003687be09ff11a53cff8c9d36d4130cb4b5fc",
+      "stake": 934,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "3b96fb5124d0df7e90440fa9ff5501bfab014b31db694c01b03ddbbe",
+      "stake": 908,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "c140043b5a723fe346f700bf44f4b40a8c4f324dbe17b5ac01e3b45e",
+      "stake": 893,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "db5640fd0014ee5c43b3498573454314eeeb89ffbf001f5724e3ff1b",
+      "stake": 750,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "90d495ff0101155eb09ed7ebb1760016b444316a202eff090b82a0c9",
+      "stake": 746,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "58ffff4bd20fc2838e882341014f43f2b5a22934207a2c4f7a57e409",
+      "stake": 717,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "ff49416cbb7e6309ef340b8702deb8cf8d77019b1cc62cf76c3b426e",
+      "stake": 698,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "a82c016500d5ffb7845300684039d9628352c61d6f45d7c1d0d58941",
+      "stake": 642,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "a69cf8710100aba9476c695c78fcbdcb9b89a84e0191695d2a5dcc47",
+      "stake": 631,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "0a754dfc0100b004638dbd846abe3ec155c82b0f8dee5f5e6c00d9ff",
+      "stake": 568,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "f3aacec30955e959ce047c75ffdea67b77d8b9fffab3aa01ffde0dcb",
+      "stake": 560,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "443e7518ab3045e4ff88cb23c4a334d997747e24a64e9ea34f247505",
+      "stake": 539,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "6733785fcc6301e8e58df40e90ed37ee1ef53cb05179007300d31564",
+      "stake": 533,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "1ecb00477c12ef001979a45884f823fac7c2572527fa810c9e0e7aea",
+      "stake": 498,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "01aa219b77ffff26b05caa247625319fc2673c3bfadb0136dc14a604",
+      "stake": 495,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "9d8a72e60df13e75575c00947192a3d493014bf5ce4f4f00a000370b",
+      "stake": 430,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "75d82022f485bcedb6b38c3a01016bd7050fdc9edc2f7fbaa09a40bc",
+      "stake": 415,
+      "is_persistent": true
+    },
+    {
+      "pool_id": "d252010f5c7a970bb92626da9c8e2280921e997c83ee499148bb5101",
+      "stake": 358,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "9adf3ed0bcc79e9b2f9781e209fdd604132868b5ba9e7bb26cff6c5b",
+      "stake": 353,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "2b9199fadb0a912d78b7010e12ff6298aec7000d000462b5b061e4f1",
+      "stake": 315,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "b839bc8cf9f25702013e019bd0d3318c380097e105f9915b653192cb",
+      "stake": 297,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "2b6edf630000468d9dc8f60fffcb9281957c01f6dc945a6a764689f1",
+      "stake": 294,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "bb2ada9401fb84d1a407a8d6a95dfad6a4f30f40bc74ff6fe85a1f77",
+      "stake": 292,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "edcd00b778815439000046ac0036806b2e49e5208b97f2373eefa399",
+      "stake": 290,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "1aaa13bf4f51da2001ac5d0059d846cbdce7ebb95718c9a3dc4b8313",
+      "stake": 285,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "aac1f0971050401758f1597d75d7ff429661fd80f2ae7efddcff2b44",
+      "stake": 282,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "2c807bb6431eba01bafdccb7ed9724ffe4a4ff9b60e0499b0e66c82e",
+      "stake": 280,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "00b76527d1f8f75a1c8bc8d47737a1456f39e900f92ddc360a44035d",
+      "stake": 251,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "caffe8edb5c9fa60ff0101934957014a489501b91b1785f9bfc07b91",
+      "stake": 218,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "c3d75a8b44f1bca7dfdd77a7bd837e5c3fca45ffcdffaff54f950023",
+      "stake": 215,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "3d38fc9218cc6ee9a2bbff011ed815fcb156d14211c11599be5ba788",
+      "stake": 202,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "01503a091fdf01a1fe93bb8cd54e858e11efcb3062ffc08fe5551c61",
+      "stake": 196,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "a9b7d4687b76cfaaf5336bd1b8056a9801d64d472e62ff46d03128a0",
+      "stake": 196,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "ffe264724801dbe3c900838152e884435c57e51a8ef9a701028a3969",
+      "stake": 181,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "cf8a0ae2ff175c5dddb4b3f82bde410a62e6284c3eb8b0c95a001e77",
+      "stake": 161,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "4e01238c2f8994651251c1f3009331e9e38602f0b3c6ff5c78ff86eb",
+      "stake": 160,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "30010fecff2471437901d979b0949fdf0029888ca985041359957bfe",
+      "stake": 157,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "0083ff8b27e6e9ff193bab599900507f97627b3696e5cd0101a65a12",
+      "stake": 146,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "6b5ecc2d7900f8732d944bff0031f84a59dc015bffd801a0bc3a01d1",
+      "stake": 144,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "207309e066ffaf681d01ec627f6b26eb017401568fe788b73101e470",
+      "stake": 137,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "001cb6d54c00316a5bdc38c25dec0002805d01275300c8556ebcc3f0",
+      "stake": 120,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "531fd03400ff89603a49cf1292c85bdd014aac24b4b06cac87bb35cc",
+      "stake": 112,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "ee0e8f64875d4573c839c801a2ff844d822f0c0a8583efabe800bee8",
+      "stake": 106,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "5756abb4f757ff01cb5b72028c01f5b9c38acefd6a6e13fd58019595",
+      "stake": 102,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "4d01b0bcc8c8006300a331d71fe30b1e4d25bf9977015fdaac58e496",
+      "stake": 99,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "1af27c3f21e7009c0aac1f653901718fc24f46c80b1001086ebbc000",
+      "stake": 88,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "dc9000e798a70e9582018179fb1dedf3ff439929b54f01c62300ba34",
+      "stake": 86,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "335701a8a706df54592e06d0b0a6303f86c8a0cf45160f4233063a23",
+      "stake": 77,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "ff435e46f95900e77300c809c9acbee7be000a177d27af8e5677c1d0",
+      "stake": 67,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "80e59d860f7af300c8fa0a0085381e98ffc016c55201f4e07903c5b5",
+      "stake": 63,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "0101caf77c2455864e765290680006008ea882ff7119336178d570d6",
+      "stake": 58,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "b0c6e4ac306cee2a93d0883901ff024056298dbfe3caff01651a5f40",
+      "stake": 55,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "01c7fff54615ff017aeefa017a436f01018062949601e3c1e17361d3",
+      "stake": 54,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "86341e8327010418ec386fc2472b68faeabd07e601ca3c4a9c60dcd9",
+      "stake": 45,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "ba50ebe1716c7bc601769781f4d001f60f2b01a500637393d5d71c1e",
+      "stake": 44,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "0563d9b90133ff2a61b0db2d654cbd8b34845d4550582f3799c047b4",
+      "stake": 42,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "000d0069f82085e3f6239016124290523a41a616a849bab01f098a39",
+      "stake": 41,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "265f28934f7ebd02014e9e301300ff940490a806f824a063f4dd0006",
+      "stake": 38,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "02a542e643ed8181ff0094d801520de5de6eab31e93af8b98ab4ab16",
+      "stake": 36,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "f4a9c6af00ff7f38fca05fbb30c612201d0747e85d46c9c739feec61",
+      "stake": 33,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "fa44e912ce3e0138976ccd75a43ed91b005a2b81382a55fe30457001",
+      "stake": 33,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "0f45ccc70009f917c37ce778ffd15e6feb94301501ae61470013ab95",
+      "stake": 32,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "ae763c00f5eb985709e87c7052eefcef8c6e2e00053ae43dbbadde23",
+      "stake": 29,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "0e49da3e75c8da00da48bf4f44ad6a6773d12ea6e2fbd06ac4708498",
+      "stake": 28,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "7da0a5ff9b13a7fb37f086c7ffff23eb6e9f22ecb737cf847ed0f54f",
+      "stake": 25,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "7adca68c6dae1a9ffd8e750e365724ff1973e8000bc5d414be96ddd8",
+      "stake": 23,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "b4795c951bdc6eb4b4fff0e7fb58a0ed66019b6feeb3d672f5d5fe4c",
+      "stake": 22,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "355d06bb68721a3f32012d7e01cdce721fff534b64daac0cf4c81154",
+      "stake": 18,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "c31868f06551db9fb49efa008c986ad74f016e5e7b16ebfa974f2638",
+      "stake": 18,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "f9b715e13a124f5020a11f2dca0100a701fbc2d464717ea7cbff563e",
+      "stake": 17,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "8017be2c179b0b006b994cc3e360ff4a01855bffccff265f15dec969",
+      "stake": 15,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "d97dec3dced0d17cff6e28ff0164475d66d4ff408bef00b06dd47514",
+      "stake": 15,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "18daffe3f32a85016a9d3b191ff243bfa00126d57bf7c96ce3740160",
+      "stake": 14,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "637ea1112b52012500377800fcbe2d630d49f7d112cfd811062c0001",
+      "stake": 14,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "d4559298046806732261ff121033bfcad7727f2e3fcd19fa7d92f221",
+      "stake": 13,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "3963d9c18518b0ed37d5e2f13a761f42ca42834400351d07ab006e88",
+      "stake": 11,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "f8095955680192bd0b5c1fd1fb097e77d4009a3528aa1da5b03f01bb",
+      "stake": 10,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "0de3e268b7a37d6be7858651fcb0e4471aaa004d107101be225b52b2",
+      "stake": 9,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "20ecc3af4979fdd8182e70d95fff01a000010b269a07e6eb4b2110a5",
+      "stake": 8,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "93a2f528ea475c20765525ae00370aeea70db47dff0d80516f25b5a5",
+      "stake": 8,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "99ed0aeb8fecf0ff4f005bb2e314bd82009a306da0b5d2005af20e2d",
+      "stake": 7,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "a7000014ff9c2d4d01ff650cb658a2ab68de94017955252b452cbb67",
+      "stake": 7,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "478d8eed13452a013ed5cacffadcca01b0515c1de41e956a4c008200",
+      "stake": 5,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "7888ffdcd24591bbcd6435a6e45b2927070a691221c710d04c4a1462",
+      "stake": 5,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "ff25ff7affffe9ffb4acff8830154f6c5ae61cca9900ccf9e9a0b9e1",
+      "stake": 5,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "1fcd8559ffd00f01118267bdcf2249918fdeeb0045fb01d8d48e3c61",
+      "stake": 4,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "54e2bbe6cb0118b4f300e499cdb1d56b7c01e0ff23ae3bb1c98180b9",
+      "stake": 4,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "f835c4cf5356f604e3d50f321d3c2b41248f700103762400479d59fc",
+      "stake": 4,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "82e98351e11d9cad3affca45e6348fdb1f81055d880013b709be427e",
+      "stake": 3,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "bc2e1db28d542ac322050c271aef6c419effaceb9118c59c343ec4e5",
+      "stake": 3,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "ccd3b6592176ff005baf7e6fd5eaa0853f219b3f0dbeefe8c801ebc2",
+      "stake": 3,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "d8fff0ffe3ff7fd67e59ae471725c4e2af3e6c56f00d012f52620104",
+      "stake": 3,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "ec3a4f922b9fecda5bd4746503ff085b6e9f322838644adbb950dffc",
+      "stake": 3,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "22277d0101e05d42a527f33785e6b08631c02dcf3de70ba550f5c9ff",
+      "stake": 2,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "59006160937cac095bbc4ce7a96a8f3fe5527659008f95b4eefba797",
+      "stake": 2,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "71b1a01a93ff410e7bf4391404ce537f5d0d19ba967dc2eec8a636b7",
+      "stake": 2,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "98b59653e3bf4859d49bafc5e540abeb8d2339c56232b837ffb833b4",
+      "stake": 2,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "ff25ff50f09bee01f10058ffdc596d91dee5f60005b9b3ffa951f879",
+      "stake": 2,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "37c401bad06f05d2ec9a77da395b3156372600ffee4f511b6864d02a",
+      "stake": 1,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "39010395d8f5e16969d721797bf846618a525e32015b23c7c60176ea",
+      "stake": 1,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "49f07c93777ce5720c35c21a48cadb9cfde005015033f3f5b4cb2b88",
+      "stake": 1,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "8300897d3c7d6e9a2907335fce58eef00009f22a56e500f46201392f",
+      "stake": 1,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "95a79da700235961ff73dc78ff5b6d2401177e79b5b2c6dbef711484",
+      "stake": 1,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "c3838dcbac6ee5c64999c3160517199db36edf0a00ffaac9adf22798",
+      "stake": 1,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "ff9314d1834e2506f701fcdaeca726b512ff518bc31b8c1136e4c4eb",
+      "stake": 1,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "ffcae231011c0d6bdd7546303abb2f1ca253e6f2a9f980008afcafff",
+      "stake": 1,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "00b9364927d3ff64bdb81559031af0a79793de4dd18a2004524316cd",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "00b9bd6144ff16889ff63ce92f500e0144e1f3578f34220090c9f8ab",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "01511e82363771cc1101c4409bde01c2ff2d692f58a88eae37cd187a",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "01752201757f364caac686e9e34d20896999bb6064003b1494726af5",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "017e5ea1a154748a90be98ecd0436cac89776ca200029eff3a95de2c",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "10a8c8ec01ed04434f7a463e14ff0a994296e97718a822c46baab88c",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "113e737d14c51476cb5db565ef179759e99a1d44999084108f2866d8",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "13717c14c3207e44d578edff0bf76a2c4e6930990e35a0009970010f",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "14ffc31bfb0110002db1187f26b16bd3482d9fafff519fb0d3b2a38d",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "20dba91387599e09d5606b6aefec981d0f5b0fed8501b579cb8e848f",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "34e8478201ffbeb0ab04fe41eabb095d36ed6e0087340fe617d09955",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "3a06013f8b1a6691aa4d9a2c952b89ce112616774ccd9e24422f09a4",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "3a6e005c411e8ef0c3a2852aec01890dd7ce00bc7e8400b983477701",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "3d007bd3a16b52cb06e5701d5b4466a5007619ccbd19871c77eaf57b",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "50446c4f26ffaf6598c783410bcdde5905354efe00fce6f7375301ff",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "522a8d515c38e3b9fffc8dcb25016b018ebaf1010164012024e0a338",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "52aa09ff004fdd8fc3f149163e7d79257aaf5d4fc3cff7576d029c7b",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "5300231cfdec3f47e44411fc8ebd00f924f45f5420a44d42ffff4681",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "596ebe0738ca1b90cbcbd10a0b804ac20001f94e6474ff384229c14c",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "5abdb5007572b254df05579124c6ff921b0051405af73ea7aba38220",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "5db101e507115c40e4468201231453ad67e1ef7d33ef52e8f601e246",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "5e8b326e867efc6e6af10f22029ed62e10d86bd2ab252f280d1a4f48",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "5ef19efeff7c483e5643b481e40d8af0f6f07bcfffbddd378a6e5407",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "639a0e1530c500d14d4d849c3c95907957896ba98b125e3f00ffd631",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "653debf312a13afba13f2cf426c101292000de0a090ea91e0d3d39dd",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "6c00017cc07aada307933f15167a869f11a101c21deee345d8bf3f25",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "6d1a598dcca7d4c324d50c0940016067507622b6a485252aa60c6969",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "71aace9f096f1101d3fd3b005694ff6242461ccb710ada3800429d4a",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "7500290ce900ff55e0ead88900fcae3b6130aabdce1c82251b864abc",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "7a5b49558d006748d492ec8d7b5a4c3150f101032e05f601b292b4cf",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "7da96f49fff07a7c1e3a000150fe00209b1dff4b7bafecb9d2ce0459",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "7f00a078e500d7d25c47be2cde9531d28b16fcf2e33919fcd9e44901",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "8a8aa178e900bea547c0d05b2aebc95545476a1a1ddf508defec68fa",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "925cff8cc10114e6b4bb6b644ab1515ad1d5f7a14acace906001d9b9",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "9629f17dafd13dd2ff50a10e5875c22b657cd97cff53ff2a2d18a14a",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "9a15ba62b8db62910e9c3912d1343a91437ab701ff24b9656deea4ae",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "9a453c8df82bffc7d689000bdc7ef50d6de0ae20c601be6ed34f7150",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "9a780054ff9f0d133a21e1830af5944b2168f7577790eedb3d01752d",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "9c67c57acd01a8e832000d00184438b80f9342b162c401c1a1be12e3",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "a05bff2f497264b839ab77016b7cff8b371a36ccb643ff0500b629d9",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "a1d4f80d5a0c3b0df1c53100d60000e6d3852a4d4d2d7d843c22a437",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "a1e427086d013db41e1c5097ef6c60c76531a5313e29c037f49757eb",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "a4e29acfb9642ee43438b0513c2a96ef4def8262d069c3acd2462501",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "afe159d207188718330fff49e3ffa0d27b834cb49b6bf656ff8f0154",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "bc5cbcfb2fd1ecbebf89daa69c579108a91b13ff95ae8946ff290340",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "c2b4ccea0d400dee7e42defe8a983648db60ff54103f6871fc07f5e3",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "cb80746a9eb1765bb7490080a3012d0e010936c16ea6923c551e3b72",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "d6dcab7100bf65a073e5003e0cf162cfc22bdbd6c971cb70ee0b3ca7",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "e0e9010efff096cb8e8dd7cc6d01dbf70c362755da9618f63f26e235",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "ee7b6eff6f754401ffc74f6d14a6087eebe1a80100ff8dbf60dd9ca5",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "f42f010142a697076ea5f42296b10f45cdca1087df799ca8ef8a195c",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "fecb57048d31890103990628480100b05211e497adc8dd2ddd5af14f",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "ff03ff27010810b9c9fd4006d59eb200ae937ce98ef499967cb80100",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "ff14b167c2f0d174457ac4bda2b2c91a18b77ea16232cd0001de80f2",
+      "stake": 0,
+      "is_persistent": false
+    },
+    {
+      "pool_id": "ff330da5a8f6da32801d8f923d07ff6ec2640157fc483f34f1a483e7",
+      "stake": 0,
+      "is_persistent": false
+    }
+  ],
+  "persistent_map": {
+    "0": "297d513e8a16fface8ffb11d535e89d0f4ca996ece5a8c2dd7395372",
+    "1": "e7ca79019900d2ff1139d3fae05eff7fc474019386f101ffc7a413d1",
+    "2": "510000bd0d89608c5f480100db9abac7ad2c011e8891d8603704d8f1",
+    "3": "f640a7267abc27ff5399b59b783195003b59bd699c7de7b1a94b90e7",
+    "4": "2bffe13687b1d07dd6a5a8c0e4f64f7c565b6b07634bde1cf5cde490",
+    "5": "4014004f403600cc7835b95fa6597a1daf75ee91d2f8a489c4cc4621",
+    "6": "0caaf065c5e8e01e9c9b01ffee6d5d28166daf9e9f013e7c59f5eea0",
+    "7": "2e3fff190094ec4b1e555381f10132cd8503bcfab77ac69f31061f80",
+    "8": "be7f491f0142d68fbe5db88f81f3611a003e1860df76ff4c993bff55",
+    "9": "80576f0db3dd223800c04d529cec22a7a4e95685fb44b3248579d129",
+    "10": "6b33e699e62bb5e9a253e94001b2e0008928af07480180efacf19eff",
+    "11": "1fac9270dce82a31acdb0044ea2bc33001bccfa733a8343ab508f8db",
+    "12": "010000ea011f3b5f560000c3b7ff09099b00cee6c904ff8db5be05af",
+    "13": "ced712e76857ae0301394b9f80d9883aa915438f3a634948e561cb1c",
+    "14": "68ff8120d80176efacffac2b21455d940a19c1c9d7015715015a2ac1",
+    "15": "8ed5d017d237129da3415d93c29bf235b802fa0d1b326d0e00943e7d",
+    "16": "f1ffb84f6cd5961467690750815dc6fe4528e47c10b5029c62aa017d",
+    "17": "f9ffdfc4cfd3aeb25b759621d4dad6c8cbc6d330d3e865f6e2ccdccd",
+    "18": "2859011646cb69e9af2b00f8a6e99a5e98c315c30d3e0950e2f936d6",
+    "19": "ba2e466a8e04eae7d9601b280bff7730395b62f753fc4dc9daac6551",
+    "20": "55077dbd0017ac00133d4d451fee91ffd732ae0f0028ee91d1f4fe25",
+    "21": "71e9fdd001726ccdce084db3f5d19175c88d7a6ffe72fb7bc7ff9fca",
+    "22": "ff017f87e40030d332e3a201790cb4d191f77cff402359afbfc3f133",
+    "23": "2c01ff0bfee051d6f9a0542f83d86f8ace9400a0bbae83125124ad6a",
+    "24": "a6f18a62cd970f4101011eff07f2ab0924c682d95701a591b2703900",
+    "25": "01b517a3397cf1f2fcffb3de23e53b356cff3000ff8175ff15ce46b5",
+    "26": "2a0197eb60069d9b9674b36d01c05633c7fd9fd9ff62ac440101e1b4",
+    "27": "ab65112ee36236dfb0cbe04901dd8664aa53e14e3a2201e8ba43010f",
+    "28": "42ff05ff217a522a4d0157b811f728ee479ddeeeb6bb791fff00adb4",
+    "29": "4a0814a0d39aff838261015cd7696a86d5bc4893ff334d9011f05dff",
+    "30": "19168e8ba075a44ce41eaacc0ba82193fbfdff79adfaef8075e96c25",
+    "31": "b0a969ed896461627b2d580817d6b723ffdd5b57eff345d2ff0dcf1f",
+    "32": "811e1c4eb5acb7088b384601455e118c0501da7e579807ed6f1042cb",
+    "33": "ebe0eb00bf42788a8cd370e5260166436500a39210f516b5d9ebdc8b",
+    "34": "e534f8d3582a76a57f5c28003af6cdf1c3bcd2a977e27c3999f1f9f3",
+    "35": "73efe21dcd67fb690069dfbd0430002c993fe43d775ed60166b93b5b",
+    "36": "4e70a101cb06c0005072c580645652ff9d5e47f717004ccaba9582ad",
+    "37": "500385315cff8eb2e06b532fadaaa001928b08049da30ce6ff93b769",
+    "38": "d7fffa2e2dd3efe4ae003687be09ff11a53cff8c9d36d4130cb4b5fc",
+    "39": "3b96fb5124d0df7e90440fa9ff5501bfab014b31db694c01b03ddbbe",
+    "40": "c140043b5a723fe346f700bf44f4b40a8c4f324dbe17b5ac01e3b45e",
+    "41": "db5640fd0014ee5c43b3498573454314eeeb89ffbf001f5724e3ff1b",
+    "42": "90d495ff0101155eb09ed7ebb1760016b444316a202eff090b82a0c9",
+    "43": "58ffff4bd20fc2838e882341014f43f2b5a22934207a2c4f7a57e409",
+    "44": "ff49416cbb7e6309ef340b8702deb8cf8d77019b1cc62cf76c3b426e",
+    "45": "a82c016500d5ffb7845300684039d9628352c61d6f45d7c1d0d58941",
+    "46": "a69cf8710100aba9476c695c78fcbdcb9b89a84e0191695d2a5dcc47",
+    "47": "0a754dfc0100b004638dbd846abe3ec155c82b0f8dee5f5e6c00d9ff",
+    "48": "f3aacec30955e959ce047c75ffdea67b77d8b9fffab3aa01ffde0dcb",
+    "49": "443e7518ab3045e4ff88cb23c4a334d997747e24a64e9ea34f247505",
+    "50": "6733785fcc6301e8e58df40e90ed37ee1ef53cb05179007300d31564",
+    "51": "1ecb00477c12ef001979a45884f823fac7c2572527fa810c9e0e7aea",
+    "52": "01aa219b77ffff26b05caa247625319fc2673c3bfadb0136dc14a604",
+    "53": "9d8a72e60df13e75575c00947192a3d493014bf5ce4f4f00a000370b",
+    "54": "75d82022f485bcedb6b38c3a01016bd7050fdc9edc2f7fbaa09a40bc"
+  },
+  "committee": [
+    {
+      "index": 1,
+      "pool_id": "297d513e8a16fface8ffb11d535e89d0f4ca996ece5a8c2dd7395372",
+      "stake": 4558
+    },
+    {
+      "index": 2,
+      "pool_id": "e7ca79019900d2ff1139d3fae05eff7fc474019386f101ffc7a413d1",
+      "stake": 4436
+    },
+    {
+      "index": 3,
+      "pool_id": "510000bd0d89608c5f480100db9abac7ad2c011e8891d8603704d8f1",
+      "stake": 3861
+    },
+    {
+      "index": 4,
+      "pool_id": "f640a7267abc27ff5399b59b783195003b59bd699c7de7b1a94b90e7",
+      "stake": 3666
+    },
+    {
+      "index": 5,
+      "pool_id": "2bffe13687b1d07dd6a5a8c0e4f64f7c565b6b07634bde1cf5cde490",
+      "stake": 3404
+    },
+    {
+      "index": 6,
+      "pool_id": "4014004f403600cc7835b95fa6597a1daf75ee91d2f8a489c4cc4621",
+      "stake": 3261
+    },
+    {
+      "index": 7,
+      "pool_id": "0caaf065c5e8e01e9c9b01ffee6d5d28166daf9e9f013e7c59f5eea0",
+      "stake": 3209
+    },
+    {
+      "index": 8,
+      "pool_id": "2e3fff190094ec4b1e555381f10132cd8503bcfab77ac69f31061f80",
+      "stake": 3208
+    },
+    {
+      "index": 9,
+      "pool_id": "be7f491f0142d68fbe5db88f81f3611a003e1860df76ff4c993bff55",
+      "stake": 3002
+    },
+    {
+      "index": 10,
+      "pool_id": "80576f0db3dd223800c04d529cec22a7a4e95685fb44b3248579d129",
+      "stake": 2818
+    },
+    {
+      "index": 11,
+      "pool_id": "6b33e699e62bb5e9a253e94001b2e0008928af07480180efacf19eff",
+      "stake": 2696
+    },
+    {
+      "index": 12,
+      "pool_id": "1fac9270dce82a31acdb0044ea2bc33001bccfa733a8343ab508f8db",
+      "stake": 2581
+    },
+    {
+      "index": 13,
+      "pool_id": "010000ea011f3b5f560000c3b7ff09099b00cee6c904ff8db5be05af",
+      "stake": 2563
+    },
+    {
+      "index": 14,
+      "pool_id": "ced712e76857ae0301394b9f80d9883aa915438f3a634948e561cb1c",
+      "stake": 2394
+    },
+    {
+      "index": 15,
+      "pool_id": "68ff8120d80176efacffac2b21455d940a19c1c9d7015715015a2ac1",
+      "stake": 2347
+    },
+    {
+      "index": 16,
+      "pool_id": "8ed5d017d237129da3415d93c29bf235b802fa0d1b326d0e00943e7d",
+      "stake": 2340
+    },
+    {
+      "index": 17,
+      "pool_id": "f1ffb84f6cd5961467690750815dc6fe4528e47c10b5029c62aa017d",
+      "stake": 2300
+    },
+    {
+      "index": 18,
+      "pool_id": "f9ffdfc4cfd3aeb25b759621d4dad6c8cbc6d330d3e865f6e2ccdccd",
+      "stake": 2265
+    },
+    {
+      "index": 19,
+      "pool_id": "2859011646cb69e9af2b00f8a6e99a5e98c315c30d3e0950e2f936d6",
+      "stake": 2160
+    },
+    {
+      "index": 20,
+      "pool_id": "ba2e466a8e04eae7d9601b280bff7730395b62f753fc4dc9daac6551",
+      "stake": 2140
+    },
+    {
+      "index": 21,
+      "pool_id": "55077dbd0017ac00133d4d451fee91ffd732ae0f0028ee91d1f4fe25",
+      "stake": 1950
+    },
+    {
+      "index": 22,
+      "pool_id": "71e9fdd001726ccdce084db3f5d19175c88d7a6ffe72fb7bc7ff9fca",
+      "stake": 1570
+    },
+    {
+      "index": 23,
+      "pool_id": "ff017f87e40030d332e3a201790cb4d191f77cff402359afbfc3f133",
+      "stake": 1412
+    },
+    {
+      "index": 24,
+      "pool_id": "2c01ff0bfee051d6f9a0542f83d86f8ace9400a0bbae83125124ad6a",
+      "stake": 1365
+    },
+    {
+      "index": 25,
+      "pool_id": "a6f18a62cd970f4101011eff07f2ab0924c682d95701a591b2703900",
+      "stake": 1358
+    },
+    {
+      "index": 26,
+      "pool_id": "01b517a3397cf1f2fcffb3de23e53b356cff3000ff8175ff15ce46b5",
+      "stake": 1283
+    },
+    {
+      "index": 27,
+      "pool_id": "2a0197eb60069d9b9674b36d01c05633c7fd9fd9ff62ac440101e1b4",
+      "stake": 1275
+    },
+    {
+      "index": 28,
+      "pool_id": "ab65112ee36236dfb0cbe04901dd8664aa53e14e3a2201e8ba43010f",
+      "stake": 1238
+    },
+    {
+      "index": 29,
+      "pool_id": "42ff05ff217a522a4d0157b811f728ee479ddeeeb6bb791fff00adb4",
+      "stake": 1209
+    },
+    {
+      "index": 30,
+      "pool_id": "4a0814a0d39aff838261015cd7696a86d5bc4893ff334d9011f05dff",
+      "stake": 1186
+    },
+    {
+      "index": 31,
+      "pool_id": "19168e8ba075a44ce41eaacc0ba82193fbfdff79adfaef8075e96c25",
+      "stake": 1179
+    },
+    {
+      "index": 32,
+      "pool_id": "b0a969ed896461627b2d580817d6b723ffdd5b57eff345d2ff0dcf1f",
+      "stake": 1153
+    },
+    {
+      "index": 33,
+      "pool_id": "811e1c4eb5acb7088b384601455e118c0501da7e579807ed6f1042cb",
+      "stake": 1126
+    },
+    {
+      "index": 34,
+      "pool_id": "ebe0eb00bf42788a8cd370e5260166436500a39210f516b5d9ebdc8b",
+      "stake": 1107
+    },
+    {
+      "index": 35,
+      "pool_id": "e534f8d3582a76a57f5c28003af6cdf1c3bcd2a977e27c3999f1f9f3",
+      "stake": 1091
+    },
+    {
+      "index": 36,
+      "pool_id": "73efe21dcd67fb690069dfbd0430002c993fe43d775ed60166b93b5b",
+      "stake": 1065
+    },
+    {
+      "index": 37,
+      "pool_id": "4e70a101cb06c0005072c580645652ff9d5e47f717004ccaba9582ad",
+      "stake": 1040
+    },
+    {
+      "index": 38,
+      "pool_id": "500385315cff8eb2e06b532fadaaa001928b08049da30ce6ff93b769",
+      "stake": 1018
+    },
+    {
+      "index": 39,
+      "pool_id": "d7fffa2e2dd3efe4ae003687be09ff11a53cff8c9d36d4130cb4b5fc",
+      "stake": 934
+    },
+    {
+      "index": 40,
+      "pool_id": "3b96fb5124d0df7e90440fa9ff5501bfab014b31db694c01b03ddbbe",
+      "stake": 908
+    },
+    {
+      "index": 41,
+      "pool_id": "c140043b5a723fe346f700bf44f4b40a8c4f324dbe17b5ac01e3b45e",
+      "stake": 893
+    },
+    {
+      "index": 42,
+      "pool_id": "db5640fd0014ee5c43b3498573454314eeeb89ffbf001f5724e3ff1b",
+      "stake": 750
+    },
+    {
+      "index": 43,
+      "pool_id": "90d495ff0101155eb09ed7ebb1760016b444316a202eff090b82a0c9",
+      "stake": 746
+    },
+    {
+      "index": 44,
+      "pool_id": "58ffff4bd20fc2838e882341014f43f2b5a22934207a2c4f7a57e409",
+      "stake": 717
+    },
+    {
+      "index": 45,
+      "pool_id": "ff49416cbb7e6309ef340b8702deb8cf8d77019b1cc62cf76c3b426e",
+      "stake": 698
+    },
+    {
+      "index": 46,
+      "pool_id": "a82c016500d5ffb7845300684039d9628352c61d6f45d7c1d0d58941",
+      "stake": 642
+    },
+    {
+      "index": 47,
+      "pool_id": "a69cf8710100aba9476c695c78fcbdcb9b89a84e0191695d2a5dcc47",
+      "stake": 631
+    },
+    {
+      "index": 48,
+      "pool_id": "0a754dfc0100b004638dbd846abe3ec155c82b0f8dee5f5e6c00d9ff",
+      "stake": 568
+    },
+    {
+      "index": 49,
+      "pool_id": "f3aacec30955e959ce047c75ffdea67b77d8b9fffab3aa01ffde0dcb",
+      "stake": 560
+    },
+    {
+      "index": 50,
+      "pool_id": "443e7518ab3045e4ff88cb23c4a334d997747e24a64e9ea34f247505",
+      "stake": 539
+    },
+    {
+      "index": 51,
+      "pool_id": "6733785fcc6301e8e58df40e90ed37ee1ef53cb05179007300d31564",
+      "stake": 533
+    },
+    {
+      "index": 52,
+      "pool_id": "1ecb00477c12ef001979a45884f823fac7c2572527fa810c9e0e7aea",
+      "stake": 498
+    },
+    {
+      "index": 53,
+      "pool_id": "01aa219b77ffff26b05caa247625319fc2673c3bfadb0136dc14a604",
+      "stake": 495
+    },
+    {
+      "index": 54,
+      "pool_id": "9d8a72e60df13e75575c00947192a3d493014bf5ce4f4f00a000370b",
+      "stake": 430
+    },
+    {
+      "index": 55,
+      "pool_id": "75d82022f485bcedb6b38c3a01016bd7050fdc9edc2f7fbaa09a40bc",
+      "stake": 415
+    },
+    {
+      "index": 56,
+      "pool_id": "d252010f5c7a970bb92626da9c8e2280921e997c83ee499148bb5101",
+      "stake": 358
+    },
+    {
+      "index": 57,
+      "pool_id": "9adf3ed0bcc79e9b2f9781e209fdd604132868b5ba9e7bb26cff6c5b",
+      "stake": 353
+    },
+    {
+      "index": 58,
+      "pool_id": "2b9199fadb0a912d78b7010e12ff6298aec7000d000462b5b061e4f1",
+      "stake": 315
+    },
+    {
+      "index": 59,
+      "pool_id": "b839bc8cf9f25702013e019bd0d3318c380097e105f9915b653192cb",
+      "stake": 297
+    },
+    {
+      "index": 60,
+      "pool_id": "2b6edf630000468d9dc8f60fffcb9281957c01f6dc945a6a764689f1",
+      "stake": 294
+    },
+    {
+      "index": 61,
+      "pool_id": "bb2ada9401fb84d1a407a8d6a95dfad6a4f30f40bc74ff6fe85a1f77",
+      "stake": 292
+    },
+    {
+      "index": 62,
+      "pool_id": "edcd00b778815439000046ac0036806b2e49e5208b97f2373eefa399",
+      "stake": 290
+    },
+    {
+      "index": 63,
+      "pool_id": "1aaa13bf4f51da2001ac5d0059d846cbdce7ebb95718c9a3dc4b8313",
+      "stake": 285
+    },
+    {
+      "index": 64,
+      "pool_id": "aac1f0971050401758f1597d75d7ff429661fd80f2ae7efddcff2b44",
+      "stake": 282
+    }
+  ],
+  "lookup": {
+    "universe_index_by_pool_id": {
+      "297d513e8a16fface8ffb11d535e89d0f4ca996ece5a8c2dd7395372": 0,
+      "e7ca79019900d2ff1139d3fae05eff7fc474019386f101ffc7a413d1": 1,
+      "510000bd0d89608c5f480100db9abac7ad2c011e8891d8603704d8f1": 2,
+      "f640a7267abc27ff5399b59b783195003b59bd699c7de7b1a94b90e7": 3,
+      "2bffe13687b1d07dd6a5a8c0e4f64f7c565b6b07634bde1cf5cde490": 4,
+      "4014004f403600cc7835b95fa6597a1daf75ee91d2f8a489c4cc4621": 5,
+      "0caaf065c5e8e01e9c9b01ffee6d5d28166daf9e9f013e7c59f5eea0": 6,
+      "2e3fff190094ec4b1e555381f10132cd8503bcfab77ac69f31061f80": 7,
+      "be7f491f0142d68fbe5db88f81f3611a003e1860df76ff4c993bff55": 8,
+      "80576f0db3dd223800c04d529cec22a7a4e95685fb44b3248579d129": 9,
+      "6b33e699e62bb5e9a253e94001b2e0008928af07480180efacf19eff": 10,
+      "1fac9270dce82a31acdb0044ea2bc33001bccfa733a8343ab508f8db": 11,
+      "010000ea011f3b5f560000c3b7ff09099b00cee6c904ff8db5be05af": 12,
+      "ced712e76857ae0301394b9f80d9883aa915438f3a634948e561cb1c": 13,
+      "68ff8120d80176efacffac2b21455d940a19c1c9d7015715015a2ac1": 14,
+      "8ed5d017d237129da3415d93c29bf235b802fa0d1b326d0e00943e7d": 15,
+      "f1ffb84f6cd5961467690750815dc6fe4528e47c10b5029c62aa017d": 16,
+      "f9ffdfc4cfd3aeb25b759621d4dad6c8cbc6d330d3e865f6e2ccdccd": 17,
+      "2859011646cb69e9af2b00f8a6e99a5e98c315c30d3e0950e2f936d6": 18,
+      "ba2e466a8e04eae7d9601b280bff7730395b62f753fc4dc9daac6551": 19,
+      "55077dbd0017ac00133d4d451fee91ffd732ae0f0028ee91d1f4fe25": 20,
+      "71e9fdd001726ccdce084db3f5d19175c88d7a6ffe72fb7bc7ff9fca": 21,
+      "ff017f87e40030d332e3a201790cb4d191f77cff402359afbfc3f133": 22,
+      "2c01ff0bfee051d6f9a0542f83d86f8ace9400a0bbae83125124ad6a": 23,
+      "a6f18a62cd970f4101011eff07f2ab0924c682d95701a591b2703900": 24,
+      "01b517a3397cf1f2fcffb3de23e53b356cff3000ff8175ff15ce46b5": 25,
+      "2a0197eb60069d9b9674b36d01c05633c7fd9fd9ff62ac440101e1b4": 26,
+      "ab65112ee36236dfb0cbe04901dd8664aa53e14e3a2201e8ba43010f": 27,
+      "42ff05ff217a522a4d0157b811f728ee479ddeeeb6bb791fff00adb4": 28,
+      "4a0814a0d39aff838261015cd7696a86d5bc4893ff334d9011f05dff": 29,
+      "19168e8ba075a44ce41eaacc0ba82193fbfdff79adfaef8075e96c25": 30,
+      "b0a969ed896461627b2d580817d6b723ffdd5b57eff345d2ff0dcf1f": 31,
+      "811e1c4eb5acb7088b384601455e118c0501da7e579807ed6f1042cb": 32,
+      "ebe0eb00bf42788a8cd370e5260166436500a39210f516b5d9ebdc8b": 33,
+      "e534f8d3582a76a57f5c28003af6cdf1c3bcd2a977e27c3999f1f9f3": 34,
+      "73efe21dcd67fb690069dfbd0430002c993fe43d775ed60166b93b5b": 35,
+      "4e70a101cb06c0005072c580645652ff9d5e47f717004ccaba9582ad": 36,
+      "500385315cff8eb2e06b532fadaaa001928b08049da30ce6ff93b769": 37,
+      "d7fffa2e2dd3efe4ae003687be09ff11a53cff8c9d36d4130cb4b5fc": 38,
+      "3b96fb5124d0df7e90440fa9ff5501bfab014b31db694c01b03ddbbe": 39,
+      "c140043b5a723fe346f700bf44f4b40a8c4f324dbe17b5ac01e3b45e": 40,
+      "db5640fd0014ee5c43b3498573454314eeeb89ffbf001f5724e3ff1b": 41,
+      "90d495ff0101155eb09ed7ebb1760016b444316a202eff090b82a0c9": 42,
+      "58ffff4bd20fc2838e882341014f43f2b5a22934207a2c4f7a57e409": 43,
+      "ff49416cbb7e6309ef340b8702deb8cf8d77019b1cc62cf76c3b426e": 44,
+      "a82c016500d5ffb7845300684039d9628352c61d6f45d7c1d0d58941": 45,
+      "a69cf8710100aba9476c695c78fcbdcb9b89a84e0191695d2a5dcc47": 46,
+      "0a754dfc0100b004638dbd846abe3ec155c82b0f8dee5f5e6c00d9ff": 47,
+      "f3aacec30955e959ce047c75ffdea67b77d8b9fffab3aa01ffde0dcb": 48,
+      "443e7518ab3045e4ff88cb23c4a334d997747e24a64e9ea34f247505": 49,
+      "6733785fcc6301e8e58df40e90ed37ee1ef53cb05179007300d31564": 50,
+      "1ecb00477c12ef001979a45884f823fac7c2572527fa810c9e0e7aea": 51,
+      "01aa219b77ffff26b05caa247625319fc2673c3bfadb0136dc14a604": 52,
+      "9d8a72e60df13e75575c00947192a3d493014bf5ce4f4f00a000370b": 53,
+      "75d82022f485bcedb6b38c3a01016bd7050fdc9edc2f7fbaa09a40bc": 54,
+      "d252010f5c7a970bb92626da9c8e2280921e997c83ee499148bb5101": 55,
+      "9adf3ed0bcc79e9b2f9781e209fdd604132868b5ba9e7bb26cff6c5b": 56,
+      "2b9199fadb0a912d78b7010e12ff6298aec7000d000462b5b061e4f1": 57,
+      "b839bc8cf9f25702013e019bd0d3318c380097e105f9915b653192cb": 58,
+      "2b6edf630000468d9dc8f60fffcb9281957c01f6dc945a6a764689f1": 59,
+      "bb2ada9401fb84d1a407a8d6a95dfad6a4f30f40bc74ff6fe85a1f77": 60,
+      "edcd00b778815439000046ac0036806b2e49e5208b97f2373eefa399": 61,
+      "1aaa13bf4f51da2001ac5d0059d846cbdce7ebb95718c9a3dc4b8313": 62,
+      "aac1f0971050401758f1597d75d7ff429661fd80f2ae7efddcff2b44": 63,
+      "2c807bb6431eba01bafdccb7ed9724ffe4a4ff9b60e0499b0e66c82e": 64,
+      "00b76527d1f8f75a1c8bc8d47737a1456f39e900f92ddc360a44035d": 65,
+      "caffe8edb5c9fa60ff0101934957014a489501b91b1785f9bfc07b91": 66,
+      "c3d75a8b44f1bca7dfdd77a7bd837e5c3fca45ffcdffaff54f950023": 67,
+      "3d38fc9218cc6ee9a2bbff011ed815fcb156d14211c11599be5ba788": 68,
+      "01503a091fdf01a1fe93bb8cd54e858e11efcb3062ffc08fe5551c61": 69,
+      "a9b7d4687b76cfaaf5336bd1b8056a9801d64d472e62ff46d03128a0": 70,
+      "ffe264724801dbe3c900838152e884435c57e51a8ef9a701028a3969": 71,
+      "cf8a0ae2ff175c5dddb4b3f82bde410a62e6284c3eb8b0c95a001e77": 72,
+      "4e01238c2f8994651251c1f3009331e9e38602f0b3c6ff5c78ff86eb": 73,
+      "30010fecff2471437901d979b0949fdf0029888ca985041359957bfe": 74,
+      "0083ff8b27e6e9ff193bab599900507f97627b3696e5cd0101a65a12": 75,
+      "6b5ecc2d7900f8732d944bff0031f84a59dc015bffd801a0bc3a01d1": 76,
+      "207309e066ffaf681d01ec627f6b26eb017401568fe788b73101e470": 77,
+      "001cb6d54c00316a5bdc38c25dec0002805d01275300c8556ebcc3f0": 78,
+      "531fd03400ff89603a49cf1292c85bdd014aac24b4b06cac87bb35cc": 79,
+      "ee0e8f64875d4573c839c801a2ff844d822f0c0a8583efabe800bee8": 80,
+      "5756abb4f757ff01cb5b72028c01f5b9c38acefd6a6e13fd58019595": 81,
+      "4d01b0bcc8c8006300a331d71fe30b1e4d25bf9977015fdaac58e496": 82,
+      "1af27c3f21e7009c0aac1f653901718fc24f46c80b1001086ebbc000": 83,
+      "dc9000e798a70e9582018179fb1dedf3ff439929b54f01c62300ba34": 84,
+      "335701a8a706df54592e06d0b0a6303f86c8a0cf45160f4233063a23": 85,
+      "ff435e46f95900e77300c809c9acbee7be000a177d27af8e5677c1d0": 86,
+      "80e59d860f7af300c8fa0a0085381e98ffc016c55201f4e07903c5b5": 87,
+      "0101caf77c2455864e765290680006008ea882ff7119336178d570d6": 88,
+      "b0c6e4ac306cee2a93d0883901ff024056298dbfe3caff01651a5f40": 89,
+      "01c7fff54615ff017aeefa017a436f01018062949601e3c1e17361d3": 90,
+      "86341e8327010418ec386fc2472b68faeabd07e601ca3c4a9c60dcd9": 91,
+      "ba50ebe1716c7bc601769781f4d001f60f2b01a500637393d5d71c1e": 92,
+      "0563d9b90133ff2a61b0db2d654cbd8b34845d4550582f3799c047b4": 93,
+      "000d0069f82085e3f6239016124290523a41a616a849bab01f098a39": 94,
+      "265f28934f7ebd02014e9e301300ff940490a806f824a063f4dd0006": 95,
+      "02a542e643ed8181ff0094d801520de5de6eab31e93af8b98ab4ab16": 96,
+      "f4a9c6af00ff7f38fca05fbb30c612201d0747e85d46c9c739feec61": 97,
+      "fa44e912ce3e0138976ccd75a43ed91b005a2b81382a55fe30457001": 98,
+      "0f45ccc70009f917c37ce778ffd15e6feb94301501ae61470013ab95": 99,
+      "ae763c00f5eb985709e87c7052eefcef8c6e2e00053ae43dbbadde23": 100,
+      "0e49da3e75c8da00da48bf4f44ad6a6773d12ea6e2fbd06ac4708498": 101,
+      "7da0a5ff9b13a7fb37f086c7ffff23eb6e9f22ecb737cf847ed0f54f": 102,
+      "7adca68c6dae1a9ffd8e750e365724ff1973e8000bc5d414be96ddd8": 103,
+      "b4795c951bdc6eb4b4fff0e7fb58a0ed66019b6feeb3d672f5d5fe4c": 104,
+      "355d06bb68721a3f32012d7e01cdce721fff534b64daac0cf4c81154": 105,
+      "c31868f06551db9fb49efa008c986ad74f016e5e7b16ebfa974f2638": 106,
+      "f9b715e13a124f5020a11f2dca0100a701fbc2d464717ea7cbff563e": 107,
+      "8017be2c179b0b006b994cc3e360ff4a01855bffccff265f15dec969": 108,
+      "d97dec3dced0d17cff6e28ff0164475d66d4ff408bef00b06dd47514": 109,
+      "18daffe3f32a85016a9d3b191ff243bfa00126d57bf7c96ce3740160": 110,
+      "637ea1112b52012500377800fcbe2d630d49f7d112cfd811062c0001": 111,
+      "d4559298046806732261ff121033bfcad7727f2e3fcd19fa7d92f221": 112,
+      "3963d9c18518b0ed37d5e2f13a761f42ca42834400351d07ab006e88": 113,
+      "f8095955680192bd0b5c1fd1fb097e77d4009a3528aa1da5b03f01bb": 114,
+      "0de3e268b7a37d6be7858651fcb0e4471aaa004d107101be225b52b2": 115,
+      "20ecc3af4979fdd8182e70d95fff01a000010b269a07e6eb4b2110a5": 116,
+      "93a2f528ea475c20765525ae00370aeea70db47dff0d80516f25b5a5": 117,
+      "99ed0aeb8fecf0ff4f005bb2e314bd82009a306da0b5d2005af20e2d": 118,
+      "a7000014ff9c2d4d01ff650cb658a2ab68de94017955252b452cbb67": 119,
+      "478d8eed13452a013ed5cacffadcca01b0515c1de41e956a4c008200": 120,
+      "7888ffdcd24591bbcd6435a6e45b2927070a691221c710d04c4a1462": 121,
+      "ff25ff7affffe9ffb4acff8830154f6c5ae61cca9900ccf9e9a0b9e1": 122,
+      "1fcd8559ffd00f01118267bdcf2249918fdeeb0045fb01d8d48e3c61": 123,
+      "54e2bbe6cb0118b4f300e499cdb1d56b7c01e0ff23ae3bb1c98180b9": 124,
+      "f835c4cf5356f604e3d50f321d3c2b41248f700103762400479d59fc": 125,
+      "82e98351e11d9cad3affca45e6348fdb1f81055d880013b709be427e": 126,
+      "bc2e1db28d542ac322050c271aef6c419effaceb9118c59c343ec4e5": 127,
+      "ccd3b6592176ff005baf7e6fd5eaa0853f219b3f0dbeefe8c801ebc2": 128,
+      "d8fff0ffe3ff7fd67e59ae471725c4e2af3e6c56f00d012f52620104": 129,
+      "ec3a4f922b9fecda5bd4746503ff085b6e9f322838644adbb950dffc": 130,
+      "22277d0101e05d42a527f33785e6b08631c02dcf3de70ba550f5c9ff": 131,
+      "59006160937cac095bbc4ce7a96a8f3fe5527659008f95b4eefba797": 132,
+      "71b1a01a93ff410e7bf4391404ce537f5d0d19ba967dc2eec8a636b7": 133,
+      "98b59653e3bf4859d49bafc5e540abeb8d2339c56232b837ffb833b4": 134,
+      "ff25ff50f09bee01f10058ffdc596d91dee5f60005b9b3ffa951f879": 135,
+      "37c401bad06f05d2ec9a77da395b3156372600ffee4f511b6864d02a": 136,
+      "39010395d8f5e16969d721797bf846618a525e32015b23c7c60176ea": 137,
+      "49f07c93777ce5720c35c21a48cadb9cfde005015033f3f5b4cb2b88": 138,
+      "8300897d3c7d6e9a2907335fce58eef00009f22a56e500f46201392f": 139,
+      "95a79da700235961ff73dc78ff5b6d2401177e79b5b2c6dbef711484": 140,
+      "c3838dcbac6ee5c64999c3160517199db36edf0a00ffaac9adf22798": 141,
+      "ff9314d1834e2506f701fcdaeca726b512ff518bc31b8c1136e4c4eb": 142,
+      "ffcae231011c0d6bdd7546303abb2f1ca253e6f2a9f980008afcafff": 143,
+      "00b9364927d3ff64bdb81559031af0a79793de4dd18a2004524316cd": 144,
+      "00b9bd6144ff16889ff63ce92f500e0144e1f3578f34220090c9f8ab": 145,
+      "01511e82363771cc1101c4409bde01c2ff2d692f58a88eae37cd187a": 146,
+      "01752201757f364caac686e9e34d20896999bb6064003b1494726af5": 147,
+      "017e5ea1a154748a90be98ecd0436cac89776ca200029eff3a95de2c": 148,
+      "10a8c8ec01ed04434f7a463e14ff0a994296e97718a822c46baab88c": 149,
+      "113e737d14c51476cb5db565ef179759e99a1d44999084108f2866d8": 150,
+      "13717c14c3207e44d578edff0bf76a2c4e6930990e35a0009970010f": 151,
+      "14ffc31bfb0110002db1187f26b16bd3482d9fafff519fb0d3b2a38d": 152,
+      "20dba91387599e09d5606b6aefec981d0f5b0fed8501b579cb8e848f": 153,
+      "34e8478201ffbeb0ab04fe41eabb095d36ed6e0087340fe617d09955": 154,
+      "3a06013f8b1a6691aa4d9a2c952b89ce112616774ccd9e24422f09a4": 155,
+      "3a6e005c411e8ef0c3a2852aec01890dd7ce00bc7e8400b983477701": 156,
+      "3d007bd3a16b52cb06e5701d5b4466a5007619ccbd19871c77eaf57b": 157,
+      "50446c4f26ffaf6598c783410bcdde5905354efe00fce6f7375301ff": 158,
+      "522a8d515c38e3b9fffc8dcb25016b018ebaf1010164012024e0a338": 159,
+      "52aa09ff004fdd8fc3f149163e7d79257aaf5d4fc3cff7576d029c7b": 160,
+      "5300231cfdec3f47e44411fc8ebd00f924f45f5420a44d42ffff4681": 161,
+      "596ebe0738ca1b90cbcbd10a0b804ac20001f94e6474ff384229c14c": 162,
+      "5abdb5007572b254df05579124c6ff921b0051405af73ea7aba38220": 163,
+      "5db101e507115c40e4468201231453ad67e1ef7d33ef52e8f601e246": 164,
+      "5e8b326e867efc6e6af10f22029ed62e10d86bd2ab252f280d1a4f48": 165,
+      "5ef19efeff7c483e5643b481e40d8af0f6f07bcfffbddd378a6e5407": 166,
+      "639a0e1530c500d14d4d849c3c95907957896ba98b125e3f00ffd631": 167,
+      "653debf312a13afba13f2cf426c101292000de0a090ea91e0d3d39dd": 168,
+      "6c00017cc07aada307933f15167a869f11a101c21deee345d8bf3f25": 169,
+      "6d1a598dcca7d4c324d50c0940016067507622b6a485252aa60c6969": 170,
+      "71aace9f096f1101d3fd3b005694ff6242461ccb710ada3800429d4a": 171,
+      "7500290ce900ff55e0ead88900fcae3b6130aabdce1c82251b864abc": 172,
+      "7a5b49558d006748d492ec8d7b5a4c3150f101032e05f601b292b4cf": 173,
+      "7da96f49fff07a7c1e3a000150fe00209b1dff4b7bafecb9d2ce0459": 174,
+      "7f00a078e500d7d25c47be2cde9531d28b16fcf2e33919fcd9e44901": 175,
+      "8a8aa178e900bea547c0d05b2aebc95545476a1a1ddf508defec68fa": 176,
+      "925cff8cc10114e6b4bb6b644ab1515ad1d5f7a14acace906001d9b9": 177,
+      "9629f17dafd13dd2ff50a10e5875c22b657cd97cff53ff2a2d18a14a": 178,
+      "9a15ba62b8db62910e9c3912d1343a91437ab701ff24b9656deea4ae": 179,
+      "9a453c8df82bffc7d689000bdc7ef50d6de0ae20c601be6ed34f7150": 180,
+      "9a780054ff9f0d133a21e1830af5944b2168f7577790eedb3d01752d": 181,
+      "9c67c57acd01a8e832000d00184438b80f9342b162c401c1a1be12e3": 182,
+      "a05bff2f497264b839ab77016b7cff8b371a36ccb643ff0500b629d9": 183,
+      "a1d4f80d5a0c3b0df1c53100d60000e6d3852a4d4d2d7d843c22a437": 184,
+      "a1e427086d013db41e1c5097ef6c60c76531a5313e29c037f49757eb": 185,
+      "a4e29acfb9642ee43438b0513c2a96ef4def8262d069c3acd2462501": 186,
+      "afe159d207188718330fff49e3ffa0d27b834cb49b6bf656ff8f0154": 187,
+      "bc5cbcfb2fd1ecbebf89daa69c579108a91b13ff95ae8946ff290340": 188,
+      "c2b4ccea0d400dee7e42defe8a983648db60ff54103f6871fc07f5e3": 189,
+      "cb80746a9eb1765bb7490080a3012d0e010936c16ea6923c551e3b72": 190,
+      "d6dcab7100bf65a073e5003e0cf162cfc22bdbd6c971cb70ee0b3ca7": 191,
+      "e0e9010efff096cb8e8dd7cc6d01dbf70c362755da9618f63f26e235": 192,
+      "ee7b6eff6f754401ffc74f6d14a6087eebe1a80100ff8dbf60dd9ca5": 193,
+      "f42f010142a697076ea5f42296b10f45cdca1087df799ca8ef8a195c": 194,
+      "fecb57048d31890103990628480100b05211e497adc8dd2ddd5af14f": 195,
+      "ff03ff27010810b9c9fd4006d59eb200ae937ce98ef499967cb80100": 196,
+      "ff14b167c2f0d174457ac4bda2b2c91a18b77ea16232cd0001de80f2": 197,
+      "ff330da5a8f6da32801d8f923d07ff6ec2640157fc483f34f1a483e7": 198
+    },
+    "committee_index_by_pool_id": {
+      "297d513e8a16fface8ffb11d535e89d0f4ca996ece5a8c2dd7395372": 1,
+      "e7ca79019900d2ff1139d3fae05eff7fc474019386f101ffc7a413d1": 2,
+      "510000bd0d89608c5f480100db9abac7ad2c011e8891d8603704d8f1": 3,
+      "f640a7267abc27ff5399b59b783195003b59bd699c7de7b1a94b90e7": 4,
+      "2bffe13687b1d07dd6a5a8c0e4f64f7c565b6b07634bde1cf5cde490": 5,
+      "4014004f403600cc7835b95fa6597a1daf75ee91d2f8a489c4cc4621": 6,
+      "0caaf065c5e8e01e9c9b01ffee6d5d28166daf9e9f013e7c59f5eea0": 7,
+      "2e3fff190094ec4b1e555381f10132cd8503bcfab77ac69f31061f80": 8,
+      "be7f491f0142d68fbe5db88f81f3611a003e1860df76ff4c993bff55": 9,
+      "80576f0db3dd223800c04d529cec22a7a4e95685fb44b3248579d129": 10,
+      "6b33e699e62bb5e9a253e94001b2e0008928af07480180efacf19eff": 11,
+      "1fac9270dce82a31acdb0044ea2bc33001bccfa733a8343ab508f8db": 12,
+      "010000ea011f3b5f560000c3b7ff09099b00cee6c904ff8db5be05af": 13,
+      "ced712e76857ae0301394b9f80d9883aa915438f3a634948e561cb1c": 14,
+      "68ff8120d80176efacffac2b21455d940a19c1c9d7015715015a2ac1": 15,
+      "8ed5d017d237129da3415d93c29bf235b802fa0d1b326d0e00943e7d": 16,
+      "f1ffb84f6cd5961467690750815dc6fe4528e47c10b5029c62aa017d": 17,
+      "f9ffdfc4cfd3aeb25b759621d4dad6c8cbc6d330d3e865f6e2ccdccd": 18,
+      "2859011646cb69e9af2b00f8a6e99a5e98c315c30d3e0950e2f936d6": 19,
+      "ba2e466a8e04eae7d9601b280bff7730395b62f753fc4dc9daac6551": 20,
+      "55077dbd0017ac00133d4d451fee91ffd732ae0f0028ee91d1f4fe25": 21,
+      "71e9fdd001726ccdce084db3f5d19175c88d7a6ffe72fb7bc7ff9fca": 22,
+      "ff017f87e40030d332e3a201790cb4d191f77cff402359afbfc3f133": 23,
+      "2c01ff0bfee051d6f9a0542f83d86f8ace9400a0bbae83125124ad6a": 24,
+      "a6f18a62cd970f4101011eff07f2ab0924c682d95701a591b2703900": 25,
+      "01b517a3397cf1f2fcffb3de23e53b356cff3000ff8175ff15ce46b5": 26,
+      "2a0197eb60069d9b9674b36d01c05633c7fd9fd9ff62ac440101e1b4": 27,
+      "ab65112ee36236dfb0cbe04901dd8664aa53e14e3a2201e8ba43010f": 28,
+      "42ff05ff217a522a4d0157b811f728ee479ddeeeb6bb791fff00adb4": 29,
+      "4a0814a0d39aff838261015cd7696a86d5bc4893ff334d9011f05dff": 30,
+      "19168e8ba075a44ce41eaacc0ba82193fbfdff79adfaef8075e96c25": 31,
+      "b0a969ed896461627b2d580817d6b723ffdd5b57eff345d2ff0dcf1f": 32,
+      "811e1c4eb5acb7088b384601455e118c0501da7e579807ed6f1042cb": 33,
+      "ebe0eb00bf42788a8cd370e5260166436500a39210f516b5d9ebdc8b": 34,
+      "e534f8d3582a76a57f5c28003af6cdf1c3bcd2a977e27c3999f1f9f3": 35,
+      "73efe21dcd67fb690069dfbd0430002c993fe43d775ed60166b93b5b": 36,
+      "4e70a101cb06c0005072c580645652ff9d5e47f717004ccaba9582ad": 37,
+      "500385315cff8eb2e06b532fadaaa001928b08049da30ce6ff93b769": 38,
+      "d7fffa2e2dd3efe4ae003687be09ff11a53cff8c9d36d4130cb4b5fc": 39,
+      "3b96fb5124d0df7e90440fa9ff5501bfab014b31db694c01b03ddbbe": 40,
+      "c140043b5a723fe346f700bf44f4b40a8c4f324dbe17b5ac01e3b45e": 41,
+      "db5640fd0014ee5c43b3498573454314eeeb89ffbf001f5724e3ff1b": 42,
+      "90d495ff0101155eb09ed7ebb1760016b444316a202eff090b82a0c9": 43,
+      "58ffff4bd20fc2838e882341014f43f2b5a22934207a2c4f7a57e409": 44,
+      "ff49416cbb7e6309ef340b8702deb8cf8d77019b1cc62cf76c3b426e": 45,
+      "a82c016500d5ffb7845300684039d9628352c61d6f45d7c1d0d58941": 46,
+      "a69cf8710100aba9476c695c78fcbdcb9b89a84e0191695d2a5dcc47": 47,
+      "0a754dfc0100b004638dbd846abe3ec155c82b0f8dee5f5e6c00d9ff": 48,
+      "f3aacec30955e959ce047c75ffdea67b77d8b9fffab3aa01ffde0dcb": 49,
+      "443e7518ab3045e4ff88cb23c4a334d997747e24a64e9ea34f247505": 50,
+      "6733785fcc6301e8e58df40e90ed37ee1ef53cb05179007300d31564": 51,
+      "1ecb00477c12ef001979a45884f823fac7c2572527fa810c9e0e7aea": 52,
+      "01aa219b77ffff26b05caa247625319fc2673c3bfadb0136dc14a604": 53,
+      "9d8a72e60df13e75575c00947192a3d493014bf5ce4f4f00a000370b": 54,
+      "75d82022f485bcedb6b38c3a01016bd7050fdc9edc2f7fbaa09a40bc": 55,
+      "d252010f5c7a970bb92626da9c8e2280921e997c83ee499148bb5101": 56,
+      "9adf3ed0bcc79e9b2f9781e209fdd604132868b5ba9e7bb26cff6c5b": 57,
+      "2b9199fadb0a912d78b7010e12ff6298aec7000d000462b5b061e4f1": 58,
+      "b839bc8cf9f25702013e019bd0d3318c380097e105f9915b653192cb": 59,
+      "2b6edf630000468d9dc8f60fffcb9281957c01f6dc945a6a764689f1": 60,
+      "bb2ada9401fb84d1a407a8d6a95dfad6a4f30f40bc74ff6fe85a1f77": 61,
+      "edcd00b778815439000046ac0036806b2e49e5208b97f2373eefa399": 62,
+      "1aaa13bf4f51da2001ac5d0059d846cbdce7ebb95718c9a3dc4b8313": 63,
+      "aac1f0971050401758f1597d75d7ff429661fd80f2ae7efddcff2b44": 64
+    }
+  },
+  "voters": {
+    "persistent_ids": [
+      52,
+      6,
+      30,
+      51,
+      11,
+      26,
+      4,
+      5,
+      28,
+      49,
+      29,
+      36,
+      37,
+      43,
+      50,
+      14,
+      10,
+      21,
+      35,
+      54,
+      15,
+      53,
+      24,
+      45,
+      27,
+      31,
+      8,
+      40,
+      13,
+      41,
+      34,
+      1,
+      33,
+      16,
+      48,
+      17,
+      22
+    ],
+    "nonpersistent_pool_ids": [
+      "001cb6d54c00316a5bdc38c25dec0002805d01275300c8556ebcc3f0",
+      "00b76527d1f8f75a1c8bc8d47737a1456f39e900f92ddc360a44035d",
+      "0101caf77c2455864e765290680006008ea882ff7119336178d570d6",
+      "01503a091fdf01a1fe93bb8cd54e858e11efcb3062ffc08fe5551c61",
+      "1aaa13bf4f51da2001ac5d0059d846cbdce7ebb95718c9a3dc4b8313",
+      "2b6edf630000468d9dc8f60fffcb9281957c01f6dc945a6a764689f1",
+      "2b9199fadb0a912d78b7010e12ff6298aec7000d000462b5b061e4f1",
+      "2c807bb6431eba01bafdccb7ed9724ffe4a4ff9b60e0499b0e66c82e",
+      "30010fecff2471437901d979b0949fdf0029888ca985041359957bfe",
+      "4d01b0bcc8c8006300a331d71fe30b1e4d25bf9977015fdaac58e496",
+      "4e01238c2f8994651251c1f3009331e9e38602f0b3c6ff5c78ff86eb",
+      "531fd03400ff89603a49cf1292c85bdd014aac24b4b06cac87bb35cc",
+      "9adf3ed0bcc79e9b2f9781e209fdd604132868b5ba9e7bb26cff6c5b",
+      "aac1f0971050401758f1597d75d7ff429661fd80f2ae7efddcff2b44",
+      "b0c6e4ac306cee2a93d0883901ff024056298dbfe3caff01651a5f40",
+      "b839bc8cf9f25702013e019bd0d3318c380097e105f9915b653192cb",
+      "c3d75a8b44f1bca7dfdd77a7bd837e5c3fca45ffcdffaff54f950023",
+      "caffe8edb5c9fa60ff0101934957014a489501b91b1785f9bfc07b91",
+      "d252010f5c7a970bb92626da9c8e2280921e997c83ee499148bb5101",
+      "edcd00b778815439000046ac0036806b2e49e5208b97f2373eefa399",
+      "f4a9c6af00ff7f38fca05fbb30c612201d0747e85d46c9c739feec61",
+      "ffe264724801dbe3c900838152e884435c57e51a8ef9a701028a3969"
+    ]
+  },
+  "certificate": {
+    "sigma_tilde_eid_prefix": "906b66a8602c760e",
+    "sigma_tilde_m_prefix": "85b692b4e7a131ae",
+    "eid": "0x64dbf8afc7c8a40c",
+    "eb": "0xcf06b28637f7696c82e5015d8f687b2b7700dccbfa06fe370027dd4bff21a974",
+    "persistent_voters_count": 37,
+    "nonpersistent_voters_count": 22,
+    "votes_bytes": 10380,
+    "certificate_bytes": 2659,
+    "compression_ratio": 3.904
+  }
+}

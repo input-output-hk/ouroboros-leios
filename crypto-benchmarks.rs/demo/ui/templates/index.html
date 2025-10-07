@@ -14,127 +14,76 @@
         <h1>Leios Voting Demo</h1>
         <form id="run-form">
             <label for="run-input">Run directory:</label>
-            <input id="run-input" value="run32" />
+            <input id="run-input" value="run64" placeholder="e.g., run64" />
             <button type="submit">Load</button>
         </form>
     </header>
 
     <main>
+        <!-- 0) Universe -->
+        <section class="card" id="universe">
+            <h2 class="card-title center">Set of SPOs</h2>
+
+            <div class="grid two wide-left">
+                <div>
+                    <div class="stack" style="margin-bottom: 0.5rem;">
+                        <strong>Total pools:</strong> <span id="universe_total">—</span>
+                    </div>
+                    <div class="stack" style="margin-bottom: 0.5rem;">
+                        <strong class="persistent-color">Persistent:</strong>
+                        <span id="universe_persistent" class="count persistent-color">—</span>
+                    </div>
+                    <div class="stack" style="margin-bottom: 0.5rem;">
+                        <strong class="nonpersistent-color">Non-persistent:</strong>
+                        <span id="universe_nonpersistent" class="count nonpersistent-color">—</span>
+                    </div>
+                </div>
+                <div>
+                    <!-- Container where app.js will render a 10×20-ish grid of circles -->
+                    <div id="universe_canvas" class="universe-canvas" role="img" aria-label="Entire set of SPOs grid">
+                        <div id="universe_tooltip" class="tooltip" hidden></div>
+                    </div>
+                    <noscript>Please enable JavaScript to view the SPO visualization.</noscript>
+                </div>
+            </div>
+        </section>
         <div id="error_banner" class="banner error" hidden>
             <strong>Backend error:</strong>
             <span id="error_text">—</span>
         </div>
         <!-- A) Election identifiers -->
         <section class="card" id="identifiers">
-            <h2>Election identifiers</h2>
-            <div class="grid two">
-                <div>
-                    <div><strong>EID</strong>
-                        <div id="eid">—</div>
-                    </div>
+            <h2 class="card-title center">Election</h2>
+            <div class="identifiers-row">
+                <div class="eid-block" style="display:flex;gap:.5rem;align-items:center;min-width:0;">
+                    <strong>EID:</strong>
+                    <span id="eid" class="text-wrap"></span>
                 </div>
-                <div>
-                    <div><strong>EB hash</strong>
-                        <div id="eb">—</div>
-                    </div>
+                <div class="eb-block"
+                    style="display:flex;gap:.5rem;align-items:center;margin-left:auto;text-align:right;justify-content:flex-end;min-width:0;">
+                    <strong>EB hash:</strong>
+                    <span id="eb" class="text-wrap"></span>
                 </div>
             </div>
+            <!--
+            .identifiers-row {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              gap: 1rem;
+            }
+            .eid-block, .eb-block {
+              flex: 1;
+              word-break: break-all;
+            }
+            -->
         </section>
 
-        <!-- B) Committee -->
-        <section class="card" id="committee">
-            <h2>Committee</h2>
-            <div class="grid two wide-left">
-                <!-- Selected pools (target N=32) -->
-                <div>
-                    <h3>Selected pools (<span id="selected_title_count">—</span>)</h3>
-                    <div class="note" id="committee_note">
-                        Derived strictly from <code>registry.cbor.info</code>, ordered by stake (desc), then pool id
-                        (tiebreaker).
-                    </div>
-                    <table id="committee_table">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Pool ID</th>
-                                <th>Stake</th>
-                            </tr>
-                        </thead>
-                        <tbody id="selected_tbody"></tbody>
-                    </table>
-                </div>
-                <!-- Elected (derived from certificate for now) -->
-                <div>
-                    <h3>Elected (<span id="elected_title_count">0</span>)</h3>
-                    <div class="note" id="elected_note">
-                        Derived from the certificate voters. Types: <em>persistent</em> or <em>non-persistent</em>.
-                    </div>
-                    <table id="elected_table">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Voter ID</th>
-                                <th>Type</th>
-                            </tr>
-                        </thead>
-                        <tbody id="elected_tbody"></tbody>
-                    </table>
-                </div>
-            </div>
-        </section>
+        <!-- Committee panel hidden for Step 1 (we focus on the entire set of SPOs). -->
 
-        <!-- C) Voters -->
-        <section class="card" id="voters">
-            <h2>Voters</h2>
-            <div class="grid two">
-                <div>
-                    <h3>Persistent (<span id="pv_count">0</span>)</h3>
-                    <table id="pv_table">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Voter ID</th>
-                            </tr>
-                        </thead>
-                        <tbody id="pv_tbody"></tbody>
-                    </table>
-                    <div class="note" id="pv_note" hidden>(sample)</div>
-                </div>
-                <div>
-                    <h3>Non-persistent (<span id="npv_count">0</span>)</h3>
-                    <table id="npv_table">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Voter ID</th>
-                            </tr>
-                        </thead>
-                        <tbody id="npv_tbody"></tbody>
-                    </table>
-                    <div class="note" id="npv_note" hidden>(sample)</div>
-                </div>
-            </div>
-        </section>
+        <!-- Voters panel hidden for Step 1 (will be enabled in Step 2/3). -->
 
-        <!-- D) Certificate -->
-        <section class="card" id="certificate">
-            <h2>Certificate</h2>
-            <div class="grid two">
-                <div>
-                    <div class="stack"><strong>Votes size</strong>
-                        <div id="votes_bytes">—</div>
-                    </div>
-                    <div class="stack gain"><strong>Compression gain</strong>
-                        <div id="compression_ratio">—</div>
-                    </div>
-                </div>
-                <div>
-                    <div class="stack"><strong>Certificate size</strong>
-                        <div id="certificate_bytes">—</div>
-                    </div>
-                </div>
-            </div>
-        </section>
+        <!-- Certificate panel hidden for Step 1 (will be enabled in Step 4). -->
 
     </main>
 </body>
