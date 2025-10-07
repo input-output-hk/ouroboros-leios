@@ -1,8 +1,6 @@
-from flask import Flask, send_from_directory, jsonify, render_template, request, abort
+from flask import Flask, send_from_directory, jsonify, render_template, request, abort, redirect, url_for
 import os, json, subprocess
 import cbor2
-
-app = Flask(__name__, static_folder="static", template_folder="templates")
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -80,6 +78,15 @@ def registry(run):
         "total_pools": len(pools),
         "total_stake": total_stake
     })
+
+@app.route("/demo/<run>")
+def demo_for_run(run):
+    """Serve demo.json from the given run directory."""
+    run_dir = run_dir_path(run)
+    demo_path = os.path.join(run_dir, "demo.json")
+    if os.path.isfile(demo_path):
+        return send_from_directory(run_dir, "demo.json")
+    abort(404, f"demo.json not found in {run_dir}")
 
 @app.route("/votes/<run>")
 def votes(run):
