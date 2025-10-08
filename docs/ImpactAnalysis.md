@@ -447,13 +447,11 @@ Note that this already anticipates that the new, third level `notValidateTx` wil
 
 In Praos, all transactions to be verified and applied to the ledger state are included directly in the block body. In Leios, ranking blocks (RB) may not include transactions directly, but instead certificate and reference to an endorsement block (EB) that further references the actual transactions. This gives rise to the following requirements:
 
-- **REQ-LedgerResolvedBlockValidation**: When validating a block body, the ledger must be provided with the endorsed transactions to be applied to the ledger state.
+- **REQ-LedgerResolvedBlockValidation**: When validating a ranking block body, the ledger must be provided with all endorsed transactions resolved.
+- **REQ-LedgerUntickedEBValidation**: When validating a ranking block body, the ledger must validate endorsed transactions against the ledger state before updating it with the new ranking block.
 - **REQ-LedgerTxValidationUnchanged**: The actual transaction validation logic should remain unchanged, i.e., the ledger must validate each transaction as it does today.
 
 The endorsement block itself does not contain any additional information besides a list of transaction identifiers (hashes of the full transaction bytes). Hence, the list of transactions is sufficient to reconstruct the EB body and verify the certificate contained in the RB. The actual transactions to be applied to the ledger state must be provided by the caller of the ledger interface, typically the storage layer.
-
-> [!NOTE]
-> In fact, the ledger might need to be provided with the previous block's slot: endorsed transactions need to be valid in the endorsing block's slot. Depending on the details of the consenus/ledger interface used for validating new blocks, this either means that the previous block's slot is provided or the block validation happens in two steps: (1) validate endorsed txs using announcing block's slot, (2) validate the certifying block (which may not contain further transactions).
 
 ## Certificate verification
 
