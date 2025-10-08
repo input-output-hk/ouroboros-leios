@@ -4,16 +4,17 @@
 set -e
 
 mkdir -p results/$d
-for f in lifecycle resources receipts cpus sizes
+#for f in lifecycle resources receipts cpus sizes
+for f in lifecycle certified generated
 do
   DIR=$(find experiments -type f -name $f.csv.gz \( -not -empty \) -printf %h\\n -quit)
   HL=$(sed -n -e '1p' "$DIR/case.csv")
   HR=$(zcat "$DIR/$f.csv.gz" | sed -n -e '1p')
-  if [[ "$f" == "lifecycle" || "$f" == "resources" || "$f" == "sizes" ]]
+  if [[ "$f" == "lifecycle" || "$f" == "resources" || "$f" == "sizes" || "$f" == "certified" || "$f" == "generated" ]]
   then
     FRACT=1.00
   else
-    FRACT=0.25
+    FRACT=0.10
   fi
   (
     echo "$HL,$HR"
