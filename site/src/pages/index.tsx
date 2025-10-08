@@ -59,9 +59,7 @@ function getNextMeeting(now = new Date()) {
         console.warn("Exceptional next meeting date:", exception);
         nextMeeting = exception;
     }
-    const meetingEndTime = new Date(
-        nextMeeting.getTime() + 60 * 60 * 1000,
-    ); // 1 hour after start
+    const meetingEndTime = new Date(nextMeeting.getTime() + 60 * 60 * 1000); // 1 hour after start
 
     // If we're past the current month's meeting end time, get next month's meeting
     if (now >= meetingEndTime) {
@@ -103,7 +101,10 @@ function formatCountdown(ms, isLive = false) {
 
 function LeiosSpecificationSection() {
     return (
-        <section id="specification" className={clsx(styles.videoSection, styles.borderTop)}>
+        <section
+            id="specification"
+            className={clsx(styles.videoSection, styles.borderTop)}
+        >
             <div className="container">
                 <div className="row">
                     <div className="col col--10 col--offset-1">
@@ -545,10 +546,8 @@ function LeiosSpecificationSection() {
                             </div>
                             <div className="col col--5">
                                 <p>
-                                    The proposed Leios specification delivers a
-                                    {" "}
-                                    <strong>30-50x throughput increase</strong>
-                                    {" "}
+                                    The proposed Leios specification delivers a{" "}
+                                    <strong>30-50x throughput increase</strong>{" "}
                                     (from ~4.5 TxkB/s to ~140-300 TxkB/s) while
                                     maintaining manageable ecosystem impact.
                                     Unlike the research paper's approach, which
@@ -587,13 +586,14 @@ function LeiosSpecificationSection() {
 
 function HowLeiosWorksSection() {
     return (
-        <section id="how" className={clsx(styles.videoSection, styles.borderTop)}>
+        <section
+            id="how"
+            className={clsx(styles.videoSection, styles.borderTop)}
+        >
             <div className="container">
                 <div className="row">
                     <div className="col col--10 col--offset-1">
-                        <h2 className="text--center">
-                            How Leios Works
-                        </h2>
+                        <h2 className="text--center">How Leios Works</h2>
                         <p className={clsx("text--center", styles.subtitle)}>
                             Block producers simultaneously create both a
                             standard Praos block and a larger secondary block
@@ -616,9 +616,10 @@ function HowLeiosWorksSection() {
                                         rel="noopener noreferrer"
                                     >
                                         <strong>Endorser Blocks (EBs)</strong>
-                                    </Link>, reference extra transactions that
-                                    would otherwise wait for the standard Praos
-                                    blocks (called{" "}
+                                    </Link>
+                                    , reference extra transactions that would
+                                    otherwise wait for the standard Praos blocks
+                                    (called{" "}
                                     <Link
                                         to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#ranking-blocks-rbs"
                                         target="_blank"
@@ -1351,10 +1352,8 @@ function HowLeiosWorksSection() {
                                                         cursor: "pointer",
                                                     }}
                                                 >
-                                                    Δ<tspan
-                                                        fontSize="16"
-                                                        dy="3"
-                                                    >
+                                                    Δ
+                                                    <tspan fontSize="16" dy="3">
                                                         RB
                                                     </tspan>
                                                     <tspan
@@ -1418,10 +1417,8 @@ function HowLeiosWorksSection() {
                                                         cursor: "pointer",
                                                     }}
                                                 >
-                                                    Δ<tspan
-                                                        fontSize="14"
-                                                        dy="3"
-                                                    >
+                                                    Δ
+                                                    <tspan fontSize="14" dy="3">
                                                         applyTxs
                                                     </tspan>
                                                     <tspan
@@ -1485,10 +1482,8 @@ function HowLeiosWorksSection() {
                                                         cursor: "pointer",
                                                     }}
                                                 >
-                                                    Δ<tspan
-                                                        fontSize="14"
-                                                        dy="3"
-                                                    >
+                                                    Δ
+                                                    <tspan fontSize="14" dy="3">
                                                         EB
                                                     </tspan>
                                                     <tspan
@@ -1552,10 +1547,8 @@ function HowLeiosWorksSection() {
                                                         cursor: "pointer",
                                                     }}
                                                 >
-                                                    Δ<tspan
-                                                        fontSize="14"
-                                                        dy="3"
-                                                    >
+                                                    Δ
+                                                    <tspan fontSize="14" dy="3">
                                                         EB
                                                     </tspan>
                                                     <tspan
@@ -1617,10 +1610,8 @@ function HowLeiosWorksSection() {
                                                         cursor: "pointer",
                                                     }}
                                                 >
-                                                    Δ<tspan
-                                                        fontSize="14"
-                                                        dy="3"
-                                                    >
+                                                    Δ
+                                                    <tspan fontSize="14" dy="3">
                                                         reapply
                                                     </tspan>
                                                     <tspan
@@ -1779,13 +1770,15 @@ function HowLeiosWorksSection() {
                                             </span>
                                             <sub>hdr</sub>
                                         </Link>{" "}
-                                        (<Link
+                                        (
+                                        <Link
                                             to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#equivocation-detection"
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >
                                             header diffusion
-                                        </Link>),{" "}
+                                        </Link>
+                                        ),{" "}
                                         <Link
                                             to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#l-vote"
                                             target="_blank"
@@ -1802,13 +1795,15 @@ function HowLeiosWorksSection() {
                                             </span>
                                             <sub>vote</sub>
                                         </Link>{" "}
-                                        (<Link
+                                        (
+                                        <Link
                                             to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#voting-period"
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >
                                             voting period
-                                        </Link>),{" "}
+                                        </Link>
+                                        ),{" "}
                                         <Link
                                             to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#l-diff"
                                             target="_blank"
@@ -1825,13 +1820,15 @@ function HowLeiosWorksSection() {
                                             </span>
                                             <sub>diff</sub>
                                         </Link>{" "}
-                                        (<Link
+                                        (
+                                        <Link
                                             to="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#diffusion-period"
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >
                                             diffusion period
-                                        </Link>).
+                                        </Link>
+                                        ).
                                     </div>
                                 </div>
                             </div>
@@ -1858,15 +1855,17 @@ function MonthlyReviewsSection() {
             setCountdown(
                 formatCountdown(target.getTime() - now.getTime(), live),
             );
-            setNextDate(target.toLocaleString(undefined, {
-                weekday: "short",
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: false,
-            }));
+            setNextDate(
+                target.toLocaleString(undefined, {
+                    weekday: "short",
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: false,
+                }),
+            );
         }
         updateCountdown();
         const interval = setInterval(updateCountdown, 1000);
@@ -1874,13 +1873,14 @@ function MonthlyReviewsSection() {
     }, []);
 
     return (
-        <section id="next" className={clsx(styles.videoSection, styles.borderTop)}>
+        <section
+            id="next"
+            className={clsx(styles.videoSection, styles.borderTop)}
+        >
             <div className="container">
                 <div className="row">
                     <div className="col col--8 col--offset-2">
-                        <h2 className="text--center">
-                            Stay up to date
-                        </h2>
+                        <h2 className="text--center">Stay up to date</h2>
                         <p className={clsx("text--center", styles.subtitle)}>
                             Catch up on the latest Leios progress, key
                             decisions, and Q&A in our monthly review videos
@@ -1906,7 +1906,7 @@ function MonthlyReviewsSection() {
                             >
                                 <Link
                                     className="button button--primary button--lg"
-                                    to="https://www.youtube.com/watch?v=WEW3Ur2QGCg"
+                                    to="https://www.youtube.com/live/5baqGY7WXAc"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     style={{
@@ -1924,8 +1924,7 @@ function MonthlyReviewsSection() {
                                             style={{
                                                 fontSize: "0.68em",
                                                 fontWeight: 600,
-                                                color:
-                                                    "var(--ifm-color-primary-contrast-background, #222)",
+                                                color: "var(--ifm-color-primary-contrast-background, #222)",
                                                 marginTop: 2,
                                                 lineHeight: 1.2,
                                             }}
@@ -1939,8 +1938,7 @@ function MonthlyReviewsSection() {
                                         style={{
                                             fontSize: "1rem",
                                             marginTop: 10,
-                                            color:
-                                                "var(--ifm-color-emphasis-800)",
+                                            color: "var(--ifm-color-emphasis-800)",
                                             textAlign: "center",
                                             fontWeight: 500,
                                         }}
