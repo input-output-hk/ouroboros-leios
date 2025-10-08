@@ -538,22 +538,27 @@ impl LinearLeiosNode {
                 return None;
             }
 
-            let eb_id = self.leios.ebs_by_rb.get(&rb_id)?;
-            let votes = self.leios.votes_by_eb.get(eb_id)?;
+            let eb_id = *self.leios.ebs_by_rb.get(&rb_id)?;
+            let votes = self.leios.votes_by_eb.get(&eb_id)?;
             let total_votes = votes.values().copied().sum::<usize>();
             if (total_votes as u64) < self.sim_config.vote_threshold {
                 // Not enough votes. No endorsement.
                 return None;
             }
+            let votes = votes.clone();
 
-            // We haven't necessarily finished validating this EB, or even received it and its contents.
-            // That won't stop us from generating the endorsement, though it'll make us produce an empty block.
-            if !self.is_eb_validated(*eb_id) {
-                self.leios.incomplete_onchain_ebs.insert(*eb_id);
+            if let Some(eb) = self.get_validated_eb(eb_id) {
+                // If we're endorsing this EB, clear its TXs out of the mempool now
+                // so that we don't include them in new blocks.
+                self.remove_eb_txs_from_mempool(&eb);
+            } else {
+                // We haven't finished validating this EB, maybe even haven't received it and its contents.
+                // That won't stop us from generating the endorsement, though it'll make us produce an empty block.
+                self.leios.incomplete_onchain_ebs.insert(eb_id);
             }
 
             Some(Endorsement {
-                eb: *eb_id,
+                eb: eb_id,
                 size_bytes: self.sim_config.sizes.cert(votes.len()),
                 votes: votes.clone(),
             })
@@ -1094,13 +1099,18 @@ impl LinearLeiosNode {
     }
 
     fn is_eb_validated(&self, eb_id: EndorserBlockId) -> bool {
-        matches!(
-            self.leios.ebs.get(&eb_id),
+        self.get_validated_eb(eb_id).is_some()
+    }
+
+    fn get_validated_eb(&self, eb_id: EndorserBlockId) -> Option<Arc<EndorserBlock>> {
+        match self.leios.ebs.get(&eb_id) {
             Some(EndorserBlockView::Received {
+                eb,
                 validated: true,
                 ..
-            })
-        )
+            }) => Some(eb.clone()),
+            _ => None,
+        }
     }
 }
 

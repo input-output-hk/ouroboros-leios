@@ -1,6 +1,7 @@
 use std::{
     collections::{BTreeMap, HashMap},
     sync::Arc,
+    time::Duration,
 };
 
 use rand::{RngCore, SeedableRng};
@@ -30,6 +31,8 @@ fn new_sim_config(topology: RawTopology) -> Arc<SimConfiguration> {
         value: tx_size as f64,
     };
     params.tx_max_size_bytes = tx_size;
+    // it takes two votes to certify an EB
+    params.vote_threshold = 2;
     let topology = topology.into();
     Arc::new(SimConfiguration::build(params, topology).unwrap())
 }
@@ -154,6 +157,14 @@ impl TestDriver {
         tx
     }
 
+    pub fn produce_txs<const N: usize>(
+        &mut self,
+        node_id: NodeId,
+        conflict: bool,
+    ) -> [Arc<Transaction>; N] {
+        [(); N].map(|_| self.produce_tx(node_id, conflict))
+    }
+
     pub fn win_next_rb_lottery(&mut self, node_id: NodeId, result: u64) {
         self.lottery
             .get(&node_id)
@@ -247,6 +258,13 @@ impl TestDriver {
 
     pub fn expect_eb_validated(&mut self, node: NodeId, eb: Arc<LinearEndorserBlock>) {
         self.expect_cpu_task(node, CpuTask::EBBlockValidated(eb, self.time.now()));
+    }
+
+    pub fn expect_vote_bundle_sent(&mut self, from: NodeId, to: NodeId, votes: Arc<VoteBundle>) {
+        self.expect_message(from, to, Message::AnnounceVotes(votes.id));
+        self.expect_message(to, from, Message::RequestVotes(votes.id));
+        self.expect_message(from, to, Message::Votes(votes.clone()));
+        self.expect_cpu_task(to, CpuTask::VTBundleValidated(from, votes));
     }
 
     pub fn expect_message(
@@ -394,12 +412,10 @@ fn should_produce_rbs_and_ebs() {
     let node2 = sim.id_for("node-2");
 
     // Node 1 produces three transactions, Node 2 should request them all
-    let tx1_1 = sim.produce_tx(node1, false);
-    sim.expect_tx_sent(node1, node2, tx1_1.clone());
-    let tx1_2 = sim.produce_tx(node1, false);
-    sim.expect_tx_sent(node1, node2, tx1_2.clone());
-    let tx1_3 = sim.produce_tx(node1, false);
-    sim.expect_tx_sent(node1, node2, tx1_3.clone());
+    let [tx1_1, tx1_2, tx1_3] = sim.produce_txs(node1, false);
+    for tx in [&tx1_1, &tx1_2, &tx1_3] {
+        sim.expect_tx_sent(node1, node2, tx.clone());
+    }
 
     sim.win_next_rb_lottery(node1, 0);
     sim.next_slot();
@@ -451,9 +467,7 @@ fn should_repropagate_conflicting_transactions_from_eb() {
     let node3 = sim.id_for("node-3");
 
     // Node 1 produces 3 transactions
-    let tx1_1 = sim.produce_tx(node1, false);
-    let tx1_2 = sim.produce_tx(node1, false);
-    let tx1_3 = sim.produce_tx(node1, false);
+    let [tx1_1, tx1_2, tx1_3] = sim.produce_txs(node1, false);
 
     // Node 2 produces a transaction which conflicts with Node 1's final transaction
     let tx2 = sim.produce_tx(node2, true);
@@ -501,9 +515,7 @@ fn should_vote_for_eb() {
     let node1 = sim.id_for("node-1");
     let node2 = sim.id_for("node-2");
 
-    let txs = (0..3)
-        .map(|_| sim.produce_tx(node1, false))
-        .collect::<Vec<_>>();
+    let txs: [_; 3] = sim.produce_txs(node1, false);
     for tx in &txs {
         sim.expect_tx_sent(node1, node2, tx.clone());
     }
@@ -520,4 +532,58 @@ fn should_vote_for_eb() {
     sim.advance_time_to(sim.now() + (sim.config.header_diffusion_time * 3));
     let vote = sim.expect_cpu_task_matching(node2, is_new_vote_task);
     assert_eq!(*vote.ebs.first_key_value().unwrap().0, eb.id());
+}
+
+#[test]
+fn should_not_include_tx_twice() {
+    let topology = new_topology(vec![
+        ("node-1", new_node(Some(1000), vec!["node-2"])),
+        ("node-2", new_node(Some(1000), vec!["node-1"])),
+    ]);
+    let mut sim = TestDriver::new(topology);
+    let node1 = sim.id_for("node-1");
+    let node2 = sim.id_for("node-2");
+
+    let [rb_tx1, rb_tx2, eb_tx] = sim.produce_txs(node1, false);
+    for tx in [&rb_tx1, &rb_tx2, &eb_tx] {
+        sim.expect_tx_sent(node1, node2, tx.clone());
+    }
+
+    sim.win_next_vote_lottery(node1, 0);
+    sim.win_next_vote_lottery(node2, 0);
+
+    // Node 1 produces an RB containing two transactions, and an EB containing a third
+    sim.win_next_rb_lottery(node1, 0);
+    sim.next_slot();
+    let (rb, eb) = sim.expect_cpu_task_matching(node1, is_new_rb_task);
+    let eb = eb.expect("node did not produce EB");
+    assert!(eb.txs.contains(&eb_tx));
+
+    // Node 2 receives and validates the RB and EB
+    sim.expect_rb_and_eb_sent(node1, node2, rb.clone(), Some(eb.clone()));
+    sim.expect_eb_validated(node2, eb.clone());
+
+    // Nodes 1 and 2 both vote for the EB
+    sim.advance_time_to(sim.now() + (sim.config.header_diffusion_time * 3));
+    let votes_1 = sim.expect_cpu_task_matching(node1, is_new_vote_task);
+    sim.expect_vote_bundle_sent(node1, node2, votes_1);
+    let votes_2 = sim.expect_cpu_task_matching(node2, is_new_vote_task);
+    sim.expect_vote_bundle_sent(node2, node1, votes_2);
+
+    // After enough time has elapsed to include the EB in a new RB, Node 2 mints a new RB
+    sim.advance_time_to(
+        sim.now()
+            + Duration::from_secs(sim.config.linear_diffuse_stage_length)
+            + Duration::from_secs(sim.config.linear_vote_stage_length),
+    );
+    sim.win_next_rb_lottery(node2, 0);
+    sim.next_slot();
+    let (rb, new_eb) = sim.expect_cpu_task_matching(node2, is_new_rb_task);
+
+    // This RB endorses the previous EB (including its transaction on the chain)
+    assert_eq!(rb.endorsement.as_ref().map(|e| e.eb), Some(eb.id()));
+
+    // And it does not include any transactions of its own
+    assert!(rb.transactions.is_empty());
+    assert_eq!(new_eb, None);
 }
