@@ -23,7 +23,7 @@ PLUTUS=$(echo -n "$LABEL" | sed -e 's/^\(.*\),\(.*\)/\1/')
 THROUGHPUT=$(echo -n "$LABEL" | sed -e 's/^\(.*\),\(.*\)/\2/')
 TX_SPACING_HONEST=$(echo "scale=3; $TX_SIZE / $THROUGHPUT / 1000" | bc)
 
-ulimit -S -m 96000000 -v 96000000
+ulimit -S -m 96000000 -v 128000000
 
 if [[ -e sim.log ]]
 then
@@ -77,6 +77,7 @@ grep -E -v '(Slot|CpuTask|Lottery)' sim.log | pigz -p 3 -9c > sim.log.gz &
 
 case "$SIM" in
   Rust)
+    export RUST_BACKTRACE=1
     ../../sim-cli --parameters config.yaml network.yaml --slots "$SIM_STOP" --conformance-events sim.log > stdout 2> stderr
     ;;
   Haskell)
@@ -122,7 +123,9 @@ zcat sim.log.gz \
     + "," + (if .message.endorsement then .message.endorsement.eb.id else "NA" end)
   '
 ) > sizes.csv
-  
+
+../../postprocessing.sh
+
 pigz -p 3 -9f {cpus,lifecycle,receipts,resources,sizes}.csv
 
 cat case.csv
