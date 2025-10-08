@@ -78,10 +78,68 @@
             }
             -->
         </section>
+        <!-- B) Committee (this election) -->
+        <section class="card" id="committee">
+            <h2 class="card-title center">Committee</h2>
+            <p class="card-subtitle center">
+                Persistent (Fait Accompli) and Non-persistent (Local Sortition)
+            </p>
 
-        <!-- Committee panel hidden for Step 1 (we focus on the entire set of SPOs). -->
+            <div class="grid two wide-left">
+                <div>
+                    <div class="stack" style="margin-bottom: 0.5rem;">
+                        <strong>Total committee seats:</strong> <span id="committee_total">—</span>
+                    </div>
+                    <div class="stack" style="margin-bottom: 0.5rem;">
+                        <strong class="persistent-color">Persistent:</strong>
+                        <span id="committee_persistent" class="count persistent-color">—</span>
+                    </div>
+                    <div class="stack" style="margin-bottom: 0.5rem;">
+                        <strong class="nonpersistent-color">Non-persistent:</strong>
+                        <span id="committee_nonpersistent" class="count nonpersistent-color">—</span>
+                    </div>
+                </div>
+                <div id="committee_canvas" class="committee-canvas" role="img" aria-label="Committee members grid">
+                    <div id="committee_tooltip" class="tooltip" hidden></div>
+                </div>
+                <noscript>Please enable JavaScript to view the committee visualization.</noscript>
+            </div>
+        </section>
+        <!-- C) Voters (observed votes) -->
+        <section class="card" id="voters">
+            <h2 class="card-title center">Voters</h2>
 
-        <!-- Voters panel hidden for Step 1 (will be enabled in Step 2/3). -->
+            <div class="grid two wide-left">
+                <div>
+                    <div class="stack" style="margin-bottom: 0.5rem;">
+                        <strong>Total voters:</strong> <span id="voters_total">—</span>
+                    </div>
+                    <div class="stack" style="margin-bottom: 0.5rem;">
+                        <strong class="persistent-color">Persistent:</strong>
+                        <span id="voters_persistent" class="count persistent-color">—</span>
+                    </div>
+                    <div class="stack" style="margin-bottom: 0.5rem;">
+                        <strong class="nonpersistent-color">Non-persistent:</strong>
+                        <span id="voters_nonpersistent" class="count nonpersistent-color">—</span>
+                    </div>
+                    <div class="stack" style="margin-bottom: 0.5rem;">
+                        <span class="nonpersistent-indent">in committee:</span>
+                        <span id="voters_nonpersistent_in_committee" class="count nonpersistent-color">—</span>
+                    </div>
+                    <div class="stack" style="margin-bottom: 0.5rem;">
+                        <span class="nonpersistent-indent">outside committee:</span>
+                        <span id="voters_nonpersistent_outside_committee" class="count nonpersistent-color">—</span>
+                    </div>
+                </div>
+                <div>
+                    <!-- Container where app.js will render the voters grid -->
+                    <div id="voters_canvas" class="universe-canvas" role="img" aria-label="Voters grid">
+                        <div id="voters_tooltip" class="tooltip" hidden></div>
+                    </div>
+                    <noscript>Please enable JavaScript to view the voters visualization.</noscript>
+                </div>
+            </div>
+        </section>
 
         <!-- Certificate panel hidden for Step 1 (will be enabled in Step 4). -->
 

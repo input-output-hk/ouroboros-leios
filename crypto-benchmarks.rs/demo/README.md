@@ -61,7 +61,7 @@ scripts/20_make_registry.sh -d run64 -n 64
 Cast votes with a specified fraction of voters voting (e.g., 1.0 means all vote):
 
 ```bash
-scripts/30_cast_votes.sh -d run64 -f 0.75
+scripts/30_cast_votes.sh -d run64 -f 0.55
 ```
 
 #### 40_make_certificate.sh
@@ -86,6 +86,14 @@ Pretty-print key metrics and statistics of the certificate:
 
 ```bash
 scripts/60_pretty_print_cert.sh -d run64
+```
+
+#### 25_export_demo_json.sh
+
+Export all relevant data (pools, committee, voters, and certificate summary) into a single `demo.json` file used by the visualization UI.
+
+```bash
+scripts/25_export_demo_json.sh -d run64
 ```
 
 ### Run a Single End-to-End Demo

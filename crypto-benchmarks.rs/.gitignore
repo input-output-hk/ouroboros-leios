@@ -4,6 +4,7 @@ target/
 
 # Demo artifacts
 demo/**/*.pretty.json
+demo/**/*.json
 demo/**/*.png
 demo/**/*.csv
 demo/scripts/.env_cli
