@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.3.1
 
 ### Linear Leios
 - Add some protocol-level tests
