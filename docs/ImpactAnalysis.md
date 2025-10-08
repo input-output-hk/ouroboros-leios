@@ -466,7 +466,7 @@ Being part of the ledger state, the voting committee will be stored in ledger sn
 > [!NOTE]
 > This is a very generic requirement and will likely change depending on how the consensus/ledger interface for block validation is realized. It might be desirable to limit the ledger's access to block headers and only provide (a means to extract) relevant information. That is, the BLS public keys to be tracked and the voting committee to be selected from.
 
-The voting committee consists of persistent and non-persistent voters. The persistet voters are to be selected at epoch boundaries using a [Fait Accompli sortition scheme](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#votes-and-certificates). Hence:
+The voting committee consists of persistent and non-persistent voters. The persistent voters are to be selected at epoch boundaries using a [Fait Accompli sortition scheme](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#votes-and-certificates). Hence:
 
 - **REQ-LedgerCommitteeSelection**: The ledger must select persistent voters in the voting committee at epoch boundaries using the Fait Accompli sortition scheme.
 
