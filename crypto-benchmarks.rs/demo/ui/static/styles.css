@@ -32,6 +32,17 @@ body {
     color: var(--orange);
 }
 
+/* utility helpers */
+.center {
+    text-align: center;
+}
+
+.card-subtitle {
+    margin: 0 0 10px;
+    color: var(--muted);
+    font-size: 13px;
+}
+
 header {
     max-width: 1100px;
     margin: 20px auto;
@@ -254,6 +265,21 @@ tbody tr:hover {
     z-index: 1000;
 }
 
+/* Tooltip for voters hover (positioned inside .universe-canvas) */
+#voters_tooltip {
+    position: absolute;
+    padding: 6px 8px;
+    background: rgba(15, 23, 32, 0.98);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 12px;
+    border-radius: 6px;
+    pointer-events: none;
+    white-space: nowrap;
+    transform: translate(-50%, -130%);
+    z-index: 1000;
+}
+
 @media (min-width: 900px) {
     .pool-dot {
         width: 18px;
@@ -306,4 +332,9 @@ tbody tr:hover {
 .mono {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-size: 13.5px;
+}
+
+.nonpersistent-indent {
+    margin-left: 18px;
+    color: var(--orange);
 }
