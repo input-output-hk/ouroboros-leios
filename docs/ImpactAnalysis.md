@@ -452,6 +452,9 @@ In Praos, all transactions to be verified and applied to the ledger state are in
 
 The endorsement block itself does not contain any additional information besides a list of transaction identifiers (hashes of the full transaction bytes). Hence, the list of transactions is sufficient to reconstruct the EB body and verify the certificate contained in the RB. The actual transactions to be applied to the ledger state must be provided by the caller of the ledger interface, typically the storage layer.
 
+> [!NOTE]
+> In fact, the ledger might need to be provided with the previous block's slot: endorsed transactions need to be valid in the endorsing block's slot. Depending on the details of the consenus/ledger interface used for validating new blocks, this either means that the previous block's slot is provided or the block validation happens in two steps: (1) validate endorsed txs using announcing block's slot, (2) validate the certifying block (which may not contain further transactions).
+
 ## Certificate verification
 
 In order to verify certificates contained in ranking blocks, the ledger must be aware of the voting committee and able to access their public keys. As defined in by **REQ-RegisterBLSKeys**, SPOs must be able to register their BLS keys to become part of the voting committee. The ledger will need to be able to keep track of the registered keys and use them to do certificate verification. Besides verifiying certificates, individual votes must also be verifiable by other components (e.g. to avoid diffusing invalid votes). This gives rise to:
@@ -461,6 +464,9 @@ In order to verify certificates contained in ranking blocks, the ledger must be 
 Being part of the ledger state, the voting committee will be stored in ledger snapshots and hence on disk in course of Ledger-HD. Depending on how exactly keys will be registered, the ledger might need to be able to access block headers in order to read the BLS public keys from the operational certificate. As this is not the case today (only block bodies are processed by the ledger), this results in requirement:
 
 - **REQ-LedgerBlockHeaderAccess**: The ledger must be able to access block headers.
+
+> [!NOTE]
+> This is a very generic requirement and will likely change depending on how the consensus/ledger interface for block validation is realized. It might be desirable to limit the ledger's access to block headers and only provide (a means to extract) relevant information. That is, the BLS public keys to be tracked and the voting committee to be selected from.
 
 The voting committee consists of persistent and non-persistent voters. The persistet voters are to be selected at epoch boundaries using a [Fait Accompli sortition scheme](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#votes-and-certificates). Hence:
 
