@@ -1,5 +1,23 @@
 # Leios logbook
 
+## 2025-10-10
+
+### Regression experiment on `sim-cli` 1.3.1
+
+See [analysis/sims/regression/analysis.ipynb](analysis/sims/regression/analysis.ipynb) for the results of a regression experiment of the new `sim-cli` version 1.3.1 versus earlier versions.
+
+## 2025-10-08
+
+### Instructions for running Leios simulations
+
+Instructurions for running the Leios simulators or re-running previous simulation experiments are now available [analysis/sims/ReadMe.md](analysis/sims/ReadMe.md):
+
+- [Building the tools](analysis/sims/ReadMe.md#building-the-tools)
+- [Running the simulators](analysis/sims/ReadMe.md#running-the-simulators)
+- [Running the trace processor](analysis/sims/ReadMe.md#running-the-trace-processor)
+- [Index of simulation studies](analysis/sims/ReadMe.md#index-of-simulation-studies)
+- [Re-reunning simulation studies](analysis/sims/ReadMe.md#re-reunning-simulation-studies)
+
 ## 2025-10-02
 
 ### Markovian simulator for Linear Leios

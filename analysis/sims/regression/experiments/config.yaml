@@ -17,7 +17,7 @@ eb-size-bytes-constant: 240
 eb-size-bytes-per-ib: 32
 leios-header-diffusion-time-ms: 1000.0
 tx-start-time: 60
-tx-stop-time: 960
+tx-stop-time: 660
 tx-generation-distribution:
   distribution: constant
   value: 10.0
