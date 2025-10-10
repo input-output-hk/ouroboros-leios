@@ -23,7 +23,7 @@ PLUTUS=$(echo -n "$LABEL" | sed -e 's/^\(.*\),\(.*\)/\1/')
 THROUGHPUT=$(echo -n "$LABEL" | sed -e 's/^\(.*\),\(.*\)/\2/')
 TX_SPACING_HONEST=$(echo "scale=3; $TX_SIZE / $THROUGHPUT / 1000" | bc)
 
-ulimit -S -m 80000000 -v 80000000
+ulimit -S -m 128000000 -v 128000000
 
 if [[ -e sim.log ]]
 then
@@ -111,6 +111,8 @@ zcat sim.log.gz \
   --resource-file resources.csv \
   --receipt-file receipts.csv
 
+pigz -p 3 -9f {cpus,lifecycle,receipts,resources}.csv
+
 (
   echo 'Kind,Item,Generated [s],Transactions,Endorses'
   zcat sim.log.gz \
@@ -122,11 +124,9 @@ zcat sim.log.gz \
     + "," + (.message.transactions | length | tostring)
     + "," + (if .message.endorsement then .message.endorsement.eb.id else "NA" end)
   '
-) > sizes.csv
+) | pigz -p 3 -9c > sizes.csv
 
 ../../postprocessing.sh
-
-pigz -p 3 -9f {cpus,lifecycle,receipts,resources,sizes}.csv
 
 cat case.csv
 
