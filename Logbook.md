@@ -2,6 +2,21 @@
 
 ## 2025-10-10
 
+### Extended analysis of ledger operations
+
+The [previously analyzed ledger operations dataset](analysis/timings/) has been extended with additional dependent and independent variables that may be useful in analyses:
+
+- Total time for apply/reapply
+- Forecast time for apply/reapply
+- Header/body-tick time for apply/reapply
+- Header/body-block time for apply/reapply
+- Number of transactions in the block
+- Total size of transactions in the block
+- Plutus memory units in the block
+- Plutus step units in the block
+
+The dataset can be downloaded at [ipfs://bafybeife7dy6bhfy4eckki542caofjlew5q26ov3ids3mo4p4gk4kfcqia](http://ipfs.functionally.io/ipfs/bafybeife7dy6bhfy4eckki542caofjlew5q26ov3ids3mo4p4gk4kfcqia).
+
 ### Regression experiment on `sim-cli` 1.3.1
 
 See [analysis/sims/regression/analysis.ipynb](analysis/sims/regression/analysis.ipynb) for the results of a regression experiment of the new `sim-cli` version 1.3.1 versus earlier versions.
