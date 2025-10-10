@@ -22,7 +22,7 @@
   "tx-stop-time": 1200,
   "tx-generation-distribution": {
     "distribution": "constant",
-    "value": 60.000
+    "value": 3.333
   },
   "tx-size-bytes-distribution": {
     "distribution": "constant",
