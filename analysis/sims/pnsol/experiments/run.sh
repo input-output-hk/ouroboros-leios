@@ -23,7 +23,7 @@ PLUTUS=$(echo -n "$LABEL" | sed -e 's/^\(.*\),\(.*\)/\1/')
 THROUGHPUT=$(echo -n "$LABEL" | sed -e 's/^\(.*\),\(.*\)/\2/')
 TX_SPACING_HONEST=$(echo "scale=3; $TX_SIZE / $THROUGHPUT / 1000" | bc)
 
-ulimit -S -m 96000000 -v 128000000
+ulimit -S -m 80000000 -v 80000000
 
 if [[ -e sim.log ]]
 then
