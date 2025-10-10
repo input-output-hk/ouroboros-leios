@@ -13,7 +13,7 @@ zcat sim.log.gz \
     end
   )
 '
-) | gzip -9c > certified.csv.gz
+) | pigz -p 3 -9c > certified.csv.gz
 
 (
 echo $'Time [s],Kind,Block,Tx'
@@ -32,4 +32,4 @@ zcat sim.log.gz \
      | $time_s + ",EB," + $block_id + "," + .id
   end
 '
-) | gzip -9c > generated.csv.gz
+) | pigz -p 3 -9c > generated.csv.gz
