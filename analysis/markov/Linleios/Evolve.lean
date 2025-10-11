@@ -118,5 +118,7 @@ def ebEfficiency (states : Probabilities) : Float :=
 def efficiency (states : Probabilities) : Float :=
   let rb := rbEfficiency states
   let eb := ebEfficiency states
-  let ρ := 12.5 / 0.9
-  (rb + ρ * eb) / (1 + ρ)
+  let rbSize := 0.9
+  let ebSize := 12.0
+  let ρ := ebSize / rbSize
+  (rb * (1 - eb) + ρ * eb) / (1 + ρ)
