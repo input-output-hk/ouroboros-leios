@@ -1,5 +1,16 @@
 # Leios logbook
 
+## 2025-10-11
+
+### Parameter-sweep experiment for Markovian model
+
+We completed the first set of experiments using the [Markovian model for Leios efficiency](analysis/markov/).
+
+|   |   |
+|---|---|
+| ![Committee and quorum without adversary](analysis/markov/experiments/Committee%20and%20quorum%20without%20adversary.svg) | ![Ideal conditions with adversary](analysis/markov/experiments/Ideal%20conditions%20with%20adversary.svg) |
+| ![Non-ideal network without adversary](analysis/markov/experiments/Non-ideal%20network%20without%20adversary.svg) | ![Protocol parameters without adversary](analysis/markov/experiments/Protocol%20parameters%20without%20adversary.svg) |
+
 ## 2025-10-10
 
 ### Extended analysis of ledger operations

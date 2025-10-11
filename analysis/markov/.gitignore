@@ -2,4 +2,3 @@
 .ipynb_checkpoints/
 experiments/*.csv.gz
 experiments/*.png
-experiments/*.svg
