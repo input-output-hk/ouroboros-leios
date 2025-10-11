@@ -22,7 +22,7 @@
   "tx-stop-time": 960,
   "tx-generation-distribution": {
     "distribution": "constant",
-    "value": 10.000
+    "value": 6.000
   },
   "tx-size-bytes-distribution": {
     "distribution": "constant",
@@ -33,7 +33,7 @@
     "distribution": "constant",
     "value": 0
   },
-  "tx-validation-cpu-time-ms": 0.7367500000000001,
+  "tx-validation-cpu-time-ms": 0.54701,
   "tx-max-size-bytes": 16384,
   "rb-generation-probability": 0.05,
   "rb-head-size-bytes": 1024,
