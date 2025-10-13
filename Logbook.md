@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2025-10-13
+
+### Regenerated CIP figures
+
+The [CIP figures](analysis/sims/cip/) were regenerated for the new `sim-rs-1.3.1` tags.
+
 ## 2025-10-11
 
 ### Parameter-sweep experiment for Markovian model
