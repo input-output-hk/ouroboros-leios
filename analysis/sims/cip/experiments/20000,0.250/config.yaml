@@ -22,7 +22,7 @@
   "tx-stop-time": 960,
   "tx-generation-distribution": {
     "distribution": "constant",
-    "value": 10.000
+    "value": 6.000
   },
   "tx-size-bytes-distribution": {
     "distribution": "constant",
@@ -33,7 +33,7 @@
     "distribution": "constant",
     "value": 0
   },
-  "tx-validation-cpu-time-ms": 1.2111000000000003,
+  "tx-validation-cpu-time-ms": 5.9546,
   "tx-max-size-bytes": 16384,
   "rb-generation-probability": 0.05,
   "rb-head-size-bytes": 1024,
@@ -43,7 +43,7 @@
   "eb-header-validation-cpu-time-ms": 0.4438,
   "rb-body-legacy-praos-payload-validation-cpu-time-ms-constant": 0.7732,
   "rb-body-legacy-praos-payload-validation-cpu-time-ms-per-byte": 0.00001943,
-  "eb-body-validation-cpu-time-ms-constant": 42.4624,
+  "eb-body-validation-cpu-time-ms-constant": 425.3224,
   "eb-body-validation-cpu-time-ms-per-byte": 0.00001943,
   "vote-generation-probability": 600,
   "vote-threshold": 450,
