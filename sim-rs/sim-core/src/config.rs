@@ -742,7 +742,7 @@ pub struct SimConfiguration {
 
 impl SimConfiguration {
     pub fn build(params: RawParameters, mut topology: Topology) -> Result<Self> {
-        if params.ib_shards % params.ib_shard_group_count != 0 {
+        if !params.ib_shards.is_multiple_of(params.ib_shard_group_count) {
             bail!(
                 "ib-shards ({}) is not divisible by ib-shard-group-count ({})",
                 params.ib_shards,
@@ -751,7 +751,9 @@ impl SimConfiguration {
         }
         if matches!(params.leios_variant, LeiosVariant::FullWithoutIbs)
             && params.ib_shard_group_count != 1
-            && params.ib_shard_period_length_slots % params.leios_stage_length_slots != 0
+            && !params
+                .ib_shard_period_length_slots
+                .is_multiple_of(params.leios_stage_length_slots)
         {
             bail!(
                 "Invalid sharding configuration. EBs are generated every {} slot(s). This sim is configured to choose EB shards from 1 of {} groups, using a different group every {} slot(s). Some groups would never be chosen.",
