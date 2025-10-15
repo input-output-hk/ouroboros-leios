@@ -17,12 +17,6 @@ This document extends:
 > [!WARNING]
 > TODO: Introduce general approach, that this is a living document: architecture reflects our current design understanding, which is driven by protocol requirements (CIP), but also by identified risks (for the implementation); From this, we sketch a (current) implementation plan that includes fact-finding, which also means potentially updating that plan as we learn things
 
-This document is a living artifact and will be updated as implementation progresses, new risks are identified, and validation results become available.
-
-| Version | Date       | Author          | Changes       |
-|---------|------------|-----------------|---------------|
-| 0.1     | 2025-10-15 | Sebastian Nagel | Initial draft |
-
 #### Key Design Principles
 
 > [!WARNING]
@@ -722,9 +716,7 @@ Genesis (Ouroboros Genesis) enables nodes to bootstrap from the genesis block wi
 > [!WARNING]
 > TODO: Motivate a rough simulations -> prototype -> testnet plan;
 
-# Appendices
-
-## Appendix A: Glossary
+# Glossary
 
 | Term | Definition |
 |------|------------|
@@ -740,7 +732,7 @@ Genesis (Ouroboros Genesis) enables nodes to bootstrap from the genesis block wi
 | **FFD** | Freshest-First Delivery - Network priority mechanism |
 | **ATK-LeiosProtocolBurst** | Attack where adversary withholds and releases EBs simultaneously |
 
-## Appendix B: References
+# References
 
 1. **CIP-164**: Ouroboros Linear Leios - Greater transaction throughput https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md
 
@@ -760,3 +752,11 @@ Genesis (Ouroboros Genesis) enables nodes to bootstrap from the genesis block wi
 
 1. **UTxO-HD Design**:
     https://github.com/IntersectMBO/ouroboros-consensus/blob/main/docs/website/contents/for-developers/utxo-hd/index.md
+
+# Document history
+
+This document is a living artifact and will be updated as implementation progresses, new risks are identified, and validation results become available.
+
+| Version | Date       | Author          | Changes       |
+|---------|------------|-----------------|---------------|
+| 0.1     | 2025-10-15 | Sebastian Nagel | Initial draft |
