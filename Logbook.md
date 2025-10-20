@@ -24,6 +24,14 @@ The experiment in [analysis/sims/pnsol/](analysis/sims/pnsol/) tests several hyp
 |---|---|
 | ![The CPU cost of processing per transaction either remains the same or goes down as the load goes up.](analysis/sims/pnsol/plots/load-cpu.svg) | ![The network cost of processing per transaction either remains the same or goes down as the load goes up.](analysis/sims/pnsol/plots/load-egress.svg) |
 
+### Experiment to test hypotheses about Praos performance
+
+The experiment in [analysis/sims/pnsol-praos/](analysis/sims/pnsol-praos/) repeats the [analysis/sims/pnsol/](analysis/sims/pnsol/) experiment, but for Praos.
+
+|   |   |   |   |   |
+|---|---|---|---|---|
+| ![Praos throughput is proportional to load until it plateaus when capacity is reached.](analysis/sims/pnsol/plots/load-throughput.svg) | ![The variability of delivery times plateaus until capacity is reached.](analysis/sims/pnsol/plots/load-txvariance.svg) | ![Relative to Praos, Praos incurs a delay for transactions reaching the ledger.](analysis/sims/pnsol/plots/load-delay.svg) | ![The CPU cost of processing per transaction either remains the same or goes down as the load goes up.](analysis/sims/pnsol/plots/load-cpu.svg) | ![The network cost of processing per transaction either remains the same or goes down as the load goes up.](analysis/sims/pnsol/plots/load-egress.svg) |
+
 ## 2025-10-13
 
 ### Regenerated CIP figures
