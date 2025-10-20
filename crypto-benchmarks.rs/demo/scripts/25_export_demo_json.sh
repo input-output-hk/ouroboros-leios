@@ -34,23 +34,51 @@ def must(path):
     return path
 
 # --- Load registry (required) ---
+
 reg = cbor2.load(open(must("registry.cbor"), "rb"))
 info = reg.get("info", {}) or {}
 persistent_pool = reg.get("persistent_pool", {}) or {}
 total_stake = reg.get("total_stake")
 N = int(reg.get("voters", 0) or 0)
 
+# Normalize persistent seat IDs to integers for robust comparisons
+try:
+    persistent_seat_ids = {int(k) for k in persistent_pool.keys()}
+except Exception:
+    persistent_seat_ids = set()
+
+# --- Quorum / voting fraction (optional, written by 30_cast_votes.sh as fraction.txt) ---
+def read_quorum_fraction():
+    for fname in ("fraction.txt", "quorum.txt", "quorum_fraction.txt"):
+        path = os.path.join(os.getcwd(), fname)
+        if os.path.exists(path):
+            try:
+                raw = open(path, "r", encoding="utf-8").read().strip()
+            except Exception:
+                continue
+            if not raw:
+                continue
+            # Prefer numeric if possible, otherwise keep as string
+            try:
+                return float(raw)
+            except ValueError:
+                return raw
+    return None
+
+quorum_fraction = read_quorum_fraction()
+
 # --- Universe (all pools from registry.info) ---
-# Each entry: pool_id, stake, is_persistent
-persistent_set = set(persistent_pool.values())
+# Each entry: pool_id, stake (no persistent flag here; committee carries epoch membership)
+# Preserve original generation order from registry.info (Python dict preserves insertion order).
 universe = [
-    {"pool_id": pid, "stake": rec.get("stake", 0), "is_persistent": pid in persistent_set}
+    {"pool_id": pid, "stake": rec.get("stake", 0)}
     for pid, rec in info.items()
 ]
-# Sort universe by stake desc, then pool_id for stability
-universe.sort(key=lambda x: (-int(x.get("stake", 0) or 0), x["pool_id"]))
 
 # Quick lookup for stake / presence
+
+# Build quick index: pool_id -> zero-based position in the universe array
+universe_index_by_pool_id = {e["pool_id"]: i for i, e in enumerate(universe)}
 stake_by_pid = {e["pool_id"]: int(e.get("stake", 0) or 0) for e in universe}
 
 # --- Persistent seats (ordered by persistent id) ---
@@ -65,124 +93,146 @@ for pid_idx in sorted(persistent_pool):
 # How many nonpersistent seats do we need?
 np_needed = max(0, N - len(persist_entries))
 
-# --- Non-persistent winners:
-# Prefer certificate.cbor (authoritative). If absent, derive from votes.cbor.
+# --- Non-persistent winners: (disabled for persistent-only committee export)
 np_winners = []
-if np_needed > 0 and os.path.exists("certificate.cbor"):
-    cert = cbor2.load(open("certificate.cbor", "rb"))
-    # Many builds export winners under 'nonpersistent_voters' as a map {pool_id: proof/...}
-    np_map = cert.get("nonpersistent_voters") or {}
-    # Keep the CBOR/map iteration order (winners order). Fall back to sorted order for stability.
-    if isinstance(np_map, dict):
-        np_winners = list(np_map.keys())
-    else:
-        # Some variants serialize as list of objects
-        try:
-            np_winners = [x.get("pool") for x in np_map if isinstance(x, dict) and x.get("pool")]
-        except Exception:
-            np_winners = []
-elif np_needed > 0 and os.path.exists("votes.cbor"):
-    # Derive per-EB top by vote count for Nonpersistent votes
-    votes = cbor2.load(open("votes.cbor", "rb"))
-    ctr = collections.Counter()
-    order = []  # first-appearance order (for tie-breaking)
-    seen = set()
-    for v in votes:
-        if "Nonpersistent" in v:
-            pid = v["Nonpersistent"].get("pool")
-            if not isinstance(pid, str): 
-                continue
-            ctr[pid] += 1
-            if pid not in seen:
-                seen.add(pid)
-                order.append(pid)
-    # Rank by count desc, break ties by first appearance
-    np_winners = sorted(ctr.keys(), key=lambda k: (-ctr[k], order.index(k) if k in order else 1e9))
-
-# Deduplicate and trim to needed seats, skipping any that duplicate persistent
 np_final = []
-seen = set(p["pool_id"] for p in persist_entries)
-for pid in np_winners:
-    if not isinstance(pid, str):
-        continue
-    if pid in seen:
-        continue
-    np_final.append(pid)
-    seen.add(pid)
-    if len(np_final) >= np_needed:
-        break
+np_final_set = set()
 
-# --- Only keep NP winners that already exist in the universe (no stubs)
-universe_pids = set(e["pool_id"] for e in universe)
-np_final = [pid for pid in np_final if pid in universe_pids]
-
-# Rebuild lookup maps after potential extensions
-universe.sort(key=lambda x: (-int(x.get("stake", 0) or 0), x["pool_id"]))
-universe_index_by_pool_id = {entry["pool_id"]: idx for idx, entry in enumerate(universe, start=1)}
-
-# --- Build final committee list: keep committee order (position) but set
-# "index" to the pool's 1-based index in the *universe* array.
-committee = []
-# persistent first (in persistent id order)
+# --- Build final committee: persistent seats + placeholders for non-persistent slots
+seats = []
 for pos, entry in enumerate(persist_entries, start=1):
     pid = entry["pool_id"]
-    committee.append({
+    seats.append({
         "position": pos,
         "index": universe_index_by_pool_id.get(pid),  # universe index
         "pool_id": pid,
         "stake": entry["stake"],
+        "kind": "persistent",
     })
-# then non-persistent winners (in certificate order or derived order)
-pos = len(committee) + 1
-for pid in np_final:
-    committee.append({
-        "position": pos,
-        "index": universe_index_by_pool_id.get(pid),  # universe index
-        "pool_id": pid,
-        "stake": stake_by_pid.get(pid, 0),
+# Append placeholders for non-persistent slots (to be filled per‑election)
+for i in range(np_needed):
+    seats.append({
+        "position": len(seats) + 1,
+        "slot": "nonpersistent",
+        "kind": "nonpersistent",
     })
-    pos += 1
+committee = {
+    "size": N,
+    "persistent_count": len(persist_entries),
+    "nonpersistent_slots": np_needed,
+    "seats": seats,
+}
+committee_source = "persistent_plus_placeholders"
 
-# If we still don't have N seats (missing certificate/votes), fill from top-by-stake excluding already chosen
-if len(committee) < N:
-    chosen = set(c["pool_id"] for c in committee)
-    for e in universe:
-        if e["pool_id"] in chosen:
-            continue
-        committee.append({
-            "position": len(committee) + 1,
-            "index": universe_index_by_pool_id.get(e["pool_id"]),
-            "pool_id": e["pool_id"],
-            "stake": e.get("stake", 0),
-        })
-        if len(committee) >= N:
-            break
-    committee_source = "fa+votes+fallback"
-else:
-    committee_source = "fa+certificate" if os.path.exists("certificate.cbor") else ("fa+votes" if os.path.exists("votes.cbor") else "fallback_topN")
+# --- Voters quick view (optional) + committee-based filtering ---
+voters_unfiltered = {
+    "persistent_ids": [],
+    "nonpersistent_pool_ids": [],
+}
+voters_filtered = {
+    "persistent_ids": [],
+    "nonpersistent_pool_ids": [],
+}
+filtered_votes_raw = []
+filtered_p_raw = []
+filtered_np_raw = []
+voters_filter_stats = {
+    "source_total": 0,
+    "kept_total": 0,
+    "removed_outside_committee": 0,
+    "removed_persistent": 0,
+    "removed_nonpersistent": 0,
+}
 
-# --- Voters quick view (optional)
-voters_persistent = []
-voters_nonpersistent = []
+def _to_int(x):
+    try:
+        return int(x)
+    except Exception:
+        return None
+
+def _is_persistent_id_in_committee(pid) -> bool:
+    """Return True iff the persistent seat id is in the registry's persistent set."""
+    pid_i = _to_int(pid)
+    return (pid_i is not None) and (pid_i in persistent_seat_ids)
+
+def _is_np_pool_in_committee(pool_id: str) -> bool:
+    return isinstance(pool_id, str) and (pool_id in np_final_set)
+
+votes_preview = []
+
 if os.path.exists("votes.cbor"):
     try:
-        votes = cbor2.load(open("votes.cbor", "rb"))
-        for v in votes:
+        votes_raw = cbor2.load(open("votes.cbor", "rb"))
+        for v in votes_raw:
+            # Unfiltered bookkeeping
             if "Persistent" in v:
-                pid = v["Persistent"].get("persistent")
-                if isinstance(pid, int):
-                    voters_persistent.append(pid)
+                pid_raw = v["Persistent"].get("persistent")
+                pid = _to_int(pid_raw)
+                if pid is not None:
+                    voters_unfiltered["persistent_ids"].append(pid)
+                    votes_preview.append({"type": "persistent", "seat_id": pid})
             elif "Nonpersistent" in v:
                 pool = v["Nonpersistent"].get("pool")
                 if isinstance(pool, str):
-                    voters_nonpersistent.append(pool)
+                    voters_unfiltered["nonpersistent_pool_ids"].append(pool)
+                    sigma_eid = v["Nonpersistent"].get("sigma_eid")
+                    prefix = None
+                    if isinstance(sigma_eid, (bytes, bytearray)):
+                        prefix = "0x" + sigma_eid[:12].hex()
+                    votes_preview.append({
+                        "type": "nonpersistent",
+                        "pool_id": pool,
+                        "eligibility_sigma_eid_prefix": prefix,
+                    })
+
+            # Filtering (committee only)
+            if "Persistent" in v:
+                pid_raw = v["Persistent"].get("persistent")
+                pid = _to_int(pid_raw)
+                if pid is not None:
+                    voters_filter_stats["source_total"] += 1
+                    if _is_persistent_id_in_committee(pid):
+                        voters_filtered["persistent_ids"].append(pid)
+                        voters_filter_stats["kept_total"] += 1
+                        filtered_votes_raw.append(v)
+                        filtered_p_raw.append(v)
+                    else:
+                        voters_filter_stats["removed_outside_committee"] += 1
+                        voters_filter_stats["removed_persistent"] += 1
+            elif "Nonpersistent" in v:
+                pool = v["Nonpersistent"].get("pool")
+                if isinstance(pool, str):
+                    voters_filter_stats["source_total"] += 1
+                    if _is_np_pool_in_committee(pool):
+                        voters_filtered["nonpersistent_pool_ids"].append(pool)
+                        voters_filter_stats["kept_total"] += 1
+                        filtered_votes_raw.append(v)
+                        filtered_np_raw.append(v)
+                    else:
+                        voters_filter_stats["removed_outside_committee"] += 1
+                        voters_filter_stats["removed_nonpersistent"] += 1
     except Exception:
         pass
 
+# --- Compute filtered vote sizes (bytes) by CBOR re-encoding the kept votes only
+votes_bytes_raw = os.path.getsize("votes.cbor") if os.path.exists("votes.cbor") else None
+votes_bytes_filtered = None
+votes_bytes_p_filtered = None
+votes_bytes_np_filtered = None
+try:
+    if filtered_votes_raw:
+        import cbor2 as _cbor2  # already imported, but keep local alias
+        votes_bytes_filtered = len(_cbor2.dumps(filtered_votes_raw))
+        if filtered_p_raw:
+            votes_bytes_p_filtered = len(_cbor2.dumps(filtered_p_raw))
+        if filtered_np_raw:
+            votes_bytes_np_filtered = len(_cbor2.dumps(filtered_np_raw))
+except Exception:
+    # Fall back to raw file size if anything goes wrong
+    votes_bytes_filtered = votes_bytes_raw
+
 # --- Certificate summary (optional) ---
 cert_summary = {}
-votes_bytes = os.path.getsize("votes.cbor") if os.path.exists("votes.cbor") else None
-certificate_bytes = os.path.getsize("certificate.cbor") if os.path.exists("certificate.cbor") else None
 
 if os.path.exists("certificate.cbor"):
     cert = cbor2.load(open("certificate.cbor", "rb"))
@@ -201,42 +251,58 @@ if os.path.exists("certificate.cbor"):
         "persistent_voters_count": len(pv) if hasattr(pv, "__len__") else None,
         "nonpersistent_voters_count": (len(npv.keys()) if isinstance(npv, dict) else (len(npv) if hasattr(npv, "__len__") else None)),
     }
+    # Override certificate counts with committee‑filtered counts
+    kept_p = len(set(voters_filtered["persistent_ids"]))
+    kept_np = len(set(voters_filtered["nonpersistent_pool_ids"]))
+    cert_summary["persistent_voters_count"] = kept_p
+    cert_summary["nonpersistent_voters_count"] = kept_np
 
-if votes_bytes is not None:
-    cert_summary["votes_bytes"] = votes_bytes
+# --- Bytes & compression (use filtered votes only)
+certificate_bytes = os.path.getsize("certificate.cbor") if os.path.exists("certificate.cbor") else None
+if votes_bytes_filtered is not None:
+    cert_summary["votes_bytes"] = votes_bytes_filtered
+    # Keep a raw reference for diagnostics
+    if votes_bytes_raw is not None:
+        cert_summary["votes_bytes_raw"] = votes_bytes_raw
+    if votes_bytes_p_filtered is not None:
+        cert_summary["votes_bytes_persistent"] = votes_bytes_p_filtered
+    if votes_bytes_np_filtered is not None:
+        cert_summary["votes_bytes_nonpersistent"] = votes_bytes_np_filtered
 if certificate_bytes is not None:
     cert_summary["certificate_bytes"] = certificate_bytes
-    if votes_bytes:
-        try:
-            cert_summary["compression_ratio"] = round(votes_bytes / certificate_bytes, 3)
-        except Exception:
-            pass
+if ("votes_bytes" in cert_summary) and ("certificate_bytes" in cert_summary):
+    try:
+        cert_summary["compression_ratio"] = round(
+            cert_summary["votes_bytes"] / cert_summary["certificate_bytes"], 3
+        )
+    except Exception:
+        pass
 
 # --- Params (handy for the UI header) ---
 params = {
     "N": N,
     "pool_count": len(universe),
     "total_stake": total_stake,
+    "quorum_fraction": quorum_fraction,  # may be None if not recorded
 }
 
 out = {
     "params": params,
     "universe": universe,
-    "persistent_map": {int(k): v for k, v in persistent_pool.items()},
     "committee": committee,
     "committee_source": committee_source,
     "lookup": {
         "universe_index_by_pool_id": universe_index_by_pool_id,
-        # Back-compat: this has always meant the committee *order* (position)
-        "committee_index_by_pool_id": {entry["pool_id"]: entry["position"] for entry in committee},
-        # New explicit alias for clarity
-        "committee_position_by_pool_id": {entry["pool_id"]: entry["position"] for entry in committee},
+        "committee_position_by_pool_id": {
+            seat["pool_id"]: seat["position"]
+            for seat in committee["seats"]
+            if "pool_id" in seat
+        },
     },
-    "voters": {
-        "persistent_ids": voters_persistent,
-        "nonpersistent_pool_ids": voters_nonpersistent,
-    },
+    "voters_unfiltered": voters_unfiltered, # raw ids (persistent seat ids and NP pool ids)
+    "voters_filter_stats": voters_filter_stats,
     "certificate": cert_summary,
+    "votes_preview": votes_preview,
 }
 
 json.dump(out, open("demo.json", "w"), indent=2)

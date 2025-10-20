@@ -19,77 +19,86 @@ function shortenHex(hex) {
     return "0x" + h.slice(0, 6) + "…" + h.slice(-4);
 }
 
-// ---------- CSS bootstrap (minimal positioning only) ----------
-function ensureUniverseStyles() {
-    if (document.getElementById("universe-inline-css")) return;
-    const style = document.createElement("style");
-    style.id = "universe-inline-css";
-    style.textContent = `
-    :root {
-      --dot-size: 30px;   /* diameter of each circle */
-      --dot-gap: 5px;     /* space between circles */
+function formatNumber(value) {
+    if (value === null || value === undefined || value === "") return "—";
+    const num = Number(value);
+    if (Number.isFinite(num)) return num.toLocaleString();
+    if (typeof value === "string") return value;
+    return String(value);
+}
+
+function firstFinite(...values) {
+    for (const value of values) {
+        if (value === null || value === undefined || value === "") continue;
+        const num = Number(value);
+        if (Number.isFinite(num)) return num;
+    }
+    return null;
+}
+
+function createEmptyState(message) {
+    const p = document.createElement("p");
+    p.className = "empty-state";
+    p.textContent = message;
+    return p;
+}
+
+// --- Vote byte sizes (visualization constants) ---
+const PERSISTENT_VOTE_BYTES = 134;   // bytes per persistent vote (viz)
+const NONPERSISTENT_VOTE_BYTES = 247; // bytes per non-persistent vote (viz)
+
+const FIXED_GRID_COLUMNS = 20; // circles per row for Voters alignment
+const UNIVERSE_COLUMNS = 30;   // circles per row for Universe panel
+const COMMITTEE_COLUMNS = 20;  // seat boxes per row for Committee
+const COMMITTEE_ROW_HEIGHT = "calc(var(--seat-size) + 10px)";
+
+// ---------- tooltip helpers ----------
+function positionTooltip(target, tooltip) {
+    if (!target || !tooltip) return;
+    const rect = target.getBoundingClientRect();
+    const top = rect.top + window.scrollY - 40;
+    tooltip.style.left = `${rect.left + window.scrollX}px`;
+    tooltip.style.top = `${Math.max(window.scrollY + 4, top)}px`;
+}
+
+function attachTooltip(element, html) {
+    if (!element) return;
+    if (!html) {
+        element.removeAttribute("data-tooltip-html");
+        return;
     }
 
-    #universe_canvas {
-      min-height: calc(var(--dot-size) * 6);
-      position: relative;
-    }
+    element.dataset.tooltipHtml = html;
+    element.removeAttribute("title");
 
-    /* Grid that lays out the circles */
-    .universe-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(var(--dot-size), var(--dot-size)));
-      grid-auto-rows: var(--dot-size);
-      gap: var(--dot-gap) var(--dot-gap);
-      align-content: start;
-      justify-content: start;
-      padding-top: 8px;
-    }
+    if (element._tooltipHandlers) return;
 
-    /* Ensure each dot consumes the whole grid cell and is a perfect circle */
-    .pool-dot {
-      width: var(--dot-size);
-      height: var(--dot-size);
-      border-radius: 50%;
-      position: relative; /* hosts the centered numeric label */
-      display: inline-block;
-    }
+    const show = (event) => {
+        const tooltip = document.createElement("div");
+        tooltip.className = "tooltip-box";
+        tooltip.innerHTML = element.dataset.tooltipHtml;
+        document.body.appendChild(tooltip);
+        positionTooltip(event.currentTarget, tooltip);
+        element._tooltip = tooltip;
+    };
 
-    /* Numeric label inside each dot */
-    .pool-dot .node-label {
-      position: absolute;
-      top: 50%;
-      left: 0;
-      width: 100%;
-      transform: translateY(-50%);
-      text-align: center;
-      font-weight: 700;
-      color: #ffffff;              /* white text for contrast */
-      text-shadow: 0 1px 2px rgba(0,0,0,0.4); /* subtle halo for readability */
-      pointer-events: none;
-      user-select: none;
-    }
-    .tooltip-box {
-        position: absolute;
-        background: rgba(30, 30, 30, 0.9);
-        color: #fff;
-        padding: 6px 8px;
-        border-radius: 6px;
-        font-size: 12px;
-        line-height: 1.4;
-        pointer-events: none;
-        z-index: 1000;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-    }
-    .pool-dot.is-voter::after {
-      content: "";
-      position: absolute;
-      inset: -3px;
-      border: 2px solid #19c37d; /* green ring for voters */
-      border-radius: 50%;
-    }
-    `;
-    document.head.appendChild(style);
+    const move = (event) => {
+        if (element._tooltip) {
+            positionTooltip(event.currentTarget, element._tooltip);
+        }
+    };
+
+    const hide = () => {
+        if (element._tooltip) {
+            element._tooltip.remove();
+            element._tooltip = null;
+        }
+    };
+
+    element.addEventListener("mouseenter", show);
+    element.addEventListener("mousemove", move);
+    element.addEventListener("mouseleave", hide);
+    element._tooltipHandlers = { show, move, hide };
 }
 
 // ---------- grid column sync so rows align across sections ----------
@@ -110,22 +119,50 @@ function computeGridColumnsFrom(el) {
     return cols;
 }
 
-function applyFixedColumns(el, cols) {
+function applyFixedColumns(
+    el,
+    cols,
+    columnSize = "var(--dot-size)",
+    rowSize = "var(--dot-size)",
+    gapSize = "var(--dot-gap)"
+) {
     if (!el || !cols) return;
     el.style.display = "grid";
-    el.style.gridTemplateColumns = `repeat(${cols}, var(--dot-size))`;
-    el.style.gridAutoRows = "var(--dot-size)";
-    el.style.gap = "var(--dot-gap)";
+    el.style.gridTemplateColumns = `repeat(${cols}, ${columnSize})`;
+    el.style.gridAutoRows = rowSize;
+    el.style.gap = gapSize;
 }
 
 function syncGridColumns() {
-    const universeEl = document.getElementById("universe_canvas");
-    const cols = computeGridColumnsFrom(universeEl);
-    if (!cols) return;
     const committeeEl = document.getElementById("committee_canvas");
-    const votersEl = document.getElementById("voters_canvas");
-    applyFixedColumns(committeeEl, cols);
-    applyFixedColumns(votersEl, cols);
+    if (committeeEl) {
+        const seatCount = committeeEl.querySelectorAll(".seat-box").length;
+        const committeeCols = seatCount ? Math.min(COMMITTEE_COLUMNS, seatCount) : COMMITTEE_COLUMNS;
+        applyFixedColumns(
+            committeeEl,
+            committeeCols,
+            "var(--seat-size)",
+            COMMITTEE_ROW_HEIGHT,
+            "var(--seat-gap)"
+        );
+    }
+}
+// Shared helper to compute vote rectangle width based on bytes
+function voteWidthPx(bytes) {
+    const maxBytes = Math.max(PERSISTENT_VOTE_BYTES, NONPERSISTENT_VOTE_BYTES) || 1;
+    const maxWidthPx = 48; // width used for the largest vote (non-persistent)
+    return Math.max(14, Math.round((bytes / maxBytes) * maxWidthPx));
+}
+
+
+// Human-readable byte formatter
+function formatBytes(bytes) {
+    if (bytes === null || bytes === undefined || isNaN(bytes)) return "—";
+    const units = ['bytes', 'KB', 'MB', 'GB'];
+    let b = Math.max(0, Number(bytes));
+    let i = 0;
+    while (b >= 1024 && i < units.length - 1) { b /= 1024; i++; }
+    return `${b.toFixed(b < 10 && i > 0 ? 1 : 0)} ${units[i]}`;
 }
 
 // Helper: Find 1-based universe index for a given poolId
@@ -148,8 +185,6 @@ function buildPoolIdToUniverseIndex(demo) {
 
 // ---------- main render ----------
 function renderUniverse(universe) {
-    ensureUniverseStyles();
-
     let pools = [];
     if (Array.isArray(universe)) {
         pools = universe;
@@ -170,19 +205,25 @@ function renderUniverse(universe) {
         else nonPersistentCount++;
     });
 
-    setText("universe_total", total || "—");
-    setText("universe_persistent", persistentCount || "—");
-    setText("universe_nonpersistent", nonPersistentCount || "—");
+    setText("universe_total", (total ?? "—"));
+    setText("universe_persistent", (persistentCount ?? "—"));
+    setText("universe_nonpersistent", (nonPersistentCount ?? "—"));
+    // Add total stake calculation
+    const totalStake = pools.reduce((sum, p) => sum + (Number(p.stake) || 0), 0);
+    const hasStake = pools.some(p => p.stake !== undefined && p.stake !== null);
+    setText("universe_stake", hasStake ? formatNumber(totalStake) : "—");
 
     const container = $("#universe_canvas");
     if (!container) return;
 
     if (total === 0) {
-        container.innerHTML = "<p style='color:#888;font-size:13px;'>No data available</p>";
+        container.classList.add("universe-grid");
+        container.replaceChildren(createEmptyState("No data available"));
         return;
     }
 
     container.classList.add("universe-grid");
+    container.style.gridTemplateColumns = `repeat(${UNIVERSE_COLUMNS}, var(--dot-size))`;
     container.innerHTML = "";
 
     pools.forEach((pool, i) => {
@@ -200,8 +241,6 @@ function renderUniverse(universe) {
         if (isSelected) div.classList.add("is-selected");
         if (isElected) div.classList.add("is-elected");
 
-        div.style.position = "relative";
-
         const label = document.createElement("span");
         label.classList.add("node-label");
         const idx = i + 1;
@@ -210,26 +249,13 @@ function renderUniverse(universe) {
         div.appendChild(label);
 
         const poolId = pool.pool_id || pool.id || "";
-        const stake = typeof pool.stake !== "undefined" ? pool.stake : "";
-        div.setAttribute("data-tooltip-html", `<b>Pool ID:</b> ${poolId}<br><b>Stake:</b> ${stake}`);
-        div.title = "";
+        const stake = typeof pool.stake !== "undefined" ? pool.stake : pool.total_stake;
+        const tooltipHtml = [
+            `<b>Pool ID:</b> ${poolId || "—"}`,
+            `<b>Stake:</b> ${formatNumber(stake)}`
+        ].join("<br>");
+        attachTooltip(div, tooltipHtml);
 
-        div.addEventListener("mouseenter", (e) => {
-            const tooltip = document.createElement("div");
-            tooltip.className = "tooltip-box";
-            tooltip.innerHTML = div.getAttribute("data-tooltip-html");
-            document.body.appendChild(tooltip);
-            const rect = e.target.getBoundingClientRect();
-            tooltip.style.left = rect.left + window.scrollX + "px";
-            tooltip.style.top = rect.top + window.scrollY - 40 + "px";
-            div._tooltip = tooltip;
-        });
-        div.addEventListener("mouseleave", () => {
-            if (div._tooltip) {
-                div._tooltip.remove();
-                div._tooltip = null;
-            }
-        });
         container.appendChild(div);
     });
 }
@@ -254,10 +280,26 @@ function buildPersistentSet(demo) {
     return set;
 }
 
-function buildPersistentIdToPoolId(map) {
+function buildPersistentIdToPoolId(demo) {
     const m = new Map();
-    if (!map || typeof map !== "object") return m;
-    for (const [k, v] of Object.entries(map)) m.set(Number(k), v);
+    const raw = demo?.persistent_map;
+    if (raw && typeof raw === "object") {
+        for (const [k, v] of Object.entries(raw)) {
+            if (v) {
+                const numericKey = Number(k);
+                if (!Number.isNaN(numericKey)) m.set(numericKey, v);
+                m.set(String(k), v);
+            }
+        }
+    }
+
+    if (m.size === 0 && Array.isArray(demo?.committee?.seats)) {
+        for (const seat of demo.committee.seats) {
+            if (!seat || !seat.pool_id) continue;
+            if (seat.position !== undefined) m.set(Number(seat.position), seat.pool_id);
+            if (seat.index !== undefined) m.set(Number(seat.index), seat.pool_id);
+        }
+    }
     return m;
 }
 
@@ -267,96 +309,222 @@ function getCommitteePoolId(x) {
 }
 
 function renderCommitteeFromDemo(demo) {
-    if (!demo || !Array.isArray(demo.committee)) return;
-    ensureUniverseStyles();
+    if (!demo) return;
     const container = document.getElementById("committee_canvas");
     if (!container) return;
 
-    const committee = demo.committee;
-    const persistentSet = buildPersistentSet(demo);
+    // Normalize seats source:
+    // Prefer new model: demo.committee.seats = [{position, pool_id?, stake?, kind: "persistent"|"nonpersistent"}]
+    // Fallback to legacy: demo.committee = [ {pool_id, stake?}, ... ] where all entries are persistent seats.
+    let seats = [];
+    if (demo.committee && Array.isArray(demo.committee.seats)) {
+        seats = demo.committee.seats.slice().sort((a, b) => (a.position || 0) - (b.position || 0));
+    } else if (Array.isArray(demo.committee)) {
+        seats = demo.committee.map((m, i) => ({
+            position: (m.position ?? (i + 1)),
+            pool_id: getCommitteePoolId(m),
+            stake: (typeof m.stake !== "undefined" ? m.stake : undefined),
+            kind: "persistent"
+        }));
+    } else {
+        // Nothing to render
+        container.classList.remove("committee-grid");
+        container.replaceChildren(createEmptyState("No committee seats"));
+        return;
+    }
+
     const poolIdToUniverseIndex = buildPoolIdToUniverseIndex(demo);
 
-    // For stats: count persistent/non-persistent
-    let persistentCount = 0, nonPersistentCount = 0;
-    for (const member of committee) {
-        const poolId = getCommitteePoolId(member);
-        if (persistentSet.has(poolId)) persistentCount++;
-        else nonPersistentCount++;
-    }
-    setText("committee_total", committee.length || "—");
-    setText("committee_persistent", persistentCount || "—");
-    setText("committee_nonpersistent", nonPersistentCount || "—");
+    // Stats: show total, persistent, and non-persistent seat counts.
+    setText("committee_total", (seats.length ?? "—"));
+    // Compute persistent/nonpersistent seat counts
+    const persistentCount = seats.filter(s => s.kind === "persistent").length;
+    const nonPersistentCount = seats.length - persistentCount;
+    setText("committee_persistent", persistentCount);
+    setText("committee_nonpersistent", nonPersistentCount);
 
-    // Sort committee members by universe index (ascending), fallback to original order
-    const sorted = [...committee].sort((a, b) => {
-        const idxA = poolIdToUniverseIndex.get(getCommitteePoolId(a)) ?? 99999;
-        const idxB = poolIdToUniverseIndex.get(getCommitteePoolId(b)) ?? 99999;
-        return idxA - idxB;
-    });
-
-    container.classList.add("universe-grid");
+    // Layout as seats (boxes), not dots
+    container.classList.remove("universe-grid");
+    container.classList.add("committee-grid");
     container.innerHTML = "";
-    sorted.forEach((member, i) => {
-        const poolId = getCommitteePoolId(member) || "";
-        const isPersistent = persistentSet.has(poolId);
-        const universeIdx = poolIdToUniverseIndex.get(poolId) || "";
+    const initialCols = Math.max(1, Math.min(COMMITTEE_COLUMNS, seats.length));
+    applyFixedColumns(
+        container,
+        initialCols,
+        "var(--seat-size)",
+        COMMITTEE_ROW_HEIGHT,
+        "var(--seat-gap)"
+    );
 
+    for (const seat of seats) {
         const div = document.createElement("div");
-        div.classList.add("pool-dot");
-        div.classList.add(isPersistent ? "is-persistent" : "is-nonpersistent");
+        div.className = "seat-box";
+        const hasPool = !!seat.pool_id;
+        const isPersistentSeat = seat.kind === "persistent";
+        div.classList.add(isPersistentSeat ? "is-persistent-seat" : "is-nonpersistent-seat");
 
-        // Numeric label: universe index (if known), else fallback to committee index
-        const label = document.createElement("span");
-        label.classList.add("node-label");
-        const idx = universeIdx || (i + 1);
-        label.textContent = idx;
-        label.style.fontSize = (idx >= 100 ? "11px" : "13px");
-        div.appendChild(label);
+        // Seat number at top-left
+        const num = document.createElement("span");
+        num.className = "seat-num";
+        num.textContent = String(seat.position ?? "");
+        div.appendChild(num);
 
-        const stake = typeof member.stake !== "undefined" ? member.stake : "";
-        div.setAttribute("data-tooltip-html", `<b>Pool ID:</b> ${poolId}<br><b>Stake:</b> ${stake}`);
-        div.title = "";
+        // If seat has a pool, add a pool-dot (reuse universal styling)
+        if (hasPool) {
+            const poolCircle = document.createElement("div");
+            poolCircle.className = "pool-dot is-nonpersistent";
+            const lbl = document.createElement("span");
+            lbl.className = "node-label";
+            const uidx = poolIdToUniverseIndex.get(seat.pool_id);
+            lbl.textContent = uidx ? String(uidx) : "";
+            lbl.style.fontSize = (uidx >= 100 ? "11px" : "13px");
+            poolCircle.appendChild(lbl);
+            div.appendChild(poolCircle);
+        }
 
-        div.addEventListener("mouseenter", (e) => {
-            const tooltip = document.createElement("div");
-            tooltip.className = "tooltip-box";
-            tooltip.innerHTML = div.getAttribute("data-tooltip-html");
-            document.body.appendChild(tooltip);
-            const rect = e.target.getBoundingClientRect();
-            tooltip.style.left = rect.left + window.scrollX + "px";
-            tooltip.style.top = rect.top + window.scrollY - 40 + "px";
-            div._tooltip = tooltip;
-        });
-        div.addEventListener("mouseleave", () => {
-            if (div._tooltip) {
-                div._tooltip.remove();
-                div._tooltip = null;
-            }
-        });
+        // Set tooltip for assigned/non-assigned seats
+        if (hasPool) {
+            const poolId = seat.pool_id;
+            const stake = (typeof seat.stake !== "undefined") ? seat.stake : "";
+            const tooltipHtml = [
+                `<b>Seat #${seat.position}</b>`,
+                `<b>Pool ID:</b> ${poolId}`,
+                stake !== "" ? `<b>Stake:</b> ${formatNumber(stake)}` : ""
+            ].filter(Boolean).join("<br>");
+            attachTooltip(div, tooltipHtml);
+        } else {
+            attachTooltip(div, `<b>Seat #${seat.position}</b><br>Empty non-persistent slot`);
+        }
+
         container.appendChild(div);
-    });
+    }
 }
 
 function buildVoterPools(demo) {
-    const pidToPool = buildPersistentIdToPoolId(demo && demo.persistent_map);
-    const pids = (demo?.voters?.persistent_ids ?? []);
-    const nonp = (demo?.voters?.nonpersistent_pool_ids ?? []);
-    const persistentPools = pids.map(pid => pidToPool.get(pid)).filter(Boolean);
-    const nonpersistentPools = nonp.filter(Boolean);
+    const pidToPool = buildPersistentIdToPoolId(demo);
+
+    const persistentMap = new Map();
+    const nonPersistentMap = new Map();
+
+    const ensurePersistentEntry = (seatId) => {
+        if (seatId === undefined || seatId === null) return null;
+        const numericSeat = Number(seatId);
+        const normalizedSeat = Number.isFinite(numericSeat) ? numericSeat : seatId;
+        const mapKey = String(normalizedSeat);
+        let entry = persistentMap.get(mapKey);
+        if (!entry) {
+            const poolId = pidToPool.get(normalizedSeat) ?? pidToPool.get(mapKey) ?? null;
+            entry = {
+                seatId: normalizedSeat,
+                poolId,
+                hasVote: false,
+                signature: null,
+                seat: null
+            };
+            persistentMap.set(mapKey, entry);
+        }
+        return entry;
+    };
+
+    const ensureNonPersistentEntry = (poolId) => {
+        if (!poolId) return null;
+        const key = String(poolId);
+        let entry = nonPersistentMap.get(key);
+        if (!entry) {
+            entry = {
+                poolId: key,
+                eligibility: null,
+                signature: null,
+                hasVote: false
+            };
+            nonPersistentMap.set(key, entry);
+        }
+        return entry;
+    };
+
+    const votersObj = demo?.voters ?? demo?.voters_filtered ?? demo?.voters_unfiltered ?? null;
+    if (votersObj && typeof votersObj === "object") {
+        const persistentIds = votersObj.persistent_ids ?? [];
+        for (const seatId of persistentIds) ensurePersistentEntry(seatId);
+
+        const nonIds = votersObj.nonpersistent_pool_ids ?? [];
+        for (const poolId of nonIds) ensureNonPersistentEntry(poolId);
+    }
+
+    if (Array.isArray(demo?.votes_preview)) {
+        for (const entry of demo.votes_preview) {
+            if (!entry) continue;
+            if (entry.type === "persistent") {
+                const record = ensurePersistentEntry(entry.seat_id ?? entry.seatId ?? entry.id);
+                if (record) {
+                    record.hasVote = true;
+                    record.signature = entry.signature ?? entry.vote_signature ?? null;
+                    if (!record.poolId && entry.pool_id) record.poolId = entry.pool_id;
+                }
+            } else if (entry.type === "nonpersistent") {
+                const record = ensureNonPersistentEntry(entry.pool_id ?? entry.id);
+                if (record) {
+                    record.signature = record.signature ?? entry.signature ?? entry.vote_signature ?? null;
+                    record.eligibility = record.eligibility ?? entry.eligibility_sigma_eid_prefix ?? entry.eligibility ?? null;
+                    record.hasVote = true;
+                }
+            }
+        }
+    }
+
+    const committeePersistentSeats = Array.isArray(demo?.committee?.seats)
+        ? demo.committee.seats.filter(seat => seat && seat.kind === "persistent")
+        : [];
+
+    for (const seat of committeePersistentSeats) {
+        const record = ensurePersistentEntry(seat.position);
+        if (record) {
+            if (!record.poolId && seat.pool_id) record.poolId = seat.pool_id;
+            record.seat = seat;
+        }
+    }
+
+    const persistentEntries = Array.from(persistentMap.values());
+    const nonPersistentEntries = Array.from(nonPersistentMap.values()).filter(entry => entry.hasVote);
+    const persistentVotePoolIds = persistentEntries
+        .filter(entry => entry.hasVote && entry.poolId)
+        .map(entry => entry.poolId);
+    const nonPersistentPoolIds = nonPersistentEntries
+        .filter(entry => entry.poolId)
+        .map(entry => entry.poolId);
+
     return {
-        persistentPools,
-        nonpersistentPools,
-        all: [...new Set([...persistentPools, ...nonpersistentPools])]
+        persistentEntries,
+        nonPersistentEntries,
+        persistentPoolIds: persistentVotePoolIds,
+        nonPersistentPoolIds,
+        persistentSeatCount: committeePersistentSeats.length,
+        nonPersistentSeatCount: Array.isArray(demo?.committee?.seats)
+            ? demo.committee.seats.filter(seat => seat && seat.kind === "nonpersistent").length
+            : 0
     };
 }
 
 function renderVotersFromDemo(demo) {
     if (!demo) return;
     const container = document.getElementById("voters_canvas");
-    const { persistentPools, nonpersistentPools, all } = buildVoterPools(demo);
+    const {
+        persistentEntries,
+        nonPersistentEntries,
+        persistentPoolIds,
+        nonPersistentPoolIds,
+        persistentSeatCount,
+        nonPersistentSeatCount
+    } = buildVoterPools(demo);
     const poolIdToUniverseIndex = buildPoolIdToUniverseIndex(demo);
+    const committeePositionLookup = new Map(
+        Object.entries(demo?.lookup?.committee_position_by_pool_id || {}).map(([k, v]) => [k, Number(v)])
+    );
+    const committeeMembers = Array.isArray(demo?.committee?.seats)
+        ? demo.committee.seats
+        : (Array.isArray(demo?.committee) ? demo.committee : []);
 
-    // Build a lookup for stakes so tooltips can show them for voters
+    // Build a lookup for stakes so tooltips can show them for voters (on circle), and vote tooltips can show voter id
     const poolIdToStake = new Map();
     if (Array.isArray(demo.universe)) {
         for (const p of demo.universe) {
@@ -364,94 +532,366 @@ function renderVotersFromDemo(demo) {
             if (id) poolIdToStake.set(id, (typeof p.stake !== "undefined") ? p.stake : "");
         }
     }
-    if (Array.isArray(demo.committee)) {
-        for (const m of demo.committee) {
-            const id = m.pool_id || m.id;
-            if (id && !poolIdToStake.has(id)) {
-                poolIdToStake.set(id, (typeof m.stake !== "undefined") ? m.stake : "");
-            }
+    for (const m of committeeMembers) {
+        const id = m.pool_id || m.id;
+        if (id && !poolIdToStake.has(id)) {
+            poolIdToStake.set(id, (typeof m.stake !== "undefined") ? m.stake : "");
         }
     }
 
-    // Stats: persistent/nonpersistent, and breakdown for *nonpersistent only*
-    const persistentCount = persistentPools.length;
-    const nonPersistentCount = nonpersistentPools.length;
-
-    // Build a set of committee poolIds for quick membership checks
-    const committeeSet = new Set();
-    if (demo.committee) {
-        for (const member of demo.committee) {
-            const pid = getCommitteePoolId(member);
-            if (pid) committeeSet.add(pid);
-        }
+    // Quorum / fraction (if present). Accept many possible shapes/keys and strings.
+    // Do NOT set any default if not found; simply show '—'.
+    let q = (
+        demo?.parameters?.vote_fraction ??
+        demo?.parameters?.fraction ??
+        demo?.voters?.fraction ??
+        demo?.voters?.quorum ??
+        demo?.vote_fraction ??
+        demo?.fraction ??
+        demo?.quorum ??
+        demo?.metadata?.vote_fraction ??
+        demo?.params?.vote_fraction ??
+        demo?.params?.fraction ??
+        demo?.params?.quorum ??
+        demo?.params?.quorum_fraction
+    );
+    if (typeof q === 'string') q = parseFloat(q);
+    if (q !== undefined && q !== null && !Number.isNaN(q)) {
+        const pct = q <= 1 ? Math.round(q * 100) : Math.round(q);
+        setText('voters_quorum', pct + '%');
+    } else {
+        setText('voters_quorum', '—');
     }
 
-    // Count only among non-persistent voters
-    let nonpInCommittee = 0, nonpOutsideCommittee = 0;
-    for (const poolId of nonpersistentPools) {
-        if (committeeSet.has(poolId)) nonpInCommittee++;
-        else nonpOutsideCommittee++;
-    }
+    // Stats: persistent/nonpersistent, and breakdown for nonpersistent only
+    const persistentTotalSeats = persistentSeatCount;
+    const persistentVotesCount = persistentEntries.filter(entry => entry.hasVote).length;
+    const nonPersistentTotalSlots = nonPersistentSeatCount;
 
-    setText("voters_total", (persistentCount + nonPersistentCount) || "—");
-    setText("voters_persistent", persistentCount || "—");
-    setText("voters_nonpersistent", nonPersistentCount || "—");
-    setText("voters_nonpersistent_in_committee", nonpInCommittee || "—");
-    setText("voters_nonpersistent_outside_committee", nonpOutsideCommittee || "—");
+    const displayedPersistentVotes = persistentVotesCount;
+    const targetNonPersistent = nonPersistentTotalSlots
+        ? Math.min(Math.round(nonPersistentTotalSlots * 0.75), nonPersistentEntries.length)
+        : Math.min(Math.round(nonPersistentEntries.length * 0.75), nonPersistentEntries.length);
+    const targetNonPersistentCount = Math.max(targetNonPersistent, 0);
+
+    setText("voters_persistent", `${displayedPersistentVotes}/${persistentTotalSeats || "—"}`);
+
 
     if (!container) return;
-    ensureUniverseStyles();
-    container.classList.add("universe-grid");
+
+    container.classList.remove("universe-grid", "voting-list");
+    container.classList.add("votes-board");
     container.innerHTML = "";
 
-    // Sort by universe index (ascending)
-    const sorted = [...all].sort((a, b) => {
-        const idxA = poolIdToUniverseIndex.get(a) ?? 99999;
-        const idxB = poolIdToUniverseIndex.get(b) ?? 99999;
+    if (!persistentEntries.length && !nonPersistentEntries.length) {
+        container.appendChild(createEmptyState("No voters recorded"));
+        return;
+    }
+
+    const persistentSorted = [...persistentEntries].sort((a, b) => {
+        const seatA = Number(a.seatId);
+        const seatB = Number(b.seatId);
+        const idxA = Number.isFinite(seatA) ? seatA : (poolIdToUniverseIndex.get(a.poolId) ?? 99999);
+        const idxB = Number.isFinite(seatB) ? seatB : (poolIdToUniverseIndex.get(b.poolId) ?? 99999);
         return idxA - idxB;
     });
-    for (const poolId of sorted) {
-        const div = document.createElement("div");
-        div.className = "pool-dot";
-        if (persistentPools.includes(poolId)) div.classList.add("is-persistent");
-        else div.classList.add("is-nonpersistent");
+    const nonPersistentSorted = [...nonPersistentEntries].sort((a, b) => {
+        const idxA = poolIdToUniverseIndex.get(a.poolId) ?? 99999;
+        const idxB = poolIdToUniverseIndex.get(b.poolId) ?? 99999;
+        return idxA - idxB;
+    });
+    const displayedNonPersistent = nonPersistentSorted.slice(0, targetNonPersistentCount);
+    const displayedNonPersistentCount = displayedNonPersistent.length;
 
-        // label = 1-based index in universe
-        const label = document.createElement("span");
-        label.classList.add("node-label");
-        const idx = poolIdToUniverseIndex.get(poolId) || "";
-        label.textContent = idx ? String(idx) : "";
-        label.style.fontSize = (idx >= 100 ? "11px" : "13px");
-        div.appendChild(label);
+    const totalVotersDisplayed = displayedPersistentVotes + displayedNonPersistentCount;
+    setText("voters_total", `${totalVotersDisplayed}`);
+    setText("voters_nonpersistent", `${displayedNonPersistentCount}/${nonPersistentTotalSlots || "—"}`);
 
-        const stake = poolIdToStake.get(poolId);
-        const stakeLine = (stake !== undefined && stake !== "") ? `<br><b>Stake:</b> ${stake}` : "";
-        div.setAttribute("data-tooltip-html", `<b>Pool ID:</b> ${poolId}` + stakeLine);
-        div.title = "";
-
-        div.addEventListener("mouseenter", (e) => {
-            const tip = document.createElement("div");
-            tip.className = "tooltip-box";
-            tip.innerHTML = div.getAttribute("data-tooltip-html");
-            document.body.appendChild(tip);
-            const rect = e.target.getBoundingClientRect();
-            tip.style.left = rect.left + window.scrollX + "px";
-            tip.style.top = rect.top + window.scrollY - 40 + "px";
-            div._tooltip = tip;
-        });
-        div.addEventListener("mouseleave", () => {
-            if (div._tooltip) { div._tooltip.remove(); div._tooltip = null; }
-        });
-        container.appendChild(div);
+    const poolIdToSeat = new Map();
+    const positionToSeat = new Map();
+    const nonPersistentSeatsOrdered = [];
+    for (const seat of committeeMembers) {
+        if (seat && seat.pool_id) {
+            poolIdToSeat.set(seat.pool_id, seat);
+        }
+        if (seat && seat.position !== undefined) {
+            positionToSeat.set(Number(seat.position), seat);
+        }
+        if (seat && seat.kind === "nonpersistent") {
+            nonPersistentSeatsOrdered.push(seat);
+        }
     }
+    nonPersistentSeatsOrdered.sort((a, b) => (a.position || 0) - (b.position || 0));
+
+    const createArrow = () => {
+        const arrow = document.createElement("span");
+        arrow.className = "vote-arrow vote-flow__arrow";
+        return arrow;
+    };
+
+    const createSeatTile = (seat, poolId, variant = "persistent") => {
+        const seatTile = document.createElement("div");
+        seatTile.className = `seat-box vote-seat-inline ${variant === "persistent" ? "is-persistent-seat" : "is-nonpersistent-seat"}`;
+
+        const seatNum = seat?.position ?? seat?.index ?? null;
+        const numSpan = document.createElement("span");
+        numSpan.className = "seat-num";
+        numSpan.textContent = seatNum ? String(seatNum) : (variant === "persistent" ? "—" : "");
+        seatTile.appendChild(numSpan);
+
+        const dot = document.createElement("div");
+        dot.className = "pool-dot is-nonpersistent";
+        const label = document.createElement("span");
+        label.className = "node-label";
+        const resolvedPoolId = poolId ?? seat?.pool_id ?? null;
+        let universeIdx = null;
+        if (resolvedPoolId) {
+            if (seat && seat.index !== undefined) {
+                const seatIndexNumeric = Number(seat.index);
+                universeIdx = Number.isFinite(seatIndexNumeric) ? (seatIndexNumeric + 1) : null;
+            }
+            if (universeIdx === null) {
+                const lookupIdx = poolIdToUniverseIndex.get(resolvedPoolId) ?? committeePositionLookup.get(resolvedPoolId);
+                if (lookupIdx !== undefined && lookupIdx !== null) {
+                    universeIdx = Number(lookupIdx);
+                    if (Number.isFinite(universeIdx)) universeIdx += 1;
+                }
+            }
+        }
+        label.textContent = universeIdx ? String(universeIdx) : "";
+        label.style.fontSize = (universeIdx >= 100 ? "11px" : "13px");
+        dot.appendChild(label);
+        seatTile.appendChild(dot);
+
+        const tooltip = [];
+        if (seatNum) tooltip.push(`<b>Seat #${seatNum}</b>`);
+        if (resolvedPoolId) tooltip.push(`<b>Pool ID:</b> ${resolvedPoolId}`);
+        if (seat && seat.stake !== undefined) {
+            tooltip.push(`<b>Stake:</b> ${formatNumber(seat.stake)}`);
+        }
+        attachTooltip(seatTile, tooltip.join("<br>"));
+        return seatTile;
+    };
+
+    const createNodeTile = (poolId, isPersistent) => {
+        const node = document.createElement("div");
+        node.className = "vote-node";
+
+        const dot = document.createElement("div");
+        dot.className = "pool-dot";
+        dot.classList.add(isPersistent ? "is-persistent" : "is-nonpersistent", "is-voter");
+        const label = document.createElement("span");
+        label.className = "node-label";
+        const universeIdx = poolIdToUniverseIndex.get(poolId);
+        label.textContent = universeIdx ? String(universeIdx) : "";
+        label.style.fontSize = (universeIdx >= 100 ? "11px" : "13px");
+        dot.appendChild(label);
+        const stake = poolIdToStake.get(poolId);
+        const lines = [];
+        if (poolId) {
+            lines.push(`<b>Pool ID:</b> ${poolId}`);
+        }
+        if (stake !== undefined && stake !== "") {
+            lines.push(`<b>Stake:</b> ${formatNumber(stake)}`);
+        }
+        attachTooltip(dot, lines.join("<br>"));
+        node.appendChild(dot);
+
+        return node;
+    };
+
+    const createVoteRect = (info, isPersistent) => {
+        const voteRect = document.createElement("div");
+        voteRect.className = "vote-rect";
+        voteRect.classList.add(isPersistent ? "is-persistent" : "is-nonpersistent");
+        const vBytes = isPersistent ? PERSISTENT_VOTE_BYTES : NONPERSISTENT_VOTE_BYTES;
+        voteRect.style.width = `${voteWidthPx(vBytes)}px`;
+
+        const tooltip = [];
+        if (isPersistent) {
+            const seatNum = info.seatId ?? info.seat?.position ?? info.seat?.index ?? "—";
+            tooltip.push(`<b>Seat #${seatNum}</b>`);
+            tooltip.push(`<b>Size:</b> ${formatBytes(vBytes)}`);
+            if (info.signature) tooltip.push(`<b>Signature:</b> ${info.signature}`);
+        } else {
+            tooltip.push(`<b>Pool ID:</b> ${info.poolId}`);
+            if (info.eligibility) tooltip.push(`<b>Eligibility prefix:</b> ${info.eligibility}`);
+            if (info.signature) tooltip.push(`<b>Signature:</b> ${info.signature}`);
+            tooltip.push(`<b>Size:</b> ${formatBytes(vBytes)}`);
+        }
+        attachTooltip(voteRect, tooltip.join("<br>"));
+        return voteRect;
+    };
+
+    const createPersistentRow = (entry, idx) => {
+        const row = document.createElement("div");
+        row.className = "vote-flow__row vote-flow__row--persistent";
+        const seat = entry.seat ?? poolIdToSeat.get(entry.poolId) ?? positionToSeat.get(entry.seatId);
+        row.appendChild(createSeatTile(seat, entry.poolId ?? seat?.pool_id ?? null, "persistent"));
+
+        const arrow = createArrow();
+        if (!entry.hasVote) {
+            arrow.classList.add("placeholder");
+        }
+        row.appendChild(arrow);
+
+        if (entry.hasVote) {
+            row.appendChild(createVoteRect({ ...entry, seat }, true));
+        } else {
+            const placeholder = document.createElement("div");
+            placeholder.className = "vote-rect placeholder persistent";
+            placeholder.style.width = `${voteWidthPx(PERSISTENT_VOTE_BYTES)}px`;
+            row.appendChild(placeholder);
+        }
+        return row;
+    };
+
+    const createNonPersistentRow = (entry, idx) => {
+        const row = document.createElement("div");
+        row.className = "vote-flow__row vote-flow__row--nonpersistent";
+        const seat = entry.seat ?? nonPersistentSeatsOrdered[idx] ?? null;
+        row.appendChild(createSeatTile(seat, entry.poolId, "nonpersistent"));
+        row.appendChild(createArrow());
+        row.appendChild(createVoteRect(entry, false));
+        return row;
+    };
+
+    const appendFlow = (entries, buildRow, modifier) => {
+        if (!entries.length) return;
+        const flow = document.createElement("div");
+        flow.className = "vote-flow";
+        if (modifier) flow.classList.add(modifier);
+        entries.forEach((entry, index) => {
+            if (!entry.seat && buildRow === createNonPersistentRow) {
+                entry.seat = nonPersistentSeatsOrdered[index] ?? null;
+            }
+            flow.appendChild(buildRow(entry, index));
+        });
+        container.appendChild(flow);
+    };
+
+    appendFlow(persistentSorted, createPersistentRow, "vote-flow--persistent");
+    appendFlow(displayedNonPersistent, createNonPersistentRow, "vote-flow--nonpersistent");
+}
+
+function renderAggregationFromDemo(demo) {
+    const container = document.getElementById('aggregation_canvas');
+    if (!container) return;
+
+    const { persistentPoolIds, nonPersistentPoolIds } = buildVoterPools(demo);
+
+    const persistentBytes = firstFinite(
+        demo?.aggregation?.persistent_bytes,
+        demo?.aggregation?.persistent_vote_bytes,
+        demo?.metrics?.persistent_bytes,
+        demo?.metrics?.persistent_vote_bytes,
+        persistentPoolIds.length * PERSISTENT_VOTE_BYTES
+    );
+    const nonPersistentBytes = firstFinite(
+        demo?.aggregation?.nonpersistent_bytes,
+        demo?.aggregation?.nonpersistent_vote_bytes,
+        demo?.aggregation?.non_persistent_bytes,
+        demo?.metrics?.nonpersistent_bytes,
+        demo?.metrics?.nonpersistent_vote_bytes,
+        nonPersistentPoolIds.length * NONPERSISTENT_VOTE_BYTES
+    );
+    const totalVotesBytes = persistentBytes + nonPersistentBytes;
+    const certBytes = firstFinite(
+        demo?.certificate?.cert_bytes,
+        demo?.certificate?.certificate_bytes,
+        demo?.certificate?.bytes,
+        demo?.aggregation?.certificate_bytes
+    );
+
+    const votesEl = document.getElementById('agg_votes_size');
+    if (votesEl) {
+        const pieces = [
+            `${formatNumber(totalVotesBytes)} B`,
+            `<span class="text-green">Persistent: ${formatNumber(persistentBytes)} B</span>`,
+            `<span class="text-blue">Non-persistent: ${formatNumber(nonPersistentBytes)} B</span>`
+        ];
+        votesEl.innerHTML = pieces.join('<br>');
+    }
+
+    setText('agg_cert_size', certBytes !== null ? formatBytes(certBytes) : '—');
+
+    const gainEl = document.getElementById('agg_gain');
+    if (gainEl) {
+        let ratioVal = firstFinite(
+            demo?.certificate?.compression_ratio,
+            demo?.compression_ratio,
+            demo?.aggregation?.compression_ratio,
+            demo?.metrics?.compression_ratio,
+            null
+        );
+        if (!ratioVal && totalVotesBytes > 0 && Number(certBytes) > 0) {
+            ratioVal = totalVotesBytes / Number(certBytes);
+        }
+        gainEl.textContent = ratioVal && isFinite(ratioVal) ? `${ratioVal.toFixed(2)}×` : '—';
+    }
+
+    container.classList.add('aggregation-row');
+    container.innerHTML = '';
+
+    if (persistentPoolIds.length + nonPersistentPoolIds.length === 0) {
+        container.appendChild(createEmptyState("No votes recorded"));
+        return;
+    }
+
+    const votesGrid = document.createElement('div');
+    votesGrid.className = 'agg-votes';
+
+    const addVoteRect = (poolId, bytes, isPersistent) => {
+        const vote = document.createElement('div');
+        vote.className = 'vote-rect';
+        vote.classList.add(isPersistent ? 'is-persistent' : 'is-nonpersistent');
+        vote.style.width = `${voteWidthPx(bytes)}px`;
+        attachTooltip(vote, `<b>Vote</b><br>From: ${poolId}<br><b>Size:</b> ${bytes} bytes`);
+        votesGrid.appendChild(vote);
+    };
+
+    persistentPoolIds.forEach(pid => addVoteRect(pid, PERSISTENT_VOTE_BYTES, true));
+    nonPersistentPoolIds.forEach(pid => addVoteRect(pid, NONPERSISTENT_VOTE_BYTES, false));
+
+    const arrow = document.createElement('span');
+    arrow.className = 'big-arrow';
+    arrow.textContent = '⇒';
+
+    const cert = document.createElement('div');
+    cert.className = 'certificate-rect';
+    cert.textContent = 'Certificate';
+
+    if (totalVotesBytes > 0 && Number(certBytes) > 0) {
+        const minWidth = 140;
+        const maxWidth = 420;
+        const scaled = Math.min(maxWidth, Math.max(minWidth, (Number(certBytes) / totalVotesBytes) * 600));
+        cert.style.width = `${Math.round(scaled)}px`;
+        cert.style.minWidth = `${Math.round(scaled)}px`;
+    }
+
+    const certificateTooltip = [];
+    const eid = demo?.certificate?.eid ?? demo?.identifiers?.eid;
+    const eb = demo?.certificate?.eb_hash ?? demo?.identifiers?.eb_hash;
+    const signer = demo?.certificate?.signer;
+    if (signer) certificateTooltip.push(`<b>Signer:</b> ${signer}`);
+    if (eid) certificateTooltip.push(`<b>EID:</b> ${eid}`);
+    if (eb) certificateTooltip.push(`<b>EB hash:</b> ${eb}`);
+    if (certBytes !== null) certificateTooltip.push(`<b>Size:</b> ${formatBytes(certBytes)}`);
+    if (certificateTooltip.length) {
+        attachTooltip(cert, certificateTooltip.join('<br>'));
+    }
+
+    container.appendChild(votesGrid);
+    container.appendChild(arrow);
+    container.appendChild(cert);
 }
 
 // ---------- data loading ----------
 function getRunFromURL() {
     const p = new URLSearchParams(window.location.search);
     const run = p.get("run");
-    // default to run64 if not provided
-    return run && /^run\d+$/i.test(run) ? run : "run64";
+    // No default fallback here. Only accept valid runX format or null.
+    return run && /^run\d+$/i.test(run) ? run : null;
 }
 
 async function tryFetchJson(url) {
@@ -464,11 +904,33 @@ async function tryFetchJson(url) {
     }
 }
 
-async function loadDemoJson() {
-    const run = getRunFromURL();
-    let data = await tryFetchJson(`/demo/${run}`);
-    if (!data) data = await tryFetchJson("/static/demo.json");
-    if (!data) data = await tryFetchJson("/demo.json");
+async function tryFetchText(url) {
+    try {
+        const r = await fetch(url, { cache: "no-store" });
+        if (!r.ok) return null;
+        return (await r.text()).trim();
+    } catch {
+        return null;
+    }
+}
+
+// Loads demo JSON for a specific run directory (runDir: string)
+async function loadDemoJson(runDir) {
+    if (!runDir || typeof runDir !== "string") return null;
+
+    const data = await tryFetchJson(`/demo/${runDir}`);
+    if (!data) return null;
+
+    if (!data.identifiers) {
+        const [eid, eb] = await Promise.all([
+            tryFetchText(`/demo/${runDir}/eid.txt`),
+            tryFetchText(`/demo/${runDir}/ebhash.txt`)
+        ]);
+        data.identifiers = {
+            eid: eid || null,
+            eb_hash: eb || null
+        };
+    }
     return data;
 }
 
@@ -478,16 +940,14 @@ function fillIdentifiers(obj) {
     const eb = obj.eb_hash || obj.eb || obj.EB || obj.ebHash;
     if (eid) {
         setText("eid", eid);
-        setText("eid_value", eid);
     }
     if (eb) {
         setText("eb", eb);
-        setText("ebhash_value", eb);
     }
 }
 
-// ---------- boot ----------
-document.addEventListener("DOMContentLoaded", async () => {
+// --- UI clearing helpers ---
+function clearUIPlaceholders() {
     setText("universe_total", "—");
     setText("universe_persistent", "—");
     setText("universe_nonpersistent", "—");
@@ -496,16 +956,29 @@ document.addEventListener("DOMContentLoaded", async () => {
     setText("committee_nonpersistent", "—");
     setText("eid", "—");
     setText("eb", "—");
-    setText("eid_value", "—");
-    setText("ebhash_value", "—");
     setText("voters_total", "—");
     setText("voters_persistent", "—");
     setText("voters_nonpersistent", "—");
-    setText("voters_in_committee", "—");
-    setText("voters_outside_committee", "—");
+    setText('voters_quorum', '—');
+    setText('agg_votes_size', '—');
+    setText('agg_cert_size', '—');
+    setText('agg_gain', '—');
+    // Clear main panels
+    const clearIds = ["universe_canvas", "committee_canvas", "voters_canvas", "aggregation_canvas"];
+    for (const id of clearIds) {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = "";
+    }
+}
 
-    const demo = await loadDemoJson();
-
+// --- Data loading and rendering sequence for a given runDir ---
+async function loadAndRenderRun(runDir) {
+    clearUIPlaceholders();
+    if (!runDir || typeof runDir !== "string") {
+        renderUniverse([]);
+        return;
+    }
+    const demo = await loadDemoJson(runDir);
     if (demo) {
         const universe = demo.universe || demo;
         renderUniverse(universe);
@@ -513,15 +986,57 @@ document.addEventListener("DOMContentLoaded", async () => {
         fillIdentifiers(demo.certificate);
         renderCommitteeFromDemo(demo);
         renderVotersFromDemo(demo);
-
-        // Align grid columns across sections and keep them in sync on resize
+        renderAggregationFromDemo(demo);
         syncGridColumns();
-        window.addEventListener("resize", () => {
-            syncGridColumns();
-        });
+        window.addEventListener("resize", syncGridColumns);
     } else {
         renderUniverse([]);
     }
+}
+
+// --- Boot logic: only auto-load if localStorage has lastRun ---
+document.addEventListener("DOMContentLoaded", () => {
+    clearUIPlaceholders();
+
+    // Setup form submission for run directory selection
+    const form = document.getElementById("run-form");
+    if (form) {
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const input = form.querySelector("input[name='run']") || document.getElementById("run-input");
+            if (!input) return;
+            let runDir = input.value.trim();
+            // Accept only runX format (e.g., run64, run5, etc.)
+            if (!/^run\d+$/i.test(runDir)) {
+                alert("Please enter a valid run directory (e.g., run64).");
+                input.focus();
+                return;
+            }
+            // Save last used run to localStorage
+            localStorage.setItem("lastRun", runDir);
+            await loadAndRenderRun(runDir);
+        });
+    }
+
+    // Prefer run from URL param if present (e.g., /ui?run=run100)
+    const runFromURL = getRunFromURL();
+    if (runFromURL) {
+        const inputUrl = document.querySelector("#run-form input[name='run']") || document.getElementById("run-input");
+        if (inputUrl) inputUrl.value = runFromURL;
+        localStorage.setItem("lastRun", runFromURL);
+        loadAndRenderRun(runFromURL);
+        return; // skip other auto-loading
+    }
+
+    // If localStorage has lastRun, auto-load it; else wait for user input
+    const lastRun = localStorage.getItem("lastRun");
+    if (lastRun && /^run\d+$/i.test(lastRun)) {
+        // Optionally set the input field, if present
+        const input = document.querySelector("#run-form input[name='run']") || document.getElementById("run-input");
+        if (input) input.value = lastRun;
+        loadAndRenderRun(lastRun);
+    }
+    // else: UI remains in cleared state, waiting for user to submit run directory
 });
 
 // === Middle-ellipsis for long identifiers (keep start and end) ===
@@ -536,11 +1051,21 @@ function watchAndEllipsize(id, opts = {}) {
     if (!el) return;
     const { keepStart = 26, keepEnd = 22, truncate = true } = opts;
     const apply = () => {
-        const full = el.getAttribute('data-full') || el.textContent.trim();
-        el.setAttribute('data-full', full);
+        const current = (el.textContent || "").trim();
+        const stored = el.getAttribute('data-full');
+        const full = current || stored || "";
+        const next = truncate ? shortenMiddle(full, keepStart, keepEnd) : full;
+
+        if (stored !== full) {
+            el.setAttribute('data-full', full);
+        }
+        if (!el.classList.contains('mono')) {
+            el.classList.add('mono');
+        }
         el.title = full;
-        el.classList.add('mono');
-        el.textContent = truncate ? shortenMiddle(full, keepStart, keepEnd) : full;
+        if (el.textContent !== next) {
+            el.textContent = next;
+        }
     };
     const mo = new MutationObserver(apply);
     mo.observe(el, { childList: true, characterData: true, subtree: true });
@@ -548,6 +1073,6 @@ function watchAndEllipsize(id, opts = {}) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    watchAndEllipsize('eid_value', { truncate: false });
-    watchAndEllipsize('ebhash_value', { keepStart: 26, keepEnd: 22, truncate: true });
+    watchAndEllipsize('eid', { truncate: false });
+    watchAndEllipsize('eb', { keepStart: 26, keepEnd: 22, truncate: true });
 });

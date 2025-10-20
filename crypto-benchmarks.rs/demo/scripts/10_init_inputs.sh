@@ -5,9 +5,9 @@ DIR_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$DIR_SCRIPT/.env_cli"
 
 DEMO_DIR="$(cd "$DIR_SCRIPT/.." && pwd)"
-POOLS=5000
-TOTAL_STAKE=100000
-ALPHA=5
+POOLS=500
+TOTAL_STAKE=1000000
+ALPHA=9
 BETA=1
 
 while [[ $# -gt 0 ]]; do

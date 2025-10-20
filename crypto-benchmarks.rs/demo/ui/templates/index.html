@@ -10,11 +10,11 @@
 </head>
 
 <body>
-    <header>
-        <h1>Leios Voting Demo</h1>
-        <form id="run-form">
+    <header class="app-header">
+        <h1 class="app-title">Leios Voting Demo</h1>
+        <form id="run-form" class="app-header__form">
             <label for="run-input">Run directory:</label>
-            <input id="run-input" value="run64" placeholder="e.g., run64" />
+            <input id="run-input" name="run" type="text" placeholder="e.g., run64" />
             <button type="submit">Load</button>
         </form>
     </header>
@@ -25,17 +25,14 @@
             <h2 class="card-title center">Set of SPOs</h2>
 
             <div class="grid two wide-left">
-                <div>
-                    <div class="stack" style="margin-bottom: 0.5rem;">
-                        <strong>Total pools:</strong> <span id="universe_total">—</span>
+                <div class="stat-group">
+                    <div class="stat">
+                        <span class="stat-label">Total pools:</span>
+                        <span id="universe_total" class="stat-value">—</span>
                     </div>
-                    <div class="stack" style="margin-bottom: 0.5rem;">
-                        <strong class="persistent-color">Persistent:</strong>
-                        <span id="universe_persistent" class="count persistent-color">—</span>
-                    </div>
-                    <div class="stack" style="margin-bottom: 0.5rem;">
-                        <strong class="nonpersistent-color">Non-persistent:</strong>
-                        <span id="universe_nonpersistent" class="count nonpersistent-color">—</span>
+                    <div class="stat">
+                        <span class="stat-label">Total stake:</span>
+                        <span id="universe_stake" class="stat-value mono">—</span>
                     </div>
                 </div>
                 <div>
@@ -51,52 +48,24 @@
             <strong>Backend error:</strong>
             <span id="error_text">—</span>
         </div>
-        <!-- A) Election identifiers -->
-        <section class="card" id="identifiers">
-            <h2 class="card-title center">Election</h2>
-            <div class="identifiers-row">
-                <div class="eid-block" style="display:flex;gap:.5rem;align-items:center;min-width:0;">
-                    <strong>EID:</strong>
-                    <span id="eid" class="text-wrap"></span>
-                </div>
-                <div class="eb-block"
-                    style="display:flex;gap:.5rem;align-items:center;margin-left:auto;text-align:right;justify-content:flex-end;min-width:0;">
-                    <strong>EB hash:</strong>
-                    <span id="eb" class="text-wrap"></span>
-                </div>
-            </div>
-            <!--
-            .identifiers-row {
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              gap: 1rem;
-            }
-            .eid-block, .eb-block {
-              flex: 1;
-              word-break: break-all;
-            }
-            -->
-        </section>
         <!-- B) Committee (this election) -->
         <section class="card" id="committee">
-            <h2 class="card-title center">Committee</h2>
-            <p class="card-subtitle center">
-                Persistent (Fait Accompli) and Non-persistent (Local Sortition)
-            </p>
+            <h2 class="card-title center">Committee Selection</h2>
+            <p class="card-subtitle center">Persistent seats selected for this epoch via Fait Accompli</p>
 
             <div class="grid two wide-left">
-                <div>
-                    <div class="stack" style="margin-bottom: 0.5rem;">
-                        <strong>Total committee seats:</strong> <span id="committee_total">—</span>
+                <div class="stat-group">
+                    <div class="stat">
+                        <span class="stat-label">Total seats:</span>
+                        <span id="committee_total" class="stat-value">—</span>
                     </div>
-                    <div class="stack" style="margin-bottom: 0.5rem;">
-                        <strong class="persistent-color">Persistent:</strong>
-                        <span id="committee_persistent" class="count persistent-color">—</span>
+                    <div class="stat stat--indent">
+                        <span class="stat-label text-green">Persistent seats:</span>
+                        <span id="committee_persistent" class="stat-value text-green">—</span>
                     </div>
-                    <div class="stack" style="margin-bottom: 0.5rem;">
-                        <strong class="nonpersistent-color">Non-persistent:</strong>
-                        <span id="committee_nonpersistent" class="count nonpersistent-color">—</span>
+                    <div class="stat stat--indent">
+                        <span class="stat-label text-muted">Non-persistent seats:</span>
+                        <span id="committee_nonpersistent" class="stat-value text-muted">—</span>
                     </div>
                 </div>
                 <div id="committee_canvas" class="committee-canvas" role="img" aria-label="Committee members grid">
@@ -105,30 +74,41 @@
                 <noscript>Please enable JavaScript to view the committee visualization.</noscript>
             </div>
         </section>
+        <!-- A) Election identifiers -->
+        <section class="card" id="identifiers">
+            <h2 class="card-title center">Election</h2>
+            <div class="identifiers-row">
+                <div class="eid-block">
+                    <strong>EID:</strong>
+                    <span id="eid" class="text-wrap"></span>
+                </div>
+                <div class="eb-block">
+                    <strong>EB hash:</strong>
+                    <span id="eb" class="text-wrap"></span>
+                </div>
+            </div>
+        </section>
         <!-- C) Voters (observed votes) -->
         <section class="card" id="voters">
-            <h2 class="card-title center">Voters</h2>
+            <h2 class="card-title center">Voting</h2>
 
             <div class="grid two wide-left">
-                <div>
-                    <div class="stack" style="margin-bottom: 0.5rem;">
-                        <strong>Total voters:</strong> <span id="voters_total">—</span>
+                <div class="stat-group">
+                    <div class="stat">
+                        <span class="stat-label">Quorum:</span>
+                        <span id="voters_quorum" class="stat-value">—</span>
                     </div>
-                    <div class="stack" style="margin-bottom: 0.5rem;">
-                        <strong class="persistent-color">Persistent:</strong>
-                        <span id="voters_persistent" class="count persistent-color">—</span>
+                    <div class="stat">
+                        <span class="stat-label">Total voters:</span>
+                        <span id="voters_total" class="stat-value">—</span>
                     </div>
-                    <div class="stack" style="margin-bottom: 0.5rem;">
-                        <strong class="nonpersistent-color">Non-persistent:</strong>
-                        <span id="voters_nonpersistent" class="count nonpersistent-color">—</span>
+                    <div class="stat stat--indent">
+                        <span class="stat-label text-green">Persistent:</span>
+                        <span id="voters_persistent" class="stat-value text-green">—</span>
                     </div>
-                    <div class="stack" style="margin-bottom: 0.5rem;">
-                        <span class="nonpersistent-indent">in committee:</span>
-                        <span id="voters_nonpersistent_in_committee" class="count nonpersistent-color">—</span>
-                    </div>
-                    <div class="stack" style="margin-bottom: 0.5rem;">
-                        <span class="nonpersistent-indent">outside committee:</span>
-                        <span id="voters_nonpersistent_outside_committee" class="count nonpersistent-color">—</span>
+                    <div class="stat stat--indent">
+                        <span class="stat-label text-blue">Non-persistent:</span>
+                        <span id="voters_nonpersistent" class="stat-value text-blue">—</span>
                     </div>
                 </div>
                 <div>
@@ -137,6 +117,31 @@
                         <div id="voters_tooltip" class="tooltip" hidden></div>
                     </div>
                     <noscript>Please enable JavaScript to view the voters visualization.</noscript>
+                </div>
+            </div>
+        </section>
+
+        <!-- D) Aggregation -->
+        <section class="card" id="aggregation">
+            <h2 class="card-title center">Aggregation</h2>
+            <div class="grid two wide-left">
+                <div class="stat-group">
+                    <div class="stat">
+                        <span class="stat-label">Total votes size:</span>
+                        <span id="agg_votes_size" class="stat-value">—</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Certificate size:</span>
+                        <span id="agg_cert_size" class="stat-value">—</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Compression gain:</span>
+                        <span id="agg_gain" class="stat-value text-green">—</span>
+                    </div>
+                </div>
+                <div>
+                    <div id="aggregation_canvas" class="aggregation-canvas" role="img"
+                        aria-label="Aggregation pipeline"></div>
                 </div>
             </div>
         </section>
