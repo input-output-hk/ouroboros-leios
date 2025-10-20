@@ -8,14 +8,11 @@ Authors:
 
 # Introduction
 
-This technical design document bridges the gap between the protocol-level specification (CIP-164) and its concrete implementation in cardano-node. While CIP-164 defines *what* the Leios protocol is and *why* it benefits Cardano, this document addresses *how* to implement it reliably and serve as a practical guide for implementation teams.
+This technical design document bridges the gap between the protocol-level specification ([CIP-164](https://github.com/cardano-foundation/CIPs/pull/1078)) and its concrete implementation in [`cardano-node`](https://github.com/IntersectMBO/cardano-node). While CIP-164 defines *what* the Leios protocol is and *why* it benefits Cardano, this document addresses *how* to implement it reliably and serve as a practical guide for implementation teams.
 
-This document extends:
-- [CIP-164](https://github.com/cardano-foundation/CIPs/pull/1078): Protocol-level specification of Leios consensus mechanism
-- [Impact Analysis](../ImpactAnalysis.md): High-level requirements and potential changes to ecosystem and node components
+This document builds on the [impact analysis](../ImpactAnalysis.md) and [early threat modelling](../threat-model.md) conducted. The document outlines the necessary architecture changes, highlights key risks and mitigation strategies, and proposes an implementation roadmap. As the implementation plan itself contains exploratory tasks, this document can be considered a living document and reflects our current understanding of the protocol, as well as design decisions taken during implementation. 
 
-> [!WARNING]
-> TODO: Introduce general approach, that this is a living document: architecture reflects our current design understanding, which is driven by protocol requirements (CIP), but also by identified risks (for the implementation); From this, we sketch a (current) implementation plan that includes fact-finding, which also means potentially updating that plan as we learn things
+Besides collecting node-specific details in this document, we intend to contribute implementation-independent specifications to the [cardano-blueprint](https://cardano-scaling.github.io/cardano-blueprint/) initiative and also update the CIP-164 specification through pull requests as needed.
 
 #### Key Design Principles
 
@@ -23,8 +20,8 @@ This document extends:
 > TODO: Needed, useful? What else to "front-load" before going into detail about architecture changes?
 
 - **Security First**: Preserve Praos security guarantees throughout deployment
-- **Incremental Delivery**: Enable phased rollout with measurable milestones
 - **Early Validation**: Test critical assumptions before full implementation
+- **Incremental Delivery**: Enable phased rollout with measurable milestones
 - **Ecosystem Compatibility**: Minimize disruption to existing infrastructure
 
 # Architecture
@@ -38,7 +35,7 @@ This document extends:
 > TODO: How to structure the changes best? No need to group them by layer?
 
 > [!CAUTION]
-> FIXME: The next few sections are AI generated based on the impact analysis contents and the (pseudo-)Haskell code are meant to be replaced other, similar level of detail specifications (barely scratching the code-level)
+> FIXME: The next few sections are AI generated based on the impact analysis contents and the (pseudo-)Haskell code should be be replaced by other, similar level of detail specifications (barely scratching the code-level)
 
 ## Consensus
 #### Block Production Thread (Updated)
