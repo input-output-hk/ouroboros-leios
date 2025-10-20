@@ -34,10 +34,12 @@ This document is a living artifact and will be updated as implementation progres
 
 # Architecture
 
-> [!WARNING]
-> TODO: Create an updated component diagram and provide a quick overview of the changes before going into detailed specifications
+Ouroboros Leios is a significant change to the consensus protocol, but does not require fundamental changes to the overall architecture of the Cardano node. Several new components will be needed for the new responsibilities related to producing and relaying Endorser Blocks (EBs) and voting on them, as well as changes to existing components to support higher throughput and freshest-first-delivery. The following diagram illustrates the key components of a relay node where new and updated components are marked by small purple circles:
 
 ![](./relay-leios-component-diagram.svg)
+
+> [!WARNING]
+> TODO: Explain why focus on relay node (upstream/downstream relationship); briefly mention block producer node differences; Add similar diagram for block producer? block and vote production not shown in relay diagram
 
 > [!WARNING]
 > TODO: How to structure the changes best? No need to group them by layer?
