@@ -24,6 +24,14 @@ Besides collecting node-specific details in this document, we intend to contribu
 - **Incremental Delivery**: Enable phased rollout with measurable milestones
 - **Ecosystem Compatibility**: Minimize disruption to existing infrastructure
 
+#### Document history
+
+This document is a living artifact and will be updated as implementation progresses, new risks are identified, and validation results become available.
+
+| Version | Date       | Author          | Changes       |
+|---------|------------|-----------------|---------------|
+| 0.1     | 2025-10-15 | Sebastian Nagel | Initial draft |
+
 # Architecture
 
 > [!WARNING]
@@ -751,11 +759,3 @@ Genesis (Ouroboros Genesis) enables nodes to bootstrap from the genesis block wi
 
 1. **UTxO-HD Design**:
     https://github.com/IntersectMBO/ouroboros-consensus/blob/main/docs/website/contents/for-developers/utxo-hd/index.md
-
-# Document history
-
-This document is a living artifact and will be updated as implementation progresses, new risks are identified, and validation results become available.
-
-| Version | Date       | Author          | Changes       |
-|---------|------------|-----------------|---------------|
-| 0.1     | 2025-10-15 | Sebastian Nagel | Initial draft |
