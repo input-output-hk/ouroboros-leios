@@ -1,0 +1,89 @@
+ INFO praos: sim_cli::events: 400000 transactions(s) were generated in total.
+ INFO praos: sim_cli::events: 56 naive praos block(s) were published.
+ INFO praos: sim_cli::events: 1144 slot(s) had no naive praos blocks.
+ INFO praos: sim_cli::events: 201740 transaction(s) (302.61 MB) finalized in a naive praos block.
+ INFO praos: sim_cli::events: 198260 transaction(s) (297.39 MB) did not reach a naive praos block.
+ INFO praos: sim_cli::events: Pool 3 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 38 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 41 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 42 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 45 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 46 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 50 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 53 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 54 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 58 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 59 published 2 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 62 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 67 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 68 failed to publish 1 naive praos block(s) due to slot battles.
+ INFO praos: sim_cli::events: Pool 70 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 71 published 0 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 71 failed to publish 1 naive praos block(s) due to slot battles.
+ INFO praos: sim_cli::events: Pool 91 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 93 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 99 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 109 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 121 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 131 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 132 published 2 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 136 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 139 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 351 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 362 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 371 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 377 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 429 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 431 published 2 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 442 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 446 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 477 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 478 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 481 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 510 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 518 published 2 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 521 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 527 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 528 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 534 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 535 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 539 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 540 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 541 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 552 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 560 published 2 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 562 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 739 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 741 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 742 published 1 naive praos block(s)
+ INFO praos: sim_cli::events: Pool 745 published 1 naive praos block(s)
+ INFO leios: sim_cli::events: 0 IB(s) were generated, on average 0.000 IB(s) per slot.
+ INFO leios: sim_cli::events: 0 out of 400000 transaction(s) were included in at least one IB.
+ INFO leios: sim_cli::events: The average age of the pending transactions is 297.391s (stddev 171.698).
+ INFO leios: sim_cli::events: Each transaction was included in an average of NaN IB(s) (stddev NaN).
+ INFO leios: sim_cli::events: Each IB contained an average of NaN transaction(s) (stddev NaN) and an average of 0 B (stddev 0 B). 0 IB(s) were empty.
+ INFO leios: sim_cli::events: Each node received an average of 0.000 IB(s) (stddev 0.000).
+ INFO leios: sim_cli::events: 58 EB(s) were generated; on average there were 0.048 EB(s) per slot.
+ INFO leios: sim_cli::events: Each EB contained an average of 7972.621 transaction(s) (stddev 187.858). 0 EB(s) were empty.
+ INFO leios: sim_cli::events: Each EB contained an average of 0.000 IB(s) (stddev 0.000). 0 EB(s) were empty.
+ INFO leios: sim_cli::events: Each IB was included in an average of NaN EB(s) (stddev NaN).
+ INFO leios: sim_cli::events: 0 out of 0 IBs were included in at least one EB.
+ INFO leios: sim_cli::events: 0 out of 0 IBs expired before they reached an EB.
+ INFO leios: sim_cli::events: 28 out of 58 EBs expired before an EB from their stage reached an RB.
+ INFO leios: sim_cli::events: 209680 out of 400000 transaction(s) were included in at least one EB.
+ INFO leios: sim_cli::events: 28193 total votes were generated.
+ INFO leios: sim_cli::events: Each stake pool produced an average of 130.523 vote(s) (stddev 37.706).
+ INFO leios: sim_cli::events: Each EB received an average of 494.614 vote(s) (stddev 186.959).
+ INFO leios: sim_cli::events: There were 9447 bundle(s) of votes. Each bundle contained 2.984 vote(s) (stddev 1.612).
+ INFO leios: sim_cli::events: 29 L1 block(s) had a Leios endorsement.
+ INFO leios: sim_cli::events: 200000 tx(s) (300 MB) were referenced by a Leios endorsement.
+ INFO leios: sim_cli::events: 1740 tx(s) (2.61 MB) were included directly in a Praos block.
+ INFO leios: sim_cli::events: Spatial efficiency: 300 MB/15.04 MB (1994.269%) of Leios bytes were unique transactions.
+ INFO leios: sim_cli::events: 0 tx(s) (0.000%) referenced by a Leios endorsement were redundant.
+ INFO leios: sim_cli::events: Each transaction took an average of NaNs (stddev NaN) to be included in an IB.
+ INFO leios: sim_cli::events: Each transaction took an average of 339.781s (stddev 153.738) to be included in an EB.
+ INFO leios: sim_cli::events: Each transaction took an average of 376.707s (stddev 141.927) to be included in a block.
+ INFO network: sim_cli::events: 299547333 TX message(s) were sent. 299538279 of them were received (99.997%).
+ INFO network: sim_cli::events: 0 IB message(s) were sent. 0 of them were received (NaN%).
+ INFO network: sim_cli::events: 42260 EB message(s) were sent. 42260 of them were received (100.000%).
+ INFO network: sim_cli::events: 7075803 Vote message(s) were sent. 7075803 of them were received (100.000%).
