@@ -88,6 +88,15 @@ def demo_for_run(run):
         return send_from_directory(run_dir, "demo.json")
     abort(404, f"demo.json not found in {run_dir}")
 
+@app.route("/demo/<run>/<path:filename>")
+def demo_asset(run, filename):
+    """Serve auxiliary files (eid.txt, ebhash.txt, etc.) from the run directory."""
+    run_dir = run_dir_path(run)
+    target_path = os.path.join(run_dir, filename)
+    if os.path.isfile(target_path):
+        return send_from_directory(run_dir, filename)
+    abort(404, f"{filename} not found in {run_dir}")
+
 @app.route("/votes/<run>")
 def votes(run):
     """Expose elected voter IDs (first pass: read from certificate.pretty.json)."""

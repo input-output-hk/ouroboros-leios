@@ -40,12 +40,14 @@ The scripts are designed to be run from the `demo/` directory.
 
 You can run each script individually to understand and control each step of the process for a given number of voters (e.g., 32). Use the `-d` option to specify the output directory (e.g., `run32`).
 
+RUN=run100 
+
 #### 10_init_inputs.sh
 
 Initialize inputs for N voters:
 
 ```bash
-scripts/10_init_inputs.sh -d run64 --pools 200 --stake 100000 --alpha 8 --beta 1
+scripts/10_init_inputs.sh -d "$RUN" --pools 500 --stake 100000 --alpha 9 --beta 1
 ```
 
 #### 20_make_registry.sh
@@ -53,7 +55,7 @@ scripts/10_init_inputs.sh -d run64 --pools 200 --stake 100000 --alpha 8 --beta 1
 Build the registry from initialized inputs:
 
 ```bash
-scripts/20_make_registry.sh -d run64 -n 64
+./scripts/20_make_registry.sh -d "$RUN" -n 100
 ```
 
 #### 30_cast_votes.sh
@@ -61,7 +63,7 @@ scripts/20_make_registry.sh -d run64 -n 64
 Cast votes with a specified fraction of voters voting (e.g., 1.0 means all vote):
 
 ```bash
-scripts/30_cast_votes.sh -d run64 -f 0.55
+scripts/30_cast_votes.sh -d "$RUN" -f 0.75
 ```
 
 #### 40_make_certificate.sh
@@ -69,7 +71,7 @@ scripts/30_cast_votes.sh -d run64 -f 0.55
 Generate the aggregated certificate:
 
 ```bash
-scripts/40_make_certificate.sh -d run64
+scripts/40_make_certificate.sh -d "$RUN"
 ```
 
 #### 50_verify_certificate.sh
@@ -77,7 +79,7 @@ scripts/40_make_certificate.sh -d run64
 Verify the generated certificate:
 
 ```bash
-scripts/50_verify_certificate.sh -d run64
+scripts/50_verify_certificate.sh -d "$RUN"
 ```
 
 #### 60_pretty_print_cert.sh
@@ -85,7 +87,7 @@ scripts/50_verify_certificate.sh -d run64
 Pretty-print key metrics and statistics of the certificate:
 
 ```bash
-scripts/60_pretty_print_cert.sh -d run64
+scripts/60_pretty_print_cert.sh -d "$RUN"
 ```
 
 #### 25_export_demo_json.sh
@@ -93,13 +95,13 @@ scripts/60_pretty_print_cert.sh -d run64
 Export all relevant data (pools, committee, voters, and certificate summary) into a single `demo.json` file used by the visualization UI.
 
 ```bash
-scripts/25_export_demo_json.sh -d run64
+scripts/25_export_demo_json.sh -d "$RUN"
 ```
 
 ### Run a Single End-to-End Demo
 
 ```bash
-scripts/70_run_one.sh -d run64 -n 64 -f 0.75
+scripts/70_run_one.sh -d "$RUN" -n 100 -f 0.75
 ```
 
 This will:
@@ -111,12 +113,12 @@ This will:
 5. Verify the certificate (`50_verify_certificate.sh`)
 6. Pretty-print key metrics (`60_pretty_print_cert.sh`)
 
-All files are placed in `demo/run64/`.
+All files are placed in `demo/run100/`.
 
 ### Sweep Across Multiple N
 
 ```bash
-scripts/80_sweep.sh -d sweep1 -f 1.0 --ns "32 64 128 256 512 1024 2056 3000"
+scripts/80_sweep.sh -d sweep1 -f 1.0 --ns "50 100 200 500 1000 2000 3000"
 ```
 
 This will run the full pipeline for multiple voter sizes (`N`) and write a CSV of results:

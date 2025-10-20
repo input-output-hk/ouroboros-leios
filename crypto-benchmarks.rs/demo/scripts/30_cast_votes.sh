@@ -29,6 +29,8 @@ fi
 # Resolve run directory relative to demo/
 RUN_DIR="$(cd "$DIR_SCRIPT/.."; cd "$RUN_DIR" && pwd)"
 echo "== [30_cast_votes] DIR=${RUN_DIR} FRACTION=${FRACTION} =="
+# Persist the voting fraction (quorum) for downstream scripts
+printf '%s\n' "$FRACTION" > "${RUN_DIR}/fraction.txt"
 
 # ---- run cast-votes ----
 pushd "$RUN_DIR" >/dev/null

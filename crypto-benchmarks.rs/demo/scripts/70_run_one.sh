@@ -82,6 +82,9 @@ INIT_CMD=("$DIR_SCRIPT/10_init_inputs.sh" -d "$RUN_DIR")
 # ---- 60: show sizes + summary JSON ----
 "$DIR_SCRIPT/60_pretty_print_cert.sh" -d "$RUN_DIR"
 
+# ---- 25: generate JSON for UI ----
+"$DIR_SCRIPT/25_export_demo_json.sh" -d "$RUN_DIR"
+
 # ---- compact tail summary ----
 PRETTY_JSON="${RUN_DIR_ABS}/certificate.pretty.json"
 if [[ -f "$PRETTY_JSON" ]] && command -v jq >/dev/null 2>&1; then
