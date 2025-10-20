@@ -12,7 +12,7 @@ This technical design document bridges the gap between the protocol-level specif
 
 This document extends:
 - [CIP-164](https://github.com/cardano-foundation/CIPs/pull/1078): Protocol-level specification of Leios consensus mechanism
-- [Impact Analysis](./ImpactAnalysis.md): High-level requirements and potential changes to ecosystem and node components
+- [Impact Analysis](../ImpactAnalysis.md): High-level requirements and potential changes to ecosystem and node components
 
 > [!WARNING]
 > TODO: Introduce general approach, that this is a living document: architecture reflects our current design understanding, which is driven by protocol requirements (CIP), but also by identified risks (for the implementation); From this, we sketch a (current) implementation plan that includes fact-finding, which also means potentially updating that plan as we learn things
@@ -31,6 +31,8 @@ This document extends:
 
 > [!WARNING]
 > TODO: Create an updated component diagram and provide a quick overview of the changes before going into detailed specifications
+
+![](./relay-leios-component-diagram.svg)
 
 > [!WARNING]
 > TODO: How to structure the changes best? No need to group them by layer?
