@@ -93,6 +93,6 @@
 <text transform='translate(13.50,225.64) rotate(-90)' text-anchor='middle' style='font-size: 11.00px; font-family: "DejaVu Sans";' textLength='112.55px' lengthAdjust='spacingAndGlyphs'>Throughput [TxkB/s]</text>
 <text x='29.06' y='31.34' style='font-size: 11.00px; font-family: "DejaVu Sans";' textLength='548.51px' lengthAdjust='spacingAndGlyphs'>Points are uncertain due to the randomness of block production in these simulations of 20 minutes.</text>
 <text x='29.06' y='43.22' style='font-size: 11.00px; font-family: "DejaVu Sans";' textLength='565.49px' lengthAdjust='spacingAndGlyphs'>Note that the simulation's unlimited memory pool starts empty and the simulation runs for 1200 slots.</text>
-<text x='29.06' y='15.10' style='font-size: 13.20px; font-family: "DejaVu Sans";' textLength='544.51px' lengthAdjust='spacingAndGlyphs'>Leios throughput is proportional to load until it plateaus when capacity is reached.</text>
+<text x='29.06' y='15.10' style='font-size: 13.20px; font-family: "DejaVu Sans";' textLength='546.85px' lengthAdjust='spacingAndGlyphs'>Praos throughput is proportional to load until it plateaus when capacity is reached.</text>
 </g>
 </svg>
