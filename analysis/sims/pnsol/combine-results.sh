@@ -4,8 +4,7 @@
 set -e
 
 mkdir -p results/$d
-#for f in lifecycle resources receipts cpus sizes
-for f in lifecycle certified generated
+for f in lifecycle resources certified generated sizes cpus receipts
 do
   DIR=$(find experiments -type f -name $f.csv.gz \( -not -empty \) -printf %h\\n -quit)
   HL=$(sed -n -e '1p' "$DIR/case.csv")
