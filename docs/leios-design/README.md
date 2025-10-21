@@ -42,7 +42,35 @@ Ouroboros Leios is a significant change to the consensus protocol, but does not 
 > TODO: Explain why focus on relay node (upstream/downstream relationship); briefly mention block producer node differences; Add similar diagram for block producer? block and vote production not shown in relay diagram
 
 > [!WARNING]
-> TODO: How to structure the changes best? No need to group them by layer?
+> TODO: Notes on what could go here
+> - Node is a concurrent, reactive (real-time) system
+> - contrast real-time to not be hard real-time (control systems etc.), but as "timely" action is crucial to the success
+> - today concurrency is minimal and basically transaction submission and block diffusion happening at the same time + side-topics like peer sharing
+> - only two responsibilities, but peer cardinalities make this highly concurrent (with quite some shared resources)
+> - adding production and diffusion of Leios block data and votes will emphasize this further
+> - use this to specify behavior as largely independent work-flows?
+> - it is crucial that the node stays reactive and resource management across the concurrent responsibilities is crucial
+> - bounding resource usage and/or prioritizing certain tasks over others will be crucial for the system to act
+> - this stresses importance of non-functional requirements (per component), performance engineering and conducting benchmarks along the way
+
+> [!WARNING]
+> TODO: How to structure the changes best? Group them by layer/component or responsibility?
+>
+> Behavior-based sketch:
+> - Transaction submission and caching
+> - EB production
+> - EB diffusion
+> - EB storage
+> - Voting committee selection
+>   - Key generation
+>   - Key registration
+>   - Key rotation
+> - Vote production
+> - Vote diffusion
+> - Certification
+>   - Block production: Including certificates in blocks
+>   - Chain validation: Verifying certificates in blocks
+>   - Staging area interactions?
 
 > [!CAUTION]
 > FIXME: The next few sections are AI generated based on the impact analysis contents and the (pseudo-)Haskell code should be be replaced by other, similar level of detail specifications (barely scratching the code-level)
