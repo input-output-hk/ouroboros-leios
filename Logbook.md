@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2025-10-21
+
+### Mainnet data on "canary transactions"
+
+The [Cardano Foundation](https://cardanofoundation.org/) regularly submits "canary transactions" to measure the delay from submitting a transaction to its first appearing in a block. In [analysis/canary/](analysis/canary/) we have extracted and plotted this data, for use in analyses such as DeltaQSD models.
+
 ## 2025-10-20
 
 ### Experiment to test hypotheses about Leios performance
