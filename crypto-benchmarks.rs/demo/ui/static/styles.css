@@ -5,6 +5,7 @@
     --muted: #9fb2c7;
     --green: #19c37d;
     --orange: #f59e0b;
+    --yellow: #facc15;
     --border: #1f2a35;
     --dot-size: 30px;
     --dot-gap: 6px;
@@ -117,6 +118,11 @@ main {
     font-weight: 700;
 }
 
+#aggregation .card-title,
+#voters .card-title {
+    margin-bottom: 20px;
+}
+
 .card-subtitle {
     margin: -6px 0 14px;
     color: var(--muted);
@@ -216,6 +222,10 @@ main {
 
 .text-blue {
     color: #2563eb;
+}
+
+.text-yellow {
+    color: var(--yellow);
 }
 
 .count {
@@ -445,7 +455,7 @@ main {
     justify-items: center;
 }
 
-.votes-board .vote-flow + .vote-flow {
+.votes-board .vote-flow+.vote-flow {
     margin-top: 1rem;
 }
 
@@ -579,12 +589,13 @@ main {
 }
 
 .agg-votes {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: flex-start;
-    justify-content: flex-start;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(50px, 1fr));
+    gap: 10px 6px;
+    align-items: center;
+    justify-items: start;
     flex: 1 1 auto;
+    max-width: 65%;
 }
 
 .big-arrow {
@@ -595,8 +606,8 @@ main {
 }
 
 .certificate-rect {
-    min-width: 140px;
-    height: 80px;
+    min-width: 0;
+    height: 100px;
     border-radius: 10px;
     background: #7c3aed;
     color: #ffffff;

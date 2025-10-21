@@ -51,6 +51,7 @@ const FIXED_GRID_COLUMNS = 20; // circles per row for Voters alignment
 const UNIVERSE_COLUMNS = 30;   // circles per row for Universe panel
 const COMMITTEE_COLUMNS = 20;  // seat boxes per row for Committee
 const COMMITTEE_ROW_HEIGHT = "calc(var(--seat-size) + 10px)";
+const VOTE_RECT_HEIGHT = 36;
 
 // ---------- tooltip helpers ----------
 function positionTooltip(target, tooltip) {
@@ -778,62 +779,80 @@ function renderAggregationFromDemo(demo) {
     const container = document.getElementById('aggregation_canvas');
     if (!container) return;
 
-    const { persistentPoolIds, nonPersistentPoolIds } = buildVoterPools(demo);
+    const {
+        persistentEntries,
+        nonPersistentEntries,
+        nonPersistentSeatCount
+    } = buildVoterPools(demo);
 
-    const persistentBytes = firstFinite(
-        demo?.aggregation?.persistent_bytes,
-        demo?.aggregation?.persistent_vote_bytes,
-        demo?.metrics?.persistent_bytes,
-        demo?.metrics?.persistent_vote_bytes,
-        persistentPoolIds.length * PERSISTENT_VOTE_BYTES
-    );
-    const nonPersistentBytes = firstFinite(
-        demo?.aggregation?.nonpersistent_bytes,
-        demo?.aggregation?.nonpersistent_vote_bytes,
-        demo?.aggregation?.non_persistent_bytes,
-        demo?.metrics?.nonpersistent_bytes,
-        demo?.metrics?.nonpersistent_vote_bytes,
-        nonPersistentPoolIds.length * NONPERSISTENT_VOTE_BYTES
-    );
+    const poolIdToUniverseIndex = buildPoolIdToUniverseIndex(demo);
+    const committeeMembers = Array.isArray(demo?.committee?.seats)
+        ? demo.committee.seats
+        : (Array.isArray(demo?.committee) ? demo.committee : []);
+
+    const poolIdToSeat = new Map();
+    const positionToSeat = new Map();
+    for (const seat of committeeMembers) {
+        if (!seat) continue;
+        if (seat.pool_id) poolIdToSeat.set(seat.pool_id, seat);
+        if (seat.position !== undefined) positionToSeat.set(Number(seat.position), seat);
+    }
+
+    const persistentSorted = [...persistentEntries].sort((a, b) => {
+        const seatA = Number(a.seatId);
+        const seatB = Number(b.seatId);
+        const idxA = Number.isFinite(seatA) ? seatA : (poolIdToUniverseIndex.get(a.poolId) ?? 99999);
+        const idxB = Number.isFinite(seatB) ? seatB : (poolIdToUniverseIndex.get(b.poolId) ?? 99999);
+        return idxA - idxB;
+    });
+    const persistentVotes = persistentSorted.filter(entry => entry.hasVote);
+
+    const nonPersistentSorted = [...nonPersistentEntries].sort((a, b) => {
+        const idxA = poolIdToUniverseIndex.get(a.poolId) ?? 99999;
+        const idxB = poolIdToUniverseIndex.get(b.poolId) ?? 99999;
+        return idxA - idxB;
+    });
+    const targetNonPersistentBase = nonPersistentSeatCount
+        ? Math.min(Math.round(nonPersistentSeatCount * 0.75), nonPersistentSorted.length)
+        : Math.min(Math.round(nonPersistentSorted.length * 0.75), nonPersistentSorted.length);
+    const targetNonPersistentCount = Math.max(targetNonPersistentBase, 0);
+    const displayedNonPersistent = nonPersistentSorted.slice(0, targetNonPersistentCount);
+
+    const persistentBytes = persistentVotes.length * PERSISTENT_VOTE_BYTES;
+    const nonPersistentBytes = displayedNonPersistent.length * NONPERSISTENT_VOTE_BYTES;
     const totalVotesBytes = persistentBytes + nonPersistentBytes;
-    const certBytes = firstFinite(
+    const certBytesRaw = firstFinite(
         demo?.certificate?.cert_bytes,
         demo?.certificate?.certificate_bytes,
         demo?.certificate?.bytes,
         demo?.aggregation?.certificate_bytes
     );
+    const certBytes = Number(certBytesRaw);
 
     const votesEl = document.getElementById('agg_votes_size');
     if (votesEl) {
         const pieces = [
             `${formatNumber(totalVotesBytes)} B`,
-            `<span class="text-green">Persistent: ${formatNumber(persistentBytes)} B</span>`,
-            `<span class="text-blue">Non-persistent: ${formatNumber(nonPersistentBytes)} B</span>`
+            ` <span class="text-green">Persistent: ${formatNumber(persistentBytes)} B</span>`,
+            ` <span class="text-blue">Non-persistent: ${formatNumber(nonPersistentBytes)} B</span>`
         ];
         votesEl.innerHTML = pieces.join('<br>');
     }
 
-    setText('agg_cert_size', certBytes !== null ? formatBytes(certBytes) : '—');
+    setText('agg_cert_size', certBytes && isFinite(certBytes) ? formatBytes(certBytes) : '—');
 
     const gainEl = document.getElementById('agg_gain');
     if (gainEl) {
-        let ratioVal = firstFinite(
-            demo?.certificate?.compression_ratio,
-            demo?.compression_ratio,
-            demo?.aggregation?.compression_ratio,
-            demo?.metrics?.compression_ratio,
-            null
-        );
-        if (!ratioVal && totalVotesBytes > 0 && Number(certBytes) > 0) {
-            ratioVal = totalVotesBytes / Number(certBytes);
-        }
+        const ratioVal = totalVotesBytes > 0 && Number(certBytes) > 0
+            ? totalVotesBytes / Number(certBytes)
+            : null;
         gainEl.textContent = ratioVal && isFinite(ratioVal) ? `${ratioVal.toFixed(2)}×` : '—';
     }
 
     container.classList.add('aggregation-row');
     container.innerHTML = '';
 
-    if (persistentPoolIds.length + nonPersistentPoolIds.length === 0) {
+    if (persistentVotes.length + displayedNonPersistent.length === 0) {
         container.appendChild(createEmptyState("No votes recorded"));
         return;
     }
@@ -841,17 +860,31 @@ function renderAggregationFromDemo(demo) {
     const votesGrid = document.createElement('div');
     votesGrid.className = 'agg-votes';
 
-    const addVoteRect = (poolId, bytes, isPersistent) => {
+    const addVoteRect = (entry, isPersistent) => {
         const vote = document.createElement('div');
         vote.className = 'vote-rect';
         vote.classList.add(isPersistent ? 'is-persistent' : 'is-nonpersistent');
+        const bytes = isPersistent ? PERSISTENT_VOTE_BYTES : NONPERSISTENT_VOTE_BYTES;
         vote.style.width = `${voteWidthPx(bytes)}px`;
-        attachTooltip(vote, `<b>Vote</b><br>From: ${poolId}<br><b>Size:</b> ${bytes} bytes`);
+        const tooltip = [];
+        if (isPersistent) {
+            const seat = entry.seat ?? poolIdToSeat.get(entry.poolId) ?? positionToSeat.get(entry.seatId);
+            const seatNum = entry.seatId ?? seat?.position ?? seat?.index ?? "—";
+            tooltip.push(`<b>Seat #${seatNum}</b>`);
+            tooltip.push(`<b>Size:</b> ${formatBytes(bytes)}`);
+            if (entry.signature) tooltip.push(`<b>Signature:</b> ${entry.signature}`);
+        } else {
+            if (entry.poolId) tooltip.push(`<b>Pool ID:</b> ${entry.poolId}`);
+            if (entry.eligibility) tooltip.push(`<b>Eligibility prefix:</b> ${entry.eligibility}`);
+            if (entry.signature) tooltip.push(`<b>Signature:</b> ${entry.signature}`);
+            tooltip.push(`<b>Size:</b> ${formatBytes(bytes)}`);
+        }
+        attachTooltip(vote, tooltip.join('<br>'));
         votesGrid.appendChild(vote);
     };
 
-    persistentPoolIds.forEach(pid => addVoteRect(pid, PERSISTENT_VOTE_BYTES, true));
-    nonPersistentPoolIds.forEach(pid => addVoteRect(pid, NONPERSISTENT_VOTE_BYTES, false));
+    persistentVotes.forEach(entry => addVoteRect(entry, true));
+    displayedNonPersistent.forEach(entry => addVoteRect(entry, false));
 
     const arrow = document.createElement('span');
     arrow.className = 'big-arrow';
@@ -861,12 +894,55 @@ function renderAggregationFromDemo(demo) {
     cert.className = 'certificate-rect';
     cert.textContent = 'Certificate';
 
-    if (totalVotesBytes > 0 && Number(certBytes) > 0) {
-        const minWidth = 140;
-        const maxWidth = 420;
-        const scaled = Math.min(maxWidth, Math.max(minWidth, (Number(certBytes) / totalVotesBytes) * 600));
-        cert.style.width = `${Math.round(scaled)}px`;
-        cert.style.minWidth = `${Math.round(scaled)}px`;
+    if (totalVotesBytes > 0 && isFinite(certBytes) && certBytes > 0) {
+        const persistentWidth = persistentVotes.length * voteWidthPx(PERSISTENT_VOTE_BYTES);
+        const nonPersistentWidth = displayedNonPersistent.length * voteWidthPx(NONPERSISTENT_VOTE_BYTES);
+        const totalVoteWidth = persistentWidth + nonPersistentWidth;
+        const voteArea = totalVoteWidth * VOTE_RECT_HEIGHT;
+        const certificateArea = voteArea * (certBytes / totalVotesBytes);
+        if (certificateArea > 0 && Number.isFinite(certificateArea)) {
+            const minWidth = 12;
+            const minHeight = VOTE_RECT_HEIGHT;
+            const maxWidth = totalVoteWidth > 0 ? totalVoteWidth : null;
+
+            let width = Math.sqrt(certificateArea);
+            if (maxWidth && width > maxWidth) {
+                width = maxWidth;
+            }
+            width = Math.max(minWidth, width);
+
+            let height = certificateArea / width;
+
+            if (height < minHeight) {
+                height = minHeight;
+                width = certificateArea / height;
+                if (maxWidth && width > maxWidth) {
+                    width = maxWidth;
+                    height = certificateArea / width;
+                }
+            }
+
+            if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) {
+                width = Math.max(minWidth, Math.sqrt(Math.max(certificateArea, 1)));
+                if (maxWidth && width > maxWidth) {
+                    width = maxWidth;
+                }
+                height = certificateArea / width;
+            }
+
+            const widthPx = Math.max(1, width);
+            const heightPx = Math.max(1, height);
+            const widthStr = `${widthPx.toFixed(1)}px`;
+            cert.style.width = widthStr;
+            cert.style.minWidth = widthStr;
+            cert.style.height = `${heightPx.toFixed(1)}px`;
+        } else {
+            cert.style.height = "110px";
+            cert.style.width = "150px";
+        }
+    } else {
+        cert.style.height = "110px";
+        cert.style.width = "150px";
     }
 
     const certificateTooltip = [];
