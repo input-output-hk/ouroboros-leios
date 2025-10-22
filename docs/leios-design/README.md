@@ -14,6 +14,15 @@ This document builds on the [impact analysis](../ImpactAnalysis.md) and [early t
 
 Besides collecting node-specific details in this document, we intend to contribute implementation-independent specifications to the [cardano-blueprint](https://cardano-scaling.github.io/cardano-blueprint/) initiative and also update the CIP-164 specification through pull requests as needed.
 
+#### Document history
+
+This document is a living artifact and will be updated as implementation progresses, new risks are identified, and validation results become available.
+
+| Version | Date       | Author          | Changes       |
+|---------|------------|-----------------|---------------|
+| 0.1     | 2025-10-15 | Sebastian Nagel | Initial draft |
+
+
 #### Key Design Principles
 
 > [!WARNING]
@@ -24,13 +33,25 @@ Besides collecting node-specific details in this document, we intend to contribu
 - **Incremental Delivery**: Enable phased rollout with measurable milestones
 - **Ecosystem Compatibility**: Minimize disruption to existing infrastructure
 
-#### Document history
+# Overview
 
-This document is a living artifact and will be updated as implementation progresses, new risks are identified, and validation results become available.
+Cardano as a cryptocurrency system fundamentally relies on an implementation of Ouroboros, the consensus protocol (TODO cite praos and genesis papers), to realize a permissionless, globally distributed ledger that guarantees _persistence_ and _liveness_. These two properties are central to the value proposition of Cardano, as they enable secure and censorship-resistant transfer of value, as well as the execution of smart contracts in a trustless manner. 
 
-| Version | Date       | Author          | Changes       |
-|---------|------------|-----------------|---------------|
-| 0.1     | 2025-10-15 | Sebastian Nagel | Initial draft |
+Ouroboros Leios is introducing _(high-)throughput_ as a third key property and is extending Ouroboros Praos, the currently deployed variant. By enabling the network to process a significantly higher number of transactions per second, Leios enables Cardano to scale economically and meet the demands of a growing user base and application ecosystem.
+
+As it was the case for the Praos variant of Ouroboros (TODO: cite shelley network-design), the specification embodied in the published and peer-reviewed paper for Ouroboros Leios (TODO: cite leios paper) was not intended to be directly implementable. This was confirmed during initial R&D and feasibility studies, which identified several unsolved problems with the fully concurrent block production design proposed in the paper. The latest design presented in CIP-164, also known as "Linear Leios", focuses on the core idea of better utilizing resources in between the necessary "calm" periods of the Praos protocol and presents an immediately implementable design.
+
+> [!WARNING]
+> TODO: Notes on what could go here
+> - Node is a concurrent, reactive (real-time) system
+> - contrast real-time to not be ms-level hard real-time (control systems etc.), but as "timely" action is crucial to the success (see also network-design.pdf)
+> - today concurrency is minimal and basically transaction submission and block diffusion happening at the same time + side-topics like peer sharing
+> - only two responsibilities, but peer cardinalities make this highly concurrent (with quite some shared resources; related: https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-design/network-design.pdf#subsubsection.5.3.2)
+> - adding production and diffusion of Leios block data and votes will emphasize this further
+> - use this to specify behavior as largely independent work-flows?
+> - it is crucial that the node stays reactive and resource management across the concurrent responsibilities is crucial
+> - bounding resource usage and/or prioritizing certain tasks over others will be crucial for the system to act
+> - this stresses importance of non-functional requirements (per component), performance engineering and conducting benchmarks along the way
 
 # Architecture
 
@@ -40,18 +61,6 @@ Ouroboros Leios is a significant change to the consensus protocol, but does not 
 
 > [!WARNING]
 > TODO: Explain why focus on relay node (upstream/downstream relationship); briefly mention block producer node differences; Add similar diagram for block producer? block and vote production not shown in relay diagram
-
-> [!WARNING]
-> TODO: Notes on what could go here
-> - Node is a concurrent, reactive (real-time) system
-> - contrast real-time to not be hard real-time (control systems etc.), but as "timely" action is crucial to the success
-> - today concurrency is minimal and basically transaction submission and block diffusion happening at the same time + side-topics like peer sharing
-> - only two responsibilities, but peer cardinalities make this highly concurrent (with quite some shared resources)
-> - adding production and diffusion of Leios block data and votes will emphasize this further
-> - use this to specify behavior as largely independent work-flows?
-> - it is crucial that the node stays reactive and resource management across the concurrent responsibilities is crucial
-> - bounding resource usage and/or prioritizing certain tasks over others will be crucial for the system to act
-> - this stresses importance of non-functional requirements (per component), performance engineering and conducting benchmarks along the way
 
 > [!WARNING]
 > TODO: How to structure the changes best? Group them by layer/component or responsibility?
