@@ -12,10 +12,15 @@ use crate::primitive::{Coin, CoinFraction, PoolKeyhash};
 /// Fait Accompli sortition results in a committee of persistent and non-persistent voters.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FaSortition {
+    /// Number of persistent voters.
     pub n_persistent: usize,
+    /// Number of non-persistent voters.
     pub n_nonpersistent: usize,
+    /// Stake held by persistent voters.
     pub persistent: Vec<(PoolKeyhash, CoinFraction)>,
+    /// State held by non-persistent voters.
     pub nonpersistent: BTreeMap<PoolKeyhash, CoinFraction>,
+    /// Stake cutoff for persistent vs non-persistent voters.
     pub rho: CoinFraction,
 }
 

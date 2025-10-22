@@ -20,17 +20,26 @@ use crate::util::*;
 /// Non-persistent voters are identified by their pool's key hash. Their `sigma_eid` attests to their presence in the voting committee.
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub enum Vote {
+    /// A persistent vote.
     Persistent {
+        /// Pool identifier for voter.
         persistent: PersistentId, //   2 bytes
+        /// Election identifier.
         eid: Eid,                 //   8 bytes
+        /// Hash of the EB being voted for.
         eb: EbHash,               //  32 bytes
+        /// Signature on the vote.
         sigma_m: Sig,             //  48 bytes
     }, //  90 bytes
     Nonpersistent {
         pool: PoolKeyhash, //  28 bytes
+        /// Election identifier.
         eid: Eid,          //   8 bytes
+        /// Hash of the EB being voted for.
         eb: EbHash,        //  32 bytes
+        /// Eligibility proof.
         sigma_eid: Sig,    //  48 bytes
+        /// Signature on the vote.
         sigma_m: Sig,      //  48 bytes
     }, // 164 bytes
 }

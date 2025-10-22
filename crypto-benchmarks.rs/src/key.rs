@@ -144,7 +144,9 @@ impl Arbitrary for Sig {
 /// A proof of possession is a pair of points in G1.
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct PoP {
+    /// Signature on the public key.
     pub mu1: Sig, // 48 bytes
+    /// Signature in G1.
     pub mu2: Sig, // 48 bytes
 } // 96 bytes
 

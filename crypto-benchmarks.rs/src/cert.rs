@@ -15,11 +15,17 @@ use crate::vote::{do_voting, Vote};
 /// A certificate records the election and EB information along with the persistent voters who voted and the proofs for the non-persistent voters. It contains two aggregate signatures, one for sortition and other for the votes themselves.
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct Cert {
+    /// Election identifier.
     pub eid: Eid,
+    /// Hash of the EB being voted upon.
     pub eb: EbHash,
+    /// Set of persistent voter identifiers.
     pub persistent_voters: HashSet<PersistentId>,
+    /// Map of non-persistent voter pool hashes to their eligibility signature.
     pub nonpersistent_voters: BTreeMap<PoolKeyhash, Sig>,
+    /// Aggregate eligibility signature.
     pub sigma_tilde_eid: Option<Sig>,
+    /// Aggregate votes signature.
     pub sigma_tilde_m: Sig,
 }
 
