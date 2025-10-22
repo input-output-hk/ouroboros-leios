@@ -7,6 +7,13 @@ See [Specification.md](Specification.md) for a description of the algorithms imp
 - Benchmarks: [benches/](benches/)
 
 
+## Background material
+
+![BLS scheme from original Leios preprint](figure-7-bls.png)
+
+![Voting scheme from original Leios preprint](figure-8-voting.png)
+
+
 ## Efficiency notes
 
 The benchmark code uses an efficient BLS implementation, but it has not been optimized.
