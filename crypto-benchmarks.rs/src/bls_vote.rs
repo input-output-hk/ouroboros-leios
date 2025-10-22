@@ -1,8 +1,8 @@
 //! Low-level operations on BLS votes.
 //! 
-//! ![Figure 7 (BLS)](../../../../figure-7-bls.png)
+//! ![Figure 7: BLS](../../../../figure-7-bls.png)
 //! 
-//! ![Figure 8 (voting)](../../../../figure-8-voting.png)
+//! ![Figure 8: voting](../../../../figure-8-voting.png)
 
 use blst::min_sig::*;
 use blst::*;
