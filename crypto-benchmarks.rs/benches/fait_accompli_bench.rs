@@ -1,3 +1,5 @@
+//! Criterion benchmarks for Fait Accompli.
+
 use criterion::{criterion_group, criterion_main, Criterion};
 use quickcheck::{Arbitrary, Gen};
 use std::collections::BTreeMap;

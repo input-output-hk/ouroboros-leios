@@ -1,9 +1,11 @@
+//! Helper functions.
+
 use quickcheck::{Arbitrary, Gen};
 use serde::de::{Error, Visitor};
 use serde::{Deserializer, Serializer};
 use std::fmt;
 
-// Helper function to serialize fixed-size byte arrays
+/// Serialize a fixed-size byte array.
 pub fn serialize_fixed_bytes<S, const N: usize>(
     bytes: &[u8; N],
     serializer: S,
@@ -14,7 +16,7 @@ where
     serializer.serialize_bytes(bytes)
 }
 
-// Helper function to deserialize fixed-size byte arrays
+/// Deserialize a fixed-size byte array
 pub fn deserialize_fixed_bytes<'de, D, const N: usize>(deserializer: D) -> Result<[u8; N], D::Error>
 where
     D: Deserializer<'de>,
@@ -45,6 +47,7 @@ where
     deserializer.deserialize_bytes(FixedBytesVisitor::<N>)
 }
 
+/// Generate arbitrary fixed-sized bytes.
 pub fn arbitrary_fixed_bytes<const N: usize>(g: &mut Gen) -> [u8; N] {
     let mut array = [0u8; N];
     for item in array.iter_mut() {

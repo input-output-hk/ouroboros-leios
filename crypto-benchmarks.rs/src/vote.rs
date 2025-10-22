@@ -1,3 +1,5 @@
+//! High-level voting operations.
+
 use blst::min_sig::*;
 use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
@@ -9,6 +11,13 @@ use crate::registry::*;
 use crate::sortition::*;
 use crate::util::*;
 
+/// A vote may be either persistent or non-persistent.
+/// 
+/// Votes occur for an EB `eb` in an election `eid`. The signature `sigma_m` signs the vote.
+/// 
+/// Persistent voter are identified by their position `persistent` in the table of pools for the epoch.
+/// 
+/// Non-persistent voters are identified by their pool's key hash. Their `sigma_eid` attests to their presence in the voting committee.
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub enum Vote {
     Persistent {
@@ -26,6 +35,7 @@ pub enum Vote {
     }, // 164 bytes
 }
 
+/// Generate an arbitrary vote, for testing.
 impl Arbitrary for Vote {
     fn arbitrary(g: &mut Gen) -> Self {
         let sk: SecretKey = SecKey::arbitrary(g).0;
@@ -52,10 +62,12 @@ impl Arbitrary for Vote {
     }
 }
 
+/// Sign an election `eid` with a secret key `sk`.
 pub fn gen_sigma_eid(eid: &Eid, sk: &SecKey) -> Sig {
     Sig(bls_vote::gen_sigma_eid(&sk.0, &eid.bytes()))
 }
 
+/// Create a persistent vote for voter `persistent` for EB `m` in election `eid` using the secret key `sk`.
 pub fn gen_vote_persistent(peristent: &PersistentId, eid: &Eid, m: &EbHash, sk: &SecKey) -> Vote {
     let sigma_m = bls_vote::gen_sig(&sk.0, &eid.bytes(), &m.bytes());
     Vote::Persistent {
@@ -66,6 +78,7 @@ pub fn gen_vote_persistent(peristent: &PersistentId, eid: &Eid, m: &EbHash, sk: 
     }
 }
 
+/// Create a non-persistent vote for voter `pool` for EB `m` in election `eid` using the secret key `sk`.
 pub fn gen_vote_nonpersistent(pool: &PoolKeyhash, eid: &Eid, m: &EbHash, sk: &SecKey) -> Vote {
     let (sigma_eid, sigma_m) = bls_vote::gen_vote(&sk.0, &eid.bytes(), &m.bytes());
     Vote::Nonpersistent {
@@ -77,6 +90,7 @@ pub fn gen_vote_nonpersistent(pool: &PoolKeyhash, eid: &Eid, m: &EbHash, sk: &Se
     }
 }
 
+/// Verify a vote `vote` cast with the public key `mvk`.
 pub fn verify_vote(mvk: &PubKey, vote: &Vote) -> bool {
     match vote {
         Vote::Persistent {
@@ -95,6 +109,7 @@ pub fn verify_vote(mvk: &PubKey, vote: &Vote) -> bool {
     }
 }
 
+/// Cast all of the votes for an election `eid` on an EB `eb` using the voter registry `reg`.
 pub fn do_voting(reg: &Registry, eid: &Eid, eb: &EbHash) -> Vec<Vote> {
     let mut votes = Vec::new();
     reg.info.values().for_each(|info| {
@@ -127,6 +142,7 @@ pub fn do_voting(reg: &Registry, eid: &Eid, eb: &EbHash) -> Vec<Vote> {
     votes
 }
 
+/// Generate votes for an arbitrary EB in an arbitrary election.
 pub fn arbitrary_votes(g: &mut Gen, reg: &Registry) -> Vec<Vote> {
     let eid = Eid::arbitrary(g);
     let eb = EbHash::arbitrary(g);
