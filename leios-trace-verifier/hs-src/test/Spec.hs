@@ -1,4 +1,4 @@
---| Main entry point.
+-- | Main entry point.
 
 module Main where
 

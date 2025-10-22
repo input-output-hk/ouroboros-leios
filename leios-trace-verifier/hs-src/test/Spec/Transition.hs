@@ -277,6 +277,6 @@ transitions =
     . fmap concat
     . mapM transition
 
--- Timestamp an event.
+-- | Timestamp an event.
 timestamp :: Monad m => Event -> StateT TracingContext m TraceEvent
 timestamp = uses clock . flip TraceEvent
