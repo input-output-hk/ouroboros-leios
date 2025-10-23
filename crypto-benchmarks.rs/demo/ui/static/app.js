@@ -12,13 +12,6 @@ function setText(id, value) {
     if (el) el.textContent = value ?? "—";
 }
 
-function shortenHex(hex) {
-    if (typeof hex !== "string") return "";
-    const h = hex.startsWith("0x") ? hex.slice(2) : hex;
-    if (h.length <= 12) return "0x" + h;
-    return "0x" + h.slice(0, 6) + "…" + h.slice(-4);
-}
-
 function formatNumber(value) {
     if (value === null || value === undefined || value === "") return "—";
     const num = Number(value);
