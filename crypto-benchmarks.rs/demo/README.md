@@ -82,20 +82,12 @@ Verify the generated certificate:
 scripts/50_verify_certificate.sh -d "$RUN"
 ```
 
-#### 60_pretty_print_cert.sh
-
-Pretty-print key metrics and statistics of the certificate:
-
-```bash
-scripts/60_pretty_print_cert.sh -d "$RUN"
-```
-
-#### 25_export_demo_json.sh
+#### 60_export_demo_json.sh
 
 Export all relevant data (pools, committee, voters, and certificate summary) into a single `demo.json` file used by the visualization UI.
 
 ```bash
-scripts/25_export_demo_json.sh -d "$RUN"
+scripts/60_export_demo_json.sh -d "$RUN"
 ```
 
 ### Run a Single End-to-End Demo
@@ -115,26 +107,6 @@ This will:
 
 All files are placed in `demo/run100/`.
 
-### Sweep Across Multiple N
-
-```bash
-scripts/80_sweep.sh -d sweep1 -f 1.0 --ns "50 100 200 500 1000 2000 3000"
-```
-
-This will run the full pipeline for multiple voter sizes (`N`) and write a CSV of results:
-
-```
-demo/sweep1/sweep_results.csv
-```
-
-### Plot Sweep Results
-
-```bash
-scripts/85_plot_sweep.sh -d sweep1 --open
-```
-
-This will generate a plot `gain_vs_N.png` showing compression ratio vs. number of voters.  
-Use `--open` to automatically open the PNG.
 
 ## Notes
 

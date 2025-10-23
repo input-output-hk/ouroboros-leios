@@ -17,8 +17,11 @@ fi
 
 # Resolve the run directory (handle paths with spaces)
 RUN_DIR="$(cd "$DIR_SCRIPT/.." && cd "$RUN_DIR" && pwd)"
+echo "== [60_export_demo_json] DIR=${RUN_DIR} =="
+
 PY="${VIRTUAL_ENV:+$VIRTUAL_ENV/bin/python}"
 PY="${PY:-python3}"
+
 
 pushd "$RUN_DIR" >/dev/null
 "$PY" - <<'PY'

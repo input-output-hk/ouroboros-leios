@@ -17,7 +17,6 @@ set -euo pipefail
 #     30_cast_votes.sh
 #     40_make_certificate.sh
 #     50_verify_certificate.sh
-#     60_pretty_print_cert.sh
 # - Each sub-script prints its own status; this wrapper adds a compact summary.
 
 DIR_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -105,20 +104,8 @@ fi
 end_verify="$(now_ms)"
 verify_ms=$(( end_verify - start_verify ))
 
-# ---- 60: show sizes + summary JSON ----
-"$DIR_SCRIPT/60_pretty_print_cert.sh" -d "$RUN_DIR"
-
-# ---- 25: generate JSON for UI ----
-"$DIR_SCRIPT/25_export_demo_json.sh" -d "$RUN_DIR"
-
-# ---- compact tail summary ----
-PRETTY_JSON="${RUN_DIR_ABS}/certificate.pretty.json"
-if [[ -f "$PRETTY_JSON" ]] && command -v jq >/dev/null 2>&1; then
-  echo "-- Summary --"
-  jq '{eid, eb, persistent_voters_count, nonpersistent_voters_count, votes_bytes, certificate_bytes, compression_ratio}' "$PRETTY_JSON"
-else
-  echo "(Tip) Install jq for a compact summary: brew install jq"
-fi
+# ---- 60: generate JSON for UI ----
+"$DIR_SCRIPT/60_export_demo_json.sh" -d "$RUN_DIR"
 
 timings_path="${RUN_DIR_ABS}/timings.json"
 cat > "$timings_path" <<JSON
@@ -153,5 +140,5 @@ data["verification"] = verification
 demo_path.write_text(json.dumps(data, indent=2))
 PY
 
-echo "Timing info written to ${timings_path}"
+echo "Timing info written to timings.json"
 echo "Done."

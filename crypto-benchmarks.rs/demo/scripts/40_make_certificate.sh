@@ -46,7 +46,5 @@ popd >/dev/null
 
 
 # ---- summary output ----
-echo
-echo "== Certificate creation summary =="
 BYTES_CERT="$(wc -c < "${RUN_DIR}/certificate.cbor" 2>/dev/null || echo "?")"
 echo "Certificate size (bytes): ${BYTES_CERT}"
