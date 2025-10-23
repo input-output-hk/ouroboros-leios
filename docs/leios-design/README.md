@@ -23,15 +23,6 @@ This document is a living artifact and will be updated as implementation progres
 | 0.1     | 2025-10-15 | Sebastian Nagel | Initial draft |
 
 
-#### Key Design Principles
-
-> [!WARNING]
-> TODO: Needed, useful? What else to "front-load" before going into detail about architecture changes?
-
-- **Security First**: Preserve Praos security guarantees throughout deployment
-- **Early Validation**: Test critical assumptions before full implementation
-- **Incremental Delivery**: Enable phased rollout with measurable milestones
-- **Ecosystem Compatibility**: Minimize disruption to existing infrastructure
 
 # Overview
 
@@ -55,6 +46,49 @@ As it was the case for the Praos variant of Ouroboros (TODO: cite shelley networ
 > - it is crucial that the node stays reactive and resource management across the concurrent responsibilities is crucial
 > - bounding resource usage and/or prioritizing certain tasks over others will be crucial for the system to act
 > - this stresses importance of non-functional requirements (per component), performance engineering and conducting benchmarks along the way
+
+# Risks and mitigations
+
+> [!WARNING]
+> TODO: Introduce chapter as being the bridge between changes and implementation plan; also, these are only selected aspects that inform the implementation (and not cover principal risks to the protocol or things that are avoided by design)
+
+> [!NOTE]
+> Alternative: Move this chapter between Introduction/Overview and Architecture/Changes? Understanding the key threats does not require intimate understanding of node-level components, but having the key threats enumerated allows us to reference them when discussing details in the architecture chapter.
+
+## Key threats
+
+> [!WARNING]
+> TODO: Selection of key threats and attacks that further inform the design and/or implementation plan. Incorporate / reference the full [threat model](../threat-model.md)
+
+### Protocol bursts
+
+> [!WARNING]
+> TODO: important because
+> - was a prominent case in research
+> - acknowledges the wealth of data to be processed
+> - mitigation: freshest-first delivery / prioritization between praos and leios traffic
+> - motivates experiments/features revolving around resource management
+> - reference/include/move related RSK-.. items from impact analysis
+
+### Data withholding
+
+> [!WARNING]
+> TODO: important because
+> - can be done from stake- and network-based attackers
+> - trivially impacts high-throughput because no certifications happening
+> - however, more advanced, potential avenue to attack blockchain safety (impact praos security argument) when carefully partitioning the network
+> - mitigation: L_diff following the [security argument](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#protocol-security) 
+> - motivates validation of optimistic and worst-case diffusion paths
+
+## Assumptions to validate early
+
+> [!WARNING]
+> TODO: Which assumptions in the CIP / on the protocol security need to be validated as early as possible?
+>
+> - Worst case diffusion of EBs given certain honest stake (certifying the EB) is realistic
+> - The cardano network stack can realize freshest first delivery (sufficiently well)
+> - A real ledger can (re-)process orders of magnitude higher loads as expected
+> - ...?
 
 # Architecture
 
@@ -607,56 +641,61 @@ Genesis (Ouroboros Genesis) enables nodes to bootstrap from the genesis block wi
 - Genesis nodes must understand Euler era blocks and track EB certification status
 - Initial Leios deployment can use trusted snapshots; full Genesis integration follows after Leios stabilization
 
-# Risks and mitigations
-
-> [!WARNING]
-> TODO: Introduce chapter as being the bridge between changes and implementation plan; also, these are only selected aspects that inform the implementation (and not cover principal risks to the protocol or things that are avoided by design)
-
-> [!NOTE]
-> Alternative: Move this chapter between Introduction/Overview and Architecture/Changes? Understanding the key threats does not require intimate understanding of node-level components, but having the key threats enumerated allows us to reference them when discussing details in the architecture chapter.
-
-## Key threats
-
-> [!WARNING]
-> TODO: Selection of key threats and attacks that further inform the design and/or implementation plan. Incorporate / reference the full [threat model](../threat-model.md)
-
-### Protocol bursts
-
-> [!WARNING]
-> TODO: important because
-> - was a prominent case in research
-> - acknowledges the wealth of data to be processed
-> - motivates freshest-first delivery / prioritization between praos and leios traffic, and experiments/features revolving around this
-> - reference/include/move related RSK-.. items from impact analysis
-
-### Data withholding
-
-> [!WARNING]
-> TODO: important because
-> - can be done from stake- and network-based attackers
-> - trivially impacts high-throughput because no certifications happening
-> - however, more advanced, potential avenue to attack blockchain safety (impact praos security argument) when carefully partitioning the network
-> - motivates validation of optimistic and worst-case diffusion paths
-
-## Assumptions to validate early
-
-> [!WARNING]
-> TODO: Which assumptions in the CIP / on the protocol security need to be validated as early as possible?
->
-> - Worst case diffusion of EBs given certain honest stake (certifying the EB) is realistic
-> - The cardano network stack can realize freshest first delivery (sufficiently well)
-> - A real ledger can (re-)process orders of magnitude higher loads as expected
-> - ...?
-
-## Validation approach
-
-> [!WARNING]
-> TODO: What kind of prototypes should we build? What experiments / tests should we conduct (on a testnet)? Are there non-explorative ways to validate? Which techniques help to mitigate which risks? What role does formal methods play here?
-
 # Implementation plan
 
 > [!WARNING]
-> TODO: Motivate a rough simulations -> prototype -> testnet plan;
+> TODO: Goals of this chapter / what to answer:
+> - Motivate a rough simulations -> prototype -> testnet plan;
+> - What kind of prototypes should we build?
+> - What experiments / tests should we conduct (on a testnet)?
+> - Are there non-explorative ways to validate?
+> - Which techniques help to mitigate which risks?
+> - What role does formal methods play here?
+
+> [!WARNING]
+> TODO: potential outline
+>
+> - intro for a plan
+>     - r&d is not a straight path (waterfall)
+>     - mature a protocol design through various SRLs to be deployed onto cardano (intro from https://leios.cardano-scaling.org/docs/roadmap ?)
+>     - introduce principles of validating early, continuous delivery and transparency (https://leios.cardano-scaling.org/docs/strategy#principles)
+>     - increasing developer confidence, but also the confidence of governing bodies (SPOs and dReps) -> acceptance
+>     - refer back to risks and mitigation chapter (what to validate early)
+>     - which techniques are at our disposal?
+>       - put simulation, prototyping/experiments, modeling, testing on a 4 quadrant picture?
+> - formal methods
+>     - trails of evidence
+>     - ensure correctness throughout multiple implementations along maturity and diversity dimensions
+>     - trace verification
+> - simulations
+>     - summarize what simulations bring to the table
+>     - why two simulators?
+>     - strengths and limitations of simulation
+>     - keep maintenaining them?
+>     - full control = great for adversarial scenarios, but accuracy needs to be validated
+> - prototypes
+>     - what differentiates a prototype from a simulation or real implementation
+>     - network prototype / diffusion only
+>         - controlled environments: small devnets, P&T cluster
+>             - antithesis to bridge the gap
+>         - load tests to explore behavior using real network (latencies!)
+>         - adversarial tests to explore attack scenarios
+>     - other prototypes
+>         - ledger validation benchmark
+>         - crypto primitives prototype?
+> - public testnet
+>     - what problem does it solve over testing in controlled environments
+>         - what experiments to run on a public testnet
+>         - "experience the throughput" (and chain growth) -> which parameters are good for the community?
+>     - software readiness levels and what powers the testnet
+>     - mature prototypes vs. implementing changes from scratch to get release candidates
+>     - testnet as an integration point (instructions, tools, APIs)
+
+> [!WARNING]
+> TODO: more thoughts
+> - why (deltaq) modeling? quick results and continued utility in parameterization
+> - parameterization in general as a (communication) tool; see also Peras' parameterization dashboard https://github.com/tweag/cardano-peras/issues/54
+> - what's left for the hard-fork after all this? more-and-more testing / maturing, governance-related topics (new protocol parameters, hard-fork coordination)
 
 # Glossary
 
