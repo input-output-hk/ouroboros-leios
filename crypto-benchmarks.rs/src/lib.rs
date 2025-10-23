@@ -1,3 +1,5 @@
+//! Leios cryptography library.
+
 pub mod bls_util;
 pub mod bls_vote;
 pub mod cert;

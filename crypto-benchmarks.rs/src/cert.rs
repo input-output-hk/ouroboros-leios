@@ -1,3 +1,5 @@
+//! High-level operations on certificates.
+
 use blst::min_sig::*;
 use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
@@ -10,16 +12,24 @@ use crate::registry::{PersistentId, Registry};
 use crate::sortition::voter_check;
 use crate::vote::{do_voting, Vote};
 
+/// A certificate records the election and EB information along with the persistent voters who voted and the proofs for the non-persistent voters. It contains two aggregate signatures, one for sortition and other for the votes themselves.
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct Cert {
+    /// Election identifier.
     pub eid: Eid,
+    /// Hash of the EB being voted upon.
     pub eb: EbHash,
+    /// Set of persistent voter identifiers.
     pub persistent_voters: HashSet<PersistentId>,
+    /// Map of non-persistent voter pool hashes to their eligibility signature.
     pub nonpersistent_voters: BTreeMap<PoolKeyhash, Sig>,
+    /// Aggregate eligibility signature.
     pub sigma_tilde_eid: Option<Sig>,
+    /// Aggregate votes signature.
     pub sigma_tilde_m: Sig,
 }
 
+/// Generate an arbitrary certificate.
 pub fn arbitrary_cert(g: &mut Gen, reg: &Registry) -> Cert {
     let eid = Eid::arbitrary(g);
     let eb = EbHash::arbitrary(g);
@@ -33,6 +43,7 @@ impl Arbitrary for Cert {
     }
 }
 
+/// It's convenient to have a data structure for holding certificate information as it is being built.
 #[derive(Default)]
 struct TraverseVote<'a> {
     pub eids: HashSet<&'a Eid>,
@@ -43,6 +54,7 @@ struct TraverseVote<'a> {
     pub sigma_ms: Vec<&'a Signature>,
 }
 
+/// Add one vote to a certification that is being constructed.
 fn traverse_vote<'a>(reg: &'a Registry, t: &mut TraverseVote<'a>, vote: &'a Vote) -> Option<()> {
     match vote {
         Vote::Persistent {
@@ -74,6 +86,7 @@ fn traverse_vote<'a>(reg: &'a Registry, t: &mut TraverseVote<'a>, vote: &'a Vote
     }
 }
 
+/// Test that a hash set is a singleton.
 fn unique<X>(xs: &HashSet<X>) -> Option<&X> {
     if xs.len() == 1 {
         xs.iter().next()
@@ -82,6 +95,7 @@ fn unique<X>(xs: &HashSet<X>) -> Option<&X> {
     }
 }
 
+/// Generate a certificate for the specified votes.
 pub fn gen_cert(reg: &Registry, votes: &[Vote]) -> Option<Cert> {
     let mut t: TraverseVote = TraverseVote::default();
     let _ = votes
@@ -113,6 +127,7 @@ pub fn gen_cert(reg: &Registry, votes: &[Vote]) -> Option<Cert> {
     }
 }
 
+/// Verify a certificate using the information in the voter registry.
 pub fn verify_cert(reg: &Registry, cert: &Cert) -> bool {
     let pks_persistent: Vec<&PublicKey> = cert
         .persistent_voters
@@ -154,6 +169,7 @@ pub fn verify_cert(reg: &Registry, cert: &Cert) -> bool {
     }
 }
 
+/// Compute the total weight (i.e., stake fraction) of the persistent votes in a certificate.
 fn weigh_persistent(reg: &Registry, cert: &Cert) -> Option<CoinFraction> {
     let weight: Option<Coin> = cert.persistent_voters.iter().try_fold(0, |acc, pid| {
         reg.persistent_pool
@@ -163,6 +179,7 @@ fn weigh_persistent(reg: &Registry, cert: &Cert) -> Option<CoinFraction> {
     weight.map(|total| CoinFraction::from_coins(total, 1))
 }
 
+/// Compute the total weight (i.e., stake fraction) of the non-persistent votes in a certificate.
 fn weigh_nonpersistent(reg: &Registry, cert: &Cert) -> Option<CoinFraction> {
     let nonpersistent_voters = reg.voters - cert.persistent_voters.len();
     let weight: Option<usize> =
@@ -184,6 +201,7 @@ fn weigh_nonpersistent(reg: &Registry, cert: &Cert) -> Option<CoinFraction> {
     })
 }
 
+/// Compute the total weight (i.e., stake fraction) of the votes in a certificate.
 pub fn weigh_cert(reg: &Registry, cert: &Cert) -> Option<CoinFraction> {
     let persistent_weight = weigh_persistent(reg, cert)?.to_ratio();
     let nonpersistent_weight = weigh_nonpersistent(reg, cert)?.to_ratio();

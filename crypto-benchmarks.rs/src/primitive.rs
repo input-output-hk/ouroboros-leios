@@ -1,3 +1,5 @@
+//! Serialization and arbitrayr operations involving primitives.
+
 use hex::{FromHex, ToHex};
 use num_bigint::BigInt;
 use num_rational::Ratio;
@@ -13,16 +15,19 @@ use crate::util::{arbitrary_fixed_bytes, deserialize_fixed_bytes, serialize_fixe
 
 pub use pallas::ledger::primitives::PoolKeyhash;
 
+/// Generate an arbitrary pool hash.
 pub fn arbitrary_poolkeyhash(g: &mut Gen) -> PoolKeyhash {
     Hash::from(arbitrary_fixed_bytes(g))
 }
 
 pub use pallas::ledger::primitives::Coin;
 
+/// Generate an arbitrary amount of coin.
 pub fn arbitrary_coin(g: &mut Gen) -> Coin {
     u64::arbitrary(g) % 999999 + 1
 }
 
+/// Generate an arbitrary stake distribution.
 pub fn arbitrary_stake_distribution(
     g: &mut Gen,
     total: u64,
@@ -37,6 +42,7 @@ pub fn arbitrary_stake_distribution(
     )
 }
 
+/// Stake is a fraction of the total coins.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
 pub struct CoinFraction(pub Ratio<BigInt>);
 
@@ -72,6 +78,7 @@ impl<'de> Deserialize<'de> for CoinFraction {
     }
 }
 
+/// An election identifier is a slot number.
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub struct Eid(pub Slot);
 
@@ -113,6 +120,7 @@ impl Arbitrary for Eid {
     }
 }
 
+/// An EB hash is a Black2b-256 hash.
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub struct EbHash(pub(crate) Blake2b256);
 
@@ -166,6 +174,7 @@ impl Arbitrary for EbHash {
     }
 }
 
+/// A KES signature is 448 bytes.
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct KesSig(pub(crate) [u8; 448]);
 

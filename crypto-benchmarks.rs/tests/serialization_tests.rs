@@ -1,3 +1,5 @@
+//! Round-trip serialization tests.
+
 #[macro_use(quickcheck)]
 extern crate quickcheck_macros;
 

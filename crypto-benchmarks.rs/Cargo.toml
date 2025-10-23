@@ -16,6 +16,7 @@ bitvec = "1.0.1"
 blst = "0.3.13"
 clap = { version = "4.5.28", features = ["derive"] }
 criterion = "0.5.1"
+embed-doc-image = "0.1.4"
 hex = "0.4.3"
 num-bigint = { version = "0.4.6", features = ["serde"] }
 num-rational = "0.4.2"
@@ -28,6 +29,12 @@ rand_chacha = "0.3.1"
 serde = { version = "1.0.217", features = ["derive"] }
 serde_cbor = "0.11.2"
 statrs = "0.18.0"
+
+[features]
+doc-images = []
+
+[package.metadata.docs.rs]
+features = ["doc-images"]
 
 [[bench]]
 name = "serialization_bench"

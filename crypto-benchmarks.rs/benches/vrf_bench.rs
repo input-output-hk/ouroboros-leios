@@ -1,3 +1,5 @@
+//! Criterion benchmarks for VRF.
+
 use criterion::{criterion_group, criterion_main, Criterion};
 
 use leios_crypto_benchmarks::vrf::{sk_random, sk_to_pk_point, vrf_prove, vrf_verify};

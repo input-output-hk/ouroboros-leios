@@ -1,7 +1,10 @@
+//! VRF operations.
+
 use blst::*;
 use min_pk::SecretKey;
 use rand::RngCore;
 
+/// Generate a random secret key.
 pub fn sk_random() -> SecretKey {
     let mut rng = rand::thread_rng();
     let mut ikm = [0u8; 32];
@@ -9,6 +12,7 @@ pub fn sk_random() -> SecretKey {
     SecretKey::key_gen(&ikm, &[]).unwrap()
 }
 
+/// Convert a secret key `sk` into a BLS scalar.
 fn sk_scalar(sk: &SecretKey) -> blst_scalar {
     let ser = sk.serialize();
     let mut sk1: blst_scalar = blst_scalar::default();
@@ -18,6 +22,7 @@ fn sk_scalar(sk: &SecretKey) -> blst_scalar {
     sk1
 }
 
+/// Map a secret key `sk` into a point in G1.
 pub fn sk_to_pk_point(sk: &SecretKey) -> blst_p1 {
     let sk_sca: blst_scalar = sk_scalar(sk);
     let mut pk: blst_p1 = blst_p1::default();
@@ -27,6 +32,7 @@ pub fn sk_to_pk_point(sk: &SecretKey) -> blst_p1 {
     pk
 }
 
+/// Generate a random BLS scalar.
 fn rnd_scalar() -> blst_scalar {
     let mut rng = rand::thread_rng();
     let mut scalar_bytes: [u8; 32] = [0u8; 32];
@@ -38,6 +44,7 @@ fn rnd_scalar() -> blst_scalar {
     scalar
 }
 
+/// Create a VRF proof for the data `input` using the secret key `sk` and domain separator `dst`.
 pub fn vrf_prove(sk: &SecretKey, input: &[u8], dst: &[u8]) -> (blst_p1, blst_scalar, blst_fr) {
     let sk_bytes: [u8; 32] = sk.to_bytes();
 
@@ -105,6 +112,7 @@ pub fn vrf_prove(sk: &SecretKey, input: &[u8], dst: &[u8]) -> (blst_p1, blst_sca
     (gamma, c, s)
 }
 
+/// Verify a VRF proof for the data `input` and domain separator `dst`, given the proof (`gamma`, `c`, `s`).
 pub fn vrf_verify(
     pk: &blst_p1,
     input: &[u8],

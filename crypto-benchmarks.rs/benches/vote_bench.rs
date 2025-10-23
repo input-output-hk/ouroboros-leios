@@ -1,3 +1,5 @@
+//! Criterion benchmarks for voting.
+
 use criterion::{criterion_group, criterion_main, Criterion};
 use leios_crypto_benchmarks::cert::*;
 use leios_crypto_benchmarks::registry::{arbitrary_pools, PersistentId, Registry};

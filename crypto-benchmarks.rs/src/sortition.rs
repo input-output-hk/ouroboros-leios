@@ -1,7 +1,10 @@
+//! Sortition operations.
+
 use num_bigint::BigInt;
 use num_rational::Ratio;
 use num_traits::{FromPrimitive, One, Signed, Zero};
 
+/// Compute the logarithm of one minus a value `f`, to the precision allowed by `Ratio<BigInt`.
 pub fn ln_1_minus(f: &Ratio<BigInt>) -> Ratio<BigInt> {
     let epsilon = Ratio::new(
         BigInt::one(),
@@ -24,6 +27,7 @@ pub fn ln_1_minus(f: &Ratio<BigInt>) -> Ratio<BigInt> {
     }
 }
 
+/// Verify that a pool with fraction `s` of the stake is selected in the block-production lottery at probability `p`, given the logarithm of one minus the active slot coefficient `ln1f`.
 pub fn leader_check(ln1f: &Ratio<BigInt>, s: &Ratio<BigInt>, p: &Ratio<BigInt>) -> bool {
     let t0 = s * ln1f;
     let zero = Ratio::from_integer(BigInt::zero());
@@ -46,6 +50,7 @@ pub fn leader_check(ln1f: &Ratio<BigInt>, s: &Ratio<BigInt>, p: &Ratio<BigInt>) 
     }
 }
 
+/// Compute $e^x$ to the precision allowed by `Ratio<BigInt>`.
 fn exp(x: &Ratio<BigInt>) -> Ratio<BigInt> {
     let epsilon = Ratio::new(
         BigInt::one(),
@@ -68,6 +73,7 @@ fn exp(x: &Ratio<BigInt>) -> Ratio<BigInt> {
     }
 }
 
+/// Verify that a pool with fraction `s` of the stake is selected as a voter at probability `p`, given a committee size of `votes`.
 pub fn voter_check(votes: usize, s: &Ratio<BigInt>, p: &Ratio<BigInt>) -> usize {
     let x = Ratio::from_integer(BigInt::from_usize(votes).unwrap()) * s;
     let v = p / exp(&(-x.clone()));
