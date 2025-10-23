@@ -26,12 +26,6 @@ This folder contains scripts that orchestrate end-to-end demonstrations of BLS-b
   pip install cbor2 matplotlib
   ```
 
-- Make sure all scripts are executable:
-
-  ```bash
-  chmod +x scripts/*.sh
-  ```
-
 ## Workflow
 
 The scripts are designed to be run from the `demo/` directory.
@@ -82,14 +76,6 @@ Verify the generated certificate:
 scripts/50_verify_certificate.sh -d "$RUN"
 ```
 
-#### 60_export_demo_json.sh
-
-Export all relevant data (pools, committee, voters, and certificate summary) into a single `demo.json` file used by the visualization UI.
-
-```bash
-scripts/60_export_demo_json.sh -d "$RUN"
-```
-
 ### Run a Single End-to-End Demo
 
 ```bash
@@ -103,10 +89,9 @@ This will:
 3. Cast votes (`30_cast_votes.sh`)
 4. Make a certificate (`40_make_certificate.sh`)
 5. Verify the certificate (`50_verify_certificate.sh`)
-6. Pretty-print key metrics (`60_pretty_print_cert.sh`)
+6. Export data for the UI (`60_export_demo_json.sh`)
 
 All files are placed in `demo/run100/`.
-
 
 ## Notes
 
