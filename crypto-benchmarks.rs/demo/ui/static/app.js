@@ -27,6 +27,97 @@ function formatNumber(value) {
     return String(value);
 }
 
+function formatDuration(ms) {
+    if (ms === null || ms === undefined || Number.isNaN(ms)) return null;
+    const value = Number(ms);
+    if (!Number.isFinite(value) || value < 0) return null;
+    if (value < 1000) {
+        if (value < 1) return "0 ms";
+        return `${Math.round(value)} ms`;
+    }
+    if (value < 60000) {
+        const display = value < 10000 ? (value / 1000).toFixed(2) : (value / 1000).toFixed(1);
+        return `${display} s`;
+    }
+    const minutes = Math.floor(value / 60000);
+    const seconds = Math.floor((value % 60000) / 1000);
+    if (minutes && seconds) return `${minutes}m ${seconds}s`;
+    if (minutes) return `${minutes}m`;
+    return `${Math.round(value / 1000)} s`;
+}
+
+function updateVerificationResult(status, label) {
+    const box = document.getElementById("verify_result_box");
+    if (!box) return;
+    box.classList.remove("is-success", "is-failure");
+    let text = label ?? "—";
+    if (!status) {
+        box.textContent = text;
+        return;
+    }
+    const normalized = String(status).toLowerCase();
+    if (normalized === "success" || normalized === "ok" || normalized === "passed") {
+        box.classList.add("is-success");
+        text = label ?? "Success";
+    } else if (normalized === "failure" || normalized === "failed" || normalized === "error") {
+        box.classList.add("is-failure");
+        text = label ?? "Failure";
+    }
+    box.textContent = text;
+}
+
+function updateVerificationCertificate() {
+    const certEl = document.getElementById("verification_cert");
+    if (!certEl) return;
+    const data = latestCertificateRender;
+    certEl.classList.remove("with-tooltip");
+    certEl.style.width = "";
+    certEl.style.minWidth = "";
+    certEl.style.height = "";
+    certEl.textContent = "Certificate";
+    if (data) {
+        if (data.width) certEl.style.width = data.width;
+        if (data.minWidth) certEl.style.minWidth = data.minWidth;
+        if (data.height) certEl.style.height = data.height;
+        if (data.tooltipHtml) {
+            attachTooltip(certEl, data.tooltipHtml);
+            certEl.classList.add("with-tooltip");
+        } else {
+            attachTooltip(certEl, null);
+        }
+    } else {
+        attachTooltip(certEl, null);
+    }
+}
+
+function applyVerificationStatus(status) {
+    latestVerificationStatus = status ?? null;
+    let normalized = null;
+    let label = "—";
+    if (status !== undefined && status !== null) {
+        normalized = String(status).toLowerCase();
+        if (normalized === "success" || normalized === "ok" || normalized === "passed") {
+            label = "Success";
+        } else if (normalized === "failure" || normalized === "failed" || normalized === "error") {
+            label = "Failure";
+        } else {
+            label = String(status);
+            normalized = null;
+        }
+    }
+    const statusEl = document.getElementById("verify_status");
+    if (statusEl) {
+        statusEl.classList.remove("text-green", "text-red");
+        if (label === "Success") {
+            statusEl.classList.add("text-green");
+        } else if (label === "Failure") {
+            statusEl.classList.add("text-red");
+        }
+    }
+    setText("verify_status", label);
+    updateVerificationResult(normalized, label !== "—" ? label : null);
+}
+
 function firstFinite(...values) {
     for (const value of values) {
         if (value === null || value === undefined || value === "") continue;
@@ -52,6 +143,10 @@ const UNIVERSE_COLUMNS = 30;   // circles per row for Universe panel
 const COMMITTEE_COLUMNS = 20;  // seat boxes per row for Committee
 const COMMITTEE_ROW_HEIGHT = "calc(var(--seat-size) + 10px)";
 const VOTE_RECT_HEIGHT = 36;
+
+let latestDisplayedVoterCount = null;
+let latestVerificationStatus = null;
+let latestCertificateRender = null;
 
 // ---------- tooltip helpers ----------
 function positionTooltip(target, tooltip) {
@@ -297,7 +392,13 @@ function buildPersistentIdToPoolId(demo) {
     if (m.size === 0 && Array.isArray(demo?.committee?.seats)) {
         for (const seat of demo.committee.seats) {
             if (!seat || !seat.pool_id) continue;
-            if (seat.position !== undefined) m.set(Number(seat.position), seat.pool_id);
+            if (seat.position !== undefined) {
+                const pos = Number(seat.position);
+                m.set(pos, seat.pool_id);
+                if (Number.isFinite(pos)) {
+                    m.set(pos - 1, seat.pool_id);
+                }
+            }
             if (seat.index !== undefined) m.set(Number(seat.index), seat.pool_id);
         }
     }
@@ -407,16 +508,29 @@ function buildVoterPools(demo) {
     const persistentMap = new Map();
     const nonPersistentMap = new Map();
 
-    const ensurePersistentEntry = (seatId) => {
-        if (seatId === undefined || seatId === null) return null;
-        const numericSeat = Number(seatId);
-        const normalizedSeat = Number.isFinite(numericSeat) ? numericSeat : seatId;
+    const toSeatIndex = (value, { isPosition = false } = {}) => {
+        if (value === undefined || value === null) return null;
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed)) return null;
+        const intVal = Math.trunc(parsed);
+        if (isPosition) {
+            return Math.max(0, intVal - 1);
+        }
+        return Math.max(0, intVal);
+    };
+
+    const ensurePersistentEntry = (seatIndex) => {
+        if (seatIndex === undefined || seatIndex === null) return null;
+        const numericSeat = Number(seatIndex);
+        if (!Number.isFinite(numericSeat)) return null;
+        const normalizedSeat = Math.max(0, Math.trunc(numericSeat));
         const mapKey = String(normalizedSeat);
         let entry = persistentMap.get(mapKey);
         if (!entry) {
             const poolId = pidToPool.get(normalizedSeat) ?? pidToPool.get(mapKey) ?? null;
             entry = {
-                seatId: normalizedSeat,
+                seatIndex: normalizedSeat,
+                seatPosition: normalizedSeat + 1,
                 poolId,
                 hasVote: false,
                 signature: null,
@@ -446,7 +560,10 @@ function buildVoterPools(demo) {
     const votersObj = demo?.voters ?? demo?.voters_filtered ?? demo?.voters_unfiltered ?? null;
     if (votersObj && typeof votersObj === "object") {
         const persistentIds = votersObj.persistent_ids ?? [];
-        for (const seatId of persistentIds) ensurePersistentEntry(seatId);
+        for (const seatId of persistentIds) {
+            const idx = toSeatIndex(seatId);
+            if (idx !== null) ensurePersistentEntry(idx);
+        }
 
         const nonIds = votersObj.nonpersistent_pool_ids ?? [];
         for (const poolId of nonIds) ensureNonPersistentEntry(poolId);
@@ -456,7 +573,8 @@ function buildVoterPools(demo) {
         for (const entry of demo.votes_preview) {
             if (!entry) continue;
             if (entry.type === "persistent") {
-                const record = ensurePersistentEntry(entry.seat_id ?? entry.seatId ?? entry.id);
+                const idx = toSeatIndex(entry.seat_id ?? entry.seatId ?? entry.id);
+                const record = ensurePersistentEntry(idx);
                 if (record) {
                     record.hasVote = true;
                     record.signature = entry.signature ?? entry.vote_signature ?? null;
@@ -478,9 +596,11 @@ function buildVoterPools(demo) {
         : [];
 
     for (const seat of committeePersistentSeats) {
-        const record = ensurePersistentEntry(seat.position);
+        const seatIdx = toSeatIndex(seat?.position, { isPosition: true });
+        const record = ensurePersistentEntry(seatIdx);
         if (record) {
             if (!record.poolId && seat.pool_id) record.poolId = seat.pool_id;
+            record.seatPosition = Number(seat.position) || (record.seatIndex + 1);
             record.seat = seat;
         }
     }
@@ -590,8 +710,8 @@ function renderVotersFromDemo(demo) {
     }
 
     const persistentSorted = [...persistentEntries].sort((a, b) => {
-        const seatA = Number(a.seatId);
-        const seatB = Number(b.seatId);
+        const seatA = Number(a.seatPosition);
+        const seatB = Number(b.seatPosition);
         const idxA = Number.isFinite(seatA) ? seatA : (poolIdToUniverseIndex.get(a.poolId) ?? 99999);
         const idxB = Number.isFinite(seatB) ? seatB : (poolIdToUniverseIndex.get(b.poolId) ?? 99999);
         return idxA - idxB;
@@ -605,6 +725,7 @@ function renderVotersFromDemo(demo) {
     const displayedNonPersistentCount = displayedNonPersistent.length;
 
     const totalVotersDisplayed = displayedPersistentVotes + displayedNonPersistentCount;
+    latestDisplayedVoterCount = totalVotersDisplayed;
     setText("voters_total", `${totalVotersDisplayed}`);
     setText("voters_nonpersistent", `${displayedNonPersistentCount}/${nonPersistentTotalSlots || "—"}`);
 
@@ -630,14 +751,24 @@ function renderVotersFromDemo(demo) {
         return arrow;
     };
 
-    const createSeatTile = (seat, poolId, variant = "persistent") => {
+    const createSeatTile = (seat, poolId, variant = "persistent", seatPositionOverride = null) => {
         const seatTile = document.createElement("div");
         seatTile.className = `seat-box vote-seat-inline ${variant === "persistent" ? "is-persistent-seat" : "is-nonpersistent-seat"}`;
 
-        const seatNum = seat?.position ?? seat?.index ?? null;
+        let seatNum = seat?.position ?? seat?.index ?? null;
+        if ((seatNum === null || seatNum === undefined) && seatPositionOverride !== null && seatPositionOverride !== undefined) {
+            const numericSeatPos = Number(seatPositionOverride);
+            if (Number.isFinite(numericSeatPos)) {
+                seatNum = numericSeatPos;
+            }
+        }
         const numSpan = document.createElement("span");
         numSpan.className = "seat-num";
-        numSpan.textContent = seatNum ? String(seatNum) : (variant === "persistent" ? "—" : "");
+        if (seatNum !== null && seatNum !== undefined) {
+            numSpan.textContent = String(seatNum);
+        } else {
+            numSpan.textContent = variant === "persistent" ? "—" : "";
+        }
         seatTile.appendChild(numSpan);
 
         const dot = document.createElement("div");
@@ -710,7 +841,7 @@ function renderVotersFromDemo(demo) {
 
         const tooltip = [];
         if (isPersistent) {
-            const seatNum = info.seatId ?? info.seat?.position ?? info.seat?.index ?? "—";
+            const seatNum = info.seatPosition ?? info.seat?.position ?? info.seat?.index ?? "—";
             tooltip.push(`<b>Seat #${seatNum}</b>`);
             tooltip.push(`<b>Size:</b> ${formatBytes(vBytes)}`);
             if (info.signature) tooltip.push(`<b>Signature:</b> ${info.signature}`);
@@ -727,8 +858,8 @@ function renderVotersFromDemo(demo) {
     const createPersistentRow = (entry, idx) => {
         const row = document.createElement("div");
         row.className = "vote-flow__row vote-flow__row--persistent";
-        const seat = entry.seat ?? poolIdToSeat.get(entry.poolId) ?? positionToSeat.get(entry.seatId);
-        row.appendChild(createSeatTile(seat, entry.poolId ?? seat?.pool_id ?? null, "persistent"));
+        const seat = entry.seat ?? poolIdToSeat.get(entry.poolId) ?? positionToSeat.get(entry.seatPosition);
+        row.appendChild(createSeatTile(seat, entry.poolId ?? seat?.pool_id ?? null, "persistent", entry.seatPosition));
 
         const arrow = createArrow();
         if (!entry.hasVote) {
@@ -799,8 +930,8 @@ function renderAggregationFromDemo(demo) {
     }
 
     const persistentSorted = [...persistentEntries].sort((a, b) => {
-        const seatA = Number(a.seatId);
-        const seatB = Number(b.seatId);
+        const seatA = Number(a.seatPosition);
+        const seatB = Number(b.seatPosition);
         const idxA = Number.isFinite(seatA) ? seatA : (poolIdToUniverseIndex.get(a.poolId) ?? 99999);
         const idxB = Number.isFinite(seatB) ? seatB : (poolIdToUniverseIndex.get(b.poolId) ?? 99999);
         return idxA - idxB;
@@ -853,6 +984,8 @@ function renderAggregationFromDemo(demo) {
     container.innerHTML = '';
 
     if (persistentVotes.length + displayedNonPersistent.length === 0) {
+        latestCertificateRender = null;
+        updateVerificationCertificate();
         container.appendChild(createEmptyState("No votes recorded"));
         return;
     }
@@ -868,8 +1001,8 @@ function renderAggregationFromDemo(demo) {
         vote.style.width = `${voteWidthPx(bytes)}px`;
         const tooltip = [];
         if (isPersistent) {
-            const seat = entry.seat ?? poolIdToSeat.get(entry.poolId) ?? positionToSeat.get(entry.seatId);
-            const seatNum = entry.seatId ?? seat?.position ?? seat?.index ?? "—";
+            const seat = entry.seat ?? poolIdToSeat.get(entry.poolId) ?? positionToSeat.get(entry.seatPosition);
+            const seatNum = entry.seatPosition ?? seat?.position ?? seat?.index ?? "—";
             tooltip.push(`<b>Seat #${seatNum}</b>`);
             tooltip.push(`<b>Size:</b> ${formatBytes(bytes)}`);
             if (entry.signature) tooltip.push(`<b>Signature:</b> ${entry.signature}`);
@@ -957,6 +1090,14 @@ function renderAggregationFromDemo(demo) {
         attachTooltip(cert, certificateTooltip.join('<br>'));
     }
 
+    latestCertificateRender = {
+        width: cert.style.width || "",
+        minWidth: cert.style.minWidth || "",
+        height: cert.style.height || "",
+        tooltipHtml: certificateTooltip.length ? certificateTooltip.join('<br>') : null
+    };
+    updateVerificationCertificate();
+
     container.appendChild(votesGrid);
     container.appendChild(arrow);
     container.appendChild(cert);
@@ -1010,6 +1151,54 @@ async function loadDemoJson(runDir) {
     return data;
 }
 
+async function loadTimingsForRun(runDir) {
+    if (!runDir || typeof runDir !== "string") {
+        setText("committee_timing", "—");
+        setText("voting_timing", "—");
+        setText("voting_timing_avg", "—");
+        setText("agg_timing", "—");
+        setText("verify_time", "—");
+        setText("verify_status", "—");
+        applyVerificationStatus(null);
+        return;
+    }
+    const timings = await tryFetchJson(`/demo/${runDir}/timings.json`);
+    if (timings && typeof timings === "object") {
+        const committeeFormatted = formatDuration(timings.committee_selection_ms);
+        const votingFormatted = formatDuration(timings.vote_casting_ms);
+        const aggregationFormatted = formatDuration(timings.aggregation_ms);
+        const verificationFormatted = formatDuration(timings.verification_ms);
+        setText("committee_timing", committeeFormatted ?? "—");
+        setText("voting_timing", votingFormatted ?? "—");
+        setText("agg_timing", aggregationFormatted ?? "—");
+        setText("verify_time", verificationFormatted ?? "—");
+        const totalVoters = Number(latestDisplayedVoterCount);
+        let avgText = "—";
+        if (Number.isFinite(totalVoters) && totalVoters > 0) {
+            const totalMs = Number(timings.vote_casting_ms);
+            if (Number.isFinite(totalMs) && totalMs >= 0) {
+                const avgMs = totalMs / totalVoters;
+                if (avgMs < 1000) {
+                    const precision = avgMs < 10 ? 2 : 1;
+                    avgText = `${avgMs.toFixed(precision)} ms`;
+                } else {
+                    avgText = formatDuration(avgMs) ?? "—";
+                }
+            }
+        }
+        setText("voting_timing_avg", avgText);
+        const statusSource = latestVerificationStatus ?? timings.verification_status ?? null;
+        applyVerificationStatus(statusSource);
+    } else {
+        setText("committee_timing", "—");
+        setText("voting_timing", "—");
+        setText("voting_timing_avg", "—");
+        setText("agg_timing", "—");
+        setText("verify_time", "—");
+        applyVerificationStatus(null);
+    }
+}
+
 function fillIdentifiers(obj) {
     if (!obj) return;
     const eid = obj.eid || obj.EID;
@@ -1022,6 +1211,92 @@ function fillIdentifiers(obj) {
     }
 }
 
+const FLOW_STEPS = [
+    {
+        wrapperId: "step_committee",
+        buttonId: "btn_step_committee",
+        targetId: "committee",
+        nextWrapperId: "step_election"
+    },
+    {
+        wrapperId: "step_election",
+        buttonId: "btn_step_election",
+        targetId: "identifiers",
+        nextWrapperId: "step_voting"
+    },
+    {
+        wrapperId: "step_voting",
+        buttonId: "btn_step_voting",
+        targetId: "voters",
+        nextWrapperId: "step_aggregation"
+    },
+    {
+        wrapperId: "step_aggregation",
+        buttonId: "btn_step_aggregation",
+        targetId: "aggregation",
+        nextWrapperId: "step_verification"
+    },
+    {
+        wrapperId: "step_verification",
+        buttonId: "btn_step_verification",
+        targetId: "verification",
+        nextWrapperId: null
+    }
+];
+
+let progressiveRevealInitialized = false;
+
+function handleFlowButtonClick(step) {
+    if (!step) return;
+    const target = document.getElementById(step.targetId);
+    if (target) {
+        target.classList.remove("is-hidden");
+        requestAnimationFrame(() => {
+            target.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+    }
+    const wrapper = document.getElementById(step.wrapperId);
+    if (wrapper) wrapper.classList.add("is-hidden");
+    if (step.nextWrapperId) {
+        const nextWrapper = document.getElementById(step.nextWrapperId);
+        if (nextWrapper) nextWrapper.classList.remove("is-hidden");
+    }
+    if (typeof syncGridColumns === "function") {
+        try {
+            syncGridColumns();
+        } catch {
+            // Ignore layout sync errors during reveal.
+        }
+    }
+}
+
+function resetProgressiveReveal() {
+    FLOW_STEPS.forEach((step, index) => {
+        const target = document.getElementById(step.targetId);
+        if (target) target.classList.add("is-hidden");
+        const wrapper = document.getElementById(step.wrapperId);
+        if (wrapper) {
+            if (index === 0) {
+                wrapper.classList.remove("is-hidden");
+            } else {
+                wrapper.classList.add("is-hidden");
+            }
+        }
+    });
+}
+
+function setupProgressiveReveal() {
+    if (!progressiveRevealInitialized) {
+        FLOW_STEPS.forEach((step) => {
+            const button = document.getElementById(step.buttonId);
+            if (!button) return;
+            button.addEventListener("click", () => handleFlowButtonClick(step));
+        });
+        progressiveRevealInitialized = true;
+    }
+    resetProgressiveReveal();
+}
+
 // --- UI clearing helpers ---
 function clearUIPlaceholders() {
     setText("universe_total", "—");
@@ -1030,6 +1305,12 @@ function clearUIPlaceholders() {
     setText("committee_total", "—");
     setText("committee_persistent", "—");
     setText("committee_nonpersistent", "—");
+    setText("committee_timing", "—");
+    setText("voting_timing", "—");
+    setText("voting_timing_avg", "—");
+    setText("agg_timing", "—");
+    setText("verify_time", "—");
+    setText("verify_status", "—");
     setText("eid", "—");
     setText("eb", "—");
     setText("voters_total", "—");
@@ -1045,6 +1326,11 @@ function clearUIPlaceholders() {
         const el = document.getElementById(id);
         if (el) el.innerHTML = "";
     }
+    latestDisplayedVoterCount = null;
+    latestCertificateRender = null;
+    updateVerificationCertificate();
+    applyVerificationStatus(null);
+    resetProgressiveReveal();
 }
 
 // --- Data loading and rendering sequence for a given runDir ---
@@ -1063,6 +1349,8 @@ async function loadAndRenderRun(runDir) {
         renderCommitteeFromDemo(demo);
         renderVotersFromDemo(demo);
         renderAggregationFromDemo(demo);
+        applyVerificationStatus(demo?.verification?.status ?? demo?.verification_status ?? null);
+        await loadTimingsForRun(runDir);
         syncGridColumns();
         window.addEventListener("resize", syncGridColumns);
     } else {
@@ -1073,6 +1361,7 @@ async function loadAndRenderRun(runDir) {
 // --- Boot logic: only auto-load if localStorage has lastRun ---
 document.addEventListener("DOMContentLoaded", () => {
     clearUIPlaceholders();
+    setupProgressiveReveal();
 
     // Setup form submission for run directory selection
     const form = document.getElementById("run-form");

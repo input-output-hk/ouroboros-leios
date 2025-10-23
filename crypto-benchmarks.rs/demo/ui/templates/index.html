@@ -48,10 +48,18 @@
             <strong>Backend error:</strong>
             <span id="error_text">—</span>
         </div>
+        <div class="flow-step" id="step_committee">
+            <button type="button" class="flow-button" id="btn_step_committee" data-reveal-target="committee"
+                data-reveal-next="step_election">
+                Select Committee for a given Epoch
+            </button>
+        </div>
         <!-- B) Committee (this election) -->
-        <section class="card" id="committee">
-            <h2 class="card-title center">Committee Selection</h2>
-            <p class="card-subtitle center">Persistent seats selected for this epoch via Fait Accompli</p>
+        <section class="card is-hidden" id="committee">
+            <h2 class="card-title center">Committee</h2>
+            <p class="card-subtitle center">Persistent seats are selected for this epoch via Fait Accompli</p>
+            <p class="card-subtitle center">Non-persistent seats are empty because no EB hash is available to determine
+                eligibility on</p>
 
             <div class="grid two wide-left">
                 <div class="stat-group">
@@ -67,6 +75,10 @@
                         <span class="stat-label text-blue">Non-persistent seats:</span>
                         <span id="committee_nonpersistent" class="stat-value text-blue">—</span>
                     </div>
+                    <div class="stat">
+                        <span class="stat-label text-timing">Selection time:</span>
+                        <span id="committee_timing" class="stat-value text-timing">—</span>
+                    </div>
                 </div>
                 <div id="committee_canvas" class="committee-canvas" role="img" aria-label="Committee members grid">
                     <div id="committee_tooltip" class="tooltip" hidden></div>
@@ -74,8 +86,14 @@
                 <noscript>Please enable JavaScript to view the committee visualization.</noscript>
             </div>
         </section>
+        <div class="flow-step is-hidden" id="step_election">
+            <button type="button" class="flow-button" id="btn_step_election" data-reveal-target="identifiers"
+                data-reveal-next="step_voting">
+                Start Election for a given EB
+            </button>
+        </div>
         <!-- A) Election identifiers -->
-        <section class="card" id="identifiers">
+        <section class="card is-hidden" id="identifiers">
             <h2 class="card-title center">Election</h2>
             <div class="identifiers-row">
                 <div class="eid-block">
@@ -88,8 +106,14 @@
                 </div>
             </div>
         </section>
+        <div class="flow-step is-hidden" id="step_voting">
+            <button type="button" class="flow-button" id="btn_step_voting" data-reveal-target="voters"
+                data-reveal-next="step_aggregation">
+                Cast Votes
+            </button>
+        </div>
         <!-- C) Voters (observed votes) -->
-        <section class="card" id="voters">
+        <section class="card is-hidden" id="voters">
             <h2 class="card-title center">Voting</h2>
 
             <div class="grid two wide-left">
@@ -110,6 +134,14 @@
                         <span class="stat-label text-blue">Non-persistent:</span>
                         <span id="voters_nonpersistent" class="stat-value text-blue">—</span>
                     </div>
+                    <div class="stat">
+                        <span class="stat-label text-timing">Voting time:</span>
+                        <span id="voting_timing" class="stat-value text-timing">—</span>
+                    </div>
+                    <div class="stat stat--indent">
+                        <span class="stat-label text-timing">Avg per vote:</span>
+                        <span id="voting_timing_avg" class="stat-value text-timing">—</span>
+                    </div>
                 </div>
                 <div>
                     <!-- Container where app.js will render the voters grid -->
@@ -120,10 +152,14 @@
                 </div>
             </div>
         </section>
-
+        <div class="flow-step is-hidden" id="step_aggregation">
+            <button type="button" class="flow-button" id="btn_step_aggregation" data-reveal-target="aggregation">
+                Aggregate Votes
+            </button>
+        </div>
         <!-- D) Aggregation -->
-        <section class="card" id="aggregation">
-            <h2 class="card-title center">Aggregation</h2>
+        <section class="card is-hidden" id="aggregation">
+            <h2 class="card-title center">Votes Aggregation</h2>
             <div class="grid two wide-left">
                 <div class="stat-group">
                     <div class="stat">
@@ -138,10 +174,43 @@
                         <span class="stat-label">Compression gain:</span>
                         <span id="agg_gain" class="stat-value text-yellow">—</span>
                     </div>
+                    <div class="stat">
+                        <span class="stat-label text-timing">Aggregation time:</span>
+                        <span id="agg_timing" class="stat-value text-timing">—</span>
+                    </div>
                 </div>
                 <div>
                     <div id="aggregation_canvas" class="aggregation-canvas" role="img"
                         aria-label="Aggregation pipeline"></div>
+                </div>
+            </div>
+        </section>
+
+        <div class="flow-step is-hidden" id="step_verification">
+            <button type="button" class="flow-button" id="btn_step_verification" data-reveal-target="verification">
+                Verify Certificate
+            </button>
+        </div>
+
+        <section class="card is-hidden" id="verification">
+            <h2 class="card-title center">Certificate Verification</h2>
+            <div class="grid two wide-left">
+                <div class="stat-group verification-stats">
+                    <div class="stat">
+                        <span class="stat-label">Result:</span>
+                        <span id="verify_status" class="stat-value">—</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label text-timing">Verification time:</span>
+                        <span id="verify_time" class="stat-value text-timing">—</span>
+                    </div>
+                </div>
+                <div class="verification-visual">
+                    <div id="verification_cert" class="certificate-rect verification-cert">Certificate</div>
+                    <span class="big-arrow">⇒</span>
+                    <div class="verification-stage">Verify</div>
+                    <span class="big-arrow">⇒</span>
+                    <div id="verify_result_box" class="verify-result">—</div>
                 </div>
             </div>
         </section>

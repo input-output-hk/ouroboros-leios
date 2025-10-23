@@ -101,7 +101,7 @@ scripts/25_export_demo_json.sh -d "$RUN"
 ### Run a Single End-to-End Demo
 
 ```bash
-scripts/70_run_one.sh -d "$RUN" -n 100 -f 0.75
+scripts/70_run_one.sh -d "$RUN" -p 500 -n 100 -f 0.75
 ```
 
 This will:

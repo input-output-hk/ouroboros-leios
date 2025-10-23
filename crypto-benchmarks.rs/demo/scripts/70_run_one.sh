@@ -28,6 +28,15 @@ N=""
 FRACTION=""
 POOLS=""
 TOTAL_STAKE=""
+PYTHON_EXEC="${VIRTUAL_ENV:+$VIRTUAL_ENV/bin/python3}"
+PYTHON_EXEC="${PYTHON_EXEC:-python3}"
+
+now_ms() {
+  "$PYTHON_EXEC" - "$@" <<'PY'
+import time
+print(int(time.time() * 1000))
+PY
+}
 
 usage() {
   cat <<USAGE
@@ -63,21 +72,38 @@ echo "== [70_run_one] DIR=${RUN_DIR_ABS} N=${N} FRACTION=${FRACTION} POOLS=${POO
 
 # ---- 10: init inputs ----
 INIT_CMD=("$DIR_SCRIPT/10_init_inputs.sh" -d "$RUN_DIR")
-[[ -n "$POOLS" ]] && INIT_CMD+=( -p "$POOLS" )
-[[ -n "$TOTAL_STAKE" ]] && INIT_CMD+=( -t "$TOTAL_STAKE" )
+[[ -n "$POOLS" ]] && INIT_CMD+=( --pools "$POOLS" )
+[[ -n "$TOTAL_STAKE" ]] && INIT_CMD+=( --stake "$TOTAL_STAKE" )
 "${INIT_CMD[@]}"
 
 # ---- 20: make registry ----
+start_make_registry="$(now_ms)"
 "$DIR_SCRIPT/20_make_registry.sh" -d "$RUN_DIR" -n "$N"
+end_make_registry="$(now_ms)"
+make_registry_ms=$(( end_make_registry - start_make_registry ))
 
 # ---- 30: cast votes ----
+start_cast_votes="$(now_ms)"
 "$DIR_SCRIPT/30_cast_votes.sh" -d "$RUN_DIR" -f "$FRACTION"
+end_cast_votes="$(now_ms)"
+cast_votes_ms=$(( end_cast_votes - start_cast_votes ))
 
 # ---- 40: make certificate ----
+start_aggregation="$(now_ms)"
 "$DIR_SCRIPT/40_make_certificate.sh" -d "$RUN_DIR"
+end_aggregation="$(now_ms)"
+aggregation_ms=$(( end_aggregation - start_aggregation ))
 
 # ---- 50: cryptographic verification ----
-"$DIR_SCRIPT/50_verify_certificate.sh" -d "$RUN_DIR"
+start_verify="$(now_ms)"
+if "$DIR_SCRIPT/50_verify_certificate.sh" -d "$RUN_DIR"; then
+  verify_status="success"
+else
+  verify_status="failure"
+  echo "[70_run_one] Certificate verification failed." >&2
+fi
+end_verify="$(now_ms)"
+verify_ms=$(( end_verify - start_verify ))
 
 # ---- 60: show sizes + summary JSON ----
 "$DIR_SCRIPT/60_pretty_print_cert.sh" -d "$RUN_DIR"
@@ -94,4 +120,38 @@ else
   echo "(Tip) Install jq for a compact summary: brew install jq"
 fi
 
+timings_path="${RUN_DIR_ABS}/timings.json"
+cat > "$timings_path" <<JSON
+{
+  "generated_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "committee_selection_ms": ${make_registry_ms},
+  "vote_casting_ms": ${cast_votes_ms},
+  "aggregation_ms": ${aggregation_ms},
+  "verification_ms": ${verify_ms}
+}
+JSON
+
+"$PYTHON_EXEC" - "$RUN_DIR_ABS" "$verify_status" <<'PY'
+import json, pathlib, sys
+
+run_dir = pathlib.Path(sys.argv[1])
+status = sys.argv[2]
+demo_path = run_dir / "demo.json"
+
+try:
+    data = json.loads(demo_path.read_text())
+except FileNotFoundError:
+    sys.exit(0)
+
+verification = data.get("verification")
+if not isinstance(verification, dict):
+    verification = {}
+
+verification["status"] = status
+data["verification"] = verification
+
+demo_path.write_text(json.dumps(data, indent=2))
+PY
+
+echo "Timing info written to ${timings_path}"
 echo "Done."
