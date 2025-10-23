@@ -42,6 +42,9 @@ Ouroboros Leios is introducing _(high-)throughput_ as a third key property and i
 As it was the case for the Praos variant of Ouroboros (TODO: cite shelley network-design), the specification embodied in the published and peer-reviewed paper for Ouroboros Leios (TODO: cite leios paper) was not intended to be directly implementable. This was confirmed during initial R&D and feasibility studies, which identified several unsolved problems with the fully concurrent block production design proposed in the paper. The latest design presented in CIP-164, also known as "Linear Leios", focuses on the core idea of better utilizing resources in between the necessary "calm" periods of the Praos protocol and presents an immediately implementable design.
 
 > [!WARNING]
+> TODO: (re-)introduce the main protocol flow of Leios?
+
+> [!WARNING]
 > TODO: Notes on what could go here
 > - Node is a concurrent, reactive (real-time) system
 > - contrast real-time to not be ms-level hard real-time (control systems etc.), but as "timely" action is crucial to the success (see also network-design.pdf)
@@ -609,138 +612,31 @@ Genesis (Ouroboros Genesis) enables nodes to bootstrap from the genesis block wi
 > [!WARNING]
 > TODO: Introduce chapter as being the bridge between changes and implementation plan; also, these are only selected aspects that inform the implementation (and not cover principal risks to the protocol or things that are avoided by design)
 
+> [!NOTE]
+> Alternative: Move this chapter between Introduction/Overview and Architecture/Changes? Understanding the key threats does not require intimate understanding of node-level components, but having the key threats enumerated allows us to reference them when discussing details in the architecture chapter.
+
 ## Key threats
 
 > [!WARNING]
-> TODO: Selection of key threats that further inform the design and/or implementation plan. Incorporate / reference the [threat model](./threat-model.md)?
+> TODO: Selection of key threats and attacks that further inform the design and/or implementation plan. Incorporate / reference the full [threat model](../threat-model.md)
 
-> [!CAUTION]
-> FIXME: The following content is AI generated and based on the CIP + impact analysis. Reduce number of "key threats"
+### Protocol bursts
 
-#### RSK-LeiosPraosContentionGC
+> [!WARNING]
+> TODO: important because
+> - was a prominent case in research
+> - acknowledges the wealth of data to be processed
+> - motivates freshest-first delivery / prioritization between praos and leios traffic, and experiments/features revolving around this
+> - reference/include/move related RSK-.. items from impact analysis
 
-**Description:** Leios components allocating in the same GHC heap as Praos might increase GC pauses, delaying RB diffusion.
+### Data withholding
 
-**Impact:** HIGH - Could violate Praos $\Delta$ assumptions and compromise chain security.
-
-**Mitigation Strategies:**
-1. **Early validation via EXP-LeiosLedgerDbAnalyser:**
-   - Measure GC behavior for realistic EB transaction sequences
-   - Quantify mutator time and GC overhead
-   - Establish safe EB size limits
-
-2. **Process isolation (if needed):**
-   - Separate Leios validation into dedicated process
-   - UTxO-HD-like IPC for ledger state access
-   - Accept overhead cost for GC isolation
-
-3. **Monitoring and alerting:**
-   - Instrument GC statistics in node telemetry
-   - Alert on anomalous GC pause times
-   - Adaptive EB production throttling
-
-#### RSK-LeiosPraosContentionDiskBandwidth
-
-**Description:** Simultaneous Leios writes (EBs, votes, transactions) and Praos/Ledger operations might saturate disk I/O.
-
-**Impact:** MEDIUM-HIGH - Especially with UTxO-HD where ledger state is on disk.
-
-**Mitigation Strategies:**
-1. **Rate limiting:**
-   - Limit Leios disk write rate with back-pressure to network
-   - Priority I/O scheduling for Praos operations
-
-2. **Buffering and batching:**
-   - Memory buffer for EB writes before flushing
-   - Batch vote storage writes
-
-3. **Validation via EXP-LeiosDiffusionOnly:**
-   - Measure disk I/O under ATK-LeiosProtocolBurst
-   - Quantify impact on Praos operations
-   - Tune buffer sizes and rate limits
-
-#### RSK-LeiosLedgerOverheadLatency
-
-**Description:** Processing 15000% of a Praos block worth of transactions in bursts might introduce unexpected latency.
-
-**Impact:** MEDIUM - Affects vote timing and certificate generation.
-
-**Mitigation Strategies:**
-1. **Benchmarking via EXP-LeiosLedgerDbAnalyser:**
-   - Process realistic EB-sized transaction sequences
-   - Measure both full validation and reapplication
-   - Profile CPU and memory pressure
-
-2. **Implementation optimization:**
-   - Lazy evaluation where safe
-   - Transaction validation result caching
-   - Parallel validation of independent transactions (future)
-
-#### RSK-TimingViolation
-
-**Description:** Network conditions might violate timing assumptions ($\Delta_\text{EB}$, $\Delta_\text{RB}$, etc.).
-
-**Impact:** CRITICAL - Could compromise Praos security properties.
-
-**Mitigation Strategies:**
-1. **Conservative parameterization:**
-   - Use 95th percentile network measurements
-   - Add safety margins to all timing parameters
-   - Start with conservative values and tighten based on empirical data
-
-2. **Monitoring and detection:**
-   - Track diffusion times in telemetry
-   - Alert on timing violations
-   - Adaptive parameter adjustment (future)
-
-3. **Testnet validation:**
-   - Run adversarial scenarios on testnet
-   - Measure worst-case diffusion times
-   - Validate timing assumptions under load
-
-#### RSK-CertificateVulnerability
-
-**Description:** BLS signature scheme vulnerabilities or implementation bugs could compromise vote integrity.
-
-**Impact:** CRITICAL - Could enable invalid EB certification.
-
-**Mitigation Strategies:**
-1. **Formal verification:**
-   - Agda specification of certificate validation
-   - Property-based testing of BLS operations
-   - Cross-implementation test vectors
-
-2. **External audit:**
-   - Third-party cryptographic review
-   - Penetration testing of voting system
-   - Bug bounty program
-
-3. **Gradual rollout:**
-   - Enable voting but don't rely on certificates initially
-   - Parallel validation in early testnets
-   - Incremental trust in cryptographic components
-
-#### RSK-SPOAdoption
-
-**Description:** SPOs might not adopt Leios due to increased operational complexity or resource requirements.
-
-**Impact:** MEDIUM - Reduced decentralization or delayed rollout.
-
-**Mitigation Strategies:**
-1. **Clear documentation and tooling:**
-   - Step-by-step upgrade guides
-   - Automated BLS key generation and registration
-   - Monitoring dashboards for Leios-specific metrics
-
-2. **Phased rollout:**
-   - Initial testnet deployment with early adopter SPOs
-   - Mainnet activation only after >80% testnet participation
-   - Fallback mechanisms if adoption is insufficient
-
-3. **Incentive alignment:**
-   - Ensure Leios improves SPO profitability at scale
-   - No penalties for non-participation in early phases
-   - Clear communication of long-term economic benefits
+> [!WARNING]
+> TODO: important because
+> - can be done from stake- and network-based attackers
+> - trivially impacts high-throughput because no certifications happening
+> - however, more advanced, potential avenue to attack blockchain safety (impact praos security argument) when carefully partitioning the network
+> - motivates validation of optimistic and worst-case diffusion paths
 
 ## Assumptions to validate early
 
