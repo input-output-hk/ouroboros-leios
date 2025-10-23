@@ -2,11 +2,20 @@
 import Linleios.Util
 
 
+/--
+Number of stake pools.
+-/
 def nPools : Nat := 2500
 
+/--
+Compute a realistic stake distribution for the specified number of pools.
+-/
 def stakeDistribution (nPools : Nat) : List Float :=
   (List.range nPools).map (fun k => ((k + 1).toFloat / nPools.toFloat)^10 - (k.toFloat / nPools.toFloat)^10)
 
+/--
+Determine the distribution parameter that achieves the specified committee size.
+-/
 private def calibrateCommittee(committeeSize : Float) : Float :=
   let stakes : List Float := stakeDistribution nPools
   let f (m : Float) : Float :=
@@ -14,6 +23,9 @@ private def calibrateCommittee(committeeSize : Float) : Float :=
     ps.sum - committeeSize
   bisectionSearch f committeeSize nPools.toFloat 0.5 10
 
+/--
+Compute the mean and standard deviation of the committee size, given the probability of a successful vote and a target committee size.
+-/
 private def committeeDistribution (pSuccessfulVote committeeSize : Float) : Float × Float :=
   let stakes : List Float := stakeDistribution nPools
   let m := calibrateCommittee committeeSize
@@ -22,6 +34,9 @@ private def committeeDistribution (pSuccessfulVote committeeSize : Float) : Floa
   let σ := (ps.map (fun p => p * (1 - p))).sum.sqrt
   ⟨ μ , σ ⟩
 
+/--
+Compute the probability of a quorum, given the probability of a successful vote, the target committee size, and the quorum fraction.
+-/
 def pQuorum (pSuccessfulVote committeeSize τ : Float) : Float :=
   let ⟨ μ , σ ⟩ := committeeDistribution pSuccessfulVote committeeSize
   1 - cdfGaussian (τ * committeeSize) μ σ

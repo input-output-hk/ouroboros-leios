@@ -1,4 +1,7 @@
 
+/--
+The error function.
+-/
 partial def erf (x : Float) : Float :=
   if x < 0
     then - erf (- x)
@@ -12,9 +15,15 @@ partial def erf (x : Float) : Float :=
       let t := 1 / (1 + p * x)
       1 - (a₁ * t + a₂ * t^2 + a₃ * t^3 + a₄ * t^4 + a₅ * t^5) * Float.exp (- x^2)
 
+/--
+The CDF for a normal distribution.
+-/
 def cdfGaussian (x μ σ : Float) : Float :=
   (1 + erf ((x - μ) / σ / Float.sqrt 2)) / 2
 
+/--
+A bisection search.
+-/
 def bisectionSearch (f : Float → Float) (low high : Float) (ε : Float) (maxIter : Nat) : Float :=
   match maxIter with
   | 0 => (low + high) / 2
