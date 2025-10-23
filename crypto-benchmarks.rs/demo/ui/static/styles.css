@@ -313,14 +313,6 @@ main {
     cursor: pointer;
 }
 
-.verify-label {
-    font-weight: 600;
-    color: var(--muted);
-    margin-right: 0.35rem;
-    display: inline-flex;
-    align-items: center;
-}
-
 .verify-result {
     display: inline-flex;
     align-items: center;
