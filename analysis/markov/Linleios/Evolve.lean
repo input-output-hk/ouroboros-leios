@@ -11,6 +11,9 @@ open Lean.ToJson (toJson)
 open Std (HashMap)
 
 
+/--
+Try to forge an RB in this substep, given the state and environment.
+-/
 def forgeRb {env : Environment} (state : State) : Outcomes :=
   let state' :=
     {
@@ -23,6 +26,9 @@ def forgeRb {env : Environment} (state : State) : Outcomes :=
   , ({state' with hasRb := false, canCertify := false}, 1 - p)
   ]
 
+/--
+Try to include a certificate in the latest RB being forged in this substep, given the state and environment.
+-/
 def certify {env : Environment} (state : State) : Outcomes :=
   if state.hasRb && state.canCertify
     then let p := env.pSpacingOkay
@@ -32,6 +38,9 @@ def certify {env : Environment} (state : State) : Outcomes :=
          ]
     else [(state, 1)]
 
+/--
+Try to forge an EB in this substep, given the state and environment.
+-/
 def forgeEb {env : Environment} (state : State) : Outcomes :=
   if state.hasRb
     then let p := 1 - env.pLate
@@ -41,6 +50,9 @@ def forgeEb {env : Environment} (state : State) : Outcomes :=
          ]
     else [(state, 1)]
 
+/--
+Try to vote for an EB in this substep, given the state and environment.
+-/
 def vote {env : Environment} (state : State) : Outcomes :=
   if state.hasRb
     then let p := env.pQuorum
@@ -50,13 +62,22 @@ def vote {env : Environment} (state : State) : Outcomes :=
          ]
     else [(state, 1)]
 
+/--
+Step forward to the next potential block.
+-/
 def step {env : Environment} : List (State → Outcomes) :=
   [@forgeRb env, @certify env, @forgeEb env, @vote env]
 
 
+/--
+Discard probabilities below the specified threshold.
+-/
 def prune (ε : Float) : Probabilities → Probabilities :=
   HashMap.filter (fun _ p => p > ε)
 
+/--
+Evolve state probabilities on step forward according the a transition function.
+-/
 def evolve (transition : State → Outcomes) : Probabilities → Probabilities :=
   HashMap.fold
     (
@@ -68,19 +89,32 @@ def evolve (transition : State → Outcomes) : Probabilities → Probabilities :
     )
     ∅
 
+/--
+Chain a sequence of transitions sequentially, evolving probabilities.
+-/
 def chain (transitions : List (State → Outcomes)) : Probabilities → Probabilities :=
   match transitions with
   | [] => id
   | (t :: ts) => chain ts ∘ evolve t
 
+/--
+Simulate the specified number of potential blocks, given a starting set of probabilities.
+-/
 def simulate (env : Environment) (start : Probabilities) (ε : Float) : Nat → Probabilities
 | 0     => start
 | n + 1 => let state' := prune ε $ chain (@step env) start
            simulate env state' ε n
 
+
+/--
+Compute the total probabilities of a set of states.
+-/
 def totalProbability (states : Probabilities) : Probability :=
   states.values.sum
 
+/--
+Compute the distribution of EB counts.
+-/
 def ebDistribution : Probabilities → HashMap Nat Probability :=
   HashMap.fold
     (
@@ -90,6 +124,9 @@ def ebDistribution : Probabilities → HashMap Nat Probability :=
     )
     ∅
 
+/--
+Format the distribution of EB counts as JSON.
+-/
 def ebDistributionJson : Probabilities → Json :=
   Json.mkObj
     ∘ List.map (fun ⟨k, v⟩ => ⟨toString k, toJson v⟩)
@@ -97,6 +134,9 @@ def ebDistributionJson : Probabilities → Json :=
     ∘ HashMap.toList
     ∘ ebDistribution
 
+/--
+Compute the RB efficiency, given a set of states.
+-/
 def rbEfficiency (states : Probabilities) : Float :=
   let clock := states.keys.head!.clock
   let rbCount :=
@@ -106,6 +146,9 @@ def rbEfficiency (states : Probabilities) : Float :=
       states
   rbCount / clock.toFloat
 
+/--
+Compute the EB efficiency, given a set of states.
+-/
 def ebEfficiency (states : Probabilities) : Float :=
   let clock := states.keys.head!.clock
   let ebCount :=
@@ -115,6 +158,9 @@ def ebEfficiency (states : Probabilities) : Float :=
       states
   ebCount / (clock.toFloat - 1)
 
+/--
+Compute the overall efficiency, give a set of states.
+-/
 def efficiency (states : Probabilities) : Float :=
   let rb := rbEfficiency states
   let eb := ebEfficiency states

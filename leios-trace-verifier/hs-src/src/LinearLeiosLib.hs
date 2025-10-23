@@ -1,3 +1,4 @@
+-- | Imports from Agda.
 module LinearLeiosLib (
   module P,
   module V,
