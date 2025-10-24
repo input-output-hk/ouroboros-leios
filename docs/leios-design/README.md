@@ -691,10 +691,6 @@ Genesis (Ouroboros Genesis) enables nodes to bootstrap from the genesis block wi
 >     - mature prototypes vs. implementing changes from scratch to get release candidates
 >     - testnet as an integration point (instructions, tools, APIs)
 
-<!-- The implementation plan for Ouroboros Leios follows a structured approach to progressively validate and mature the protocol design through various software readiness levels (SRLs). Research and development (R&D) is inherently non-linear, requiring iterative exploration, validation, and refinement. Hence, we embrace guiding principles such as early validation, continuous delivery, and transparency to build confidence among developers and stakeholders, including SPOs and dReps. -->
-
-<!-- If we refer back to the identified risks and mitigation strategies, our implementation plan leverages a combination of formal methods, simulations, prototypes, and public testnets to address key uncertainties and validate critical assumptions. Different techniques serve distinct purposes in this journey: ... -->
-
 The implementation of Ouroboros Leios represents a substantial evolution of the Cardano consensus protocol, introducing high throughput as a third key property alongside the existing persistence and liveness guarantees. The path from protocol specification to production deployment requires careful validation of assumptions, progressive refinement through multiple system readiness levels, and continuous demonstration of correctness and performance characteristics. This chapter outlines the strategy for maturing the Leios protocol design through systematic application of formal methods, simulation, prototyping, and testing techniques.
 
 ## Approach
@@ -707,7 +703,26 @@ The challenge is compounded by the nature of the system itself. Cardano as deplo
 
 Three [principles](https://leios.cardano-scaling.org/docs/strategy#principles) guide the implementation strategy: First, **early validation** of critical assumptions and risks enables discovery of fundamental problems as early as possible in the development cycle and reduces the likelihood for wasteful pivots and delays in delivery. Second, the implementation must progress through **continuous delivery** of increasingly capable prototypes rather than attempting to build the complete system in isolation. This allows for empirical validation at each stage and enables course corrections based on observed behavior. Third, **transparency** in both capabilities and limitations must be maintained throughout, ensuring that stakeholders including stake pool operators and delegated representatives can make informed decisions about deployment readiness.
 
-These principles are reflected in the choice of validation techniques applied at each stage. Formal methods provide the strongest guarantees of correctness but apply to abstracted models. Simulation enables exploration of protocol behavior under controlled conditions including adversarial models. Prototypes running on real infrastructure validate that theoretical performance bounds can be achieved in practice. Public testnets demonstrate end-to-end integration and allow the broader community to evaluate the system under realistic conditions.
+These principles are also reflected in the choice of validation techniques applied at each stage. Formal methods provide the strongest guarantees of correctness but apply to abstracted models. Simulation enables exploration of protocol behavior under controlled conditions including adversarial models. Prototypes running on real infrastructure validate that theoretical performance bounds can be achieved in practice. Public testnets demonstrate end-to-end integration and allow the broader community to evaluate the system under realistic conditions.
+
+## Correctness in two dimensions
+
+Formal specification and verification play a central role in ensuring correctness throughout the implementation process, which happens along two dimensions: 
+- Maturity: Implementations maturing from proof of concept, prototype to production-ready release candidates
+- Diversity: Multiple emerging implementations of Cardano nodes using different programming langugages and targeting slightly different use cases
+
+A protocol specification captured in a formal langugage like Agda, provides an unambiguous description of the protocol that can be checked for consistency and allows proving equivalence and other properties. A formal specification serves as the authoritative reference against which all implementations must be verified.
+
+The approach to formal verification in Leios follows the "trail of evidence" methodology successfully applied in previous Ouroboros consensus implementations. Rather than attempting to verify the entire codebase directly, which becomes intractable for systems of this complexity, the methodology establishes correctness through a chain of increasingly refined specifications. For example, the high-level specification defines the protocol abstractly, while further refined specifications would focus on details such as message ordering and timing. Finally, an executable implementation is shown to correspond to the formal specification through a combination of techniques including type safety, property-based testing, and trace verification - often summarized as **conformance testing**.
+
+Trace verification deserves particular attention as it provides a bridge between formal specifications and running code. The approach involves instrumenting both the formal specification and the implementation to produce detailed execution traces. These traces can then be compared to verify that the implementation exhibits the same observable behavior as the specification for given inputs. For consensus protocols, the relevant observable behavior includes the sequence of blocks produced, the certificates generated, and the final ledger state. By systematically exploring the space of possible inputs including adversarial scenarios, high confidence can be achieved that the implementation faithfully realizes the specification.
+
+Multiple implementations provide additional assurance through diversity. The primary Haskell implementation in `cardano-node` continues to serve as the reference, while alternative implementations in other languages are currently in development and will eventually increase the **node diversity** of Cardano. Alternative implementations on the node- or component-level serve multiple purposes:
+  - validate that the specification is sufficiently precise and complete,
+  - exercise different corner cases that might be missed by a single implementation, and
+  - reduce the risk that a subtle bug in one implementation compromises the entire network.
+  
+The formal specification must be maintained as a living artifact throughout implementation. As design decisions are made to address practical concerns, these decisions must be reflected back into the specification to ensure it remains accurate. This bidirectional relationship between specification and other steps on the implementation plan is essential. The specification guides implementation, while implementation experience reveals necessary refinements to the specification. Documentation of these refinements and the rationale behind them provides crucial context for future maintainers and for external review. Consequently, the specification itself and other implementation-independent artifacts will be contributed to the [`cardano-blueprint`](https://cardano-scaling.github.io/cardano-blueprint) initiative.
 
 > [!WARNING]
 > TODO: more thoughts
