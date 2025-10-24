@@ -643,54 +643,6 @@ Genesis (Ouroboros Genesis) enables nodes to bootstrap from the genesis block wi
 
 # Implementation plan
 
-> [!WARNING]
-> TODO: Goals of this chapter / what to answer:
-> - Motivate a rough simulations -> prototype -> testnet plan;
-> - What kind of prototypes should we build?
-> - What experiments / tests should we conduct (on a testnet)?
-> - Are there non-explorative ways to validate?
-> - Which techniques help to mitigate which risks?
-> - What role does formal methods play here?
-
-> [!WARNING]
-> TODO: potential outline
->
-> - intro for a plan
->     - r&d is not a straight path (waterfall)
->     - mature a protocol design through various SRLs to be deployed onto cardano (intro from https://leios.cardano-scaling.org/docs/roadmap ?)
->     - introduce principles of validating early, continuous delivery and transparency (https://leios.cardano-scaling.org/docs/strategy#principles)
->     - increasing developer confidence, but also the confidence of governing bodies (SPOs and dReps) -> acceptance
->     - refer back to risks and mitigation chapter (what to validate early)
->     - which techniques are at our disposal?
->       - put simulation, prototyping/experiments, modeling, testing on a 4 quadrant picture?
-> - formal methods
->     - trails of evidence
->     - ensure correctness throughout multiple implementations along maturity and diversity dimensions
->     - trace verification
-> - simulations
->     - summarize what simulations bring to the table
->     - why two simulators?
->     - strengths and limitations of simulation
->     - keep maintenaining them?
->     - full control = great for adversarial scenarios, but accuracy needs to be validated
-> - prototypes
->     - what differentiates a prototype from a simulation or real implementation
->     - network prototype / diffusion only
->         - controlled environments: small devnets, P&T cluster
->             - antithesis to bridge the gap
->         - load tests to explore behavior using real network (latencies!)
->         - adversarial tests to explore attack scenarios
->     - other prototypes
->         - ledger validation benchmark
->         - crypto primitives prototype?
-> - public testnet
->     - what problem does it solve over testing in controlled environments
->         - what experiments to run on a public testnet
->         - "experience the throughput" (and chain growth) -> which parameters are good for the community?
->     - software readiness levels and what powers the testnet
->     - mature prototypes vs. implementing changes from scratch to get release candidates
->     - testnet as an integration point (instructions, tools, APIs)
-
 The implementation of Ouroboros Leios represents a substantial evolution of the Cardano consensus protocol, introducing high throughput as a third key property alongside the existing persistence and liveness guarantees. The path from protocol specification to production deployment requires careful validation of assumptions, progressive refinement through multiple system readiness levels, and continuous demonstration of correctness and performance characteristics. This chapter outlines the strategy for maturing the Leios protocol design through systematic application of formal methods, simulation, prototyping, and testing techniques.
 
 The result is an implementation plan that not only covers the ["path to active" of CIP-164](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#path-to-active), but also serves as a rationale for what concrete steps will be taken on our [product roadmap](https://leios.cardano-scaling.org/docs/roadmap/) of realizing Ouroboros Leios.
@@ -752,13 +704,27 @@ Beyond networking prototypes, additional focused prototypes may be created to ad
 
 Focused prototypes provide empirical data that complements the theoretical analysis. They reveal where optimizations are necessary and validate that the required performance is achievable with available hardware. They also serve to build developer confidence in the feasibility of the overall design, as well as directly validate and inform architectural decisions. Discovering a fundamental performance limitation early, through prototyping, is far preferable to discovering it late during testnet deployment or, worse, after mainnet deployment.
 
+## Public testnets and integration
+
+A public testnet serves distinct purposes over simulations and controlled environments: it requires integration of all components into a complete implementation, enables for tests under realistic conditions with diverse node operators and hardware, and allows the community to experience enhanced throughput directly. While some shortcuts can still be made, the testnet-ready implementation must offer complete Leios functionality - endorser block production and diffusion, vote aggregation, certificate formation, ledger integration, enhanced mempool - plus sufficient robustness for continuous operation and operational tooling for deployment and monitoring.
+
+The testnet enables multiple validation categories. Functional testing verifies correct protocol operation: nodes produce endorser blocks when elected, votes aggregate into certificates, certified blocks incorporate into the ledger, and ledger state remains consistent. Performance testing measures achieved throughput against business requirements - sustained transaction rate, mempool-to-ledger latency, and behavior under bursty synthetic workloads. Adversarial testing is limited on a public testnet, but some attempts with deliberately misbehaving nodes can be made on withholding blocks, sending invalid data, attempting network partitioning, or resource exhaustion.
+
+The testnet integrates ecosystem tooling: wallets handling increased throughput, block explorers understanding new structures, monitoring systems tracking Leios metrics, and stake pool operator documentation and deployment guides. Crucially, the testnet further enables empirical parameter selection (size limits, timing parameters), where simulation provides initial guidance but real-world testing with community feedback informs acceptable mainnet values.
+
+Software deployed to the public testnet progressively converges toward mainnet release candidates. Early deployments may use instrumented prototypes lacking production optimizations; later upgrades run increasingly complete and optimized implementations. This progressive refinement maintains community engagement while preserving engineering velocity. Traces from testnet nodes can still be verified against formal specifications using the trace verification approach, ultimately linking the abstraction layers.
+
+## Mainnet deployment readiness
+
+Mainnet deployment requires governance approval and operational readiness beyond technical validation. The Cardano governance process involves delegated representatives and stake pool operators who need clear understanding of proposed changes, benefits, and risks. Technical validation evidence from formal methods, simulation, prototyping, and testnet operation must be communicated accessibly beyond technical documentation.
+
+Operational readiness encompasses stake pool operator testing in their environments, updated procedures and training, clearly documented upgrade procedures, updated monitoring and alerting systems, and prepared support channels. The hard fork combinator enables relatively smooth transitions, but Leios represents substantial consensus changes. Conservative timeline estimates must account for discovering and addressing unexpected issues - a normal part of the hard-fork scheduling process. The months of validation and refinement required before prudent mainnet deployment reflect the critical nature of modifications to a system holding substantial economic value and providing essential services that users depend upon.
+
 > [!WARNING]
 > TODO: more thoughts
 > - why (deltaq) modeling? quick results and continued utility in parameterization
 > - parameterization in general as a (communication) tool; see also Peras' parameterization dashboard https://github.com/tweag/cardano-peras/issues/54
 > - what's left for the hard-fork after all this? more-and-more testing / maturing, governance-related topics (new protocol parameters, hard-fork coordination)
-
-
 
 # Glossary
 
