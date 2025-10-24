@@ -691,11 +691,31 @@ Genesis (Ouroboros Genesis) enables nodes to bootstrap from the genesis block wi
 >     - mature prototypes vs. implementing changes from scratch to get release candidates
 >     - testnet as an integration point (instructions, tools, APIs)
 
+<!-- The implementation plan for Ouroboros Leios follows a structured approach to progressively validate and mature the protocol design through various software readiness levels (SRLs). Research and development (R&D) is inherently non-linear, requiring iterative exploration, validation, and refinement. Hence, we embrace guiding principles such as early validation, continuous delivery, and transparency to build confidence among developers and stakeholders, including SPOs and dReps. -->
+
+<!-- If we refer back to the identified risks and mitigation strategies, our implementation plan leverages a combination of formal methods, simulations, prototypes, and public testnets to address key uncertainties and validate critical assumptions. Different techniques serve distinct purposes in this journey: ... -->
+
+The implementation of Ouroboros Leios represents a substantial evolution of the Cardano consensus protocol, introducing high throughput as a third key property alongside the existing persistence and liveness guarantees. The path from protocol specification to production deployment requires careful validation of assumptions, progressive refinement through multiple system readiness levels, and continuous demonstration of correctness and performance characteristics. This chapter outlines the strategy for maturing the Leios protocol design through systematic application of formal methods, simulation, prototyping, and testing techniques.
+
+## Approach
+
+Research and development of distributed consensus protocols does not follow a linear waterfall process. Rather, the protocol design must be matured through various stages of validation, each building confidence in different aspects of the system. The peer-reviewed research paper provides strong theoretical guarantees under certain assumptions, but translating these guarantees into a working implementation that operates reliably on real-world infrastructure requires bridging substantial gaps. The implementation strategy must therefore balance multiple concerns: validating that core assumptions hold in practice, ensuring that refinements preserve essential properties, building developer confidence through rigorous testing, and ultimately securing acceptance from the governing bodies that must approve deployment to mainnet.
+
+The challenge is compounded by the nature of the system itself. Cardano as deployed on mainnet is a globally distributed system with hard real-time constraints operating in an adversarial environment. Failures or performance degradation cannot be tolerated, as they directly impact the economic value and security guarantees that users depend upon. This necessitates an implementation approach that validates critical properties early, maintains continuous delivery of working prototypes, and ensures transparency in both progress and limitations throughout the development process.
+
+## Principles
+
+Three [principles](https://leios.cardano-scaling.org/docs/strategy#principles) guide the implementation strategy: First, **early validation** of critical assumptions and risks enables discovery of fundamental problems as early as possible in the development cycle and reduces the likelihood for wasteful pivots and delays in delivery. Second, the implementation must progress through **continuous delivery** of increasingly capable prototypes rather than attempting to build the complete system in isolation. This allows for empirical validation at each stage and enables course corrections based on observed behavior. Third, **transparency** in both capabilities and limitations must be maintained throughout, ensuring that stakeholders including stake pool operators and delegated representatives can make informed decisions about deployment readiness.
+
+These principles are reflected in the choice of validation techniques applied at each stage. Formal methods provide the strongest guarantees of correctness but apply to abstracted models. Simulation enables exploration of protocol behavior under controlled conditions including adversarial models. Prototypes running on real infrastructure validate that theoretical performance bounds can be achieved in practice. Public testnets demonstrate end-to-end integration and allow the broader community to evaluate the system under realistic conditions.
+
 > [!WARNING]
 > TODO: more thoughts
 > - why (deltaq) modeling? quick results and continued utility in parameterization
 > - parameterization in general as a (communication) tool; see also Peras' parameterization dashboard https://github.com/tweag/cardano-peras/issues/54
 > - what's left for the hard-fork after all this? more-and-more testing / maturing, governance-related topics (new protocol parameters, hard-fork coordination)
+
+
 
 # Glossary
 
