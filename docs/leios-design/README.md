@@ -19,7 +19,7 @@ Besides collecting node-specific details in this document, we intend to contribu
 This document is a living artifact and will be updated as implementation progresses, new risks are identified, and validation results become available.
 
 | Version | Date       | Author          | Changes       |
-|---------|------------|-----------------|---------------|
+| ------- | ---------- | --------------- | ------------- |
 | 0.1     | 2025-10-15 | Sebastian Nagel | Initial draft |
 
 
@@ -697,21 +697,68 @@ Genesis (Ouroboros Genesis) enables nodes to bootstrap from the genesis block wi
 > - parameterization in general as a (communication) tool; see also Peras' parameterization dashboard https://github.com/tweag/cardano-peras/issues/54
 > - what's left for the hard-fork after all this? more-and-more testing / maturing, governance-related topics (new protocol parameters, hard-fork coordination)
 
+# Performance & Tracing
+
+## Observability as a first-class citizen
+
+By implementing evidence of code execution, a well-founded tracing system is the prime provider of observability for a system.
+This observability not only forms the base for monitoring and logging, but also performance and conformance testing.  
+
+Treating observability as a first-class citizen in Leios means:
+- to continue operating and maintaining existing simulations
+- to derive an initial set of new, Leios-specific observables from them
+- to oversee implementation of those observables in prototypes, potentially extending the set
+- to create and maintain a formal specification of those observables, which can be fed back to formal methods
+
+## Testing during development
+
+Wheras simulations operate on models and are able to falsify hypotheses or assess probability of certain outcomes, evolving
+prototypes and implementations rely on evidence to that end. We plan to provide an environment suitable for both performance and conformance testing, primarily as feedbeck for development, but also to provide transparency into the ongoing process.  
+
+This environment would be capable of:
+- automating deployment, configuration and operation of small testnets
+- supporting different prototypes or implementations, as well as mixed deployments including adversarial nodes
+- supporting customizable workloads that are submitted to the testnet
+- gathering reliable and reproducible evidence - i.e raw data - from those testnets
+- automating analysis of that evidence to obtain performance and conformance data
+- aiding in refining or validating existing simulations
+
+This requires the presence of basic observability with shared semantics of traces in all participating prototypes or implementations, as outlined in the previous section.
+
+### Micro-benchmarks
+
+On some occasions, smaller units of implementation (vs. full system integration) deserve a performance safeguard. When the necessity arises, we will assist in creating stable benchmarks that target isolated aspects of the system, and do not need a full testnet to run.
+
+## Testing a full implementation
+
+This eventual step will stop support for prototypes and instead focus on full implementations of Leios. This will allow
+for a uniform way to operate, and artificially constrain, Leios by configuration while maintainsing its performance properties.
+
+Furthermore, this phase will see custom benchmarks that can scale individual aspects of Leios independently (by config or protocol
+parameter), so that the observed change in performance metrics can be clearly correlated to a specific protocol change.
+
+## Final remarks
+
+As Leios development in all aspects is an ongoing and very much alive process, this chapter could only focus on 
+mid-to-high-level items. Depending on the progress of various protoypes and implementations, this high-level plan
+will need to be broken down and sequenced into smaller tasks. We will do so keeping in mind the result of those
+tasks should be reusable both internally, and by the community.
+
 # Glossary
 
-| Term | Definition |
-|------|------------|
-| **RB** | Ranking Block - Extended Praos block that announces and certifies EBs |
-| **EB** | Endorser Block - Additional block containing transaction references |
-| **CertRB** | Ranking Block containing a certificate |
-| **TxRB** | Ranking Block containing transactions |
-| **BLS** | Boneh-Lynn-Shacham signature scheme using elliptic curve BLS12-381 |
-| **PoP** | Proof-of-Possession - Prevents rogue key attacks in BLS aggregation |
-| **$L_\text{hdr}$** | Header diffusion period (1 slot) |
-| **$L_\text{vote}$** | Voting period (4 slots) |
-| **$L_\text{diff}$** | Certificate diffusion period (7 slots) |
-| **FFD** | Freshest-First Delivery - Network priority mechanism |
-| **ATK-LeiosProtocolBurst** | Attack where adversary withholds and releases EBs simultaneously |
+| Term                       | Definition                                                            |
+| -------------------------- | --------------------------------------------------------------------- |
+| **RB**                     | Ranking Block - Extended Praos block that announces and certifies EBs |
+| **EB**                     | Endorser Block - Additional block containing transaction references   |
+| **CertRB**                 | Ranking Block containing a certificate                                |
+| **TxRB**                   | Ranking Block containing transactions                                 |
+| **BLS**                    | Boneh-Lynn-Shacham signature scheme using elliptic curve BLS12-381    |
+| **PoP**                    | Proof-of-Possession - Prevents rogue key attacks in BLS aggregation   |
+| **$L_\text{hdr}$**         | Header diffusion period (1 slot)                                      |
+| **$L_\text{vote}$**        | Voting period (4 slots)                                               |
+| **$L_\text{diff}$**        | Certificate diffusion period (7 slots)                                |
+| **FFD**                    | Freshest-First Delivery - Network priority mechanism                  |
+| **ATK-LeiosProtocolBurst** | Attack where adversary withholds and releases EBs simultaneously      |
 
 # References
 
