@@ -698,6 +698,13 @@ Genesis (Ouroboros Genesis) enables nodes to bootstrap from the genesis block wi
 
 # Implementation plan
 
+> [!WARNING]
+> TODO: mention on-disk storage and its availability; relevant for prototyping and early testnet (chain volume)
+>
+> TODO: incorporate or at least mention interactions with Peras
+>
+> TODO: also mention Genesis (potential to only do this later once testnet available?)
+
 The implementation of Ouroboros Leios represents a substantial evolution of the Cardano consensus protocol, introducing high throughput as a third key property alongside the existing persistence and liveness guarantees. The path from protocol specification to production deployment requires careful validation of assumptions, progressive refinement through multiple system readiness levels, and continuous demonstration of correctness and performance characteristics. This chapter outlines the strategy for maturing the Leios protocol design through systematic application of formal methods, simulation, prototyping, and testing techniques.
 
 The result is an implementation plan that not only covers the ["path to active" of CIP-164](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#path-to-active), but also serves as a rationale for what concrete steps will be taken on our [product roadmap](https://leios.cardano-scaling.org/docs/roadmap/) of realizing Ouroboros Leios.
