@@ -1,7 +1,7 @@
 ---
 Title: Leios technical design and implementation plan
 Status: Draft
-Version: 0.2
+Version: 0.3
 Authors:
   - Sebastian Nagel <sebastian.nagel@iohk.io>
 ---
@@ -18,10 +18,11 @@ Besides collecting node-specific details in this document, we intend to contribu
 
 This document is a living artifact and will be updated as implementation progresses, new risks are identified, and validation results become available.
 
-| Version | Date       | Author          | Changes                 |
-|---------|------------|-----------------|-------------------------|
-| 0.2     | 2025-10-24 | Sebastian Nagel | Add implementation plan |
-| 0.1     | 2025-10-15 | Sebastian Nagel | Initial draft           |
+| Version | Date       | Author          | Changes                           |
+|---------|------------|-----------------|-----------------------------------|
+| 0.3     | 2025-10-25 | Sebastian Nagel | Add dependencies and interactions |
+| 0.2     | 2025-10-24 | Sebastian Nagel | Add implementation plan           |
+| 0.1     | 2025-10-15 | Sebastian Nagel | Initial draft                     |
 
 # Overview
 
@@ -93,6 +94,9 @@ As it was the case for the Praos variant of Ouroboros (TODO: cite shelley networ
 
 Ouroboros Leios is a significant change to the consensus protocol, but does not require fundamental changes to the overall architecture of the Cardano node. Several new components will be needed for the new responsibilities related to producing and relaying Endorser Blocks (EBs) and voting on them, as well as changes to existing components to support higher throughput and freshest-first-delivery. The following diagram illustrates the key components of a relay node where new and updated components are marked in purple:
 
+> [!WARNING]
+> TODO: Should consider adding Leios prefixes to VoteStore (to not confuse with PerasVoteDB), i.e. LeiosVoteDB?
+
 ![](./relay-leios-component-diagram.svg)
 
 > [!WARNING]
@@ -116,6 +120,9 @@ Ouroboros Leios is a significant change to the consensus protocol, but does not 
 >   - Block production: Including certificates in blocks
 >   - Chain validation: Verifying certificates in blocks
 >   - Staging area interactions?
+>
+> See also this mind map of changes as created by @nfrisby:
+[![](https://mermaid.ink/img/pako:eNqVVdtu2zAM_RVCD0MLJG0uy2XGsGFNt6FAUnRLsIchL6pFx0JsyaPktGnRfx_lwU6yZkX3Ytji5ZCHh_KjiK1CEYlcG5XLYmkAyFp_cjJFbR146dauBbElBIUbd3oaPACCXa2Q6m-AOZKWmX6QXltTHwJMkLwDbeD7BdxapdG9v6UPbZBrPvMWbpCkO3SHUFLszieXl9Paco13UJD1NrYZFJJkjh7JHZgtmzbWa7OCNW5fwqlQNlytOqg2ZJnaWGZzLz1-K5G28IufXPTH2mdRGoTPF5DpXHtXkzGxxqFxpWu32yidfgUxASzRmKmanRSlQto5MMgRIgB-WI_HLHNvSa5wP4GDNug8B2kUM5PtTIt7BzZ5ySOgBKM12fbvWIhlnDZAVT3PyZxhHiayi4MrExOTg-D0w16ZMM9KKiAhm4eC9oexIBkjAW7QePc_U_qkFLMaZ6VCVXXJCrhmyhZ2kmlOBpNUajPfmvjYBFNJan-CN6Qtac9V86sMW5FyI8odMMDz0I77h8yudFybvqJBpx1UtcKMedOsH0_SOB3YYlGj0jEbGy1do7-ztH4JnmSS7DBeLq9J-KZpcZc6cMmbr5vd2lvFGTrHejouwmoNwhwr5Xid48FGNC6FLjBjAN5JhYVPa_MX9HH6D854P2W5Sj2Uxe7ooszW4HhgnKpJQuhSdJ73iPipGGnDatgFofYpUsQtcOe0YX1unpe0VzL3cm5Zb5nDCEIEUttphUBogyQabCaVWTnkkUESzTmll-Fo16n0Jd-eSSZXDhJOz_coFCkvwoGkJ9OrZzJ-9bUmWmJFWonIU4ktkSPlMnyKx5BqKZiGHJci4leFiSwzvxRL88RhhTQ_rc3rSLLMvIgSyRS0RFlwN3ip5Yov3NpFlt6Gzam_OYOIHsW9iEbds-G7bn_YeTvqD_u9cbcltiLqjYZn425v0O8MuqPBaNx9aomHCrJzNh4NOp1Or98b9sadwWDcErwNfI_N_vyUqn8TF4WGyZ_Y0ngRdUdPvwGOCRlc?type=png)](https://mermaid.live/edit#pako:eNqVVdtu2zAM_RVCD0MLJG0uy2XGsGFNt6FAUnRLsIchL6pFx0JsyaPktGnRfx_lwU6yZkX3Ytji5ZCHh_KjiK1CEYlcG5XLYmkAyFp_cjJFbR146dauBbElBIUbd3oaPACCXa2Q6m-AOZKWmX6QXltTHwJMkLwDbeD7BdxapdG9v6UPbZBrPvMWbpCkO3SHUFLszieXl9Paco13UJD1NrYZFJJkjh7JHZgtmzbWa7OCNW5fwqlQNlytOqg2ZJnaWGZzLz1-K5G28IufXPTH2mdRGoTPF5DpXHtXkzGxxqFxpWu32yidfgUxASzRmKmanRSlQto5MMgRIgB-WI_HLHNvSa5wP4GDNug8B2kUM5PtTIt7BzZ5ySOgBKM12fbvWIhlnDZAVT3PyZxhHiayi4MrExOTg-D0w16ZMM9KKiAhm4eC9oexIBkjAW7QePc_U_qkFLMaZ6VCVXXJCrhmyhZ2kmlOBpNUajPfmvjYBFNJan-CN6Qtac9V86sMW5FyI8odMMDz0I77h8yudFybvqJBpx1UtcKMedOsH0_SOB3YYlGj0jEbGy1do7-ztH4JnmSS7DBeLq9J-KZpcZc6cMmbr5vd2lvFGTrHejouwmoNwhwr5Xid48FGNC6FLjBjAN5JhYVPa_MX9HH6D854P2W5Sj2Uxe7ooszW4HhgnKpJQuhSdJ73iPipGGnDatgFofYpUsQtcOe0YX1unpe0VzL3cm5Zb5nDCEIEUttphUBogyQabCaVWTnkkUESzTmll-Fo16n0Jd-eSSZXDhJOz_coFCkvwoGkJ9OrZzJ-9bUmWmJFWonIU4ktkSPlMnyKx5BqKZiGHJci4leFiSwzvxRL88RhhTQ_rc3rSLLMvIgSyRS0RFlwN3ip5Yov3NpFlt6Gzam_OYOIHsW9iEbds-G7bn_YeTvqD_u9cbcltiLqjYZn425v0O8MuqPBaNx9aomHCrJzNh4NOp1Or98b9sadwWDcErwNfI_N_vyUqn8TF4WGyZ_Y0ngRdUdPvwGOCRlc)
 
 > [!CAUTION]
 > FIXME: The next few sections are AI generated based on the impact analysis contents and the (pseudo-)Haskell code should be be replaced by other, similar level of detail specifications (barely scratching the code-level)
@@ -546,101 +553,88 @@ instance DSIGNAlgorithm BLS_DSIGN where
 
 ---
 
-# Dependencies and interactions
+## Client interfaces
 
 > [!WARNING]
-> TODO: Identify and explain dependencies, synergies and potential conflicts with other existing or future features of the node. Potential topics:
->
-> - On-disk storage of ledger state (UTxO-/Ledger-HD)
-> - Interactions with Genesis (catching up node)
-> - Synergies with Peras:
->   - immediate: sharing key material, same key generation, registration, rotation
->   - to research: protocol-level interactions between certified EBs and boosting blocks
-> - Impact onto Mithril
-> - Which era to target and hard-fork schedule
+> TODO: concrete discussion on how the `cardano-node` will need to change on the N2C interface, based on https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/ImpactAnalysis.md#client-interfaces
 
-> [!CAUTION]
-> FIXME: The remainder of this chapter is AI generated based on rough notes
+# Dependencies and interactions
+
+The implementation of Ouroboros Leios represents a substantial evolution of the Cardano consensus protocol that must integrate carefully with existing infrastructure and emerging features. This section examines the critical dependencies that must be satisfied before Leios deployment, identifies synergies with parallel developments, and analyzes potential conflicts that require careful coordination. The analysis informs both the implementation timeline and architectural decisions throughout the development process.
+
+## On-disk storage of ledger state
+
+> [!WARNING]
+> TODO: Add some links and references to UTxO-HD and Ledger-HD specification and status
+
+The transition from memory-based to disk-based ledger state storage represents a fundamental prerequisite for Leios deployment. This dependency stems directly from the throughput characteristics that Leios is designed to enable.
+
+At the time of writing, the latest released `cardano-node` implementation supports UTxO state storage on disk through UTxO-HD, while other parts of the ledger state including reward accounts are put on disk within the Ledger-HD initiative. The completion of this transition is essential for Leios viability, as the increased transaction volume would otherwise quickly exhaust available memory resources on realistic hardware configurations.
+
+The shift to disk-based storage fundamentally alters the resource profile of node operation. Memory requirements become more predictable and bounded, while disk I/O bandwidth and storage capacity emerge as primary constraints. Most significantly, ledger state access latency necessarily increases relative to memory-based operations, and this latency must be accounted for in the timing constraints that govern transaction validation.
+
+Early validation through comprehensive benchmarking becomes crucial to identify required optimizations in ledger state access patterns. The (re-)validation of orders of magnitude bigger transaction closures, potentially initiated by multiple concurrent threads, places particular stress on the storage subsystem, as multiple validation threads may contend for access to the same underlying state. The timing requirements for vote production - where nodes must complete endorser block validation within the $L_\text{vote}$ period - on one hand, and applying (without validation) thousands transactions during block diffusion on the other hand, impose hard constraints on acceptable access latencies.
+
+These performance characteristics must be validated empirically rather than estimated theoretically. The ledger prototyping described in the implementation plan must therefore include realistic disk-based storage configurations that mirror the expected deployment environment.
 
 ## Synergies with Peras
 
-Peras and Leios share several design elements that enable synergistic development:
+The relationship between Ouroboros Leios and Ouroboros Peras presents both opportunities for synergy and challenges requiring careful coordination. As characterized in the [Peras design](https://tweag.github.io/cardano-peras/peras-design.pdf) document, the two protocols are orthogonal in their fundamental mechanisms, Leios addressing throughput while Peras improves finality, but their concurrent development and potential deployment creates several interaction points.
 
-### Common Infrastructure
+**Resource contention and prioritization** emerges as the most immediate coordination challenge. Both protocols introduce additional network traffic that competes with existing Praos communication. The [resource management](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/ImpactAnalysis.md#resource-management) requirements for Leios - prioritizing Praos traffic above fresh Leios traffic above stale Leios traffic - must be extended to also accommodate Peras network messages. Any prioritization scheme requires careful analysis of the timing constraints for each protocol to ensure that neither compromises the other's security guarantees.
 
-**Shared Components:**
-1. **BLS Signature Scheme:**
-   - Both protocols use BLS12-381 for voting
-   - Shared cryptographic infrastructure
-   - Common key management tooling
-   - Unified audit and testing
+**Vote diffusion protocols** present a potential area for code reuse, though this opportunity comes with important caveats. The Leios implementation will initially evaluate the vote diffusion protocols [specified in CIP-164](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#leios-mini-protocols) for their resilience against protocol burst attacks and general performance characteristics. Once the Peras [object diffusion mini-protocol](https://tweag.github.io/cardano-peras/peras-design.pdf#section.2.5) becomes available, it should also be evaluated for applicability to Leios vote diffusion. However, the distinct performance requirements and timing constraints of the two protocols may ultimately demand separate implementations despite structural similarities.
 
-2. **Voting Mechanisms:**
-   - Similar sortition-based committee selection
-   - Overlapping vote diffusion requirements
-   - Potential for unified vote aggregation logic
+**Cryptographic infrastructure** offers the most promising near-term synergy. Both protocols are based on the BLS signature scheme using BLS12-381 keys, creating an opportunity for shared cryptographic infrastructure. If key material can be shared across protocols, stake pool operators would need to generate and register only one additional key pair rather than separate keys for each protocol. This shared approach would significantly simplify the bootstrapping process for whichever protocol deploys second.
 
-3. **Priority Scheduling:**
-   - Peras votes also need prioritization over Leios
-   - Shared multiplexer design: Peras > Praos > Leios
-   - Common freshest-first delivery mechanisms
+> [!WARNING]
+> TODO: Reference the respective specifications
 
-### Development Coordination
+The Peras requirement for forward secrecy may necessitate an additional mechanism, but these can be implemented independently of Leios requirements. The proof-of-possession mechanisms required for BLS aggregation are identical across both protocols, allowing for shared implementation and validation procedures.
 
-**Parallel Development Strategy:**
-```
-           Peras                      Leios
-             │                          │
-             ├─── BLS Crypto ───────────┤  (Shared)
-             │                          │
-             ├─── Voting Logic ─────────┤  (Coordinate)
-             │                          │
-             ├─── Network Priority ─────┤  (Coordinate)
-             │                          │
-        (Checkpoint                (Throughput
-         Voting)                    Scaling)
-```
+**Protocol-level interactions** between Leios certified endorser blocks and Peras boosted blocks represent a longer-term research opportunity. In principle, the vote aggregation mechanisms used for endorser block certification could potentially be leveraged for Peras boosting, creating a unified voting infrastructure. However, such integration is likely undesirable for initial deployments due to the complexity it would introduce and the dependency it would create between the two protocols. In the medium to long term, exploring these interactions could yield further improvements to both throughput and finality properties.
 
-**Integration Considerations:**
-- Leios vote production thread can be generalized for Peras votes
-- Network multiplexer handles three priority levels: Peras > Praos > Leios
-- Shared telemetry and monitoring infrastructure
+## Era and hard-fork coordination
 
-### Combined Benefits
+As already identified in the [impact analysis](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/ImpactAnalysis.md#ledger), Leios requires a new ledger era to accommodate the modified block structure and validation rules. The timing of this transition must be carefully coordinated with the broader Cardano hard-fork schedule and other planned protocol upgrades.
 
-With both Peras and Leios deployed:
-- **Faster finality** via Peras checkpointing
-- **Higher throughput** via Leios EBs
-- **Better security** through voting committee diversity
-- **Unified cryptographic framework** reduces complexity
+The currently deployed era is `Conway`, with `Dijkstra` planned as the immediate successor. Current plans for `Dijkstra` include nested transactions and potentially Peras integration. Before that, an intra-era hard fork is planned for early 2026 to enable additional features within the `Conway` era still.
 
-**Deployment Sequencing:**
-- Option A: Deploy Leios first, add Peras later (prioritizes throughput)
-- Option B: Deploy Peras first, add Leios later (prioritizes finality)
-- Option C: Joint deployment (maximum benefit, higher complexity)
+Deploying both Peras and Leios within the same hard fork is technically feasible but increases deployment risk substantially. Both protocols represent significant consensus changes that affect network communication patterns, resource utilization, and operational procedures. The complexity of coordinating these changes, validating their interactions, and managing the upgrade process across the diverse Cardano ecosystem suggests that sequential deployment provides a more conservative and manageable approach.
 
-**Recommendation:** Deploy Leios first to address economic sustainability concerns, then add Peras for faster finality. This sequencing:
-- Addresses immediate throughput bottleneck
-- Validates BLS infrastructure before Peras relies on it
-- Enables incremental complexity management
+Therefore, we suggest to target the `Euler` era for Leios deployment, with the option to advance the timeline into `Dijkstra` if the development schedule permits. This is preferrable because merging features into an era is expected to be easier than splitting an era into two during development. Consequently, targeting `Euler` also provides flexibility in addressing any unexpected technical challenges that emerge during implementation while ensuring that Leios development does not become a blocking dependency for other planned protocol upgrades.
 
 ## Interactions with Genesis
 
-Genesis (Ouroboros Genesis) enables nodes to bootstrap from the genesis block without trusted checkpoints. Leios requires the following considerations for Genesis compatibility:
+Ouroboros Genesis enables nodes to bootstrap safely from the genesis block with minimal trust assumptions. The integration of Leios with Genesis requires careful consideration of how the enhanced chain structure affects bootstrapping procedures and chain density calculations, though Genesis support is not required for initial testnet deployments.
 
-**Key Considerations:**
-- Syncing nodes must fetch both RBs and their certified EBs
-- LeiosFetch `MsgLeiosBlockRangeRequest` enables efficient batch fetching during sync
-- EB closures needed to validate chain density
-- Chain density calculations must include transactions from certified EBs (RB-only view underestimates chain quality)
-- Certified EBs must be stored permanently alongside RBs
-- Immutable storage grows at ~13TB/year at sustained 200 TxkB/s throughput
-- Uncertified EBs can be pruned after settlement window
-- Parallel fetching from multiple peers critical for sync performance
-- Genesis nodes must understand Euler era blocks and track EB certification status
-- Initial Leios deployment can use trusted snapshots; full Genesis integration follows after Leios stabilization
+> ![WARNING]
+> TODO: Chain synchronization / syncing node discussion could be moved to the respective section in the architecture/changes chapter
+
+**Chain synchronization** in general becomes more complex under Leios due to the multi-layered block structure. Syncing nodes must fetch both ranking blocks and their associated certified endorser blocks to construct a complete view of the chain. A node that downloads only ranking blocks cannot validate the chain density or reconstruct the complete ledger state, as the actual transactions content resides within closures of the endorser blocks referenced by certificates on the ranking blocks. The `LeiosFetch` mini-protocol addresses this requirement through the `MsgLeiosBlockRangeRequest` message type, enabling efficient batch fetching of complete block ranges during synchronization. This allows nodes to request not only a range of ranking blocks but also all associated endorser blocks and their transaction closures in coordinated requests. Parallel fetching from multiple peers becomes critical for synchronization performance, as the data volume substantially exceeds that of traditional Praos blocks.
+
+**Chain density calculations** must be extended to account for the transactions contained within certified endorser blocks. The security arguments underlying Genesis rely on accurate measurement of chain quality, which depends on the density of valid transactions rather than merely the presence of ranking blocks. A ranking block containing a certificate for an endorser block that references many transactions may represent significantly more chain progress than a Praos block containing transactions directly. The density calculation must therefore incorporate the transaction content from all certified endorser blocks when assessing chain quality. This requires that syncing nodes download and validate endorser block closures even during the initial bootstrapping phase, as the EB content directly affects the security decisions that Genesis bootstrapping procedures must make.
+
+**Deployment sequencing** allows for pragmatic staging of Genesis integration. Following the [approach established for Peras](https://tweag.github.io/cardano-peras/peras-design.pdf#section.4.1), Leios can also be deployed initially on public testnets without Genesis support. This reduces the initial implementation complexity and allows the core Leios functionality of achieving high-throughput consensus be validated independently of synchronization via Genesis. Ultimately though, Genesis will be essential for mainnet deployment, as we must not lose the ability to safely bootstrap with minimal trust ssumptions. Consequently, Leios+Genesis integration must be validated extensively through integration tests and on public testnets well before any mainnet release candidate is prepared.
+    
+## Impact on Mithril
+
+While Mithril operates as a separate layer above the consensus protocol and does not directly interact with Leios mechanisms, the integration requires consideration of several practical compatibility aspects.
+
+The most prominent feature of Mithril is that it serves verifable snapshots of the `cardano-node` databases. The additional data structures introduced by Leios (e.g. the EBStore) must be incorporated into the snapshots that Mithril produces and delivers to its users. Beyond that, Mithril needs to also extend its procedures for digesting and verifying the more complex chain structure including endorser blocks and their certification status.
+
+Mithril relies on a consistent view of the blockchain across all participating signers. Hence, the client APIs used by Mithril signers may require updates depending on which interfaces are utilized. While Mithril initially focused on digesting and signing the immutable database as persisted on disk, the consideration of using `LocalChainSync` for signing block ranges introduces potential interaction points with Leios induced [changes to client interface](#client-interfaces).
+
+In summary, Leios will not require fundamental changes to Mithril's architecture but requires careful attention to data completeness and consistency checks in the snapshot generation and verification processes.
 
 # Implementation plan
+
+> [!WARNING]
+> TODO: mention on-disk storage and its availability; relevant for prototyping and early testnet (chain volume)
+>
+> TODO: incorporate or at least mention interactions with Peras
+>
+> TODO: also mention Genesis (potential to only do this later once testnet available?)
 
 The implementation of Ouroboros Leios represents a substantial evolution of the Cardano consensus protocol, introducing high throughput as a third key property alongside the existing persistence and liveness guarantees. The path from protocol specification to production deployment requires careful validation of assumptions, progressive refinement through multiple system readiness levels, and continuous demonstration of correctness and performance characteristics. This chapter outlines the strategy for maturing the Leios protocol design through systematic application of formal methods, simulation, prototyping, and testing techniques.
 
