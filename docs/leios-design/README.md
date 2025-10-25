@@ -1,8 +1,8 @@
 ---
-Title: Leios technical design and implementation plan
-Status: Draft
-Version: 0.2
-Authors:
+title: Leios technical design and implementation plan
+status: Draft
+version: 0.2
+author:
   - Sebastian Nagel <sebastian.nagel@iohk.io>
 ---
 
@@ -709,7 +709,7 @@ The testnet enables multiple validation categories. Functional testing verifies 
 
 The testnet integrates ecosystem tooling: wallets handling increased throughput, block explorers understanding new structures, monitoring systems tracking Leios metrics, and stake pool operator documentation and deployment guides. Crucially, the testnet further enables empirical parameter selection (size limits, timing parameters), where simulation provides initial guidance but real-world testing with community feedback informs acceptable mainnet values.
 
-Software deployed to the public testnet progressively converges toward mainnet release candidates. Early deployments may use instrumented prototypes lacking production optimizations; later upgrades run increasingly complete and optimized implementations. Eventually, all changes as [outlined in this design document](#Architecture) must be realized in the `cardano-node` and other node implementations. This progressive refinement maintains community engagement while preserving engineering velocity. Traces from testnet nodes can still be verified against formal specifications using the trace verification approach, ultimately linking the abstraction layers.
+Software deployed to the public testnet progressively converges toward mainnet release candidates. Early deployments may use instrumented prototypes lacking production optimizations; later upgrades run increasingly complete and optimized implementations. Eventually, all changes as [outlined in this design document](#architecture) must be realized in the `cardano-node` and other node implementations. This progressive refinement maintains community engagement while preserving engineering velocity. Traces from testnet nodes can still be verified against formal specifications using the trace verification approach, ultimately linking the abstraction layers.
 
 ## Mainnet deployment readiness
 
@@ -740,6 +740,9 @@ Operational readiness encompasses stake pool operator testing in their environme
 | **ATK-LeiosProtocolBurst** | Attack where adversary withholds and releases EBs simultaneously |
 
 # References
+
+> [!WARNING]
+> TODO: Use pandoc-compatible citations https://pandoc.org/MANUAL.html#citation-syntax
 
 1. **CIP-164**: Ouroboros Linear Leios - Greater transaction throughput https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md
 
