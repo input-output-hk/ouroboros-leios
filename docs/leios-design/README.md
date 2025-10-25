@@ -1,9 +1,9 @@
 ---
-Title: Leios technical design and implementation plan
-Status: Draft
-Version: 0.3
-Authors:
+title: Leios technical design and implementation plan
+author:
   - Sebastian Nagel <sebastian.nagel@iohk.io>
+status: Draft
+version: 0.3
 ---
 
 # Introduction
@@ -121,8 +121,6 @@ Ouroboros Leios is a significant change to the consensus protocol, but does not 
 >   - Chain validation: Verifying certificates in blocks
 >   - Staging area interactions?
 >
-> See also this mind map of changes as created by @nfrisby:
-[![](https://mermaid.ink/img/pako:eNqVVdtu2zAM_RVCD0MLJG0uy2XGsGFNt6FAUnRLsIchL6pFx0JsyaPktGnRfx_lwU6yZkX3Ytji5ZCHh_KjiK1CEYlcG5XLYmkAyFp_cjJFbR146dauBbElBIUbd3oaPACCXa2Q6m-AOZKWmX6QXltTHwJMkLwDbeD7BdxapdG9v6UPbZBrPvMWbpCkO3SHUFLszieXl9Paco13UJD1NrYZFJJkjh7JHZgtmzbWa7OCNW5fwqlQNlytOqg2ZJnaWGZzLz1-K5G28IufXPTH2mdRGoTPF5DpXHtXkzGxxqFxpWu32yidfgUxASzRmKmanRSlQto5MMgRIgB-WI_HLHNvSa5wP4GDNug8B2kUM5PtTIt7BzZ5ySOgBKM12fbvWIhlnDZAVT3PyZxhHiayi4MrExOTg-D0w16ZMM9KKiAhm4eC9oexIBkjAW7QePc_U_qkFLMaZ6VCVXXJCrhmyhZ2kmlOBpNUajPfmvjYBFNJan-CN6Qtac9V86sMW5FyI8odMMDz0I77h8yudFybvqJBpx1UtcKMedOsH0_SOB3YYlGj0jEbGy1do7-ztH4JnmSS7DBeLq9J-KZpcZc6cMmbr5vd2lvFGTrHejouwmoNwhwr5Xid48FGNC6FLjBjAN5JhYVPa_MX9HH6D854P2W5Sj2Uxe7ooszW4HhgnKpJQuhSdJ73iPipGGnDatgFofYpUsQtcOe0YX1unpe0VzL3cm5Zb5nDCEIEUttphUBogyQabCaVWTnkkUESzTmll-Fo16n0Jd-eSSZXDhJOz_coFCkvwoGkJ9OrZzJ-9bUmWmJFWonIU4ktkSPlMnyKx5BqKZiGHJci4leFiSwzvxRL88RhhTQ_rc3rSLLMvIgSyRS0RFlwN3ip5Yov3NpFlt6Gzam_OYOIHsW9iEbds-G7bn_YeTvqD_u9cbcltiLqjYZn425v0O8MuqPBaNx9aomHCrJzNh4NOp1Or98b9sadwWDcErwNfI_N_vyUqn8TF4WGyZ_Y0ngRdUdPvwGOCRlc?type=png)](https://mermaid.live/edit#pako:eNqVVdtu2zAM_RVCD0MLJG0uy2XGsGFNt6FAUnRLsIchL6pFx0JsyaPktGnRfx_lwU6yZkX3Ytji5ZCHh_KjiK1CEYlcG5XLYmkAyFp_cjJFbR146dauBbElBIUbd3oaPACCXa2Q6m-AOZKWmX6QXltTHwJMkLwDbeD7BdxapdG9v6UPbZBrPvMWbpCkO3SHUFLszieXl9Paco13UJD1NrYZFJJkjh7JHZgtmzbWa7OCNW5fwqlQNlytOqg2ZJnaWGZzLz1-K5G28IufXPTH2mdRGoTPF5DpXHtXkzGxxqFxpWu32yidfgUxASzRmKmanRSlQto5MMgRIgB-WI_HLHNvSa5wP4GDNug8B2kUM5PtTIt7BzZ5ySOgBKM12fbvWIhlnDZAVT3PyZxhHiayi4MrExOTg-D0w16ZMM9KKiAhm4eC9oexIBkjAW7QePc_U_qkFLMaZ6VCVXXJCrhmyhZ2kmlOBpNUajPfmvjYBFNJan-CN6Qtac9V86sMW5FyI8odMMDz0I77h8yudFybvqJBpx1UtcKMedOsH0_SOB3YYlGj0jEbGy1do7-ztH4JnmSS7DBeLq9J-KZpcZc6cMmbr5vd2lvFGTrHejouwmoNwhwr5Xid48FGNC6FLjBjAN5JhYVPa_MX9HH6D854P2W5Sj2Uxe7ooszW4HhgnKpJQuhSdJ73iPipGGnDatgFofYpUsQtcOe0YX1unpe0VzL3cm5Zb5nDCEIEUttphUBogyQabCaVWTnkkUESzTmll-Fo16n0Jd-eSSZXDhJOz_coFCkvwoGkJ9OrZzJ-9bUmWmJFWonIU4ktkSPlMnyKx5BqKZiGHJci4leFiSwzvxRL88RhhTQ_rc3rSLLMvIgSyRS0RFlwN3ip5Yov3NpFlt6Gzam_OYOIHsW9iEbds-G7bn_YeTvqD_u9cbcltiLqjYZn425v0O8MuqPBaNx9aomHCrJzNh4NOp1Or98b9sadwWDcErwNfI_N_vyUqn8TF4WGyZ_Y0ngRdUdPvwGOCRlc)
 
 > [!CAUTION]
 > FIXME: The next few sections are AI generated based on the impact analysis contents and the (pseudo-)Haskell code should be be replaced by other, similar level of detail specifications (barely scratching the code-level)
@@ -703,7 +701,7 @@ The testnet enables multiple validation categories. Functional testing verifies 
 
 The testnet integrates ecosystem tooling: wallets handling increased throughput, block explorers understanding new structures, monitoring systems tracking Leios metrics, and stake pool operator documentation and deployment guides. Crucially, the testnet further enables empirical parameter selection (size limits, timing parameters), where simulation provides initial guidance but real-world testing with community feedback informs acceptable mainnet values.
 
-Software deployed to the public testnet progressively converges toward mainnet release candidates. Early deployments may use instrumented prototypes lacking production optimizations; later upgrades run increasingly complete and optimized implementations. Eventually, all changes as [outlined in this design document](#Architecture) must be realized in the `cardano-node` and other node implementations. This progressive refinement maintains community engagement while preserving engineering velocity. Traces from testnet nodes can still be verified against formal specifications using the trace verification approach, ultimately linking the abstraction layers.
+Software deployed to the public testnet progressively converges toward mainnet release candidates. Early deployments may use instrumented prototypes lacking production optimizations; later upgrades run increasingly complete and optimized implementations. Eventually, all changes as [outlined in this design document](#architecture) must be realized in the `cardano-node` and other node implementations. This progressive refinement maintains community engagement while preserving engineering velocity. Traces from testnet nodes can still be verified against formal specifications using the trace verification approach, ultimately linking the abstraction layers.
 
 ## Mainnet deployment readiness
 
