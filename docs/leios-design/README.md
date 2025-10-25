@@ -116,6 +116,62 @@ Ouroboros Leios is a significant change to the consensus protocol, but does not 
 >   - Block production: Including certificates in blocks
 >   - Chain validation: Verifying certificates in blocks
 >   - Staging area interactions?
+>
+> See also this mind map of changes as created by @nfrisby:
+>
+> ``` mermaid
+> mindmap
+>   root((Leios tasks, core devs))
+>     ((Ledger))
+>       Serialization
+>         Certs in RB bodies<br>- akin to Peras
+>         Cert codecs/CDDL
+>       New protocol parameters
+>       New pool voting keys<br>- akin to Peras
+>       Cert validation
+>       New LocalStateQuery queries?
+>       Tune EB limits
+>     ((Consensus---easier))
+>       Serialization
+>         New fields in RB header
+>         EB codecs/CDDL
+>         Vote codecs/CDDL
+>       Storage
+>         EBs - imm and vol
+>         Txs of EBs - imm and vol
+>         Votes - only vol
+>         Tx cache
+>       Vote validation
+>       Mempool
+>          Increase size
+>          Slurp from EBs
+>       New Tracer events
+>       New LocalStateQuery queries?
+>       Add included EBs to NodeToClient ChainSync
+>     ((Consensus---harder))
+>       Prioritize Praos threads
+>       Vote decision logic
+>       Genesis State Machine transition predicates
+>     ((Network))
+>       Prioritize Praos traffic
+>       Prioritize Praos threads
+>     ((Network&Consensus))
+>       New mini protocols
+>         Message codecs/CDDL
+>         Tune size and time limits
+>         Tune pipelining depth
+>       Fetch decision logic
+>         Caught up
+>         Bulk syncing
+>       Freshest first delivery
+>         either: conservative pipelining depths
+>         and/or else: server-side reordering
+>     ((Node))
+>       New config data    
+>       Feature flags for dev phases
+>       New CLI queries?
+>       New pool voting keys<br>- akin to Peras
+> ```
 
 > [!CAUTION]
 > FIXME: The next few sections are AI generated based on the impact analysis contents and the (pseudo-)Haskell code should be be replaced by other, similar level of detail specifications (barely scratching the code-level)
