@@ -1,7 +1,7 @@
 ---
 title: Leios technical design and implementation plan
 status: Draft
-version: 0.2
+version: 0.3
 author:
   - Sebastian Nagel <sebastian.nagel@iohk.io>
 ---
@@ -18,10 +18,11 @@ Besides collecting node-specific details in this document, we intend to contribu
 
 This document is a living artifact and will be updated as implementation progresses, new risks are identified, and validation results become available.
 
-| Version | Date       | Author          | Changes                 |
-|---------|------------|-----------------|-------------------------|
-| 0.2     | 2025-10-24 | Sebastian Nagel | Add implementation plan |
-| 0.1     | 2025-10-15 | Sebastian Nagel | Initial draft           |
+| Version | Date       | Author          | Changes                           |
+|---------|------------|-----------------|-----------------------------------|
+| 0.3     | 2025-10-25 | Sebastian Nagel | Add dependencies and interactions |
+| 0.2     | 2025-10-24 | Sebastian Nagel | Add implementation plan           |
+| 0.1     | 2025-10-15 | Sebastian Nagel | Initial draft                     |
 
 # Overview
 
