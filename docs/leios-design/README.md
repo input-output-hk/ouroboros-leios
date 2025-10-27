@@ -638,12 +638,9 @@ The relationship between Ouroboros Leios and Ouroboros Peras presents both oppor
 
 **Vote diffusion protocols** present a potential area for code reuse, though this opportunity comes with important caveats. The Leios implementation will initially evaluate the vote diffusion protocols [specified in CIP-164](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#leios-mini-protocols) for their resilience against protocol burst attacks and general performance characteristics. Once the Peras [object diffusion mini-protocol](https://tweag.github.io/cardano-peras/peras-design.pdf#section.2.5) becomes available, it should also be evaluated for applicability to Leios vote diffusion. However, the distinct performance requirements and timing constraints of the two protocols may ultimately demand separate implementations despite structural similarities.
 
-**Cryptographic infrastructure** offers the most promising near-term synergy. Both protocols are based on the BLS signature scheme using BLS12-381 keys, creating an opportunity for shared cryptographic infrastructure. If key material can be shared across protocols, stake pool operators would need to generate and register only one additional key pair rather than separate keys for each protocol. This shared approach would significantly simplify the bootstrapping process for whichever protocol deploys second.
+**Cryptographic infrastructure** offers the most promising near-term synergy. Both protocols are based on signature schemes using BLS12-381 keys, creating an opportunity for shared cryptographic infrastructure. If key material can be shared across protocols, stake pool operators would need to generate and register only one additional key pair rather than separate keys for each protocol. This shared approach would significantly simplify the bootstrapping process for whichever protocol deploys second.
 
-> [!WARNING]
-> TODO: Reference the respective specifications
-
-The Peras requirement for forward secrecy may necessitate an additional mechanism, but these can be implemented independently of Leios requirements. The proof-of-possession mechanisms required for BLS aggregation are identical across both protocols, allowing for shared implementation and validation procedures.
+The [Peras requirement](https://tweag.github.io/cardano-peras/peras-design.pdf#appendix.B) for forward secrecy may necessitate the use of [Pixel signatures](https://eprint.iacr.org/2019/514.pdf) on top of the BLS12-381 curve, in addition to BLS (as a VRF) for committee membership proofs, but this is completely independent of Leios requirements. Furthermore, the proof-of-possession mechanisms required for BLS aggregation are identical across both protocols, allowing for shared implementation and validation procedures.
 
 **Protocol-level interactions** between Leios certified endorser blocks and Peras boosted blocks represent a longer-term research opportunity. In principle, the vote aggregation mechanisms used for endorser block certification could potentially be leveraged for Peras boosting, creating a unified voting infrastructure. However, such integration is likely undesirable for initial deployments due to the complexity it would introduce and the dependency it would create between the two protocols. In the medium to long term, exploring these interactions could yield further improvements to both throughput and finality properties.
 
@@ -770,19 +767,20 @@ Operational readiness encompasses stake pool operator testing in their environme
 
 # Glossary
 
-| Term | Definition |
-|------|------------|
-| **RB** | Ranking Block - Extended Praos block that announces and certifies EBs |
-| **EB** | Endorser Block - Additional block containing transaction references |
-| **CertRB** | Ranking Block containing a certificate |
-| **TxRB** | Ranking Block containing transactions |
-| **BLS** | Boneh-Lynn-Shacham signature scheme using elliptic curve BLS12-381 |
-| **PoP** | Proof-of-Possession - Prevents rogue key attacks in BLS aggregation |
-| **$L_\text{hdr}$** | Header diffusion period (1 slot) |
-| **$L_\text{vote}$** | Voting period (4 slots) |
-| **$L_\text{diff}$** | Certificate diffusion period (7 slots) |
-| **FFD** | Freshest-First Delivery - Network priority mechanism |
-| **ATK-LeiosProtocolBurst** | Attack where adversary withholds and releases EBs simultaneously |
+| Term                       | Definition                                                            |
+|----------------------------|-----------------------------------------------------------------------|
+| **RB**                     | Ranking Block - Extended Praos block that announces and certifies EBs |
+| **EB**                     | Endorser Block - Additional block containing transaction references   |
+| **CertRB**                 | Ranking Block containing a certificate                                |
+| **TxRB**                   | Ranking Block containing transactions                                 |
+| **BLS**                    | Boneh-Lynn-Shacham signature scheme using elliptic curve cryptography |
+| **BLS12-381**              | Specific elliptic curve used in cryptography                          |
+| **PoP**                    | Proof-of-Possession - Prevents rogue key attacks in BLS aggregation   |
+| **$L_\text{hdr}$**         | Header diffusion period (1 slot)                                      |
+| **$L_\text{vote}$**        | Voting period (4 slots)                                               |
+| **$L_\text{diff}$**        | Certificate diffusion period (7 slots)                                |
+| **FFD**                    | Freshest-First Delivery - Network priority mechanism                  |
+| **ATK-LeiosProtocolBurst** | Attack where adversary withholds and releases EBs simultaneously      |
 
 # References
 
