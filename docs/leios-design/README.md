@@ -1,7 +1,7 @@
 ---
 title: Leios technical design and implementation plan
 status: Draft
-version: 0.3
+version: 0.4
 author:
   - Sebastian Nagel <sebastian.nagel@iohk.io>
 ---
@@ -14,12 +14,13 @@ This document builds on the [impact analysis](../ImpactAnalysis.md) and [early t
 
 Besides collecting node-specific details in this document, we intend to contribute implementation-independent specifications to the [cardano-blueprint](https://cardano-scaling.github.io/cardano-blueprint/) initiative and also update the CIP-164 specification through pull requests as needed.
 
-#### Document history
+**Document history**
 
 This document is a living artifact and will be updated as implementation progresses, new risks are identified, and validation results become available.
 
 | Version | Date       | Author          | Changes                           |
 |---------|------------|-----------------|-----------------------------------|
+| 0.4     | 2025-10-27 | Sebastian Nagel | Add overview chapter              |
 | 0.3     | 2025-10-25 | Sebastian Nagel | Add dependencies and interactions |
 | 0.2     | 2025-10-24 | Sebastian Nagel | Add implementation plan           |
 | 0.1     | 2025-10-15 | Sebastian Nagel | Initial draft                     |
