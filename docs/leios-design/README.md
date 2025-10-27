@@ -33,18 +33,45 @@ Ouroboros Leios is introducing _(high-)throughput_ as a third key property and i
 As it was the case for the Praos variant of Ouroboros (TODO: cite shelley network-design), the specification embodied in the published and peer-reviewed paper for Ouroboros Leios (TODO: cite leios paper) was not intended to be directly implementable. This was confirmed during initial R&D and feasibility studies, which identified several unsolved problems with the fully concurrent block production design proposed in the paper. The latest design presented in CIP-164, also known as "Linear Leios", focuses on the core idea of better utilizing resources in between the necessary "calm" periods of the Praos protocol and presents an immediately implementable design.
 
 > [!WARNING]
-> TODO: (re-)introduce the main protocol flow of Leios?
-
-> [!WARNING]
-> TODO: Notes on what could go here
-> - Node is a concurrent, reactive (real-time) system
-> - contrast real-time to not be ms-level hard real-time (control systems etc.), but as "timely" action is crucial to the success (see also network-design.pdf)
-> - today concurrency is minimal and basically transaction submission and block diffusion happening at the same time + side-topics like peer sharing
-> - only two responsibilities, but peer cardinalities make this highly concurrent (with quite some shared resources; related: https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-design/network-design.pdf#subsubsection.5.3.2)
-> - adding production and diffusion of Leios block data and votes will emphasize this further
-> - use this to specify behavior as largely independent work-flows?
-> - it is crucial that the node stays reactive and resource management across the concurrent responsibilities is crucial
-> - bounding resource usage and/or prioritizing certain tasks over others will be crucial for the system to act
+> TODO: Rewrite/expand using outline:
+>
+> - Cardano as a cryptocurrency system -> consensus protocol is essential to realize a permissionless, globally distributed ledger
+> - two key properties that blockchains provide to realize this: persistence and liveness
+> - Leios adds another one: (high-)throughput
+> 
+> - As it was for Praos, the Leios research paper was not intended to be directly implementable
+> - initial R&D and feasibility studies identified several unsolved problems with fully concurrent block production when considering the concrete Cardano ledger
+> - Hence, design proposed in CIP-164 focuses on the core idea of better utilizing resources between the (name-giving) "calm periods" of the Praos protocol -> immediately implementable already providing orders of magnitude higher throughput
+> 
+> - Summary of Leios protocol flow?
+> 
+> - The cardano node
+>     - Node is a concurrent, reactive (real-time) system, operating in an adversarial environment
+> 
+> - real-time system
+>     - contrast real-time to not be ms-level hard real-time (control systems etc.), but "timely" action is crucial to the success (see also network-design.pdf)
+>     - praos data diffusion targets, % reached within 5s (Delta): threshold 95%+, target 98%+, stretch 99%+ (https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-design/network-design.pdf#subsection.8.1)
+>     - reward calculation / epoch boundary is an example /  current situation where the deadlines are currently often missed
+>     - not inherently a hard deadline, but we must realize that the network is most vulnerable in such times -> when honest nodes are less efficient in building the longest chain
+> 
+> - concurrency
+>     - current responsibilities of a node:
+>       - basically transaction submission and block diffusion happening at the same time + side-topics like peer sharing
+>     - despite only two responsibilities, peer cardinalities (~10 upstream, ~100 downstream) make this highly concurrent (with quite some shared resources; related: https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-design/network-design.pdf#subsubsection.5.3.2)
+> 
+> - new responsibilities 
+>     - adding production and diffusion of Leios block data and votes will emphasize this further
+>         - use this to specify new node behavior as largely independent work-flows?
+>     - resource management across the concurrent responsibilities is crucial (https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/ImpactAnalysis.md#resource-management)
+> 
+> - optimize for the worst case (https://cardano-scaling.github.io/cardano-blueprint/principles/index.html#optimise-only-for-the-worst-case) 
+>     - following Hyrum's law, despite being an overlay protocol, we must acknowledge that Leios throughput will be relied upon
+>     - Leios protocol security (https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#protocol-security) is based on worst case diffusion of EBs and their transaction closures being "small enough"
+>         - small enough: difference between optimistic diffusion (which leads to a certified EB) and worst case diffusion must be bounded (by L_diff and Praos' Delta)
+> - as before with Praos, even with new information exchange requirements, the node must be resilient against denial of service and asymmetric resource attacks
+> 
+> - it is crucial that the node stays reactive and (continues) to operate in a reactive and "in-time"
+> - bounding resource usage and/or priorization across responsibilities is essential
 > - this stresses importance of non-functional requirements (per component), performance engineering and conducting benchmarks along the way
 
 # Risks and mitigations
