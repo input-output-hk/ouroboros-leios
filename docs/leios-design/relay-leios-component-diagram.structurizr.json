@@ -1,0 +1,648 @@
+{
+  "id": 1,
+  "model": {
+    "enterprise": {
+      "name": "Sebastian Nagel's landscape"
+    },
+    "people": [],
+    "softwareSystems": [
+      {
+        "description": "The whole Cardano P2P network as a system with a few key infrastructure containers.",
+        "documentation": {
+          "sections": [
+            {
+              "content": "Some information on topology and P2P (specific to cardano-node): [https://developers.cardano.org/docs/get-started/cardano-node/topology](https://developers.cardano.org/docs/get-started/cardano-node/topology)",
+              "format": "Markdown"
+            }
+          ]
+        },
+        "id": "DVxSPsgsdqVlhmVqUx3n",
+        "location": "Internal",
+        "name": "Cardano Network",
+        "relationships": [],
+        "containers": [
+          {
+            "description": "Connects to the cardano network, accepts transactions and produces blocks.",
+            "id": "xdMGCOQVA9i3F8hNqLl8",
+            "name": "Block Producer",
+            "relationships": [],
+            "components": []
+          },
+          {
+            "description": "Isolated role of a Cardano node being a downstream peer.",
+            "id": "3WbVs7xr57ifUvZUKpg4",
+            "name": "Downstream Node",
+            "relationships": [
+              {
+                "description": "Connects To",
+                "destinationId": "8FagNabdvRt5eGx7fz3W",
+                "id": "bstk3fSNv6U42VgXeP9p",
+                "interactionStyle": "Synchronous",
+                "sourceId": "3WbVs7xr57ifUvZUKpg4"
+              },
+              {
+                "description": "Requests block headers",
+                "destinationId": "tzx0lY0K9KXuvDnEw0kJ",
+                "id": "3NmQXrWyfrbrVCnB82cb",
+                "interactionStyle": "Synchronous",
+                "sourceId": "3WbVs7xr57ifUvZUKpg4"
+              },
+              {
+                "description": "Requests blocks",
+                "destinationId": "r6RQkLiEwB4gxHw6Lwn1",
+                "id": "tBxDrVKxUtUyODGQa5nE",
+                "interactionStyle": "Synchronous",
+                "sourceId": "3WbVs7xr57ifUvZUKpg4"
+              },
+              {
+                "description": "Requests peers",
+                "destinationId": "XGJmR1ZcSS7hDumvVWAV",
+                "id": "QpLRkd80kUIOfLf4JnAS",
+                "interactionStyle": "Synchronous",
+                "sourceId": "3WbVs7xr57ifUvZUKpg4"
+              }
+            ],
+            "components": []
+          },
+          {
+            "description": "Outbound + inbound components and no block forging.",
+            "id": "8FagNabdvRt5eGx7fz3W",
+            "name": "Relay",
+            "relationships": [
+              {
+                "description": "Connects to",
+                "destinationId": "ohcJKX2gLrEIfngEFzQw",
+                "id": "noiQs0rOSgvvJLHtbgMI",
+                "interactionStyle": "Synchronous",
+                "sourceId": "8FagNabdvRt5eGx7fz3W"
+              },
+              {
+                "description": "Connects To",
+                "destinationId": "3WbVs7xr57ifUvZUKpg4",
+                "id": "zg7xtnMEDKGB8bb8VxFn",
+                "interactionStyle": "Synchronous",
+                "sourceId": "8FagNabdvRt5eGx7fz3W"
+              }
+            ],
+            "url": "https://github.com/intersectmbo/cardano-node/tree/dd8fc729502476d8e974dfc5c42aab8f77aa0762/cardano-node/src/Cardano/Node/Run.hs",
+            "components": [
+              {
+                "description": "Clients that fetch blocks as determined by the block fetching decision logic.",
+                "id": "y8SaV3Sdx1w2Kx2FOVRP",
+                "name": "Block fetch clients",
+                "relationships": [
+                  {
+                    "description": "Adds block with punishment",
+                    "destinationId": "ayWS3CpGe5RwcIJavTia",
+                    "id": "cAoIzlWbbJ9sFptz3zIe",
+                    "interactionStyle": "Synchronous",
+                    "sourceId": "y8SaV3Sdx1w2Kx2FOVRP"
+                  },
+                  {
+                    "description": "Requests blocks",
+                    "destinationId": "ohcJKX2gLrEIfngEFzQw",
+                    "id": "nsYf9nXSmB9CXxFP3aey",
+                    "interactionStyle": "Synchronous",
+                    "sourceId": "y8SaV3Sdx1w2Kx2FOVRP"
+                  }
+                ],
+                "url": "https://ouroboros-network.cardano.intersectmbo.org/ouroboros-network/Ouroboros-Network-BlockFetch-Client.html"
+              },
+              {
+                "description": "Serves block of the current chain.",
+                "id": "r6RQkLiEwB4gxHw6Lwn1",
+                "name": "Block fetch servers",
+                "relationships": [
+                  {
+                    "description": "Get stream of blocks",
+                    "destinationId": "ayWS3CpGe5RwcIJavTia",
+                    "id": "2DEX7aY4NoOP4D9Uoyok",
+                    "interactionStyle": "Synchronous",
+                    "sourceId": "r6RQkLiEwB4gxHw6Lwn1"
+                  }
+                ],
+                "url": "https://ouroboros-consensus.cardano.intersectmbo.org/haddocks/ouroboros-consensus/Ouroboros-Consensus-MiniProtocol-BlockFetch-Server.html"
+              },
+              {
+                "description": "Fetches blocks continuously by scheduling fetch requests across multiple N2N block fetch clients.",
+                "id": "jazbab7eAF8TIRdsHctS",
+                "name": "Block fetching",
+                "relationships": [
+                  {
+                    "description": "Gets candidates",
+                    "destinationId": "EFYoz6hCZ7dA7f3w6OUM",
+                    "id": "chjqfPNk6ffP42iEohBj",
+                    "interactionStyle": "Synchronous",
+                    "sourceId": "jazbab7eAF8TIRdsHctS"
+                  },
+                  {
+                    "description": "Gets current chain",
+                    "destinationId": "ayWS3CpGe5RwcIJavTia",
+                    "id": "Fp7C3Pe2rDLgybp4MvKr",
+                    "interactionStyle": "Synchronous",
+                    "sourceId": "jazbab7eAF8TIRdsHctS"
+                  },
+                  {
+                    "description": "Schedules fetch requests",
+                    "destinationId": "y8SaV3Sdx1w2Kx2FOVRP",
+                    "id": "Owvdd16DgHfSAWu5D75I",
+                    "interactionStyle": "Synchronous",
+                    "sourceId": "jazbab7eAF8TIRdsHctS"
+                  }
+                ],
+                "url": "https://ouroboros-network.cardano.intersectmbo.org/ouroboros-network/Ouroboros-Network-BlockFetch.html"
+              },
+              {
+                "id": "J4ZEw4Iqx6NZTksp8Rug",
+                "name": "Candidate chains",
+                "relationships": []
+              },
+              {
+                "description": "Stores immutable, volatile and ledger state, but also runs chain selection.",
+                "id": "ayWS3CpGe5RwcIJavTia",
+                "name": "Chain DB",
+                "relationships": [
+                  {
+                    "description": "Validates blocks using",
+                    "destinationId": "Sy0ZXae83F3CpDhLD7Ug",
+                    "id": "QEeas7jasbfLMeaU1TYA",
+                    "interactionStyle": "Synchronous",
+                    "sourceId": "ayWS3CpGe5RwcIJavTia"
+                  }
+                ]
+              },
+              {
+                "description": "Clients that share state to find chain candidates by following the chain of peers",
+                "documentation": {
+                  "sections": [
+                    {
+                      "content": "Also watches for invalid blocks (headers)",
+                      "format": "Markdown"
+                    }
+                  ]
+                },
+                "id": "EFYoz6hCZ7dA7f3w6OUM",
+                "name": "Chain sync clients",
+                "relationships": [
+                  {
+                    "description": "Gets current chain and block header history",
+                    "destinationId": "ayWS3CpGe5RwcIJavTia",
+                    "id": "bmNXgbwgtJEl6DPGWItn",
+                    "interactionStyle": "Synchronous",
+                    "sourceId": "EFYoz6hCZ7dA7f3w6OUM"
+                  },
+                  {
+                    "description": "Requests block headers",
+                    "destinationId": "ohcJKX2gLrEIfngEFzQw",
+                    "id": "VxKsuYQ5w2198gUaogux",
+                    "interactionStyle": "Synchronous",
+                    "sourceId": "EFYoz6hCZ7dA7f3w6OUM"
+                  }
+                ],
+                "url": "https://ouroboros-consensus.cardano.intersectmbo.org/haddocks/ouroboros-consensus/Ouroboros-Consensus-MiniProtocol-ChainSync-Client.html"
+              },
+              {
+                "description": "Serves block headers of the tentative chain statefully through RollForward and RollBackward instructions.",
+                "id": "tzx0lY0K9KXuvDnEw0kJ",
+                "name": "Chain sync servers",
+                "relationships": [
+                  {
+                    "description": "Gets current tip",
+                    "destinationId": "ayWS3CpGe5RwcIJavTia",
+                    "id": "0Q1h6cXilKPkcfHuD611",
+                    "interactionStyle": "Synchronous",
+                    "sourceId": "tzx0lY0K9KXuvDnEw0kJ"
+                  },
+                  {
+                    "description": "Regisers follower, gets current tip and follower instructions",
+                    "destinationId": "ayWS3CpGe5RwcIJavTia",
+                    "id": "0cW4CbmS7JjnQtJEdi7c",
+                    "interactionStyle": "Synchronous",
+                    "sourceId": "tzx0lY0K9KXuvDnEw0kJ"
+                  },
+                  {
+                    "description": "Registers new follower",
+                    "destinationId": "ayWS3CpGe5RwcIJavTia",
+                    "id": "o2oBx8441oTJoWTszYzc",
+                    "interactionStyle": "Synchronous",
+                    "sourceId": "tzx0lY0K9KXuvDnEw0kJ"
+                  }
+                ],
+                "url": "https://ouroboros-consensus.cardano.intersectmbo.org/haddocks/ouroboros-consensus/Ouroboros-Consensus-MiniProtocol-ChainSync-Server.html"
+              },
+              {
+                "description": "Pools connections such that they can be re-used for protocol initiation by running handshake protocol",
+                "id": "RrTcN3yLZQ0T42VkSdC7",
+                "name": "Connection manager",
+                "relationships": [
+                  {
+                    "description": "Starts one per connection",
+                    "destinationId": "0fVeMht7VD1YW50boGqP",
+                    "id": "SIZsULCAbGWhKkE45FGU",
+                    "interactionStyle": "Synchronous",
+                    "sourceId": "RrTcN3yLZQ0T42VkSdC7"
+                  }
+                ],
+                "url": "https://ouroboros-network.cardano.intersectmbo.org/ouroboros-network-framework/Ouroboros-Network-ConnectionManager-Types.html"
+              },
+              {
+                "id": "3ZjJWrOd4BFzr6UswjzM",
+                "name": "Consensus",
+                "relationships": []
+              },
+              {
+                "id": "h3RlmAPTGfBVrVrNyvwA",
+                "name": "Immutable DB",
+                "relationships": []
+              },
+              {
+                "description": "Validates blocks & transactions and evolves a given ledger state.",
+                "id": "Sy0ZXae83F3CpDhLD7Ug",
+                "name": "Ledger",
+                "relationships": []
+              },
+              {
+                "description": "Keeps valid transactions up to some capacity. A sync thread will re-validate transactions on ledger state changes.",
+                "id": "iISTq038AWRJGcHZuZvh",
+                "name": "Mempool",
+                "relationships": [
+                  {
+                    "description": "Applies mempool diffs",
+                    "destinationId": "Sy0ZXae83F3CpDhLD7Ug",
+                    "id": "MWn5Tvqz2XnMSR8L1baB",
+                    "interactionStyle": "Synchronous",
+                    "sourceId": "iISTq038AWRJGcHZuZvh"
+                  },
+                  {
+                    "description": "Applies transactions using",
+                    "destinationId": "Sy0ZXae83F3CpDhLD7Ug",
+                    "id": "TUKDmUlOUxN36Ewx57cj",
+                    "interactionStyle": "Synchronous",
+                    "sourceId": "iISTq038AWRJGcHZuZvh"
+                  },
+                  {
+                    "description": "Gets tip and ledger state",
+                    "destinationId": "ayWS3CpGe5RwcIJavTia",
+                    "id": "6rxxQqac03G5nh3QeXtv",
+                    "interactionStyle": "Synchronous",
+                    "sourceId": "iISTq038AWRJGcHZuZvh"
+                  },
+                  {
+                    "description": "Re-applies transactions using",
+                    "destinationId": "Sy0ZXae83F3CpDhLD7Ug",
+                    "id": "hY07fuAqNUwcSOwBj08U",
+                    "interactionStyle": "Synchronous",
+                    "sourceId": "iISTq038AWRJGcHZuZvh"
+                  }
+                ],
+                "url": "https://ouroboros-consensus.cardano.intersectmbo.org/haddocks/ouroboros-consensus/Ouroboros-Consensus-Mempool-API.html"
+              },
+              {
+                "description": "Multiplexes mini-protocols over one bearer in Initiator, Responder or InitiatorAndResponder mode.",
+                "id": "0fVeMht7VD1YW50boGqP",
+                "name": "Mux",
+                "relationships": [
+                  {
+                    "description": "Runs",
+                    "destinationId": "czzINgGe9Ca7MmLBHiwz",
+                    "id": "HgOF9PQE3mZ4dF2FdwUj",
+                    "interactionStyle": "Synchronous",
+                    "sourceId": "0fVeMht7VD1YW50boGqP"
+                  },
+                  {
+                    "description": "Runs",
+                    "destinationId": "dFyinaNx7efXrjUt2HoF",
+                    "id": "d49FwYiHv0XHKVgcQlal",
+                    "interactionStyle": "Synchronous",
+                    "sourceId": "0fVeMht7VD1YW50boGqP"
+                  }
+                ],
+                "url": "https://ouroboros-network.cardano.intersectmbo.org/network-mux/Network-Mux.html"
+              },
+              {
+                "id": "xuHwoJLiozcLrg0USqXR",
+                "name": "N2C Chain sync server",
+                "relationships": []
+              },
+              {
+                "id": "rR4uk2hxqj9ScQOdzsdQ",
+                "name": "N2C Tx submission server",
+                "relationships": []
+              },
+              {
+                "id": "DqZrDJlXT31f8BdXhXkB",
+                "name": "Node kernel",
+                "relationships": []
+              },
+              {
+                "description": "Establishes and manages outbound peer connections; a.k.a outbound governor.",
+                "id": "2GVjNOnyqUvHs0u5d57s",
+                "name": "Peer selection",
+                "relationships": [
+                  {
+                    "description": "Establishes, monitors and closes connections",
+                    "destinationId": "RrTcN3yLZQ0T42VkSdC7",
+                    "id": "e7QQyHpIYNMfRBt7bEnB",
+                    "interactionStyle": "Synchronous",
+                    "sourceId": "2GVjNOnyqUvHs0u5d57s"
+                  },
+                  {
+                    "description": "Request peers",
+                    "destinationId": "ACGDdEPs0wHG1AswXwih",
+                    "id": "27ltYqkzvqkJJYl9QiZr",
+                    "interactionStyle": "Synchronous",
+                    "sourceId": "2GVjNOnyqUvHs0u5d57s"
+                  }
+                ],
+                "url": "https://ouroboros-network.cardano.intersectmbo.org/ouroboros-network/Ouroboros-Network-PeerSelection-Governor.html"
+              },
+              {
+                "description": "Can ask a peer for a sample of known peers.",
+                "id": "ACGDdEPs0wHG1AswXwih",
+                "name": "Peer sharing clients",
+                "relationships": [
+                  {
+                    "description": "Requests peers",
+                    "destinationId": "ohcJKX2gLrEIfngEFzQw",
+                    "id": "EYDxBPEo6VcOxDGkzvj9",
+                    "interactionStyle": "Synchronous",
+                    "sourceId": "ACGDdEPs0wHG1AswXwih"
+                  }
+                ],
+                "url": "https://ouroboros-network.cardano.intersectmbo.org/ouroboros-network/Ouroboros-Network-PeerSharing.html"
+              },
+              {
+                "description": "Serves a random subset of known peers.",
+                "id": "XGJmR1ZcSS7hDumvVWAV",
+                "name": "Peer sharing servers",
+                "relationships": [
+                  {
+                    "description": "Accesses peer selection state",
+                    "destinationId": "2GVjNOnyqUvHs0u5d57s",
+                    "id": "2qXfLLZYpjK4qhih4Ruy",
+                    "interactionStyle": "Synchronous",
+                    "sourceId": "XGJmR1ZcSS7hDumvVWAV"
+                  }
+                ],
+                "url": "https://ouroboros-network.cardano.intersectmbo.org/ouroboros-network/Ouroboros-Network-PeerSharing.html"
+              },
+              {
+                "description": "Runs inbound governor and accept loop(s) to respond to protocol initiation requests.",
+                "id": "8vI81YaFoHl86zXTW1pE",
+                "name": "Server",
+                "relationships": [
+                  {
+                    "description": "Gets # of connections and adds new ones",
+                    "destinationId": "RrTcN3yLZQ0T42VkSdC7",
+                    "id": "UKwQTB8HievZoKP8wKCH",
+                    "interactionStyle": "Synchronous",
+                    "sourceId": "8vI81YaFoHl86zXTW1pE"
+                  },
+                  {
+                    "description": "Promotes, demotes and releases connections",
+                    "destinationId": "RrTcN3yLZQ0T42VkSdC7",
+                    "id": "X1AHAuESmkzTgPlHJkcJ",
+                    "interactionStyle": "Synchronous",
+                    "sourceId": "8vI81YaFoHl86zXTW1pE"
+                  }
+                ],
+                "url": "https://ouroboros-network.cardano.intersectmbo.org/ouroboros-network-framework/Ouroboros-Network-Server.html"
+              },
+              {
+                "description": "Serves transactions by keeping state for each peer and delivers indexed txs from a mempool snapshot.",
+                "id": "0OZMOOyLNG8ZQkWrO4Ly",
+                "name": "Tx submission clients",
+                "relationships": [
+                  {
+                    "description": "Gets snapshot",
+                    "destinationId": "iISTq038AWRJGcHZuZvh",
+                    "id": "tj5dyRPXbWfszgJnQrjJ",
+                    "interactionStyle": "Synchronous",
+                    "sourceId": "0OZMOOyLNG8ZQkWrO4Ly"
+                  }
+                ],
+                "url": "https://ouroboros-network.cardano.intersectmbo.org/ouroboros-network/Ouroboros-Network-TxSubmission-Outbound.html"
+              },
+              {
+                "description": "Request new transactions and fetches missing ones.",
+                "id": "RyV50cJoKAPfr5CAG5uC",
+                "name": "Tx submission servers",
+                "relationships": [
+                  {
+                    "description": "Adds transactions",
+                    "destinationId": "iISTq038AWRJGcHZuZvh",
+                    "id": "7Bx2SIlr8uu8I6riZBWq",
+                    "interactionStyle": "Synchronous",
+                    "sourceId": "RyV50cJoKAPfr5CAG5uC"
+                  },
+                  {
+                    "description": "Gets snapshot",
+                    "destinationId": "iISTq038AWRJGcHZuZvh",
+                    "id": "TiBFakhWKMBrnkJgWBP8",
+                    "interactionStyle": "Synchronous",
+                    "sourceId": "RyV50cJoKAPfr5CAG5uC"
+                  },
+                  {
+                    "description": "Requests transactions",
+                    "destinationId": "3WbVs7xr57ifUvZUKpg4",
+                    "id": "U7AxjCSPys2cCY5eMTqr",
+                    "interactionStyle": "Synchronous",
+                    "sourceId": "RyV50cJoKAPfr5CAG5uC"
+                  }
+                ],
+                "url": "https://ouroboros-network.cardano.intersectmbo.org/ouroboros-network/Ouroboros-Network-TxSubmission-Inbound.html"
+              }
+            ]
+          },
+          {
+            "description": "Isolated role of a Cardano node being an upstream peer.",
+            "id": "ohcJKX2gLrEIfngEFzQw",
+            "name": "Upstream Node",
+            "relationships": [
+              {
+                "description": "Requests transactions",
+                "destinationId": "0OZMOOyLNG8ZQkWrO4Ly",
+                "id": "3FQvNuobjt5DfjdvH76L",
+                "interactionStyle": "Synchronous",
+                "sourceId": "ohcJKX2gLrEIfngEFzQw"
+              }
+            ],
+            "components": []
+          }
+        ]
+      }
+    ]
+  },
+  "name": "Sebastian Nagel's landscape",
+  "views": {
+    "componentViews": [
+      {
+        "automaticLayout": {
+          "implementation": "Dagre"
+        },
+        "containerId": "8FagNabdvRt5eGx7fz3W",
+        "elements": [
+          {
+            "id": "8FagNabdvRt5eGx7fz3W"
+          },
+          {
+            "id": "xdMGCOQVA9i3F8hNqLl8"
+          },
+          {
+            "id": "ohcJKX2gLrEIfngEFzQw"
+          },
+          {
+            "id": "3WbVs7xr57ifUvZUKpg4"
+          },
+          {
+            "id": "iISTq038AWRJGcHZuZvh"
+          },
+          {
+            "id": "RyV50cJoKAPfr5CAG5uC"
+          },
+          {
+            "id": "0OZMOOyLNG8ZQkWrO4Ly"
+          },
+          {
+            "id": "EFYoz6hCZ7dA7f3w6OUM"
+          },
+          {
+            "id": "tzx0lY0K9KXuvDnEw0kJ"
+          },
+          {
+            "id": "ayWS3CpGe5RwcIJavTia"
+          },
+          {
+            "id": "y8SaV3Sdx1w2Kx2FOVRP"
+          },
+          {
+            "id": "r6RQkLiEwB4gxHw6Lwn1"
+          },
+          {
+            "id": "Sy0ZXae83F3CpDhLD7Ug"
+          },
+          {
+            "id": "RrTcN3yLZQ0T42VkSdC7"
+          },
+          {
+            "id": "2GVjNOnyqUvHs0u5d57s"
+          },
+          {
+            "id": "8vI81YaFoHl86zXTW1pE"
+          },
+          {
+            "id": "0fVeMht7VD1YW50boGqP"
+          },
+          {
+            "id": "ACGDdEPs0wHG1AswXwih"
+          },
+          {
+            "id": "jazbab7eAF8TIRdsHctS"
+          },
+          {
+            "id": "XGJmR1ZcSS7hDumvVWAV"
+          }
+        ],
+        "key": "MVpPbAfizl",
+        "relationships": [
+          {
+            "id": "noiQs0rOSgvvJLHtbgMI"
+          },
+          {
+            "id": "bstk3fSNv6U42VgXeP9p"
+          },
+          {
+            "id": "X1AHAuESmkzTgPlHJkcJ"
+          },
+          {
+            "id": "e7QQyHpIYNMfRBt7bEnB"
+          },
+          {
+            "id": "HgOF9PQE3mZ4dF2FdwUj"
+          },
+          {
+            "id": "d49FwYiHv0XHKVgcQlal"
+          },
+          {
+            "id": "SIZsULCAbGWhKkE45FGU"
+          },
+          {
+            "id": "3FQvNuobjt5DfjdvH76L"
+          },
+          {
+            "id": "tj5dyRPXbWfszgJnQrjJ"
+          },
+          {
+            "id": "7Bx2SIlr8uu8I6riZBWq"
+          },
+          {
+            "id": "TiBFakhWKMBrnkJgWBP8"
+          },
+          {
+            "id": "U7AxjCSPys2cCY5eMTqr"
+          },
+          {
+            "id": "EYDxBPEo6VcOxDGkzvj9"
+          },
+          {
+            "id": "27ltYqkzvqkJJYl9QiZr"
+          },
+          {
+            "id": "2qXfLLZYpjK4qhih4Ruy"
+          },
+          {
+            "id": "QpLRkd80kUIOfLf4JnAS"
+          },
+          {
+            "id": "chjqfPNk6ffP42iEohBj"
+          },
+          {
+            "id": "bmNXgbwgtJEl6DPGWItn"
+          },
+          {
+            "id": "Owvdd16DgHfSAWu5D75I"
+          },
+          {
+            "id": "cAoIzlWbbJ9sFptz3zIe"
+          },
+          {
+            "id": "QEeas7jasbfLMeaU1TYA"
+          },
+          {
+            "id": "Fp7C3Pe2rDLgybp4MvKr"
+          },
+          {
+            "id": "0cW4CbmS7JjnQtJEdi7c"
+          },
+          {
+            "id": "hY07fuAqNUwcSOwBj08U"
+          },
+          {
+            "id": "2DEX7aY4NoOP4D9Uoyok"
+          },
+          {
+            "id": "nsYf9nXSmB9CXxFP3aey"
+          },
+          {
+            "id": "VxKsuYQ5w2198gUaogux"
+          },
+          {
+            "id": "tBxDrVKxUtUyODGQa5nE"
+          },
+          {
+            "id": "3NmQXrWyfrbrVCnB82cb"
+          },
+          {
+            "id": "TUKDmUlOUxN36Ewx57cj"
+          },
+          {
+            "id": "6rxxQqac03G5nh3QeXtv"
+          }
+        ],
+        "title": "Relay Component Diagram"
+      }
+    ],
+    "containerViews": [],
+    "systemLandscapeViews": []
+  }
+}
