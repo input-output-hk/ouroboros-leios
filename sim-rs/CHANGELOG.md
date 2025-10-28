@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Linear Leios
+
+- Add bounded mempools. Configure them with by setting `leios-mempool-size-bytes`. Incoming transactions which don't fit in the mempool will be queued for inclusion in the mempool when there is space. Transactions referenced by an EB which are not yet in the mempool will still be forwarded to peers.
+
+### Other
+
+- Update dependencies
+
 ## v1.3.1
 
 ### Linear Leios
