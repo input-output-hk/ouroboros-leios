@@ -8,7 +8,7 @@
 
 ### Other
 
-- Update dependencies
+- Fix warnings from new rust version
 
 ## v1.3.1
 
