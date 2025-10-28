@@ -1559,7 +1559,7 @@ impl Mempool {
     }
     fn try_insert(&mut self, tx: Arc<Transaction>) -> bool {
         let new_bytes = self.mempool_size_bytes + tx.bytes;
-        if self.mempool_count < self.queue.len() && new_bytes > self.max_size_bytes {
+        if self.mempool_count < self.queue.len() || new_bytes > self.max_size_bytes {
             // mempool is or would be full, just put this at the end and Be Done
             let id = self.new_id();
             self.queue.insert(id, tx);
@@ -1678,5 +1678,55 @@ impl Mempool {
         let id = self.next_id;
         self.next_id += 1;
         id
+    }
+}
+
+#[cfg(test)]
+mod mempool_tests {
+    use std::sync::Arc;
+
+    use crate::model::{Transaction, TransactionId};
+
+    use super::Mempool;
+
+    struct TxFactory {
+        next_id: u64,
+    }
+    impl TxFactory {
+        fn new() -> Self {
+            Self { next_id: 0 }
+        }
+        fn tx(&mut self, bytes: u64) -> Arc<Transaction> {
+            let id = self.next_id;
+            self.next_id += 1;
+            Arc::new(Transaction {
+                id: TransactionId::new(id),
+                shard: 0,
+                bytes,
+                input_id: id,
+                overcollateralization_factor: 0,
+            })
+        }
+        fn txs<const N: usize>(&mut self, bytes: [u64; N]) -> [Arc<Transaction>; N] {
+            bytes.map(|b| self.tx(b))
+        }
+    }
+
+    #[test]
+    fn should_fill_as_space_is_available() {
+        let mut txs = TxFactory::new();
+        let [tx1, tx2, tx3] = txs.txs([5, 5, 5]);
+        let mut mempool = Mempool::new(10);
+        assert!(mempool.try_insert(tx1.clone()));
+        assert!(mempool.try_insert(tx2.clone()));
+
+        // new TX doesn't fit
+        assert!(!mempool.try_insert(tx3.clone()));
+        assert_eq!(mempool.ids().collect::<Vec<_>>(), vec![tx1.id, tx2.id]);
+
+        // until we remove a TX, and suddenly it does
+        let added = mempool.remove_txs([tx2.id]);
+        assert_eq!(added, vec![tx3.id]);
+        assert_eq!(mempool.ids().collect::<Vec<_>>(), vec![tx1.id, tx3.id]);
     }
 }
