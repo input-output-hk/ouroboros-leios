@@ -186,7 +186,7 @@ Operational readiness encompasses stake pool operator testing in their environme
 
 # Dependencies and interactions
 
-The implementation of Ouroboros Leios represents a substantial evolution of the Cardano consensus protocol that must integrate carefully with existing infrastructure and emerging features. This section examines the critical dependencies that must be satisfied before Leios deployment, identifies synergies with parallel developments, and analyzes potential conflicts that require careful coordination. The analysis informs both the implementation timeline and architectural decisions throughout the development process.
+The changes necessary to realizing Leios must integrate carefully with existing infrastructure and emerging features. This section examines the critical dependencies that must be satisfied before Leios deployment, identifies synergies with parallel developments, and analyzes potential conflicts that require careful coordination. The analysis informs both the implementation timeline and architectural decisions throughout the development process.
 
 ## On-disk storage of ledger state
 
