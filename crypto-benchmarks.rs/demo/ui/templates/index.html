@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Leios Voting Demo</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script defer src="{{ url_for('static', filename='app.js') }}"></script>
+</head>
+
+<body>
+    <header class="app-header">
+        <h1 class="app-title">Leios Voting Demo</h1>
+        <form id="run-form" class="app-header__form">
+            <label for="run-input">Run directory:</label>
+            <input id="run-input" name="run" type="text" placeholder="e.g., run64" />
+            <button type="submit">Load</button>
+        </form>
+        <div id="demo_meta" class="app-meta" hidden>
+            <span class="app-meta__line">
+                <strong>Environment:</strong>
+                <span id="machine_summary">—</span>
+            </span>
+        </div>
+    </header>
+
+    <main>
+        <!-- 0) Universe -->
+        <section class="card" id="universe">
+            <h2 class="card-title center">Set of SPOs</h2>
+
+            <div class="grid two wide-left">
+                <div class="stat-group">
+                    <div class="stat">
+                        <span class="stat-label">Total pools:</span>
+                        <span id="universe_total" class="stat-value">—</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Total stake:</span>
+                        <span id="universe_stake" class="stat-value mono">—</span>
+                    </div>
+                </div>
+                <div>
+                    <!-- Container where app.js will render a 10×20-ish grid of circles -->
+                    <div id="universe_canvas" class="universe-canvas" role="img" aria-label="Entire set of SPOs grid">
+                        <div id="universe_tooltip" class="tooltip" hidden></div>
+                    </div>
+                    <noscript>Please enable JavaScript to view the SPO visualization.</noscript>
+                </div>
+            </div>
+        </section>
+        <div id="error_banner" class="banner error" hidden>
+            <strong>Backend error:</strong>
+            <span id="error_text">—</span>
+        </div>
+        <div class="flow-step" id="step_committee">
+            <button type="button" class="flow-button" id="btn_step_committee" data-reveal-target="committee"
+                data-reveal-next="step_election">
+                Select Committee for a given Epoch
+            </button>
+        </div>
+        <!-- B) Committee (this election) -->
+        <section class="card is-hidden" id="committee">
+            <h2 class="card-title center">Committee</h2>
+            <p class="card-subtitle center">Persistent seats are selected for this epoch via Fait Accompli</p>
+            <p class="card-subtitle center">Non-persistent seats are empty because no EB hash is available to determine
+                eligibility on</p>
+
+            <div class="grid two wide-left">
+                <div class="stat-group">
+                    <div class="stat">
+                        <span class="stat-label">Total seats:</span>
+                        <span id="committee_total" class="stat-value">—</span>
+                    </div>
+                    <div class="stat stat--indent">
+                        <span class="stat-label text-green">Persistent seats:</span>
+                        <span id="committee_persistent" class="stat-value text-green">—</span>
+                    </div>
+                    <div class="stat stat--indent">
+                        <span class="stat-label text-blue">Non-persistent seats:</span>
+                        <span id="committee_nonpersistent" class="stat-value text-blue">—</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label text-timing">Selection time:</span>
+                        <span id="committee_timing" class="stat-value text-timing">—</span>
+                    </div>
+                </div>
+                <div id="committee_canvas" class="committee-canvas" role="img" aria-label="Committee members grid">
+                    <div id="committee_tooltip" class="tooltip" hidden></div>
+                </div>
+                <noscript>Please enable JavaScript to view the committee visualization.</noscript>
+            </div>
+        </section>
+        <div class="flow-step is-hidden" id="step_election">
+            <button type="button" class="flow-button" id="btn_step_election" data-reveal-target="identifiers"
+                data-reveal-next="step_voting">
+                Start Election for a given EB
+            </button>
+        </div>
+        <!-- A) Election identifiers -->
+        <section class="card is-hidden" id="identifiers">
+            <h2 class="card-title center">Election</h2>
+            <div class="identifiers-row">
+                <div class="eid-block">
+                    <strong>EID:</strong>
+                    <span id="eid" class="text-wrap"></span>
+                </div>
+                <div class="eb-block">
+                    <strong>EB hash:</strong>
+                    <span id="eb" class="text-wrap"></span>
+                </div>
+            </div>
+        </section>
+        <div class="flow-step is-hidden" id="step_voting">
+            <button type="button" class="flow-button" id="btn_step_voting" data-reveal-target="voters"
+                data-reveal-next="step_aggregation">
+                Cast Votes
+            </button>
+        </div>
+        <!-- C) Voters (observed votes) -->
+        <section class="card is-hidden" id="voters">
+            <h2 class="card-title center">Voting</h2>
+
+            <div class="grid two wide-left">
+                <div class="stat-group">
+                    <div class="stat">
+                        <span class="stat-label">Quorum:</span>
+                        <span id="voters_quorum" class="stat-value">—</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Total voters:</span>
+                        <span id="voters_total" class="stat-value">—</span>
+                    </div>
+                    <div class="stat stat--indent">
+                        <span class="stat-label text-green">Persistent:</span>
+                        <span id="voters_persistent" class="stat-value text-green">—</span>
+                    </div>
+                    <div class="stat stat--indent">
+                        <span class="stat-label text-blue">Non-persistent:</span>
+                        <span id="voters_nonpersistent" class="stat-value text-blue">—</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label text-timing">Voting time:</span>
+                        <span id="voting_timing" class="stat-value text-timing">—</span>
+                    </div>
+                    <div class="stat stat--indent">
+                        <span class="stat-label text-timing">Avg per vote:</span>
+                        <span id="voting_timing_avg" class="stat-value text-timing">—</span>
+                    </div>
+                </div>
+                <div>
+                    <!-- Container where app.js will render the voters grid -->
+                    <div id="voters_canvas" class="universe-canvas" role="img" aria-label="Voters grid">
+                        <div id="voters_tooltip" class="tooltip" hidden></div>
+                    </div>
+                    <noscript>Please enable JavaScript to view the voters visualization.</noscript>
+                </div>
+            </div>
+        </section>
+        <div class="flow-step is-hidden" id="step_aggregation">
+            <button type="button" class="flow-button" id="btn_step_aggregation" data-reveal-target="aggregation">
+                Aggregate Votes
+            </button>
+        </div>
+        <!-- D) Aggregation -->
+        <section class="card is-hidden" id="aggregation">
+            <h2 class="card-title center">Votes Aggregation</h2>
+            <div class="grid two wide-left">
+                <div class="stat-group">
+                    <div class="stat">
+                        <span class="stat-label">Votes size:</span>
+                        <span id="agg_votes_size" class="stat-value">—</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Certificate size:</span>
+                        <span id="agg_cert_size" class="stat-value">—</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Compression gain:</span>
+                        <span id="agg_gain" class="stat-value text-yellow">—</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label text-timing">Aggregation time:</span>
+                        <span id="agg_timing" class="stat-value text-timing">—</span>
+                    </div>
+                </div>
+                <div>
+                    <div id="aggregation_canvas" class="aggregation-canvas" role="img"
+                        aria-label="Aggregation pipeline"></div>
+                </div>
+            </div>
+        </section>
+
+        <div class="flow-step is-hidden" id="step_verification">
+            <button type="button" class="flow-button" id="btn_step_verification" data-reveal-target="verification">
+                Verify Certificate
+            </button>
+        </div>
+
+        <section class="card is-hidden" id="verification">
+            <h2 class="card-title center">Certificate Verification</h2>
+            <div class="grid two wide-left">
+                <div class="stat-group verification-stats">
+                    <div class="stat">
+                        <span class="stat-label">Result:</span>
+                        <span id="verify_status" class="stat-value">—</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label text-timing">Verification time:</span>
+                        <span id="verify_time" class="stat-value text-timing">—</span>
+                    </div>
+                </div>
+                <div class="verification-visual">
+                    <div id="verification_cert" class="certificate-rect verification-cert">Certificate</div>
+                    <span class="big-arrow">⇒</span>
+                    <div class="verification-stage">Verify</div>
+                    <span class="big-arrow">⇒</span>
+                    <div id="verify_result_box" class="verify-result">—</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Certificate panel hidden for Step 1 (will be enabled in Step 4). -->
+
+    </main>
+</body>
+
+</html>
