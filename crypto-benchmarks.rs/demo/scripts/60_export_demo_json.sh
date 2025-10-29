@@ -326,6 +326,48 @@ def detect_total_memory_bytes():
     return None
 
 
+def detect_cpu_name():
+    """Return a human-readable CPU name if available."""
+    try:
+        if sys.platform.startswith("linux"):
+            with open("/proc/cpuinfo", "r", encoding="utf-8") as f:
+                for line in f:
+                    if line.lower().startswith("model name"):
+                        _, value = line.split(":", 1)
+                        return value.strip()
+        elif sys.platform == "darwin":
+            try:
+                out = subprocess.check_output(
+                    ["sysctl", "-n", "machdep.cpu.brand_string"],
+                    text=True,
+                    stderr=subprocess.DEVNULL
+                ).strip()
+                if out:
+                    return out
+            except Exception:
+                pass
+            out = subprocess.check_output(
+                ["sysctl", "-n", "hw.model"],
+                text=True,
+                stderr=subprocess.DEVNULL
+            ).strip()
+            if out:
+                return out
+        elif sys.platform.startswith("win"):
+            out = subprocess.check_output(
+                ["wmic", "cpu", "get", "Name"],
+                text=True,
+                stderr=subprocess.DEVNULL
+            )
+            for line in out.splitlines():
+                line = line.strip()
+                if line and line.lower() != "name":
+                    return line
+    except Exception:
+        return None
+    return platform.processor() or None
+
+
 def gather_environment():
     uname = platform.uname()
     info = {
@@ -334,8 +376,11 @@ def gather_environment():
         "cpu_count": os.cpu_count(),
     }
     mem_bytes = detect_total_memory_bytes()
-    if mem_bytes:
+    if mem_bytes is not None:
         info["memory_bytes"] = mem_bytes
+    cpu_name = detect_cpu_name()
+    if cpu_name:
+        info["cpu"] = cpu_name
     return {k: v for k, v in info.items() if v is not None}
 
 

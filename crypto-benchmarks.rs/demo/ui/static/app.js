@@ -1228,6 +1228,15 @@ function applyEnvironmentInfo(environment) {
         parts.push(environment.architecture);
     }
 
+    if (environment.cpu) {
+        const cpuLabel = typeof environment.cpu === "string"
+            ? environment.cpu.trim()
+            : environment.cpu;
+        if (cpuLabel) {
+            parts.push(cpuLabel);
+        }
+    }
+
     if (environment.cpu_count !== undefined && environment.cpu_count !== null) {
         const cores = Number(environment.cpu_count);
         if (Number.isFinite(cores) && cores > 0) {
