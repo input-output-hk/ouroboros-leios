@@ -57,12 +57,22 @@ The current primary responsibilities of a Cardano node are roughly:
 
 Despite this apparent simplicity, this already results in a highly concurrent system once cardinalities of upstream and downstream network peers are considered. A `cardano-node` with the default configuration maintains 20 upstream hot peers, 10 upstream warm peers and can have up to a few hundred downstream connections, each of which may be simultaneously requesting or serving data. All of these operations share critical resources, including memory, CPU, and network bandwidth, requiring careful resource management to ensure timing requirements are met even under load.
 
+Concretely, in the current system there are (including protocols for supporting features like peer sharing):
+
+- 2 pipelined + 3 non-pipelined instances per upstream peers => 7 threads per upstream peer;
+- 1 pipelined + 4 non-pipelined instances per downstream peer => 6 threads per downstream peer
+
 Leios significantly expands this concurrency model by introducing new responsibilities:
 
 - Endorser block and closure diffusion: receiving, validating, and transmitting EBs and their transaction closures.
 - Voting and vote diffusion: receiving, validating, and transmitting own and foreign votes on EBs. 
 
-With these (at least) two additional functionalities, each across many peers, the node set of concurrent tasks only increases. The implementation must ensure that the increased data flows and processing demands do not interfere with each other, or priorization mechanisms ensure to meet the stringent timing constraints necessary for protocol security.
+Given the [proposed Leios mini-protocols](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#leios-mini-protocols), this would result in:
+
+- 4 pipelined + 3 non-pipelined per upstream peers => 11 threads per upstream peer;
+- 1 pipelined + 6 non-pipelined per downstream peer => 8 threads per downstream peer
+
+With these two additional functionalities, each across many peers, the node set of concurrent tasks strictly increases. The implementation must ensure that the increased data flows and processing demands do not interfere with each other, or priorization mechanisms ensure to meet the stringent timing constraints necessary for protocol security.
 
 ## Designing for the worst-case
 
