@@ -25,7 +25,11 @@ PY="${PY:-python3}"
 
 pushd "$RUN_DIR" >/dev/null
 "$PY" - <<'PY'
-import os, json, collections
+import json
+import os
+import platform
+import subprocess
+import sys
 try:
     import cbor2
 except ImportError:
@@ -289,6 +293,54 @@ params = {
     "quorum_fraction": quorum_fraction,  # may be None if not recorded
 }
 
+
+def detect_total_memory_bytes():
+    """Attempt to detect total physical memory without external dependencies."""
+    try:
+        if sys.platform.startswith("linux"):
+            with open("/proc/meminfo", "r", encoding="utf-8") as f:
+                for line in f:
+                    if line.startswith("MemTotal:"):
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            # Value reported in kB
+                            return int(float(parts[1]) * 1024)
+        elif sys.platform == "darwin":
+            out = subprocess.check_output(
+                ["sysctl", "-n", "hw.memsize"], text=True, stderr=subprocess.DEVNULL
+            ).strip()
+            if out:
+                return int(out)
+        elif sys.platform.startswith("win"):
+            out = subprocess.check_output(
+                ["wmic", "ComputerSystem", "get", "TotalPhysicalMemory"],
+                text=True,
+                stderr=subprocess.DEVNULL
+            )
+            for line in out.splitlines():
+                line = line.strip()
+                if line.isdigit():
+                    return int(line)
+    except Exception:
+        return None
+    return None
+
+
+def gather_environment():
+    uname = platform.uname()
+    info = {
+        "os": f"{uname.system} {uname.release}".strip(),
+        "architecture": uname.machine or None,
+        "cpu_count": os.cpu_count(),
+    }
+    mem_bytes = detect_total_memory_bytes()
+    if mem_bytes:
+        info["memory_bytes"] = mem_bytes
+    return {k: v for k, v in info.items() if v is not None}
+
+
+environment = gather_environment()
+
 out = {
     "params": params,
     "universe": universe,
@@ -307,6 +359,9 @@ out = {
     "certificate": cert_summary,
     "votes_preview": votes_preview,
 }
+
+if environment:
+    out["environment"] = environment
 
 json.dump(out, open("demo.json", "w"), indent=2)
 print("Wrote demo.json")

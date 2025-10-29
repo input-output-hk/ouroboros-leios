@@ -1153,7 +1153,7 @@ async function loadTimingsForRun(runDir) {
         setText("verify_time", "—");
         setText("verify_status", "—");
         applyVerificationStatus(null);
-        return;
+        return null;
     }
     const timings = await tryFetchJson(`/demo/${runDir}/timings.json`);
     if (timings && typeof timings === "object") {
@@ -1190,6 +1190,7 @@ async function loadTimingsForRun(runDir) {
         setText("verify_time", "—");
         applyVerificationStatus(null);
     }
+    return timings ?? null;
 }
 
 function fillIdentifiers(obj) {
@@ -1202,6 +1203,53 @@ function fillIdentifiers(obj) {
     if (eb) {
         setText("eb", eb);
     }
+}
+
+function applyEnvironmentInfo(environment) {
+    const container = document.getElementById("demo_meta");
+    const summaryEl = document.getElementById("machine_summary");
+
+    if (!container || !summaryEl) return;
+
+    const hasEnvironment = environment && typeof environment === "object";
+
+    if (!hasEnvironment) {
+        summaryEl.textContent = "—";
+        container.hidden = true;
+        return;
+    }
+
+    const parts = [];
+    if (environment.os && environment.architecture) {
+        parts.push(`${environment.os} (${environment.architecture})`);
+    } else if (environment.os) {
+        parts.push(environment.os);
+    } else if (environment.architecture) {
+        parts.push(environment.architecture);
+    }
+
+    if (environment.cpu_count !== undefined && environment.cpu_count !== null) {
+        const cores = Number(environment.cpu_count);
+        if (Number.isFinite(cores) && cores > 0) {
+            parts.push(`${cores} ${cores === 1 ? "core" : "cores"}`);
+        }
+    }
+
+    if (environment.memory_bytes !== undefined && environment.memory_bytes !== null) {
+        const memoryBytes = Number(environment.memory_bytes);
+        if (Number.isFinite(memoryBytes) && memoryBytes > 0) {
+            parts.push(`${formatBytes(memoryBytes)} RAM`);
+        }
+    }
+
+    if (!parts.length) {
+        summaryEl.textContent = "—";
+        container.hidden = true;
+        return;
+    }
+
+    summaryEl.textContent = parts.join(" • ");
+    container.hidden = false;
 }
 
 const FLOW_STEPS = [
@@ -1313,6 +1361,9 @@ function clearUIPlaceholders() {
     setText('agg_votes_size', '—');
     setText('agg_cert_size', '—');
     setText('agg_gain', '—');
+    setText("machine_summary", "—");
+    const metaEl = document.getElementById("demo_meta");
+    if (metaEl) metaEl.hidden = true;
     // Clear main panels
     const clearIds = ["universe_canvas", "committee_canvas", "voters_canvas", "aggregation_canvas"];
     for (const id of clearIds) {
@@ -1342,8 +1393,9 @@ async function loadAndRenderRun(runDir) {
         renderCommitteeFromDemo(demo);
         renderVotersFromDemo(demo);
         renderAggregationFromDemo(demo);
+        applyEnvironmentInfo(demo?.environment ?? null);
         applyVerificationStatus(demo?.verification?.status ?? demo?.verification_status ?? null);
-        await loadTimingsForRun(runDir);
+        const timings = await loadTimingsForRun(runDir);
         syncGridColumns();
         window.addEventListener("resize", syncGridColumns);
     } else {
