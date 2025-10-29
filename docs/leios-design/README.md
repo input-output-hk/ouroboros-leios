@@ -184,7 +184,9 @@ Mainnet deployment requires governance approval and operational readiness beyond
 Operational readiness encompasses stake pool operator testing in their environments, updated procedures and training, clearly documented upgrade procedures, updated monitoring and alerting systems, and prepared support channels. The hard fork combinator enables relatively smooth transitions, but Leios represents substantial consensus changes. Conservative timeline estimates must account for discovering and addressing unexpected issues - a normal part of the hard-fork scheduling process. The months of validation and refinement required before prudent mainnet deployment reflect the critical nature of modifications to a system holding substantial economic value and providing essential services that users depend upon.
 
 > [!WARNING]
-> TODO: more thoughts
+>
+> TODO: more thoughts:
+>
 > - why (deltaq) modeling? quick results and continued utility in parameterization
 > - parameterization in general as a (communication) tool; see also Peras' parameterization dashboard https://github.com/tweag/cardano-peras/issues/54
 > - what's left for the hard-fork after all this? more-and-more testing / maturing, governance-related topics (new protocol parameters, hard-fork coordination)
@@ -196,6 +198,7 @@ The changes necessary to realizing Leios must integrate carefully with existing 
 ## On-disk storage of ledger state
 
 > [!WARNING]
+>
 > TODO: Add some links and references to UTxO-HD and Ledger-HD specification and status
 
 The transition from memory-based to disk-based ledger state storage represents a fundamental prerequisite for Leios deployment. This dependency stems directly from the throughput characteristics that Leios is designed to enable.
@@ -246,6 +249,7 @@ Ouroboros Genesis enables nodes to bootstrap safely from the genesis block with 
 **Chain synchronization** in general becomes more complex under Leios due to the multi-layered block structure. Syncing nodes must fetch both ranking blocks and their associated certified endorser blocks to construct a complete view of the chain. A node that downloads only ranking blocks cannot reconstruct the complete ledger state, as the actual transactions content resides within closures of the endorser blocks referenced by certificates on the ranking blocks. The `LeiosFetch` mini-protocol addresses this requirement through the `MsgLeiosBlockRangeRequest` message type, enabling efficient batch fetching of complete block ranges during synchronization. This allows nodes to request not only a range of ranking blocks but also all associated endorser blocks and their transaction closures in coordinated requests. Parallel fetching from multiple peers becomes critical for synchronization performance, as the data volume substantially exceeds that of traditional Praos blocks.
 
 > ![WARNING]
+>
 > TODO: Chain synchronization / syncing node discussion could be moved to the respective section in the architecture/changes chapter
 
 ## Impact on Mithril
@@ -261,17 +265,21 @@ In summary, Leios will not require fundamental changes to Mithril's architecture
 # Risks and mitigations
 
 > [!WARNING]
+>
 > TODO: Introduce chapter as being the bridge between implementation plan and concrete technical design; also, these are only selected aspects that inform the implementation (and not cover principal risks to the protocol or things that are avoided by design)
 
 ## Key threats
 
 > [!WARNING]
+>
 > TODO: Selection of key threats and attacks that further inform the design and/or implementation plan. Incorporate / reference the full [threat model](../threat-model.md)
 
 ### Protocol bursts
 
 > [!WARNING]
+>
 > TODO: important because
+>
 > - was a prominent case in research
 > - acknowledges the wealth of data to be processed
 > - mitigation: freshest-first delivery / prioritization between praos and leios traffic
@@ -281,7 +289,9 @@ In summary, Leios will not require fundamental changes to Mithril's architecture
 ### Data withholding
 
 > [!WARNING]
+>
 > TODO: important because
+>
 > - can be done from stake- and network-based attackers
 > - trivially impacts high-throughput because no certifications happening
 > - however, more advanced, potential avenue to attack blockchain safety (impact praos security argument) when carefully partitioning the network
@@ -291,6 +301,7 @@ In summary, Leios will not require fundamental changes to Mithril's architecture
 ## Assumptions to validate early
 
 > [!WARNING]
+>
 > TODO: Which assumptions in the CIP / on the protocol security need to be validated as early as possible?
 >
 > - Worst case diffusion of EBs given certain honest stake (certifying the EB) is realistic
@@ -307,6 +318,7 @@ In summary, Leios will not require fundamental changes to Mithril's architecture
 > When transferring things from impact analysis, the **REQ-...** requirements are as well as the **NEW-..** and **UPD-..** references were kept. Not sure if we need all of them to references between concepts and designs.
 
 > [!WARNING]
+>
 > TODO: How to structure the changes best? Group them by layer/component or responsibility?
 >
 > Behavior-based sketch:
@@ -386,11 +398,13 @@ In summary, Leios will not require fundamental changes to Mithril's architecture
 While being a significant change to the consensus protocol, Leios does not require fundamental changes to the overall architecture of the `cardano-node`. Several new components will be needed for the new responsibilities related to producing and relaying Endorser Blocks (EBs) and voting on them, as well as changes to existing components to support higher throughput and freshest-first-delivery. The following diagram illustrates the key components of a relay node where new and updated components are marked in purple:
 
 > [!WARNING]
+>
 > TODO: Should consider adding Leios prefixes to VoteStore (to not confuse with PerasVoteDB), i.e. LeiosVoteDB?
 
 ![](./relay-leios-component-diagram.svg)
 
 > [!WARNING]
+>
 > TODO: Explain why focus on relay node (upstream/downstream relationship); briefly mention block producer node differences; Add similar diagram for block producer? block and vote production not shown in relay diagram
 
 ## Consensus
@@ -589,6 +603,7 @@ Concretely, this means defining the `PParams` and `PParamsUpdate` types for the 
 Traditionally, the ledger component defines the serialization format of blocks and transactions. CIP-164 introduces three new types that need to be serialized and deserialized:
 
 > [!WARNING]
+>
 > TODO: Serialization of votes a consensus component responsibility?
 
 - **REQ-LedgerSerializationRB** The ranking block body contents must be deterministically de-/serializable from/to bytes using CBOR encoding.
