@@ -618,7 +618,7 @@ Corresponding types with instances of `EncCBOR` and `DecCBOR` must be provided i
 >
 > Work in progress. Content is created based on [impact analysis](../ImpactAnalysis.md), [Leios crypto project board](https://github.com/orgs/IntersectMBO/projects/75), and [CIP](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md).
 > 
-> TODO: Write: risks and mitigations, roadmap. Complete: implementation plan.
+> TODO: Contribution from crypto team. 
 
 In Leios, EBs are compactly certified for inclusion in RBs. 
 Certification is achieved through a voting mechanism in which committee members cast votes referencing specific EBs, and these votes are then aggregated into compact certificates. 
@@ -713,111 +713,130 @@ This section presents the implementation plan for extending `cardano-base` with 
 The requirements are organized into two main categories: **core functionality**, which defines the essential BLS operations needed, and **performance and quality**, which ensures the implementation meets the expected efficiency, reliability, and maintainability standards.
 
 #### Core functionality
-**BLS types** 
-- The `BLS12_381.Internal` module in `cardano-base` already provides a comprehensive set of types designed for safe interaction with the linked C functions from the `blst` library. 
-- As part of the integration effort, it is necessary to evaluate which additional types should be introduced beyond those already defined, ensuring full support for the BLS functionality required by Leios.
+- **BLS types** 
+  - The `BLS12_381.Internal` module in `cardano-base` already provides a comprehensive set of types designed for safe interaction with the linked C functions from the `blst` library. 
+  - As part of the integration effort, it is necessary to evaluate which additional types should be introduced beyond those already defined, ensuring full support for the BLS functionality required by Leios.
 
-**Key generation** 
-- Secure key generation must ensure strong randomness and resilience against side-channel attacks. To achieve this, an integration with the `blst` library through a FFI is required. This involves adding the necessary foreign function imports to the `BLS12_381.Internal` module and implementing the corresponding `SecretKey` type to enable safe and efficient handling of secret keys within the Haskell environment.
-- The `blst` library exposes a key-generation function [`blst_keygen`](https://github.com/supranational/blst/blob/e7f90de551e8df682f3cc99067d204d8b90d27ad/bindings/blst.h#L330) 
-  ```C
-  void blst_keygen(blst_scalar *out_SK, const byte *IKM, size_t IKM_len, const byte *info DEFNULL, size_t info_len DEFNULL);
-  ```
-  which derives a secret key from input keying material (IKM) and optional `info`. To use this safely in `cardano-base`, we need to clarify the security guarantees of this construction: what qualifies as a cryptographically secure IKM (length, entropy, generation source) and how `info` should be used (additional entropy vs. domain/context bytes). In parallel, we should examine how `cardano-base` currently sources seeds for other schemes in the `DSIGN` class, review the `blst` keygen C implementation to assess robustness and side-channel posture, align our requirements with the IETF BLS draft’s guidance on key generation (see the “KeyGen” section in the CFRG draft), and determine whether `info` is treated as entropy input or merely contextual/domain-separation data; documenting these findings will let us standardize secure IKM generation and `info` usage for BLS within `cardano-base`.
+- **Key generation** 
+  - Secure key generation must ensure strong randomness and resilience against side-channel attacks. To achieve this, an integration with the `blst` library through a FFI is required. This involves adding the necessary foreign function imports to the `BLS12_381.Internal` module and implementing the corresponding `SecretKey` type to enable safe and efficient handling of secret keys within the Haskell environment.
+  - The `blst` library exposes a key-generation function [`blst_keygen`](https://github.com/supranational/blst/blob/e7f90de551e8df682f3cc99067d204d8b90d27ad/bindings/blst.h#L330) 
+    ```C
+    void blst_keygen(blst_scalar *out_SK, const byte *IKM, size_t IKM_len, const byte *info DEFNULL, size_t info_len DEFNULL);
+    ```
+    which derives a secret key from input keying material (IKM) and optional `info`. To use this safely in `cardano-base`, we need to clarify the security guarantees of this construction: what qualifies as a cryptographically secure IKM (length, entropy, generation source) and how `info` should be used (additional entropy vs. domain/context bytes). In parallel, we should examine how `cardano-base` currently sources seeds for other schemes in the `DSIGN` class, review the `blst` keygen C implementation to assess robustness and side-channel posture, align our requirements with the IETF BLS draft’s guidance on key generation (see the “KeyGen” section in the CFRG draft), and determine whether `info` is treated as entropy input or merely contextual/domain-separation data; documenting these findings will let us standardize secure IKM generation and `info` usage for BLS within `cardano-base`.
 
-**Proof-of-Possession** 
-- The `blst` C library does not provide a direct interface for generating a proof of possession ($PoP$). 
-- This functionality must be implemented manually in `cardano-base`, leveraging the existing `blst` bindings to construct a $PoP$ from the available primitives.
+- **Proof-of-Possession** 
+  - The `blst` C library does not provide a direct interface for generating a proof of possession ($PoP$). 
+  - This functionality must be implemented manually in `cardano-base`, leveraging the existing `blst` bindings to construct a $PoP$ from the available primitives.
 
-**Public key derivation** 
-- Implement deterministic derivation of the public key ($pk$) from the corresponding secret key ($sk$) for the selected BLS variant. 
-- This requires adding a FFI binding to the `blst` library to enable secure and efficient key derivation within `cardano-base`.
-  ```C
-  void blst_sk_to_pk_in_g1(blst_p1 *out_pk, const blst_scalar *SK);
-  void blst_sk_to_pk_in_g2(blst_p2 *out_pk, const blst_scalar *SK);
-  ```
+- **Public key derivation** 
+  - Implement deterministic derivation of the public key ($pk$) from the corresponding secret key ($sk$) for the selected BLS variant. 
+  - This requires adding a FFI binding to the `blst` library to enable secure and efficient key derivation within `cardano-base`.
+    ```C
+    void blst_sk_to_pk_in_g1(blst_p1 *out_pk, const blst_scalar *SK);
+    void blst_sk_to_pk_in_g2(blst_p2 *out_pk, const blst_scalar *SK);
+    ```
 
-**Signature** 
-- Implement signature generation and verification APIs that are variant-agnostic and support domain separation, with DST supplied by the caller. This functionality requires integrating with the `blst` library through FFI bindings, using the following functions:
-  ```C
-  void blst_sign_pk_in_g1(blst_p2 *out_sig, const blst_p2 *hash, const blst_scalar *SK);
-  void blst_sign_pk_in_g2(blst_p1 *out_sig, const blst_p1 *hash, const blst_scalar *SK);
-  ```
-  For single-signature verification, correctness can be established through a standard pairing check between the signature, message hash, and public key. See [this](https://www.ietf.org/archive/id/draft-irtf-cfrg-bls-signature-05.html#name-verify).
+- **Signature** 
+  - Implement signature generation and verification APIs that are variant-agnostic and support domain separation, with DST supplied by the caller. This functionality requires integrating with the `blst` library through FFI bindings, using the following functions:
+    ```C
+    void blst_sign_pk_in_g1(blst_p2 *out_sig, const blst_p2 *hash, const blst_scalar *SK);
+    void blst_sign_pk_in_g2(blst_p1 *out_sig, const blst_p1 *hash, const blst_scalar *SK);
+    ```
+    For single-signature verification, correctness can be established through a standard pairing check between the signature, message hash, and public key. See [this](https://www.ietf.org/archive/id/draft-irtf-cfrg-bls-signature-05.html#name-verify).
 
-**Aggregation** 
+- **Aggregation** 
 
-The core cryptographic feature of Leios EB certificates is the ability to aggregate signatures from persistent voters. By combining multiple signatures into a single compact representation, we achieve significant space efficiency within EB blocks. This aggregation also enables more efficient verification, as a single pairing check can replace many individual ones—saving numerous expensive pairing operations while requiring only a few lightweight point additions in $G_1$ or $G_2$.
+  The core cryptographic feature of Leios EB certificates is the ability to aggregate signatures from persistent voters. By combining multiple signatures into a single compact representation, we achieve significant space efficiency within EB blocks. This aggregation also enables more efficient verification, as a single pairing check can replace many individual ones—saving numerous expensive pairing operations while requiring only a few lightweight point additions in $G_1$ or $G_2$.
 
-To support this functionality, several helper functions should be implemented:
-- A function to aggregate multiple public keys into a single aggregated key.  
-- A function to aggregate multiple signatures into a single aggregated signature.  
-- A function that, given a message and multiple $(pk, sig)$ pairs over that message, performs batch verification.
+  To support this functionality, several helper functions should be implemented:
+  - A function to aggregate multiple public keys into a single aggregated key.  
+  - A function to aggregate multiple signatures into a single aggregated signature.  
+  - A function that, given a message and multiple $(pk, sig)$ pairs over that message, performs batch verification.
 
-The first two functions are particularly useful for building an accumulator that locally tallies Leios votes and aggregates them in advance for block production. The third provides a one-shot approach for efficient verification. Since the optimal aggregation strategy depends on when and how votes are combined, all three functions should be implemented to support flexible and efficient use within Leios.
+  The first two functions are particularly useful for building an accumulator that locally tallies Leios votes and aggregates them in advance for block production. The third provides a one-shot approach for efficient verification. Since the optimal aggregation strategy depends on when and how votes are combined, all three functions should be implemented to support flexible and efficient use within Leios.
 
-**Batch verification** 
-- Implement a batch verification API to efficiently verify multiple $(pk, msg, sig)$ tuples. 
-- This requires adding FFI bindings to the `blst` library. 
-- The underlying C functions can be composed to load multiple $(pk, msg, sig)$ combinations into a single pairing context for verification. 
-- When many of the messages are identical, it becomes more efficient to merge them beforehand. 
-  - It is advisable to use a key-value data structure where each $msg$ serves as the key, and the corresponding values are the multiple $(pk, sig)$ pairs that can be aggregated using the existing aggregation functions.
+- **Batch verification** 
+  - Implement a batch verification API to efficiently verify multiple $(pk, msg, sig)$ tuples. 
+  - This requires adding FFI bindings to the `blst` library. 
+  - The underlying C functions can be composed to load multiple $(pk, msg, sig)$ combinations into a single pairing context for verification. 
+  - When many of the messages are identical, it becomes more efficient to merge them beforehand. 
+    - It is advisable to use a key-value data structure where each $msg$ serves as the key, and the corresponding values are the multiple $(pk, sig)$ pairs that can be aggregated using the existing aggregation functions.
 
-**DSIGN integration**
+- **DSIGN integration**
+  - Integrate the internal BLS signature implementation into the `DSIGN` class. 
+  - Once completed, the `cardano-base` module `BLS12_381.Internal` will expose a comprehensive set of utility functions for setting up and managing the BLS signature scheme—similar to how `DSIGN.Ed25519` provides utilities for Ed25519 signatures. 
+  - End users will not interact directly with this low-level API but will instead use the higher-level `DSIGN` class interface. 
+  - As part of this integration, a new `DSIGN` instance must be defined for BLS signatures, specifying the minimal required functions and their corresponding type signatures.
 
-...
+- **Serialization**
+  - Implement deterministic serialization by providing `ToCBOR` and `FromCBOR` instances, as well as raw byte encodings for keys and signatures. 
+  - Enforce strict validation through length, subgroup membership, and infinity checks.
+  - Ensure canonical compressed encodings following the Zcash standard for BLS points.
 
-**Serialization**
-
-...
-
-**Conformance vectors**
-
-...
+- **Conformance vectors**
+  - Add conformance tests using test vectors from the initial Rust implementation to ensure cross-impl compatibility.
 
 #### Performance and quality
-**Performance benchmarks**
+- **Performance benchmarks**
+  - Benchmark single-verify, aggregate-verify, and batch-verify; report the impact of batching vs individual verification.
 
-...
+- **Rust parity**
+  - Compare performance against the Rust implementation; document gaps and ensure functional parity on vectors.
 
-**Rust parity**
+- **Determinism portability**
+  - Deterministic results across platforms/architectures; outputs independent of CPU feature detection.
 
-...
-
-**Determinism portability**
-
-...
-
-**Documentation**
-
-...
+- **Documentation**
+  - Document the outward facing API in cardano-base and provide example usages. Additionally add a section on do's and don'ts with regards to security of this scheme outside the context of Leios.
 
 #### Other utilities
-**Registration**
+- Registration: See [this](https://github.com/input-output-hk/ouroboros-leios/blob/d5f1a9bc940e69f406c3e25c0d7d9aa58cf701f8/crypto-benchmarks.rs/Specification.md#key-registration)
+- Sortition: See [this](https://github.com/input-output-hk/ouroboros-leios/blob/d5f1a9bc940e69f406c3e25c0d7d9aa58cf701f8/crypto-benchmarks.rs/Specification.md#sortition)
 
-...
-
-**Fa sortition**
-
-...
-
-**Local sortition**
-
-...
-
-**Implementation notes**
-
-...
+#### Implementation notes
+- The $PoP$ verification is likely performed at the certificate level; therefore, the API described above should not handle it directly.  
+  - The existing `BLS12_381` code already abstracts over both $G_1$ and $G_2$ curves, and this abstraction should be preserved.  
+- The `blst` library provides optimized verification for multiple messages, signatures, and public keys using a combined pairing check.  
+  - While this functionality could offer performance benefits, it remains uncertain whether it will be necessary for linear Leios, where such batch verification may not provide a meaningful speedup.
 
 ### Potential Risks and Mitigations
-... 
+
+> [!WARNING]
+>
+> TODO: Contribution from crypto team.
 
 ### Roadmap
-- Delivery cycle 1
-- Delivery cycle 2
-- Delivery cycle 3
-- Delivery cycle 4
-- ... 
+
+> [!WARNING]
+>
+> TODO: Contribution from crypto team.
+
+This roadmap outlines the planned tasks and milestones for integrating BLS functionality into `cardano-base` to support the Leios protocol. 
+The implementation is divided into three delivery cycles, progressing from foundational FFI bindings to high-level integration and code audit.
+
+#### Core Bindings and Setup
+<!-- Delivery cycle 1 -->
+*Establish the foundational Haskell ↔ C interoperability layer for BLS operations.*
+- Create Haskell ↔ C Bindings for the following functionalities:
+  - Key generation,
+  - Public key derivation,
+  - Signature generation and verification.
+- Create Haskell Function for Proof-of-Possession functionality using existing `blst` primitives.  
+
+#### Extended Functionality and Security Review
+<!-- Delivery cycle 2 -->
+*Build higher-level cryptographic utilities, perform security validation, and finalize BLS type definitions.*
+- Define and Add New Types: Identify and introduce any missing types needed for safe and ergonomic BLS operations.
+- Create Haskell ↔ C Binding for batch verification support for efficient validation of multiple $(pk, msg, sig)$ triples.
+- Create Haskell Function for aggregation logic for multiple signatures and public keys to enable compact certificates.  
+- Check Security of key generation function of the C implementation and assess its adherence to the IETF BLS standard for secure IKM handling.  
+
+#### Integration and Quality Assurance
+<!-- Delivery cycle 3 -->
+*Integrate BLS signatures into the `DSIGN` class and complete final review.*
+- Add Internal BLS Signature to `DSIGN` Class  
+- Audit the Code
 
 ## Performance & Tracing (P&T)
 
