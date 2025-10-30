@@ -1,3 +1,5 @@
+//! Fait Accompli operations.
+
 use num_bigint::BigInt;
 use num_rational::Ratio;
 use num_traits::{One, Zero};
@@ -7,16 +9,23 @@ use std::collections::BTreeMap;
 
 use crate::primitive::{Coin, CoinFraction, PoolKeyhash};
 
+/// Fait Accompli sortition results in a committee of persistent and non-persistent voters.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FaSortition {
+    /// Number of persistent voters.
     pub n_persistent: usize,
+    /// Number of non-persistent voters.
     pub n_nonpersistent: usize,
+    /// Stake held by persistent voters.
     pub persistent: Vec<(PoolKeyhash, CoinFraction)>,
+    /// State held by non-persistent voters.
     pub nonpersistent: BTreeMap<PoolKeyhash, CoinFraction>,
+    /// Stake cutoff for persistent vs non-persistent voters.
     pub rho: CoinFraction,
 }
 
 impl FaSortition {
+    /// Perform Fait Accompli sortiion on the stake distribution `pools` and target committee size `n`.
     pub fn fait_accompli(pools: &BTreeMap<PoolKeyhash, Coin>, n: usize) -> Self {
         let zero: Ratio<BigInt> = Ratio::from_integer(BigInt::zero());
         let (s, p): (Vec<Ratio<BigInt>>, Vec<PoolKeyhash>) = sort_stake(pools);
@@ -57,6 +66,7 @@ impl FaSortition {
     }
 }
 
+/// Sort stake pools in order of decreasing stake.
 fn sort_stake(pools: &BTreeMap<PoolKeyhash, Coin>) -> (Vec<Ratio<BigInt>>, Vec<PoolKeyhash>) {
     let mut sp: Vec<(Ratio<BigInt>, &PoolKeyhash)> = pools
         .iter()
@@ -67,6 +77,7 @@ fn sort_stake(pools: &BTreeMap<PoolKeyhash, Coin>) -> (Vec<Ratio<BigInt>>, Vec<P
     sp.into_iter().unzip()
 }
 
+/// Sum stake fractions.
 fn sum_stake(s: &[Ratio<BigInt>]) -> Vec<Ratio<BigInt>> {
     let zero: Ratio<BigInt> = Ratio::from_integer(BigInt::zero());
     let (mut rho, _): (Vec<Ratio<BigInt>>, Ratio<BigInt>) =
@@ -81,6 +92,7 @@ fn sum_stake(s: &[Ratio<BigInt>]) -> Vec<Ratio<BigInt>> {
     rho
 }
 
+/// Perform the Fait Accompli test that check whether there are any more persistent pools to be selected.
 fn fa_test(s: &[Ratio<BigInt>], rho: &[Ratio<BigInt>], n: usize, i: usize) -> bool {
     let zero: Ratio<BigInt> = Ratio::from_integer(BigInt::zero());
     let one: Ratio<BigInt> = Ratio::from_integer(BigInt::one());

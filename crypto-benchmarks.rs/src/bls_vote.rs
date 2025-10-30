@@ -1,13 +1,22 @@
+//! Low-level operations on BLS votes.
+//! 
+//! ![Figure 7: BLS](../../../../figure-7-bls.png)
+//! 
+//! ![Figure 8: voting](../../../../figure-8-voting.png)
+
 use blst::min_sig::*;
 use blst::*;
 use rand::RngCore;
 
 use crate::bls_util::*;
 
+/// An empty bytestring.
 const EMPTY: [u8; 0] = [];
 
+/// The domain separator for Leios.
 const DST: &[u8; 5] = b"Leios";
 
+/// Generate a secret BLS scalar.
 pub fn gen_key() -> SecretKey {
     let mut rng: rand::prelude::ThreadRng = rand::thread_rng();
     let mut ikm: [u8; 32] = [0u8; 32];
@@ -16,12 +25,14 @@ pub fn gen_key() -> SecretKey {
     SecretKey::key_gen(&ikm, info).unwrap()
 }
 
+/// Create a proof of possession from a secret key `sk`, namely $\mu_1$ and $\mu_2$ of [Figure 8 (voting)](index.html).
 pub fn make_pop(sk: &SecretKey) -> (Signature, Signature) {
     let m1: [u8; 192] = sk.sk_to_pk().serialize();
     let m2 = EMPTY;
     (sk.sign(&m1, DST, b"PoP"), sk.sign(&m2, DST, &EMPTY))
 }
 
+/// Verify the the proof of possession, namely $\mu_1$ and $\mu_2$ of [Figure 8 (voting)](index.html), for a public key `pk`.
 pub fn check_pop(pk: &PublicKey, mu1: &Signature, mu2: &Signature) -> bool {
     let m1: [u8; 192] = pk.serialize();
     let m2 = EMPTY;
@@ -30,29 +41,35 @@ pub fn check_pop(pk: &PublicKey, mu1: &Signature, mu2: &Signature) -> bool {
     result1 == BLST_ERROR::BLST_SUCCESS && result2 == BLST_ERROR::BLST_SUCCESS
 }
 
+/// Sign the message `m` in the election `eid` using the secret key `sk`.
 pub fn gen_sig(sk: &SecretKey, eid: &[u8], m: &[u8]) -> Signature {
     sk.sign(m, DST, eid)
 }
 
+/// Verify a signature `vs` on the message `m` in the election `eid` for the public key `pk`.
 pub fn verify_sig(pk: &PublicKey, eid: &[u8], m: &[u8], vs: &Signature) -> bool {
     let result_m = vs.verify(true, m, DST, eid, pk, false);
     result_m == BLST_ERROR::BLST_SUCCESS
 }
 
+/// Sign the election `eid` with the secret key `sk`.
 pub fn gen_sigma_eid(sk: &SecretKey, eid: &[u8]) -> Signature {
     sk.sign(&EMPTY, DST, eid)
 }
 
+/// Create a vote for the message `m` in the election `eid` using the secret key `sk`.
 pub fn gen_vote(sk: &SecretKey, eid: &[u8], m: &[u8]) -> (Signature, Signature) {
     (sk.sign(&EMPTY, DST, eid), sk.sign(m, DST, eid))
 }
 
+/// Verify the vote `vs` for the message `m` in the election `eid` for the public key `pk`.
 pub fn verify_vote(pk: &PublicKey, eid: &[u8], m: &[u8], vs: &(Signature, Signature)) -> bool {
     let result_eid = vs.0.verify(true, &EMPTY, DST, eid, pk, true);
     let result_m = vs.1.verify(true, m, DST, eid, pk, false);
     result_eid == BLST_ERROR::BLST_SUCCESS && result_m == BLST_ERROR::BLST_SUCCESS
 }
 
+/// Hash an array of signatures `sigma_eids` and `sigma_ms`.
 fn hash_sigs(sigma_eids: &[&Signature], sigma_ms: &[&Signature]) -> [u8; 32] {
     let mut sigmas: Vec<&Signature> = Vec::new();
     sigmas.extend(sigma_eids);
@@ -65,6 +82,7 @@ fn hash_sigs(sigma_eids: &[&Signature], sigma_ms: &[&Signature]) -> [u8; 32] {
     }
 }
 
+/// Hash an integer `i` with a previous hash `h`.
 fn hash_index(i: i32, h: &[u8; 32]) -> [u8; 32] {
     let mut msg: [u8; 36] = [0; 36];
     let ii: [u8; 4] = i.to_ne_bytes();
@@ -80,12 +98,14 @@ fn hash_index(i: i32, h: &[u8; 32]) -> [u8; 32] {
     }
 }
 
+/// Create the signatures for a certificate from the individual vote signatures `vss`.
 pub fn gen_cert(vss: &[&(Signature, Signature)]) -> Result<(Signature, Signature), BLST_ERROR> {
     let sigma_eids: Vec<&Signature> = vss.iter().map(|vs| &vs.1).collect();
     let sigma_ms: Vec<&Signature> = vss.iter().map(|vs| &vs.1).collect();
     gen_cert_fa(&sigma_eids, &sigma_ms)
 }
 
+/// Verify the contents of certificate signatures `cs` for the message `m` in election `eid`, given the vote signatures `vss`.
 pub fn verify_cert(
     pks: &[&PublicKey],
     eid: &[u8],
@@ -129,6 +149,7 @@ pub fn verify_cert(
     }
 }
 
+/// Create certificate signatures including both sortition and message signing signatures.
 pub fn gen_cert_fa(
     sigma_eids: &[&Signature],
     sigma_ms: &[&Signature],
@@ -161,6 +182,7 @@ pub fn gen_cert_fa(
     }
 }
 
+/// Create cerificate signatures including only message signing signatures.
 pub fn gen_cert_fa_pure(sigma_ms: &[&Signature]) -> Result<Signature, BLST_ERROR> {
     let result_m = AggregateSignature::aggregate(sigma_ms, true);
     match result_m {
@@ -169,6 +191,7 @@ pub fn gen_cert_fa_pure(sigma_ms: &[&Signature]) -> Result<Signature, BLST_ERROR
     }
 }
 
+/// Verify cerificate sigantures according to [Figure 8 (voting)](index.html).
 pub fn verify_cert_fa(
     pks: &[&PublicKey],
     pks_nonpersistent: &[&PublicKey],
@@ -212,6 +235,7 @@ pub fn verify_cert_fa(
     }
 }
 
+/// Verify signatures for a message, without verifying sortition.
 pub fn verify_cert_fa_pure(
     pks: &[&PublicKey],
     eid: &[u8],

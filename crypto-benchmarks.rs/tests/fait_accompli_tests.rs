@@ -1,3 +1,5 @@
+//! Quickcheck tests for Fait Accompli.
+
 use num_bigint::BigInt;
 use num_rational::Ratio;
 use std::collections::BTreeMap;

@@ -1,3 +1,5 @@
+//! Operations on the voter registry.
+
 use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -10,6 +12,7 @@ use crate::primitive::{
 };
 use crate::realism::realistic_voters;
 
+/// A persistent identifier is just an integer identifying the epoch's pools.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Debug, Serialize, Deserialize)]
 pub struct PersistentId(pub u16);
 
@@ -19,10 +22,14 @@ impl Arbitrary for PersistentId {
     }
 }
 
+/// Pools are tracked by their secret key `secret`, their public registration information `reg`, and the amount of stake `stake` they have at the start of the epoch.
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
 pub struct PoolInfo {
+    /// The secret key.
     pub secret: SecKey,
+    /// The public registration.
     pub reg: Reg,
+    /// The stake for the epoch.
     pub stake: Coin,
 }
 
@@ -38,6 +45,7 @@ impl Arbitrary for PoolInfo {
     }
 }
 
+/// Generate an arbitrary array of pools from the stake distribution `stake`.
 pub fn arbitrary_pools(g: &mut Gen, stake: &BTreeMap<PoolKeyhash, Coin>) -> Vec<PoolInfo> {
     stake
         .iter()
@@ -52,17 +60,25 @@ pub fn arbitrary_pools(g: &mut Gen, stake: &BTreeMap<PoolKeyhash, Coin>) -> Vec<
         .collect()
 }
 
+/// The voter registry records which pools are persistent vs non-persistent and their private and public registration information, along with the number of voters and amount of stake.
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
 pub struct Registry {
+    /// Private and public data for the pools.
     pub info: BTreeMap<PoolKeyhash, PoolInfo>,
+    /// Lookup table of pool key hashes for the persistent voters.
     pub persistent_pool: BTreeMap<PersistentId, PoolKeyhash>,
+    /// Lookup table of pool identifiers for the persistent voters.
     pub persistent_id: BTreeMap<PoolKeyhash, PersistentId>,
+    /// Total stake.
     pub total_stake: Coin,
+    /// Stake of non-persistent voters.
     pub nonpersistent_stake: CoinFraction,
+    /// Committee size.
     pub voters: usize,
 }
 
 impl Registry {
+    /// Create the registry for the pools `stake` and a committee-size parameter `voters`.
     pub fn make(stake: &[PoolInfo], voters: usize) -> Self {
         let info: BTreeMap<PoolKeyhash, PoolInfo> =
             BTreeMap::from_iter(stake.iter().map(|pool| (pool.reg.pool, pool.clone())));

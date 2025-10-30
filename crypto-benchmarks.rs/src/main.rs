@@ -1,3 +1,5 @@
+//! Command-line interface for Leios cryptography.
+
 use clap::{Parser, Subcommand};
 use hex::ToHex;
 use num_bigint::BigInt;
@@ -467,6 +469,7 @@ fn main() {
     }
 }
 
+/// Write CBOR to a file.
 fn write_cbor<A>(path: &PathBuf, item: &A) -> Result<(), Error>
 where
     A: serde::Serialize,
@@ -475,6 +478,7 @@ where
     std::fs::write(path, cbor)
 }
 
+/// Read CBOR from a file.
 fn read_cbor<A>(path: &PathBuf) -> Result<A, Error>
 where
     A: serde::de::DeserializeOwned,
