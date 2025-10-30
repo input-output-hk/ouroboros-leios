@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.4.0
+
+### Linear Leios
+
+- Add bounded mempools. Configure them with by setting `leios-mempool-size-bytes`. Incoming transactions which don't fit in the mempool will be queued for inclusion in the mempool when there is space. Transactions referenced by an EB which are not yet in the mempool will still be forwarded to peers.
+
+### Other
+
+- Fix warnings from new rust version
+
 ## v1.3.1
 
 ### Linear Leios

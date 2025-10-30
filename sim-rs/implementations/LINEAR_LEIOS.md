@@ -50,6 +50,12 @@ When a node creates an RB, it will follow these steps in order:
 
 When a node receives an RB body, it immediately removes all referenced/conflicting transactions from its mempool. If the RB has an EB certificate, it also removes that EB’s transactions from its mempool. If the certified EB arrives after the RB body, we remove its TXs from the mempool once it arrives.
 
+### Bounded mempools
+
+The mempool can be configured with an optional size limit, through the `leios-mempool-size-bytes` parameter. When a node tries adding a transaction to a full mempool, the transaction will go into an (unbounded) queue instead. Nodes will only announce transactions to their peers once those transactions have actually reached the mempool.
+
+If a node has received an EB which references transactions, and those transactions are in the queue but not yet in the mempool, the node will announce those transactions to its peer as well. This is to simulate the behavior of the real protocol, where nodes may request transactions from an EB separately from the TxSubmission mini-protocol.
+
 ## New parameters
 
 |Name|Description|Default value|

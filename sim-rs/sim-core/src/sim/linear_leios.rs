@@ -259,7 +259,6 @@ impl RankingBlockView {
 
 #[derive(Default)]
 struct NodePraosState {
-    mempool: BTreeMap<TransactionId, Arc<Transaction>>,
     peer_heads: BTreeMap<NodeId, u64>,
     blocks: BTreeMap<BlockId, RankingBlockView>,
     block_ids_by_slot: BTreeMap<u64, BlockId>,
@@ -310,6 +309,7 @@ pub struct LinearLeiosNode {
     lottery: LotteryConfig,
     consumers: Vec<NodeId>,
     txs: HashMap<TransactionId, TransactionView>,
+    mempool: Mempool,
     ledger_states: BTreeMap<BlockId, Arc<LedgerState>>,
     praos: NodePraosState,
     leios: NodeLeiosState,
@@ -338,6 +338,7 @@ impl NodeImpl for LinearLeiosNode {
             stake: config.stake,
             total_stake: sim_config.total_stake,
         };
+        let mempool_max_size_bytes = sim_config.mempool_size_bytes;
 
         Self {
             id: config.id,
@@ -349,6 +350,7 @@ impl NodeImpl for LinearLeiosNode {
             lottery,
             consumers: config.consumers.clone(),
             txs: HashMap::new(),
+            mempool: Mempool::new(mempool_max_size_bytes),
             ledger_states: BTreeMap::new(),
             praos: NodePraosState::default(),
             leios: NodeLeiosState::default(),
@@ -1025,10 +1027,12 @@ impl LinearLeiosNode {
             LeiosVariant::LinearWithTxReferences
         ) {
             // If the EB references any TXs which we already have, but are not in our mempool,
-            // we must have failed to add them to the mempool due to conflicts.
-            // Announce those TXs to our peers, since we didn't before.
+            // either we must have failed to add them to the mempool due to conflicts,
+            // or they haven't reached the mempool _yet_.
+            // Announce those TXs to our peers, since either way we didn't before.
+            let mempool_ids = self.mempool.ids().collect::<HashSet<_>>();
             for tx in &eb.txs {
-                if !self.has_tx(tx.id) || self.praos.mempool.contains_key(&tx.id) {
+                if !self.has_tx(tx.id) || mempool_ids.contains(&tx.id) {
                     continue;
                 }
                 for peer in &self.consumers {
@@ -1396,17 +1400,7 @@ impl LinearLeiosNode {
             return false;
         }
 
-        if self
-            .praos
-            .mempool
-            .values()
-            .any(|t| t.input_id == tx.input_id)
-        {
-            // This TX conflicts with something already in the mempool
-            return false;
-        }
-        self.praos.mempool.insert(tx.id, tx.clone());
-        true
+        self.mempool.try_insert(tx.clone())
     }
 
     fn sample_from_mempool(
@@ -1416,7 +1410,7 @@ impl LinearLeiosNode {
         remove: bool,
     ) {
         let mut size = txs.iter().map(|tx| tx.bytes).sum::<u64>();
-        let mut candidates: Vec<_> = self.praos.mempool.keys().copied().collect();
+        let mut candidates: Vec<_> = self.mempool.ids().collect();
         if matches!(
             self.sim_config.mempool_strategy,
             MempoolSamplingStrategy::Random
@@ -1427,16 +1421,24 @@ impl LinearLeiosNode {
         }
 
         // Fill with as many pending transactions as can fit
+        let mut removed_ids = vec![];
         while let Some(id) = candidates.pop() {
-            let tx = self.praos.mempool.get(&id).unwrap();
+            let Some(TransactionView::Received(tx)) = self.txs.get(&id) else {
+                panic!("missing a TX in our mempool");
+            };
             if size + tx.bytes > max_size {
                 break;
             }
             size += tx.bytes;
+            txs.push(tx.clone());
             if remove {
-                txs.push(self.praos.mempool.remove(&id).unwrap());
-            } else {
-                txs.push(tx.clone());
+                removed_ids.push(tx.id);
+            }
+        }
+        for newly_queued_tx in self.mempool.remove_txs(removed_ids) {
+            for peer in &self.consumers {
+                self.queued
+                    .send_to(*peer, Message::AnnounceTx(newly_queued_tx));
             }
         }
     }
@@ -1458,9 +1460,12 @@ impl LinearLeiosNode {
 
     fn remove_txs_from_mempool(&mut self, txs: &[Arc<Transaction>]) {
         let inputs = txs.iter().map(|tx| tx.input_id).collect::<HashSet<_>>();
-        self.praos
-            .mempool
-            .retain(|_, tx| !inputs.contains(&tx.input_id));
+        for newly_queued_tx in self.mempool.remove_conflicting_txs(&inputs) {
+            for peer in &self.consumers {
+                self.queued
+                    .send_to(*peer, Message::AnnounceTx(newly_queued_tx));
+            }
+        }
     }
 
     fn resolve_ledger_state(&mut self, rb_ref: Option<BlockId>) -> Arc<LedgerState> {
@@ -1530,5 +1535,198 @@ impl LinearLeiosNode {
     // Simulates the output of a VRF using this node's stake (if any).
     fn run_vrf(&mut self, kind: LotteryKind, success_rate: f64) -> Option<u64> {
         self.lottery.run(kind, success_rate, &mut self.rng)
+    }
+}
+
+struct Mempool {
+    next_id: u64,
+    mempool_count: usize,
+    mempool_size_bytes: u64,
+    max_size_bytes: u64,
+    queue: BTreeMap<u64, Arc<Transaction>>,
+    input_ids: HashSet<u64>,
+}
+impl Mempool {
+    fn new(max_size_bytes: u64) -> Self {
+        Self {
+            next_id: 0,
+            mempool_count: 0,
+            mempool_size_bytes: 0,
+            max_size_bytes,
+            queue: BTreeMap::new(),
+            input_ids: HashSet::new(),
+        }
+    }
+    fn try_insert(&mut self, tx: Arc<Transaction>) -> bool {
+        let new_bytes = self.mempool_size_bytes + tx.bytes;
+        if self.mempool_count < self.queue.len() || new_bytes > self.max_size_bytes {
+            // mempool is or would be full, just put this at the end and Be Done
+            let id = self.new_id();
+            self.queue.insert(id, tx);
+            return false;
+        }
+        if self.input_ids.contains(&tx.input_id) {
+            // conflicts with something already in the mempool
+            return false;
+        }
+
+        self.mempool_count += 1;
+        self.mempool_size_bytes = new_bytes;
+        self.input_ids.insert(tx.input_id);
+        let id = self.new_id();
+        self.queue.insert(id, tx);
+        true
+    }
+
+    fn ids(&self) -> impl Iterator<Item = TransactionId> {
+        self.queue.values().take(self.mempool_count).map(|tx| tx.id)
+    }
+
+    // Removes a set of TXs from the mempool.
+    // Returns any previously-queued TXs now added to the mempool.
+    fn remove_txs(&mut self, ids: impl IntoIterator<Item = TransactionId>) -> Vec<TransactionId> {
+        let id_set: HashSet<TransactionId> = ids.into_iter().collect();
+        if id_set.is_empty() {
+            return vec![];
+        }
+        let mut new_mempool_count = self.mempool_count;
+        let mut full = false;
+        let mut newly_added = vec![];
+        let mut seen_so_far = 0;
+        self.queue.retain(|_, tx| {
+            let seen = seen_so_far;
+            seen_so_far += 1;
+            if seen < self.mempool_count {
+                // we're iterating through the mempool
+                if !id_set.contains(&tx.id) {
+                    return true;
+                }
+                // this is a transaction in the mempool which we want to remove
+                new_mempool_count -= 1;
+                self.mempool_size_bytes -= tx.bytes;
+                self.input_ids.remove(&tx.input_id);
+                false
+            } else {
+                // we're iterating through the queued TXs which aren't yet in the mempool
+                if self.input_ids.contains(&tx.input_id) {
+                    // conflicts with the mempool, remove it at once
+                    return false;
+                }
+                // add TXs until we're full
+                if !full {
+                    let new_size = self.mempool_size_bytes + tx.bytes;
+                    if new_size > self.max_size_bytes {
+                        full = true;
+                    } else {
+                        new_mempool_count += 1;
+                        self.mempool_size_bytes = new_size;
+                        self.input_ids.insert(tx.input_id);
+                        newly_added.push(tx.id);
+                    }
+                }
+                true
+            }
+        });
+        self.mempool_count = new_mempool_count;
+        newly_added
+    }
+
+    fn remove_conflicting_txs(&mut self, input_ids: &HashSet<u64>) -> Vec<TransactionId> {
+        let mut new_mempool_count = self.mempool_count;
+        let mut full = false;
+        let mut newly_added = vec![];
+        let mut seen_so_far = 0;
+        self.queue.retain(|_, tx| {
+            let seen = seen_so_far;
+            seen_so_far += 1;
+            if seen < self.mempool_count {
+                // we're iterating through the mempool
+                if !input_ids.contains(&tx.input_id) {
+                    return true;
+                }
+                // this is a transaction in the mempool which we want to remove
+                new_mempool_count -= 1;
+                self.mempool_size_bytes -= tx.bytes;
+                self.input_ids.remove(&tx.input_id);
+                false
+            } else {
+                // we're iterating through the queued TXs which aren't yet in the mempool
+                if self.input_ids.contains(&tx.input_id) || input_ids.contains(&tx.input_id) {
+                    // conflicts with the ledger or the new mempool, remove it at once
+                    return false;
+                }
+                // add TXs until we're full
+                if !full {
+                    let new_size = self.mempool_size_bytes + tx.bytes;
+                    if new_size > self.max_size_bytes {
+                        full = true;
+                    } else {
+                        new_mempool_count += 1;
+                        self.mempool_size_bytes = new_size;
+                        self.input_ids.insert(tx.input_id);
+                        newly_added.push(tx.id);
+                    }
+                }
+                true
+            }
+        });
+        self.mempool_count = new_mempool_count;
+        newly_added
+    }
+
+    fn new_id(&mut self) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        id
+    }
+}
+
+#[cfg(test)]
+mod mempool_tests {
+    use std::sync::Arc;
+
+    use crate::model::{Transaction, TransactionId};
+
+    use super::Mempool;
+
+    struct TxFactory {
+        next_id: u64,
+    }
+    impl TxFactory {
+        fn new() -> Self {
+            Self { next_id: 0 }
+        }
+        fn tx(&mut self, bytes: u64) -> Arc<Transaction> {
+            let id = self.next_id;
+            self.next_id += 1;
+            Arc::new(Transaction {
+                id: TransactionId::new(id),
+                shard: 0,
+                bytes,
+                input_id: id,
+                overcollateralization_factor: 0,
+            })
+        }
+        fn txs<const N: usize>(&mut self, bytes: [u64; N]) -> [Arc<Transaction>; N] {
+            bytes.map(|b| self.tx(b))
+        }
+    }
+
+    #[test]
+    fn should_fill_as_space_is_available() {
+        let mut txs = TxFactory::new();
+        let [tx1, tx2, tx3] = txs.txs([5, 5, 5]);
+        let mut mempool = Mempool::new(10);
+        assert!(mempool.try_insert(tx1.clone()));
+        assert!(mempool.try_insert(tx2.clone()));
+
+        // new TX doesn't fit
+        assert!(!mempool.try_insert(tx3.clone()));
+        assert_eq!(mempool.ids().collect::<Vec<_>>(), vec![tx1.id, tx2.id]);
+
+        // until we remove a TX, and suddenly it does
+        let added = mempool.remove_txs([tx2.id]);
+        assert_eq!(added, vec![tx3.id]);
+        assert_eq!(mempool.ids().collect::<Vec<_>>(), vec![tx1.id, tx3.id]);
     }
 }
