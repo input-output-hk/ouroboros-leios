@@ -6,10 +6,12 @@ open Lake DSL
 package «linleios» where
 
 lean_lib «Linleios» where
+  srcDir := "src"
 
 @[default_target]
 lean_exe «linleios» where
   root := `Main
+  srcDir := "src"
   supportInterpreter := false
 
 require mathlib from git
