@@ -110,7 +110,7 @@ def simulate (env : Environment) (start : Probabilities) (ε : Float) : Nat → 
 Compute the total probabilities of a set of states.
 -/
 def totalProbability (states : Probabilities) : Probability :=
-  states.values.sum
+  states.fold (Function.const State ∘ Add.add) 0
 
 /--
 Compute the distribution of EB counts.
@@ -119,6 +119,7 @@ def ebDistribution : Probabilities → HashMap Nat Probability :=
   HashMap.fold
     (
       fun acc state p =>
+        -- FIXME: Rewrite using `Function.const`.
         HashMap.mergeWith (fun _ => Add.add) acc
           $ singleton ⟨ state.ebCount , p ⟩
     )
