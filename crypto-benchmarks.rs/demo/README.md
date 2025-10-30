@@ -1,95 +1,113 @@
-
-
 # Demo Scripts for Leios Crypto Benchmarks
 
-This folder contains scripts that orchestrate end-to-end demonstrations of BLS-based vote aggregation and certificate generation/verification for the Leios project.
+## Setup
 
-## Prerequisites
-
-- Ensure the CLI built from the repository root is available; see `crypto-benchmarks.rs/ReadMe.md` for build instructions and usage details.
-- Ensure Python 3 is available with `cbor2` installed.  
-  For example:
-
-  ```bash
-  python3 -m venv .venv
-  source .venv/bin/activate
-  pip install cbor2
-  ```
-
-## Workflow
-
-The scripts are designed to be run from the `demo/` directory.
-
-### Run Step by Step (Manual Mode)
-
-You can run each script individually to understand and control each step of the process for a given number of voters (e.g., 100). Use the `-d` option to specify the output directory (e.g., `run100`).
-
-#### 10_init_inputs.sh
-
-Initialize inputs for N voters:
+From the `demo/` directory, go one level up to the `crypto-benchmarks.rs` directory and build the CLI binary:
 
 ```bash
-scripts/10_init_inputs.sh -d run100 --pools 500 --stake 100000 --alpha 9 --beta 1
+cd ..
+cargo build --release
 ```
 
-#### 20_make_registry.sh
-
-Build the registry from initialized inputs:
+**Register the CLI path (while still in `crypto-benchmarks.rs/`)** so all demo scripts can find it:
 
 ```bash
-./scripts/20_make_registry.sh -d run100 -n 100
+./demo/scripts/00_set_cli.sh -p "$(pwd)/target/release/leios_crypto_benchmarks"
 ```
 
-#### 30_cast_votes.sh
-
-Cast votes with a specified fraction of voters voting (e.g., 1.0 means all vote):
+Now return to the `demo/` directory to proceed:
 
 ```bash
-scripts/30_cast_votes.sh -d run100 -f 0.75
+cd demo
 ```
 
-#### 40_make_certificate.sh
-
-Generate the aggregated certificate:
+Verify the `.env_cli` file and sanity‑check the CLI:
 
 ```bash
-scripts/40_make_certificate.sh -d run100
+cat scripts/.env_cli
+source scripts/.env_cli
+echo "$CLI"
+$CLI --help
 ```
 
-#### 50_verify_certificate.sh
+Ensure the CLI binary is accessible and working before proceeding.
 
-Verify the generated certificate:
+## Python Environment Setup
+
+Create and activate a Python virtual environment, then install the required dependencies:
 
 ```bash
-scripts/50_verify_certificate.sh -d run100
+python3 -m venv .venv
+source .venv/bin/activate
+pip install flask cbor2
 ```
 
-### Run a Single End-to-End Demo
+(Flask is required to serve the demo UI, and cbor2 is used for parsing CBOR files.)
+
+## Run a Single End-to-End Demo
+
+From the `demo/` directory, run the combined script to generate a complete demo for a specified number of voters and pools. Ensure `.env_cli` exists in this directory:
+
+(If you haven’t yet, run the **Setup** steps above to build the CLI and create `scripts/.env_cli`.)
 
 ```bash
 scripts/70_run_one.sh -d run100 -p 500 -n 100 -f 0.75
 ```
 
-This will:
+This script will:
 
-1. Initialize inputs (`10_init_inputs.sh`)
-2. Build a registry (`20_make_registry.sh`)
-3. Cast votes (`30_cast_votes.sh`)
-4. Make a certificate (`40_make_certificate.sh`)
-5. Verify the certificate (`50_verify_certificate.sh`)
-6. Export data for the UI (`60_export_demo_json.sh`)
+1. Initialize inputs
+2. Build the registry
+3. Cast votes
+4. Generate the aggregated certificate
+5. Verify the certificate
+6. Export data for the UI
 
-All files are placed in `demo/run100/`.
+All output files will be placed under `demo/run100/`.
 
-### Launch the Demo UI
+## Launch the Demo UI
 
-After generating a demo run (for example via `scripts/70_run_one.sh`), start the UI server from this directory:
+After generating a demo run, start the UI server from the `demo/` directory:
 
 ```bash
 python3 ui/server.py
 ```
 
-Then open your browser at [http://127.0.0.1:5050/ui](http://127.0.0.1:5050/ui) to explore the results.
+Open your browser at [http://127.0.0.1:5050/ui](http://127.0.0.1:5050/ui) to explore the results.
+
+## Run Step by Step (Manual Mode)
+
+For advanced users who want to control each phase individually, the following scripts can be run sequentially from the `demo/` directory. Use the `-d` option to specify the output directory (e.g., `run100`).
+
+1. **Initialize inputs for N voters:**
+
+```bash
+scripts/10_init_inputs.sh -d run100 --pools 500 --stake 100000 --alpha 9 --beta 1
+```
+
+2. **Build the registry:**
+
+```bash
+scripts/20_make_registry.sh -d run100 -n 100
+```
+
+3. **Cast votes with a fraction of voters participating:**
+
+```bash
+scripts/30_cast_votes.sh -d run100 -f 0.75
+```
+
+4. **Generate the aggregated certificate:**
+
+```bash
+scripts/40_make_certificate.sh -d run100
+```
+
+5. **Verify the generated certificate:**
+
+```bash
+scripts/50_verify_certificate.sh -d run100
+```
 
 ## Notes
 
@@ -101,4 +119,5 @@ Then open your browser at [http://127.0.0.1:5050/ui](http://127.0.0.1:5050/ui) t
   votes_bytes / certificate_bytes
   ```
 
-which illustrates the storage/bandwidth savings achieved by BLS aggregation.
+  which illustrates the storage and bandwidth savings achieved by BLS aggregation.
+- The CLI path is stored in `scripts/.env_cli` (generated by `00_set_cli.sh`). Source it with `source scripts/.env_cli` to make `$CLI` available in your shell.
