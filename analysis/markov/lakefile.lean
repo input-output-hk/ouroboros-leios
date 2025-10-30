@@ -1,10 +1,10 @@
-
 import Lake
 
 open Lake DSL
 
 package «linleios» where
   version := StdVer.mk (SemVerCore.mk 0 1 0) ""
+  testDriver := "linleios_test"
   leanOptions := #[
     -- pretty-prints `fun a ↦ b`
     ⟨`pp.unicode.fun, true⟩,
@@ -24,8 +24,15 @@ lean_exe «linleios» where
   srcDir := "src"
   supportInterpreter := false
 
+lean_exe «linleios_test» where
+  root := `LinleiosTest
+  srcDir := "src"
+
 require mathlib from git
   "https://github.com/leanprover-community/mathlib4" @ "v4.20.0"
+
+require LSpec from git
+  "https://github.com/argumentcomputer/LSpec.git"
 
 require Parser from git
   "https://github.com/fgdorais/lean4-parser" @ "26d5ce4d60195a869b1fdb100b442794ea63e1ad"
