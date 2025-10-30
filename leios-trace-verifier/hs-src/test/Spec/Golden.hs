@@ -3,6 +3,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+-- | Golden tests.
 module Spec.Golden (
   golden,
 ) where
@@ -22,6 +23,7 @@ import System.Directory (listDirectory)
 import System.FilePath ((</>))
 import Test.Hspec (Expectation, Spec, SpecWith, describe, it, runIO, shouldBe, shouldNotBe)
 
+-- | Run golden tests.
 golden :: Spec
 golden = do
   dir <- runIO $ Paths.getDataDir

@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
+-- | Main entry for trace verification of Linear Leios.
 module Main where
 
 import Control.Monad (unless)
@@ -18,6 +19,7 @@ import System.IO (hPutStrLn, stderr)
 
 import qualified Data.Text as T (unpack)
 
+-- | Run the CLI.
 main :: IO ()
 main =
   do
@@ -47,6 +49,7 @@ main =
         putStrLn . T.unpack $ snd (snd result)
         exitFailure
 
+-- | CLI commands.
 data Command = Command
   { logFile :: FilePath
   , configFile :: FilePath
@@ -55,6 +58,7 @@ data Command = Command
   }
   deriving (Eq, Ord, Read, Show)
 
+-- | Command parser.
 commandParser :: ParserInfo Command
 commandParser =
   info (com <**> helper) $

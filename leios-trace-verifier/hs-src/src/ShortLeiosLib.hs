@@ -1,3 +1,4 @@
+-- | Imports from Agda.
 module ShortLeiosLib (
   module P,
   module V,

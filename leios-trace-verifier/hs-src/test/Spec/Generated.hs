@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
+-- | Arbitrary and generated tests.
 module Spec.Generated where
 
 import Control.Monad (join, liftM2, mzero, replicateM)
@@ -20,6 +21,7 @@ import Test.QuickCheck hiding (scale)
 import qualified Data.Map.Strict as M
 import qualified Spec.Scenario as Scenario (config, idSut, topology)
 
+-- | Run the verify on a list of events.
 verify :: [TraceEvent] -> (Integer, (Text, Text))
 verify =
   let
@@ -33,12 +35,14 @@ verify =
    in
     verifyTrace nrNodes Scenario.idSut stakeDistribution stageLength' ledgerQuality lateIBInclusion
 
+-- | Expectation for checking a trace.
 data Check
   = MustBeOkay
   | MustNotBeOkay
   | MustBe Text
   deriving (Show)
 
+-- | Check that a trace has the expected number of actions and result.
 check ::
   Maybe Integer ->
   Check ->
@@ -57,6 +61,7 @@ check expectedActions expectedMessage events =
       Nothing -> checkMessage $ fst (snd result)
       Just expectedActions' -> fst result === expectedActions' .&&. checkMessage (fst (snd result))
 
+-- | Generate the initial IB and events leading up to it.
 initStageIB :: Gen [Transition]
 initStageIB =
   let
@@ -65,6 +70,7 @@ initStageIB =
    in
     join <$> replicateM stageLength' ((: [NextSlot]) <$> gIB)
 
+-- | Generate the initial EB and events leading up to it.
 initStageEB :: Gen [Transition]
 initStageEB =
   let
@@ -79,6 +85,7 @@ initStageEB =
       a <- join <$> replicateM (stageLength' - 1) ((: [NextSlot]) <$> gIB)
       pure $ l ++ [NextSlot] ++ a
 
+-- | Generate the initial vote and events leading up to it.
 initStageVT :: Gen [Transition]
 initStageVT =
   let
@@ -103,6 +110,7 @@ initStageVT =
             )
       pure $ l ++ [NextSlot] ++ a
 
+-- | Generate the initial events.
 initPipelines :: Gen [Transition]
 initPipelines = do
   s1 <- initStageIB
@@ -112,6 +120,7 @@ initPipelines = do
   s5 <- initStageVT
   pure $ s1 ++ s2 ++ s3 ++ s4 ++ s5
 
+-- | Wrapper for skipping production of RBs, IBs, EBs, or votes.
 newtype SkipProduction = SkipProduction {unSkipProduction :: [Transition]}
   deriving (Show)
 
@@ -127,6 +136,7 @@ instance Arbitrary SkipProduction where
       pure $ SkipProduction (i ++ r)
   shrink = fmap SkipProduction . init . inits . unSkipProduction
 
+-- | Wrapper for sporadic production of RBs, IBs, EBs, or votes.
 newtype SporadicProduction = SporadicProduction {unSporadicProduction :: [Transition]}
   deriving (Show)
 
@@ -153,6 +163,7 @@ instance Arbitrary SporadicProduction where
       pure $ SporadicProduction (i ++ r)
   shrink = fmap SporadicProduction . init . inits . unSporadicProduction
 
+-- | Wrapper for noisy production (i.e., shuffled) of RBs, IBs, EB, and votes.
 newtype NoisyProduction = NoisyProduction {unNoisyProduction :: [Transition]}
   deriving (Show)
 
@@ -182,6 +193,7 @@ instance Arbitrary NoisyProduction where
       pure $ NoisyProduction (i ++ r)
   shrink = fmap NoisyProduction . init . inits . unNoisyProduction
 
+-- | Wrapper for sporadically missing RBs, IBs, EB, and votes.
 newtype SporadicMisses = SporadicMisses {unSporadicMisses :: [Transition]}
   deriving (Show)
 
@@ -192,6 +204,7 @@ instance Arbitrary SporadicMisses where
       i <- choose (1, length valid - 1)
       pure . SporadicMisses $ take i valid <> drop (i + 1) valid <> pure NextSlot
 
+-- | Generate tests.
 generated :: Spec
 generated =
   do
