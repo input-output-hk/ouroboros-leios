@@ -32,6 +32,7 @@ leios-header-diffusion-time-ms: 1000.0
 leios-ib-generation-time-ms: 130.0
 leios-mempool-sampling-strategy: ordered-by-id
 leios-mempool-aggressive-pruning: false
+leios-mempool-size-bytes: null
 # TODO: revise default
 praos-chain-quality: 40
 praos-fallback-enabled: true

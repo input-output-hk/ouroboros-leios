@@ -232,7 +232,7 @@ impl TraceAggregator {
         let new_chunk = (event.time_s - Timestamp::zero()).as_millis() / 250;
         self.current_time = event.time_s;
         if current_chunk != new_chunk {
-            if new_chunk % 4 == 0 {
+            if new_chunk.is_multiple_of(4) {
                 let timestamp = Timestamp::from_secs((new_chunk / 4) as u64);
                 self.tx_counts.push(self.produce_tx_counts(timestamp));
             }

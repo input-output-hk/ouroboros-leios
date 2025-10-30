@@ -74,6 +74,7 @@ pub struct RawParameters {
     pub leios_ib_generation_time_ms: f64,
     pub leios_mempool_sampling_strategy: MempoolSamplingStrategy,
     pub leios_mempool_aggressive_pruning: bool,
+    pub leios_mempool_size_bytes: Option<u64>,
     pub praos_chain_quality: u64,
     pub praos_fallback_enabled: bool,
     pub linear_vote_stage_length_slots: u64,
@@ -716,6 +717,7 @@ pub struct SimConfiguration {
     pub(crate) relay_strategy: RelayStrategy,
     pub(crate) mempool_strategy: MempoolSamplingStrategy,
     pub(crate) mempool_aggressive_pruning: bool,
+    pub(crate) mempool_size_bytes: u64,
     pub(crate) praos_chain_quality: u64,
     pub(crate) block_generation_probability: f64,
     pub(crate) ib_generation_probability: f64,
@@ -742,7 +744,7 @@ pub struct SimConfiguration {
 
 impl SimConfiguration {
     pub fn build(params: RawParameters, mut topology: Topology) -> Result<Self> {
-        if params.ib_shards % params.ib_shard_group_count != 0 {
+        if !params.ib_shards.is_multiple_of(params.ib_shard_group_count) {
             bail!(
                 "ib-shards ({}) is not divisible by ib-shard-group-count ({})",
                 params.ib_shards,
@@ -751,7 +753,9 @@ impl SimConfiguration {
         }
         if matches!(params.leios_variant, LeiosVariant::FullWithoutIbs)
             && params.ib_shard_group_count != 1
-            && params.ib_shard_period_length_slots % params.leios_stage_length_slots != 0
+            && !params
+                .ib_shard_period_length_slots
+                .is_multiple_of(params.leios_stage_length_slots)
         {
             bail!(
                 "Invalid sharding configuration. EBs are generated every {} slot(s). This sim is configured to choose EB shards from 1 of {} groups, using a different group every {} slot(s). Some groups would never be chosen.",
@@ -782,6 +786,7 @@ impl SimConfiguration {
             relay_strategy: params.relay_strategy,
             mempool_strategy: params.leios_mempool_sampling_strategy,
             mempool_aggressive_pruning: params.leios_mempool_aggressive_pruning,
+            mempool_size_bytes: params.leios_mempool_size_bytes.unwrap_or(u64::MAX),
             praos_chain_quality: params.praos_chain_quality,
             block_generation_probability: params.rb_generation_probability,
             ib_generation_probability: params.ib_generation_probability,

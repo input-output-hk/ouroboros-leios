@@ -64,6 +64,10 @@ export interface Config {
    */
   "leios-mempool-aggressive-pruning": boolean;
   /**
+   * The maximum size of a mempool, in bytes
+   */
+  "leios-mempool-size-bytes"?: bigint | null;
+  /**
    * Praos blockchain quality parameter.
    * This is η from the Leios paper.
    * Controls the pipelines EBs should reference in Full leios:
