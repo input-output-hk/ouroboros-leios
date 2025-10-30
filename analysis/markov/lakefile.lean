@@ -4,6 +4,16 @@ import Lake
 open Lake DSL
 
 package «linleios» where
+  version := StdVer.mk (SemVerCore.mk 0 1 0) ""
+  leanOptions := #[
+    -- pretty-prints `fun a ↦ b`
+    ⟨`pp.unicode.fun, true⟩,
+    -- disables automatic implicit arguments
+    ⟨`autoImplicit, false⟩,
+  ]
+  moreServerOptions := #[
+    ⟨`trace.debug, true⟩,
+  ]
 
 lean_lib «Linleios» where
   srcDir := "src"
