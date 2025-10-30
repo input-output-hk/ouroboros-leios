@@ -13,6 +13,7 @@ relay-strategy: request-from-first
 treat-blocks-as-full: false
 eb-diffusion-strategy: peer-order
 eb-referenced-txs-max-size-bytes: 12000000
+leios-mempool-size-bytes: 24000000
 eb-size-bytes-constant: 240
 eb-size-bytes-per-ib: 32
 leios-header-diffusion-time-ms: 1000.0
