@@ -33,7 +33,30 @@ let
     '';
   };
 
+  leiosDesignPdf = pkgs.stdenv.mkDerivation {
+    name = "leios-design-pdf";
+    src = ../docs/leios-design;
+    buildInputs = [
+      pkgs.pandoc
+      pkgs.texliveFull
+      pkgs.librsvg
+    ];
+    buildPhase = ''
+      # Work directly in the source directory where all assets are available
+      cd $src
+      mkdir -p $out
+
+      # Convert markdown to PDF using pandoc with XeLaTeX
+      pandoc README.md \
+        --pdf-engine=xelatex \
+        --from=markdown \
+        --to=pdf \
+        --metadata-file metadata.yaml \
+        --output=$out/leios-design.pdf
+    '';
+  };
+
 in
 {
-  inherit simRealism networkSpec;
+  inherit simRealism networkSpec leiosDesignPdf;
 }

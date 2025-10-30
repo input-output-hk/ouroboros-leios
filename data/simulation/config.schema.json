@@ -383,6 +383,12 @@
       "$ref": "#/definitions/MempoolSamplingStrategy",
       "description": "The strategy to use when selecting TXs from the Leios mempool."
     },
+    "leios-mempool-size-bytes": {
+      "additionalProperties": false,
+      "description": "The maximum size of a mempool, in bytes",
+      "properties": {},
+      "type": "number"
+    },
     "leios-stage-active-voting-slots": {
       "additionalProperties": false,
       "properties": {},

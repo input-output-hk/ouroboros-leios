@@ -280,7 +280,7 @@ impl NodeImpl for StracciatellaLeiosNode {
     }
 
     fn handle_new_slot(&mut self, slot: u64) -> EventResult {
-        if slot % self.sim_config.stage_length == 0 {
+        if slot.is_multiple_of(self.sim_config.stage_length) {
             // A new stage has begun.
 
             // Decide how many votes to generate in each slot
