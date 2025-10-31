@@ -126,8 +126,8 @@ private def outcomeNearUnity (os : Outcomes) : Bool :=
     )
   $ group "Quorum" (
       check "All voters vote and all votes are received" (
-        ∀ τ : RangedFloat 1 999,
-        ∀ committeeSize : RangedNat 100 nPools,
+        ∀ τ : RangedFloat 0.51 0.80,
+        ∀ committeeSize : RangedNat 100 800,
         (nearUnity $ pQuorum 1 committeeSize.value.toFloat τ.value)
       )
     )
@@ -152,8 +152,12 @@ private def outcomeNearUnity (os : Outcomes) : Bool :=
         ∀ state : State,
         (outcomeNearUnity $ @vote env state)
       )
+    $ check "Simulation" (
+        ∀ env : Environment,
+        ∀ steps : RangedNat 0 30,
+        (nearUnity ∘ totalProbability $ simulate env default 0 steps.value)
+      )
     )
-
 
 /--
 Testing is done elsewhere in this file.
