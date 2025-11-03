@@ -4,9 +4,6 @@ import Lean.Data.Json.FromToJson
 
 import Linleios.Types
 
-import Linleios.Probability
-import Linleios.Evolve
-
 open Lean (Json)
 open Lean.ToJson (toJson)
 open Std (HashMap)
@@ -75,11 +72,3 @@ def efficiency (states : Probabilities) : Float :=
   let ebSize := 12.0
   let ρ := ebSize / rbSize
   (rb * (1 - eb) + ρ * eb) / (1 + ρ)
-
-
-#eval ebEfficiency (simulate {(default : Environment) with pLate := 0.1} default 0 30)
-#eval (0.95^13 * 0.9)
-
-#eval makeEnvironment 1 4 7 0.05 600 0.75 1 1 0 0.1
-#eval ebEfficiency (simulate (makeEnvironment 1 4 7 0.05 600 0.75 1 1 0 0.1) default 0 30)
-#eval (0.95^13 * 0.9)

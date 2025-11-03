@@ -98,9 +98,14 @@ Tolerance for floating-point operations.
 private def ε := 1e-6
 
 /--
+Check that a probability is near a specified value.
+-/
+private def nearValue (value x : Float) : Bool := (x - value).abs < ε
+
+/--
 Check that a probability is close to unity.
 -/
-private def nearUnity (x : Float) : Bool := (x - 1).abs < ε
+private def nearUnity : Float → Bool := nearValue 1
 
 /--
 Check that the total outcome is near unity.
@@ -121,43 +126,92 @@ private def outcomeNearUnity (os : Outcomes) : Bool :=
       )
     $ check "Stake fractions sum to unity" (
         ∀ nPools : RangedNat 500 5000,
-        (nearUnity $ (stakeDistribution nPools.value).sum)
+        nearUnity $ (stakeDistribution nPools.value).sum
       )
     )
   $ group "Quorum" (
       check "All voters vote and all votes are received" (
         ∀ τ : RangedFloat 0.51 0.80,
         ∀ committeeSize : RangedNat 100 800,
-        (nearUnity $ pQuorum 1 committeeSize.value.toFloat τ.value)
+        nearUnity $ pQuorum 1 committeeSize.value.toFloat τ.value
       )
     )
   $ group "Conservation of probability" (
       check "Forging RB" (
         ∀ env : Environment,
         ∀ state : State,
-        (outcomeNearUnity $ @forgeRb env state)
+        outcomeNearUnity $ @forgeRb env state
       )
     $ check "Certifying" (
         ∀ env : Environment,
         ∀ state : State,
-        (outcomeNearUnity $ @certify env state)
+        outcomeNearUnity $ @certify env state
       )
     $ check "Forging EB" (
         ∀ env : Environment,
         ∀ state : State,
-        (outcomeNearUnity $ @forgeEb env state)
+        outcomeNearUnity $ @forgeEb env state
       )
     $ check "Voting" (
         ∀ env : Environment,
         ∀ state : State,
-        (outcomeNearUnity $ @vote env state)
+        outcomeNearUnity $ @vote env state
       )
     $ check "Simulation" (
         ∀ env : Environment,
         ∀ steps : RangedNat 0 30,
-        (nearUnity ∘ totalProbability $ simulate env default 0 steps.value)
+        nearUnity ∘ totalProbability $ simulate env default 0 steps.value
       )
     )
+  $ group "EB distribution" (
+      check "Total probability is unity" (
+        ∀ env : Environment,
+        ∀ steps : RangedNat 0 30,
+        let states := simulate env default 0 steps.value
+        let ebDist := ebDistribution states
+        nearUnity $ ebDist.values.sum
+      )
+    )
+  $ group "Efficiency" (
+      group "RB efficiency" (
+        check "Honest environment" (
+          ∀ steps : RangedNat 1 30,
+          let states := simulate default default 0 steps.value
+          nearUnity $ rbEfficiency states
+        )
+      $ check "Adversarial environment" (
+          ∀ fAdversary : RangedFloat 0.01 0.49,
+          let env := {(default : Environment) with fAdversary := fAdversary.value}
+          let states := simulate env default 0 30
+          nearValue (1 - fAdversary.value) $ rbEfficiency states
+        )
+      )
+    $ group "EB efficiency" (
+        check "Ideal environment" (
+          let states := simulate default default 0 30
+          nearValue (0.95^13) $ ebEfficiency states
+        )
+      $ check "Quorum failure" (
+          ∀ τ : RangedFloat 0.90 1.00,
+          let env := makeEnvironment 1 4 7 0.05 600 τ.value 1 1 0 0
+          let states := simulate env default 0 30
+          nearValue (0.95^13 * env.pQuorum) $ ebEfficiency states
+        )
+      $ check "Late EB validation" (
+          ∀ pLate : RangedFloat 0.01 0.99,
+          let env := {(default : Environment) with pLate := pLate.value}
+          let states := simulate env default 0 30
+          nearValue (0.95^13 * (1 - pLate.value)) $ ebEfficiency states
+        )
+      $ check "Adversarial environment" (
+          ∀ fAdversary : RangedFloat 0.01 0.49,
+          let env := {(default : Environment) with fAdversary := fAdversary.value}
+          let states := simulate env default 0 30
+          nearValue (0.95^13 * (1 - fAdversary.value)^2) $ ebEfficiency states
+        )
+      )
+    )
+
 
 /--
 Testing is done elsewhere in this file.
