@@ -57,6 +57,12 @@ def makeEnvironment (Lheader Lvote Ldiff : Nat) (activeSlotCoefficient committee
     fAdversary := fAdversary
   }
 
+/--
+A perfect honest environment with the recommended protocol parameters.
+-/
+instance : Inhabited Environment where
+  default := makeEnvironment 1 4 7 0.05 600 0.75 1 1 0 0
+
 
 /--
 The state of the chain's evolution.
