@@ -1,3 +1,5 @@
+//! Quickcheck tests for sortition.
+
 use num_bigint::BigInt;
 use num_rational::Ratio;
 use num_traits::{FromPrimitive, One};

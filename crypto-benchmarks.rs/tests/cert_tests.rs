@@ -1,3 +1,5 @@
+//! Quickcheck tests for certificates.
+
 #[macro_use(quickcheck)]
 extern crate quickcheck_macros;
 

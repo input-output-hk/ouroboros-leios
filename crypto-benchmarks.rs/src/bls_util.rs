@@ -1,9 +1,12 @@
+//! Low-level utility functions for BLS operations not supported by the `blst` library.
+
 use blst::min_sig::*;
 use blst::*;
 use num_bigint::{BigInt, Sign};
 use num_rational::Ratio;
 use num_traits::FromPrimitive;
 
+/// Apply a function to a public key (i.e., to a point in G2).
 pub fn pk_transform(f: &dyn Fn(blst_p2) -> blst_p2, pk: &PublicKey) -> PublicKey {
     let mut point: blst_p2 = blst_p2::default();
     unsafe {
@@ -24,6 +27,7 @@ pub fn pk_transform(f: &dyn Fn(blst_p2) -> blst_p2, pk: &PublicKey) -> PublicKey
     }
 }
 
+/// Apply a function to a signature (i.e., to a point in G1).
 pub fn sig_transform(f: &dyn Fn(blst_p1) -> blst_p1, sig: &Signature) -> Signature {
     let mut point: blst_p1 = blst_p1::default();
     unsafe {
@@ -44,6 +48,7 @@ pub fn sig_transform(f: &dyn Fn(blst_p1) -> blst_p1, sig: &Signature) -> Signatu
     }
 }
 
+/// Convert a signature to a rational number between zero and one.
 pub fn sig_to_rational(sig: &Signature) -> Ratio<BigInt> {
     let bytes: [u8; 48] = sig.to_bytes();
     let mut hashed: [u8; 32] = [0; 32];

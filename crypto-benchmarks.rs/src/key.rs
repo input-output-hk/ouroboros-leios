@@ -1,3 +1,5 @@
+//! High-level operations on Leios keys.
+
 use blst::min_sig::*;
 use blst::BLST_ERROR;
 use num_bigint::BigInt;
@@ -11,6 +13,7 @@ use crate::bls_vote;
 use crate::primitive::{arbitrary_poolkeyhash, KesSig, PoolKeyhash};
 use crate::util::{arbitrary_fixed_bytes, deserialize_fixed_bytes, serialize_fixed_bytes};
 
+/// A secret key is a BLS scalar.
 #[derive(Clone, Debug)]
 pub struct SecKey(pub(crate) SecretKey);
 
@@ -58,6 +61,7 @@ impl Arbitrary for SecKey {
     }
 }
 
+/// A public key is a point in G2.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct PubKey(pub(crate) PublicKey);
 
@@ -96,6 +100,7 @@ impl Arbitrary for PubKey {
     }
 }
 
+/// A signature is a point in G1.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Sig(pub(crate) Signature);
 
@@ -136,9 +141,12 @@ impl Arbitrary for Sig {
     }
 }
 
+/// A proof of possession is a pair of points in G1.
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct PoP {
+    /// Signature on the public key.
     pub mu1: Sig, // 48 bytes
+    /// Signature in G1.
     pub mu2: Sig, // 48 bytes
 } // 96 bytes
 
@@ -153,6 +161,7 @@ impl Arbitrary for PoP {
     }
 }
 
+/// Key registration includes the pool hash, the public key, the proof of possession, and a KES signature.
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct Reg {
     pub pool: PoolKeyhash, //  28 bytes
@@ -161,6 +170,7 @@ pub struct Reg {
     pub kes_sig: KesSig,   // 448 bytes
 } // 668 bytes
 
+/// Generate an arbitrary pool registration.
 pub fn arbitrary_reg(g: &mut Gen, pool: &PoolKeyhash, sk: &SecKey) -> Reg {
     let (mu1, mu2) = bls_vote::make_pop(&sk.0);
     Reg {
@@ -182,6 +192,7 @@ impl Arbitrary for Reg {
     }
 }
 
+/// Generate an arbitrary secret key along with its public key and proof of possession.
 pub fn key_gen() -> (SecKey, PubKey, PoP) {
     let sk: SecretKey = bls_vote::gen_key();
     let mvk: PublicKey = sk.sk_to_pk();
@@ -196,14 +207,17 @@ pub fn key_gen() -> (SecKey, PubKey, PoP) {
     )
 }
 
+/// Verify a proof of possession `mu` for a public key `mvk`.
 pub fn check_pop(mvk: &PubKey, mu: &PoP) -> bool {
     bls_vote::check_pop(&mvk.0, &mu.mu1.0, &mu.mu2.0)
 }
 
+/// Sign a message `msg` in the domain `dst` with the secret key `sk`.
 pub fn sign_message(sk: &SecKey, dst: &[u8], msg: &[u8]) -> Sig {
     Sig(sk.0.sign(msg, dst, &[]))
 }
 
+/// Verify signature `sig` on a message `msg` in the domain `dst` using a public key `pk`.
 pub fn verify_message(pk: &PubKey, dst: &[u8], msg: &[u8], sig: &Sig) -> bool {
     let result = sig.0.verify(true, msg, dst, &[], &pk.0, true);
     result == BLST_ERROR::BLST_SUCCESS

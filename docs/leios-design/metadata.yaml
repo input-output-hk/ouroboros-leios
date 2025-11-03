@@ -1,0 +1,21 @@
+# Pandoc PDF metadata
+toc: true
+numbersections: true
+highlight-style: haddock
+documentclass: scrartcl
+fontsize: 11pt
+geometry:
+  - margin=2.5cm
+  - top=3cm
+  - bottom=3cm
+colorlinks: true
+linkcolor: NavyBlue
+urlcolor: NavyBlue
+citecolor: NavyBlue
+toccolor: black
+papersize: a4
+linestretch: 1.15
+indent: false
+header-includes: |
+  \usepackage{microtype}
+  \usepackage[T1]{fontenc}

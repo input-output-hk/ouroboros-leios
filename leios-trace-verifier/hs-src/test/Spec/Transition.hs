@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
+-- | Generation of valid sequences of events.
 module Spec.Transition where
 
 import Control.Lens hiding (elements)
@@ -23,6 +24,7 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Spec.Scenario as Scenario (config, idOther, idSut)
 
+-- | The context for tracking the state, used in generating valid events.
 data TracingContext = TracingContext
   { _clock :: Time
   , _slotNo :: SlotNo
@@ -50,6 +52,8 @@ instance Default TracingContext where
       Scenario.idSut
       Scenario.idOther
       (leiosStageLengthSlots Scenario.config)
+
+-- Various lenses.
 
 clock :: Lens' TracingContext Time
 clock = lens _clock $ \ctx x -> ctx{_clock = x}
@@ -87,6 +91,7 @@ other = to $ T.pack . ("node-" <>) . show . _idOther
 stageLength :: Getter TracingContext Word
 stageLength = to _stageLength
 
+-- | An abstract (i.e., contextless) event.
 data Transition
   = NextSlot
   | SkipSlot
@@ -103,6 +108,7 @@ data Transition
   | ReceiveVT
   deriving (Show)
 
+-- | Generate a new identifier.
 genId :: Integer -> Word64 -> Set Text -> Gen Text
 genId system slot forbidden =
   let
@@ -110,6 +116,7 @@ genId system slot forbidden =
    in
     g `suchThat` (not . (`S.member` forbidden))
 
+-- | Generate a valid RB.
 genRB :: Integer -> StateT TracingContext Gen (Text, Nullable BlockRef)
 genRB i =
   do
@@ -123,6 +130,7 @@ genRB i =
     rbs %= M.insert block_id parent
     pure (block_id, Nullable . pure $ BlockRef parent)
 
+-- | Generate a valid IB.
 genIB :: Integer -> StateT TracingContext Gen Text
 genIB i =
   do
@@ -132,6 +140,7 @@ genIB i =
     ibs %= S.insert ib
     pure ib
 
+-- | Generate a valid EB.
 genEB :: Integer -> StateT TracingContext Gen Text
 genEB i =
   do
@@ -141,6 +150,7 @@ genEB i =
     ebs %= S.insert eb
     pure eb
 
+-- | Generate a valid vote.
 genVT :: Integer -> StateT TracingContext Gen Text
 genVT i =
   do
@@ -150,9 +160,11 @@ genVT i =
     vts %= S.insert vt
     pure vt
 
+-- | Advance the clock.
 tick :: StateT TracingContext Gen ()
 tick = clock %= (+ 0.000001)
 
+-- | Generate an actual valid event from its abstract representation.
 transition :: Transition -> StateT TracingContext Gen [Event]
 transition SkipSlot =
   do
@@ -257,6 +269,7 @@ transition ReceiveVT =
     block_id <- genVT =<< use idOther
     pure [VTBundleReceived{..}]
 
+-- | Generate a valid trace from abstract events.
 transitions :: [Transition] -> Gen [TraceEvent]
 transitions =
   (`evalStateT` def)
@@ -264,5 +277,6 @@ transitions =
     . fmap concat
     . mapM transition
 
+-- | Timestamp an event.
 timestamp :: Monad m => Event -> StateT TracingContext m TraceEvent
 timestamp = uses clock . flip TraceEvent

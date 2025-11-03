@@ -7,6 +7,23 @@ See [Specification.md](Specification.md) for a description of the algorithms imp
 - Benchmarks: [benches/](benches/)
 
 
+## Background material
+
+![BLS scheme from original Leios preprint](figure-7-bls.png)
+
+![Voting scheme from original Leios preprint](figure-8-voting.png)
+
+
+## Efficiency notes
+
+The benchmark code uses an efficient BLS implementation, but it has not been optimized.
+
+- Some of the hash data structures in the certificate could be replaced by bit sets.
+- The optional group checks are turned on for calls to the `blst` library even though in some cases these may not strictly be necessary.
+- The rational arthmetic for computing logarithms and performing sortition uses the maximum precision obtainable in `Ratio<BigInt>` even though that precision is not necessarily needed.
+- The code has not been profiled.
+
+
 ## Command-line interface
 
 A command-line interface is provided for testing and exploration. Note that all input and output files are CBOR.

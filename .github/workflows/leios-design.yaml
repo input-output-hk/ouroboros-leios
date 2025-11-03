@@ -1,0 +1,99 @@
+name: "Build Leios Design PDF"
+
+on:
+  pull_request:
+    paths:
+      - "docs/leios-design/**"
+      - "nix/artifacts.nix"
+      - ".github/workflows/leios-design.yaml"
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/leios-design/**"
+      - "nix/artifacts.nix"
+  workflow_dispatch: # Allow manual triggering
+
+permissions:
+  contents: read
+  actions: read
+
+# Prevent redundant workflow runs
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-pdf:
+    name: "Build Leios Design PDF"
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: 🛠️ Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+            extra-substituters = https://cache.iog.io
+            extra-trusted-public-keys = hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=
+
+      - name: 🗂️ Setup Cachix for IOG cache
+        uses: cachix/cachix-action@v15
+        with:
+          name: iog
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          skipPush: true
+
+      - name: 🏗️ Build PDF using Nix
+        run: |
+          echo "Building Leios Design PDF..."
+          nix build .#leiosDesignPdf -L
+          
+          # Verify the PDF was created
+          if [ ! -f result/leios-design.pdf ]; then
+            echo "Error: PDF file was not created"
+            exit 1
+          fi
+          
+          # Show file size and info
+          ls -lh result/leios-design.pdf
+          file result/leios-design.pdf
+
+      - name: 📊 Get PDF metadata
+        run: |
+          # Get basic file info
+          echo "PDF file size: $(stat -c%s result/leios-design.pdf) bytes"
+          echo "PDF creation date: $(stat -c%y result/leios-design.pdf)"
+          
+          # If pdfinfo is available, show more details
+          if command -v pdfinfo &> /dev/null; then
+            echo "PDF metadata:"
+            pdfinfo result/leios-design.pdf || true
+          fi
+
+      - name: 🚀 Upload PDF artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: leios-design-pdf-${{ github.sha }}
+          path: result/leios-design.pdf
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: 📄 Add PDF info to job summary
+        run: |
+          echo "## 📄 Leios Design PDF Generated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Successfully built PDF from markdown source" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**File details:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Size: $(stat -c%s result/leios-design.pdf) bytes" >> $GITHUB_STEP_SUMMARY
+          echo "- Generated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "- Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The PDF is available as a workflow artifact named \`leios-design-pdf-${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY

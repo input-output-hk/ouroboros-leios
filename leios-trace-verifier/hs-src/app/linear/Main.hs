@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
+-- | Main entry for trace verification of Linear Leios.
 module Main where
 
 import Control.Monad (unless)
@@ -18,12 +19,13 @@ import System.IO (hPutStrLn, stderr)
 
 import qualified Data.Text as T (unpack)
 
+-- | Run the CLI.
 main :: IO ()
 main =
   do
     Command{..} <- execParser commandParser
 
-    -- Prameters from topology
+    -- Parameters from topology
     (top :: Topology COORD2D) <- decodeFileThrow topologyFile
     let nrNodes = toInteger $ Prelude.length (elems $ nodes top)
     let nodeNames = Prelude.map unNodeName (keys $ nodes top)
@@ -37,9 +39,10 @@ main =
     let ldiff = toInteger (linearDiffuseStageLengthSlots config)
     let validityCheckTime = 3 -- TODO: read from config
     result <-
-      verifyTrace nrNodes idSut stakeDistribution lhdr lvote ldiff validityCheckTime
-        . decodeJSONL
-        <$> BSL.readFile logFile
+      pure ($ startingSlot)
+        <*> verifyTraceFromSlot nrNodes idSut stakeDistribution lhdr lvote ldiff validityCheckTime
+            . decodeJSONL
+            <$> BSL.readFile logFile
     hPutStrLn stderr $ "Applying " <> show (fst result) <> " actions"
     unless (fst (snd result) == "ok") $
       do
@@ -47,14 +50,17 @@ main =
         putStrLn . T.unpack $ snd (snd result)
         exitFailure
 
+-- | CLI commands.
 data Command = Command
   { logFile :: FilePath
   , configFile :: FilePath
   , topologyFile :: FilePath
+  , startingSlot :: Integer
   , idSut :: Integer
   }
   deriving (Eq, Ord, Read, Show)
 
+-- | Command parser.
 commandParser :: ParserInfo Command
 commandParser =
   info (com <**> helper) $
@@ -67,4 +73,5 @@ commandParser =
       <$> strOption (long "trace-file" <> help "Leios simulation trace log file")
       <*> strOption (long "config-file" <> help "Leios configuration file")
       <*> strOption (long "topology-file" <> help "Leios topology file")
+      <*> option auto (long "starting-slot" <> value 0 <> help "Starting slot of trace-file")
       <*> option auto (long "idSut" <> help "Id of system under test (SUT)")

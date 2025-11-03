@@ -1,3 +1,5 @@
+//! Criterion benchmarks for sortition.
+
 use criterion::{criterion_group, criterion_main, Criterion};
 use num_bigint::BigInt;
 use num_rational::Ratio;
