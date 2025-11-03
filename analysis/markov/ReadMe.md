@@ -54,7 +54,7 @@ Provided that a quorum of votes have endorsed the EB, the following conditions a
 Provided that an honest RB exists, an EB can be forged if the node has received the previous EB and computed the ledger state.
 
 - Because of their membership in the previous vote, a fraction $n_\text{comm} / n_\text{pools}$ of the pools have already updated their ledger state.
-- Of the pools not having voted on the block we define $p_\text{late}$ as the probability that the EB has arrived too late to compute the ledger state needed to produce the next EB.
+- We define $p_\text{late}$ as the probability that the EB has arrived too late to compute the ledger state needed to produce the next EB.
 
 
 ### Substep 4: Vote
