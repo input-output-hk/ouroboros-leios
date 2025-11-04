@@ -61,7 +61,7 @@ def makeEnvironment (Lheader Lvote Ldiff : Nat) (activeSlotCoefficient committee
 A perfect honest environment with the recommended protocol parameters.
 -/
 instance : Inhabited Environment where
-  default := makeEnvironment 1 4 7 0.05 600 0.75 1 1 0 0
+  default := makeEnvironment 1 4 7 0.05 700 0.75 1 1 0 0
 
 
 /--

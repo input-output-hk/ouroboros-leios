@@ -8,35 +8,48 @@ Number of stake pools.
 def nPools : Nat := 2500
 
 /--
-Compute a realistic stake distribution for the specified number of pools.
+Sortition results.
 -/
-def stakeDistribution (nPools : Nat) : List Float :=
-  (List.range nPools).map (fun k => ((k + 1).toFloat / nPools.toFloat)^10 - (k.toFloat / nPools.toFloat)^10)
+structure Sortition where
+  stake : Float
+  probability : Float
+deriving Repr
 
 /--
-Determine the distribution parameter that achieves the specified committee size.
+Fait Accompli sortition.
 -/
-private def calibrateCommittee(committeeSize : Float) : Float :=
-  let stakes : List Float := stakeDistribution nPools
-  let f (m : Float) : Float :=
-    let ps : List Float := stakes.map (fun s => 1 - Float.exp (- m * s))
-    ps.sum - committeeSize
-  bisectionSearch f committeeSize nPools.toFloat 0.5 10
+def faSortition (nPools n : Nat) : List Sortition :=
+  let S (i : Nat) := ((nPools - i + 1).toFloat / nPools.toFloat)^10 - ((nPools - i).toFloat / nPools.toFloat)^10
+  let ρ (i : Nat) := 1 - ((nPools - i).toFloat / nPools.toFloat)^10
+  let test (n i : Nat) : Bool := (1 - S i / ρ i)^2 < (n - i).toFloat / (n - i + 1).toFloat
+  let i := (List.range nPools).map $ Add.add 1
+  let ⟨ persistent , nonpersistent ⟩ := i.partition $ test n
+  let ρStar := ρ $ persistent.length + 1
+  let persistent' := persistent.map $ fun i ↦ {stake := S i, probability := 1}
+  let nonpersistent' :=
+    nonpersistent.map $ fun i ↦
+      let Si := S i
+      {stake := Si, probability := Si / ρStar}
+  persistent' ++ nonpersistent'
 
 /--
 Compute the mean and standard deviation of the committee size, given the probability of a successful vote and a target committee size.
 -/
-private def committeeDistribution (pSuccessfulVote committeeSize : Float) : Float × Float :=
-  let stakes : List Float := stakeDistribution nPools
-  let m := calibrateCommittee committeeSize
-  let ps : List Float := stakes.map (fun s => pSuccessfulVote * (1 - Float.exp (- m * s)))
-  let μ := ps.sum
-  let σ := (ps.map (fun p => p * (1 - p))).sum.sqrt
+def voteDistribution (pSuccessfulVote : Float) (committeeSize : Nat) : Float × Float :=
+  let sortition := faSortition nPools committeeSize
+  let μ := (sortition.map $ fun s ↦ let p := s.probability * pSuccessfulVote; s.stake * p).sum
+  let σ := (sortition.map $ fun s ↦ let p := s.probability * pSuccessfulVote; (s.stake * s.stake * p * (1 - p))).sum.sqrt
   ⟨ μ , σ ⟩
 
 /--
 Compute the probability of a quorum, given the probability of a successful vote, the target committee size, and the quorum fraction.
 -/
 def pQuorum (pSuccessfulVote committeeSize τ : Float) : Float :=
-  let ⟨ μ , σ ⟩ := committeeDistribution pSuccessfulVote committeeSize
-  1 - cdfGaussian (τ * committeeSize) μ σ
+  let ⟨ μ , σ ⟩ := voteDistribution pSuccessfulVote committeeSize.toUInt64.toNat
+  1 - cdfGaussian τ μ σ
+
+/--
+Compute a realistic stake distribution for the specified number of pools.
+-/
+def stakeDistribution (nPools : Nat) : List Float :=
+  (faSortition nPools 700).map Sortition.stake
