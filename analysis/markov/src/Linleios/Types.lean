@@ -57,6 +57,12 @@ def makeEnvironment (Lheader Lvote Ldiff : Nat) (activeSlotCoefficient committee
     fAdversary := fAdversary
   }
 
+/--
+A perfect honest environment with the recommended protocol parameters.
+-/
+instance : Inhabited Environment where
+  default := makeEnvironment 1 4 7 0.05 700 0.75 1 1 0 0
+
 
 /--
 The state of the chain's evolution.
@@ -75,23 +81,13 @@ structure State where
 deriving Repr, BEq, Hashable, Inhabited
 
 /--
-The genesis state starts when zero counts.
--/
-theorem genesis : (default : State).clock = 0 ∧ (default : State).rbCount = 0 ∧ (default : State).ebCount = 0 := by
-  constructor
-  rfl
-  constructor
-  rfl
-  rfl
-
-
-/--
 The active states and their probabilities.
 -/
 def Probabilities := HashMap State Probability
 deriving Repr, EmptyCollection
 
 instance : Inhabited Probabilities where
+  -- TODO: Rewrite using `Singleton.singleton`.
   default := (∅ : Probabilities).insert Inhabited.default 1
 
 
