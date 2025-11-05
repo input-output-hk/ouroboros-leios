@@ -19,17 +19,19 @@ deriving Repr
 Fait Accompli sortition.
 -/
 def faSortition (nPools n : Nat) : List Sortition :=
-  let S (i : Nat) := ((nPools - i + 1).toFloat / nPools.toFloat)^10 - ((nPools - i).toFloat / nPools.toFloat)^10
-  let ρ (i : Nat) := 1 - ((nPools - i).toFloat / nPools.toFloat)^10
-  let test (n i : Nat) : Bool := (1 - S i / ρ i)^2 < (n - i).toFloat / (n - i + 1).toFloat
+  let ρ (i : Nat) := ((nPools - i + 1).toFloat / nPools.toFloat)^10
+  let S (i : Nat) := ρ i - ((nPools - i).toFloat / nPools.toFloat)^10
+  let test (i : Nat) : Bool := (1 - S i / ρ i)^2 < (n - i).toFloat / (n - i + 1).toFloat
   let i := (List.range nPools).map $ Add.add 1
-  let ⟨ persistent , nonpersistent ⟩ := i.partition $ test n
-  let ρStar := ρ $ persistent.length + 1
+  let ⟨ persistent , nonpersistent ⟩ := i.partition test
+  let n₁ := persistent.length
+  let n₂ := n - n₁
+  let ρStar := ρ $ n₁ + 1
   let persistent' := persistent.map $ fun i ↦ {stake := S i, probability := 1}
   let nonpersistent' :=
     nonpersistent.map $ fun i ↦
       let Si := S i
-      {stake := Si, probability := Si / ρStar}
+      {stake := Si, probability := 1 - Float.exp (- n₂.toFloat * Si / ρStar)}
   persistent' ++ nonpersistent'
 
 /--
