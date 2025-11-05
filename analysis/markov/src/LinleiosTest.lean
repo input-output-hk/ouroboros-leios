@@ -131,8 +131,8 @@ private def outcomeNearUnity (os : Outcomes) : Bool :=
     )
   $ group "Quorum" (
       check "All voters vote and all votes are received" (
-        ∀ τ : RangedFloat 0.51 0.76,
-        ∀ committeeSize : RangedNat 700 1000,
+        ∀ τ : RangedFloat 0.50 0.90,
+        ∀ committeeSize : RangedNat 600 1000,
         nearUnity $ pQuorum 1 committeeSize.value.toFloat τ.value
       )
     )
