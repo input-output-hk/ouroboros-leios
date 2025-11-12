@@ -6,6 +6,7 @@ on:
       - "**/*.d2"
       - "site/**"
       - "ui/**"
+      - ".github/workflows/docs.yaml"
   push:
     branches:
       - main
@@ -160,9 +161,33 @@ jobs:
           name: visualizer
           path: site/static/visualizer
 
+      - name: Find leios design build artifact
+        id: leios-design-workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            let res = await github.rest.actions.listWorkflowRuns({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'leios-design.yaml',
+                branch: 'main',
+                status: 'success'
+            });
+            return res.data.workflow_runs[0].id;
+
+      - name: 📥 Download built leios design
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN || github.token }}
+          run-id: ${{steps.leios-design-workflow.outputs.result}}
+          pattern: leios-design-pdf*
+          merge-multiple: true
+          path: site/static
+
       - name: 🏗️ Build Docusaurus site
         working-directory: site
         run: |
+          find static
           npm run build
 
       - name: Verify Docusaurus build
