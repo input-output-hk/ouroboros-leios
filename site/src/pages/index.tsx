@@ -1906,7 +1906,7 @@ function MonthlyReviewsSection() {
                             >
                                 <Link
                                     className="button button--primary button--lg"
-                                    to="https://www.youtube.com/live/5baqGY7WXAc"
+                                    to="https://youtube.com/live/rraKzt-JIqM"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     style={{
