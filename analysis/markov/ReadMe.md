@@ -21,7 +21,7 @@ The protocol state is represented by three quantities.
 - Whether an honest RB was produced.
 - Whether a certificate is ready for inclusion in the next RB.
 
-Time is tracked in terms of block-forging opportunties instead of in terms of slots.
+Time is tracked in terms of block-forging opportunities instead of in terms of slots.
 
 Transitions occur in several substeps:
 
