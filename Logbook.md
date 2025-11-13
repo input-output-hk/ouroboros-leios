@@ -1,5 +1,12 @@
 # Leios logbook
 
+> [!IMPORTANT]
+> 
+> Now that the [Leios CIP](https://github.com/cardano-foundation/CIPs/pull/1078) is under review and implementation work has begun, this Leios logbook has been retired in favor of github tickets in the [Leios implementation roadmap](https://github.com/orgs/input-output-hk/projects/167/views/3).
+> 
+> See the [Post-CIP R&D Findings](docs/post-cip-findings.md) document for additional (after 2025-11-01) findings and artifacts not directly related to the implementation of Linear Leios.
+
+
 ## 2025-10-21
 
 ### Mainnet data on "canary transactions"
