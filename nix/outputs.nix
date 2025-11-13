@@ -19,5 +19,7 @@ in
         pkgs.nodePackages.prettier
       ];
     };
+
+    devShells.ui = import ../ui/shell.nix { inherit pkgs; };
   }
 ]
