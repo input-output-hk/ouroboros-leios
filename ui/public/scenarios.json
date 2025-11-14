@@ -1,6 +1,13 @@
 {
   "scenarios": [
     {
+      "name": "Small",
+      "topology": "topologies/example.yaml",
+      "duration": 120,
+      "trace": "traces/example.jsonl.gz",
+      "aggregated": false
+    },
+    {
       "name": "1x",
       "topology": "topologies/thousand.yaml",
       "duration": 300,

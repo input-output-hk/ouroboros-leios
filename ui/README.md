@@ -33,25 +33,34 @@ To prepare a scenario to visualize, add or update `public/scenarios.json`:
 {
   "scenarios": [
     {
-      "name": "My Scenario",
-      "topology": "topologies/thousand.yaml",
-      "duration": 30.0,
-      "trace": "traces/myscenario.jsonl"
-    }
+      "name": "Example",
+      "topology": "topologies/example.yaml",
+      "duration": 300,
+      "trace": "traces/example.jsonl",
+      "aggregated": false
+    },
   ]
 }
 ```
 
-Now add that topology to the public directory:
+Now add that topology to the public directory, for example:
 
 ```sh
 mkdir -p public/topologies
-cp ../sim-rs/test-data/thousand.yaml public/topologies
+ln -sr ../sim-rs/test_data/small.yaml public/topologies/example.yaml
 ```
 
-And generate a trace to visualize from the `sim-rs` directory:
+And generate a trace to visualize using the built `sim-rs`:
 
 ```bash
-mkdir -p ../ui/public/traces
-cargo run --release test_data/thousand.yaml ../ui/public/traces/myscenario.jsonl -s 30
+mkdir -p public/traces
+../sim-rs/target/release/sim-cli -p ../analysis/sims/cip/experiments/NA,0.200/config.yaml public/topologies/example.yaml public/traces/example.jsonl -s 120
 ```
+
+In case you want to store it, use gzip and git lfs:
+
+``` bash
+gzip public/traces/examples.jsonl
+git lfs track public/traces/examples.jsonl.gz
+```
+
