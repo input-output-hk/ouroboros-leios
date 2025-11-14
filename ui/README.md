@@ -66,3 +66,10 @@ Before you can run the UI, ensure you have the following installed:
 
 - If you encounter any issues, check the console for error messages and ensure
   all dependencies are correctly installed.
+
+- Example scenarios may be stored with Git LFS in the repository, fetch it with:
+
+  ``` bash
+  git lfs fetch
+  git lfs checkout
+  ```
