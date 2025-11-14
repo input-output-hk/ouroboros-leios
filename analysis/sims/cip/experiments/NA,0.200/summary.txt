@@ -72,26 +72,26 @@
  INFO leios: sim_cli::events: Each IB contained an average of NaN transaction(s) (stddev NaN) and an average of 0 B (stddev 0 B). 0 IB(s) were empty.
  INFO leios: sim_cli::events: Each node received an average of 0.000 IB(s) (stddev 0.000).
  INFO leios: sim_cli::events: 44 EB(s) were generated; on average there were 0.029 EB(s) per slot.
- INFO leios: sim_cli::events: Each EB contained an average of 5493.386 transaction(s) (stddev 1999.347). 0 EB(s) were empty.
+ INFO leios: sim_cli::events: Each EB contained an average of 4925.341 transaction(s) (stddev 1807.155). 0 EB(s) were empty.
  INFO leios: sim_cli::events: Each EB contained an average of 0.000 IB(s) (stddev 0.000). 0 EB(s) were empty.
  INFO leios: sim_cli::events: Each IB was included in an average of NaN EB(s) (stddev NaN).
  INFO leios: sim_cli::events: 0 out of 0 IBs were included in at least one EB.
  INFO leios: sim_cli::events: 0 out of 0 IBs expired before they reached an EB.
- INFO leios: sim_cli::events: 23 out of 44 EBs expired before an EB from their stage reached an RB.
+ INFO leios: sim_cli::events: 21 out of 44 EBs expired before an EB from their stage reached an RB.
  INFO leios: sim_cli::events: 128512 out of 128572 transaction(s) were included in at least one EB.
- INFO leios: sim_cli::events: 22692 total votes were generated.
- INFO leios: sim_cli::events: Each stake pool produced an average of 105.056 vote(s) (stddev 29.971).
- INFO leios: sim_cli::events: Each EB received an average of 527.721 vote(s) (stddev 147.122).
- INFO leios: sim_cli::events: There were 7585 bundle(s) of votes. Each bundle contained 2.992 vote(s) (stddev 1.628).
- INFO leios: sim_cli::events: 23 L1 block(s) had a Leios endorsement.
- INFO leios: sim_cli::events: 127252 tx(s) (190.88 MB) were referenced by a Leios endorsement.
- INFO leios: sim_cli::events: 1320 tx(s) (1.98 MB) were included directly in a Praos block.
- INFO leios: sim_cli::events: Spatial efficiency: 190.88 MB/7.93 MB (2407.265%) of Leios bytes were unique transactions.
+ INFO leios: sim_cli::events: 22808 total votes were generated.
+ INFO leios: sim_cli::events: Each stake pool produced an average of 105.593 vote(s) (stddev 30.032).
+ INFO leios: sim_cli::events: Each EB received an average of 530.419 vote(s) (stddev 146.669).
+ INFO leios: sim_cli::events: There were 7625 bundle(s) of votes. Each bundle contained 2.991 vote(s) (stddev 1.627).
+ INFO leios: sim_cli::events: 25 L1 block(s) had a Leios endorsement.
+ INFO leios: sim_cli::events: 127372 tx(s) (191.06 MB) were referenced by a Leios endorsement.
+ INFO leios: sim_cli::events: 1200 tx(s) (1.80 MB) were included directly in a Praos block.
+ INFO leios: sim_cli::events: Spatial efficiency: 191.06 MB/7.15 MB (2673.845%) of Leios bytes were unique transactions.
  INFO leios: sim_cli::events: 0 tx(s) (0.000%) referenced by a Leios endorsement were redundant.
  INFO leios: sim_cli::events: Each transaction took an average of NaNs (stddev NaN) to be included in an IB.
- INFO leios: sim_cli::events: Each transaction took an average of 22.633s (stddev 17.424) to be included in an EB.
- INFO leios: sim_cli::events: Each transaction took an average of 64.275s (stddev 25.055) to be included in a block.
+ INFO leios: sim_cli::events: Each transaction took an average of 18.646s (stddev 14.819) to be included in an EB.
+ INFO leios: sim_cli::events: Each transaction took an average of 55.554s (stddev 20.094) to be included in a block.
  INFO network: sim_cli::events: 96300428 TX message(s) were sent. 96300428 of them were received (100.000%).
  INFO network: sim_cli::events: 0 IB message(s) were sent. 0 of them were received (NaN%).
- INFO network: sim_cli::events: 32502 EB message(s) were sent. 32502 of them were received (100.000%).
- INFO network: sim_cli::events: 5681165 Vote message(s) were sent. 5681165 of them were received (100.000%).
+ INFO network: sim_cli::events: 32500 EB message(s) were sent. 32500 of them were received (100.000%).
+ INFO network: sim_cli::events: 5711125 Vote message(s) were sent. 5711125 of them were received (100.000%).
