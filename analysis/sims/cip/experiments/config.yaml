@@ -13,7 +13,7 @@ linear-diffuse-stage-length-slots: 7
 praos-fallback-enabled: true      
 leios-stage-active-voting-slots: 1
 leios-mempool-sampling-strategy: ordered-by-id
-leios-mempool-size-bytes: 24000000
+leios-mempool-size-bytes: 12000000
 relay-strategy: request-from-first
 treat-blocks-as-full: false                       
 eb-diffusion-strategy: peer-order

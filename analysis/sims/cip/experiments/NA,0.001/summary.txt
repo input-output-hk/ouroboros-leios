@@ -98,7 +98,7 @@
  INFO leios: sim_cli::events: 0 tx(s) (NaN%) referenced by a Leios endorsement were redundant.
  INFO leios: sim_cli::events: Each transaction took an average of NaNs (stddev NaN) to be included in an IB.
  INFO leios: sim_cli::events: Each transaction took an average of NaNs (stddev NaN) to be included in an EB.
- INFO leios: sim_cli::events: Each transaction took an average of 16.857s (stddev 16.718) to be included in a block.
+ INFO leios: sim_cli::events: Each transaction took an average of 16.862s (stddev 16.666) to be included in a block.
  INFO network: sim_cli::events: 450149 TX message(s) were sent. 450149 of them were received (100.000%).
  INFO network: sim_cli::events: 0 IB message(s) were sent. 0 of them were received (NaN%).
  INFO network: sim_cli::events: 0 EB message(s) were sent. 0 of them were received (NaN%).
