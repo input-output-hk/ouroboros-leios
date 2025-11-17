@@ -10,7 +10,7 @@ import { GraphWrapper } from "../Graph/GraphWrapper";
 import { TransactionsView } from "../Transactions/TransactionsView";
 import { Controls } from "./modules/Controls";
 import { Scenario } from "./modules/Scenario";
-import { Progress } from "./modules/Slider";
+import { TimelineSlider } from "./modules/TimelineSlider";
 import { Speed } from "./modules/Speed";
 import { Stats } from "./modules/Stats";
 import { ITransformedNode } from "./types";
@@ -124,8 +124,13 @@ export const SimWrapper: FC = ({}) => {
             <Scenario />
           </div>
           <div className="flex border-2 rounded-md p-4 border-gray-200 items-end justify-center gap-4 my-4 mx-auto w-full bg-white/80 backdrop-blur-xs">
-            <Controls />
-            <Progress />
+            <div className="flex flex-col gap-4 w-full">
+              <Controls />
+              <div>
+                <h3 className="text-sm font-semibold mb-1">Timeline Control</h3>
+                <TimelineSlider />
+              </div>
+            </div>
           </div>
           <div className="flex border-2 rounded-md p-4 border-gray-200 items-end justify-center gap-4 my-4 mx-auto bg-white/80 backdrop-blur-xs">
             <Speed />

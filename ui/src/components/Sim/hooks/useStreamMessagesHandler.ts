@@ -15,6 +15,9 @@ export const useStreamMessagesHandler = () => {
   }, []);
 
   const startStream = useCallback(() => {
+    // Reset timeline when starting new stream
+    dispatch({ type: "RESET_TIMELINE" });
+    
     worker.postMessage({
       type: "START",
       tracePath,
@@ -23,7 +26,7 @@ export const useStreamMessagesHandler = () => {
       speedMultiplier,
     });
     setStreaming(true);
-  }, [worker, tracePath, aggregated, batchSize, speedMultiplier]);
+  }, [worker, tracePath, aggregated, batchSize, speedMultiplier, dispatch]);
 
   const stopStream = useCallback(() => {
     worker.postMessage({ type: "STOP" });
@@ -36,10 +39,10 @@ export const useStreamMessagesHandler = () => {
       if (message.tracePath !== tracePath) {
         return;
       }
-      if (message.type === "EVENT") {
+      if (message.type === "TIMELINE_EVENT") {
         dispatch({
-          type: "SET_AGGREGATED_DATA",
-          payload: message.aggregatedData,
+          type: "ADD_TIMELINE_EVENT",
+          payload: message.event,
         });
       }
       if (message.type === "DONE") {

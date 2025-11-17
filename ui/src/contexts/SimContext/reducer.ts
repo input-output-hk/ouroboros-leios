@@ -142,6 +142,25 @@ export const reducer = (
         topologyLoaded: true,
       };
 
+    case "ADD_TIMELINE_EVENT":
+      return {
+        ...state,
+        events: [...state.events, action.payload],
+      };
+
+    case "SET_TIMELINE_TIME":
+      return {
+        ...state,
+        currentTime: action.payload,
+      };
+
+    case "RESET_TIMELINE":
+      return {
+        ...state,
+        events: [],
+        currentTime: 0,
+      };
+
     default:
       return state;
   }

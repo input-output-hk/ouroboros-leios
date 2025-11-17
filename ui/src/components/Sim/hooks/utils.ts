@@ -109,6 +109,7 @@ const extractEb = (
   };
 };
 
+// TODO: unsued
 export const processMessage = (
   json: IServerMessage,
   aggregatedData: ISimulationAggregatedDataState,

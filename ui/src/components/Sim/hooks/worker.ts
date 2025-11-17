@@ -1,13 +1,11 @@
 import {
   ISimulationAggregatedDataState,
   ISimulationBlock,
-  ISimulationIntermediateDataState,
   ISimulationTransactionData,
 } from "@/contexts/SimContext/types";
 import * as cbor from "cborg";
 import type { ReadableStream } from "stream/web";
-import { IServerMessage } from "../types";
-import { processMessage } from "./utils";
+import { IServerMessage, EMessageType } from "../types";
 
 export type TWorkerRequest =
   | {
@@ -20,11 +18,7 @@ export type TWorkerRequest =
   | { type: "STOP" };
 
 export type TWorkerResponse =
-  | {
-      type: "EVENT";
-      tracePath: string;
-      aggregatedData: ISimulationAggregatedDataState;
-    }
+  | { type: "TIMELINE_EVENT"; tracePath: string; event: IServerMessage }
   | { type: "DONE"; tracePath: string };
 
 const createEventStream = async <T>(
@@ -87,93 +81,43 @@ const createCborTransformer = <T>(): TransformStream<Uint8Array, T> => {
   });
 };
 
+// Relevant event types for visualization
+const VISUALIZATION_EVENTS = new Set([
+  EMessageType.EBGenerated,
+  EMessageType.EBSent, 
+  EMessageType.EBReceived,
+  EMessageType.RBGenerated,
+  EMessageType.RBSent,
+  EMessageType.RBReceived,
+  EMessageType.VTBundleGenerated,
+  EMessageType.VTBundleSent,
+  EMessageType.VTBundleReceived,
+  // Note: Transaction events (TX*) can be enabled later for performance testing
+  // EMessageType.TransactionGenerated,
+  // EMessageType.TransactionSent,
+  // EMessageType.TransactionReceived,
+]);
+
 const consumeStream = async (
   stream: ReadableStream<IServerMessage>,
   tracePath: string,
-  batchSize: number,
 ) => {
-  const aggregatedData: ISimulationAggregatedDataState = {
-    progress: 0,
-    nodes: new Map(),
-    global: {
-      praosTxOnChain: 0,
-      leiosTxOnChain: 0,
-    },
-    blocks: [],
-    transactions: [],
-    lastNodesUpdated: [],
-  };
-  const intermediate: ISimulationIntermediateDataState = {
-    txs: [],
-    txStatuses: [],
-    leiosTxs: new Set(),
-    praosTxs: new Set(),
-    ibs: new Map(),
-    ebs: new Map(),
-    bytes: new Map(),
-  };
-
-  const nodesUpdated = new Set<string>();
-  let batchEvents = 0;
-  let lastSec = null;
-  for await (const { time_s, message } of stream) {
-    if (message.type.endsWith("Received") && "recipient" in message) {
-      nodesUpdated.add(message.recipient);
-    }
-    if (message.type.endsWith("Sent") && "sender" in message) {
-      nodesUpdated.add(message.sender);
-    }
-    if (message.type.endsWith("Generated") && "id" in message) {
-      nodesUpdated.add(message.id);
-    }
-    processMessage({ time_s, message }, aggregatedData, intermediate);
-    if (lastSec !== Math.floor(time_s)) {
-      lastSec = Math.floor(time_s);
-      aggregatedData.transactions.push(
-        intermediate.txStatuses.reduce(
-          (acc, curr) => {
-            acc[curr] += 1;
-            return acc;
-          },
-          {
-            timestamp: lastSec,
-            created: 0,
-            inIb: 0,
-            inEb: 0,
-            onChain: 0,
-          },
-        ),
-      );
-    }
-    aggregatedData.progress = time_s;
-    batchEvents++;
-    if (batchEvents === batchSize) {
+  for await (const serverMessage of stream) {
+    const { message } = serverMessage;
+    
+    // Filter only visualization-relevant events
+    if (message.type !== "__unknown" && VISUALIZATION_EVENTS.has(message.type)) {
       postMessage({
-        type: "EVENT",
+        type: "TIMELINE_EVENT",
         tracePath,
-        aggregatedData: {
-          ...aggregatedData,
-          lastNodesUpdated: [...nodesUpdated.values()],
-        },
+        event: serverMessage,
       } as TWorkerResponse);
-
-      nodesUpdated.clear();
-      batchEvents = 0;
     }
-  }
-  if (batchEvents) {
-    postMessage({
-      type: "EVENT",
-      tracePath,
-      aggregatedData: {
-        ...aggregatedData,
-        lastNodesUpdated: [...nodesUpdated.values()],
-      },
-    } as TWorkerResponse);
   }
   postMessage({ type: "DONE", tracePath });
 };
 
+// TODO: unused
 const consumeAggregateStream = async (
   stream: ReadableStream<ISimulationAggregatedDataState>,
   tracePath: string,
@@ -199,11 +143,12 @@ const consumeAggregateStream = async (
       setTimeout(resolve, elapsedMs / speedMultiplier),
     );
 
-    postMessage({
-      type: "EVENT",
-      tracePath,
-      aggregatedData,
-    } as TWorkerResponse);
+    // TODO: re-create when needed
+    // postMessage({
+    //   type: "EVENT",
+    //   tracePath,
+    //   aggregatedData,
+    // } as TWorkerResponse);
   }
   postMessage({ type: "DONE", tracePath });
 };
@@ -236,9 +181,7 @@ onmessage = (e: MessageEvent<TWorkerRequest>) => {
       });
   } else {
     createEventStream<IServerMessage>(request.tracePath, controller.signal)
-      .then((stream) =>
-        consumeStream(stream, request.tracePath, request.batchSize),
-      )
+      .then((stream) => consumeStream(stream, request.tracePath))
       .catch((err) => {
         if (err.name !== "AbortError") {
           throw err;

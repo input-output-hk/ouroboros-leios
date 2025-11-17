@@ -1,4 +1,4 @@
-import { ITransformedNodeMap } from "@/components/Sim/types";
+import { IServerMessage, ITransformedNodeMap } from "@/components/Sim/types";
 import { Dispatch, RefObject } from "react";
 
 export enum ESpeedOptions {
@@ -147,6 +147,8 @@ export interface ISimContextState {
   graph: IGraphContextState;
   blocks: IBlocksContextState;
   activeTab: Tab;
+  events: IServerMessage[];
+  currentTime: number;
   aggregatedData: ISimulationAggregatedDataState;
   maxTime: number;
   tracePath: string;
@@ -179,6 +181,7 @@ export type TSimContextActions =
         canvasOffsetY: ((prev: number) => number) | number;
       }>;
     }
+  // TODO: unused
   | { type: "SET_AGGREGATED_DATA"; payload: ISimulationAggregatedDataState }
   | {
       type: "BATCH_UPDATE";
@@ -191,7 +194,15 @@ export type TSimContextActions =
         topologyPath: string;
         topology: ITransformedNodeMap;
       };
-    };
+    }
+  | {
+      type: "ADD_TIMELINE_EVENT";
+      payload: IServerMessage;
+    }
+  | { type: "SET_TIMELINE_TIME"; payload: number }
+  | { type: "SET_TIMELINE_PLAYING"; payload: boolean }
+  | { type: "SET_TIMELINE_SPEED"; payload: number }
+  | { type: "RESET_TIMELINE" };
 
 export interface ISimContext {
   state: ISimContextState;
