@@ -150,6 +150,12 @@ export const reducer = (
         events: [...state.events, action.payload],
       };
 
+    case "ADD_TIMELINE_EVENT_BATCH":
+      return {
+        ...state,
+        events: [...state.events, ...action.payload],
+      };
+
     case "SET_TIMELINE_TIME":
       return {
         ...state,

@@ -14,11 +14,20 @@ export type TWorkerRequest =
       aggregated: true;
       speedMultiplier: number;
     }
-  | { type: "START"; tracePath: string; aggregated?: false }
+  | {
+      type: "START";
+      tracePath: string;
+      aggregated?: false;
+      includeTransactions?: boolean;
+    }
   | { type: "STOP" };
 
 export type TWorkerResponse =
-  | { type: "TIMELINE_EVENT"; tracePath: string; event: IServerMessage }
+  | {
+      type: "TIMELINE_EVENTS";
+      tracePath: string;
+      events: IServerMessage[];
+    }
   | { type: "DONE"; tracePath: string };
 
 const createEventStream = async <T>(
@@ -81,10 +90,10 @@ const createCborTransformer = <T>(): TransformStream<Uint8Array, T> => {
   });
 };
 
-// Relevant event types for visualization
-const VISUALIZATION_EVENTS = new Set([
+// Base event types (always included)
+const BASE_VISUALIZATION_EVENTS = new Set([
   EMessageType.EBGenerated,
-  EMessageType.EBSent, 
+  EMessageType.EBSent,
   EMessageType.EBReceived,
   EMessageType.RBGenerated,
   EMessageType.RBSent,
@@ -92,28 +101,76 @@ const VISUALIZATION_EVENTS = new Set([
   EMessageType.VTBundleGenerated,
   EMessageType.VTBundleSent,
   EMessageType.VTBundleReceived,
-  // Note: Transaction events (TX*) can be enabled later for performance testing
-  // EMessageType.TransactionGenerated,
-  // EMessageType.TransactionSent,
-  // EMessageType.TransactionReceived,
+]);
+
+// Transaction events (optional)
+const TRANSACTION_EVENTS = new Set([
+  EMessageType.TransactionGenerated,
+  EMessageType.TransactionSent,
+  EMessageType.TransactionReceived,
 ]);
 
 const consumeStream = async (
   stream: ReadableStream<IServerMessage>,
   tracePath: string,
+  includeTransactions = false,
 ) => {
-  for await (const serverMessage of stream) {
-    const { message } = serverMessage;
-    
-    // Filter only visualization-relevant events
-    if (message.type !== "__unknown" && VISUALIZATION_EVENTS.has(message.type)) {
+  // Build event filter based on settings
+  const allowedEvents = new Set(BASE_VISUALIZATION_EVENTS);
+  if (includeTransactions) {
+    TRANSACTION_EVENTS.forEach((event) => allowedEvents.add(event));
+  }
+
+  let eventCount = 0;
+  let filteredCount = 0;
+  let batchCount = 0;
+  const startTime = performance.now();
+  let batchStart = performance.now();
+
+  // Batch events to reduce postMessage overhead
+  const batch: IServerMessage[] = [];
+  const BATCH_SIZE = includeTransactions ? 10000 : 1000; // Larger batches for high-volume scenarios
+
+  const flushBatch = () => {
+    if (batch.length > 0) {
       postMessage({
-        type: "TIMELINE_EVENT",
+        type: "TIMELINE_EVENTS",
         tracePath,
-        event: serverMessage,
+        events: batch.splice(0),
       } as TWorkerResponse);
+      batchCount++;
+    }
+  };
+
+  for await (const serverMessage of stream) {
+    eventCount++;
+    const { message } = serverMessage;
+
+    // Filter only visualization-relevant events
+    if (message.type !== "__unknown" && allowedEvents.has(message.type)) {
+      filteredCount++;
+      batch.push(serverMessage);
+
+      if (batch.length >= BATCH_SIZE) {
+        flushBatch();
+        // Log progress every batch
+        const batchEnd = performance.now();
+        console.log(
+          `Worker progress: ${eventCount} events, ${filteredCount} filtered, ${batchCount} messages sent, batch ${(batchEnd - batchStart).toFixed(2)}ms`,
+        );
+        batchStart = performance.now();
+      }
     }
   }
+
+  // Flush remaining batch
+  flushBatch();
+
+  const totalTime = performance.now() - startTime;
+  console.log(
+    `Worker completed: ${eventCount} events processed, ${filteredCount} filtered, ${batchCount} batches sent in ${totalTime.toFixed(0)}ms`,
+  );
+
   postMessage({ type: "DONE", tracePath });
 };
 
@@ -181,7 +238,9 @@ onmessage = (e: MessageEvent<TWorkerRequest>) => {
       });
   } else {
     createEventStream<IServerMessage>(request.tracePath, controller.signal)
-      .then((stream) => consumeStream(stream, request.tracePath))
+      .then((stream) =>
+        consumeStream(stream, request.tracePath, request.includeTransactions),
+      )
       .catch((err) => {
         if (err.name !== "AbortError") {
           throw err;

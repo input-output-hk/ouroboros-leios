@@ -14,20 +14,26 @@ export const useStreamMessagesHandler = () => {
     return new StreamWorker();
   }, []);
 
-  const startStream = useCallback(() => {
-    // Reset timeline when starting new stream
-    dispatch({ type: "RESET_TIMELINE" });
-    
-    worker.postMessage({
-      type: "START",
-      tracePath,
-      aggregated,
-      speedMultiplier,
-    });
-    setStreaming(true);
-  }, [worker, tracePath, aggregated, speedMultiplier, dispatch]);
+  const startStream = useCallback(
+    async (includeTransactions = false) => {
+      // Reset timeline when starting new stream
+      dispatch({ type: "RESET_TIMELINE" });
+      setStreaming(true);
+
+      // Use worker
+      worker.postMessage({
+        type: "START",
+        tracePath,
+        aggregated,
+        speedMultiplier,
+        includeTransactions,
+      });
+    },
+    [worker, tracePath, aggregated, speedMultiplier, dispatch],
+  );
 
   const stopStream = useCallback(() => {
+    // Stop worker
     worker.postMessage({ type: "STOP" });
     setStreaming(false);
   }, [worker]);
@@ -38,10 +44,11 @@ export const useStreamMessagesHandler = () => {
       if (message.tracePath !== tracePath) {
         return;
       }
-      if (message.type === "TIMELINE_EVENT") {
+      if (message.type === "TIMELINE_EVENTS") {
+        // Process batch of events in single dispatch
         dispatch({
-          type: "ADD_TIMELINE_EVENT",
-          payload: message.event,
+          type: "ADD_TIMELINE_EVENT_BATCH",
+          payload: message.events,
         });
       }
       if (message.type === "DONE") {

@@ -197,6 +197,10 @@ export type TSimContextActions =
       type: "ADD_TIMELINE_EVENT";
       payload: IServerMessage;
     }
+  | {
+      type: "ADD_TIMELINE_EVENT_BATCH";
+      payload: IServerMessage[];
+    }
   | { type: "SET_TIMELINE_TIME"; payload: number }
   | { type: "SET_TIMELINE_PLAYING"; payload: boolean }
   | { type: "SET_TIMELINE_SPEED"; payload: number }

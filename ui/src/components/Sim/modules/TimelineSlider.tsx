@@ -7,18 +7,20 @@ export const TimelineSlider: FC = () => {
     dispatch,
   } = useSimContext();
 
-  const maxTime = useMemo(() => {
-    if (events.length === 0) return 0;
-    return Math.max(...events.map(event => event.time_s));
-  }, [events]);
-
   const handleTimeChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const newTime = parseFloat(event.target.value);
       dispatch({ type: "SET_TIMELINE_TIME", payload: newTime });
     },
-    [dispatch]
+    [dispatch],
   );
+
+  // Don't render if no events loaded
+  if (events.length === 0) {
+    return null;
+  }
+
+  const maxTime = events[events.length - 1].time_s;
 
   const formatTime = (timeInSeconds: number) => {
     const minutes = Math.floor(timeInSeconds / 60);
@@ -26,14 +28,7 @@ export const TimelineSlider: FC = () => {
     return minutes ? `${minutes}m${seconds}s` : `${seconds}s`;
   };
 
-  const currentPercent = maxTime > 0 
-    ? (currentTime / maxTime) * 100 
-    : 0;
-
-  // Don't render if no events loaded
-  if (events.length === 0) {
-    return null;
-  }
+  const currentPercent = maxTime > 0 ? (currentTime / maxTime) * 100 : 0;
 
   return (
     <div className="w-full mx-auto px-4 flex flex-col items-between justify-center">
@@ -46,7 +41,7 @@ export const TimelineSlider: FC = () => {
             style={{ width: `${currentPercent}%` }}
           />
         </div>
-        
+
         {/* Interactive slider */}
         <input
           type="range"
@@ -57,7 +52,7 @@ export const TimelineSlider: FC = () => {
           onChange={handleTimeChange}
           className="relative w-full h-2 bg-transparent appearance-none cursor-pointer z-10"
           style={{
-            background: 'transparent',
+            background: "transparent",
           }}
         />
       </div>

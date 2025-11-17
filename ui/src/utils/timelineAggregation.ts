@@ -29,39 +29,45 @@ export const computeAggregatedDataAtTime = (
     const { message } = event;
     
     switch (message.type) {
-      case EMessageType.EBGenerated: {
-        const stats = nodeStats.get(message.producer);
+      case EMessageType.EBGenerated:
+      case EMessageType.RBGenerated:
+      case EMessageType.VTBundleGenerated:
+      case EMessageType.TransactionGenerated: {
+        const nodeId = 'producer' in message ? message.producer : message.publisher;
+        const stats = nodeStats.get(nodeId);
         if (stats) {
           stats.generated[message.type] = (stats.generated[message.type] || 0) + 1;
         }
         break;
       }
       
-      case EMessageType.EBSent: {
+      case EMessageType.EBSent:
+      case EMessageType.RBSent:
+      case EMessageType.VTBundleSent:
+      case EMessageType.TransactionSent: {
         const stats = nodeStats.get(message.sender);
         if (stats) {
           if (!stats.sent[message.type]) {
             stats.sent[message.type] = { count: 0, bytes: 0 };
           }
           stats.sent[message.type].count += 1;
-          // Note: EBSent doesn't have size_bytes, we'd need to track from EBGenerated
         }
         break;
       }
       
-      case EMessageType.EBReceived: {
+      case EMessageType.EBReceived:
+      case EMessageType.RBReceived:
+      case EMessageType.VTBundleReceived:
+      case EMessageType.TransactionReceived: {
         const stats = nodeStats.get(message.recipient);
         if (stats) {
           if (!stats.received[message.type]) {
             stats.received[message.type] = { count: 0, bytes: 0 };
           }
           stats.received[message.type].count += 1;
-          // Note: EBReceived doesn't have size_bytes, we'd need to track from EBGenerated
         }
         break;
       }
-      
-      // Add other message types as needed
     }
   }
   
