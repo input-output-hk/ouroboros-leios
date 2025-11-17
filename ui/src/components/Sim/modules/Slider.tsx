@@ -15,12 +15,11 @@ export const Progress: FC = () => {
   return (
     <div className="w-full mx-auto px-4 flex flex-col items-between justify-center">
       <p className="mb-0">
-        Time: {time}<br />
+        Time: {time}
+        <br />
       </p>
 
-      <div
-        className="relative w-full mt-4"
-      >
+      <div className="relative w-full mt-4">
         {/* Track */}
         <div className="absolute top-1/2 left-0 w-full h-2 -mt-3 rounded-full bg-gray-200">
           {/* Filled portion */}

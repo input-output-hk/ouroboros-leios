@@ -17,11 +17,13 @@ export const reducer = (
         tracePath: scenario.trace,
         aggregated: scenario.aggregated,
         topologyPath: scenario.topology,
-      }
+      };
     }
 
     case "SET_SCENARIO": {
-      const scenario = state.allScenarios.find(s => s.name === action.payload);
+      const scenario = state.allScenarios.find(
+        (s) => s.name === action.payload,
+      );
       if (!scenario) {
         return state;
       }
@@ -33,15 +35,16 @@ export const reducer = (
         tracePath: scenario.trace,
         aggregated: scenario.aggregated,
         topologyPath: scenario.topology,
-        topologyLoaded: state.topologyLoaded && scenario.topology === state.topologyPath,
+        topologyLoaded:
+          state.topologyLoaded && scenario.topology === state.topologyPath,
         graph: {
           ...state.graph,
           currentNode: undefined,
         },
         blocks: {
           currentBlock: undefined,
-        }
-      }
+        },
+      };
     }
 
     case "SET_ACTIVE_TAB": {
@@ -50,30 +53,35 @@ export const reducer = (
         activeTab: action.payload,
         graph: {
           ...state.graph,
-          currentNode: state.activeTab === action.payload ? state.graph.currentNode : undefined
+          currentNode:
+            state.activeTab === action.payload
+              ? state.graph.currentNode
+              : undefined,
         },
         blocks: {
-          currentBlock: undefined
-        }
-      }
+          currentBlock: undefined,
+        },
+      };
     }
 
     case "SET_CURRENT_NODE": {
       return {
-        ...state, graph: {
+        ...state,
+        graph: {
           ...state.graph,
-          currentNode: action.payload
+          currentNode: action.payload,
         },
-      }
+      };
     }
 
     case "SET_CURRENT_BLOCK": {
       return {
-        ...state, blocks: {
+        ...state,
+        blocks: {
           ...state.blocks,
-          currentBlock: action.payload
-        }
-      }
+          currentBlock: action.payload,
+        },
+      };
     }
 
     case "SET_AGGREGATED_DATA": {
@@ -88,16 +96,16 @@ export const reducer = (
           canvasScale:
             typeof action.payload.canvasScale === "function"
               ? action.payload.canvasScale(state.graph.canvasScale)
-              : action.payload.canvasScale ?? state.graph.canvasScale,
+              : (action.payload.canvasScale ?? state.graph.canvasScale),
           canvasOffsetX:
             typeof action.payload.canvasOffsetX === "function"
               ? action.payload.canvasOffsetX(state.graph.canvasOffsetX)
-              : action.payload.canvasOffsetX ?? state.graph.canvasOffsetX,
+              : (action.payload.canvasOffsetX ?? state.graph.canvasOffsetX),
           canvasOffsetY:
             typeof action.payload.canvasOffsetY === "function"
               ? action.payload.canvasOffsetY(state.graph.canvasOffsetY)
-              : action.payload.canvasOffsetY ?? state.graph.canvasOffsetY,
-        }
+              : (action.payload.canvasOffsetY ?? state.graph.canvasOffsetY),
+        },
       };
     }
 
@@ -106,7 +114,7 @@ export const reducer = (
         ...state,
         batchSize: action.payload.batchSize,
         speedMultiplier: action.payload.speedMultiplier,
-      }
+      };
     }
 
     case "BATCH_UPDATE": {
@@ -132,7 +140,7 @@ export const reducer = (
         ...state,
         topography: action.payload.topology,
         topologyLoaded: true,
-      }
+      };
 
     default:
       return state;

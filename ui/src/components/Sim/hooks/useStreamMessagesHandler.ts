@@ -1,17 +1,12 @@
 import { useSimContext } from "@/contexts/SimContext/context";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { TWorkerResponse } from "./worker";
-import StreamWorker from './worker?worker';
+import StreamWorker from "./worker?worker";
 
 export const useStreamMessagesHandler = () => {
   const {
-    state: {
-      tracePath,
-      aggregated,
-      batchSize,
-      speedMultiplier,
-    },
-    dispatch
+    state: { tracePath, aggregated, batchSize, speedMultiplier },
+    dispatch,
   } = useSimContext();
   const [streaming, setStreaming] = useState(false);
 
@@ -64,4 +59,4 @@ export const useStreamMessagesHandler = () => {
     }),
     [startStream, stopStream, streaming],
   );
-}
+};

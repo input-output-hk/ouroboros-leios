@@ -23,21 +23,25 @@ interface ITabButtonProps {
 
 const TabButton: FC<ITabButtonProps> = ({ name, active, onClick }) => {
   const color = active ? "bg-[blue]" : "bg-gray-400";
-  return <button className={`${color} text-white rounded-md px-4 py-2`} onClick={onClick}>{name}</button>
-}
+  return (
+    <button
+      className={`${color} text-white rounded-md px-4 py-2`}
+      onClick={onClick}
+    >
+      {name}
+    </button>
+  );
+};
 
-export const SimWrapper: FC = ({
-}) => {
+export const SimWrapper: FC = ({}) => {
   const {
     state: {
       activeTab,
       topologyPath,
       topologyLoaded,
-      blocks: {
-        currentBlock,
-      }
+      blocks: { currentBlock },
     },
-    dispatch
+    dispatch,
   } = useSimContext();
 
   // Load topology if it has changed
@@ -50,8 +54,10 @@ export const SimWrapper: FC = ({
       const topographyRes = await fetch(topologyPath);
       const topography = parse(await topographyRes.text());
       const nodes = new Map<string, ITransformedNode>();
-      const links = new Map<string, { source: string, target: string }>();
-      for (const [id, node] of Object.entries<Node<Coord2D>>(topography.nodes)) {
+      const links = new Map<string, { source: string; target: string }>();
+      for (const [id, node] of Object.entries<Node<Coord2D>>(
+        topography.nodes,
+      )) {
         nodes.set(id, {
           data: {
             location: node.location,
@@ -63,33 +69,54 @@ export const SimWrapper: FC = ({
         });
         for (const peerId of Object.keys(node.producers)) {
           const linkIds = [id, peerId].sort();
-          links.set(`${linkIds[0]}|${linkIds[1]}`, { source: linkIds[0], target: linkIds[1] });
+          links.set(`${linkIds[0]}|${linkIds[1]}`, {
+            source: linkIds[0],
+            target: linkIds[1],
+          });
         }
       }
       dispatch({
-        type: "SET_TOPOLOGY", payload: {
+        type: "SET_TOPOLOGY",
+        payload: {
           topologyPath,
           topology: { nodes, links },
-        }
-      })
+        },
+      });
     })();
   }, [topologyPath]);
 
-  const setActiveTab = useCallback((tab: Tab) => dispatch({ type: 'SET_ACTIVE_TAB', payload: tab }), [dispatch]);
+  const setActiveTab = useCallback(
+    (tab: Tab) => dispatch({ type: "SET_ACTIVE_TAB", payload: tab }),
+    [dispatch],
+  );
   return (
     <>
-      {activeTab === Tab.Graph ? <div className="flex flex-col items-center justify-between gap-4 z-10 absolute left-10 top-10">
-        <Stats />
-      </div> : null}
+      {activeTab === Tab.Graph ? (
+        <div className="flex flex-col items-center justify-between gap-4 z-10 absolute left-10 top-10">
+          <Stats />
+        </div>
+      ) : null}
       <div className="flex items-center justify-center gap-4 relative h-screen w-screen">
         {activeTab === Tab.Graph && topologyLoaded ? <GraphWrapper /> : null}
         {activeTab === Tab.Blocks ? <BlocksView /> : null}
         {activeTab === Tab.Transactions ? <TransactionsView /> : null}
         <div className="absolute top-10 w-full">
           <div className="flex justify-center gap-4 min-w-[200px]">
-            <TabButton name="Graph" active={activeTab === Tab.Graph} onClick={() => setActiveTab(Tab.Graph)} />
-            <TabButton name="Blocks" active={activeTab === Tab.Blocks && currentBlock === undefined} onClick={() => setActiveTab(Tab.Blocks)} />
-            <TabButton name="Transactions" active={activeTab === Tab.Transactions} onClick={() => setActiveTab(Tab.Transactions)} />
+            <TabButton
+              name="Graph"
+              active={activeTab === Tab.Graph}
+              onClick={() => setActiveTab(Tab.Graph)}
+            />
+            <TabButton
+              name="Blocks"
+              active={activeTab === Tab.Blocks && currentBlock === undefined}
+              onClick={() => setActiveTab(Tab.Blocks)}
+            />
+            <TabButton
+              name="Transactions"
+              active={activeTab === Tab.Transactions}
+              onClick={() => setActiveTab(Tab.Transactions)}
+            />
           </div>
         </div>
         <div className="absolute bottom-12 flex w-1/2 gap-4 justify-center">

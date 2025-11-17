@@ -7,21 +7,21 @@ prototypes and node implementations.
 
 Example traces are available via Git LFS. Fetch them first:
 
-``` bash
+```bash
 git lfs fetch
 git lfs checkout
 ```
 
 Install dependencies and build the project with:
 
-``` bash
+```bash
 npm install
 npm run build
 ```
 
 Or run the development server with:
 
-``` bash
+```bash
 npm start
 ```
 
@@ -38,7 +38,7 @@ To prepare a scenario to visualize, add or update `public/scenarios.json`:
       "duration": 300,
       "trace": "traces/example.jsonl",
       "aggregated": false
-    },
+    }
   ]
 }
 ```
@@ -59,8 +59,7 @@ mkdir -p public/traces
 
 In case you want to store it, use gzip and git lfs:
 
-``` bash
+```bash
 gzip public/traces/examples.jsonl
 git lfs track public/traces/examples.jsonl.gz
 ```
-

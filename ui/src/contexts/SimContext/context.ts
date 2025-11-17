@@ -1,6 +1,11 @@
 "use client";
 import { Context, createContext, useContext } from "react";
-import { ISimContext, ISimContextState, ISimulationAggregatedDataState, Tab } from "./types";
+import {
+  ISimContext,
+  ISimContextState,
+  ISimulationAggregatedDataState,
+  Tab,
+} from "./types";
 
 export const defaultAggregatedData: ISimulationAggregatedDataState = {
   progress: 0,
@@ -11,12 +16,12 @@ export const defaultAggregatedData: ISimulationAggregatedDataState = {
   },
   blocks: [],
   transactions: [],
-  lastNodesUpdated: []
+  lastNodesUpdated: [],
 };
 
 export const defaultState: ISimContextState = {
   allScenarios: [],
-  activeScenario: '',
+  activeScenario: "",
   aggregated: true,
   graph: {
     canvasRef: { current: null },
@@ -30,14 +35,14 @@ export const defaultState: ISimContextState = {
   speedMultiplier: 10,
   aggregatedData: defaultAggregatedData,
   maxTime: 0,
-  tracePath: '',
+  tracePath: "",
   topography: { links: new Map(), nodes: new Map() },
-  topologyPath: '',
+  topologyPath: "",
   topologyLoaded: false,
-}
+};
 
 export const SimContext: Context<ISimContext> = createContext({
   state: defaultState,
-  dispatch: (_val) => { }
+  dispatch: (_val) => {},
 });
 export const useSimContext = () => useContext(SimContext);

@@ -15,18 +15,18 @@ export interface IServerNodeMap {
 
 export enum EServerType {
   NODE = "node",
-  LINK = "link"
+  LINK = "link",
 }
 
 export type TServerNode = {
   type: EServerType.NODE;
   data: INode;
-}
+};
 
 export type TServerLink = {
-  type: EServerType.LINK,
+  type: EServerType.LINK;
   data: ILink;
-}
+};
 
 export type TServerNodeMap = TServerNode | TServerLink;
 
@@ -38,7 +38,7 @@ export interface ITransformedNode {
     location: number[];
     stake?: number;
   };
-};
+}
 
 /** source|target */
 export type TLinkMapId = string;
@@ -135,7 +135,7 @@ export interface IPraosBlockGenerated {
 export interface IEndorsement {
   eb: { id: string };
   size_bytes: number;
-  votes: {}
+  votes: {};
 }
 
 export interface IPraosBlockReceived {
@@ -200,7 +200,7 @@ export interface IVotesGenerated {
   slot: number;
   producer: string;
   size_bytes: number;
-  votes: any[] // @todo
+  votes: any[]; // @todo
 }
 
 export interface IVotesReceived {
@@ -220,7 +220,7 @@ export interface IVotesSent {
 }
 
 export interface IUnknown {
-  type: '__unknown';
+  type: "__unknown";
 }
 
 export type TMessageType =

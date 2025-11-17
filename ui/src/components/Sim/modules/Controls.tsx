@@ -1,6 +1,9 @@
 import { FC, memo, useCallback } from "react";
 
-import { defaultAggregatedData, useSimContext } from "@/contexts/SimContext/context";
+import {
+  defaultAggregatedData,
+  useSimContext,
+} from "@/contexts/SimContext/context";
 import { useStreamMessagesHandler } from "../hooks/useStreamMessagesHandler";
 
 export const Controls: FC = memo(() => {
@@ -23,7 +26,7 @@ export const Controls: FC = memo(() => {
         aggregatedData: defaultAggregatedData,
       },
     });
-  }, [stopStream, state, dispatch])
+  }, [stopStream, state, dispatch]);
 
   return (
     <div className="min-w-[200px] flex items-center justify-end gap-4">

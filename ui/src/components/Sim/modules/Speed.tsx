@@ -12,17 +12,27 @@ export const Speed: FC = () => {
   if (aggregated) {
     return (
       <div className="min-w-32">
-        <label htmlFor="speedMultiplier" className="block text-xs text-gray-600">
+        <label
+          htmlFor="speedMultiplier"
+          className="block text-xs text-gray-600"
+        >
           Speed
         </label>
-        <select name="speedMultiplier" className="mt-1 w-full text-lg" disabled={streaming} value={speedMultiplier} onChange={(e) => {
-          dispatch({
-            type: "SET_SPEED", payload: {
-              batchSize,
-              speedMultiplier: Number(e.target.value),
-            }
-          })
-        }}>
+        <select
+          name="speedMultiplier"
+          className="mt-1 w-full text-lg"
+          disabled={streaming}
+          value={speedMultiplier}
+          onChange={(e) => {
+            dispatch({
+              type: "SET_SPEED",
+              payload: {
+                batchSize,
+                speedMultiplier: Number(e.target.value),
+              },
+            });
+          }}
+        >
           <option value={1}>1x</option>
           <option value={10}>10x</option>
           <option value={100}>100x</option>
@@ -43,15 +53,15 @@ export const Speed: FC = () => {
           value={batchSize}
           onChange={(e) =>
             dispatch({
-              type: "SET_SPEED", payload: {
+              type: "SET_SPEED",
+              payload: {
                 batchSize: Number(e.target.value),
                 speedMultiplier,
-              }
+              },
             })
           }
         />
       </div>
     );
-
   }
 };

@@ -1,6 +1,4 @@
-import {
-  ITransformedNodeMap
-} from "@/components/Sim/types";
+import { ITransformedNodeMap } from "@/components/Sim/types";
 import { Dispatch, RefObject } from "react";
 
 export enum ESpeedOptions {
@@ -28,8 +26,8 @@ export interface ISimulationAggregatedData {
   bytesSent: number;
   bytesReceived: number;
   generated: { [type: string]: number };
-  sent: { [type: string]: { count: number, bytes: number } };
-  received: { [type: string]: { count: number, bytes: number } };
+  sent: { [type: string]: { count: number; bytes: number } };
+  received: { [type: string]: { count: number; bytes: number } };
 }
 
 export interface ISimulationGlobalData {
@@ -84,7 +82,7 @@ export interface ISimulationAggregatedDataState {
   progress: number;
   nodes: Map<string, ISimulationAggregatedData>;
   global: ISimulationGlobalData;
-  blocks: ISimulationBlock[],
+  blocks: ISimulationBlock[];
   transactions: ISimulationTransactionData[];
   lastNodesUpdated: string[];
 }
@@ -105,7 +103,7 @@ export interface ISimulationIntermediateEndorsementBlock {
   ebs: string[];
 }
 
-type TxStatus = 'created' | 'inIb' | 'inEb' | 'onChain';
+type TxStatus = "created" | "inIb" | "inEb" | "onChain";
 
 export interface ISimulationIntermediateDataState {
   txs: ISimulationTransaction[];
@@ -114,7 +112,7 @@ export interface ISimulationIntermediateDataState {
   leiosTxs: Set<number>;
   ibs: Map<string, ISimulationIntermediateInputBlock>;
   ebs: Map<string, ISimulationIntermediateEndorsementBlock>;
-  bytes: Map<string, number>,
+  bytes: Map<string, number>;
 }
 
 export interface IGraphContextState {
@@ -162,35 +160,38 @@ export interface ISimContextState {
 
 export type TSimContextActions =
   | { type: "SET_SCENARIOS"; payload: IScenario[] }
-  | { type: "SET_SCENARIO", payload: string }
+  | { type: "SET_SCENARIO"; payload: string }
   | { type: "SET_ACTIVE_TAB"; payload: Tab }
   | { type: "SET_CURRENT_NODE"; payload: string | undefined }
   | { type: "SET_CURRENT_BLOCK"; payload: number | undefined }
   | {
-    type: "SET_SPEED"; payload: {
-      batchSize: number,
-      speedMultiplier: number,
+      type: "SET_SPEED";
+      payload: {
+        batchSize: number;
+        speedMultiplier: number;
+      };
     }
-  }
   | {
-    type: "SET_CANVAS_PROPS"; payload: Partial<{
-      canvasScale: ((prev: number) => number) | number,
-      canvasOffsetX: ((prev: number) => number) | number,
-      canvasOffsetY: ((prev: number) => number) | number
-    }>
-  }
+      type: "SET_CANVAS_PROPS";
+      payload: Partial<{
+        canvasScale: ((prev: number) => number) | number;
+        canvasOffsetX: ((prev: number) => number) | number;
+        canvasOffsetY: ((prev: number) => number) | number;
+      }>;
+    }
   | { type: "SET_AGGREGATED_DATA"; payload: ISimulationAggregatedDataState }
   | {
-    type: "BATCH_UPDATE";
-    payload: Partial<ISimContextState>;
-  }
-  | { type: "RESET_TOPOLOGY", payload: string }
-  | {
-    type: "SET_TOPOLOGY", payload: {
-      topologyPath: string;
-      topology: ITransformedNodeMap
+      type: "BATCH_UPDATE";
+      payload: Partial<ISimContextState>;
     }
-  };
+  | { type: "RESET_TOPOLOGY"; payload: string }
+  | {
+      type: "SET_TOPOLOGY";
+      payload: {
+        topologyPath: string;
+        topology: ITransformedNodeMap;
+      };
+    };
 
 export interface ISimContext {
   state: ISimContextState;

@@ -70,7 +70,10 @@ export const Canvas: FC = () => {
       );
 
       if (clicked && node) {
-        dispatch({ type: "SET_CURRENT_NODE", payload: currentNode === node ? undefined : node });
+        dispatch({
+          type: "SET_CURRENT_NODE",
+          payload: currentNode === node ? undefined : node,
+        });
       }
     },
     [canvasScale, currentNode, canvasOffsetX, canvasOffsetY],
@@ -180,7 +183,5 @@ export const Canvas: FC = () => {
     };
   }, [drawTopography, handleClick, handleWheel]);
 
-  return (
-    <canvas ref={canvasRef} />
-  );
+  return <canvas ref={canvasRef} />;
 };

@@ -1,6 +1,4 @@
-import {
-  useSimContext
-} from "@/contexts/SimContext/context";
+import { useSimContext } from "@/contexts/SimContext/context";
 import { useCallback } from "react";
 
 export const useHandlers = () => {
@@ -84,7 +82,7 @@ export const useHandlers = () => {
       if (currentNode === node.id.toString()) {
         context.fillStyle = "blue";
       } else if (!node.data.stake) {
-        context.fillStyle = "gray"
+        context.fillStyle = "gray";
       }
 
       context.fill();
