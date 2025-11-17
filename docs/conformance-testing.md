@@ -133,12 +133,9 @@ Make sure, to specify the same topology and configuration files as used to gener
 $ nix run .#linear-leios-trace-verifier -- +RTS -H1G -s -RTS --trace-file trace.log --config-file data/simulation/config.default.yaml --topology-file leios-trace-verifier/examples/topology.yaml --idSut 0
 ```
 
-#### Performance
-
-The performance of the trace verifier is still an open issue. When running log traces, the performance degrades significantly as the Haskell garbage collector takes a lot of resources.
-
 ### TODOs
 
 * Move Linear Leios, specification and trace verifier code into a separate module or repo. The other Leios variants are more complex than Linear Leios and therefore the general model in the formal specification might be confusing with Linear Leios
 * Currently the leader selection is inferred from the log file. The formal specification needs to run the leader selection algorithm with the same seed as the node. This is a requirement for the trace verifier to be used for *live monitoring* in a production system
 * [PR-605](https://github.com/input-output-hk/ouroboros-leios/pull/605) introduced the feature, that allows the trace verifier to start at an arbitrary slot. This needs to be more generalized, in order for the trace verifier to start with an arbitrary state
+* The performance of the trace verifier needs to be improved: When running long traces, the performance degrades significantly (the Haskell garbage collector taking a lot of resources)
