@@ -33,7 +33,6 @@ export const defaultState: ISimContextState = {
   activeTab: Tab.Graph,
   events: [],
   currentTime: 0,
-  batchSize: 5000,
   speedMultiplier: 10,
   aggregatedData: defaultAggregatedData,
   maxTime: 0,

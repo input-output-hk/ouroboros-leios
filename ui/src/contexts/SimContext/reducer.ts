@@ -44,6 +44,9 @@ export const reducer = (
         blocks: {
           currentBlock: undefined,
         },
+        // Reset timeline when switching scenarios
+        events: [],
+        currentTime: 0,
       };
     }
 
@@ -112,7 +115,6 @@ export const reducer = (
     case "SET_SPEED": {
       return {
         ...state,
-        batchSize: action.payload.batchSize,
         speedMultiplier: action.payload.speedMultiplier,
       };
     }

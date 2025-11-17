@@ -1,67 +1,42 @@
 import { useSimContext } from "@/contexts/SimContext/context";
-import { FC } from "react";
-import { useStreamMessagesHandler } from "../hooks/useStreamMessagesHandler";
+import { FC, useCallback, useMemo } from "react";
 
 export const Speed: FC = () => {
   const {
-    state: { aggregated, batchSize, speedMultiplier },
-    dispatch,
+    state: { events },
   } = useSimContext();
-  const { streaming } = useStreamMessagesHandler();
 
-  if (aggregated) {
-    return (
-      <div className="min-w-32">
-        <label
-          htmlFor="speedMultiplier"
-          className="block text-xs text-gray-600"
-        >
-          Speed
-        </label>
-        <select
-          name="speedMultiplier"
-          className="mt-1 w-full text-lg"
-          disabled={streaming}
-          value={speedMultiplier}
-          onChange={(e) => {
-            dispatch({
-              type: "SET_SPEED",
-              payload: {
-                batchSize,
-                speedMultiplier: Number(e.target.value),
-              },
-            });
-          }}
-        >
-          <option value={1}>1x</option>
-          <option value={10}>10x</option>
-          <option value={100}>100x</option>
-        </select>
-      </div>
-    );
-  } else {
-    return (
-      <div className="min-w-32">
-        <label htmlFor="batchSize" className="block text-xs text-gray-600">
-          Batch Size
-        </label>
-        <input
-          name="batchSize"
-          className="appearance-none outline-0 text-lg w-full"
-          disabled={streaming}
-          type="number"
-          value={batchSize}
-          onChange={(e) =>
-            dispatch({
-              type: "SET_SPEED",
-              payload: {
-                batchSize: Number(e.target.value),
-                speedMultiplier,
-              },
-            })
-          }
-        />
-      </div>
-    );
-  }
+  // For now, just show placeholder - implementation will come later
+  const timelinePlaybackSpeed = useMemo(() => 1, []);
+
+  const handleSpeedChange = useCallback(
+    (event: React.ChangeEvent<HTMLSelectElement>) => {
+      const newSpeed = parseFloat(event.target.value);
+      // TODO: Implement timeline playback speed
+      console.log("Timeline playback speed:", newSpeed);
+    },
+    []
+  );
+
+  return (
+    <div className="min-w-32">
+      <label htmlFor="timelineSpeed" className="block text-xs text-gray-600">
+        Playback Speed
+      </label>
+      <select
+        name="timelineSpeed"
+        className="mt-1 w-full text-lg"
+        value={timelinePlaybackSpeed}
+        onChange={handleSpeedChange}
+        disabled={events.length === 0}
+      >
+        <option value={0.25}>0.25x</option>
+        <option value={0.5}>0.5x</option>
+        <option value={1}>1x</option>
+        <option value={2}>2x</option>
+        <option value={4}>4x</option>
+        <option value={8}>8x</option>
+      </select>
+    </div>
+  );
 };

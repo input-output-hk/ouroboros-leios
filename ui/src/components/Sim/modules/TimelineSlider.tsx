@@ -30,17 +30,13 @@ export const TimelineSlider: FC = () => {
     ? (currentTime / maxTime) * 100 
     : 0;
 
+  // Don't render if no events loaded
+  if (events.length === 0) {
+    return null;
+  }
+
   return (
     <div className="w-full mx-auto px-4 flex flex-col items-between justify-center">
-      <div className="flex items-center justify-between mb-2">
-        <p className="mb-0">
-          Timeline: {formatTime(currentTime)} / {formatTime(maxTime)}
-        </p>
-        <div className="text-sm text-gray-600">
-          {events.length} events
-        </div>
-      </div>
-
       <div className="relative w-full">
         {/* Track */}
         <div className="absolute top-1/2 left-0 w-full h-2 -mt-1 rounded-full bg-gray-200">
@@ -63,7 +59,6 @@ export const TimelineSlider: FC = () => {
           style={{
             background: 'transparent',
           }}
-          disabled={maxTime === 0}
         />
       </div>
 

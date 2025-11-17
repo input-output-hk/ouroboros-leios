@@ -156,7 +156,6 @@ export interface ISimContextState {
   topography: ITransformedNodeMap;
   topologyPath: string;
   topologyLoaded: boolean;
-  batchSize: number;
   speedMultiplier: number;
 }
 
@@ -169,7 +168,6 @@ export type TSimContextActions =
   | {
       type: "SET_SPEED";
       payload: {
-        batchSize: number;
         speedMultiplier: number;
       };
     }

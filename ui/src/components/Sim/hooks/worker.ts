@@ -14,7 +14,7 @@ export type TWorkerRequest =
       aggregated: true;
       speedMultiplier: number;
     }
-  | { type: "START"; tracePath: string; aggregated?: false; batchSize: number }
+  | { type: "START"; tracePath: string; aggregated?: false }
   | { type: "STOP" };
 
 export type TWorkerResponse =

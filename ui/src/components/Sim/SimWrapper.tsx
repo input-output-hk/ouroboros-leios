@@ -126,10 +126,7 @@ export const SimWrapper: FC = ({}) => {
           <div className="flex border-2 rounded-md p-4 border-gray-200 items-end justify-center gap-4 my-4 mx-auto w-full bg-white/80 backdrop-blur-xs">
             <div className="flex flex-col gap-4 w-full">
               <Controls />
-              <div>
-                <h3 className="text-sm font-semibold mb-1">Timeline Control</h3>
-                <TimelineSlider />
-              </div>
+              <TimelineSlider />
             </div>
           </div>
           <div className="flex border-2 rounded-md p-4 border-gray-200 items-end justify-center gap-4 my-4 mx-auto bg-white/80 backdrop-blur-xs">
