@@ -17,6 +17,10 @@ export const defaultAggregatedData: ISimulationAggregatedDataState = {
   blocks: [],
   transactions: [],
   lastNodesUpdated: [],
+  eventCounts: {
+    total: 0,
+    byType: {},
+  },
 };
 
 export const defaultState: ISimContextState = {

@@ -76,6 +76,7 @@ export const computeAggregatedDataAtTime = (
   };
 
   // Initialize result structure
+  // REVIEW: migrated from old processMessage workflow. Is this still needed?
   const result: ISimulationAggregatedDataState = {
     progress: targetTime,
     nodes: nodeStats,
@@ -86,10 +87,23 @@ export const computeAggregatedDataAtTime = (
     blocks: [],
     transactions: [],
     lastNodesUpdated: [],
+    // Add event counts for the UI
+    eventCounts: {
+      total: 0,
+      byType: {},
+    },
   };
 
   // Process all timeline events up to the target time
   const filteredEvents = events.filter((event) => event.time_s <= targetTime);
+
+  // Update event counts
+  result.eventCounts.total = filteredEvents.length;
+  for (const event of filteredEvents) {
+    const type = event.message.type;
+    result.eventCounts.byType[type] =
+      (result.eventCounts.byType[type] || 0) + 1;
+  }
 
   for (const event of filteredEvents) {
     const { message } = event;
@@ -346,23 +360,4 @@ export const computeAggregatedDataAtTime = (
   }
 
   return result;
-};
-
-// Get simple counts for debugging timeline functionality
-export const getEventCountsAtTime = (
-  events: IServerMessage[],
-  targetTime: number,
-): { total: number; byType: Record<string, number> } => {
-  const filteredEvents = events.filter((event) => event.time_s <= targetTime);
-  const byType: Record<string, number> = {};
-
-  for (const event of filteredEvents) {
-    const type = event.message.type;
-    byType[type] = (byType[type] || 0) + 1;
-  }
-
-  return {
-    total: filteredEvents.length,
-    byType,
-  };
 };

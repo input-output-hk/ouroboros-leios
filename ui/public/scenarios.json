@@ -4,7 +4,7 @@
       "name": "Small",
       "topology": "topologies/example.yaml",
       "duration": 120,
-      "trace": "traces/example.jsonl.gz",
+      "trace": "traces/example-nocpu.jsonl",
       "aggregated": false
     },
     {

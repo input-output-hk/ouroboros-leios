@@ -7,20 +7,6 @@ export enum ESpeedOptions {
   "10% Speed" = 0.1,
 }
 
-export interface ISimulationAggregatedTotalData {
-  txGenerated: number;
-  txPropagations: number;
-  ibGenerated: number;
-  ibPropagations: number;
-  ebGenerated: number;
-  ebPropagations: number;
-  pbGenerated: number;
-  pbPropagations: number;
-  votesGenerated: number;
-  votesPropagations: number;
-  praosTxOnChain: number;
-  leiosTxOnChain: number;
-}
 
 export interface ISimulationAggregatedData {
   bytesSent: number;
@@ -85,6 +71,10 @@ export interface ISimulationAggregatedDataState {
   blocks: ISimulationBlock[];
   transactions: ISimulationTransactionData[];
   lastNodesUpdated: string[];
+  eventCounts: {
+    total: number;
+    byType: Record<string, number>;
+  };
 }
 
 export interface ISimulationIntermediateInputBlock {
