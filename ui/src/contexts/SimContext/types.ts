@@ -8,6 +8,20 @@ export enum ESpeedOptions {
   "10% Speed" = 0.1,
 }
 
+export enum VisualizedMessage {
+  EB = "eb",
+  RB = "rb",
+  IB = "ib", 
+  TX = "tx",
+  Votes = "votes",
+}
+
+export enum ActivityAction {
+  Generated = "generated",
+  Sent = "sent", 
+  Received = "received",
+}
+
 export interface ISimulationAggregatedData {
   bytesSent: number;
   bytesReceived: number;
@@ -15,8 +29,8 @@ export interface ISimulationAggregatedData {
   sent: { [type: string]: { count: number; bytes: number } };
   received: { [type: string]: { count: number; bytes: number } };
   lastActivity?: {
-    type: "eb" | "rb" | "ib" | "tx" | "votes";
-    action: "generated" | "sent" | "received";
+    type: VisualizedMessage;
+    action: ActivityAction;
     time: number;
   };
 }
@@ -71,7 +85,7 @@ export interface ISimulationBlock {
 
 export interface IMessageAnimation {
   id: string;
-  type: "eb" | "ib" | "rb" | "tx" | "votes";
+  type: VisualizedMessage;
   sender: string;
   recipient: string;
   sentTime: number;

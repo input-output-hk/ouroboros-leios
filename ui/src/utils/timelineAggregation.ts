@@ -7,21 +7,58 @@ import {
   ISimulationIntermediateInputBlock,
   ISimulationIntermediateEndorsementBlock,
   ISimulationIntermediateDataState,
+  VisualizedMessage,
+  ActivityAction,
 } from "@/contexts/SimContext/types";
 
 // Helper functions
 const updateLastActivity = (
   nodeStats: Map<string, ISimulationAggregatedData>,
   nodeId: string,
-  type: "eb" | "rb" | "ib" | "tx" | "votes",
-  action: "generated" | "sent" | "received",
+  type: VisualizedMessage,
+  action: ActivityAction,
   time: number,
 ) => {
   const stats = nodeStats.get(nodeId);
   if (stats) {
-    if (!stats.lastActivity || time >= stats.lastActivity.time) {
+    // Always update if it's an EB activity, or if timestamp is newer
+    if (
+      !stats.lastActivity ||
+      type === VisualizedMessage.EB ||
+      time >= stats.lastActivity.time
+    ) {
       stats.lastActivity = { type, action, time };
     }
+  }
+};
+
+// TODO: use topology latencies and/or message receival times
+const createMessageAnimation = (
+  result: ISimulationAggregatedDataState,
+  messageType: VisualizedMessage,
+  messageId: string,
+  sender: string,
+  recipient: string,
+  sentTime: number,
+  targetTime: number,
+  travelTime: number,
+) => {
+  const estimatedReceiveTime = sentTime + travelTime;
+
+  // Only show if message is currently in transit at targetTime
+  if (targetTime >= sentTime && targetTime < estimatedReceiveTime) {
+    const progress = (targetTime - sentTime) / travelTime;
+    const animationKey = `${messageId}-${sender}-${recipient}`;
+
+    result.messages.push({
+      id: animationKey,
+      type: messageType,
+      sender,
+      recipient,
+      sentTime,
+      receivedTime: estimatedReceiveTime,
+      progress,
+    });
   }
 };
 
@@ -109,10 +146,6 @@ export const computeAggregatedDataAtTime = (
       byType: {},
     },
   };
-
-  // Track messages in flight for animation with fixed 1-second travel time
-  // TODO: use topology latencies and/or message receival times
-  const TRAVEL_TIME = 1.0; // seconds
 
   // Process all timeline events up to the target time
   const filteredEvents = events.filter((event) => event.time_s <= targetTime);
@@ -230,8 +263,8 @@ export const computeAggregatedDataAtTime = (
         updateLastActivity(
           nodeStats,
           message.producer,
-          "eb",
-          "generated",
+          VisualizedMessage.EB,
+          ActivityAction.Generated,
           event.time_s,
         );
         for (const { id: ibId } of message.input_blocks) {
@@ -280,30 +313,22 @@ export const computeAggregatedDataAtTime = (
         updateLastActivity(
           nodeStats,
           message.sender,
-          "eb",
-          "sent",
+          VisualizedMessage.EB,
+          ActivityAction.Sent,
           event.time_s,
         );
 
         // Create animation with fixed travel time
-        const sentTime = event.time_s;
-        const estimatedReceiveTime = sentTime + TRAVEL_TIME;
-
-        // Only show if message is currently in transit at targetTime
-        if (targetTime >= sentTime && targetTime < estimatedReceiveTime) {
-          const progress = (targetTime - sentTime) / TRAVEL_TIME;
-          const messageKey = `${message.id}-${message.sender}-${message.recipient}`;
-
-          result.messages.push({
-            id: messageKey,
-            type: "eb",
-            sender: message.sender,
-            recipient: message.recipient,
-            sentTime,
-            receivedTime: estimatedReceiveTime,
-            progress,
-          });
-        }
+        createMessageAnimation(
+          result,
+          VisualizedMessage.EB,
+          message.id,
+          message.sender,
+          message.recipient,
+          event.time_s,
+          targetTime,
+          1.0, // TODO: hard-coded travel time
+        );
         break;
       }
 
@@ -323,8 +348,8 @@ export const computeAggregatedDataAtTime = (
         updateLastActivity(
           nodeStats,
           message.recipient,
-          "eb",
-          "received",
+          VisualizedMessage.EB,
+          ActivityAction.Received,
           event.time_s,
         );
         break;
@@ -358,8 +383,8 @@ export const computeAggregatedDataAtTime = (
         updateLastActivity(
           nodeStats,
           message.producer,
-          "rb",
-          "generated",
+          VisualizedMessage.RB,
+          ActivityAction.Generated,
           event.time_s,
         );
 
@@ -385,9 +410,21 @@ export const computeAggregatedDataAtTime = (
         updateLastActivity(
           nodeStats,
           message.sender,
-          "rb",
-          "sent",
+          VisualizedMessage.RB,
+          ActivityAction.Sent,
           event.time_s,
+        );
+
+        // Create RB animation with fixed travel time
+        createMessageAnimation(
+          result,
+          VisualizedMessage.RB,
+          message.id,
+          message.sender,
+          message.recipient,
+          event.time_s,
+          targetTime,
+          0.1, // TODO: hard-coded travel time
         );
         break;
       }
@@ -408,8 +445,8 @@ export const computeAggregatedDataAtTime = (
         updateLastActivity(
           nodeStats,
           message.recipient,
-          "rb",
-          "received",
+          VisualizedMessage.RB,
+          ActivityAction.Received,
           event.time_s,
         );
         break;

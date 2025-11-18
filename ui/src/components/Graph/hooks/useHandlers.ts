@@ -1,10 +1,12 @@
 import { useSimContext } from "@/contexts/SimContext/context";
+import { VisualizedMessage } from "@/contexts/SimContext/types";
 import { useCallback } from "react";
 
 export const useHandlers = () => {
   const {
     state: {
       aggregatedData,
+      currentTime,
       graph: {
         canvasOffsetX,
         canvasOffsetY,
@@ -16,6 +18,8 @@ export const useHandlers = () => {
       topography,
     },
   } = useSimContext();
+
+  const ACTIVITY_TIMEOUT = 1.0; // seconds after which node color resets
 
   const drawTopography = useCallback(() => {
     const canvas = canvasRef.current;
@@ -86,10 +90,14 @@ export const useHandlers = () => {
         const nodeStats = aggregatedData.nodes.get(node.id.toString());
         const lastActivity = nodeStats?.lastActivity;
 
-        if (lastActivity) {
-          if (lastActivity.type === "eb") {
+        // Check if activity is recent (within timeout)
+        const activityIsRecent = lastActivity && 
+          (currentTime - lastActivity.time) <= ACTIVITY_TIMEOUT;
+
+        if (activityIsRecent) {
+          if (lastActivity.type === VisualizedMessage.EB) {
             context.fillStyle = "#9333ea"; // Purple for EB-related activity
-          } else if (lastActivity.type === "rb") {
+          } else if (lastActivity.type === VisualizedMessage.RB) {
             context.fillStyle = "#87ceeb"; // Light blue for RB-related activity
           } else {
             context.fillStyle = node.data.stake ? "#DC53DE" : "blue"; // Default colors
@@ -119,13 +127,23 @@ export const useHandlers = () => {
       const y =
         senderNode.fy + (recipientNode.fy - senderNode.fy) * message.progress;
 
-      // Draw purple rectangle for EB messages
+      // Draw colored rectangle based on message type
       const rectSize = Math.min((0.8 / canvasScale) * 6, 0.8);
-      context.fillStyle = "#9333ea"; // Purple color
+      
+      if (message.type === VisualizedMessage.EB) {
+        context.fillStyle = "#9333ea"; // Purple for EB messages
+        context.strokeStyle = "#7c3aed";
+      } else if (message.type === VisualizedMessage.RB) {
+        context.fillStyle = "#87ceeb"; // Light blue for RB messages
+        context.strokeStyle = "#5f9ea0";
+      } else {
+        context.fillStyle = "#666"; // Gray for other message types
+        context.strokeStyle = "#444";
+      }
+      
       context.fillRect(x - rectSize / 2, y - rectSize / 2, rectSize, rectSize);
 
       // Add a slight border for visibility
-      context.strokeStyle = "#7c3aed";
       context.lineWidth = Math.min((0.1 / canvasScale) * 6, 0.1);
       context.strokeRect(
         x - rectSize / 2,
@@ -138,6 +156,7 @@ export const useHandlers = () => {
     context.restore();
   }, [
     aggregatedData,
+    currentTime,
     maxTime,
     topography.nodes,
     topography.links,
