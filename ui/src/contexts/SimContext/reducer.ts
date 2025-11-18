@@ -1,5 +1,6 @@
 import { defaultAggregatedData } from "./context";
 import { ISimContextState, TSimContextActions } from "./types";
+import { computeAggregatedDataAtTime } from "@/utils/timelineAggregation";
 
 export const reducer = (
   state: ISimContextState,
@@ -156,11 +157,22 @@ export const reducer = (
         events: [...state.events, ...action.payload],
       };
 
-    case "SET_TIMELINE_TIME":
+    case "SET_TIMELINE_TIME": {
+      const newTime = action.payload;
+      
+      // Recompute complete aggregated data based on new timeline position
+      let newAggregatedData = state.aggregatedData;
+      if (state.events.length > 0 && state.topography.nodes.size > 0) {
+        const nodeIds = Array.from(state.topography.nodes.keys());
+        newAggregatedData = computeAggregatedDataAtTime(state.events, newTime, nodeIds);
+      }
+      
       return {
         ...state,
-        currentTime: action.payload,
+        currentTime: newTime,
+        aggregatedData: newAggregatedData,
       };
+    }
 
     case "SET_TIMELINE_PLAYING":
       return {
