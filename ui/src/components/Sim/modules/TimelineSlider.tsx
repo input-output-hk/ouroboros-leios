@@ -19,12 +19,9 @@ export const TimelineSlider: FC = () => {
   const maxTime = hasEvents ? events[events.length - 1].time_s : 100; // Default duration when no events
 
   const formatTime = (timeInSeconds: number, highResolution = false) => {
-    const minutes = Math.floor(timeInSeconds / 60);
-    const seconds = timeInSeconds % 60;
-    const secondsFormatted = highResolution
-      ? seconds.toFixed(3)
-      : seconds.toFixed(1);
-    return minutes ? `${minutes}m${secondsFormatted}s` : `${secondsFormatted}s`;
+    return highResolution
+      ? `${timeInSeconds.toFixed(3)}s`
+      : `${timeInSeconds.toFixed(1)}s`;
   };
 
   const currentPercent = maxTime > 0 ? (currentTime / maxTime) * 100 : 0;

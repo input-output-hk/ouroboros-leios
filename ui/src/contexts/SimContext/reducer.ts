@@ -194,6 +194,45 @@ export const reducer = (
         speedMultiplier: action.payload,
       };
 
+    case "STEP_TIMELINE_FORWARD": {
+      const maxTime = state.events.length > 0 
+        ? state.events[state.events.length - 1].time_s 
+        : state.maxTime;
+      const newTime = Math.min(state.currentTime + action.payload, maxTime);
+      
+      // Recompute aggregated data for the new time
+      const nodeIds = Array.from(state.topography.nodes.keys());
+      const newAggregatedData = computeAggregatedDataAtTime(
+        state.events,
+        newTime,
+        nodeIds,
+      );
+      
+      return {
+        ...state,
+        currentTime: newTime,
+        aggregatedData: newAggregatedData,
+      };
+    }
+
+    case "STEP_TIMELINE_BACKWARD": {
+      const newTime = Math.max(state.currentTime - action.payload, 0);
+      
+      // Recompute aggregated data for the new time
+      const nodeIds = Array.from(state.topography.nodes.keys());
+      const newAggregatedData = computeAggregatedDataAtTime(
+        state.events,
+        newTime,
+        nodeIds,
+      );
+      
+      return {
+        ...state,
+        currentTime: newTime,
+        aggregatedData: newAggregatedData,
+      };
+    }
+
     case "RESET_TIMELINE":
       return {
         ...state,

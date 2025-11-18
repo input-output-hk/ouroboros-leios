@@ -19,26 +19,83 @@ export const Playback: FC = () => {
     dispatch({ type: "SET_TIMELINE_PLAYING", payload: !isPlaying });
   }, [dispatch, isPlaying]);
 
+  const handleStepBackward10ms = useCallback(() => {
+    dispatch({ type: "STEP_TIMELINE_BACKWARD", payload: 0.01 });
+  }, [dispatch]);
+
+  const handleStepBackward1ms = useCallback(() => {
+    dispatch({ type: "STEP_TIMELINE_BACKWARD", payload: 0.001 });
+  }, [dispatch]);
+
+  const handleStepForward1ms = useCallback(() => {
+    dispatch({ type: "STEP_TIMELINE_FORWARD", payload: 0.001 });
+  }, [dispatch]);
+
+  const handleStepForward10ms = useCallback(() => {
+    dispatch({ type: "STEP_TIMELINE_FORWARD", payload: 0.01 });
+  }, [dispatch]);
+
+  const disabled = events.length === 0;
+
   return (
-    <div className="flex items-end gap-4">
+    <div className="flex items-center gap-2">
+      {/* Play/Pause button */}
       <button
         onClick={handlePlayPause}
-        disabled={events.length === 0}
-        className="bg-blue-500 text-white px-3 py-2 rounded disabled:bg-gray-300 disabled:cursor-not-allowed w-20"
+        disabled={disabled}
+        className="bg-blue-500 text-white px-3 py-2 rounded disabled:bg-gray-300 disabled:cursor-not-allowed w-16 text-sm"
       >
         {isPlaying ? "Pause" : "Play"}
       </button>
 
+      {/* Step controls: << < > >> */}
+      <button
+        onClick={handleStepBackward10ms}
+        disabled={disabled}
+        className="bg-gray-500 text-white px-2 py-2 rounded disabled:bg-gray-300 disabled:cursor-not-allowed text-sm"
+        title="Step backward 10ms"
+      >
+        &lt;&lt;
+      </button>
+
+      <button
+        onClick={handleStepBackward1ms}
+        disabled={disabled}
+        className="bg-gray-500 text-white px-2 py-2 rounded disabled:bg-gray-300 disabled:cursor-not-allowed text-sm"
+        title="Step backward 1ms"
+      >
+        &lt;
+      </button>
+
+      <button
+        onClick={handleStepForward1ms}
+        disabled={disabled}
+        className="bg-gray-500 text-white px-2 py-2 rounded disabled:bg-gray-300 disabled:cursor-not-allowed text-sm"
+        title="Step forward 1ms"
+      >
+        &gt;
+      </button>
+
+      <button
+        onClick={handleStepForward10ms}
+        disabled={disabled}
+        className="bg-gray-500 text-white px-2 py-2 rounded disabled:bg-gray-300 disabled:cursor-not-allowed text-sm"
+        title="Step forward 10ms"
+      >
+        &gt;&gt;
+      </button>
+
+      {/* Speed control */}
       <div className="min-w-16">
         <label htmlFor="timelineSpeed" className="block text-xs text-gray-600">
           Speed
         </label>
         <select
           name="timelineSpeed"
-          className="mt-1 w-full text-lg"
+          className="mt-1 w-full text-sm"
           value={speedMultiplier}
           onChange={handleSpeedChange}
-          disabled={events.length === 0}
+          disabled={disabled}
         >
           <option value={0.25}>0.25x</option>
           <option value={0.5}>0.5x</option>
