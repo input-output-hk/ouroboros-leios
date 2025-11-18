@@ -36,6 +36,9 @@ const updateLastActivity = (
   }
 };
 
+// Memoization cache for topology latency lookups: Map<sender, Map<recipient, latency>>
+const latencyCache = new Map<string, Map<string, number | null>>();
+
 // Helper function to get latency between two nodes from topology
 const getTopologyLatency = (
   topology: ITransformedNodeMap,
@@ -44,12 +47,35 @@ const getTopologyLatency = (
 ): number | null => {
   if (!topology || !topology.links) return null;
 
-  // Create link key in same format as topology loading (sorted)
+  // Check cache first
+  const senderCache = latencyCache.get(sender);
+  if (senderCache && senderCache.has(recipient)) {
+    return senderCache.get(recipient)!;
+  }
+
+  // Compute result - need to check both directions since topology uses sorted keys
   const linkIds = [sender, recipient].sort();
   const linkKey = `${linkIds[0]}|${linkIds[1]}`;
-
   const link = topology.links.get(linkKey);
-  return link?.latencyMs ? link.latencyMs / 1000 : null; // Convert ms to seconds
+  const latency = link?.latencyMs ? link.latencyMs / 1000 : null; // Convert ms to seconds
+  
+  // Cache result in both directions for bidirectional access
+  if (!latencyCache.has(sender)) {
+    latencyCache.set(sender, new Map());
+  }
+  if (!latencyCache.has(recipient)) {
+    latencyCache.set(recipient, new Map());
+  }
+  
+  latencyCache.get(sender)!.set(recipient, latency);
+  latencyCache.get(recipient)!.set(sender, latency);
+  
+  return latency;
+};
+
+// Clear latency cache when topology changes
+export const clearLatencyCache = () => {
+  latencyCache.clear();
 };
 
 const createMessageAnimation = (
@@ -176,16 +202,16 @@ export const computeAggregatedDataAtTime = (
   // Process all timeline events up to the target time
   const filteredEvents = events.filter((event) => event.time_s <= targetTime);
 
-  // Update event counts
+  // Update event counts and process events in single iteration
   result.eventCounts.total = filteredEvents.length;
-  for (const event of filteredEvents) {
-    const type = event.message.type;
-    result.eventCounts.byType[type] =
-      (result.eventCounts.byType[type] || 0) + 1;
-  }
-
+  
   for (const event of filteredEvents) {
     const { message } = event;
+    
+    // Update event counts
+    const type = message.type;
+    result.eventCounts.byType[type] =
+      (result.eventCounts.byType[type] || 0) + 1;
 
     switch (message.type) {
       case EMessageType.TransactionGenerated: {

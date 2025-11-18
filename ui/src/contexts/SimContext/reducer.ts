@@ -1,6 +1,6 @@
 import { defaultAggregatedData } from "./context";
 import { ISimContextState, TSimContextActions } from "./types";
-import { computeAggregatedDataAtTime } from "@/utils/timelineAggregation";
+import { computeAggregatedDataAtTime, clearLatencyCache } from "@/utils/timelineAggregation";
 
 export const reducer = (
   state: ISimContextState,
@@ -128,6 +128,7 @@ export const reducer = (
     }
 
     case "RESET_TOPOLOGY":
+      clearLatencyCache();
       return {
         ...state,
         topography: { links: new Map(), nodes: new Map() },
@@ -139,6 +140,7 @@ export const reducer = (
       if (action.payload.topologyPath != state.topologyPath) {
         return state;
       }
+      clearLatencyCache();
       return {
         ...state,
         topography: action.payload.topology,
