@@ -1,6 +1,7 @@
 import { FC } from "react";
 
 import { useSimContext } from "@/contexts/SimContext/context";
+import { EMessageType } from "../types";
 
 export const Stats: FC = () => {
   const {
@@ -26,15 +27,16 @@ export const Stats: FC = () => {
           </h4>
           <br />
           <h4 className="font-semibold">Event Types</h4>
-          {Object.keys(aggregatedData.eventCounts.byType).length > 0 && (
+          {aggregatedData.eventCounts.total > 0 && (
             <div className="text-sm mt-2">
-              {Object.entries(aggregatedData.eventCounts.byType).map(
-                ([type, count]) => (
-                  <div key={type} className="flex justify-between text-sm">
-                    <span>{type}:</span> <span>{count}</span>
+              {Object.values(EMessageType).map((eventType) => {
+                const count = aggregatedData.eventCounts.byType[eventType];
+                return (
+                  <div key={eventType} className="flex justify-between text-sm">
+                    <span>{eventType}:</span> <span>{count || 0}</span>
                   </div>
-                ),
-              )}
+                );
+              })}
             </div>
           )}
         </div>

@@ -80,7 +80,7 @@ export interface IMessageAnimation {
 }
 
 export interface ISimulationAggregatedDataState {
-  progress: number;
+  progress: number; // TODO: unused
   nodes: Map<string, ISimulationAggregatedData>;
   global: ISimulationGlobalData;
   blocks: ISimulationBlock[];

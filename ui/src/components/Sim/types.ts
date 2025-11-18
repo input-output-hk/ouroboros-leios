@@ -55,15 +55,15 @@ export enum EMessageType {
   IBGenerated = "IBGenerated",
   IBReceived = "IBReceived",
   IBSent = "IBSent",
-  RBGenerated = "RBGenerated",
-  RBReceived = "RBReceived",
-  RBSent = "RBSent",
   EBGenerated = "EBGenerated",
   EBReceived = "EBReceived",
   EBSent = "EBSent",
   VTBundleGenerated = "VTBundleGenerated",
   VTBundleReceived = "VTBundleReceived",
   VTBundleSent = "VTBundleSent",
+  RBGenerated = "RBGenerated",
+  RBReceived = "RBReceived",
+  RBSent = "RBSent",
 }
 
 export interface ITransactionGenerated {
