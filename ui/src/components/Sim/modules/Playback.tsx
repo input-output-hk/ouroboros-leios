@@ -3,7 +3,7 @@ import { FC, useCallback } from "react";
 
 export const Playback: FC = () => {
   const {
-    state: { events, isPlaying, speedMultiplier },
+    state: { events, isPlaying, speedMultiplier, currentTime, maxTime },
     dispatch,
   } = useSimContext();
 
@@ -19,21 +19,19 @@ export const Playback: FC = () => {
     dispatch({ type: "SET_TIMELINE_PLAYING", payload: !isPlaying });
   }, [dispatch, isPlaying]);
 
-  const handleStepBackward10ms = useCallback(() => {
-    dispatch({ type: "STEP_TIMELINE_BACKWARD", payload: 0.01 });
-  }, [dispatch]);
+  const handleStep = useCallback(
+    (stepAmount: number) => {
+      const maxEventTime =
+        events.length > 0 ? events[events.length - 1].time_s : maxTime;
+      const newTime = Math.max(
+        0,
+        Math.min(currentTime + stepAmount, maxEventTime),
+      );
+      dispatch({ type: "SET_TIMELINE_TIME", payload: newTime });
+    },
+    [dispatch, currentTime, events, maxTime],
+  );
 
-  const handleStepBackward1ms = useCallback(() => {
-    dispatch({ type: "STEP_TIMELINE_BACKWARD", payload: 0.001 });
-  }, [dispatch]);
-
-  const handleStepForward1ms = useCallback(() => {
-    dispatch({ type: "STEP_TIMELINE_FORWARD", payload: 0.001 });
-  }, [dispatch]);
-
-  const handleStepForward10ms = useCallback(() => {
-    dispatch({ type: "STEP_TIMELINE_FORWARD", payload: 0.01 });
-  }, [dispatch]);
 
   const disabled = events.length === 0;
 
@@ -50,7 +48,7 @@ export const Playback: FC = () => {
 
       {/* Step controls: << < > >> */}
       <button
-        onClick={handleStepBackward10ms}
+        onClick={() => handleStep(-0.01)}
         disabled={disabled}
         className="bg-gray-500 text-white px-2 py-2 rounded disabled:bg-gray-300 disabled:cursor-not-allowed text-sm"
         title="Step backward 10ms"
@@ -59,7 +57,7 @@ export const Playback: FC = () => {
       </button>
 
       <button
-        onClick={handleStepBackward1ms}
+        onClick={() => handleStep(-0.001)}
         disabled={disabled}
         className="bg-gray-500 text-white px-2 py-2 rounded disabled:bg-gray-300 disabled:cursor-not-allowed text-sm"
         title="Step backward 1ms"
@@ -68,7 +66,7 @@ export const Playback: FC = () => {
       </button>
 
       <button
-        onClick={handleStepForward1ms}
+        onClick={() => handleStep(0.001)}
         disabled={disabled}
         className="bg-gray-500 text-white px-2 py-2 rounded disabled:bg-gray-300 disabled:cursor-not-allowed text-sm"
         title="Step forward 1ms"
@@ -77,7 +75,7 @@ export const Playback: FC = () => {
       </button>
 
       <button
-        onClick={handleStepForward10ms}
+        onClick={() => handleStep(0.01)}
         disabled={disabled}
         className="bg-gray-500 text-white px-2 py-2 rounded disabled:bg-gray-300 disabled:cursor-not-allowed text-sm"
         title="Step forward 10ms"

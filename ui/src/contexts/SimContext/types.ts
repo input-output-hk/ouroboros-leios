@@ -225,8 +225,6 @@ export type TSimContextActions =
   | { type: "SET_TIMELINE_TIME"; payload: number }
   | { type: "SET_TIMELINE_PLAYING"; payload: boolean }
   | { type: "SET_TIMELINE_SPEED"; payload: number }
-  | { type: "STEP_TIMELINE_FORWARD"; payload: number } // step size in seconds
-  | { type: "STEP_TIMELINE_BACKWARD"; payload: number } // step size in seconds
   | { type: "RESET_TIMELINE" };
 
 export interface ISimContext {

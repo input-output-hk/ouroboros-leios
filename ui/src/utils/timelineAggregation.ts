@@ -1,4 +1,8 @@
-import { IServerMessage, EMessageType } from "@/components/Sim/types";
+import {
+  IServerMessage,
+  EMessageType,
+  ITransformedNodeMap,
+} from "@/components/Sim/types";
 import {
   ISimulationAggregatedData,
   ISimulationAggregatedDataState,
@@ -32,7 +36,22 @@ const updateLastActivity = (
   }
 };
 
-// TODO: use topology latencies and/or message receival times
+// Helper function to get latency between two nodes from topology
+const getTopologyLatency = (
+  topology: ITransformedNodeMap,
+  sender: string,
+  recipient: string,
+): number | null => {
+  if (!topology || !topology.links) return null;
+
+  // Create link key in same format as topology loading (sorted)
+  const linkIds = [sender, recipient].sort();
+  const linkKey = `${linkIds[0]}|${linkIds[1]}`;
+
+  const link = topology.links.get(linkKey);
+  return link?.latencyMs ? link.latencyMs / 1000 : null; // Convert ms to seconds
+};
+
 const createMessageAnimation = (
   result: ISimulationAggregatedDataState,
   messageType: VisualizedMessage,
@@ -41,8 +60,14 @@ const createMessageAnimation = (
   recipient: string,
   sentTime: number,
   targetTime: number,
-  travelTime: number,
+  fallbackTravelTime: number,
+  topology: ITransformedNodeMap,
 ) => {
+  // Try to get realistic latency from topology, fallback to hardcoded time
+  const topologyLatency = getTopologyLatency(topology, sender, recipient);
+  const travelTime =
+    topologyLatency !== null ? topologyLatency : fallbackTravelTime;
+
   const estimatedReceiveTime = sentTime + travelTime;
 
   // Only show if message is currently in transit at targetTime
@@ -102,6 +127,7 @@ export const computeAggregatedDataAtTime = (
   events: IServerMessage[],
   targetTime: number,
   nodeIds: string[],
+  topology: ITransformedNodeMap,
 ): ISimulationAggregatedDataState => {
   const nodeStats = new Map<string, ISimulationAggregatedData>();
 
@@ -318,7 +344,7 @@ export const computeAggregatedDataAtTime = (
           event.time_s,
         );
 
-        // Create animation with fixed travel time
+        // Create animation with topology latency
         createMessageAnimation(
           result,
           VisualizedMessage.EB,
@@ -327,7 +353,8 @@ export const computeAggregatedDataAtTime = (
           message.recipient,
           event.time_s,
           targetTime,
-          1.0, // TODO: hard-coded travel time
+          1.0, // fallback travel time for EB
+          topology,
         );
         break;
       }
@@ -415,7 +442,7 @@ export const computeAggregatedDataAtTime = (
           event.time_s,
         );
 
-        // Create RB animation with fixed travel time
+        // Create RB animation with topology latency
         createMessageAnimation(
           result,
           VisualizedMessage.RB,
@@ -424,7 +451,8 @@ export const computeAggregatedDataAtTime = (
           message.recipient,
           event.time_s,
           targetTime,
-          0.1, // TODO: hard-coded travel time
+          0.1, // fallback travel time for RB
+          topology,
         );
         break;
       }

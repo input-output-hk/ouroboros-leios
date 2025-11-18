@@ -8,6 +8,7 @@ export const NodeStats: FC = () => {
     state: {
       aggregatedData,
       graph: { currentNode },
+      topography,
     },
   } = useSimContext();
 
@@ -20,6 +21,25 @@ export const NodeStats: FC = () => {
     const received = currentNodeStats?.received?.[type]?.bytes ?? 0;
     return { sent, received };
   };
+
+  const getPeerLatencies = useMemo(() => {
+    if (!currentNode || !topography.links) return [];
+
+    const peers: { peerId: string; latencyMs: number | null }[] = [];
+
+    // Find all links involving the current node
+    topography.links.forEach((link) => {
+      if (link.source === currentNode || link.target === currentNode) {
+        const peerId = link.source === currentNode ? link.target : link.source;
+        peers.push({
+          peerId,
+          latencyMs: link.latencyMs || null,
+        });
+      }
+    });
+
+    return peers.sort((a, b) => a.peerId.localeCompare(b.peerId));
+  }, [currentNode, topography.links]);
 
   const data = [
     { name: "Transactions", ...getCounts("tx"), color: "#26de81" },
@@ -34,6 +54,27 @@ export const NodeStats: FC = () => {
       <h2 className="flex items-center justify-between gap-4 font-bold uppercase mb-2">
         Node Stats <span>{currentNode}</span>
       </h2>
+
+      {/* Peer Latencies Section */}
+      {getPeerLatencies.length > 0 && (
+        <div className="mb-4">
+          <h3 className="font-semibold text-sm mb-2">Peer Latencies</h3>
+          <div className="max-h-32 overflow-y-auto text-xs">
+            {getPeerLatencies.map(({ peerId, latencyMs }) => (
+              <div
+                key={peerId}
+                className="flex justify-between items-center py-1"
+              >
+                <span className="text-gray-700">{peerId}:</span>
+                <span className="font-mono">
+                  {latencyMs !== null ? `${latencyMs}ms` : "N/A"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {currentNodeStats && (
         <div className="w-full h-full">
           <h2 className="text-center">
