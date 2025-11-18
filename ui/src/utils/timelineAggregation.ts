@@ -58,7 +58,7 @@ const getTopologyLatency = (
   const linkKey = `${linkIds[0]}|${linkIds[1]}`;
   const link = topology.links.get(linkKey);
   const latency = link?.latencyMs ? link.latencyMs / 1000 : null; // Convert ms to seconds
-  
+
   // Cache result in both directions for bidirectional access
   if (!latencyCache.has(sender)) {
     latencyCache.set(sender, new Map());
@@ -66,10 +66,10 @@ const getTopologyLatency = (
   if (!latencyCache.has(recipient)) {
     latencyCache.set(recipient, new Map());
   }
-  
+
   latencyCache.get(sender)!.set(recipient, latency);
   latencyCache.get(recipient)!.set(sender, latency);
-  
+
   return latency;
 };
 
@@ -169,6 +169,7 @@ export const computeAggregatedDataAtTime = (
   });
 
   // Initialize intermediate state for tracking relationships between events
+  // REVIEW: migrated from old processMessage workflow. Is this still needed?
   const intermediate: ISimulationIntermediateDataState = {
     txs: [],
     txStatuses: [],
@@ -180,7 +181,6 @@ export const computeAggregatedDataAtTime = (
   };
 
   // Initialize result structure
-  // REVIEW: migrated from old processMessage workflow. Is this still needed?
   const result: ISimulationAggregatedDataState = {
     progress: targetTime,
     nodes: nodeStats,
@@ -199,19 +199,22 @@ export const computeAggregatedDataAtTime = (
     },
   };
 
-  // Process all timeline events up to the target time
-  const filteredEvents = events.filter((event) => event.time_s <= targetTime);
+  // Process timeline events up to target time with early termination
+  let eventCount = 0;
+  const eventCountsByType: Record<string, number> = {};
 
-  // Update event counts and process events in single iteration
-  result.eventCounts.total = filteredEvents.length;
-  
-  for (const event of filteredEvents) {
+  for (const event of events) {
+    // Stop processing when we reach target time
+    if (event.time_s > targetTime) {
+      break;
+    }
+
     const { message } = event;
-    
-    // Update event counts
+
+    // Accumulate event counts
+    eventCount++;
     const type = message.type;
-    result.eventCounts.byType[type] =
-      (result.eventCounts.byType[type] || 0) + 1;
+    eventCountsByType[type] = (eventCountsByType[type] || 0) + 1;
 
     switch (message.type) {
       case EMessageType.TransactionGenerated: {
@@ -557,6 +560,10 @@ export const computeAggregatedDataAtTime = (
       }
     }
   }
+
+  // Set final event counts
+  result.eventCounts.total = eventCount;
+  result.eventCounts.byType = eventCountsByType;
 
   return result;
 };
