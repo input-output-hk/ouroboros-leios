@@ -213,6 +213,19 @@ export const computeAggregatedDataAtTime = (
           stats.sent["tx"].bytes += bytes;
           stats.bytesSent += bytes;
         }
+
+        // Create transaction animation with topology latency
+        createMessageAnimation(
+          result,
+          VisualizedMessage.TX,
+          message.id,
+          message.sender,
+          message.recipient,
+          event.time_s,
+          targetTime,
+          0.05, // fallback travel time for transactions (faster than blocks)
+          topology,
+        );
         break;
       }
 

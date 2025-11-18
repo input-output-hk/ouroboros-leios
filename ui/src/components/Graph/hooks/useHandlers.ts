@@ -136,6 +136,9 @@ export const useHandlers = () => {
       } else if (message.type === VisualizedMessage.RB) {
         context.fillStyle = "#87ceeb"; // Light blue for RB messages
         context.strokeStyle = "#5f9ea0";
+      } else if (message.type === VisualizedMessage.TX) {
+        context.fillStyle = "#90ee90"; // Light green for transaction messages
+        context.strokeStyle = "#6bc46b";
       } else {
         context.fillStyle = "#666"; // Gray for other message types
         context.strokeStyle = "#444";
