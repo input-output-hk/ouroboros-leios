@@ -159,14 +159,22 @@ export const reducer = (
 
     case "SET_TIMELINE_TIME": {
       const newTime = action.payload;
-      
+
       // Recompute complete aggregated data based on new timeline position
-      let newAggregatedData = state.aggregatedData;
-      if (state.events.length > 0 && state.topography.nodes.size > 0) {
-        const nodeIds = Array.from(state.topography.nodes.keys());
-        newAggregatedData = computeAggregatedDataAtTime(state.events, newTime, nodeIds);
+      const nodeIds = Array.from(state.topography.nodes.keys());
+
+      const newAggregatedData = computeAggregatedDataAtTime(
+        state.events,
+        newTime,
+        nodeIds,
+      );
+
+      if (state.graph.currentNode) {
+        const newState = newAggregatedData.nodes.get(state.graph.currentNode);
+        // TODO: only log when different
+        console.log(`Node ${state.graph.currentNode} state`, newState);
       }
-      
+
       return {
         ...state,
         currentTime: newTime,

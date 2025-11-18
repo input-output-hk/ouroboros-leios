@@ -1,12 +1,12 @@
 import { IServerMessage, ITransformedNodeMap } from "@/components/Sim/types";
 import { Dispatch, RefObject } from "react";
 
+// TODO: unused
 export enum ESpeedOptions {
   "1% Speed" = 0.01,
   "3% Speed" = 0.03,
   "10% Speed" = 0.1,
 }
-
 
 export interface ISimulationAggregatedData {
   bytesSent: number;
@@ -14,6 +14,11 @@ export interface ISimulationAggregatedData {
   generated: { [type: string]: number };
   sent: { [type: string]: { count: number; bytes: number } };
   received: { [type: string]: { count: number; bytes: number } };
+  lastActivity?: {
+    type: "eb" | "rb" | "ib" | "tx" | "votes";
+    action: "generated" | "sent" | "received";
+    time: number;
+  };
 }
 
 export interface ISimulationGlobalData {
@@ -64,6 +69,16 @@ export interface ISimulationBlock {
   cert: ISimulationCertificate | null;
 }
 
+export interface IMessageAnimation {
+  id: string;
+  type: "eb" | "ib" | "rb" | "tx" | "votes";
+  sender: string;
+  recipient: string;
+  sentTime: number;
+  receivedTime: number;
+  progress: number; // 0-1, calculated based on current timeline position
+}
+
 export interface ISimulationAggregatedDataState {
   progress: number;
   nodes: Map<string, ISimulationAggregatedData>;
@@ -71,6 +86,7 @@ export interface ISimulationAggregatedDataState {
   blocks: ISimulationBlock[];
   transactions: ISimulationTransactionData[];
   lastNodesUpdated: string[];
+  messages: IMessageAnimation[]; // Active messages traveling on the graph
   eventCounts: {
     total: number;
     byType: Record<string, number>;

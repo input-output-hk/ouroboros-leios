@@ -121,7 +121,7 @@ export interface IInputBlockSent {
   recipient: string;
 }
 
-export interface IPraosBlockGenerated {
+export interface IRankingBlockGenerated {
   type: EMessageType.RBGenerated;
   id: string;
   slot: number;
@@ -138,7 +138,7 @@ export interface IEndorsement {
   votes: {};
 }
 
-export interface IPraosBlockReceived {
+export interface IRankingBlockReceived {
   type: EMessageType.RBReceived;
   id: string;
   slot: number;
@@ -146,7 +146,7 @@ export interface IPraosBlockReceived {
   recipient: string;
 }
 
-export interface IPraosBlockSent {
+export interface IRankingBlockSent {
   type: EMessageType.RBSent;
   slot: number;
   id: string;
@@ -227,9 +227,9 @@ export type TMessageType =
   | IInputBlockGenerated
   | IInputBlockReceived
   | IInputBlockSent
-  | IPraosBlockGenerated
-  | IPraosBlockReceived
-  | IPraosBlockSent
+  | IRankingBlockGenerated
+  | IRankingBlockReceived
+  | IRankingBlockSent
   | IEndorserBlockGenerated
   | IEndorserBlockReceived
   | IEndorserBlockSent

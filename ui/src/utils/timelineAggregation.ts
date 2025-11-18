@@ -10,6 +10,21 @@ import {
 } from "@/contexts/SimContext/types";
 
 // Helper functions
+const updateLastActivity = (
+  nodeStats: Map<string, ISimulationAggregatedData>,
+  nodeId: string,
+  type: "eb" | "rb" | "ib" | "tx" | "votes",
+  action: "generated" | "sent" | "received",
+  time: number,
+) => {
+  const stats = nodeStats.get(nodeId);
+  if (stats) {
+    if (!stats.lastActivity || time >= stats.lastActivity.time) {
+      stats.lastActivity = { type, action, time };
+    }
+  }
+};
+
 const extractEb = (
   intermediate: ISimulationIntermediateDataState,
   ebId: string,
@@ -87,12 +102,17 @@ export const computeAggregatedDataAtTime = (
     blocks: [],
     transactions: [],
     lastNodesUpdated: [],
+    messages: [],
     // Add event counts for the UI
     eventCounts: {
       total: 0,
       byType: {},
     },
   };
+
+  // Track messages in flight for animation with fixed 1-second travel time
+  // TODO: use topology latencies and/or message receival times
+  const TRAVEL_TIME = 1.0; // seconds
 
   // Process all timeline events up to the target time
   const filteredEvents = events.filter((event) => event.time_s <= targetTime);
@@ -205,6 +225,15 @@ export const computeAggregatedDataAtTime = (
           stats.generated["eb"] = (stats.generated["eb"] || 0) + 1;
           intermediate.bytes.set(`eb-${message.id}`, message.size_bytes);
         }
+
+        // Track last activity for node coloring
+        updateLastActivity(
+          nodeStats,
+          message.producer,
+          "eb",
+          "generated",
+          event.time_s,
+        );
         for (const { id: ibId } of message.input_blocks) {
           for (const tx of intermediate.ibs.get(ibId)?.txs ?? []) {
             if (
@@ -246,6 +275,35 @@ export const computeAggregatedDataAtTime = (
           stats.sent["eb"].bytes += bytes;
           stats.bytesSent += bytes;
         }
+
+        // Track last activity for node coloring
+        updateLastActivity(
+          nodeStats,
+          message.sender,
+          "eb",
+          "sent",
+          event.time_s,
+        );
+
+        // Create animation with fixed travel time
+        const sentTime = event.time_s;
+        const estimatedReceiveTime = sentTime + TRAVEL_TIME;
+
+        // Only show if message is currently in transit at targetTime
+        if (targetTime >= sentTime && targetTime < estimatedReceiveTime) {
+          const progress = (targetTime - sentTime) / TRAVEL_TIME;
+          const messageKey = `${message.id}-${message.sender}-${message.recipient}`;
+
+          result.messages.push({
+            id: messageKey,
+            type: "eb",
+            sender: message.sender,
+            recipient: message.recipient,
+            sentTime,
+            receivedTime: estimatedReceiveTime,
+            progress,
+          });
+        }
         break;
       }
 
@@ -260,6 +318,15 @@ export const computeAggregatedDataAtTime = (
           stats.received["eb"].bytes += bytes;
           stats.bytesReceived += bytes;
         }
+
+        // Track last activity for node coloring
+        updateLastActivity(
+          nodeStats,
+          message.recipient,
+          "eb",
+          "received",
+          event.time_s,
+        );
         break;
       }
 
@@ -286,6 +353,16 @@ export const computeAggregatedDataAtTime = (
           stats.generated["pb"] = (stats.generated["pb"] || 0) + 1;
           intermediate.bytes.set(`pb-${message.id}`, message.size_bytes);
         }
+
+        // Track last activity for node coloring
+        updateLastActivity(
+          nodeStats,
+          message.producer,
+          "rb",
+          "generated",
+          event.time_s,
+        );
+
         result.global.praosTxOnChain = intermediate.praosTxs.size;
         result.global.leiosTxOnChain = intermediate.leiosTxs.size;
         result.blocks.push(block);
@@ -303,6 +380,15 @@ export const computeAggregatedDataAtTime = (
           stats.sent["pb"].bytes += bytes;
           stats.bytesSent += bytes;
         }
+
+        // Track last activity for node coloring
+        updateLastActivity(
+          nodeStats,
+          message.sender,
+          "rb",
+          "sent",
+          event.time_s,
+        );
         break;
       }
 
@@ -317,6 +403,15 @@ export const computeAggregatedDataAtTime = (
           stats.received["pb"].bytes += bytes;
           stats.bytesReceived += bytes;
         }
+
+        // Track last activity for node coloring
+        updateLastActivity(
+          nodeStats,
+          message.recipient,
+          "rb",
+          "received",
+          event.time_s,
+        );
         break;
       }
 

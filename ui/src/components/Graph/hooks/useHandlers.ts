@@ -81,11 +81,58 @@ export const useHandlers = () => {
 
       if (currentNode === node.id.toString()) {
         context.fillStyle = "blue";
-      } else if (!node.data.stake) {
-        context.fillStyle = "gray";
+      } else {
+        // Color based on last activity
+        const nodeStats = aggregatedData.nodes.get(node.id.toString());
+        const lastActivity = nodeStats?.lastActivity;
+
+        if (lastActivity) {
+          if (lastActivity.type === "eb") {
+            context.fillStyle = "#9333ea"; // Purple for EB-related activity
+          } else if (lastActivity.type === "rb") {
+            context.fillStyle = "#87ceeb"; // Light blue for RB-related activity
+          } else {
+            context.fillStyle = node.data.stake ? "#DC53DE" : "blue"; // Default colors
+          }
+        } else if (!node.data.stake) {
+          context.fillStyle = "gray";
+        } else {
+          context.fillStyle = "#DC53DE"; // Stake node default
+        }
       }
 
       context.fill();
+    });
+
+    // Draw message animations
+    aggregatedData.messages.forEach((message) => {
+      const senderNode = topography.nodes.get(message.sender);
+      const recipientNode = topography.nodes.get(message.recipient);
+
+      if (!senderNode || !recipientNode) {
+        return;
+      }
+
+      // Calculate position along the edge based on progress (0-1)
+      const x =
+        senderNode.fx + (recipientNode.fx - senderNode.fx) * message.progress;
+      const y =
+        senderNode.fy + (recipientNode.fy - senderNode.fy) * message.progress;
+
+      // Draw purple rectangle for EB messages
+      const rectSize = Math.min((0.8 / canvasScale) * 6, 0.8);
+      context.fillStyle = "#9333ea"; // Purple color
+      context.fillRect(x - rectSize / 2, y - rectSize / 2, rectSize, rectSize);
+
+      // Add a slight border for visibility
+      context.strokeStyle = "#7c3aed";
+      context.lineWidth = Math.min((0.1 / canvasScale) * 6, 0.1);
+      context.strokeRect(
+        x - rectSize / 2,
+        y - rectSize / 2,
+        rectSize,
+        rectSize,
+      );
     });
 
     context.restore();
