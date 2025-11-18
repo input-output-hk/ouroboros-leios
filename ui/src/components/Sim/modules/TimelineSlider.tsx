@@ -1,5 +1,5 @@
 import { useSimContext } from "@/contexts/SimContext/context";
-import { type FC, useCallback, useMemo } from "react";
+import { type FC, useCallback } from "react";
 
 export const TimelineSlider: FC = () => {
   const {
@@ -15,29 +15,30 @@ export const TimelineSlider: FC = () => {
     [dispatch],
   );
 
-  // Don't render if no events loaded
-  if (events.length === 0) {
-    return null;
-  }
+  const hasEvents = events.length > 0;
+  const maxTime = hasEvents ? events[events.length - 1].time_s : 100; // Default duration when no events
 
-  const maxTime = events[events.length - 1].time_s;
-
-  const formatTime = (timeInSeconds: number) => {
+  const formatTime = (timeInSeconds: number, highResolution = false) => {
     const minutes = Math.floor(timeInSeconds / 60);
-    const seconds = (timeInSeconds % 60).toFixed(1);
-    return minutes ? `${minutes}m${seconds}s` : `${seconds}s`;
+    const seconds = timeInSeconds % 60;
+    const secondsFormatted = highResolution
+      ? seconds.toFixed(3)
+      : seconds.toFixed(1);
+    return minutes ? `${minutes}m${secondsFormatted}s` : `${secondsFormatted}s`;
   };
 
   const currentPercent = maxTime > 0 ? (currentTime / maxTime) * 100 : 0;
 
   return (
-    <div className="w-full mx-auto px-4 flex flex-col items-between justify-center">
+    <div
+      className={`w-full mx-auto flex flex-col items-between justify-center ${!hasEvents ? "opacity-50" : ""}`}
+    >
       <div className="relative w-full">
         {/* Track */}
         <div className="absolute top-1/2 left-0 w-full h-2 -mt-1 rounded-full bg-gray-200">
           {/* Filled portion */}
           <div
-            className="absolute h-full rounded-full bg-green-500"
+            className={`absolute h-full rounded-full ${hasEvents ? "bg-green-500" : "bg-gray-400"}`}
             style={{ width: `${currentPercent}%` }}
           />
         </div>
@@ -50,16 +51,19 @@ export const TimelineSlider: FC = () => {
           step={0.1}
           value={currentTime}
           onChange={handleTimeChange}
-          className="relative w-full h-2 bg-transparent appearance-none cursor-pointer z-10"
+          disabled={!hasEvents}
+          className="relative w-full h-2 bg-transparent appearance-none cursor-pointer z-10 disabled:cursor-not-allowed"
           style={{
             background: "transparent",
           }}
         />
       </div>
 
-      <div className="flex justify-between text-xs text-gray-500 mt-1">
-        <span>0s</span>
-        <span>{formatTime(maxTime)}</span>
+      <div className="flex justify-start text-sm text-gray-600 mt-1">
+        <span>
+          {hasEvents ? formatTime(currentTime, true) : "0s"} /{" "}
+          {hasEvents ? formatTime(maxTime) : "0s"}
+        </span>
       </div>
     </div>
   );

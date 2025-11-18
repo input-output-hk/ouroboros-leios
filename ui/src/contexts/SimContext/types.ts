@@ -147,15 +147,16 @@ export interface ISimContextState {
   graph: IGraphContextState;
   blocks: IBlocksContextState;
   activeTab: Tab;
-  events: IServerMessage[];
-  currentTime: number;
   aggregatedData: ISimulationAggregatedDataState;
-  maxTime: number;
   tracePath: string;
   aggregated: boolean;
   topography: ITransformedNodeMap;
   topologyPath: string;
   topologyLoaded: boolean;
+  events: IServerMessage[];
+  currentTime: number;
+  maxTime: number;
+  isPlaying: boolean;
   speedMultiplier: number;
 }
 

@@ -11,6 +11,9 @@ export const NodeStats: FC = () => {
     },
   } = useSimContext();
 
+  // FIXME: NodeStats are broken - aggregatedData.nodes is not being populated correctly
+  // with the new timeline-based architecture. Need to implement proper aggregation
+  // based on currentTime and timeline events.
   const currentNodeStats = useMemo(() => {
     return currentNode ? aggregatedData.nodes.get(currentNode) : undefined;
   }, [currentNode, aggregatedData.nodes]);

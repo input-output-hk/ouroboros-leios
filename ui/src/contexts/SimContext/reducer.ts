@@ -162,11 +162,25 @@ export const reducer = (
         currentTime: action.payload,
       };
 
+    case "SET_TIMELINE_PLAYING":
+      return {
+        ...state,
+        isPlaying: action.payload,
+      };
+
+    case "SET_TIMELINE_SPEED":
+      return {
+        ...state,
+        speedMultiplier: action.payload,
+      };
+
     case "RESET_TIMELINE":
       return {
         ...state,
         events: [],
         currentTime: 0,
+        isPlaying: false,
+        speedMultiplier: 1,
       };
 
     default:

@@ -31,15 +31,16 @@ export const defaultState: ISimContextState = {
   },
   blocks: {},
   activeTab: Tab.Graph,
-  events: [],
-  currentTime: 0,
-  speedMultiplier: 10,
   aggregatedData: defaultAggregatedData,
-  maxTime: 0,
   tracePath: "",
   topography: { links: new Map(), nodes: new Map() },
   topologyPath: "",
   topologyLoaded: false,
+  events: [],
+  currentTime: 0,
+  maxTime: 0,
+  isPlaying: false,
+  speedMultiplier: 1,
 };
 
 export const SimContext: Context<ISimContext> = createContext({

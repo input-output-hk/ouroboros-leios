@@ -1,5 +1,5 @@
 import { useSimContext } from "@/contexts/SimContext/context";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TWorkerResponse } from "./worker";
 import StreamWorker from "./worker?worker";
 
@@ -9,6 +9,7 @@ export const useStreamMessagesHandler = () => {
     dispatch,
   } = useSimContext();
   const [streaming, setStreaming] = useState(false);
+  const hasAutoStartedPlayback = useRef(false);
 
   const worker = useMemo(() => {
     return new StreamWorker();
@@ -19,6 +20,7 @@ export const useStreamMessagesHandler = () => {
       // Reset timeline when starting new stream
       dispatch({ type: "RESET_TIMELINE" });
       setStreaming(true);
+      hasAutoStartedPlayback.current = false;
 
       // Use worker
       worker.postMessage({
@@ -50,6 +52,12 @@ export const useStreamMessagesHandler = () => {
           type: "ADD_TIMELINE_EVENT_BATCH",
           payload: message.events,
         });
+        
+        // Auto-start playback on first batch of events
+        if (!hasAutoStartedPlayback.current) {
+          hasAutoStartedPlayback.current = true;
+          dispatch({ type: "SET_TIMELINE_PLAYING", payload: true });
+        }
       }
       if (message.type === "DONE") {
         setStreaming(false);

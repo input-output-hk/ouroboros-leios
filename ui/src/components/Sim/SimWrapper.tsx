@@ -5,13 +5,13 @@ import { Tab } from "@/contexts/SimContext/types";
 import { FC, useCallback, useEffect } from "react";
 import { parse } from "yaml";
 import { Coord2D, Node } from "../../../../data/simulation/topology";
+import { useTimelinePlayback } from "@/hooks/useTimelinePlayback";
 import { BlocksView } from "../Blocks/BlocksView";
 import { GraphWrapper } from "../Graph/GraphWrapper";
 import { TransactionsView } from "../Transactions/TransactionsView";
-import { Controls } from "./modules/Controls";
 import { Scenario } from "./modules/Scenario";
 import { TimelineSlider } from "./modules/TimelineSlider";
-import { Speed } from "./modules/Speed";
+import { Playback } from "./modules/Playback";
 import { Stats } from "./modules/Stats";
 import { ITransformedNode } from "./types";
 
@@ -43,6 +43,9 @@ export const SimWrapper: FC = ({}) => {
     },
     dispatch,
   } = useSimContext();
+
+  // Enable timeline playback
+  useTimelinePlayback();
 
   // Load topology if it has changed
   useEffect(() => {
@@ -119,18 +122,13 @@ export const SimWrapper: FC = ({}) => {
             />
           </div>
         </div>
-        <div className="absolute bottom-12 flex w-1/2 gap-4 justify-center">
-          <div className="flex border-2 rounded-md p-4 border-gray-200 items-end justify-center gap-4 my-4 mx-auto bg-white/80 backdrop-blur-xs">
+        <div className="absolute bottom-12 flex w-3/4 gap-4 justify-center">
+          <div className="flex flex-shrink-0 border-2 rounded-md p-4 border-gray-200 gap-4 my-4 mx-auto bg-white/80 backdrop-blur-xs">
             <Scenario />
           </div>
-          <div className="flex border-2 rounded-md p-4 border-gray-200 items-end justify-center gap-4 my-4 mx-auto w-full bg-white/80 backdrop-blur-xs">
-            <div className="flex flex-col gap-4 w-full">
-              <Controls />
-              <TimelineSlider />
-            </div>
-          </div>
-          <div className="flex border-2 rounded-md p-4 border-gray-200 items-end justify-center gap-4 my-4 mx-auto bg-white/80 backdrop-blur-xs">
-            <Speed />
+          <div className="flex border-2 rounded-md p-4 border-gray-200 gap-4 my-4 mx-auto w-full bg-white/80 backdrop-blur-xs">
+            <Playback />
+            <TimelineSlider />
           </div>
         </div>
       </div>
