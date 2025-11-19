@@ -1,0 +1,25 @@
+.linkButton {
+  display: flex;
+  height: 3.75rem;
+  padding: 1.5rem;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+  border-radius: 0.25rem;
+  border: 1px solid var(--ifm-color-primary);
+  text-decoration: none;
+  color: var(--ifm-color-primar);
+}
+
+.linkButton:hover {
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: var(--link-button-background-hover);
+  color: #fff;
+  text-decoration: none;
+}
+
+.linkButton span {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}

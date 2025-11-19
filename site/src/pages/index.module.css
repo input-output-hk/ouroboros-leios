@@ -1,287 +1,344 @@
 .heroBanner {
-    padding: 4rem 0;
-    text-align: center;
-    position: relative;
-    overflow: hidden;
-    background-image: url("/static/img/wave-pattern-flipped.svg"), url("/static/img/wave-pattern.svg");
-    background-repeat: repeat-x, repeat-x;
-    background-position: top, bottom;
-
-    background-size: 50px 50px;
-
+  padding-top: 4rem;
+  padding-bottom: 4rem;
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
+  align-items: flex-start;
+  position: relative;
+  height: 37.75rem;
+  color: #fff;
 }
 
-@media screen and (max-width: 996px) {
-    .heroBanner {
-        padding: 2rem;
-    }
+.heroStandfirst {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-sm);
+}
+
+.heroTitle {
+  margin-bottom: 2.5rem !important;
+}
+
+@media (max-width: 997px) {
+  .heroStandfirst {
+    font-size: var(--text-xl);
+    line-height: var(--line-height-normal);
+  }
+  .heroTitle {
+    margin-bottom: 1.8125rem !important;
+  }
 }
 
 .buttons {
-    display: flex;
-    align-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.contentWrapper,
+.researchContentWrapper {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  gap: 3rem;
+}
+
+.contentWrapper h2,
+.researchContentWrapper h2 {
+  margin-bottom: 0;
+}
+
+@media (max-width: 997px) {
+  .contentWrapper {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 997px) {
+  .researchContentWrapper {
+    flex-direction: column-reverse;
+  }
+}
+
+.researchContent {
+  width: 100%;
+  max-width: 607px;
+  display: flex;
+  flex-direction: column;
+}
+
+.researchContentinkButton {
+  max-width: 18.75rem;
+  margin-top: 1.5rem;
+}
+
+.howLeiosWorksContentinkButton {
+  max-width: 19.5rem;
+  margin-top: 1.5rem;
+}
+
+.howLeiosWorksContent {
+  width: 100%;
+  max-width: 631px;
+  display: flex;
+  flex-direction: column;
+}
+
+.stayUpToDateContent {
+  width: 100%;
+  max-width: 300px;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 997px) {
+  .researchContentinkButton {
+    max-width: 100%;
+    margin-top: 1.75rem;
+  }
+  .howLeiosWorksContentinkButton {
+    max-width: 100%;
+    margin-top: 1.75rem;
+  }
+  .researchContent {
+    max-width: 100%;
+  }
+  .howLeiosWorksContent {
+    max-width: 100%;
+  }
+  .stayUpToDateContent {
+    max-width: 100%;
+  }
+}
+
+.stayUpToDateContent p {
+  font-size: var(--text-xl);
+  line-height: var(--line-height-normal);
+}
+
+.reviewMeetingContaner {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  max-width: 39.25rem;
+  padding: 1.375rem 1.75rem;
+  gap: 1.5rem;
+  border: 0.5px solid #8b8190;
+  background-color: var(--ifm-background-color-primary);
+}
+
+.backgroundGrid {
+  background-image: url("/static/img/grid-lines.svg");
+  background-repeat: no-repeat;
+  background-size: cover;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  inset: 0;
+  z-index: 0;
+}
+
+.cameraImageContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  max-width: 230px;
+  background-color: var(--ifm-background-color-secondary);
+}
+
+.cameraImageContainer img {
+  max-width: 90px;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  display: block;
+  z-index: 10;
+}
+
+.countdownContainer {
+  display: flex;
+  flex-direction: column;
+  max-width: 230px;
+  min-width: 230px;
+  margin-right: 3rem;
+  z-index: 10;
+}
+
+.countdown {
+  font-size: var(--text-2xl);
+  font-family: var(--font-lexend);
+  line-height: var(--text-3xl);
+  color: var(--ifm-font-color-alternate);
+  text-decoration: none;
+}
+
+.countdownLabel {
+  color: var(--ifm-font-color-alternate);
+  margin-top: 1.19rem;
+  margin-bottom: 1.25rem;
+}
+
+.reviewDate {
+  color: #fff;
+  display: flex;
+  padding: 0.15rem 0.6875rem;
+  justify-content: center;
+  align-items: center;
+  gap: 0.625rem;
+  background-color: #333;
+  border-radius: 1rem;
+}
+
+@media (max-width: 997px) {
+  .reviewMeetingContaner {
+    flex-direction: column;
+    max-width: 100%;
+  }
+  .countdownContainer {
+    max-width: 100%;
+    margin: 0;
+    height: 10.2rem;
     justify-content: center;
-}
-
-.videoSection {
-    padding: 4rem 0;
-    position: relative;
-}
-
-.videoSection h2 {
-    font-size: 2.5rem;
-    margin-bottom: 1rem;
-}
-
-.videoSection .subtitle {
-    color: var(--ifm-color-emphasis-700);
-    font-size: 1.2rem;
-    max-width: 600px;
-    margin: 0 auto 2rem;
-}
-
-.videoWrapper {
-    position: relative;
-    padding-bottom: 56.25%;
-    /* 16:9 aspect ratio */
-    height: 0;
-    overflow: hidden;
-    border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-}
-
-.video {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.faqSection {
-    padding: 4rem 0;
-    background-color: var(--ifm-color-emphasis-100);
-}
-
-.faqWrapper {
-    margin-top: 2rem;
-}
-
-.faqItem {
-    margin-bottom: 1rem;
-    border: 1px solid var(--ifm-color-emphasis-300);
-    border-radius: 8px;
-    padding: 1rem;
-    background-color: var(--ifm-background-color);
-}
-
-.faqQuestion {
-    cursor: pointer;
-    font-weight: bold;
-    list-style: none;
+    text-align: center;
+  }
+  .cameraImageContainer {
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
     width: 100%;
+    max-width: 100%;
+    height: 12.375rem;
+    background-color: var(--ifm-background-color-secondary);
+  }
 }
 
-.faqQuestion::-webkit-details-marker {
-    display: none;
+.subtitle {
+  font-size: var(--text-xl);
+  line-height: var(--line-height-normal);
+  margin: 2.75rem 0;
 }
 
-/* Add chevron and its animation */
-.faqQuestion::after {
-    content: '';
-    width: 24px;
-    height: 24px;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    transition: transform 0.3s ease;
-}
-
-/* Rotate chevron when expanded */
-details[open] .faqQuestion::after {
-    transform: rotate(180deg);
-}
-
-.faqAnswer {
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--ifm-color-emphasis-200);
-    /* Add animation for the answer */
-    animation: slideDown 0.3s ease-out;
-}
-
-/* Animation keyframes for sliding down */
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.borderTop {
-    border-top: 1px solid var(--ifm-color-emphasis-300);
-    margin-top: 2rem;
-}
-
-.underlineLink {
-    background: none;
-    color: var(--ifm-link-color);
-    text-decoration: underline;
-    text-underline-offset: 4px;
-    font-size: 1.1rem;
-    font-weight: 600;
-    padding: 0;
-    border: none;
-    box-shadow: none;
-    cursor: pointer;
+@media (max-width: 997px) {
+  .subtitle {
+    font-size: var(--text-base);
+    margin: 3rem 0;
+  }
 }
 
 .leiosSvg {
-    width: 100%;
-    height: auto;
-    max-width: 100%;
-    display: block;
-    transition: filter 0.3s ease;
-    background-color: transparent;
-    /* Ensure SVG scales properly maintaining aspect ratio */
-    object-fit: contain;
-    max-height: 500px;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  display: block;
+  transition: filter 0.3s ease;
+  background-color: transparent;
+  /* Ensure SVG scales properly maintaining aspect ratio */
+  object-fit: contain;
+  max-height: 500px;
 }
 
 .svgContainer {
-    /* Container that properly handles SVG aspect ratio */
-    overflow: visible;
-    position: relative;
-    padding: 1rem;
-    border-radius: 4px;
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+  /* Container that properly handles SVG aspect ratio */
+  overflow: visible;
+  position: relative;
+  justify-content: center;
+  border-radius: 4px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 /* Light theme - specific background color and SVG variables */
-[data-theme='light'] .svgContainer {
-    background-color: #f1f6f8;
-    --svg-bg-color: #f1f6f8;
-    --svg-border-color: #d0d0d0;
-    --svg-text-color: #333333;
-    --svg-text-secondary: #666666;
-    --svg-text-muted: #999999;
-    --svg-arrow-color: #595959;
-    --svg-legend-bg: #ffffff;
+[data-theme="light"] .svgContainer {
+  background-color: transparent;
+  --svg-bg-color: transparent;
+  --svg-border-color: #d0d0d0;
+  --svg-text-color: #333333;
+  --svg-text-secondary: #666666;
+  --svg-text-muted: #999999;
+  --svg-arrow-color: #595959;
+  --svg-legend-bg: #ffffff;
 }
 
 /* Dark theme - specific background color and SVG variables */
-[data-theme='dark'] .svgContainer {
-    background-color: #1b1b1d;
-    --svg-bg-color: #1b1b1d;
-    --svg-border-color: #555555;
-    --svg-text-color: #e0e0e0;
-    --svg-text-secondary: #cccccc;
-    --svg-text-muted: #aaaaaa;
-    --svg-arrow-color: #bbbbbb;
-    --svg-legend-bg: #2a2a2c;
+[data-theme="dark"] .svgContainer {
+  background-color: transparent;
+  --svg-bg-color: transparent;
+  --svg-border-color: #555555;
+  --svg-text-color: #e0e0e0;
+  --svg-text-secondary: #cccccc;
+  --svg-text-muted: #aaaaaa;
+  --svg-arrow-color: #bbbbbb;
+  --svg-legend-bg: #2a2a2c;
 }
 
 /* Remove filters since we're using CSS variables for direct color control */
-[data-theme='light'] .leiosSvg {
-    filter: none;
+[data-theme="light"] .leiosSvg {
+  filter: none;
 }
 
-[data-theme='dark'] .leiosSvg {
-    filter: none;
+[data-theme="dark"] .leiosSvg {
+  filter: none;
 }
 
 /* SVG Hover Effects */
 /* Remove default link underlines for all SVG links */
 .leiosSvg a {
-    text-decoration: none;
+  text-decoration: none;
 }
 
 .leiosSvg a:hover {
-    text-decoration: none;
+  text-decoration: none;
 }
 
 .leiosSvg a[href*="ranking-blocks"]:hover rect,
 .leiosSvg a[href*="endorser-blocks"]:hover rect,
 .leiosSvg a[href*="votes-and-certificates"]:hover polygon {
-    stroke-width: 3;
-    filter: brightness(1.1);
+  stroke-width: 3;
+  filter: brightness(1.1);
 }
 
 .leiosSvg a[href*="ranking-blocks"]:hover text,
 .leiosSvg a[href*="endorser-blocks"]:hover text,
 .leiosSvg a[href*="votes-and-certificates"]:hover text {
-    font-weight: bold;
+  font-weight: bold;
 }
 
 .leiosSvg a[href*="votes-and-certificates"]:hover rect {
-    transform: scale(2.0);
-    filter: brightness(1.5) saturate(1.3);
-    stroke: #ff6b35;
-    stroke-width: 1;
+  transform: scale(2);
+  filter: brightness(1.5) saturate(1.3);
+  stroke: #ff6b35;
+  stroke-width: 1;
 }
 
 .leiosSvg a[href*="l-hdr"]:hover path,
 .leiosSvg a[href*="l-vote"]:hover path,
 .leiosSvg a[href*="l-diff"]:hover path,
 .leiosSvg a[href*="delta-"]:hover line {
-    stroke-width: 4;
-    filter: brightness(1.1);
+  stroke-width: 4;
+  filter: brightness(1.1);
 }
 
 .leiosSvg a[href*="l-hdr"]:hover text,
 .leiosSvg a[href*="l-vote"]:hover text,
 .leiosSvg a[href*="l-diff"]:hover text,
 .leiosSvg a[href*="delta-"]:hover text {
-    font-weight: bold;
+  font-weight: bold;
 }
 
 .svgCaption {
-    margin-top: 0.75rem;
-    font-size: 0.875rem;
-    color: var(--ifm-color-emphasis-700);
-    text-align: center;
-    font-style: italic;
-    line-height: 1.4;
+  margin-top: 0.69rem;
+  color: var(--ifm-color-caption);
+  text-align: center;
+  line-height: 1.5;
 }
 
-.svgCaption a {
-    color: var(--ifm-link-color);
-    text-decoration: none;
-    font-weight: 500;
-}
-
-.svgCaption a:hover {
-    text-decoration: underline;
-}
-
-/* Responsive adjustments for SVG sizing */
-@media screen and (max-width: 996px) {
-    .leiosSvg {
-        max-height: 400px;
-    }
-
-    .svgContainer {
-        padding: 0.75rem;
-    }
-}
-
-@media screen and (max-width: 768px) {
-    .leiosSvg {
-        max-height: 350px;
-    }
-
-    .svgContainer {
-        padding: 0.5rem;
-    }
+@media (max-width: 997px) {
+  .svgCaption {
+    margin-top: 3rem;
+  }
 }
