@@ -1,45 +1,23 @@
 "use client";
 
 import { useSimContext } from "@/contexts/SimContext/context";
-import { Tab } from "@/contexts/SimContext/types";
-import { FC, useCallback, useEffect } from "react";
+import { FC, useEffect } from "react";
 import { parse } from "yaml";
 import { Coord2D, Node } from "../../../../data/simulation/topology";
 import { useTimelinePlayback } from "@/hooks/useTimelinePlayback";
-import { BlocksView } from "../Blocks/BlocksView";
 import { GraphWrapper } from "../Graph/GraphWrapper";
-import { TransactionsView } from "../Transactions/TransactionsView";
 import { Scenario } from "./modules/Scenario";
 import { TimelineSlider } from "./modules/TimelineSlider";
 import { Playback } from "./modules/Playback";
 import { Stats } from "./modules/Stats";
 import { ITransformedNode } from "./types";
 
-interface ITabButtonProps {
-  name: string;
-  active: boolean;
-  onClick: () => void;
-}
 
-const TabButton: FC<ITabButtonProps> = ({ name, active, onClick }) => {
-  const color = active ? "bg-[blue]" : "bg-gray-400";
-  return (
-    <button
-      className={`${color} text-white rounded-md px-4 py-2`}
-      onClick={onClick}
-    >
-      {name}
-    </button>
-  );
-};
-
-export const SimWrapper: FC = ({}) => {
+export const SimWrapper: FC = () => {
   const {
     state: {
-      activeTab,
       topologyPath,
       topologyLoaded,
-      blocks: { currentBlock },
     },
     dispatch,
   } = useSimContext();
@@ -98,40 +76,13 @@ export const SimWrapper: FC = ({}) => {
     })();
   }, [topologyPath]);
 
-  const setActiveTab = useCallback(
-    (tab: Tab) => dispatch({ type: "SET_ACTIVE_TAB", payload: tab }),
-    [dispatch],
-  );
   return (
     <>
-      {activeTab === Tab.Graph ? (
-        <div className="flex flex-col items-center justify-between gap-4 z-10 absolute left-10 top-10">
-          <Stats />
-        </div>
-      ) : null}
+      <div className="flex flex-col items-center justify-between gap-4 z-10 absolute left-10 top-10">
+        <Stats />
+      </div>
       <div className="flex items-center justify-center gap-4 relative h-screen w-screen">
-        {activeTab === Tab.Graph && topologyLoaded ? <GraphWrapper /> : null}
-        {activeTab === Tab.Blocks ? <BlocksView /> : null}
-        {activeTab === Tab.Transactions ? <TransactionsView /> : null}
-        <div className="absolute top-10 w-full">
-          <div className="flex justify-center gap-4 min-w-[200px]">
-            <TabButton
-              name="Graph"
-              active={activeTab === Tab.Graph}
-              onClick={() => setActiveTab(Tab.Graph)}
-            />
-            <TabButton
-              name="Blocks"
-              active={activeTab === Tab.Blocks && currentBlock === undefined}
-              onClick={() => setActiveTab(Tab.Blocks)}
-            />
-            <TabButton
-              name="Transactions"
-              active={activeTab === Tab.Transactions}
-              onClick={() => setActiveTab(Tab.Transactions)}
-            />
-          </div>
-        </div>
+        {topologyLoaded ? <GraphWrapper /> : null}
         <div className="absolute bottom-12 flex w-3/4 gap-4 justify-center">
           <div className="flex flex-shrink-0 border-2 rounded-md p-4 border-gray-200 gap-4 my-4 mx-auto bg-white/80 backdrop-blur-xs">
             <Scenario />

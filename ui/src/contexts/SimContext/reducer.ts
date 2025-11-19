@@ -42,31 +42,12 @@ export const reducer = (
           ...state.graph,
           currentNode: undefined,
         },
-        blocks: {
-          currentBlock: undefined,
-        },
         // Reset timeline when switching scenarios
         events: [],
         currentTime: 0,
       };
     }
 
-    case "SET_ACTIVE_TAB": {
-      return {
-        ...state,
-        activeTab: action.payload,
-        graph: {
-          ...state.graph,
-          currentNode:
-            state.activeTab === action.payload
-              ? state.graph.currentNode
-              : undefined,
-        },
-        blocks: {
-          currentBlock: undefined,
-        },
-      };
-    }
 
     case "SET_CURRENT_NODE": {
       return {
@@ -78,15 +59,6 @@ export const reducer = (
       };
     }
 
-    case "SET_CURRENT_BLOCK": {
-      return {
-        ...state,
-        blocks: {
-          ...state.blocks,
-          currentBlock: action.payload,
-        },
-      };
-    }
 
     case "SET_AGGREGATED_DATA": {
       return { ...state, aggregatedData: action.payload };

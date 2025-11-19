@@ -40,48 +40,6 @@ export interface ISimulationGlobalData {
   leiosTxOnChain: number;
 }
 
-export interface ISimulationTransactionData {
-  timestamp: number;
-  created: number;
-  inIb: number;
-  inEb: number;
-  onChain: number;
-}
-
-export interface ISimulationTransaction {
-  id: number;
-  bytes: number;
-}
-
-export interface ISimulationInputBlock {
-  id: string;
-  slot: number;
-  pipeline: number;
-  headerBytes: number;
-  txs: ISimulationTransaction[];
-}
-
-export interface ISimulationEndorsementBlock {
-  id: string;
-  slot: number;
-  pipeline: number;
-  bytes: number;
-  txs: ISimulationTransaction[];
-  ibs: ISimulationInputBlock[];
-  ebs: ISimulationEndorsementBlock[];
-}
-
-export interface ISimulationCertificate {
-  bytes: number;
-  eb: ISimulationEndorsementBlock;
-}
-
-export interface ISimulationBlock {
-  slot: number;
-  txs: ISimulationTransaction[];
-  headerBytes: number;
-  cert: ISimulationCertificate | null;
-}
 
 export interface IMessageAnimation {
   id: string;
@@ -97,8 +55,6 @@ export interface ISimulationAggregatedDataState {
   progress: number; // TODO: unused
   nodes: Map<string, ISimulationAggregatedData>;
   global: ISimulationGlobalData;
-  blocks: ISimulationBlock[];
-  transactions: ISimulationTransactionData[];
   lastNodesUpdated: string[];
   messages: IMessageAnimation[]; // Active messages traveling on the graph
   eventCounts: {
@@ -107,33 +63,6 @@ export interface ISimulationAggregatedDataState {
   };
 }
 
-export interface ISimulationIntermediateInputBlock {
-  slot: number;
-  pipeline: number;
-  headerBytes: number;
-  txs: number[];
-}
-
-export interface ISimulationIntermediateEndorsementBlock {
-  slot: number;
-  pipeline: number;
-  bytes: number;
-  txs: string[];
-  ibs: string[];
-  ebs: string[];
-}
-
-type TxStatus = "created" | "inIb" | "inEb" | "onChain";
-
-export interface ISimulationIntermediateDataState {
-  txs: ISimulationTransaction[];
-  txStatuses: TxStatus[];
-  praosTxs: Set<number>;
-  leiosTxs: Set<number>;
-  ibs: Map<string, ISimulationIntermediateInputBlock>;
-  ebs: Map<string, ISimulationIntermediateEndorsementBlock>;
-  bytes: Map<string, number>;
-}
 
 export interface IGraphContextState {
   canvasRef: RefObject<HTMLCanvasElement | null>;
@@ -143,15 +72,6 @@ export interface IGraphContextState {
   currentNode?: string;
 }
 
-export interface IBlocksContextState {
-  currentBlock?: number;
-}
-
-export enum Tab {
-  Graph,
-  Blocks,
-  Transactions,
-}
 
 export interface IScenario {
   name: string;
@@ -165,8 +85,6 @@ export interface ISimContextState {
   allScenarios: IScenario[];
   activeScenario: string;
   graph: IGraphContextState;
-  blocks: IBlocksContextState;
-  activeTab: Tab;
   aggregatedData: ISimulationAggregatedDataState;
   tracePath: string;
   aggregated: boolean;
@@ -183,9 +101,7 @@ export interface ISimContextState {
 export type TSimContextActions =
   | { type: "SET_SCENARIOS"; payload: IScenario[] }
   | { type: "SET_SCENARIO"; payload: string }
-  | { type: "SET_ACTIVE_TAB"; payload: Tab }
   | { type: "SET_CURRENT_NODE"; payload: string | undefined }
-  | { type: "SET_CURRENT_BLOCK"; payload: number | undefined }
   | {
       type: "SET_SPEED";
       payload: {

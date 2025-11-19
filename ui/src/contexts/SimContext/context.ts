@@ -4,7 +4,6 @@ import {
   ISimContext,
   ISimContextState,
   ISimulationAggregatedDataState,
-  Tab,
 } from "./types";
 
 export const defaultAggregatedData: ISimulationAggregatedDataState = {
@@ -14,8 +13,6 @@ export const defaultAggregatedData: ISimulationAggregatedDataState = {
     praosTxOnChain: 0,
     leiosTxOnChain: 0,
   },
-  blocks: [],
-  transactions: [],
   lastNodesUpdated: [],
   messages: [],
   eventCounts: {
@@ -34,8 +31,6 @@ export const defaultState: ISimContextState = {
     canvasOffsetY: 0,
     canvasScale: 6,
   },
-  blocks: {},
-  activeTab: Tab.Graph,
   aggregatedData: defaultAggregatedData,
   tracePath: "",
   topography: { links: new Map(), nodes: new Map() },
@@ -50,6 +45,6 @@ export const defaultState: ISimContextState = {
 
 export const SimContext: Context<ISimContext> = createContext({
   state: defaultState,
-  dispatch: (_val) => {},
+  dispatch: () => {},
 });
 export const useSimContext = () => useContext(SimContext);
