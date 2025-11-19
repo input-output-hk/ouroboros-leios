@@ -158,6 +158,7 @@ export const computeAggregatedDataAtTime = (
       total: 0,
       byType: {},
     },
+    lastAggregatedTime: targetTime,
   };
 
   // Process timeline events up to target time with early termination
@@ -413,6 +414,19 @@ export const computeAggregatedDataAtTime = (
           sentStats.bytes += msgBytes;
           stats.bytesSent += msgBytes;
         }
+
+        // Create vote animation with topology latency
+        createMessageAnimation(
+          result,
+          EMessageType.Votes,
+          message.id,
+          message.sender,
+          message.recipient,
+          event.time_s,
+          targetTime,
+          0.2, // fallback travel time for votes
+          topology,
+        );
         break;
       }
 

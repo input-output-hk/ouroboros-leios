@@ -60,6 +60,7 @@ export interface ISimulationAggregatedDataState {
     total: number;
     byType: Record<string, number>;
   };
+  lastAggregatedTime: number; // Timestamp up to which aggregation was last computed
 }
 
 export interface IGraphContextState {

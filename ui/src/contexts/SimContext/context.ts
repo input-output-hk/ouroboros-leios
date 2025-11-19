@@ -19,6 +19,7 @@ export const defaultAggregatedData: ISimulationAggregatedDataState = {
     total: 0,
     byType: {},
   },
+  lastAggregatedTime: 0,
 };
 
 export const defaultState: ISimContextState = {

@@ -1,5 +1,6 @@
 import { useSimContext } from "@/contexts/SimContext/context";
 import { EMessageType } from "@/contexts/SimContext/types";
+import { ELinkColor, EMessageColor, ENodeColor } from "@/utils/colors";
 import { useCallback } from "react";
 
 export const useHandlers = () => {
@@ -53,10 +54,10 @@ export const useHandlers = () => {
       context.beginPath();
       context.moveTo(nodeStart.fx, nodeStart.fy);
       context.lineTo(nodeEnd.fx, nodeEnd.fy);
-      context.strokeStyle = "#ddd";
+      context.strokeStyle = ELinkColor.LINK_DEFAULT;
 
       if (link.source === currentNode || link.target === currentNode) {
-        context.strokeStyle = "black";
+        context.strokeStyle = ELinkColor.LINK_SELECTED;
       }
 
       context.lineWidth = Math.min((0.2 / canvasScale) * 6, 0.2);
@@ -84,28 +85,30 @@ export const useHandlers = () => {
       }
 
       if (currentNode === node.id.toString()) {
-        context.fillStyle = "blue";
+        context.fillStyle = ENodeColor.SELECTED;
       } else {
         // Color based on last activity
         const nodeStats = aggregatedData.nodes.get(node.id.toString());
         const lastActivity = nodeStats?.lastActivity;
 
         // Check if activity is recent (within timeout)
-        const activityIsRecent = lastActivity && 
-          (currentTime - lastActivity.time) <= ACTIVITY_TIMEOUT;
+        const activityIsRecent =
+          lastActivity && currentTime - lastActivity.time <= ACTIVITY_TIMEOUT;
 
         if (activityIsRecent) {
           if (lastActivity.type === EMessageType.EB) {
-            context.fillStyle = "#9333ea"; // Purple for EB-related activity
+            context.fillStyle = EMessageColor.EB;
           } else if (lastActivity.type === EMessageType.RB) {
-            context.fillStyle = "#87ceeb"; // Light blue for RB-related activity
+            context.fillStyle = EMessageColor.RB;
           } else {
-            context.fillStyle = node.data.stake ? "#DC53DE" : "blue"; // Default colors
+            context.fillStyle = node.data.stake
+              ? ENodeColor.STAKE_NODE
+              : ENodeColor.SELECTED;
           }
         } else if (!node.data.stake) {
-          context.fillStyle = "gray";
+          context.fillStyle = ENodeColor.INACTIVE;
         } else {
-          context.fillStyle = "#DC53DE"; // Stake node default
+          context.fillStyle = ENodeColor.STAKE_NODE;
         }
       }
 
@@ -127,33 +130,24 @@ export const useHandlers = () => {
       const y =
         senderNode.fy + (recipientNode.fy - senderNode.fy) * message.progress;
 
-      // Draw colored rectangle based on message type
+      // Draw colored rectangle based on message type (consistent with pie chart colors)
       const rectSize = Math.min((0.8 / canvasScale) * 6, 0.8);
-      
-      if (message.type === EMessageType.EB) {
-        context.fillStyle = "#9333ea"; // Purple for EB messages
-        context.strokeStyle = "#7c3aed";
-      } else if (message.type === EMessageType.RB) {
-        context.fillStyle = "#87ceeb"; // Light blue for RB messages
-        context.strokeStyle = "#5f9ea0";
-      } else if (message.type === EMessageType.TX) {
-        context.fillStyle = "#90ee90"; // Light green for transaction messages
-        context.strokeStyle = "#6bc46b";
-      } else {
-        context.fillStyle = "#666"; // Gray for other message types
-        context.strokeStyle = "#444";
-      }
-      
-      context.fillRect(x - rectSize / 2, y - rectSize / 2, rectSize, rectSize);
 
-      // Add a slight border for visibility
-      context.lineWidth = Math.min((0.1 / canvasScale) * 6, 0.1);
-      context.strokeRect(
-        x - rectSize / 2,
-        y - rectSize / 2,
-        rectSize,
-        rectSize,
-      );
+      switch (message.type) {
+        case EMessageType.TX:
+          context.fillStyle = EMessageColor.TX;
+          break;
+        case EMessageType.EB:
+          context.fillStyle = EMessageColor.EB;
+          break;
+        case EMessageType.Votes:
+          context.fillStyle = EMessageColor.VOTES;
+          break;
+        case EMessageType.RB:
+          context.fillStyle = EMessageColor.RB;
+          break;
+      }
+      context.fillRect(x - rectSize / 2, y - rectSize / 2, rectSize, rectSize);
     });
 
     context.restore();

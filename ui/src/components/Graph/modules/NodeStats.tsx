@@ -1,6 +1,7 @@
 import { useSimContext } from "@/contexts/SimContext/context";
 import { EMessageType } from "@/contexts/SimContext/types";
 import { printBytes } from "@/utils";
+import { EMessageColor } from "@/utils/colors";
 import { FC, useMemo } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
@@ -43,10 +44,10 @@ export const NodeStats: FC = () => {
   }, [currentNode, topography.links]);
 
   const data = [
-    { name: "Transactions", ...getCounts(EMessageType.TX), color: "#26de81" },
-    { name: "Endorser Blocks", ...getCounts(EMessageType.EB), color: "#4b7bec" },
-    { name: "Votes", ...getCounts(EMessageType.Votes), color: "#2d98da" },
-    { name: "Blocks", ...getCounts(EMessageType.RB), color: "#fc5c65" },
+    { name: "Transactions", ...getCounts(EMessageType.TX), color: EMessageColor.TX },
+    { name: "Endorser Blocks", ...getCounts(EMessageType.EB), color: EMessageColor.EB },
+    { name: "Votes", ...getCounts(EMessageType.Votes), color: EMessageColor.VOTES },
+    { name: "Blocks", ...getCounts(EMessageType.RB), color: EMessageColor.RB },
   ];
 
   return (
