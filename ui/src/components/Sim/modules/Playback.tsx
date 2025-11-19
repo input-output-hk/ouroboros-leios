@@ -257,11 +257,9 @@ export const Playback: FC = () => {
         onMouseLeave={stopSeeking}
         disabled={disabled}
         variant="secondary"
-        size="sm"
-        className="px-2"
         title={`Step backward ${1.0 * speedMultiplier}s (Ctrl + ←)`}
       >
-        &lt;&lt;
+        ◀◀
       </Button>
 
       <Button
@@ -278,11 +276,9 @@ export const Playback: FC = () => {
         onMouseLeave={stopSeeking}
         disabled={disabled}
         variant="secondary"
-        size="sm"
-        className="px-2"
         title={`Step backward ${0.1 * speedMultiplier}s (←)`}
       >
-        &lt;
+        ◀
       </Button>
 
       <Button
@@ -299,11 +295,9 @@ export const Playback: FC = () => {
         onMouseLeave={stopSeeking}
         disabled={disabled}
         variant="secondary"
-        size="sm"
-        className="px-2"
         title={`Step forward ${0.1 * speedMultiplier}s (→)`}
       >
-        &gt;
+        ▶
       </Button>
 
       <Button
@@ -320,33 +314,26 @@ export const Playback: FC = () => {
         onMouseLeave={stopSeeking}
         disabled={disabled}
         variant="secondary"
-        size="sm"
-        className="px-2"
         title={`Step forward ${1.0 * speedMultiplier}s (Ctrl + →)`}
       >
-        &gt;&gt;
+        ▶▶
       </Button>
 
-      <div className="min-w-16">
-        <label htmlFor="timelineSpeed" className="block text-xs text-gray-600">
-          Speed
-        </label>
-        <select
-          ref={speedSelectRef}
-          name="timelineSpeed"
-          className="mt-1 w-full text-sm"
-          value={speedMultiplier}
-          onChange={handleSpeedChange}
-          disabled={disabled}
-          title="Change speed (↑ / ↓)"
-        >
-          {SPEED_OPTIONS.map((speed) => (
-            <option key={speed} value={speed}>
-              {speed}x
-            </option>
-          ))}
-        </select>
-      </div>
+      <select
+        ref={speedSelectRef}
+        name="timelineSpeed"
+        className="min-w-16 rounded-md transition-all duration-150 bg-gray-600 hover:bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:bg-gray-300 disabled:text-gray-500 px-2 py-2 cursor-pointer disabled:cursor-not-allowed"
+        value={speedMultiplier}
+        onChange={handleSpeedChange}
+        disabled={disabled}
+        title="Change speed (↑ / ↓)"
+      >
+        {SPEED_OPTIONS.map((speed) => (
+          <option key={speed} value={speed}>
+            {speed}x
+          </option>
+        ))}
+      </select>
     </div>
   );
 };
