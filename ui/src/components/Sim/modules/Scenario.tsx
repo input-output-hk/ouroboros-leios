@@ -5,6 +5,7 @@ import {
 import { IScenario } from "@/contexts/SimContext/types";
 import { ChangeEvent, FC, useCallback, useEffect, useState } from "react";
 import { useStreamMessagesHandler } from "../hooks/useStreamMessagesHandler";
+import { Button } from "@/components/Button";
 
 export const Scenario: FC = () => {
   const {
@@ -55,7 +56,7 @@ export const Scenario: FC = () => {
   const isLoaded = events.length > 0 || streaming;
 
   return (
-    <div className="flex items-center justify-start gap-4">
+    <div className="flex items-center justify-start gap-4 border-2 rounded-md p-4 border-gray-200 bg-white/80 backdrop-blur-xs">
       <div className="min-w-32">
         <label htmlFor="scenario" className="block text-xs text-gray-600">
           Scenario
@@ -72,24 +73,6 @@ export const Scenario: FC = () => {
         </select>
       </div>
 
-      <div className="flex gap-2">
-        <button
-          className="bg-[blue] text-white rounded-md px-4 py-2"
-          onClick={handleStartStream}
-          disabled={streaming || isLoaded}
-        >
-          {streaming ? "Loading..." : isLoaded ? "Loaded" : "Load Scenario"}
-        </button>
-        {isLoaded && (
-          <button
-            className="bg-gray-400 text-white w-[80px] rounded-md px-4 py-2"
-            onClick={handleUnloadScenario}
-          >
-            {streaming ? "Cancel" : "Unload"}
-          </button>
-        )}
-      </div>
-
       <div className="flex flex-col gap-1">
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -100,6 +83,25 @@ export const Scenario: FC = () => {
           />
           Include Transactions
         </label>
+      </div>
+
+      <div className="flex gap-2">
+        <Button
+          variant="primary"
+          onClick={handleStartStream}
+          disabled={streaming || isLoaded}
+        >
+          {streaming ? "Loading..." : isLoaded ? "Loaded" : "Load Scenario"}
+        </Button>
+        {isLoaded && (
+          <Button
+            variant="secondary"
+            onClick={handleUnloadScenario}
+            className="w-[80px]"
+          >
+            {streaming ? "Cancel" : "Unload"}
+          </Button>
+        )}
       </div>
     </div>
   );

@@ -23,6 +23,7 @@ export const Canvas: FC = () => {
   } = useSimContext();
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
+  const hasMoved = useRef(false);
   const pointerCapture = useRef<number | undefined>(undefined);
 
   useEffect(() => {
@@ -56,6 +57,11 @@ export const Canvas: FC = () => {
         return;
       }
 
+      // Only handle clicks if we weren't dragging
+      if (hasMoved.current) {
+        return;
+      }
+
       const rect = canvas.getBoundingClientRect();
       const x = ev.clientX - rect.left;
       const y = ev.clientY - rect.top;
@@ -73,6 +79,12 @@ export const Canvas: FC = () => {
         dispatch({
           type: "SET_CURRENT_NODE",
           payload: currentNode === node ? undefined : node,
+        });
+      } else {
+        // Click on background - unset current node
+        dispatch({
+          type: "SET_CURRENT_NODE",
+          payload: undefined,
         });
       }
     },
@@ -116,6 +128,7 @@ export const Canvas: FC = () => {
     }
 
     isDragging.current = true;
+    hasMoved.current = false;
     canvas.setPointerCapture(ev.pointerId);
     pointerCapture.current = ev.pointerId;
     dragStart.current = { x: ev.clientX, y: ev.clientY };
@@ -129,6 +142,11 @@ export const Canvas: FC = () => {
 
     const deltaX = ev.clientX - dragStart.current.x;
     const deltaY = ev.clientY - dragStart.current.y;
+
+    // Mark that we've moved if there's significant movement
+    if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) {
+      hasMoved.current = true;
+    }
 
     dispatch({
       type: "SET_CANVAS_PROPS",

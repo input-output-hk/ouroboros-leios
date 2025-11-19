@@ -1,5 +1,6 @@
 import { useSimContext } from "@/contexts/SimContext/context";
 import { FC, useCallback, useEffect, useRef } from "react";
+import { Button } from "@/components/Button";
 
 export const Playback: FC = () => {
   const {
@@ -55,9 +56,12 @@ export const Playback: FC = () => {
           ((now - lastUpdateRef.current) / 1000) * speedMultiplier;
         lastUpdateRef.current = now;
 
-        const newTime = Math.min(currentTimeRef.current + deltaTime, maxEventTime);
+        const newTime = Math.min(
+          currentTimeRef.current + deltaTime,
+          maxEventTime,
+        );
         currentTimeRef.current = newTime;
-        
+
         dispatch({
           type: "SET_TIMELINE_TIME",
           payload: newTime,
@@ -97,50 +101,59 @@ export const Playback: FC = () => {
   return (
     <div className="flex items-center gap-2">
       {/* Play/Pause button */}
-      <button
+      <Button
         onClick={handlePlayPause}
         disabled={disabled}
-        className="bg-blue-500 text-white px-3 py-2 rounded disabled:bg-gray-300 disabled:cursor-not-allowed w-16 text-sm"
+        variant="primary"
+        className="w-20"
       >
         {isPlaying ? "Pause" : "Play"}
-      </button>
+      </Button>
 
       {/* Step controls: << < > >> */}
-      <button
+      <Button
         onClick={() => handleStep(-0.01)}
         disabled={disabled}
-        className="bg-gray-500 text-white px-2 py-2 rounded disabled:bg-gray-300 disabled:cursor-not-allowed text-sm"
+        variant="secondary"
+        size="sm"
+        className="px-2"
         title="Step backward 10ms"
       >
         &lt;&lt;
-      </button>
+      </Button>
 
-      <button
+      <Button
         onClick={() => handleStep(-0.001)}
         disabled={disabled}
-        className="bg-gray-500 text-white px-2 py-2 rounded disabled:bg-gray-300 disabled:cursor-not-allowed text-sm"
+        variant="secondary"
+        size="sm"
+        className="px-2"
         title="Step backward 1ms"
       >
         &lt;
-      </button>
+      </Button>
 
-      <button
+      <Button
         onClick={() => handleStep(0.001)}
         disabled={disabled}
-        className="bg-gray-500 text-white px-2 py-2 rounded disabled:bg-gray-300 disabled:cursor-not-allowed text-sm"
+        variant="secondary"
+        size="sm"
+        className="px-2"
         title="Step forward 1ms"
       >
         &gt;
-      </button>
+      </Button>
 
-      <button
+      <Button
         onClick={() => handleStep(0.01)}
         disabled={disabled}
-        className="bg-gray-500 text-white px-2 py-2 rounded disabled:bg-gray-300 disabled:cursor-not-allowed text-sm"
+        variant="secondary"
+        size="sm"
+        className="px-2"
         title="Step forward 10ms"
       >
         &gt;&gt;
-      </button>
+      </Button>
 
       {/* Speed control */}
       <div className="min-w-16">
