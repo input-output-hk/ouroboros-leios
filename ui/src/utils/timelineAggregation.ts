@@ -230,44 +230,8 @@ export const computeAggregatedDataAtTime = (
         break;
       }
 
-      case EServerMessageType.IBGenerated: {
-        const stats = nodeStats.get(message.producer);
-        if (stats) {
-          stats.generated.set(EMessageType.IB, (stats.generated.get(EMessageType.IB) || 0) + 1);
-          setMessageBytes(EMessageType.IB, message.id, message.size_bytes);
-        }
-        break;
-      }
 
-      case EServerMessageType.IBSent: {
-        const stats = nodeStats.get(message.sender);
-        if (stats) {
-          const msgBytes = getMessageBytes(EMessageType.IB, message.id);
-          if (!stats.sent.has(EMessageType.IB)) {
-            stats.sent.set(EMessageType.IB, { count: 0, bytes: 0 });
-          }
-          const sentStats = stats.sent.get(EMessageType.IB)!;
-          sentStats.count += 1;
-          sentStats.bytes += msgBytes;
-          stats.bytesSent += msgBytes;
-        }
-        break;
-      }
 
-      case EServerMessageType.IBReceived: {
-        const stats = nodeStats.get(message.recipient);
-        if (stats) {
-          const msgBytes = getMessageBytes(EMessageType.IB, message.id);
-          if (!stats.received.has(EMessageType.IB)) {
-            stats.received.set(EMessageType.IB, { count: 0, bytes: 0 });
-          }
-          const receivedStats = stats.received.get(EMessageType.IB)!;
-          receivedStats.count += 1;
-          receivedStats.bytes += msgBytes;
-          stats.bytesReceived += msgBytes;
-        }
-        break;
-      }
 
       case EServerMessageType.EBGenerated: {
         const stats = nodeStats.get(message.producer);

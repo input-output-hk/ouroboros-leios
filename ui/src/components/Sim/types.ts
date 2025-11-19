@@ -52,9 +52,6 @@ export enum EServerMessageType {
   TransactionGenerated = "TXGenerated",
   TransactionReceived = "TXReceived",
   TransactionSent = "TXSent",
-  IBGenerated = "IBGenerated",
-  IBReceived = "IBReceived",
-  IBSent = "IBSent",
   EBGenerated = "EBGenerated",
   EBReceived = "EBReceived",
   EBSent = "EBSent",
@@ -87,39 +84,6 @@ export interface ITransactionSent {
   recipient: string;
 }
 
-export interface IInputBlockGenerated {
-  type: EServerMessageType.IBGenerated;
-  id: string;
-  slot: number;
-  pipeline: number;
-  producer: string;
-  index: number;
-  vrf: number;
-  timestamp: number;
-  header_bytes: number;
-  size_bytes: number;
-  transactions: number[];
-}
-
-export interface IInputBlockReceived {
-  type: EServerMessageType.IBReceived;
-  id: string;
-  slot: number;
-  producer: string;
-  index: number;
-  sender: string;
-  recipient: string;
-}
-
-export interface IInputBlockSent {
-  type: EServerMessageType.IBSent;
-  id: string;
-  slot: number;
-  producer: string;
-  index: number;
-  sender: string;
-  recipient: string;
-}
 
 export interface IRankingBlockGenerated {
   type: EServerMessageType.RBGenerated;
@@ -162,7 +126,6 @@ export interface IEndorserBlockGenerated {
   producer: string;
   size_bytes: number;
   transactions: ITransaction[];
-  input_blocks: IInputBlock[];
   endorser_blocks: IEndorserBlock[];
 }
 
@@ -170,9 +133,6 @@ export interface ITransaction {
   id: string;
 }
 
-export interface IInputBlock {
-  id: string;
-}
 
 export interface IEndorserBlock {
   id: string;
@@ -224,9 +184,6 @@ export interface IUnknown {
 }
 
 export type TServerMessageType =
-  | IInputBlockGenerated
-  | IInputBlockReceived
-  | IInputBlockSent
   | IRankingBlockGenerated
   | IRankingBlockReceived
   | IRankingBlockSent

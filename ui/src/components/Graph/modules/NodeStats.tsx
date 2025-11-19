@@ -44,7 +44,6 @@ export const NodeStats: FC = () => {
 
   const data = [
     { name: "Transactions", ...getCounts(EMessageType.TX), color: "#26de81" },
-    { name: "Input Blocks", ...getCounts(EMessageType.IB), color: "#2bcbba" },
     { name: "Endorser Blocks", ...getCounts(EMessageType.EB), color: "#4b7bec" },
     { name: "Votes", ...getCounts(EMessageType.Votes), color: "#2d98da" },
     { name: "Blocks", ...getCounts(EMessageType.RB), color: "#fc5c65" },

@@ -12,7 +12,6 @@ export enum ESpeedOptions {
 export enum EMessageType {
   EB = "eb",
   RB = "rb",
-  IB = "ib",
   TX = "tx",
   Votes = "votes",
 }
