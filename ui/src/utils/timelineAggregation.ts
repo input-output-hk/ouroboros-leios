@@ -1,12 +1,12 @@
 import {
   IServerMessage,
-  EMessageType,
+  EServerMessageType,
   ITransformedNodeMap,
 } from "@/components/Sim/types";
 import {
   ISimulationAggregatedData,
   ISimulationAggregatedDataState,
-  VisualizedMessage,
+  EMessageType,
   ActivityAction,
 } from "@/contexts/SimContext/types";
 
@@ -14,7 +14,7 @@ import {
 const updateLastActivity = (
   nodeStats: Map<string, ISimulationAggregatedData>,
   nodeId: string,
-  type: VisualizedMessage,
+  type: EMessageType,
   action: ActivityAction,
   time: number,
 ) => {
@@ -23,7 +23,7 @@ const updateLastActivity = (
     // Always update if it's an EB activity, or if timestamp is newer
     if (
       !stats.lastActivity ||
-      type === VisualizedMessage.EB ||
+      type === EMessageType.EB ||
       time >= stats.lastActivity.time
     ) {
       stats.lastActivity = { type, action, time };
@@ -75,7 +75,7 @@ export const clearLatencyCache = () => {
 
 const createMessageAnimation = (
   result: ISimulationAggregatedDataState,
-  messageType: VisualizedMessage,
+  messageType: EMessageType,
   messageId: string,
   sender: string,
   recipient: string,
@@ -108,7 +108,6 @@ const createMessageAnimation = (
   }
 };
 
-
 // Compute complete aggregated data from timeline events up to a specific time
 export const computeAggregatedDataAtTime = (
   events: IServerMessage[],
@@ -123,14 +122,26 @@ export const computeAggregatedDataAtTime = (
     nodeStats.set(nodeId, {
       bytesSent: 0,
       bytesReceived: 0,
-      generated: {},
-      sent: {},
-      received: {},
+      generated: new Map<EMessageType, number>(),
+      sent: new Map<EMessageType, { count: number; bytes: number }>(),
+      received: new Map<EMessageType, { count: number; bytes: number }>(),
     });
   });
 
-  // Initialize intermediate state for tracking message sizes
-  const bytes = new Map<string, number>();
+  // Initialize nested map for efficient message size lookup: messageType -> messageId -> size
+  const messageBytes = new Map<EMessageType, Map<string, number>>();
+
+  // Helper functions for efficient byte storage/retrieval
+  const setMessageBytes = (messageType: EMessageType, messageId: string, size: number) => {
+    if (!messageBytes.has(messageType)) {
+      messageBytes.set(messageType, new Map());
+    }
+    messageBytes.get(messageType)!.set(messageId, size);
+  };
+
+  const getMessageBytes = (messageType: EMessageType, messageId: string): number => {
+    return messageBytes.get(messageType)?.get(messageId) || 0;
+  };
 
   // Initialize result structure
   const result: ISimulationAggregatedDataState = {
@@ -167,31 +178,32 @@ export const computeAggregatedDataAtTime = (
     eventCountsByType[type] = (eventCountsByType[type] || 0) + 1;
 
     switch (message.type) {
-      case EMessageType.TransactionGenerated: {
+      case EServerMessageType.TransactionGenerated: {
         const stats = nodeStats.get(message.publisher);
         if (stats) {
-          stats.generated["tx"] = (stats.generated["tx"] || 0) + 1;
-          bytes.set(`tx-${message.id}`, message.size_bytes);
+          stats.generated.set(EMessageType.TX, (stats.generated.get(EMessageType.TX) || 0) + 1);
+          setMessageBytes(EMessageType.TX, message.id, message.size_bytes);
         }
         break;
       }
 
-      case EMessageType.TransactionSent: {
+      case EServerMessageType.TransactionSent: {
         const stats = nodeStats.get(message.sender);
         if (stats) {
-          const msgBytes = bytes.get(`tx-${message.id}`) || 0;
-          if (!stats.sent["tx"]) {
-            stats.sent["tx"] = { count: 0, bytes: 0 };
+          const msgBytes = getMessageBytes(EMessageType.TX, message.id);
+          if (!stats.sent.has(EMessageType.TX)) {
+            stats.sent.set(EMessageType.TX, { count: 0, bytes: 0 });
           }
-          stats.sent["tx"].count += 1;
-          stats.sent["tx"].bytes += msgBytes;
+          const sentStats = stats.sent.get(EMessageType.TX)!;
+          sentStats.count += 1;
+          sentStats.bytes += msgBytes;
           stats.bytesSent += msgBytes;
         }
 
         // Create transaction animation with topology latency
         createMessageAnimation(
           result,
-          VisualizedMessage.TX,
+          EMessageType.TX,
           message.id,
           message.sender,
           message.recipient,
@@ -203,84 +215,88 @@ export const computeAggregatedDataAtTime = (
         break;
       }
 
-      case EMessageType.TransactionReceived: {
+      case EServerMessageType.TransactionReceived: {
         const stats = nodeStats.get(message.recipient);
         if (stats) {
-          const msgBytes = bytes.get(`tx-${message.id}`) || 0;
-          if (!stats.received["tx"]) {
-            stats.received["tx"] = { count: 0, bytes: 0 };
+          const msgBytes = getMessageBytes(EMessageType.TX, message.id);
+          if (!stats.received.has(EMessageType.TX)) {
+            stats.received.set(EMessageType.TX, { count: 0, bytes: 0 });
           }
-          stats.received["tx"].count += 1;
-          stats.received["tx"].bytes += msgBytes;
+          const receivedStats = stats.received.get(EMessageType.TX)!;
+          receivedStats.count += 1;
+          receivedStats.bytes += msgBytes;
           stats.bytesReceived += msgBytes;
         }
         break;
       }
 
-      case EMessageType.IBGenerated: {
+      case EServerMessageType.IBGenerated: {
         const stats = nodeStats.get(message.producer);
         if (stats) {
-          stats.generated["ib"] = (stats.generated["ib"] || 0) + 1;
-          bytes.set(`ib-${message.id}`, message.size_bytes);
+          stats.generated.set(EMessageType.IB, (stats.generated.get(EMessageType.IB) || 0) + 1);
+          setMessageBytes(EMessageType.IB, message.id, message.size_bytes);
         }
         break;
       }
 
-      case EMessageType.IBSent: {
+      case EServerMessageType.IBSent: {
         const stats = nodeStats.get(message.sender);
         if (stats) {
-          const msgBytes = bytes.get(`ib-${message.id}`) || 0;
-          if (!stats.sent["ib"]) {
-            stats.sent["ib"] = { count: 0, bytes: 0 };
+          const msgBytes = getMessageBytes(EMessageType.IB, message.id);
+          if (!stats.sent.has(EMessageType.IB)) {
+            stats.sent.set(EMessageType.IB, { count: 0, bytes: 0 });
           }
-          stats.sent["ib"].count += 1;
-          stats.sent["ib"].bytes += msgBytes;
+          const sentStats = stats.sent.get(EMessageType.IB)!;
+          sentStats.count += 1;
+          sentStats.bytes += msgBytes;
           stats.bytesSent += msgBytes;
         }
         break;
       }
 
-      case EMessageType.IBReceived: {
+      case EServerMessageType.IBReceived: {
         const stats = nodeStats.get(message.recipient);
         if (stats) {
-          const msgBytes = bytes.get(`ib-${message.id}`) || 0;
-          if (!stats.received["ib"]) {
-            stats.received["ib"] = { count: 0, bytes: 0 };
+          const msgBytes = getMessageBytes(EMessageType.IB, message.id);
+          if (!stats.received.has(EMessageType.IB)) {
+            stats.received.set(EMessageType.IB, { count: 0, bytes: 0 });
           }
-          stats.received["ib"].count += 1;
-          stats.received["ib"].bytes += msgBytes;
+          const receivedStats = stats.received.get(EMessageType.IB)!;
+          receivedStats.count += 1;
+          receivedStats.bytes += msgBytes;
           stats.bytesReceived += msgBytes;
         }
         break;
       }
 
-      case EMessageType.EBGenerated: {
+      case EServerMessageType.EBGenerated: {
         const stats = nodeStats.get(message.producer);
         if (stats) {
-          stats.generated["eb"] = (stats.generated["eb"] || 0) + 1;
-          bytes.set(`eb-${message.id}`, message.size_bytes);
+          stats.generated.set(EMessageType.EB, (stats.generated.get(EMessageType.EB) || 0) + 1);
+          setMessageBytes(EMessageType.EB, message.id, message.size_bytes);
         }
 
         // Track last activity for node coloring
         updateLastActivity(
           nodeStats,
           message.producer,
-          VisualizedMessage.EB,
+          EMessageType.EB,
           ActivityAction.Generated,
           event.time_s,
         );
         break;
       }
 
-      case EMessageType.EBSent: {
+      case EServerMessageType.EBSent: {
         const stats = nodeStats.get(message.sender);
         if (stats) {
-          const msgBytes = bytes.get(`eb-${message.id}`) || 0;
-          if (!stats.sent["eb"]) {
-            stats.sent["eb"] = { count: 0, bytes: 0 };
+          const msgBytes = getMessageBytes(EMessageType.EB, message.id);
+          if (!stats.sent.has(EMessageType.EB)) {
+            stats.sent.set(EMessageType.EB, { count: 0, bytes: 0 });
           }
-          stats.sent["eb"].count += 1;
-          stats.sent["eb"].bytes += msgBytes;
+          const sentStats = stats.sent.get(EMessageType.EB)!;
+          sentStats.count += 1;
+          sentStats.bytes += msgBytes;
           stats.bytesSent += msgBytes;
         }
 
@@ -288,7 +304,7 @@ export const computeAggregatedDataAtTime = (
         updateLastActivity(
           nodeStats,
           message.sender,
-          VisualizedMessage.EB,
+          EMessageType.EB,
           ActivityAction.Sent,
           event.time_s,
         );
@@ -296,7 +312,7 @@ export const computeAggregatedDataAtTime = (
         // Create animation with topology latency
         createMessageAnimation(
           result,
-          VisualizedMessage.EB,
+          EMessageType.EB,
           message.id,
           message.sender,
           message.recipient,
@@ -308,15 +324,16 @@ export const computeAggregatedDataAtTime = (
         break;
       }
 
-      case EMessageType.EBReceived: {
+      case EServerMessageType.EBReceived: {
         const stats = nodeStats.get(message.recipient);
         if (stats) {
-          const msgBytes = bytes.get(`eb-${message.id}`) || 0;
-          if (!stats.received["eb"]) {
-            stats.received["eb"] = { count: 0, bytes: 0 };
+          const msgBytes = getMessageBytes(EMessageType.EB, message.id);
+          if (!stats.received.has(EMessageType.EB)) {
+            stats.received.set(EMessageType.EB, { count: 0, bytes: 0 });
           }
-          stats.received["eb"].count += 1;
-          stats.received["eb"].bytes += msgBytes;
+          const receivedStats = stats.received.get(EMessageType.EB)!;
+          receivedStats.count += 1;
+          receivedStats.bytes += msgBytes;
           stats.bytesReceived += msgBytes;
         }
 
@@ -324,25 +341,25 @@ export const computeAggregatedDataAtTime = (
         updateLastActivity(
           nodeStats,
           message.recipient,
-          VisualizedMessage.EB,
+          EMessageType.EB,
           ActivityAction.Received,
           event.time_s,
         );
         break;
       }
 
-      case EMessageType.RBGenerated: {
+      case EServerMessageType.RBGenerated: {
         const stats = nodeStats.get(message.producer);
         if (stats) {
-          stats.generated["pb"] = (stats.generated["pb"] || 0) + 1;
-          bytes.set(`pb-${message.id}`, message.size_bytes);
+          stats.generated.set(EMessageType.RB, (stats.generated.get(EMessageType.RB) || 0) + 1);
+          setMessageBytes(EMessageType.RB, message.id, message.size_bytes);
         }
 
         // Track last activity for node coloring
         updateLastActivity(
           nodeStats,
           message.producer,
-          VisualizedMessage.RB,
+          EMessageType.RB,
           ActivityAction.Generated,
           event.time_s,
         );
@@ -350,15 +367,16 @@ export const computeAggregatedDataAtTime = (
         break;
       }
 
-      case EMessageType.RBSent: {
+      case EServerMessageType.RBSent: {
         const stats = nodeStats.get(message.sender);
         if (stats) {
-          const msgBytes = bytes.get(`pb-${message.id}`) || 0;
-          if (!stats.sent["pb"]) {
-            stats.sent["pb"] = { count: 0, bytes: 0 };
+          const msgBytes = getMessageBytes(EMessageType.RB, message.id);
+          if (!stats.sent.has(EMessageType.RB)) {
+            stats.sent.set(EMessageType.RB, { count: 0, bytes: 0 });
           }
-          stats.sent["pb"].count += 1;
-          stats.sent["pb"].bytes += msgBytes;
+          const sentStats = stats.sent.get(EMessageType.RB)!;
+          sentStats.count += 1;
+          sentStats.bytes += msgBytes;
           stats.bytesSent += msgBytes;
         }
 
@@ -366,7 +384,7 @@ export const computeAggregatedDataAtTime = (
         updateLastActivity(
           nodeStats,
           message.sender,
-          VisualizedMessage.RB,
+          EMessageType.RB,
           ActivityAction.Sent,
           event.time_s,
         );
@@ -374,7 +392,7 @@ export const computeAggregatedDataAtTime = (
         // Create RB animation with topology latency
         createMessageAnimation(
           result,
-          VisualizedMessage.RB,
+          EMessageType.RB,
           message.id,
           message.sender,
           message.recipient,
@@ -386,15 +404,16 @@ export const computeAggregatedDataAtTime = (
         break;
       }
 
-      case EMessageType.RBReceived: {
+      case EServerMessageType.RBReceived: {
         const stats = nodeStats.get(message.recipient);
         if (stats) {
-          const msgBytes = bytes.get(`pb-${message.id}`) || 0;
-          if (!stats.received["pb"]) {
-            stats.received["pb"] = { count: 0, bytes: 0 };
+          const msgBytes = getMessageBytes(EMessageType.RB, message.id);
+          if (!stats.received.has(EMessageType.RB)) {
+            stats.received.set(EMessageType.RB, { count: 0, bytes: 0 });
           }
-          stats.received["pb"].count += 1;
-          stats.received["pb"].bytes += msgBytes;
+          const receivedStats = stats.received.get(EMessageType.RB)!;
+          receivedStats.count += 1;
+          receivedStats.bytes += msgBytes;
           stats.bytesReceived += msgBytes;
         }
 
@@ -402,45 +421,47 @@ export const computeAggregatedDataAtTime = (
         updateLastActivity(
           nodeStats,
           message.recipient,
-          VisualizedMessage.RB,
+          EMessageType.RB,
           ActivityAction.Received,
           event.time_s,
         );
         break;
       }
 
-      case EMessageType.VTBundleGenerated: {
+      case EServerMessageType.VTBundleGenerated: {
         const stats = nodeStats.get(message.producer);
         if (stats) {
-          stats.generated["votes"] = (stats.generated["votes"] || 0) + 1;
-          bytes.set(`votes-${message.id}`, message.size_bytes);
+          stats.generated.set(EMessageType.Votes, (stats.generated.get(EMessageType.Votes) || 0) + 1);
+          setMessageBytes(EMessageType.Votes, message.id, message.size_bytes);
         }
         break;
       }
 
-      case EMessageType.VTBundleSent: {
+      case EServerMessageType.VTBundleSent: {
         const stats = nodeStats.get(message.sender);
         if (stats) {
-          const msgBytes = bytes.get(`votes-${message.id}`) || 0;
-          if (!stats.sent["votes"]) {
-            stats.sent["votes"] = { count: 0, bytes: 0 };
+          const msgBytes = getMessageBytes(EMessageType.Votes, message.id);
+          if (!stats.sent.has(EMessageType.Votes)) {
+            stats.sent.set(EMessageType.Votes, { count: 0, bytes: 0 });
           }
-          stats.sent["votes"].count += 1;
-          stats.sent["votes"].bytes += msgBytes;
+          const sentStats = stats.sent.get(EMessageType.Votes)!;
+          sentStats.count += 1;
+          sentStats.bytes += msgBytes;
           stats.bytesSent += msgBytes;
         }
         break;
       }
 
-      case EMessageType.VTBundleReceived: {
+      case EServerMessageType.VTBundleReceived: {
         const stats = nodeStats.get(message.recipient);
         if (stats) {
-          const msgBytes = bytes.get(`votes-${message.id}`) || 0;
-          if (!stats.received["votes"]) {
-            stats.received["votes"] = { count: 0, bytes: 0 };
+          const msgBytes = getMessageBytes(EMessageType.Votes, message.id);
+          if (!stats.received.has(EMessageType.Votes)) {
+            stats.received.set(EMessageType.Votes, { count: 0, bytes: 0 });
           }
-          stats.received["votes"].count += 1;
-          stats.received["votes"].bytes += msgBytes;
+          const receivedStats = stats.received.get(EMessageType.Votes)!;
+          receivedStats.count += 1;
+          receivedStats.bytes += msgBytes;
           stats.bytesReceived += msgBytes;
         }
         break;

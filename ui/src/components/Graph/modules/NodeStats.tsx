@@ -1,4 +1,5 @@
 import { useSimContext } from "@/contexts/SimContext/context";
+import { EMessageType } from "@/contexts/SimContext/types";
 import { printBytes } from "@/utils";
 import { FC, useMemo } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
@@ -16,9 +17,9 @@ export const NodeStats: FC = () => {
     return currentNode ? aggregatedData.nodes.get(currentNode) : undefined;
   }, [currentNode, aggregatedData.nodes]);
 
-  const getCounts = (type: string) => {
-    const sent = currentNodeStats?.sent?.[type]?.bytes ?? 0;
-    const received = currentNodeStats?.received?.[type]?.bytes ?? 0;
+  const getCounts = (type: EMessageType) => {
+    const sent = currentNodeStats?.sent?.get(type)?.bytes ?? 0;
+    const received = currentNodeStats?.received?.get(type)?.bytes ?? 0;
     return { sent, received };
   };
 
@@ -42,11 +43,11 @@ export const NodeStats: FC = () => {
   }, [currentNode, topography.links]);
 
   const data = [
-    { name: "Transactions", ...getCounts("tx"), color: "#26de81" },
-    { name: "Input Blocks", ...getCounts("ib"), color: "#2bcbba" },
-    { name: "Endorser Blocks", ...getCounts("eb"), color: "#4b7bec" },
-    { name: "Votes", ...getCounts("votes"), color: "#2d98da" },
-    { name: "Blocks", ...getCounts("pb"), color: "#fc5c65" },
+    { name: "Transactions", ...getCounts(EMessageType.TX), color: "#26de81" },
+    { name: "Input Blocks", ...getCounts(EMessageType.IB), color: "#2bcbba" },
+    { name: "Endorser Blocks", ...getCounts(EMessageType.EB), color: "#4b7bec" },
+    { name: "Votes", ...getCounts(EMessageType.Votes), color: "#2d98da" },
+    { name: "Blocks", ...getCounts(EMessageType.RB), color: "#fc5c65" },
   ];
 
   return (

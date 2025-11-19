@@ -1,7 +1,7 @@
 import { FC } from "react";
 
 import { useSimContext } from "@/contexts/SimContext/context";
-import { EMessageType } from "../types";
+import { EServerMessageType } from "../types";
 
 export const Stats: FC = () => {
   const {
@@ -29,7 +29,7 @@ export const Stats: FC = () => {
           <h4 className="font-semibold">Event Types</h4>
           {aggregatedData.eventCounts.total > 0 && (
             <div className="text-sm mt-2">
-              {Object.values(EMessageType).map((eventType) => {
+              {Object.values(EServerMessageType).map((eventType) => {
                 const count = aggregatedData.eventCounts.byType[eventType];
                 return (
                   <div key={eventType} className="flex justify-between text-sm">

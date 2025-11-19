@@ -3,7 +3,7 @@ import {
 } from "@/contexts/SimContext/types";
 import * as cbor from "cborg";
 import type { ReadableStream } from "stream/web";
-import { IServerMessage, EMessageType } from "../types";
+import { IServerMessage, EServerMessageType } from "../types";
 
 export type TWorkerRequest =
   | {
@@ -90,22 +90,22 @@ const createCborTransformer = <T>(): TransformStream<Uint8Array, T> => {
 
 // Base event types (always included)
 const BASE_VISUALIZATION_EVENTS = new Set([
-  EMessageType.EBGenerated,
-  EMessageType.EBSent,
-  EMessageType.EBReceived,
-  EMessageType.RBGenerated,
-  EMessageType.RBSent,
-  EMessageType.RBReceived,
-  EMessageType.VTBundleGenerated,
-  EMessageType.VTBundleSent,
-  EMessageType.VTBundleReceived,
+  EServerMessageType.EBGenerated,
+  EServerMessageType.EBSent,
+  EServerMessageType.EBReceived,
+  EServerMessageType.RBGenerated,
+  EServerMessageType.RBSent,
+  EServerMessageType.RBReceived,
+  EServerMessageType.VTBundleGenerated,
+  EServerMessageType.VTBundleSent,
+  EServerMessageType.VTBundleReceived,
 ]);
 
 // Transaction events (optional)
 const TRANSACTION_EVENTS = new Set([
-  EMessageType.TransactionGenerated,
-  EMessageType.TransactionSent,
-  EMessageType.TransactionReceived,
+  EServerMessageType.TransactionGenerated,
+  EServerMessageType.TransactionSent,
+  EServerMessageType.TransactionReceived,
 ]);
 
 const consumeStream = async (

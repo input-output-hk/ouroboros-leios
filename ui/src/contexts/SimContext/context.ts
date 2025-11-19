@@ -46,5 +46,5 @@ export const defaultState: ISimContextState = {
 export const SimContext: Context<ISimContext> = createContext({
   state: defaultState,
   dispatch: () => {},
-});
+} as ISimContext);
 export const useSimContext = () => useContext(SimContext);

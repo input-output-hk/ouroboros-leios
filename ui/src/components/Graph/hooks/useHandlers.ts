@@ -1,5 +1,5 @@
 import { useSimContext } from "@/contexts/SimContext/context";
-import { VisualizedMessage } from "@/contexts/SimContext/types";
+import { EMessageType } from "@/contexts/SimContext/types";
 import { useCallback } from "react";
 
 export const useHandlers = () => {
@@ -95,9 +95,9 @@ export const useHandlers = () => {
           (currentTime - lastActivity.time) <= ACTIVITY_TIMEOUT;
 
         if (activityIsRecent) {
-          if (lastActivity.type === VisualizedMessage.EB) {
+          if (lastActivity.type === EMessageType.EB) {
             context.fillStyle = "#9333ea"; // Purple for EB-related activity
-          } else if (lastActivity.type === VisualizedMessage.RB) {
+          } else if (lastActivity.type === EMessageType.RB) {
             context.fillStyle = "#87ceeb"; // Light blue for RB-related activity
           } else {
             context.fillStyle = node.data.stake ? "#DC53DE" : "blue"; // Default colors
@@ -130,13 +130,13 @@ export const useHandlers = () => {
       // Draw colored rectangle based on message type
       const rectSize = Math.min((0.8 / canvasScale) * 6, 0.8);
       
-      if (message.type === VisualizedMessage.EB) {
+      if (message.type === EMessageType.EB) {
         context.fillStyle = "#9333ea"; // Purple for EB messages
         context.strokeStyle = "#7c3aed";
-      } else if (message.type === VisualizedMessage.RB) {
+      } else if (message.type === EMessageType.RB) {
         context.fillStyle = "#87ceeb"; // Light blue for RB messages
         context.strokeStyle = "#5f9ea0";
-      } else if (message.type === VisualizedMessage.TX) {
+      } else if (message.type === EMessageType.TX) {
         context.fillStyle = "#90ee90"; // Light green for transaction messages
         context.strokeStyle = "#6bc46b";
       } else {

@@ -8,28 +8,29 @@ export enum ESpeedOptions {
   "10% Speed" = 0.1,
 }
 
-export enum VisualizedMessage {
+// Types of messages submitted between nodes
+export enum EMessageType {
   EB = "eb",
   RB = "rb",
-  IB = "ib", 
+  IB = "ib",
   TX = "tx",
   Votes = "votes",
 }
 
 export enum ActivityAction {
   Generated = "generated",
-  Sent = "sent", 
+  Sent = "sent",
   Received = "received",
 }
 
 export interface ISimulationAggregatedData {
   bytesSent: number;
   bytesReceived: number;
-  generated: { [type: string]: number };
-  sent: { [type: string]: { count: number; bytes: number } };
-  received: { [type: string]: { count: number; bytes: number } };
+  generated: Map<EMessageType, number>;
+  sent: Map<EMessageType, { count: number; bytes: number }>;
+  received: Map<EMessageType, { count: number; bytes: number }>;
   lastActivity?: {
-    type: VisualizedMessage;
+    type: EMessageType;
     action: ActivityAction;
     time: number;
   };
@@ -40,10 +41,9 @@ export interface ISimulationGlobalData {
   leiosTxOnChain: number;
 }
 
-
 export interface IMessageAnimation {
   id: string;
-  type: VisualizedMessage;
+  type: EMessageType;
   sender: string;
   recipient: string;
   sentTime: number;
@@ -63,7 +63,6 @@ export interface ISimulationAggregatedDataState {
   };
 }
 
-
 export interface IGraphContextState {
   canvasRef: RefObject<HTMLCanvasElement | null>;
   canvasScale: number;
@@ -71,7 +70,6 @@ export interface IGraphContextState {
   canvasOffsetY: number;
   currentNode?: string;
 }
-
 
 export interface IScenario {
   name: string;

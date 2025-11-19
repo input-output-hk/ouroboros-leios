@@ -48,7 +48,7 @@ export interface ITransformedNodeMap {
   links: Map<string, { source: string; target: string; latencyMs?: number }>;
 }
 
-export enum EMessageType {
+export enum EServerMessageType {
   TransactionGenerated = "TXGenerated",
   TransactionReceived = "TXReceived",
   TransactionSent = "TXSent",
@@ -67,28 +67,28 @@ export enum EMessageType {
 }
 
 export interface ITransactionGenerated {
-  type: EMessageType.TransactionGenerated;
+  type: EServerMessageType.TransactionGenerated;
   id: string;
   publisher: string;
   size_bytes: number;
 }
 
 export interface ITransactionReceived {
-  type: EMessageType.TransactionReceived;
+  type: EServerMessageType.TransactionReceived;
   id: string;
   sender: string;
   recipient: string;
 }
 
 export interface ITransactionSent {
-  type: EMessageType.TransactionSent;
+  type: EServerMessageType.TransactionSent;
   id: string;
   sender: string;
   recipient: string;
 }
 
 export interface IInputBlockGenerated {
-  type: EMessageType.IBGenerated;
+  type: EServerMessageType.IBGenerated;
   id: string;
   slot: number;
   pipeline: number;
@@ -102,7 +102,7 @@ export interface IInputBlockGenerated {
 }
 
 export interface IInputBlockReceived {
-  type: EMessageType.IBReceived;
+  type: EServerMessageType.IBReceived;
   id: string;
   slot: number;
   producer: string;
@@ -112,7 +112,7 @@ export interface IInputBlockReceived {
 }
 
 export interface IInputBlockSent {
-  type: EMessageType.IBSent;
+  type: EServerMessageType.IBSent;
   id: string;
   slot: number;
   producer: string;
@@ -122,7 +122,7 @@ export interface IInputBlockSent {
 }
 
 export interface IRankingBlockGenerated {
-  type: EMessageType.RBGenerated;
+  type: EServerMessageType.RBGenerated;
   id: string;
   slot: number;
   producer: string;
@@ -139,7 +139,7 @@ export interface IEndorsement {
 }
 
 export interface IRankingBlockReceived {
-  type: EMessageType.RBReceived;
+  type: EServerMessageType.RBReceived;
   id: string;
   slot: number;
   sender: string;
@@ -147,7 +147,7 @@ export interface IRankingBlockReceived {
 }
 
 export interface IRankingBlockSent {
-  type: EMessageType.RBSent;
+  type: EServerMessageType.RBSent;
   slot: number;
   id: string;
   sender: string;
@@ -155,7 +155,7 @@ export interface IRankingBlockSent {
 }
 
 export interface IEndorserBlockGenerated {
-  type: EMessageType.EBGenerated;
+  type: EServerMessageType.EBGenerated;
   id: string;
   slot: number;
   pipeline: number;
@@ -179,7 +179,7 @@ export interface IEndorserBlock {
 }
 
 export interface IEndorserBlockReceived {
-  type: EMessageType.EBReceived;
+  type: EServerMessageType.EBReceived;
   id: string;
   slot: number;
   sender: string;
@@ -187,7 +187,7 @@ export interface IEndorserBlockReceived {
 }
 
 export interface IEndorserBlockSent {
-  type: EMessageType.EBSent;
+  type: EServerMessageType.EBSent;
   slot: number;
   id: string;
   sender: string;
@@ -195,7 +195,7 @@ export interface IEndorserBlockSent {
 }
 
 export interface IVotesGenerated {
-  type: EMessageType.VTBundleGenerated;
+  type: EServerMessageType.VTBundleGenerated;
   id: string;
   slot: number;
   producer: string;
@@ -204,7 +204,7 @@ export interface IVotesGenerated {
 }
 
 export interface IVotesReceived {
-  type: EMessageType.VTBundleReceived;
+  type: EServerMessageType.VTBundleReceived;
   id: string;
   slot: number;
   sender: string;
@@ -212,7 +212,7 @@ export interface IVotesReceived {
 }
 
 export interface IVotesSent {
-  type: EMessageType.VTBundleSent;
+  type: EServerMessageType.VTBundleSent;
   slot: number;
   id: string;
   sender: string;
@@ -223,7 +223,7 @@ export interface IUnknown {
   type: "__unknown";
 }
 
-export type TMessageType =
+export type TServerMessageType =
   | IInputBlockGenerated
   | IInputBlockReceived
   | IInputBlockSent
@@ -241,7 +241,8 @@ export type TMessageType =
   | ITransactionSent
   | IUnknown;
 
-export interface IServerMessage<T = TMessageType> {
+// TODO: should rename ServerMessage -> ServerMessage
+export interface IServerMessage<T = TServerMessageType> {
   time_s: number;
   message: T;
 }
