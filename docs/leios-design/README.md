@@ -727,7 +727,25 @@ The requirements are organized into two main categories: **core functionality**,
 
 - **Proof-of-Possession** 
   - The `blst` C library does not provide a direct interface for generating a proof of possession ($PoP$). 
-  - This functionality must be implemented manually in `cardano-base`, leveraging the existing `blst` bindings to construct a $PoP$ from the available primitives.
+  - This functionality must be implemented manually in `cardano-base`, leveraging the existing `blst` bindings and will be exposed as part of the BLS signing interface.
+  - For each BLS keypair `(sk_bls, pk_bls)`, let `pk_bytes` be the canonical compressed encoding of `pk_bls`.  
+  - The PoP is defined as a BLS signature over the fixed message: `msg_pop = “PoP” || pk_bytes` where `"PoP"` is a fixed ASCII tag. This ensures that PoP messages are clearly separated from vote messages and cannot be confused with them.
+  - PoP generation and verification are performed through dedicated PoP helper functions in the BLS signing module. Although the exact API shape differs by implementation language, the logical interface follows:
+    ```
+    pop  = derive_pop(sk_bls, context_pop)
+    ok   = verify_pop(pk_bls, pop, context_pop)
+    ```
+    where `context_pop` provides the domain-separation settings (e.g., DST).
+  - The PoP and vote-signature domains must be distinct.  
+Leios **must** use a PoP-specific domain separation tag (`DST_POP`) that differs from the tag used for vote signatures (`DST_VOTE`).  
+This prevents PoPs from being repurposed as votes and preserves the security separation between registration and voting.
+  - The current BLS implementation in Cardano uses the base domain-separation tag: `“BLS_DST_CARDANO_BASE_V1”`
+
+    For Leios, we recommend deriving protocol-specific DSTs from this base value, for example:
+    ```
+    DST_POP  = “BLS_DST_CARDANO_BASE_LEIOS_POP_V1”
+    DST_VOTE = “BLS_DST_CARDANO_BASE_LEIOS_VOTE_V1”
+    ```
 
 - **Public key derivation** 
   - Implement deterministic derivation of the public key ($pk$) from the corresponding secret key ($sk$) for the selected BLS variant. 
@@ -747,8 +765,18 @@ The requirements are organized into two main categories: **core functionality**,
 
 - **Aggregation** 
 
-  The core cryptographic feature of Leios EB certificates is the ability to aggregate signatures from persistent voters. By combining multiple signatures into a single compact representation, we achieve significant space efficiency within EB blocks. This aggregation also enables more efficient verification, as a single pairing check can replace many individual ones—saving numerous expensive pairing operations while requiring only a few lightweight point additions in $G_1$ or $G_2$.
+  The Leios EB certificate contains a single aggregated BLS signature over the message 
+  ```
+  msg_vote = (election_id, EB_hash)
+  ```
+  All valid votes from both **persistent** and **non-persistent** voters can be combined into the same aggregated signature.
 
+  - **Persistent voters**  
+  These are always eligible and require only their public key and signature.
+
+  - **Non-persistent voters**  
+  These voters succeed in a sortition and must also provide an eligibility proof.  
+ 
   To support this functionality, several helper functions should be implemented:
   - A function to aggregate multiple public keys into a single aggregated key.  
   - A function to aggregate multiple signatures into a single aggregated signature.  
@@ -780,6 +808,9 @@ The requirements are organized into two main categories: **core functionality**,
 #### Performance and quality
 - **Performance benchmarks**
   - Benchmark single-verify, aggregate-verify, and batch-verify; report the impact of batching vs individual verification.
+  - Ensure that certificate generation and certificate verification both fit comfortably within protocol deadlines.
+  - Provide comparable measurements across implementations (Haskell, Rust, and future node variants).
+  - Track performance evolution over time on stable, dedicated hardware.
 
 - **Rust parity**
   - Compare performance against the Rust implementation; document gaps and ensure functional parity on vectors.
