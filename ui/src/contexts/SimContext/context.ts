@@ -7,7 +7,6 @@ import {
 } from "./types";
 
 export const defaultAggregatedData: ISimulationAggregatedDataState = {
-  progress: 0,
   nodes: new Map(),
   global: {
     praosTxOnChain: 0,

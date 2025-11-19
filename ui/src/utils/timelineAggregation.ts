@@ -132,20 +132,26 @@ export const computeAggregatedDataAtTime = (
   const messageBytes = new Map<EMessageType, Map<string, number>>();
 
   // Helper functions for efficient byte storage/retrieval
-  const setMessageBytes = (messageType: EMessageType, messageId: string, size: number) => {
+  const setMessageBytes = (
+    messageType: EMessageType,
+    messageId: string,
+    size: number,
+  ) => {
     if (!messageBytes.has(messageType)) {
       messageBytes.set(messageType, new Map());
     }
     messageBytes.get(messageType)!.set(messageId, size);
   };
 
-  const getMessageBytes = (messageType: EMessageType, messageId: string): number => {
+  const getMessageBytes = (
+    messageType: EMessageType,
+    messageId: string,
+  ): number => {
     return messageBytes.get(messageType)?.get(messageId) || 0;
   };
 
   // Initialize result structure
   const result: ISimulationAggregatedDataState = {
-    progress: targetTime,
     nodes: nodeStats,
     global: {
       praosTxOnChain: 0,
@@ -182,7 +188,10 @@ export const computeAggregatedDataAtTime = (
       case EServerMessageType.TransactionGenerated: {
         const stats = nodeStats.get(message.publisher);
         if (stats) {
-          stats.generated.set(EMessageType.TX, (stats.generated.get(EMessageType.TX) || 0) + 1);
+          stats.generated.set(
+            EMessageType.TX,
+            (stats.generated.get(EMessageType.TX) || 0) + 1,
+          );
           setMessageBytes(EMessageType.TX, message.id, message.size_bytes);
         }
         break;
@@ -231,13 +240,13 @@ export const computeAggregatedDataAtTime = (
         break;
       }
 
-
-
-
       case EServerMessageType.EBGenerated: {
         const stats = nodeStats.get(message.producer);
         if (stats) {
-          stats.generated.set(EMessageType.EB, (stats.generated.get(EMessageType.EB) || 0) + 1);
+          stats.generated.set(
+            EMessageType.EB,
+            (stats.generated.get(EMessageType.EB) || 0) + 1,
+          );
           setMessageBytes(EMessageType.EB, message.id, message.size_bytes);
         }
 
@@ -316,7 +325,10 @@ export const computeAggregatedDataAtTime = (
       case EServerMessageType.RBGenerated: {
         const stats = nodeStats.get(message.producer);
         if (stats) {
-          stats.generated.set(EMessageType.RB, (stats.generated.get(EMessageType.RB) || 0) + 1);
+          stats.generated.set(
+            EMessageType.RB,
+            (stats.generated.get(EMessageType.RB) || 0) + 1,
+          );
           setMessageBytes(EMessageType.RB, message.id, message.size_bytes);
         }
 
@@ -396,7 +408,10 @@ export const computeAggregatedDataAtTime = (
       case EServerMessageType.VTBundleGenerated: {
         const stats = nodeStats.get(message.producer);
         if (stats) {
-          stats.generated.set(EMessageType.Votes, (stats.generated.get(EMessageType.Votes) || 0) + 1);
+          stats.generated.set(
+            EMessageType.Votes,
+            (stats.generated.get(EMessageType.Votes) || 0) + 1,
+          );
           setMessageBytes(EMessageType.Votes, message.id, message.size_bytes);
         }
         break;

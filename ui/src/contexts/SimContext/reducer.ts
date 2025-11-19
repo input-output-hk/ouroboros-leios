@@ -1,6 +1,9 @@
 import { defaultAggregatedData } from "./context";
 import { ISimContextState, TSimContextActions } from "./types";
-import { computeAggregatedDataAtTime, clearLatencyCache } from "@/utils/timelineAggregation";
+import {
+  computeAggregatedDataAtTime,
+  clearLatencyCache,
+} from "@/utils/timelineAggregation";
 
 export const reducer = (
   state: ISimContextState,
@@ -46,7 +49,6 @@ export const reducer = (
       };
     }
 
-
     case "SET_CURRENT_NODE": {
       return {
         ...state,
@@ -56,8 +58,6 @@ export const reducer = (
         },
       };
     }
-
-
 
     case "SET_CANVAS_PROPS": {
       return {
@@ -77,13 +77,6 @@ export const reducer = (
               ? action.payload.canvasOffsetY(state.graph.canvasOffsetY)
               : (action.payload.canvasOffsetY ?? state.graph.canvasOffsetY),
         },
-      };
-    }
-
-    case "SET_SPEED": {
-      return {
-        ...state,
-        speedMultiplier: action.payload.speedMultiplier,
       };
     }
 
@@ -112,12 +105,6 @@ export const reducer = (
         ...state,
         topography: action.payload.topology,
         topologyLoaded: true,
-      };
-
-    case "ADD_TIMELINE_EVENT":
-      return {
-        ...state,
-        events: [...state.events, action.payload],
       };
 
     case "ADD_TIMELINE_EVENT_BATCH":
@@ -163,7 +150,6 @@ export const reducer = (
         ...state,
         speedMultiplier: action.payload,
       };
-
 
     case "RESET_TIMELINE":
       return {

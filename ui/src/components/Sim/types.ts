@@ -84,7 +84,6 @@ export interface ITransactionSent {
   recipient: string;
 }
 
-
 export interface IRankingBlockGenerated {
   type: EServerMessageType.RBGenerated;
   id: string;
@@ -132,7 +131,6 @@ export interface IEndorserBlockGenerated {
 export interface ITransaction {
   id: string;
 }
-
 
 export interface IEndorserBlock {
   id: string;
@@ -198,7 +196,6 @@ export type TServerMessageType =
   | ITransactionSent
   | IUnknown;
 
-// TODO: should rename ServerMessage -> ServerMessage
 export interface IServerMessage<T = TServerMessageType> {
   time_s: number;
   message: T;
