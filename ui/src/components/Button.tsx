@@ -1,18 +1,18 @@
-import { FC, ButtonHTMLAttributes } from "react";
+import { forwardRef, ButtonHTMLAttributes } from "react";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary" | "danger";
   size?: "sm" | "md";
 }
 
-export const Button: FC<ButtonProps> = ({
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
   children,
   className = "",
   variant = "secondary",
   size = "md",
   disabled,
   ...props
-}) => {
+}, ref) => {
   const baseStyles = "rounded-md font-medium transition-all duration-150 active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2";
   
   const variantStyles = {
@@ -30,6 +30,7 @@ export const Button: FC<ButtonProps> = ({
   
   return (
     <button
+      ref={ref}
       className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${disabledStyles} ${className}`}
       disabled={disabled}
       {...props}
@@ -37,4 +38,6 @@ export const Button: FC<ButtonProps> = ({
       {children}
     </button>
   );
-};
+});
+
+Button.displayName = "Button";

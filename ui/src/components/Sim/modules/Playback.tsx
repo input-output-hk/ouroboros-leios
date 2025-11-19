@@ -149,6 +149,21 @@ export const Playback: FC = () => {
 
   const disabled = events.length === 0;
 
+  // Button refs for focus management
+  const playPauseRef = useRef<HTMLButtonElement>(null);
+  const stepSmallBackwardRef = useRef<HTMLButtonElement>(null);
+  const stepBigBackwardRef = useRef<HTMLButtonElement>(null);
+  const stepSmallForwardRef = useRef<HTMLButtonElement>(null);
+  const stepBigForwardRef = useRef<HTMLButtonElement>(null);
+  const speedSelectRef = useRef<HTMLSelectElement>(null);
+
+  const focusButton = (ref: React.RefObject<HTMLElement | null>) => {
+    ref.current?.focus();
+    setTimeout(() => {
+      ref.current?.blur();
+    }, 200); // Show focus for 200ms
+  };
+
   // Keyboard event handler
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -157,26 +172,32 @@ export const Playback: FC = () => {
       switch (event.code) {
         case "Space":
           event.preventDefault();
+          focusButton(playPauseRef);
           handlePlayPause();
           break;
         case "ArrowRight":
           event.preventDefault();
           if (event.ctrlKey) {
+            focusButton(stepBigForwardRef);
             handleStep(1.0 * speedMultiplier); // 10x forward (big step)
           } else {
+            focusButton(stepSmallForwardRef);
             handleStep(0.1 * speedMultiplier); // 1x forward (small step)
           }
           break;
         case "ArrowLeft":
           event.preventDefault();
           if (event.ctrlKey) {
+            focusButton(stepBigBackwardRef);
             handleStep(-1.0 * speedMultiplier); // 10x backward (big step)
           } else {
+            focusButton(stepSmallBackwardRef);
             handleStep(-0.1 * speedMultiplier); // 1x backward (small step)
           }
           break;
         case "ArrowUp":
           event.preventDefault();
+          focusButton(speedSelectRef);
           // Increase speed to next available option
           {
             const currentIndex = SPEED_OPTIONS.indexOf(speedMultiplier);
@@ -190,6 +211,7 @@ export const Playback: FC = () => {
           break;
         case "ArrowDown":
           event.preventDefault();
+          focusButton(speedSelectRef);
           // Decrease speed to previous available option
           {
             const currentIndex = SPEED_OPTIONS.indexOf(speedMultiplier);
@@ -211,6 +233,7 @@ export const Playback: FC = () => {
   return (
     <div className="flex items-center gap-2">
       <Button
+        ref={playPauseRef}
         onClick={handlePlayPause}
         disabled={disabled}
         variant="primary"
@@ -221,6 +244,7 @@ export const Playback: FC = () => {
       </Button>
 
       <Button
+        ref={stepBigBackwardRef}
         onClick={() => handleStep(-1.0 * speedMultiplier)}
         onMouseDown={(e) => {
           e.preventDefault();
@@ -241,6 +265,7 @@ export const Playback: FC = () => {
       </Button>
 
       <Button
+        ref={stepSmallBackwardRef}
         onClick={() => handleStep(-0.1 * speedMultiplier)}
         onMouseDown={(e) => {
           e.preventDefault();
@@ -261,6 +286,7 @@ export const Playback: FC = () => {
       </Button>
 
       <Button
+        ref={stepSmallForwardRef}
         onClick={() => handleStep(0.1 * speedMultiplier)}
         onMouseDown={(e) => {
           e.preventDefault();
@@ -281,6 +307,7 @@ export const Playback: FC = () => {
       </Button>
 
       <Button
+        ref={stepBigForwardRef}
         onClick={() => handleStep(1.0 * speedMultiplier)}
         onMouseDown={(e) => {
           e.preventDefault();
@@ -305,6 +332,7 @@ export const Playback: FC = () => {
           Speed
         </label>
         <select
+          ref={speedSelectRef}
           name="timelineSpeed"
           className="mt-1 w-full text-sm"
           value={speedMultiplier}
