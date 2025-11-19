@@ -4,7 +4,6 @@ import { useSimContext } from "@/contexts/SimContext/context";
 import { FC, useEffect } from "react";
 import { parse } from "yaml";
 import { Coord2D, Node } from "../../../../data/simulation/topology";
-import { useTimelinePlayback } from "@/hooks/useTimelinePlayback";
 import { GraphWrapper } from "../Graph/GraphWrapper";
 import { Scenario } from "./modules/Scenario";
 import { TimelineSlider } from "./modules/TimelineSlider";
@@ -21,9 +20,6 @@ export const SimWrapper: FC = () => {
     },
     dispatch,
   } = useSimContext();
-
-  // Enable timeline playback
-  useTimelinePlayback();
 
   // Load topology if it has changed
   useEffect(() => {
