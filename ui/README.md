@@ -27,39 +27,43 @@ npm start
 
 ## Add a scenario from sim-rs
 
-To prepare a scenario to visualize, add or update `public/scenarios.json`:
+To prepare a scenario to visualize, find or add the topology to the public directory, for example:
+
+```sh
+mkdir -p public/topologies
+ln -sr ../sim-rs/test_data/small.yaml public/topologies/small.yaml
+```
+
+And generate a trace to visualize using the built `sim-rs`, for example using the CIP scenario:
+
+```bash
+mkdir -p public/traces
+cat ../analysis/sims/cip/experiments/NA,0.200/config.yaml \
+  | jq '."tx-start-time" = 20' > public/traces/config-200txkbs.json
+../sim-rs/target/release/sim-cli -p public/traces/config-200txkbs.json public/topologies/small.yaml public/traces/small-200txkbs.jsonl -s 120
+```
+
+You might want to filter out `Cpu` events (not visualized) and, in case you want to store it, use gzip and git lfs:
+
+```bash
+grep -v 'Cpu' < public/traces/small-200txkbs.jsonl > public/traces/small-200txkbs-nocpu.jsonl
+gzip public/traces/small-200txkbs-nocpu.jsonl
+git lfs track public/traces/small-200txkbs-nocpu.jsonl.gz
+```
+
+Then update `public/scenarios.json` accordingly:
 
 ```json
 {
   "scenarios": [
     {
-      "name": "Example",
-      "topology": "topologies/example.yaml",
-      "duration": 300,
-      "trace": "traces/example.jsonl",
-      "aggregated": false
+      "name": "200 TxkB/s",
+      "topology": "topologies/small.yaml",
+      "duration": 120,
+      "trace": "traces/small-200txkbs-nocpu.jsonl.gz"
     }
   ]
 }
 ```
 
-Now add that topology to the public directory, for example:
-
-```sh
-mkdir -p public/topologies
-ln -sr ../sim-rs/test_data/small.yaml public/topologies/example.yaml
-```
-
-And generate a trace to visualize using the built `sim-rs`:
-
-```bash
-mkdir -p public/traces
-../sim-rs/target/release/sim-cli -p ../analysis/sims/cip/experiments/NA,0.200/config.yaml public/topologies/example.yaml public/traces/example.jsonl -s 120
-```
-
-In case you want to store it, use gzip and git lfs:
-
-```bash
-gzip public/traces/examples.jsonl
-git lfs track public/traces/examples.jsonl.gz
-```
+Now add that

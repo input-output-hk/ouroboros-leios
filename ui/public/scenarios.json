@@ -1,10 +1,16 @@
 {
   "scenarios": [
     {
-      "name": "Small",
-      "topology": "topologies/example.yaml",
+      "name": "200 TxkB/s",
+      "topology": "topologies/small.yaml",
       "duration": 120,
-      "trace": "traces/example-nocpu.jsonl"
+      "trace": "traces/small-200txkbs-nocpu.jsonl.gz"
+    },
+    {
+      "name": "1 TxkB/s",
+      "topology": "topologies/small.yaml",
+      "duration": 120,
+      "trace": "traces/small-1txkbs-nocpu.jsonl.gz"
     }
   ]
 }
