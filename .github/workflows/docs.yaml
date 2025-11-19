@@ -111,20 +111,15 @@ jobs:
           fetch-depth: 2
 
       - name: 🛠️ Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: "yarn"
-          cache-dependency-path: ./ui/yarn.lock
+        uses: actions/setup-node@v6
 
       - name: 📦 Install dependencies
         working-directory: ui
-        run: yarn install
+        run: npm install
 
       - name: 🏗️ Build visualizer
         working-directory: ui
-        run: |
-          yarn build
+        run: npm run build
 
       - name: 🚢 Upload visualizer static site
         id: upload_viz
