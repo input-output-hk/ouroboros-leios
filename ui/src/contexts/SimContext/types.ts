@@ -75,7 +75,6 @@ export interface IScenario {
   topology: string;
   duration: number;
   trace: string;
-  aggregated: boolean;
 }
 
 export interface ISimContextState {
@@ -84,7 +83,6 @@ export interface ISimContextState {
   graph: IGraphContextState;
   aggregatedData: ISimulationAggregatedDataState;
   tracePath: string;
-  aggregated: boolean;
   topography: ITransformedNodeMap;
   topologyPath: string;
   topologyLoaded: boolean;
@@ -113,8 +111,6 @@ export type TSimContextActions =
         canvasOffsetY: ((prev: number) => number) | number;
       }>;
     }
-  // TODO: unused
-  | { type: "SET_AGGREGATED_DATA"; payload: ISimulationAggregatedDataState }
   | {
       type: "BATCH_UPDATE";
       payload: Partial<ISimContextState>;

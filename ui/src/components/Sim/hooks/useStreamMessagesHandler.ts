@@ -5,7 +5,7 @@ import StreamWorker from "./worker?worker";
 
 export const useStreamMessagesHandler = () => {
   const {
-    state: { tracePath, aggregated, speedMultiplier },
+    state: { tracePath },
     dispatch,
   } = useSimContext();
   const [streaming, setStreaming] = useState(false);
@@ -26,12 +26,10 @@ export const useStreamMessagesHandler = () => {
       worker.postMessage({
         type: "START",
         tracePath,
-        aggregated,
-        speedMultiplier,
         includeTransactions,
       });
     },
-    [worker, tracePath, aggregated, speedMultiplier, dispatch],
+    [worker, tracePath, dispatch],
   );
 
   const stopStream = useCallback(() => {

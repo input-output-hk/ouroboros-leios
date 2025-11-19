@@ -16,7 +16,6 @@ export const reducer = (
         activeScenario: scenario.name,
         maxTime: scenario.duration,
         tracePath: scenario.trace,
-        aggregated: scenario.aggregated,
         topologyPath: scenario.topology,
       };
     }
@@ -34,7 +33,6 @@ export const reducer = (
         activeScenario: scenario.name,
         maxTime: scenario.duration,
         tracePath: scenario.trace,
-        aggregated: scenario.aggregated,
         topologyPath: scenario.topology,
         topologyLoaded:
           state.topologyLoaded && scenario.topology === state.topologyPath,
@@ -60,9 +58,6 @@ export const reducer = (
     }
 
 
-    case "SET_AGGREGATED_DATA": {
-      return { ...state, aggregatedData: action.payload };
-    }
 
     case "SET_CANVAS_PROPS": {
       return {

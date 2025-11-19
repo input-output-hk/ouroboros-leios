@@ -24,7 +24,6 @@ export const defaultAggregatedData: ISimulationAggregatedDataState = {
 export const defaultState: ISimContextState = {
   allScenarios: [],
   activeScenario: "",
-  aggregated: true,
   graph: {
     canvasRef: { current: null },
     canvasOffsetX: 0,

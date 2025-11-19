@@ -1,6 +1,3 @@
-import {
-  ISimulationAggregatedDataState,
-} from "@/contexts/SimContext/types";
 import * as cbor from "cborg";
 import type { ReadableStream } from "stream/web";
 import { IServerMessage, EServerMessageType } from "../types";
@@ -9,13 +6,6 @@ export type TWorkerRequest =
   | {
       type: "START";
       tracePath: string;
-      aggregated: true;
-      speedMultiplier: number;
-    }
-  | {
-      type: "START";
-      tracePath: string;
-      aggregated?: false;
       includeTransactions?: boolean;
     }
   | { type: "STOP" };
@@ -172,35 +162,6 @@ const consumeStream = async (
   postMessage({ type: "DONE", tracePath });
 };
 
-// TODO: unused
-const consumeAggregateStream = async (
-  stream: ReadableStream<ISimulationAggregatedDataState>,
-  tracePath: string,
-  speedMultiplier: number,
-) => {
-  let lastTimestamp = 0;
-  for await (const aggregatedData of stream) {
-    const nodes = new Map();
-    for (const [id, stats] of Object.entries(aggregatedData.nodes)) {
-      nodes.set(id, stats);
-    }
-    aggregatedData.nodes = nodes;
-
-    const elapsedMs = (aggregatedData.progress - lastTimestamp) * 1000;
-    lastTimestamp = aggregatedData.progress;
-    await new Promise((resolve) =>
-      setTimeout(resolve, elapsedMs / speedMultiplier),
-    );
-
-    // TODO: re-create when needed
-    // postMessage({
-    //   type: "EVENT",
-    //   tracePath,
-    //   aggregatedData,
-    // } as TWorkerResponse);
-  }
-  postMessage({ type: "DONE", tracePath });
-};
 
 let controller = new AbortController();
 onmessage = (e: MessageEvent<TWorkerRequest>) => {
@@ -211,32 +172,13 @@ onmessage = (e: MessageEvent<TWorkerRequest>) => {
   }
 
   controller = new AbortController();
-  if (request.aggregated) {
-    createEventStream<ISimulationAggregatedDataState>(
-      request.tracePath,
-      controller.signal,
+  createEventStream<IServerMessage>(request.tracePath, controller.signal)
+    .then((stream) =>
+      consumeStream(stream, request.tracePath, request.includeTransactions),
     )
-      .then((stream) =>
-        consumeAggregateStream(
-          stream,
-          request.tracePath,
-          request.speedMultiplier,
-        ),
-      )
-      .catch((err) => {
-        if (err.name !== "AbortError") {
-          throw err;
-        }
-      });
-  } else {
-    createEventStream<IServerMessage>(request.tracePath, controller.signal)
-      .then((stream) =>
-        consumeStream(stream, request.tracePath, request.includeTransactions),
-      )
-      .catch((err) => {
-        if (err.name !== "AbortError") {
-          throw err;
-        }
-      });
-  }
+    .catch((err) => {
+      if (err.name !== "AbortError") {
+        throw err;
+      }
+    });
 };
