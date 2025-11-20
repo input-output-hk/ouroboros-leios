@@ -11,6 +11,7 @@ import NavbarItem, { type Props as NavbarItemConfig } from "@theme/NavbarItem";
 import SearchBar from "@theme/SearchBar";
 import { type ReactNode } from "react";
 
+import { useLocation } from "@docusaurus/router";
 import styles from "./styles.module.css";
 
 function useNavbarItems() {
@@ -47,18 +48,35 @@ function NavbarContentLayout({
   left: ReactNode;
   right: ReactNode;
 }) {
+  const { pathname } = useLocation();
   return (
-    <div className="container">
-      <div className="container-padding">
-        <div className="navbar__inner">
-          {/* <div className="navbar__items ">{left}</div> */}
+    <>
+      {pathname === "/" || pathname === "/formal-spec/" ? (
+        <div className="container">
+          <div className="container-padding">
+            <div className="navbar__inner">
+              {/* <div className="navbar__items ">{left}</div> */}
+              <NavbarLogo />
+              <div className="navbar__items navbar__items--right">{right}</div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="navbar__non_homepage">
+          {/* <div className="navbar__items">{left}</div> */}
           <NavbarLogo />
+
           <div className="navbar__items navbar__items--right">{right}</div>
         </div>
-      </div>
-    </div>
+      )}
+    </>
   );
 }
+
+//  <div className="navbar__inner">
+//       <div className="navbar__items">{left}</div>
+//       <div className="navbar__items navbar__items--right">{right}</div>
+//     </div>
 
 export default function NavbarContent(): JSX.Element {
   const mobileSidebar = useNavbarMobileSidebar();

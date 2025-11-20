@@ -98,7 +98,7 @@ function formatCountdown(ms, isLive = false) {
   if (seconds && parts.length < 2) {
     parts.push(`${seconds} sec${seconds > 1 ? "s" : ""}`);
   }
-  return ` in ${parts.slice(0, 2).join(", ")}`;
+  return ` in \n ${parts.slice(0, 2).join(", ")}`;
 }
 
 function highlightNumbers(str: string) {

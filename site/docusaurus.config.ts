@@ -226,7 +226,7 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} IOG, Inc`,
+      copyright: `Copyright © ${new Date().getFullYear()} Input Output Global <a href="https://static.iohk.io/terms/iog-privacy-policy.pdf" target="_blank" class="footer__link-item">Privacy Policy</a> <a href="https://static.iohk.io/terms/iohktermsandconditions.pdf" target="_blank" class="footer__link-item">Terms & Conditions</a> <small>Built with Docusaurus</small>`,
     },
     prism: {
       theme: prismThemes.github,

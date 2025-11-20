@@ -144,6 +144,13 @@
   flex-wrap: nowrap;
 }
 
+.navbar__non_homepage {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.5rem 1rem;
+}
+
 .navbar__brand {
   width: fit-content;
   min-width: 81px;
@@ -203,6 +210,10 @@
   line-height: var(--line-height-sm);
 }
 
+.footer__link-item {
+  color: inherit;
+}
+
 .footer__title {
   margin-bottom: 1.25rem;
 }
@@ -235,10 +246,21 @@
 
 .hero {
   padding: 0;
-  background-color: #200830;
-  background-image: url("/static/img/homepage-background.png");
-  background-size: cover;
-  background-repeat: no-repeat;
+  background: linear-gradient(0deg, #200830 0%, rgba(32, 8, 48, 0) 39.98%),
+    url("/static/img/homepage-background.png"), #200830;
+
+  background-size: cover, cover, auto;
+  background-repeat: no-repeat, no-repeat, no-repeat;
+}
+
+@media (max-width: 768px) {
+  .hero {
+    background: linear-gradient(0deg, #200830 0%, rgba(32, 8, 48, 0) 39.98%),
+      url("/static/img/homepage-background-mobile.png"), #200830;
+
+    background-size: cover, cover, auto;
+    background-repeat: no-repeat, no-repeat, no-repeat;
+  }
 }
 
 .homepage-section-primary {
@@ -259,6 +281,24 @@ a {
 
 .footer__col {
   padding: 0;
+}
+
+.pagination-nav {
+  grid-gap: 1rem;
+}
+
+.theme-admonition {
+  padding: 1rem;
+}
+
+blockquote {
+  padding: 0 1rem;
+}
+
+.menu__link,
+.table-of-contents__link,
+.pagination-nav__link {
+  text-decoration: none;
 }
 
 @media (max-width: 996px) {
