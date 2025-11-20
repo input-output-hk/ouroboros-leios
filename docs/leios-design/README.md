@@ -617,8 +617,7 @@ Corresponding types with instances of `EncCBOR` and `DecCBOR` must be provided i
 > [!WARNING]
 >
 > Work in progress. Content is created based on [impact analysis](../ImpactAnalysis.md), [Leios crypto project board](https://github.com/orgs/IntersectMBO/projects/75), and [CIP](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md).
-> 
-> TODO: Contribution from crypto team. 
+
 
 In Leios, EBs are compactly certified for inclusion in RBs. 
 Certification is achieved through a voting mechanism in which committee members cast votes referencing specific EBs, and these votes are then aggregated into compact certificates. 
