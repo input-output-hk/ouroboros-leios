@@ -9,12 +9,10 @@
 
 /* You can override the default Infima variables here. */
 
-@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&display=swap");
 @import "./typography.css";
 
 :root {
-  --ifm-font-family-base: "Poppins", sans-serif;
+  --ifm-font-family-base: var(--font-base);
 
   --ifm-background-color: #f8f6fa;
   --ifm-navbar-background-color: #f1edf5;
