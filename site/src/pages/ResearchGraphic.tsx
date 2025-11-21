@@ -1,6 +1,6 @@
 import styles from "./index.module.css";
 
-export function ResearchGraphic() {
+export default function ResearchGraphic() {
   return (
     <svg
       width="650"

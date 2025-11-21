@@ -1,7 +1,7 @@
 import Link from "@docusaurus/Link";
 import styles from "./index.module.css";
 
-export function HowLeiosWorksGraphic() {
+export default function HowLeiosWorksGraphic() {
   return (
     <>
       <svg

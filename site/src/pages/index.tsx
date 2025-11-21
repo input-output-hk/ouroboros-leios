@@ -7,9 +7,9 @@ import clsx from "clsx";
 import React, { useEffect, useState } from "react";
 
 import { LinkButton } from "../components/LinkButton/LinkButton";
-import { HowLeiosWorksGraphic } from "./HowLeiosWorksGraphic";
+import HowLeiosWorksGraphic from "./HowLeiosWorksGraphic";
 import styles from "./index.module.css";
-import { ResearchGraphic } from "./ResearchGraphic";
+import ResearchGraphic from "./ResearchGraphic";
 
 function HomepageHeader() {
   const { siteConfig } = useDocusaurusContext();
@@ -259,7 +259,7 @@ function MonthlyReviewsSection() {
       setIsLive(live);
       const rawCountdown = formatCountdown(
         target.getTime() - now.getTime(),
-        live
+        live,
       );
       //@ts-ignore
       setCountdown(highlightNumbers(rawCountdown));
@@ -272,7 +272,7 @@ function MonthlyReviewsSection() {
           hour: "2-digit",
           minute: "2-digit",
           hour12: false,
-        })
+        }),
       );
     }
     updateCountdown();
