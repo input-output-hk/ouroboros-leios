@@ -36,7 +36,7 @@ select
   , tx_times.logged as tx_logged
   , extract(epoch from (tx_times.logged - xref.time)) as mempool_minus_slot
   , extract(epoch from (block_times.logged - xref.time)) as block_minus_slot
-  , coalesce(tx_times.logged < block_times.logged, false) as tx_seen_first
+  , case when coalesce(tx_times.logged < block_times.logged, false) then 'TRUE' else 'FALSE' end as tx_seen_first
   from (
     select
         slot_no
@@ -112,9 +112,9 @@ select
     region
   , tx_seen_first
   , count(*) as "count"
-  , (count(*) + 0.0) / (select count(*) from mempool_vs_blocks z where z.region = mempool_vs_blocks.region and block_logged >= now() - interval '2 hours') as "fraction"
+  , (count(*) + 0.0) / (select count(*) from mempool_vs_blocks z where z.region = mempool_vs_blocks.region and block_logged >= now() - interval '6 hours') as "fraction"
   from mempool_vs_blocks
-  where block_logged >= now() - interval '2 hours'
+  where block_logged >= now() - interval '6 hours'
   group by region, tx_seen_first
 order by 1
 ;
