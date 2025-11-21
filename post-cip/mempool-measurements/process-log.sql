@@ -2,7 +2,8 @@
 drop table if exists block_times;
 
 create temporary table block_times (
-  logged     timestamp without time zone not null
+  region     varchar(30)                 not null
+, logged     timestamp without time zone not null
 , block_hash char(64)                    not null
 , slot_no    word63type                  not null
 );
@@ -13,7 +14,8 @@ create temporary table block_times (
 drop table if exists tx_times;
 
 create temporary table tx_times (
-  logged timestamp without time zone not null
+  region     varchar(30)             not null
+, logged timestamp without time zone not null
 , tx_hash8 char(8)                   not null
 );
 
@@ -24,7 +26,8 @@ drop table if exists mempool_vs_blocks;
 
 create temporary table mempool_vs_blocks as
 select
-    xref.slot_no
+    block_times.region
+  , xref.slot_no
   , xref.block_hash
   , xref.tx_hash
   , xref.tx_hash8
@@ -49,8 +52,8 @@ select
   inner join block_times
     using (block_hash)
   left join tx_times
-    using (tx_hash8)
-order by 1, 6
+    using (region, tx_hash8)
+order by 1, 2, 7
 ;
 
 \copy mempool_vs_blocks to 'mempool_vs_blocks.tsv' csv header delimiter E'\t'
@@ -60,12 +63,13 @@ drop table if exists mempool_history;
 
 create temporary table mempool_history as
 select
-    slot_no
+    region
+  , slot_no
   , tx_seen_first
   , count(*) as tx_count
   from mempool_vs_blocks
-  group by slot_no, tx_seen_first
-order by 1, 2
+  group by region, slot_no, tx_seen_first
+order by 1, 2, 3
 ;
 
 \copy mempool_history to 'mempool_history.tsv' csv header delimiter E'\t'
@@ -75,38 +79,43 @@ drop table if exists mempool_hourly;
 
 create temporary table mempool_hourly as
 select
-    hour
+    region
+  , hour
   , tx_seen_first
   , tx_count
-  , cast( tx_count as real) / tx_total
+  , cast( tx_count as real) / tx_total as tx_fraction
   from (
     select
-        date_trunc('hour', block_logged) as hour
+        region
+      , date_trunc('hour', block_logged) as hour
       , tx_seen_first
       , count(*) as tx_count
       from mempool_vs_blocks
-      group by date_trunc('hour', block_logged), tx_seen_first
+      group by region, date_trunc('hour', block_logged), tx_seen_first
   ) a
   inner join (
     select
-        date_trunc('hour', block_logged) as hour
+        region
+      , date_trunc('hour', block_logged) as hour
       , count(*) as tx_total
       from mempool_vs_blocks
-      group by date_trunc('hour', block_logged)
+      group by region, date_trunc('hour', block_logged)
   ) b
-    using (hour)
-order by 1, 2
+    using (region, hour)
+order by 1, 2, 3
 ;
 
 \copy mempool_hourly to 'mempool_hourly.tsv' csv header delimiter E'\t'
 
 
 select
-    tx_seen_first
+    region
+  , tx_seen_first
   , count(*) as "count"
-  , (count(*) + 0.0) / (select count(*) from mempool_vs_blocks where block_logged >= now() - interval '2 hours') as "fraction"
+  , (count(*) + 0.0) / (select count(*) from mempool_vs_blocks z where z.region = mempool_vs_blocks.region and block_logged >= now() - interval '2 hours') as "fraction"
   from mempool_vs_blocks
   where block_logged >= now() - interval '2 hours'
-  group by tx_seen_first
+  group by region, tx_seen_first
+order by 1
 ;
 

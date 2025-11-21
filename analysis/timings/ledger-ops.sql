@@ -77,8 +77,8 @@ select block_no, coalesce(tx_outs, 0) as tx_outs
   left join (
     select block_id, count(*) as tx_outs
       from tx
-      inner join tx_ins
-        on tx_ins.id = tx.id
+      inner join tx_out
+        on tx_out.id = tx.id
       group by block_id
   ) tx
     on tx.block_id = block.id
@@ -115,6 +115,8 @@ create temporary table ledger_ops as
 select
     slot_no
   , block_no
+  , epoch_no
+  , epoch_slot_no
   , encode(block.hash, 'hex') as block_hash
   , ledger_ops_apply.mut as apply_mut
   , ledger_ops_apply.mut_forecast as apply_mut_forecast
