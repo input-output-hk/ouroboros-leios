@@ -1,9 +1,12 @@
 import { LinkButton } from "../LinkButton/LinkButton";
 import styles from "./styles.module.css";
+import ScaleSvg from "@site/static/img/scale.svg";
+import SecureSvg from "@site/static/img/secure.svg";
+import FlexibleSvg from "@site/static/img/flexible.svg";
 
 type FeatureItem = {
   title: string;
-  svg: string;
+  Svg: string;
   description: React.ReactElement;
   button: {
     text: string;
@@ -14,7 +17,7 @@ type FeatureItem = {
 const FeatureList: FeatureItem[] = [
   {
     title: "Scalable",
-    svg: "/img/scale.svg",
+    Svg: ScaleSvg,
     description: (
       <>
         Optimizes network bandwidth for faster transaction processing,
@@ -29,7 +32,7 @@ const FeatureList: FeatureItem[] = [
   },
   {
     title: "Secure",
-    svg: "/img/secure.svg",
+    Svg: SecureSvg,
     description: (
       <>
         Preserves Ouroboros' strong security properties with robust defenses
@@ -43,7 +46,7 @@ const FeatureList: FeatureItem[] = [
   },
   {
     title: "Flexible",
-    svg: "/img/flexible.svg",
+    Svg: FlexibleSvg,
     description: <>Ouroboros Leios supports diverse applications.</>,
     button: {
       text: "Link to Documentation",
@@ -52,11 +55,11 @@ const FeatureList: FeatureItem[] = [
   },
 ];
 
-function Feature({ title, svg, description, button }: FeatureItem) {
+function Feature({ Svg, title, description, button }: FeatureItem) {
   return (
     <div className={styles.feature}>
       <div className={styles.featureContent}>
-        <img src={svg} className={styles.featureImg} />
+        <Svg className={styles.featureImg} />
         <div className="">
           <h2 className="">{title}</h2>
           <p>{description}</p>

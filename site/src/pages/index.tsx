@@ -10,6 +10,7 @@ import { LinkButton } from "../components/LinkButton/LinkButton";
 import HowLeiosWorksGraphic from "./HowLeiosWorksGraphic";
 import styles from "./index.module.css";
 import ResearchGraphic from "./ResearchGraphic";
+import VideoCamUrl from "@site/static/img/video-cam.png";
 
 function HomepageHeader() {
   const { siteConfig } = useDocusaurusContext();
@@ -301,7 +302,7 @@ function MonthlyReviewsSection() {
             <div className={styles.reviewMeetingContaner}>
               <div className={styles.backgroundGrid} />
               <div className={styles.cameraImageContainer}>
-                <img src={"/img/video-cam.png"} />
+                <img src={VideoCamUrl} />
               </div>
               <div className={styles.countdownContainer}>
                 <Link
