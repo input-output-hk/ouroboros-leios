@@ -8,7 +8,7 @@ create temporary table block_times (
 , slot_no    word63type                  not null
 );
 
-\copy block_times from 'block_times.tsv' csv header delimiter E'\t'
+\copy block_times from 'block-times.tsv' csv header delimiter E'\t'
 
 
 drop table if exists tx_times;
@@ -19,7 +19,7 @@ create temporary table tx_times (
 , tx_hash8 char(8)                   not null
 );
 
-\copy tx_times from 'tx_times.tsv' csv header delimiter E'\t'
+\copy tx_times from 'tx-times.tsv' csv header delimiter E'\t'
 
 
 drop table if exists mempool_vs_blocks;
@@ -56,7 +56,7 @@ select
 order by 1, 2, 7
 ;
 
-\copy mempool_vs_blocks to 'mempool_vs_blocks.tsv' csv header delimiter E'\t'
+\copy mempool_vs_blocks to 'mempool-vs-blocks.tsv' csv header delimiter E'\t'
 
 
 drop table if exists mempool_history;
@@ -72,7 +72,7 @@ select
 order by 1, 2, 3
 ;
 
-\copy mempool_history to 'mempool_history.tsv' csv header delimiter E'\t'
+\copy mempool_history to 'mempool-history.tsv' csv header delimiter E'\t'
 
 
 drop table if exists mempool_hourly;
@@ -105,7 +105,7 @@ select
 order by 1, 2, 3
 ;
 
-\copy mempool_hourly to 'mempool_hourly.tsv' csv header delimiter E'\t'
+\copy mempool_hourly to 'mempool-hourly.tsv' csv header delimiter E'\t'
 
 
 select
