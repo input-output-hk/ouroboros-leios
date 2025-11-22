@@ -34,3 +34,17 @@ The `linleios` program executes the Markov model for EB production in Linear L
 The figure below shows example results for the probability distribution of the number of EBs generated per 100 RBs. This directly relates to Leios efficiency.
 
 ![Example results](../analysis/markov/example-results.png)
+
+## Analysis of UTxO set size and UTxO lifetime
+
+[Analysis of Cardano mainnet](../post-cip/tx-lifetime/tx-lifetime.ipynb) indicates that the number of active UTxOs has leveled off at approximately 11 million unspent transaction outputs. The data likely is not sufficient to build a statistical model to forecast the size of the UTxO set as a function of demand: a more speculative model would be needed.
+
+![Size of mainnet UTxO set as a function of slot number](../post-cip/tx-lifetime/utxo-set.png)
+In terms of lifetime, UTxOs have a trimodal distribution:
+- About 3% of UTxOs are spent in the same block that they are created.
+- About 65% of the UTxOs are active less than one day.
+- The remainder are active for multiple days, sometimes for months or years.
+
+|                                                                                                                 |                                                                                                                  |
+| --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| ![Distribution of UTxO lifetime on mainnet (square-root scale)](../post-cip/tx-lifetime/utxo-lifetime-sqrt.svg) | ![Distribution of UTxO lifetime on mainnet (logarithmic scale)](../post-cip/tx-lifetime/utxo-lifetime-log10.svg) |
