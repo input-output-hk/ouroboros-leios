@@ -293,18 +293,19 @@ The cost to the victim is merely the work to acquire the closures and to check t
 In particular, at most one of the EBs in the burst could extend the tip of a victim node's current selection, and so that's the only EB the victim would attempt to fully parse and validate.
 
 Even without honest nodes needing to validate the vast majority of the burst, the sheer amount of concentrated bandwidth utilization can be problematic.
-Suppose the adversary controls 1/3rd stake but they're issuing nominal RBs.
-In this scenario, the CIP requires that the honest nodes attempt to acquire any EB that was promptly announced within the last 12 hours.
-The conservative assumption is that the honest node might later need to switch to a fork that requires having this EB, and that switch ideally wouldn't be delayed by waiting on that EB's arrival.
+Suppose the adversary controls 1/3rd stake and they're issuing nominal RBs.
+Recall that CIP-164 requires each honest node to attempt to acquire any EB that was promptly announced within the last 12 hours.
+Even if it's too late for the honest node itself to vote on a tardy EB, the lack of global objective information implies the node must not assume the EB cannot be certified by other node's in the network.
+Thus, the honest node might later need to switch to a fork that requires having this EB, and that switch ideally wouldn't be delayed by waiting on that EB's arrival; the node should still acquire the EB as soon as it can.
 
-For this attack, the adversary would announce each EB promptly, but withhold the messages that actually initiate the diffusion of substantial Leios traffic throughout the honest network.
+For this attack, the adversary would announce each EB promptly (by diffusing the corresponding RB headers on-time), but withhold the mini protocol messages that actually initiate the diffusion of substantial Leios traffic throughout the honest network.
 Only after withholding every EB's diffusion for 12 hours, would they suddenly release them.
 In this scenario---which is not the worst-case---the average would be 2160 * (1/3) = 720 EBs, but there could be hundreds more just due to luck and multi-leader slots.
 There could be thousands if the adversary is also grinding, for example, or had closer to 50% stake, etc.
 If each of the attacker's EBs has the maximum size of 500 kilobytes of tx references and 12.5 megabytes of actual txs---which don't even need to be valid---then that's an average of 720 * (12.5 + 0.5 megabytes) = 9.36 gigabytes the honest nodes will be eagerly diffusing throughout the network.
 
 For however long it takes for the network to (carefully) diffuse 10 gigabytes, honest traffic might diffuse more poorly.
-The CIP-1634 requires that Praos traffic will be preferred over Leios traffic, and that fresher Leios traffic will be preferred over stale Leios traffic.
+CIP-164 requires that Praos traffic will be preferred over Leios traffic, and that fresher Leios traffic will be preferred over stale Leios traffic.
 And doing so would prevent the burst from degrading contemporary honest traffic.
 However, there are some infrastructural resources that cannot be prioritized perfectly nor instantly redistributed, including: CPU, memory, disk, disk bandwidth, and buffer utilization on the nodes themselves but also along the Internet routers carrying packets between Cardano peers.
 One non-obvious concern is that cloud providers often throttle users exhibiting large bursts of bandwidth, so a node might perform fine outside of a protocol burst but struggle disproportionately during one.
@@ -320,7 +321,7 @@ That is, how to prevent this kind of protocol burst from increasing the latency 
 
 The adversary is only able to issue EBs at an average rate in proportion to their resources (stake and grinding).
 There will be some variance, but in general they can do smaller bursts more often or larger bursts less often.
-However, the Praos security argument's parameters represent the worst-case, so the largest burst fundamentally challenges the current Praos security argument even if it can only happen rarely to whatever extent the CIP-1634 prioritization schemes are imperfectly implemented.
+However, the Praos security argument's parameters represent the worst-case, so the largest burst fundamentally challenges the current Praos security argument even if it can only happen rarely to whatever extent the prioritization schemes of CIP-164 are imperfectly implemented.
 
 ### Data withholding
 
