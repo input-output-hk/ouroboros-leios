@@ -299,15 +299,15 @@ Even if it's too late for the honest node itself to vote on a tardy EB, the lack
 Thus, the honest node might later need to switch to a fork that requires having this EB, and that switch ideally wouldn't be delayed by waiting on that EB's arrival; the node should still acquire the EB as soon as it can.
 
 For this attack, the adversary would announce each EB promptly (by diffusing the corresponding RB headers on-time), but withhold the mini protocol messages that actually initiate the diffusion of substantial Leios traffic throughout the honest network.
-Only after withholding every EB's diffusion for 12 hours, would they suddenly release them.
-In this scenario---which is not the worst-case---the average would be 2160 * (1/3) = 720 EBs, but there could be hundreds more just due to luck and multi-leader slots.
-There could be thousands if the adversary is also grinding, for example, or had closer to 50% stake, etc.
+Only after withholding every EB's diffusion for 12 hours would they suddenly release them.
+In this scenario---which is not the worst-case---the average would be approximately 2160 * (1/3) = 720 EBs, but there could be hundreds more merely due to luck and multi-leader slots.
+There could be several thousand if the adversary is also grinding, for example, and/or had closer to 50% stake, etc.
 If each of the attacker's EBs has the maximum size of 500 kilobytes of tx references and 12.5 megabytes of actual txs---which don't even need to be valid---then that's an average of 720 * (12.5 + 0.5 megabytes) = 9.36 gigabytes the honest nodes will be eagerly diffusing throughout the network.
 
 For however long it takes for the network to (carefully) diffuse 10 gigabytes, honest traffic might diffuse more poorly.
-CIP-164 requires that Praos traffic will be preferred over Leios traffic, and that fresher Leios traffic will be preferred over stale Leios traffic.
-And doing so would prevent the burst from degrading contemporary honest traffic.
-However, there are some infrastructural resources that cannot be prioritized perfectly nor instantly redistributed, including: CPU, memory, disk, disk bandwidth, and buffer utilization on the nodes themselves but also along the Internet routers carrying packets between Cardano peers.
+CIP-164 requires that Praos traffic will be preferred over Leios traffic and that fresher Leios traffic will be preferred over stale Leios traffic.
+That would prevent the burst from degrading contemporary honest traffic if the prioritization could be perfect.
+However, there are some infrastructural resources that cannot be prioritized perfectly nor instantly reapportioned, including: CPU, memory, disk, disk bandwidth, and buffer utilization on the nodes themselves but also along the Internet routers carrying packets between Cardano peers.
 One non-obvious concern is that cloud providers often throttle users exhibiting large bursts of bandwidth, so a node might perform fine outside of a protocol burst but struggle disproportionately during one.
 (A node in a data center might not struggle at all to diffuse the 10 gigabytes over the course of each 12 hours but be very slow to diffuse it in a single burst that arrives every 12 hours.)
 
@@ -317,7 +317,7 @@ The identifying hashes of those txs alone is more than 230 megabytes.
 To maximize the bookkeeping overhead, for example, the adversary might choose to diffuse all of the EB bodies before diffusing any of their closures.
 
 It remains an engineering challenge to achieve as much prioritization as possible, especially during a protocol burst, without unnecessarily delaying the diffusion of any EB.
-That is, how to prevent this kind of protocol burst from increasing the latency of contemporary Praos and Leios traffic among honest nodes.
+That is, determining how to prevent this kind of protocol burst from increasing the latency of contemporary Praos and Leios traffic among honest nodes.
 
 The adversary is only able to issue EBs at an average rate in proportion to their resources (stake and grinding).
 There will be some variance, but in general they can do smaller bursts more often or larger bursts less often.
