@@ -25,10 +25,6 @@ const FeatureList: FeatureItem[] = [
         confirmed with minimal delays for a seamless user experience.
       </>
     ),
-    button: {
-      text: "Link to Documentation",
-      url: "/docs/development/overview",
-    },
   },
   {
     title: "Secure",
@@ -39,19 +35,11 @@ const FeatureList: FeatureItem[] = [
         against attacks while ensuring fair participation.
       </>
     ),
-    button: {
-      text: "Link to Documentation",
-      url: "/docs/development/overview",
-    },
   },
   {
     title: "Flexible",
     Svg: FlexibleSvg,
     description: <>Ouroboros Leios supports diverse applications.</>,
-    button: {
-      text: "Link to Documentation",
-      url: "/docs/development/overview",
-    },
   },
 ];
 
@@ -65,7 +53,7 @@ function Feature({ Svg, title, description, button }: FeatureItem) {
           <p>{description}</p>
         </div>
       </div>
-      <LinkButton text={button.text} url={button.url} />
+      {button ? <LinkButton text={button.text} url={button.url} /> : null}
     </div>
   );
 }
