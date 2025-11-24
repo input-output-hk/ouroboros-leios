@@ -3,7 +3,7 @@ import type { SVGProps } from "react";
 import { forwardRef, memo, Ref } from "react";
 const ArrowRightIcon = (
   props: SVGProps<SVGSVGElement>,
-  ref: Ref<SVGSVGElement>
+  ref: Ref<SVGSVGElement>,
 ) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -17,9 +17,9 @@ const ArrowRightIcon = (
     <path
       d="M0.75 6.75H12.75M12.75 6.75L6.75 12.75M12.75 6.75L6.75 0.75"
       stroke="currentColor"
-      stroke-width="1.5"
-      stroke-linecap="round"
-      stroke-linejoin="round"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
     />
   </svg>
 );
