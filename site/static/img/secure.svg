@@ -1,8 +1,5 @@
 <svg width="326" height="320" viewBox="0 0 326 320" fill="none" xmlns="http://www.w3.org/2000/svg">
-<mask id="mask0_6568_1083" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="326" height="320">
-<rect width="326" height="320" fill="#D9D9D9"/>
-</mask>
-<g mask="url(#mask0_6568_1083)">
+<g>
 <path d="M118.095 5.14058L1.51074 4.99683" stroke="#EECCFB" stroke-width="1.77" stroke-miterlimit="10"/>
 <path d="M126.654 27.5664L1.49316 27.4047" stroke="#EBC1FB" stroke-width="1.84" stroke-miterlimit="10"/>
 <path d="M135.194 49.9922L1.45703 49.8304" stroke="#E9B7FB" stroke-width="1.91" stroke-miterlimit="10"/>

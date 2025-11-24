@@ -1,8 +1,5 @@
 <svg width="328" height="326" viewBox="0 0 328 326" fill="none" xmlns="http://www.w3.org/2000/svg">
-<mask id="mask0_6568_2014" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="-139" y="172" width="728" height="610">
-<ellipse cx="224.651" cy="476.704" rx="389.494" ry="270.137" transform="rotate(-29.9536 224.651 476.704)" fill="#D9D9D9"/>
-</mask>
-<g mask="url(#mask0_6568_2014)">
+<g>
 <path d="M0.509766 269.544V325.571" stroke="#F8F6FA" stroke-width="1.02" stroke-miterlimit="10"/>
 <path d="M15.7686 263.694V325.571" stroke="#F5EBFA" stroke-width="1.07" stroke-miterlimit="10"/>
 <path d="M31.0449 257.862V325.57" stroke="#F3E1FA" stroke-width="1.12" stroke-miterlimit="10"/>
