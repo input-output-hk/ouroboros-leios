@@ -2,6 +2,12 @@
 
 This document catalogs Leios-related findings and artifacts that were created subsequent to the [Leios CIP](https://github.com/cardano-foundation/CIPs/pull/1078).
 
+1. [Markovian model of Linear Leios](#markovian-model-of-linear-leios)
+2. [Analysis of UTxO set size and UTxO lifetime](#analysis-of-utxo-set-size-and-utxo-lifetime)
+3. [CPU cost of `Apply`, `Reapply`, and Plutus ledger operations](#cpu-cost-of--apply---reapply---and-plutus-ledger-operations)
+
+---
+
 ## Markovian model of Linear Leios
 
 [Markovian simulation of Linear Leios](../analysis/markov/) computes the probability of EB certifications as RBs are produced.
@@ -35,6 +41,8 @@ The figure below shows example results for the probability distribution of the n
 
 ![Example results](../analysis/markov/example-results.png)
 
+---
+
 ## Analysis of UTxO set size and UTxO lifetime
 
 [Analysis of Cardano mainnet](../post-cip/tx-lifetime/tx-lifetime.ipynb) indicates that the number of active UTxOs has leveled off at approximately 11 million unspent transaction outputs. The data likely is not sufficient to build a statistical model to forecast the size of the UTxO set as a function of demand: a more speculative model would be needed.
@@ -48,3 +56,23 @@ In terms of lifetime, UTxOs have a trimodal distribution:
 |                                                                                                                 |                                                                                                                  |
 | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | ![Distribution of UTxO lifetime on mainnet (square-root scale)](../post-cip/tx-lifetime/utxo-lifetime-sqrt.svg) | ![Distribution of UTxO lifetime on mainnet (logarithmic scale)](../post-cip/tx-lifetime/utxo-lifetime-log10.svg) |
+
+---
+
+## CPU cost of `Apply`, `Reapply`, and Plutus ledger operations
+
+As previously discussed, the `db-analyser` is very noisy and hard to fit. Nevertheless, here are the best fits obtained using linear models and the quantile regression. Note that the quantile regression was based on a random subset of the data because it is not computationally feasible to perform quantile regression on such a large dataset in a reasonable amount of time.
+
+| Regression      | Dependent variable |   Block size | Number of transactions | Number of transaction inputs | Number of Plutus steps |
+| --------------- | ------------------ | -----------: | ---------------------: | ---------------------------: | ---------------------: |
+| Simple ratio    | `Apply - Reapply`  |              |                        |                              |        `1.5e0 ps/step` |
+| Linear model    | `Apply - Reapply`  | `4.7e4 ps/B` |          `2.3e8 ps/tx` |              `8.0e3 ps/txin` |       `6.1e-1 ps/step` |
+|                 | `Reapply`          | `2.8e3 ps/B` |          `3.5e7 ps/tx` |              `5.2e6 ps/txin` |                        |
+|                 | `Apply`            | `4.8e4 ps/B` |          `1.6e8 ps/tx` |              `1.3e7 ps/txin` |       `6.3e-1 ps/step` |
+| 75th percentile | `Apply - Reapply`  | `1.6e4 ps/B` |          `1.7e8 ps/tx` |              `1.8e7 ps/txin` |       `9.6e-1 ps/step` |
+|                 | `Reapply`          | `1.7e3 ps/B` |          `4.2e7 ps/tx` |              `5.7e6 ps/txin` |                        |
+|                 | `Apply`            | `1.6e4 ps/B` |          `2.2e8 ps/tx` |              `2.3e7 ps/txin` |       `9.7e-1 ps/step` |
+
+Coarsely, the "one picosecond per Plutus step" is a reasonable estimate for Plutus costs; we did not assess whether "eight bytes per Plutus memory unit" was also reasonable.
+
+---
