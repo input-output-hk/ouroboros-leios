@@ -4,7 +4,7 @@ This document catalogs Leios-related findings and artifacts that were created su
 
 1. [Markovian model of Linear Leios](#markovian-model-of-linear-leios)
 2. [Analysis of UTxO set size and UTxO lifetime](#analysis-of-utxo-set-size-and-utxo-lifetime)
-3. [CPU cost of `Apply`, `Reapply`, and Plutus ledger operations](#cpu-cost-of--apply---reapply---and-plutus-ledger-operations)
+3. [CPU cost of `Apply`, `Reapply`, and Plutus ledger operations](#analysis-of-utxo-set-size-and-utxo-lifetime)
 
 ---
 
@@ -61,7 +61,15 @@ In terms of lifetime, UTxOs have a trimodal distribution:
 
 ## CPU cost of `Apply`, `Reapply`, and Plutus ledger operations
 
-As previously discussed, the `db-analyser` is very noisy and hard to fit. Nevertheless, here are the best fits obtained using linear models and the quantile regression. Note that the quantile regression was based on a random subset of the data because it is not computationally feasible to perform quantile regression on such a large dataset in a reasonable amount of time.
+The Jupyter notebook [post-cip/apply-reapply/analysis.ipynb](../post-cip/apply-reapply/analysis.ipynb) analyzes `db-analyser` measurements for Cardano `mainnet`. Linear models and quantile regressions were applied to the dataset in order to estimate how CPU resources scale with block size, transaction count, number of transaction inputs, and number of Plutus steps. These results can be used for reasoning about feasible values of Leios protocol parameters.
+
+Regarding Plutus, nominally, one step unit corresponds to one picosecond on the benchmark machine and one memory unit corresponds to eight bytes allocated on that machine. The following plots show the relationship between execution steps and CPU on the machine where the `db-analyser` experiment was conducted.
+
+| Plutus steps vs CPU usage                                                                 | CPU usage per Plutus step                                                               |
+| ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| ![CPU usage vs Plutus steps](../post-cip/apply-reapply/steps-picoseconds-scatterplot.png) | ![CPU usage per Plutus step](../post-cip/apply-reapply/steps-picoseconds-histogram.png) |
+
+The db-analyser is very noisy and hard to fit. Nevertheless, here are the best fits obtained using linear models and the quantile regression. Note that the quantile regression was based on a random subset of the data because it is not computationally feasible to perform quantile regression on such a large dataset in a reasonable amount of time.
 
 | Regression      | Dependent variable |   Block size | Number of transactions | Number of transaction inputs | Number of Plutus steps |
 | --------------- | ------------------ | -----------: | ---------------------: | ---------------------------: | ---------------------: |
