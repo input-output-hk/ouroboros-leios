@@ -45,6 +45,8 @@ In terms of lifetime, UTxOs have a trimodal distribution:
 - About 65% of the UTxOs are active less than one day.
 - The remainder are active for multiple days, sometimes for months or years.
 
+The left plot is on a square-root scale horizontally, so one can see how big the dynamic range of lifetimes is; it also includes the 3.0% of txs that are spent in the same block that they are created. The right plot is the same data on a logarithmic scale (omitting zero lifetime), so that one can see the multimodal structure above and below the one-day lifetime.
+
 |                                                                                                                 |                                                                                                                  |
 | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | ![Distribution of UTxO lifetime on mainnet (square-root scale)](../post-cip/tx-lifetime/utxo-lifetime-sqrt.svg) | ![Distribution of UTxO lifetime on mainnet (logarithmic scale)](../post-cip/tx-lifetime/utxo-lifetime-log10.svg) |
