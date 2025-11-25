@@ -154,9 +154,9 @@ A particularly interesting case involves BLS key compromise for voting. When a B
 
 **Mitigation**: The Leios protocol specification includes explicit equivocation detection mechanisms that identify misbehaving nodes and equivocation proofs are forwarded through the network. For BLS key compromise, key rotation procedures enable recovery while defensive equivocation provides interim protection. Double voting has limited safety impact since multiple certificates can exist but only RB inclusion determines chain progression.
 
-| # | Method             | Effect                                | Resources                               | Mitigation                               |
+| # | Method             | Effect                                | Resources                                  | Mitigation                               |
 |---|--------------------|---------------------------------------|--------------------------------------------|------------------------------------------|
-| 5 | EB equivocation    | Lower throughput, resource waste    | Stake for block production                 | Equivocation detection per Leios design  |
+| 5 | EB equivocation    | Lower throughput, resource waste      | Stake for block production                 | Equivocation detection per Leios design  |
 | 6 | Vote equivocation  | Interferes with certificate creation  | Stake for voting eligibility               | Equivocation detection per Leios design  |
 | 7 | Double voting      | Multiple certificates, resource waste | Stake for voting eligibility               | Chain selection prioritizes RB inclusion |
 | 8 | BLS key compromise | Unauthorized vote creation            | Cryptographic attack or social engineering | Key rotation + defensive equivocation    |
@@ -207,6 +207,22 @@ SPOs concerned about front-running competition may choose to bypass the EB mecha
 | 17 | Reorder transactions in EB                  | MEV, market manipulation                    | Stake for block production | Limited detection capability                                 |
 | 18 | Insert or replace transactions in EB        | MEV, market manipulation                    | Stake for block production | Limited detection capability                                 |
 | 19 | Ignore certificates, include txs in RB only | Reduces EB throughput, avoids front-running | Stake for block production | Reduced rewards, Self-limiting when load exceeds RB capacity |
+
+### Protocol Bursts
+
+Adversaries can withhold large numbers of EBs and their transaction closures over extended periods, then release them simultaneously to create concentrated bursts of network traffic. This attack exploits Leios' requirement that nodes must attempt to acquire any EB correctly announced even if it arrives too late for the node to vote on it, since the EB might still be certified by other nodes and required for future chain selection.
+
+The attack magnitude depends on the adversary's stake proportion and EB size parameters, reaching hundreds of megabytes or even gigabytes of data to be fetched. An adversary controlling 1/3 stake could accumulate approximately 720 EBs over 12 hours, potentially totaling over 9 gigabytes if each EB contains maximum-sized transaction sets. When released simultaneously, this creates sustained bandwidth pressure that can degrade network performance even for nodes that validate only a small subset of the burst.
+
+**Impact**: Protocol bursts target network resources and can escalate from operational issues to safety threats if traffic prioritization is insufficient. While the protocol requires Praos traffic to be prioritized over Leios traffic, imperfect prioritization during large bursts can delay Praos block diffusion beyond the critical timing parameter Δ, potentially compromising blockchain safety. The sheer bandwidth utilization is problematic even when honest nodes validate only a fraction of the burst data. Infrastructure limitations like cloud provider throttling, router buffer saturation, and asymmetric CPU/memory costs amplify the impact and make perfect prioritization challenging.
+
+**Assets Affected**: Operational Sustainability, High Throughput, Blockchain Safety (if prioritization fails)
+
+**Mitigation**: The primary defense is traffic prioritization implementing freshest-first delivery semantics - Praos traffic must be preferred over Leios traffic, and fresh Leios traffic over stale traffic. However, some infrastructural resources cannot be prioritized perfectly, including CPU, memory, disk bandwidth, and network router buffers. The attack's magnitude is bounded by the adversary's stake proportion, but ultimately requires engineering solutions for effective prioritization during burst conditions.
+
+| #  | Method                                    | Effect                                                                     | Resources                         | Mitigation                                     |
+|----|-------------------------------------------|----------------------------------------------------------------------------|-----------------------------------|------------------------------------------------|
+| 20 | Withhold then release large number of EBs | Bandwidth saturation, processing delays, potential Praos timing disruption | Proportional to adversarial stake | Freshest-first delivery, Traffic prioriziation |
 
 ### Legacy threats
 
