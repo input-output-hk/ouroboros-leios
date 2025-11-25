@@ -135,12 +135,12 @@ In Leios, successful grinding would allow attackers to increase their probabilit
   - Amplify costs of VRF grinding Ouroboros Phalanx ([CIP-0161](https://github.com/nhenin/CIPs/tree/CIP-Ouroboros-Phalanx/CIP-0161)), which introduces computational cost amplification to make grinding attacks economically infeasible by increasing grinding costs by approximately 10^10 while maintaining lightweight computation for honest participants.
   - Standard key management practices protect against VRF key compromise.
 
-| # | Method                             | Effect                                    | Resources                        | Mitigation            | Status               |
-|---|------------------------------------|-------------------------------------------|----------------------------------|-----------------------|----------------------|
-| 1 | Any threat to Praos                | Leios is only as secure as Praos          | -                                | -                     | Dependency           |
-| 2 | VRF grinding on EB eligibility     | Increased probability of EB creation      | CPU & stake (>20%)               | Ouroboros Phalanx R&D | Ongoing              |
-| 3 | VRF grinding on voting eligibility | Increased probability of voting selection | CPU & stake (>20%)               | Ouroboros Phalanx R&D | Ongoing              |
-| 4 | VRF key compromise                 | Unfair advantage in eligibility           | Very high - cryptographic attack | Strong key management | Established practice |
+| # | Method                             | Effect                                    | Resources                     | Mitigation            |
+|---|------------------------------------|-------------------------------------------|----------------------------------|-----------------------|
+| 1 | Any threat to Praos                | Leios is only as secure as Praos          | -                                | Dependency on Praos   |
+| 2 | VRF grinding on EB eligibility     | Increased probability of EB creation      | CPU & stake (>20%)               | Ouroboros Phalanx R&D |
+| 3 | VRF grinding on voting eligibility | Increased probability of voting selection | CPU & stake (>20%)               | Ouroboros Phalanx R&D |
+| 4 | VRF key compromise                 | Unfair advantage in eligibility           | Very high - cryptographic attack | Strong key management |
 
 ### Equivocation
 
@@ -154,13 +154,38 @@ A particularly interesting case involves BLS key compromise for voting. When a B
 
 **Mitigation**: The Leios protocol specification includes explicit equivocation detection mechanisms that identify misbehaving nodes and equivocation proofs are forwarded through the network. For BLS key compromise, key rotation procedures enable recovery while defensive equivocation provides interim protection. Double voting has limited safety impact since multiple certificates can exist but only RB inclusion determines chain progression.
 
-| # | Method             | Effect                                      | Resources                        | Mitigation                               | Status                |
-|---|--------------------|---------------------------------------------|----------------------------------|------------------------------------------|-----------------------|
-| 5 | EB equivocation    | Resource burden on nodes, wasted validation | Stake for block production       | Equivocation detection per Leios spec    | Protocol design       |
-| 6 | Vote equivocation  | Interferes with certificate creation        | Stake for voting eligibility     | Equivocation detection per Leios spec    | Protocol design       |
-| 7 | Double voting      | Multiple certificates, resource waste       | Stake for voting eligibility     | Chain selection prioritizes RB inclusion | Protocol design       |
-| 8 | BLS key compromise | Unauthorized vote creation                  | Very high - cryptographic attack | Key rotation + defensive equivocation    | Operational procedure |
+| # | Method             | Effect                                | Resources                               | Mitigation                               |
+|---|--------------------|---------------------------------------|--------------------------------------------|------------------------------------------|
+| 5 | EB equivocation    | Lower throughput, resource waste    | Stake for block production                 | Equivocation detection per Leios design  |
+| 6 | Vote equivocation  | Interferes with certificate creation  | Stake for voting eligibility               | Equivocation detection per Leios design  |
+| 7 | Double voting      | Multiple certificates, resource waste | Stake for voting eligibility               | Chain selection prioritizes RB inclusion |
+| 8 | BLS key compromise | Unauthorized vote creation            | Cryptographic attack or social engineering | Key rotation + defensive equivocation    |
 
+### Inaction and Nuisance
+
+Producer nodes might attempt to disrupt the protocol by failing to play their assigned role or by creating invalid information. This includes declining to create EBs when entitled, declining to vote when eligible, or creating invalid EBs or votes. More serious variants involve certificate manipulation - including invalid certificates in RBs or attempting to cryptographically forge certificates without sufficient votes. The latter represents a fundamental attack on the protocol's cryptographic foundations and would indicate a severe compromise of the BLS signature scheme used for vote aggregation.
+
+The incentive structure of Leios is designed such that most inaction attacks are self-defeating - nodes that decline to participate receive fewer rewards albeit very indirectly. Creating invalid blocks or votes wastes the attacker's own eligibility while create a minor annoyance to their first downstream nodes by burdening them with useless verification work, but the cryptographic aspects of Leios quickly catch and discard invalid submissions.
+
+**Impact**: These attacks primarily reduce protocol throughput rather than compromising safety. Invalid submissions create computational overhead for validation but are quickly detected and discarded. The economic incentives generally discourage such behavior since attackers forfeit their own rewards while providing minimal disruption to the network.
+
+**Assets Affected**: High Throughput, Operational Sustainability
+
+**Mitigation**: The protocol's incentive structure provides the primary defense - participants who don't fulfill their roles receive proportionally reduced rewards. Cryptographic validation quickly identifies and discards invalid submissions to avoid assymetric resource attacks. The voting committee mechanism in Leios provides additional resilience by requiring multiple participants for EB certification, so individual node inaction has limited impact.
+
+> [!WARNING]
+>
+> TODO: Move certificate forging somewhere else as it is quite different?
+
+| #  | Method                               | Effect                           | Resources                    | Mitigation                                  |
+|----|--------------------------------------|----------------------------------|------------------------------|---------------------------------------------|
+| 9  | Decline to create EB                 | Lower throughput                 | Stake for block production   | Reduced rewards                             |
+| 10 | Decline to vote                      | Lower throughput                 | Stake for voting eligibility | Reduced rewards                             |
+| 11 | Create invalid EB                    | Lower throughput, resource waste | Stake for block production   | Reduced rewards and validate before forward |
+| 12 | Create invalid vote                  | Lower throughput, resource waste | Stake for voting eligibility | Reduced rewards and validate before forward |
+| 13 | Reference invalid transactions in EB | Lower throughput, resource waste | Stake for block production   | Reduced rewards and validate before forward |
+| 14 | Include invalid certificate in RB    | Lower throughput, resource waste | Stake for block production   | Certificate verification                    |
+| 15 | Forge certificate without quorum     | Manipulate transaction inclusion | Cryptographic attack         | Strong BLS cryptography                     |
 
 ### Legacy threats
 
