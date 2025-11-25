@@ -208,6 +208,32 @@ SPOs concerned about front-running competition may choose to bypass the EB mecha
 | 18 | Insert or replace transactions in EB        | MEV, market manipulation                    | Stake for block production | Limited detection capability                                 |
 | 19 | Ignore certificates, include txs in RB only | Reduces EB throughput, avoids front-running | Stake for block production | Reduced rewards, Self-limiting when load exceeds RB capacity |
 
+### Data Withholding
+
+Adversaries deliberately prevent or delay the diffusion of EB transaction data to disrupt the certification process and degrade network throughput. This attack targets the fundamental dependency between transaction availability and EB certification, exploiting the gap between optimistic and worst-case diffusion scenarios that forms the basis of Leios' security argument. Unlike protocol bursts that overwhelm with volume, data withholding attacks manipulate timing and availability of critical data.
+
+The attack operates by controlling when and to whom transaction data becomes available. When an EB is announced via an RB header, voting committee members must acquire and validate the complete transaction closure before casting votes. Adversaries can refuse to serve EB bodies, selectively withhold individual transactions, or strategically time data release to exceed voting deadlines. More sophisticated variants involve network-level manipulation to prevent data from reaching specific voting committee members within the required timeframe.
+
+Advanced network-based variants can target high-stake voting nodes through eclipse attacks, where adversaries control the network connections of specific nodes to manipulate their information flow. Since voting committee membership involves some degree of public information, persistent voting members with significant stake could potentially be identified and targeted. However, eclipsing distinct nodes across a distributed network is non-trivial due to high network connectivity degrees and existing eclipse protection mechanisms.
+
+A particularly dangerous and sophisticated variant targets blockchain safety itself by allowing EBs to achieve certification while preventing timely availability to all honest nodes. The adversary releases data to just enough voting committee members to achieve certification, but not to all network participants. This can create scenarios where certified EBs cannot be processed by honest nodes within the L_diff parameter, potentially violating Praos timing assumptions.
+
+**Impact**: Data withholding primarily reduces throughput when EBs fail certification due to unavailable data, forcing wasted voting resources and delayed transaction processing. Thereotically, there is a high impact variant that can compromise blockchain safety by creating timing violations in Praos diffusion. By reducing the number of honest nodes that receive EB data in time for certification, adversaries also impair subsequent diffusion, making peer-to-peer propagation slower and less reliable. While occasional timing misses are normal in Ouroboros, persistent violations can lead to longer forks and degraded chain quality.
+
+**Assets Affected**: High Throughput (primary), Blockchain Safety (sophisticated)
+
+**Mitigation**: The L_diff parameter is designed to bound the gap between optimistic and worst-case diffusion even under adversarial conditions. The certification mechanism provides defense against stake-based withholding by requiring broad consensus before including EBs in the ledger. Network-level attacks require sophisticated countermeasures including redundant peer connections, timeouts for non-responsive nodes, and strategic committee selection. Eclipse protection mechanisms like "ledger peers", high network connectivity degrees, and connection diversity provide significant defense against targeted node isolation. Empirical validation of real-world network conditions against timing assumptions is essential.
+
+> [!WARNING]
+>
+> TODO: Should this be also about network delays?
+
+| #  | Method                                          | Effect                                              | Resources                               | Mitigation                                               |
+|----|-------------------------------------------------|-----------------------------------------------------|-----------------------------------------|----------------------------------------------------------|
+| 20 | Withhold announced EB or endorsed transactions  | Reduces throughput                                  | Stake for block production              | Connection timeouts, peer pruning                        |
+| 21 | Selectively withhold data from voting committee | Prevent honest EB certification, reduces throughput | Network position control                | Redundant peer connections, diffusion monitoring         |
+| 22 | Selectively withhold data from honest nodes     | Allow certification, but delay block propagation    | Network position control + modest stake | L_diff parameter sizing, worst-case diffusion validation |
+
 ### Protocol Bursts
 
 Adversaries can withhold large numbers of EBs and their transaction closures over extended periods, then release them simultaneously to create concentrated bursts of network traffic. This attack exploits Leios' requirement that nodes must attempt to acquire any EB correctly announced even if it arrives too late for the node to vote on it, since the EB might still be certified by other nodes and required for future chain selection.
@@ -222,7 +248,7 @@ The attack magnitude depends on the adversary's stake proportion and EB size par
 
 | #  | Method                                    | Effect                                                                     | Resources                         | Mitigation                                     |
 |----|-------------------------------------------|----------------------------------------------------------------------------|-----------------------------------|------------------------------------------------|
-| 20 | Withhold then release large number of EBs | Bandwidth saturation, processing delays, potential Praos timing disruption | Proportional to adversarial stake | Freshest-first delivery, Traffic prioriziation |
+| 23 | Withhold then release large number of EBs | Bandwidth saturation, processing delays, potential Praos timing disruption | Proportional to adversarial stake | Freshest-first delivery, Traffic prioritization |
 
 ### Legacy threats
 
