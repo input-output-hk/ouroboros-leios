@@ -1,9 +1,9 @@
 ---
 Authors: Sebastian Nagel
 Status: Draft
-Version: 0.2
-Last Updated: 2025-08-05
-Next Review: 2025-10-05
+Version: 0.3
+Last Updated: 2025-11-25
+Next Review: 2026-01-30
 ---
 
 # Leios Consensus Upgrade - Threat Model
@@ -114,7 +114,37 @@ For each asset we define what could be impacted in respect to its Confidentialit
 
 ## Threats
 
-Notable threats to the system that could impact assets.
+The Leios protocol may be vulnerable to the following categories of threats. Each category represents fundamental attack surfaces that stem from the protocol's design and operation.
+
+### Praos dependency and VRF-based eligibility
+
+Leios builds upon Ouroboros Praos and inherits both its security properties and potential vulnerabilities.
+The VRF (Verifiable Random Function) mechanism that determines block production eligibility in Praos also governs EB creation and voting committee selection in Leios.
+The fundamental threat is that adversaries can manipulate the randomness generation process to gain unfair advantages in leader election, potentially concentrating block production and voting power.
+
+VRF grinding attacks involve adversaries using computational resources to try multiple VRF evaluations and selectively revealing only favorable outcomes.
+As described in [CPS-0021](https://github.com/nhenin/CIPs/tree/CIP-Ouroboros-Phalanx/CPS-0021), this manipulation becomes more viable with >20% total stake and can enable various attacks including private forking, selfish mining, and censorship.
+In Leios, successful grinding would allow attackers to increase their probability of EB creation opportunities and voting committee selection beyond their proportional stake.
+
+**Impact**: VRF manipulation can concentrate EB production and voting power, undermining the decentralization that Leios depends on for security. This amplification effect is particularly dangerous because Leios relies on diverse participation for both block production and voting-based certification. Successful grinding attacks enable secondary attacks like private forking, where adversaries can build longer chains in secret, and selective censorship through concentrated block production control. A compromise of VRF keys has a similar effect of giving the attacker more block production opportunities than they would normally have.
+
+**Assets Affected**: Blockchain Safety, Decentralization
+
+**Mitigation**:
+  - Leios security is fundamentally tied to Praos security.
+  - Amplify costs of VRF grinding Ouroboros Phalanx ([CIP-0161](https://github.com/nhenin/CIPs/tree/CIP-Ouroboros-Phalanx/CIP-0161)), which introduces computational cost amplification to make grinding attacks economically infeasible by increasing grinding costs by approximately 10^10 while maintaining lightweight computation for honest participants.
+  - Standard key management practices protect against VRF key compromise.
+
+| # | Method                             | Effect                                    | Resources                        | Mitigation            | Status               |
+|---|------------------------------------|-------------------------------------------|----------------------------------|-----------------------|----------------------|
+| 1 | Any threat to Praos                | Leios is only as secure as Praos          | -                                | -                     | Dependency           |
+| 2 | VRF grinding on EB eligibility     | Increased probability of EB creation      | CPU & stake (>20%)               | Ouroboros Phalanx R&D | Ongoing              |
+| 3 | VRF grinding on voting eligibility | Increased probability of voting selection | CPU & stake (>20%)               | Ouroboros Phalanx R&D | Ongoing              |
+| 4 | VRF key compromise                 | Unfair advantage in eligibility           | Very high - cryptographic attack | Strong key management | Established practice |
+
+> [!CAUTION]
+>
+> FIXME: Replace individual (example) threats with threat categories to be more exhaustive.
 
 #### T1: Mempool Partitioning
 **Description**: Attacker deliberately partitions the mempools of block producing nodes by submitting conflicting transactions (spending the same inputs) to different network segments, creating inconsistent views of valid transactions across the network.
@@ -401,7 +431,7 @@ Notable threats to the system that could impact assets.
     a. If attacker is successful, only transaction fees were spent and `amount` can go back into the honey pot.
 4. Continue until funds run out.
 
-**Cost**: HIGH - Enough ADA to appeal many concurrent users and keep the attack going. 
+**Cost**: HIGH - Enough ADA to appeal many concurrent users and keep the attack going.
 
 **Impact**:
 - **Resource Waste**: Network processes all conflicting transactions trying to spend the honey pot output, but only one pays fees at a time. Highest costs are from perpetual storage when conflicting transactions are submitted concurrently.
