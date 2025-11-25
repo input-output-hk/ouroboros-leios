@@ -280,25 +280,25 @@ This will lead to a sustained maximal load on the honest network for a smaller b
 The potential magnitude of that burst will depend on various factors, including at least the adversary's portion of stake, but the worst-case is more than a gigabyte of download.
 The cost to the victim is merely the work to acquire the closures and to check the hashes of the received EB bodies and transaction bodies.
 In particular, at most one of the EBs in the burst could extend the tip of a victim node's current selection, and so that's the only EB the victim would attempt to fully parse and validate.
-
 Even without honest nodes needing to validate the vast majority of the burst, the sheer amount of concentrated bandwidth utilization can be problematic.
-Suppose the adversary controls 1/3rd stake and they're issuing nominal RBs.
+
+**Attack magnitude.** Suppose the adversary controls 1/3rd stake and they're issuing nominal RBs.
 Recall that CIP-164 requires each honest node to attempt to acquire any EB that was promptly announced within the last 12 hours.
 Even if it's too late for the honest node itself to vote on a tardy EB, the lack of global objective information implies the node must not assume the EB cannot be certified by other node's in the network.
 Thus, the honest node might later need to switch to a fork that requires having this EB, and that switch ideally wouldn't be delayed by waiting on that EB's arrival; the node should still acquire the EB as soon as it can.
-
 For this attack, the adversary would announce each EB promptly (by diffusing the corresponding RB headers on-time), but withhold the mini protocol messages that actually initiate the diffusion of substantial Leios traffic throughout the honest network.
 Only after withholding every EB's diffusion for 12 hours would they suddenly release them.
-In this scenario---which is not the worst-case---the average would be approximately 2160 * (1/3) = 720 EBs, but there could be hundreds more merely due to luck and multi-leader slots.
+In this scenario, which is not the worst-case, the average would be approximately 2160 * (1/3) = 720 EBs, but there could be hundreds more merely due to luck and multi-leader slots.
 There could be several thousand if the adversary is also grinding, for example, and/or had closer to 50% stake, etc.
-If each of the attacker's EBs has the maximum size of 500 kilobytes of tx references and 12.5 megabytes of actual txs---which don't even need to be valid---then that's an average of 720 * (12.5 + 0.5 megabytes) = 9.36 gigabytes the honest nodes will be eagerly diffusing throughout the network.
+If each of the attacker's EBs has the maximum size of 500 kilobytes of tx references and 12.5 megabytes of actual txs, which don't even need to be valid, then that's an average of 720 * (12.5 + 0.5 megabytes) = 9.36 gigabytes the honest nodes will be eagerly diffusing throughout the network.
 
-For however long it takes for the network to (carefully) diffuse 10 gigabytes, honest traffic might diffuse more poorly.
+**Resource contention.** For however long it takes for the network to (carefully) diffuse 10 gigabytes, honest traffic might diffuse more poorly.
 CIP-164 requires that Praos traffic will be preferred over Leios traffic and that fresher Leios traffic will be preferred over stale Leios traffic.
 That would prevent the burst from degrading contemporary honest traffic if the prioritization could be perfect.
+
 However, there are some infrastructural resources that cannot be prioritized perfectly nor instantly reapportioned, including: CPU, memory, disk, disk bandwidth, and buffer utilization on the nodes themselves but also along the Internet routers carrying packets between Cardano peers.
 One non-obvious concern is that cloud providers often throttle users exhibiting large bursts of bandwidth, so a node might perform fine outside of a protocol burst but struggle disproportionately during one.
-(A node in a data center might not struggle at all to diffuse the 10 gigabytes over the course of each 12 hours but be very slow to diffuse it in a single burst that arrives every 12 hours.)
+A node in a data center might not struggle at all to diffuse the 10 gigabytes over the course of each 12 hours but be very slow to diffuse it in a single burst that arrives every 12 hours.
 
 Some of CPU and memory costs will scale in the number of txs rather than the number of EBs, which can be a ratio of more than 10,000 to 1.
 If none of the 720 EBs overlap, then there would be more than 7,200,000 unique txs on average that the honest nodes need to keep track of during this burst.
@@ -314,55 +314,38 @@ However, the Praos security argument's parameters represent the worst-case, so t
 
 ### Data withholding
 
-In a data withholding attack (**ATK-LeiosDataWithholding**), the adversary deliberately prevents the diffusion of endorser block transaction closures to disrupt the certification process and degrade network throughput.
-This attack targets the fundamental dependency between transaction availability and EB certification, exploiting the gap between optimistic and worst-case diffusion scenarios that forms the basis of Leios' [security argument](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#protocol-security).
+In a data withholding attack (**ATK-LeiosDataWithholding**), the adversary deliberately prevents the diffusion of endorser block transaction closures to disrupt certification and degrade network throughput.
+This attack exploits the fundamental dependency between transaction availability and EB certification, targeting the gap between optimistic and worst-case diffusion scenarios that underlies Leios' [security argument](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#protocol-security).
 
-The attack operates by manipulating the timing and availability of transaction data required for EB validation.
-When an EB is announced via an RB header, voting committee members must acquire and validate the complete transaction closure before they can cast their votes.
-The adversary can exploit this requirement in several ways: withholding the EB body itself, selectively withholding individual transactions referenced by the EB, or strategically timing the release of data to exceed the voting period deadline.
+The attack operates by manipulating timing and availability of transaction data required for EB validation.
+When an EB is announced via an RB header, voting committee members must acquire and validate the complete transaction closure before casting votes.
+The adversary can exploit this in several ways: withholding the EB body itself, selectively withholding individual transactions, or strategically timing data release to exceed the $L_\text{vote}$ deadline.
 
-The most direct form involves an adversarial block producer creating valid EBs but refusing to serve the transaction closures when requested by voting nodes.
+**Direct threshold impact.** The most direct form involves an adversarial block producer creating valid EBs but refusing to serve transaction closures when requested by voting nodes.
 Since committee members cannot validate unavailable transactions, they cannot vote for certification, effectively nullifying the EB's throughput contribution.
-This attack requires no additional stake beyond block production eligibility and can be executed by any malicious SPO.
+More sophisticated variants involve network-level manipulation where the adversary controls network relays to selectively prevent transaction propagation to specific voting committee members.
 
-A more sophisticated variant involves network-level manipulation where the adversary controls routing infrastructure or operates multiple nodes to selectively prevent transaction propagation to specific voting committee members.
-By ensuring that a sufficient fraction of voting stake cannot access the required transaction data within the $L_\text{vote}$ period, the adversary can prevent EBs from achieving the certification threshold even when the transactions are technically available elsewhere in the network.
+Consider an adversary controlling 15% of stake attempting to prevent honest EBs from achieving the 75% certification threshold.
+The adversary must withhold transaction data from enough voting committee members to reduce available honest stake below 75%.
+Since the adversary controls 15% stake directly, they need to prevent an additional 10% of honest stake from voting.
+This demonstrates how modest adversarial stake combined with strategic network positioning could significantly impact honest EB certification.
 
-The quantitative impact depends on the adversary's capabilities and the network's diffusion characteristics.
-In the simplest case where a single adversarial block producer withholds their own EB data, the throughput loss is limited to that producer's contribution—approximately their proportional stake multiplied by the EB capacity.
-However, when combined with network partitioning techniques, the attack can affect honest EBs by preventing their certification.
+**Attack on safety.** While throughput degradation represents the obvious impact, the most dangerous variant targets blockchain safety itself.
+The adversary can strategically delay transaction data release to create scenarios where EBs achieve certification but cannot be processed by honest nodes within the required timeframe.
+Just before the voting deadline, they release data to a subset of voting committee members—enough to achieve certification, but not to all network participants.
+The resulting certificate gets included in a subsequent RB, but honest block producers cannot acquire the certified EB's transaction closure within $L_\text{diff}$.
 
-Consider an adversary controlling 20% of stake and strategically targeting EBs from honest producers by selectively withholding transaction data to 30% of the voting committee.
-If the certification threshold is set at 67%, and the remaining 70% of voters represent 47% stake on average (due to the random committee selection), many honest EBs would fail certification.
-This could reduce effective throughput by 50% or more, far exceeding the adversary's direct stake proportion.
+By reducing the number of honest nodes that received the EB data in time for certification, the adversary also impairs subsequent diffusion.
+With fewer nodes initially possessing the complete transaction closure, propagation becomes slower and less reliable, potentially extending diffusion times beyond protocol anticipation.
+This would represent a violation of Praos' timing assumptions.
+While missing the $\Delta$ deadline occasionally does not break safety, short forks are normal in Ouroboros, persistent violations can lead to longer forks and degraded chain quality.
+In summary, the attack fundamentally challenges the security argument's assumption that the difference between optimistic and worst-case diffusion remains bounded by $L_\text{diff}$.
 
-While throughput degradation represents the obvious impact, the most dangerous variant of data withholding targets blockchain safety itself.
-The attack exploits the timing relationship between EB certification and the Praos diffusion deadline $\Delta$.
-An adversary can strategically delay transaction data release to create a scenario where EBs achieve certification but cannot be processed by honest nodes within the required timeframe.
+Mitigation relies primarily on the protocol design ensuring that diffusion timing remains bounded even under adversarial conditions.
+The certification mechanism provides defense against stake-based withholding by requiring broad consensus before including EBs in the ledger.
+Network-level attacks require sophisticated countermeasures including redundant peer connections, timeouts that punish non-responsive nodes, and strategic committee selection considering network topology.
 
-Consider this attack sequence: The adversary allows an EB to be announced and initially withholds transaction data to prevent early voting.
-Just before the voting deadline, they release the data to a subset of voting committee members—enough to achieve certification, but not to all network participants.
-The resulting certificate gets included in a subsequent RB, but honest block producers who need to build upon this RB cannot acquire the certified EB's transaction closure within $L_\text{diff}$.
-
-By reducing the number of honest nodes that received the EB data in time for certification, the adversary also impairs the subsequent diffusion process itself.
-With fewer nodes initially possessing the complete transaction closure, the peer-to-peer propagation becomes slower and less reliable, potentially extending diffusion times beyond what the protocol's timing parameters anticipate.
-
-This creates a violation of Praos' timing assumptions.
-While missing the $\Delta$ deadline occasionally does not break safety—short forks are normal in Ouroboros and handled by the fork choice rule—persistent violations can lead to longer forks than the protocol is designed to handle.
-If honest nodes regularly cannot construct the ledger state required to validate and build upon ranking blocks within reasonable time bounds, it degrades the chain quality and increases the risk of deeper reorganizations.
-Some honest nodes may consistently lag behind in processing certified EBs, creating a persistent split in the network's view of the valid chain tip.
-
-The attack fundamentally challenges the security argument's assumption that the difference between optimistic and worst-case diffusion remains bounded by $L_\text{diff}$.
-When data withholding prevents unanimous certification of honest EBs, it merely reduces throughput.
-But when it allows partial certification followed by delayed availability, it can compromise the blockchain safety property that underpins Cardano's value proposition.
-
-Mitigation relies primarily on the protocol's design ensuring that the difference between optimistic and worst-case diffusion remains bounded by $L_\text{diff}$ even under adversarial conditions.
-The certification mechanism itself provides defense against stake-based withholding by requiring broad consensus before including EBs in the ledger.
-Network-level attacks require more sophisticated countermeasures including redundant peer connections, timeouts that punish non-responsive nodes, and strategic committee selection that considers network topology.
-
-The implementation must validate empirically that real-world network conditions support the timing assumptions underlying the security argument.
-Prototyping efforts should specifically test diffusion performance under adversarial scenarios where motivated attackers attempt to maximize the gap between optimistic and worst-case EB availability.
-Only through such validation can we ensure that the $L_\text{diff}$ parameter provides adequate protection against data withholding attacks while maintaining the throughput benefits that justify Leios' complexity.
+The implementation must validate empirically that real-world network conditions support the timing assumptions underlying the security argument through adversarial diffusion testing.
 
 ## Assumptions to validate early
 
