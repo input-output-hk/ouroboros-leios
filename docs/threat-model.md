@@ -142,6 +142,33 @@ In Leios, successful grinding would allow attackers to increase their probabilit
 | 3 | VRF grinding on voting eligibility | Increased probability of voting selection | CPU & stake (>20%)               | Ouroboros Phalanx R&D | Ongoing              |
 | 4 | VRF key compromise                 | Unfair advantage in eligibility           | Very high - cryptographic attack | Strong key management | Established practice |
 
+### Equivocation
+
+In Leios, block producers and voters are only allowed one production per VRF lottery win for EBs and votes respectively. Equivocation occurs when malicious actors create multiple conflicting EBs or votes and diffuse them to different network segments, attempting to disrupt the protocol or gain unfair advantages. Equivocation detection mechanisms were already considered in the original Leios paper and are part of the protocol specification.
+
+A particularly interesting case involves BLS key compromise for voting. When a BLS private key used for voting is compromised, legitimate key holders can intentionally equivocate (create conflicting votes) as a defensive measure until key rotation takes effect. This "defensive equivocation" invalidates both honest and adversarial votes signed by the compromised key, preventing the attacker from using the key maliciously while minimizing protocol disruption.
+
+**Impact**: EB equivocation wastes network resources as nodes must process multiple conflicting blocks, only one of which can be valid. Vote equivocation can interfere with certificate creation and force nodes to choose between conflicting certificates. However, the protocol's design limits the impact through equivocation detection such that a slight waste of network resources and the chance of EB non-inclusion are the worst-case impacts.
+
+**Assets Affected**: Operational Sustainability, High Throughput
+
+**Mitigation**: The Leios protocol specification includes explicit equivocation detection mechanisms that identify misbehaving nodes and equivocation proofs are forwarded through the network. For BLS key compromise, key rotation procedures enable recovery while defensive equivocation provides interim protection.
+
+> [!WARNING]
+>
+> TODO: What exactly is the mitigation for vote equivocation? For EBs it is clear by the 3*L_hdr waiting period, but for votes it is less clear.
+>
+> TODO: double voting as part of this category?
+
+| # | Method             | Effect                                      | Resources                        | Mitigation                            | Status                |
+|---|--------------------|---------------------------------------------|----------------------------------|---------------------------------------|-----------------------|
+| 5 | EB equivocation    | Resource burden on nodes, wasted validation | Stake for block production       | Equivocation detection per Leios spec | Protocol design       |
+| 6 | Vote equivocation  | Interferes with certificate creation        | Stake for voting eligibility     | Equivocation detection per Leios spec | Protocol design       |
+| 7 | BLS key compromise | Unauthorized vote creation                  | Very high - cryptographic attack | Key rotation + defensive equivocation | Operational procedure |
+
+
+### Legacy threats
+
 > [!CAUTION]
 >
 > FIXME: Replace individual (example) threats with threat categories to be more exhaustive.
