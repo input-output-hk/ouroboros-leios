@@ -349,14 +349,15 @@ The implementation must validate empirically that real-world network conditions 
 
 ## Assumptions to validate early
 
-> [!WARNING]
->
-> TODO: Which assumptions in the CIP / on the protocol security need to be validated as early as possible?
->
-> - Worst case diffusion of EBs given certain honest stake (certifying the EB) is realistic
-> - The cardano network stack can realize freshest first delivery (sufficiently well)
-> - A real ledger can (re-)process orders of magnitude higher loads as expected
-> - ...?
+Following the principle of early validation outlined in the [implementation plan](#approach), several critical assumptions underlying Leios' security argument must be validated before we can commit to full scale implementation and deployment. These assumptions represent potential failure points where theoretical models may not match real-world performance.
+
+- **Worst case diffusion of EBs given certain honest stake is realistic.** The security argument assumes that even under adversarial conditions, EBs can be diffused to honest nodes within bounded timeframes. This assumption must be validated under various network topologies and attack scenarios to ensure the $L_\text{diff}$ parameter provides adequate protection.
+
+- **The Cardano network stack can realize freshest-first delivery sufficiently well.** Prioritizing Praos, over recent Leios , over stale Leios traffic is essential for mitigating protocol burst attacks. Real-world validation must demonstrate that the network layer can maintain this prioritization under load without significantly impacting Praos traffic.
+
+- **A real ledger can process orders of magnitude higher transaction loads as expected.** Leios assumes that nodes can validate and apply large transaction sets within tight timing constraints. This requires empirical validation of transaction validation throughput, especially when combined with disk-based ledger storage and concurrent processing demands.
+
+The [prototyping and adversarial testing](#prototyping-and-adversarial-testing) phase of the implementation plan is specifically designed to validate these assumptions through controlled experiments. Only with such validation we can confidently design and implement the components that realize a Leiso consensus.
 
 # Technical design
 
