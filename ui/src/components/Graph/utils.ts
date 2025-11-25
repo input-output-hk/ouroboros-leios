@@ -13,7 +13,7 @@ export const getOffsetCoordinates = (
   topography: ITransformedNodeMap,
   width: number,
   height: number,
-  scale: number
+  scale: number,
 ) => {
   let offsetX = 0,
     offsetY = 0;
@@ -56,8 +56,8 @@ export const isClickOnNode = (
   threshold: number = 10,
   offsetX: number,
   offsetY: number,
-  scale: number
-): { node: string | undefined, clicked: boolean } => {
+  scale: number,
+): { node: string | undefined; clicked: boolean } => {
   let node: string | undefined;
   let clicked = false;
 

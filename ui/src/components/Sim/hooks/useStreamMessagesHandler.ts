@@ -1,36 +1,39 @@
 import { useSimContext } from "@/contexts/SimContext/context";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TWorkerResponse } from "./worker";
-import StreamWorker from './worker?worker';
+import StreamWorker from "./worker?worker";
 
 export const useStreamMessagesHandler = () => {
   const {
-    state: {
-      tracePath,
-      aggregated,
-      batchSize,
-      speedMultiplier,
-    },
-    dispatch
+    state: { tracePath },
+    dispatch,
   } = useSimContext();
   const [streaming, setStreaming] = useState(false);
+  const hasAutoStartedPlayback = useRef(false);
 
   const worker = useMemo(() => {
     return new StreamWorker();
   }, []);
 
-  const startStream = useCallback(() => {
-    worker.postMessage({
-      type: "START",
-      tracePath,
-      aggregated,
-      batchSize,
-      speedMultiplier,
-    });
-    setStreaming(true);
-  }, [worker, tracePath, aggregated, batchSize, speedMultiplier]);
+  const startStream = useCallback(
+    async (includeTransactions = false) => {
+      // Reset timeline when starting new stream
+      dispatch({ type: "RESET_TIMELINE" });
+      setStreaming(true);
+      hasAutoStartedPlayback.current = false;
+
+      // Use worker
+      worker.postMessage({
+        type: "START",
+        tracePath,
+        includeTransactions,
+      });
+    },
+    [worker, tracePath, dispatch],
+  );
 
   const stopStream = useCallback(() => {
+    // Stop worker
     worker.postMessage({ type: "STOP" });
     setStreaming(false);
   }, [worker]);
@@ -41,11 +44,18 @@ export const useStreamMessagesHandler = () => {
       if (message.tracePath !== tracePath) {
         return;
       }
-      if (message.type === "EVENT") {
+      if (message.type === "TIMELINE_EVENTS") {
+        // Process batch of events in single dispatch
         dispatch({
-          type: "SET_AGGREGATED_DATA",
-          payload: message.aggregatedData,
+          type: "ADD_TIMELINE_EVENT_BATCH",
+          payload: message.events,
         });
+        
+        // Auto-start playback on first batch of events
+        if (!hasAutoStartedPlayback.current) {
+          hasAutoStartedPlayback.current = true;
+          dispatch({ type: "SET_TIMELINE_PLAYING", payload: true });
+        }
       }
       if (message.type === "DONE") {
         setStreaming(false);
@@ -64,4 +74,4 @@ export const useStreamMessagesHandler = () => {
     }),
     [startStream, stopStream, streaming],
   );
-}
+};

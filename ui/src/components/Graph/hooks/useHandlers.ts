@@ -1,12 +1,13 @@
-import {
-  useSimContext
-} from "@/contexts/SimContext/context";
+import { useSimContext } from "@/contexts/SimContext/context";
+import { EMessageType } from "@/contexts/SimContext/types";
+import { ELinkColor, EMessageColor, ENodeColor } from "@/utils/colors";
 import { useCallback } from "react";
 
 export const useHandlers = () => {
   const {
     state: {
       aggregatedData,
+      currentTime,
       graph: {
         canvasOffsetX,
         canvasOffsetY,
@@ -18,6 +19,8 @@ export const useHandlers = () => {
       topography,
     },
   } = useSimContext();
+
+  const ACTIVITY_TIMEOUT = 1.0; // seconds after which node color resets
 
   const drawTopography = useCallback(() => {
     const canvas = canvasRef.current;
@@ -51,10 +54,10 @@ export const useHandlers = () => {
       context.beginPath();
       context.moveTo(nodeStart.fx, nodeStart.fy);
       context.lineTo(nodeEnd.fx, nodeEnd.fy);
-      context.strokeStyle = "#ddd";
+      context.strokeStyle = ELinkColor.LINK_DEFAULT;
 
       if (link.source === currentNode || link.target === currentNode) {
-        context.strokeStyle = "black";
+        context.strokeStyle = ELinkColor.LINK_SELECTED;
       }
 
       context.lineWidth = Math.min((0.2 / canvasScale) * 6, 0.2);
@@ -82,17 +85,75 @@ export const useHandlers = () => {
       }
 
       if (currentNode === node.id.toString()) {
-        context.fillStyle = "blue";
-      } else if (!node.data.stake) {
-        context.fillStyle = "gray"
+        context.fillStyle = ENodeColor.SELECTED;
+      } else {
+        // Color based on last activity
+        const nodeStats = aggregatedData.nodes.get(node.id.toString());
+        const lastActivity = nodeStats?.lastActivity;
+
+        // Check if activity is recent (within timeout)
+        const activityIsRecent =
+          lastActivity && currentTime - lastActivity.time <= ACTIVITY_TIMEOUT;
+
+        if (activityIsRecent) {
+          if (lastActivity.type === EMessageType.EB) {
+            context.fillStyle = EMessageColor.EB;
+          } else if (lastActivity.type === EMessageType.RB) {
+            context.fillStyle = EMessageColor.RB;
+          } else {
+            context.fillStyle = node.data.stake
+              ? ENodeColor.STAKE_NODE
+              : ENodeColor.SELECTED;
+          }
+        } else if (!node.data.stake) {
+          context.fillStyle = ENodeColor.INACTIVE;
+        } else {
+          context.fillStyle = ENodeColor.STAKE_NODE;
+        }
       }
 
       context.fill();
     });
 
+    // Draw message animations
+    aggregatedData.messages.forEach((message) => {
+      const senderNode = topography.nodes.get(message.sender);
+      const recipientNode = topography.nodes.get(message.recipient);
+
+      if (!senderNode || !recipientNode) {
+        return;
+      }
+
+      // Calculate position along the edge based on progress (0-1)
+      const x =
+        senderNode.fx + (recipientNode.fx - senderNode.fx) * message.progress;
+      const y =
+        senderNode.fy + (recipientNode.fy - senderNode.fy) * message.progress;
+
+      // Draw colored rectangle based on message type (consistent with pie chart colors)
+      const rectSize = Math.min((0.8 / canvasScale) * 6, 0.8);
+
+      switch (message.type) {
+        case EMessageType.TX:
+          context.fillStyle = EMessageColor.TX;
+          break;
+        case EMessageType.EB:
+          context.fillStyle = EMessageColor.EB;
+          break;
+        case EMessageType.Votes:
+          context.fillStyle = EMessageColor.VOTES;
+          break;
+        case EMessageType.RB:
+          context.fillStyle = EMessageColor.RB;
+          break;
+      }
+      context.fillRect(x - rectSize / 2, y - rectSize / 2, rectSize, rectSize);
+    });
+
     context.restore();
   }, [
     aggregatedData,
+    currentTime,
     maxTime,
     topography.nodes,
     topography.links,

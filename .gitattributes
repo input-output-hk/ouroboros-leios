@@ -1,3 +1,6 @@
 ui/public/traces/1xsummary.jsonl.gz filter=lfs diff=lfs merge=lfs -text
 ui/public/traces/100xsummary.jsonl.gz filter=lfs diff=lfs merge=lfs -text
 ui/public/traces/10xsummary.jsonl.gz filter=lfs diff=lfs merge=lfs -text
+ui/public/traces/example.jsonl.gz filter=lfs diff=lfs merge=lfs -text
+ui/public/traces/small-1txkbs-nocpu.jsonl.gz filter=lfs diff=lfs merge=lfs -text
+ui/public/traces/small-200txkbs-nocpu.jsonl.gz filter=lfs diff=lfs merge=lfs -text

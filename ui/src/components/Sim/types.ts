@@ -15,18 +15,18 @@ export interface IServerNodeMap {
 
 export enum EServerType {
   NODE = "node",
-  LINK = "link"
+  LINK = "link",
 }
 
 export type TServerNode = {
   type: EServerType.NODE;
   data: INode;
-}
+};
 
 export type TServerLink = {
-  type: EServerType.LINK,
+  type: EServerType.LINK;
   data: ILink;
-}
+};
 
 export type TServerNodeMap = TServerNode | TServerLink;
 
@@ -38,91 +38,54 @@ export interface ITransformedNode {
     location: number[];
     stake?: number;
   };
-};
+}
 
 /** source|target */
 export type TLinkMapId = string;
 
 export interface ITransformedNodeMap {
   nodes: Map<string, ITransformedNode>;
-  links: Map<string, { source: string; target: string }>;
+  links: Map<string, { source: string; target: string; latencyMs?: number }>;
 }
 
-export enum EMessageType {
+export enum EServerMessageType {
   TransactionGenerated = "TXGenerated",
   TransactionReceived = "TXReceived",
   TransactionSent = "TXSent",
-  IBGenerated = "IBGenerated",
-  IBReceived = "IBReceived",
-  IBSent = "IBSent",
-  RBGenerated = "RBGenerated",
-  RBReceived = "RBReceived",
-  RBSent = "RBSent",
   EBGenerated = "EBGenerated",
   EBReceived = "EBReceived",
   EBSent = "EBSent",
   VTBundleGenerated = "VTBundleGenerated",
   VTBundleReceived = "VTBundleReceived",
   VTBundleSent = "VTBundleSent",
+  RBGenerated = "RBGenerated",
+  RBReceived = "RBReceived",
+  RBSent = "RBSent",
 }
 
 export interface ITransactionGenerated {
-  type: EMessageType.TransactionGenerated;
+  type: EServerMessageType.TransactionGenerated;
   id: string;
   publisher: string;
   size_bytes: number;
 }
 
 export interface ITransactionReceived {
-  type: EMessageType.TransactionReceived;
+  type: EServerMessageType.TransactionReceived;
   id: string;
   sender: string;
   recipient: string;
 }
 
 export interface ITransactionSent {
-  type: EMessageType.TransactionSent;
+  type: EServerMessageType.TransactionSent;
   id: string;
   sender: string;
   recipient: string;
 }
 
-export interface IInputBlockGenerated {
-  type: EMessageType.IBGenerated;
-  id: string;
-  slot: number;
-  pipeline: number;
-  producer: string;
-  index: number;
-  vrf: number;
-  timestamp: number;
-  header_bytes: number;
-  size_bytes: number;
-  transactions: number[];
-}
-
-export interface IInputBlockReceived {
-  type: EMessageType.IBReceived;
-  id: string;
-  slot: number;
-  producer: string;
-  index: number;
-  sender: string;
-  recipient: string;
-}
-
-export interface IInputBlockSent {
-  type: EMessageType.IBSent;
-  id: string;
-  slot: number;
-  producer: string;
-  index: number;
-  sender: string;
-  recipient: string;
-}
-
-export interface IPraosBlockGenerated {
-  type: EMessageType.RBGenerated;
+export interface IRankingBlockGenerated {
+  type: EServerMessageType.RBGenerated;
   id: string;
   slot: number;
   producer: string;
@@ -135,19 +98,19 @@ export interface IPraosBlockGenerated {
 export interface IEndorsement {
   eb: { id: string };
   size_bytes: number;
-  votes: {}
+  votes: {};
 }
 
-export interface IPraosBlockReceived {
-  type: EMessageType.RBReceived;
+export interface IRankingBlockReceived {
+  type: EServerMessageType.RBReceived;
   id: string;
   slot: number;
   sender: string;
   recipient: string;
 }
 
-export interface IPraosBlockSent {
-  type: EMessageType.RBSent;
+export interface IRankingBlockSent {
+  type: EServerMessageType.RBSent;
   slot: number;
   id: string;
   sender: string;
@@ -155,22 +118,17 @@ export interface IPraosBlockSent {
 }
 
 export interface IEndorserBlockGenerated {
-  type: EMessageType.EBGenerated;
+  type: EServerMessageType.EBGenerated;
   id: string;
   slot: number;
   pipeline: number;
   producer: string;
   size_bytes: number;
   transactions: ITransaction[];
-  input_blocks: IInputBlock[];
   endorser_blocks: IEndorserBlock[];
 }
 
 export interface ITransaction {
-  id: string;
-}
-
-export interface IInputBlock {
   id: string;
 }
 
@@ -179,7 +137,7 @@ export interface IEndorserBlock {
 }
 
 export interface IEndorserBlockReceived {
-  type: EMessageType.EBReceived;
+  type: EServerMessageType.EBReceived;
   id: string;
   slot: number;
   sender: string;
@@ -187,7 +145,7 @@ export interface IEndorserBlockReceived {
 }
 
 export interface IEndorserBlockSent {
-  type: EMessageType.EBSent;
+  type: EServerMessageType.EBSent;
   slot: number;
   id: string;
   sender: string;
@@ -195,16 +153,16 @@ export interface IEndorserBlockSent {
 }
 
 export interface IVotesGenerated {
-  type: EMessageType.VTBundleGenerated;
+  type: EServerMessageType.VTBundleGenerated;
   id: string;
   slot: number;
   producer: string;
   size_bytes: number;
-  votes: any[] // @todo
+  votes: any[]; // @todo
 }
 
 export interface IVotesReceived {
-  type: EMessageType.VTBundleReceived;
+  type: EServerMessageType.VTBundleReceived;
   id: string;
   slot: number;
   sender: string;
@@ -212,7 +170,7 @@ export interface IVotesReceived {
 }
 
 export interface IVotesSent {
-  type: EMessageType.VTBundleSent;
+  type: EServerMessageType.VTBundleSent;
   slot: number;
   id: string;
   sender: string;
@@ -220,16 +178,13 @@ export interface IVotesSent {
 }
 
 export interface IUnknown {
-  type: '__unknown';
+  type: "__unknown";
 }
 
-export type TMessageType =
-  | IInputBlockGenerated
-  | IInputBlockReceived
-  | IInputBlockSent
-  | IPraosBlockGenerated
-  | IPraosBlockReceived
-  | IPraosBlockSent
+export type TServerMessageType =
+  | IRankingBlockGenerated
+  | IRankingBlockReceived
+  | IRankingBlockSent
   | IEndorserBlockGenerated
   | IEndorserBlockReceived
   | IEndorserBlockSent
@@ -241,7 +196,7 @@ export type TMessageType =
   | ITransactionSent
   | IUnknown;
 
-export interface IServerMessage<T = TMessageType> {
+export interface IServerMessage<T = TServerMessageType> {
   time_s: number;
   message: T;
 }
