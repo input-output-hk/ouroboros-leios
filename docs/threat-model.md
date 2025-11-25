@@ -177,15 +177,36 @@ The incentive structure of Leios is designed such that most inaction attacks are
 >
 > TODO: Move certificate forging somewhere else as it is quite different?
 
-| #  | Method                               | Effect                           | Resources                    | Mitigation                                  |
-|----|--------------------------------------|----------------------------------|------------------------------|---------------------------------------------|
-| 9  | Decline to create EB                 | Lower throughput                 | Stake for block production   | Reduced rewards                             |
-| 10 | Decline to vote                      | Lower throughput                 | Stake for voting eligibility | Reduced rewards                             |
-| 11 | Create invalid EB                    | Lower throughput, resource waste | Stake for block production   | Reduced rewards and validate before forward |
-| 12 | Create invalid vote                  | Lower throughput, resource waste | Stake for voting eligibility | Reduced rewards and validate before forward |
-| 13 | Reference invalid transactions in EB | Lower throughput, resource waste | Stake for block production   | Reduced rewards and validate before forward |
-| 14 | Include invalid certificate in RB    | Lower throughput, resource waste | Stake for block production   | Certificate verification                    |
-| 15 | Forge certificate without quorum     | Manipulate transaction inclusion | Cryptographic attack         | Strong BLS cryptography                     |
+| #  | Method                               | Effect                           | Resources                    | Mitigation                               |
+|----|--------------------------------------|----------------------------------|------------------------------|------------------------------------------|
+| 9  | Decline to create EB                 | Lower throughput                 | Stake for block production   | Reduced rewards                          |
+| 10 | Decline to vote                      | Lower throughput                 | Stake for voting eligibility | Reduced rewards                          |
+| 11 | Create invalid EB                    | Lower throughput, resource waste | Stake for block production   | Reduced rewards, Validate before forward |
+| 12 | Create invalid vote                  | Lower throughput, resource waste | Stake for voting eligibility | Reduced rewards, Validate before forward |
+| 13 | Reference invalid transactions in EB | Lower throughput, resource waste | Stake for block production   | Reduced rewards, Validate before forward |
+| 14 | Include invalid certificate in RB    | Lower throughput, resource waste | Stake for block production   | Certificate verification                 |
+| 15 | Forge certificate without quorum     | Manipulate transaction inclusion | Cryptographic attack         | Strong BLS cryptography                  |
+
+### Omission and Manipulation
+
+Block producers have control over which transactions to include in their EBs and can exploit this power for censorship (omission) or value extraction (manipulation). In Linear Leios, the coupled RB/EB production model gives every block producer opportunities to manipulate transaction ordering and selection within the EB they create alongside their RB.
+
+This creates opportunities for front-running, where producers observe profitable transactions in the mempool and either reorder them for advantage or insert their own competing transactions. Censorship attacks involve deliberately omitting specific transactions to prevent their execution, though the mempool design limits effectiveness since omitted transactions will likely appear in subsequent honest blocks.
+
+SPOs concerned about front-running competition may choose to bypass the EB mechanism entirely and include transactions directly in their RBs, avoiding exposure of these tranactions by the endorsement process. This reduces overall network throughput but provides some protection against MEV extraction by other producers. However, this strategy becomes self-limiting when transaction load exceeds Praos-only capacity, forcing delays upon these transactions and risking being front-run themselves.
+
+**Impact**: These attacks primarily affect transaction fairness and market efficiency rather than protocol safety. Transaction reordering has limited impact on Cardano due to the EUTxO ledger design, where transactions either succeed or fail independently based on available UTxOs rather than global state changes. However, front-running and MEV extraction remain significant concerns - block producers can observe profitable transactions and may be able to compete with better prices or insert intermediary transactions - depending on application design. Censorship reduces liveness for targeted transactions but cannot permanently prevent inclusion due to the distributed nature of block production and the memory pool mechanism.
+
+**Assets Affected**: Transaction Validity/Availability/Determinism, Decentralization
+
+**Mitigation**: The primary defense is the memory pool design - omitted transactions remain available for inclusion in subsequent honest blocks, limiting censorship effectiveness. The distributed nature of block production means no single actor can permanently censor transactions. Detection of MEV extraction is challenging since legitimate transaction selection and ordering can appear similar to value extraction. Mitigation options are limited since EB opportunities are coupled to RB opportunities and cannot be parameterized separately.
+
+| #  | Method                                      | Effect                                      | Resources                  | Mitigation                                                   |
+|----|---------------------------------------------|---------------------------------------------|----------------------------|--------------------------------------------------------------|
+| 16 | Omit transactions from EB                   | Reduces throughput, temporary censorship    | Stake for block production | Memory pool persistence                                      |
+| 17 | Reorder transactions in EB                  | MEV, market manipulation                    | Stake for block production | Limited detection capability                                 |
+| 18 | Insert or replace transactions in EB        | MEV, market manipulation                    | Stake for block production | Limited detection capability                                 |
+| 19 | Ignore certificates, include txs in RB only | Reduces EB throughput, avoids front-running | Stake for block production | Reduced rewards, Self-limiting when load exceeds RB capacity |
 
 ### Legacy threats
 
