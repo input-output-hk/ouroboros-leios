@@ -148,23 +148,18 @@ In Leios, block producers and voters are only allowed one production per VRF lot
 
 A particularly interesting case involves BLS key compromise for voting. When a BLS private key used for voting is compromised, legitimate key holders can intentionally equivocate (create conflicting votes) as a defensive measure until key rotation takes effect. This "defensive equivocation" invalidates both honest and adversarial votes signed by the compromised key, preventing the attacker from using the key maliciously while minimizing protocol disruption.
 
-**Impact**: EB equivocation wastes network resources as nodes must process multiple conflicting blocks, only one of which can be valid. Vote equivocation can interfere with certificate creation and force nodes to choose between conflicting certificates. However, the protocol's design limits the impact through equivocation detection such that a slight waste of network resources and the chance of EB non-inclusion are the worst-case impacts.
+**Impact**: EB equivocation wastes network resources as nodes must process multiple conflicting blocks, only one of which can be valid. Vote equivocation can interfere with certificate creation and force nodes to choose between conflicting certificates. Double voting (voting on multiple conflicting EBs for the same voting period) can enable multiple certificates for conflicting transaction sets, wasting bandwidth and processing resources. However, the protocol's design limits the impact through equivocation detection and the principle that only RB inclusion affects chain selection, not certificate existence alone.
 
 **Assets Affected**: Operational Sustainability, High Throughput
 
-**Mitigation**: The Leios protocol specification includes explicit equivocation detection mechanisms that identify misbehaving nodes and equivocation proofs are forwarded through the network. For BLS key compromise, key rotation procedures enable recovery while defensive equivocation provides interim protection.
+**Mitigation**: The Leios protocol specification includes explicit equivocation detection mechanisms that identify misbehaving nodes and equivocation proofs are forwarded through the network. For BLS key compromise, key rotation procedures enable recovery while defensive equivocation provides interim protection. Double voting has limited safety impact since multiple certificates can exist but only RB inclusion determines chain progression.
 
-> [!WARNING]
->
-> TODO: What exactly is the mitigation for vote equivocation? For EBs it is clear by the 3*L_hdr waiting period, but for votes it is less clear.
->
-> TODO: double voting as part of this category?
-
-| # | Method             | Effect                                      | Resources                        | Mitigation                            | Status                |
-|---|--------------------|---------------------------------------------|----------------------------------|---------------------------------------|-----------------------|
-| 5 | EB equivocation    | Resource burden on nodes, wasted validation | Stake for block production       | Equivocation detection per Leios spec | Protocol design       |
-| 6 | Vote equivocation  | Interferes with certificate creation        | Stake for voting eligibility     | Equivocation detection per Leios spec | Protocol design       |
-| 7 | BLS key compromise | Unauthorized vote creation                  | Very high - cryptographic attack | Key rotation + defensive equivocation | Operational procedure |
+| # | Method             | Effect                                      | Resources                        | Mitigation                               | Status                |
+|---|--------------------|---------------------------------------------|----------------------------------|------------------------------------------|-----------------------|
+| 5 | EB equivocation    | Resource burden on nodes, wasted validation | Stake for block production       | Equivocation detection per Leios spec    | Protocol design       |
+| 6 | Vote equivocation  | Interferes with certificate creation        | Stake for voting eligibility     | Equivocation detection per Leios spec    | Protocol design       |
+| 7 | Double voting      | Multiple certificates, resource waste       | Stake for voting eligibility     | Chain selection prioritizes RB inclusion | Protocol design       |
+| 8 | BLS key compromise | Unauthorized vote creation                  | Very high - cryptographic attack | Key rotation + defensive equivocation    | Operational procedure |
 
 
 ### Legacy threats
