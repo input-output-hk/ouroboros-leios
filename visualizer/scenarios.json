@@ -1,25 +1,16 @@
 {
   "scenarios": [
     {
-      "name": "1x",
-      "topology": "topologies/thousand.yaml",
-      "duration": 300,
-      "trace": "traces/1xsummary.jsonl.gz",
-      "aggregated": true
+      "name": "200 TxkB/s",
+      "topology": "topologies/small.yaml",
+      "duration": 120,
+      "trace": "traces/small-200txkbs-nocpu.jsonl.gz"
     },
     {
-      "name": "10x",
-      "topology": "topologies/thousand.yaml",
-      "duration": 300,
-      "trace": "traces/10xsummary.jsonl.gz",
-      "aggregated": true
-    },
-    {
-      "name": "100x",
-      "topology": "topologies/thousand.yaml",
-      "duration": 300,
-      "trace": "traces/100xsummary.jsonl.gz",
-      "aggregated": true
+      "name": "1 TxkB/s",
+      "topology": "topologies/small.yaml",
+      "duration": 120,
+      "trace": "traces/small-1txkbs-nocpu.jsonl.gz"
     }
   ]
 }
