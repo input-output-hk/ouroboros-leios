@@ -264,27 +264,15 @@ In summary, Leios will not require fundamental changes to Mithril's architecture
 
 # Risks and mitigations
 
-> [!WARNING]
->
-> TODO: Introduce chapter as being the bridge between implementation plan and concrete technical design; also, these are only selected aspects that inform the implementation (and not cover principal risks to the protocol or things that are avoided by design)
+This chapter bridges the implementation plan with concrete technical design by examining selected threats that directly inform architectural decisions and validation priorities. The focus is on implementation-specific risks rather than general protocol threats, which are either mitigated by design or othterwise covered in the [threat model](../threat-model.md).
+
+The threats examined here represent scenarios that could compromise the implementation's ability to deliver Leios' promised benefits while maintaining Praos' security guarantees. Each threat analysis motivates specific technical requirements, validation experiments, or design constraints that shape the implementation outlined in subsequent chapters.
 
 ## Key threats
 
-> [!WARNING]
->
-> TODO: Selection of key threats and attacks that further inform the design and/or implementation plan. Incorporate / reference the full [threat model](../threat-model.md)
+The following threats have been selected for detailed analysis based on their potential to inform critical implementation decisions. These represent attack vectors that emerged prominently during research, have significant implications for system performance under adversarial conditions, or require empirical validation through prototyping and testing.
 
 ### Protocol bursts
-
-> [!WARNING]
->
-> TODO: important because
->
-> - was a prominent case in research
-> - acknowledges the wealth of data to be processed
-> - mitigation: freshest-first delivery / prioritization between praos and leios traffic
-> - motivates experiments/features revolving around resource management
-> - reference/include/move related RSK-.. items from impact analysis
 
 In a protocol burst attack (**ATK-LeiosProtocolBurst**) the adversary withholds a large number of EBs and/or their closures over a significant duration and then releases them all at once.
 This will lead to a sustained maximal load on the honest network for a smaller but still significant duration, a.k.a. a burst.
@@ -325,18 +313,8 @@ However, the Praos security argument's parameters represent the worst-case, so t
 
 ### Data withholding
 
-> [!WARNING]
->
-> TODO: important because
->
-> - can be done from stake- and network-based attackers
-> - trivially impacts high-throughput because no certifications happening
-> - however, more advanced, potential avenue to attack blockchain safety (impact praos security argument) when carefully partitioning the network
-> - mitigation: L_diff following the [security argument](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#protocol-security)
-> - motivates validation of optimistic and worst-case diffusion paths
-
 In a data withholding attack (**ATK-LeiosDataWithholding**), the adversary deliberately prevents the diffusion of endorser block transaction closures to disrupt the certification process and degrade network throughput.
-This attack targets the fundamental dependency between transaction availability and EB certification, exploiting the gap between optimistic and worst-case diffusion scenarios that forms the basis of Leios' security argument.
+This attack targets the fundamental dependency between transaction availability and EB certification, exploiting the gap between optimistic and worst-case diffusion scenarios that forms the basis of Leios' [security argument](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#protocol-security).
 
 The attack operates by manipulating the timing and availability of transaction data required for EB validation.
 When an EB is announced via an RB header, voting committee members must acquire and validate the complete transaction closure before they can cast their votes.
