@@ -135,12 +135,12 @@ In Leios, successful grinding would allow attackers to increase their probabilit
   - Amplify costs of VRF grinding Ouroboros Phalanx ([CIP-0161](https://github.com/nhenin/CIPs/tree/CIP-Ouroboros-Phalanx/CIP-0161)), which introduces computational cost amplification to make grinding attacks economically infeasible by increasing grinding costs by approximately 10^10 while maintaining lightweight computation for honest participants.
   - Standard key management practices protect against VRF key compromise.
 
-| # | Method                             | Effect                                    | Resources                     | Mitigation            |
-|---|------------------------------------|-------------------------------------------|----------------------------------|-----------------------|
-| 1 | Any threat to Praos                | Leios is only as secure as Praos          | -                                | Dependency on Praos   |
-| 2 | VRF grinding on EB eligibility     | Increased probability of EB creation      | CPU & stake (>20%)               | Ouroboros Phalanx R&D |
-| 3 | VRF grinding on voting eligibility | Increased probability of voting selection | CPU & stake (>20%)               | Ouroboros Phalanx R&D |
-| 4 | VRF key compromise                 | Unfair advantage in eligibility           | Very high - cryptographic attack | Strong key management |
+| # | Method                             | Effect                                    | Resources                      | Mitigation            |
+|---|------------------------------------|-------------------------------------------|--------------------------------|-----------------------|
+| 1 | Any threat to Praos                | Leios is only as secure as Praos          | -                              | Dependency on Praos   |
+| 2 | VRF grinding on EB eligibility     | Increased probability of EB creation      | CPU, stake (>20%)              | Ouroboros Phalanx R&D |
+| 3 | VRF grinding on voting eligibility | Increased probability of voting selection | CPU, stake (>20%)              | Ouroboros Phalanx R&D |
+| 4 | VRF key compromise                 | Unfair advantage in eligibility           | Very high cryptographic attack | Strong key management |
 
 ### Equivocation
 
@@ -154,12 +154,12 @@ A particularly interesting case involves BLS key compromise for voting. When a B
 
 **Mitigation**: The Leios protocol specification includes explicit equivocation detection mechanisms that identify misbehaving nodes and equivocation proofs are forwarded through the network. For BLS key compromise, key rotation procedures enable recovery while defensive equivocation provides interim protection. Double voting has limited safety impact since multiple certificates can exist but only RB inclusion determines chain progression.
 
-| # | Method             | Effect                                | Resources                                  | Mitigation                               |
-|---|--------------------|---------------------------------------|--------------------------------------------|------------------------------------------|
-| 5 | EB equivocation    | Lower throughput, resource waste      | Stake for block production                 | Equivocation detection per Leios design  |
-| 6 | Vote equivocation  | Interferes with certificate creation  | Stake for voting eligibility               | Equivocation detection per Leios design  |
-| 7 | Double voting      | Multiple certificates, resource waste | Stake for voting eligibility               | Chain selection prioritizes RB inclusion |
-| 8 | BLS key compromise | Unauthorized vote creation            | Cryptographic attack or social engineering | Key rotation + defensive equivocation    |
+| # | Method             | Effect                                | Resources                    | Mitigation                               |
+|---|--------------------|---------------------------------------|------------------------------|------------------------------------------|
+| 5 | EB equivocation    | Lower throughput, resource waste      | Stake for block production   | Equivocation detection per Leios design  |
+| 6 | Vote equivocation  | Interfere with certificate creation   | Stake for voting eligibility | Equivocation detection per Leios design  |
+| 7 | Double voting      | Multiple certificates, resource waste | Stake for voting eligibility | Chain selection prioritizes RB inclusion |
+| 8 | BLS key compromise | Unauthorized vote creation            | Cryptographic attack         | Key rotation, defensive equivocation     |
 
 ### Inaction and Nuisance
 
@@ -177,15 +177,15 @@ The incentive structure of Leios is designed such that most inaction attacks are
 >
 > TODO: Move certificate forging somewhere else as it is quite different?
 
-| #  | Method                               | Effect                           | Resources                    | Mitigation                               |
-|----|--------------------------------------|----------------------------------|------------------------------|------------------------------------------|
+| #  | Method                               | Effect                            | Resources                    | Mitigation                               |
+|----|--------------------------------------|-----------------------------------|------------------------------|------------------------------------------|
 | 9  | Decline to create EB                 | Lower throughput                 | Stake for block production   | Reduced rewards                          |
 | 10 | Decline to vote                      | Lower throughput                 | Stake for voting eligibility | Reduced rewards                          |
-| 11 | Create invalid EB                    | Lower throughput, resource waste | Stake for block production   | Reduced rewards, Validate before forward |
-| 12 | Create invalid vote                  | Lower throughput, resource waste | Stake for voting eligibility | Reduced rewards, Validate before forward |
-| 13 | Reference invalid transactions in EB | Lower throughput, resource waste | Stake for block production   | Reduced rewards, Validate before forward |
+| 11 | Create invalid EB                    | Lower throughput, resource waste | Stake for block production   | Reduced rewards, validate before forward |
+| 12 | Create invalid vote                  | Lower throughput, resource waste | Stake for voting eligibility | Reduced rewards, validate before forward |
+| 13 | Reference invalid transactions in EB | Lower throughput, resource waste | Stake for block production   | Reduced rewards, validate before forward |
 | 14 | Include invalid certificate in RB    | Lower throughput, resource waste | Stake for block production   | Certificate verification                 |
-| 15 | Forge certificate without quorum     | Manipulate transaction inclusion | Cryptographic attack         | Strong BLS cryptography                  |
+| 15 | Forge certificate without quorum     | Manipulate transaction inclusion  | Cryptographic attack         | Strong BLS cryptography                  |
 
 ### Omission and Manipulation
 
@@ -201,12 +201,12 @@ SPOs concerned about front-running competition may choose to bypass the EB mecha
 
 **Mitigation**: The primary defense is the memory pool design - omitted transactions remain available for inclusion in subsequent honest blocks, limiting censorship effectiveness. The distributed nature of block production means no single actor can permanently censor transactions. Detection of MEV extraction is challenging since legitimate transaction selection and ordering can appear similar to value extraction. Mitigation options are limited since EB opportunities are coupled to RB opportunities and cannot be parameterized separately.
 
-| #  | Method                                      | Effect                                      | Resources                  | Mitigation                                                   |
-|----|---------------------------------------------|---------------------------------------------|----------------------------|--------------------------------------------------------------|
-| 16 | Omit transactions from EB                   | Reduces throughput, temporary censorship    | Stake for block production | Memory pool persistence                                      |
-| 17 | Reorder transactions in EB                  | MEV, market manipulation                    | Stake for block production | Limited detection capability                                 |
-| 18 | Insert or replace transactions in EB        | MEV, market manipulation                    | Stake for block production | Limited detection capability                                 |
-| 19 | Ignore certificates, include txs in RB only | Reduces EB throughput, avoids front-running | Stake for block production | Reduced rewards, Self-limiting when load exceeds RB capacity |
+| #  | Method                                      | Effect                                  | Resources                  | Mitigation                                                   |
+|----|---------------------------------------------|-----------------------------------------|----------------------------|--------------------------------------------------------------|
+| 16 | Omit transactions from EB                   | Lower throughput, temporary censorship | Stake for block production | Memory pool persistence                                      |
+| 17 | Reorder transactions in EB                  | MEV, market manipulation                | Stake for block production | Limited detection capability                                 |
+| 18 | Insert or replace transactions in EB        | MEV, market manipulation                | Stake for block production | Limited detection capability                                 |
+| 19 | Ignore certificates, include txs in RB only | Lower throughput, avoid front-running  | Stake for block production | Reduced rewards, self-limiting when load exceeds RB capacity |
 
 ### Data withholding
 
@@ -231,11 +231,11 @@ A particularly dangerous and sophisticated variant targets blockchain safety its
 >
 > TODO: Should this be also about network delays?
 
-| #  | Method                                          | Effect                                              | Resources                               | Mitigation                                               |
-|----|-------------------------------------------------|-----------------------------------------------------|-----------------------------------------|----------------------------------------------------------|
-| 20 | Withhold announced EB or endorsed transactions  | Reduces throughput                                  | Stake for block production              | Connection timeouts, peer pruning                        |
-| 21 | Selectively withhold data from voting committee | Prevent honest EB certification, reduces throughput | Network position control                | Redundant peer connections, diffusion monitoring         |
-| 22 | Selectively withhold data from honest nodes     | Allow certification, but delay block propagation    | Network position control + modest stake | L_diff parameter sizing, worst-case diffusion validation |
+| #  | Method                                          | Effect                                             | Resources                              | Mitigation                                               |
+|----|-------------------------------------------------|----------------------------------------------------|----------------------------------------|----------------------------------------------------------|
+| 20 | Withhold announced EB or endorsed transactions  | Lower throughput                                   | Stake for block production             | Connection timeouts, peer pruning                        |
+| 21 | Selectively withhold data from voting committee | Prevent honest EB certification, reduce throughput | Network position control               | Redundant peer connections, diffusion monitoring         |
+| 22 | Selectively withhold data from honest nodes     | Allow certification, delay block propagation       | Network position control, modest stake | L_diff parameter sizing, worst-case diffusion validation |
 
 ### Protocol bursts
 
@@ -252,9 +252,9 @@ The attack magnitude depends on the adversary's stake proportion and EB size par
 
 **Mitigation**: The primary defense is traffic prioritization implementing freshest-first delivery semantics - Praos traffic must be preferred over Leios traffic, and fresh Leios traffic over stale traffic. However, some infrastructural resources cannot be prioritized perfectly, including CPU, memory, disk bandwidth, and network router buffers. The attack's magnitude is bounded by the adversary's stake proportion, but ultimately requires engineering solutions for effective prioritization during burst conditions.
 
-| #  | Method                                    | Effect                                                                     | Resources                         | Mitigation                                     |
-|----|-------------------------------------------|----------------------------------------------------------------------------|-----------------------------------|------------------------------------------------|
-| 23 | Withhold then release large number of EBs | Bandwidth saturation, processing delays, potential Praos timing disruption | Proportional to adversarial stake | Freshest-first delivery, Traffic prioritization |
+| #  | Method                                    | Effect                                                                     | Resources                      | Mitigation                                      |
+|----|-------------------------------------------|----------------------------------------------------------------------------|--------------------------------|-------------------------------------------------|
+| 23 | Withhold then release large number of EBs | Bandwidth saturation, processing delays, potential Praos timing disruption | Stake (proportional magnitude) | Freshest-first delivery, traffic prioritization |
 
 ### Legacy threats
 
