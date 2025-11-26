@@ -288,6 +288,26 @@ Mempool partitioning differs from eclipse attacks on voting/diffusion in that it
 | 27 | Mempool partitioning via network control     | Inconsistent mempools, conflicting EBs     | Network infrastructure control         | Limited: directional flow difference      |
 | 28 | Honeypot contract creating transaction races | Artificial high-volume conflicting traffic | Contract deployment costs / incentives | Limited: attacker pays for some conflicts |
 
+### System operation and Governance
+
+**Description**: Threats arising from the complexity and scale of deploying and operating Leios, including governance failures, implementation inconsistencies, and resource sustainability challenges. These risks stem from the inherent complexity of coordinating protocol upgrades across a decentralized network and the long-term operational demands of increased system capacity.
+
+Backward compatibility failures represent a particularly critical risk, as demonstrated by recent mainnet events (Nov 2025) where differences in node version behavior led to chain forks until stake consolidated on node versions with consistent behavior. Any functional change or complexity increase in Leios can create similar scenarios where subtle implementation differences cause honest nodes to diverge. Hard fork coordination attacks target the governance process itself, attempting to prevent or delay beneficial upgrades through manipulation of stakeholder voting or readiness signaling. While governance attacks primarily aim to prevent hard forks, they could theoretically create similar network inconsistency effects if they result in partial deployment scenarios where some nodes upgrade while others remain on older versions, effectively creating the same divergent behavior as implementation bugs.
+
+Excessive chain growth poses a different challenge where the success of Leios could paradoxically threaten decentralization. If transaction throughput increases faster than SPO storage capabilities, honest stake could be forced offline due to resource constraints, inadvertently concentrating power among well-resourced operators and giving adversaries advantages in most stake-based attacks.
+
+**Impact**: These threats can undermine the fundamental assumptions that keep Cardano secure and decentralized. Backward compatibility failures create chain splits that require manual coordination to resolve. Governance attacks can prevent beneficial upgrades entirely or create persistent network splits. Excessive growth can force honest operators offline, reducing effective honest stake and strengthening potential attackers' relative position in all stake-based attacks.
+
+**Assets Affected**: Blockchain Safety, Blockchain Liveness, Decentralization, Operational Sustainability
+
+**Mitigation**: Extensive conformance testing and testnet deployments reduce implementation risks. Comprehensive communication, education, and staged rollouts help ensure successful governance coordination. Conservative parameterization and monitoring of storage requirements protect against excessive growth, with protocol parameters adjusted based on observed SPO capabilities. The Ouroboros consensus protocols are provenly self-healing for temporary inconsistencies, but persistent issues require coordinated community response.
+
+| #  | Method                                                   | Effect                                     | Resources                                    | Mitigation                                                   |
+|----|----------------------------------------------------------|--------------------------------------------|----------------------------------------------|--------------------------------------------------------------|
+| 29 | Exploit implementation differences between node versions | Network fork, chain splits                 | Technical analysis, mixed-version targeting  | Comprehensive conformance testing, staged deployment         |
+| 30 | Coordinate governance attacks to prevent hard fork       | Block beneficial upgrades, network splits  | Governance influence, infrastructure control | Communication, education, stakeholder coordination           |
+| 31 | Honest demand exceeds SPO storage capabilities           | Forced node dropouts, reduced honest stake | Indirect through parameterization            | Conservative parameterization, load tests, staged deployment |
+
 ### Legacy threats
 
 > [!CAUTION]
