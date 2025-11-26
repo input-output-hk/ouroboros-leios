@@ -256,6 +256,38 @@ The attack magnitude depends on the adversary's stake proportion and EB size par
 |----|-------------------------------------------|----------------------------------------------------------------------------|--------------------------------|-------------------------------------------------|
 | 23 | Withhold then release large number of EBs | Bandwidth saturation, processing delays, potential Praos timing disruption | Stake (proportional magnitude) | Freshest-first delivery, traffic prioritization |
 
+### Transaction-Based Denial of Service
+
+**Description**: Adversaries can degrade network performance and waste resources by submitting problematic transactions that consume processing capacity while providing minimal throughput value. These attacks exploit the transaction validation and mempool management overhead, forcing nodes to spend resources on transactions that either fail validation or conflict with each other. Unlike data withholding or protocol bursts, these attacks use normal transaction submission mechanisms, making them difficult to distinguish from legitimate network congestion.
+
+The attack surface includes multiple vectors with varying resource requirements. Simple variants involve submitting duplicate, invalid, or conflicting transactions as regular client nodes. Network-level variants like mempool partitioning require control over network positioning to segment transaction propagation, creating inconsistent views across block producers.
+
+An interesting economic variant involves honeypot contracts that entice many users to submit conflicting transactions by offering attractive rewards, using the ledger's intended functionality to generate artificial traffic. For example:
+1. Lock a lot of ADA into a script that allows anyone to take `amount` while the remainder must be kept in the script.
+2. Advertise the honey pot and that `amount` of ADA is available for free.
+3. Race with everyone in claiming the output.
+    a. If attacker is successful, only transaction fees were spent and `amount` can go back into the honey pot.
+    b. Continue until funds run out.
+
+Mempool partitioning differs from eclipse attacks on voting/diffusion in that it targets transactions flowing upstream rather than blocks propagating downstream: transactions propagate from clients to block producers, while block data flows from producers to voters and the broader network. This directional difference means that partitioning transaction pools requires different network positioning and currently lacks specific mitigation mechanisms.
+
+**Impact**: These attacks primarily reduce effective transaction throughput while wasting computational and network resources. Invalid transactions consume validation cycles before being discarded. Conflicting transactions force nodes to process multiple alternatives when only one can succeed. Mempool partitioning can create scenarios where different block producers have inconsistent transaction views, potentially leading to conflicting EBs that don't reach quorum (in time) wasting voting resources. The honeypot variant creates artificial high-volume traffic that appears legitimate but provides low practical utility.
+
+**Assets Affected**: High Throughput, Operational Sustainability
+
+**Mitigation**: Transaction validation and fee mechanisms provide primary defense against invalid submissions. Pull-based transaction diffusion and strict mempool limits help contain resource consumption. Linear Leios' design prevents conflicting transactions from reaching permanent storage, limiting long-term impact. However, mempool partitioning currently lacks specific countermeasures due to the directional nature of transaction flow. Detection of artificial transaction patterns is challenging since legitimate congestion can appear similar to attack traffic.
+
+> [!NOTE]
+> Linear Leios prevents conflicting transactions from reaching permanent storage, so impact is limited to temporary and mostly local resource waste. This is not the case for protocol variants with decoupled, concurrent block production (of EBs or IBs) where conflicting transactions would largely be "unpaid".
+
+| #  | Method                                       | Effect                                     | Resources                              | Mitigation                                |
+|----|----------------------------------------------|--------------------------------------------|----------------------------------------|-------------------------------------------|
+| 24 | Submit duplicate transactions                | Resource waste                             | Network bandwidth                      | Pull-based diffusion, validation          |
+| 25 | Submit invalid transactions                  | Resource waste                             | Network bandwidth                      | Validation before propagation             |
+| 26 | Submit conflicting transactions              | Processing waste, only one succeeds        | Transaction fees per conflict          | Linear Leios design                       |
+| 27 | Mempool partitioning via network control     | Inconsistent mempools, conflicting EBs     | Network infrastructure control         | Limited: directional flow difference      |
+| 28 | Honeypot contract creating transaction races | Artificial high-volume conflicting traffic | Contract deployment costs / incentives | Limited: attacker pays for some conflicts |
+
 ### Legacy threats
 
 > [!CAUTION]
