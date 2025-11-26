@@ -55,29 +55,29 @@ See also the [CIP draft](https://github.com/input-output-hk/ouroboros-leios/pull
 For each asset we define what could be impacted in respect to its Confidentiality, Integrity, Availability; i.e. the [CIA Triad](https://www.splunk.com/en_us/blog/learn/cia-triad-confidentiality-integrity-availability.html)
 
 ### A1: Blockchain Safety
-**Description**: The fundamental guarantee that all honest nodes agree on the blockchain history and no conflicting valid chains exist.
+The fundamental guarantee that all honest nodes agree on the blockchain history and no conflicting valid chains exist.
 
-**CIA Impact:**
+**CIA Impact**
 - **Confidentiality**: Not applicable - blockchain is public
 - **Integrity**: CRITICAL - Chain splits or conflicting histories would break consensus
 - **Availability**: HIGH - Safety failures could halt the network indefinitely
 
-**Leios-Specific Considerations**: Vote certificates and EB validation must not create conflicting blockchain states or enable double-spending.
+**Leios-Specific Considerations**: Leios is an overlay protocol and relies on the safety (and liveness) of the underlying consensus protocol: Praos. Safety in Praos, also called persistence, is guaranteed if the Delta assumption holds and honest stake exceeds 50%. Hence, any of the Leios-specific mechanisms (EB creation, voting, certificate inclusion) must not delay Praos blocks consistently.
 
 ### A2: Blockchain Liveness
-**Description**: The guarantee that the blockchain continues to make progress by producing new blocks and processing transactions within reasonable time bounds.
+The guarantee that the blockchain continues to make progress by producing new blocks and processing transactions within reasonable time bounds.
 
-**CIA Impact:**
+**CIA Impact**
 - **Confidentiality**: Not applicable - blockchain is public
 - **Integrity**: MEDIUM - Liveness failures don't corrupt existing data but prevent new valid transactions
 - **Availability**: CRITICAL - Network becomes unusable if block production stops
 
-**Leios-Specific Considerations**: EB creation, voting, and certificate inclusion must not prevent regular block production or create bottlenecks.
+**Leios-Specific Considerations**: Analogously to Blockchain Safety, EB creation, voting, and certificate inclusion must not prevent Praos block production from making progress. Any mechanisms that prevent production - by protocol, or practically, also temporarily - can lead to loss of liveness.
 
 ### A3: Transaction Validity, Availability, and Determinism
-**Description**: All transactions included in the blockchain must be cryptographically valid, available to all network participants for verification, and deterministic (transactions only consume fees if successfully included, a key Cardano property).
+All transactions included in the blockchain must be cryptographically valid, available to all network participants for verification, and deterministic (transactions only consume fees if successfully included, a key Cardano property).
 
-**CIA Impact:**
+**CIA Impact**
 - **Confidentiality**: Not applicable - transactions are public once included
 - **Integrity**: CRITICAL - Invalid transactions would corrupt the ledger state; non-deterministic behavior would break fee guarantees
 - **Availability**: HIGH - Unavailable transactions prevent proper validation and syncing
@@ -85,9 +85,9 @@ For each asset we define what could be impacted in respect to its Confidentialit
 **Leios-Specific Considerations**: EBs reference transactions that must be available when the EB is processed; voting nodes must verify transaction availability before voting; deterministic behavior must be preserved across the EB endorsement and certification process.
 
 ### A4: Operational Sustainability
-**Description**: Computational and network resources consumed by Stake Pool Operators to participate in the protocol, including CPU, memory, storage, and bandwidth. Resource increases are acceptable as long as they are covered by corresponding incentives to maintain operational sustainability.
+Computational and network resources consumed by Stake Pool Operators to participate in the protocol, including CPU, memory, storage, and bandwidth. Resource increases are acceptable as long as they are covered by corresponding incentives to maintain operational sustainability.
 
-**CIA Impact:**
+**CIA Impact**
 - **Confidentiality**: LOW - Resource usage patterns could reveal some operational information
 - **Integrity**: MEDIUM - Resource exhaustion could compromise node operation and validation
 - **Availability**: HIGH - Excessive resource usage could force SPOs offline or prevent participation
@@ -95,17 +95,17 @@ For each asset we define what could be impacted in respect to its Confidentialit
 **Leios-Specific Considerations**: New responsibilities (EB creation, voting, additional network protocols) must not significantly increase SPO operational costs relative to incentives or create barriers to participation.
 
 ### A5: Decentralization
-**Description**: The distribution of block production, voting power, and network participation across many independent operators.
+The distribution of block production, voting power, and network participation across many independent operators.
 
-**CIA Impact:**
+**CIA Impact**
 - **Confidentiality**: LOW - Centralization patterns are observable but don't directly affect data secrecy
 - **Integrity**: HIGH - Centralization increases risk of coordinated attacks on consensus
 - **Availability**: HIGH - Centralized infrastructure creates single points of failure
 
 ### A6: High Throughput
-**Description**: The enhanced transaction processing capacity that Leios provides beyond basic Praos liveness, enabling the network to handle significantly more transactions per unit time.
+The enhanced transaction processing capacity that Leios provides beyond basic Praos liveness, enabling the network to handle significantly more transactions per unit time.
 
-**CIA Impact:**
+**CIA Impact**
 - **Confidentiality**: Not applicable - throughput is a performance metric
 - **Integrity**: LOW - Reduced throughput doesn't corrupt data but may affect user expectations
 - **Availability**: HIGH - Throughput reduction defeats the primary purpose of the Leios upgrade
@@ -258,7 +258,7 @@ The attack magnitude depends on the adversary's stake proportion and EB size par
 
 ### Transaction-Based Denial of Service
 
-**Description**: Adversaries can degrade network performance and waste resources by submitting problematic transactions that consume processing capacity while providing minimal throughput value. These attacks exploit the transaction validation and mempool management overhead, forcing nodes to spend resources on transactions that either fail validation or conflict with each other. Unlike data withholding or protocol bursts, these attacks use normal transaction submission mechanisms, making them difficult to distinguish from legitimate network congestion.
+Adversaries can degrade network performance and waste resources by submitting problematic transactions that consume processing capacity while providing minimal throughput value. These attacks exploit the transaction validation and mempool management overhead, forcing nodes to spend resources on transactions that either fail validation or conflict with each other. Unlike data withholding or protocol bursts, these attacks use normal transaction submission mechanisms, making them difficult to distinguish from legitimate network congestion.
 
 The attack surface includes multiple vectors with varying resource requirements. Simple variants involve submitting duplicate, invalid, or conflicting transactions as regular client nodes. Network-level variants like mempool partitioning require control over network positioning to segment transaction propagation, creating inconsistent views across block producers.
 
