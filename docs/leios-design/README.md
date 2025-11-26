@@ -286,6 +286,43 @@ In summary, Leios will not require fundamental changes to Mithril's architecture
 > - motivates experiments/features revolving around resource management
 > - reference/include/move related RSK-.. items from impact analysis
 
+In a protocol burst attack (**ATK-LeiosProtocolBurst**) the adversary withholds a large number of EBs and/or their closures over a significant duration and then releases them all at once.
+This will lead to a sustained maximal load on the honest network for a smaller but still significant duration, a.k.a. a burst.
+The potential magnitude of that burst will depend on various factors, including at least the adversary's portion of stake, but the worst-case is more than a gigabyte of download.
+The cost to the victim is merely the work to acquire the closures and to check the hashes of the received EB bodies and transaction bodies.
+In particular, at most one of the EBs in the burst could extend the tip of a victim node's current selection, and so that's the only EB the victim would attempt to fully parse and validate.
+
+Even without honest nodes needing to validate the vast majority of the burst, the sheer amount of concentrated bandwidth utilization can be problematic.
+Suppose the adversary controls 1/3rd stake and they're issuing nominal RBs.
+Recall that CIP-164 requires each honest node to attempt to acquire any EB that was promptly announced within the last 12 hours.
+Even if it's too late for the honest node itself to vote on a tardy EB, the lack of global objective information implies the node must not assume the EB cannot be certified by other node's in the network.
+Thus, the honest node might later need to switch to a fork that requires having this EB, and that switch ideally wouldn't be delayed by waiting on that EB's arrival; the node should still acquire the EB as soon as it can.
+
+For this attack, the adversary would announce each EB promptly (by diffusing the corresponding RB headers on-time), but withhold the mini protocol messages that actually initiate the diffusion of substantial Leios traffic throughout the honest network.
+Only after withholding every EB's diffusion for 12 hours would they suddenly release them.
+In this scenario---which is not the worst-case---the average would be approximately 2160 * (1/3) = 720 EBs, but there could be hundreds more merely due to luck and multi-leader slots.
+There could be several thousand if the adversary is also grinding, for example, and/or had closer to 50% stake, etc.
+If each of the attacker's EBs has the maximum size of 500 kilobytes of tx references and 12.5 megabytes of actual txs---which don't even need to be valid---then that's an average of 720 * (12.5 + 0.5 megabytes) = 9.36 gigabytes the honest nodes will be eagerly diffusing throughout the network.
+
+For however long it takes for the network to (carefully) diffuse 10 gigabytes, honest traffic might diffuse more poorly.
+CIP-164 requires that Praos traffic will be preferred over Leios traffic and that fresher Leios traffic will be preferred over stale Leios traffic.
+That would prevent the burst from degrading contemporary honest traffic if the prioritization could be perfect.
+However, there are some infrastructural resources that cannot be prioritized perfectly nor instantly reapportioned, including: CPU, memory, disk, disk bandwidth, and buffer utilization on the nodes themselves but also along the Internet routers carrying packets between Cardano peers.
+One non-obvious concern is that cloud providers often throttle users exhibiting large bursts of bandwidth, so a node might perform fine outside of a protocol burst but struggle disproportionately during one.
+(A node in a data center might not struggle at all to diffuse the 10 gigabytes over the course of each 12 hours but be very slow to diffuse it in a single burst that arrives every 12 hours.)
+
+Some of CPU and memory costs will scale in the number of txs rather than the number of EBs, which can be a ratio of more than 10,000 to 1.
+If none of the 720 EBs overlap, then there would be more than 7,200,000 unique txs on average that the honest nodes need to keep track of during this burst.
+The identifying hashes of those txs alone is more than 230 megabytes.
+To maximize the bookkeeping overhead, for example, the adversary might choose to diffuse all of the EB bodies before diffusing any of their closures.
+
+It remains an engineering challenge to achieve as much prioritization as possible, especially during a protocol burst, without unnecessarily delaying the diffusion of any EB.
+That is, determining how to prevent this kind of protocol burst from increasing the latency of contemporary Praos and Leios traffic among honest nodes.
+
+The adversary is only able to issue EBs at an average rate in proportion to their resources (stake and grinding).
+There will be some variance, but in general they can do smaller bursts more often or larger bursts less often.
+However, the Praos security argument's parameters represent the worst-case, so the largest burst fundamentally challenges the current Praos security argument even if it can only happen rarely to whatever extent the prioritization schemes of CIP-164 are imperfectly implemented.
+
 ### Data withholding
 
 > [!WARNING]
