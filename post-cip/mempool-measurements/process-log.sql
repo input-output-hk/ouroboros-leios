@@ -112,9 +112,9 @@ select
     region
   , tx_seen_first
   , count(*) as "count"
-  , (count(*) + 0.0) / (select count(*) from mempool_vs_blocks z where z.region = mempool_vs_blocks.region and block_logged >= now() - interval '6 hours') as "fraction"
+  , (count(*) + 0.0) / (select count(*) from mempool_vs_blocks z where z.region = mempool_vs_blocks.region and block_logged >= now() - interval '100 hours') as "fraction"
   from mempool_vs_blocks
-  where block_logged >= now() - interval '6 hours'
+  where block_logged >= now() - interval '100 hours'
   group by region, tx_seen_first
 order by 1
 ;
