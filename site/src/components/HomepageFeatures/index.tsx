@@ -1,70 +1,75 @@
-import Heading from "@theme/Heading";
-import clsx from "clsx";
+import { LinkButton } from "../LinkButton/LinkButton";
 import styles from "./styles.module.css";
+import ScaleSvg from "@site/static/img/scale.svg";
+import SecureSvg from "@site/static/img/secure.svg";
+import FlexibleSvg from "@site/static/img/flexible.svg";
 
 type FeatureItem = {
-    title: string;
-    Svg: React.ComponentType<React.ComponentProps<"svg">>;
-    description: React.ReactElement;
+  title: string;
+  Svg: string;
+  description: React.ReactElement;
+  button: {
+    text: string;
+    url: string;
+  };
 };
 
 const FeatureList: FeatureItem[] = [
-    {
-        title: "Scalable",
-        Svg: require("@site/static/img/cargo-ship.svg").default,
-        description: (
-            <>
-                Optimizes network bandwidth for faster transaction processing,
-                significantly enhancing Cardano’s scalability. Transactions are
-                confirmed with minimal delays for a seamless user experience.
-            </>
-        ),
-    },
-    {
-        title: "Secure",
-        Svg: require("@site/static/img/safe.svg").default,
-        description: (
-            <>
-                Preserves Ouroboros' strong security properties with robust
-                defenses against attacks while ensuring fair participation.
-            </>
-        ),
-    },
-    {
-        title: "Flexible",
-        Svg: require("@site/static/img/socket-chord.svg").default,
-        description: (
-            <>
-                Ouroboros Leios supports diverse applications.
-            </>
-        ),
-    },
+  {
+    title: "Scalable",
+    Svg: ScaleSvg,
+    description: (
+      <>
+        Optimizes network bandwidth for faster transaction processing,
+        significantly enhancing Cardano’s scalability. Transactions are
+        confirmed with minimal delays for a seamless user experience.
+      </>
+    ),
+  },
+  {
+    title: "Secure",
+    Svg: SecureSvg,
+    description: (
+      <>
+        Preserves Ouroboros' strong security properties with robust defenses
+        against attacks while ensuring fair participation.
+      </>
+    ),
+  },
+  {
+    title: "Flexible",
+    Svg: FlexibleSvg,
+    description: <>Ouroboros Leios supports diverse applications.</>,
+  },
 ];
 
-function Feature({ title, Svg, description }: FeatureItem) {
-    return (
-        <div className={clsx("col col--4")}>
-            <div className="text--center">
-                <Svg className={styles.featureSvg} role="img" />
-            </div>
-            <div className="text--center padding-horiz--md">
-                <Heading as="h3">{title}</Heading>
-                <p>{description}</p>
-            </div>
+function Feature({ Svg, title, description, button }: FeatureItem) {
+  return (
+    <div className={styles.feature}>
+      <div className={styles.featureContent}>
+        <Svg className={styles.featureImg} />
+        <div className="">
+          <h2 className="">{title}</h2>
+          <p>{description}</p>
         </div>
-    );
+      </div>
+      {button ? <LinkButton text={button.text} url={button.url} /> : null}
+    </div>
+  );
 }
 
 export default function HomepageFeatures(): React.ReactElement {
-    return (
-        <section className={styles.features}>
-            <div className="container">
-                <div className="row">
-                    {FeatureList.map((props, idx) => (
-                        <Feature key={idx} {...props} />
-                    ))}
-                </div>
-            </div>
-        </section>
-    );
+  return (
+    <section className="padding-section">
+      <div className="container">
+        <div className="container-padding">
+          <div className={styles.features}>
+            {FeatureList.map((props, idx) => (
+              <Feature key={idx} {...props} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 }

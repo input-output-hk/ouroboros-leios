@@ -4,47 +4,312 @@
  * work well for content-centric websites.
  */
 
- /*@import url("https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,200..1000;1,200..1000&family=Quicksand:wght@300..700&display=swap");
+/*@import url("https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,200..1000;1,200..1000&family=Quicksand:wght@300..700&display=swap");
 */
 
 /* You can override the default Infima variables here. */
+
+@import "./typography.css";
+
 :root {
- /* --ifm-font-family-base: "Quicksand", sans-serif; */
+  --ifm-font-family-base: var(--font-base);
 
-  --ifm-background-color: #f1f6f8;
+  --ifm-background-color: #f8f6fa;
+  --ifm-navbar-background-color: #f1edf5;
 
-  --ifm-color-primary: #326C85;
-  --ifm-color-primary-dark: #29586C;
+  --ifm-font-color-base: #180425;
+  --ifm-font-color-alternate: #000;
+  --ifm-background-color-primary: #f8f6fa;
+  --ifm-background-color-secondary: #f1edf5;
+  --ifm-color-caption: #73489a;
+  --ifm-link-color: #73489a;
+  --ifm-menu-color: #73489a;
+  --ifm-toc-link-color: #73489a;
+  --link-button-background-hover: #73489a;
+
+  --ifm-navbar-height: 6.063rem;
+
+  --ifm-color-primary: #180425;
+  --ifm-color-primary-dark: #29586c;
   --ifm-color-primary-darker: #275468;
   --ifm-color-primary-darkest: #224859;
-  --ifm-color-primary-light: #97C3D8;
-  --ifm-color-primary-lighter: #A6CCDD;
-  --ifm-color-primary-lightest: #B5D4E3;
+  --ifm-color-primary-light: #97c3d8;
+  --ifm-color-primary-lighter: #a6ccdd;
+  --ifm-color-primary-lightest: #b5d4e3;
   --ifm-code-font-size: 95%;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
 
-  --ifm-footer-background-color: #29586C;
-  --ifm-footer-title-color: #fff;
-  --ifm-footer-link-color: #ffffffaa;
-  --ifm-footer-color:  #ffffffaa;
+  --ifm-footer-background-color: #180425;
+  --ifm-footer-title-color: #f8f6fa;
+  --ifm-footer-link-color: #f8f6fa;
+  --ifm-footer-color: #f8f6fa;
 
   --ifm-footer-link-hover-color: #ffffffdd;
+
+  --ifm-navbar-padding-vertical: 0;
+  --ifm-navbar-item-padding-vertical: 0;
+  --ifm-navbar-item-padding-horizontal: 0;
+  --ifm-spacing-horizontal: 0;
 }
 
 /* For readability concerns, you should choose a lighter palette in dark mode. */
-[data-theme='dark'] {
-  --ifm-color-primary: #6BA8C7;
-  --ifm-color-primary-dark: #5CA0C1;
-  --ifm-color-primary-darker: #4E97BC;
+[data-theme="dark"] {
+  --ifm-navbar-background-color: #333;
+  --ifm-background-color-primary: #1a1a1a;
+  --ifm-background-color-secondary: #333;
+
+  --ifm-link-color: #b1e0fe;
+  --ifm-color-caption: #b1e0fe;
+  --ifm-link-color: #b1e0fe;
+  --ifm-menu-color: #b1e0fe;
+  --ifm-toc-link-color: #b1e0fe;
+
+  --link-button-background-hover: rgba(255, 255, 255, 0.15);
+
+  --ifm-footer-link-hover-color: #000000dd;
+
+  --ifm-font-color-base: #f8f6fa;
+  --ifm-font-color-alternate: #fff;
+  --ifm-color-primary: #f8f6fa;
+  --ifm-color-primary-dark: #5ca0c1;
+  --ifm-color-primary-darker: #4e97bc;
   --ifm-color-primary-darkest: #1a8870;
-  --ifm-color-primary-lighter:#438DB1;
-  --ifm-color-primary-lighter: #A6CCDD;
-  --ifm-color-primary-lightest: #B5D4E3;
+  --ifm-color-primary-lighter: #438db1;
+  --ifm-color-primary-lighter: #a6ccdd;
+  --ifm-color-primary-lightest: #b5d4e3;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+}
+
+@media (max-width: 997px) {
+  :root {
+    --ifm-navbar-height: 3.75rem;
+  }
 }
 
 /* Hide external link icons in navbar */
 .navbar .navbar__items a.navbar__item svg[class*="iconExternalLink"],
 .navbar .dropdown__menu a.dropdown__link svg[class*="iconExternalLink"] {
   display: none;
+}
+
+.container {
+  max-width: 1440px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.container-padding {
+  width: 100%;
+  padding-left: 80px;
+  padding-right: 80px;
+}
+
+.padding-section {
+  padding-top: 6rem;
+  padding-bottom: 6rem;
+}
+
+@media (max-width: 997px) {
+  .container-padding {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+  .padding-section {
+    padding-top: 4.5rem;
+    padding-bottom: 4.5rem;
+  }
+}
+
+.navbar,
+.navbar__inner,
+.navbar__items,
+.navbar__items--right {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.navbar {
+  display: flex;
+  align-items: center;
+}
+
+.navbar__inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 100%;
+  flex-wrap: nowrap;
+}
+
+.navbar__non_homepage {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.5rem 1rem;
+}
+
+.navbar__brand {
+  width: fit-content;
+  min-width: 81px;
+  max-width: 132px;
+}
+
+.navbar__items--right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 978px;
+  width: 100%;
+  flex-shrink: 1;
+  justify-content: space-between;
+}
+
+.navbar_item_menu {
+  display: contents;
+}
+
+@media (max-width: 997px) {
+  .navbar_item_menu {
+    display: none;
+  }
+  .navbar__items--right {
+    justify-content: flex-end;
+  }
+}
+
+.navbar__link {
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-bold);
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.navbar-sidebar__brand {
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+@media (max-width: 1100px) {
+  .navbar__link {
+    font-size: var(--text-xs);
+  }
+}
+
+.footer {
+  padding: 3.5rem 0;
+}
+
+.footer a {
+  text-decoration: none;
+  font-size: var(--text-sm);
+  line-height: var(--line-height-sm);
+}
+
+.footer__link-item {
+  color: inherit;
+}
+
+.footer__title {
+  margin-bottom: 1.25rem;
+}
+
+.footer__items {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.footer__bottom {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 1rem;
+  border-top: 1px solid #8b8190;
+  margin-top: 4.25rem;
+}
+
+.footer__logo {
+  margin: 0;
+}
+
+.footer__copyright {
+  font-size: var(--text-sm);
+  line-height: var(--line-height-sm);
+  color: #8b8190;
+}
+
+.hero {
+  padding: 0;
+  background: linear-gradient(0deg, #200830 0%, rgba(32, 8, 48, 0) 39.98%),
+    url("/static/img/homepage-background.png"), #200830;
+
+  background-size: cover, cover, auto;
+  background-repeat: no-repeat, no-repeat, no-repeat;
+}
+
+@media (max-width: 768px) {
+  .hero {
+    background: linear-gradient(0deg, #200830 0%, rgba(32, 8, 48, 0) 39.98%),
+      url("/static/img/homepage-background-mobile.png"), #200830;
+
+    background-size: cover, cover, auto;
+    background-repeat: no-repeat, no-repeat, no-repeat;
+  }
+}
+
+.homepage-section-primary {
+  background-color: var(--ifm-background-color-primary);
+}
+
+.homepage-section-secondary {
+  background-color: var(--ifm-background-color-secondary);
+}
+
+a {
+  text-decoration: underline;
+}
+
+.col {
+  padding: var(--ifm-global-spacing);
+}
+
+.footer__col {
+  padding: 0;
+}
+
+.pagination-nav {
+  grid-gap: 1rem;
+}
+
+.theme-admonition {
+  padding: 1rem;
+}
+
+blockquote {
+  padding: 0 1rem;
+}
+
+.menu__link,
+.table-of-contents__link,
+.pagination-nav__link {
+  text-decoration: none;
+}
+
+@media (max-width: 996px) {
+  .footer__col {
+    margin-bottom: 6.25rem;
+  }
+  .footer__bottom {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1.375rem;
+    padding-top: 0;
+    border-top: 0;
+    margin-top: -1.25rem;
+  }
 }

@@ -1,0 +1,117 @@
+/* Poppins font family */
+@font-face {
+  font-family: "Poppins";
+  src: url("/fonts/Poppins/Poppins-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Poppins";
+  src: url("/fonts/Poppins/Poppins-Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Poppins";
+  src: url("/fonts/Poppins/Poppins-SemiBold.ttf") format("truetype");
+  font-weight: 600;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Poppins";
+  src: url("/fonts/Poppins/Poppins-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Poppins";
+  src: url("/fonts/Poppins/Poppins-Italic.ttf") format("truetype");
+  font-weight: 400;
+  font-style: italic;
+}
+
+/* Lexend font family */
+@font-face {
+  font-family: "Lexend";
+  src: url("/fonts/Lexend/Lexend-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Lexend";
+  src: url("/fonts/Lexend/Lexend-Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Lexend";
+  src: url("/fonts/Lexend/Lexend-SemiBold.ttf") format("truetype");
+  font-weight: 600;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Lexend";
+  src: url("/fonts/Lexend/Lexend-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+}
+
+:root {
+  --font-base: "Poppins", sans-serif;
+  --font-lexend: "Lexend", sans-serif;
+
+  --font-weight-light: 300;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2rem;
+  --text-5xl: 2.875rem;
+  --text-6xl: 4.5rem;
+
+  --line-height-lg: 1.71;
+  --line-height-sm: 1.25;
+  --line-height-xs: 1.1;
+  --line-height-normal: 1.5;
+}
+
+h1 {
+  font-size: var(--text-6xl);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-xs);
+}
+
+h2 {
+  font-size: var(--text-4xl);
+  font-weight: var(--font-weight-regular);
+  letter-spacing: -0.02rem;
+  line-height: var(--line-height-sm);
+}
+
+@media (max-width: 997px) {
+  h1 {
+    font-size: var(--text-5xl);
+  }
+
+  h2 {
+    font-size: var(--text-4xl);
+    font-weight: var(--font-weight-regular);
+    letter-spacing: -0.02rem;
+    line-height: var(--line-height-sm);
+  }
+}

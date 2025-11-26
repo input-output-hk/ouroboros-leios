@@ -1,11 +1,38 @@
 .features {
-  display: flex;
-  align-items: center;
-  padding: 2rem 0;
-  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2.5rem;
 }
 
-.featureSvg {
-  height: 200px;
-  width: 200px;
+.feature {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+  max-width: 20.375rem;
+}
+
+.feature h2 {
+  margin-bottom: 1.8125rem;
+}
+
+.featureContent {
+  display: flex;
+  flex-direction: column;
+  gap: 1.8125rem;
+}
+
+.featureImg {
+  object-fit: contain;
+}
+
+@media (max-width: 997px) {
+  .features {
+    display: flex;
+    flex-direction: column;
+    gap: 5.375rem;
+  }
+  .feature {
+    max-width: 100%;
+  }
 }

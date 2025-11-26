@@ -3,12 +3,6 @@
   background-color: var(--ifm-background-color);
 }
 
-.container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 1rem;
-}
-
 .fileGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -50,4 +44,4 @@
   font-size: 0.9rem;
   color: var(--ifm-color-emphasis-700);
   line-height: 1.4;
-} 
+}
