@@ -208,7 +208,10 @@ SPOs concerned about front-running competition may choose to bypass the EB mecha
 | 18 | Insert or replace transactions in EB        | MEV, market manipulation                    | Stake for block production | Limited detection capability                                 |
 | 19 | Ignore certificates, include txs in RB only | Reduces EB throughput, avoids front-running | Stake for block production | Reduced rewards, Self-limiting when load exceeds RB capacity |
 
-### Data Withholding
+### Data withholding
+
+> [!NOTE]
+> This is also a [key threat informing the Leios technical design](./leios-design#data-withholding)
 
 Adversaries deliberately prevent or delay the diffusion of EB transaction data to disrupt the certification process and degrade network throughput. This attack targets the fundamental dependency between transaction availability and EB certification, exploiting the gap between optimistic and worst-case diffusion scenarios that forms the basis of Leios' security argument. Unlike protocol bursts that overwhelm with volume, data withholding attacks manipulate timing and availability of critical data.
 
@@ -234,7 +237,10 @@ A particularly dangerous and sophisticated variant targets blockchain safety its
 | 21 | Selectively withhold data from voting committee | Prevent honest EB certification, reduces throughput | Network position control                | Redundant peer connections, diffusion monitoring         |
 | 22 | Selectively withhold data from honest nodes     | Allow certification, but delay block propagation    | Network position control + modest stake | L_diff parameter sizing, worst-case diffusion validation |
 
-### Protocol Bursts
+### Protocol bursts
+
+> [!NOTE]
+> This is also a [key threat informing the Leios technical design](./leios-design#protocol-bursts)
 
 Adversaries can withhold large numbers of EBs and their transaction closures over extended periods, then release them simultaneously to create concentrated bursts of network traffic. This attack exploits Leios' requirement that nodes must attempt to acquire any EB correctly announced even if it arrives too late for the node to vote on it, since the EB might still be certified by other nodes and required for future chain selection.
 

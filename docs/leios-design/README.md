@@ -273,9 +273,44 @@ The threats examined here represent scenarios that could compromise the implemen
 
 The following threats have been selected for detailed analysis based on their potential to inform critical implementation decisions. These represent attack vectors that emerged prominently during research, have significant implications for system performance under adversarial conditions, or require empirical validation through prototyping and testing.
 
+### Data withholding
+
+In a data withholding attack (**ATK-LeiosDataWithholding**, see also [threat vectors #20, #21 and #22](../threat-model.md#data-withholding)), the adversary deliberately prevents the diffusion of endorser block transaction closures to disrupt certification and degrade network throughput.
+This attack exploits the fundamental dependency between transaction availability and EB certification, targeting the gap between optimistic and worst-case diffusion scenarios that underlies Leios' [security argument](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#protocol-security).
+
+The attack operates by manipulating timing and availability of transaction data required for EB validation.
+When an EB is announced via an RB header, voting committee members must acquire and validate the complete transaction closure before casting votes.
+The adversary can exploit this in several ways: withholding the EB body itself, selectively withholding individual transactions, or strategically timing data release to exceed the $L_\text{vote}$ deadline.
+
+**Direct threshold impact.** The most direct form involves an adversarial block producer creating valid EBs but refusing to serve transaction closures when requested by voting nodes.
+Since committee members cannot validate unavailable transactions, they cannot vote for certification, effectively nullifying the EB's throughput contribution.
+More sophisticated variants involve network-level manipulation where the adversary controls network relays to selectively prevent transaction propagation to specific voting committee members.
+
+Consider an adversary controlling 15% of stake attempting to prevent honest EBs from achieving the 75% certification threshold.
+The adversary must withhold transaction data from enough voting committee members to reduce available honest stake below 75%.
+Since the adversary controls 15% stake directly, they need to prevent an additional 10% of honest stake from voting.
+This demonstrates how modest adversarial stake combined with strategic network positioning could significantly impact honest EB certification.
+
+**Attack on safety.** While throughput degradation represents the obvious impact, the most dangerous variant targets blockchain safety itself.
+The adversary can strategically delay transaction data release to create scenarios where EBs achieve certification but cannot be processed by honest nodes within the required timeframe.
+Just before the voting deadline, they release data to a subset of voting committee members—enough to achieve certification, but not to all network participants.
+The resulting certificate gets included in a subsequent RB, but honest block producers cannot acquire the certified EB's transaction closure within $L_\text{diff}$.
+
+By reducing the number of honest nodes that received the EB data in time for certification, the adversary also impairs subsequent diffusion.
+With fewer nodes initially possessing the complete transaction closure, propagation becomes slower and less reliable, potentially extending diffusion times beyond protocol anticipation.
+This would represent a violation of Praos' timing assumptions.
+While missing the $\Delta$ deadline occasionally does not break safety, short forks are normal in Ouroboros, persistent violations can lead to longer forks and degraded chain quality.
+In summary, the attack fundamentally challenges the security argument's assumption that the difference between optimistic and worst-case diffusion remains bounded by $L_\text{diff}$.
+
+Mitigation relies primarily on the protocol design ensuring that diffusion timing remains bounded even under adversarial conditions.
+The certification mechanism provides defense against stake-based withholding by requiring broad consensus before including EBs in the ledger.
+Network-level attacks require sophisticated countermeasures including redundant peer connections, timeouts that punish non-responsive nodes, and strategic committee selection considering network topology.
+
+The implementation must validate empirically that real-world network conditions support the timing assumptions underlying the security argument through adversarial diffusion testing.
+
 ### Protocol bursts
 
-In a protocol burst attack (**ATK-LeiosProtocolBurst**) the adversary withholds a large number of EBs and/or their closures over a significant duration and then releases them all at once.
+In a protocol burst attack (**ATK-LeiosProtocolBurst**, see also [threat vector #23](../threat-model.md#protocol-bursts)) the adversary withholds a large number of EBs and/or their closures over a significant duration and then releases them all at once.
 This will lead to a sustained maximal load on the honest network for a smaller but still significant duration, a.k.a. a burst.
 The potential magnitude of that burst will depend on various factors, including at least the adversary's portion of stake, but the worst-case is more than a gigabyte of download.
 The cost to the victim is merely the work to acquire the closures and to check the hashes of the received EB bodies and transaction bodies.
@@ -312,41 +347,6 @@ The adversary is only able to issue EBs at an average rate in proportion to thei
 There will be some variance, but in general they can do smaller bursts more often or larger bursts less often.
 However, the Praos security argument's parameters represent the worst-case, so the largest burst fundamentally challenges the current Praos security argument even if it can only happen rarely to whatever extent the prioritization schemes of CIP-164 are imperfectly implemented.
 
-### Data withholding
-
-In a data withholding attack (**ATK-LeiosDataWithholding**), the adversary deliberately prevents the diffusion of endorser block transaction closures to disrupt certification and degrade network throughput.
-This attack exploits the fundamental dependency between transaction availability and EB certification, targeting the gap between optimistic and worst-case diffusion scenarios that underlies Leios' [security argument](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#protocol-security).
-
-The attack operates by manipulating timing and availability of transaction data required for EB validation.
-When an EB is announced via an RB header, voting committee members must acquire and validate the complete transaction closure before casting votes.
-The adversary can exploit this in several ways: withholding the EB body itself, selectively withholding individual transactions, or strategically timing data release to exceed the $L_\text{vote}$ deadline.
-
-**Direct threshold impact.** The most direct form involves an adversarial block producer creating valid EBs but refusing to serve transaction closures when requested by voting nodes.
-Since committee members cannot validate unavailable transactions, they cannot vote for certification, effectively nullifying the EB's throughput contribution.
-More sophisticated variants involve network-level manipulation where the adversary controls network relays to selectively prevent transaction propagation to specific voting committee members.
-
-Consider an adversary controlling 15% of stake attempting to prevent honest EBs from achieving the 75% certification threshold.
-The adversary must withhold transaction data from enough voting committee members to reduce available honest stake below 75%.
-Since the adversary controls 15% stake directly, they need to prevent an additional 10% of honest stake from voting.
-This demonstrates how modest adversarial stake combined with strategic network positioning could significantly impact honest EB certification.
-
-**Attack on safety.** While throughput degradation represents the obvious impact, the most dangerous variant targets blockchain safety itself.
-The adversary can strategically delay transaction data release to create scenarios where EBs achieve certification but cannot be processed by honest nodes within the required timeframe.
-Just before the voting deadline, they release data to a subset of voting committee members—enough to achieve certification, but not to all network participants.
-The resulting certificate gets included in a subsequent RB, but honest block producers cannot acquire the certified EB's transaction closure within $L_\text{diff}$.
-
-By reducing the number of honest nodes that received the EB data in time for certification, the adversary also impairs subsequent diffusion.
-With fewer nodes initially possessing the complete transaction closure, propagation becomes slower and less reliable, potentially extending diffusion times beyond protocol anticipation.
-This would represent a violation of Praos' timing assumptions.
-While missing the $\Delta$ deadline occasionally does not break safety, short forks are normal in Ouroboros, persistent violations can lead to longer forks and degraded chain quality.
-In summary, the attack fundamentally challenges the security argument's assumption that the difference between optimistic and worst-case diffusion remains bounded by $L_\text{diff}$.
-
-Mitigation relies primarily on the protocol design ensuring that diffusion timing remains bounded even under adversarial conditions.
-The certification mechanism provides defense against stake-based withholding by requiring broad consensus before including EBs in the ledger.
-Network-level attacks require sophisticated countermeasures including redundant peer connections, timeouts that punish non-responsive nodes, and strategic committee selection considering network topology.
-
-The implementation must validate empirically that real-world network conditions support the timing assumptions underlying the security argument through adversarial diffusion testing.
-
 ## Assumptions to validate early
 
 Following the principle of early validation outlined in the [implementation plan](#approach), several critical assumptions underlying Leios' security argument must be validated before we can commit to full scale implementation and deployment. These assumptions represent potential failure points where theoretical models may not match real-world performance.
@@ -357,7 +357,7 @@ Following the principle of early validation outlined in the [implementation plan
 
 - **A real ledger can process orders of magnitude higher transaction loads as expected.** Leios assumes that nodes can validate and apply large transaction sets within tight timing constraints. This requires empirical validation of transaction validation throughput, especially when combined with disk-based ledger storage and concurrent processing demands.
 
-The [prototyping and adversarial testing](#prototyping-and-adversarial-testing) phase of the implementation plan is specifically designed to validate these assumptions through controlled experiments. Only with such validation we can confidently design and implement the components that realize a Leiso consensus.
+The [prototyping and adversarial testing](#prototyping-and-adversarial-testing) phase of the implementation plan is specifically designed to validate these assumptions through controlled experiments. Only with such validation we can confidently design and implement the components that realize a Leios consensus.
 
 # Technical design
 
