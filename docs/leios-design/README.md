@@ -1,7 +1,7 @@
 ---
 title: Leios technical design and implementation plan
 status: Draft
-version: 0.5
+version: 0.6
 author:
   - Sebastian Nagel <sebastian.nagel@iohk.io>
   - Nicolas Frisby <nick.frisby@iohk.io>
@@ -14,7 +14,7 @@ author:
 
 This technical design document bridges the gap between the protocol-level specification ([CIP-164](https://github.com/cardano-foundation/CIPs/pull/1078)) and its concrete implementation in [`cardano-node`](https://github.com/IntersectMBO/cardano-node). While CIP-164 defines *what* the Leios protocol is and *why* it benefits Cardano, this document addresses *how* to implement it reliably and serve as a practical guide for implementation teams.
 
-This document builds on the [impact analysis](../ImpactAnalysis.md) and [early threat modelling](../threat-model.md) conducted. The document outlines the necessary architecture changes, highlights key risks and mitigation strategies, and proposes an implementation roadmap. As the implementation plan itself contains exploratory tasks, this document can be considered a living document and reflects our current understanding of the protocol, as well as design decisions taken during implementation.
+This document builds on the conducted [impact analysis](../ImpactAnalysis.md) and [threat modeling](../threat-model.md). The document outlines the necessary architecture changes, highlights key risks and mitigation strategies, and proposes an implementation roadmap. As the implementation plan itself contains exploratory tasks, this document can be considered a living document and reflects our current understanding of the protocol, as well as design decisions taken during implementation.
 
 Besides collecting node-specific details in this document, we intend to contribute implementation-independent specifications to the [cardano-blueprint](https://cardano-scaling.github.io/cardano-blueprint/) initiative and also update the CIP-164 specification through pull requests as needed.
 
@@ -22,13 +22,14 @@ Besides collecting node-specific details in this document, we intend to contribu
 
 This document is a living artifact and will be updated as implementation progresses, new risks are identified, and validation results become available.
 
-| Version | Date       | Author          | Changes                                                            |
-|---------|------------|-----------------|--------------------------------------------------------------------|
-| 0.5     | 2025-10-29 | Sebastian Nagel | Re-structure and start design chapter with impact analysis content |
-| 0.4     | 2025-10-27 | Sebastian Nagel | Add overview chapter                                               |
-| 0.3     | 2025-10-25 | Sebastian Nagel | Add dependencies and interactions                                  |
-| 0.2     | 2025-10-24 | Sebastian Nagel | Add implementation plan                                            |
-| 0.1     | 2025-10-15 | Sebastian Nagel | Initial draft                                                      |
+| Version | Date       | Changes                                                            |
+|---------|------------|--------------------------------------------------------------------|
+| 0.6     | 2025-11-25 | Risks and mitigations with key threats                             |
+| 0.5     | 2025-10-29 | Re-structure and start design chapter with impact analysis content |
+| 0.4     | 2025-10-27 | Add overview chapter                                               |
+| 0.3     | 2025-10-25 | Add dependencies and interactions                                  |
+| 0.2     | 2025-10-24 | Add implementation plan                                            |
+| 0.1     | 2025-10-15 | Initial draft                                                      |
 
 # Overview
 
@@ -264,52 +265,75 @@ In summary, Leios will not require fundamental changes to Mithril's architecture
 
 # Risks and mitigations
 
-> [!WARNING]
->
-> TODO: Introduce chapter as being the bridge between implementation plan and concrete technical design; also, these are only selected aspects that inform the implementation (and not cover principal risks to the protocol or things that are avoided by design)
+This chapter bridges the implementation plan with concrete technical design by examining selected threats that directly inform architectural decisions and validation priorities. The focus is on implementation-specific risks rather than general protocol threats, which are either mitigated by design or othterwise covered in the [threat model](../threat-model.md).
+
+The threats examined here represent scenarios that could compromise the implementation's ability to deliver Leios' promised benefits while maintaining Praos' security guarantees. Each threat analysis motivates specific technical requirements, validation experiments, or design constraints that shape the implementation outlined in subsequent chapters.
 
 ## Key threats
 
-> [!WARNING]
->
-> TODO: Selection of key threats and attacks that further inform the design and/or implementation plan. Incorporate / reference the full [threat model](../threat-model.md)
+The following threats have been selected for detailed analysis based on their potential to inform critical implementation decisions. These represent attack vectors that emerged prominently during research, have significant implications for system performance under adversarial conditions, or require empirical validation through prototyping and testing.
+
+### Data withholding
+
+In a data withholding attack (**ATK-LeiosDataWithholding**, see also [threat vectors #20, #21 and #22](../threat-model.md#data-withholding)), the adversary deliberately prevents the diffusion of endorser block transaction closures to disrupt certification and degrade network throughput.
+This attack exploits the fundamental dependency between transaction availability and EB certification, targeting the gap between optimistic and worst-case diffusion scenarios that underlies Leios' [security argument](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#protocol-security).
+
+The attack operates by manipulating timing and availability of transaction data required for EB validation.
+When an EB is announced via an RB header, voting committee members must acquire and validate the complete transaction closure before casting votes.
+The adversary can exploit this in several ways: withholding the EB body itself, selectively withholding individual transactions, or strategically timing data release to exceed the $L_\text{vote}$ deadline.
+
+**Direct threshold impact.** The most direct form involves an adversarial block producer creating valid EBs but refusing to serve transaction closures when requested by voting nodes.
+Since committee members cannot validate unavailable transactions, they cannot vote for certification, effectively nullifying the EB's throughput contribution.
+More sophisticated variants involve network-level manipulation where the adversary controls network relays to selectively prevent transaction propagation to specific voting committee members.
+
+Consider an adversary controlling 15% of stake attempting to prevent honest EBs from achieving the 75% certification threshold.
+The adversary must withhold transaction data from enough voting committee members to reduce available honest stake below 75%.
+Since the adversary controls 15% stake directly, they need to prevent an additional 10% of honest stake from voting.
+This demonstrates how modest adversarial stake combined with strategic network positioning could significantly impact honest EB certification.
+
+**Attack on safety.** While throughput degradation represents the obvious impact, the most dangerous variant targets blockchain safety itself.
+The adversary can strategically delay transaction data release to create scenarios where EBs achieve certification but cannot be processed by honest nodes within the required timeframe.
+Just before the voting deadline, they release data to a subset of voting committee members—enough to achieve certification, but not to all network participants.
+The resulting certificate gets included in a subsequent RB, but honest block producers cannot acquire the certified EB's transaction closure within $L_\text{diff}$.
+
+By reducing the number of honest nodes that received the EB data in time for certification, the adversary also impairs subsequent diffusion.
+With fewer nodes initially possessing the complete transaction closure, propagation becomes slower and less reliable, potentially extending diffusion times beyond protocol anticipation.
+This would represent a violation of Praos' timing assumptions.
+While missing the $\Delta$ deadline occasionally does not break safety, short forks are normal in Ouroboros, persistent violations can lead to longer forks and degraded chain quality.
+In summary, the attack fundamentally challenges the security argument's assumption that the difference between optimistic and worst-case diffusion remains bounded by $L_\text{diff}$.
+
+Mitigation relies primarily on the protocol design ensuring that diffusion timing remains bounded even under adversarial conditions.
+The certification mechanism provides defense against stake-based withholding by requiring broad consensus before including EBs in the ledger.
+Network-level attacks require sophisticated countermeasures including redundant peer connections, timeouts that punish non-responsive nodes, and strategic committee selection considering network topology.
+
+The implementation must validate empirically that real-world network conditions support the timing assumptions underlying the security argument through adversarial diffusion testing.
 
 ### Protocol bursts
 
-> [!WARNING]
->
-> TODO: important because
->
-> - was a prominent case in research
-> - acknowledges the wealth of data to be processed
-> - mitigation: freshest-first delivery / prioritization between praos and leios traffic
-> - motivates experiments/features revolving around resource management
-> - reference/include/move related RSK-.. items from impact analysis
-
-In a protocol burst attack (**ATK-LeiosProtocolBurst**) the adversary withholds a large number of EBs and/or their closures over a significant duration and then releases them all at once.
+In a protocol burst attack (**ATK-LeiosProtocolBurst**, see also [threat vector #23](../threat-model.md#protocol-bursts)) the adversary withholds a large number of EBs and/or their closures over a significant duration and then releases them all at once.
 This will lead to a sustained maximal load on the honest network for a smaller but still significant duration, a.k.a. a burst.
 The potential magnitude of that burst will depend on various factors, including at least the adversary's portion of stake, but the worst-case is more than a gigabyte of download.
 The cost to the victim is merely the work to acquire the closures and to check the hashes of the received EB bodies and transaction bodies.
 In particular, at most one of the EBs in the burst could extend the tip of a victim node's current selection, and so that's the only EB the victim would attempt to fully parse and validate.
-
 Even without honest nodes needing to validate the vast majority of the burst, the sheer amount of concentrated bandwidth utilization can be problematic.
-Suppose the adversary controls 1/3rd stake and they're issuing nominal RBs.
+
+**Attack magnitude.** Suppose the adversary controls 1/3rd stake and they're issuing nominal RBs.
 Recall that CIP-164 requires each honest node to attempt to acquire any EB that was promptly announced within the last 12 hours.
 Even if it's too late for the honest node itself to vote on a tardy EB, the lack of global objective information implies the node must not assume the EB cannot be certified by other node's in the network.
 Thus, the honest node might later need to switch to a fork that requires having this EB, and that switch ideally wouldn't be delayed by waiting on that EB's arrival; the node should still acquire the EB as soon as it can.
-
 For this attack, the adversary would announce each EB promptly (by diffusing the corresponding RB headers on-time), but withhold the mini protocol messages that actually initiate the diffusion of substantial Leios traffic throughout the honest network.
 Only after withholding every EB's diffusion for 12 hours would they suddenly release them.
-In this scenario---which is not the worst-case---the average would be approximately 2160 * (1/3) = 720 EBs, but there could be hundreds more merely due to luck and multi-leader slots.
+In this scenario, which is not the worst-case, the average would be approximately 2160 * (1/3) = 720 EBs, but there could be hundreds more merely due to luck and multi-leader slots.
 There could be several thousand if the adversary is also grinding, for example, and/or had closer to 50% stake, etc.
-If each of the attacker's EBs has the maximum size of 500 kilobytes of tx references and 12.5 megabytes of actual txs---which don't even need to be valid---then that's an average of 720 * (12.5 + 0.5 megabytes) = 9.36 gigabytes the honest nodes will be eagerly diffusing throughout the network.
+If each of the attacker's EBs has the maximum size of 500 kilobytes of tx references and 12.5 megabytes of actual txs, which don't even need to be valid, then that's an average of 720 * (12.5 + 0.5 megabytes) = 9.36 gigabytes the honest nodes will be eagerly diffusing throughout the network.
 
-For however long it takes for the network to (carefully) diffuse 10 gigabytes, honest traffic might diffuse more poorly.
+**Resource contention.** For however long it takes for the network to (carefully) diffuse 10 gigabytes, honest traffic might diffuse more poorly.
 CIP-164 requires that Praos traffic will be preferred over Leios traffic and that fresher Leios traffic will be preferred over stale Leios traffic.
 That would prevent the burst from degrading contemporary honest traffic if the prioritization could be perfect.
+
 However, there are some infrastructural resources that cannot be prioritized perfectly nor instantly reapportioned, including: CPU, memory, disk, disk bandwidth, and buffer utilization on the nodes themselves but also along the Internet routers carrying packets between Cardano peers.
 One non-obvious concern is that cloud providers often throttle users exhibiting large bursts of bandwidth, so a node might perform fine outside of a protocol burst but struggle disproportionately during one.
-(A node in a data center might not struggle at all to diffuse the 10 gigabytes over the course of each 12 hours but be very slow to diffuse it in a single burst that arrives every 12 hours.)
+A node in a data center might not struggle at all to diffuse the 10 gigabytes over the course of each 12 hours but be very slow to diffuse it in a single burst that arrives every 12 hours.
 
 Some of CPU and memory costs will scale in the number of txs rather than the number of EBs, which can be a ratio of more than 10,000 to 1.
 If none of the 720 EBs overlap, then there would be more than 7,200,000 unique txs on average that the honest nodes need to keep track of during this burst.
@@ -323,28 +347,17 @@ The adversary is only able to issue EBs at an average rate in proportion to thei
 There will be some variance, but in general they can do smaller bursts more often or larger bursts less often.
 However, the Praos security argument's parameters represent the worst-case, so the largest burst fundamentally challenges the current Praos security argument even if it can only happen rarely to whatever extent the prioritization schemes of CIP-164 are imperfectly implemented.
 
-### Data withholding
-
-> [!WARNING]
->
-> TODO: important because
->
-> - can be done from stake- and network-based attackers
-> - trivially impacts high-throughput because no certifications happening
-> - however, more advanced, potential avenue to attack blockchain safety (impact praos security argument) when carefully partitioning the network
-> - mitigation: L_diff following the [security argument](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#protocol-security)
-> - motivates validation of optimistic and worst-case diffusion paths
-
 ## Assumptions to validate early
 
-> [!WARNING]
->
-> TODO: Which assumptions in the CIP / on the protocol security need to be validated as early as possible?
->
-> - Worst case diffusion of EBs given certain honest stake (certifying the EB) is realistic
-> - The cardano network stack can realize freshest first delivery (sufficiently well)
-> - A real ledger can (re-)process orders of magnitude higher loads as expected
-> - ...?
+Following the principle of early validation outlined in the [implementation plan](#approach), several critical assumptions underlying Leios' security argument must be validated before we can commit to full scale implementation and deployment. These assumptions represent potential failure points where theoretical models may not match real-world performance.
+
+- **Worst case diffusion of EBs given certain honest stake is realistic.** The security argument assumes that even under adversarial conditions, EBs can be diffused to honest nodes within bounded timeframes. This assumption must be validated under various network topologies and attack scenarios to ensure the $L_\text{diff}$ parameter provides adequate protection.
+
+- **The Cardano network stack can realize freshest-first delivery sufficiently well.** Prioritizing Praos, over recent Leios , over stale Leios traffic is essential for mitigating protocol burst attacks. Real-world validation must demonstrate that the network layer can maintain this prioritization under load without significantly impacting Praos traffic.
+
+- **A real ledger can process orders of magnitude higher transaction loads as expected.** Leios assumes that nodes can validate and apply large transaction sets within tight timing constraints. This requires empirical validation of transaction validation throughput, especially when combined with disk-based ledger storage and concurrent processing demands.
+
+The [prototyping and adversarial testing](#prototyping-and-adversarial-testing) phase of the implementation plan is specifically designed to validate these assumptions through controlled experiments. Only with such validation we can confidently design and implement the components that realize a Leios consensus.
 
 # Technical design
 
