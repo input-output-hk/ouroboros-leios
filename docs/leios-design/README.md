@@ -767,7 +767,7 @@ Last not least, the existing simulations will be maintained and kept operational
 ## Testing during development
 
 Wheras simulations operate on models and are able to falsify hypotheses or assess probability of certain outcomes, evolving
-prototypes and implementations rely on evidence to that end. A dedicated environment suitable for both performance and conformance testing will be created; primarily as feedbeck for development, but also to provide transparency into the ongoing process.  
+prototypes and implementations rely on evidence to that end. A dedicated environment suitable for both performance and conformance testing will be created; primarily as feedback for development, but also to provide transparency into the ongoing process.  
 
 This environment serves as a host for operating small testnets. It automates deployment and configuration, and is parametrizable as far as topology, and deployed binaries are concerned. This means it needs to abstract wrt. of configuring
 a specific prototype or implementation. This enables deploying adversarial nodes for the purpose of network conformance testing, as well as performance testing at system integration level. This environment also guarantees the
@@ -778,10 +778,10 @@ approach we chose is conformance testing using Linear Temporal Logic (LTL). By f
 this tends to be versatile and fast to evaluate incrementally. This means, system invariants can be tested as part of CI, or even by consuming live output of a running testnet.
 
 Performance testing requires constant submission pressure over an extended period of time. With Leios being built for high throughput, creating submissions fully dynamically (as is the case with Praos benchmarks) is likely
-isufficient to maintain that pressure. We will create a declarative, abstract definition of what constitues a workload to be submitted. This enables to pre-generate part or all submissions for the benchmarks. Moreover, it guarantees
+insufficient to maintain that pressure. We will create a declarative, abstract definition of what constitutes a workload to be submitted. This enables to pre-generate part or all submissions for the benchmarks. Moreover, it guarantees
 identical outcomes regardless of how exactly the workload is generated. These workloads will retain their property of being customizable regarding particular aspects they stress in the system, such as the UTxO set, or Plutus script evaluation.
 
-As raw data from a benchmark / confirmance test can be huge, existing analysis tooling will be extended or built, such that extracting key insights from raw data can be automated as much as possible.
+As raw data from a benchmark / conformance test can be huge, existing analysis tooling will be extended or built, such that extracting key insights from raw data can be automated as much as possible.
 
 This requires the presence of basic observability with shared semantics of traces in all participating prototypes or implementations, as outlined in the previous section.
 
