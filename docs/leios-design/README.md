@@ -708,32 +708,6 @@ The following non-functional requirements ensure the implementation meets perfor
 
 Note that the PoP checks probably are done at the certificate level, and that the above-described API should not be responsible for this. The current code on BLS12-381 already abstracts over both curves `G1`/`G2`, we should maintain this. The `BLST` package also exposes fast verification over many messages and signatures + public keys by doing a combined pairing check. This might be helpful, though it's currently unclear if we can use this speedup. It might be the case, since we have linear Leios, that this is never needed.
 
-## Performance & Tracing (P&T)
-
-> [!WARNING]
->
-> TODO: Mostly content directly taken from [impact analysis](../ImpactAnalysis.md). Expand on motivation and concreteness of changes. We could also consider merging performance engineering aspects into respective layers/components. This also feels a bit ouf of touch with the [implementation plan](#implementation-plan); to be integrated better for a more holistic quality and performance strategy. See also https://github.com/input-output-hk/ouroboros-leios/pull/596 for more notes on performance & tracing.
-
-This outlines Leios impact on the node's tracing system and on dedicated Leios performance testing and benchmarks.
-
-### Tracing
-
-Leios will require a whole new set of observables for a Cardano node, which do not exist for Praos. These observables will need to be exposed - just as the existing ones - via trace evidence and metrics. A specification document will need to be created and maintained, detailing the semantics of those new observables. Some might be specific to the Haskell implementation, some might be generic to any Leios implementation. The work from R&D and the insights gained from Leios simulations will be the input to that document.
-
-During Leios implementation process, P&T will need to oversee that traces are emitted at appropriate source locations wrt. their semantics, as well as properly serialized or captured in a metric in `cardano-node` itself. P&T analysis tooling - mostly the `locli` package - will need significant adjustment to parse, process and extract meaningful performance data from raw trace evidence.
-
-### Performance testing
-
-For a systematic approach to benchmarking, all Leios modes of operation and their respective configurations will need to be captured in P&T's benchmark profile library - the `cardano-profile` package. P&T's `nix` & `Nomad` based automations need to be adjusted to deploy and execute Leios profiles as benchmarks from that library.
-
-On a conceptual level, the challenge to benchmarking Leios - being built for high throughput - is putting it under a stable saturation workload for an extended period of time. By stable, I'm referring to maintaining equal submission pressure over the benchmark's entire duration. These workloads need to be synthetic in nature, as only that way one can reliably and consistently stress specific aspects of the implementation. For Praos benchmarks, they're created dynamically by `tx-generator`. New workloads will need to be implemented, or derived from the existing ones.
-
-Considering all the above, the most promising approach would be finding a model, or symmetrically scaled-down Leios, which is able to reliably predict performance characteristics of the non-scaled down version - exactly as P&T's benchmarking cluster hardware models a larger environment like `mainnet` at scale and is able to predict performance impact based on observations from the cluster. By Leios version above, I'm of course referring to the exact same Leios implementation whose performance characteristics are being measured. Model or scaled versions will have to be realized via configuration or protocol parameters exclusively.
-
-Any Leios option or protocol parameter that allows for sensibly scaling the implementation has to be identified. This will allow for correlating observed performance impact or trade-offs to e.g. linearly scaling some parameter. Comparative benchmarking will require a clearly structured process of integrating new features or changes into the implementation. When many changes are convoluted into one single benchmarkable, it gets increasingly difficult to attribute an observation to a single change - in the worst case, an optimization can obscure a regression when both are introduced in the same benchmarkable.
-
-Finding a model / scaled Leios version is an iterative process which requires continuous validation. It will require P&T to be in constant, close coordination with both implementors and researchers.
-
 ## End-to-end testing
 
 > [!WARNING]
