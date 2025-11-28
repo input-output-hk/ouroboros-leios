@@ -10,7 +10,6 @@
     "lint": "eslint .",
     "preview": "vite preview"
   },
-  "packageManager": "npm",
   "dependencies": {
     "cborg": "^4.2.18",
     "classnames": "^2.5.1",
