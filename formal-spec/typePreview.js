@@ -1,1 +1,775 @@
-!function(){let e,t,n=null;const l=new Map;function i(i){t&&clearTimeout(t),n=i.target;n.getAttribute("data-original-href");const c=n.getAttribute("href");c&&(t=setTimeout((()=>{!async function(t,n){const[i,c]=n.split("#");if(!c)return;let a,s;const d=c.match(/^(B\d+)-L(\d+)$/);if(d)s=d[1],a=parseInt(d[2],10);else{if(!c.startsWith("L"))return;s="B1",a=parseInt(c.substring(1),10)}if(isNaN(a))return;const m=`${i||window.location.pathname}#${s}-${a}`;let p;if(l.has(m))p=l.get(m);else if(i&&i!==window.location.pathname.split("/").pop())try{const e=i.replace(".html","");p=await async function(e,t,n="",l="B1"){try{const i=await fetch(e);if(!i.ok)throw new Error(`Failed to fetch ${e}: ${i.status}`);const c=await i.text(),a=(new DOMParser).parseFromString(c,"text/html"),s=`${l}-LC${t}`,d=a.getElementById(s);if(!d){const e=a.getElementById(`LC${t}`);if(e){const l=e.closest(".code-content");if(l){const i=Array.from(l.querySelectorAll(".code-line")),c=i.indexOf(e);if(-1!==c){const{startIndex:e,endIndex:l,commentLines:a}=o(i,c);return r(i.slice(e,l+1),t,e,n,"B1",a)}}}return null}const m=d.closest(".code-content");if(!m)return null;const p=Array.from(m.querySelectorAll(".code-line")),u=p.indexOf(d);if(-1===u)return null;const{startIndex:h,endIndex:f,commentLines:w}=o(p,u);return r(p.slice(h,f+1),t,h,n,l,w)}catch(i){return console.error("Error fetching preview:",i),null}}(i,a,e,s),p&&l.set(m,p)}catch(u){return void console.error("Error fetching code preview:",u)}else{const e=`${s}-LC${a}`,t=document.getElementById(e);if(!t)return;const n=t.closest(".code-content");if(!n)return;const i=Array.from(n.querySelectorAll(".code-line")),c=i.indexOf(t);if(-1===c)return;const{startIndex:d,endIndex:u,commentLines:h}=o(i,c);p=r(i.slice(d,u+1),a,d,document.title||window.location.pathname.split("/").pop().replace(".html",""),s,h),l.set(m,p)}if(!p)return;e.innerHTML="",e.appendChild(p),function(t){if(!t||!e)return;const n=t.getBoundingClientRect(),l=window.innerWidth,i=window.innerHeight;e.style.maxHeight="",e.style.maxWidth="",e.style.visibility="hidden",e.style.display="block";const c=e.offsetWidth,o=e.offsetHeight;let r=n.bottom+window.scrollY+5,a=n.left+window.scrollX;if(n.bottom+o>i&&(r=n.top+window.scrollY-o-5,r<window.scrollY)){r=window.scrollY+5;const t=i-10;e.style.maxHeight=`${t}px`}a+c>l&&(a=l-c+window.scrollX-5,a<window.scrollX&&(a=window.scrollX+5,e.style.maxWidth=l-10+"px"));e.style.top=`${r}px`,e.style.left=`${a}px`,e.style.visibility="visible"}(t),e.style.display="block"}(n,c)}),300))}function c(){t&&(clearTimeout(t),t=null)}function o(e,t){const n=e=>""===(e.textContent||"").trim(),l=e=>(e.innerHTML||"").includes('class="Comment"'),i=e=>{const t=e.querySelectorAll(".Comment");return 0===t.length?"":Array.from(t).map((e=>e.textContent||"")).join(" ").trim()};let c=Math.max(0,t-3),o=Math.min(e.length-1,t+3),r=[],a=t,s=t;for(;s>0;){if(s--,n(e[s])){a=s+1,r=[];break}if(l(e[s])){let t=s,n=[];for(;t>=0&&l(e[t]);)n.unshift({line:e[t],text:i(e[t])}),t--;n.length>0&&(r=n);let c=s;for(;c<e.length&&l(e[c]);)c++;a=c;break}a=s}c=a,s=t;let d=0,m=!1;for(;s<e.length-1&&!m;){const t=e[s].textContent||"";for(const e of t)"("!==e&&"{"!==e&&"["!==e||d++,")"!==e&&"}"!==e&&"]"!==e||d--;if(s++,s<e.length&&d<=0&&(n(e[s])||l(e[s]))){m=!0,o=s-1;break}o=s}return c=Math.max(0,c),o=Math.min(e.length-1,o),{startIndex:c,endIndex:o,commentLines:r}}function r(e,t,n,l="",i="B1",c=[]){const o=document.createElement("div");o.className="code-preview-container";const r=document.createElement("div");r.className="preview-heading";const a=document.createElement("span");a.className="module-name",a.textContent=l?`Definition in ${l}`:"Definition";const s=document.createElement("a");if(s.className="link-to-definition",s.textContent=`Line ${t}`,l&&l!==(document.title||"")?s.href=`${l}.html#${i}-L${t}`:s.href=`#${i}-L${t}`,r.appendChild(a),r.appendChild(s),o.appendChild(r),c.length>0){const e=document.createElement("div");e.className="preview-comment-container";let t="";if(c.forEach(((e,n)=>{let l=e.text.replace(/^\{-\s*/,"").replace(/\s*-\}$/,"").replace(/^--\s*/,"").replace(/^\s*\*\s*/,"").trim();t&&l?t+="\n"+l:l&&(t=l)})),t){const n=t.split("\n").map((e=>e.replace(/^\s*--\s*/,"").replace(/^\s*\*?\s*/,"").trim())).filter((e=>e.length>0));if(n.length>0){const t=document.createElement("div");t.className="preview-comment-block";let l=null,i=null,c=null,o=!1,r=null;n.forEach((e=>{if(e.toLowerCase().match(/^\s*parameters?\s*:?\s*$/i)){l&&(t.appendChild(l),l=null,i=null,c=null);const e=document.createElement("div");e.className="preview-comment-spacer",t.appendChild(e);const n=document.createElement("div");return n.className="preview-comment-line preview-parameters-heading",n.innerHTML="<strong>Parameters:</strong>",t.appendChild(n),r=document.createElement("table"),r.className="preview-parameters-table",void(o=!0)}const n=e.match(/^[-*+]\s+(.+)$/),a=e.match(/^\d+\.\s+(.+)$/);if(n&&o){const e=n[1],t=e.indexOf(":");if(t>0){const n=e.substring(0,t).trim(),l=e.substring(t+1).trim(),i=document.createElement("tr");i.className="preview-parameter-row";const c=document.createElement("td");c.className="preview-parameter-name",c.textContent=n;const o=document.createElement("td");o.className="preview-parameter-desc",o.textContent=l,i.appendChild(c),i.appendChild(o),r.appendChild(i)}else{const t=document.createElement("tr");t.className="preview-parameter-row";const n=document.createElement("td");n.className="preview-parameter-name",n.textContent=e;const l=document.createElement("td");l.className="preview-parameter-desc",l.textContent="",t.appendChild(n),t.appendChild(l),r.appendChild(t)}}else if(n)o&&r&&(t.appendChild(r),r=null,o=!1),"ul"!==i&&(l&&t.appendChild(l),l=document.createElement("ul"),l.className="preview-comment-list",i="ul"),c=document.createElement("li"),c.className="preview-comment-list-item",c.textContent=n[1],l.appendChild(c);else if(a)o&&r&&(t.appendChild(r),r=null,o=!1),"ol"!==i&&(l&&t.appendChild(l),l=document.createElement("ol"),l.className="preview-comment-list",i="ol"),c=document.createElement("li"),c.className="preview-comment-list-item",c.textContent=a[1],l.appendChild(c);else if(c&&""!==e.trim()&&!o)c.textContent+=" "+e;else if(o&&r&&""!==e.trim()){const t=r.lastElementChild;if(t){const n=t.querySelector(".preview-parameter-desc");n&&(n.textContent+=" "+e)}}else if(o&&r&&(t.appendChild(r),r=null,o=!1),l&&(t.appendChild(l),l=null,i=null,c=null),""!==e.trim()){const n=document.createElement("div");n.className="preview-comment-line",n.textContent=e,t.appendChild(n)}})),l&&t.appendChild(l),o&&r&&t.appendChild(r),e.appendChild(t)}}o.appendChild(e)}const d=document.createElement("div");d.className="preview-line-numbers";const m=document.createElement("div");m.className="preview-code-content",e.forEach(((e,l)=>{const i=n+l+1,c=document.createElement("span");c.className="preview-line-number",c.textContent=i,i===t&&c.classList.add("highlight"),d.appendChild(c);const o=document.createElement("div");o.className="preview-code-line",i===t&&o.classList.add("highlight");const r=document.createElement("div");r.style.whiteSpace="pre",r.innerHTML=e.innerHTML,o.appendChild(r),m.appendChild(o)}));const p=document.createElement("div");p.className="Agda";const u=document.createElement("div");return u.className="code-container",u.appendChild(d),u.appendChild(m),p.appendChild(u),o.appendChild(p),o}document.addEventListener("DOMContentLoaded",(function(){!function(){e=document.getElementById("type-preview-container"),e||(e=document.createElement("div"),e.id="type-preview-container",e.className="type-preview-container",e.style.display="none",document.body.appendChild(e));function l(){document.querySelectorAll(".type-hoverable").forEach((e=>{e.addEventListener("mouseenter",i),e.addEventListener("mouseleave",c),e.addEventListener("focus",i),e.addEventListener("blur",c)}))}l(),document.addEventListener("click",(function(l){"block"!==e.style.display||e.contains(l.target)||n?.contains(l.target)||function(){e&&(e.style.display="none");t&&(clearTimeout(t),t=null);n=null}()}))}()}))}();
+/**
+ * Type Preview on Hover
+ * Shows a preview of Agda type/function definitions when hovering over links
+ */
+
+(function() {
+  let previewContainer;
+  let activeTimeout;
+  let activeLink = null;
+  const codeCache = new Map();
+  const previewDelay = 300; // ms delay before showing preview
+  
+  document.addEventListener('DOMContentLoaded', function() {
+    init();
+  });
+  
+  /**
+   * Initialize the preview functionality
+   */
+  function init() {
+    // Get or create the preview container
+    previewContainer = document.getElementById('type-preview-container');
+    if (!previewContainer) {
+      previewContainer = document.createElement('div');
+      previewContainer.id = 'type-preview-container';
+      previewContainer.className = 'type-preview-container';
+      previewContainer.style.display = 'none';
+      document.body.appendChild(previewContainer);
+    }
+    
+    // Add event listeners to hoverable links
+    function setupHoverableLinks() {
+      const hoverableLinks = document.querySelectorAll('.type-hoverable');
+      hoverableLinks.forEach(link => {
+        link.addEventListener('mouseenter', handleMouseEnter);
+        link.addEventListener('mouseleave', handleMouseLeave);
+        link.addEventListener('focus', handleMouseEnter);
+        link.addEventListener('blur', handleMouseLeave);
+      });
+    }
+    
+    // Initial setup
+    setupHoverableLinks();
+    
+    // Hide preview when clicking outside
+    document.addEventListener('click', function(event) {
+      if (previewContainer.style.display === 'block' && 
+          !previewContainer.contains(event.target) && 
+          !activeLink?.contains(event.target)) {
+        hidePreview();
+      }
+    });
+  }
+  
+  /**
+   * Handle mouse enter event on hoverable links
+   */
+  function handleMouseEnter(event) {
+    // Clear any existing timeout
+    if (activeTimeout) {
+      clearTimeout(activeTimeout);
+    }
+    
+    // Set the active link
+    activeLink = event.target;
+    
+    // Get the href attribute or data-original-href if available
+    const originalHref = activeLink.getAttribute('data-original-href');
+    const href = activeLink.getAttribute('href');
+    
+    if (!href) return;
+    
+    // Use timeout to avoid showing preview for quick mouse movements
+    activeTimeout = setTimeout(() => {
+      showPreview(activeLink, href);
+    }, previewDelay);
+  }
+  
+  /**
+   * Handle mouse leave event
+   */
+  function handleMouseLeave() {
+    // Clear timeout if mouse leaves quickly
+    if (activeTimeout) {
+      clearTimeout(activeTimeout);
+      activeTimeout = null;
+    }
+  }
+  
+  /**
+   * Determine which context lines to include in the preview
+   */
+  function determineContextLines(allLines, targetIndex) {
+    // Default to showing a few lines before and after the target line
+    const defaultContextLines = 3;
+    
+    // Helper function to check if a line is empty or just whitespace
+    const isEmptyLine = (line) => {
+      const content = line.textContent || '';
+      return content.trim() === '';
+    };
+    
+    // Helper function to check if a line contains a comment
+    const isComment = (line) => {
+      const content = line.innerHTML || '';
+      return content.includes('class="Comment"');
+    };
+
+    // Helper function to extract comment text from a line
+    const extractCommentText = (line) => {
+      const commentElements = line.querySelectorAll('.Comment');
+      if (commentElements.length === 0) return '';
+      
+      // Join all comment text and clean it up
+      return Array.from(commentElements)
+        .map(el => el.textContent || '')
+        .join(' ')
+        .trim();
+    };
+    
+    // Start with basic context
+    let startIndex = Math.max(0, targetIndex - defaultContextLines);
+    let endIndex = Math.min(allLines.length - 1, targetIndex + defaultContextLines);
+    
+    // Look for comments that precede the definition
+    let commentLines = [];
+    let definitionStartIndex = targetIndex;
+    
+    // Look backward from the target to find comments and the start of the definition
+    let idx = targetIndex;
+    while (idx > 0) {
+      idx--;
+      
+      // If we find an empty line, this means any comments before it should NOT be included
+      if (isEmptyLine(allLines[idx])) {
+        // The definition starts after the empty line
+        definitionStartIndex = idx + 1;
+        // Don't include any comments that are separated by an empty line
+        commentLines = [];
+        break;
+      }
+      
+      // If we find a comment line directly before the definition (no empty line in between)
+      if (isComment(allLines[idx])) {
+        // Collect all consecutive comment lines that are directly adjacent
+        let commentIdx = idx;
+        let foundComments = [];
+        
+        while (commentIdx >= 0 && isComment(allLines[commentIdx])) {
+          foundComments.unshift({
+            line: allLines[commentIdx],
+            text: extractCommentText(allLines[commentIdx])
+          });
+          commentIdx--;
+        }
+        
+        if (foundComments.length > 0) {
+          commentLines = foundComments;
+        }
+        
+        // The definition starts AFTER the comment lines
+        // Find the first non-comment line after the comments
+        let nextIdx = idx;
+        while (nextIdx < allLines.length && isComment(allLines[nextIdx])) {
+          nextIdx++;
+        }
+        definitionStartIndex = nextIdx;
+        break;
+      }
+      
+      definitionStartIndex = idx;
+    }
+    
+    // Set the start index to the beginning of the definition (excluding comments)
+    startIndex = definitionStartIndex;
+    
+    // Look forward to capture the entire declaration
+    idx = targetIndex;
+    let bracketCount = 0;
+    let foundEndOfDeclaration = false;
+    
+    // Count open and close brackets/parens to find the complete expression
+    while (idx < allLines.length - 1 && !foundEndOfDeclaration) {
+      const content = allLines[idx].textContent || '';
+      
+      // Count brackets crudely (this is a simple heuristic)
+      for (const char of content) {
+        if (char === '(' || char === '{' || char === '[') bracketCount++;
+        if (char === ')' || char === '}' || char === ']') bracketCount--;
+      }
+      
+      idx++;
+      
+      // Check if the next line is empty and brackets are balanced
+      if (idx < allLines.length && bracketCount <= 0) {
+        if (isEmptyLine(allLines[idx]) || isComment(allLines[idx])) {
+          // Found the end, but don't include this empty line
+          foundEndOfDeclaration = true;
+          // Keep endIndex at the last non-empty line
+          endIndex = idx - 1;
+          break;
+        }
+      }
+      
+      // If we reached here, include this line
+      endIndex = idx;
+    }
+    
+    // Ensure we don't exceed array bounds
+    startIndex = Math.max(0, startIndex);
+    endIndex = Math.min(allLines.length - 1, endIndex);
+    
+    return { startIndex, endIndex, commentLines };
+  }
+  
+  /**
+   * Show the preview for the given link and target
+   */
+  async function showPreview(link, href) {
+    // Parse the href to get the file and line number
+    const [file, lineFragment] = href.split('#');
+    
+    if (!lineFragment) return;
+    
+    // Extract the line number and block ID from the fragment
+    let lineNumber, blockId;
+    
+    // Check if using the new block-specific format (BX-LY)
+    const blockLineMatch = lineFragment.match(/^(B\d+)-L(\d+)$/);
+    if (blockLineMatch) {
+      blockId = blockLineMatch[1];
+      lineNumber = parseInt(blockLineMatch[2], 10);
+    } else if (lineFragment.startsWith('L')) {
+      // Legacy format (LY)
+      blockId = 'B1'; // Assume first block for legacy format
+      lineNumber = parseInt(lineFragment.substring(1), 10);
+    } else {
+      return; // Unknown format
+    }
+    
+    if (isNaN(lineNumber)) return;
+    
+    // Construct cache key
+    const cacheKey = `${file || window.location.pathname}#${blockId}-${lineNumber}`;
+    
+    // Check if we already have this code block in cache
+    let codeBlock;
+    if (codeCache.has(cacheKey)) {
+      codeBlock = codeCache.get(cacheKey);
+    } else {
+      // Find the code block content - either in the current page or fetch from another page
+      if (!file || file === window.location.pathname.split('/').pop()) {
+        // Same page - look for the target line
+        const lineContentId = `${blockId}-LC${lineNumber}`;
+        const targetLine = document.getElementById(lineContentId);
+        if (!targetLine) return;
+        
+        // Get the containing code block
+        const codeContainer = targetLine.closest('.code-content');
+        if (!codeContainer) return;
+        
+        // Get all lines from the code container
+        const allLines = Array.from(codeContainer.querySelectorAll('.code-line'));
+        const targetIndex = allLines.indexOf(targetLine);
+        
+        if (targetIndex === -1) return;
+        
+        // Determine context-aware start and end indexes
+        const { startIndex, endIndex, commentLines } = determineContextLines(allLines, targetIndex);
+        
+        // Create a new container with the context lines
+        const contextLines = allLines.slice(startIndex, endIndex + 1);
+        
+        // Get current module name from document title or path
+        const moduleName = document.title || window.location.pathname.split('/').pop().replace('.html', '');
+        
+        // Build HTML for the code preview
+        codeBlock = buildCodePreview(contextLines, lineNumber, startIndex, moduleName, blockId, commentLines);
+        
+        // Cache the result
+        codeCache.set(cacheKey, codeBlock);
+      } else {
+        // Different page - we'll need to fetch it
+        try {
+          // Extract module name from file path
+          const moduleName = file.replace('.html', '');
+          codeBlock = await fetchCodeFromFile(file, lineNumber, moduleName, blockId);
+          if (codeBlock) {
+            codeCache.set(cacheKey, codeBlock);
+          }
+        } catch (error) {
+          console.error('Error fetching code preview:', error);
+          return;
+        }
+      }
+    }
+    
+    if (!codeBlock) return;
+    
+    // Add content to preview container
+    previewContainer.innerHTML = '';
+    previewContainer.appendChild(codeBlock);
+    
+    // Position the preview near the link
+    positionPreview(link);
+    
+    // Show the preview
+    previewContainer.style.display = 'block';
+  }
+  
+  /**
+   * Build a code preview element with the given context lines
+   */
+  function buildCodePreview(contextLines, highlightLineNumber, startLineIndex, moduleName = '', blockId = 'B1', commentLines = []) {
+    const container = document.createElement('div');
+    container.className = 'code-preview-container';
+    
+    // Add heading with link to full definition
+    const heading = document.createElement('div');
+    heading.className = 'preview-heading';
+    
+    // Create module name text
+    const moduleText = document.createElement('span');
+    moduleText.className = 'module-name';
+    
+    // If module name is provided, include it
+    if (moduleName) {
+      moduleText.textContent = `Definition in ${moduleName}`;
+    } else {
+      moduleText.textContent = 'Definition';
+    }
+    
+    // Create link to full definition
+    const linkToDefinition = document.createElement('a');
+    linkToDefinition.className = 'link-to-definition';
+    linkToDefinition.textContent = `Line ${highlightLineNumber}`;
+    
+    // Determine the link href using block-specific format
+    // If this is from another file, include the file name
+    if (moduleName && moduleName !== (document.title || '')) {
+      linkToDefinition.href = `${moduleName}.html#${blockId}-L${highlightLineNumber}`;
+    } else {
+      linkToDefinition.href = `#${blockId}-L${highlightLineNumber}`;
+    }
+    
+    // Add both elements to heading
+    heading.appendChild(moduleText);
+    heading.appendChild(linkToDefinition);
+    
+    container.appendChild(heading);
+    
+    // Add comment section if we have comments
+    if (commentLines.length > 0) {
+      const commentContainer = document.createElement('div');
+      commentContainer.className = 'preview-comment-container';
+      
+      // Combine all comment text into one block for proper list processing
+      let allCommentText = '';
+      commentLines.forEach((comment, index) => {
+        const commentText = comment.text;
+        
+        // Clean up the comment text - remove comment delimiters and extra whitespace
+        let cleanText = commentText
+          .replace(/^\{-\s*/, '')  // Remove opening {-
+          .replace(/\s*-\}$/, '')  // Remove closing -}
+          .replace(/^--\s*/, '')   // Remove -- prefix for line comments
+          .replace(/^\s*\*\s*/, '') // Remove leading asterisks
+          .trim();
+        
+        // Add to combined text with proper spacing
+        if (allCommentText && cleanText) {
+          allCommentText += '\n' + cleanText;
+        } else if (cleanText) {
+          allCommentText = cleanText;
+        }
+      });
+      
+      if (allCommentText) {
+        // Split into lines and clean each line
+        const lines = allCommentText.split('\n').map(line => {
+          // Remove common comment prefixes and clean up, but preserve list markers
+          return line
+            .replace(/^\s*--\s*/, '') // Remove -- prefix for line comments
+            .replace(/^\s*\*?\s*/, '') // Remove leading asterisks and whitespace
+            .trim();
+        }).filter(line => line.length > 0);
+        
+        if (lines.length > 0) {
+          const commentBlock = document.createElement('div');
+          commentBlock.className = 'preview-comment-block';
+          
+          // Process lines to detect lists and format them properly
+          let currentList = null;
+          let currentListType = null;
+          let currentListItem = null;
+          let inParametersSection = false;
+          let parametersTable = null;
+          
+          lines.forEach(line => {
+            // Check if this line indicates a parameters section
+            if (line.toLowerCase().match(/^\s*parameters?\s*:?\s*$/i)) {
+              // Close any existing list first
+              if (currentList) {
+                commentBlock.appendChild(currentList);
+                currentList = null;
+                currentListType = null;
+                currentListItem = null;
+              }
+              
+              // Add some spacing before parameters section
+              const spacer = document.createElement('div');
+              spacer.className = 'preview-comment-spacer';
+              commentBlock.appendChild(spacer);
+              
+              // Create parameters heading
+              const parametersHeading = document.createElement('div');
+              parametersHeading.className = 'preview-comment-line preview-parameters-heading';
+              parametersHeading.innerHTML = '<strong>Parameters:</strong>';
+              commentBlock.appendChild(parametersHeading);
+              
+              // Create parameters table
+              parametersTable = document.createElement('table');
+              parametersTable.className = 'preview-parameters-table';
+              inParametersSection = true;
+              return;
+            }
+            
+            // Check if this line is a list item (be more specific about list detection)
+            const bulletMatch = line.match(/^[-*+]\s+(.+)$/);
+            const numberedMatch = line.match(/^\d+\.\s+(.+)$/);
+            
+            if (bulletMatch && inParametersSection) {
+              // This is a parameter item - parse it as "name: description"
+              const paramText = bulletMatch[1];
+              const colonIndex = paramText.indexOf(':');
+              
+              if (colonIndex > 0) {
+                const paramName = paramText.substring(0, colonIndex).trim();
+                const paramDesc = paramText.substring(colonIndex + 1).trim();
+                
+                const row = document.createElement('tr');
+                row.className = 'preview-parameter-row';
+                
+                const nameCell = document.createElement('td');
+                nameCell.className = 'preview-parameter-name';
+                nameCell.textContent = paramName;
+                
+                const descCell = document.createElement('td');
+                descCell.className = 'preview-parameter-desc';
+                descCell.textContent = paramDesc;
+                
+                row.appendChild(nameCell);
+                row.appendChild(descCell);
+                parametersTable.appendChild(row);
+              } else {
+                // No colon found, treat as regular parameter with no description
+                const row = document.createElement('tr');
+                row.className = 'preview-parameter-row';
+                
+                const nameCell = document.createElement('td');
+                nameCell.className = 'preview-parameter-name';
+                nameCell.textContent = paramText;
+                
+                const descCell = document.createElement('td');
+                descCell.className = 'preview-parameter-desc';
+                descCell.textContent = '';
+                
+                row.appendChild(nameCell);
+                row.appendChild(descCell);
+                parametersTable.appendChild(row);
+              }
+              
+            } else if (bulletMatch) {
+              // Regular bullet list item (not in parameters section)
+              // End parameters section if we were in one
+              if (inParametersSection && parametersTable) {
+                commentBlock.appendChild(parametersTable);
+                parametersTable = null;
+                inParametersSection = false;
+              }
+              
+              if (currentListType !== 'ul') {
+                // Close any existing list and start a new unordered list
+                if (currentList) {
+                  commentBlock.appendChild(currentList);
+                }
+                currentList = document.createElement('ul');
+                currentList.className = 'preview-comment-list';
+                currentListType = 'ul';
+              }
+              
+              currentListItem = document.createElement('li');
+              currentListItem.className = 'preview-comment-list-item';
+              currentListItem.textContent = bulletMatch[1];
+              currentList.appendChild(currentListItem);
+              
+            } else if (numberedMatch) {
+              // Numbered list item
+              // End parameters section if we were in one
+              if (inParametersSection && parametersTable) {
+                commentBlock.appendChild(parametersTable);
+                parametersTable = null;
+                inParametersSection = false;
+              }
+              
+              if (currentListType !== 'ol') {
+                // Close any existing list and start a new ordered list
+                if (currentList) {
+                  commentBlock.appendChild(currentList);
+                }
+                currentList = document.createElement('ol');
+                currentList.className = 'preview-comment-list';
+                currentListType = 'ol';
+              }
+              
+              currentListItem = document.createElement('li');
+              currentListItem.className = 'preview-comment-list-item';
+              currentListItem.textContent = numberedMatch[1]; // Use the first capture group for the text
+              currentList.appendChild(currentListItem);
+              
+            } else if (currentListItem && line.trim() !== '' && !inParametersSection) {
+              // This is a continuation line for the current list item (but not in parameters section)
+              // Add it to the current list item with a space
+              currentListItem.textContent += ' ' + line;
+              
+            } else if (inParametersSection && parametersTable && line.trim() !== '') {
+              // This is a continuation line for the last parameter description
+              const lastRow = parametersTable.lastElementChild;
+              if (lastRow) {
+                const descCell = lastRow.querySelector('.preview-parameter-desc');
+                if (descCell) {
+                  descCell.textContent += ' ' + line;
+                }
+              }
+              
+            } else {
+              // This is a regular line or empty line
+              // End parameters section if we were in one
+              if (inParametersSection && parametersTable) {
+                commentBlock.appendChild(parametersTable);
+                parametersTable = null;
+                inParametersSection = false;
+              }
+              
+              // Close any existing list first
+              if (currentList) {
+                commentBlock.appendChild(currentList);
+                currentList = null;
+                currentListType = null;
+                currentListItem = null;
+              }
+              
+              // Only add non-empty lines as regular comment lines
+              if (line.trim() !== '') {
+                const commentLine = document.createElement('div');
+                commentLine.className = 'preview-comment-line';
+                commentLine.textContent = line;
+                commentBlock.appendChild(commentLine);
+              }
+            }
+          });
+          
+          // Don't forget to append any remaining list or parameters table
+          if (currentList) {
+            commentBlock.appendChild(currentList);
+          }
+          if (inParametersSection && parametersTable) {
+            commentBlock.appendChild(parametersTable);
+          }
+          
+          commentContainer.appendChild(commentBlock);
+        }
+      }
+      
+      container.appendChild(commentContainer);
+    }
+    
+    // Create line numbers container
+    const lineNumbers = document.createElement('div');
+    lineNumbers.className = 'preview-line-numbers';
+    
+    // Create code content container
+    const codeContent = document.createElement('div');
+    codeContent.className = 'preview-code-content';
+    
+    // Add each line with its number
+    contextLines.forEach((line, index) => {
+      // The actual line number in the document (startLineIndex is 0-based, but lines are 1-based)
+      const actualLineNumber = startLineIndex + index + 1;
+      
+      // Add line number
+      const lineNumberSpan = document.createElement('span');
+      lineNumberSpan.className = 'preview-line-number';
+      lineNumberSpan.textContent = actualLineNumber;
+      if (actualLineNumber === highlightLineNumber) {
+        lineNumberSpan.classList.add('highlight');
+      }
+      lineNumbers.appendChild(lineNumberSpan);
+      
+      // Add code line
+      const codeLine = document.createElement('div');
+      codeLine.className = 'preview-code-line';
+      if (actualLineNumber === highlightLineNumber) {
+        codeLine.classList.add('highlight');
+      }
+      
+      // Clone the line content more carefully to preserve whitespace and syntax highlighting
+      const lineContentWrapper = document.createElement('div');
+      lineContentWrapper.style.whiteSpace = 'pre';
+      lineContentWrapper.innerHTML = line.innerHTML;
+      
+      codeLine.appendChild(lineContentWrapper);
+      codeContent.appendChild(codeLine);
+    });
+    
+    // Create preview code structure - use the same exact class structure as in the main content
+    const previewCode = document.createElement('div');
+    // Use the same class structure as the main Agda code blocks to inherit styles
+    previewCode.className = 'Agda'; 
+    
+    // Create a code container to match the main content structure
+    const codeContainer = document.createElement('div');
+    codeContainer.className = 'code-container';
+    codeContainer.appendChild(lineNumbers);
+    codeContainer.appendChild(codeContent);
+    
+    previewCode.appendChild(codeContainer);
+    container.appendChild(previewCode);
+    
+    return container;
+  }
+  
+  /**
+   * Fetch code from another file
+   */
+  async function fetchCodeFromFile(file, lineNumber, moduleName = '', blockId = 'B1') {
+    try {
+      const response = await fetch(file);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${file}: ${response.status}`);
+      }
+      
+      const html = await response.text();
+      
+      // Create a temporary document to parse the HTML
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      
+      // Find the target line using the block-specific ID
+      const lineContentId = `${blockId}-LC${lineNumber}`;
+      const targetLine = doc.getElementById(lineContentId);
+      
+      // If the specific block isn't found, try to find any line with that number
+      // (fallback for files that might not have the updated format)
+      if (!targetLine) {
+        // Look for a line with the legacy format or in any block
+        const legacyTarget = doc.getElementById(`LC${lineNumber}`);
+        if (legacyTarget) {
+          // Use the legacy target's code block
+          const codeContainer = legacyTarget.closest('.code-content');
+          if (codeContainer) {
+            const allLines = Array.from(codeContainer.querySelectorAll('.code-line'));
+            const targetIndex = allLines.indexOf(legacyTarget);
+            
+            if (targetIndex !== -1) {
+              const { startIndex, endIndex, commentLines } = determineContextLines(allLines, targetIndex);
+              const contextLines = allLines.slice(startIndex, endIndex + 1);
+              return buildCodePreview(contextLines, lineNumber, startIndex, moduleName, 'B1', commentLines);
+            }
+          }
+        }
+        return null;
+      }
+      
+      // Get the containing code block
+      const codeContainer = targetLine.closest('.code-content');
+      if (!codeContainer) return null;
+      
+      // Get all lines from the code container
+      const allLines = Array.from(codeContainer.querySelectorAll('.code-line'));
+      const targetIndex = allLines.indexOf(targetLine);
+      
+      if (targetIndex === -1) return null;
+      
+      // Determine context-aware start and end indexes
+      const { startIndex, endIndex, commentLines } = determineContextLines(allLines, targetIndex);
+      
+      // Create a new container with the context lines
+      const contextLines = allLines.slice(startIndex, endIndex + 1);
+      
+      // Build HTML for the code preview
+      return buildCodePreview(contextLines, lineNumber, startIndex, moduleName, blockId, commentLines);
+    } catch (error) {
+      console.error('Error fetching preview:', error);
+      return null;
+    }
+  }
+  
+  /**
+   * Position the preview container near the link
+   */
+  function positionPreview(link) {
+    if (!link || !previewContainer) return;
+    
+    const linkRect = link.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    // Reset any previous positioning
+    previewContainer.style.maxHeight = '';
+    previewContainer.style.maxWidth = '';
+    
+    // Allow the container to take its natural size first
+    previewContainer.style.visibility = 'hidden';
+    previewContainer.style.display = 'block';
+    
+    // Get container dimensions
+    const containerWidth = previewContainer.offsetWidth;
+    const containerHeight = previewContainer.offsetHeight;
+    
+    // Default position is below the link
+    let top = linkRect.bottom + window.scrollY + 5;
+    let left = linkRect.left + window.scrollX;
+    
+    // Check if the preview would go off the bottom of the viewport
+    if (linkRect.bottom + containerHeight > viewportHeight) {
+      // Position above the link instead
+      top = linkRect.top + window.scrollY - containerHeight - 5;
+      
+      // If it would go off the top too, position it at the top of the viewport
+      if (top < window.scrollY) {
+        top = window.scrollY + 5;
+        
+        // Constrain height to fit in viewport
+        const maxHeight = viewportHeight - 10;
+        previewContainer.style.maxHeight = `${maxHeight}px`;
+      }
+    }
+    
+    // Check if the preview would go off the right of the viewport
+    if (left + containerWidth > viewportWidth) {
+      // Align right edge with viewport edge
+      left = viewportWidth - containerWidth + window.scrollX - 5;
+      
+      // Don't let it go off the left either
+      if (left < window.scrollX) {
+        left = window.scrollX + 5;
+        previewContainer.style.maxWidth = `${viewportWidth - 10}px`;
+      }
+    }
+    
+    // Apply the calculated position
+    previewContainer.style.top = `${top}px`;
+    previewContainer.style.left = `${left}px`;
+    
+    // Show the preview
+    previewContainer.style.visibility = 'visible';
+  }
+  
+  /**
+   * Hide the preview
+   */
+  function hidePreview() {
+    if (previewContainer) {
+      previewContainer.style.display = 'none';
+    }
+    
+    if (activeTimeout) {
+      clearTimeout(activeTimeout);
+      activeTimeout = null;
+    }
+    
+    activeLink = null;
+  }
+})();

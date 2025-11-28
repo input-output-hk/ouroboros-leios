@@ -1,0 +1,1 @@
+"use strict";(globalThis.webpackChunksite=globalThis.webpackChunksite||[]).push([[4811],{43067:s=>{s.exports=JSON.parse('{"tag":{"label":"bls","permalink":"/news/tags/bls","allTagsPath":"/news/tags","count":4,"unlisted":false},"listMetadata":{"permalink":"/news/tags/bls","page":1,"postsPerPage":10,"totalPages":1,"totalCount":4,"blogDescription":"Blog","blogTitle":"News"}}')}}]);

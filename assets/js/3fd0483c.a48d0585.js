@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunksite=self.webpackChunksite||[]).push([[838],{5433:e=>{e.exports=JSON.parse('{"tag":{"label":"deltaq","permalink":"/news/tags/deltaq","allTagsPath":"/news/tags","count":10,"unlisted":false},"listMetadata":{"permalink":"/news/tags/deltaq","page":1,"postsPerPage":10,"totalPages":1,"totalCount":10,"blogDescription":"Blog","blogTitle":"News"}}')}}]);

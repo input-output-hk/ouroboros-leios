@@ -1,0 +1,1 @@
+"use strict";(globalThis.webpackChunksite=globalThis.webpackChunksite||[]).push([[9317],{45479:a=>{a.exports=JSON.parse('{"tag":{"label":"cip","permalink":"/news/tags/cip","allTagsPath":"/news/tags","count":4,"unlisted":false},"listMetadata":{"permalink":"/news/tags/cip","page":1,"postsPerPage":10,"totalPages":1,"totalCount":4,"blogDescription":"Blog","blogTitle":"News"}}')}}]);
