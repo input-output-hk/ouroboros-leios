@@ -13,13 +13,6 @@ in
   {
     packages = agda // artifacts;
 
-    devShells.docs = pkgs.mkShell {
-      packages = [
-        # To format *.md files
-        pkgs.nodePackages.prettier
-      ];
-    };
-
-    devShells.ui = import ../ui/shell.nix { inherit pkgs; };
+    devShells.web = import ./web-shell.nix { inherit pkgs; };
   }
 ]

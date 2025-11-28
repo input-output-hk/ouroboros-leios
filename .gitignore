@@ -29,4 +29,9 @@ _build
 /simulation/docs/_minted-sim-realism/
 /data/simulation/*.trace.json
 /data/simulation/*.array.schema.json
+
+# npm packages
 node_modules/
+
+# direnv caches
+**/.direnv/
