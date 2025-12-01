@@ -8,6 +8,8 @@ author:
   - Thomas Vellekoop <thomas.vellekoop@iohk.io>
   - Michael Karg <michael.karg@iohk.io>
   - Martin Kourim <martin.kourim@iohk.io>
+  - Gamze Orhon Kılıç <gamze.kilic@iohk.io>
+  - Hamza Jeljeli <hamza.jeljeli@iohk.io>
 ---
 
 # Introduction
@@ -701,6 +703,19 @@ However, among the schemes analyzed, BLS certificates offered the most favorable
 The BLS voting mechanism relies on a pairing-based signature scheme defined over the BLS12-381 elliptic curve. 
 This approach is advantageous because it enables the aggregation of public keys and signatures, allowing large groups of participants to collectively signal approval through a single compact artifact. 
 Beyond Leios, the BLS mechanism is also relevant to other Cardano subsystems; Mithril already employs BLS-based aggregation, and Peras is expected to adopt a similar approach in future implementations.
+
+#### Choice of BLS Variant
+
+BLS12-381 signatures can be instantiated in two variants that differ only in which group is used for public keys and which is used for signatures. Both variants are equivalent in security and share the same API surface; they differ only in the size of the encoded artifacts:
+- **MinPk variant**: public keys are 48 bytes, signatures are 96 bytes.
+- **MinSig variant**: signatures are 48 bytes, public keys are 96 bytes.
+This creates a straightforward trade-off: either public keys are smaller (MinPk) or signatures are smaller (MinSig).
+
+For Leios, this choice affects several components:
+- **Certificate size** — Certificates contain one aggregated signature but may include multiple public keys (e.g., for non-persistent voters). MinPk yields smaller certificates.
+- **Network load** — Across the protocol, significantly more signatures than public keys will be produced, propagated, and verified. MinSig reduces total bandwidth and memory usage.
+
+Given the expected high volume of signatures flowing through the Leios voting and certification path, the current architectural expectation is that **MinSig** will be the preferred variant. This preference remains subject to final review as part of the broader Leios integration discussions.
 
 ### Implementation Plan
 
