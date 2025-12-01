@@ -838,35 +838,38 @@ This prevents PoPs from being repurposed as votes and preserves the security sep
 
 ### Roadmap
 
-> [!WARNING]
->
-> TODO: Contribution from crypto team.
-
 This roadmap outlines the planned tasks and milestones for integrating BLS functionality into `cardano-base` to support the Leios protocol. 
-The implementation is divided into three delivery cycles, progressing from foundational FFI bindings to high-level integration and code audit.
+The implementation is divided into four delivery cycles, progressing from foundational FFI bindings to code audit.
 
 #### Core Bindings and Setup
 <!-- Delivery cycle 1 -->
 *Establish the foundational Haskell ↔ C interoperability layer for BLS operations.*
-- Create Haskell ↔ C Bindings for the following functionalities:
+- Create Haskell ↔ C bindings for the following functionalities:
   - Key generation,
   - Public key derivation,
   - Signature generation and verification.
-- Create Haskell Function for Proof-of-Possession functionality using existing `blst` primitives.  
+- Create a Haskell function for Proof-of-Possession functionality using existing `blst` primitives.  
 
-#### Extended Functionality and Security Review
+#### Functional Expansion and Integration
 <!-- Delivery cycle 2 -->
-*Build higher-level cryptographic utilities, perform security validation, and finalize BLS type definitions.*
-- Define and Add New Types: Identify and introduce any missing types needed for safe and ergonomic BLS operations.
-- Create Haskell ↔ C Binding for batch verification support for efficient validation of multiple $(pk, msg, sig)$ triples.
-- Create Haskell Function for aggregation logic for multiple signatures and public keys to enable compact certificates.  
-- Check Security of key generation function of the C implementation and assess its adherence to the IETF BLS standard for secure IKM handling.  
+*Extend BLS functionality with aggregation and batch verification support, and integrate it into the DSIGN interface.*
+- Create Haskell functions for aggregation logic over multiple signatures and public keys to enable compact certificates.
+- Create Haskell ↔ C bindings for batch verification support for efficient validation of multiple $(pk, msg, sig)$ triples.
+- Define and add any missing types and helpers needed for safe and ergonomic BLS operations.
+- Add the internal BLS signature implementation to the `DSIGN` class and extend the DSIGN API with BLS-specific utilities (e.g., PoP helpers and aggregation helpers).
 
-#### Integration and Quality Assurance
+#### Internal Security Review and Quality Assurance
 <!-- Delivery cycle 3 -->
-*Integrate BLS signatures into the `DSIGN` class and complete final review.*
-- Add Internal BLS Signature to `DSIGN` Class  
-- Audit the Code
+*Validate the security and robustness of the BLS integration and prepare it for consensus use.*
+- Check the security of the key generation function in the C implementation and assess its adherence to the IETF BLS standard for secure IKM handling.
+- Consolidate and extend tests for the new BLS utilities and DSIGN integration.
+- Conduct an internal review by the Leios core team to validate correctness and readiness for upstream consensus integration.
+
+#### External Audit and Hardening
+<!-- Delivery cycle 4 -->
+*Obtain independent assurance on security and implementation quality and apply any required fixes.*
+- Commission an external audit covering the BLS implementation end-to-end, including cryptographic soundness, FFI and memory-safety of the `blst` bindings, and the exposed Haskell APIs.
+- Address audit findings and finalize the BLS module as production-ready infrastructure for Leios and related protocols.
 
 ## Performance & Tracing (P&T)
 
