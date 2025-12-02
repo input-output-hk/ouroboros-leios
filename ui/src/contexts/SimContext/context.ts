@@ -32,6 +32,8 @@ export const defaultState: ISimContextState = {
   },
   aggregatedData: defaultAggregatedData,
   tracePath: "",
+  lokiHost: undefined,
+  lokiConnected: false,
   topography: { links: new Map(), nodes: new Map() },
   topologyPath: "",
   topologyLoaded: false,
