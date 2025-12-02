@@ -1,4 +1,9 @@
 import { useSimContext } from "@/contexts/SimContext/context";
+import {
+  IServerMessage,
+  EServerMessageType,
+  IRankingBlockSent,
+} from "@/components/Sim/types";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export const useLokiWebSocket = () => {
@@ -10,6 +15,29 @@ export const useLokiWebSocket = () => {
   const [connected, setConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
 
+  const parseUpstreamNodeLog = (
+    logLine: string,
+    timestamp: number,
+  ): IServerMessage | null => {
+    if (logLine.trim() === "MsgBlock") {
+      // Hard-coded IRankingBlockSent for UpstreamNode -> Node0
+      const message: IRankingBlockSent = {
+        type: EServerMessageType.RBSent,
+        slot: 0, // TODO: extract from actual data when available
+        id: `rb-${timestamp}`,
+        sender: "UpstreamNode",
+        recipient: "Node0",
+      };
+
+      return {
+        time_s: timestamp,
+        message,
+      };
+    }
+
+    return null;
+  };
+
   const connect = useCallback(() => {
     if (!lokiHost || connecting || connected) return;
 
@@ -17,8 +45,10 @@ export const useLokiWebSocket = () => {
     dispatch({ type: "RESET_TIMELINE" });
 
     try {
-      // TODO: find a better query
-      const query = encodeURIComponent('{service="cardano-node"} |= "blockNo"');
+      // TODO: find better queries
+      const query = encodeURIComponent(
+        '{service="immdb-server"} |= "MsgBlock"',
+      );
       const wsUrl = `ws://${lokiHost}/loki/api/v1/tail?query=${query}`;
       console.log("Connecting to ", wsUrl);
       const ws = new WebSocket(wsUrl);
@@ -36,15 +66,35 @@ export const useLokiWebSocket = () => {
           console.log("Received Loki stream data:", data);
 
           if (data.streams && Array.isArray(data.streams)) {
+            const events: IServerMessage[] = [];
+
             data.streams.forEach((stream: any) => {
               if (stream.values && Array.isArray(stream.values)) {
                 stream.values.forEach(
                   ([timestamp, logLine]: [string, string]) => {
                     console.log("Stream value:", { timestamp, logLine });
+
+                    const timestampSeconds = parseFloat(timestamp) / 1000000000;
+                    const event = parseUpstreamNodeLog(
+                      logLine,
+                      timestampSeconds,
+                    );
+
+                    if (event) {
+                      events.push(event);
+                    }
                   },
                 );
               }
             });
+
+            if (events.length > 0) {
+              console.log("Dispatching events:", events);
+              dispatch({
+                type: "ADD_TIMELINE_EVENT_BATCH",
+                payload: events,
+              });
+            }
           }
         } catch (error) {
           console.error("Error processing Loki message:", error);

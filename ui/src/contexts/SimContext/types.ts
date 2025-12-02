@@ -85,6 +85,7 @@ export interface ISimContextState {
   topologyLoaded: boolean;
   events: IServerMessage[];
   currentTime: number;
+  minTime: number;
   maxTime: number;
   isPlaying: boolean;
   speedMultiplier: number;
