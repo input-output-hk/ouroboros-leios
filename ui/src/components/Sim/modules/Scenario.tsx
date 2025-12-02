@@ -10,7 +10,7 @@ import { Button } from "@/components/Button";
 
 export const Scenario: FC = () => {
   const {
-    state: { allScenarios, activeScenario, events, lokiHost, lokiConnected },
+    state: { allScenarios, activeScenario, events, lokiHost, lokiConnected, autoStart },
     dispatch,
   } = useSimContext();
   const { startStream, streaming, stopStream } = useStreamMessagesHandler();
@@ -32,8 +32,32 @@ export const Scenario: FC = () => {
         trace: scenario.trace ? new URL(scenario.trace, window.location.toString()).toString() : undefined,
       }));
       dispatch({ type: "SET_SCENARIOS", payload: scenarios });
+
+      // Check for scenario URL parameter
+      const urlParams = new URLSearchParams(window.location.search);
+      const scenarioParam = urlParams.get("scenario");
+      if (scenarioParam) {
+        const scenarioIndex = parseInt(scenarioParam, 10);
+        if (scenarioIndex >= 0 && scenarioIndex < scenarios.length) {
+          const targetScenario = scenarios[scenarioIndex];
+          dispatch({ type: "SET_SCENARIO", payload: targetScenario.name, autoStart: true });
+        }
+      }
     })();
   }, []);
+
+  // Auto-load/connect when autoStart is true
+  useEffect(() => {
+    if (autoStart && activeScenario) {
+      if (isLokiMode) {
+        connectLoki();
+      } else {
+        startStream(true); // Include transactions by default for auto-load
+      }
+      // Reset autoStart flag after triggering
+      dispatch({ type: "SET_SCENARIO", payload: activeScenario, autoStart: false });
+    }
+  }, [autoStart, activeScenario, isLokiMode, connectLoki, startStream, dispatch]);
 
   const chooseScenario = useCallback(
     (event: ChangeEvent<HTMLSelectElement>) => {
@@ -117,10 +141,7 @@ export const Scenario: FC = () => {
             onClick={handleUnloadScenario}
             className="w-[80px]"
           >
-            {isLokiMode 
-              ? "Disconnect"
-              : (streaming ? "Cancel" : "Reset")
-            }
+            {isConnecting ? "Cancel" : "Reset"}
           </Button>
         )}
       </div>
