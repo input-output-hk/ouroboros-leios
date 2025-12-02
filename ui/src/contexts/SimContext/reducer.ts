@@ -18,7 +18,7 @@ export const reducer = (
         allScenarios,
         activeScenario: scenario.name,
         maxTime: scenario.duration,
-        tracePath: scenario.trace,
+        tracePath: scenario.trace || "",
         topologyPath: scenario.topology,
       };
     }
@@ -35,7 +35,9 @@ export const reducer = (
         aggregatedData: defaultAggregatedData,
         activeScenario: scenario.name,
         maxTime: scenario.duration,
-        tracePath: scenario.trace,
+        tracePath: scenario.trace || "",
+        lokiHost: scenario.loki,
+        lokiConnected: false,
         topologyPath: scenario.topology,
         topologyLoaded:
           state.topologyLoaded && scenario.topology === state.topologyPath,
@@ -158,6 +160,12 @@ export const reducer = (
         currentTime: 0,
         isPlaying: false,
         speedMultiplier: 1,
+      };
+
+    case "SET_LOKI_CONNECTED":
+      return {
+        ...state,
+        lokiConnected: action.payload,
       };
 
     default:

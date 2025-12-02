@@ -5,15 +5,19 @@ import {
 import { IScenario } from "@/contexts/SimContext/types";
 import { ChangeEvent, FC, useCallback, useEffect, useState } from "react";
 import { useStreamMessagesHandler } from "../hooks/useStreamMessagesHandler";
+import { useLokiWebSocket } from "../hooks/useLokiWebSocket";
 import { Button } from "@/components/Button";
 
 export const Scenario: FC = () => {
   const {
-    state: { allScenarios, activeScenario, events },
+    state: { allScenarios, activeScenario, events, lokiHost, lokiConnected },
     dispatch,
   } = useSimContext();
   const { startStream, streaming, stopStream } = useStreamMessagesHandler();
+  const { connect: connectLoki, disconnect: disconnectLoki, connecting: lokiConnecting } = useLokiWebSocket();
   const [includeTransactions, setIncludeTransactions] = useState(true);
+
+  const isLokiMode = !!lokiHost;
 
   useEffect(() => {
     (async () => {
@@ -25,7 +29,7 @@ export const Scenario: FC = () => {
           scenario.topology,
           window.location.toString(),
         ).toString(),
-        trace: new URL(scenario.trace, window.location.toString()).toString(),
+        trace: scenario.trace ? new URL(scenario.trace, window.location.toString()).toString() : undefined,
       }));
       dispatch({ type: "SET_SCENARIOS", payload: scenarios });
     })();
@@ -39,7 +43,11 @@ export const Scenario: FC = () => {
   );
 
   const handleUnloadScenario = useCallback(() => {
-    stopStream();
+    if (isLokiMode) {
+      disconnectLoki();
+    } else {
+      stopStream();
+    }
     dispatch({ type: "RESET_TIMELINE" });
     dispatch({
       type: "BATCH_UPDATE",
@@ -47,13 +55,18 @@ export const Scenario: FC = () => {
         aggregatedData: defaultAggregatedData,
       },
     });
-  }, [stopStream, dispatch]);
+  }, [isLokiMode, disconnectLoki, stopStream, dispatch]);
 
   const handleStartStream = useCallback(() => {
-    startStream(includeTransactions);
-  }, [startStream, includeTransactions]);
+    if (isLokiMode) {
+      connectLoki();
+    } else {
+      startStream(includeTransactions);
+    }
+  }, [isLokiMode, connectLoki, startStream, includeTransactions]);
 
-  const isLoaded = events.length > 0 || streaming;
+  const isLoaded = events.length > 0 || streaming || lokiConnected;
+  const isConnecting = streaming || lokiConnecting;
 
   return (
     <div className="flex items-center justify-start gap-4 border-2 rounded-md p-4 border-gray-200 bg-white/80 backdrop-blur-xs">
@@ -73,25 +86,30 @@ export const Scenario: FC = () => {
         </select>
       </div>
 
-      <div className="flex flex-col gap-1">
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={includeTransactions}
-            onChange={(e) => setIncludeTransactions(e.target.checked)}
-            disabled={streaming || isLoaded}
-          />
-          Include Transactions
-        </label>
-      </div>
+      {!isLokiMode && (
+        <div className="flex flex-col gap-1">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={includeTransactions}
+              onChange={(e) => setIncludeTransactions(e.target.checked)}
+              disabled={isConnecting || isLoaded}
+            />
+            Include Transactions
+          </label>
+        </div>
+      )}
 
       <div className="flex gap-2">
         <Button
           variant="primary"
           onClick={handleStartStream}
-          disabled={streaming || isLoaded}
+          disabled={isConnecting || isLoaded}
         >
-          {streaming ? "Loading..." : isLoaded ? "Loaded" : "Load Scenario"}
+          {isLokiMode 
+            ? (lokiConnecting ? "Connecting..." : lokiConnected ? "Connected" : "Connect") 
+            : (streaming ? "Loading..." : isLoaded ? "Loaded" : "Load Scenario")
+          }
         </Button>
         {isLoaded && (
           <Button
@@ -99,7 +117,10 @@ export const Scenario: FC = () => {
             onClick={handleUnloadScenario}
             className="w-[80px]"
           >
-            {streaming ? "Cancel" : "Unload"}
+            {isLokiMode 
+              ? "Disconnect"
+              : (streaming ? "Cancel" : "Reset")
+            }
           </Button>
         )}
       </div>

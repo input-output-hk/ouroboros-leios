@@ -67,7 +67,8 @@ export interface IScenario {
   name: string;
   topology: string;
   duration: number;
-  trace: string;
+  trace?: string;
+  loki?: string;
 }
 
 export interface ISimContextState {
@@ -76,6 +77,8 @@ export interface ISimContextState {
   graph: IGraphContextState;
   aggregatedData: ISimulationAggregatedDataState;
   tracePath: string;
+  lokiHost?: string;
+  lokiConnected: boolean;
   topography: ITransformedNodeMap;
   topologyPath: string;
   topologyLoaded: boolean;
@@ -108,7 +111,8 @@ export type TSimContextActions =
   | { type: "SET_TIMELINE_TIME"; payload: number }
   | { type: "SET_TIMELINE_PLAYING"; payload: boolean }
   | { type: "SET_TIMELINE_SPEED"; payload: number }
-  | { type: "RESET_TIMELINE" };
+  | { type: "RESET_TIMELINE" }
+  | { type: "SET_LOKI_CONNECTED"; payload: boolean };
 
 export interface ISimContext {
   state: ISimContextState;

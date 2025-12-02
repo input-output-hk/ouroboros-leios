@@ -66,4 +66,31 @@ Then update `public/scenarios.json` accordingly:
 }
 ```
 
-Now add that
+## Add a live Loki streaming scenario
+
+For live visualization of node logs, you can configure scenarios that connect to a Loki instance via WebSocket. This allows real-time monitoring of running Cardano nodes.
+
+First, ensure your Loki instance is running and accessible, for example by following the [leios-demo](https://github.com/input-output-hk/leios-demo/) instructions.
+Then add a scenario with a `loki` field instead of `trace` to `public/scenarios.json`:
+
+```json
+{
+  "scenarios": [
+    {
+      "name": "Leios Demo 202511",
+      "topology": "topologies/prototype.yaml",
+      "duration": 300,
+      "loki": "localhost:3100"
+    }
+  ]
+}
+```
+
+## Configuration
+
+Scenarios support two modes:
+
+- **Stored traces**: Use the `trace` field pointing to a JSONL file (optionally gzipped)
+- **Live streaming**: Use the `loki` field with host:port of your Loki instance
+
+Both modes require a `topology` field specifying the network topology YAML file and a `duration` defining the amount of loaded data.
