@@ -74,6 +74,7 @@ export interface IScenario {
 export interface ISimContextState {
   allScenarios: IScenario[];
   activeScenario: string;
+  autoStart: boolean;
   graph: IGraphContextState;
   aggregatedData: ISimulationAggregatedDataState;
   tracePath: string;
@@ -91,7 +92,7 @@ export interface ISimContextState {
 
 export type TSimContextActions =
   | { type: "SET_SCENARIOS"; payload: IScenario[] }
-  | { type: "SET_SCENARIO"; payload: string }
+  | { type: "SET_SCENARIO"; payload: string; autoStart?: boolean }
   | { type: "SET_CURRENT_NODE"; payload: string | undefined }
   | {
       type: "SET_CANVAS_PROPS";

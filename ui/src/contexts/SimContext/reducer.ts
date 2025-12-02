@@ -34,6 +34,7 @@ export const reducer = (
         ...state,
         aggregatedData: defaultAggregatedData,
         activeScenario: scenario.name,
+        autoStart: action.autoStart || false,
         maxTime: scenario.duration,
         tracePath: scenario.trace || "",
         lokiHost: scenario.loki,
