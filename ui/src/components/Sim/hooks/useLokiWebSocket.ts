@@ -6,6 +6,62 @@ import {
 } from "@/components/Sim/types";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+// TODO: Replace with topology-based mapping
+const HOST_PORT_TO_NODE: Record<string, string> = {
+  "127.0.0.1:3001": "UpstreamNode",
+  "127.0.0.1:3002": "Node0",
+  "127.0.0.1:3003": "Node1",
+  "127.0.0.1:3004": "Node2",
+  // Add more mappings as needed
+};
+
+const parseCardanoNodeLog = (
+  streamLabels: any,
+  timestamp: number,
+  logLine: string,
+): IServerMessage | null => {
+  try {
+    const logData = JSON.parse(logLine);
+
+    if (logData.msg === "MsgBlock" && logData.direction === "Send") {
+      // Extract sender from stream labels (process name)
+      const sender = streamLabels.process;
+
+      // Parse connection to extract recipient
+      // connectionId format: "127.0.0.1:3001 127.0.0.1:3002"
+      const connectionId = logData.connectionId;
+      let recipient = "Node0"; // fallback
+
+      if (connectionId) {
+        // Split connectionId to get both endpoints
+        const endpoints = connectionId.split(" ");
+        if (endpoints.length === 2) {
+          // Second endpoint is the recipient
+          const recipientEndpoint = endpoints[1];
+          recipient = HOST_PORT_TO_NODE[recipientEndpoint] || recipient;
+        }
+      }
+
+      const message: IRankingBlockSent = {
+        type: EServerMessageType.RBSent,
+        slot: logData.prevCount || 0, // FIXME: Use proper slot number
+        id: `rb-${logData.prevCount + 1}`,
+        sender,
+        recipient,
+      };
+
+      return {
+        time_s: timestamp,
+        message,
+      };
+    }
+  } catch (error) {
+    console.warn("Failed to parse log line:", logLine, error);
+  }
+
+  return null;
+};
+
 export const useLokiWebSocket = () => {
   const {
     state: { lokiHost },
@@ -14,29 +70,6 @@ export const useLokiWebSocket = () => {
   const [connecting, setConnecting] = useState(false);
   const [connected, setConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
-
-  const parseUpstreamNodeLog = (
-    logLine: string,
-    timestamp: number,
-  ): IServerMessage | null => {
-    if (logLine.trim() === "MsgBlock") {
-      // Hard-coded IRankingBlockSent for UpstreamNode -> Node0
-      const message: IRankingBlockSent = {
-        type: EServerMessageType.RBSent,
-        slot: 0, // TODO: extract from actual data when available
-        id: `rb-${timestamp}`,
-        sender: "UpstreamNode",
-        recipient: "Node0",
-      };
-
-      return {
-        time_s: timestamp,
-        message,
-      };
-    }
-
-    return null;
-  };
 
   const connect = useCallback(() => {
     if (!lokiHost || connecting || connected) return;
@@ -47,7 +80,7 @@ export const useLokiWebSocket = () => {
     try {
       // TODO: find better queries
       const query = encodeURIComponent(
-        '{service="immdb-server"} |= "MsgBlock"',
+        '{service="cardano-node"} |= "MsgBlock"',
       );
       const wsUrl = `ws://${lokiHost}/loki/api/v1/tail?query=${query}`;
       console.log("Connecting to ", wsUrl);
@@ -63,24 +96,26 @@ export const useLokiWebSocket = () => {
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log("Received Loki stream data:", data);
+          console.debug("Received Loki streams:", data);
 
           if (data.streams && Array.isArray(data.streams)) {
             const events: IServerMessage[] = [];
 
             data.streams.forEach((stream: any) => {
+              console.debug("Stream labels:", stream.stream);
               if (stream.values && Array.isArray(stream.values)) {
                 stream.values.forEach(
                   ([timestamp, logLine]: [string, string]) => {
-                    console.log("Stream value:", { timestamp, logLine });
+                    console.debug("Stream value:", { timestamp, logLine });
 
                     const timestampSeconds = parseFloat(timestamp) / 1000000000;
-                    const event = parseUpstreamNodeLog(
-                      logLine,
+                    const event = parseCardanoNodeLog(
+                      stream.stream,
                       timestampSeconds,
+                      logLine,
                     );
-
                     if (event) {
+                      console.debug("Parsed", event.time_s, event.message);
                       events.push(event);
                     }
                   },
@@ -89,7 +124,6 @@ export const useLokiWebSocket = () => {
             });
 
             if (events.length > 0) {
-              console.log("Dispatching events:", events);
               dispatch({
                 type: "ADD_TIMELINE_EVENT_BATCH",
                 payload: events,
