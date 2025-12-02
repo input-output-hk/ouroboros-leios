@@ -709,7 +709,7 @@ Beyond Leios, the BLS mechanism is also relevant to other Cardano subsystems; Mi
 BLS12-381 signatures can be instantiated in two variants that differ only in which group is used for public keys and which is used for signatures. Both variants are equivalent in security and share the same API surface; they differ only in the size of the encoded artifacts:
 - **MinPk variant**: public keys are 48 bytes, signatures are 96 bytes, and a proof of possesion is 2 times 96 bytes.
 - **MinSig variant**: signatures are 48 bytes, public keys are 96 bytes, and a proof of possesion is 2 times 48 bytes.
-This creates a straightforward trade-off: either public keys are smaller (MinPk) or signatures are smaller (MinSig).
+This creates a straightforward trade-off: either public keys are smaller (MinPk) or signatures are smaller (MinSig). Note that proofs of possession are only used at key registration time (once per stake pool key), so their size has negligible impact on steady-state bandwidth, storage, or verification costs. They therefore do not weigh into the choice between the two variants.
 
 For Leios, this choice affects several components:
 - **Certificate size** — Certificates contain one aggregated signature but may include multiple public keys (e.g., for non-persistent voters). MinPk yields smaller certificates.
