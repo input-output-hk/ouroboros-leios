@@ -35,7 +35,6 @@ export const reducer = (
         aggregatedData: defaultAggregatedData,
         activeScenario: scenario.name,
         autoStart: action.autoStart || false,
-        maxTime: scenario.duration,
         tracePath: scenario.trace || "",
         lokiHost: scenario.loki,
         lokiConnected: false,
@@ -49,6 +48,8 @@ export const reducer = (
         // Reset timeline when switching scenarios
         events: [],
         currentTime: 0,
+        minTime: 0,
+        maxTime: scenario.duration,
       };
     }
 
@@ -110,14 +111,47 @@ export const reducer = (
         topologyLoaded: true,
       };
 
-    case "ADD_TIMELINE_EVENT_BATCH":
+    case "ADD_TIMELINE_EVENT_BATCH": {
+      const newEvents = [...state.events, ...action.payload];
+
+      if (newEvents.length === 0) {
+        return {
+          ...state,
+          events: newEvents,
+        };
+      }
+
+      // Calculate timeline bounds
+      const timestamps = newEvents.map((event) => event.time_s);
+      const minEventTime = Math.min(...timestamps);
+      const maxEventTime = Math.max(...timestamps);
+
+      // Update timeline bounds and clamp current time
+      const newMinTime =
+        state.minTime == 0
+          ? minEventTime
+          : Math.min(state.minTime, minEventTime);
+      const newMaxTime = Math.max(state.maxTime, maxEventTime);
+
+      const clampedCurrentTime = Math.max(
+        newMinTime,
+        Math.min(state.currentTime, newMaxTime),
+      );
+
       return {
         ...state,
-        events: [...state.events, ...action.payload],
+        events: newEvents,
+        minTime: newMinTime,
+        maxTime: newMaxTime,
+        currentTime: clampedCurrentTime,
       };
+    }
 
     case "SET_TIMELINE_TIME": {
-      const newTime = action.payload;
+      const newTime = Math.max(
+        state.minTime,
+        Math.min(action.payload, state.maxTime),
+      );
 
       // Recompute complete aggregated data based on new timeline position
       const nodeIds = Array.from(state.topography.nodes.keys());
@@ -159,6 +193,8 @@ export const reducer = (
         ...state,
         events: [],
         currentTime: 0,
+        minTime: 0,
+        maxTime: 0,
         isPlaying: false,
         speedMultiplier: 1,
       };

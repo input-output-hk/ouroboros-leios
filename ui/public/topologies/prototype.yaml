@@ -1,23 +1,23 @@
 nodes:
-  node-0:
+  UpstreamNode:
     stake: 1
     location:
       - 0
       - 0
     producers: {}
-  node-1:
+  Node0:
     stake: 0
     location:
       - 0
       - 100
     producers:
-      node-0:
+      UpstreamNode:
         latency-ms: 17.0
-  node-2:
+  DownstreamNode:
     stake: 0
     location:
       - 0
       - 200
     producers:
-      node-1:
+      Node0:
         latency-ms: 32.0

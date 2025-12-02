@@ -40,6 +40,7 @@ export const defaultState: ISimContextState = {
   topologyLoaded: false,
   events: [],
   currentTime: 0,
+  minTime: 0,
   maxTime: 0,
   isPlaying: false,
   speedMultiplier: 1,
