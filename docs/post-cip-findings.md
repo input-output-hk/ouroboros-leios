@@ -1,1 +1,0 @@
-Relocated to [/post-cip/ReadMe.md](../post-cip/README.md).
