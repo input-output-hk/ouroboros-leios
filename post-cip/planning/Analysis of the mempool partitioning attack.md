@@ -1,4 +1,4 @@
-## Analysis of the mempool partitioning attack
+# Analysis of the mempool partitioning attack
 
 What are the costs and benefits from the adversary’s perspective when considering attack vectors that cause the honest nodes’ mempools to not overlap.
 
@@ -9,24 +9,24 @@ Timeline:
 - *March:* assemble technical report.
 - *March 11:* end of 100-day cycle.
 
-### Motivation
+## Motivation
 
 Part of the motivation for the Linear Leios indirection in EB bodies versus EB closures is the assumption that honest nodes’ mempools usually mostly overlap. If this is assumed to be common, then it might also justify decreasing $L_\text{vote}$, for example.
 
-### Customers
+## Customers
 
 In addition to informing research and networking experts, memory pool modeling and scenario analyses will help inform the community as to safe setting of protocol parameters.
 
-### Outcomes
+## Outcomes
 
 1. Statistical models of the memory pool and its correlations.
 2. Mathematical model of mempool operation under optimistic and adversarial conditions.
 3. A computational embodiment of the mempool model.
 4. Analyses of adversarial memory pool simulations.
 
-### Tasks
+## Tasks
 
-#### Empirical foundations on Cardano mainnet
+### Empirical foundations on Cardano mainnet
 
 - [ ] Mempool telemetry experiment
 	- [ ] Probability that a transaction is in one node's mempool, given that it is in another node's mempool.
@@ -56,7 +56,7 @@ In addition to informing research and networking experts, memory pool modeling a
 	- [ ] Connectivity matrix heat map.
 	- [ ] Filtration of topological components by long hops.
 
-#### Modeling the memory pools and their spatio-temporal correlations
+### Modeling the memory pools and their spatio-temporal correlations
 
 - [ ] Regression models of mempool behavior under normal operating conditions.
 	- [ ] Coherence between local and global memory pools.
@@ -78,6 +78,6 @@ In addition to informing research and networking experts, memory pool modeling a
 		- How does fragmentation of the memory pool (either under typical or adversarial conditions) interact with resource requirements and protocol parameters?
 		- To what extent can memory-pool fragmentation stop the production of EBs or impact Praos?
 
-#### Stretch goals
+### Stretch goals
 
 - [ ] Simulator for the node's p2p network.
