@@ -56,6 +56,6 @@ The Linear Leios engineering effort and the broader technical community can use 
 - Executable realization of the mathematical model.
 - Numerical study of feasible protocol parameters hardware requirements.
 
-### Stretch goal
+### Stretch goal (uncommitted)
 
 - [ ] Improve granularity of ledger-operation measurements by `db-analyser` tool.

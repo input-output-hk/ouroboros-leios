@@ -80,6 +80,6 @@ In addition to informing research and networking experts, memory pool modeling a
 		- How does fragmentation of the memory pool (either under typical or adversarial conditions) interact with resource requirements and protocol parameters?
 		- To what extent can memory-pool fragmentation stop the production of EBs or impact Praos?
 
-### Stretch goals
+### Stretch goals (uncommitted)
 
 - [ ] Simulator that is approximately faithful to the node's p2p network logic.
