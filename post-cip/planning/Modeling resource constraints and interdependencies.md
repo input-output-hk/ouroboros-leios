@@ -21,7 +21,9 @@ The Linear Leios engineering effort and the broader technical community can use 
 
 1. Statistical models of ledger operations.
 2. Mathematical model that relates Leios operations and phases (and associated protocol parameters) to the resource budgets (network, CPU, and I/O) available for meeting various transaction loads.
-3. A computable embodiment of that model in DeltaQSD, Agda, Lean, or other suitable platform.
+3. A computable embodiment of that model in Agda, Lean, or other suitable platform.
+	1. The statistical model and, to some extent, the mathematical model will be suitable for use in the DeltaQSD effort for Linear Leios.
+	2. The executable model will be suitable for optimization and feasibility studies.
 4. Example computational experiments demonstrating the models usage for computing resource budgets and identifying bottlenecks.
 
 ## Tasks
@@ -56,4 +58,4 @@ The Linear Leios engineering effort and the broader technical community can use 
 
 ### Stretch goal
 
-- [ ] Improve granularity of measurements by `db-analyser` tool.
+- [ ] Improve granularity of ledger-operation measurements by `db-analyser` tool.

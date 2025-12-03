@@ -21,6 +21,8 @@ In addition to informing research and networking experts, memory pool modeling a
 
 1. Statistical models of the memory pool and its correlations.
 2. Mathematical model of mempool operation under optimistic and adversarial conditions.
+	1. The statistical model and, to some extent, the mathematical model will be suitable for use in the DeltaQSD effort for Linear Leios.
+	2. The executable model will be suitable for optimization and feasibility studies.
 3. A computational embodiment of the mempool model.
 4. Analyses of adversarial memory pool simulations.
 
@@ -80,4 +82,4 @@ In addition to informing research and networking experts, memory pool modeling a
 
 ### Stretch goals
 
-- [ ] Simulator for the node's p2p network.
+- [ ] Simulator that is approximately faithful to the node's p2p network logic.
