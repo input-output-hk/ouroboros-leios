@@ -1,37 +1,6 @@
 {
   description = "Ouroboros Leios";
 
-
-  inputs = {
-    iogx = {
-      url = "github:input-output-hk/iogx";
-    };
-
-    leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?rev=2ccae64440bf8834cbed69acfd1993a808b9046a";
-  };
-
-
-  outputs = inputs: inputs.iogx.lib.mkFlake {
-
-    inherit inputs;
-
-    repoRoot = ./.;
-
-    outputs = import ./nix/outputs.nix;
-
-    # systems = [ "x86_64-linux" "x86_64-darwin" "aarch64-darwin" "aarch64-linux" ];
-
-    # debug = false;
-
-    # nixpkgsArgs = {
-    #   config = {};
-    #   overlays = [];
-    # };
-
-    # flake = { repoRoot, inputs }: {};
-  };
-
-
   nixConfig = {
     extra-substituters = [
       "https://cache.iog.io"
@@ -41,4 +10,55 @@
     ];
     allow-import-from-derivation = true;
   };
+
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs";
+
+    iogx.url = "github:input-output-hk/iogx";
+
+    leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?rev=2ccae64440bf8834cbed69acfd1993a808b9046a";
+
+    flake-parts.url = "github:hercules-ci/flake-parts";
+
+    pre-commit-hooks.url = "github:cachix/git-hooks.nix";
+
+    ouroboros-consensus.url = "github:intersectmbo/ouroboros-consensus?ref=leios-prototype-demo-202511";
+
+    cardano-node.url = "github:intersectmbo/cardano-node?ref=leios-prototype-demo-202511";
+  };
+
+  outputs =
+    inputs@{
+      self,
+      nixpkgs,
+      flake-parts,
+      ...
+    }:
+    let
+      inherit (nixpkgs) lib;
+      # Collect all the build.nix files (flake-parts module)
+      buildDotNixes =
+        with builtins;
+        filter (lib.hasSuffix "build.nix") (
+          lib.filesystem.listFilesRecursive (filterSource (path: type: true) ./.) # NOTE(bladyjoker): This is here to prevent errors due to invalid Nix store filenames (spaces, commas, etc.)
+        );
+    in
+    flake-parts.lib.mkFlake { inherit inputs; } {
+
+      imports = [
+        inputs.pre-commit-hooks.flakeModule
+        ./pkgs.nix
+      ]
+      ++ buildDotNixes;
+
+      debug = true;
+
+      systems = [
+        "x86_64-linux"
+        # "x86_64-darwin"
+        # "aarch64-linux"
+        # "aarch64-darwin"
+      ];
+    };
+
 }
