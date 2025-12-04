@@ -60,7 +60,7 @@ parseFieldOrDefault obj =
   tracingParser v =
     parseJSON v
       `parserCatchError` ( \path msg ->
-                            trace ("Using default value for: " ++ show path ++ " , error: " ++ msg) (pure defVal)
+                             trace ("Using default value for: " ++ show path ++ " , error: " ++ msg) (pure defVal)
                          )
 
 parseField :: forall obj fld a. (HasField fld obj a, KnownSymbol fld, FromJSON a) => Object -> Parser a

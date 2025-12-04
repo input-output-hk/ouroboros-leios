@@ -127,12 +127,12 @@ data RelaySimVizState = RelaySimVizState
   , vizNodeLinks :: !(Map Link LinkPoints)
   , vizMsgsInTransit ::
       !( Map
-          (NodeId, NodeId)
-          [ ( TestBlockRelayMessage
-            , TcpMsgForecast
-            , [TcpMsgForecast]
-            )
-          ]
+           (NodeId, NodeId)
+           [ ( TestBlockRelayMessage
+             , TcpMsgForecast
+             , [TcpMsgForecast]
+             )
+           ]
        )
   , vizMsgsAtNodeQueue :: !(Map NodeId [TestBlock])
   , vizMsgsAtNodeBuffer :: !(Map NodeId [TestBlock])
@@ -424,11 +424,11 @@ relaySimVizRenderModel
       Cairo.setLineWidth 3
       sequence_
         [ do
-          Cairo.arc x y 25 0 (pi * 2)
-          Cairo.setSourceRGB 0.7 0.7 0.7
-          Cairo.fillPreserve
-          Cairo.setSourceRGB 0 0 0
-          Cairo.stroke
+            Cairo.arc x y 25 0 (pi * 2)
+            Cairo.setSourceRGB 0.7 0.7 0.7
+            Cairo.fillPreserve
+            Cairo.setSourceRGB 0 0 0
+            Cairo.stroke
         | (_node, pos) <- Map.toList vizNodePos
         , let (Point x y) = simPointToPixel worldDimensions screenSize pos
         ]
@@ -438,18 +438,18 @@ relaySimVizRenderModel
       Cairo.save
       sequence_
         [ do
-          Cairo.setSourceRGB r g b
-          Cairo.arc (x - 10) y' 10 0 (2 * pi)
-          Cairo.fillPreserve
-          Cairo.setSourceRGB 0 0 0
-          Cairo.setLineWidth 1
-          Cairo.stroke
-          case nodeMessageText msg of
-            Nothing -> return ()
-            Just txt -> do
-              Cairo.moveTo (x - 32) (y' + 5)
-              Cairo.showText txt
-              Cairo.newPath
+            Cairo.setSourceRGB r g b
+            Cairo.arc (x - 10) y' 10 0 (2 * pi)
+            Cairo.fillPreserve
+            Cairo.setSourceRGB 0 0 0
+            Cairo.setLineWidth 1
+            Cairo.stroke
+            case nodeMessageText msg of
+              Nothing -> return ()
+              Just txt -> do
+                Cairo.moveTo (x - 32) (y' + 5)
+                Cairo.showText txt
+                Cairo.newPath
         | (node, msgs) <- Map.toList vizMsgsAtNodeQueue
         , (n, msg) <- zip [1 ..] msgs
         , let (Point x y) =
@@ -462,18 +462,18 @@ relaySimVizRenderModel
         ]
       sequence_
         [ do
-          Cairo.setSourceRGB r g b
-          Cairo.arc (x + 10) y' 10 0 (2 * pi)
-          Cairo.fillPreserve
-          Cairo.setSourceRGB 0 0 0
-          Cairo.setLineWidth 1
-          Cairo.stroke
-          case nodeMessageText msg of
-            Nothing -> return ()
-            Just txt -> do
-              Cairo.moveTo (x + 22) (y' + 5)
-              Cairo.showText txt
-              Cairo.newPath
+            Cairo.setSourceRGB r g b
+            Cairo.arc (x + 10) y' 10 0 (2 * pi)
+            Cairo.fillPreserve
+            Cairo.setSourceRGB 0 0 0
+            Cairo.setLineWidth 1
+            Cairo.stroke
+            case nodeMessageText msg of
+              Nothing -> return ()
+              Just txt -> do
+                Cairo.moveTo (x + 22) (y' + 5)
+                Cairo.showText txt
+                Cairo.newPath
         | (node, msgs) <- Map.toList vizMsgsAtNodeBuffer
         , (n, msg) <- zip [1 ..] msgs
         , let (Point x y) =
@@ -492,24 +492,24 @@ relaySimVizRenderModel
       Cairo.setLineWidth 3
       sequence_
         [ do
-          Cairo.save
-          renderPathRoundedRect fromPos toPos 20
-          Cairo.setSourceRGB 0.9 0.9 0.9
-          Cairo.fillPreserve
-          Cairo.clip
-          Cairo.newPath
-          -- draw all the messages within the clipping region of the link
-          renderMessagesInFlight
-            (TcpSimVizConfig ptclMessageColor)
-            now
-            fromPos
-            toPos
-            msgs
-          Cairo.restore
-          -- the draw the link border on top (without clipping)
-          renderPathRoundedRect fromPos toPos 20
-          Cairo.setSourceRGB 0 0 0
-          Cairo.stroke
+            Cairo.save
+            renderPathRoundedRect fromPos toPos 20
+            Cairo.setSourceRGB 0.9 0.9 0.9
+            Cairo.fillPreserve
+            Cairo.clip
+            Cairo.newPath
+            -- draw all the messages within the clipping region of the link
+            renderMessagesInFlight
+              (TcpSimVizConfig ptclMessageColor)
+              now
+              fromPos
+              toPos
+              msgs
+            Cairo.restore
+            -- the draw the link border on top (without clipping)
+            renderPathRoundedRect fromPos toPos 20
+            Cairo.setSourceRGB 0 0 0
+            Cairo.stroke
         | (fromPos, toPos, msgs) <- linksAndMsgs
         ]
       -- draw the message labels on top of the links
@@ -550,8 +550,8 @@ relaySimVizRenderModel
       -- draw lines from labels to messages
       sequence_
         [ do
-          withPoint Cairo.moveTo (labelsOrigin `addP` Vector 0 (n * 10))
-          withPoint Cairo.lineTo msgTrailingEdge
+            withPoint Cairo.moveTo (labelsOrigin `addP` Vector 0 (n * 10))
+            withPoint Cairo.lineTo msgTrailingEdge
         | ((_msgLabel, msgforecast), n) <- zip msgLabels [0 ..]
         , let (msgTrailingEdge, _msgLeadingEdge) =
                 lineMessageInFlight now fromPos toPos msgforecast
@@ -561,9 +561,9 @@ relaySimVizRenderModel
       Cairo.setSourceRGB 0 0 0
       sequence_
         [ do
-          withPoint Cairo.moveTo (labelsOrigin `addP` Vector 0 (n * 10))
-          Cairo.showText msgLabel
-          Cairo.newPath
+            withPoint Cairo.moveTo (labelsOrigin `addP` Vector 0 (n * 10))
+            Cairo.showText msgLabel
+            Cairo.newPath
         | ((msgLabel, _), n) <- zip msgLabels [0 ..]
         ]
       Cairo.restore

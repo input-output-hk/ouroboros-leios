@@ -77,8 +77,8 @@ traverseLinks p2pLinks newConn = do
   tcplinks <-
     sequence
       [ do
-        (aChan, bChan) <- newConn na nb info
-        return ((na :<- nb), (aChan :<- bChan))
+          (aChan, bChan) <- newConn na nb info
+          return ((na :<- nb), (aChan :<- bChan))
       | ((na :<- nb), info) <- Map.toList p2pLinks
       ]
   let chansToUpstream =
@@ -373,12 +373,12 @@ allPairsMinWeights g edgeWeight vertexWeight =
     sequence_ [writeArray arr (v, v) 0 | v <- [0 .. n]]
     sequence_
       [ do
-        w_ik <- readArray arr (i, k)
-        w_kj <- readArray arr (k, j)
-        w_ij <- readArray arr (i, j)
-        let !w_ikj = w_ik + w_kj + vertexWeight k
-        when (w_ij > w_ikj) $
-          writeArray arr (i, j) w_ikj
+          w_ik <- readArray arr (i, k)
+          w_kj <- readArray arr (k, j)
+          w_ij <- readArray arr (i, j)
+          let !w_ikj = w_ik + w_kj + vertexWeight k
+          when (w_ij > w_ikj) $
+            writeArray arr (i, j) w_ikj
       | k <- [0 .. n]
       , i <- [0 .. n]
       , j <- [0 .. n]

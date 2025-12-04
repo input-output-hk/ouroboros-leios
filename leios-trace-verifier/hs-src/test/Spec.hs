@@ -1,5 +1,4 @@
 -- | Main entry point.
-
 module Main where
 
 import Spec.Generated (generated)
