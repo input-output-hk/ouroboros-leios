@@ -1,3 +1,4 @@
+# Sourced by build.nix
 # https://github.com/cachix/git-hooks.nix?tab=readme-ov-file#hooks
 {
   # Nix
@@ -8,4 +9,8 @@
   # Haskell
   fourmolu.enable = true;
   hlint.enable = true;
+
+  # Python
+  black.enable = true;
+  ruff.enable = true;
 }
