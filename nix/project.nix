@@ -1,8 +1,14 @@
-{ repoRoot, inputs, pkgs, system, lib }:
+{
+  repoRoot,
+  inputs,
+  pkgs,
+  lib,
+  ...
+}:
 
 let
 
-  agda = import ./agda.nix {inherit pkgs lib inputs;};
+  agda = import ./agda.nix { inherit pkgs lib inputs; };
 
   sources = pkgs.stdenv.mkDerivation {
     name = "leios-hs-sources";
@@ -36,27 +42,15 @@ let
     '';
   };
 
-  cabalProject' = pkgs.haskell-nix.cabalProject' ({ pkgs, config, ... }:
-    let
-      # When `isCross` is `true`, it means that we are cross-compiling the project.
-      # WARNING You must use the `pkgs` coming from cabalProject' for `isCross` to work.
-      isCross = pkgs.stdenv.hostPlatform != pkgs.stdenv.buildPlatform;
-    in
-    {
-      src = sources.out;
-      shell.withHoogle = false;
-      inputMap = {
-        "https://chap.intersectmbo.org/" = inputs.iogx.inputs.CHaP;
-      };
-      name = "ouroboros-leios";
-      compiler-nix-name = lib.mkDefault "ghc9101";
-      modules = [
-        { #enableLibraryProfiling = true;
-          #enableProfiling = true;
-          #profilingDetail = "late";
-        }
-      ];
-    });
+  cabalProject' = pkgs.haskell-nix.cabalProject' {
+    src = sources.out;
+    shell.withHoogle = false;
+    inputMap = {
+      "https://chap.intersectmbo.org/" = inputs.iogx.inputs.CHaP;
+    };
+    name = "ouroboros-leios";
+    compiler-nix-name = lib.mkDefault "ghc9101";
+  };
 
   cabalProject = cabalProject'.appendOverlays [ ];
 
@@ -65,22 +59,6 @@ let
     inherit cabalProject;
 
     shellArgs = repoRoot.nix.shell;
-
-    # includeMingwW64HydraJobs = false;
-
-    # includeProfiledHydraJobs = false;
-
-    # readTheDocs = {
-    #   enable = false;
-    #   siteFolder = "doc/read-the-docs-site";
-    #   sphinxToolchain = null;
-    # };
-
-    # combinedHaddock = {
-    #   enable = false;
-    #   prologue = "";
-    #   packages = [];
-    # };
   };
 
 in

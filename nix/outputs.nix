@@ -1,15 +1,21 @@
-{ repoRoot, inputs, pkgs, lib, system }:
+{
+  repoRoot,
+  inputs,
+  pkgs,
+  lib,
+  ...
+}:
 
 let
 
-  project = repoRoot.nix.project;
+  inherit (repoRoot.nix) project;
   agda = import ./agda.nix { inherit pkgs lib inputs; };
   artifacts = import ./artifacts.nix { inherit pkgs; };
 
 in
 
 [
-  (project.flake)
+  project.flake
   {
     packages = agda // artifacts;
 

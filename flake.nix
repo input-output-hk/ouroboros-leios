@@ -29,7 +29,6 @@
 
   outputs =
     inputs@{
-      self,
       nixpkgs,
       flake-parts,
       ...
@@ -40,7 +39,7 @@
       buildDotNixes =
         with builtins;
         filter (lib.hasSuffix "build.nix") (
-          lib.filesystem.listFilesRecursive (filterSource (path: type: true) ./.) # NOTE(bladyjoker): This is here to prevent errors due to invalid Nix store filenames (spaces, commas, etc.)
+          lib.filesystem.listFilesRecursive (filterSource (_path: _type: true) ./.) # NOTE(bladyjoker): This is here to prevent errors due to invalid Nix store filenames (spaces, commas, etc.)
         );
     in
     flake-parts.lib.mkFlake { inherit inputs; } {

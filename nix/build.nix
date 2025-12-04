@@ -1,4 +1,5 @@
-{inputs, ...}: {
+{ inputs, ... }:
+{
   flake = inputs.iogx.lib.mkFlake {
 
     inherit inputs;

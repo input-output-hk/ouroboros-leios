@@ -1,4 +1,4 @@
-{pkgs, ...}:
+{ pkgs, ... }:
 
 {
 
@@ -10,37 +10,38 @@
     enable = true;
     nixpkgs = pkgs;
     haskellCompiler = "ghc94";
-    extraHaskellPackages = p: with p; [
+    extraHaskellPackages =
+      p: with p; [
 
-      # Required for charts in iHaskell kernel
-      ihaskell
-      ihaskell-charts
-      Chart-cairo
+        # Required for charts in iHaskell kernel
+        ihaskell
+        ihaskell-charts
+        Chart-cairo
 
-      # Packages
-      deltaq
-      probability-polynomial
+        # Packages
+        deltaq
+        probability-polynomial
 
-      # Library dependencies
-      Chart
-      exact-combinatorics
-      graphviz
-      lattices
+        # Library dependencies
+        Chart
+        exact-combinatorics
+        graphviz
+        lattices
 
-      # Test dependencies, not strictly needed but perhaps convenient
-      hspec
-      hspec-discover
-      QuickCheck
- 
-      # Benchmark dependencies, not strictly needed but perhaps convenient
-      cassava
-      criterion
-      hvega
-      optparse-applicative
-      statistics
-      vector
+        # Test dependencies, not strictly needed but perhaps convenient
+        hspec
+        hspec-discover
+        QuickCheck
 
-    ];
+        # Benchmark dependencies, not strictly needed but perhaps convenient
+        cassava
+        criterion
+        hvega
+        optparse-applicative
+        statistics
+        vector
+
+      ];
   };
 
 }
