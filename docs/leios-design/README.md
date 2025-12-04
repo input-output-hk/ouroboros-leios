@@ -709,13 +709,59 @@ Beyond Leios, the BLS mechanism is also relevant to other Cardano subsystems; Mi
 BLS12-381 signatures can be instantiated in two variants that differ only in which group is used for public keys and which is used for signatures. Both variants are equivalent in security and share the same API surface; they differ only in the size of the encoded artifacts:
 - **MinPk variant**: public keys are 48 bytes, signatures are 96 bytes, and a proof of possesion is 2 times 96 bytes.
 - **MinSig variant**: signatures are 48 bytes, public keys are 96 bytes, and a proof of possesion is 2 times 48 bytes.
-This creates a straightforward trade-off: either public keys are smaller (MinPk) or signatures are smaller (MinSig). Note that proofs of possession are only used at key registration time (once per stake pool key), so their size has negligible impact on steady-state bandwidth, storage, or verification costs. They therefore do not weigh into the choice between the two variants.
+This creates a straightforward trade-off: either public keys are smaller (MinPk) or signatures are smaller (MinSig).
 
-For Leios, this choice affects several components:
-- **Certificate size** — Certificates contain one aggregated signature but may include multiple public keys (e.g., for non-persistent voters). MinPk yields smaller certificates.
-- **Network load** — Across the protocol, significantly more signatures than public keys will be produced, propagated, and verified. MinSig reduces total bandwidth and memory usage.
+For Leios, this choice affects the size of voting certificates, which in turn impacts bandwidth, storage, and block propagation. Note that proofs of possession are only used at key registration time, so their size has negligible impact on steady-state bandwidth, storage, or verification costs. They therefore do not weigh into the choice between the two variants.
 
-Given the expected high volume of signatures flowing through the Leios voting and certification path, the current architectural expectation is that **MinSig** will be the preferred variant. This preference remains subject to final review as part of the broader Leios integration discussions.
+The certificate scheme we use follows the one defined in CIP-0164 together with the more detailed description in
+[Specification.md](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md) (section *“BLS certificate scheme”*). At a high level, a certificate records:
+
+- the **election identifier** (8 bytes) and **EB hash** (32 bytes),
+- a **bitset of persistent voters**, of size \(m / 8\) bytes,
+- for each **non-persistent voter**:
+  - the Pool ID (28 bytes),
+  - its **eligibility proof**, an individual BLS signature of size S_sig,
+- one **aggregate vote signature** on the EB (a single BLS signature of size S_sig).
+
+A key point is that **eligibility proofs remain non-aggregated**: the block producer must be able to verify each proof individually against the Fait-Accompli sortition condition. Only the vote signatures on the EB are aggregated.
+
+Under these assumptions, the total certificate size (ignoring small CBOR overhead) is
+
+\[
+certificate_bytes = 40 + 2 * S_sig + m / 8 + (28 + S_sig) * (n - m).
+\]
+
+Current sortition simulations tune the number of non-persistent seats to roughly 100 across the committee sizes we care about. Concretely, we assume:
+- for n = 500, we have m ≈ 400 persistent voters,
+- for n = 1000, we have m ≈ 900 persistent voters,
+
+so in both cases (n - m) ≈ 100 non-persistent voters, and the term (28 + S_sig) * (n-m) dominates.
+
+**Quantitative comparison**
+
+For a 1000-seat committee with m ≈ 900 persistent voters:
+
+- **MinSig**:
+
+  \[ certificate_bytes = 40 + 2 * 48 + 113 + (28 + 48) * 100 = 136 + 113 + 7600 = 7849 bytes.
+  \]
+
+- **MinPk**:
+
+  \[ certificate_bytes = 40 + 2 * 96 + 113 + (28 + 96) * 100 = 232 + 113 + 12400 = 12745 bytes.
+  \]
+
+So, for n = 1000 and \(n - m ≈ 100\), MinPk certificates are about 4.9 kB larger, which is roughly a **60% increase** over MinSig.
+
+We also evaluated the 500-seat case. The percentage increase from MinSig to MinPk is essentially the same (~60%).
+
+**Interpretation for Leios**
+
+- With MinSig, certificates stay comfortably below **8 kB** and keeps certificate propagation and storage lightweight.
+- With MinPk, certificates grow to around **12.7 kB**, still within Praos limits but significantly heavier for bandwidth, storage, and diffusion—especially given the number of certificates the system will handle over time.
+- Since Leios produces far more **signatures** (votes and eligibility proofs) than public keys, the overall cost is driven by signature size rather than key size.
+
+In summary, the Leios cryptography design therefore **fixes MinSig as the BLS12-381 variant**.
 
 ### Implementation Plan
 
