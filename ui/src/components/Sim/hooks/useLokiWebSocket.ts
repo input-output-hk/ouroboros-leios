@@ -10,8 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 const HOST_PORT_TO_NODE: Record<string, string> = {
   "127.0.0.1:3001": "UpstreamNode",
   "127.0.0.1:3002": "Node0",
-  "127.0.0.1:3003": "Node1",
-  "127.0.0.1:3004": "Node2",
+  "127.0.0.1:3003": "DownstreamNode",
   // Add more mappings as needed
 };
 
@@ -23,6 +22,7 @@ const parseCardanoNodeLog = (
   try {
     const logData = JSON.parse(logLine);
 
+    // Handle MsgBlock with Send direction
     if (logData.msg === "MsgBlock" && logData.direction === "Send") {
       // Extract sender from stream labels (process name)
       const sender = streamLabels.process;
@@ -45,7 +45,41 @@ const parseCardanoNodeLog = (
       const message: IRankingBlockSent = {
         type: EServerMessageType.RBSent,
         slot: logData.prevCount || 0, // FIXME: Use proper slot number
-        id: `rb-${logData.prevCount + 1}`,
+        id: `rb-${logData.prevCount + 1}`, // FIXME: use proper block hash
+        sender,
+        recipient,
+      };
+
+      return {
+        time_s: timestamp,
+        message,
+      };
+    }
+
+    // Handle BlockFetchServer kind
+    if (logData.kind === "BlockFetchServer" && logData.peer && logData.block) {
+      // Extract sender from stream labels (process name)
+      const sender = streamLabels.process;
+
+      // Parse connection to extract recipient
+      // connectionId format: "127.0.0.1:3002 127.0.0.1:3003"
+      const connectionId = logData.peer.connectionId;
+      let recipient = "Node0"; // fallback
+
+      if (connectionId) {
+        // Split connectionId to get both endpoints
+        const endpoints = connectionId.split(" ");
+        if (endpoints.length === 2) {
+          // Second endpoint is the recipient
+          const recipientEndpoint = endpoints[1];
+          recipient = HOST_PORT_TO_NODE[recipientEndpoint] || recipient;
+        }
+      }
+
+      const message: IRankingBlockSent = {
+        type: EServerMessageType.RBSent,
+        slot: 0, // FIXME: Use proper slot number
+        id: `rb-${logData.block.substring(0, 8)}`,
         sender,
         recipient,
       };
@@ -78,15 +112,14 @@ export const useLokiWebSocket = () => {
     dispatch({ type: "RESET_TIMELINE" });
 
     try {
-      // TODO: find better queries
-      const query = encodeURIComponent(
-        '{service="cardano-node"} |= "MsgBlock"',
-      );
-      const wsUrl = `ws://${lokiHost}/loki/api/v1/tail?query=${query}`;
+      // TODO: Multiple websockets instead? e.g. query={ns="BlockFetch.Client.CompletedBlockFetch"}
+      const query = encodeURIComponent('{service="cardano-node"}');
+      const wsUrl = `ws://${lokiHost}/loki/api/v1/tail?query=${query}&limit=10000`;
       console.log("Connecting to ", wsUrl);
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
+      let count = 0;
       ws.onopen = () => {
         setConnecting(false);
         setConnected(true);
@@ -106,7 +139,11 @@ export const useLokiWebSocket = () => {
               if (stream.values && Array.isArray(stream.values)) {
                 stream.values.forEach(
                   ([timestamp, logLine]: [string, string]) => {
-                    console.debug("Stream value:", { timestamp, logLine });
+                    count++;
+                    console.debug("Stream value:", count, {
+                      timestamp,
+                      logLine,
+                    });
 
                     const timestampSeconds = parseFloat(timestamp) / 1000000000;
                     const event = parseCardanoNodeLog(
