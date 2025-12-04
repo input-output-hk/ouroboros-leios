@@ -7,15 +7,6 @@ import {
 } from "@/components/Sim/types";
 import { useRef } from "react";
 
-interface QueryConfig {
-  query: string;
-  parser: (
-    streamLabels: any,
-    timestamp: number,
-    logLine: string,
-  ) => IServerMessage | null;
-}
-
 // FIXME: latency in topology is wrong
 
 // TODO: Replace with topology-based mapping
@@ -176,122 +167,102 @@ const parseCompletedBlockFetchLog = (
   return null;
 };
 
-// Query configurations
-const QUERY_CONFIGS: QueryConfig[] = [
-  {
-    query: '{service="cardano-node", ns="BlockFetch.Server.SendBlock"}',
-    parser: parseBlockFetchServerLog,
-  },
-  {
-    query: '{service="cardano-node", process="UpstreamNode"} |= `MsgBlock`',
-    parser: parseUpstreamNodeLog,
-  },
-  {
-    query:
-      '{service="cardano-node", ns="BlockFetch.Client.CompletedBlockFetch"}',
-    parser: parseCompletedBlockFetchLog,
-  },
-];
-
-function connectLokiWebSockets(lokiHost: string, dispatch: any): () => void {
-  const websockets: WebSocket[] = [];
-  let connectedCount = 0;
-
-  dispatch({ type: "SET_LOKI_CONNECTED", payload: false });
-
-  const createWebSocket = (config: QueryConfig, index: number): WebSocket => {
-    const query = encodeURIComponent(config.query);
-    const wsUrl = `ws://${lokiHost}/loki/api/v1/tail?query=${query}`;
-    console.log(`Connecting with query ${index}:`, wsUrl);
-    const ws = new WebSocket(wsUrl);
-
-    let count = 0;
-    ws.onopen = () => {
-      connectedCount += 1;
-      if (connectedCount === QUERY_CONFIGS.length) {
-        dispatch({ type: "SET_LOKI_CONNECTED", payload: true });
-      }
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        console.debug(`Received Loki streams from query ${index}:`, data);
-
-        if (data.streams && Array.isArray(data.streams)) {
-          const events: IServerMessage[] = [];
-
-          data.streams.forEach((stream: any) => {
-            console.debug("Stream labels:", stream.stream);
-            if (stream.values && Array.isArray(stream.values)) {
-              stream.values.forEach(
-                ([timestamp, logLine]: [string, string]) => {
-                  count++;
-                  console.debug(`Stream value from query ${index}:`, count, {
-                    timestamp,
-                    logLine,
-                  });
-
-                  const timestampSeconds = parseFloat(timestamp) / 1000000000;
-                  const event = config.parser(
-                    stream.stream,
-                    timestampSeconds,
-                    logLine,
-                  );
-                  if (event) {
-                    console.warn("Parsed", event.time_s, event.message);
-                    events.push(event);
-                  }
-                },
-              );
-            }
-          });
-
-          if (events.length > 0) {
-            dispatch({ type: "ADD_TIMELINE_EVENT_BATCH", payload: events });
-          }
-        }
-      } catch (error) {
-        console.error(
-          `Error processing Loki message from query ${index}:`,
-          error,
-        );
-      }
-    };
-
-    ws.onerror = (error) => {
-      console.error(`WebSocket error for query ${index}:`, error);
-      connectedCount = 0;
-      dispatch({ type: "SET_LOKI_CONNECTED", payload: false });
-    };
-
-    ws.onclose = () => {
-      connectedCount = Math.max(0, connectedCount - 1);
-      if (connectedCount === 0) {
-        dispatch({ type: "SET_LOKI_CONNECTED", payload: false });
-      }
-    };
-
-    return ws;
-  };
-
+// Combined parser that handles all event types
+const parseCardanoNodeLog = (
+  streamLabels: any,
+  timestamp: number,
+  logLine: string,
+): IServerMessage | null => {
   try {
-    QUERY_CONFIGS.forEach((config, index) => {
-      websockets.push(createWebSocket(config, index));
-    });
+    const logData = JSON.parse(logLine);
+
+    // Try each parser in order
+    if (logData.kind === "BlockFetchServer") {
+      return parseBlockFetchServerLog(streamLabels, timestamp, logLine);
+    }
+
+    if (logData.kind === "CompletedBlockFetch") {
+      return parseCompletedBlockFetchLog(streamLabels, timestamp, logLine);
+    }
+
+    if (logData.msg === "MsgBlock" && logData.direction === "Send") {
+      return parseUpstreamNodeLog(streamLabels, timestamp, logLine);
+    }
   } catch (error) {
-    console.error("Failed to create WebSocket connections:", error);
-    dispatch({ type: "SET_LOKI_CONNECTED", payload: false });
+    console.warn("Failed to parse log line:", logLine, error);
   }
 
-  // Return cleanup function
-  return () => {
-    websockets.forEach((ws) => {
-      if (ws) {
-        ws.close();
-      }
-    });
+  return null;
+};
+
+function connectLokiWebSocket(lokiHost: string, dispatch: any): () => void {
+  // NOTE: Single websocket is essential because:
+  // 1. Timeline aggregation assumes events are chronologically ordered
+  // 2. Multiple websockets deliver events out of order across different queries
+  // 3. Loki naturally returns results in chronological order within a single stream
+  // 4. Sorting large event arrays in the reducer is too expensive for dense simulation data
+  const query =
+    '{service="cardano-node"} |~ "SendBlock|MsgBlock|CompletedBlockFetch"';
+  const wsUrl = `ws://${lokiHost}/loki/api/v1/tail?query=${encodeURIComponent(query)}&limit=5000`;
+  console.log("Connecting to Loki:", wsUrl);
+
+  const ws = new WebSocket(wsUrl);
+
+  ws.onopen = () => {
+    dispatch({ type: "SET_LOKI_CONNECTED", payload: true });
   };
+
+  let count = 0;
+  ws.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      console.debug("Received Loki streams:", data);
+
+      if (data.streams && Array.isArray(data.streams)) {
+        const events: IServerMessage[] = [];
+
+        data.streams.forEach((stream: any) => {
+          console.debug("Stream labels:", stream.stream);
+          if (stream.values && Array.isArray(stream.values)) {
+            stream.values.forEach(([timestamp, logLine]: [string, string]) => {
+              count++;
+              console.debug(`Stream value:`, count, {
+                timestamp,
+                logLine,
+              });
+              const timestampSeconds = parseFloat(timestamp) / 1000000000;
+              const event = parseCardanoNodeLog(
+                stream.stream,
+                timestampSeconds,
+                logLine,
+              );
+              if (event) {
+                console.warn("Parsed", event.time_s, event.message);
+                events.push(event);
+              }
+            });
+          }
+        });
+
+        if (events.length > 0) {
+          dispatch({ type: "ADD_TIMELINE_EVENT_BATCH", payload: events });
+        }
+      }
+    } catch (error) {
+      console.error("Error processing Loki message:", error);
+    }
+  };
+
+  ws.onerror = (error) => {
+    console.error("WebSocket error:", error);
+    dispatch({ type: "SET_LOKI_CONNECTED", payload: false });
+  };
+
+  ws.onclose = () => {
+    dispatch({ type: "SET_LOKI_CONNECTED", payload: false });
+  };
+
+  return () => ws.close();
 }
 
 export const useLokiWebSocket = () => {
@@ -306,7 +277,7 @@ export const useLokiWebSocket = () => {
 
     dispatch({ type: "RESET_TIMELINE" });
 
-    cleanupRef.current = connectLokiWebSockets(lokiHost, dispatch);
+    cleanupRef.current = connectLokiWebSocket(lokiHost, dispatch);
   };
 
   const disconnect = () => {
