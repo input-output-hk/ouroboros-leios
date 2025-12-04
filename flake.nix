@@ -21,10 +21,6 @@
     flake-parts.url = "github:hercules-ci/flake-parts";
 
     pre-commit-hooks.url = "github:cachix/git-hooks.nix";
-
-    ouroboros-consensus.url = "github:intersectmbo/ouroboros-consensus?ref=leios-prototype-demo-202511";
-
-    cardano-node.url = "github:intersectmbo/cardano-node?ref=leios-prototype-demo-202511";
   };
 
   outputs =
