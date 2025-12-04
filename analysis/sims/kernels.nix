@@ -31,6 +31,7 @@ in
       ggplot2
       ggExtra
       igraph
+      ltsa
       lubridate
       mongolite
       poibin

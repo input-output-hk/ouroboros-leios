@@ -4,8 +4,8 @@ set -eo pipefail
 
 SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
 
-echo $'Region\tTimestamp\tTxId' > tx_times.tsv
-echo $'Region\tTimestamp\tBlock\tSlot' > block_times.tsv
+echo $'Region\tTimestamp\tTxId' > tx-times.tsv
+echo $'Region\tTimestamp\tBlock\tSlot' > block-times.tsv
 
 for region in eu-central-1 us-east-2 ap-northeast-1
 do
