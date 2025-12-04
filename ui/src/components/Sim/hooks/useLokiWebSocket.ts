@@ -3,6 +3,7 @@ import {
   IServerMessage,
   EServerMessageType,
   IRankingBlockSent,
+  IRankingBlockReceived,
 } from "@/components/Sim/types";
 import { useRef } from "react";
 
@@ -56,7 +57,7 @@ const parseBlockFetchServerLog = (
       const message: IRankingBlockSent = {
         type: EServerMessageType.RBSent,
         slot: 0, // FIXME: Use proper slot number
-        id: `rb-blockfetch-${logData.block.substring(0, 8)}`,
+        id: `rb-${logData.block.substring(0, 8)}`,
         sender,
         recipient,
       };
@@ -121,6 +122,60 @@ const parseUpstreamNodeLog = (
   return null;
 };
 
+const parseCompletedBlockFetchLog = (
+  streamLabels: any,
+  timestamp: number,
+  logLine: string,
+): IServerMessage | null => {
+  try {
+    const logData = JSON.parse(logLine);
+
+    // Handle CompletedBlockFetch kind
+    if (
+      logData.kind === "CompletedBlockFetch" &&
+      logData.peer &&
+      logData.block
+    ) {
+      // Extract recipient from stream labels (process name)
+      const recipient = streamLabels.process;
+
+      // Parse connection to extract sender
+      // connectionId format: "127.0.0.1:3003 127.0.0.1:3002"
+      const connectionId = logData.peer.connectionId;
+      let sender = "Node0"; // fallback
+      if (connectionId) {
+        // Split connectionId to get both endpoints
+        const endpoints = connectionId.split(" ");
+        if (endpoints.length === 2) {
+          const senderEndpoint = endpoints[1];
+          sender = HOST_PORT_TO_NODE[senderEndpoint] || sender;
+        }
+      }
+
+      const message: IRankingBlockReceived = {
+        type: EServerMessageType.RBReceived,
+        slot: 0, // FIXME: Use proper slot number
+        id: `rb-${logData.block.substring(0, 8)}`,
+        sender,
+        recipient,
+      };
+
+      return {
+        time_s: timestamp,
+        message,
+      };
+    }
+  } catch (error) {
+    console.warn(
+      "Failed to parse CompletedBlockFetch log line:",
+      logLine,
+      error,
+    );
+  }
+
+  return null;
+};
+
 // Query configurations
 const QUERY_CONFIGS: QueryConfig[] = [
   {
@@ -130,6 +185,11 @@ const QUERY_CONFIGS: QueryConfig[] = [
   {
     query: '{service="cardano-node", process="UpstreamNode"} |= `MsgBlock`',
     parser: parseUpstreamNodeLog,
+  },
+  {
+    query:
+      '{service="cardano-node", ns="BlockFetch.Client.CompletedBlockFetch"}',
+    parser: parseCompletedBlockFetchLog,
   },
 ];
 
@@ -179,7 +239,7 @@ function connectLokiWebSockets(lokiHost: string, dispatch: any): () => void {
                     logLine,
                   );
                   if (event) {
-                    console.debug("Parsed", event.time_s, event.message);
+                    console.warn("Parsed", event.time_s, event.message);
                     events.push(event);
                   }
                 },
