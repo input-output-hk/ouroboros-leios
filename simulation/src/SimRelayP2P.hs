@@ -56,11 +56,11 @@ traceRelayP2P
         runConcurrently $
           sequenceA_
             [ Concurrently $
-              relayNode
-                (nodeTracer nid)
-                (relayConfig rng)
-                (Map.findWithDefault [] nid chansToDownstream)
-                (Map.findWithDefault [] nid chansToUpstream)
+                relayNode
+                  (nodeTracer nid)
+                  (relayConfig rng)
+                  (Map.findWithDefault [] nid chansToDownstream)
+                  (Map.findWithDefault [] nid chansToUpstream)
             | (nid, rng) <-
                 zip
                   (Map.keys p2pNodes)

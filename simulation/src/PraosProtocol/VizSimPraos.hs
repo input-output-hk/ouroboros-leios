@@ -90,12 +90,12 @@ data PraosSimVizState = PraosSimVizState
   , vizNodeLinks :: !(Map Link LinkPoints)
   , vizMsgsInTransit ::
       !( Map
-          (NodeId, NodeId)
-          [ ( PraosMessage BlockBody
-            , TcpMsgForecast
-            , [TcpMsgForecast]
-            )
-          ]
+           (NodeId, NodeId)
+           [ ( PraosMessage BlockBody
+             , TcpMsgForecast
+             , [TcpMsgForecast]
+             )
+           ]
        )
   , vizNodeTip :: !(Map NodeId FullTip)
   , -- the Buffer and Queue names are legacy from VizSimRelay.
@@ -405,11 +405,11 @@ praosSimVizRenderModel
       Cairo.setLineWidth 3
       sequence_
         [ do
-          Cairo.arc x y 25 0 (pi * 2)
-          Cairo.setSourceRGB 0.7 0.7 0.7
-          Cairo.fillPreserve
-          Cairo.setSourceRGB 0 0 0
-          Cairo.stroke
+            Cairo.arc x y 25 0 (pi * 2)
+            Cairo.setSourceRGB 0.7 0.7 0.7
+            Cairo.fillPreserve
+            Cairo.setSourceRGB 0 0 0
+            Cairo.stroke
         | (_node, pos) <- Map.toList vizNodePos
         , let (Point x y) = simPointToPixel worldDimensions screenSize pos
         ]
@@ -421,24 +421,24 @@ praosSimVizRenderModel
       Cairo.setLineWidth 3
       sequence_
         [ do
-          Cairo.save
-          renderPathRoundedRect fromPos toPos 20
-          Cairo.setSourceRGB 0.9 0.9 0.9
-          Cairo.fillPreserve
-          Cairo.clip
-          Cairo.newPath
-          -- draw all the messages within the clipping region of the link
-          renderMessagesInFlight
-            (TcpSimVizConfig $ either chainSyncMessageColor blockFetchMessageColor . coerce)
-            now
-            fromPos
-            toPos
-            msgs
-          Cairo.restore
-          -- the draw the link border on top (without clipping)
-          renderPathRoundedRect fromPos toPos 20
-          Cairo.setSourceRGB 0 0 0
-          Cairo.stroke
+            Cairo.save
+            renderPathRoundedRect fromPos toPos 20
+            Cairo.setSourceRGB 0.9 0.9 0.9
+            Cairo.fillPreserve
+            Cairo.clip
+            Cairo.newPath
+            -- draw all the messages within the clipping region of the link
+            renderMessagesInFlight
+              (TcpSimVizConfig $ either chainSyncMessageColor blockFetchMessageColor . coerce)
+              now
+              fromPos
+              toPos
+              msgs
+            Cairo.restore
+            -- the draw the link border on top (without clipping)
+            renderPathRoundedRect fromPos toPos 20
+            Cairo.setSourceRGB 0 0 0
+            Cairo.stroke
         | (fromPos, toPos, msgs) <- linksAndMsgs
         ]
       -- draw the message labels on top of the links
@@ -479,8 +479,8 @@ praosSimVizRenderModel
       -- draw lines from labels to messages
       sequence_
         [ do
-          withPoint Cairo.moveTo (labelsOrigin `addP` Vector 0 (n * 10))
-          withPoint Cairo.lineTo msgTrailingEdge
+            withPoint Cairo.moveTo (labelsOrigin `addP` Vector 0 (n * 10))
+            withPoint Cairo.lineTo msgTrailingEdge
         | ((_msgLabel, msgforecast), n) <- zip msgLabels [0 ..]
         , let (msgTrailingEdge, _msgLeadingEdge) =
                 lineMessageInFlight now fromPos toPos msgforecast
@@ -490,9 +490,9 @@ praosSimVizRenderModel
       Cairo.setSourceRGB 0 0 0
       sequence_
         [ do
-          withPoint Cairo.moveTo (labelsOrigin `addP` Vector 0 (n * 10))
-          Cairo.showText msgLabel
-          Cairo.newPath
+            withPoint Cairo.moveTo (labelsOrigin `addP` Vector 0 (n * 10))
+            Cairo.showText msgLabel
+            Cairo.newPath
         | ((msgLabel, _), n) <- zip msgLabels [0 ..]
         ]
       Cairo.restore
