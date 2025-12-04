@@ -7,4 +7,5 @@
 
   # Haskell
   fourmolu.enable = true;
+  hlint.enable = true;
 }
