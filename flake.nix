@@ -32,11 +32,11 @@
     let
       inherit (nixpkgs) lib;
       # Collect all the build.nix files (flake-parts module)
-      buildDotNixes =
-        with builtins;
-        filter (lib.hasSuffix "build.nix") (
-          lib.filesystem.listFilesRecursive (filterSource (_path: _type: true) ./.) # NOTE(bladyjoker): This is here to prevent errors due to invalid Nix store filenames (spaces, commas, etc.)
-        );
+      buildDotNixes = import ./nix/findFilesRecursive.nix {
+        inherit lib;
+        toInclude = lib.hasSuffix "build.nix";
+        dir = ./.;
+      };
     in
     flake-parts.lib.mkFlake { inherit inputs; } {
 
