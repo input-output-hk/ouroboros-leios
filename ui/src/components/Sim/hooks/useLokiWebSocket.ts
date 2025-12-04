@@ -4,6 +4,7 @@ import {
   EServerMessageType,
   IRankingBlockSent,
   IRankingBlockReceived,
+  IEndorserBlockSent,
 } from "@/components/Sim/types";
 import { useRef } from "react";
 
@@ -17,29 +18,24 @@ const HOST_PORT_TO_NODE: Record<string, string> = {
   // Add more mappings as needed
 };
 
-const parseBlockFetchServerLog = (
+const parseRankingBlockSent = (
   streamLabels: any,
   timestamp: number,
   logLine: string,
 ): IServerMessage | null => {
   try {
-    const logData = JSON.parse(logLine);
+    const log = JSON.parse(logLine);
 
-    // Handle BlockFetchServer kind
-    if (logData.kind === "BlockFetchServer" && logData.peer && logData.block) {
-      // Extract sender from stream labels (process name)
+    // From cardano-node ns=BlockFetch.Server.SendBlock
+    // {"block":"56515bfd5751ca2c1ca0f21050cdb1cd020e396c623a16a2274528f643d4b5fd","kind":"BlockFetchServer","peer":{"connectionId":"127.0.0.1:3002 127.0.0.1:3003"}}
+    if (log.kind === "BlockFetchServer" && log.peer && log.block) {
       const sender = streamLabels.process;
-
-      // Parse connection to extract recipient
-      // connectionId format: "127.0.0.1:3002 127.0.0.1:3003"
-      const connectionId = logData.peer.connectionId;
-      let recipient = "Node0"; // fallback
+      const connectionId = log.peer.connectionId;
+      let recipient = "Node0";
 
       if (connectionId) {
-        // Split connectionId to get both endpoints
         const endpoints = connectionId.split(" ");
         if (endpoints.length === 2) {
-          // Second endpoint is the recipient
           const recipientEndpoint = endpoints[1];
           recipient = HOST_PORT_TO_NODE[recipientEndpoint] || recipient;
         }
@@ -47,8 +43,37 @@ const parseBlockFetchServerLog = (
 
       const message: IRankingBlockSent = {
         type: EServerMessageType.RBSent,
-        slot: 0, // FIXME: Use proper slot number
-        id: `rb-${logData.block.substring(0, 8)}`,
+        slot: 0,
+        id: `rb-${log.block.substring(0, 8)}`,
+        sender,
+        recipient,
+      };
+
+      return {
+        time_s: timestamp,
+        message,
+      };
+    }
+
+    // From immdb-server (no ns)
+    // {"at":"2025-12-05T12:45:21.0021Z","connectionId":"127.0.0.1:3001 127.0.0.1:3002","direction":"Send","msg":"MsgBlock","mux_at":"2025-12-05T12:45:21.0020Z","prevCount":13}
+    if (log.msg === "MsgBlock" && log.direction === "Send") {
+      const sender = streamLabels.process;
+      const connectionId = log.connectionId;
+      let recipient = "Node0";
+
+      if (connectionId) {
+        const endpoints = connectionId.split(" ");
+        if (endpoints.length === 2) {
+          const recipientEndpoint = endpoints[1];
+          recipient = HOST_PORT_TO_NODE[recipientEndpoint] || recipient;
+        }
+      }
+
+      const message: IRankingBlockSent = {
+        type: EServerMessageType.RBSent,
+        slot: log.prevCount || 0,
+        id: `rb-upstream-${log.prevCount + 1}`,
         sender,
         recipient,
       };
@@ -59,83 +84,28 @@ const parseBlockFetchServerLog = (
       };
     }
   } catch (error) {
-    console.warn("Failed to parse BlockFetchServer log line:", logLine, error);
+    console.warn("Failed to parse RankingBlockSent log line:", logLine, error);
   }
 
   return null;
 };
 
-const parseUpstreamNodeLog = (
+const parseRankingBlockReceived = (
   streamLabels: any,
   timestamp: number,
   logLine: string,
 ): IServerMessage | null => {
   try {
-    const logData = JSON.parse(logLine);
+    const log = JSON.parse(logLine);
 
-    // Handle MsgBlock with Send direction
-    if (logData.msg === "MsgBlock" && logData.direction === "Send") {
-      // Extract sender from stream labels (process name)
-      const sender = streamLabels.process;
-
-      // Parse connection to extract recipient
-      // connectionId format: "127.0.0.1:3001 127.0.0.1:3002"
-      const connectionId = logData.connectionId;
-      let recipient = "Node0"; // fallback
-
-      if (connectionId) {
-        // Split connectionId to get both endpoints
-        const endpoints = connectionId.split(" ");
-        if (endpoints.length === 2) {
-          // Second endpoint is the recipient
-          const recipientEndpoint = endpoints[1];
-          recipient = HOST_PORT_TO_NODE[recipientEndpoint] || recipient;
-        }
-      }
-
-      const message: IRankingBlockSent = {
-        type: EServerMessageType.RBSent,
-        slot: logData.prevCount || 0, // FIXME: Use proper slot number
-        id: `rb-upstream-${logData.prevCount + 1}`, // FIXME: use proper block hash
-        sender,
-        recipient,
-      };
-
-      return {
-        time_s: timestamp,
-        message,
-      };
-    }
-  } catch (error) {
-    console.warn("Failed to parse UpstreamNode log line:", logLine, error);
-  }
-
-  return null;
-};
-
-const parseCompletedBlockFetchLog = (
-  streamLabels: any,
-  timestamp: number,
-  logLine: string,
-): IServerMessage | null => {
-  try {
-    const logData = JSON.parse(logLine);
-
-    // Handle CompletedBlockFetch kind
-    if (
-      logData.kind === "CompletedBlockFetch" &&
-      logData.peer &&
-      logData.block
-    ) {
-      // Extract recipient from stream labels (process name)
+    // ns=BlockFetch.Client.CompletedBlockFetch
+    // {"block":"56515bfd5751ca2c1ca0f21050cdb1cd020e396c623a16a2274528f643d4b5fd","delay":4985924.003937032,"kind":"CompletedBlockFetch","peer":{"connectionId":"127.0.0.1:3003 127.0.0.1:3002"},"size":862}
+    if (log.kind === "CompletedBlockFetch" && log.peer && log.block) {
       const recipient = streamLabels.process;
+      const connectionId = log.peer.connectionId;
+      let sender = "Node0";
 
-      // Parse connection to extract sender
-      // connectionId format: "127.0.0.1:3003 127.0.0.1:3002"
-      const connectionId = logData.peer.connectionId;
-      let sender = "Node0"; // fallback
       if (connectionId) {
-        // Split connectionId to get both endpoints
         const endpoints = connectionId.split(" ");
         if (endpoints.length === 2) {
           const senderEndpoint = endpoints[1];
@@ -145,8 +115,8 @@ const parseCompletedBlockFetchLog = (
 
       const message: IRankingBlockReceived = {
         type: EServerMessageType.RBReceived,
-        slot: 0, // FIXME: Use proper slot number
-        id: `rb-${logData.block.substring(0, 8)}`,
+        slot: 0, // FIXME: use proper slot
+        id: `rb-${log.block.substring(0, 8)}`,
         sender,
         recipient,
       };
@@ -158,7 +128,7 @@ const parseCompletedBlockFetchLog = (
     }
   } catch (error) {
     console.warn(
-      "Failed to parse CompletedBlockFetch log line:",
+      "Failed to parse RankingBlockReceived log line:",
       logLine,
       error,
     );
@@ -167,29 +137,73 @@ const parseCompletedBlockFetchLog = (
   return null;
 };
 
-// Combined parser that handles all event types
-const parseCardanoNodeLog = (
+const parseEndorserBlockSent = (
   streamLabels: any,
   timestamp: number,
   logLine: string,
 ): IServerMessage | null => {
   try {
-    const logData = JSON.parse(logLine);
+    const log = JSON.parse(logLine);
 
-    // Try each parser in order
-    if (logData.kind === "BlockFetchServer") {
-      return parseBlockFetchServerLog(streamLabels, timestamp, logLine);
+    // From immdb-server (no ns)
+    // {"at":"2025-12-05T12:45:20.9134Z","connectionId":"127.0.0.1:3001 127.0.0.1:3002","direction":"Send","msg":"MsgLeiosBlock","mux_at":"2025-12-05T12:45:20.9131Z","prevCount":0}
+    if (log.msg === "MsgLeiosBlock" && log.direction === "Send") {
+      const sender = streamLabels.process;
+      const connectionId = log.connectionId;
+      let recipient = "Node0";
+
+      if (connectionId) {
+        const endpoints = connectionId.split(" ");
+        if (endpoints.length === 2) {
+          const recipientEndpoint = endpoints[1];
+          recipient = HOST_PORT_TO_NODE[recipientEndpoint] || recipient;
+        }
+      }
+
+      const message: IEndorserBlockSent = {
+        type: EServerMessageType.EBSent,
+        slot: 0, // FIXME: use correct slot
+        id: `eb-${log.prevCount || 0}`,
+        sender,
+        recipient,
+      };
+
+      return {
+        time_s: timestamp,
+        message,
+      };
     }
 
-    if (logData.kind === "CompletedBlockFetch") {
-      return parseCompletedBlockFetchLog(streamLabels, timestamp, logLine);
-    }
+    // From cardano-node ns=LeiosFetch.Remote.Send.Block
+    // {"kind":"Send","msg":{"eb":"\u003celided\u003e","ebBytesSize":27471,"kind":"MsgLeiosBlock"},"mux_at":"2025-12-05T12:45:20.93446848Z","peer":{"connectionId":"127.0.0.1:3002 127.0.0.1:3003"}}
+    if (log.kind === "Send" && log.msg && log.msg.kind === "MsgLeiosBlock") {
+      const sender = streamLabels.process;
+      const connectionId = log.peer?.connectionId;
+      let recipient = "Node0";
 
-    if (logData.msg === "MsgBlock" && logData.direction === "Send") {
-      return parseUpstreamNodeLog(streamLabels, timestamp, logLine);
+      if (connectionId) {
+        const endpoints = connectionId.split(" ");
+        if (endpoints.length === 2) {
+          const recipientEndpoint = endpoints[1];
+          recipient = HOST_PORT_TO_NODE[recipientEndpoint] || recipient;
+        }
+      }
+
+      const message: IEndorserBlockSent = {
+        type: EServerMessageType.EBSent,
+        slot: 0, // FIXME: use correct slot
+        id: `eb-${log.msg.eb}`, // FIXME: msg.eb is always elided
+        sender,
+        recipient,
+      };
+
+      return {
+        time_s: timestamp,
+        message,
+      };
     }
   } catch (error) {
-    console.warn("Failed to parse log line:", logLine, error);
+    console.warn("Failed to parse EndorserBlockSent log line:", logLine, error);
   }
 
   return null;
@@ -202,7 +216,7 @@ function connectLokiWebSocket(lokiHost: string, dispatch: any): () => void {
   // 3. Loki naturally returns results in chronological order within a single stream
   // 4. Sorting large event arrays in the reducer is too expensive for dense simulation data
   const query =
-    '{service="cardano-node"} |~ "SendBlock|MsgBlock|CompletedBlockFetch"';
+    '{service="cardano-node"} |~ "SendBlock|MsgBlock|CompletedBlockFetch|MsgLeiosBlock"';
   const wsUrl = `ws://${lokiHost}/loki/api/v1/tail?query=${encodeURIComponent(query)}&limit=5000`;
   console.log("Connecting to Loki:", wsUrl);
 
@@ -226,16 +240,14 @@ function connectLokiWebSocket(lokiHost: string, dispatch: any): () => void {
           if (stream.values && Array.isArray(stream.values)) {
             stream.values.forEach(([timestamp, logLine]: [string, string]) => {
               count++;
-              console.debug(`Stream value:`, count, {
-                timestamp,
-                logLine,
-              });
-              const timestampSeconds = parseFloat(timestamp) / 1000000000;
-              const event = parseCardanoNodeLog(
-                stream.stream,
-                timestampSeconds,
-                logLine,
-              );
+              console.debug(`Stream value:`, count, { timestamp, logLine });
+              const ts = parseFloat(timestamp) / 1000000000;
+
+              // TODO: simplify and push further upstream (e.g. into alloy)
+              const event =
+                parseRankingBlockSent(stream.stream, ts, logLine) ||
+                parseRankingBlockReceived(stream.stream, ts, logLine) ||
+                parseEndorserBlockSent(stream.stream, ts, logLine);
               if (event) {
                 console.warn("Parsed", event.time_s, event.message);
                 events.push(event);
