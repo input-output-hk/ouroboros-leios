@@ -707,49 +707,68 @@ Beyond Leios, the BLS mechanism is also relevant to other Cardano subsystems; Mi
 #### Choice of BLS Variant
 
 BLS12-381 signatures can be instantiated in two variants that differ only in which group is used for public keys and which is used for signatures. Both variants are equivalent in security and share the same API surface; they differ only in the size of the encoded artifacts:
-- **MinPk variant**: public keys are 48 bytes, signatures are 96 bytes, and a proof of possesion is 2 times 96 bytes.
-- **MinSig variant**: signatures are 48 bytes, public keys are 96 bytes, and a proof of possesion is 2 times 48 bytes.
+- **MinPk variant**: public keys are 48 bytes, signatures are 96 bytes, and a proof of possession is 2 times 96 bytes.
+- **MinSig variant**: signatures are 48 bytes, public keys are 96 bytes, and a proof of possession is 2 times 48 bytes.
 This creates a straightforward trade-off: either public keys are smaller (MinPk) or signatures are smaller (MinSig).
 
-For Leios, this choice affects the size of voting certificates, which in turn impacts bandwidth, storage, and block propagation. Note that proofs of possession are only used at key registration time, so their size has negligible impact on steady-state bandwidth, storage, or verification costs. They therefore do not weigh into the choice between the two variants.
+For Leios, this choice affects the size of voting certificates, which in turn impacts bandwidth, storage, and block propagation. Note that proofs of possession are only used at key registration time, so their size has negligible impact on steady-state bandwidth, storage. They therefore do not weigh into the choice between the two variants.
 
-The certificate scheme we use follows the one defined in CIP-0164 together with the more detailed description in
-[Specification.md](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md) (section *“BLS certificate scheme”*). At a high level, a certificate records:
+The certificate and vote schemes we use follows those defined in CIP-0164 together with the more detailed description in
+[Specification.md](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md).
 
-- the **election identifier** (8 bytes) and **EB hash** (32 bytes),
-- a **bitset of persistent voters**, of size \(m / 8\) bytes,
+For **persistent voters**, a vote contains:
+- common fields (election ID, EB hash, vote signature), and
+- a 2-byte epoch-specific pool identifier.
+
+For **non-persistent voters**, a vote contains:
+- the same common fields as above,
+- a 28-byte Pool ID, and
+- a separate eligibility signature.
+
+At a high level, a certificate records:
+
+- the election identifier (8 bytes) and EB hash (32 bytes),
+- a bitset of persistent voters, of size \(m / 8\) bytes,
 - for each **non-persistent voter**:
-  - the Pool ID (28 bytes),
+  - the Pool ID,
   - its **eligibility proof**, an individual BLS signature of size S_sig,
 - one **aggregate vote signature** on the EB (a single BLS signature of size S_sig).
 
 A key point is that **eligibility proofs remain non-aggregated**: the block producer must be able to verify each proof individually against the Fait-Accompli sortition condition. Only the vote signatures on the EB are aggregated.
 
-Under these assumptions, the total certificate size (ignoring small CBOR overhead) is
+Under these assumptions, the total certificate size is
 
-\[
+```text
 certificate_bytes = 40 + 2 * S_sig + m / 8 + (28 + S_sig) * (n - m).
-\]
+```
 
 Current sortition simulations tune the number of non-persistent seats to roughly 100 across the committee sizes we care about. Concretely, we assume:
 - for n = 500, we have m ≈ 400 persistent voters,
 - for n = 1000, we have m ≈ 900 persistent voters,
 
-so in both cases (n - m) ≈ 100 non-persistent voters, and the term (28 + S_sig) * (n-m) dominates.
+**Impact on vote size**
 
-**Quantitative comparison**
+- **Votes from persistent voters**: With MinSig the size is 90 bytes. With MinPk, the vote grows to 138 bytes. MinSig therefore makes persistent votes about **35% smaller** than MinPk.
 
-For a 1000-seat committee with m ≈ 900 persistent voters:
+- **Votes from non-persistent voters**: With MinSig the size is 164 bytes. With MinPk, the vote grows to 260 bytes. MinSig therefore makes persistent votes about **37% smaller** than MinPk.
+
+For a 1000-seat committee with 900 persistent, this translates to roughly 97 kB of vote traffic per EB with MinSig versus about 150 kB with MinPk, i.e. MinSig reduces vote-related bandwidth by roughly one third per election round.
+
+**Impact on certificate size**
+
+For a 1000-seat committee with ≈900 persistent voters:
 
 - **MinSig**:
 
-  \[ certificate_bytes = 40 + 2 * 48 + 113 + (28 + 48) * 100 = 136 + 113 + 7600 = 7849 bytes.
-  \]
+  ```text
+   certificate_bytes = 40 + 2 * 48 + 113 + (28 + 48) * 100 = 136 + 113 + 7600 = 7849 bytes.
+  ```
 
 - **MinPk**:
 
-  \[ certificate_bytes = 40 + 2 * 96 + 113 + (28 + 96) * 100 = 232 + 113 + 12400 = 12745 bytes.
-  \]
+  ```text
+  certificate_bytes = 40 + 2 * 96 + 113 + (28 + 96) * 100 = 232 + 113 + 12400 = 12745 bytes.
+  ```
 
 So, for n = 1000 and \(n - m ≈ 100\), MinPk certificates are about 4.9 kB larger, which is roughly a **60% increase** over MinSig.
 
@@ -757,9 +776,9 @@ We also evaluated the 500-seat case. The percentage increase from MinSig to MinP
 
 **Interpretation for Leios**
 
-- With MinSig, certificates stay comfortably below **8 kB** and keeps certificate propagation and storage lightweight.
-- With MinPk, certificates grow to around **12.7 kB**, still within Praos limits but significantly heavier for bandwidth, storage, and diffusion—especially given the number of certificates the system will handle over time.
-- Since Leios produces far more **signatures** (votes and eligibility proofs) than public keys, the overall cost is driven by signature size rather than key size.
+- With MinSig, **both votes and certificates** are significantly smaller. For a 1000-seat committee, total vote traffic per EB drops from ~150 kB to ~97 kB, and certificates stay comfortably below **8 kB**, keeping propagation and storage lightweight.
+- With MinPk, sizes of both votes and certificates are significantly worse for bandwidth, storage, and diffusion, especially given the number of votes and certificates the system will handle over time.
+- Since Leios produces far more **signatures** than public keys, the overall cost is driven by signature size rather than key size.
 
 In summary, the Leios cryptography design therefore **fixes MinSig as the BLS12-381 variant**.
 
