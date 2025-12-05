@@ -1,0 +1,14 @@
+{
+    "networkMagic": 42,
+    "network": {
+        "tag": "AcceptAt",
+        "contents": "#REPLACE#"
+    },
+    "logging": [
+        {
+            "logMode": "JournalMode",
+            "logRoot": "n/a",
+            "logFormat": "ForMachine"
+        }
+    ]
+}
