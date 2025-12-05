@@ -5,6 +5,7 @@ import {
   IRankingBlockSent,
   IRankingBlockReceived,
   IEndorserBlockSent,
+  IEndorserBlockReceived,
 } from "@/components/Sim/types";
 import { useRef } from "react";
 
@@ -209,6 +210,53 @@ const parseEndorserBlockSent = (
   return null;
 };
 
+const parseEndorserBlockReceived = (
+  streamLabels: any,
+  timestamp: number,
+  logLine: string,
+): IServerMessage | null => {
+  try {
+    const log = JSON.parse(logLine);
+
+    // From cardano-node ns=LeiosFetch.Remote.Receive.Block
+    // {"mux_at":"2025-12-05T12:45:21.98320066Z","peer":{"connectionId":"127.0.0.1:3003 127.0.0.1:3002"},"kind":"Recv","msg":{"kind":"MsgLeiosBlock","eb":"\u003celided\u003e","ebBytesSize":27471}}
+    if (log.kind === "Recv" && log.msg && log.msg.kind === "MsgLeiosBlock") {
+      const recipient = streamLabels.process;
+      const connectionId = log.peer?.connectionId;
+      let sender = "Node0";
+
+      if (connectionId) {
+        const endpoints = connectionId.split(" ");
+        if (endpoints.length === 2) {
+          const senderEndpoint = endpoints[1];
+          sender = HOST_PORT_TO_NODE[senderEndpoint] || sender;
+        }
+      }
+
+      const message: IEndorserBlockReceived = {
+        type: EServerMessageType.EBReceived,
+        slot: 0, // FIXME: use correct slot
+        id: `eb-${log.msg.eb}`, // FIXME: msg.eb is always elided
+        sender,
+        recipient,
+      };
+
+      return {
+        time_s: timestamp,
+        message,
+      };
+    }
+  } catch (error) {
+    console.warn(
+      "Failed to parse EndorserBlockReceived log line:",
+      logLine,
+      error,
+    );
+  }
+
+  return null;
+};
+
 function connectLokiWebSocket(lokiHost: string, dispatch: any): () => void {
   // NOTE: Single websocket is essential because:
   // 1. Timeline aggregation assumes events are chronologically ordered
@@ -247,7 +295,8 @@ function connectLokiWebSocket(lokiHost: string, dispatch: any): () => void {
               const event =
                 parseRankingBlockSent(stream.stream, ts, logLine) ||
                 parseRankingBlockReceived(stream.stream, ts, logLine) ||
-                parseEndorserBlockSent(stream.stream, ts, logLine);
+                parseEndorserBlockSent(stream.stream, ts, logLine) ||
+                parseEndorserBlockReceived(stream.stream, ts, logLine);
               if (event) {
                 console.warn("Parsed", event.time_s, event.message);
                 events.push(event);
