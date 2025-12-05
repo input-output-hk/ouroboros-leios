@@ -3,16 +3,22 @@ import { type FC, useCallback } from "react";
 
 export const TimelineSlider: FC = () => {
   const {
-    state: { events, currentTime, minTime, maxTime },
+    state: { events, currentTime, minTime, maxTime, isPlaying },
     dispatch,
   } = useSimContext();
 
   const handleTimeChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const newTime = parseFloat(event.target.value);
+
+      // Pause playback when slider is moved
+      if (isPlaying) {
+        dispatch({ type: "SET_TIMELINE_PLAYING", payload: false });
+      }
+
       dispatch({ type: "SET_TIMELINE_TIME", payload: newTime });
     },
-    [dispatch],
+    [dispatch, isPlaying],
   );
 
   const hasEvents = events.length > 0;
@@ -26,7 +32,8 @@ export const TimelineSlider: FC = () => {
       : `${relativeTime.toFixed(1)}s`;
   };
 
-  const currentPercent = timeRange > 0 ? ((currentTime - minTime) / timeRange) * 100 : 0;
+  const currentPercent =
+    timeRange > 0 ? ((currentTime - minTime) / timeRange) * 100 : 0;
 
   return (
     <div
