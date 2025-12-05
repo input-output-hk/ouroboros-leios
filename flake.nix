@@ -21,6 +21,10 @@
     flake-parts.url = "github:hercules-ci/flake-parts";
 
     pre-commit-hooks.url = "github:cachix/git-hooks.nix";
+
+    # Used by demo/
+    ouroboros-consensus.url = "github:intersectmbo/ouroboros-consensus?ref=leios-prototype-demo-202511";
+    cardano-node.url = "github:intersectmbo/cardano-node?ref=leios-prototype-demo-202511";
   };
 
   outputs =
@@ -51,9 +55,9 @@
 
       systems = [
         "x86_64-linux"
-        "x86_64-darwin"
-        "aarch64-linux"
-        "aarch64-darwin"
+        # "x86_64-darwin"
+        # "aarch64-linux"
+        # "aarch64-darwin"
       ];
 
       flake.hydraJobs = import ./nix/hydra.nix {
@@ -61,9 +65,9 @@
         inherit lib;
         systems = [
           "x86_64-linux"
-          "x86_64-darwin"
-          "aarch64-linux"
-          "aarch64-darwin"
+          # "x86_64-darwin"
+          # "aarch64-linux"
+          # "aarch64-darwin"
         ];
       };
 
