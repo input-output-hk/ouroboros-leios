@@ -1,48 +1,29 @@
 # Conformance testing
 
 The goal of conformance testing is to check that an implementation of a protocol behaves as described in the formal specification of the protocol.
-In Leios this is achieved by doing trace verification. The trace verifier checks, whether a trace log corresponds to a possible execution path of the relation in the formal specification. If it accepts a trace, the trace verifier produces a correctness proof, otherwise a proof for a specific failure is provided.
+In Leios this is achieved by doing trace verification. The *trace verifier* checks, whether a trace log corresponds to a possible execution path of the relation in the formal specification. If it accepts a trace, the trace verifier produces a correctness proof, otherwise a proof for a specific failure is provided.
 
-The formal specification usually have safety and liveness properties proved. A trace verifier serves as the connection for testing conformance of the implementation against this verified model.
+A formal specification for a consenus protocol usually has safety and liveness properties proved. The trace verifier serves as the connection for testing conformance of the implementation against this verified model.
 
 ## Formal specification
 
-The formal specification of [Ouroboros Leios](https://github.com/input-output-hk/ouroboros-leios-formal-spec) is implemented in Agda as a relational specification. Different variants of the Leios protocol have been explored in the formal specification, with a focus on Linear Leios. A common code base for the variants is used in order to share data types, for example the block types. The functionalities (FFD, VRF, Base ledger, etc.) are abstract data types with defining properties. The protocol carries out state transition steps upon block creation, transitioning to next slot and interacting with the base ledger. Those steps usually have pre-conditions that need to be fulfilled. For details, see [Linear Leios transitions](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Linear.lagda.md#linear-leios-transitions) in the formal specification.
+The formal specification of [Ouroboros Leios](https://github.com/input-output-hk/ouroboros-leios-formal-spec) is implemented in Agda as a relational specification. The relation describes the evolution of the local state of a single node, together with inputs and outputs from and to other functionalities (for example the FFD functionality) or the base ledger (which for Linear Leios is Ouroboros Praos) - see the section [Categorical Crypto framework](#categorical-crypto-framework) for more details on the composition of these channels.
+
+Different variants of the Leios protocol have been explored in the formal specification, with a focus on *Linear Leios*. A common code base for the variants is used in order to share data types, for example the block types. The functionalities (FFD, VRF, Base ledger, etc.) are abstract data types with defining properties. The protocol carries out state transition steps upon block creation, transitioning to next slot and interacting with the base ledger. Those steps usually have pre-conditions that need to be fulfilled. For details, see [Linear Leios transitions](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Linear.lagda.md#linear-leios-transitions) in the formal specification.
 
 ## Trace verification
 
-Trace verification checks, whether an execution trace of the Leios protocol is a possible realization of the formal specification. This idea has been developed in the [formal-streamlet](https://github.com/input-output-hk/formal-streamlet) protocol and been adapted in the [Fast-BFT](https://github.com/input-output-hk/innovation-fastbft) and Leios projects. Trace verification in the Leios project is currently implemented for Short and Linear-Leios.
+Trace verification checks, whether an *execution trace* of the Leios protocol is a possible realization of the formal specification. This idea has been developed in the [formal-streamlet](https://github.com/input-output-hk/formal-streamlet) protocol and been adapted in the [Fast-BFT](https://github.com/input-output-hk/innovation-fastbft) and Leios projects. Trace verification in the Leios project is currently implemented for Short and Linear Leios.
 
-When parsing a trace log file, events are mapped to actions that trigger a step in the relational specification of the protocol. As long as for an action the pre-conditions for the next transition step can be fulfilled and the step can be done, the transition is considered correct with respect to the formal specification. Steps are done sequentially until a transition fails with a proof providing the reason of failure that gets included in the error.
+An execution trace is defined as a list of actions, where an *action* provides the necessary input for the rule selection. As long as for an action the pre-conditions for a transition step can be fulfilled, the step can be executed and is therefore correct with respect to the formal specification. Steps are done sequentially and for every step there is a correctness proof until a transition fails with a proof for a specific failure. Error handling is the interpretation of the failure proofs, mapping the failure proofs to informative error messages that can be displayed in the output of the trace verifier.
 
-In order to be able to build explicit traces, the generic entities of the trace verifier and the formal specification need to be instantiated (parameterized modules in Agda). Those are in particular the `SpecStructure` that is a collection of types (for example the transaction type `Tx` needs to be defined), hashing functions (for example hashing for the different block types, etc.), or entire functionalities like the FFD (freshest-first delivery) functionality. There is an Agda module `Leios.Defaults` that contains trivial implementation of all entites needed. In addition parameters need to be provided through the `Params` record type, which are mostly about the network setup that we assume for the formal specification.
+In order to be able to build explicit traces, the generic entities of the trace verifier and the formal specification need to be instantiated by specifying the parameters for the parameterized modules. An exmaple trace and it's verification can be found in [trace verifier example](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Linear/Trace/Verifier/Test.lagda.md).
 
-### Error handling
+## Running in Haskell
 
-Error handling is the interpretation of the failure proofs, mapping the failure proofs to informative error messages that can be displayed in the output of the trace verifier.
+In the [leios-trace-verifier](../leios-trace-verifier) module the executables for the trace verifier are built. This is done by extracting the Agda code as MAlonzo to Haskell. Having the Haskell code for the trace verifier allows to use it together with log file parser from the module [leios-trace-hs](../leios-trace-hs) - the Haskell module is a shared module that both the Haskell simulation code and the trace verifier use.
 
-### Formal spec repository
-
-The formal specification of the Leios protocol is implemented in the repository [ouroboros-leios-formal-spec](https://github.com/input-output-hk/ouroboros-leios-formal-spec).
-In that repository there are [examples](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Linear/Trace/Verifier/Test.lagda.md) that illustrate how the trace verifier works. Here the trace is part of the example in the Agda file. In addition in order to setup the trace verifier for Linear Leios we need the following configuration values:
-
-* Network parameters
-  * numberOfParties: Number of parties (nodes) in the distributed system
-  * stakeDistribution: The stake distribution, i.e. stake per node
-
-* Other parameters
-  * sutId: The id of the system under test (SUT)
-  * winning-slots: The lotteries for EB and Votes
-
-### Leios repository
-
-#### Conformance events
-
-For conformance testing additional events had to be added to the Haskell and Rust simulation. For Short and Linear Leios, an explicit event for the slot transition of a node has been added (the event could also be inferred from the other log entries), for Short-Leios the non-election for block creation or voting events have been added as well (those "negative" events are needed as the formal specification enforces a node to always check, whether a block or vote can be created).
-
-In the `leios-trace-verifier` module in the Leios repository the executables for the trace verifier is built. This is done by extracting the Agda code as MAlonzo to Haskell. Having the Haskell code for the trace verifier allows to use it together with log file parser from the module `leios-trace-hs`. The Haskell module is a shared module that both the Haskell simulation code and the trace verifier use.
-
-In addition there is a common trace log file format specified in JSON, that both the Haskell and Rust simulation use when externalizing events into the trace log file.
+There is a common trace log file format specified in JSON, that both the Haskell and Rust simulation use when externalizing events into the trace log file. An example log file looks as follows:
 ```bash
 {"message":{"node":"node-0","slot":25,"type":"Slot"},"time_s":25}
 {"message":{"node":"node-0","slot":25,"type":"NoIBGenerated"},"time_s":25}
@@ -74,6 +55,7 @@ In addition there is a common trace log file format specified in JSON, that both
 {"message":{"id":"35-2","recipient":"node-0","type":"IBReceived"},"time_s":27.502044}
 {"message":{"id":"35-2","node":"node-0","slot":26,"type":"IBEnteredState"},"time_s":27.601196}
 ```
+In order that the trace log includes all the required events, we need to specify the `--conformance-events` flag when running the simulations.
 
 The stake distribution, that has to be passed to the trace verifier as argument is deduced from the trace log file. This is possible as in the log file there are also the negative events, i.e. for every slot there is a message, if block was created or not.
 
@@ -83,22 +65,14 @@ Other parameters are read from the configuration files that were used to run the
 * trace log file
 
 ### Running the trace verifier
-
-The Leios trace verifier needs a simulation output.
-
 #### Generate a trace file
-
 Currently both simulations, Rust and Haskell, support generating the additional events needed for conformance testing by adding the flag `--conformance-testing` when running the simulation from the command line. A Rust simulation output for a whole day can be produced as follows:
 
 ```bash
 $ cargo run --release -- --slots 86400 --conformance-events ../leios-trace-verifier/examples/topology.yaml ../sim-rs.out
 ```
-
-### Run trace verifier
-
-It is recommended to run trace verifier using Nix and with the Haskell runtime system parameters setting the minimal heap size.
-
-The trace verifier can be invoked as follows:
+#### Verify the trace file
+It is recommended to run trace verifier using Nix and with the Haskell runtime system parameters setting the minimal heap size. The trace verifier can be invoked as follows:
 
 ```bash
 $ nix run .#linear-leios-trace-verifier -- --help
