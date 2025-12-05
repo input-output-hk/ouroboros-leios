@@ -95,30 +95,30 @@ relayP2PSimVizRenderModel
       Cairo.setFontSize 10
       sequence_
         [ do
-          Cairo.arc x y 10 0 (pi * 2)
-          Cairo.setSourceRGB r g b
-          Cairo.fillPreserve
-          Cairo.setSourceRGB 0 0 0
-          Cairo.stroke
-          {-
-                       -- Label with message counts, processing and buffer
-                       let qlabel = show nqmsgs ++ "," ++ show rqmsgs ++ "," ++ show tqmsgs
-                       Cairo.moveTo (x-6) (y-5)
-                       Cairo.setSourceRGB 1 1 1  -- white backdrop text for readabilty
-                       Cairo.showText qlabel     -- on dark backgrounds
-                       Cairo.moveTo (x-7) (y-4)
-                       Cairo.setSourceRGB 0 0 0
-                       Cairo.showText qlabel
+            Cairo.arc x y 10 0 (pi * 2)
+            Cairo.setSourceRGB r g b
+            Cairo.fillPreserve
+            Cairo.setSourceRGB 0 0 0
+            Cairo.stroke
+            {-
+                         -- Label with message counts, processing and buffer
+                         let qlabel = show nqmsgs ++ "," ++ show rqmsgs ++ "," ++ show tqmsgs
+                         Cairo.moveTo (x-6) (y-5)
+                         Cairo.setSourceRGB 1 1 1  -- white backdrop text for readabilty
+                         Cairo.showText qlabel     -- on dark backgrounds
+                         Cairo.moveTo (x-7) (y-4)
+                         Cairo.setSourceRGB 0 0 0
+                         Cairo.showText qlabel
 
-                       let blabel = show nbmsgs ++ "," ++ show rbmsgs ++ "," ++ show tbmsgs
-                       Cairo.moveTo (x-6) (y+10)
-                       Cairo.setSourceRGB 1 1 1  -- white backdrop text for readabilty
-                       Cairo.showText blabel     -- on dark backgrounds
-                       Cairo.moveTo (x-7) (y+9)
-                       Cairo.setSourceRGB 0 0 0
-                       Cairo.showText blabel
-          -}
-          Cairo.newPath
+                         let blabel = show nbmsgs ++ "," ++ show rbmsgs ++ "," ++ show tbmsgs
+                         Cairo.moveTo (x-6) (y+10)
+                         Cairo.setSourceRGB 1 1 1  -- white backdrop text for readabilty
+                         Cairo.showText blabel     -- on dark backgrounds
+                         Cairo.moveTo (x-7) (y+9)
+                         Cairo.setSourceRGB 0 0 0
+                         Cairo.showText blabel
+            -}
+            Cairo.newPath
         | (node, pos) <- Map.toList vizNodePos
         , let Point x y = toScreenPoint pos
               qmsgs = fromMaybe [] (Map.lookup node vizMsgsAtNodeQueue)
@@ -144,84 +144,84 @@ relayP2PSimVizRenderModel
       Cairo.save
       sequence_
         [ case classifyInFlightMsgs msgs of
-          -- We don't even draw links that are inactive
-          MsgsInFlightNone -> return ()
-          -- Similarly, all links will have boring control messages
-          -- it'd be too much details
-          MsgsInFlightControl -> return ()
-          -- We draw with a dotted line
-          MsgsInFlightNonBallistic ->
-            case catMaybes [ptclMessageColor msg | (msg, _, _) <- msgs] of
-              [] -> return ()
-              ((r, g, b) : _) -> do
-                Cairo.setSourceRGB r g b
-                Cairo.setLineWidth 1
-                Cairo.setDash [10, 5] 0
-                case vizNodeLinks !!! (fromNode, toNode) of
-                  LinkPointsNoWrap fromPos toPos -> do
-                    withPoint Cairo.moveTo (toScreenPoint fromPos)
-                    withPoint Cairo.lineTo (toScreenPoint toPos)
-                    Cairo.stroke
-                  LinkPointsWrap fromPos toPos fromPos' toPos' -> do
-                    withPoint Cairo.moveTo (toScreenPoint fromPos)
-                    withPoint Cairo.lineTo (toScreenPoint toPos)
-                    Cairo.stroke
-                    withPoint Cairo.moveTo (toScreenPoint fromPos')
-                    withPoint Cairo.lineTo (toScreenPoint toPos')
-                    Cairo.stroke
+            -- We don't even draw links that are inactive
+            MsgsInFlightNone -> return ()
+            -- Similarly, all links will have boring control messages
+            -- it'd be too much details
+            MsgsInFlightControl -> return ()
+            -- We draw with a dotted line
+            MsgsInFlightNonBallistic ->
+              case catMaybes [ptclMessageColor msg | (msg, _, _) <- msgs] of
+                [] -> return ()
+                ((r, g, b) : _) -> do
+                  Cairo.setSourceRGB r g b
+                  Cairo.setLineWidth 1
+                  Cairo.setDash [10, 5] 0
+                  case vizNodeLinks !!! (fromNode, toNode) of
+                    LinkPointsNoWrap fromPos toPos -> do
+                      withPoint Cairo.moveTo (toScreenPoint fromPos)
+                      withPoint Cairo.lineTo (toScreenPoint toPos)
+                      Cairo.stroke
+                    LinkPointsWrap fromPos toPos fromPos' toPos' -> do
+                      withPoint Cairo.moveTo (toScreenPoint fromPos)
+                      withPoint Cairo.lineTo (toScreenPoint toPos)
+                      Cairo.stroke
+                      withPoint Cairo.moveTo (toScreenPoint fromPos')
+                      withPoint Cairo.lineTo (toScreenPoint toPos')
+                      Cairo.stroke
 
-          -- We draw with a full line
-          MsgsInFlightBallistic ->
-            case catMaybes [ptclMessageColor msg | (msg, _, _) <- msgs] of
-              [] -> return ()
-              ((r, g, b) : _) -> do
-                Cairo.setSourceRGB r g b
-                Cairo.setDash [] 0
-                Cairo.setLineWidth 2
-                case vizNodeLinks !!! (fromNode, toNode) of
-                  LinkPointsNoWrap fromPos toPos -> do
-                    withPoint Cairo.moveTo (toScreenPoint fromPos)
-                    withPoint Cairo.lineTo (toScreenPoint toPos)
-                    Cairo.stroke
-                  LinkPointsWrap fromPos toPos fromPos' toPos' -> do
-                    withPoint Cairo.moveTo (toScreenPoint fromPos)
-                    withPoint Cairo.lineTo (toScreenPoint toPos)
-                    Cairo.stroke
-                    withPoint Cairo.moveTo (toScreenPoint fromPos')
-                    withPoint Cairo.lineTo (toScreenPoint toPos')
-                    Cairo.stroke
+            -- We draw with a full line
+            MsgsInFlightBallistic ->
+              case catMaybes [ptclMessageColor msg | (msg, _, _) <- msgs] of
+                [] -> return ()
+                ((r, g, b) : _) -> do
+                  Cairo.setSourceRGB r g b
+                  Cairo.setDash [] 0
+                  Cairo.setLineWidth 2
+                  case vizNodeLinks !!! (fromNode, toNode) of
+                    LinkPointsNoWrap fromPos toPos -> do
+                      withPoint Cairo.moveTo (toScreenPoint fromPos)
+                      withPoint Cairo.lineTo (toScreenPoint toPos)
+                      Cairo.stroke
+                    LinkPointsWrap fromPos toPos fromPos' toPos' -> do
+                      withPoint Cairo.moveTo (toScreenPoint fromPos)
+                      withPoint Cairo.lineTo (toScreenPoint toPos)
+                      Cairo.stroke
+                      withPoint Cairo.moveTo (toScreenPoint fromPos')
+                      withPoint Cairo.lineTo (toScreenPoint toPos')
+                      Cairo.stroke
         | ((fromNode, toNode), msgs) <- Map.toList vizMsgsInTransit
         ]
       Cairo.restore
       -- draw the messages in flight on top
       sequence_
         [ case vizNodeLinks !!! (fromNode, toNode) of
-          LinkPointsNoWrap fromPos toPos -> do
-            let (msgTrailingEdge, _msgLeadingEdge) =
-                  lineMessageInFlight now fromPos toPos msgforecast
-                Point x y = toScreenPoint msgTrailingEdge
-            Cairo.rectangle (x - 8) (y - 8) 16 16
-            Cairo.setSourceRGB r g b
-            Cairo.fillPreserve
-            Cairo.setSourceRGB 0 0 0
-            Cairo.stroke
-          LinkPointsWrap fromPos toPos fromPos' toPos' -> do
-            let (msgTrailingEdge, _msgLeadingEdge) =
-                  lineMessageInFlight now fromPos toPos msgforecast
-                Point x y = toScreenPoint msgTrailingEdge
-            Cairo.rectangle (x - 8) (y - 8) 16 16
-            Cairo.setSourceRGB r g b
-            Cairo.fillPreserve
-            Cairo.setSourceRGB 0 0 0
-            Cairo.stroke
-            let (msgTrailingEdge', _msgLeadingEdge) =
-                  lineMessageInFlight now fromPos' toPos' msgforecast
-                Point x' y' = toScreenPoint msgTrailingEdge'
-            Cairo.rectangle (x' - 8) (y' - 8) 16 16
-            Cairo.setSourceRGB r g b
-            Cairo.fillPreserve
-            Cairo.setSourceRGB 0 0 0
-            Cairo.stroke
+            LinkPointsNoWrap fromPos toPos -> do
+              let (msgTrailingEdge, _msgLeadingEdge) =
+                    lineMessageInFlight now fromPos toPos msgforecast
+                  Point x y = toScreenPoint msgTrailingEdge
+              Cairo.rectangle (x - 8) (y - 8) 16 16
+              Cairo.setSourceRGB r g b
+              Cairo.fillPreserve
+              Cairo.setSourceRGB 0 0 0
+              Cairo.stroke
+            LinkPointsWrap fromPos toPos fromPos' toPos' -> do
+              let (msgTrailingEdge, _msgLeadingEdge) =
+                    lineMessageInFlight now fromPos toPos msgforecast
+                  Point x y = toScreenPoint msgTrailingEdge
+              Cairo.rectangle (x - 8) (y - 8) 16 16
+              Cairo.setSourceRGB r g b
+              Cairo.fillPreserve
+              Cairo.setSourceRGB 0 0 0
+              Cairo.stroke
+              let (msgTrailingEdge', _msgLeadingEdge) =
+                    lineMessageInFlight now fromPos' toPos' msgforecast
+                  Point x' y' = toScreenPoint msgTrailingEdge'
+              Cairo.rectangle (x' - 8) (y' - 8) 16 16
+              Cairo.setSourceRGB r g b
+              Cairo.fillPreserve
+              Cairo.setSourceRGB 0 0 0
+              Cairo.stroke
         | ((fromNode, toNode), msgs) <- Map.toList vizMsgsInTransit
         , (msg, msgforecast, _msgforecasts) <- msgs
         , now >= msgSendTrailingEdge msgforecast
@@ -270,12 +270,12 @@ chartDiffusionLatency RelayP2PSimVizConfig{nodeMessageColor} =
     \_
      _
      ( SimVizModel
-        _
-        RelaySimVizState
-          { vizNodePos
-          , vizMsgsDiffusionLatency
-          }
-      ) ->
+         _
+         RelaySimVizState
+           { vizNodePos
+           , vizMsgsDiffusionLatency
+           }
+       ) ->
         (Chart.def :: Chart.Layout DiffTime Chart.Percent)
           { Chart._layout_title = "Diffusion latency"
           , Chart._layout_title_style = Chart.def{Chart._font_size = 15}
@@ -291,14 +291,14 @@ chartDiffusionLatency RelayP2PSimVizConfig{nodeMessageColor} =
                 }
           , Chart._layout_plots =
               [ Chart.toPlot $
-                Chart.def
-                  { Chart._plot_lines_values = [timeseries]
-                  , Chart._plot_lines_style =
-                      let (r, g, b) = nodeMessageColor blk
-                       in Chart.def
-                            { Chart._line_color = Chart.opaque (Colour.sRGB r g b)
-                            }
-                  }
+                  Chart.def
+                    { Chart._plot_lines_values = [timeseries]
+                    , Chart._plot_lines_style =
+                        let (r, g, b) = nodeMessageColor blk
+                         in Chart.def
+                              { Chart._line_color = Chart.opaque (Colour.sRGB r g b)
+                              }
+                    }
               | let nnodes = Map.size vizNodePos
               , (blk, _nid, created, arrivals) <- Map.elems vizMsgsDiffusionLatency
               , let timeseries =
@@ -343,14 +343,14 @@ chartDiffusionImperfection
                       }
                 , Chart._layout_plots =
                     [ Chart.toPlot $
-                      Chart.def
-                        { Chart._plot_lines_values = [timeseries]
-                        , Chart._plot_lines_style =
-                            let (r, g, b) = nodeMessageColor blk
-                             in Chart.def
-                                  { Chart._line_color = Chart.opaque (Colour.sRGB r g b)
-                                  }
-                        }
+                        Chart.def
+                          { Chart._plot_lines_values = [timeseries]
+                          , Chart._plot_lines_style =
+                              let (r, g, b) = nodeMessageColor blk
+                               in Chart.def
+                                    { Chart._line_color = Chart.opaque (Colour.sRGB r g b)
+                                    }
+                          }
                     | (blk, nid, created, arrivals) <- Map.elems vizMsgsDiffusionLatency
                     , let timeseries =
                             [ (latencyActual, imperfection)
@@ -381,12 +381,12 @@ chartBandwidth =
     \_
      _
      ( SimVizModel
-        _
-        RelaySimVizState
-          { vizMsgsAtNodeRecentQueue
-          , vizMsgsAtNodeRecentBuffer
-          }
-      ) ->
+         _
+         RelaySimVizState
+           { vizMsgsAtNodeRecentQueue
+           , vizMsgsAtNodeRecentBuffer
+           }
+       ) ->
         (Chart.def :: Chart.Layout Double Double)
           { Chart._layout_title = "Distribution of block frequency"
           , Chart._layout_title_style = Chart.def{Chart._font_size = 15}
@@ -404,21 +404,21 @@ chartBandwidth =
                 }
           , Chart._layout_plots =
               [ bandwidthHistPlot
-                "CPU (block validation completion)"
-                Chart.red
-                ( map
-                    ((fromIntegral :: Int -> Double) . recentRate)
-                    (Map.elems vizMsgsAtNodeRecentBuffer)
-                )
+                  "CPU (block validation completion)"
+                  Chart.red
+                  ( map
+                      ((fromIntegral :: Int -> Double) . recentRate)
+                      (Map.elems vizMsgsAtNodeRecentBuffer)
+                  )
               | not (Map.null vizMsgsAtNodeRecentBuffer)
               ]
                 ++ [ bandwidthHistPlot
-                    "Network (block arrival)"
-                    Chart.blue
-                    ( map
-                        ((fromIntegral :: Int -> Double) . recentRate)
-                        (Map.elems vizMsgsAtNodeRecentQueue)
-                    )
+                       "Network (block arrival)"
+                       Chart.blue
+                       ( map
+                           ((fromIntegral :: Int -> Double) . recentRate)
+                           (Map.elems vizMsgsAtNodeRecentQueue)
+                       )
                    | not (Map.null vizMsgsAtNodeRecentQueue)
                    ]
           }
@@ -451,11 +451,11 @@ chartLinkUtilisation =
     \_
      _
      ( SimVizModel
-        _
-        RelaySimVizState
-          { vizMsgsInTransit
-          }
-      ) ->
+         _
+         RelaySimVizState
+           { vizMsgsInTransit
+           }
+       ) ->
         let counts :: UArray MsgsInFlightClassification Int
             counts =
               accumArray

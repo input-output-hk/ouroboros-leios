@@ -150,11 +150,11 @@ diffusionSampleModel p2pTopography fp = SampleModel initState accum render
     let stable_chain_hashes = coerce $ map blockHash $ Chain.toNewestFirst stable_chain
     let entries =
           [ DiffusionEntry
-            { hash = coerce hash'
-            , node_id = coerce i
-            , created = coerce t
-            , arrivals = coerce ts
-            }
+              { hash = coerce hash'
+              , node_id = coerce i
+              , created = coerce t
+              , arrivals = coerce ts
+              }
           | (hash', (_, i, t, ts)) <- Map.toList diffusions
           ]
     let latency_per_stake = map (diffusionEntryToLatencyPerStake nnodes) entries

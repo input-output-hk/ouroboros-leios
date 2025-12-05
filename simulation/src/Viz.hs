@@ -175,8 +175,8 @@ layoutTiles allocToplevel =
               takeUpTo h (map (snd . reqSize . Tree.rootLabel) lps)
           | otherwise =
               [ if expand
-                then rh' + dh + (if i < dhrem then 1 else 0)
-                else rh'
+                  then rh' + dh + (if i < dhrem then 1 else 0)
+                  else rh'
               | let ( nexpand
                       , iprops
                       ) = enumerateExpanding (map rootLabel lps)
@@ -204,8 +204,8 @@ layoutTiles allocToplevel =
               takeUpTo w (map (fst . reqSize . Tree.rootLabel) lps)
           | otherwise =
               [ if expand
-                then rw' + dw + (if i < dwrem then 1 else 0)
-                else rw'
+                  then rw' + dw + (if i < dwrem then 1 else 0)
+                  else rw'
               | let ( nexpand
                       , iprops
                       ) = enumerateExpanding (map rootLabel lps)

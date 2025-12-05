@@ -41,8 +41,8 @@ main =
     result <-
       pure ($ startingSlot)
         <*> verifyTraceFromSlot nrNodes idSut stakeDistribution lhdr lvote ldiff validityCheckTime
-            . decodeJSONL
-            <$> BSL.readFile logFile
+          . decodeJSONL
+        <$> BSL.readFile logFile
     hPutStrLn stderr $ "Applying " <> show (fst result) <> " actions"
     unless (fst (snd result) == "ok") $
       do

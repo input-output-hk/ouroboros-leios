@@ -109,9 +109,9 @@ generatorNode tracer (UniformTrafficPattern nmsgs msgsz mdelay) chan = do
     ]
   sequence_
     [ do
-      writeChan chan msg
-      traceWith tracer (MsgDepart msg)
-      maybe (return ()) threadDelay mdelay
+        writeChan chan msg
+        traceWith tracer (MsgDepart msg)
+        maybe (return ()) threadDelay mdelay
     | msg <- map (flip TestMessage msgsz) [0 .. nmsgs - 1]
     ]
 

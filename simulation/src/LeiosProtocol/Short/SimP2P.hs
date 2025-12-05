@@ -62,10 +62,10 @@ traceLeiosP2P
         mapM_
           (\m -> mapM_ forkIO =<< m)
           [ leiosNode
-            (nodeTracer nid)
-            (leiosNodeConfig slotConfig nid rng)
-            (Map.findWithDefault [] nid chansToDownstream)
-            (Map.findWithDefault [] nid chansToUpstream)
+              (nodeTracer nid)
+              (leiosNodeConfig slotConfig nid rng)
+              (Map.findWithDefault [] nid chansToDownstream)
+              (Map.findWithDefault [] nid chansToUpstream)
           | (nid, rng) <-
               zip
                 (Map.keys p2pNodes)
