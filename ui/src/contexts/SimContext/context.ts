@@ -4,6 +4,7 @@ import {
   ISimContext,
   ISimContextState,
   ISimulationAggregatedDataState,
+  EConnectionState,
 } from "./types";
 
 export const defaultAggregatedData: ISimulationAggregatedDataState = {
@@ -34,7 +35,7 @@ export const defaultState: ISimContextState = {
   aggregatedData: defaultAggregatedData,
   tracePath: "",
   lokiHost: undefined,
-  lokiConnected: false,
+  lokiConnectionState: EConnectionState.NotConnected,
   topography: { links: new Map(), nodes: new Map() },
   topologyPath: "",
   topologyLoaded: false,
