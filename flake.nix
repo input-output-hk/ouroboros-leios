@@ -32,7 +32,7 @@
     }:
     let
       inherit (nixpkgs) lib;
-      # Collect all the build.nix files (flake-parts module)
+      # Collect all the build.nix files (flake-parts modules)
       buildDotNixes = import ./nix/findFilesRecursive.nix {
         inherit lib;
         toInclude = lib.hasSuffix "build.nix";
@@ -43,7 +43,7 @@
 
       imports = [
         inputs.pre-commit-hooks.flakeModule
-        ./pkgs.nix
+        ./nix/pkgs.nix
       ]
       ++ buildDotNixes;
 
@@ -59,7 +59,12 @@
       flake.hydraJobs = import ./nix/hydra.nix {
         flake = self;
         inherit lib;
-        systems = [ "x86_64-linux" ];
+        systems = [
+          "x86_64-linux"
+          "x86_64-darwin"
+          "aarch64-linux"
+          "aarch64-darwin"
+        ];
       };
 
     };
