@@ -1,6 +1,7 @@
-{ inputs, ... }:
+# NOTE(bladyjoker): Removing the hydraJobs from iogx to produce it generically for the entire flake after
+{ inputs, config, ... }:
 {
-  flake = inputs.iogx.lib.mkFlake {
+  flake = builtins.removeAttrs (inputs.iogx.lib.mkFlake {
 
     inherit inputs;
 
@@ -8,6 +9,6 @@
 
     outputs = import ./outputs.nix;
 
-    systems = [ "x86_64-linux" ];
-  };
+    inherit (config) systems;
+  }) [ "hydraJobs" ];
 }
