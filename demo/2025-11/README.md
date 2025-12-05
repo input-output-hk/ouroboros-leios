@@ -7,20 +7,20 @@ Slight improvement of the [October 2025 demonstration](../2025-10) using `tc` an
 - Observability/reporting/monitoring was improved.
 - Packaging of the prerequisites for executing the demo was improved.
 
-![](./demo-2025-11.excalidraw.svg)
+![Demo diagram](./demo-2025-11.excalidraw.svg)
 
 > [!TIP]
 > This is an excalidraw SVG with embedded scene so it can be loaded and edited in [https://excalidraw.com/].
 
 ## Bufferbloat
 
-The investigation into the unexpectedly high latency seen in October and related refinements to the prototype are apparent in the asynchronous conversation that took place in the comments on this tracking Issue https://github.com/IntersectMBO/ouroboros-consensus/issues/1756.
+The investigation into the unexpectedly high latency seen in October and related refinements to the prototype are apparent in the asynchronous conversation that took place in the comments on a [tracking Issue](https://github.com/IntersectMBO/ouroboros-consensus/issues/1756).
 
-- The latency was due to https://www.bufferbloat.net.
+- The latency was due to a network phenomena called [bufferbloat](https://www.bufferbloat.net)
   In October, the bufferbloat arose directly from the naive use of [Toxiproxy](https://github.com/Shopify/toxiproxy) for the initial demo.
 - As user-space mechanism, Toxiproxy cannot introduce latency/rate/etc in a way that will influence the kernel algorithms managing the TCP stream.
 - [Linux Traffic Control](https://tldp.org/HOWTO/Traffic-Control-HOWTO/intro.html) is the approriate mechanism.
-- An example of relevant commands for a more appropriate WAN (Wide Area Network) emulation can be found in this GitHub comment https://github.com/IntersectMBO/ouroboros-consensus/issues/1756#issuecomment-3587268042.
+- An example of relevant commands for a more appropriate WAN (Wide Area Network) emulation can be found in [this GitHub comment](https://github.com/IntersectMBO/ouroboros-consensus/issues/1756#issuecomment-3587268042).
   - `htb rate 100mbt` limts the sender's bandwidth.
   - `fq_codel` paces the sender's traffic, adapting to any bottleneck between it and the recipient.
   - `netem delay` established the link latency of 20ms between `fq_codel` and the recipient.
@@ -58,7 +58,7 @@ No other packages have yet been patched for this demo, the appropriate versions 
 Beware that the listed commits do not already include `source-repository-package` stanzas in their `cabal.project` files, if that's
 the contributor's chosen method for cross-repo dependencies.
 
-```
+```shell
 $ for i in ouroboros-consensus ouroboros-network cardano-node; do (cd $i; echo REPO $i; git log -1); done
 REPO ouroboros-consensus
 commit 7929c3716a18abb852f8abec7111c78f2059287e (HEAD -> nfrisby/leios-202511-demo, origin/nfrisby/leios-202511-demo)
