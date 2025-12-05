@@ -2,18 +2,30 @@ import {
   useSimContext,
   defaultAggregatedData,
 } from "@/contexts/SimContext/context";
-import { IScenario } from "@/contexts/SimContext/types";
+import { EConnectionState, IScenario } from "@/contexts/SimContext/types";
 import { ChangeEvent, FC, useCallback, useEffect, useState } from "react";
 import { useStreamMessagesHandler } from "../hooks/useStreamMessagesHandler";
+import { useLokiWebSocket } from "../hooks/useLokiWebSocket";
 import { Button } from "@/components/Button";
 
 export const Scenario: FC = () => {
   const {
-    state: { allScenarios, activeScenario, events },
+    state: {
+      allScenarios,
+      activeScenario,
+      events,
+      lokiHost,
+      lokiConnectionState,
+      autoStart,
+    },
     dispatch,
   } = useSimContext();
   const { startStream, streaming, stopStream } = useStreamMessagesHandler();
+  const { connect: connectLoki, disconnect: disconnectLoki } =
+    useLokiWebSocket();
   const [includeTransactions, setIncludeTransactions] = useState(true);
+
+  const isLokiMode = !!lokiHost;
 
   useEffect(() => {
     (async () => {
@@ -25,11 +37,52 @@ export const Scenario: FC = () => {
           scenario.topology,
           window.location.toString(),
         ).toString(),
-        trace: new URL(scenario.trace, window.location.toString()).toString(),
+        trace: scenario.trace
+          ? new URL(scenario.trace, window.location.toString()).toString()
+          : undefined,
       }));
       dispatch({ type: "SET_SCENARIOS", payload: scenarios });
+
+      // Check for scenario URL parameter
+      const urlParams = new URLSearchParams(window.location.search);
+      const scenarioParam = urlParams.get("scenario");
+      if (scenarioParam) {
+        const scenarioIndex = parseInt(scenarioParam, 10);
+        if (scenarioIndex >= 0 && scenarioIndex < scenarios.length) {
+          const targetScenario = scenarios[scenarioIndex];
+          dispatch({
+            type: "SET_SCENARIO",
+            payload: targetScenario.name,
+            autoStart: true,
+          });
+        }
+      }
     })();
   }, []);
+
+  // Auto-load/connect when autoStart is true
+  useEffect(() => {
+    if (autoStart && activeScenario) {
+      if (isLokiMode) {
+        connectLoki();
+      } else {
+        startStream(true); // Include transactions by default for auto-load
+      }
+      // Reset autoStart flag after triggering
+      dispatch({
+        type: "SET_SCENARIO",
+        payload: activeScenario,
+        autoStart: false,
+      });
+    }
+  }, [
+    autoStart,
+    activeScenario,
+    isLokiMode,
+    connectLoki,
+    startStream,
+    dispatch,
+  ]);
 
   const chooseScenario = useCallback(
     (event: ChangeEvent<HTMLSelectElement>) => {
@@ -39,7 +92,11 @@ export const Scenario: FC = () => {
   );
 
   const handleUnloadScenario = useCallback(() => {
-    stopStream();
+    if (isLokiMode) {
+      disconnectLoki();
+    } else {
+      stopStream();
+    }
     dispatch({ type: "RESET_TIMELINE" });
     dispatch({
       type: "BATCH_UPDATE",
@@ -47,13 +104,19 @@ export const Scenario: FC = () => {
         aggregatedData: defaultAggregatedData,
       },
     });
-  }, [stopStream, dispatch]);
+  }, [isLokiMode, disconnectLoki, stopStream, dispatch]);
 
   const handleStartStream = useCallback(() => {
-    startStream(includeTransactions);
-  }, [startStream, includeTransactions]);
+    if (isLokiMode) {
+      connectLoki();
+    } else {
+      startStream(includeTransactions);
+    }
+  }, [isLokiMode, connectLoki, startStream, includeTransactions]);
 
-  const isLoaded = events.length > 0 || streaming;
+  const isConnected = lokiConnectionState == EConnectionState.Connected;
+  const isConnecting = lokiConnectionState == EConnectionState.Connecting;
+  const isLoaded = events.length > 0 || streaming || isConnected;
 
   return (
     <div className="flex items-center justify-start gap-4 border-2 rounded-md p-4 border-gray-200 bg-white/80 backdrop-blur-xs">
@@ -73,25 +136,37 @@ export const Scenario: FC = () => {
         </select>
       </div>
 
-      <div className="flex flex-col gap-1">
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={includeTransactions}
-            onChange={(e) => setIncludeTransactions(e.target.checked)}
-            disabled={streaming || isLoaded}
-          />
-          Include Transactions
-        </label>
-      </div>
+      {!isLokiMode && (
+        <div className="flex flex-col gap-1">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={includeTransactions}
+              onChange={(e) => setIncludeTransactions(e.target.checked)}
+              disabled={isConnecting || isLoaded}
+            />
+            Include Transactions
+          </label>
+        </div>
+      )}
 
       <div className="flex gap-2">
         <Button
           variant="primary"
           onClick={handleStartStream}
-          disabled={streaming || isLoaded}
+          disabled={isConnecting || isLoaded}
         >
-          {streaming ? "Loading..." : isLoaded ? "Loaded" : "Load Scenario"}
+          {isLokiMode
+            ? isConnecting
+              ? "Connecting..."
+              : isConnected
+                ? "Connected"
+                : "Connect"
+            : streaming
+              ? "Loading..."
+              : isLoaded
+                ? "Loaded"
+                : "Load"}
         </Button>
         {isLoaded && (
           <Button
@@ -99,7 +174,7 @@ export const Scenario: FC = () => {
             onClick={handleUnloadScenario}
             className="w-[80px]"
           >
-            {streaming ? "Cancel" : "Unload"}
+            {isConnecting ? "Cancel" : "Reset"}
           </Button>
         )}
       </div>
