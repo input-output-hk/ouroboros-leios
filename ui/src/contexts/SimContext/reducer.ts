@@ -1,5 +1,9 @@
 import { defaultAggregatedData } from "./context";
-import { ISimContextState, TSimContextActions } from "./types";
+import {
+  ISimContextState,
+  TSimContextActions,
+  EConnectionState,
+} from "./types";
 import {
   computeAggregatedDataAtTime,
   clearLatencyCache,
@@ -37,7 +41,7 @@ export const reducer = (
         autoStart: action.autoStart || false,
         tracePath: scenario.trace || "",
         lokiHost: scenario.loki,
-        lokiConnected: false,
+        lokiConnectionState: EConnectionState.NotConnected,
         topologyPath: scenario.topology,
         topologyLoaded:
           state.topologyLoaded && scenario.topology === state.topologyPath,
@@ -199,10 +203,10 @@ export const reducer = (
         speedMultiplier: 1,
       };
 
-    case "SET_LOKI_CONNECTED":
+    case "SET_LOKI_CONNECTION_STATE":
       return {
         ...state,
-        lokiConnected: action.payload,
+        lokiConnectionState: action.payload,
       };
 
     default:

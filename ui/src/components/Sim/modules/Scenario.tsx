@@ -2,7 +2,7 @@ import {
   useSimContext,
   defaultAggregatedData,
 } from "@/contexts/SimContext/context";
-import { IScenario } from "@/contexts/SimContext/types";
+import { EConnectionState, IScenario } from "@/contexts/SimContext/types";
 import { ChangeEvent, FC, useCallback, useEffect, useState } from "react";
 import { useStreamMessagesHandler } from "../hooks/useStreamMessagesHandler";
 import { useLokiWebSocket } from "../hooks/useLokiWebSocket";
@@ -10,11 +10,19 @@ import { Button } from "@/components/Button";
 
 export const Scenario: FC = () => {
   const {
-    state: { allScenarios, activeScenario, events, lokiHost, lokiConnected, autoStart },
+    state: {
+      allScenarios,
+      activeScenario,
+      events,
+      lokiHost,
+      lokiConnectionState,
+      autoStart,
+    },
     dispatch,
   } = useSimContext();
   const { startStream, streaming, stopStream } = useStreamMessagesHandler();
-  const { connect: connectLoki, disconnect: disconnectLoki, connecting: lokiConnecting } = useLokiWebSocket();
+  const { connect: connectLoki, disconnect: disconnectLoki } =
+    useLokiWebSocket();
   const [includeTransactions, setIncludeTransactions] = useState(true);
 
   const isLokiMode = !!lokiHost;
@@ -29,7 +37,9 @@ export const Scenario: FC = () => {
           scenario.topology,
           window.location.toString(),
         ).toString(),
-        trace: scenario.trace ? new URL(scenario.trace, window.location.toString()).toString() : undefined,
+        trace: scenario.trace
+          ? new URL(scenario.trace, window.location.toString()).toString()
+          : undefined,
       }));
       dispatch({ type: "SET_SCENARIOS", payload: scenarios });
 
@@ -40,7 +50,11 @@ export const Scenario: FC = () => {
         const scenarioIndex = parseInt(scenarioParam, 10);
         if (scenarioIndex >= 0 && scenarioIndex < scenarios.length) {
           const targetScenario = scenarios[scenarioIndex];
-          dispatch({ type: "SET_SCENARIO", payload: targetScenario.name, autoStart: true });
+          dispatch({
+            type: "SET_SCENARIO",
+            payload: targetScenario.name,
+            autoStart: true,
+          });
         }
       }
     })();
@@ -55,9 +69,20 @@ export const Scenario: FC = () => {
         startStream(true); // Include transactions by default for auto-load
       }
       // Reset autoStart flag after triggering
-      dispatch({ type: "SET_SCENARIO", payload: activeScenario, autoStart: false });
+      dispatch({
+        type: "SET_SCENARIO",
+        payload: activeScenario,
+        autoStart: false,
+      });
     }
-  }, [autoStart, activeScenario, isLokiMode, connectLoki, startStream, dispatch]);
+  }, [
+    autoStart,
+    activeScenario,
+    isLokiMode,
+    connectLoki,
+    startStream,
+    dispatch,
+  ]);
 
   const chooseScenario = useCallback(
     (event: ChangeEvent<HTMLSelectElement>) => {
@@ -89,8 +114,9 @@ export const Scenario: FC = () => {
     }
   }, [isLokiMode, connectLoki, startStream, includeTransactions]);
 
-  const isLoaded = events.length > 0 || streaming || lokiConnected;
-  const isConnecting = streaming || lokiConnecting;
+  const isConnected = lokiConnectionState == EConnectionState.Connected;
+  const isConnecting = lokiConnectionState == EConnectionState.Connecting;
+  const isLoaded = events.length > 0 || streaming || isConnected;
 
   return (
     <div className="flex items-center justify-start gap-4 border-2 rounded-md p-4 border-gray-200 bg-white/80 backdrop-blur-xs">
@@ -130,10 +156,17 @@ export const Scenario: FC = () => {
           onClick={handleStartStream}
           disabled={isConnecting || isLoaded}
         >
-          {isLokiMode 
-            ? (lokiConnecting ? "Connecting..." : lokiConnected ? "Connected" : "Connect") 
-            : (streaming ? "Loading..." : isLoaded ? "Loaded" : "Load Scenario")
-          }
+          {isLokiMode
+            ? isConnecting
+              ? "Connecting..."
+              : isConnected
+                ? "Connected"
+                : "Connect"
+            : streaming
+              ? "Loading..."
+              : isLoaded
+                ? "Loaded"
+                : "Load"}
         </Button>
         {isLoaded && (
           <Button

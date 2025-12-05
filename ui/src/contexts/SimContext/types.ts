@@ -63,6 +63,12 @@ export interface IGraphContextState {
   currentNode?: string;
 }
 
+export enum EConnectionState {
+  NotConnected = "NotConnected",
+  Connecting = "Connecting",
+  Connected = "Connected",
+}
+
 export interface IScenario {
   name: string;
   topology: string;
@@ -79,7 +85,7 @@ export interface ISimContextState {
   aggregatedData: ISimulationAggregatedDataState;
   tracePath: string;
   lokiHost?: string;
-  lokiConnected: boolean;
+  lokiConnectionState: EConnectionState;
   topography: ITransformedNodeMap;
   topologyPath: string;
   topologyLoaded: boolean;
@@ -114,7 +120,7 @@ export type TSimContextActions =
   | { type: "SET_TIMELINE_PLAYING"; payload: boolean }
   | { type: "SET_TIMELINE_SPEED"; payload: number }
   | { type: "RESET_TIMELINE" }
-  | { type: "SET_LOKI_CONNECTED"; payload: boolean };
+  | { type: "SET_LOKI_CONNECTION_STATE"; payload: EConnectionState };
 
 export interface ISimContext {
   state: ISimContextState;

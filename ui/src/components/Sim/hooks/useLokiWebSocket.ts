@@ -10,6 +10,7 @@ import {
   ITransactionReceived,
 } from "@/components/Sim/types";
 import { useRef } from "react";
+import { EConnectionState } from "@/contexts/SimContext/types";
 
 // FIXME: latency in topology is wrong
 
@@ -387,11 +388,18 @@ function connectLokiWebSocket(lokiHost: string, dispatch: any): () => void {
     '{service="cardano-node"} |~ "BlockFetchServer|MsgBlock|CompletedBlockFetch|MsgLeiosBlock|MsgLeiosBlockTxs"';
   const wsUrl = `ws://${lokiHost}/loki/api/v1/tail?query=${encodeURIComponent(query)}&limit=5000`;
   console.log("Connecting to Loki:", wsUrl);
+  dispatch({
+    type: "SET_LOKI_CONNECTION_STATE",
+    payload: EConnectionState.Connecting,
+  });
 
   const ws = new WebSocket(wsUrl);
 
   ws.onopen = () => {
-    dispatch({ type: "SET_LOKI_CONNECTED", payload: true });
+    dispatch({
+      type: "SET_LOKI_CONNECTION_STATE",
+      payload: EConnectionState.Connected,
+    });
   };
 
   let count = 0;
@@ -438,11 +446,17 @@ function connectLokiWebSocket(lokiHost: string, dispatch: any): () => void {
 
   ws.onerror = (error) => {
     console.error("WebSocket error:", error);
-    dispatch({ type: "SET_LOKI_CONNECTED", payload: false });
+    dispatch({
+      type: "SET_LOKI_CONNECTION_STATE",
+      payload: EConnectionState.NotConnected,
+    });
   };
 
   ws.onclose = () => {
-    dispatch({ type: "SET_LOKI_CONNECTED", payload: false });
+    dispatch({
+      type: "SET_LOKI_CONNECTION_STATE",
+      payload: EConnectionState.NotConnected,
+    });
   };
 
   return () => ws.close();
@@ -450,13 +464,14 @@ function connectLokiWebSocket(lokiHost: string, dispatch: any): () => void {
 
 export const useLokiWebSocket = () => {
   const {
-    state: { lokiHost, lokiConnected },
+    state: { lokiHost, lokiConnectionState },
     dispatch,
   } = useSimContext();
+
   const cleanupRef = useRef<(() => void) | null>(null);
 
   const connect = () => {
-    if (!lokiHost || lokiConnected) return;
+    if (!lokiHost || lokiConnectionState === EConnectionState.Connected) return;
 
     dispatch({ type: "RESET_TIMELINE" });
 
@@ -466,7 +481,10 @@ export const useLokiWebSocket = () => {
   const disconnect = () => {
     cleanupRef.current?.();
     cleanupRef.current = null;
-    dispatch({ type: "SET_LOKI_CONNECTED", payload: false });
+    dispatch({
+      type: "SET_LOKI_CONNECTION_STATE",
+      payload: EConnectionState.NotConnected,
+    });
   };
 
   return { connect, disconnect };
