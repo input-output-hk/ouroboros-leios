@@ -6,6 +6,8 @@ import {
   IRankingBlockReceived,
   IEndorserBlockSent,
   IEndorserBlockReceived,
+  ITransactionSent,
+  ITransactionReceived,
 } from "@/components/Sim/types";
 import { useRef } from "react";
 
@@ -257,6 +259,124 @@ const parseEndorserBlockReceived = (
   return null;
 };
 
+const parseTransactionSent = (
+  streamLabels: any,
+  timestamp: number,
+  logLine: string,
+): IServerMessage | null => {
+  try {
+    const log = JSON.parse(logLine);
+
+    // TODO: indicate this is many transactions or visualize as a very big transaction
+
+    // From immdb-server (no ns)
+    // {"at":"2025-12-05T14:06:12.4254Z","connectionId":"127.0.0.1:3001 127.0.0.1:3002","direction":"Send","msg":"MsgLeiosBlockTxs","mux_at":"2025-12-05T14:06:12.4254Z","prevCount":265}
+    if (log.msg === "MsgLeiosBlockTxs" && log.direction === "Send") {
+      const sender = streamLabels.process;
+      const connectionId = log.connectionId;
+      let recipient = "Node0";
+
+      if (connectionId) {
+        const endpoints = connectionId.split(" ");
+        if (endpoints.length === 2) {
+          const recipientEndpoint = endpoints[1];
+          recipient = HOST_PORT_TO_NODE[recipientEndpoint] || recipient;
+        }
+      }
+
+      const message: ITransactionSent = {
+        type: EServerMessageType.TransactionSent,
+        id: `tx-batch-${log.prevCount}`,
+        sender,
+        recipient,
+      };
+
+      return {
+        time_s: timestamp,
+        message,
+      };
+    }
+
+    // From cardano-node ns=LeiosFetch.Remote.Send.BlockTxs
+    // {"kind":"Send","msg":{"kind":"MsgLeiosBlockTxs","numTxs":30,"txs":"\u003celided\u003e","txsBytesSize":491520},"mux_at":"2025-12-05T14:06:12.52467535Z","peer":{"connectionId":"127.0.0.1:3002 127.0.0.1:3003"}}
+    if (log.kind === "Send" && log.msg && log.msg.kind === "MsgLeiosBlockTxs") {
+      const sender = streamLabels.process;
+      const connectionId = log.peer?.connectionId;
+      let recipient = "Node0";
+
+      if (connectionId) {
+        const endpoints = connectionId.split(" ");
+        if (endpoints.length === 2) {
+          const recipientEndpoint = endpoints[1];
+          recipient = HOST_PORT_TO_NODE[recipientEndpoint] || recipient;
+        }
+      }
+
+      const message: ITransactionSent = {
+        type: EServerMessageType.TransactionSent,
+        id: `tx-batch-${log.msg.txs}`, // FIXME: msg.txs is always elided
+        sender,
+        recipient,
+      };
+
+      return {
+        time_s: timestamp,
+        message,
+      };
+    }
+  } catch (error) {
+    console.warn("Failed to parse TransactionSent log line:", logLine, error);
+  }
+
+  return null;
+};
+
+const parseTransactionReceived = (
+  streamLabels: any,
+  timestamp: number,
+  logLine: string,
+): IServerMessage | null => {
+  try {
+    const log = JSON.parse(logLine);
+
+    // From cardano-node ns=LeiosFetch.Remote.Receive.BlockTxs
+    // {"mux_at":"2025-12-05T14:06:12.52499731Z","peer":{"connectionId":"127.0.0.1:3003 127.0.0.1:3002"},"kind":"Recv","msg":{"txsBytesSize":491520,"kind":"MsgLeiosBlockTxs","numTxs":30,"txs":"\u003celided\u003e"}}
+    if (log.kind === "Recv" && log.msg && log.msg.kind === "MsgLeiosBlockTxs") {
+      const recipient = streamLabels.process;
+      const connectionId = log.peer?.connectionId;
+      let sender = "Node0";
+
+      if (connectionId) {
+        const endpoints = connectionId.split(" ");
+        if (endpoints.length === 2) {
+          const senderEndpoint = endpoints[1];
+          sender = HOST_PORT_TO_NODE[senderEndpoint] || sender;
+        }
+      }
+
+      const message: ITransactionReceived = {
+        type: EServerMessageType.TransactionReceived,
+        id: `tx-${log.msg.txs}`, // FIXME: msg.txs is always elided
+        sender,
+        recipient,
+      };
+
+      return {
+        time_s: timestamp,
+        message,
+      };
+    }
+  } catch (error) {
+    console.warn(
+      "Failed to parse TransactionReceived log line:",
+      logLine,
+      error,
+    );
+  }
+
+  return null;
+};
+
 function connectLokiWebSocket(lokiHost: string, dispatch: any): () => void {
   // NOTE: Single websocket is essential because:
   // 1. Timeline aggregation assumes events are chronologically ordered
@@ -264,7 +384,7 @@ function connectLokiWebSocket(lokiHost: string, dispatch: any): () => void {
   // 3. Loki naturally returns results in chronological order within a single stream
   // 4. Sorting large event arrays in the reducer is too expensive for dense simulation data
   const query =
-    '{service="cardano-node"} |~ "BlockFetchServer|MsgBlock|CompletedBlockFetch|MsgLeiosBlock"';
+    '{service="cardano-node"} |~ "BlockFetchServer|MsgBlock|CompletedBlockFetch|MsgLeiosBlock|MsgLeiosBlockTxs"';
   const wsUrl = `ws://${lokiHost}/loki/api/v1/tail?query=${encodeURIComponent(query)}&limit=5000`;
   console.log("Connecting to Loki:", wsUrl);
 
@@ -296,7 +416,9 @@ function connectLokiWebSocket(lokiHost: string, dispatch: any): () => void {
                 parseRankingBlockSent(stream.stream, ts, logLine) ||
                 parseRankingBlockReceived(stream.stream, ts, logLine) ||
                 parseEndorserBlockSent(stream.stream, ts, logLine) ||
-                parseEndorserBlockReceived(stream.stream, ts, logLine);
+                parseEndorserBlockReceived(stream.stream, ts, logLine) ||
+                parseTransactionSent(stream.stream, ts, logLine) ||
+                parseTransactionReceived(stream.stream, ts, logLine);
               if (event) {
                 console.warn("Parsed", event.time_s, event.message);
                 events.push(event);
