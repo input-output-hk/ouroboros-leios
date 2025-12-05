@@ -15,6 +15,7 @@
 
   # Python
   black.enable = true;
+  ruff.enable = true;
 
   # Yaml
   yamllint.enable = true;
