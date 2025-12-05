@@ -1,25 +1,13 @@
 # Conformance testing
 
 The goal of conformance testing is to check that an implementation of a protocol behaves as described in the formal specification of the protocol.
-In Leios this is achieved by doing trace verification. The trace verifier checks, whether a trace log corresponds to a possible execution path of the relation in the formal specification.
+In Leios this is achieved by doing trace verification. The trace verifier checks, whether a trace log corresponds to a possible execution path of the relation in the formal specification. If it accepts a trace, the trace verifier produces a correctness proof, otherwise a proof for a specific failure is provided.
+
+The formal specification usually have safety and liveness properties proved. A trace verifier serves as the connection for testing conformance of the implementation against this verified model.
 
 ## Formal specification
 
-The formal specification of [Ouroboros Leios](https://github.com/input-output-hk/ouroboros-leios-formal-spec) is implemented in Agda as a relational specification. Different variants of the Leios protocol have been explored in the formal specification, with a focus on Linear Leios.
-A common code base for the variants is used in order to share data types, for example the block types.
-The functionalities (FFD, VRF, Base ledger, etc.) are abstract data types with defining properties.
-
-### Categorical crypto framework
-
-Motivated by the need for better runtime performance of the trace verifier, the Categorical Crypto Framework has been introduced in the project. The framework facilitates the composition of the different components and we no longer have to manage the state of the functionalities explicitly (previously state of the functionalities was also put into the `LeiosState` for convenience).
-
-The Leios protocol is specified from the view of a single, honest party, describing all the possible changes of the `LeiosState` with pre-conditions.
-
-This is different to the formal specifications of [Ouroboros Peras](https://github.com/input-output-hk/peras-design/blob/main/src/Peras/SmallStep.lagda.md) or [Ouroboros Praos](https://github.com/input-output-hk/ouroboros-praos-formal-spec/blob/main/src/Protocol/Semantics.agda), where in both cases all nodes of the distributed system, including adversarial nodes, are modelled and the relation in the formal specification describes the possible evolution of the distributed system as a whole.
-
-### State transitions in Leios
-
-The relation specifying the Linear-Leios protocol carries out state transition steps upon block creation, transitioning to next slot and interacting with the base ledger. Those steps usually have pre-conditions that need to be fulfilled. For details, see [Linear Leios transitions](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Linear.lagda.md#linear-leios-transitions) in the formal specification.
+The formal specification of [Ouroboros Leios](https://github.com/input-output-hk/ouroboros-leios-formal-spec) is implemented in Agda as a relational specification. Different variants of the Leios protocol have been explored in the formal specification, with a focus on Linear Leios. A common code base for the variants is used in order to share data types, for example the block types. The functionalities (FFD, VRF, Base ledger, etc.) are abstract data types with defining properties. The protocol carries out state transition steps upon block creation, transitioning to next slot and interacting with the base ledger. Those steps usually have pre-conditions that need to be fulfilled. For details, see [Linear Leios transitions](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Linear.lagda.md#linear-leios-transitions) in the formal specification.
 
 ## Trace verification
 
@@ -27,13 +15,11 @@ Trace verification checks, whether an execution trace of the Leios protocol is a
 
 When parsing a trace log file, events are mapped to actions that trigger a step in the relational specification of the protocol. As long as for an action the pre-conditions for the next transition step can be fulfilled and the step can be done, the transition is considered correct with respect to the formal specification. Steps are done sequentially until a transition fails with a proof providing the reason of failure that gets included in the error.
 
+In order to be able to build explicit traces, the generic entities of the trace verifier and the formal specification need to be instantiated (parameterized modules in Agda). Those are in particular the `SpecStructure` that is a collection of types (for example the transaction type `Tx` needs to be defined), hashing functions (for example hashing for the different block types, etc.), or entire functionalities like the FFD (freshest-first delivery) functionality. There is an Agda module `Leios.Defaults` that contains trivial implementation of all entites needed. In addition parameters need to be provided through the `Params` record type, which are mostly about the network setup that we assume for the formal specification.
+
 ### Error handling
 
 Error handling is the interpretation of the failure proofs, mapping the failure proofs to informative error messages that can be displayed in the output of the trace verifier.
-
-### Conformance events
-
-For conformance testing additional events had to be added to the Haskell and Rust simulation. For Short and Linear Leios, an explicit event for the slot transition of a node has been added (the event could also be inferred from the other log entries), for Short-Leios the non-election for block creation or voting events have been added as well (those "negative" events are needed as the formal specification enforces a node to always check, whether a block or vote can be created).
 
 ### Formal spec repository
 
@@ -49,6 +35,10 @@ In that repository there are [examples](https://github.com/input-output-hk/ourob
   * winning-slots: The lotteries for EB and Votes
 
 ### Leios repository
+
+#### Conformance events
+
+For conformance testing additional events had to be added to the Haskell and Rust simulation. For Short and Linear Leios, an explicit event for the slot transition of a node has been added (the event could also be inferred from the other log entries), for Short-Leios the non-election for block creation or voting events have been added as well (those "negative" events are needed as the formal specification enforces a node to always check, whether a block or vote can be created).
 
 In the `leios-trace-verifier` module in the Leios repository the executables for the trace verifier is built. This is done by extracting the Agda code as MAlonzo to Haskell. Having the Haskell code for the trace verifier allows to use it together with log file parser from the module `leios-trace-hs`. The Haskell module is a shared module that both the Haskell simulation code and the trace verifier use.
 
@@ -132,6 +122,14 @@ Make sure, to specify the same topology and configuration files as used to gener
 ```bash
 $ nix run .#linear-leios-trace-verifier -- +RTS -H1G -s -RTS --trace-file trace.log --config-file data/simulation/config.default.yaml --topology-file leios-trace-verifier/examples/topology.yaml --idSut 0
 ```
+## Appendix
+### Categorical crypto framework
+
+Motivated by the need for better runtime performance of the trace verifier, the Categorical Crypto Framework has been introduced in the project. The framework facilitates the composition of the different components and we no longer have to manage the state of the functionalities explicitly (previously state of the functionalities was also put into the `LeiosState` for convenience).
+
+The Leios protocol is specified from the view of a single, honest party, describing all the possible changes of the `LeiosState` with pre-conditions.
+
+This is different to the formal specifications of [Ouroboros Peras](https://github.com/input-output-hk/peras-design/blob/main/src/Peras/SmallStep.lagda.md) or [Ouroboros Praos](https://github.com/input-output-hk/ouroboros-praos-formal-spec/blob/main/src/Protocol/Semantics.agda), where in both cases all nodes of the distributed system, including adversarial nodes, are modelled and the relation in the formal specification describes the possible evolution of the distributed system as a whole.
 
 ### TODOs
 
