@@ -1,0 +1,194 @@
+prometheus.remote_write "prometheus" {
+	endpoint {
+		url = "http://127.0.0.1:9090/api/v1/write"
+	}
+}
+
+prometheus.scrape "ss_exporter" {
+	targets = [
+		{
+			"__address__" = "127.0.0.1:9100",
+			"job"         = "ss_metrics",
+			"instance"    = "localhost",
+		},
+	]
+
+	metrics_path = "/"
+
+	scrape_timeout  = "250ms"
+	scrape_interval = "250ms"
+
+	forward_to = [prometheus.remote_write.prometheus.receiver]
+}
+
+// TODO(bladyjoker): Make this configurable via env
+prometheus.scrape "cardano_node_exporter" {
+	targets = [
+		{
+			"__address__" = "127.0.0.1:12900",
+			"job"         = "cardano_node_metrics",
+			"instance"    = "localhost",
+			"alias"       = "upstream-node",
+			"process"     = "UpstreamNode",
+		},
+		{
+			"__address__" = "127.0.0.1:12901",
+			"job"         = "cardano_node_metrics",
+			"instance"    = "localhost",
+			"alias"       = "node0",
+			"process"     = "Node0",
+		},
+		{
+			"__address__" = "127.0.0.1:12902",
+			"job"         = "cardano_node_metrics",
+			"instance"    = "localhost",
+			"alias"       = "downstream-node",
+			"process"     = "DownstreamNode",
+		},
+	]
+
+	metrics_path = "/metrics"
+
+	scrape_timeout  = "1s"
+	scrape_interval = "1s"
+
+	forward_to = [prometheus.remote_write.prometheus.receiver]
+}
+
+loki.write "loki" {
+	endpoint {
+		url = "http://localhost:3100/loki/api/v1/push"
+    batch_size = "2MB"
+	}
+}
+
+local.file_match "local_files" {
+	path_targets = [{"__path__" = sys.env("LOG_PATH")}]
+	sync_period  = "5s"
+}
+
+loki.source.file "process_compose_log_scrape" {
+	targets       = local.file_match.local_files.targets
+	forward_to    = [loki.process.extract_process_compose_logs.receiver]
+	tail_from_end = false
+}
+
+loki.process "extract_process_compose_logs" {
+	stage.json {
+		expressions = {
+			level   = "level",
+			process = "process",
+			replica = "replica",
+			message = "message",
+		}
+	}
+
+	stage.labels {
+		values = {
+			level   = "level",
+			process = "process",
+			replica = "replica",
+		}
+	}
+
+	stage.static_labels {
+		values = {
+			service = "process-compose",
+			type    = "process-compose",
+		}
+	}
+
+	stage.output {
+		source = "message"
+	}
+
+	forward_to = [
+		loki.write.loki.receiver,
+		loki.process.extract_cardano_node_logs.receiver,
+		loki.process.extract_immdb_server_logs.receiver,
+	]
+}
+
+loki.process "extract_cardano_node_logs" {
+	stage.json {
+		expressions = {
+			at     = "at",
+			sev    = "sev",
+			host   = "host",
+			thread = "thread",
+			ns     = "ns",
+			data   = "data",
+		}
+	}
+
+	stage.timestamp {
+		source = "at"
+		format = "RFC3339"
+	}
+
+	stage.labels {
+		values = {
+			level    = "sev",
+			alias    = "host",
+			host     = "host",
+			instance = "host",
+			sev      = "sev",
+			thread   = "thread",
+			ns       = "ns",
+		}
+	}
+
+	stage.static_labels {
+		values = {
+			service = "cardano-node",
+			type    = "cardano-node",
+		}
+	}
+
+	stage.output {
+		source = "data"
+	}
+
+	forward_to = [loki.write.loki.receiver]
+}
+
+loki.process "extract_immdb_server_logs" {
+	stage.match {
+		selector = "{process=\"UpstreamNode\"}"
+		action   = "keep"
+
+		stage.json {
+			expressions = {
+				at           = "at",
+				connectionId = "connectionId",
+				direction    = "direction",
+				prevCount    = "prevCount",
+				msg          = "msg",
+			}
+		}
+
+		stage.timestamp {
+			source = "at"
+			format = "RFC3339"
+		}
+
+		stage.labels {
+			values = {
+				connectionId = "connectionId",
+				direction    = "direction",
+			}
+		}
+
+		stage.static_labels {
+			values = {
+				service = "immdb-server",
+				type    = "immdb-server",
+			}
+		}
+
+		stage.output {
+			source = "msg"
+		}
+	}
+	forward_to = [loki.write.loki.receiver]
+}
