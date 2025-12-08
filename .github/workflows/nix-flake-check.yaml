@@ -24,6 +24,12 @@ jobs:
     steps:
     - name: 📥 Checkout repository
       uses: actions/checkout@v4
+    - name: Run only on Ubuntu
+      if: matrix.os == 'ubuntu-22.04'
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
     - name: 🛠️ Install Nix
       uses: cachix/install-nix-action@v21
       with:
