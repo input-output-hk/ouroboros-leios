@@ -31,6 +31,7 @@ select
   from block_times
 ;
 
+
 drop table if exists mempool_vs_blocks;
 
 create temporary table mempool_vs_blocks as
@@ -122,12 +123,46 @@ order by 1, 2, 3
 \copy mempool_hourly to 'mempool-hourly.tsv' csv header delimiter E'\t'
 
 
+drop table if exists canary;
+
+create temporary table canary as
+select 
+    tx_out.address
+  , encode(tx.hash, 'hex') as tx_hash
+  , cast(tx_metadata.json ->> 'absolute_slot' as word63type) as sub_slot_no
+  , block.slot_no - cast(tx_metadata.json ->> 'absolute_slot' as word63type) as delay 
+  from tx_out                                        
+  inner join tx_in
+    on tx_out.tx_id = tx_in.tx_out_id
+  inner join tx
+    on (tx.id, tx_in.tx_out_index) = (tx_in.tx_in_id, tx_out.index)
+  inner join block
+    on tx.block_id = block.id
+  inner join slot_range
+    on block.slot_no between slot_range.min_slot_no and slot_range.max_slot_no
+  inner join tx_metadata
+    on tx_metadata.tx_id = tx.id
+    and tx_out.address in (
+          'addr1vy0zwnn5yj4h3s25xuere4h38np4z6gcng2mdgxg0mapxagl6x66d'
+        , 'addr1vxpvhtj5vvcqmf9td3vlvv4vza9nnuqrmkc42cnd42dg7fsz0v99d'
+        , 'addr1vx7gvyvy2r7mycya22f3x88wlgra2552uxm8xz2g0v3g6yccgyydv'
+        , 'addr1vx2uvrm53dak4x3u0txy98r2jpg2nhy0n82vk8a6v9wmk4s8up888'
+        )
+order by time
+;
+
+\copy canary to 'canary.tsv' csv header delimiter E'\t'
+
+
 select
     region
   , tx_seen_first
   , count(*) as "count"
-  , (count(*) + 0.0) / (select count(*) from mempool_vs_blocks z where z.region = mempool_vs_blocks.region) as "fraction"
+  , (count(*) + 0.0)
+    /
+    (select count(*) from mempool_vs_blocks z where z.region = mempool_vs_blocks.region and slot_no >= 172210527) as "fraction"
   from mempool_vs_blocks
+  where region is not null and slot_no >= 172210527
   group by region, tx_seen_first
 order by 1
 ;
