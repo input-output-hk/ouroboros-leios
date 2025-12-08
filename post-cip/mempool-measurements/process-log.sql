@@ -22,6 +22,15 @@ create temporary table tx_times (
 \copy tx_times from 'tx-times.tsv' csv header delimiter E'\t'
 
 
+drop table if exists slot_range;
+
+create temporary table slot_range as
+select
+    min(slot_no) as min_slot_no
+  , max(slot_no) as max_slot_no
+  from block_times
+;
+
 drop table if exists mempool_vs_blocks;
 
 create temporary table mempool_vs_blocks as
@@ -37,7 +46,8 @@ select
   , extract(epoch from (tx_times.logged - xref.time)) as mempool_minus_slot
   , extract(epoch from (block_times.logged - xref.time)) as block_minus_slot
   , case when coalesce(tx_times.logged < block_times.logged, false) then 'TRUE' else 'FALSE' end as tx_seen_first
-  from (
+  from slot_range
+  inner join (
     select
         slot_no
       , time
@@ -49,7 +59,8 @@ select
         on tx.block_id = block.id
       where block.slot_no >= (select min(slot_no) from block_times)
   ) xref
-  inner join block_times
+    on xref.slot_no between slot_range.min_slot_no and slot_range.max_slot_no
+  left join block_times
     using (block_hash)
   left join tx_times
     using (region, tx_hash8)
@@ -68,6 +79,7 @@ select
   , tx_seen_first
   , count(*) as tx_count
   from mempool_vs_blocks
+  where region is not null
   group by region, slot_no, tx_seen_first
 order by 1, 2, 3
 ;
@@ -91,6 +103,7 @@ select
       , tx_seen_first
       , count(*) as tx_count
       from mempool_vs_blocks
+      where region is not null
       group by region, date_trunc('hour', block_logged), tx_seen_first
   ) a
   inner join (
@@ -99,6 +112,7 @@ select
       , date_trunc('hour', block_logged) as hour
       , count(*) as tx_total
       from mempool_vs_blocks
+      where region is not null
       group by region, date_trunc('hour', block_logged)
   ) b
     using (region, hour)
@@ -112,9 +126,8 @@ select
     region
   , tx_seen_first
   , count(*) as "count"
-  , (count(*) + 0.0) / (select count(*) from mempool_vs_blocks z where z.region = mempool_vs_blocks.region and block_logged >= now() - interval '100 hours') as "fraction"
+  , (count(*) + 0.0) / (select count(*) from mempool_vs_blocks z where z.region = mempool_vs_blocks.region) as "fraction"
   from mempool_vs_blocks
-  where block_logged >= now() - interval '100 hours'
   group by region, tx_seen_first
 order by 1
 ;
