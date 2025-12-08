@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-13, macos-14, ubuntu-22.04]
+        os: [macos-14, macos-15-intel, ubuntu-22.04]
     runs-on: ${{ matrix.os }}
     steps:
     - name: 📥 Checkout repository
@@ -37,4 +37,5 @@ jobs:
           accept-flake-config = true
     - name: nix-flake-check
       run: |
+        nix show-config
         nix --show-trace -L flake check
