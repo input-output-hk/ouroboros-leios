@@ -96,6 +96,68 @@ Make sure, to specify the same topology and configuration files as used to gener
 ```bash
 $ nix run .#linear-leios-trace-verifier -- +RTS -H1G -s -RTS --trace-file trace.log --config-file data/simulation/config.default.yaml --topology-file leios-trace-verifier/examples/topology.yaml --idSut 0
 ```
+### Unit tests
+Along with the Haskell module for the trace verifier, there is a [small DSL](../leios-trace-verifier/hs-src/test/Spec.hs) that allows building test-traces for property based tests in Haskell. The library allows to build specific positive and negative scenarios that are tested using quick-check. A test run looks as follows:
+
+```bash
+$ cabal test
+Build profile: -w ghc-9.10.1 -O1
+In order, the following will be built (use -v for more details):
+ - trace-parser-0.1.0.0 (test:test-trace-verifier) (first run)
+Preprocessing test suite 'test-trace-verifier' for trace-parser-0.1.0.0...
+Building test suite 'test-trace-verifier' for trace-parser-0.1.0.0...
+Running 1 test suites...
+Test suite test-trace-verifier: RUNNING...
+
+Generated traces
+  Positive cases
+    Genesis slot [✔]
+      +++ OK, passed 1 test.
+    Generate RB [✔]
+      +++ OK, passed 1 test.
+    Generate IB [✔]
+      +++ OK, passed 1 test.
+    Generate no IB [✔]
+      +++ OK, passed 1 test.
+    Generate EB [✔]
+      +++ OK, passed 1 test.
+    Generate no EB [✔]
+      +++ OK, passed 1 test.
+    Generate VT [✔]
+      +++ OK, passed 1 test.
+    Generate no VT [✔]
+      +++ OK, passed 1 test.
+    Skip block production [✔]
+      +++ OK, passed 100 tests.
+    Sporadic block production [✔]
+      +++ OK, passed 100 tests.
+    Noisy block production [✔]
+      +++ OK, passed 100 tests.
+  Negative cases
+    No actions [✔]
+      +++ OK, passed 1 test.
+    Start after genesis [✔]
+      +++ OK, passed 1 test.
+    Failure to generate IB [✔]
+      +++ OK, passed 1 test.
+    Failure to generate EB [✔]
+      +++ OK, passed 1 test.
+    Failure to generate VT [✔]
+      +++ OK, passed 1 test.
+Golden traces
+  Verify valid traces
+    agda-1.jsonl [✔]
+  Reject invalid traces
+    agda-2.jsonl [✔]
+    case-1.jsonl [✔]
+
+Finished in 0.4433 seconds
+19 examples, 0 failures
+Test suite test-trace-verifier: PASS
+Test suite logged to:
+/home/yves/code/ouroboros-leios/leios-trace-verifier/dist-newstyle/build/x86_64-linux/ghc-9.10.1/trace-parser-0.1.0.0/t/test-trace-verifier/test/trace-parser-0.1.0.0-test-trace-verifier.log
+1 of 1 test suites (1 of 1 test cases) passed.
+```
 ## Appendix
 ### Categorical crypto framework
 
