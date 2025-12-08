@@ -158,6 +158,7 @@ Test suite logged to:
 /home/yves/code/ouroboros-leios/leios-trace-verifier/dist-newstyle/build/x86_64-linux/ghc-9.10.1/trace-parser-0.1.0.0/t/test-trace-verifier/test/trace-parser-0.1.0.0-test-trace-verifier.log
 1 of 1 test suites (1 of 1 test cases) passed.
 ```
+As a result of the fine grained error handling in the trace verifier, using this technique negative tests can be tailored to detect very specific small deviations from the specification in traces.
 ## Appendix
 ### Categorical crypto framework
 
