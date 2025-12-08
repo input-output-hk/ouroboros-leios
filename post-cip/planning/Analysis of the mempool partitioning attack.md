@@ -1,4 +1,4 @@
-# Analysis of the mempool partitioning attack
+# [#664](https://github.com/input-output-hk/ouroboros-leios/issues/664) Analysis of the mempool partitioning attack
 
 What are the costs and benefits from the adversary’s perspective when considering attack vectors that cause the honest nodes’ mempools to not overlap.
 
@@ -28,9 +28,9 @@ In addition to informing research and networking experts, memory pool modeling a
 
 ## Tasks
 
-### Empirical foundations on Cardano mainnet
+### [#637](https://github.com/input-output-hk/ouroboros-leios/issues/637) Empirical foundations on Cardano mainnet
 
-- [ ] Mempool telemetry experiment
+- [ ] [#644](https://github.com/input-output-hk/ouroboros-leios/issues/644) Mempool telemetry experiment
 	- [ ] Probability that a transaction is in one node's mempool, given that it is in another node's mempool.
 	- [ ] Probability that a transaction is in the node's mempool, given that it is later received in a block.
 	- [ ] Probability that a transaction is in a block received by a node, given that is was previously received in the node's memory pool.
@@ -41,15 +41,15 @@ In addition to informing research and networking experts, memory pool modeling a
 	- [ ] Identification and filtration of node clusters of mempool correlation.
 	- [ ] Tracking of CF's "canary" transactions' arrival in memory pools.
 	- [ ] Tracking of natural and induced congestion on arrival in memory pools.
-- [ ] Transaction analysis
+- [ ] [#645](https://github.com/input-output-hk/ouroboros-leios/issues/645) Transaction analysis
 	- [ ] Fraction of transaction spent in the block they were created.
 	- [ ] Distribution of transaction lifetime (blocks and slots).
 	- [ ] Distribution of length of transaction chains in consecutive blocks.
-- [ ] Block analysis
+- [ ] [#646](https://github.com/input-output-hk/ouroboros-leios/issues/646) Block analysis
 	- [ ] Distribution of block utilization.
 	- [ ] Temporal autocorrelation of block utilization.
 	- [ ] Temporal autocorrelation of highly utilized blocks.
-- [ ] Peer telemetry experiment and CF topology dataset
+- [ ] [#647](https://github.com/input-output-hk/ouroboros-leios/issues/647) Peer telemetry experiment and CF topology dataset
 	- [ ] Geographic distance of block or transaction providers.
 	- [ ] Distribution of frequency of block or transaction provision by downstream nodes.
 	- [ ] Persistence (temporal autocorrelation) of active peers.
@@ -58,14 +58,14 @@ In addition to informing research and networking experts, memory pool modeling a
 	- [ ] Connectivity matrix heat map.
 	- [ ] Filtration of topological components by long hops.
 
-### Modeling the memory pools and their spatio-temporal correlations
+### [#667](https://github.com/input-output-hk/ouroboros-leios/issues/667) Modeling the memory pools and their spatio-temporal correlations
 
-- [ ] Regression models of mempool behavior under normal operating conditions.
+- [ ] [#668](https://github.com/input-output-hk/ouroboros-leios/issues/668) Regression models of mempool behavior under normal operating conditions.
 	- [ ] Coherence between local and global memory pools.
 	- [ ] Variability of mempool synchronization.
 	- [ ] Time delays between transaction arrival and block arrival.
 	- [ ] Frequency of long hops.
-- [ ] Mathematical model of memory pool behavior.
+- [ ] [#669](https://github.com/input-output-hk/ouroboros-leios/issues/669) Mathematical model of memory pool behavior.
 	- Model definition.
 		- Independent variables.
 			- Network topology.

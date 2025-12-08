@@ -1,4 +1,4 @@
-# Modeling resource constraints and interdependencies
+# [#654](https://github.com/input-output-hk/ouroboros-leios/issues/654) Modeling resource constraints and interdependencies
 
 Develop a model of the constraints, dependencies, scheduling latitude for critical operations such as message transfer and cryptography.
 
@@ -28,16 +28,16 @@ The Linear Leios engineering effort and the broader technical community can use 
 
 ## Tasks
 
-### Empirical foundations on Cardano mainnet
+### [#655](https://github.com/input-output-hk/ouroboros-leios/issues/655) Empirical foundations on Cardano mainnet
 
-- [ ] Measure `Apply`, `Reapply`, and their difference for all mainnet transactions.
-- [ ] Estimate available bandwidth.
-- [ ] Estimate typical latencies.
+- [ ] [#656](https://github.com/input-output-hk/ouroboros-leios/issues/656) Measure `Apply`, `Reapply`, and their difference for all mainnet transactions.
+- [ ] [#657](https://github.com/input-output-hk/ouroboros-leios/issues/657) Estimate available bandwidth.
+- [ ] [#658](https://github.com/input-output-hk/ouroboros-leios/issues/658) Estimate typical latencies.
 
-### Modeling resource constraints
+### [#659](https://github.com/input-output-hk/ouroboros-leios/issues/659) Modeling resource constraints
 
-- [ ] Regression models for `Apply`, `Reapply`, and their difference.
-- [ ] Mathematical model of constraints on Linear Leios.
+- [ ] [#660](https://github.com/input-output-hk/ouroboros-leios/issues/660) Regression models for `Apply`, `Reapply`, and their difference.
+- [ ] [#661](https://github.com/input-output-hk/ouroboros-leios/issues/661) Mathematical model of constraints on Linear Leios.
 	- Model definition
 		- Independent variables.
 			- Protocol parameters
@@ -53,8 +53,8 @@ The Linear Leios engineering effort and the broader technical community can use 
 		- *Forward:* predict dependent variables from independent ones.
 		- *Reverse:* estimate protocol parameters and hardware requirements for a specified level of performance.
 		- *Mapping:* find boundaries around feasible regions of performance in parameter space.
-- Executable realization of the mathematical model.
-- Numerical study of feasible protocol parameters hardware requirements.
+- [ ] [#662](https://github.com/input-output-hk/ouroboros-leios/issues/662) Executable realization of the mathematical model.
+- [ ] [#664](https://github.com/input-output-hk/ouroboros-leios/issues/663) Numerical study of feasible protocol parameters hardware requirements.
 
 ### Stretch goal (uncommitted)
 
