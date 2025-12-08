@@ -154,6 +154,33 @@ order by time
 \copy canary to 'canary.tsv' csv header delimiter E'\t'
 
 
+drop table if exists congestions;
+
+create temporary table congestions as
+select distinct
+    case
+      when block.time between '2025-11-26 14:00:00' and '2025-11-26 14:02:00' then '2025-11-26 14:01:16'
+      when block.time between '2025-11-26 14:22:00' and '2025-11-26 14:25:00' then '2025-11-26 14:23:16'
+    end :: timestamp without time zone as time
+  , encode(tx.hash, 'hex') as tx_hash
+  from tx
+  inner join block
+    on block.id = tx.block_id
+  inner join tx_in
+    on tx_in.tx_in_id = tx.id
+  inner join tx_out
+    on (tx_out.tx_id, tx_out.index) = (tx_in.tx_out_id, tx_out_index)
+  where tx_out.address = 'addr1qy9prvx8ufwutkwxx9cmmuuajaqmjqwujqlp9d8pvg6gupcvluken35ncjnu0puetf5jvttedkze02d5kf890kquh60sut9jg7'
+    and (
+             block.time between '2025-11-26 14:00:00' and '2025-11-26 14:02:00'
+          or block.time between '2025-11-26 14:22:00' and '2025-11-26 14:25:00'
+        )
+order by 1, 2
+;
+
+\copy congestions to 'congestions.tsv' csv header delimiter E'\t'
+
+
 select
     region
   , tx_seen_first
