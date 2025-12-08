@@ -25,6 +25,7 @@
 
   outputs =
     inputs@{
+      self,
       nixpkgs,
       flake-parts,
       ...
@@ -55,18 +56,17 @@
         "aarch64-darwin"
       ];
 
-      flake.hydraJobs = {};
       # TODO(bladyjoker): Enable when Hydra is back to stable
-      # flake.hydraJobs = import ./nix/hydra.nix {
-      #   flake = self;
-      #   inherit lib;
-      #   systems = [
-      #     "x86_64-linux"
-      #     "x86_64-darwin"
-      #     "aarch64-linux"
-      #     "aarch64-darwin"
-      #   ];
-      # };
+      flake.hydraJobs = import ./nix/hydra.nix {
+        flake = self;
+        inherit lib;
+        systems = [
+          "x86_64-linux"
+          # "x86_64-darwin"
+          # "aarch64-linux"
+          # "aarch64-darwin"
+        ];
+      };
 
     };
 
