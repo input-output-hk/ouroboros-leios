@@ -2,6 +2,9 @@ NS_PREFIX="leios_experiment"
 NS_UPSTREAM="${NS_PREFIX}-upstream"
 NS_NODE0="${NS_PREFIX}-node0"
 NS_DOWNSTREAM="${NS_PREFIX}-downstream"
+IP_UPSTREAM="10.0.0.1"
+IP_NODE0="10.0.0.2"
+IP_DOWNSTREAM="10.0.0.3"
 
 # Delete all namespaces
 ip netns del "$NS_UPSTREAM";
@@ -69,6 +72,9 @@ delay "$NS_NODE0" "n0->down" "20ms"
 limit_rate "$NS_DOWNSTREAM" "down->n0" "100mbit"
 delay "$NS_DOWNSTREAM" "down->n0" "20ms"
 
-# Configure UPSTREAM network
-# ip netns exec "$NS_UPSTREAM" ip addr add "$NET_NODE0" dev "upstream->node0"
+# Configure IP assignments and network routes
+ip netns exec "$NS_UPSTREAM" ip addr add local "$IP_UPSTREAM" peer "$IP_NODE0" dev "up->n0"
+ip netns exec "$NS_NODE0" ip addr add local "$IP_NODE0" peer "$IP_UPSTREAM" dev "n0->up"
+ip netns exec "$NS_NODE0" ip addr add local "$IP_NODE0" peer "$IP_DOWNSTREAM" dev "n0->down"
+ip netns exec "$NS_DOWNSTREAM" ip addr add local "$IP_DOWNSTREAM" peer "$IP_NODE0" dev "down->n0"
 
