@@ -181,6 +181,61 @@ order by 1, 2
 \copy congestions to 'congestions.tsv' csv header delimiter E'\t'
 
 
+drop table if exists outbounds_denorm;
+
+create temporary table outbounds_denorm (
+  region     varchar(30)                 not null
+, logged     timestamp without time zone not null
+, local      varchar(21)                 not null
+, remote     varchar(21)                 not null
+, tx_hash_1  char(64)                    not null
+, tx_hash_2  char(64)
+);
+
+\copy outbounds_denorm from 'outbounds.tsv' csv header delimiter E'\t'
+
+
+drop table if exists outbounds;
+
+create temporary table outbounds as
+select region, logged, local, remote, tx_hash_1 as tx_hash from outbounds_denorm
+union all
+select region, logged, local, remote, tx_hash_2 from outbounds_denorm where tx_hash_2 is not null
+;
+
+update outbounds
+  set local = '18.176.178.121:3001'
+  where region = 'ap-northeast-1'
+;
+
+update outbounds
+  set local = '52.28.55.26:3001'
+  where region = 'eu-central-1'
+;
+
+update outbounds
+  set local = '18.218.69.112:3001'
+  where region = 'us-east-2'
+;
+
+\copy outbounds to 'outbounds.tsv' csv header delimiter E'\t'
+
+
+\copy (select split_part(remote, ':', 1) from outbounds union select split_part(local, ':', 1) from outbounds) to 'remotes.tsv'
+
+
+drop table if exists remote_geo;
+
+create temporary table remote_geo (
+  remote     varchar(21) not null
+, longitude  real        not null
+, latitude   real        not null
+);
+
+-- Via `https://reallyfreegeoip.org/json/`
+\copy remote_geo from 'reallyfreegeoip.tsv' csv header delimiter E'\t'
+
+
 select
     region
   , tx_seen_first

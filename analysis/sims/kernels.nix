@@ -27,12 +27,15 @@ in
       curl
       data_table
       dplyr
+      geosphere
       ggpattern
       ggplot2
       ggExtra
       igraph
       ltsa
       lubridate
+      mapproj
+      maps
       mongolite
       poibin
       quantreg
