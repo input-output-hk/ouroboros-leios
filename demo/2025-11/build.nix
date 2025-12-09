@@ -13,7 +13,12 @@
           name = "dev-demo-2025-11";
           src = ./.;
           inputsFrom = [ config.devShells.dev-demo ];
-          packages = [ pkgs.process-compose ];
+          packages = [
+            pkgs.process-compose
+            pkgs.iproute2
+            pkgs.sqlite
+            config.packages.ss_http_exporter
+          ];
           inherit (config.devShells.dev-demo) IMMDB_SERVER CARDANO_NODE;
         };
       };
