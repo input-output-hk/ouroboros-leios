@@ -38,11 +38,13 @@ for var in "${VARS_TO_DEFAULT[@]}"; do
   echo "$var=$val" >>"$WORKING_DIR/.env"
 done
 
-echo "UPSTREAM_NODE_DIR=$WORKING_DIR/upstream-node" >>"$WORKING_DIR/.env"
-echo "NODE0_DIR=$WORKING_DIR/node0" >>"$WORKING_DIR/.env"
-echo "DOWNSTREAM_NODE_DIR=$WORKING_DIR/downstream-node" >>"$WORKING_DIR/.env"
-now=$(date +%s)
-echo "ONSET_OF_REF_SLOT=$((now + SECONDS_UNTIL_REF_SLOT))" >>"$WORKING_DIR/.env"
+{
+  echo "UPSTREAM_NODE_DIR=$WORKING_DIR/upstream-node"
+  echo "NODE0_DIR=$WORKING_DIR/node0"
+  echo "DOWNSTREAM_NODE_DIR=$WORKING_DIR/downstream-node"
+  now=$(date +%s)
+  echo "ONSET_OF_REF_SLOT=$((now + SECONDS_UNTIL_REF_SLOT))"
+} >>"$WORKING_DIR/.env"
 
 set -a && source "$WORKING_DIR/.env" && set +a
 
