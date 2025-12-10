@@ -30,17 +30,17 @@ In addition to informing research and networking experts, memory pool modeling a
 
 ### [#637](https://github.com/input-output-hk/ouroboros-leios/issues/637) Empirical foundations on Cardano mainnet
 
-- [ ] [#644](https://github.com/input-output-hk/ouroboros-leios/issues/644) Mempool telemetry experiment
-	- [ ] Probability that a transaction is in one node's mempool, given that it is in another node's mempool.
-	- [ ] Probability that a transaction is in the node's mempool, given that it is later received in a block.
-	- [ ] Probability that a transaction is in a block received by a node, given that is was previously received in the node's memory pool.
-	- [ ] Distribution of a transaction's arrival time prior to the slot where the block was produced.
-	- [ ] Fraction of mempool transactions received in the node's mempool before in their block.
-	- [ ] Temporal autocorrelation of fraction of mempool transactions received  in the node's mempool before in their block.
-	- [ ] Temporal and spatial autocorrelation of fraction of mempool transactions received in the node's mempool before in their block.
-	- [ ] Identification and filtration of node clusters of mempool correlation.
-	- [ ] Tracking of CF's "canary" transactions' arrival in memory pools.
-	- [ ] Tracking of natural and induced congestion on arrival in memory pools.
+- [x] [#644](https://github.com/input-output-hk/ouroboros-leios/issues/644) Mempool telemetry experiment
+	- [x] Probability that a transaction is in one node's mempool, given that it is in another node's mempool.
+	- [x] Probability that a transaction is in the node's mempool, given that it is later received in a block.
+	- [x] Probability that a transaction is in a block received by a node, given that is was previously received in the node's memory pool.
+	- [x] Distribution of a transaction's arrival time prior to the slot where the block was produced.
+	- [x] Fraction of mempool transactions received in the node's mempool before in their block.
+	- [x] Temporal autocorrelation of fraction of mempool transactions received  in the node's mempool before in their block.
+	- [x] Temporal and spatial autocorrelation of fraction of mempool transactions received in the node's mempool before in their block.
+	- [x] Identification and filtration of node clusters of mempool correlation.
+	- [x] Tracking of CF's "canary" transactions' arrival in memory pools.
+	- [x] Tracking of natural and induced congestion on arrival in memory pools.
 - [ ] [#645](https://github.com/input-output-hk/ouroboros-leios/issues/645) Transaction analysis
 	- [ ] Fraction of transaction spent in the block they were created.
 	- [ ] Distribution of transaction lifetime (blocks and slots).
