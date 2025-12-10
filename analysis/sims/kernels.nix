@@ -28,9 +28,11 @@ in
       data_table
       dplyr
       geosphere
+      ggExtra
       ggpattern
       ggplot2
-      ggExtra
+      ggraph
+    # ggtda
       igraph
       ltsa
       lubridate
@@ -39,10 +41,12 @@ in
       mongolite
       poibin
       quantreg
-      RPostgres
       R_utils
+      ripserr
+      RPostgres
       stringr
       svglite
+      TDAstats
       VGAM
     ];
   };
