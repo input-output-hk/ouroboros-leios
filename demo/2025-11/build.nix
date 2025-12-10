@@ -20,7 +20,8 @@
           name = "leios_202511_demo";
           runtimeInputs =
             config.devShells.dev-leios-202511-demo.nativeBuildInputs
-            ++ config.devShells.dev-leios-202511-demo.buildInputs;
+            ++ config.devShells.dev-leios-202511-demo.buildInputs
+            ++ [ pkgs.sqlite ];
           runtimeEnv = {
             # Non configurable
             WORKING_DIR = ".tmp-leios-202511-demo";
