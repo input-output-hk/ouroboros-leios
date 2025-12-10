@@ -3,10 +3,10 @@
 }:
 
 pkgs.mkShell {
-  packages = [
-    pkgs.nodejs
-    pkgs.nodePackages.prettier
-    pkgs.typescript
-    pkgs.typescript-language-server
+  packages = with pkgs; [
+    nodejs
+    nodePackages.prettier
+    typescript
+    typescript-language-server
   ];
 }
