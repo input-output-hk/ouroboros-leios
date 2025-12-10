@@ -67,7 +67,7 @@ function Feature({ Svg, title, description, button }: FeatureItem) {
 
 export default function HomepageFeatures(): React.ReactElement {
   return (
-    <section className="padding-section">
+    <section className="padding-section homepage-section-primary">
       <div className="container">
         <div className="container-padding">
           <div className={styles.features}>
