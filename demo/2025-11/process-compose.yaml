@@ -1,102 +1,34 @@
 version: "0.5"
+is_strict: true
 
 processes:
   Init:
     command: |
-      set -exo pipefail;
-
-      echo "Initializing WORKING_DIR";
-      if [ ! -d "$WORKING_DIR" ]; then
-        mkdir "$WORKING_DIR"
-        echo "Working directory created: $WORKING_DIR"
-      fi;
-
-      cat <<-EOF > "$WORKING_DIR/.env"
-      CARDANO_NODE=${CARDANO_NODE:-"$DEF_CARDANO_NODE"}
-      IMMDB_SERVER=${IMMDB_SERVER:-"$DEF_IMMDB_SERVER"}
-      SECONDS_UNTIL_REF_SLOT=${SECONDS_UNTIL_REF_SLOT:-"$DEF_SECONDS_UNTIL_REF_SLOT"}
-      REF_SLOT=${REF_SLOT:-"$DEF_REF_SLOT"}
-      DATA_DIR=${DATA_DIR:-"$DEF_DATA_DIR"}
-      LEIOS_MANIFEST=${LEIOS_MANIFEST:-"$DEF_LEIOS_MANIFEST"}
-      PYTHON3=${PYTHON3:-"$DEF_PYTHON3"}
-      ANALYSE_PY=${ANALYSE_PY:-"$DEF_ANALYSE_PY"}
-      UPSTREAM_NODE_DIR="$WORKING_DIR/upstream-node"
-      NODE0_DIR="$WORKING_DIR/node0"
-      DOWNSTREAM_NODE_DIR="$WORKING_DIR/downstream-node"
-      UPSTREAM_NODE_PORT=${UPSTREAM_NODE_PORT:-"$DEF_UPSTREAM_NODE_PORT"}
-      NODE0_PORT=${NODE0_PORT:-"$DEF_NODE0_PORT"}
-      DOWNSTREAM_NODE_PORT=${DOWNSTREAM_NODE_PORT:-"$DEF_DOWNSTREAM_NODE_PORT"}
-      EOF
-
-      set -a && source "$WORKING_DIR/.env" && set +a;
-
-      if [ ! -d "$WORKING_DIR/genesis" ]; then
-        echo "Copying genesis";
-        cp -fr "$DATA_DIR/genesis" "$WORKING_DIR/genesis";
-        chmod -R +rw "$WORKING_DIR/genesis";
-      fi;
-
-      now=$(date +%s);
-      cat <<-EOF >> "$WORKING_DIR/.env"
-      ONSET_OF_REF_SLOT=$(( now + SECONDS_UNTIL_REF_SLOT ))
-      EOF
-
-
+      bash "${SCRIPTS}/init.sh"
     availability:
       restart: "on_failure"
 
+  InitNamespaces:
+    is_elevated: true
+    command: |
+      bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/init-namespaces.sh"
+    depends_on:
+      Init:
+        condition: process_completed_successfully
 
   PrepareUpstreamNode:
     command: |
-      set -exuo pipefail;
-      set -a && source "$WORKING_DIR/.env" && set +a;
-
-      if [ -d "$UPSTREAM_NODE_DIR" ]; then
-        echo "Removing old $UPSTREAM_NODE_DIR"
-        rm -fr "$UPSTREAM_NODE_DIR";
-      fi
-
-      mkdir "$UPSTREAM_NODE_DIR";
-      echo "Working directory created for upstream-node: $UPSTREAM_NODE_DIR";
-
-      echo "Generate the Leios DB and the schedules";
-
-      leiosdemo202510 generate \
-        "$UPSTREAM_NODE_DIR/leios.db" \
-        "$LEIOS_MANIFEST" \
-        "$UPSTREAM_NODE_DIR/base-schedule.json";
-
-      if [[ ! -v LEIOS_SCHEDULE ]]; then
-        jq 'map(.[0] = 182.9)' "$UPSTREAM_NODE_DIR/base-schedule.json" > "$UPSTREAM_NODE_DIR/schedule.json"
-        echo "LEIOS_SCHEDULE not set, using default";
-      else
-        cp -f "$LEIOS_SCHEDULE" "$UPSTREAM_NODE_DIR/schedule.json";
-      fi;
-
-      cp -f "$DATA_DIR/upstream-node/config.json" "$UPSTREAM_NODE_DIR/config.json";
-      tar -xzf "$DATA_DIR/upstream-node/immutable.tar.gz" -C "$UPSTREAM_NODE_DIR";
-      chmod -R +rw "$UPSTREAM_NODE_DIR";
-
+      bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/prepare-upstream-node.sh"
     depends_on:
-      Init:
+      InitNamespaces:
         condition: process_completed_successfully
     availability:
       restart: "on_failure"
 
   UpstreamNode:
+    is_elevated: true
     command: |
-      set -exuo pipefail;
-      set -a && source "$WORKING_DIR/.env" && set +a;
-
-      cd "$UPSTREAM_NODE_DIR";
-      $IMMDB_SERVER \
-        --db "immutable/" \
-        --config "config.json" \
-        --initial-slot "$REF_SLOT" \
-        --initial-time "$ONSET_OF_REF_SLOT" \
-        --leios-schedule "schedule.json" \
-        --leios-db "leios.db" \
-        --port $((UPSTREAM_NODE_PORT));
+      ip netns exec leios-experiment:upstream bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/upstream-node.sh"
     log_location: "${WORKING_DIR}/upstream-node/log"
     depends_on:
       PrepareUpstreamNode:
@@ -106,41 +38,17 @@ processes:
 
   PrepareNode0:
     command: |
-      set -exuo pipefail;
-      set -a && source "$WORKING_DIR/.env" && set +a;
-
-      if [ -d "$NODE0_DIR" ]; then
-        echo "Removing old $NODE0_DIR"
-        rm -fr "$NODE0_DIR";
-      fi
-
-      mkdir "$NODE0_DIR";
-      echo "Working directory created for node0: $NODE0_DIR";
-
-      cat "$DATA_DIR/leios-schema.sql" | sqlite3 "$NODE0_DIR/leios.db";
-      jq --argjson port "$UPSTREAM_NODE_PORT" '.localRoots[0].accessPoints[0].port = $port' "$DATA_DIR/topology.template.json" > "$NODE0_DIR/topology.json";
-      cp -f "$DATA_DIR/node0/config.json" "$NODE0_DIR/config.json";
-
+      bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/prepare-node0.sh"
     depends_on:
-      Init:
+      InitNamespaces:
         condition: process_completed_successfully
     availability:
       restart: "on_failure"
 
   Node0:
+    is_elevated: true
     command: |
-      set -exuo pipefail;
-      set -a && source "$WORKING_DIR/.env" && set +a;
-
-      cd "$NODE0_DIR";
-      echo $NODE0_PORT;
-      export LEIOS_DB_PATH="leios.db";
-      "$CARDANO_NODE" run \
-        --config "config.json" \
-        --topology "topology.json" \
-        --database-path "db" \
-        --socket-path "socket" \
-        --host-addr 127.0.0.1 --port "$NODE0_PORT";
+      ip netns exec leios-experiment:node0 bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/node0.sh"
     log_location: "${WORKING_DIR}/node0/log"
     depends_on:
       PrepareNode0:
@@ -150,41 +58,17 @@ processes:
 
   PrepareDownstreamNode:
     command: |
-      set -exuo pipefail;
-      set -a && source "$WORKING_DIR/.env" && set +a;
-
-      if [ -d "$DOWNSTREAM_NODE_DIR" ]; then
-        echo "Removing old $DOWNSTREAM_NODE_DIR"
-        rm -fr "$DOWNSTREAM_NODE_DIR";
-      fi
-
-      mkdir "$DOWNSTREAM_NODE_DIR";
-      echo "Working directory created for downstream-node: $DOWNSTREAM_NODE_DIR";
-
-      cat "$DATA_DIR/leios-schema.sql" | sqlite3 "$DOWNSTREAM_NODE_DIR/leios.db";
-      jq --argjson port "$NODE0_PORT" '.localRoots[0].accessPoints[0].port = $port' "$DATA_DIR/topology.template.json" > "$DOWNSTREAM_NODE_DIR/topology.json";
-      cp -f "$DATA_DIR/downstream-node/config.json" "$DOWNSTREAM_NODE_DIR/config.json";
-
+      bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/prepare-downstream-node.sh"
     depends_on:
-      Init:
+      InitNamespaces:
         condition: process_completed_successfully
     availability:
       restart: "on_failure"
 
   DownstreamNode:
+    is_elevated: true
     command: |
-      set -exuo pipefail;
-      set -a && source "$WORKING_DIR/.env" && set +a;
-
-      cd "$DOWNSTREAM_NODE_DIR";
-      export LEIOS_DB_PATH="leios.db";
-      "$CARDANO_NODE" run \
-        --config "config.json" \
-        --topology "topology.json" \
-        --database-path "db" \
-        --socket-path "socket" \
-        --host-addr 127.0.0.1 --port "$DOWNSTREAM_NODE_PORT";
-
+      ip netns exec leios-experiment:downstream bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/downstream-node.sh"
     log_location: "${WORKING_DIR}/downstream-node/log"
     depends_on:
       PrepareDownstreamNode:
@@ -210,8 +94,12 @@ processes:
 
     log_location: "${WORKING_DIR}/analyse.log"
     depends_on:
-      Init:
-        condition: process_completed_successfully
+      UpstreamNode:
+        condition: process_started
+      Node0:
+        condition: process_started
+      DownstreamNode:
+        condition: process_started
     availability:
       restart: "always"
 

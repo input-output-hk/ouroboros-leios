@@ -12,6 +12,7 @@
 
   # Shell
   shellcheck.enable = true;
+  shfmt.enable = true;
 
   # Python
   black.enable = true;

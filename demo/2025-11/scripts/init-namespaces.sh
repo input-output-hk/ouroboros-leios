@@ -1,20 +1,20 @@
-NS_PREFIX="leios_experiment"
-NS_UPSTREAM="${NS_PREFIX}-upstream"
-NS_NODE0="${NS_PREFIX}-node0"
-NS_DOWNSTREAM="${NS_PREFIX}-downstream"
-IP_UPSTREAM="10.0.0.1"
-IP_NODE0="10.0.0.2"
-IP_DOWNSTREAM="10.0.0.3"
+set -exuo pipefail
+set -a && source "$WORKING_DIR/.env" && set +a
+
+NS_PREFIX="leios-experiment"
+NS_UPSTREAM="${NS_PREFIX}:upstream"
+NS_NODE0="${NS_PREFIX}:node0"
+NS_DOWNSTREAM="${NS_PREFIX}:downstream"
 
 # Delete all namespaces
-ip netns del "$NS_UPSTREAM";
-ip netns del "$NS_NODE0";
-ip netns del "$NS_DOWNSTREAM";
+ip netns del "$NS_UPSTREAM" || true
+ip netns del "$NS_NODE0" || true
+ip netns del "$NS_DOWNSTREAM" || true
 
 # Create all namespaces
-ip netns add "$NS_UPSTREAM";
-ip netns add "$NS_NODE0";
-ip netns add "$NS_DOWNSTREAM";
+ip netns add "$NS_UPSTREAM"
+ip netns add "$NS_NODE0"
+ip netns add "$NS_DOWNSTREAM"
 
 # Create a VETH link upstream <-> node0
 ip link add "up->n0" type veth peer name "n0->up"
@@ -61,20 +61,22 @@ function delay() {
   ip netns exec "$ns" tc qdisc add dev "ifb!$veth_dev" root netem delay "$delay"
 }
 
-limit_rate "$NS_UPSTREAM" "up->n0" "100mbit"
-delay "$NS_UPSTREAM" "up->n0" "20ms"
+limit_rate "$NS_UPSTREAM" "up->n0" "$RATE_UP_TO_N0"
+delay "$NS_UPSTREAM" "up->n0" "$DELAY_UP_TO_N0"
 
-limit_rate "$NS_NODE0" "n0->up" "100mbit"
-delay "$NS_NODE0" "n0->up" "20ms"
-limit_rate "$NS_NODE0" "n0->down" "100mbit"
-delay "$NS_NODE0" "n0->down" "20ms"
+limit_rate "$NS_NODE0" "n0->up" "$RATE_N0_TO_UP"
+delay "$NS_NODE0" "n0->up" "$DELAY_N0_TO_UP"
+limit_rate "$NS_NODE0" "n0->down" "$RATE_N0_TO_DOWN"
+delay "$NS_NODE0" "n0->down" "$DELAY_N0_TO_DOWN"
 
-limit_rate "$NS_DOWNSTREAM" "down->n0" "100mbit"
-delay "$NS_DOWNSTREAM" "down->n0" "20ms"
+limit_rate "$NS_DOWNSTREAM" "down->n0" "$RATE_DOWN_TO_N0"
+delay "$NS_DOWNSTREAM" "down->n0" "$DELAY_DOWN_TO_N0"
 
 # Configure IP assignments and network routes
-ip netns exec "$NS_UPSTREAM" ip addr add local "$IP_UPSTREAM" peer "$IP_NODE0" dev "up->n0"
-ip netns exec "$NS_NODE0" ip addr add local "$IP_NODE0" peer "$IP_UPSTREAM" dev "n0->up"
-ip netns exec "$NS_NODE0" ip addr add local "$IP_NODE0" peer "$IP_DOWNSTREAM" dev "n0->down"
-ip netns exec "$NS_DOWNSTREAM" ip addr add local "$IP_DOWNSTREAM" peer "$IP_NODE0" dev "down->n0"
-
+ip netns exec "$NS_UPSTREAM" ip addr add local "$IP_UPSTREAM_NODE" peer "$IP_NODE0" dev "up->n0"
+ip netns exec "$NS_UPSTREAM" ip addr add local "127.0.0.1" dev "lo"
+ip netns exec "$NS_NODE0" ip addr add local "$IP_NODE0" peer "$IP_UPSTREAM_NODE" dev "n0->up"
+ip netns exec "$NS_NODE0" ip addr add local "$IP_NODE0" peer "$IP_DOWNSTREAM_NODE" dev "n0->down"
+ip netns exec "$NS_NODE0" ip addr add local "127.0.0.1" dev "lo"
+ip netns exec "$NS_DOWNSTREAM" ip addr add local "$IP_DOWNSTREAM_NODE" peer "$IP_NODE0" dev "down->n0"
+ip netns exec "$NS_DOWNSTREAM" ip addr add local "127.0.0.1" dev "lo"

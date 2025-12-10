@@ -72,7 +72,14 @@ LEIOS_MANIFEST=manifest.json
 ANALYSE_PY=analyse.py
 PYTHON3=python
 CARDANO_NODE=cardano-node
-IMMDB_SERVER=immdb-server
+RATE_UP_TO_N0="100Mbps";
+DELAY_UP_TO_N0="20ms";
+RATE_N0_TO_UP="100Mbps";
+DELAY_N0_TO_UP="20ms";
+RATE_N0_TO_DOWN="100Mbps";
+DELAY_N0_TO_DOWN="20ms";
+RATE_DOWN_TO_N0="100Mbps";
+DMMDB_SERVER=immdb-server
 ```
 
 To clean up just delete the working directories
