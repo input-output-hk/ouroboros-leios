@@ -236,7 +236,7 @@
       "severity": "Notice"
     },
     "Resources": {
-      "severity": "Debug"
+      "severity": "Silence"
     },
     "Shutdown": {
       "severity": "Notice"
