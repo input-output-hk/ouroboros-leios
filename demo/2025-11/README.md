@@ -50,13 +50,13 @@ Run the Leios X-Ray (Grafana based observability stack)
 ```shell
 export LOG_PATH=".tmp-leios-202511-demo/*.log"
 export SS_FILTER="( sport = 3001 and dport = 3002 ) or ( sport = 3002 and dport = 3001 ) or ( sport = 3002 and dport = 3003 ) or ( sport = 3003 and dport = 3002 )"
-nix run github:IntersectMBO/ouroboros-leios#x_ray
+nix run github:input-output-hk/ouroboros-leios#x_ray
 ```
 
 Run the Leios experiment with default configuration
 
 ```shell
-nix run github:IntersectMBO/ouroboros-leios#leios_202511_demo
+nix run github:input-output-hk/ouroboros-leios#leios_202511_demo
 ```
 
 If you want to further configure the experiment set the following environment

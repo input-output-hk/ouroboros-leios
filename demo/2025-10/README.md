@@ -79,7 +79,7 @@ This section summarizes some lessons learned during the development of this prot
 You can run the demo directly from the GitHub repository using Nix (requires SSH access):
 
 ```shell
-nix run github:IntersectMBO/ouroboros-leios#leios-202510-demo
+nix run github:input-output-hk/ouroboros-leios#leios-202510-demo
 ```
 
 Or from a local checkout:
@@ -91,7 +91,7 @@ nix run .#leios-202510-demo
 The demo uses default values of `REF_SLOT=41` and `SECONDS_UNTIL_REF_SLOT=5`. You can override these:
 
 ```shell
-SECONDS_UNTIL_REF_SLOT=10 REF_SLOT=200 nix run github:IntersectMBO/ouroboros-leios#leios-202510-demo
+SECONDS_UNTIL_REF_SLOT=10 REF_SLOT=200 nix run github:input-output-hk/ouroboros-leios#leios-202510-demo
 ```
 
 ## Using run-demo.sh directly
