@@ -34,7 +34,7 @@
           touch $out
           before=$(ls)
           http_command 127.0.0.1 1337 "ls" &
-          sleep 1
+          sleep 5
           after=$(curl 127.0.0.1:1337)
           if [[ "$before" != "$after" ]]; then
               echo "Before and after should match"

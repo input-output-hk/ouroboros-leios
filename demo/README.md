@@ -84,5 +84,6 @@ shellcheck...............................................................Passed
 
 This repository is using
 [git-hooks.nix](https://github.com/cachix/git-hooks.nix) and you can manage them in:
+
 1. [top level configuration](../pre-commit-hooks.nix).
 1. [demo configuration](./pre-commit-hooks.nix).
