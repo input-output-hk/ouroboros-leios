@@ -19,8 +19,8 @@
         leios_202511_demo = pkgs.writeShellApplication {
           name = "leios_202511_demo";
           runtimeInputs =
-            config.devShells.dev-leios-202511-demo.nativeBuildInputs
-            ++ config.devShells.dev-leios-202511-demo.buildInputs
+            config.devShells.dev-demo-2025-11.nativeBuildInputs
+            ++ config.devShells.dev-demo-2025-11.buildInputs
             ++ [ pkgs.sqlite ];
           runtimeEnv = {
             # Non configurable
@@ -29,8 +29,8 @@
             NODE0_PORT = 3002;
             DOWNSTREAM_NODE_PORT = 3003;
             # Configurable (if you see DEF_FOO that's a default value for FOO if unset)
-            DEF_CARDANO_NODE = config.devShells.dev-leios-202511-demo.CARDANO_NODE;
-            DEF_IMMDB_SERVER = config.devShells.dev-leios-202511-demo.IMMDB_SERVER;
+            DEF_CARDANO_NODE = config.devShells.dev-demo-2025-11.CARDANO_NODE;
+            DEF_IMMDB_SERVER = config.devShells.dev-demo-2025-11.IMMDB_SERVER;
             DEF_REF_SLOT = 41;
             DEF_SECONDS_UNTIL_REF_SLOT = 5;
             DEF_LEIOS_MANIFEST = ./manifest.json;
