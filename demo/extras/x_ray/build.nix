@@ -8,7 +8,7 @@
     }:
     {
 
-      devShells.dev-x-ray = pkgs.mkShell {
+      devShells.dev-demo-extras-x-ray = pkgs.mkShell {
         packages = [
           pkgs.nettools
           pkgs.netcat

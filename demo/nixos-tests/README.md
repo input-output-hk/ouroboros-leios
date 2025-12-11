@@ -1,5 +1,9 @@
 # Leios Demo NixOS test
 
+> DISCLAIMER: This setup is related to the 2025-10 demo where we were iterating on
+> possible ways to structure and run everything. We keep it around because it's
+> likely we might need these artifacts evetually.
+
 Leios demo with NixOS test based setup for spawning reproducible and/or interactive demo scenarios. Also includes observability stack using prometheus, loki and grafana.
 
 ``` mermaid

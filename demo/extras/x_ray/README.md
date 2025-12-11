@@ -1,6 +1,6 @@
 # X-RAY - socket stats with Grafana
 
-Position your terminal into the current direcotry and enter the shell with
+Position your terminal into the current directory and enter the shell with
 
 ```shell
 nix develop .#dev-x-ray

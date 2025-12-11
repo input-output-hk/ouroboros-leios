@@ -7,8 +7,8 @@
       ...
     }:
     {
-      devShells.dev-leios-202511-demo = pkgs.mkShell {
-        name = "dev-leios-202511-demo";
+      devShells.dev-demo-2025-11 = pkgs.mkShell {
+        name = "dev-demo-2025-11";
         src = ./.;
         inputsFrom = [ config.devShells.dev-demo ];
         packages = [ pkgs.process-compose ];

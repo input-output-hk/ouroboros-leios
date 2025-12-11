@@ -51,7 +51,7 @@ automatically loaded when found.
 Enter the shell either by
 
 ```shell
-nix develop
+nix develop .#dev-demo
 ```
 
 or if you're using Direnv the shell will automatically load once you
@@ -83,44 +83,6 @@ shellcheck...............................................................Passed
 ```
 
 This repository is using
-[git-hooks.nix](https://github.com/cachix/git-hooks.nix) and to manage said
-hooks edit [./pre-commit-hooks.nix](./pre-commit-hooks.nix).
-
-## Running the Leios 202511 demo
-
-Run the Leios X-Ray
-
-```shell
-export LOG_PATH=".tmp-leios-202511-demo/*/log"
-export SS_FILTER="( sport = 3001 and dport = 3002 ) or ( sport = 3002 and dport = 3001 ) or ( sport = 3002 and dport = 3003 ) or ( sport = 3003 and dport = 3002 )"
-nix run git+ssh://git@github.com/IntersectMBO/ouroboros-leios#x_ray
-```
-
-Run the Leios experiment with default configuration
-
-```shell
-nix run git+ssh://git@github.com/IntersectMBO/ouroboros-leios#leios_202511_demo
-```
-
-If you want to further configure the experiment set the following environment
-variables:
-
-```shell
-CARDANO_NODE=cardano-node
-IMMDB_SERVER=immdb-server
-DATA_DIR=data
-REF_SLOT=41
-SECONDS_UNTIL_REF_SLOT=5
-LEIOS_MANIFEST=manifest.json
-ANALYSE_PY=analyse.py
-PYTHON3=python
-CARDANO_NODE=cardano-node
-IMMDB_SERVER=immdb-server
-```
-
-To clean up just delete the working directories
-
-```shell
-rm -fr .tmp-leios-202511-demo
-rm -fr .tmp-x-ray
-```
+[git-hooks.nix](https://github.com/cachix/git-hooks.nix) and you can manage them in:
+1. [top level configuration](../pre-commit-hooks.nix).
+1. [demo configuration](./pre-commit-hooks.nix).
