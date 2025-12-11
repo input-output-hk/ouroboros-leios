@@ -25,9 +25,9 @@
 
       packages.x_ray = pkgs.writeShellApplication {
         name = "x_ray";
-        runtimeInputs = config.devShells.dev-x-ray.nativeBuildInputs;
+        runtimeInputs = config.devShells.dev-demo-extras-x-ray.nativeBuildInputs;
         runtimeEnv = {
-          inherit (config.devShells.dev-x-ray) GRAFANA_SHARE;
+          inherit (config.devShells.dev-demo-extras-x-ray) GRAFANA_SHARE;
           GRAFANA_INI = ./grafana.ini;
           GRAFANA_HOMEPATH = ./grafana;
           ALLOY_CONFIG = ./alloy;
