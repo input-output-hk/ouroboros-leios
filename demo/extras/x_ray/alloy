@@ -7,9 +7,25 @@ prometheus.remote_write "prometheus" {
 prometheus.scrape "ss_exporter" {
 	targets = [
 		{
-			"__address__" = "127.0.0.1:9100",
+			"__address__" = "10.0.0.1:9100",
 			"job"         = "ss_metrics",
 			"instance"    = "localhost",
+			"alias"       = "upstream-node",
+			"process"     = "UpstreamNode",
+		},
+		{
+			"__address__" = "10.0.0.2:9100",
+			"job"         = "ss_metrics",
+			"instance"    = "localhost",
+			"alias"       = "node0",
+			"process"     = "Node0",
+		},
+		{
+			"__address__" = "10.0.0.3:9100",
+			"job"         = "ss_metrics",
+			"instance"    = "localhost",
+			"alias"       = "downstream-node",
+			"process"     = "DownstreamNode",
 		},
 	]
 
@@ -25,21 +41,21 @@ prometheus.scrape "ss_exporter" {
 prometheus.scrape "cardano_node_exporter" {
 	targets = [
 		{
-			"__address__" = "127.0.0.1:12900",
+			"__address__" = "10.0.0.1:12900",
 			"job"         = "cardano_node_metrics",
 			"instance"    = "localhost",
 			"alias"       = "upstream-node",
 			"process"     = "UpstreamNode",
 		},
 		{
-			"__address__" = "127.0.0.1:12901",
+			"__address__" = "10.0.0.2:12900",
 			"job"         = "cardano_node_metrics",
 			"instance"    = "localhost",
 			"alias"       = "node0",
 			"process"     = "Node0",
 		},
 		{
-			"__address__" = "127.0.0.1:12902",
+			"__address__" = "10.0.0.3:12900",
 			"job"         = "cardano_node_metrics",
 			"instance"    = "localhost",
 			"alias"       = "downstream-node",

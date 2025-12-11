@@ -37,6 +37,7 @@ processes:
       restart: "always"
 
   PrepareNode0:
+    is_elevated: true
     command: |
       bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/prepare-node0.sh"
     depends_on:
@@ -57,6 +58,7 @@ processes:
       restart: "always"
 
   PrepareDownstreamNode:
+    is_elevated: true
     command: |
       bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/prepare-downstream-node.sh"
     depends_on:
@@ -73,6 +75,16 @@ processes:
     depends_on:
       PrepareDownstreamNode:
         condition: process_completed_successfully
+    availability:
+      restart: "always"
+
+  SSOnDownstreamNode:
+    is_elevated: true
+    command: |
+      ip netns exec leios-experiment:downstream bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/ss-on-downstream.sh"
+    depends_on:
+      DownstreamNode:
+        condition: "process_started"
     availability:
       restart: "always"
 

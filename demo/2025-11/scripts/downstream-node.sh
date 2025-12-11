@@ -8,4 +8,4 @@ export LEIOS_DB_PATH="leios.db"
   --topology "topology.json" \
   --database-path "db" \
   --socket-path "socket" \
-  --host-addr 127.0.0.1 --port "$PORT_DOWNSTREAM_NODE"
+  --host-addr "0.0.0.0" --port "$PORT_DOWNSTREAM_NODE"

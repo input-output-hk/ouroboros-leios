@@ -30,6 +30,24 @@ ip link set "down->n0" netns "$NS_DOWNSTREAM"
 ip netns exec "$NS_NODE0" ip link set "n0->down" up
 ip netns exec "$NS_DOWNSTREAM" ip link set "down->n0" up
 
+# Create a VETH link host <-> upstream
+ip link add "host->up" type veth peer name "up->host"
+ip link set "up->host" netns "$NS_UPSTREAM"
+ip link set "host->up" up
+ip netns exec "$NS_UPSTREAM" ip link set "up->host" up
+
+# Create a VETH link host <-> node0
+ip link add "host->n0" type veth peer name "n0->host"
+ip link set "n0->host" netns "$NS_NODE0"
+ip link set "host->n0" up
+ip netns exec "$NS_NODE0" ip link set "n0->host" up
+
+# Create a VETH link host <-> downstream
+ip link add "host->down" type veth peer name "down->host"
+ip link set "down->host" netns "$NS_DOWNSTREAM"
+ip link set "host->down" up
+ip netns exec "$NS_DOWNSTREAM" ip link set "down->host" up
+
 # Configure IFB devices for TC
 ip netns exec "$NS_UPSTREAM" ip link add "ifb!up->n0" type ifb
 ip netns exec "$NS_NODE0" ip link add "ifb!n0->up" type ifb
@@ -80,3 +98,20 @@ ip netns exec "$NS_NODE0" ip addr add local "$IP_NODE0" peer "$IP_DOWNSTREAM_NOD
 ip netns exec "$NS_NODE0" ip addr add local "127.0.0.1" dev "lo"
 ip netns exec "$NS_DOWNSTREAM" ip addr add local "$IP_DOWNSTREAM_NODE" peer "$IP_NODE0" dev "down->n0"
 ip netns exec "$NS_DOWNSTREAM" ip addr add local "127.0.0.1" dev "lo"
+
+IP_HOST="10.0.0.4"
+ip addr add "$IP_HOST" dev "host->up"
+ip route add "$IP_UPSTREAM_NODE" dev "host->up"
+ip netns exec "$NS_UPSTREAM" ip addr add "$IP_UPSTREAM_NODE" dev "up->host"
+ip netns exec "$NS_UPSTREAM" ip route add "$IP_HOST" dev "up->host"
+
+ip addr add "$IP_HOST" dev "host->n0"
+ip route add "$IP_NODE0" dev "host->n0"
+ip netns exec "$NS_NODE0" ip addr add "$IP_NODE0" dev "n0->host"
+ip netns exec "$NS_NODE0" ip route add "$IP_HOST" dev "n0->host"
+
+ip addr add "$IP_HOST" dev "host->down"
+ip route add "$IP_DOWNSTREAM_NODE" dev "host->down"
+ip netns exec "$NS_DOWNSTREAM" ip addr add "$IP_DOWNSTREAM_NODE" dev "down->host"
+ip netns exec "$NS_DOWNSTREAM" ip route add "$IP_HOST" dev "down->host"
+
