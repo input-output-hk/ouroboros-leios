@@ -4,10 +4,11 @@
       pkgs,
       inputs',
       lib,
+      system,
       ...
     }:
     {
-      packages = lib.optionalAttrs pkgs.stdenv.isLinux {
+      packages = lib.optionalAttrs (system == "x86_64-linux") {
         leios-empty-db = pkgs.stdenv.mkDerivation {
           name = "leios-empty-db";
           src = ./.;

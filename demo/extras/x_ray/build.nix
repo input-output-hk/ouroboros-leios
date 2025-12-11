@@ -5,11 +5,12 @@
       pkgs,
       config,
       lib,
+      system,
       ...
     }:
     {
 
-      devShells = lib.optionalAttrs pkgs.stdenv.isLinux {
+      devShells = lib.optionalAttrs (system == "x86_64-linux") {
         dev-demo-extras-x-ray = pkgs.mkShell {
           packages = [
             pkgs.nettools
@@ -26,7 +27,7 @@
         };
       };
 
-      packages = lib.optionalAttrs pkgs.stdenv.isLinux {
+      packages = lib.optionalAttrs (system == "x86_64-linux") {
         x_ray = pkgs.writeShellApplication {
           name = "x_ray";
           runtimeInputs = config.devShells.dev-demo-extras-x-ray.nativeBuildInputs;

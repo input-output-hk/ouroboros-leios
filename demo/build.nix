@@ -11,7 +11,7 @@
     }:
     {
       packages =
-        lib.optionalAttrs pkgs.stdenv.isLinux {
+        lib.optionalAttrs (system == "x86_64-linux") {
           leios-cardano-node = inputs'.cardano-node.packages.cardano-node;
         }
         // (with inputs'.ouroboros-consensus.legacyPackages.hsPkgs; {
@@ -26,7 +26,7 @@
         };
       };
 
-      devShells = lib.optionalAttrs pkgs.stdenv.isLinux {
+      devShells = lib.optionalAttrs (system == "x86_64-linux") {
         dev-demo = pkgs.mkShell {
           name = "dev-demo";
 

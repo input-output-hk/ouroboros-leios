@@ -5,10 +5,11 @@
       pkgs,
       config,
       lib,
+      system,
       ...
     }:
     {
-      packages = lib.optionalAttrs pkgs.stdenv.isLinux {
+      packages = lib.optionalAttrs (system == "x86_64-linux") {
 
         ss_prom = pkgs.writeShellApplication {
           name = "ss_prom";
@@ -34,7 +35,7 @@
         };
       };
 
-      checks = lib.optionalAttrs pkgs.stdenv.isLinux {
+      checks = lib.optionalAttrs (system == "x86_64-linux") {
 
         test_ss_to_prometheus = pkgs.stdenv.mkDerivation {
           name = "test_ss_to_prometheus";

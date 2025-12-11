@@ -5,10 +5,11 @@
       pkgs,
       config,
       lib,
+      system,
       ...
     }:
     {
-      packages = lib.optionalAttrs pkgs.stdenv.isLinux {
+      packages = lib.optionalAttrs (system == "x86_64-linux") {
         http_command_on_request = pkgs.writeShellApplication {
           name = "on_request";
           text = builtins.readFile ./on_request.sh;
@@ -24,7 +25,7 @@
         };
       };
 
-      checks = lib.optionalAttrs pkgs.stdenv.isLinux {
+      checks = lib.optionalAttrs (system == "x86_64-linux") {
         test_http_command = pkgs.stdenv.mkDerivation {
           name = "test_http_command";
           src = ./.;

@@ -4,10 +4,11 @@
       pkgs,
       config,
       lib,
+      system,
       ...
     }:
     {
-      devShells = lib.optionalAttrs pkgs.stdenv.isLinux {
+      devShells = lib.optionalAttrs (system == "x86_64-linux") {
         dev-demo-2025-11 = pkgs.mkShell {
           name = "dev-demo-2025-11";
           src = ./.;
@@ -17,7 +18,7 @@
         };
       };
 
-      packages = lib.optionalAttrs pkgs.stdenv.isLinux {
+      packages = lib.optionalAttrs (system == "x86_64-linux") {
         leios_202511_demo = pkgs.writeShellApplication {
           name = "leios_202511_demo";
           runtimeInputs =
