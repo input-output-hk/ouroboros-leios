@@ -7,9 +7,13 @@ import styles from "./styles.module.css";
 
 type FeatureItem = {
   title: string;
-  Svg: string;
+  Svg: React.ComponentType<
+    React.SVGProps<SVGSVGElement> & {
+      title?: string;
+    }
+  >;
   description: React.ReactElement;
-  button: {
+  button?: {
     text: string;
     url: string;
   };
