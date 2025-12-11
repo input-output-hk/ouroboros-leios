@@ -73,8 +73,8 @@ prometheus.scrape "cardano_node_exporter" {
 
 loki.write "loki" {
 	endpoint {
-		url = "http://localhost:3100/loki/api/v1/push"
-    batch_size = "2MB"
+		url        = "http://localhost:3100/loki/api/v1/push"
+		batch_size = "2MB"
 	}
 }
 
@@ -97,6 +97,7 @@ loki.process "extract_process_compose_logs" {
 			replica = "replica",
 			message = "message",
 		}
+		drop_malformed = true
 	}
 
 	stage.labels {
@@ -135,6 +136,12 @@ loki.process "extract_cardano_node_logs" {
 			ns     = "ns",
 			data   = "data",
 		}
+		drop_malformed = true
+	}
+
+	stage.drop {
+    source = "process"
+    value = "Analyze"
 	}
 
 	stage.timestamp {
@@ -181,6 +188,7 @@ loki.process "extract_immdb_server_logs" {
 				prevCount    = "prevCount",
 				msg          = "msg",
 			}
+			drop_malformed = true
 		}
 
 		stage.timestamp {
