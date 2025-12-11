@@ -1,5 +1,9 @@
 import { defaultAggregatedData } from "./context";
-import { ISimContextState, TSimContextActions } from "./types";
+import {
+  ISimContextState,
+  TSimContextActions,
+  EConnectionState,
+} from "./types";
 import {
   computeAggregatedDataAtTime,
   clearLatencyCache,
@@ -18,7 +22,7 @@ export const reducer = (
         allScenarios,
         activeScenario: scenario.name,
         maxTime: scenario.duration,
-        tracePath: scenario.trace,
+        tracePath: scenario.trace || "",
         topologyPath: scenario.topology,
       };
     }
@@ -34,8 +38,10 @@ export const reducer = (
         ...state,
         aggregatedData: defaultAggregatedData,
         activeScenario: scenario.name,
-        maxTime: scenario.duration,
-        tracePath: scenario.trace,
+        autoStart: action.autoStart || false,
+        tracePath: scenario.trace || "",
+        lokiHost: scenario.loki,
+        lokiConnectionState: EConnectionState.NotConnected,
         topologyPath: scenario.topology,
         topologyLoaded:
           state.topologyLoaded && scenario.topology === state.topologyPath,
@@ -46,6 +52,8 @@ export const reducer = (
         // Reset timeline when switching scenarios
         events: [],
         currentTime: 0,
+        minTime: 0,
+        maxTime: scenario.duration,
       };
     }
 
@@ -107,14 +115,47 @@ export const reducer = (
         topologyLoaded: true,
       };
 
-    case "ADD_TIMELINE_EVENT_BATCH":
+    case "ADD_TIMELINE_EVENT_BATCH": {
+      const newEvents = [...state.events, ...action.payload];
+
+      if (newEvents.length === 0) {
+        return {
+          ...state,
+          events: newEvents,
+        };
+      }
+
+      // Calculate timeline bounds
+      const timestamps = newEvents.map((event) => event.time_s);
+      const minEventTime = Math.min(...timestamps);
+      const maxEventTime = Math.max(...timestamps);
+
+      // Update timeline bounds and clamp current time
+      const newMinTime =
+        state.minTime == 0
+          ? minEventTime
+          : Math.min(state.minTime, minEventTime);
+      const newMaxTime = Math.max(state.maxTime, maxEventTime);
+
+      const clampedCurrentTime = Math.max(
+        newMinTime,
+        Math.min(state.currentTime, newMaxTime),
+      );
+
       return {
         ...state,
-        events: [...state.events, ...action.payload],
+        events: newEvents,
+        minTime: newMinTime,
+        maxTime: newMaxTime,
+        currentTime: clampedCurrentTime,
       };
+    }
 
     case "SET_TIMELINE_TIME": {
-      const newTime = action.payload;
+      const newTime = Math.max(
+        state.minTime,
+        Math.min(action.payload, state.maxTime),
+      );
 
       // Recompute complete aggregated data based on new timeline position
       const nodeIds = Array.from(state.topography.nodes.keys());
@@ -156,8 +197,16 @@ export const reducer = (
         ...state,
         events: [],
         currentTime: 0,
+        minTime: 0,
+        maxTime: 0,
         isPlaying: false,
         speedMultiplier: 1,
+      };
+
+    case "SET_LOKI_CONNECTION_STATE":
+      return {
+        ...state,
+        lokiConnectionState: action.payload,
       };
 
     default:

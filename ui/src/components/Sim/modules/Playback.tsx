@@ -13,9 +13,9 @@ export const Playback: FC = () => {
   // Timeline playback refs
   const intervalRef = useRef<number | null>(null);
   const lastUpdateRef = useRef<number>(0);
-  const currentTimeRef = useRef<number>(currentTime);
 
-  // Refs for seeking functionality
+  // Refs for stable seeking callbacks
+  const currentTimeRef = useRef(currentTime);
   const eventsRef = useRef(events);
   const maxTimeRef = useRef(maxTime);
 
@@ -49,13 +49,26 @@ export const Playback: FC = () => {
   const handleStep = useCallback(
     (stepAmount: number) => {
       const maxEventTime =
-        eventsRef.current.length > 0
-          ? eventsRef.current[eventsRef.current.length - 1].time_s
-          : maxTimeRef.current;
-      const currentTime = currentTimeRef.current;
+        events.length > 0 ? events[events.length - 1].time_s : maxTime;
       const newTime = Math.max(
         0,
         Math.min(currentTime + stepAmount, maxEventTime),
+      );
+      dispatch({ type: "SET_TIMELINE_TIME", payload: newTime });
+    },
+    [dispatch, events, maxTime, currentTime],
+  );
+
+  // Stable version for seeking intervals (uses refs)
+  const handleStepForSeeking = useCallback(
+    (stepAmount: number) => {
+      const maxEventTime =
+        eventsRef.current.length > 0
+          ? eventsRef.current[eventsRef.current.length - 1].time_s
+          : maxTimeRef.current;
+      const newTime = Math.max(
+        0,
+        Math.min(currentTimeRef.current + stepAmount, maxEventTime),
       );
       currentTimeRef.current = newTime;
       dispatch({ type: "SET_TIMELINE_TIME", payload: newTime });
@@ -68,17 +81,17 @@ export const Playback: FC = () => {
       // Clear any existing seeking first
       stopSeeking();
 
-      // Initial step using current ref values
+      // Initial step using current context values
       handleStep(stepAmount);
 
-      // Start continuous seeking after delay
+      // Start continuous seeking after delay using stable callback
       stepTimeoutRef.current = window.setTimeout(() => {
         stepIntervalRef.current = window.setInterval(() => {
-          handleStep(stepAmount);
+          handleStepForSeeking(stepAmount);
         }, 33); // ~30 FPS smooth seeking
       }, 300); // initial delay
     },
-    [handleStep, stopSeeking],
+    [handleStep, handleStepForSeeking, stopSeeking],
   );
 
   // Timeline playback effect - handles automatic advancement when playing
@@ -91,6 +104,9 @@ export const Playback: FC = () => {
         clearInterval(intervalRef.current);
       }
 
+      // Capture current time at interval start to avoid stale closure
+      let localCurrentTime = currentTime;
+
       // Start playback interval
       intervalRef.current = window.setInterval(() => {
         const now = performance.now();
@@ -99,16 +115,10 @@ export const Playback: FC = () => {
           ((now - lastUpdateRef.current) / 1000) * speedMultiplier;
         lastUpdateRef.current = now;
 
-        const newTime = Math.min(
-          currentTimeRef.current + deltaTime,
-          maxEventTime,
-        );
-        currentTimeRef.current = newTime;
+        const newTime = Math.min(localCurrentTime + deltaTime, maxEventTime);
+        localCurrentTime = newTime;
 
-        dispatch({
-          type: "SET_TIMELINE_TIME",
-          payload: newTime,
-        });
+        dispatch({ type: "SET_TIMELINE_TIME", payload: newTime });
 
         // Auto-pause at the end
         if (newTime >= maxEventTime) {
@@ -124,16 +134,9 @@ export const Playback: FC = () => {
         intervalRef.current = null;
       }
     }
-  }, [
-    isPlaying,
-    events.length,
-    currentTime,
-    speedMultiplier,
-    dispatch,
-    stopSeeking,
-  ]);
+  }, [isPlaying, events.length, speedMultiplier, dispatch]);
 
-  // Keep refs in sync when values change externally
+  // Keep refs in sync with context values
   useEffect(() => {
     currentTimeRef.current = currentTime;
     lastUpdateRef.current = performance.now();
@@ -245,7 +248,6 @@ export const Playback: FC = () => {
 
       <Button
         ref={stepBigBackwardRef}
-        onClick={() => handleStep(-1.0 * speedMultiplier)}
         onMouseDown={(e) => {
           e.preventDefault();
           startSeeking(-1.0 * speedMultiplier);
@@ -264,7 +266,6 @@ export const Playback: FC = () => {
 
       <Button
         ref={stepSmallBackwardRef}
-        onClick={() => handleStep(-0.1 * speedMultiplier)}
         onMouseDown={(e) => {
           e.preventDefault();
           startSeeking(-0.1 * speedMultiplier);
@@ -283,7 +284,6 @@ export const Playback: FC = () => {
 
       <Button
         ref={stepSmallForwardRef}
-        onClick={() => handleStep(0.1 * speedMultiplier)}
         onMouseDown={(e) => {
           e.preventDefault();
           startSeeking(0.1 * speedMultiplier);
@@ -302,7 +302,6 @@ export const Playback: FC = () => {
 
       <Button
         ref={stepBigForwardRef}
-        onClick={() => handleStep(1.0 * speedMultiplier)}
         onMouseDown={(e) => {
           e.preventDefault();
           startSeeking(1.0 * speedMultiplier);

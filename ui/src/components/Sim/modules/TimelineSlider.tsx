@@ -3,28 +3,37 @@ import { type FC, useCallback } from "react";
 
 export const TimelineSlider: FC = () => {
   const {
-    state: { events, currentTime },
+    state: { events, currentTime, minTime, maxTime, isPlaying },
     dispatch,
   } = useSimContext();
 
   const handleTimeChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const newTime = parseFloat(event.target.value);
+
+      // Pause playback when slider is moved
+      if (isPlaying) {
+        dispatch({ type: "SET_TIMELINE_PLAYING", payload: false });
+      }
+
       dispatch({ type: "SET_TIMELINE_TIME", payload: newTime });
     },
-    [dispatch],
+    [dispatch, isPlaying],
   );
 
   const hasEvents = events.length > 0;
-  const maxTime = hasEvents ? events[events.length - 1].time_s : 100; // Default duration when no events
+  const timeRange = maxTime - minTime;
 
   const formatTime = (timeInSeconds: number, highResolution = false) => {
+    // Show relative time from minTime
+    const relativeTime = timeInSeconds - minTime;
     return highResolution
-      ? `${timeInSeconds.toFixed(3)}s`
-      : `${timeInSeconds.toFixed(1)}s`;
+      ? `${relativeTime.toFixed(3)}s`
+      : `${relativeTime.toFixed(1)}s`;
   };
 
-  const currentPercent = maxTime > 0 ? (currentTime / maxTime) * 100 : 0;
+  const currentPercent =
+    timeRange > 0 ? ((currentTime - minTime) / timeRange) * 100 : 0;
 
   return (
     <div
@@ -43,7 +52,7 @@ export const TimelineSlider: FC = () => {
         {/* Interactive slider */}
         <input
           type="range"
-          min={0}
+          min={minTime}
           max={maxTime}
           step={0.1}
           value={currentTime}
