@@ -11,7 +11,7 @@ import type { Props } from "@theme/Navbar/Layout";
 import NavbarMobileSidebar from "@theme/Navbar/MobileSidebar";
 import clsx from "clsx";
 import { motion, useMotionValueEvent, useScroll } from "framer-motion";
-import { useEffect, useState, type ComponentProps } from "react";
+import { JSX, useEffect, useState, type ComponentProps } from "react";
 
 function NavbarBackdrop(props: ComponentProps<"div">) {
   return (
