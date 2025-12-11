@@ -2,8 +2,10 @@
 
 Minimum viable demo of Leios network traffic interfering with Praos using a three node setup and prepared Praos and Leios data.
 
-![WARNING]
-TODO: Add overview / architecture diagram.
+![Demo diagram](./demo-2025-10.excalidraw.svg)
+
+> [!TIP]
+> This is an excalidraw SVG with embedded scene so it can be loaded and edited in [https://excalidraw.com/].
 
 ## The Praos traffic and Leios traffic
 
