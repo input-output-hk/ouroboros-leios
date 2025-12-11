@@ -3,7 +3,7 @@
 import { useSimContext } from "@/contexts/SimContext/context";
 import { FC, useEffect } from "react";
 import { parse } from "yaml";
-import { Coord2D, Node } from "../../../../data/simulation/topology";
+import { Coord2D, Node } from "./topology";
 import { GraphWrapper } from "../Graph/GraphWrapper";
 import { Scenario } from "./modules/Scenario";
 import { TimelineSlider } from "./modules/TimelineSlider";
