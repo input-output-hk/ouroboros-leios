@@ -8,7 +8,7 @@
       ...
     }:
     {
-      packages = lib.optionalAttrs (system == "x86_64-linux") {
+      packages = lib.optionalAttrs (system == "x86_64-linux") rec {
         leios-empty-db = pkgs.stdenv.mkDerivation {
           name = "leios-empty-db";
           src = ./.;
@@ -40,7 +40,7 @@
           '';
         };
 
-        leios-202510-demo = pkgs.writeShellApplication {
+        demo-2025-10 = pkgs.writeShellApplication {
           name = "leios-202510-demo";
 
           runtimeInputs = [
@@ -91,6 +91,9 @@
             exec ./run-demo.sh "$@"
           '';
         };
+
+        # TODO: drop this once we are sure no external uses exist anymore
+        leios-202510-demo = demo-2025-10;
       };
     };
 }

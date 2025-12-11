@@ -18,8 +18,8 @@
         };
       };
 
-      packages = lib.optionalAttrs (system == "x86_64-linux") {
-        leios_202511_demo = pkgs.writeShellApplication {
+      packages = lib.optionalAttrs (system == "x86_64-linux") rec {
+        demo-2025-11 = pkgs.writeShellApplication {
           name = "leios_202511_demo";
           runtimeInputs =
             config.devShells.dev-demo-2025-11.nativeBuildInputs
@@ -52,6 +52,8 @@
             process-compose --no-server -f ${./process-compose.yaml};
           '';
         };
+        # TODO: drop this once we are sure no external uses exist anymore
+        leios_202511_demo = demo-2025-11;
       };
     };
 }

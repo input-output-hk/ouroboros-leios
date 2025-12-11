@@ -56,7 +56,7 @@ nix run github:input-output-hk/ouroboros-leios#x_ray
 Run the Leios experiment with default configuration
 
 ```shell
-nix run github:input-output-hk/ouroboros-leios#leios_202511_demo
+nix run github:input-output-hk/ouroboros-leios#demo-2025-11
 ```
 
 If you want to further configure the experiment set the following environment
