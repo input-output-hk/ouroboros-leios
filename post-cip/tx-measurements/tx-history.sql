@@ -5,6 +5,7 @@ create temporary table utxo_creation as
 select
     encode(tx.hash, 'hex') || '#' || tx_out.index as utxo_id
   , coalesce(block.slot_no, 0) as slot_created
+  , coalesce(block.block_no, 0) as block_created
   from block
   inner join tx
     on tx.block_id = block.id
@@ -24,6 +25,7 @@ create temporary table utxo_spending as
 select
     encode(tx_create.hash, 'hex') || '#' || tx_in.tx_out_index as utxo_id
   , block.slot_no as slot_spent
+  , block.block_no as block_spent
   from tx_in
   inner join tx tx_spend
     on tx_spend.id = tx_in.tx_in_id
@@ -46,6 +48,8 @@ select
     utxo_id
   , slot_created
   , slot_spent
+  , block_created
+  , block_spent
   from utxo_creation
   left join utxo_spending
     using (utxo_id)
@@ -59,11 +63,12 @@ drop table if exists utxo_lifetime;
 
 create temporary table utxo_lifetime as
 select
-    slot_spent - slot_created as lifetime
+    slot_spent - slot_created as slot_lifetime
+  , block_spent - block_created as block_lifetime
   , count(*) as utxo_count
   from utxo_history
-  where slot_spent is not null
-  group by slot_spent - slot_created
+  where slot_spent is not null or block_spent is not null
+  group by slot_spent - slot_created, block_spent - block_created
 order by 1
 ;
 
