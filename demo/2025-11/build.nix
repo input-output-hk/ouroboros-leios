@@ -7,15 +7,17 @@
       ...
     }:
     {
-      devShells.dev-demo-2025-11 = pkgs.mkShell {
-        name = "dev-demo-2025-11";
-        src = ./.;
-        inputsFrom = [ config.devShells.dev-demo ];
-        packages = [ pkgs.process-compose ];
-        inherit (config.devShells.dev-demo) IMMDB_SERVER CARDANO_NODE;
+      devShells = lib.optionalAttrs pkgs.stdenv.isLinux {
+        dev-demo-2025-11 = pkgs.mkShell {
+          name = "dev-demo-2025-11";
+          src = ./.;
+          inputsFrom = [ config.devShells.dev-demo ];
+          packages = [ pkgs.process-compose ];
+          inherit (config.devShells.dev-demo) IMMDB_SERVER CARDANO_NODE;
+        };
       };
 
-      packages = {
+      packages = lib.optionalAttrs pkgs.stdenv.isLinux {
         leios_202511_demo = pkgs.writeShellApplication {
           name = "leios_202511_demo";
           runtimeInputs =

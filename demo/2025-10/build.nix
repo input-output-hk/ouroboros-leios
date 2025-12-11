@@ -1,8 +1,13 @@
 {
   perSystem =
-    { pkgs, inputs', ... }:
     {
-      packages = {
+      pkgs,
+      inputs',
+      lib,
+      ...
+    }:
+    {
+      packages = lib.optionalAttrs pkgs.stdenv.isLinux {
         leios-empty-db = pkgs.stdenv.mkDerivation {
           name = "leios-empty-db";
           src = ./.;

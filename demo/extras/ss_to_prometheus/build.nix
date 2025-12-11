@@ -4,10 +4,11 @@
     {
       pkgs,
       config,
+      lib,
       ...
     }:
     {
-      packages = {
+      packages = lib.optionalAttrs pkgs.stdenv.isLinux {
 
         ss_prom = pkgs.writeShellApplication {
           name = "ss_prom";
@@ -33,7 +34,7 @@
         };
       };
 
-      checks = {
+      checks = lib.optionalAttrs pkgs.stdenv.isLinux {
 
         test_ss_to_prometheus = pkgs.stdenv.mkDerivation {
           name = "test_ss_to_prometheus";
