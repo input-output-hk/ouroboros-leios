@@ -29,7 +29,7 @@ processes:
     is_elevated: true
     command: |
       ip netns exec leios-experiment:upstream bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/upstream-node.sh"
-    log_location: "${WORKING_DIR}/upstream-node/log"
+    log_location: "${WORKING_DIR}/upstream-node.log"
     depends_on:
       PrepareUpstreamNode:
         condition: process_completed_successfully
@@ -50,7 +50,7 @@ processes:
     is_elevated: true
     command: |
       ip netns exec leios-experiment:node0 bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/node0.sh"
-    log_location: "${WORKING_DIR}/node0/log"
+    log_location: "${WORKING_DIR}/node0.log"
     depends_on:
       PrepareNode0:
         condition: process_completed_successfully
@@ -71,10 +71,30 @@ processes:
     is_elevated: true
     command: |
       ip netns exec leios-experiment:downstream bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/downstream-node.sh"
-    log_location: "${WORKING_DIR}/downstream-node/log"
+    log_location: "${WORKING_DIR}/downstream-node.log"
     depends_on:
       PrepareDownstreamNode:
         condition: process_completed_successfully
+    availability:
+      restart: "always"
+
+  SSOnUpstreamNode:
+    is_elevated: true
+    command: |
+      ip netns exec leios-experiment:upstream bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/ss-on-upstream.sh"
+    depends_on:
+      UpstreamNode:
+        condition: "process_started"
+    availability:
+      restart: "always"
+
+  SSOnNode0:
+    is_elevated: true
+    command: |
+      ip netns exec leios-experiment:node0 bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/ss-on-node0.sh"
+    depends_on:
+      Node0:
+        condition: "process_started"
     availability:
       restart: "always"
 
@@ -98,9 +118,9 @@ processes:
         "$PYTHON3" "$ANALYSE_PY" \
           "$REF_SLOT" "$ONSET_OF_REF_SLOT" \
           "$UPSTREAM_NODE_DIR/schedule.json" \
-          "$UPSTREAM_NODE_DIR/log" \
-          "$NODE0_DIR/log" \
-          "$DOWNSTREAM_NODE_DIR/log" \
+          "$WORKING_DIR/upstream-node.log" \
+          "$WORKING_DIR/node0.log" \
+          "$WORKING_DIR/downstream-node.log" \
           "$WORKING_DIR/scatter_plot.png"
       done;
 
