@@ -1,5 +1,6 @@
 import type { Props } from "@theme/Footer/Layout";
 import clsx from "clsx";
+import { JSX } from "react";
 
 export default function FooterLayout({
   style,

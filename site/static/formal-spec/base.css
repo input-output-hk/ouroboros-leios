@@ -9,7 +9,8 @@
   --hover-bg: rgba(0, 119, 204, 0.1);
   --hover-transform: translateY(-1px);
   --hover-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    sans-serif;
   --content-padding: 40px;
   --background-color: #ffffff;
   --code-bg: #f6f8fa;
@@ -97,6 +98,7 @@ header {
 }
 
 /* Header button/link shared styles */
+
 .back-button,
 .github-link,
 .theme-toggle,
@@ -416,8 +418,10 @@ a:hover {
 }
 
 /* Code blocks */
-pre, code {
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+pre,
+code {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier,
+    monospace;
   background-color: var(--code-bg);
   color: var(--code-color);
   border-radius: 6px;
@@ -447,25 +451,64 @@ pre code {
 }
 
 /* Syntax highlighting for Agda */
-.Keyword { color: var(--syntax-keyword); }
-.String { color: var(--syntax-string); }
-.Comment { color: var(--syntax-comment); }
-.Function { color: var(--syntax-function); }
-.InductiveConstructor { color: var(--syntax-class); }
-.CoinductiveConstructor { color: var(--syntax-class); }
-.Datatype { color: var(--syntax-class); }
-.Field { color: var(--syntax-variable); }
-.Bound { color: var(--code-color); }
-.Generalizable { color: var(--syntax-variable); }
-.Module { color: var(--syntax-keyword); }
-.Number { color: var(--syntax-variable); }
-.Postulate { color: var(--syntax-function); }
-.Primitive { color: var(--syntax-keyword); }
-.Record { color: var(--syntax-class); }
-.Hole { color: var(--syntax-operator); background-color: rgba(255, 255, 0, 0.1); }
-.Symbol { color: var(--syntax-operator); }
-.PrimitiveType { color: var(--syntax-keyword); }
-.Macro { color: var(--syntax-function); }
+.Keyword {
+  color: var(--syntax-keyword);
+}
+.String {
+  color: var(--syntax-string);
+}
+.Comment {
+  color: var(--syntax-comment);
+}
+.Function {
+  color: var(--syntax-function);
+}
+.InductiveConstructor {
+  color: var(--syntax-class);
+}
+.CoinductiveConstructor {
+  color: var(--syntax-class);
+}
+.Datatype {
+  color: var(--syntax-class);
+}
+.Field {
+  color: var(--syntax-variable);
+}
+.Bound {
+  color: var(--code-color);
+}
+.Generalizable {
+  color: var(--syntax-variable);
+}
+.Module {
+  color: var(--syntax-keyword);
+}
+.Number {
+  color: var(--syntax-variable);
+}
+.Postulate {
+  color: var(--syntax-function);
+}
+.Primitive {
+  color: var(--syntax-keyword);
+}
+.Record {
+  color: var(--syntax-class);
+}
+.Hole {
+  color: var(--syntax-operator);
+  background-color: rgba(255, 255, 0, 0.1);
+}
+.Symbol {
+  color: var(--syntax-operator);
+}
+.PrimitiveType {
+  color: var(--syntax-keyword);
+}
+.Macro {
+  color: var(--syntax-function);
+}
 
 /* Override Agda.css hover styles */
 .Agda a[href]:hover {
@@ -479,46 +522,46 @@ pre code {
 }
 
 /* Specific Agda syntax improvements for dark theme */
-:root.dark-theme .Agda .Keyword, 
+:root.dark-theme .Agda .Keyword,
 :root.dark-theme .Agda .Module,
-:root.dark-theme .Agda .Pragma { 
-  color: var(--syntax-keyword) !important; 
+:root.dark-theme .Agda .Pragma {
+  color: var(--syntax-keyword) !important;
 }
 
 :root.dark-theme .Agda .Symbol,
-:root.dark-theme .Agda .Operator { 
-  color: var(--syntax-operator) !important; 
+:root.dark-theme .Agda .Operator {
+  color: var(--syntax-operator) !important;
 }
 
 :root.dark-theme .Agda .InductiveConstructor,
-:root.dark-theme .Agda .CoinductiveConstructor { 
-  color: var(--syntax-variable) !important; 
+:root.dark-theme .Agda .CoinductiveConstructor {
+  color: var(--syntax-variable) !important;
 }
 
 :root.dark-theme .Agda .Datatype,
 :root.dark-theme .Agda .Record,
 :root.dark-theme .Agda .Primitive,
-:root.dark-theme .Agda .PrimitiveType { 
-  color: var(--syntax-class) !important; 
+:root.dark-theme .Agda .PrimitiveType {
+  color: var(--syntax-class) !important;
 }
 
-:root.dark-theme .Agda .String { 
-  color: var(--syntax-string) !important; 
+:root.dark-theme .Agda .String {
+  color: var(--syntax-string) !important;
 }
 
-:root.dark-theme .Agda .Comment { 
-  color: var(--syntax-comment) !important; 
+:root.dark-theme .Agda .Comment {
+  color: var(--syntax-comment) !important;
 }
 
 :root.dark-theme .Agda .Function,
 :root.dark-theme .Agda .Macro,
-:root.dark-theme .Agda .Postulate { 
-  color: var(--syntax-function) !important; 
+:root.dark-theme .Agda .Postulate {
+  color: var(--syntax-function) !important;
 }
 
 :root.dark-theme .Agda .Bound,
-:root.dark-theme .Agda .Generalizable { 
-  color: var(--code-color) !important; 
+:root.dark-theme .Agda .Generalizable {
+  color: var(--code-color) !important;
 }
 
 /* Code line numbers styling */
@@ -759,8 +802,8 @@ pre.Agda.has-copy-button {
     width: 40px;
     padding-right: 8px;
   }
-  
+
   .code-content {
     padding-left: 8px;
   }
-} 
+}

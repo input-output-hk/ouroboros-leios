@@ -10,7 +10,6 @@ import { LinkButton } from "../components/LinkButton/LinkButton";
 import HowLeiosWorksGraphic from "./HowLeiosWorksGraphic";
 import styles from "./index.module.css";
 import ResearchGraphic from "./ResearchGraphic";
-import VideoCamUrl from "@site/static/img/video-cam.png";
 
 function HomepageHeader() {
   const { siteConfig } = useDocusaurusContext();
@@ -263,7 +262,7 @@ function MonthlyReviewsSection() {
       setIsLive(live);
       const rawCountdown = formatCountdown(
         target.getTime() - now.getTime(),
-        live,
+        live
       );
       //@ts-ignore
       setCountdown(highlightNumbers(rawCountdown));
@@ -276,7 +275,7 @@ function MonthlyReviewsSection() {
           hour: "2-digit",
           minute: "2-digit",
           hour12: false,
-        }),
+        })
       );
     }
     updateCountdown();
@@ -305,7 +304,7 @@ function MonthlyReviewsSection() {
             <div className={styles.reviewMeetingContaner}>
               <div className={styles.backgroundGrid} />
               <div className={styles.cameraImageContainer}>
-                <img src={VideoCamUrl} />
+                <img src={`/img/video-cam.png`} />
               </div>
               <div className={styles.countdownContainer}>
                 <Link
