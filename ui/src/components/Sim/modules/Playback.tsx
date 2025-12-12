@@ -1,12 +1,20 @@
 import { useSimContext } from "@/contexts/SimContext/context";
 import { FC, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/Button";
+import { EConnectionState } from "@/contexts/SimContext/types";
 
 const SPEED_OPTIONS = [0.01, 0.1, 0.25, 0.5, 1, 2, 4, 8];
 
 export const Playback: FC = () => {
   const {
-    state: { events, isPlaying, speedMultiplier, currentTime, maxTime },
+    state: {
+      events,
+      isPlaying,
+      speedMultiplier,
+      currentTime,
+      maxTime,
+      lokiConnectionState,
+    },
     dispatch,
   } = useSimContext();
 
@@ -120,8 +128,11 @@ export const Playback: FC = () => {
 
         dispatch({ type: "SET_TIMELINE_TIME", payload: newTime });
 
-        // Auto-pause at the end
-        if (newTime >= maxEventTime) {
+        // Auto-pause at the end (but only if we're not connected to live Loki)
+        if (
+          newTime >= maxEventTime &&
+          lokiConnectionState !== EConnectionState.Connected
+        ) {
           dispatch({ type: "SET_TIMELINE_PLAYING", payload: false });
         }
       }, 16); // ~60 FPS
