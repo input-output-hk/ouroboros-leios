@@ -7,20 +7,20 @@ Slight improvement of the [October 2025 demonstration](../2025-10) using `tc` an
 - Observability/reporting/monitoring was improved.
 - Packaging of the prerequisites for executing the demo was improved.
 
-![](./demo-2025-11.excalidraw.svg)
+![Demo diagram](./demo-2025-11.excalidraw.svg)
 
 > [!TIP]
 > This is an excalidraw SVG with embedded scene so it can be loaded and edited in [https://excalidraw.com/].
 
 ## Bufferbloat
 
-The investigation into the unexpectedly high latency seen in October and related refinements to the prototype are apparent in the asynchronous conversation that took place in the comments on this tracking Issue https://github.com/IntersectMBO/ouroboros-consensus/issues/1756.
+The investigation into the unexpectedly high latency seen in October and related refinements to the prototype are apparent in the asynchronous conversation that took place in the comments on a [tracking Issue](https://github.com/IntersectMBO/ouroboros-consensus/issues/1756).
 
-- The latency was due to https://www.bufferbloat.net.
+- The latency was due to a network phenomena called [bufferbloat](https://www.bufferbloat.net)
   In October, the bufferbloat arose directly from the naive use of [Toxiproxy](https://github.com/Shopify/toxiproxy) for the initial demo.
 - As user-space mechanism, Toxiproxy cannot introduce latency/rate/etc in a way that will influence the kernel algorithms managing the TCP stream.
 - [Linux Traffic Control](https://tldp.org/HOWTO/Traffic-Control-HOWTO/intro.html) is the approriate mechanism.
-- An example of relevant commands for a more appropriate WAN (Wide Area Network) emulation can be found in this GitHub comment https://github.com/IntersectMBO/ouroboros-consensus/issues/1756#issuecomment-3587268042.
+- An example of relevant commands for a more appropriate WAN (Wide Area Network) emulation can be found in [this GitHub comment](https://github.com/IntersectMBO/ouroboros-consensus/issues/1756#issuecomment-3587268042).
   - `htb rate 100mbt` limts the sender's bandwidth.
   - `fq_codel` paces the sender's traffic, adapting to any bottleneck between it and the recipient.
   - `netem delay` established the link latency of 20ms between `fq_codel` and the recipient.
@@ -43,39 +43,41 @@ Highlights include the following.
 - The `ss` tool is being used to sample socket statistics throughout the demo's execution, so that the TCP algorithm's state can be monitored.
   For example, the `rtt` and `notsent` fields are directly related to bufferbloat.
 
-## Monitoring with Grafana
+## Running the Leios 202511 demo
 
-TODO
+Run the Leios X-Ray (Grafana based observability stack)
 
-## Packaging
-
-TODO
-
-## Building from Source
-
-Contributers who want to build the demo from source will need to packages in the three repositories on these commits.
-No other packages have yet been patched for this demo, the appropriate versions are those used in the 10.5.1 build.
-Beware that the listed commits do not already include `source-repository-package` stanzas in their `cabal.project` files, if that's
-the contributor's chosen method for cross-repo dependencies.
-
+```shell
+export LOG_PATH=".tmp-leios-202511-demo/*.log"
+export SS_FILTER="( sport = 3001 and dport = 3002 ) or ( sport = 3002 and dport = 3001 ) or ( sport = 3002 and dport = 3003 ) or ( sport = 3003 and dport = 3002 )"
+nix run github:input-output-hk/ouroboros-leios#x_ray
 ```
-$ for i in ouroboros-consensus ouroboros-network cardano-node; do (cd $i; echo REPO $i; git log -1); done
-REPO ouroboros-consensus
-commit 7929c3716a18abb852f8abec7111c78f2059287e (HEAD -> nfrisby/leios-202511-demo, origin/nfrisby/leios-202511-demo)
-Author: Nicolas Frisby <nick.frisby@iohk.io>
-Date:   Thu Nov 27 12:57:43 2025 -0800
 
-    leiosdemo202511: polishing per-message table format
-REPO ouroboros-network
-commit 479f0d0d82413162c8444b912394dd74c052831f (HEAD -> nfrisby/leios-202511-demo, tag: leios-202511-demo, origin/nfrisby/leios-202511-demo)
-Author: Nicolas Frisby <nick.frisby@iohk.io>
-Date:   Thu Nov 27 10:49:49 2025 -0800
+Run the Leios experiment with default configuration
 
-    leiosdemo202511: introduce BearerBytes class
-REPO cardano-node
-commit 93d2c8481912309faf5a7d9058f9fdeca95710a0 (HEAD -> nfrisby/leios-202511-demo, origin/nfrisby/leios-202511-demo)
-Author: Nicolas Frisby <nick.frisby@iohk.io>
-Date:   Thu Nov 27 11:02:11 2025 -0800
+```shell
+nix run github:input-output-hk/ouroboros-leios#demo-2025-11
+```
 
-    leiosdemo202511: integrate ouroboros-network BearerBytes
+If you want to further configure the experiment set the following environment
+variables:
+
+```shell
+CARDANO_NODE=cardano-node
+IMMDB_SERVER=immdb-server
+DATA_DIR=data
+REF_SLOT=41
+SECONDS_UNTIL_REF_SLOT=5
+LEIOS_MANIFEST=manifest.json
+ANALYSE_PY=analyse.py
+PYTHON3=python
+CARDANO_NODE=cardano-node
+IMMDB_SERVER=immdb-server
+```
+
+To clean up just delete the working directories
+
+```shell
+rm -fr .tmp-leios-202511-demo
+rm -fr .tmp-x-ray
 ```

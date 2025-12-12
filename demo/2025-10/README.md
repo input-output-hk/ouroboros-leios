@@ -2,117 +2,10 @@
 
 Minimum viable demo of Leios network traffic interfering with Praos using a three node setup and prepared Praos and Leios data.
 
-> ![WARNING]
-> TODO: Add overview / architecture diagram.
+![Demo diagram](./demo-2025-10.excalidraw.svg)
 
-See https://github.com/IntersectMBO/ouroboros-consensus/issues/1701 for more context.
-
-## Prepare the shell environment
-
-- If your environment can successfully execute `cabal build exe:cardano-node` from this commit, then it can build this demo's exes.
-
-  ```
-  $ git log -1 10.5.1
-  commit ca1ec278070baf4481564a6ba7b4a5b9e3d9f366 (tag: 10.5.1, origin/release/10.5.1, nfrisby/leiosdemo2025-anchor)
-  Author: Jordan Millar <jordan.millar@iohk.io>
-  Date:   Wed Jul 2 08:24:11 2025 -0400
-
-      Bump node version to 10.5.1
-  ```
-
-- The Python script needs `pandas` and `matplotlib`.
-- The various commands and bash scripts below needs `toxiproxy`, `sqlite`, `ps` (which on a `nix-shell` might require the `procps` package for matching CLIB, eg), and so on.
-- Set `CONSENSUS_BUILD_DIR` to the absolute path of a directory in which `cabal build exe:immdb-server` will succeed.
-- Set `NODE_BUILD_DIR` to the absolute path of a directory in which `cabal build exe:cardano-node` will succeed.
-- Set `CONSENSUS_REPO_DIR` to the absolute path of the `ouroboros-consensus` repo.
-
-- Checkout a patched version of the `cardano-node` repository, something like the following, eg.
-
-```
-6119c5cff0 - (HEAD -> nfrisby/leiosdemo2025, origin/nfrisby/leiosdemo2025) WIP add Leios demo Consensus s-r-p (25 hours ago) <Nicolas Frisby>
-```
-
-- If you're using a `source-repository-package` stanza for the `cabal build exe:cardano-node` command in the `NODE_BUILD_DIR`, confirm that it identifies the `ouroboros-consensus` commit you want to use (eg the one you're reading this file in).
-
-## Build the exes
-
-```
-$ (cd $CONSENSUS_BUILD_DIR; cabal build exe:immdb-server exe:leiosdemo202510)
-$ IMMDB_SERVER="$(cd $CONSENSUS_BUILD_DIR; cabal list-bin exe:immdb-server)"
-$ DEMO_TOOL="$(cd $CONSENSUS_BUILD_DIR; cabal list-bin exe:leiosdemo202510)"
-$ (cd $CONSENSUS_BUILD_DIR; cabal build exe:cardano-node)
-$ CARDANO_NODE="$(cd $CONSENSUS_BUILD_DIR; cabal list-bin exe:cardano-node)"
-```
-
-## Prepare the input data files
-
-```
-$ (cd $CONSENSUS_BUILD_DIR; $DEMO_TOOL generate demoUpstream.db "${CONSENSUS_REPO_DIR}/demoManifest.json" demoBaseSchedule.json)
-$ cp demoBaseSchedule.json demoSchedule.json
-$ # You must now edit demoSchedule.json so that the first number in each array is 182.9
-$ echo '[]' >emptySchedule.json
-$ # create the following symlinks
-$ (cd $CONSENSUS_REPO_DIR; ls -l $(find nix/ -name genesis-*.json))
-lrwxrwxrwx 1 nfrisby nifr 30 Oct 24 16:27 nix/leios-mvd/immdb-node/genesis-alonzo.json -> ../genesis/genesis.alonzo.json
-lrwxrwxrwx 1 nfrisby nifr 29 Oct 24 16:27 nix/leios-mvd/immdb-node/genesis-byron.json -> ../genesis/genesis.byron.json
-lrwxrwxrwx 1 nfrisby nifr 30 Oct 24 16:27 nix/leios-mvd/immdb-node/genesis-conway.json -> ../genesis/genesis.conway.json
-lrwxrwxrwx 1 nfrisby nifr 31 Oct 24 16:27 nix/leios-mvd/immdb-node/genesis-shelley.json -> ../genesis/genesis.shelley.json
-lrwxrwxrwx 1 nfrisby nifr 30 Oct 24 16:27 nix/leios-mvd/leios-node/genesis-alonzo.json -> ../genesis/genesis.alonzo.json
-lrwxrwxrwx 1 nfrisby nifr 29 Oct 24 16:27 nix/leios-mvd/leios-node/genesis-byron.json -> ../genesis/genesis.byron.json
-lrwxrwxrwx 1 nfrisby nifr 30 Oct 24 16:27 nix/leios-mvd/leios-node/genesis-conway.json -> ../genesis/genesis.conway.json
-lrwxrwxrwx 1 nfrisby nifr 31 Oct 24 16:27 nix/leios-mvd/leios-node/genesis-shelley.json -> ../genesis/genesis.shelley.json
-```
-
-## Prepare to run scenarios
-
-Ensure a toxiproxy server is running.
-
-```
-$ toxiproxy-server 1>toxiproxy.log 2>&1 &
-```
-
-## Run the scenario
-
-Run the scenario with `emptySchedule.json`, ie no Leios traffic.
-
-```
-$ LEIOS_UPSTREAM_DB_PATH="$(pwd)/demoUpstream.db" LEIOS_SCHEDULE="$(pwd)/emptySchedule.json" SECONDS_UNTIL_REF_SLOT=5 REF_SLOT=177 CLUSTER_RUN_DATA="${CONSENSUS_REPO_DIR}/nix/leios-mvd" CARDANO_NODE=$CARDANO_NODE IMMDB_SERVER=$IMMDB_SERVER ${CONSENSUS_REPO_DIR}/scripts/leios-demo/leios-october-demo.sh
-$ # wait about ~20 seconds before stopping the execution by pressing any key
-```
-
-Run the scenario with `demoSchedule.json`.
-
-```
-$ LEIOS_UPSTREAM_DB_PATH="$(pwd)/demoUpstream.db" LEIOS_SCHEDULE="$(pwd)/demoSchedule.json" SECONDS_UNTIL_REF_SLOT=5 REF_SLOT=177 CLUSTER_RUN_DATA="${CONSENSUS_REPO_DIR}/nix/leios-mvd" CARDANO_NODE=$CARDANO_NODE IMMDB_SERVER=$IMMDB_SERVER ${CONSENSUS_REPO_DIR}/scripts/leios-demo/leios-october-demo.sh
-$ # wait about ~20 seconds before stopping the execution by pressing any key
-```
-
-## Analysis
-
-Compare and contrast the `latency_ms` column for the rows with a slot that's after the reference slot 177.
-The first few such ros (ie those within a couple seconds of the reference slot) seem to often also be disrupted, because the initial bulk syncing to catch up to the reference slot presumably leaves the node in a disrupted state for a short interval.
-
-**WARNING**.
-Each execution consumes about 0.5 gigabytes of disk.
-The script announces where (eg `Temporary data stored at: /run/user/1000/leios-october-demo.c5Wmxc`), so you can delete each run's data when necessary.
-
-**INFO**.
-If you don't see any data in the 'Extracted and Merged Data Summary' table, then check the log files in the run's temporary directory.
-This is where you might see messages about, eg, the missing `genesis-*.json` files, bad syntax in the `demoSchedule.json` file, etc.
-
-# Details about the demo components
-
-## The topology
-
-For this first iteration, the demo topology is a simple linear graph.
-
-```mermaid
-flowchart TD
-    MockedUpstreamPeer --> Node0 --> MockedDownstreamPeer
-```
-
-**INFO**.
-In this iteration of the demo, the mocked downstream peer (see section below) is simply another node, ie Node1.
+> [!TIP]
+> This is an excalidraw SVG with embedded scene so it can be loaded and edited in [https://excalidraw.com/].
 
 ## The Praos traffic and Leios traffic
 
@@ -125,51 +18,8 @@ In this iteration of the demo, the data and traffic is very simple.
 - The mocked upstream peer serves those EBs just prior to the onset of one of the Praos block's slot, akin to (relatively minor) ATK-LeiosProtocolBurst attack.
   Thus, the patched nodes are under significant Leios load when that Praos block begins diffusing.
 
-## The demo tool
-
-The `cabal run exe:leiosdemo202510 -- generate ...` command generates a SQLite database with the following schema.
-
-```
-CREATE TABLE ebPoints (
-    ebSlot INTEGER NOT NULL
-  ,
-    ebHashBytes BLOB NOT NULL
-  ,
-    ebId INTEGER NOT NULL
-  ,
-    PRIMARY KEY (ebSlot, ebHashBytes)
-  ) WITHOUT ROWID;
-CREATE TABLE ebTxs (
-    ebId INTEGER NOT NULL   -- foreign key ebPoints.ebId
-  ,
-    txOffset INTEGER NOT NULL
-  ,
-    txHashBytes BLOB NOT NULL   -- raw bytes
-  ,
-    txBytesSize INTEGER NOT NULL
-  ,
-    txBytes BLOB   -- valid CBOR
-  ,
-    PRIMARY KEY (ebId, txOffset)
-  ) WITHOUT ROWID;
-```
-
-The contents of the generated database are determine by the given `manifest.json` file.
-For now, see the `demoManifest.json` file for the primary schema: each "`txRecipe`" is simply the byte size of the transaction.
-
-The `generate` subcommand also generates a default `schedule.json`.
-Each EB will have two array elements in the schedule.
-The first number in an array element is a fractional slot, which determines when the mocked upstream peer will offer the payload.
-The rest of the array element is `MsgLeiosBlockOffer` if the EB's byte size is listed or `MsgLeiosBlockTxsOffer` if `null` is listed.
-
-The secondary schema of the manifest allows for EBs to overlap (which isn't necessary for this demo, despite the pathced node fully supporting it).
-Overlap is created by an alternative "`txRecipe`", an object `{"share": "XYZ", "startIncl": 90, "stopExcl": 105}` where `"nickname": "XYZ"` was included in a preceding _source_ EB recipe.
-The `"startIncl`" and `"stopExcl"` are inclusive and exclusive indices into the source EB (aka a left-closed right-open interval); `"stopExcl"` is optional and defaults to the length of the source EB.
-With this `"share"` syntax, it is possible for an EB to include the same tx multiple times.
-That would not be a well-formed EB, but the prototype's behavior in response to such an EB is undefined---it's fine for the prototype to simply assume all the Leios EBs and txs in their closures are well-formed.
-(TODO check for this one, since it's easy to check for---just in the patched node itself, or also in `generate`?)
-
-## The mocked upstream peer
+## Demo components
+### The mocked upstream peer
 
 The mocked upstream peer is a patched variant of `immdb-server`.
 
@@ -177,7 +27,7 @@ The mocked upstream peer is a patched variant of `immdb-server`.
 - It serves the EBs present in the given `--leios-db`; it sends Leios notificaitons offering the data according to the given `--leios-schedule`.
   See the demo tool section above for how to generate those files.
 
-## The patched node/node-under-test
+### The patched node/node-under-test
 
 The patched node is a patched variant of `cardano-node`.
 All of the material changes were made in the `ouroboros-consensus` repo; the `cardano-node` changes are merely for integration.
@@ -209,12 +59,12 @@ Some examples includes the following.
   However, it "wastes" disk space and disk bandwidth.
   It's left to future work to decide whether that's a worthwhile trade-off.
 
-## The mocked downstream node
+### The mocked downstream node
 
 For simplicity, this is simply another instance of the patched node.
 In the future, it could be comparatively lightweight and moreover could replay an arbitrary schedule of downstream requests, dual to the mocked upstream peer's arbitrary schedule of upstream notifications.
 
-# Appendix: Engineering Notes
+### Appendix: Engineering Notes
 
 This section summarizes some lessons learned during the development of this prototype.
 
@@ -225,3 +75,80 @@ This section summarizes some lessons learned during the development of this prot
   Therefore at least one join (the one that copies out of `txCache` for the EbTxs identified in an in-memory table) was replaced with application-level iteration.
   It's not yet clear whether a one-time ANALYZE call might suffice, for example.
   Even if it did, it's also not yet clear how much bandwidth usage/latency/jitter/etc might be reduced.
+
+## Using Nix run (recommended)
+
+You can run the demo directly from the GitHub repository using Nix (requires SSH access):
+
+```shell
+nix run github:input-output-hk/ouroboros-leios#leios-202510-demo
+```
+
+Or from a local checkout:
+
+```shell
+nix run .#leios-202510-demo
+```
+
+The demo uses default values of `REF_SLOT=41` and `SECONDS_UNTIL_REF_SLOT=5`. You can override these:
+
+```shell
+SECONDS_UNTIL_REF_SLOT=10 REF_SLOT=200 nix run github:input-output-hk/ouroboros-leios#leios-202510-demo
+```
+
+## Using run-demo.sh directly
+
+Alternatively, you can run the script directly from a dev shell:
+
+```shell
+SECONDS_UNTIL_REF_SLOT=5 REF_SLOT=177 DATA="./data" ./run-demo.sh
+
+...
+Each row represents a unique block seen by both nodes, joined by hash and slot.
+   slot                                               hash     latency_ms
+0     2  4e93dab121aaeabf20a6b6112048260fb1b72ed94f10eb...  179118.490342
+1    44  bd384ce8792d89da9ab6d11d10fc70a36a2899e6c3b10d...  137309.362409
+2    52  23b021f8e2c06e64b10647d9eeb5c9f11e50181f5a5694...  129462.848231
+3    53  5ecd12b363657693f31e62421726fcc427788eed6d2fb2...  128463.045544
+4    59  0341e8795f13d6bcbd0d1fec0fc03fb75ede8cd6d75999...  122466.373131
+5   183  56515bfd5751ca2c1ca0f21050cdb1cd020e396c623a16...     605.664913
+6   187  60fd8fc00994ac1d3901f1d7a777edf5b99546a748fc7d...    3269.136876
+7   188  48cf5b44cb529d51b5b90c8b7c2572a27a2f22fc8933fe...    6842.006962
+
+Total unique block events matched: 8
+```
+
+## Nix build targets
+
+Build an empty Leios DB:
+
+```shell
+$ nix build .#leios-empty-db
+$ sqlite3 result ".schema"
+CREATE TABLE txCache
+...
+```
+
+Build a busy Leios DB from the manifest:
+
+```shell
+$ nix build .#leios-busy-db
+$ sqlite3 result ".schema"
+CREATE TABLE txCache
+...
+```
+
+Build a busy Leios schedule from the manifest:
+
+```shell
+$ nix build .#leios-busy-db.schedule
+$ cat result-schedule
+[
+  [
+    182.9,
+    [
+      0,
+      "adfe0e24083d8dc2fc6192fcd9b01c0a2ad75d7dac5c3745de408ea69eaf62d8",
+      28234
+...
+```
