@@ -159,17 +159,17 @@ data Event where
   deriving (Generic)
 
 $( deriveJSON
-    defaultOptions
-      { sumEncoding = defaultTaggedObject{tagFieldName = "type"}
-      , fieldLabelModifier = \fl -> case fl of
-          ('b' : 'l' : 'o' : 'c' : 'k' : '_' : xs) -> xs
-          "bytes" -> "size_bytes"
-          "payload_bytes" -> "tx_payload_bytes"
-          xs -> xs
-      , allowOmittedFields = True
-      , omitNothingFields = True
-      }
-    ''Event
+     defaultOptions
+       { sumEncoding = defaultTaggedObject{tagFieldName = "type"}
+       , fieldLabelModifier = \fl -> case fl of
+           ('b' : 'l' : 'o' : 'c' : 'k' : '_' : xs) -> xs
+           "bytes" -> "size_bytes"
+           "payload_bytes" -> "tx_payload_bytes"
+           xs -> xs
+       , allowOmittedFields = True
+       , omitNothingFields = True
+       }
+     ''Event
  )
 
 data TraceEvent = TraceEvent

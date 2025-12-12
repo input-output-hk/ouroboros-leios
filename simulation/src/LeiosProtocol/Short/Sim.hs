@@ -94,9 +94,9 @@ logLeiosEvent nodeNames loudness e = case e of
             .= to
           <> mconcat
             [ "fragments"
-              .= length fcs
-              <> "forecast"
-                .= forecast
+                .= length fcs
+                <> "forecast"
+                  .= forecast
             | emitDebug
             ]
           <> mconcat ["forecasts" .= fcs | emitControl]
