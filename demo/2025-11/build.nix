@@ -29,7 +29,10 @@
           runtimeInputs =
             config.devShells.dev-demo-2025-11.nativeBuildInputs
             ++ config.devShells.dev-demo-2025-11.buildInputs
-            ++ [ pkgs.sqlite ];
+            ++ [
+              pkgs.iproute2
+              pkgs.sqlite
+            ];
           runtimeEnv = {
             # Non configurable
             WORKING_DIR = ".tmp-leios-202511-demo";

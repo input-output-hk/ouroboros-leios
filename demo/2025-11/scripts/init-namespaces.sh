@@ -114,4 +114,3 @@ ip addr add "$IP_HOST" dev "host->down"
 ip route add "$IP_DOWNSTREAM_NODE" dev "host->down"
 ip netns exec "$NS_DOWNSTREAM" ip addr add "$IP_DOWNSTREAM_NODE" dev "down->host"
 ip netns exec "$NS_DOWNSTREAM" ip route add "$IP_HOST" dev "down->host"
-

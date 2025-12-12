@@ -49,7 +49,6 @@ Run the Leios X-Ray (Grafana based observability stack)
 
 ```shell
 export LOG_PATH=".tmp-leios-202511-demo/*.log"
-export SS_FILTER="( sport = 3001 and dport = 3002 ) or ( sport = 3002 and dport = 3001 ) or ( sport = 3002 and dport = 3003 ) or ( sport = 3003 and dport = 3002 )"
 nix run github:input-output-hk/ouroboros-leios#x_ray
 ```
 
@@ -71,7 +70,6 @@ SECONDS_UNTIL_REF_SLOT=5
 LEIOS_MANIFEST=manifest.json
 ANALYSE_PY=analyse.py
 PYTHON3=python
-CARDANO_NODE=cardano-node
 RATE_UP_TO_N0="100Mbps";
 DELAY_UP_TO_N0="20ms";
 RATE_N0_TO_UP="100Mbps";
@@ -79,7 +77,6 @@ DELAY_N0_TO_UP="20ms";
 RATE_N0_TO_DOWN="100Mbps";
 DELAY_N0_TO_DOWN="20ms";
 RATE_DOWN_TO_N0="100Mbps";
-DMMDB_SERVER=immdb-server
 ```
 
 To clean up just delete the working directories

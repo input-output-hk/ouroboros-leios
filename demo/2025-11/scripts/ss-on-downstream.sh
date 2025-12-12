@@ -1,4 +1,4 @@
-set -exuo pipefail;
+set -exuo pipefail
 
 set -a && source "$WORKING_DIR/.env" && set +a
 
