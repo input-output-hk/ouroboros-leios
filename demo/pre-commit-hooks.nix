@@ -12,6 +12,8 @@
 
   # Shell
   shellcheck.enable = true;
+  shfmt.enable = true;
+  shfmt.settings.simplify = false;
 
   # Python
   black.enable = true;

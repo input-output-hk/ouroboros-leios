@@ -37,7 +37,7 @@
     "": {
       "backends": [
         "Stdout MachineFormat",
-        "PrometheusSimple 127.0.0.1 12900"
+        "PrometheusSimple 0.0.0.0 12900"
       ],
       "detail": "DNormal",
       "severity": "Notice"

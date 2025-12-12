@@ -13,7 +13,12 @@
           name = "dev-demo-2025-11";
           src = ./.;
           inputsFrom = [ config.devShells.dev-demo ];
-          packages = [ pkgs.process-compose ];
+          packages = [
+            pkgs.process-compose
+            pkgs.iproute2
+            pkgs.sqlite
+            config.packages.ss_http_exporter
+          ];
           inherit (config.devShells.dev-demo) IMMDB_SERVER CARDANO_NODE;
         };
       };
@@ -24,13 +29,20 @@
           runtimeInputs =
             config.devShells.dev-demo-2025-11.nativeBuildInputs
             ++ config.devShells.dev-demo-2025-11.buildInputs
-            ++ [ pkgs.sqlite ];
+            ++ [
+              pkgs.iproute2
+              pkgs.sqlite
+            ];
           runtimeEnv = {
             # Non configurable
             WORKING_DIR = ".tmp-leios-202511-demo";
-            UPSTREAM_NODE_PORT = 3001;
-            NODE0_PORT = 3002;
-            DOWNSTREAM_NODE_PORT = 3003;
+            SCRIPTS = ./scripts;
+            PORT_UPSTREAM_NODE = 3001;
+            PORT_NODE0 = 3002;
+            PORT_DOWNSTREAM_NODE = 3003;
+            IP_UPSTREAM_NODE = "10.0.0.1";
+            IP_NODE0 = "10.0.0.2";
+            IP_DOWNSTREAM_NODE = "10.0.0.3";
             # Configurable (if you see DEF_FOO that's a default value for FOO if unset)
             DEF_CARDANO_NODE = config.devShells.dev-demo-2025-11.CARDANO_NODE;
             DEF_IMMDB_SERVER = config.devShells.dev-demo-2025-11.IMMDB_SERVER;
@@ -47,6 +59,14 @@
                 ]
               )
             );
+            DEF_RATE_UP_TO_N0 = "100Mbps";
+            DEF_DELAY_UP_TO_N0 = "20ms";
+            DEF_RATE_N0_TO_UP = "100Mbps";
+            DEF_DELAY_N0_TO_UP = "20ms";
+            DEF_RATE_N0_TO_DOWN = "100Mbps";
+            DEF_DELAY_N0_TO_DOWN = "20ms";
+            DEF_RATE_DOWN_TO_N0 = "100Mbps";
+            DEF_DELAY_DOWN_TO_N0 = "20ms";
           };
           text = ''
             process-compose --no-server -f ${./process-compose.yaml};

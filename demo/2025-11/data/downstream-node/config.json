@@ -37,7 +37,7 @@
     "": {
       "backends": [
         "Stdout MachineFormat",
-        "PrometheusSimple 127.0.0.1 12902"
+        "PrometheusSimple 0.0.0.0 12900"
       ],
       "detail": "DNormal",
       "severity": "Notice"
@@ -236,7 +236,7 @@
       "severity": "Notice"
     },
     "Resources": {
-      "severity": "Debug"
+      "severity": "Silence"
     },
     "Shutdown": {
       "severity": "Notice"
