@@ -10,14 +10,15 @@
       ...
     }:
     {
-      packages =
-        lib.optionalAttrs (system == "x86_64-linux") {
+      packages = lib.optionalAttrs (system == "x86_64-linux") (
+        {
           leios-cardano-node = inputs'.cardano-node.packages.cardano-node;
         }
         // (with inputs'.ouroboros-consensus.legacyPackages.hsPkgs; {
-          leios-immdb-server = ouroboros-consensus-cardano.getComponent "exe:immdb-server";
-          leios-demo-tool = ouroboros-consensus.getComponent "exe:leiosdemo202510";
-        });
+          leios-immdb-server = ouroboros-consensus-cardano.components.exes.immdb-server;
+          leios-demo-tool = ouroboros-consensus.components.exes.leiosdemo202510;
+        })
+      );
 
       checks = {
         pre-commit-demo = inputs.pre-commit-hooks.lib.${system}.run {
@@ -37,9 +38,9 @@
               inputs'.cardano-node.packages.cardano-tracer
             ]
             ++ (with inputs'.ouroboros-consensus.legacyPackages.hsPkgs; [
-              (ouroboros-consensus-cardano.getComponent "exe:immdb-server")
-              (ouroboros-consensus-cardano.getComponent "exe:db-analyser")
-              (ouroboros-consensus.getComponent "exe:leiosdemo202510")
+              ouroboros-consensus-cardano.components.exes.immdb-server
+              ouroboros-consensus-cardano.components.exes.db-analyser
+              ouroboros-consensus.components.exes.leiosdemo202510
             ])
             ++ (with pkgs.python3Packages; [
 
@@ -72,9 +73,7 @@
             ];
 
           CARDANO_NODE = pkgs.lib.getExe inputs'.cardano-node.packages.cardano-node;
-          IMMDB_SERVER = pkgs.lib.getExe (
-            inputs'.ouroboros-consensus.legacyPackages.hsPkgs.ouroboros-consensus-cardano.getComponent "exe:immdb-server"
-          );
+          IMMDB_SERVER = pkgs.lib.getExe inputs'.ouroboros-consensus.legacyPackages.hsPkgs.ouroboros-consensus-cardano.components.exes.immdb-server;
         };
       };
 
