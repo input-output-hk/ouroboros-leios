@@ -41,13 +41,6 @@ prometheus.scrape "ss_exporter" {
 prometheus.scrape "cardano_node_exporter" {
 	targets = [
 		{
-			"__address__" = "10.0.0.1:12900",
-			"job"         = "cardano_node_metrics",
-			"instance"    = "localhost",
-			"alias"       = "upstream-node",
-			"process"     = "UpstreamNode",
-		},
-		{
 			"__address__" = "10.0.0.2:12900",
 			"job"         = "cardano_node_metrics",
 			"instance"    = "localhost",

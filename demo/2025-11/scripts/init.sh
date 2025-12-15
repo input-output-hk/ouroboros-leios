@@ -30,6 +30,7 @@ VARS_TO_DEFAULT=(
   DELAY_N0_TO_DOWN
   RATE_DOWN_TO_N0
   DELAY_DOWN_TO_N0
+  CLUSTER_RUN
 )
 
 for var in "${VARS_TO_DEFAULT[@]}"; do
@@ -50,6 +51,6 @@ set -a && source "$WORKING_DIR/.env" && set +a
 
 if [ ! -d "$WORKING_DIR/genesis" ]; then
   echo "Copying genesis"
-  cp -fr "$DATA_DIR/genesis" "$WORKING_DIR/genesis"
+  cp -fr "$CLUSTER_RUN/genesis" "$WORKING_DIR/genesis"
   chmod -R +rw "$WORKING_DIR/genesis"
 fi
