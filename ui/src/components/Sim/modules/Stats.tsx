@@ -8,6 +8,11 @@ export const Stats: FC = () => {
     state: { aggregatedData, events, currentTime },
   } = useSimContext();
 
+  const formatTimeAsISO8601 = (timeInSeconds: number): string => {
+    const date = new Date(timeInSeconds * 1000);
+    return date.toISOString().replace('T', ' ').replace('Z', '');
+  };
+
   return (
     <div
       className={`flex flex-col gap-4 backdrop-blur-xs bg-white/80 min-w-[300px]`}
@@ -19,7 +24,7 @@ export const Stats: FC = () => {
           Loaded Events: <span>{events.length}</span>
         </h4>
         <h4 className="flex items-center justify-between gap-4">
-          Current Time: <span>{currentTime.toFixed(2)}s</span>
+          Current Time: <span>{formatTimeAsISO8601(currentTime)}</span>
         </h4>
         <h4 className="flex items-center justify-between gap-4">
           Events at Time: <span>{aggregatedData.eventCounts.total}</span>

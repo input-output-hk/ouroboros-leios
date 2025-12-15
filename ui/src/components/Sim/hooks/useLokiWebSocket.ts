@@ -16,9 +16,9 @@ import { EConnectionState } from "@/contexts/SimContext/types";
 
 // TODO: Replace with topology-based mapping
 const HOST_PORT_TO_NODE: Record<string, string> = {
-  "127.0.0.1:3001": "UpstreamNode",
-  "127.0.0.1:3002": "Node0",
-  "127.0.0.1:3003": "DownstreamNode",
+  "10.0.0.1:3001": "UpstreamNode",
+  "10.0.0.2:3002": "Node0",
+  "10.0.0.3:3003": "DownstreamNode",
   // Add more mappings as needed
 };
 
@@ -31,7 +31,7 @@ const parseRankingBlockSent = (
     const log = JSON.parse(logLine);
 
     // From cardano-node ns=BlockFetch.Server.SendBlock
-    // {"block":"56515bfd5751ca2c1ca0f21050cdb1cd020e396c623a16a2274528f643d4b5fd","kind":"BlockFetchServer","peer":{"connectionId":"127.0.0.1:3002 127.0.0.1:3003"}}
+    // {"block": "23b021f8e2c06e64b10647d9eeb5c9f11e50181f5a569424e49f2448f6d5f8a8", "kind": "BlockFetchServer", "peer": {"connectionId": "10.0.0.2:3002 10.0.0.3:3003"}}
     if (log.kind === "BlockFetchServer" && log.peer && log.block) {
       const sender = streamLabels.process;
       const connectionId = log.peer.connectionId;
@@ -48,7 +48,7 @@ const parseRankingBlockSent = (
       const message: IRankingBlockSent = {
         type: EServerMessageType.RBSent,
         slot: 0,
-        id: `rb-${log.block.substring(0, 8)}`,
+        id: log.block,
         sender,
         recipient,
       };
@@ -60,11 +60,11 @@ const parseRankingBlockSent = (
     }
 
     // From immdb-server (no ns)
-    // {"at":"2025-12-05T12:45:21.0021Z","connectionId":"127.0.0.1:3001 127.0.0.1:3002","direction":"Send","msg":"MsgBlock","mux_at":"2025-12-05T12:45:21.0020Z","prevCount":13}
-    if (log.msg === "MsgBlock" && log.direction === "Send") {
+    // {"at":"2025-12-16T11:35:30.0472Z","connectionId":"0.0.0.0:3001 10.0.0.2:3002","direction":"Send","msg":{"blockHash":"23b021f8e2c06e64b10647d9eeb5c9f11e50181f5a569424e49f2448f6d5f8a8","kind":"MsgBlock"},"mux_at":null,"prevCount":0}
+    if (log.direction === "Send" && log.msg && log.msg.kind === "MsgBlock") {
       const sender = streamLabels.process;
       const connectionId = log.connectionId;
-      let recipient = "Node0";
+      let recipient = "UNKNOWN";
 
       if (connectionId) {
         const endpoints = connectionId.split(" ");
@@ -76,8 +76,8 @@ const parseRankingBlockSent = (
 
       const message: IRankingBlockSent = {
         type: EServerMessageType.RBSent,
-        slot: log.prevCount || 0,
-        id: `rb-upstream-${log.prevCount + 1}`,
+        slot: 0,
+        id: log.msg.blockHash,
         sender,
         recipient,
       };
@@ -120,7 +120,7 @@ const parseRankingBlockReceived = (
       const message: IRankingBlockReceived = {
         type: EServerMessageType.RBReceived,
         slot: 0, // FIXME: use proper slot
-        id: `rb-${log.block.substring(0, 8)}`,
+        id: log.block,
         sender,
         recipient,
       };
@@ -150,40 +150,17 @@ const parseEndorserBlockSent = (
     const log = JSON.parse(logLine);
 
     // From immdb-server (no ns)
-    // {"at":"2025-12-05T12:45:20.9134Z","connectionId":"127.0.0.1:3001 127.0.0.1:3002","direction":"Send","msg":"MsgLeiosBlock","mux_at":"2025-12-05T12:45:20.9131Z","prevCount":0}
-    if (log.msg === "MsgLeiosBlock" && log.direction === "Send") {
-      const sender = streamLabels.process;
-      const connectionId = log.connectionId;
-      let recipient = "Node0";
-
-      if (connectionId) {
-        const endpoints = connectionId.split(" ");
-        if (endpoints.length === 2) {
-          const recipientEndpoint = endpoints[1];
-          recipient = HOST_PORT_TO_NODE[recipientEndpoint] || recipient;
-        }
-      }
-
-      const message: IEndorserBlockSent = {
-        type: EServerMessageType.EBSent,
-        slot: 0, // FIXME: use correct slot
-        id: `eb-${log.prevCount || 0}`,
-        sender,
-        recipient,
-      };
-
-      return {
-        time_s: timestamp,
-        message,
-      };
-    }
-
+    // {"at": "2025-12-15T14:20:07.5401Z", "connectionId": "0.0.0.0:3001 10.0.0.2:3002", "direction": "Send", "msg": {"ebBytesSize": 27471, "ebHash": "8f5ef7199fd1d75c7a98f6e4f53987380ed3897b132f499e0715ae93c225400c", "kind": "MsgLeiosBlock"}, "mux_at": "2025-12-15T14:20:07.5399Z", "prevCount": 0}
     // From cardano-node ns=LeiosFetch.Remote.Send.Block
-    // {"kind":"Send","msg":{"eb":"\u003celided\u003e","ebBytesSize":27471,"kind":"MsgLeiosBlock"},"mux_at":"2025-12-05T12:45:20.93446848Z","peer":{"connectionId":"127.0.0.1:3002 127.0.0.1:3003"}}
-    if (log.kind === "Send" && log.msg && log.msg.kind === "MsgLeiosBlock") {
+    // {"kind": "Send", "msg": {"ebBytesSize": 27471, "ebHash": "8f5ef7199fd1d75c7a98f6e4f53987380ed3897b132f499e0715ae93c225400c", "kind": "MsgLeiosBlock"}, "mux_at": "2025-12-15T14:20:08.12367307Z", "peer": {"connectionId": "10.0.0.2:3002 10.0.0.3:3003"}}
+    if (
+      (log.direction || log.kind) === "Send" &&
+      log.msg &&
+      log.msg.kind === "MsgLeiosBlock"
+    ) {
       const sender = streamLabels.process;
       const connectionId = log.peer?.connectionId;
-      let recipient = "Node0";
+      let recipient = "UNKNOWN";
 
       if (connectionId) {
         const endpoints = connectionId.split(" ");
@@ -195,8 +172,8 @@ const parseEndorserBlockSent = (
 
       const message: IEndorserBlockSent = {
         type: EServerMessageType.EBSent,
-        slot: 0, // FIXME: use correct slot
-        id: `eb-${log.msg.eb}`, // FIXME: msg.eb is always elided
+        slot: 0, // FIXME: drop as not available/needed
+        id: log.msg.ebHash,
         sender,
         recipient,
       };
@@ -222,11 +199,11 @@ const parseEndorserBlockReceived = (
     const log = JSON.parse(logLine);
 
     // From cardano-node ns=LeiosFetch.Remote.Receive.Block
-    // {"mux_at":"2025-12-05T12:45:21.98320066Z","peer":{"connectionId":"127.0.0.1:3003 127.0.0.1:3002"},"kind":"Recv","msg":{"kind":"MsgLeiosBlock","eb":"\u003celided\u003e","ebBytesSize":27471}}
+    // {"kind":"Recv","msg":{"ebBytesSize":27471,"ebHash":"320648bc67a2a160bda3ca52cdf1fe05b3cee404da82fb98e5fa02b2fb970741","kind":"MsgLeiosBlock"},"mux_at":"2025-12-15T15:18:49.13935251Z","peer":{"connectionId":"10.0.0.2:3002 10.0.0.1:3001"}}
     if (log.kind === "Recv" && log.msg && log.msg.kind === "MsgLeiosBlock") {
       const recipient = streamLabels.process;
       const connectionId = log.peer?.connectionId;
-      let sender = "Node0";
+      let sender = "UNKNOWN";
 
       if (connectionId) {
         const endpoints = connectionId.split(" ");
@@ -239,7 +216,7 @@ const parseEndorserBlockReceived = (
       const message: IEndorserBlockReceived = {
         type: EServerMessageType.EBReceived,
         slot: 0, // FIXME: use correct slot
-        id: `eb-${log.msg.eb}`, // FIXME: msg.eb is always elided
+        id: log.msg.ebHash,
         sender,
         recipient,
       };
@@ -271,39 +248,17 @@ const parseTransactionSent = (
     // TODO: indicate this is many transactions or visualize as a very big transaction
 
     // From immdb-server (no ns)
-    // {"at":"2025-12-05T14:06:12.4254Z","connectionId":"127.0.0.1:3001 127.0.0.1:3002","direction":"Send","msg":"MsgLeiosBlockTxs","mux_at":"2025-12-05T14:06:12.4254Z","prevCount":265}
-    if (log.msg === "MsgLeiosBlockTxs" && log.direction === "Send") {
-      const sender = streamLabels.process;
-      const connectionId = log.connectionId;
-      let recipient = "Node0";
-
-      if (connectionId) {
-        const endpoints = connectionId.split(" ");
-        if (endpoints.length === 2) {
-          const recipientEndpoint = endpoints[1];
-          recipient = HOST_PORT_TO_NODE[recipientEndpoint] || recipient;
-        }
-      }
-
-      const message: ITransactionSent = {
-        type: EServerMessageType.TransactionSent,
-        id: `tx-batch-${log.prevCount}`,
-        sender,
-        recipient,
-      };
-
-      return {
-        time_s: timestamp,
-        message,
-      };
-    }
-
+    // {"at":"2025-12-15T15:19:01.5108Z","connectionId":"0.0.0.0:3001 10.0.0.2:3002","direction":"Send","msg":{"kind":"MsgLeiosBlockTxs","numTxs":30,"txs":"<elided>","txsBytesSize":491520},"mux_at":"2025-12-15T15:19:01.5107Z","prevCount":235}
     // From cardano-node ns=LeiosFetch.Remote.Send.BlockTxs
     // {"kind":"Send","msg":{"kind":"MsgLeiosBlockTxs","numTxs":30,"txs":"\u003celided\u003e","txsBytesSize":491520},"mux_at":"2025-12-05T14:06:12.52467535Z","peer":{"connectionId":"127.0.0.1:3002 127.0.0.1:3003"}}
-    if (log.kind === "Send" && log.msg && log.msg.kind === "MsgLeiosBlockTxs") {
+    if (
+      (log.direction || log.kind) === "Send" &&
+      log.msg &&
+      log.msg.kind === "MsgLeiosBlockTxs"
+    ) {
       const sender = streamLabels.process;
       const connectionId = log.peer?.connectionId;
-      let recipient = "Node0";
+      let recipient = "UNKNOWN";
 
       if (connectionId) {
         const endpoints = connectionId.split(" ");
@@ -345,7 +300,7 @@ const parseTransactionReceived = (
     if (log.kind === "Recv" && log.msg && log.msg.kind === "MsgLeiosBlockTxs") {
       const recipient = streamLabels.process;
       const connectionId = log.peer?.connectionId;
-      let sender = "Node0";
+      let sender = "UNKNOWN";
 
       if (connectionId) {
         const endpoints = connectionId.split(" ");
@@ -441,7 +396,13 @@ function connectLokiWebSocket(lokiHost: string, dispatch: any): () => void {
                     parseTransactionSent(stream.stream, ts, logLine) ||
                     parseTransactionReceived(stream.stream, ts, logLine);
                   if (event) {
-                    console.warn("Parsed", event.time_s, event.message);
+                    console.warn(
+                      "Parsed",
+                      event.time_s,
+                      event.message,
+                      "from",
+                      logLine,
+                    );
                     events.push(event);
                   }
                 },
