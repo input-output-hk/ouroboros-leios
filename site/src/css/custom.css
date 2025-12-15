@@ -21,11 +21,11 @@
   --ifm-font-color-alternate: #000;
   --ifm-background-color-primary: #f8f6fa;
   --ifm-background-color-secondary: #f1edf5;
-  --ifm-color-caption: #8c02c2;
   --ifm-link-color: #8c02c2;
-  --ifm-menu-color: #8c02c2;
-  --ifm-toc-link-color: #8c02c2;
-  --link-button-background-hover: #8c02c2;
+  --ifm-color-caption: var(--ifm-link-color);
+  --ifm-menu-color: var(--ifm-link-color);
+  --ifm-toc-link-color: var(--ifm-link-color);
+  --ifm-color-emphasis-300: var(--ifm-border-color);
 
   --ifm-navbar-height: 6.063rem;
 
@@ -66,12 +66,6 @@ html[data-theme="dark"] {
   --ifm-toc-border-color: var(--ifm-border-color);
 
   --ifm-link-color: #6effd1;
-  --ifm-link-hover-color: rgba(255, 255, 255, 0.95);
-  --ifm-color-caption: #6effd1;
-  --ifm-link-color: #6effd1;
-  --ifm-menu-color: #6effd1;
-  --ifm-toc-link-color: #6effd1;
-  --ifm-color-emphasis-300: var(--ifm-border-color);
 
   --link-button-background-hover: rgba(255, 255, 255, 0.15);
   --ifm-dropdown-background-color: var(--ifm-background-color-primary);
