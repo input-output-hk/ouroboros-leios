@@ -18,7 +18,5 @@ in
   project.flake
   {
     packages = agda // artifacts;
-
-    devShells.web = import ./web-shell.nix { inherit pkgs; };
   }
 ]

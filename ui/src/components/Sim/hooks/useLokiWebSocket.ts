@@ -387,79 +387,133 @@ function connectLokiWebSocket(lokiHost: string, dispatch: any): () => void {
   const query =
     '{service="cardano-node"} |~ "BlockFetchServer|MsgBlock|CompletedBlockFetch|MsgLeiosBlock|MsgLeiosBlockTxs"';
   const wsUrl = `ws://${lokiHost}/loki/api/v1/tail?query=${encodeURIComponent(query)}&limit=5000`;
-  console.log("Connecting to Loki:", wsUrl);
-  dispatch({
-    type: "SET_LOKI_CONNECTION_STATE",
-    payload: EConnectionState.Connecting,
-  });
 
-  const ws = new WebSocket(wsUrl);
+  let hasAutoStartedPlayback = false;
+  let ws: WebSocket | null = null;
+  let retryTimeoutId: number | null = null;
+  let cancelled = false;
+  let retryCount = 0;
+  const maxRetryDelay = 30000; // 30 seconds max delay
 
-  ws.onopen = () => {
+  const connect = () => {
+    if (cancelled) return;
+
+    console.log(`Connecting to Loki (attempt ${retryCount + 1}):`, wsUrl);
     dispatch({
       type: "SET_LOKI_CONNECTION_STATE",
-      payload: EConnectionState.Connected,
+      payload: EConnectionState.Connecting,
     });
-  };
 
-  let count = 0;
-  ws.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      console.debug("Received Loki streams:", data);
+    ws = new WebSocket(wsUrl);
 
-      if (data.streams && Array.isArray(data.streams)) {
-        const events: IServerMessage[] = [];
+    ws.onopen = () => {
+      retryCount = 0; // Reset retry count on successful connection
+      dispatch({
+        type: "SET_LOKI_CONNECTION_STATE",
+        payload: EConnectionState.Connected,
+      });
+    };
 
-        data.streams.forEach((stream: any) => {
-          console.debug("Stream labels:", stream.stream);
-          if (stream.values && Array.isArray(stream.values)) {
-            stream.values.forEach(([timestamp, logLine]: [string, string]) => {
-              count++;
-              console.debug(`Stream value:`, count, { timestamp, logLine });
-              const ts = parseFloat(timestamp) / 1000000000;
+    let count = 0;
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.debug("Received Loki streams:", data);
 
-              // TODO: simplify and push further upstream (e.g. into alloy)
-              const event =
-                parseRankingBlockSent(stream.stream, ts, logLine) ||
-                parseRankingBlockReceived(stream.stream, ts, logLine) ||
-                parseEndorserBlockSent(stream.stream, ts, logLine) ||
-                parseEndorserBlockReceived(stream.stream, ts, logLine) ||
-                parseTransactionSent(stream.stream, ts, logLine) ||
-                parseTransactionReceived(stream.stream, ts, logLine);
-              if (event) {
-                console.warn("Parsed", event.time_s, event.message);
-                events.push(event);
-              }
-            });
+        if (data.streams && Array.isArray(data.streams)) {
+          const events: IServerMessage[] = [];
+
+          data.streams.forEach((stream: any) => {
+            console.debug("Stream labels:", stream.stream);
+            if (stream.values && Array.isArray(stream.values)) {
+              stream.values.forEach(
+                ([timestamp, logLine]: [string, string]) => {
+                  count++;
+                  console.debug(`Stream value:`, count, { timestamp, logLine });
+                  const ts = parseFloat(timestamp) / 1000000000;
+
+                  // TODO: simplify and push further upstream (e.g. into alloy)
+                  const event =
+                    parseRankingBlockSent(stream.stream, ts, logLine) ||
+                    parseRankingBlockReceived(stream.stream, ts, logLine) ||
+                    parseEndorserBlockSent(stream.stream, ts, logLine) ||
+                    parseEndorserBlockReceived(stream.stream, ts, logLine) ||
+                    parseTransactionSent(stream.stream, ts, logLine) ||
+                    parseTransactionReceived(stream.stream, ts, logLine);
+                  if (event) {
+                    console.warn("Parsed", event.time_s, event.message);
+                    events.push(event);
+                  }
+                },
+              );
+            }
+          });
+
+          if (events.length > 0) {
+            dispatch({ type: "ADD_TIMELINE_EVENT_BATCH", payload: events });
+
+            // Auto-start playback on first batch of events
+            if (!hasAutoStartedPlayback) {
+              hasAutoStartedPlayback = true;
+              dispatch({ type: "SET_TIMELINE_PLAYING", payload: true });
+            }
           }
-        });
-
-        if (events.length > 0) {
-          dispatch({ type: "ADD_TIMELINE_EVENT_BATCH", payload: events });
         }
+      } catch (error) {
+        console.error("Error processing Loki message:", error);
       }
-    } catch (error) {
-      console.error("Error processing Loki message:", error);
+    };
+
+    const scheduleRetry = () => {
+      if (cancelled) return;
+
+      retryCount++;
+      // Exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s (max)
+      const delay = Math.min(1000 * Math.pow(2, retryCount - 1), maxRetryDelay);
+      console.log(`Retrying connection in ${delay}ms (attempt ${retryCount})`);
+
+      retryTimeoutId = window.setTimeout(() => {
+        if (!cancelled) {
+          connect();
+        }
+      }, delay);
+    };
+
+    ws.onerror = (error) => {
+      console.error("WebSocket error:", error);
+      scheduleRetry();
+    };
+
+    ws.onclose = (event) => {
+      console.log("WebSocket closed:", event.code, event.reason);
+      if (!cancelled) {
+        scheduleRetry();
+      } else {
+        dispatch({
+          type: "SET_LOKI_CONNECTION_STATE",
+          payload: EConnectionState.NotConnected,
+        });
+      }
+    };
+  };
+
+  // Start initial connection
+  connect();
+
+  return () => {
+    cancelled = true;
+    if (retryTimeoutId) {
+      clearTimeout(retryTimeoutId);
+      retryTimeoutId = null;
     }
-  };
-
-  ws.onerror = (error) => {
-    console.error("WebSocket error:", error);
+    if (ws) {
+      ws.close();
+    }
     dispatch({
       type: "SET_LOKI_CONNECTION_STATE",
       payload: EConnectionState.NotConnected,
     });
   };
-
-  ws.onclose = () => {
-    dispatch({
-      type: "SET_LOKI_CONNECTION_STATE",
-      payload: EConnectionState.NotConnected,
-    });
-  };
-
-  return () => ws.close();
 }
 
 export const useLokiWebSocket = () => {

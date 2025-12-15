@@ -25,6 +25,12 @@ Or run the development server with:
 npm start
 ```
 
+Or build & start the ui using nix:
+
+``` bash
+nix run .#ui-live
+```
+
 ## Add a scenario from sim-rs
 
 To prepare a scenario to visualize, find or add the topology to the public directory, for example:
