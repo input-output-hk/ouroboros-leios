@@ -1,5 +1,5 @@
 .main {
-  padding: 2rem 0;
+  padding: 3.5rem 0;
   background-color: var(--ifm-background-color);
 }
 
@@ -44,4 +44,9 @@
   font-size: 0.9rem;
   color: var(--ifm-color-emphasis-700);
   line-height: 1.4;
+}
+
+.plainHero {
+  max-width: 800px;
+  margin-bottom: 2rem;
 }

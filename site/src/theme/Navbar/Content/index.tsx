@@ -9,7 +9,7 @@ import NavbarMobileSidebarToggle from "@theme/Navbar/MobileSidebar/Toggle";
 import NavbarSearch from "@theme/Navbar/Search";
 import NavbarItem, { type Props as NavbarItemConfig } from "@theme/NavbarItem";
 import SearchBar from "@theme/SearchBar";
-import { type ReactNode } from "react";
+import { JSX, type ReactNode } from "react";
 
 import { useLocation } from "@docusaurus/router";
 import styles from "./styles.module.css";
@@ -25,12 +25,11 @@ function NavbarItems({ items }: { items: NavbarItemConfig[] }): JSX.Element {
       {items.map((item, i) => (
         <ErrorCauseBoundary
           key={i}
-          onError={(error) =>
+          onError={() =>
             new Error(
               `A theme navbar item failed to render.
 Please double-check the following navbar item (themeConfig.navbar.items) of your Docusaurus config:
-${JSON.stringify(item, null, 2)}`,
-              { cause: error }
+${JSON.stringify(item, null, 2)}`
             )
           }
         >
