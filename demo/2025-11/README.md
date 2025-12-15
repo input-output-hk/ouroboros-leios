@@ -64,12 +64,16 @@ variables:
 ```shell
 CARDANO_NODE=cardano-node
 IMMDB_SERVER=immdb-server
+
 DATA_DIR=data
+CLUSTER_RUN=data/2025-10-10-13-29-24641-1050-50-blocks-50-coay-sup
 REF_SLOT=41
 SECONDS_UNTIL_REF_SLOT=5
 LEIOS_MANIFEST=manifest.json
+
 ANALYSE_PY=analyse.py
 PYTHON3=python
+
 RATE_UP_TO_N0="100Mbps";
 DELAY_UP_TO_N0="20ms";
 RATE_N0_TO_UP="100Mbps";
