@@ -763,7 +763,7 @@ We also evaluated the 500-seat case. The percentage increase from MinSig to MinP
 
 In summary, the Leios cryptography design therefore **fixes MinSig as the BLS12-381 variant**.
 
-### Implementation Plan
+### Implementation
 
 To implement the linear Leios design, efficient BLS signature functionality is essential for achieving fast and compact certificate generation. 
 With the adoption of [CIP-0381](https://cips.cardano.org/cip/CIP-0381), `cardano-base` already provides foundational utilities for BLS operations, offering a solid basis for this integration. 
