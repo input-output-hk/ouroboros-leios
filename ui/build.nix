@@ -1,6 +1,6 @@
 {
   perSystem =
-    { pkgs, ... }:
+    { config, pkgs, ... }:
     let
       # NOTE: This requires the whole repository as context to resolve symlinks
       # properly. There is no easy way to restrict the derivation inputs
@@ -16,6 +16,17 @@
       };
     in
     rec {
+      devShells.dev-ui = pkgs.mkShell {
+        inherit (config.pre-commit.settings) shellHook;
+        buildInputs = config.pre-commit.settings.enabledPackages;
+        packages = with pkgs; [
+          nodejs
+          nodePackages.prettier
+          typescript
+          typescript-language-server
+        ];
+      };
+
       packages.ui = pkgs.buildNpmPackage {
         name = "leios-ui";
         src = resolvedSrc;
