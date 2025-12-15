@@ -1,6 +1,10 @@
 {
   perSystem =
-    { pkgs, ... }:
+    {
+      config,
+      pkgs,
+      ...
+    }:
     let
       # NOTE: This requires the whole repository as context to resolve symlinks
       # properly. There is no easy way to restrict the derivation inputs
@@ -38,6 +42,17 @@
         text = ''
           http-server ${packages.ui} -o /visualizer/?scenario=2
         '';
+      };
+
+      devShells.dev-ui = pkgs.mkShell {
+        inherit (config.pre-commit.settings) shellHook;
+        buildInputs = config.pre-commit.settings.enabledPackages;
+        packages = with pkgs; [
+          nodejs
+          nodePackages.prettier
+          typescript
+          typescript-language-server
+        ];
       };
     };
 }
