@@ -210,6 +210,9 @@ const parseEndorserBlockReceived = (
   return null;
 };
 
+// HACK: plain enumeration of txs to emulate a sequence number on these messages
+const nextTxId: Record<string, number> = {};
+
 const parseTransactionSent = (
   streamLabels: any,
   timestamp: number,
@@ -234,9 +237,13 @@ const parseTransactionSent = (
         log.peer?.connectionId || log.connectionId,
       );
 
+      // FIXME: msg.txs is always elided
+      const txId = nextTxId[sender] || 0;
+      nextTxId[sender] = txId + 1;
+
       const message: ITransactionSent = {
         type: EServerMessageType.TransactionSent,
-        id: `tx-batch-${log.msg.txs}`, // FIXME: msg.txs is always elided
+        id: txId.toString(),
         sender,
         recipient,
       };
@@ -267,9 +274,13 @@ const parseTransactionReceived = (
       const recipient = streamLabels.process;
       const sender = getRemoteFromConnection(log.peer?.connectionId);
 
+      // FIXME: msg.txs is always elided
+      const txId = nextTxId[recipient] || 0;
+      nextTxId[recipient] = txId + 1;
+
       const message: ITransactionReceived = {
         type: EServerMessageType.TransactionReceived,
-        id: `tx-${log.msg.txs}`, // FIXME: msg.txs is always elided
+        id: txId.toString(),
         sender,
         recipient,
       };
