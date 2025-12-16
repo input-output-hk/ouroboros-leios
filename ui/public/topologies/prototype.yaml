@@ -9,7 +9,7 @@ nodes:
     stake: 0
     location:
       - 0
-      - 100
+      - 50
     producers:
       UpstreamNode:
         latency-ms: 200.0
@@ -17,7 +17,7 @@ nodes:
     stake: 0
     location:
       - 0
-      - 200
+      - 100
     producers:
       Node0:
         latency-ms: 200.0
