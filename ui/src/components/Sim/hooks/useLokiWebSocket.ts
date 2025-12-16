@@ -66,8 +66,7 @@ const parseRankingBlockSent = (
     // {"at":"2025-12-16T11:35:30.0472Z","connectionId":"0.0.0.0:3001 10.0.0.2:3002","direction":"Send","msg":{"blockHash":"23b021f8e2c06e64b10647d9eeb5c9f11e50181f5a569424e49f2448f6d5f8a8","kind":"MsgBlock"},"mux_at":null,"prevCount":0}
     if (log.direction === "Send" && log.msg && log.msg.kind === "MsgBlock") {
       const sender = streamLabels.process;
-      const connectionId = log.connectionId;
-      const recipient = getRemoteFromConnection(connectionId);
+      const recipient = getRemoteFromConnection(log.connectionId);
 
       const message: IRankingBlockSent = {
         type: EServerMessageType.RBSent,
@@ -83,7 +82,7 @@ const parseRankingBlockSent = (
       };
     }
   } catch (error) {
-    console.warn("Failed to parse RankingBlockSent log line:", logLine, error);
+    console.error("Failed to parse RankingBlockSent log line:", logLine, error);
   }
 
   return null;
@@ -145,7 +144,9 @@ const parseEndorserBlockSent = (
       log.msg.kind === "MsgLeiosBlock"
     ) {
       const sender = streamLabels.process;
-      const recipient = getRemoteFromConnection(log.peer.connectionId);
+      const recipient = getRemoteFromConnection(
+        log.peer?.connectionId || log.connectionId,
+      );
 
       const message: IEndorserBlockSent = {
         type: EServerMessageType.EBSent,
@@ -161,7 +162,11 @@ const parseEndorserBlockSent = (
       };
     }
   } catch (error) {
-    console.warn("Failed to parse EndorserBlockSent log line:", logLine, error);
+    console.error(
+      "Failed to parse EndorserBlockSent log line:",
+      logLine,
+      error,
+    );
   }
 
   return null;
@@ -225,7 +230,9 @@ const parseTransactionSent = (
       log.msg.kind === "MsgLeiosBlockTxs"
     ) {
       const sender = streamLabels.process;
-      const recipient = getRemoteFromConnection(log.peer.connectionId);
+      const recipient = getRemoteFromConnection(
+        log.peer?.connectionId || log.connectionId,
+      );
 
       const message: ITransactionSent = {
         type: EServerMessageType.TransactionSent,
@@ -240,7 +247,7 @@ const parseTransactionSent = (
       };
     }
   } catch (error) {
-    console.warn("Failed to parse TransactionSent log line:", logLine, error);
+    console.error("Failed to parse TransactionSent log line:", logLine, error);
   }
 
   return null;
@@ -258,8 +265,7 @@ const parseTransactionReceived = (
     // {"mux_at":"2025-12-05T14:06:12.52499731Z","peer":{"connectionId":"127.0.0.1:3003 127.0.0.1:3002"},"kind":"Recv","msg":{"txsBytesSize":491520,"kind":"MsgLeiosBlockTxs","numTxs":30,"txs":"\u003celided\u003e"}}
     if (log.kind === "Recv" && log.msg && log.msg.kind === "MsgLeiosBlockTxs") {
       const recipient = streamLabels.process;
-      const connectionId = log.peer?.connectionId;
-      const sender = getRemoteFromConnection(connectionId);
+      const sender = getRemoteFromConnection(log.peer?.connectionId);
 
       const message: ITransactionReceived = {
         type: EServerMessageType.TransactionReceived,
