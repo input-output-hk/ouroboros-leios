@@ -123,10 +123,10 @@ export const useHandlers = () => {
         0,
         2 * Math.PI,
       );
-      context.fillStyle = node.data.stake ? "#DC53DE" : "blue";
-      context.stroke();
       context.lineWidth = Math.min((0.5 / canvasScale) * 6, 0.5);
       context.strokeStyle = "black";
+      context.stroke();
+      context.fillStyle = node.data.stake ? "#DC53DE" : "blue";
 
       if (currentNode === node.id.toString()) {
         context.fillStyle = ENodeColor.SELECTED;
