@@ -259,25 +259,36 @@ export const computeAggregatedDataAtTime = (
   const eventCountsByType: Record<string, number> = {};
   const MAX_LOOKAHEAD_TIME = 5.0; // seconds
 
-  // Helper function to calculate travel time with 3-tier fallback
-  // TODO: take event instead
+  const getMessageParticipants = (
+    event: IServerMessage,
+  ): { sender: string; recipient: string } => {
+    const { message } = event;
+    switch (message.type) {
+      case EServerMessageType.TransactionSent:
+      case EServerMessageType.EBSent:
+      case EServerMessageType.RBSent:
+      case EServerMessageType.VTBundleSent:
+        return {
+          sender: (message as any).sender,
+          recipient: (message as any).recipient,
+        };
+      default:
+        throw new Error(
+          `Cannot extract participants from message type: ${message.type}`,
+        );
+    }
+  };
+
   const calculateTravelTime = (
+    event: IServerMessage,
     eventIndex: number,
-    messageType: EMessageType,
-    messageId: string,
-    sender: string,
-    recipient: string,
-    sentTime: number,
     fallbackTime: number,
   ): number => {
+    const { sender, recipient } = getMessageParticipants(event);
+    const sentTime = event.time_s;
+
     // First: Try to find matching received event
-    const receivedTime = findMatchingReceivedEvent(
-      eventIndex,
-      messageType,
-      messageId,
-      recipient,
-      sentTime,
-    );
+    const receivedTime = findMatchingReceivedEvent(event, eventIndex);
     if (receivedTime) {
       return receivedTime - sentTime;
     }
@@ -293,43 +304,39 @@ export const computeAggregatedDataAtTime = (
   };
 
   // Helper function to look ahead for matching received event within time limit
-  // TODO: take event instead
   const findMatchingReceivedEvent = (
+    sentEvent: IServerMessage,
     startIndex: number,
-    messageType: EMessageType,
-    messageId: string,
-    recipient: string,
-    sentTime: number,
   ): number | null => {
-    const maxLookaheadTime = sentTime + MAX_LOOKAHEAD_TIME;
+    const messageType = sentEvent.message.type;
+    const { recipient } = getMessageParticipants(sentEvent);
+    const sentTime = sentEvent.time_s;
+    const messageId = (sentEvent.message as any).id;
 
     for (let j = startIndex + 1; j < events.length; j++) {
       const futureEvent = events[j];
 
       // Stop looking if we've gone beyond our time limit or target time
-      if (
-        futureEvent.time_s > maxLookaheadTime ||
-        futureEvent.time_s > targetTime
-      ) {
+      if (futureEvent.time_s > sentTime + MAX_LOOKAHEAD_TIME) {
         break;
       }
 
       // Check if this is a matching received event
       const isMatchingReceived =
-        (messageType === EMessageType.TX &&
+        (messageType === EServerMessageType.TransactionSent &&
           futureEvent.message.type ===
             EServerMessageType.TransactionReceived) ||
-        (messageType === EMessageType.EB &&
+        (messageType === EServerMessageType.EBSent &&
           futureEvent.message.type === EServerMessageType.EBReceived) ||
-        (messageType === EMessageType.RB &&
+        (messageType === EServerMessageType.RBSent &&
           futureEvent.message.type === EServerMessageType.RBReceived) ||
-        (messageType === EMessageType.Votes &&
+        (messageType === EServerMessageType.VTBundleSent &&
           futureEvent.message.type === EServerMessageType.VTBundleReceived);
 
       if (
         isMatchingReceived &&
-        futureEvent.message.id === messageId &&
-        futureEvent.message.recipient === recipient &&
+        (futureEvent.message as any).id === messageId &&
+        (futureEvent.message as any).recipient === recipient &&
         futureEvent.time_s >= sentTime
       ) {
         return futureEvent.time_s; // Return the received time
@@ -380,12 +387,8 @@ export const computeAggregatedDataAtTime = (
 
         // Calculate travel time with 3-tier fallback
         const travelTime = calculateTravelTime(
+          event,
           i,
-          EMessageType.TX,
-          message.id,
-          message.sender,
-          message.recipient,
-          event.time_s,
           0.05, // fallback for TX
         );
 
@@ -463,12 +466,8 @@ export const computeAggregatedDataAtTime = (
 
         // Calculate travel time with 3-tier fallback
         const travelTime = calculateTravelTime(
+          event,
           i,
-          EMessageType.EB,
-          message.id,
-          message.sender,
-          message.recipient,
-          event.time_s,
           1.0, // fallback for EB
         );
 
@@ -556,12 +555,8 @@ export const computeAggregatedDataAtTime = (
 
         // Calculate travel time with 3-tier fallback
         const travelTime = calculateTravelTime(
+          event,
           i,
-          EMessageType.RB,
-          message.id,
-          message.sender,
-          message.recipient,
-          event.time_s,
           0.1, // fallback for RB
         );
 
@@ -630,12 +625,8 @@ export const computeAggregatedDataAtTime = (
 
         // Calculate travel time with 3-tier fallback
         const travelTime = calculateTravelTime(
+          event,
           i,
-          EMessageType.Votes,
-          message.id,
-          message.sender,
-          message.recipient,
-          event.time_s,
           0.2, // fallback for Votes
         );
 
