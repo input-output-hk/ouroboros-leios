@@ -37,14 +37,36 @@ export const Stats: FC = () => {
           <>
             <h4 className="font-semibold">Event Types</h4>
             <div className="text-sm mt-2">
-              {Object.values(EServerMessageType).map((eventType) => {
-                const count = aggregatedData.eventCounts.byType[eventType];
-                return (
-                  <div key={eventType} className="flex justify-between text-sm">
-                    <span>{eventType}:</span> <span>{count || 0}</span>
-                  </div>
-                );
-              })}
+              {Object.values(EServerMessageType)
+                .filter((eventType) => {
+                  const count = aggregatedData.eventCounts.byType[eventType];
+                  return (count || 0) > 0;
+                })
+                .map((eventType) => {
+                  const count = aggregatedData.eventCounts.byType[eventType];
+                  const isTxReceived =
+                    eventType === EServerMessageType.TransactionReceived;
+
+                  return (
+                    <div
+                      key={eventType}
+                      className="flex justify-between text-sm items-center"
+                    >
+                      <span className="flex items-center gap-1">
+                        {eventType}:
+                        {isTxReceived && (
+                          <span
+                            className="text-yellow-600 text-xs font-bold cursor-help"
+                            title="Transaction IDs are incomplete and may lead to inaccurate numbers and visualization"
+                          >
+                            ⚠️
+                          </span>
+                        )}
+                      </span>
+                      <span>{count || 0}</span>
+                    </div>
+                  );
+                })}
             </div>
           </>
         )}
