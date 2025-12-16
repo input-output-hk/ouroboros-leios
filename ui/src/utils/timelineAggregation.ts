@@ -140,14 +140,8 @@ const createMessageAnimation = (
   recipient: string,
   sentTime: number,
   targetTime: number,
-  fallbackTravelTime: number,
-  topology: ITransformedNodeMap,
+  travelTime: number,
 ) => {
-  // Try to get realistic latency from topology, fallback to hardcoded time
-  const topologyLatency = getTopologyLatency(topology, sender, recipient);
-  const travelTime =
-    topologyLatency !== null ? topologyLatency : fallbackTravelTime;
-
   const estimatedReceiveTime = sentTime + travelTime;
 
   // Create edge key for consistent lookup
@@ -263,8 +257,89 @@ export const computeAggregatedDataAtTime = (
   // Process timeline events up to target time with early termination
   let eventCount = 0;
   const eventCountsByType: Record<string, number> = {};
+  const MAX_LOOKAHEAD_TIME = 5.0; // seconds
 
-  for (const event of events) {
+  // Helper function to calculate travel time with 3-tier fallback
+  // TODO: take event instead
+  const calculateTravelTime = (
+    eventIndex: number,
+    messageType: EMessageType,
+    messageId: string,
+    sender: string,
+    recipient: string,
+    sentTime: number,
+    fallbackTime: number,
+  ): number => {
+    // First: Try to find matching received event
+    const receivedTime = findMatchingReceivedEvent(
+      eventIndex,
+      messageType,
+      messageId,
+      recipient,
+      sentTime,
+    );
+    if (receivedTime) {
+      return receivedTime - sentTime;
+    }
+
+    // Second: Try topology latency
+    const topologyLatency = getTopologyLatency(topology, sender, recipient);
+    if (topologyLatency !== null) {
+      return topologyLatency;
+    }
+
+    // Third: Use message-type specific fallback
+    return fallbackTime;
+  };
+
+  // Helper function to look ahead for matching received event within time limit
+  // TODO: take event instead
+  const findMatchingReceivedEvent = (
+    startIndex: number,
+    messageType: EMessageType,
+    messageId: string,
+    recipient: string,
+    sentTime: number,
+  ): number | null => {
+    const maxLookaheadTime = sentTime + MAX_LOOKAHEAD_TIME;
+
+    for (let j = startIndex + 1; j < events.length; j++) {
+      const futureEvent = events[j];
+
+      // Stop looking if we've gone beyond our time limit or target time
+      if (
+        futureEvent.time_s > maxLookaheadTime ||
+        futureEvent.time_s > targetTime
+      ) {
+        break;
+      }
+
+      // Check if this is a matching received event
+      const isMatchingReceived =
+        (messageType === EMessageType.TX &&
+          futureEvent.message.type ===
+            EServerMessageType.TransactionReceived) ||
+        (messageType === EMessageType.EB &&
+          futureEvent.message.type === EServerMessageType.EBReceived) ||
+        (messageType === EMessageType.RB &&
+          futureEvent.message.type === EServerMessageType.RBReceived) ||
+        (messageType === EMessageType.Votes &&
+          futureEvent.message.type === EServerMessageType.VTBundleReceived);
+
+      if (
+        isMatchingReceived &&
+        futureEvent.message.id === messageId &&
+        futureEvent.message.recipient === recipient &&
+        futureEvent.time_s >= sentTime
+      ) {
+        return futureEvent.time_s; // Return the received time
+      }
+    }
+    return null; // No matching received event found within time window
+  };
+
+  for (let i = 0; i < events.length; i++) {
+    const event = events[i];
     // Stop processing when we reach target time
     if (event.time_s > targetTime) {
       break;
@@ -303,7 +378,18 @@ export const computeAggregatedDataAtTime = (
           stats.bytesSent += msgBytes;
         }
 
-        // Create transaction animation with topology latency
+        // Calculate travel time with 3-tier fallback
+        const travelTime = calculateTravelTime(
+          i,
+          EMessageType.TX,
+          message.id,
+          message.sender,
+          message.recipient,
+          event.time_s,
+          0.05, // fallback for TX
+        );
+
+        // Create transaction animation with calculated travel time
         createMessageAnimation(
           result,
           EMessageType.TX,
@@ -312,8 +398,7 @@ export const computeAggregatedDataAtTime = (
           message.recipient,
           event.time_s,
           targetTime,
-          0.05, // fallback travel time for transactions (faster than blocks)
-          topology,
+          travelTime,
         );
         break;
       }
@@ -376,7 +461,18 @@ export const computeAggregatedDataAtTime = (
           event.time_s,
         );
 
-        // Create animation with topology latency
+        // Calculate travel time with 3-tier fallback
+        const travelTime = calculateTravelTime(
+          i,
+          EMessageType.EB,
+          message.id,
+          message.sender,
+          message.recipient,
+          event.time_s,
+          1.0, // fallback for EB
+        );
+
+        // Create animation with calculated travel time
         createMessageAnimation(
           result,
           EMessageType.EB,
@@ -385,8 +481,7 @@ export const computeAggregatedDataAtTime = (
           message.recipient,
           event.time_s,
           targetTime,
-          1.0, // fallback travel time for EB
-          topology,
+          travelTime,
         );
         break;
       }
@@ -459,7 +554,18 @@ export const computeAggregatedDataAtTime = (
           event.time_s,
         );
 
-        // Create RB animation with topology latency
+        // Calculate travel time with 3-tier fallback
+        const travelTime = calculateTravelTime(
+          i,
+          EMessageType.RB,
+          message.id,
+          message.sender,
+          message.recipient,
+          event.time_s,
+          0.1, // fallback for RB
+        );
+
+        // Create RB animation with calculated travel time
         createMessageAnimation(
           result,
           EMessageType.RB,
@@ -468,8 +574,7 @@ export const computeAggregatedDataAtTime = (
           message.recipient,
           event.time_s,
           targetTime,
-          0.1, // fallback travel time for RB
-          topology,
+          travelTime,
         );
         break;
       }
@@ -523,7 +628,18 @@ export const computeAggregatedDataAtTime = (
           stats.bytesSent += msgBytes;
         }
 
-        // Create vote animation with topology latency
+        // Calculate travel time with 3-tier fallback
+        const travelTime = calculateTravelTime(
+          i,
+          EMessageType.Votes,
+          message.id,
+          message.sender,
+          message.recipient,
+          event.time_s,
+          0.2, // fallback for Votes
+        );
+
+        // Create vote animation with calculated travel time
         createMessageAnimation(
           result,
           EMessageType.Votes,
@@ -532,8 +648,7 @@ export const computeAggregatedDataAtTime = (
           message.recipient,
           event.time_s,
           targetTime,
-          0.2, // fallback travel time for votes
-          topology,
+          travelTime,
         );
         break;
       }

@@ -10,7 +10,7 @@ export const Stats: FC = () => {
 
   const formatTimeAsISO8601 = (timeInSeconds: number): string => {
     const date = new Date(timeInSeconds * 1000);
-    return date.toISOString().replace('T', ' ').replace('Z', '');
+    return date.toISOString().replace("T", " ").replace("Z", "");
   };
 
   return (
@@ -24,7 +24,10 @@ export const Stats: FC = () => {
           Loaded Events: <span>{events.length}</span>
         </h4>
         <h4 className="flex items-center justify-between gap-4">
-          Current Time: <span>{formatTimeAsISO8601(currentTime)}</span>
+          Current Time:{" "}
+          <span className="min-w-[200px] text-right">
+            {formatTimeAsISO8601(currentTime)}
+          </span>
         </h4>
         <h4 className="flex items-center justify-between gap-4">
           Events at Time: <span>{aggregatedData.eventCounts.total}</span>
