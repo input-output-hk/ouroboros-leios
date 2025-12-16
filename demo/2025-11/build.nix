@@ -67,6 +67,8 @@
             DEF_DELAY_N0_TO_DOWN = "20ms";
             DEF_RATE_DOWN_TO_N0 = "100Mbps";
             DEF_DELAY_DOWN_TO_N0 = "20ms";
+            # DEF_CLUSTER_RUN = ./data/2025-10-08-19-42-9d25e-1050-50-blocks-50-coay-sup;
+            DEF_CLUSTER_RUN = ./data/2025-10-10-13-29-24641-1050-50-blocks-50-coay-sup;
           };
           text = ''
             process-compose --no-server -f ${./process-compose.yaml};

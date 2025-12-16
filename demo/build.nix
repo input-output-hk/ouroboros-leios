@@ -40,6 +40,7 @@
             ++ (with inputs'.ouroboros-consensus.legacyPackages.hsPkgs; [
               ouroboros-consensus-cardano.components.exes.immdb-server
               ouroboros-consensus-cardano.components.exes.db-analyser
+              ouroboros-consensus-cardano.components.exes.db-immutaliser
               ouroboros-consensus.components.exes.leiosdemo202510
             ])
             ++ (with pkgs.python3Packages; [

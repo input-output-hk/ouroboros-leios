@@ -24,5 +24,5 @@ else
 fi
 
 cp -f "$DATA_DIR/upstream-node/config.json" "$UPSTREAM_NODE_DIR/config.json"
-tar -xzf "$DATA_DIR/upstream-node/immutable.tar.gz" -C "$UPSTREAM_NODE_DIR"
+tar -xzf "$CLUSTER_RUN/immutable.tar.gz" -C "$UPSTREAM_NODE_DIR"
 chmod -R +rw "$UPSTREAM_NODE_DIR"
