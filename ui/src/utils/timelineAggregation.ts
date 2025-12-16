@@ -8,9 +8,68 @@ import {
   ISimulationAggregatedDataState,
   EMessageType,
   ActivityAction,
+  IMessageTypeCounts,
+  INodeActivityState,
 } from "@/contexts/SimContext/types";
 
 // Helper functions
+
+// Message type priority order: RBs > EBs > Votes > TXs
+const MESSAGE_PRIORITY_ORDER = [
+  EMessageType.RB, // Highest priority
+  EMessageType.EB,
+  EMessageType.Votes,
+  EMessageType.TX, // Lowest priority
+];
+
+export const getHighestPriorityMessageType = (
+  counts: IMessageTypeCounts,
+): EMessageType | null => {
+  for (const messageType of MESSAGE_PRIORITY_ORDER) {
+    if (counts[messageType] > 0) {
+      return messageType;
+    }
+  }
+  return null;
+};
+
+const createEmptyMessageTypeCounts = (): IMessageTypeCounts => ({
+  [EMessageType.RB]: 0,
+  [EMessageType.EB]: 0,
+  [EMessageType.Votes]: 0,
+  [EMessageType.TX]: 0,
+});
+
+const getTotalActiveCount = (counts: IMessageTypeCounts): number => {
+  return Object.values(counts).reduce((sum, count) => sum + count, 0);
+};
+
+// Helper function to update node activity state
+const updateNodeActivity = (
+  nodeActivityMap: Map<string, INodeActivityState>,
+  nodeId: string,
+  messageType: EMessageType,
+  time: number,
+) => {
+  const existingActivity = nodeActivityMap.get(nodeId);
+  if (existingActivity) {
+    // Increment count for this message type
+    existingActivity.activeCounts[messageType]++;
+    // Update timestamp
+    if (time >= existingActivity.lastActivityTime) {
+      existingActivity.lastActivityTime = time;
+    }
+  } else {
+    // First activity on this node
+    const activeCounts = createEmptyMessageTypeCounts();
+    activeCounts[messageType] = 1;
+    nodeActivityMap.set(nodeId, {
+      lastActivityTime: time,
+      activeCounts,
+    });
+  }
+};
+
 const updateLastActivity = (
   nodeStats: Map<string, ISimulationAggregatedData>,
   nodeId: string,
@@ -91,8 +150,39 @@ const createMessageAnimation = (
 
   const estimatedReceiveTime = sentTime + travelTime;
 
-  // Only show if message is currently in transit at targetTime
-  if (targetTime >= sentTime && targetTime < estimatedReceiveTime) {
+  // Create edge key for consistent lookup
+  const edgeIds = [sender, recipient].sort();
+  const edgeKey = `${edgeIds[0]}|${edgeIds[1]}`;
+
+  // Check if message is currently in transit
+  const isInTransit =
+    targetTime >= sentTime && targetTime < estimatedReceiveTime;
+
+  if (isInTransit) {
+    // Message is traveling - increment reference count and show animation
+    const existingEdgeState = result.edges.get(edgeKey);
+    if (existingEdgeState) {
+      // Increment count for this message type
+      existingEdgeState.activeCounts[messageType]++;
+      // Update timestamp
+      if (sentTime >= existingEdgeState.lastMessageTime) {
+        existingEdgeState.lastMessageTime = sentTime;
+      }
+    } else {
+      // First message on this edge
+      const activeCounts = createEmptyMessageTypeCounts();
+      activeCounts[messageType] = 1;
+      result.edges.set(edgeKey, {
+        lastMessageTime: sentTime,
+        activeCounts,
+      });
+    }
+
+    // Update node activity for sender and recipient during transit
+    updateNodeActivity(result.nodeActivity, sender, messageType, sentTime);
+    updateNodeActivity(result.nodeActivity, recipient, messageType, sentTime);
+
+    // Create animation
     const progress = (targetTime - sentTime) / travelTime;
     const animationKey = `${messageId}-${sender}-${recipient}`;
 
@@ -106,6 +196,8 @@ const createMessageAnimation = (
       progress,
     });
   }
+  // Note: We don't handle the "completed" case here since we need to process
+  // all messages first to get accurate counts, then clean up afterward
 };
 
 // Compute complete aggregated data from timeline events up to a specific time
@@ -157,8 +249,9 @@ export const computeAggregatedDataAtTime = (
       praosTxOnChain: 0,
       leiosTxOnChain: 0,
     },
-    lastNodesUpdated: [],
     messages: [],
+    edges: new Map(),
+    nodeActivity: new Map(),
     // Add event counts for the UI
     eventCounts: {
       total: 0,
@@ -465,6 +558,20 @@ export const computeAggregatedDataAtTime = (
   // Set final event counts
   result.eventCounts.total = eventCount;
   result.eventCounts.byType = eventCountsByType;
+
+  // Clean up edges with no active messages (revert to default color)
+  result.edges.forEach((edgeState, edgeKey) => {
+    if (getTotalActiveCount(edgeState.activeCounts) === 0) {
+      result.edges.delete(edgeKey);
+    }
+  });
+
+  // Clean up node activities with no active messages
+  result.nodeActivity.forEach((nodeState, nodeId) => {
+    if (getTotalActiveCount(nodeState.activeCounts) === 0) {
+      result.nodeActivity.delete(nodeId);
+    }
+  });
 
   return result;
 };
