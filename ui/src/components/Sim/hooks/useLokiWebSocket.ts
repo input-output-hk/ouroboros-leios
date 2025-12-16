@@ -22,6 +22,18 @@ const HOST_PORT_TO_NODE: Record<string, string> = {
   // Add more mappings as needed
 };
 
+const getRemoteFromConnection = (connectionId: string | undefined): string => {
+  if (!connectionId) return "UNKNOWN";
+
+  const endpoints = connectionId.split(" ");
+  if (endpoints.length === 2) {
+    const targetEndpoint = endpoints[1];
+    return HOST_PORT_TO_NODE[targetEndpoint] || "UNKNOWN";
+  }
+
+  return "UNKNOWN";
+};
+
 const parseRankingBlockSent = (
   streamLabels: any,
   timestamp: number,
@@ -34,16 +46,7 @@ const parseRankingBlockSent = (
     // {"block": "23b021f8e2c06e64b10647d9eeb5c9f11e50181f5a569424e49f2448f6d5f8a8", "kind": "BlockFetchServer", "peer": {"connectionId": "10.0.0.2:3002 10.0.0.3:3003"}}
     if (log.kind === "BlockFetchServer" && log.peer && log.block) {
       const sender = streamLabels.process;
-      const connectionId = log.peer.connectionId;
-      let recipient = "Node0";
-
-      if (connectionId) {
-        const endpoints = connectionId.split(" ");
-        if (endpoints.length === 2) {
-          const recipientEndpoint = endpoints[1];
-          recipient = HOST_PORT_TO_NODE[recipientEndpoint] || recipient;
-        }
-      }
+      const recipient = getRemoteFromConnection(log.peer.connectionId);
 
       const message: IRankingBlockSent = {
         type: EServerMessageType.RBSent,
@@ -64,15 +67,7 @@ const parseRankingBlockSent = (
     if (log.direction === "Send" && log.msg && log.msg.kind === "MsgBlock") {
       const sender = streamLabels.process;
       const connectionId = log.connectionId;
-      let recipient = "UNKNOWN";
-
-      if (connectionId) {
-        const endpoints = connectionId.split(" ");
-        if (endpoints.length === 2) {
-          const recipientEndpoint = endpoints[1];
-          recipient = HOST_PORT_TO_NODE[recipientEndpoint] || recipient;
-        }
-      }
+      const recipient = getRemoteFromConnection(connectionId);
 
       const message: IRankingBlockSent = {
         type: EServerMessageType.RBSent,
@@ -106,16 +101,7 @@ const parseRankingBlockReceived = (
     // {"block":"56515bfd5751ca2c1ca0f21050cdb1cd020e396c623a16a2274528f643d4b5fd","delay":4985924.003937032,"kind":"CompletedBlockFetch","peer":{"connectionId":"127.0.0.1:3003 127.0.0.1:3002"},"size":862}
     if (log.kind === "CompletedBlockFetch" && log.peer && log.block) {
       const recipient = streamLabels.process;
-      const connectionId = log.peer.connectionId;
-      let sender = "Node0";
-
-      if (connectionId) {
-        const endpoints = connectionId.split(" ");
-        if (endpoints.length === 2) {
-          const senderEndpoint = endpoints[1];
-          sender = HOST_PORT_TO_NODE[senderEndpoint] || sender;
-        }
-      }
+      const sender = getRemoteFromConnection(log.peer.connectionId);
 
       const message: IRankingBlockReceived = {
         type: EServerMessageType.RBReceived,
@@ -159,16 +145,7 @@ const parseEndorserBlockSent = (
       log.msg.kind === "MsgLeiosBlock"
     ) {
       const sender = streamLabels.process;
-      const connectionId = log.peer?.connectionId;
-      let recipient = "UNKNOWN";
-
-      if (connectionId) {
-        const endpoints = connectionId.split(" ");
-        if (endpoints.length === 2) {
-          const recipientEndpoint = endpoints[1];
-          recipient = HOST_PORT_TO_NODE[recipientEndpoint] || recipient;
-        }
-      }
+      const recipient = getRemoteFromConnection(log.peer.connectionId);
 
       const message: IEndorserBlockSent = {
         type: EServerMessageType.EBSent,
@@ -202,16 +179,7 @@ const parseEndorserBlockReceived = (
     // {"kind":"Recv","msg":{"ebBytesSize":27471,"ebHash":"320648bc67a2a160bda3ca52cdf1fe05b3cee404da82fb98e5fa02b2fb970741","kind":"MsgLeiosBlock"},"mux_at":"2025-12-15T15:18:49.13935251Z","peer":{"connectionId":"10.0.0.2:3002 10.0.0.1:3001"}}
     if (log.kind === "Recv" && log.msg && log.msg.kind === "MsgLeiosBlock") {
       const recipient = streamLabels.process;
-      const connectionId = log.peer?.connectionId;
-      let sender = "UNKNOWN";
-
-      if (connectionId) {
-        const endpoints = connectionId.split(" ");
-        if (endpoints.length === 2) {
-          const senderEndpoint = endpoints[1];
-          sender = HOST_PORT_TO_NODE[senderEndpoint] || sender;
-        }
-      }
+      const sender = getRemoteFromConnection(log.peer.connectionId);
 
       const message: IEndorserBlockReceived = {
         type: EServerMessageType.EBReceived,
@@ -257,16 +225,7 @@ const parseTransactionSent = (
       log.msg.kind === "MsgLeiosBlockTxs"
     ) {
       const sender = streamLabels.process;
-      const connectionId = log.peer?.connectionId;
-      let recipient = "UNKNOWN";
-
-      if (connectionId) {
-        const endpoints = connectionId.split(" ");
-        if (endpoints.length === 2) {
-          const recipientEndpoint = endpoints[1];
-          recipient = HOST_PORT_TO_NODE[recipientEndpoint] || recipient;
-        }
-      }
+      const recipient = getRemoteFromConnection(log.peer.connectionId);
 
       const message: ITransactionSent = {
         type: EServerMessageType.TransactionSent,
@@ -300,15 +259,7 @@ const parseTransactionReceived = (
     if (log.kind === "Recv" && log.msg && log.msg.kind === "MsgLeiosBlockTxs") {
       const recipient = streamLabels.process;
       const connectionId = log.peer?.connectionId;
-      let sender = "UNKNOWN";
-
-      if (connectionId) {
-        const endpoints = connectionId.split(" ");
-        if (endpoints.length === 2) {
-          const senderEndpoint = endpoints[1];
-          sender = HOST_PORT_TO_NODE[senderEndpoint] || sender;
-        }
-      }
+      const sender = getRemoteFromConnection(connectionId);
 
       const message: ITransactionReceived = {
         type: EServerMessageType.TransactionReceived,
