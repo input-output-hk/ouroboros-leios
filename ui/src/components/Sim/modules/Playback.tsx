@@ -56,6 +56,11 @@ export const Playback: FC = () => {
 
   const handleStep = useCallback(
     (stepAmount: number) => {
+      // Pause playback when seeking
+      if (isPlaying) {
+        dispatch({ type: "SET_TIMELINE_PLAYING", payload: false });
+      }
+
       const maxEventTime =
         events.length > 0 ? events[events.length - 1].time_s : maxTime;
       const newTime = Math.max(
@@ -64,7 +69,7 @@ export const Playback: FC = () => {
       );
       dispatch({ type: "SET_TIMELINE_TIME", payload: newTime });
     },
-    [dispatch, events, maxTime, currentTime],
+    [dispatch, events, maxTime, currentTime, isPlaying],
   );
 
   // Stable version for seeking intervals (uses refs)
@@ -89,6 +94,11 @@ export const Playback: FC = () => {
       // Clear any existing seeking first
       stopSeeking();
 
+      // Pause playback when seeking starts
+      if (isPlaying) {
+        dispatch({ type: "SET_TIMELINE_PLAYING", payload: false });
+      }
+
       // Initial step using current context values
       handleStep(stepAmount);
 
@@ -99,7 +109,7 @@ export const Playback: FC = () => {
         }, 33); // ~30 FPS smooth seeking
       }, 300); // initial delay
     },
-    [handleStep, handleStepForSeeking, stopSeeking],
+    [handleStep, handleStepForSeeking, stopSeeking, isPlaying, dispatch],
   );
 
   // Timeline playback effect - handles automatic advancement when playing
