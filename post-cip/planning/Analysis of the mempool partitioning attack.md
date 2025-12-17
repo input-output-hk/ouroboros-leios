@@ -42,8 +42,8 @@ In addition to informing research and networking experts, memory pool modeling a
 	- [x] Tracking of CF's "canary" transactions' arrival in memory pools.
 	- [x] Tracking of natural and induced congestion on arrival in memory pools.
 - [ ] [#645](https://github.com/input-output-hk/ouroboros-leios/issues/645) Transaction analysis
-	- [ ] Fraction of transaction spent in the block they were created.
-	- [ ] Distribution of transaction lifetime (blocks and slots).
+	- [x] Fraction of transaction spent in the block they were created.
+	- [x] Distribution of transaction lifetime (blocks and slots).
 	- [ ] Distribution of length of transaction chains in consecutive blocks.
 - [ ] [#646](https://github.com/input-output-hk/ouroboros-leios/issues/646) Block analysis
 	- [ ] Distribution of block utilization.
