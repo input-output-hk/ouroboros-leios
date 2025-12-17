@@ -1,0 +1,25 @@
+<!--
+<pre class="Agda"><a id="14" class="Symbol">{-#</a> <a id="18" class="Keyword">OPTIONS</a> <a id="26" class="Pragma">--safe</a> <a id="33" class="Symbol">#-}</a>
+</pre>-->
+<pre class="Agda"><a id="53" class="Keyword">open</a> <a id="58" class="Keyword">import</a> <a id="65" href="Leios.Prelude.html" class="Module">Leios.Prelude</a>
+<a id="79" class="Keyword">open</a> <a id="84" class="Keyword">import</a> <a id="91" href="Leios.Abstract.html" class="Module">Leios.Abstract</a>
+<a id="106" class="Keyword">open</a> <a id="111" class="Keyword">import</a> <a id="118" href="Leios.VRF.html" class="Module">Leios.VRF</a>
+
+<a id="129" class="Keyword">module</a> <a id="136" href="Leios.KeyRegistration.html" class="Module">Leios.KeyRegistration</a> <a id="158" class="Symbol">(</a><a id="159" href="Leios.KeyRegistration.html#159" class="Bound">a</a> <a id="161" class="Symbol">:</a> <a id="163" href="Leios.Abstract.html#452" class="Record">LeiosAbstract</a><a id="176" class="Symbol">)</a> <a id="178" class="Symbol">(</a><a id="179" class="Keyword">open</a> <a id="184" href="Leios.Abstract.html#452" class="Module">LeiosAbstract</a> <a id="198" href="Leios.KeyRegistration.html#159" class="Bound">a</a><a id="199" class="Symbol">)</a>
+  <a id="203" class="Symbol">(</a><a id="204" href="Leios.KeyRegistration.html#204" class="Bound">vrf</a> <a id="208" class="Symbol">:</a> <a id="210" href="Leios.VRF.html#878" class="Record">LeiosVRF</a> <a id="219" href="Leios.KeyRegistration.html#159" class="Bound">a</a><a id="220" class="Symbol">)</a> <a id="222" class="Symbol">(</a><a id="223" class="Keyword">let</a> <a id="227" class="Keyword">open</a> <a id="232" href="Leios.VRF.html#878" class="Module">LeiosVRF</a> <a id="241" href="Leios.KeyRegistration.html#204" class="Bound">vrf</a><a id="244" class="Symbol">)</a> <a id="246" class="Keyword">where</a>
+
+<a id="253" class="Keyword">record</a> <a id="KeyRegistrationAbstract"></a><a id="260" href="Leios.KeyRegistration.html#260" class="Record">KeyRegistrationAbstract</a> <a id="284" class="Symbol">:</a> <a id="286" href="Agda.Primitive.html#388" class="Primitive">Type₁</a> <a id="292" class="Keyword">where</a>
+
+  <a id="301" class="Keyword">data</a> <a id="KeyRegistrationAbstract.Input"></a><a id="306" href="Leios.KeyRegistration.html#306" class="Datatype">Input</a> <a id="312" class="Symbol">:</a> <a id="314" href="Agda.Primitive.html#388" class="Primitive">Type₁</a> <a id="320" class="Keyword">where</a>
+    <a id="KeyRegistrationAbstract.Input.INIT"></a><a id="330" href="Leios.KeyRegistration.html#330" class="InductiveConstructor">INIT</a> <a id="335" class="Symbol">:</a> <a id="337" href="Leios.VRF.html#909" class="Field">PubKey</a> <a id="344" class="Symbol">→</a> <a id="346" href="Leios.VRF.html#909" class="Field">PubKey</a> <a id="353" class="Symbol">→</a> <a id="355" href="Leios.KeyRegistration.html#306" class="Datatype">Input</a>
+
+  <a id="364" class="Keyword">data</a> <a id="KeyRegistrationAbstract.Output"></a><a id="369" href="Leios.KeyRegistration.html#369" class="Datatype">Output</a> <a id="376" class="Symbol">:</a> <a id="378" href="Agda.Primitive.html#388" class="Primitive">Type</a> <a id="383" class="Keyword">where</a>
+    <a id="KeyRegistrationAbstract.Output.PUBKEYS"></a><a id="393" href="Leios.KeyRegistration.html#393" class="InductiveConstructor">PUBKEYS</a> <a id="401" class="Symbol">:</a> <a id="403" href="Agda.Builtin.List.html#147" class="Datatype">List</a> <a id="408" href="Leios.VRF.html#909" class="Field">PubKey</a> <a id="415" class="Symbol">→</a> <a id="417" href="Leios.KeyRegistration.html#369" class="Datatype">Output</a>
+
+  <a id="427" class="Keyword">record</a> <a id="KeyRegistrationAbstract.Functionality"></a><a id="434" href="Leios.KeyRegistration.html#434" class="Record">Functionality</a> <a id="448" class="Symbol">:</a> <a id="450" href="Agda.Primitive.html#388" class="Primitive">Type₁</a> <a id="456" class="Keyword">where</a>
+    <a id="466" class="Keyword">field</a> <a id="472" href="Leios.KeyRegistration.html#472" class="Field">State</a> <a id="478" class="Symbol">:</a> <a id="480" href="Agda.Primitive.html#388" class="Primitive">Type</a>
+          <a id="495" href="Leios.KeyRegistration.html#495" class="Field Operator">_-⟦_/_⟧⇀_</a> <a id="505" class="Symbol">:</a> <a id="507" href="Leios.KeyRegistration.html#472" class="Field">State</a> <a id="513" class="Symbol">→</a> <a id="515" href="Leios.KeyRegistration.html#306" class="Datatype">Input</a> <a id="521" class="Symbol">→</a> <a id="523" href="Leios.KeyRegistration.html#369" class="Datatype">Output</a> <a id="530" class="Symbol">→</a> <a id="532" href="Leios.KeyRegistration.html#472" class="Field">State</a> <a id="538" class="Symbol">→</a> <a id="540" href="Agda.Primitive.html#388" class="Primitive">Type</a>
+
+    <a id="550" class="Keyword">open</a> <a id="555" href="Leios.KeyRegistration.html#306" class="Module">Input</a> <a id="561" class="Keyword">public</a>
+    <a id="572" class="Keyword">open</a> <a id="577" href="Leios.KeyRegistration.html#369" class="Module">Output</a> <a id="584" class="Keyword">public</a>
+</pre>
