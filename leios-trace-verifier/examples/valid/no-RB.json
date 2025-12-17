@@ -1,0 +1,7 @@
+#
+# No RB is generated
+#
+{"message": {"type": "RBReceived", "recipient": "node-0", "id": "e996590b50ee39d640975de80b1c4ebfaa923866437d36b2d2ab08dacda2a09d"}, "time_s": 0.088236}
+{"message": {"type": "Slot", "node": "node-0", "slot": 0}, "time_s": 0.002423}
+{"message": {"type": "Slot", "node": "node-0", "slot": 1}, "time_s": 0.007779}
+{"message": {"type": "Slot", "node": "node-0", "slot": 2}, "time_s": 1e-06}
