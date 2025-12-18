@@ -54,7 +54,7 @@ export const TimelineSlider: FC = () => {
           type="range"
           min={minTime}
           max={maxTime}
-          step={0.1}
+          step={0.001}
           value={currentTime}
           onChange={handleTimeChange}
           disabled={!hasEvents}

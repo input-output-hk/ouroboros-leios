@@ -23,8 +23,8 @@
     pre-commit-hooks.url = "github:cachix/git-hooks.nix";
 
     # Used by demo/
-    ouroboros-consensus.url = "github:intersectmbo/ouroboros-consensus?ref=leios-prototype-demo-202511";
-    cardano-node.url = "github:intersectmbo/cardano-node?ref=leios-prototype-demo-202511";
+    ouroboros-consensus.url = "github:intersectmbo/ouroboros-consensus?ref=ch1bo/leios-consistent-traces";
+    cardano-node.url = "github:intersectmbo/cardano-node?ref=ch1bo/leios-consistent-traces";
   };
 
   outputs =

@@ -10,6 +10,9 @@ export default defineConfig({
   plugins: [react(), tailwindcss(), nodePolyfills()],
   server: {
     port: 3000,
+    watch: {
+      followSymlinks: false,
+    },
   },
   resolve: {
     alias: [{ find: "@", replacement: path.resolve(__dirname, "src") }],

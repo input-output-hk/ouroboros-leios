@@ -3,6 +3,25 @@ import { EMessageType } from "@/contexts/SimContext/types";
 import { ELinkColor, EMessageColor, ENodeColor } from "@/utils/colors";
 import { useCallback } from "react";
 
+// Import helper function from timelineAggregation
+const getHighestPriorityMessageType = (counts: {
+  [key in EMessageType]: number;
+}): EMessageType | null => {
+  const MESSAGE_PRIORITY_ORDER = [
+    EMessageType.RB, // Highest priority
+    EMessageType.EB,
+    EMessageType.Votes,
+    EMessageType.TX, // Lowest priority
+  ];
+
+  for (const messageType of MESSAGE_PRIORITY_ORDER) {
+    if (counts[messageType] > 0) {
+      return messageType;
+    }
+  }
+  return null;
+};
+
 export const useHandlers = () => {
   const {
     state: {
@@ -19,8 +38,6 @@ export const useHandlers = () => {
       topography,
     },
   } = useSimContext();
-
-  const ACTIVITY_TIMEOUT = 1.0; // seconds after which node color resets
 
   const drawTopography = useCallback(() => {
     const canvas = canvasRef.current;
@@ -54,10 +71,42 @@ export const useHandlers = () => {
       context.beginPath();
       context.moveTo(nodeStart.fx, nodeStart.fy);
       context.lineTo(nodeEnd.fx, nodeEnd.fy);
-      context.strokeStyle = ELinkColor.LINK_DEFAULT;
 
+      // Create edge key for lookup (consistent with aggregation logic)
+      const edgeIds = [link.source, link.target].sort();
+      const edgeKey = `${edgeIds[0]}|${edgeIds[1]}`;
+      const edgeState = aggregatedData.edges.get(edgeKey);
+
+      // Set edge color based on highest priority message type or default
       if (link.source === currentNode || link.target === currentNode) {
         context.strokeStyle = ELinkColor.LINK_SELECTED;
+      } else if (edgeState) {
+        // Get highest priority message type currently traveling
+        const highestPriorityType = getHighestPriorityMessageType(
+          edgeState.activeCounts,
+        );
+        if (highestPriorityType) {
+          switch (highestPriorityType) {
+            case EMessageType.TX:
+              context.strokeStyle = EMessageColor.TX;
+              break;
+            case EMessageType.EB:
+              context.strokeStyle = EMessageColor.EB;
+              break;
+            case EMessageType.RB:
+              context.strokeStyle = EMessageColor.RB;
+              break;
+            case EMessageType.Votes:
+              context.strokeStyle = EMessageColor.VOTES;
+              break;
+            default:
+              context.strokeStyle = ELinkColor.LINK_DEFAULT;
+          }
+        } else {
+          context.strokeStyle = ELinkColor.LINK_DEFAULT;
+        }
+      } else {
+        context.strokeStyle = ELinkColor.LINK_DEFAULT;
       }
 
       context.lineWidth = Math.min((0.2 / canvasScale) * 6, 0.2);
@@ -74,36 +123,41 @@ export const useHandlers = () => {
         0,
         2 * Math.PI,
       );
-      context.fillStyle = node.data.stake ? "#DC53DE" : "blue";
-      context.stroke();
       context.lineWidth = Math.min((0.5 / canvasScale) * 6, 0.5);
-
-      if (aggregatedData.lastNodesUpdated.includes(node.id.toString())) {
-        context.strokeStyle = "red";
-      } else {
-        context.strokeStyle = "black";
-      }
+      context.strokeStyle = "black";
+      context.stroke();
+      context.fillStyle = node.data.stake ? "#DC53DE" : "blue";
 
       if (currentNode === node.id.toString()) {
         context.fillStyle = ENodeColor.SELECTED;
       } else {
-        // Color based on last activity
-        const nodeStats = aggregatedData.nodes.get(node.id.toString());
-        const lastActivity = nodeStats?.lastActivity;
+        // Color based on priority-based node activity
+        const nodeActivity = aggregatedData.nodeActivity.get(
+          node.id.toString(),
+        );
+        const highestPriorityType = nodeActivity
+          ? getHighestPriorityMessageType(nodeActivity.activeCounts)
+          : null;
 
-        // Check if activity is recent (within timeout)
-        const activityIsRecent =
-          lastActivity && currentTime - lastActivity.time <= ACTIVITY_TIMEOUT;
-
-        if (activityIsRecent) {
-          if (lastActivity.type === EMessageType.EB) {
-            context.fillStyle = EMessageColor.EB;
-          } else if (lastActivity.type === EMessageType.RB) {
-            context.fillStyle = EMessageColor.RB;
-          } else {
-            context.fillStyle = node.data.stake
-              ? ENodeColor.STAKE_NODE
-              : ENodeColor.SELECTED;
+        if (highestPriorityType) {
+          // Node has active messages - color by highest priority
+          switch (highestPriorityType) {
+            case EMessageType.TX:
+              context.fillStyle = EMessageColor.TX;
+              break;
+            case EMessageType.EB:
+              context.fillStyle = EMessageColor.EB;
+              break;
+            case EMessageType.RB:
+              context.fillStyle = EMessageColor.RB;
+              break;
+            case EMessageType.Votes:
+              context.fillStyle = EMessageColor.VOTES;
+              break;
+            default:
+              context.fillStyle = node.data.stake
+                ? ENodeColor.STAKE_NODE
+                : ENodeColor.INACTIVE;
           }
         } else if (!node.data.stake) {
           context.fillStyle = ENodeColor.INACTIVE;

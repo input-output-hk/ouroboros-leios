@@ -13,8 +13,9 @@ export const defaultAggregatedData: ISimulationAggregatedDataState = {
     praosTxOnChain: 0,
     leiosTxOnChain: 0,
   },
-  lastNodesUpdated: [],
   messages: [],
+  edges: new Map(),
+  nodeActivity: new Map(),
   eventCounts: {
     total: 0,
     byType: {},

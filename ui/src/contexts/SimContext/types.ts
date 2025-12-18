@@ -43,11 +43,29 @@ export interface IMessageAnimation {
   progress: number; // 0-1, calculated based on current timeline position
 }
 
+export interface IMessageTypeCounts {
+  [EMessageType.RB]: number;
+  [EMessageType.EB]: number;
+  [EMessageType.Votes]: number;
+  [EMessageType.TX]: number;
+}
+
+export interface IEdgeState {
+  lastMessageTime: number;
+  activeCounts: IMessageTypeCounts; // Count of each message type currently traveling
+}
+
+export interface INodeActivityState {
+  lastActivityTime: number;
+  activeCounts: IMessageTypeCounts; // Count of each activity type currently active
+}
+
 export interface ISimulationAggregatedDataState {
   nodes: Map<string, ISimulationAggregatedData>;
   global: ISimulationGlobalData;
-  lastNodesUpdated: string[];
   messages: IMessageAnimation[]; // Active messages traveling on the graph
+  edges: Map<string, IEdgeState>; // Edge state for coloring based on message priority
+  nodeActivity: Map<string, INodeActivityState>; // Node activity state for priority-based coloring
   eventCounts: {
     total: number;
     byType: Record<string, number>;

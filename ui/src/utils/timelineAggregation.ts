@@ -8,9 +8,68 @@ import {
   ISimulationAggregatedDataState,
   EMessageType,
   ActivityAction,
+  IMessageTypeCounts,
+  INodeActivityState,
 } from "@/contexts/SimContext/types";
 
 // Helper functions
+
+// Message type priority order: RBs > EBs > Votes > TXs
+const MESSAGE_PRIORITY_ORDER = [
+  EMessageType.RB, // Highest priority
+  EMessageType.EB,
+  EMessageType.Votes,
+  EMessageType.TX, // Lowest priority
+];
+
+export const getHighestPriorityMessageType = (
+  counts: IMessageTypeCounts,
+): EMessageType | null => {
+  for (const messageType of MESSAGE_PRIORITY_ORDER) {
+    if (counts[messageType] > 0) {
+      return messageType;
+    }
+  }
+  return null;
+};
+
+const createEmptyMessageTypeCounts = (): IMessageTypeCounts => ({
+  [EMessageType.RB]: 0,
+  [EMessageType.EB]: 0,
+  [EMessageType.Votes]: 0,
+  [EMessageType.TX]: 0,
+});
+
+const getTotalActiveCount = (counts: IMessageTypeCounts): number => {
+  return Object.values(counts).reduce((sum, count) => sum + count, 0);
+};
+
+// Helper function to update node activity state
+const updateNodeActivity = (
+  nodeActivityMap: Map<string, INodeActivityState>,
+  nodeId: string,
+  messageType: EMessageType,
+  time: number,
+) => {
+  const existingActivity = nodeActivityMap.get(nodeId);
+  if (existingActivity) {
+    // Increment count for this message type
+    existingActivity.activeCounts[messageType]++;
+    // Update timestamp
+    if (time >= existingActivity.lastActivityTime) {
+      existingActivity.lastActivityTime = time;
+    }
+  } else {
+    // First activity on this node
+    const activeCounts = createEmptyMessageTypeCounts();
+    activeCounts[messageType] = 1;
+    nodeActivityMap.set(nodeId, {
+      lastActivityTime: time,
+      activeCounts,
+    });
+  }
+};
+
 const updateLastActivity = (
   nodeStats: Map<string, ISimulationAggregatedData>,
   nodeId: string,
@@ -81,18 +140,43 @@ const createMessageAnimation = (
   recipient: string,
   sentTime: number,
   targetTime: number,
-  fallbackTravelTime: number,
-  topology: ITransformedNodeMap,
+  travelTime: number,
 ) => {
-  // Try to get realistic latency from topology, fallback to hardcoded time
-  const topologyLatency = getTopologyLatency(topology, sender, recipient);
-  const travelTime =
-    topologyLatency !== null ? topologyLatency : fallbackTravelTime;
-
   const estimatedReceiveTime = sentTime + travelTime;
 
-  // Only show if message is currently in transit at targetTime
-  if (targetTime >= sentTime && targetTime < estimatedReceiveTime) {
+  // Create edge key for consistent lookup
+  const edgeIds = [sender, recipient].sort();
+  const edgeKey = `${edgeIds[0]}|${edgeIds[1]}`;
+
+  // Check if message is currently in transit
+  const isInTransit =
+    targetTime >= sentTime && targetTime < estimatedReceiveTime;
+
+  if (isInTransit) {
+    // Message is traveling - increment reference count and show animation
+    const existingEdgeState = result.edges.get(edgeKey);
+    if (existingEdgeState) {
+      // Increment count for this message type
+      existingEdgeState.activeCounts[messageType]++;
+      // Update timestamp
+      if (sentTime >= existingEdgeState.lastMessageTime) {
+        existingEdgeState.lastMessageTime = sentTime;
+      }
+    } else {
+      // First message on this edge
+      const activeCounts = createEmptyMessageTypeCounts();
+      activeCounts[messageType] = 1;
+      result.edges.set(edgeKey, {
+        lastMessageTime: sentTime,
+        activeCounts,
+      });
+    }
+
+    // Update node activity for sender and recipient during transit
+    updateNodeActivity(result.nodeActivity, sender, messageType, sentTime);
+    updateNodeActivity(result.nodeActivity, recipient, messageType, sentTime);
+
+    // Create animation
     const progress = (targetTime - sentTime) / travelTime;
     const animationKey = `${messageId}-${sender}-${recipient}`;
 
@@ -106,6 +190,8 @@ const createMessageAnimation = (
       progress,
     });
   }
+  // Note: We don't handle the "completed" case here since we need to process
+  // all messages first to get accurate counts, then clean up afterward
 };
 
 // Compute complete aggregated data from timeline events up to a specific time
@@ -157,8 +243,9 @@ export const computeAggregatedDataAtTime = (
       praosTxOnChain: 0,
       leiosTxOnChain: 0,
     },
-    lastNodesUpdated: [],
     messages: [],
+    edges: new Map(),
+    nodeActivity: new Map(),
     // Add event counts for the UI
     eventCounts: {
       total: 0,
@@ -170,8 +257,96 @@ export const computeAggregatedDataAtTime = (
   // Process timeline events up to target time with early termination
   let eventCount = 0;
   const eventCountsByType: Record<string, number> = {};
+  const MAX_LOOKAHEAD_TIME = 5.0; // seconds
 
-  for (const event of events) {
+  const getMessageParticipants = (
+    event: IServerMessage,
+  ): { sender: string; recipient: string } => {
+    const { message } = event;
+    switch (message.type) {
+      case EServerMessageType.TransactionSent:
+      case EServerMessageType.EBSent:
+      case EServerMessageType.RBSent:
+      case EServerMessageType.VTBundleSent:
+        return {
+          sender: (message as any).sender,
+          recipient: (message as any).recipient,
+        };
+      default:
+        throw new Error(
+          `Cannot extract participants from message type: ${message.type}`,
+        );
+    }
+  };
+
+  const calculateTravelTime = (
+    event: IServerMessage,
+    eventIndex: number,
+    fallbackTime: number,
+  ): number => {
+    const { sender, recipient } = getMessageParticipants(event);
+    const sentTime = event.time_s;
+
+    // First: Try to find matching received event
+    const receivedTime = findMatchingReceivedEvent(event, eventIndex);
+    if (receivedTime) {
+      return receivedTime - sentTime;
+    }
+
+    // Second: Try topology latency
+    const topologyLatency = getTopologyLatency(topology, sender, recipient);
+    if (topologyLatency !== null) {
+      return topologyLatency;
+    }
+
+    // Third: Use message-type specific fallback
+    return fallbackTime;
+  };
+
+  // Helper function to look ahead for matching received event within time limit
+  const findMatchingReceivedEvent = (
+    sentEvent: IServerMessage,
+    startIndex: number,
+  ): number | null => {
+    const messageType = sentEvent.message.type;
+    const { recipient } = getMessageParticipants(sentEvent);
+    const sentTime = sentEvent.time_s;
+    const messageId = (sentEvent.message as any).id;
+
+    for (let j = startIndex + 1; j < events.length; j++) {
+      const futureEvent = events[j];
+
+      // Stop looking if we've gone beyond our time limit or target time
+      if (futureEvent.time_s > sentTime + MAX_LOOKAHEAD_TIME) {
+        break;
+      }
+
+      // Check if this is a matching received event
+      const isMatchingReceived =
+        (messageType === EServerMessageType.TransactionSent &&
+          futureEvent.message.type ===
+            EServerMessageType.TransactionReceived) ||
+        (messageType === EServerMessageType.EBSent &&
+          futureEvent.message.type === EServerMessageType.EBReceived) ||
+        (messageType === EServerMessageType.RBSent &&
+          futureEvent.message.type === EServerMessageType.RBReceived) ||
+        (messageType === EServerMessageType.VTBundleSent &&
+          futureEvent.message.type === EServerMessageType.VTBundleReceived);
+
+      if (
+        isMatchingReceived &&
+        (futureEvent.message as any).id === messageId &&
+        (futureEvent.message as any).recipient === recipient &&
+        futureEvent.time_s >= sentTime
+      ) {
+        return futureEvent.time_s; // Return the received time
+      }
+    }
+    return null; // No matching received event found within time window
+  };
+
+  for (let i = 0; i < events.length; i++) {
+    const event = events[i];
     // Stop processing when we reach target time
     if (event.time_s > targetTime) {
       break;
@@ -210,7 +385,14 @@ export const computeAggregatedDataAtTime = (
           stats.bytesSent += msgBytes;
         }
 
-        // Create transaction animation with topology latency
+        // Calculate travel time with 3-tier fallback
+        const travelTime = calculateTravelTime(
+          event,
+          i,
+          0.05, // fallback for TX
+        );
+
+        // Create transaction animation with calculated travel time
         createMessageAnimation(
           result,
           EMessageType.TX,
@@ -219,8 +401,7 @@ export const computeAggregatedDataAtTime = (
           message.recipient,
           event.time_s,
           targetTime,
-          0.05, // fallback travel time for transactions (faster than blocks)
-          topology,
+          travelTime,
         );
         break;
       }
@@ -283,7 +464,14 @@ export const computeAggregatedDataAtTime = (
           event.time_s,
         );
 
-        // Create animation with topology latency
+        // Calculate travel time with 3-tier fallback
+        const travelTime = calculateTravelTime(
+          event,
+          i,
+          1.0, // fallback for EB
+        );
+
+        // Create animation with calculated travel time
         createMessageAnimation(
           result,
           EMessageType.EB,
@@ -292,8 +480,7 @@ export const computeAggregatedDataAtTime = (
           message.recipient,
           event.time_s,
           targetTime,
-          1.0, // fallback travel time for EB
-          topology,
+          travelTime,
         );
         break;
       }
@@ -366,7 +553,14 @@ export const computeAggregatedDataAtTime = (
           event.time_s,
         );
 
-        // Create RB animation with topology latency
+        // Calculate travel time with 3-tier fallback
+        const travelTime = calculateTravelTime(
+          event,
+          i,
+          0.1, // fallback for RB
+        );
+
+        // Create RB animation with calculated travel time
         createMessageAnimation(
           result,
           EMessageType.RB,
@@ -375,8 +569,7 @@ export const computeAggregatedDataAtTime = (
           message.recipient,
           event.time_s,
           targetTime,
-          0.1, // fallback travel time for RB
-          topology,
+          travelTime,
         );
         break;
       }
@@ -430,7 +623,14 @@ export const computeAggregatedDataAtTime = (
           stats.bytesSent += msgBytes;
         }
 
-        // Create vote animation with topology latency
+        // Calculate travel time with 3-tier fallback
+        const travelTime = calculateTravelTime(
+          event,
+          i,
+          0.2, // fallback for Votes
+        );
+
+        // Create vote animation with calculated travel time
         createMessageAnimation(
           result,
           EMessageType.Votes,
@@ -439,8 +639,7 @@ export const computeAggregatedDataAtTime = (
           message.recipient,
           event.time_s,
           targetTime,
-          0.2, // fallback travel time for votes
-          topology,
+          travelTime,
         );
         break;
       }
@@ -465,6 +664,20 @@ export const computeAggregatedDataAtTime = (
   // Set final event counts
   result.eventCounts.total = eventCount;
   result.eventCounts.byType = eventCountsByType;
+
+  // Clean up edges with no active messages (revert to default color)
+  result.edges.forEach((edgeState, edgeKey) => {
+    if (getTotalActiveCount(edgeState.activeCounts) === 0) {
+      result.edges.delete(edgeKey);
+    }
+  });
+
+  // Clean up node activities with no active messages
+  result.nodeActivity.forEach((nodeState, nodeId) => {
+    if (getTotalActiveCount(nodeState.activeCounts) === 0) {
+      result.nodeActivity.delete(nodeId);
+    }
+  });
 
   return result;
 };
