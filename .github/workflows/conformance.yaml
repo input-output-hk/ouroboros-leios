@@ -40,7 +40,7 @@ jobs:
           accept-flake-config = true
     - name: 🏗️ Build trace verifier
       run: |
-        nix build --show-trace .#short-leios-trace-verifier
+        nix build --show-trace .#linear-leios-trace-verifier
     - name: 🧪 Test trace verifier
       run: |
         nix run --show-trace .#test-trace-verifier
@@ -54,7 +54,7 @@ jobs:
           --shared-log-format JSON \
           --output-seconds 30 \
           --output-file sim.log
-        nix run .#short-leios-trace-verifier -- \
+        nix run .#linear-leios-trace-verifier -- \
           --config-file data/simulation/config.default.yaml \
           --topology-file data/simulation/topo-default-100.yaml \
           --trace-file sim.log \
