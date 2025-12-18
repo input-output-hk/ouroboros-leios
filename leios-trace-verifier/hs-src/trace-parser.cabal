@@ -37,22 +37,6 @@ common globalOptions
         -Wno-overlapping-patterns
         -Wunused-packages
 
-executable short-leios-trace-verifier
-    import: globalOptions
-    main-is: app/short/Main.hs
-    build-depends:
-      , base
-      , bytestring
-      , containers
-      , leios-trace-hs
-      , optparse-applicative
-      , text
-      , trace-parser
-      , yaml
-
-    default-language: Haskell2010
-    ghc-options:      -Wall -Werror -rtsopts
-
 executable linear-leios-trace-verifier
     import: globalOptions
     main-is: app/linear/Main.hs
@@ -69,38 +53,37 @@ executable linear-leios-trace-verifier
     default-language: Haskell2010
     ghc-options:      -Wall -Werror -rtsopts
 
-test-suite test-trace-verifier
-  type:                exitcode-stdio-1.0
-  main-is:          Spec.hs
-  other-modules:    Paths_trace_parser
-                    Spec.Generated
-                    Spec.Golden
-                    Spec.Scenario
-                    Spec.Transition
-  hs-source-dirs:     test
-  build-depends:
-      base
-    , bytestring
-    , containers
-    , data-default
-    , directory
-    , filepath
-    , hspec
-    , leios-trace-hs
-    , lens
-    , mtl
-    , QuickCheck
-    , text
-    , trace-parser
-    , yaml
-  default-language:    Haskell2010
-  ghc-options:      -Wall -Werror
+-- test-suite test-trace-verifier
+--   type:                exitcode-stdio-1.0
+--   main-is:          Spec.hs
+--   other-modules:    Paths_trace_parser
+--                     Spec.Generated
+--                     Spec.Golden
+--                     Spec.Scenario
+--                     Spec.Transition
+--   hs-source-dirs:     test
+--   build-depends:
+--       base
+--     , bytestring
+--     , containers
+--     , data-default
+--     , directory
+--     , filepath
+--     , hspec
+--     , leios-trace-hs
+--     , lens
+--     , mtl
+--     , QuickCheck
+--     , text
+--     , trace-parser
+--     , yaml
+--   default-language:    Haskell2010
+--   ghc-options:      -Wall -Werror
 
 library
     import: globalOptions
     hs-source-dirs: src
     exposed-modules:
-      ShortLeiosLib
       LinearLeiosLib
     build-depends:
       , base

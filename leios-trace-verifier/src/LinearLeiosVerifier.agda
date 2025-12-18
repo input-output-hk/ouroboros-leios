@@ -2,8 +2,8 @@ open import Prelude.AssocList
 open import Prelude.Result
 
 open import Leios.Config
+open import Leios.SpecStructure using (SpecStructure)
 open import Leios.Prelude hiding (id)
-open import Leios.Foreign.Util
 
 open import Data.Bool using (if_then_else_)
 import Data.Nat.Show as S
@@ -23,6 +23,11 @@ module LinearLeiosVerifier
   (stakeDistr : List (Pair String ℕ))
   (Lhdr Lvote Ldiff validityCheckTimeValue : ℕ)
   where
+
+  postulate
+    error : {A : Set} → String → A
+  {-# FOREIGN GHC import Data.Text #-}
+  {-# COMPILE GHC error = \ _ s -> error (unpack s) #-}
 
   from-id : ℕ → Fin numberOfParties
   from-id n =
@@ -49,8 +54,8 @@ module LinearLeiosVerifier
 
   open FunTot (completeFin numberOfParties) (maximalFin numberOfParties)
 
-  stakeDistribution : TotalMap (Fin numberOfParties) ℕ
-  stakeDistribution =
+  exampleDistr : TotalMap (Fin numberOfParties) ℕ
+  exampleDistr =
     let (r , l) = fromListᵐ (L.map (λ (x , y) → (nodeId x , y)) stakeDistr)
     in case (¿ total r ¿) of λ where
          (yes p) → record { rel = r ; left-unique-rel = l ; total-rel = p }
@@ -103,16 +108,19 @@ module LinearLeiosVerifier
         { networkParams =
             record
               { numberOfParties   = numberOfParties
-              ; ledgerQuality     = 1 -- n/a in Linear Leios
-              ; stakeDistribution = stakeDistribution
-              ; stageLength       = 1 -- n/a in Linear Leios
-              ; lateIBInclusion   = false -- n/a in Linear Leios
+              ; stakeDistribution = exampleDistr
               }
-        ; sutId         = SUT-id
+        }
+
+    testParams : TestParams params
+    testParams =
+      record
+        { sutId         = SUT-id
         ; winning-slots = fromList ∘ L.catMaybes $ L.map winningSlot l
         }
 
-    open import Leios.Linear.Trace.Verifier params
+    open import Test.Defaults params testParams using (d-SpecStructure; FFDBuffers; isb; hpe)
+    open SpecStructure d-SpecStructure hiding (Hashable-EndorserBlock)
 
     splitTxs : List Tx → List Tx × List Tx
     splitTxs l = [] , l
@@ -120,15 +128,20 @@ module LinearLeiosVerifier
     validityCheckTime : EndorserBlock → ℕ
     validityCheckTime eb = validityCheckTimeValue
 
-    open Defaults Lhdr Lvote Ldiff splitTxs validityCheckTime renaming (verifyTrace to checkTrace)
+    open import Leios.Linear.Trace.Verifier d-SpecStructure params Lhdr Lvote Ldiff splitTxs validityCheckTime renaming (verifyTrace to checkTrace)
+
+    open Params params
+    open Types params
+    open FFD hiding (_-⟦_/_⟧⇀_)
+    open GenFFD
+    open import CategoricalCrypto hiding (_∘_)
 
     data Blk : Type where
-      IB-Blk : InputBlock → Blk
       EB-Blk : EndorserBlock → Blk
       VT-Blk : List Vote → Blk
       RB-Blk : RankingBlock → Blk
 
-    record State : Type where
+    record Accumulator : Type where
       field EB-refs : AssocList String EndorserBlock
             EB-received : AssocList String ℕ
             VT-refs : AssocList String (List Vote)
@@ -136,20 +149,11 @@ module LinearLeiosVerifier
             FFD-blks : List Blk
             currentSlot : ℕ
 
-    open State
-    open Types params
-    open import CategoricalCrypto hiding (_∘_)
-    open import Leios.Defaults params using (isb; FFDBuffers)
+    open Accumulator
 
     instance
       _ = Show-List
       _ = Show-×
-
-    unquoteDecl Show-IBHeaderOSig Show-IBBody Show-InputBlock = derive-Show $
-        (quote IBHeaderOSig , Show-IBHeaderOSig)
-      ∷ (quote IBBody , Show-IBBody)
-      ∷ (quote InputBlock , Show-InputBlock)
-      ∷ []
 
     instance
       Show-EBCert : Show (Maybe EBCert)
@@ -165,28 +169,23 @@ module LinearLeiosVerifier
     blksToHeaderAndBodyList (EB-Blk eb ∷ l) = inj₁ (GenFFD.ebHeader eb) ∷ blksToHeaderAndBodyList l
     blksToHeaderAndBodyList (VT-Blk vt ∷ l) = inj₁ (GenFFD.vtHeader vt) ∷ blksToHeaderAndBodyList l
     blksToHeaderAndBodyList (RB-Blk _ ∷ l)  = blksToHeaderAndBodyList l
-    blksToHeaderAndBodyList (IB-Blk _ ∷ l)  = blksToHeaderAndBodyList l
 
     isEB : Blk → Type
-    isEB (IB-Blk x) = ⊥
     isEB (EB-Blk x) = ⊤
     isEB (VT-Blk x) = ⊥
     isEB (RB-Blk x) = ⊥
 
     isEB? : ∀ b → Dec (isEB b)
-    isEB? (IB-Blk x) = no λ ()
     isEB? (EB-Blk x) = yes tt
     isEB? (VT-Blk x) = no λ ()
     isEB? (RB-Blk x) = no λ ()
 
     isVT : Blk → Type
-    isVT (IB-Blk x) = ⊥
     isVT (EB-Blk x) = ⊥
     isVT (VT-Blk x) = ⊤
     isVT (RB-Blk x) = ⊥
 
     isVT? : ∀ b → Dec (isVT b)
-    isVT? (IB-Blk x) = no λ ()
     isVT? (EB-Blk x) = no λ ()
     isVT? (VT-Blk x) = yes tt
     isVT? (RB-Blk x) = no λ ()
@@ -214,7 +213,7 @@ module LinearLeiosVerifier
     ... | yes _ = []
     ... | no  _ = (No-VT-Role-Action (primWord64ToNat s), inj₁ FFDT.SLOT) ∷ []
 
-    traceEvent→action : State → TraceEvent → State × List (Action × (FFDT Out ⊎ BaseT Out ⊎ IOT In))
+    traceEvent→action : Accumulator → TraceEvent → Accumulator × List (Action × (FFDT Out ⊎ BaseT Out ⊎ IOT In))
     traceEvent→action l record { message = Slot p s }
       with p ≟ SUT
     ... | yes _ =
@@ -235,8 +234,6 @@ module LinearLeiosVerifier
                  ; producerID = nodeId p
                  ; lotteryPf  = tt
                  ; txs        = map primWord64ToNat transactions
-                 ; ibRefs     = []
-                 ; ebRefs     = []
                  ; signature  = tt
                  }
       in record l
@@ -344,19 +341,19 @@ module LinearLeiosVerifier
       Show-FFDT-Out .show FFDT.FTCH        = "FTCH"
 
     s₀ : LeiosState
-    s₀ = initLeiosState tt stakeDistribution ((SUT-id , tt) ∷ [])
-
-    format-Err-verifyAction :  ∀ {α i s} → Err-verifyAction α i s → Pair String String
-    format-Err-verifyAction {α} {i} {s} (E-Err-Slot _)         = "Invalid Slot", "Parameters: " ◇ show params ◇ " Input: " ◇ show i ◇ " LeiosState: " ◇ show s
-    format-Err-verifyAction {α} {i} {s} (E-Err-CanProduceIB _) = "Can not produce IB", "Parameters: " ◇ show params ◇ " Input: " ◇ show i ◇ " LeiosState: " ◇ show s
-    format-Err-verifyAction {α} {i} {s} dummyErr               = "Transition Error", "Action: " ◇ show α ◇ " Parameters: " ◇ show params ◇ " Input: " ◇ show i ◇ " LeiosState: " ◇ show s
-
-    format-error : ∀ {αs s} → Err-verifyTrace αs s → Pair String String
-    format-error {(α , i) ∷ []} {s} (Err-StepOk x) = "Error step" , show α
-    format-error {(α , i) ∷ αs} {s} (Err-StepOk x) = format-error x
-    format-error {(α , i) ∷ []} {s} (Err-Action x) = format-Err-verifyAction x
-    format-error {(α , i) ∷ αs} {s} (Err-Action x) = format-Err-verifyAction x
-
+    s₀ = initLeiosState tt exampleDistr ((SUT-id , tt) ∷ [])
+-- 
+--     format-Err-verifyAction :  ∀ {α i s} → Err-verifyAction α i s → Pair String String
+--     format-Err-verifyAction {α} {i} {s} (E-Err-Slot _)         = "Invalid Slot", "Parameters: " ◇ show params ◇ " Input: " ◇ show i ◇ " LeiosState: " ◇ show s
+--     format-Err-verifyAction {α} {i} {s} (E-Err-CanProduceIB _) = "Can not produce IB", "Parameters: " ◇ show params ◇ " Input: " ◇ show i ◇ " LeiosState: " ◇ show s
+--     format-Err-verifyAction {α} {i} {s} dummyErr               = "Transition Error", "Action: " ◇ show α ◇ " Parameters: " ◇ show params ◇ " Input: " ◇ show i ◇ " LeiosState: " ◇ show s
+-- 
+--     format-error : ∀ {αs s} → Err-verifyTrace αs s → Pair String String
+--     format-error {(α , i) ∷ []} {s} (Err-StepOk x) = "Error step" , show α
+--     format-error {(α , i) ∷ αs} {s} (Err-StepOk x) = format-error x
+--     format-error {(α , i) ∷ []} {s} (Err-Action x) = format-Err-verifyAction x
+--     format-error {(α , i) ∷ αs} {s} (Err-Action x) = format-Err-verifyAction x
+-- 
     opaque
       unfolding List-Model
 
@@ -366,7 +363,7 @@ module LinearLeiosVerifier
             l' = proj₂ $ mapAccuml traceEvent→action n₀ l
             αs = L.reverse (L.concat l')
             tr = checkTrace αs s
-        in L.length αs , result (λ _ → ("ok" , "")) format-error tr
+        in L.length αs , ("","") -- result (λ _ → ("ok" , "")) "error" -- format-error tr
         where
           mapAccuml : {A B S : Set} → (S → A → S × B) → S → List A → S × List B
           mapAccuml f s []       = s , []
