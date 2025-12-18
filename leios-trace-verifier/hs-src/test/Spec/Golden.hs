@@ -18,7 +18,7 @@ import LeiosConfig (Config (..))
 import LeiosEvents (decodeJSONL)
 import LeiosTopology (LocationKind (COORD2D), Node (..), NodeInfo (..), NodeName (..), Topology (..))
 import qualified Paths_trace_parser as Paths
-import ShortLeiosLib (verifyTrace)
+import LinearLeiosLib (verifyTrace)
 import System.Directory (listDirectory)
 import System.FilePath ((</>))
 import Test.Hspec (Expectation, Spec, SpecWith, describe, it, runIO, shouldBe, shouldNotBe)
@@ -35,17 +35,18 @@ golden = do
   let nodeNames = Prelude.map unNodeName (keys $ nodes top)
   let stakes = Prelude.map (toInteger . stake . nodeInfo) (elems $ nodes top)
   let stakeDistribution = Prelude.zip nodeNames stakes
-  let stageLength = toInteger (leiosStageLengthSlots config)
   let idSut = 0
-  let ledgerQuality = ceiling (praosChainQuality config) -- TODO: int in schema?
-  let lateIBInclusion = leiosLateIbInclusion config
+  let lHdr = 1 -- TODO: read from config
+  let lVote = toInteger (linearVoteStageLengthSlots config)
+  let lDiff = toInteger (linearDiffuseStageLengthSlots config)
+  let validityCheckTime = 3 -- TODO: read from config
   let check :: String -> String -> [FilePath] -> (Text -> Text -> Expectation) -> SpecWith ()
       check label folder files predicate =
         describe label $ do
           forM_ files $ \file ->
             it file $ do
               result <-
-                verifyTrace nrNodes idSut stakeDistribution stageLength ledgerQuality lateIBInclusion
+                verifyTrace nrNodes idSut stakeDistribution lHdr lVote lDiff validityCheckTime
                   . decodeJSONL
                   <$> BSL.readFile (dir </> folder </> file)
               fst (snd result) `predicate` "ok"

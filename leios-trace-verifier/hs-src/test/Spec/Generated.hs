@@ -12,7 +12,7 @@ import Data.Text (Text)
 import LeiosConfig
 import LeiosEvents
 import LeiosTopology (nodeInfo, nodes, stake, unNodeName)
-import ShortLeiosLib (verifyTrace)
+import LinearLeiosLib (verifyTrace)
 import Spec.Transition
 import Test.Hspec
 import Test.Hspec.QuickCheck
@@ -29,11 +29,12 @@ verify =
     nodeNames = unNodeName <$> (M.keys $ nodes Scenario.topology)
     stakes = toInteger . stake . nodeInfo <$> (M.elems $ nodes Scenario.topology)
     stakeDistribution = zip nodeNames stakes
-    stageLength' = toInteger $ leiosStageLengthSlots Scenario.config
-    ledgerQuality = ceiling (praosChainQuality Scenario.config) -- TODO: int in schema?
-    lateIBInclusion = leiosLateIbInclusion Scenario.config
+    lHdr = 1 -- TODO: read from config
+    lVote = toInteger (linearVoteStageLengthSlots Scenario.config)
+    lDiff = toInteger (linearDiffuseStageLengthSlots Scenario.config)
+    validityCheckTime = 3 -- TODO: read from config
    in
-    verifyTrace nrNodes Scenario.idSut stakeDistribution stageLength' ledgerQuality lateIBInclusion
+    verifyTrace nrNodes Scenario.idSut stakeDistribution lHdr lVote lDiff validityCheckTime
 
 -- | Expectation for checking a trace.
 data Check

@@ -53,32 +53,32 @@ executable linear-leios-trace-verifier
     default-language: Haskell2010
     ghc-options:      -Wall -Werror -rtsopts
 
--- test-suite test-trace-verifier
---   type:                exitcode-stdio-1.0
---   main-is:          Spec.hs
---   other-modules:    Paths_trace_parser
---                     Spec.Generated
---                     Spec.Golden
---                     Spec.Scenario
---                     Spec.Transition
---   hs-source-dirs:     test
---   build-depends:
---       base
---     , bytestring
---     , containers
---     , data-default
---     , directory
---     , filepath
---     , hspec
---     , leios-trace-hs
---     , lens
---     , mtl
---     , QuickCheck
---     , text
---     , trace-parser
---     , yaml
---   default-language:    Haskell2010
---   ghc-options:      -Wall -Werror
+test-suite test-trace-verifier
+  type:                exitcode-stdio-1.0
+  main-is:          Spec.hs
+  other-modules:    Paths_trace_parser
+                    Spec.Generated
+                    Spec.Golden
+                    Spec.Scenario
+                    Spec.Transition
+  hs-source-dirs:     test
+  build-depends:
+      base
+    , bytestring
+    , containers
+    , data-default
+    , directory
+    , filepath
+    , hspec
+    , leios-trace-hs
+    , lens
+    , mtl
+    , QuickCheck
+    , text
+    , trace-parser
+    , yaml
+  default-language:    Haskell2010
+  ghc-options:      -Wall -Werror
 
 library
     import: globalOptions
