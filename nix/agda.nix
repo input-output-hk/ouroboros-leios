@@ -19,15 +19,15 @@ let
     leiosSpec
     ;
 
-  agdaWithDeps = agdaWithPkgs.withPackages (p:
-    [ p.standard-library
-      p.standard-library-classes
-      p.standard-library-meta
-      p.abstract-set-theory
-      p.agda-categories
-      p.iog-prelude
-      leiosSpec
-    ]);
+  agdaWithDeps = agdaWithPkgs.withPackages (p: [
+    p.standard-library
+    p.standard-library-classes
+    p.standard-library-meta
+    p.abstract-set-theory
+    p.agda-categories
+    p.iog-prelude
+    leiosSpec
+  ]);
 
   agdaTraceParser = pkgs.agdaPackages.mkDerivation {
     inherit (locales) LANG LC_ALL LOCALE_ARCHIVE;
