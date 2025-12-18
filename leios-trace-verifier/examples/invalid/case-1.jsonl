@@ -1,9 +1,0 @@
-{"message":{"node":"node-0","slot":9,"type":"NoIBGenerated"},"time_s":0.01}
-{"message":{"node":"node-0","slot":0,"type":"NoVTBundleGenerated"},"time_s":0.02}
-{"message":{"node":"node-0","slot":0,"type":"NoEBGenerated"},"time_s":0.03}
-{"message":{"node":"node-0","slot":0,"type":"Slot"},"time_s":0.04}
-{"message":{"id":"0-0","pipeline":0,"producer":"node-0","rb_ref":"genesis","size_bytes":98608,"slot":1,"tx_payload_bytes":98304,"type":"IBGenerated"},"time_s":0.04}
-{"message":{"id":"0-0","recipient":"node-0","type":"IBReceived"},"time_s":0.05}
-{"message":{"id":"1-0","msg_size_bytes":98337,"recipient":"node-1","sender":"node-0","sending_s":0.615105,"type":"IBSent"},"time_s":0.06}
-{"message":{"node":"node-0","slot":1,"type":"NoVTBundleGenerated"},"time_s":0.07}
-{"message":{"node":"node-0","slot":1,"type":"NoEBGenerated"},"time_s":0.08}
