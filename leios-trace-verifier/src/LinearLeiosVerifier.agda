@@ -1,5 +1,6 @@
 open import Prelude.AssocList
 open import Prelude.Result
+open import Prelude.Errors
 
 open import Leios.Config
 open import Leios.SpecStructure using (SpecStructure)
@@ -293,69 +294,12 @@ module LinearLeiosVerifier where
       traceEvent→action l record { message = VTBundleEnteredState _ _ _ } = l , []
       traceEvent→action l record { message = RBEnteredState _ _ _ }       = l , []
 
-      instance
-        Show-FFDBuffers : Show FFDBuffers
-        Show-FFDBuffers .show _ = "ffd buffers"
-
-        Show-Action : Show Action
-        Show-Action .show (EB-Role-Action x _)   = "EB-Role-Action "    ◇ show x
-        Show-Action .show (VT-Role-Action x _ _) = "VT-Role-Action "    ◇ show x
-        Show-Action .show (No-EB-Role-Action x)  = "No-EB-Role-Action " ◇ show x
-        Show-Action .show (No-VT-Role-Action x)  = "No-VT-Role-Action " ◇ show x
-        Show-Action .show (Ftch-Action x)        = "Ftch-Action "       ◇ show x
-        Show-Action .show (Slot₁-Action x)       = "Slot₁-Action "       ◇ show x
-        Show-Action .show (Slot₂-Action x)       = "Slot₂-Action "       ◇ show x
-        Show-Action .show (Base₁-Action x)       = "Base₁-Action "       ◇ show x
-        Show-Action .show (Base₂-Action x)       = "Base₂-Action "       ◇ show x
-
-      instance
-        Show-NonZero : ∀ {n : ℕ} → Show (NonZero n)
-        Show-NonZero .show record { nonZero = _ } = "NonZero"
-
-        Show-SD : ∀ {n : ℕ} → Show (TotalMap (Fin n) ℕ)
-        Show-SD .show _ = "stake distribution"
-
-      unquoteDecl Show-BlockType = derive-Show [ (quote BlockType , Show-BlockType) ]
-
-      instance
-        Show-⊎ : ∀ {ℓ} {A B : Type ℓ} → ⦃ Show A ⦄ → ⦃ Show B ⦄ → Show (A ⊎ B)
-        Show-⊎ .show (inj₁ x) = show x
-        Show-⊎ .show (inj₂ y) = show y
-
-        Show-⊥ : Show ⊥
-        Show-⊥ .show _ = "⊥"
-
-        Show-BaseT-Out : Show (BaseT Out)
-        Show-BaseT-Out .show _ = "BaseT-Out" -- TODO
-
-        Show-IOT-In : Show (IOT In)
-        Show-IOT-In .show _ = "IOT-In" -- TODO
-
-      unquoteDecl Show-NetworkParams = derive-Show [ (quote NetworkParams , Show-NetworkParams) ]
-      unquoteDecl Show-Params        = derive-Show [ (quote Params , Show-Params) ]
-      unquoteDecl Show-Upkeep        = derive-Show [ (quote SlotUpkeep , Show-Upkeep) ]
-      unquoteDecl Show-LeiosState    = derive-Show [ (quote LeiosState , Show-LeiosState) ]
-
-      instance
-        Show-FFDT-Out : Show (FFDT Out)
-        Show-FFDT-Out .show (FFDT.FFD-OUT l) = "FFD-OUT, length " ◇ show (length l)
-        Show-FFDT-Out .show FFDT.SLOT        = "SLOT"
-        Show-FFDT-Out .show FFDT.FTCH        = "FTCH"
-
       s₀ : LeiosState
       s₀ = initLeiosState tt exampleDistr ((SUT-id , tt) ∷ [])
-  --
-  --     format-Err-verifyAction :  ∀ {α i s} → Err-verifyAction α i s → Pair String String
-  --     format-Err-verifyAction {α} {i} {s} (E-Err-Slot _)         = "Invalid Slot", "Parameters: " ◇ show params ◇ " Input: " ◇ show i ◇ " LeiosState: " ◇ show s
-  --     format-Err-verifyAction {α} {i} {s} (E-Err-CanProduceIB _) = "Can not produce IB", "Parameters: " ◇ show params ◇ " Input: " ◇ show i ◇ " LeiosState: " ◇ show s
-  --     format-Err-verifyAction {α} {i} {s} dummyErr               = "Transition Error", "Action: " ◇ show α ◇ " Parameters: " ◇ show params ◇ " Input: " ◇ show i ◇ " LeiosState: " ◇ show s
-  --
-  --     format-error : ∀ {αs s} → Err-verifyTrace αs s → Pair String String
-  --     format-error {(α , i) ∷ []} {s} (Err-StepOk x) = "Error step" , show α
-  --     format-error {(α , i) ∷ αs} {s} (Err-StepOk x) = format-error x
-  --     format-error {(α , i) ∷ []} {s} (Err-Action x) = format-Err-verifyAction x
-  --     format-error {(α , i) ∷ αs} {s} (Err-Action x) = format-Err-verifyAction x
-  --
+
+      format-error : ∀ {αs s} → Err-verifyTrace αs s → Pair String String
+      format-error x = errorMsg x , "error verifyTrace"
+
       opaque
         unfolding List-Model
 
@@ -365,7 +309,7 @@ module LinearLeiosVerifier where
               l' = proj₂ $ mapAccuml traceEvent→action n₀ l
               αs = L.reverse (L.concat l')
               tr = checkTrace αs s
-          in L.length αs , ("","") -- result (λ _ → ("ok" , "")) "error" -- format-error tr
+          in L.length αs , result (λ _ → ("ok" , "")) format-error tr
           where
             mapAccuml : {A B S : Set} → (S → A → S × B) → S → List A → S × List B
             mapAccuml f s []       = s , []
