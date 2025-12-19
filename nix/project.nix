@@ -28,7 +28,7 @@ let
       cp -r . $out
       # Copy the test data.
       mkdir -p $out/leios-trace-verifier/dist/haskell/data
-      cp -r leios-trace-verifier/examples/{config.yaml,topology.yaml,valid,invalid} $out/leios-trace-verifier/dist/haskell/data/
+      cp -r leios-trace-verifier/conformance-traces/{config.yaml,topology.yaml,valid,invalid} $out/leios-trace-verifier/dist/haskell/data/
     '';
     installPhase = ''
       # Add the MAlonzo modules to the cabal file.
