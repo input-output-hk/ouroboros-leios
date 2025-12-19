@@ -64,11 +64,4 @@ in
     agdaTraceParser
     hsTraceParser
     ;
-
-  standard-library = agdaWithPkgs.withPackages (p: [ p.standard-library ]);
-  standard-library-classes = agdaWithPkgs.withPackages (p: [ p.standard-library-classes ]);
-  standard-library-meta = agdaWithPkgs.withPackages (p: [ p.standard-library-meta ]);
-  abstract-set-theory = agdaWithPkgs.withPackages (p: [ p.abstract-set-theory ]);
-  agda-categories = agdaWithPkgs.withPackages (p: [ p.agda-categories ]);
-  iog-prelude = agdaWithPkgs.withPackages (p: [ p.iog-prelude ]);
 }
