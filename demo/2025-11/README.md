@@ -83,6 +83,13 @@ DELAY_N0_TO_DOWN="20ms";
 RATE_DOWN_TO_N0="100Mbps";
 ```
 
+To use a locally built `cardano-node` and `immdb-server` (using your own paths to the codebase):
+
+```shell
+export CARDANO_NODE=$(cd ~/code/iog/cardano-node; cabal list-bin cardano-node)
+export IMMDB_SERVER=$(cd ~/code/iog/ouroboros-consensus; cabal list-bin immdb-server)
+```
+
 To clean up just delete the working directories
 
 ```shell
