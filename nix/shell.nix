@@ -36,24 +36,26 @@ in
     pkgs.entr
   ];
 
-  #  # Agda environment variables.
-  #  env = {
-  #    AGDA_STDLIB = "${agda.standard-library}/standard-library.agda-lib";
-  #    AGDA_STDLIB_CLASSES = "${agda.standard-library-classes}/standard-library-classes.agda-lib";
-  #    AGDA_STDLIB_META = "${agda.standard-library-meta}/standard-library-meta.agda-lib";
-  #    AGDA_SETS = "${agda.abstract-set-theory}/abstract-set-theory.agda-lib";
-  #    AGDA_IOG_PRELUDE = "${agda.iog-prelude}/iog-prelude.agda-lib";
-  #  };
-  #      ${agda.standard-library}/standard-library.agda-lib
-  #      ${agda.standard-library-classes}/standard-library-classes.agda-lib
-  #      ${agda.standard-library-meta}/standard-library-meta.agda-lib
-  #      ${agda.abstract-set-theory}/abstract-set-theory.agda-lib
-  #      ${agda.iog-prelude}/iog-prelude.agda-lib
-  #
+  # Agda environment variables.
+  env = {
+    AGDA = "${agda.agdaWithDeps}";
+    AGDA_STDLIB = "${agda.standard-library}/standard-library.agda-lib";
+    AGDA_STDLIB_CLASSES = "${agda.standard-library-classes}/standard-library-classes.agda-lib";
+    AGDA_STDLIB_META = "${agda.standard-library-meta}/standard-library-meta.agda-lib";
+    AGDA_CATEGORIES = "${agda.agda-categories}/agda-categories.agda-lib";
+    AGDA_SETS = "${agda.abstract-set-theory}/abstract-set-theory.agda-lib";
+    AGDA_IOG_PRELUDE = "${agda.iog-prelude}/iog-prelude.agda-lib";
+  };
   welcomeMessage = ''
     Welcome to Ouroboros Leios!
 
     Locations of Agda libraries:
+        ${agda.standard-library}/standard-library.agda-lib
+        ${agda.standard-library-classes}/standard-library-classes.agda-lib
+        ${agda.standard-library-meta}/standard-library-meta.agda-lib
+        ${agda.agda-categories}/agda-categories.agda-lib
+        ${agda.abstract-set-theory}/abstract-set-theory.agda-lib
+        ${agda.iog-prelude}/iog-prelude.agda-lib
 
     Run 'emacs' to edit .agda files.
   '';
