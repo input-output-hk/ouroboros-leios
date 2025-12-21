@@ -18,6 +18,7 @@ packages:
   simulation
   leios-trace-hs
   analysis/sims/trace-processor
+  post-cip/tx-measurements/betti0
 
 tests: True
 
