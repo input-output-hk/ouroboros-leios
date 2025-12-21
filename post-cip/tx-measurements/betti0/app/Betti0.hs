@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StrictData #-}
 
@@ -7,14 +5,10 @@
 module Main where
 
 
-import Control.DeepSeq (NFData)
 import Control.Monad (forM_, when, zipWithM_)
 import Control.Monad.ST (ST, runST)
-import Control.Parallel.Strategies (using, parBuffer, rdeepseq)
 import Data.Array.ST (STUArray, newArray, readArray, writeArray)
-import Data.Function (on)
-import Data.List (intercalate, nub, sortBy, nub)
-import GHC.Generics (Generic)
+import Data.List (intercalate)
 import System.Environment (getArgs)
 import System.IO (IOMode(WriteMode), hClose, hPutStrLn, openFile, stderr)
 
@@ -43,7 +37,7 @@ data Edge =
   deriving (Show)
 
 
-readTsv :: ((Weight, Weight) -> Weight) -> Weight -> FilePath -> IO (V.Vector TxId, M.Map TxId Int, [Edge])
+readTsv :: ((Weight, Weight) -> Weight) -> Weight -> FilePath -> IO (V.Vector TxId, [Edge])
 readTsv getWeight maxWeight path = do
   rawContent <- BL.readFile path
   let rows = BL8.lines rawContent
@@ -52,14 +46,13 @@ readTsv getWeight maxWeight path = do
       parse x = error $ show x
       edges =
           takeWhile ((<= maxWeight) . snd)
-        . fmap (parse . fmap BL8.unpack)
-        . fmap (BL8.split '\t')
+        . fmap (parse . fmap BL8.unpack . BL8.split '\t')
         $ drop 1 rows
       vertices = V.fromList . S.toList $ S.fromList (fst . fst <$> edges) <> S.fromList (snd . fst <$> edges)
       vertexMap = M.fromList $ zip (V.toList vertices) [0..]
       reindex :: ((TxId, TxId), Weight) -> Edge 
       reindex ((tc, ts), w) = Edge (vertexMap M.! tc) (vertexMap M.! ts) w
-  pure (vertices, vertexMap, reindex <$> edges)
+  pure (vertices, reindex <$> edges)
 
 
 find :: STUArray s Int Int -> Int -> ST s Int
@@ -88,28 +81,31 @@ union parent rank i j = do
           writeArray parent rootJ rootI
           when (rankI == rankJ)
             $ writeArray rank rootI (rankI + 1)
-      pure True -- Merged successfully
-    else pure False -- Already in same component
+      -- Merged successfully
+      pure True 
+    else
+      -- Already in same component
+      pure False
 
--- 3. MAIN ALGORITHM: Compute Betti-0 Curve
 computeBetti0 :: Int -> [Edge] -> [(Weight, Int)]
 computeBetti0 numNodes sortedEdges = runST $ do
   -- Initialize Union-Find
   parent <- newArray (0, numNodes - 1) 0 :: ST s (STUArray s Int Int)
   rank   <- newArray (0, numNodes - 1) 0 :: ST s (STUArray s Int Int)
   -- Initialize parent array so each node points to itself
-  forM_ [0 .. numNodes - 1] $ \i -> writeArray parent i i
+  forM_ [0 .. numNodes - 1]
+    $ \i -> writeArray parent i i
   -- Iterate through edges and track Betti-0
   -- Using a recursive helper to accumulate results
   let go [] _ = pure mempty
       go (e:es) currentCount = do
-          merged <- union parent rank (u e) (v e)
-          let newCount = if merged then currentCount - 1 else currentCount
-          -- Look ahead to handle edges with identical weights
-          -- We only emit a data point when the weight actually changes
-          case es of
-            (nextE:_) | w nextE == w e -> go es newCount
-            _  -> ((w e, newCount) :) <$> go es newCount
+        merged <- union parent rank (u e) (v e)
+        let newCount = if merged then currentCount - 1 else currentCount
+        -- Look ahead to handle edges with identical weights
+        -- We only emit a data point when the weight actually changes
+        case es of
+          (nextE : _) | w nextE == w e -> go es newCount
+          _  -> ((w e, newCount) :) <$> go es newCount
   -- Start with b0 = numNodes (everyone is isolated)
   go sortedEdges numNodes
 
@@ -117,59 +113,59 @@ computeBetti0 numNodes sortedEdges = runST $ do
 -- Helper to get the canonical root for EVERY node
 getSnapshot :: STUArray s Int Int -> Int -> ST s [Int]
 getSnapshot parent numNodes = do
-    -- We map 'find' over every node index [0 .. n-1]
-    -- Note: This modifies the array (path compression), which is good!
-    mapM (find parent) [0 .. numNodes - 1]
+  -- We map 'find' over every node index [0 .. n-1]
+  -- Note: This modifies the array (path compression), which is good!
+  mapM (find parent) [0 .. numNodes - 1]
 
 computeMembership :: Int -> [Edge] -> [(Weight, [Int])]
 computeMembership numNodes sortedEdges = runST $ do
-    parent <- newArray (0, numNodes - 1) 0 :: ST s (STUArray s Int Int)
-    rank   <- newArray (0, numNodes - 1) 0 :: ST s (STUArray s Int Int)
-    forM_ [0 .. numNodes - 1] $ \i -> writeArray parent i i
-    let go [] _ = pure mempty
-        go (e:es) _ = do -- We don't need to track 'count' anymore
-            _ <- union parent rank (u e) (v e) -- Ignore boolean result
-            case es of
-                (nextE:_) | w nextE == w e -> go es ()
-                _                          -> do
-                                -- SNAPSHOT: This is the expensive part (O(N))
-                                currentRoots <- getSnapshot parent numNodes
-                                tailRes <- go es ()
-                                pure ((w e, currentRoots) : tailRes)
-    go sortedEdges ()
+  parent <- newArray (0, numNodes - 1) 0 :: ST s (STUArray s Int Int)
+  rank   <- newArray (0, numNodes - 1) 0 :: ST s (STUArray s Int Int)
+  forM_ [0 .. numNodes - 1]
+    $ \i -> writeArray parent i i
+  let go [] = pure mempty
+      go (e:es) = do
+        _ <- union parent rank (u e) (v e) -- Ignore boolean result
+        case es of
+          (nextE : _) | w nextE == w e -> go es
+          _ -> do
+                 -- SNAPSHOT: This is the expensive part (O(N))
+                 currentRoots <- getSnapshot parent numNodes
+                 tailRes <- go es
+                 pure ((w e, currentRoots) : tailRes)
+  go sortedEdges
 
 
 main :: IO ()
-main =
-  do
-    [wType, wMax, infile, outfile] <- getArgs
-    let maxWeight = read wMax
-        getWeight :: (Weight, Weight) -> Weight
-        getWeight =
-          case wType of
-            "slot" -> fst
-            "block" -> snd
-            _ -> error "invalid type"
-    (vertices, vertexMap, edges) <- readTsv getWeight maxWeight infile
-    let n = V.length vertices
-    hPutStrLn stderr $ "Filter: " <> wType <> " lifetime <= " <> show wMax
-    hPutStrLn stderr $ "Vertices: " <> show n
-    hPutStrLn stderr $ "Edges: " <> show (length edges)
-    if False
-      then do
-        let bettiCurve = computeBetti0 n edges
-        putStrLn "Lifetime \t Betti-0"
-        mapM_ (\(w, b) -> putStrLn $ intercalate tab [show w, show b]) bettiCurve
-      else do
-        let memberships = computeMembership n edges
-        h <- openFile outfile WriteMode
-        forM_ memberships
-          $ \(w, components) ->
-            zipWithM_
-              (\i c -> hPutStrLn h $ intercalate tab [show w, show $ vertices V.! i, show c])
-              [0..] components
-        hClose h
-        putStrLn "Lifetime \t Betti-0"
-        forM_ memberships
-          $ \(w, components) -> putStrLn $ intercalate tab [show w, show . length $ nub components]
+main = do
+ [wType, wMax, infile, outfile] <- getArgs
+ let maxWeight = read wMax
+     getWeight :: (Weight, Weight) -> Weight
+     getWeight =
+       case wType of
+         "slot" -> fst
+         "block" -> snd
+         _ -> error "invalid type"
+ (vertices, edges) <- readTsv getWeight maxWeight infile
+ let n = V.length vertices
+ hPutStrLn stderr $ "Filter: " <> wType <> " lifetime <= " <> show maxWeight
+ hPutStrLn stderr $ "Vertices: " <> show n
+ hPutStrLn stderr $ "Edges: " <> show (length edges)
+ if False
+   then do
+     let bettiCurve = computeBetti0 n edges
+     putStrLn "Lifetime \t Betti-0"
+     mapM_ (\(w, b) -> putStrLn $ intercalate tab [show w, show b]) bettiCurve
+   else do
+     let memberships = computeMembership n edges
+     h <- openFile outfile WriteMode
+     forM_ memberships
+       $ \(w, components) ->
+         zipWithM_
+           (\i c -> hPutStrLn h $ intercalate tab [show w, show $ vertices V.! i, show c])
+           [0..] components
+     hClose h
+     putStrLn "Lifetime \t Betti-0"
+     forM_ memberships
+       $ \(w, components) -> putStrLn $ intercalate tab [show w, show . S.size $ S.fromList components]
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-psql -f tx-history.sql mainnet
-
-pigz -9fv *.tsv
+####psql -f tx-history.sql mainnet
+####
+####pigz -9fv *.tsv
 
 zcat utxo-history.tsv.gz \
 | gawk '
@@ -13,7 +13,8 @@ BEGIN {
 FNR == 1 {
   print "utxo_id16", "tx_create_id", "tx_spend_id", "slots", "blocks"
 }
-FNR > 1 && $3 != "" {
+# Limit to epochs 400 to 599.
+FNR > 1 && $3 != "" && $4 >= 87868783 && $4 < 174268750 && $5 >= 87868783 && $5 < 174268750 {
   print substr($1, 0, 16) substr($1, 65), $2, $3, $5 - $4, $7 - $6
 }
 ' \
@@ -30,6 +31,8 @@ FNR > 1 && $3 != "" {
   zcat history-graph.tsv.gz | head -n 1
   zcat history-graph.tsv.gz | tail -n +2 | sort -k5,5n --parallel=12 -S 50G
 ) | pigz -9c > history-graph-sorted-block.tsv.gz
+
+zcat history-graphy.tsv.gz | wc -l
 
 rm history-graph.tsv.gz
 

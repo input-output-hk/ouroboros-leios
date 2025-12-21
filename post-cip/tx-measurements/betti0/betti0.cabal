@@ -1,17 +1,12 @@
 cabal-version:      3.0
 name:               betti0
 version:            0.1.0.0
--- synopsis:
--- description:
 license:            MIT
 license-file:       LICENSE
 author:             Brian W Bush
 maintainer:         brian.bush@iohk.io
--- copyright:
 category:           Network
 build-type:         Simple
--- extra-doc-files:    CHANGELOG.md
--- extra-source-files:
 
 common warnings
     ghc-options: -Wall
@@ -19,16 +14,11 @@ common warnings
 executable betti0
     import:           warnings
     main-is:          Betti0.hs
-    -- other-modules:
-    -- other-extensions:
     build-depends:    base ^>=4.20.0.0
                  ,    array
                  ,    bytestring
                  ,    containers
-                 ,    deepseq
-                 ,    parallel
                  ,    vector
-                 ,    zlib
     hs-source-dirs:   app
     default-language: Haskell2010
     ghc-options: -O2 -threaded
@@ -36,16 +26,8 @@ executable betti0
 executable edges-to-binary
     import:           warnings
     main-is:          EdgesToBinary.hs
-    -- other-modules:
-    -- other-extensions:
     build-depends:    base ^>=4.20.0.0
-                 ,    array
                  ,    bytestring
-                 ,    containers
-                 ,    deepseq
-                 ,    parallel
-                 ,    vector
-                 ,    zlib
     hs-source-dirs:   app
     default-language: Haskell2010
-    ghc-options: -O2 -threaded
+    ghc-options: -O2
