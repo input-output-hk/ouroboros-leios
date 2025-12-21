@@ -154,18 +154,17 @@ main = do
  if False
    then do
      let bettiCurve = computeBetti0 n edges
-     putStrLn "Lifetime \t Betti-0"
+     putStrLn "Lifetime\tBetti-0"
      mapM_ (\(w, b) -> putStrLn $ intercalate tab [show w, show b]) bettiCurve
    else do
      let memberships = computeMembership n edges
+     putStrLn "Lifetime\tBetti-0"
      h <- openFile outfile WriteMode
      forM_ memberships
-       $ \(w, components) ->
+       $ \(w, components) -> do
          zipWithM_
            (\i c -> hPutStrLn h $ intercalate tab [show w, show $ vertices V.! i, show c])
            [0..] components
+         putStrLn $ intercalate tab [show w, show . S.size $ S.fromList components]
      hClose h
-     putStrLn "Lifetime \t Betti-0"
-     forM_ memberships
-       $ \(w, components) -> putStrLn $ intercalate tab [show w, show . S.size $ S.fromList components]
 
