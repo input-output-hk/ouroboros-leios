@@ -52,7 +52,7 @@ readTsv getWeight maxWeight path = do
         foldl
           (\acc row -> S.insert (fst $ fst row) . S.insert (snd $ fst row) $ acc)
           (S.fromList (fst . fst <$> edges) <> S.fromList (snd . fst <$> edges))
-          $ take 0 rest
+          $ take 0 rest -- FIXME: Insufficient memory to process all txs.
       vertices = V.fromList $ S.toList vertexSet
       vertexMap = M.fromList $ zip (V.toList vertices) [0..]
       reindex :: ((TxId, TxId), Weight) -> Edge 
