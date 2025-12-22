@@ -41,7 +41,7 @@ let
     buildPhase = ''
       agda src/trace-parser.agda
     '';
- };
+  };
 
   hsTraceParser = pkgs.agdaPackages.mkDerivation {
     inherit (locales) LANG LC_ALL LOCALE_ARCHIVE;
