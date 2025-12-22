@@ -27,6 +27,7 @@ executable block-stats
     import:           warnings
     main-is:          BlockStats.hs
     build-depends:    base ^>=4.20.0.0
+                 ,    array
                  ,    bytestring
                  ,    containers
                  ,    vector
