@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-####psql -f tx-history.sql mainnet
-####
-####pigz -9fv *.tsv
+psql -f tx-history.sql mainnet
+
+pigz -9fv *.tsv
 
 zcat utxo-history.tsv.gz \
 | gawk '
