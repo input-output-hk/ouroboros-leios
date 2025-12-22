@@ -23,6 +23,17 @@ executable betti0
     default-language: Haskell2010
     ghc-options: -O2 -threaded
 
+executable block-stats
+    import:           warnings
+    main-is:          BlockStats.hs
+    build-depends:    base ^>=4.20.0.0
+                 ,    bytestring
+                 ,    containers
+                 ,    vector
+    hs-source-dirs:   app
+    default-language: Haskell2010
+    ghc-options: -O2
+
 executable edges-to-binary
     import:           warnings
     main-is:          EdgesToBinary.hs
