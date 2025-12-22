@@ -16,7 +16,7 @@
 
     iogx.url = "github:input-output-hk/iogx";
 
-    leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?rev=0dae47110d216a96d51801d7175e080ccc761454";
+    leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?rev=a654a1761476fcf8e6a43aeedbc1455bd7ad77db";
 
     flake-parts.url = "github:hercules-ci/flake-parts";
 

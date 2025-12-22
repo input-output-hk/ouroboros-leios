@@ -3406,17 +3406,17 @@
         "nixpkgs": "nixpkgs_5"
       },
       "locked": {
-        "lastModified": 1765980301,
-        "narHash": "sha256-O7MeiPbU5wZsg14eKfAYG4L7husMM2H7n8s9JcYX7Wc=",
+        "lastModified": 1766065805,
+        "narHash": "sha256-ITk6cNexwieBlDKxbASK4UEKGKfK+xYAOdeytu1G9yA=",
         "owner": "input-output-hk",
         "repo": "ouroboros-leios-formal-spec",
-        "rev": "0dae47110d216a96d51801d7175e080ccc761454",
+        "rev": "a654a1761476fcf8e6a43aeedbc1455bd7ad77db",
         "type": "github"
       },
       "original": {
         "owner": "input-output-hk",
         "repo": "ouroboros-leios-formal-spec",
-        "rev": "0dae47110d216a96d51801d7175e080ccc761454",
+        "rev": "a654a1761476fcf8e6a43aeedbc1455bd7ad77db",
         "type": "github"
       }
     },
@@ -4628,11 +4628,11 @@
     },
     "nixpkgs_6": {
       "locked": {
-        "lastModified": 1766148151,
-        "narHash": "sha256-KwEhc3NGmByynC0W81T016nkYedFP1gOh3zKG/wj48I=",
+        "lastModified": 1766399689,
+        "narHash": "sha256-e5sTH5jMB8r3Teo0EYvLMN0YUDJ1TW2ZgUODOUvlY+c=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "0a89da2c4eeb13ebe6fd96c3ec7d70e2d42ca7c4",
+        "rev": "849bef3b05287ac5fed2cf03b78efeb8aff782a0",
         "type": "github"
       },
       "original": {

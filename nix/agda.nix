@@ -38,7 +38,11 @@ let
     libraryFile = "trace-parser.agda-lib";
     everythingFile = "src/trace-parser.agda";
     buildInputs = [ agdaWithDeps ];
-  };
+    buildPhase = ''
+      agda src/trace-parser.agda
+    '';
+ };
+
   hsTraceParser = pkgs.agdaPackages.mkDerivation {
     inherit (locales) LANG LC_ALL LOCALE_ARCHIVE;
     pname = "trace-parser-hs";
