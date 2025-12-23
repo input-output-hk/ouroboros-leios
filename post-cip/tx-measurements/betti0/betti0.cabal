@@ -1,0 +1,45 @@
+cabal-version:      3.0
+name:               betti0
+version:            0.1.0.0
+license:            MIT
+license-file:       LICENSE
+author:             Brian W Bush
+maintainer:         brian.bush@iohk.io
+category:           Network
+build-type:         Simple
+
+common warnings
+    ghc-options: -Wall
+
+executable betti0
+    import:           warnings
+    main-is:          Betti0.hs
+    build-depends:    base ^>=4.20.0.0
+                 ,    array
+                 ,    bytestring
+                 ,    containers
+                 ,    vector
+    hs-source-dirs:   app
+    default-language: Haskell2010
+    ghc-options: -O2 -threaded
+
+executable block-stats
+    import:           warnings
+    main-is:          BlockStats.hs
+    build-depends:    base ^>=4.20.0.0
+                 ,    array
+                 ,    bytestring
+                 ,    containers
+                 ,    vector
+    hs-source-dirs:   app
+    default-language: Haskell2010
+    ghc-options: -O2
+
+executable edges-to-binary
+    import:           warnings
+    main-is:          EdgesToBinary.hs
+    build-depends:    base ^>=4.20.0.0
+                 ,    bytestring
+    hs-source-dirs:   app
+    default-language: Haskell2010
+    ghc-options: -O2
