@@ -25,9 +25,9 @@ create index idx_blk_redeemers
 ;
 
 
-drop table if exists block_utilization;
+drop table if exists block_stats;
 
-create table block_utilization as
+create table block_stats as
 select
     encode(hash, 'hex') as block_hash
   , block_no
@@ -49,4 +49,4 @@ select
 order by block_no
 ;
 
-\copy block_utilization to 'block-utilization.tsv' csv header delimiter E'\t'
+\copy block_stats to 'block-stats.tsv' csv header delimiter E'\t'

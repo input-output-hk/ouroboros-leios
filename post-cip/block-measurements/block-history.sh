@@ -2,5 +2,5 @@
 
 psql -f block-history.sql mainnet
 
-pigz -9fv block-utilization.tsv
+pigz -9fv block-stats.tsv
 
