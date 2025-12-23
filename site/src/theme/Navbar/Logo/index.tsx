@@ -1,4 +1,5 @@
 import Logo from "@theme/Logo";
+import { JSX } from "react";
 
 export default function NavbarLogo(): JSX.Element {
   return (

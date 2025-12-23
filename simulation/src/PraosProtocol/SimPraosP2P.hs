@@ -60,10 +60,10 @@ tracePraosP2P
         mapM_
           (\m -> mapM_ forkIO =<< m)
           [ praosNode
-            (nodeTracer nid)
-            (praosConfig slotConfig nid rng)
-            (Map.findWithDefault [] nid chansToDownstream)
-            (Map.findWithDefault [] nid chansToUpstream)
+              (nodeTracer nid)
+              (praosConfig slotConfig nid rng)
+              (Map.findWithDefault [] nid chansToDownstream)
+              (Map.findWithDefault [] nid chansToUpstream)
           | (nid, rng) <-
               zip
                 (Map.keys p2pNodes)

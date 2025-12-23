@@ -1,0 +1,150 @@
+version: "0.5"
+is_strict: true
+
+processes:
+  Init:
+    command: |
+      bash "${SCRIPTS}/init.sh"
+    availability:
+      restart: "on_failure"
+
+  InitNamespaces:
+    is_elevated: true
+    command: |
+      bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/init-namespaces.sh"
+    depends_on:
+      Init:
+        condition: process_completed_successfully
+
+  PrepareUpstreamNode:
+    command: |
+      bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/prepare-upstream-node.sh"
+    depends_on:
+      InitNamespaces:
+        condition: process_completed_successfully
+    availability:
+      restart: "on_failure"
+
+  UpstreamNode:
+    is_elevated: true
+    command: |
+      ip netns exec leios-experiment:upstream bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/upstream-node.sh"
+    log_location: "${WORKING_DIR}/upstream-node.log"
+    depends_on:
+      PrepareUpstreamNode:
+        condition: process_completed_successfully
+    availability:
+      restart: "always"
+
+  PrepareNode0:
+    is_elevated: true
+    command: |
+      bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/prepare-node0.sh"
+    depends_on:
+      InitNamespaces:
+        condition: process_completed_successfully
+    availability:
+      restart: "on_failure"
+
+  Node0:
+    is_elevated: true
+    command: |
+      ip netns exec leios-experiment:node0 bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/node0.sh"
+    log_location: "${WORKING_DIR}/node0.log"
+    depends_on:
+      PrepareNode0:
+        condition: process_completed_successfully
+    availability:
+      restart: "always"
+
+  PrepareDownstreamNode:
+    is_elevated: true
+    command: |
+      bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/prepare-downstream-node.sh"
+    depends_on:
+      InitNamespaces:
+        condition: process_completed_successfully
+    availability:
+      restart: "on_failure"
+
+  DownstreamNode:
+    is_elevated: true
+    command: |
+      ip netns exec leios-experiment:downstream bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/downstream-node.sh"
+    log_location: "${WORKING_DIR}/downstream-node.log"
+    depends_on:
+      PrepareDownstreamNode:
+        condition: process_completed_successfully
+    availability:
+      restart: "always"
+
+  SSOnUpstreamNode:
+    is_elevated: true
+    command: |
+      ip netns exec leios-experiment:upstream bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/ss-on-upstream.sh"
+    depends_on:
+      UpstreamNode:
+        condition: "process_started"
+    availability:
+      restart: "always"
+
+  SSOnNode0:
+    is_elevated: true
+    command: |
+      ip netns exec leios-experiment:node0 bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/ss-on-node0.sh"
+    depends_on:
+      Node0:
+        condition: "process_started"
+    availability:
+      restart: "always"
+
+  SSOnDownstreamNode:
+    is_elevated: true
+    command: |
+      ip netns exec leios-experiment:downstream bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/ss-on-downstream.sh"
+    depends_on:
+      DownstreamNode:
+        condition: "process_started"
+    availability:
+      restart: "always"
+
+  Analyze:
+    command: |
+      set -exuo pipefail;
+      set -a && source "$WORKING_DIR/.env" && set +a;
+
+      while true; do
+        sleep 1
+        "$PYTHON3" "$ANALYSE_PY" \
+          "$REF_SLOT" "$ONSET_OF_REF_SLOT" \
+          "$UPSTREAM_NODE_DIR/schedule.json" \
+          "$WORKING_DIR/upstream-node.log" \
+          "$WORKING_DIR/node0.log" \
+          "$WORKING_DIR/downstream-node.log" \
+          "$WORKING_DIR/scatter_plot.png"
+      done;
+
+    log_location: "${WORKING_DIR}/analyse.log"
+    depends_on:
+      UpstreamNode:
+        condition: process_started
+      Node0:
+        condition: process_started
+      DownstreamNode:
+        condition: process_started
+    availability:
+      restart: "always"
+
+  Test:
+    command: |
+      set -exuo pipefail;
+
+      while true; do
+        cat "$WORKING_DIR/.env";
+        ls -la;
+      done;
+    depends_on:
+      Init:
+        condition: process_completed_successfully
+    availability:
+      restart: "always"

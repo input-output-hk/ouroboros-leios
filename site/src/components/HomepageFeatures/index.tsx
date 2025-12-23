@@ -1,14 +1,19 @@
-import { LinkButton } from "../LinkButton/LinkButton";
-import styles from "./styles.module.css";
+import DecentralizedSvg from "@site/static/img/decentralized.svg";
+
 import ScaleSvg from "@site/static/img/scale.svg";
 import SecureSvg from "@site/static/img/secure.svg";
-import FlexibleSvg from "@site/static/img/flexible.svg";
+import { LinkButton } from "../LinkButton/LinkButton";
+import styles from "./styles.module.css";
 
 type FeatureItem = {
   title: string;
-  Svg: string;
+  Svg: React.ComponentType<
+    React.SVGProps<SVGSVGElement> & {
+      title?: string;
+    }
+  >;
   description: React.ReactElement;
-  button: {
+  button?: {
     text: string;
     url: string;
   };
@@ -37,9 +42,15 @@ const FeatureList: FeatureItem[] = [
     ),
   },
   {
-    title: "Flexible",
-    Svg: FlexibleSvg,
-    description: <>Ouroboros Leios supports diverse applications.</>,
+    title: "Decentralized",
+    Svg: DecentralizedSvg,
+    description: (
+      <>
+        Improving the throughput by 50x while not compromising decentralization.
+        So, the network still will maintain its resiliance, fairness and
+        democratisation.
+      </>
+    ),
   },
 ];
 
@@ -60,7 +71,7 @@ function Feature({ Svg, title, description, button }: FeatureItem) {
 
 export default function HomepageFeatures(): React.ReactElement {
   return (
-    <section className="padding-section">
+    <section className="padding-section homepage-section-primary">
       <div className="container">
         <div className="container-padding">
           <div className={styles.features}>

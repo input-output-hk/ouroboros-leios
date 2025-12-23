@@ -291,8 +291,8 @@ convertConfig disk =
             durationMsToDiffTime $
               sum
                 [ disk.voteGenerationCpuTimeMsConstant
-                  + disk.voteGenerationCpuTimeMsPerIb
-                    `forEach` eb.inputBlocks
+                    + disk.voteGenerationCpuTimeMsPerIb
+                      `forEach` eb.inputBlocks
                 | eb <- ebs
                 ]
       , linearVoteMsgGeneration = \vm ibs ->
@@ -354,11 +354,11 @@ delaysAndSizesAsFull cfg@LeiosConfig{pipeline, voteSendStage} =
     ]
   fullLinearEBsVotedFor =
     [ InputBlock
-      { body = fullIB.body
-      , header =
-          let InputBlockHeader{..} = fullIB.header
-           in InputBlockHeader{id = unconvertLinearId id', ..}
-      }
+        { body = fullIB.body
+        , header =
+            let InputBlockHeader{..} = fullIB.header
+             in InputBlockHeader{id = unconvertLinearId id', ..}
+        }
     | id' <- fullVT.endorseBlocks
     ]
   fullRB = mockFullRankingBlock cfg

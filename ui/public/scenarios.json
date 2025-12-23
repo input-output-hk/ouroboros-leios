@@ -11,6 +11,12 @@
       "topology": "topologies/small.yaml",
       "duration": 120,
       "trace": "traces/small-1txkbs-nocpu.jsonl.gz"
+    },
+    {
+      "name": "Leios Demo 202511",
+      "topology": "topologies/prototype.yaml",
+      "duration": 300,
+      "loki": "localhost:3100"
     }
   ]
 }

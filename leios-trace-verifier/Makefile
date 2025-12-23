@@ -15,7 +15,7 @@ define agdaToHs
     cp -r hs-src/* $(HS_DIR)/
     cp hs-src/$(CABAL_FILE) $(HS_DIR)/
     mkdir -p $(HS_DIR)/data
-    cp -r examples/{config.yaml,topology.yaml,valid,invalid} $(HS_DIR)/data/
+    cp -r conformance-traces/{config.yaml,topology.yaml,valid,invalid} $(HS_DIR)/data/
     $(AGDA_RUN) -c --ghc-dont-call-ghc --compile-dir $(HS_DIST) $<
     find $(HS_DIST)/MAlonzo -name "*.hs" -print\
       | sed "s#^$(HS_DIST)/#        #;s#\.hs##;s#/#.#g"\

@@ -18,63 +18,97 @@
     deltaq.flake = false;
   };
 
-  outputs = {
-    self,
-    flake-compat,
-    flake-utils,
-    nixpkgs,
-    jupyenv,
-    deltaq,
-    ...
-  } @ inputs:
-    flake-utils.lib.eachSystem (with flake-utils.lib.system; [ x86_64-linux ])
-    (
-      system: let
+  outputs =
+    {
+      self,
+      flake-utils,
+      nixpkgs,
+      jupyenv,
+      deltaq,
+      ...
+    }:
+    flake-utils.lib.eachSystem (with flake-utils.lib.system; [ x86_64-linux ]) (
+      system:
+      let
 
-        overlay = next: prev: {
+        overlay = _next: prev: {
           haskell = prev.haskell // {
-            packageOverrides = hnext: hprev: {
+            packageOverrides = _hnext: hprev: {
               # Include the DeltaQ packages.
-              deltaq = hprev.callCabal2nixWithOptions
-                "deltaq"
-                (deltaq.outPath + "/lib/deltaq")
-                "--no-check"
-                {};
-              probability-polynomial = hprev.callCabal2nixWithOptions
-                "probability-polynomial"
-                (deltaq.outPath + "/lib/probability-polynomial")
-                "--no-check"
-                {};
+              deltaq = hprev.callCabal2nixWithOptions "deltaq" (deltaq.outPath + "/lib/deltaq") "--no-check" { };
+              probability-polynomial = hprev.callCabal2nixWithOptions "probability-polynomial" (
+                deltaq.outPath + "/lib/probability-polynomial"
+              ) "--no-check" { };
               # Use a more recent version of `lattices` than is available in the curated Nix package set.
               lattices = hprev.callPackage (
-                { mkDerivation, base, containers, deepseq, hashable
-                , integer-logarithms, lib, QuickCheck, quickcheck-instances, tagged
-                , tasty, tasty-quickcheck, transformers, universe-base
-                , universe-reverse-instances, unordered-containers
+                {
+                  mkDerivation,
+                  base,
+                  containers,
+                  deepseq,
+                  hashable,
+                  integer-logarithms,
+                  lib,
+                  QuickCheck,
+                  quickcheck-instances,
+                  tagged,
+                  tasty,
+                  tasty-quickcheck,
+                  transformers,
+                  universe-base,
+                  universe-reverse-instances,
+                  unordered-containers,
                 }:
                 mkDerivation {
                   pname = "lattices";
                   version = "2.2.1";
                   sha256 = "27063f2343b1547033cd59f61b27f797041ed0c25c921f253ce82dc6fffa7666";
                   libraryHaskellDepends = [
-                    base containers deepseq hashable integer-logarithms QuickCheck
-                    tagged transformers universe-base universe-reverse-instances
+                    base
+                    containers
+                    deepseq
+                    hashable
+                    integer-logarithms
+                    QuickCheck
+                    tagged
+                    transformers
+                    universe-base
+                    universe-reverse-instances
                     unordered-containers
                   ];
                   testHaskellDepends = [
-                    base containers QuickCheck quickcheck-instances tasty
-                    tasty-quickcheck transformers universe-base
-                    universe-reverse-instances unordered-containers
+                    base
+                    containers
+                    QuickCheck
+                    quickcheck-instances
+                    tasty
+                    tasty-quickcheck
+                    transformers
+                    universe-base
+                    universe-reverse-instances
+                    unordered-containers
                   ];
                   homepage = "http://github.com/phadej/lattices/";
                   description = "Fine-grained library for constructing and manipulating lattices";
                   license = lib.licenses.bsd3;
                 }
-              ) {};
+              ) { };
               # Sadly, we need to loosen the dependency constraint that `Chart-cairo` has on `time`.
               Chart-cairo = hprev.callPackage (
-                { mkDerivation, array, base, cairo, Chart, colour
-                , data-default-class, lens, lib, mtl, old-locale, operational, time
+                {
+                  mkDerivation,
+                  array,
+                  base,
+                  cairo,
+                  Chart,
+                  colour,
+                  data-default-class,
+                  lens,
+                  lib,
+                  mtl,
+                  old-locale,
+                  operational,
+                  time,
                 }:
                 mkDerivation {
                   pname = "Chart-cairo";
@@ -84,26 +118,41 @@
                     sed -e '/, time/s/ >=.*$//' -i Chart-cairo.cabal
                   '';
                   libraryHaskellDepends = [
-                    array base cairo Chart colour data-default-class lens mtl
-                    old-locale operational time
+                    array
+                    base
+                    cairo
+                    Chart
+                    colour
+                    data-default-class
+                    lens
+                    mtl
+                    old-locale
+                    operational
+                    time
                   ];
                   homepage = "https://github.com/timbod7/haskell-chart/wiki";
                   description = "Cairo backend for Charts";
                   license = lib.licenses.bsd3;
                 }
-              ) {};
+              ) { };
             };
           };
         };
 
-        pkgs = import nixpkgs { inherit system; overlays = [ overlay ]; };
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [ overlay ];
+        };
 
         inherit (jupyenv.lib.${system}) mkJupyterlabNew;
 
-        jupyterlab = mkJupyterlabNew ({...}: {
-          nixpkgs = nixpkgs;
-          imports = [(import ./kernels.nix {pkgs = pkgs;})];
-        });
+        jupyterlab = mkJupyterlabNew (
+          { ... }:
+          {
+            inherit nixpkgs;
+            imports = [ (import ./kernels.nix { inherit pkgs; }) ];
+          }
+        );
 
         docker = pkgs.dockerTools.buildImage {
           name = "jupyter-deltaq";
@@ -146,13 +195,14 @@
               "--NotebookApp.token=deltaq"
             ];
             ExposedPorts = {
-              "8888" = {};
+              "8888" = { };
             };
           };
         };
 
-      in rec {
-        packages = {inherit jupyterlab docker;};
+      in
+      rec {
+        packages = { inherit jupyterlab docker; };
         packages.default = jupyterlab;
         apps.default.program = "${jupyterlab}/bin/jupyter-lab";
         apps.default.type = "app";

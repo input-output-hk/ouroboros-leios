@@ -1,0 +1,121 @@
+version: "0.5"
+
+environment:
+  - "WORKING_DIR=.tmp-x-ray"
+
+processes:
+
+  Init:
+    command: |
+      set -exuo pipefail;
+
+      if [ ! -d "$WORKING_DIR" ]; then
+        mkdir "$WORKING_DIR"
+        echo "Working directory created: $WORKING_DIR"
+      else
+        echo "Working directory already exists"
+      fi
+
+    availability:
+      restart: "on_failure"
+
+  SSHTTPExporter:
+    command: |
+      set -exuo pipefail;
+
+      ss_http_exporter 127.0.0.1 9100 "$SS_FILTER";
+
+    depends_on:
+      Init:
+        condition: "process_completed_successfully"
+    availability:
+      restart: "always"
+
+
+  Prometheus:
+    command: |
+      set -exuo pipefail;
+
+      prometheus \
+        --config.file="$PROMETHEUS_CONFIG" \
+        --storage.tsdb.path="$WORKING_DIR/prometheus" \
+        --web.listen-address="127.0.0.1:9090" \
+        --web.enable-remote-write-receiver;
+
+    depends_on:
+      Init:
+        condition: "process_completed_successfully"
+
+    availability:
+      restart: "always"
+
+  Loki:
+    command: |
+      set -exuo pipefail;
+
+      if [ -d "$WORKING_DIR/loki" ]; then
+        rm -fr "$WORKING_DIR/loki";
+        echo "Removed old Loki state $WORKING_DIR/loki"
+      fi;
+
+      loki -config.expand-env=true -config.file="$LOKI_CONFIG";
+
+    depends_on:
+      Init:
+        condition: "process_completed_successfully"
+
+    availability:
+      restart: "always"
+
+  Alloy:
+    command: |
+      set -exuo pipefail;
+
+      if [ -d "$WORKING_DIR/alloy" ]; then
+        rm -fr "$WORKING_DIR/alloy";
+        echo "Removed old Alloy state $WORKING_DIR/alloy"
+      fi;
+
+      alloy run \
+        --storage.path "$WORKING_DIR/alloy" \
+        "$ALLOY_CONFIG";
+
+    depends_on:
+      Prometheus:
+        condition: "process_started"
+      Loki:
+        condition: "process_started"
+    shutdown:
+      signal: 9
+      parent_only: false
+
+    availability:
+      restart: "always"
+
+  # NOTE(bladyjoker): When 'homepath' is relative, all other paths are under it -.-
+  Grafana:
+    command: |
+      set -exuo pipefail;
+
+      if [ ! -d "$WORKING_DIR/grafana" ]; then
+        mkdir "$WORKING_DIR/grafana";
+        echo "Grafana working directory created: $WORKING_DIR/grafana";
+        cp -fr $GRAFANA_HOMEPATH/* "$WORKING_DIR/grafana";
+      else
+        echo "Grafana working directory already exists";
+      fi
+
+      grafana server \
+        --config "$GRAFANA_INI" \
+        --homepath "$WORKING_DIR/grafana" \
+        cfg:default.paths.provisioning="conf/provisioning" \
+        cfg:default.paths.data="data" \
+        cfg:default.paths.logs="logs" \
+        cfg:default.paths.plugins="plugins";
+
+    depends_on:
+      Init:
+        condition: "process_completed_successfully"
+
+    availability:
+      restart: "always"

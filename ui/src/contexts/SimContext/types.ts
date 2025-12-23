@@ -43,11 +43,29 @@ export interface IMessageAnimation {
   progress: number; // 0-1, calculated based on current timeline position
 }
 
+export interface IMessageTypeCounts {
+  [EMessageType.RB]: number;
+  [EMessageType.EB]: number;
+  [EMessageType.Votes]: number;
+  [EMessageType.TX]: number;
+}
+
+export interface IEdgeState {
+  lastMessageTime: number;
+  activeCounts: IMessageTypeCounts; // Count of each message type currently traveling
+}
+
+export interface INodeActivityState {
+  lastActivityTime: number;
+  activeCounts: IMessageTypeCounts; // Count of each activity type currently active
+}
+
 export interface ISimulationAggregatedDataState {
   nodes: Map<string, ISimulationAggregatedData>;
   global: ISimulationGlobalData;
-  lastNodesUpdated: string[];
   messages: IMessageAnimation[]; // Active messages traveling on the graph
+  edges: Map<string, IEdgeState>; // Edge state for coloring based on message priority
+  nodeActivity: Map<string, INodeActivityState>; // Node activity state for priority-based coloring
   eventCounts: {
     total: number;
     byType: Record<string, number>;
@@ -63,24 +81,35 @@ export interface IGraphContextState {
   currentNode?: string;
 }
 
+export enum EConnectionState {
+  NotConnected = "NotConnected",
+  Connecting = "Connecting",
+  Connected = "Connected",
+}
+
 export interface IScenario {
   name: string;
   topology: string;
   duration: number;
-  trace: string;
+  trace?: string;
+  loki?: string;
 }
 
 export interface ISimContextState {
   allScenarios: IScenario[];
   activeScenario: string;
+  autoStart: boolean;
   graph: IGraphContextState;
   aggregatedData: ISimulationAggregatedDataState;
   tracePath: string;
+  lokiHost?: string;
+  lokiConnectionState: EConnectionState;
   topography: ITransformedNodeMap;
   topologyPath: string;
   topologyLoaded: boolean;
   events: IServerMessage[];
   currentTime: number;
+  minTime: number;
   maxTime: number;
   isPlaying: boolean;
   speedMultiplier: number;
@@ -88,7 +117,7 @@ export interface ISimContextState {
 
 export type TSimContextActions =
   | { type: "SET_SCENARIOS"; payload: IScenario[] }
-  | { type: "SET_SCENARIO"; payload: string }
+  | { type: "SET_SCENARIO"; payload: string; autoStart?: boolean }
   | { type: "SET_CURRENT_NODE"; payload: string | undefined }
   | {
       type: "SET_CANVAS_PROPS";
@@ -108,7 +137,8 @@ export type TSimContextActions =
   | { type: "SET_TIMELINE_TIME"; payload: number }
   | { type: "SET_TIMELINE_PLAYING"; payload: boolean }
   | { type: "SET_TIMELINE_SPEED"; payload: number }
-  | { type: "RESET_TIMELINE" };
+  | { type: "RESET_TIMELINE" }
+  | { type: "SET_LOKI_CONNECTION_STATE"; payload: EConnectionState };
 
 export interface ISimContext {
   state: ISimContextState;

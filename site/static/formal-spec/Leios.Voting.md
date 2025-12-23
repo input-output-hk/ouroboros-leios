@@ -1,0 +1,13 @@
+<pre class="Agda"><a id="9" class="Symbol">{-#</a> <a id="13" class="Keyword">OPTIONS</a> <a id="21" class="Pragma">--safe</a> <a id="28" class="Symbol">#-}</a>
+
+<a id="33" class="Keyword">open</a> <a id="38" class="Keyword">import</a> <a id="45" href="Leios.Prelude.html" class="Module">Leios.Prelude</a>
+
+<a id="60" class="Keyword">module</a> <a id="67" href="Leios.Voting.html" class="Module">Leios.Voting</a> <a id="80" class="Keyword">where</a>
+
+<a id="87" class="Keyword">record</a> <a id="VotingAbstract"></a><a id="94" href="Leios.Voting.html#94" class="Record">VotingAbstract</a> <a id="109" class="Symbol">(</a><a id="110" href="Leios.Voting.html#110" class="Bound">X</a> <a id="112" class="Symbol">:</a> <a id="114" href="Agda.Primitive.html#388" class="Primitive">Type</a><a id="118" class="Symbol">)</a> <a id="120" class="Symbol">:</a> <a id="122" href="Agda.Primitive.html#388" class="Primitive">Type₁</a> <a id="128" class="Keyword">where</a>
+  <a id="136" class="Keyword">field</a> <a id="VotingAbstract.VotingState"></a><a id="142" href="Leios.Voting.html#142" class="Field">VotingState</a>     <a id="158" class="Symbol">:</a> <a id="160" href="Agda.Primitive.html#388" class="Primitive">Type</a>
+        <a id="VotingAbstract.initVotingState"></a><a id="173" href="Leios.Voting.html#173" class="Field">initVotingState</a> <a id="189" class="Symbol">:</a> <a id="191" href="Leios.Voting.html#142" class="Field">VotingState</a>
+        <a id="VotingAbstract.isVoteCertified"></a><a id="211" href="Leios.Voting.html#211" class="Field">isVoteCertified</a> <a id="227" class="Symbol">:</a> <a id="229" href="Leios.Voting.html#142" class="Field">VotingState</a> <a id="241" class="Symbol">→</a> <a id="243" href="Leios.Voting.html#110" class="Bound">X</a> <a id="245" class="Symbol">→</a> <a id="247" href="Agda.Primitive.html#388" class="Primitive">Type</a>
+
+        <a id="261" class="Symbol">⦃</a> <a id="VotingAbstract.isVoteCertified⁇"></a><a id="263" href="Leios.Voting.html#263" class="Field">isVoteCertified⁇</a> <a id="280" class="Symbol">⦄</a> <a id="282" class="Symbol">:</a> <a id="284" class="Symbol">∀</a> <a id="286" class="Symbol">{</a><a id="287" href="Leios.Voting.html#287" class="Bound">vs</a> <a id="290" href="Leios.Voting.html#290" class="Bound">x</a><a id="291" class="Symbol">}</a> <a id="293" class="Symbol">→</a> <a id="295" href="Leios.Voting.html#211" class="Field">isVoteCertified</a> <a id="311" href="Leios.Voting.html#287" class="Bound">vs</a> <a id="314" href="Leios.Voting.html#290" class="Bound">x</a> <a id="316" href="Class.Decidable.Core.html#217" class="Record Operator">⁇</a>
+</pre>

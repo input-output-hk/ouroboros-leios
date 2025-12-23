@@ -317,8 +317,8 @@ relayClient
               -- non-recent, but recent ones still oldest to newest).
               sequence_
                 [ do
-                  writeChan chan (MsgReqBlock blkid)
-                  writeChan chan MsgReqBlockIdsNonBlocking
+                    writeChan chan (MsgReqBlock blkid)
+                    writeChan chan MsgReqBlockIdsNonBlocking
                 | (blkid, _ttl) <- sortBy (compare `on` snd) newBlkIds
                 ]
               idle (nreplies - 1 + 2 * length newBlkIds)

@@ -162,11 +162,11 @@ tcpSimVizRenderModel
       Cairo.setLineWidth 3
       sequence_
         [ do
-          Cairo.arc x y 25 0 (pi * 2)
-          Cairo.setSourceRGB 0.7 0.7 0.7
-          Cairo.fillPreserve
-          Cairo.setSourceRGB 0 0 0
-          Cairo.stroke
+            Cairo.arc x y 25 0 (pi * 2)
+            Cairo.setSourceRGB 0.7 0.7 0.7
+            Cairo.fillPreserve
+            Cairo.setSourceRGB 0 0 0
+            Cairo.stroke
         | (_node, Point x y) <- Map.toList vizNodePos
         ]
       Cairo.restore
@@ -175,12 +175,12 @@ tcpSimVizRenderModel
       Cairo.save
       sequence_
         [ do
-          Cairo.setSourceRGB r g b
-          Cairo.arc x y' 10 0 (2 * pi)
-          Cairo.fillPreserve
-          Cairo.setSourceRGB 0 0 0
-          Cairo.setLineWidth 1
-          Cairo.stroke
+            Cairo.setSourceRGB r g b
+            Cairo.arc x y' 10 0 (2 * pi)
+            Cairo.fillPreserve
+            Cairo.setSourceRGB 0 0 0
+            Cairo.setLineWidth 1
+            Cairo.stroke
         | (node, msgs) <- Map.toList vizMsgsAtNode
         , (n, msg) <- zip [1 ..] msgs
         , let Point x y = vizNodePos Map.! node
@@ -195,19 +195,19 @@ tcpSimVizRenderModel
       Cairo.setLineWidth 3
       sequence_
         [ do
-          Cairo.save
-          renderPathRoundedRect fromPos toPos 20
-          Cairo.setSourceRGB 0.9 0.9 0.9
-          Cairo.fillPreserve
-          Cairo.clip
-          Cairo.newPath
-          -- draw all the messages within the clipping region of the link
-          renderMessagesInFlight config now fromPos toPos msgs
-          Cairo.restore
-          -- the draw the link border on top (without clipping)
-          renderPathRoundedRect fromPos toPos 20
-          Cairo.setSourceRGB 0 0 0
-          Cairo.stroke
+            Cairo.save
+            renderPathRoundedRect fromPos toPos 20
+            Cairo.setSourceRGB 0.9 0.9 0.9
+            Cairo.fillPreserve
+            Cairo.clip
+            Cairo.newPath
+            -- draw all the messages within the clipping region of the link
+            renderMessagesInFlight config now fromPos toPos msgs
+            Cairo.restore
+            -- the draw the link border on top (without clipping)
+            renderPathRoundedRect fromPos toPos 20
+            Cairo.setSourceRGB 0 0 0
+            Cairo.stroke
         | (fromPos, toPos, msgs) <- linksAndMsgs
         ]
       Cairo.restore
@@ -245,37 +245,37 @@ renderMessagesInFlight ::
 renderMessagesInFlight TcpSimVizConfig{messageColor} now fromPos toPos msgs = do
   sequence_
     [ do
-      -- The overall message
-      withPoint Cairo.moveTo msgTrailingEdge
-      withPoint Cairo.lineTo msgLeadingEdge
-      Cairo.setSourceRGBA r g b 0.4
-      Cairo.setLineWidth 10
-      Cairo.stroke
-      -- The TCP message fragments
-      sequence_
-        [ do
-          withPoint Cairo.moveTo (msgfragTrailingEdge `addP` offset)
-          withPoint Cairo.lineTo (msgfragLeadingEdge `addP` offset)
-          withPoint Cairo.lineTo (msgfragLeadingEdge `addP` negateV offset)
-          withPoint Cairo.lineTo (msgfragTrailingEdge `addP` negateV offset)
-          Cairo.closePath
-        | msgfragforecast <- msgforecasts
-        , now >= msgSendLeadingEdge msgfragforecast
-        , now <= msgRecvTrailingEdge msgfragforecast
-        , let (msgfragTrailingEdge, msgfragLeadingEdge) =
-                lineMessageInFlight now fromPos toPos msgfragforecast
-              offset =
-                scaleV (18 / 2) $
-                  unitV $
-                    normalV $
-                      vector
-                        msgfragTrailingEdge
-                        msgfragLeadingEdge
-        ]
-      Cairo.setSourceRGB r g b
-      Cairo.fillPreserve
-      Cairo.setLineWidth 2
-      Cairo.stroke
+        -- The overall message
+        withPoint Cairo.moveTo msgTrailingEdge
+        withPoint Cairo.lineTo msgLeadingEdge
+        Cairo.setSourceRGBA r g b 0.4
+        Cairo.setLineWidth 10
+        Cairo.stroke
+        -- The TCP message fragments
+        sequence_
+          [ do
+              withPoint Cairo.moveTo (msgfragTrailingEdge `addP` offset)
+              withPoint Cairo.lineTo (msgfragLeadingEdge `addP` offset)
+              withPoint Cairo.lineTo (msgfragLeadingEdge `addP` negateV offset)
+              withPoint Cairo.lineTo (msgfragTrailingEdge `addP` negateV offset)
+              Cairo.closePath
+          | msgfragforecast <- msgforecasts
+          , now >= msgSendLeadingEdge msgfragforecast
+          , now <= msgRecvTrailingEdge msgfragforecast
+          , let (msgfragTrailingEdge, msgfragLeadingEdge) =
+                  lineMessageInFlight now fromPos toPos msgfragforecast
+                offset =
+                  scaleV (18 / 2) $
+                    unitV $
+                      normalV $
+                        vector
+                          msgfragTrailingEdge
+                          msgfragLeadingEdge
+          ]
+        Cairo.setSourceRGB r g b
+        Cairo.fillPreserve
+        Cairo.setLineWidth 2
+        Cairo.stroke
     | (msg, msgforecast, msgforecasts) <- msgs
     , now <= msgRecvTrailingEdge msgforecast
     , let (r, g, b) = messageColor msg

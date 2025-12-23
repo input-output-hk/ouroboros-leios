@@ -1,1 +1,0 @@
-../nix/web-shell.nix

@@ -1,4 +1,8 @@
-{ pkgs, lib, inputs, ... }:
+{
+  pkgs,
+  inputs,
+  ...
+}:
 
 with pkgs;
 let
@@ -6,22 +10,24 @@ let
   locales = {
     LANG = "en_US.UTF-8";
     LC_ALL = "en_US.UTF-8";
-    LOCALE_ARCHIVE = if pkgs.system == "x86_64-linux"
-                     then "${pkgs.glibcLocales}/lib/locale/locale-archive"
-                     else "";
+    LOCALE_ARCHIVE =
+      if pkgs.system == "x86_64-linux" then "${pkgs.glibcLocales}/lib/locale/locale-archive" else "";
   };
 
-  leiosSpec = inputs.leios-spec;
+  inherit (inputs.leios-spec.packages)
+    agdaWithPkgs
+    leiosSpec
+    ;
 
-  agdaIOGPrelude = leiosSpec.packages.agdaIOGPrelude;
-  agdaSets = leiosSpec.packages.agdaSets;
-  agdaStdlib = leiosSpec.packages.agdaStdlib;
-  agdaStdlibMeta = leiosSpec.packages.agdaStdlibMeta;
-  agdaStdlibClasses = leiosSpec.packages.agdaStdlibClasses;
-  agdaLeiosSpec = leiosSpec.packages.leiosSpec;
-  agdaWithDeps = leiosSpec.packages.agdaWithDeps;
-
-  deps = [ agdaStdlib agdaStdlibMeta agdaStdlibClasses agdaSets agdaIOGPrelude agdaLeiosSpec ];
+  agdaWithDeps = agdaWithPkgs.withPackages (p: [
+    p.standard-library
+    p.standard-library-classes
+    p.standard-library-meta
+    p.abstract-set-theory
+    p.agda-categories
+    p.iog-prelude
+    leiosSpec
+  ]);
 
   agdaTraceParser = pkgs.agdaPackages.mkDerivation {
     inherit (locales) LANG LC_ALL LOCALE_ARCHIVE;
@@ -31,17 +37,21 @@ let
     meta = { };
     libraryFile = "trace-parser.agda-lib";
     everythingFile = "src/trace-parser.agda";
-    buildInputs = deps;
+    buildInputs = [ agdaWithDeps ];
+    buildPhase = ''
+      agda src/trace-parser.agda
+    '';
   };
+
   hsTraceParser = pkgs.agdaPackages.mkDerivation {
     inherit (locales) LANG LC_ALL LOCALE_ARCHIVE;
-    pname = "trace-parser";
-    name = "trace-parser"; # In principle, this should have a version number.
+    pname = "trace-parser-hs";
+    name = "trace-parser-hs"; # In principle, this should have a version number.
     src = ../leios-trace-verifier;
     meta = { };
     libraryFile = "trace-parser.agda-lib";
     everythingFile = "src/trace-parser.agda";
-    buildInputs = deps;
+    buildInputs = [ agdaWithDeps ];
     buildPhase = ''
       agda --transliterate src/trace-parser.agda -c --ghc-dont-call-ghc --compile-dir hs-src/src
     '';
@@ -52,6 +62,10 @@ let
   };
 in
 {
-  inherit agdaStdlib agdaStdlibMeta agdaStdlibClasses agdaSets agdaIOGPrelude agdaLeiosSpec agdaTraceParser hsTraceParser;
-  agdaWithDeps = agdaWithDeps.withPackages { pkgs = deps; };
+  inherit
+    leiosSpec
+    agdaWithDeps
+    agdaTraceParser
+    hsTraceParser
+    ;
 }

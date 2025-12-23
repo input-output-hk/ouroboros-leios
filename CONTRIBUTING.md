@@ -68,14 +68,14 @@ how something is implemented in a feature idea or bug ticket beforehand.
 
 To build Haskell code in this repository, you need to install:
 
-* The [GHC](https://www.haskell.org/ghc/) compiler version 9.6.3
-* [cabal](https://www.haskell.org/cabal/) build tool
+* The [GHC](https://www.haskell.org/ghc/) compiler version 9.10.1
+* [cabal](https://www.haskell.org/cabal/) build tool version 3.12.1.0
 
 > [!NOTE]
 > Installing those tools might depend on your system's details, we suggest two different methods:
 >
 > * Install [GHCup](https://www.haskell.org/ghcup/) to manage various tools from the Haskell ecosystem
-> * Use the provided [Nix shell](shell.nix)
+> * Use the provided Nix shell by invoking `nix develop`
 
 Running `cabal update && cabal build all` at the top-level of the
 project should build all the Haskell components. Tests are run with

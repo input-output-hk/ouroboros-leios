@@ -1,0 +1,6 @@
+#
+# An invalid (namely, non-increasing) slot sequence
+#
+{"message": {"type": "Slot", "node": "node-0", "slot": 0}, "time_s": 0.002423}
+{"message": {"type": "Slot", "node": "node-0", "slot": 1}, "time_s": 0.007779}
+{"message": {"type": "Slot", "node": "node-0", "slot": 0}, "time_s": 1e-06}

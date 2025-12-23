@@ -21,11 +21,11 @@
   --ifm-font-color-alternate: #000;
   --ifm-background-color-primary: #f8f6fa;
   --ifm-background-color-secondary: #f1edf5;
-  --ifm-color-caption: #73489a;
-  --ifm-link-color: #73489a;
-  --ifm-menu-color: #73489a;
-  --ifm-toc-link-color: #73489a;
-  --link-button-background-hover: #73489a;
+  --ifm-link-color: #8c02c2;
+  --ifm-color-caption: var(--ifm-link-color);
+  --ifm-menu-color: var(--ifm-link-color);
+  --ifm-toc-link-color: var(--ifm-link-color);
+  --ifm-color-emphasis-300: var(--ifm-border-color);
 
   --ifm-navbar-height: 6.063rem;
 
@@ -44,29 +44,31 @@
   --ifm-footer-link-color: #f8f6fa;
   --ifm-footer-color: #f8f6fa;
 
-  --ifm-footer-link-hover-color: #ffffffdd;
+  --ifm-footer-link-hover-color: rgba(255, 255, 255, 0.6);
 
   --ifm-navbar-padding-vertical: 0;
   --ifm-navbar-item-padding-vertical: 0;
   --ifm-navbar-item-padding-horizontal: 0;
   --ifm-spacing-horizontal: 0;
+  --ifm-heading-font-weight: 500;
+
+  --ifm-footer-heading-color: #8f6dae;
+  --ifm-container-width-xl: 1440px;
 }
 
 /* For readability concerns, you should choose a lighter palette in dark mode. */
-[data-theme="dark"] {
-  --ifm-navbar-background-color: #333;
-  --ifm-background-color-primary: #1a1a1a;
-  --ifm-background-color-secondary: #333;
+html[data-theme="dark"] {
+  --ifm-background-color: #180425;
+  --ifm-navbar-background-color: #180425;
+  --ifm-background-color-primary: #200830;
+  --ifm-background-color-secondary: #180425;
+  --ifm-border-color: #45364e;
+  --ifm-toc-border-color: var(--ifm-border-color);
 
-  --ifm-link-color: #b1e0fe;
-  --ifm-color-caption: #b1e0fe;
-  --ifm-link-color: #b1e0fe;
-  --ifm-menu-color: #b1e0fe;
-  --ifm-toc-link-color: #b1e0fe;
+  --ifm-link-color: #6effd1;
 
   --link-button-background-hover: rgba(255, 255, 255, 0.15);
-
-  --ifm-footer-link-hover-color: #000000dd;
+  --ifm-dropdown-background-color: var(--ifm-background-color-primary);
 
   --ifm-font-color-base: #f8f6fa;
   --ifm-font-color-alternate: #fff;
@@ -78,6 +80,16 @@
   --ifm-color-primary-lighter: #a6ccdd;
   --ifm-color-primary-lightest: #b5d4e3;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+
+  --ifm-card-background-color: rgba(0, 0, 0, 0.2);
+}
+
+html[data-theme="dark"] .navbar {
+  border-bottom: 1px solid var(--ifm-border-color);
+}
+
+html[data-theme="dark"] footer {
+  border-top: 1px solid var(--ifm-border-color);
 }
 
 @media (max-width: 997px) {
@@ -153,13 +165,14 @@
   width: fit-content;
   min-width: 81px;
   max-width: 132px;
+  margin-right: 1.5rem;
 }
 
 .navbar__items--right {
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.25rem;
   max-width: 978px;
   width: 100%;
   flex-shrink: 1;
@@ -181,7 +194,6 @@
 
 .navbar__link {
   font-size: var(--text-sm);
-  font-weight: var(--font-weight-bold);
   display: flex;
   align-items: center;
   text-decoration: none;
@@ -196,6 +208,10 @@
   .navbar__link {
     font-size: var(--text-xs);
   }
+}
+
+.menu {
+  font-weight: normal;
 }
 
 .footer {
@@ -214,12 +230,14 @@
 
 .footer__title {
   margin-bottom: 1.25rem;
+  font-weight: 500;
+  color: var(--ifm-footer-heading-color);
 }
 
 .footer__items {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 0.75rem;
 }
 
 .footer__bottom {
@@ -228,7 +246,7 @@
   justify-content: space-between;
   align-items: center;
   padding-top: 1rem;
-  border-top: 1px solid #8b8190;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   margin-top: 4.25rem;
 }
 

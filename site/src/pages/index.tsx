@@ -263,7 +263,7 @@ function MonthlyReviewsSection() {
       setIsLive(live);
       const rawCountdown = formatCountdown(
         target.getTime() - now.getTime(),
-        live,
+        live
       );
       //@ts-ignore
       setCountdown(highlightNumbers(rawCountdown));
@@ -276,7 +276,7 @@ function MonthlyReviewsSection() {
           hour: "2-digit",
           minute: "2-digit",
           hour12: false,
-        }),
+        })
       );
     }
     updateCountdown();
@@ -310,7 +310,7 @@ function MonthlyReviewsSection() {
               <div className={styles.countdownContainer}>
                 <Link
                   className={styles.countdown}
-                  to="https://youtube.com/live/K-gv8Kci1t4"
+                  to="https://youtube.com/live/TrLFL34BYBQ"
                   target="_blank"
                   rel="noopener noreferrer"
                 >

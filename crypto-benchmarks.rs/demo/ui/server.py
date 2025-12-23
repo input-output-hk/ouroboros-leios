@@ -1,4 +1,12 @@
-from flask import Flask, send_from_directory, jsonify, render_template, abort, redirect, url_for
+from flask import (
+    Flask,
+    send_from_directory,
+    jsonify,
+    render_template,
+    abort,
+    redirect,
+    url_for,
+)
 import json
 import subprocess
 from pathlib import Path
@@ -22,7 +30,9 @@ def committee(run):
         abort(500, f"extract_committee.py not found at {script}")
 
     try:
-        out = subprocess.check_output(["python3", str(script), str(rdir)], cwd=ROOT, text=True)
+        out = subprocess.check_output(
+            ["python3", str(script), str(rdir)], cwd=ROOT, text=True
+        )
         data = json.loads(out)
         return jsonify(data)
     except subprocess.CalledProcessError as e:
@@ -48,11 +58,10 @@ def registry(run):
                     pools.append({"id": pid, "stake": s})
                     total_stake += s
 
-    return jsonify({
-        "pools": pools,
-        "total_pools": len(pools),
-        "total_stake": total_stake
-    })
+    return jsonify(
+        {"pools": pools, "total_pools": len(pools), "total_stake": total_stake}
+    )
+
 
 @app.route("/demo/<run>")
 def demo_for_run(run):
@@ -63,6 +72,7 @@ def demo_for_run(run):
         return send_from_directory(str(run_dir), "demo.json")
     abort(404, f"demo.json not found in {run_dir}")
 
+
 @app.route("/demo/<run>/<path:filename>")
 def demo_asset(run, filename):
     """Serve auxiliary files (eid.txt, ebhash.txt, etc.) from the run directory."""
@@ -72,15 +82,18 @@ def demo_asset(run, filename):
         return send_from_directory(str(run_dir), filename)
     abort(404, f"{filename} not found in {run_dir}")
 
+
 # === UI endpoint ===
 @app.route("/ui")
 def ui():
     return render_template("index.html")
 
+
 # Small helper route to redirect `/` to `/ui`
 @app.route("/")
 def root():
     return redirect(url_for("ui"))
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5050, debug=True)

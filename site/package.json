@@ -22,7 +22,8 @@
     "prism-react-renderer": "^2.3.0",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
-    "undici": "^7.2.3"
+    "undici": "^7.2.3",
+    "framer-motion": "^12.23.25"
   },
   "devDependencies": {
     "@docusaurus/module-type-aliases": "3.4.0",

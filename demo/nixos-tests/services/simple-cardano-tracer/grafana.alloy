@@ -1,0 +1,71 @@
+logging {
+	level  = "debug"
+	format = "logfmt"
+}
+
+loki.relabel "journal" {
+	forward_to = [loki.write.endpoint.receiver]
+
+	rule {
+		source_labels = ["__journal__systemd_unit"]
+		target_label  = "systemd_unit"
+		action        = "replace"
+	}
+}
+
+loki.source.journal "read" {
+	forward_to = [loki.relabel.journal.receiver]
+
+	labels = {component = "journald"}
+}
+
+loki.source.journal "cardano_tracer_logs" {
+	forward_to = [loki.process.cardano_tracer_parser.receiver]
+	matches    = "_SYSTEMD_UNIT=cardano-tracer.service"
+	labels     = {
+		service = "cardano-tracer",
+		type    = "cardano-node",
+	}
+}
+
+loki.process "cardano_tracer_parser" {
+	stage.json {
+		expressions = {
+			at     = "at",
+			sev    = "sev",
+			host   = "host",
+			thread = "thread",
+			ns     = "ns",
+			data   = "data",
+		}
+	}
+
+	stage.timestamp {
+		source = "at"
+		format = "RFC3339"
+	}
+
+	stage.labels {
+		values = {
+			level  = "sev",
+			alias  = "host",
+			host   = "host",
+      instance = "host",
+			sev    = "sev",
+			thread = "thread",
+			ns     = "ns",
+		}
+	}
+
+	stage.output {
+		source = "data"
+	}
+
+	forward_to = [loki.write.endpoint.receiver]
+}
+
+loki.write "endpoint" {
+	endpoint {
+		url = "http://localhost:3100/loki/api/v1/push"
+	}
+}

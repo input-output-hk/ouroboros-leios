@@ -106,12 +106,12 @@ data LeiosSimVizState = LeiosSimVizState
   , vizNodeLinks :: !(Map Link LinkPoints)
   , vizMsgsInTransit ::
       !( Map
-          (NodeId, NodeId)
-          [ ( LeiosMessage
-            , TcpMsgForecast
-            , [TcpMsgForecast]
-            )
-          ]
+           (NodeId, NodeId)
+           [ ( LeiosMessage
+             , TcpMsgForecast
+             , [TcpMsgForecast]
+             )
+           ]
        )
   , vizNodeTip :: !(Map NodeId FullTip)
   , -- the Buffer and Queue names are legacy from VizSimRelay.
@@ -738,11 +738,11 @@ leiosSimVizRenderModel
       Cairo.setLineWidth 3
       sequence_
         [ do
-          Cairo.arc x y 25 0 (pi * 2)
-          Cairo.setSourceRGB r b g
-          Cairo.fillPreserve
-          Cairo.setSourceRGB 0 0 0
-          Cairo.stroke
+            Cairo.arc x y 25 0 (pi * 2)
+            Cairo.setSourceRGB r b g
+            Cairo.fillPreserve
+            Cairo.setSourceRGB 0 0 0
+            Cairo.stroke
         | (node, pos) <- Map.toList vizNodePos
         , let (Point x y) = simPointToPixel worldDimensions screenSize pos
         , let (r, b, g) = case Map.lookup node vizNodeTip of
@@ -757,24 +757,24 @@ leiosSimVizRenderModel
       Cairo.setLineWidth 3
       sequence_
         [ do
-          Cairo.save
-          renderPathRoundedRect fromPos toPos 20
-          Cairo.setSourceRGB 0.9 0.9 0.9
-          Cairo.fillPreserve
-          Cairo.clip
-          Cairo.newPath
-          -- draw all the messages within the clipping region of the link
-          renderMessagesInFlight
-            (TcpSimVizConfig $ leiosMessageColor cfg)
-            now
-            fromPos
-            toPos
-            msgs
-          Cairo.restore
-          -- the draw the link border on top (without clipping)
-          renderPathRoundedRect fromPos toPos 20
-          Cairo.setSourceRGB 0 0 0
-          Cairo.stroke
+            Cairo.save
+            renderPathRoundedRect fromPos toPos 20
+            Cairo.setSourceRGB 0.9 0.9 0.9
+            Cairo.fillPreserve
+            Cairo.clip
+            Cairo.newPath
+            -- draw all the messages within the clipping region of the link
+            renderMessagesInFlight
+              (TcpSimVizConfig $ leiosMessageColor cfg)
+              now
+              fromPos
+              toPos
+              msgs
+            Cairo.restore
+            -- the draw the link border on top (without clipping)
+            renderPathRoundedRect fromPos toPos 20
+            Cairo.setSourceRGB 0 0 0
+            Cairo.stroke
         | (fromPos, toPos, msgs) <- linksAndMsgs
         ]
       -- draw the message labels on top of the links
@@ -815,8 +815,8 @@ leiosSimVizRenderModel
       -- draw lines from labels to messages
       sequence_
         [ do
-          withPoint Cairo.moveTo (labelsOrigin `addP` Vector 0 (n * 10))
-          withPoint Cairo.lineTo msgTrailingEdge
+            withPoint Cairo.moveTo (labelsOrigin `addP` Vector 0 (n * 10))
+            withPoint Cairo.lineTo msgTrailingEdge
         | ((_msgLabel, msgforecast), n) <- zip msgLabels [0 ..]
         , let (msgTrailingEdge, _msgLeadingEdge) =
                 lineMessageInFlight now fromPos toPos msgforecast
@@ -826,9 +826,9 @@ leiosSimVizRenderModel
       Cairo.setSourceRGB 0 0 0
       sequence_
         [ do
-          withPoint Cairo.moveTo (labelsOrigin `addP` Vector 0 (n * 10))
-          Cairo.showText msgLabel
-          Cairo.newPath
+            withPoint Cairo.moveTo (labelsOrigin `addP` Vector 0 (n * 10))
+            Cairo.showText msgLabel
+            Cairo.newPath
         | ((msgLabel, _), n) <- zip msgLabels [0 ..]
         ]
       Cairo.restore
@@ -846,18 +846,18 @@ leiosSimVizRenderModel
       Cairo.save
       sequence_
         [ do
-          Cairo.setSourceRGB r g b
-          Cairo.arc (x - 10) y' 10 0 (2 * pi)
-          Cairo.fillPreserve
-          Cairo.setSourceRGB 0 0 0
-          Cairo.setLineWidth 1
-          Cairo.stroke
-          case nodeMessageText msg of
-            Nothing -> return ()
-            Just txt -> do
-              Cairo.moveTo (x - 32) (y' + 5)
-              Cairo.showText txt
-              Cairo.newPath
+            Cairo.setSourceRGB r g b
+            Cairo.arc (x - 10) y' 10 0 (2 * pi)
+            Cairo.fillPreserve
+            Cairo.setSourceRGB 0 0 0
+            Cairo.setLineWidth 1
+            Cairo.stroke
+            case nodeMessageText msg of
+              Nothing -> return ()
+              Just txt -> do
+                Cairo.moveTo (x - 32) (y' + 5)
+                Cairo.showText txt
+                Cairo.newPath
         | (node, msgs) <- Map.toList msgsAtNodeQueue
         , (n, msg) <- zip [1 ..] msgs
         , let (Point x y) =
@@ -870,18 +870,18 @@ leiosSimVizRenderModel
         ]
       sequence_
         [ do
-          Cairo.setSourceRGB r g b
-          Cairo.arc (x + 10) y' 10 0 (2 * pi)
-          Cairo.fillPreserve
-          Cairo.setSourceRGB 0 0 0
-          Cairo.setLineWidth 1
-          Cairo.stroke
-          case nodeMessageText msg of
-            Nothing -> return ()
-            Just txt -> do
-              Cairo.moveTo (x + 22) (y' + 5)
-              Cairo.showText txt
-              Cairo.newPath
+            Cairo.setSourceRGB r g b
+            Cairo.arc (x + 10) y' 10 0 (2 * pi)
+            Cairo.fillPreserve
+            Cairo.setSourceRGB 0 0 0
+            Cairo.setLineWidth 1
+            Cairo.stroke
+            case nodeMessageText msg of
+              Nothing -> return ()
+              Just txt -> do
+                Cairo.moveTo (x + 22) (y' + 5)
+                Cairo.showText txt
+                Cairo.newPath
         | (node, msgs) <- Map.toList msgsAtNodeBuffer
         , (n, msg) <- zip [1 ..] msgs
         , let (Point x y) =

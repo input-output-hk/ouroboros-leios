@@ -23,7 +23,7 @@
 }
 
 .heroTitle {
-  margin-bottom: 2rem !important;
+  margin-bottom: 1.25rem !important;
 }
 
 @media (max-width: 997px) {
@@ -195,7 +195,7 @@
   justify-content: center;
   align-items: center;
   gap: 0.625rem;
-  background-color: #333;
+  background-color: rgba(0, 0, 0, 0.7);
   border-radius: 1rem;
 }
 
@@ -225,13 +225,12 @@
 .subtitle {
   font-size: var(--text-xl);
   line-height: var(--line-height-normal);
-  margin: 2.75rem 0;
+  margin: 1.75rem 0;
 }
 
 @media (max-width: 997px) {
   .subtitle {
     font-size: var(--text-base);
-    margin: 3rem 0;
   }
 }
 
@@ -276,7 +275,7 @@
   background-color: transparent;
   --svg-bg-color: transparent;
   --svg-border-color: #555555;
-  --svg-text-color: #e0e0e0;
+  --svg-text-color: #fff;
   --svg-text-secondary: #cccccc;
   --svg-text-muted: #aaaaaa;
   --svg-arrow-color: #bbbbbb;
@@ -339,7 +338,6 @@
 
 .svgCaption {
   margin-top: 0.69rem;
-  color: var(--ifm-color-caption);
   text-align: center;
   line-height: 1.5;
 }

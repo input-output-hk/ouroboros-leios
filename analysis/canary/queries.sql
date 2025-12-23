@@ -44,7 +44,7 @@ create temporary table canary_txs as
 select
     time
   , delay
-  , json
+  , sub_slot_no
   , round(avg(delay) over (order by time rows between 4 preceding and current row), 1) as avg_delay_1h
   , round(avg(delay) over (order by time rows between 24 preceding and current row), 1) as avg_delay_6h
   from canary
