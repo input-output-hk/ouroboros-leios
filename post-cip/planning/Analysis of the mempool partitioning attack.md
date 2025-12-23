@@ -45,10 +45,10 @@ In addition to informing research and networking experts, memory pool modeling a
 	- [x] Fraction of transaction spent in the block they were created.
 	- [x] Distribution of transaction lifetime (blocks and slots).
 	- [x] Distribution of length of transaction chains in consecutive blocks.
-- [ ] [#646](https://github.com/input-output-hk/ouroboros-leios/issues/646) Block analysis
+- [x] [#646](https://github.com/input-output-hk/ouroboros-leios/issues/646) Block analysis
 	- [x] Distribution of block utilization.
 	- [x] Temporal autocorrelation of block utilization.
-	- [ ] Temporal autocorrelation of highly utilized blocks.
+	- [x] Temporal autocorrelation of highly utilized blocks.
 - [ ] [#647](https://github.com/input-output-hk/ouroboros-leios/issues/647) Peer telemetry experiment and CF topology dataset
 	- [ ] Geographic distance of block or transaction providers.
 	- [ ] Distribution of frequency of block or transaction provision by downstream nodes.
