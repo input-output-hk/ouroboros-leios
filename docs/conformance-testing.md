@@ -3,7 +3,7 @@
 The goal of conformance testing is to check that an implementation of a protocol behaves as described in the formal specification of the protocol.
 In Leios this is achieved by doing trace verification. The *trace verifier* checks, whether a trace log corresponds to a possible execution path of the relation in the formal specification. If it accepts a trace, the trace verifier produces a correctness proof, otherwise a proof for a specific failure is provided.
 
-A formal specification for a consenus protocol usually has safety and liveness properties proved. The trace verifier serves as the connection for testing conformance of the implementation against this verified model.
+A formal specification for a consensus protocol usually has safety and liveness properties proved. The trace verifier serves as the connection for testing conformance of the implementation against this verified model.
 
 ## Formal specification
 
@@ -13,11 +13,32 @@ Different variants of the Leios protocol have been explored in the formal specif
 
 ## Trace verification
 
-Trace verification checks, whether an *execution trace* of the Leios protocol is a possible realization of the formal specification. This idea has been developed in the [formal-streamlet](https://github.com/input-output-hk/formal-streamlet) protocol and been adapted in the [Fast-BFT](https://github.com/input-output-hk/innovation-fastbft) and Leios projects. Trace verification in the Leios project is currently implemented for Short and Linear Leios.
+Trace verification checks, whether an *execution trace* of the Leios protocol is a possible realization of the formal specification. This idea has been developed in the [formal-streamlet](https://github.com/input-output-hk/formal-streamlet) protocol and been adapted in the [Fast-BFT](https://github.com/input-output-hk/innovation-fastbft) and Leios projects. Trace verification in the Leios project is currently implemented for Linear Leios.
 
-An execution trace is defined as a list of actions, where an *action* provides the necessary input for the rule selection. As long as for an action the pre-conditions for a transition step can be fulfilled, the step can be executed and is therefore correct with respect to the formal specification. Steps are done sequentially and for every step there is a correctness proof until a transition fails with a proof for a specific failure. Error handling is the interpretation of the failure proofs, mapping the failure proofs to informative error messages that can be displayed in the output of the trace verifier.
+#### Actions an execution trace
 
-In order to be able to build explicit traces, the generic entities of the trace verifier and the formal specification need to be instantiated by specifying the parameters for the parameterized modules. An exmaple trace and it's verification can be found in [trace verifier example](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Linear/Trace/Verifier/Test.lagda.md).
+An *action* provides the necessary input for the rule selection. As long as for an action the pre-conditions for a transition step can be fulfilled, the step can be executed and is therefore correct with respect to the formal specification.
+
+An execution trace (see `TestTrace` in the formal specification) is defined as a list of actions combined with their interactions with the other functionalities. Every action triggers a step in the formal specification and for every step there is a correctness proof, or a proof for a specific failure.
+
+The trace verifier is the decision procedure to decide if an execution trace starting from the specified state is valid or not (`Result` is similar to `Either`):
+
+```agda
+verifyTrace : ∀ (σs : TestTrace) → (s : LeiosState) → Result (Err-verifyTrace σs s) (ValidTrace σs s)
+```
+
+#### Decidability
+
+Linear Leios is specified by a decidable relation, i.e., a relation built by rules, where all the premisses are decidable. By using a technique called *proof by computation* there is no need to explicitly provide the proof obligations when building an execution trace.
+
+
+#### Error handling
+
+Error handling is the interpretation of the failure proofs, [mapping the failure proofs to informative error messages](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Linear/Trace/Verifier.lagda.md#error-handling-1) that can be displayed in the output of the trace verifier.
+
+#### Parameters
+
+In order to be able to build explicit traces, the generic entities of the trace verifier and the formal specification need to be instantiated by specifying the parameters for the parameterized modules. An example trace and it's verification can be found in [trace verifier example](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Linear/Trace/Verifier/Test.lagda.md).
 
 ## Running in Haskell
 
@@ -97,67 +118,12 @@ Make sure, to specify the same topology and configuration files as used to gener
 $ nix run .#linear-leios-trace-verifier -- +RTS -H1G -s -RTS --trace-file trace.log --config-file data/simulation/config.default.yaml --topology-file leios-trace-verifier/examples/topology.yaml --idSut 0
 ```
 ### Unit tests
-Along with the Haskell module for the trace verifier, there is a [small DSL](../leios-trace-verifier/hs-src/test/Spec.hs) that allows building test-traces for property based tests in Haskell. The library allows to build specific positive and negative scenarios that are tested using quick-check. A test run looks as follows:
+Along with the Haskell module for the trace verifier, there is a [small DSL](../leios-trace-verifier/hs-src/test/Spec.hs) that allows building test-traces for property based tests in Haskell. The library allows to build specific positive and negative scenarios that are tested using quick-check. In addition there are some golden tests provided as valid and invalid trace files in JSON format. The test suite is run with nix as follows:
 
 ```bash
-$ cabal test
-Build profile: -w ghc-9.10.1 -O1
-In order, the following will be built (use -v for more details):
- - trace-parser-0.1.0.0 (test:test-trace-verifier) (first run)
-Preprocessing test suite 'test-trace-verifier' for trace-parser-0.1.0.0...
-Building test suite 'test-trace-verifier' for trace-parser-0.1.0.0...
-Running 1 test suites...
-Test suite test-trace-verifier: RUNNING...
-
-Generated traces
-  Positive cases
-    Genesis slot [✔]
-      +++ OK, passed 1 test.
-    Generate RB [✔]
-      +++ OK, passed 1 test.
-    Generate IB [✔]
-      +++ OK, passed 1 test.
-    Generate no IB [✔]
-      +++ OK, passed 1 test.
-    Generate EB [✔]
-      +++ OK, passed 1 test.
-    Generate no EB [✔]
-      +++ OK, passed 1 test.
-    Generate VT [✔]
-      +++ OK, passed 1 test.
-    Generate no VT [✔]
-      +++ OK, passed 1 test.
-    Skip block production [✔]
-      +++ OK, passed 100 tests.
-    Sporadic block production [✔]
-      +++ OK, passed 100 tests.
-    Noisy block production [✔]
-      +++ OK, passed 100 tests.
-  Negative cases
-    No actions [✔]
-      +++ OK, passed 1 test.
-    Start after genesis [✔]
-      +++ OK, passed 1 test.
-    Failure to generate IB [✔]
-      +++ OK, passed 1 test.
-    Failure to generate EB [✔]
-      +++ OK, passed 1 test.
-    Failure to generate VT [✔]
-      +++ OK, passed 1 test.
-Golden traces
-  Verify valid traces
-    agda-1.jsonl [✔]
-  Reject invalid traces
-    agda-2.jsonl [✔]
-    case-1.jsonl [✔]
-
-Finished in 0.4433 seconds
-19 examples, 0 failures
-Test suite test-trace-verifier: PASS
-Test suite logged to:
-/home/yves/code/ouroboros-leios/leios-trace-verifier/dist-newstyle/build/x86_64-linux/ghc-9.10.1/trace-parser-0.1.0.0/t/test-trace-verifier/test/trace-parser-0.1.0.0-test-trace-verifier.log
-1 of 1 test suites (1 of 1 test cases) passed.
+$ nix run .#test-trace-verifier
 ```
+
 As a result of the fine grained error handling in the trace verifier, using this technique negative tests can be tailored to detect very specific small deviations from the specification in traces.
 ## Appendix
 ### Categorical crypto framework
@@ -170,7 +136,6 @@ This is different to the formal specifications of [Ouroboros Peras](https://gith
 
 ### TODOs
 
-* Move Linear Leios, specification and trace verifier code into a separate module or repo. The other Leios variants are more complex than Linear Leios and therefore the general model in the formal specification might be confusing with Linear Leios
 * Currently the leader selection is inferred from the log file. The formal specification needs to run the leader selection algorithm with the same seed as the node. This is a requirement for the trace verifier to be used for *live monitoring* in a production system
 * [PR-605](https://github.com/input-output-hk/ouroboros-leios/pull/605) introduced the feature, that allows the trace verifier to start at an arbitrary slot. This needs to be more generalized, in order for the trace verifier to start with an arbitrary state
 * The performance of the trace verifier needs to be improved: When running long traces, the performance degrades significantly (the Haskell garbage collector taking a lot of resources)
