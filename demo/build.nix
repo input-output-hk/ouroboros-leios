@@ -52,6 +52,7 @@
               # Configurable (if you see DEF_FOO that's a default value for FOO if unset)
               DEF_CARDANO_NODE = config.devShells.dev-demo.CARDANO_NODE;
               DEF_IMMDB_SERVER = config.devShells.dev-demo.IMMDB_SERVER;
+              DEF_SS_HTTP_EXPORTER = config.devShells.dev-demo.SS_HTTP_EXPORTER;
               DEF_LEIOS_MANIFEST = ./manifest.json;
               DEF_DATA_DIR = ./data;
               DEF_ANALYSE_PY = ./analyse.py;
@@ -145,6 +146,7 @@
 
           CARDANO_NODE = pkgs.lib.getExe inputs'.cardano-node.packages.cardano-node;
           IMMDB_SERVER = pkgs.lib.getExe inputs'.ouroboros-consensus.legacyPackages.hsPkgs.ouroboros-consensus-cardano.components.exes.immdb-server;
+          SS_HTTP_EXPORTER = pkgs.lib.getExe config.packages.ss_http_exporter;
         };
       };
 
