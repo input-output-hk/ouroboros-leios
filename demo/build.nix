@@ -19,6 +19,17 @@
           leios-demo-tool = ouroboros-consensus.components.exes.leiosdemo202510;
         })
         // rec {
+          generate-leios-db = pkgs.writeShellApplication {
+            name = "generate-leios-db";
+            runtimeInputs =
+              config.devShells.dev-demo.nativeBuildInputs ++ config.devShells.dev-demo.buildInputs ++ [ pkgs.jq ];
+            text = ''
+              # Set default manifest to the one packaged with this demo
+              DEFAULT_MANIFEST="${./manifest.json}"
+              ${builtins.readFile ./scripts/generate-leios-db.sh}
+            '';
+          };
+
           leios-demo = pkgs.writeShellApplication {
             name = "leios-demo";
             runtimeInputs =
