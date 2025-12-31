@@ -52,6 +52,8 @@ nix run .#demo-2025-11
 nix run .#demo-2025-10
 ```
 
+**Note:** The demo requires sudo privileges to create network namespaces and configure traffic control. When the process-compose UI starts, navigate to the `InitNamespaces` process and provide your password when prompted. This is needed to simulate isolated network environments with realistic bandwidth and latency constraints between the nodes.
+
 ## Background Concepts
 
 Before diving into configuration and customization, it's helpful to understand the key components and concepts used in the demo.
