@@ -100,7 +100,7 @@ SECONDS_UNTIL_REF_SLOT=5
 LEIOS_MANIFEST=manifest.json
 
 # Analysis tools
-ANALYZE=analyse.py
+ANALYSE=analyse.py
 PYTHON3=python
 
 # Network parameters (for 2025-11 demo onwards, using tc)

@@ -55,7 +55,7 @@
               DEF_SS_HTTP_EXPORTER = config.devShells.dev-demo.SS_HTTP_EXPORTER;
               DEF_LEIOS_MANIFEST = ./manifest.json;
               DEF_DATA_DIR = ./data;
-              DEF_ANALYSE_PY = ./analyse.py;
+              DEF_ANALYSE = ./analyse.py;
               DEF_PYTHON3 = lib.getExe (
                 pkgs.python3.withPackages (
                   ps: with ps; [

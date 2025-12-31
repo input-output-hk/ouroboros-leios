@@ -113,7 +113,7 @@ processes:
 
       while true; do
         sleep 1
-        "$PYTHON3" "$ANALYSE_PY" \
+        "$PYTHON3" "$ANALYSE" \
           "$REF_SLOT" "$ONSET_OF_REF_SLOT" \
           "$UPSTREAM_NODE_DIR/schedule.json" \
           "$WORKING_DIR/upstream-node.log" \
