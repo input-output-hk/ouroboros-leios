@@ -37,7 +37,6 @@ processes:
       restart: "always"
 
   PrepareNode0:
-    is_elevated: true
     command: |
       bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/prepare-node0.sh"
     depends_on:
@@ -58,7 +57,6 @@ processes:
       restart: "always"
 
   PrepareDownstreamNode:
-    is_elevated: true
     command: |
       bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/prepare-downstream-node.sh"
     depends_on:
