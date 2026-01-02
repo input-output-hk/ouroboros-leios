@@ -49,14 +49,14 @@ In addition to informing research and networking experts, memory pool modeling a
 	- [x] Distribution of block utilization.
 	- [x] Temporal autocorrelation of block utilization.
 	- [x] Temporal autocorrelation of highly utilized blocks.
-- [ ] [#647](https://github.com/input-output-hk/ouroboros-leios/issues/647) Peer telemetry experiment and CF topology dataset
-	- [ ] Geographic distance of block or transaction providers.
-	- [ ] Distribution of frequency of block or transaction provision by downstream nodes.
-	- [ ] Persistence (temporal autocorrelation) of active peers.
-	- [ ] Number of active peers.
-	- [ ] Frequency of out-of-ASN and out-of-region hops.
-	- [ ] Connectivity matrix heat map.
-	- [ ] Filtration of topological components by long hops.
+- [x] [#647](https://github.com/input-output-hk/ouroboros-leios/issues/647) Peer telemetry experiment and CF topology dataset
+	- [x] Geographic distance of block or transaction providers.
+	- [x] Distribution of frequency of block or transaction provision by downstream nodes.
+	- [ ] ~~Persistence (temporal autocorrelation) of active peers.~~
+	- [ ] ~~Number of active peers.~~
+	- [ ] ~~Frequency of out-of-ASN and out-of-region hops.~~
+	- [ ] ~~Connectivity matrix heat map.~~
+	- [ ] ~~Filtration of topological components by long hops.~~
 
 ### [#667](https://github.com/input-output-hk/ouroboros-leios/issues/667) Modeling the memory pools and their spatio-temporal correlations
 
