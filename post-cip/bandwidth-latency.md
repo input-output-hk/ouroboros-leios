@@ -56,6 +56,23 @@ Because bandwidth between nodes has been identified as a critical resource that 
 
 The OVH machines are inexpensive instances, the AWS is a `r5a.4xlarge`, and CenturyLink is a local ISP. Overall, it looks like 100 Mbps is a conservative lower bound.
 
+## RIPE Atlas ping dataset
+
+[RIPE Atlas](https://atlas.ripe.net/) uses a global network of probes to measure metrics like latencies between machines scattered on the internet. We downloaded a snapshot of this dataset and examine the `ping` latencies.
+
+### Inter-ASN
+
+![Inter-ASN latencies in RIPE Atlas ping dataset](../data/internet/asn-to-asn.svg)
+### Inter-country
+
+![Inter-ASN latencies in RIPE Atlas ping dataset](../data/internet/cty-to-cty.svg)
+
+### Intra-ASN
+
+| Observations |    RTT mean | RTT standard deviation | RTT minimum | RTT maximum |
+| -----------: | ----------: | ---------------------: | ----------: | ----------: |
+|  145,057,189 | 80.41246 ms |            103.5428 ms |        0 ms | 249625.7 ms |
+
 ## Analysis from Gemini Pro[^1]
 
 [^1]: The response was independently checked with Kagi.
