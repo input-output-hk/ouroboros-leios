@@ -5,25 +5,9 @@ import styles from "./styles.module.css";
 // List of available Agda modules with their actual file paths
 const AGDA_MODULES = [
   {
-    name: "Leios Protocol",
-    path: "Leios.Protocol.html",
-    description: "Protocol state and transitions",
-  },
-  {
-    name: "Leios Blocks",
-    path: "Leios.Blocks.html",
-    description: "Block structure and validation",
-  },
-  {
-    name: "Leios Network",
-    path: "Leios.Network.html",
-    description: "Network communication and messages",
-  },
-  {
-    name: "Short Leios Variant",
-    path: "Leios.Short.html",
-    description:
-      "A specific variant of the Leios protocol with fewer stages per pipeline.",
+    name: "Leios Linear",
+    path: "Leios.Linear.html",
+    description: "Linear Leios Protocol state and transitions",
   },
   {
     name: "Network Basic Broadcast",
