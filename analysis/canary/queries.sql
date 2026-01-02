@@ -8,6 +8,7 @@ select
   , block.slot_no
   , cast(tx_metadata.json ->> 'absolute_slot' as word63type) as sub_slot_no
   , block.slot_no - cast(tx_metadata.json ->> 'absolute_slot' as word63type) as delay 
+  , (block.size :: real) / (epoch_param.max_block_size :: real) as block_utilization
   from tx_out                                        
   inner join tx_in
     on tx_out.tx_id = tx_in.tx_out_id
@@ -15,6 +16,8 @@ select
     on (tx.id, tx_in.tx_out_index) = (tx_in.tx_in_id, tx_out.index)
   inner join block
     on tx.block_id = block.id
+  inner join epoch_param
+    on epoch_param.epoch_no = block.epoch_no
   inner join tx_metadata
     on tx_metadata.tx_id = tx.id
   where block.slot_no > 129832246
@@ -47,6 +50,7 @@ select
   , sub_slot_no
   , round(avg(delay) over (order by time rows between 4 preceding and current row), 1) as avg_delay_1h
   , round(avg(delay) over (order by time rows between 24 preceding and current row), 1) as avg_delay_6h
+  , block_utilization
   from canary
 order by time desc
 ;
@@ -60,10 +64,11 @@ create temporary table canary_blocks as
 select
     canary.time
   , count(block.block_no) as block_delay
+  , block_utilization
   from canary
   join block
     on block.slot_no <= canary.slot_no and block.slot_no >= canary.sub_slot_no 
-  group by canary.time
+  group by canary.time, block_utilization
 order by canary.time desc
 ;
 
