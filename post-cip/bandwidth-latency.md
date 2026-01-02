@@ -1,12 +1,26 @@
-# Bandwidth estimates
+# Bandwidth and latency estimates
 
 ### Benchmarking cluster
 
-The Cardano Node benchmarking team kindly provided bandwidth measurements (using `iperf3`) for data centers on three continents. The results are consistent with previous measurements and with Leios requirements.
+#### Bandwidth
+
+The Cardano Node benchmarking team kindly provided bandwidth measurements (using `iperf3`) for data centers on three continents.
 
 ![Bandwidth measurements form node benchmarking cluster](../analysis/bandwidth/bm-bw.png)
 
-## Inter-datacenter for common cloud providers
+#### Latencies
+
+The Cardano Node benchmarking team kindly provided latency measurements (using `ping`) for data centers on three continents.
+
+##### Overview
+
+![Latency measurements form node benchmarking cluster](benchmark-latency-grid.svg)
+
+##### Detail
+
+![Latency measurements form node benchmarking cluster](benchmark-latency-wrap.svg)
+
+## Inter-datacenter bandwidth for common cloud providers
 
 Because bandwidth between nodes has been identified as a critical resource that limits Leios throughput, we conducted an unscientific experiment, using `iperf3` for bidirectional measurements between locations in North America and Europe:
 
