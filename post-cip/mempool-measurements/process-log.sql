@@ -47,6 +47,7 @@ select
   , extract(epoch from (tx_times.logged - xref.time)) as mempool_minus_slot
   , extract(epoch from (block_times.logged - xref.time)) as block_minus_slot
   , case when coalesce(tx_times.logged < block_times.logged, false) then 'TRUE' else 'FALSE' end as tx_seen_first
+  , block_utilization
   from slot_range
   inner join (
     select
@@ -55,7 +56,10 @@ select
       , encode(block.hash, 'hex') as block_hash
       , encode(tx.hash, 'hex') as tx_hash
       , left(encode(tx.hash, 'hex'), 8) as tx_hash8
+      , (block.size :: real) / (epoch_param.max_block_size :: real) as block_utilization
       from block
+      inner join epoch_param
+        on epoch_param.epoch_no = block.epoch_no
       inner join tx
         on tx.block_id = block.id
       where block.slot_no >= (select min(slot_no) from block_times)
@@ -79,9 +83,10 @@ select
   , slot_no
   , tx_seen_first
   , count(*) as tx_count
+  , block_utilization
   from mempool_vs_blocks
   where region is not null
-  group by region, slot_no, tx_seen_first
+  group by region, slot_no, tx_seen_first, block_utilization
 order by 1, 2, 3
 ;
 
@@ -131,6 +136,7 @@ select
   , encode(tx.hash, 'hex') as tx_hash
   , cast(tx_metadata.json ->> 'absolute_slot' as word63type) as sub_slot_no
   , block.slot_no - cast(tx_metadata.json ->> 'absolute_slot' as word63type) as delay 
+  , (block.size :: real) / (epoch_param.max_block_size :: real) as block_utilization
   from tx_out                                        
   inner join tx_in
     on tx_out.tx_id = tx_in.tx_out_id
@@ -138,6 +144,8 @@ select
     on (tx.id, tx_in.tx_out_index) = (tx_in.tx_in_id, tx_out.index)
   inner join block
     on tx.block_id = block.id
+  inner join epoch_param
+    on epoch_param.epoch_no = block.epoch_no
   inner join slot_range
     on block.slot_no between slot_range.min_slot_no and slot_range.max_slot_no
   inner join tx_metadata
@@ -163,9 +171,12 @@ select distinct
       when block.time between '2025-11-26 14:22:00' and '2025-11-26 14:25:00' then '2025-11-26 14:23:16'
     end :: timestamp without time zone as time
   , encode(tx.hash, 'hex') as tx_hash
+  , (block.size :: real) / (epoch_param.max_block_size :: real) as block_utilization
   from tx
   inner join block
     on block.id = tx.block_id
+  inner join epoch_param
+    on epoch_param.epoch_no = block.epoch_no
   inner join tx_in
     on tx_in.tx_in_id = tx.id
   inner join tx_out
