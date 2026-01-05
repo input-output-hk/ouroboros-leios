@@ -304,17 +304,20 @@ Each entry contains a **slot number** (fractional) and EB metadata:
 **Understanding the entries:**
 
 Each EB generates **two messages**:
+
 1. **Block offer** (with size): Slot 129.0 for EB 0, slot 130.0 for EB 1
 2. **Transactions offer** (without size): Slot 129.1 for EB 0, slot 130.1 for EB 1
 
 **How `immdb-server` uses the schedule:**
 
 The slot numbers are converted to wall-clock times using:
-```
+
+```shell
 send_time = ONSET_OF_REF_SLOT + (schedule_slot - REF_SLOT)
 ```
 
 With `REF_SLOT=41` and `ONSET_OF_REF_SLOT=1735561000`:
+
 - Slot 129.0 → sends at `1735561000 + (129.0 - 41) = 1735561088` (unix timestamp)
 - Slot 129.1 → sends at `1735561000 + (129.1 - 41) = 1735561088.1`
 - Slot 130.0 → sends at `1735561000 + (130.0 - 41) = 1735561089`
@@ -327,36 +330,38 @@ Schedules allow precise timing of Leios traffic to overlap with Praos block diff
 
 The SQLite database associated to an EB schedule contains:
 
- - txCache table: Transaction storage
-    - txHashBytes: Transaction hash (primary key)
-    - txBytes: CBOR-encoded transaction data
-    - txBytesSize: Size in bytes
-    - expiryUnixEpoch: Expiration timestamp
-  - ebPoints table: EB metadata
-    - ebSlot: Slot number
-    - ebHashBytes: EB hash
-    - ebId: Internal identifier
-  - ebTxs table: EB-transaction mappings
-    - ebId: References ebPoints.ebId
-    - txOffset: Transaction position within EB
-    - txHashBytes: References txCache.txHashBytes
-    - txBytesSize: Transaction size
-    - txBytes: Transaction data (nullable)
+- txCache table: Transaction storage
+  - txHashBytes: Transaction hash (primary key)
+  - txBytes: CBOR-encoded transaction data
+  - txBytesSize: Size in bytes
+  - expiryUnixEpoch: Expiration timestamp
+- ebPoints table: EB metadata
+  - ebSlot: Slot number
+  - ebHashBytes: EB hash
+  - ebId: Internal identifier
+- ebTxs table: EB-transaction mappings
+  - ebId: References ebPoints.ebId
+  - txOffset: Transaction position within EB
+  - txHashBytes: References txCache.txHashBytes
+  - txBytesSize: Transaction size
+  - txBytes: Transaction data (nullable)
 
 ## Pre-generating Leios databases and schedules
 
 You can pre-generate Leios databases and EB schedules independently from running the demo.
 
-#### Basic generation
+### Basic generation
+
+Generate with default settings
 
 ```shell
-# Generate with default settings
 nix run .#generate-leios-db
-
-# Outputs to ./leios-data/ by default:
-#   - leios.db           # SQLite database with EB and transaction data
-#   - base-schedule.json # Base schedule with relative timing (before offset is applied)
 ```
+
+Outputs to ./leios-data/ by default:
+
+- leios.db           # SQLite database with EB and transaction data -->
+- base-schedule.json # Base schedule with relative timing (before offset is applied) -->
 
 **Note:** The final `schedule.json` (with `EB_RELEASE_OFFSET` applied) is generated at runtime by the demo, allowing you to test different release timings without regenerating the database.
 
@@ -463,7 +468,7 @@ nix flake lock --update-input cardano-node --update-input ouroboros-consensus
 Every `build.nix` files is a [flake-parts module](https://flake.parts/) and is
 automatically loaded when found.
 
-## Using the repository
+## Developing the demo
 
 Enter the shell either by
 
@@ -488,19 +493,10 @@ nixfmt-rfc-style.........................................................Passed
 shellcheck...............................................................Passed
 ```
 
-or alternatively in the shell
+And to invoke the Demo specific formatting use
 
 ```shell
-$ pre-commit run --all
-black................................................(no files to check)Skipped
-deadnix..................................................................Passed
-markdownlint.............................................................Passed
-nixfmt-rfc-style.........................................................Passed
-shellcheck...............................................................Passed
+nix build .#checks.x86_64-linux.pre-commit-demo
 ```
 
-This repository is using
-[git-hooks.nix](https://github.com/cachix/git-hooks.nix) and you can manage them in:
-
-1. [top level configuration](../pre-commit-hooks.nix).
-1. [demo configuration](./pre-commit-hooks.nix).
+To configure the Demo [git-hooks.nix](https://github.com/cachix/git-hooks.nix) edit the [./pre-commit-hooks.nix](./pre-commit-hooks.nix).
