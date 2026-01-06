@@ -8,16 +8,17 @@ import Leios.Linear.Stats
 import Praos.BlockDiffusion
 import Text.Printf
 
-cipConfig :: Config
-cipConfig =
-  Config
-    { lHdr = 1
-    , lVote = 4
-    , lDiff = 7
-    }
-
 main :: IO ()
-main = do
+main =
+  mainWith
+    Config
+      { lHdr = 1
+      , lVote = 4
+      , lDiff = 7
+      }
+
+mainWith :: Config -> IO ()
+mainWith c = do
   _ <-
     renderableToFile def{_fo_format = SVG} "block-diffustion.svg" $
       toRenderable $
@@ -41,13 +42,13 @@ main = do
 
   printf
     "Probability that a header arrives on time: %.2f\n"
-    $ (fromRational (pHeaderOnTime cipConfig) :: Double)
+    $ (fromRational (pHeaderOnTime c) :: Double)
   printf
     "Probability that EB validation is completed before voting is over: %.2f\n"
-    $ (fromRational (pValidating cipConfig) :: Double)
-  printf "Probability of Quorum: %.2f\n" (pQuorum cipConfig)
+    $ (fromRational (pValidating c) :: Double)
+  printf "Probability of Quorum: %.2f\n" (pQuorum c)
   printf
     "Probability that the next Praos block has already been produced after the waiting period: %.4f\n"
-    (pBlock cipConfig)
-  printf "Probability that an EB is certified: %.4f\n" (pCertified cipConfig)
-  printf "Expected time for certified EB: %.2f slots" (1 / (eCertifiedEB cipConfig))
+    (pBlock c)
+  printf "Probability that an EB is certified: %.4f\n" (pCertified c)
+  printf "Expected time for certified EB: %.2f slots\n" (1 / (eCertifiedEB c))
