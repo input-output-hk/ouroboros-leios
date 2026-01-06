@@ -24,8 +24,8 @@ main = do
               layout_title .= "Quorum distribution"
               plot (line "pQuorum" [vs])
 
-  print lVoteEstimated
-  print lDiffEstimated
+  maybe (print "Nothing") (printf "Estimate for lVote: %d\n") lVoteEstimated
+  maybe (print "Nothing") (printf "Estimate for lDiff: %d\n") lDiffEstimated
 
   printf "Probability that a header arrives on time: %.2f\n" $ (fromRational pHeaderOnTime :: Double)
   printf "Probability that EB validation is completed before voting is over: %.2f\n" $ (fromRational pValidating :: Double)
@@ -33,5 +33,3 @@ main = do
   printf "Probability that the next Praos block has already been produced after the waiting period: %.4f\n" pBlock
   printf "Probability that an EB is certified: %.4f\n" pCertified
   printf "Expected time for certified EB: %.2f slots" (1 / eCertifiedEB)
-
-  pure ()

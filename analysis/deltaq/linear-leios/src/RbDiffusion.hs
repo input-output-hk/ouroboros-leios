@@ -1,8 +1,13 @@
 {- Leios RB diffusion
+
+The module specifies a module for Ranking Block diffusion in Leios,
+which is equal to the block diffusion for Praos. See also
+* Modelling Block Diffusion in Cardano using ∆Q in
+  https://github.com/IntersectMBO/cardano-formal-specifications
 -}
 module RbDiffusion where
 
-import DeltaQ (DQ, DeltaQ (choices), Outcome (wait, (./\.), (.>>.), (.\/.)))
+import DeltaQ (DQ, DeltaQ (choices), Outcome (wait, (.>>.)))
 
 data BlockSize = B64 | B256 | B512 | B1024 | B2048
   deriving (Show, Eq)
@@ -34,21 +39,16 @@ long B2048 = wait 1.867
 hop :: BlockSize -> DQ
 hop b = choices [(1, short b), (1, medium b), (1, long b)]
 
-doSequentially :: [DQ] -> DQ
-doSequentially = foldr (.>>.) (wait 0)
-
-doAll :: [DQ] -> DQ
-doAll = foldr (./\.) (wait 0)
-
-doAny :: [DQ] -> DQ
-doAny = foldr (.\/.) (wait 0)
-
 hops :: Int -> BlockSize -> DQ
 hops n b = doSequentially (replicate n (hop b))
+ where
+  doSequentially :: [DQ] -> DQ
+  doSequentially = foldr (.>>.) (wait 0)
 
 blendedDelay :: BlockSize -> DQ
 blendedDelay b = choices $ map (\(n, p) -> (p, hops n b)) hopCount
  where
+  -- values are taken from topology checker tool
   hopCount = [(1, 1909), (2, 3867), (3, 2826), (4, 1068), (5, 214), (6, 16)]
 
 emitRBHeader :: DQ

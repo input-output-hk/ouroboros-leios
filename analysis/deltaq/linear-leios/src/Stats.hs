@@ -1,12 +1,12 @@
 {-
-Questions to ask
-\* Probablity of certification for an EB
-\* Probability to be in the voting committee
+Questions to ask:
+1. Probablity of certification for an EB
+  * Probability to be in the voting committee
   * Probability that votes are delivered on-time
-  * Probability of a quorum
+    * Probability of a quorum
     * Probability no RB/EB has been produced before:
-\* Expectation of distribution of certified EBs (see throughput analysis)
-\* Probability of safety property violation
+2. Expectation of distribution of certified EBs (see throughput analysis)
+3. Probability of safety property violation
 -}
 module Stats where
 
@@ -55,9 +55,9 @@ votingThreshold = 3 % 4
 
 {-
 Step 1: Block Production
-The poisson schedule for the block production implies that the waiting time for the next block is exponentially distributed with lambda (active slot coefficient)
+The poisson schedule for the block production implies that the waiting time for the
+next block is exponentially distributed with lambda (active slot coefficient)
 -}
-
 praosBlockDistr :: S.ExponentialDistribution
 praosBlockDistr = S.exponential (fromRational lambda)
 
@@ -66,7 +66,6 @@ Step 2: EB Distribution
 Step 3: Committee Validation
 The RB header arrived within
 -}
-
 pHeaderOnTime :: Probability DQ
 pHeaderOnTime = successWithin emitRBHeader lHdr
 
@@ -148,7 +147,7 @@ Assumption: The mem-pools are synchronized up to
 This implies, that EBs are diffused on time
 -}
 eCertifiedEB :: Double
-eCertifiedEB = (l * (1 - l)) ** n
+eCertifiedEB = l * ((1 - l) ** n)
  where
   n = fromRational $ 3 * lHdr + lVote + lDiff
   l = fromRational lambda
