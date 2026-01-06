@@ -1,5 +1,8 @@
+{-# LANGUAGE RecordWildCards #-}
+
 module Main where
 
+import Data.Ratio ((%))
 import DeltaQ
 import Graphics.Rendering.Chart.Backend.Cairo
 import Graphics.Rendering.Chart.Easy
@@ -12,13 +15,20 @@ main :: IO ()
 main =
   mainWith
     Config
-      { lHdr = 1
+      { -- cip
+        lHdr = 1
       , lVote = 4
       , lDiff = 7
+      , votingThreshold = 3 % 4
+      , -- estimate
+        committeeSizeEstimated = 600
+      , -- mainnet
+        lambda = 1 % 20
+      , nPools = 2500
       }
 
 mainWith :: Config -> IO ()
-mainWith c = do
+mainWith c@Config{..} = do
   _ <-
     renderableToFile def{_fo_format = SVG} "block-diffustion.svg" $
       toRenderable $
@@ -32,7 +42,7 @@ mainWith c = do
     renderableToFile def{_fo_format = SVG} "quorumProb.svg" $
       toRenderable $
         let xs = [0.50, 0.51 .. 1]
-            vs = [(x, quorumProbability x committeeSizeEstimated (fromRational votingThreshold)) | x <- xs]
+            vs = [(x, quorumProbability c x committeeSizeEstimated (fromRational votingThreshold)) | x <- xs]
          in do
               layout_title .= "Quorum distribution"
               plot (line "pQuorum" [vs])

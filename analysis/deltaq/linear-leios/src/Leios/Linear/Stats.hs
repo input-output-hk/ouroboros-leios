@@ -12,7 +12,6 @@ Questions to ask:
 -}
 module Leios.Linear.Stats where
 
-import Data.Ratio ((%))
 import DeltaQ (DQ, DeltaQ (Probability, quantile, successWithin), maybeFromEventually)
 import Leios.Linear.EbDiffusion (validateEB)
 import Praos.BlockDiffusion (emitRBHeader)
@@ -24,6 +23,10 @@ data Config = Config
   { lHdr :: Rational
   , lVote :: Rational
   , lDiff :: Rational
+  , lambda :: Rational
+  , nPools :: Double
+  , committeeSizeEstimated :: Double
+  , votingThreshold :: Rational
   }
 
 -- The quantiles of validateEB are used to estimate L-vote and L-diff
@@ -38,28 +41,13 @@ lVoteEstimated = round <$> liftA2 (-) q75 (pure 3)
 lDiffEstimated :: Maybe Integer
 lDiffEstimated = round <$> liftA2 (-) q95 q75
 
--- Set the number of stake pools for the analysis
-nPools :: Double
-nPools = 2500
-
--- The active slot coefficient, i.e. the rate of block production
-lambda :: Rational
-lambda = 1 % 20
-
--- Voting committee related parameters
-committeeSizeEstimated :: Double
-committeeSizeEstimated = 600
-
-votingThreshold :: Rational
-votingThreshold = 3 % 4
-
 {-
 Step 1: Block Production
 The poisson schedule for the block production implies that the waiting time for the
 next block is exponentially distributed with lambda (active slot coefficient)
 -}
-praosBlockDistr :: S.ExponentialDistribution
-praosBlockDistr = S.exponential (fromRational lambda)
+praosBlockDistr :: Config -> S.ExponentialDistribution
+praosBlockDistr Config{..} = S.exponential (fromRational lambda)
 
 {-
 Step 2: EB Distribution
@@ -78,8 +66,8 @@ pValidating Config{..} = successWithin validateEB n
  where
   n = 3 * lHdr + lVote
 
-stakeDistribution :: [Double]
-stakeDistribution = map f [0, 1 .. nPools]
+stakeDistribution :: Config -> [Double]
+stakeDistribution Config{..} = map f [0, 1 .. nPools]
  where
   f k = ((k + 1) / nPools) ** 10 - (k / nPools) ** 10
 
@@ -94,26 +82,26 @@ bisectionSearch f low high eps maxIter =
             then bisectionSearch f low mid eps (maxIter - 1)
             else bisectionSearch f mid high eps (maxIter - 1)
 
-calibrateCommittee :: Double -> Double
-calibrateCommittee m =
-  let f x = sum (map (\s -> 1 - exp (-x * s)) stakeDistribution) - m
+calibrateCommittee :: Config -> Double -> Double
+calibrateCommittee c@Config{..} m =
+  let f x = sum (map (\s -> 1 - exp (-x * s)) (stakeDistribution c)) - m
    in bisectionSearch f m nPools 0.5 10
 
-committeeDistribution :: Double -> Double -> (Double, Double)
-committeeDistribution pSuccessfulVote m =
-  let m' = calibrateCommittee m
-      ps = map (\s -> pSuccessfulVote * (1 - exp (-m' * s))) stakeDistribution
+committeeDistribution :: Config -> Double -> Double -> (Double, Double)
+committeeDistribution c pSuccessfulVote m =
+  let m' = calibrateCommittee c m
+      ps = map (\s -> pSuccessfulVote * (1 - exp (-m' * s))) (stakeDistribution c)
       μ = sum ps
       σ = sqrt $ sum $ map (\p -> p * (1 - p)) ps
    in (μ, σ)
 
-quorumProbability :: Double -> Double -> Double -> Double
-quorumProbability pSuccessfulVote m τ =
-  let (μ, σ) = committeeDistribution pSuccessfulVote m
+quorumProbability :: Config -> Double -> Double -> Double -> Double
+quorumProbability c pSuccessfulVote m τ =
+  let (μ, σ) = (committeeDistribution c pSuccessfulVote) m
    in S.complCumulative (S.normalDistr μ σ) (τ * m)
 
 pQuorum :: Config -> Double
-pQuorum c = quorumProbability (fromRational $ pValidating c) committeeSizeEstimated (fromRational votingThreshold)
+pQuorum c@Config{..} = quorumProbability c (fromRational $ pValidating c) committeeSizeEstimated (fromRational votingThreshold)
 
 {-
 The EB is the one announced by the latest RB in the voter's current chain,
@@ -131,7 +119,7 @@ RB' may include a certificate for the EB announced in RB if and only if RB' is a
  slots after RB.
 -}
 pBlock :: Config -> Double
-pBlock Config{..} = S.cumulative praosBlockDistr n
+pBlock c@Config{..} = S.cumulative (praosBlockDistr c) n
  where
   n = fromRational $ 3 * lHdr + lVote + lDiff
 
