@@ -28,6 +28,7 @@ Block producer attacks map to [T16-T18](../threat-model.md). Searcher attacks ar
 |-----|----------|--------------|
 | SundaeSwap | FIFO | Lower |
 | Minswap | FIFO | Lower |
+| WingRiders | FIFO + DAO-enforced compliance | Lower |
 | MuesliSwap | Profit-maximizing | Higher |
 | Splash | Execution Engine Operators + reputation | Variable |
 
@@ -37,6 +38,17 @@ Other vulnerable patterns:
 - **Lending protocols** - liquidation races (Liqwid)
 - **Oracle-dependent apps** - front-running price updates
 - **Auction contracts** - displacement attacks on bids
+
+### Attack Targets: Honest vs Conflicting Transactions
+
+MEV attacks target transactions at two distinct points:
+
+| Target | Attack | Mechanism |
+|--------|--------|-----------|
+| **Honest tx in mempool** | Insertion, sandwich | Attacker observes victim's tx and positions around it |
+| **Attacker-created conflicting tx** | Displacement | Attacker creates tx consuming same UTxO as victim |
+
+On Cardano, displacement is particularly relevant due to eUTxO contention - only one transaction can consume a given UTxO. See [front-running attacks](./attack-vectors/front-running.md) for details.
 
 ## 3. Leios-Specific Considerations
 
