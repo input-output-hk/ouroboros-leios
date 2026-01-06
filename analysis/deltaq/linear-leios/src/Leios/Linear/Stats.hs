@@ -1,3 +1,5 @@
+{-# LANGUAGE RecordWildCards #-}
+
 {-
 Questions to ask:
 1. Probablity of certification for an EB
@@ -18,6 +20,12 @@ import qualified Statistics.Distribution as S
 import qualified Statistics.Distribution.Exponential as S
 import qualified Statistics.Distribution.Normal as S
 
+data Config = Config
+  { lHdr :: Rational
+  , lVote :: Rational
+  , lDiff :: Rational
+  }
+
 -- The quantiles of validateEB are used to estimate L-vote and L-diff
 q75, q95, q99 :: Maybe Rational
 q75 = maybeFromEventually $ quantile validateEB 0.75
@@ -29,12 +37,6 @@ lVoteEstimated = round <$> liftA2 (-) q75 (pure 3)
 
 lDiffEstimated :: Maybe Integer
 lDiffEstimated = round <$> liftA2 (-) q95 q75
-
--- Parameters suggested in the CIP
-lHdr, lVote, lDiff :: Rational
-lHdr = 1
-lVote = 4
-lDiff = 7
 
 -- Set the number of stake pools for the analysis
 nPools :: Double
@@ -64,15 +66,17 @@ Step 2: EB Distribution
 Step 3: Committee Validation
 The RB header arrived within
 -}
-pHeaderOnTime :: Probability DQ
-pHeaderOnTime = successWithin emitRBHeader lHdr
+pHeaderOnTime :: Config -> Probability DQ
+pHeaderOnTime Config{..} = successWithin emitRBHeader lHdr
 
 {-
 It has not detected any equivocating RB header for the same slot,
 It finished validating the EB before slots after the EB slot
 -}
-pValidating :: Probability DQ
-pValidating = successWithin validateEB (3 * lHdr + lVote)
+pValidating :: Config -> Probability DQ
+pValidating Config{..} = successWithin validateEB n
+ where
+  n = 3 * lHdr + lVote
 
 stakeDistribution :: [Double]
 stakeDistribution = map f [0, 1 .. nPools]
@@ -108,8 +112,8 @@ quorumProbability pSuccessfulVote m τ =
   let (μ, σ) = committeeDistribution pSuccessfulVote m
    in S.complCumulative (S.normalDistr μ σ) (τ * m)
 
-pQuorum :: Double
-pQuorum = quorumProbability (fromRational pValidating) committeeSizeEstimated (fromRational votingThreshold)
+pQuorum :: Config -> Double
+pQuorum c = quorumProbability (fromRational $ pValidating c) committeeSizeEstimated (fromRational votingThreshold)
 
 {-
 The EB is the one announced by the latest RB in the voter's current chain,
@@ -126,8 +130,10 @@ Step 5: Chain Inclusion
 RB' may include a certificate for the EB announced in RB if and only if RB' is at least
  slots after RB.
 -}
-pBlock :: Double
-pBlock = S.cumulative praosBlockDistr (fromRational $ 3 * lHdr + lVote + lDiff)
+pBlock :: Config -> Double
+pBlock Config{..} = S.cumulative praosBlockDistr n
+ where
+  n = fromRational $ 3 * lHdr + lVote + lDiff
 
 {-
 Any included certificate must be valid as defined in Certificate Validation.
@@ -137,15 +143,15 @@ If RB' cannot include a certificate due to timing constraints (i.e., fewer than
 
 Regardless of whether RB' includes a certificate, it may optionally announce its own EB for future certification by subsequent blocks.
 -}
-pCertified :: Double
-pCertified = (1 - pBlock) * pQuorum
+pCertified :: Config -> Double
+pCertified c = (1 - pBlock c) * pQuorum c
 
 {-
 Assumption: The mem-pools are synchronized up to
 This implies, that EBs are diffused on time
 -}
-eCertifiedEB :: Double
-eCertifiedEB = l * ((1 - l) ** n)
+eCertifiedEB :: Config -> Double
+eCertifiedEB Config{..} = l * ((1 - l) ** n)
  where
   n = fromRational $ 3 * lHdr + lVote + lDiff
   l = fromRational lambda

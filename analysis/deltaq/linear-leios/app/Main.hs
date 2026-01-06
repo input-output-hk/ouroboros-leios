@@ -8,6 +8,14 @@ import Leios.Linear.Stats
 import Praos.BlockDiffusion
 import Text.Printf
 
+cipConfig :: Config
+cipConfig =
+  Config
+    { lHdr = 1
+    , lVote = 4
+    , lDiff = 7
+    }
+
 main :: IO ()
 main = do
   _ <-
@@ -33,13 +41,13 @@ main = do
 
   printf
     "Probability that a header arrives on time: %.2f\n"
-    $ (fromRational pHeaderOnTime :: Double)
+    $ (fromRational (pHeaderOnTime cipConfig) :: Double)
   printf
     "Probability that EB validation is completed before voting is over: %.2f\n"
-    $ (fromRational pValidating :: Double)
-  printf "Probability of Quorum: %.2f\n" pQuorum
+    $ (fromRational (pValidating cipConfig) :: Double)
+  printf "Probability of Quorum: %.2f\n" (pQuorum cipConfig)
   printf
     "Probability that the next Praos block has already been produced after the waiting period: %.4f\n"
-    pBlock
-  printf "Probability that an EB is certified: %.4f\n" pCertified
-  printf "Expected time for certified EB: %.2f slots" (1 / eCertifiedEB)
+    (pBlock cipConfig)
+  printf "Probability that an EB is certified: %.4f\n" (pCertified cipConfig)
+  printf "Expected time for certified EB: %.2f slots" (1 / (eCertifiedEB cipConfig))
