@@ -8,17 +8,15 @@ Questions to ask:
 2. Expectation of distribution of certified EBs (see throughput analysis)
 3. Probability of safety property violation
 -}
-module Stats where
+module Leios.Linear.Stats where
 
 import Data.Ratio ((%))
+import DeltaQ (DQ, DeltaQ (Probability, quantile, successWithin), maybeFromEventually)
+import Leios.Linear.EbDiffusion (validateEB)
+import Leios.Linear.RbDiffusion (emitRBHeader)
 import qualified Statistics.Distribution as S
 import qualified Statistics.Distribution.Exponential as S
 import qualified Statistics.Distribution.Normal as S
-
-import DeltaQ (DQ, DeltaQ (Probability, quantile, successWithin), maybeFromEventually)
-
-import EbDiffusion (validateEB)
-import RbDiffusion (emitRBHeader)
 
 -- The quantiles of validateEB are used to estimate L-vote and L-diff
 q75, q95, q99 :: Maybe Rational

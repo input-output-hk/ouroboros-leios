@@ -1,15 +1,12 @@
 module Main where
 
-import EbDiffusion
-import RbDiffusion
-import Stats
-
 import DeltaQ
-
-import Text.Printf
-
 import Graphics.Rendering.Chart.Backend.Cairo
 import Graphics.Rendering.Chart.Easy
+import Leios.Linear.EbDiffusion
+import Leios.Linear.RbDiffusion
+import Leios.Linear.Stats
+import Text.Printf
 
 main :: IO ()
 main = do

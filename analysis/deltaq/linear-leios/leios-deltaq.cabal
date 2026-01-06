@@ -18,9 +18,9 @@ library
                     , random
                     , statistics
     hs-source-dirs:   src
-    exposed-modules:  RbDiffusion
-                    , EbDiffusion
-                    , Stats
+    exposed-modules:  Leios.Linear.RbDiffusion
+                    , Leios.Linear.EbDiffusion
+                    , Leios.Linear.Stats
     default-language: Haskell2010
 
 executable leios-deltaq-analysis

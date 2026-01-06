@@ -1,13 +1,13 @@
 {- Leios EB diffusion
 TODO: model FFD
 -}
-module EbDiffusion
-  ( validateEB
-  ) where
+module Leios.Linear.EbDiffusion (
+  validateEB,
+) where
 
-import qualified Numeric.Measure.Finite.Mixed as M
 import DeltaQ (DQ, Outcome (wait, (./\.), (.>>.)), unsafeFromPositiveMeasure)
-import RbDiffusion (BlockSize (B2048, B64), blendedDelay, fetchingRBBody)
+import Leios.Linear.RbDiffusion (BlockSize (B2048, B64), blendedDelay, fetchingRBBody)
+import qualified Numeric.Measure.Finite.Mixed as M
 
 fetchingEBHeader :: DQ
 fetchingEBHeader = blendedDelay B64

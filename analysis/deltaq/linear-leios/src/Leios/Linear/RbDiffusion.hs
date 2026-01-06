@@ -2,10 +2,10 @@
 
 The module specifies a module for Ranking Block diffusion in Leios,
 which is equal to the block diffusion for Praos. See also
-* Modelling Block Diffusion in Cardano using ∆Q in
+\* Modelling Block Diffusion in Cardano using ∆Q in
   https://github.com/IntersectMBO/cardano-formal-specifications
 -}
-module RbDiffusion where
+module Leios.Linear.RbDiffusion where
 
 import DeltaQ (DQ, DeltaQ (choices), Outcome (wait, (.>>.)))
 
