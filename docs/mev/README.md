@@ -1,70 +1,66 @@
-# MEV Analysis for Linear Leios
+# MEV Research for Linear Leios
 
-Analysis of Maximal Extractable Value (MEV) and front-running vulnerabilities in the Linear Leios protocol ([CIP-0164](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md)).
+Research and analysis of MEV vulnerabilities in the Linear Leios protocol.
 
 | Version | Date       | Changes       |
 |---------|------------|---------------|
 | 0.1     | 2025-12-11 | Initial draft |
 
-## What is MEV?
+## 1. Attack Classification
 
-Maximal Extractable Value refers to profit that block producers can extract by including, excluding, or reordering transactions within blocks. Originally termed "Miner Extractable Value" in proof-of-work systems, MEV represents a fundamental tension between transaction ordering fairness and economic incentives of block producers.
+**Finding:** MEV attacks divide into three actor categories with distinct resource requirements.
 
-### MEV in the Cardano Context
+| Actor | Attacks | Leios Impact |
+|-------|---------|--------------|
+| **Block Producer** | Reordering, insertion, censorship | ↑ Larger EBs extend advantage |
+| **Searcher** | Arbitrage, liquidation | = Competitive, often beneficial |
+| **Infrastructure** | Batcher sandwich | ↑ Primary Cardano MEV vector |
 
-Cardano's Extended UTxO (eUTxO) model differs from account-based chains like Ethereum:
+Block producer attacks map to [T16-T18](../threat-model.md). Searcher attacks are mempool races - competitive but not extractive on Cardano due to eUTxO.
 
-| Property | MEV Impact |
-|----------|------------|
-| **Transaction determinism** | Outcomes fixed at submission - no state manipulation between submission and execution |
-| **No global state reads** | Scripts can't read arbitrary state, limiting some attack vectors |
-| **UTxO contention** | Competing txs for same UTxO are mutually exclusive - natural serialization |
+→ [Detailed classification](./classification.md) | [Attack vectors](./attack-vectors/)
 
-These properties provide structural protection against some attacks (notably classic sandwich attacks), but MEV still exists via:
+## 2. Vulnerable Transaction Types
 
-- **DEX batcher ordering** - batchers control order sequencing within their transactions
-- **Oracle update front-running** - positioning before known price changes
-- **Liquidation opportunities** - racing to liquidate undercollateralized positions
-- **Script-spending visibility** - transaction intent visible in mempool
+**Finding:** DEX batchers are the primary MEV surface on Cardano.
 
-For comparison, ~95% of Ethereum DEX volume now routes through private mempools to avoid MEV extraction.
+| DEX | Ordering | MEV Exposure |
+|-----|----------|--------------|
+| SundaeSwap | FIFO | Lower |
+| Minswap | FIFO | Lower |
+| MuesliSwap | Profit-maximizing | Higher |
+| Splash | Execution Engine Operators + reputation | Variable |
 
-## How Leios Changes the MEV Landscape
+Slippage tolerance directly impacts extraction room: 1-10% standard, up to 100% for volatile tokens.
 
-Linear Leios introduces several changes affecting MEV dynamics:
+Other vulnerable patterns:
+- **Lending protocols** - liquidation races (Liqwid)
+- **Oracle-dependent apps** - front-running price updates
+- **Auction contracts** - displacement attacks on bids
 
-1. **Endorser Blocks (EBs)**: Larger blocks (~512 kB) giving producers more transaction selection capacity
-2. **Coupled RB/EB Production**: Same producer controls both Ranking Blocks and EBs
-3. **Extended Observation Window**: The voting period [L<sub>vote</sub>](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#protocol-parameters) exposes EB contents to the network before certification and finality
-4. **RB-Only Option**: High-value transactions may bypass EBs entirely to reduce exposure ([T19](../threat-model.md#t19))
+## 3. Leios-Specific Considerations
 
-The eUTxO model continues providing structural protection, but larger blocks and extended observation windows slightly increase some risks.
+**Finding:** [L<sub>vote</sub>](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#protocol-parameters) creates an observation window where EB contents are visible before finality.
 
-## Attack Vector Summary
+```
+EB announced ──── L_vote ──── certified
+                    │
+              attack window
+```
 
-| Attack | Description | Praos | Leios Δ | Details |
-|--------|-------------|-------|---------|---------|
-| [Skip-the-Line](./attack-vectors/front-running.md#skip-the-line) | Higher-fee tx jumps queue | Moderate | ↑ | Larger EB selection |
-| [Displacement](./attack-vectors/front-running.md#displacement) | Attacker consumes victim's UTxO | High | = | UTxO contention unchanged |
-| [Insertion](./attack-vectors/front-running.md#insertion) | Tx inserted before victim's | Low | ↑ | EB construction opaque |
-| [Arbitrage Back-Run](./attack-vectors/back-running.md#arbitrage) | Profit from cross-DEX price lag | Moderate | = | Volume may increase |
-| [Liquidation Snipe](./attack-vectors/back-running.md#liquidation) | Race to liquidate positions | High | = | Protocol-dependent |
-| [Classic Sandwich](./attack-vectors/sandwich.md#classic) | Front+back-run around victim | Very Low | = | eUTxO prevents |
-| [Batcher Sandwich](./attack-vectors/sandwich.md#batcher-level) | Exploit order within batch | Moderate | ↑ | Larger batches |
-| [Time-Bandit](./attack-vectors/time-bandit.md) | Reorg chain to steal MEV | Very Low | = | Praos settlement |
-| [Competitive Censorship](./attack-vectors/censorship.md#competitive) | Omit competitor txs | Low | ↑ | Larger block window |
-| [Targeted Censorship](./attack-vectors/censorship.md#targeted) | Sustained omission for bribes | Very Low | = | Needs majority stake |
+Implications:
+- Searchers observe pending txs before settlement
+- Counter-transactions can target announced EBs
+- High-value txs may route via RB ([T19](../threat-model.md))
 
-**Legend**: ↑ increased risk, = unchanged
+eUTxO protections remain effective - classic sandwich attacks still prevented.
+
+## 4. Nested Transactions
+
+*Research pending.*
 
 ## References
 
-### Protocol Specifications
-- [CIP-0164: Leios](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md) - Linear Leios protocol specification
-- [Leios Threat Model](../threat-model.md) - Threats T16-T19 cover MEV at high level
-
-### Cardano DEX Documentation
-- [SundaeSwap](https://docs.sundaeswap.finance/)
-- [Minswap](https://docs.minswap.org/)
-- [Splash](https://docs.splash.trade/concepts/protocol-concepts/temporal-liquidity-book)
-- [Liqwid](https://docs.liqwid.finance/)
+- [CIP-0164](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md) - Leios specification
+- [Threat Model](../threat-model.md) - T16-T19
+- [SundaeSwap](https://docs.sundaeswap.finance/), [Minswap](https://docs.minswap.org/), [Splash](https://docs.splash.trade/), [Liqwid](https://docs.liqwid.finance/)
