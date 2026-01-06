@@ -4,8 +4,8 @@ import DeltaQ
 import Graphics.Rendering.Chart.Backend.Cairo
 import Graphics.Rendering.Chart.Easy
 import Leios.Linear.EbDiffusion
-import Leios.Linear.RbDiffusion
 import Leios.Linear.Stats
+import Praos.BlockDiffusion
 import Text.Printf
 
 main :: IO ()

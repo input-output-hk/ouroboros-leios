@@ -6,8 +6,8 @@ module Leios.Linear.EbDiffusion (
 ) where
 
 import DeltaQ (DQ, Outcome (wait, (./\.), (.>>.)), unsafeFromPositiveMeasure)
-import Leios.Linear.RbDiffusion (BlockSize (B2048, B64), blendedDelay, fetchingRBBody)
 import qualified Numeric.Measure.Finite.Mixed as M
+import Praos.BlockDiffusion (BlockSize (B2048, B64), blendedDelay, fetchingRBBody)
 
 fetchingEBHeader :: DQ
 fetchingEBHeader = blendedDelay B64

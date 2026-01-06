@@ -13,7 +13,7 @@ module Leios.Linear.Stats where
 import Data.Ratio ((%))
 import DeltaQ (DQ, DeltaQ (Probability, quantile, successWithin), maybeFromEventually)
 import Leios.Linear.EbDiffusion (validateEB)
-import Leios.Linear.RbDiffusion (emitRBHeader)
+import Praos.BlockDiffusion (emitRBHeader)
 import qualified Statistics.Distribution as S
 import qualified Statistics.Distribution.Exponential as S
 import qualified Statistics.Distribution.Normal as S
