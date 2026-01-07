@@ -12,19 +12,17 @@ Questions to ask:
 -}
 module Leios.Linear.Probabilities where
 
-import Leios.Linear.Stats (Config(..), pValidating)
+import Leios.Linear.Stats (pValidating)
 import qualified Statistics.Distribution as S
 import qualified Statistics.Distribution.Exponential as S
 import qualified Statistics.Distribution.Normal as S
 
-
 -- | Stake Distribution
 -- See: https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/deltaq/linear-leios-preliminaries.md#stake-distribution
-stakeDistribution :: Config -> [Double]
-stakeDistribution Config{..} = map f [0, 1 .. n]
+stakeDistribution :: Double -> [Double]
+stakeDistribution n = map f [0, 1 .. n]
  where
   f k = ((k + 1) / n) ** 10 - (k / n) ** 10
-  n = fromInteger nPools
 
 bisectionSearch :: (Double -> Double) -> Double -> Double -> Double -> Integer -> Double
 bisectionSearch _ low high _ 0 = (low + high) / 2
@@ -37,31 +35,41 @@ bisectionSearch f low high eps maxIter =
             then bisectionSearch f low mid eps (maxIter - 1)
             else bisectionSearch f mid high eps (maxIter - 1)
 
-calibrateCommittee :: Config -> Double -> Double
-calibrateCommittee c@Config{..} m =
-  let f x = sum (map (\s -> 1 - exp (-x * s)) (stakeDistribution c)) - m
-      n = fromInteger nPools
+calibrateCommittee :: Double -> Double -> Double
+calibrateCommittee n m =
+  let f x = sum (map (\s -> 1 - exp (-x * s)) (stakeDistribution n)) - m
    in bisectionSearch f m n 0.5 10
 
-committeeDistribution :: Config -> Double -> Double -> (Double, Double)
-committeeDistribution c pSuccessfulVote m =
-  let m' = calibrateCommittee c m
-      ps = map (\s -> pSuccessfulVote * (1 - exp (-m' * s))) (stakeDistribution c)
+committeeDistribution :: Double -> Double -> Double -> (Double, Double)
+committeeDistribution n pSuccessfulVote m =
+  let m' = calibrateCommittee n m
+      ps = map (\s -> pSuccessfulVote * (1 - exp (-m' * s))) (stakeDistribution n)
       μ = sum ps
       σ = sqrt $ sum $ map (\p -> p * (1 - p)) ps
    in (μ, σ)
 
-quorumProbability :: Config -> Double -> Double -> Double -> Double
-quorumProbability c pSuccessfulVote m τ =
-  let (μ, σ) = (committeeDistribution c pSuccessfulVote) m
+quorumProbability :: Double -> Double -> Double -> Double -> Double
+quorumProbability n pSuccessfulVote m τ =
+  let (μ, σ) = (committeeDistribution n pSuccessfulVote) m
    in S.complCumulative (S.normalDistr μ σ) (τ * m)
+
+-- | Configuration
+data Config = Config
+  { lHdr :: Integer
+  , lVote :: Integer
+  , lDiff :: Integer
+  , λ :: Rational
+  , nPools :: Integer
+  , committeeSizeEstimated :: Integer
+  , votingThreshold :: Rational
+  }
 
 -- | Probability that there is a quorum
 pQuorum :: Config -> Double
-pQuorum c@Config{..} =
+pQuorum Config{..} =
   quorumProbability
-    c
-    (fromRational $ pValidating c)
+    (fromInteger nPools)
+    (fromRational $ pValidating (lHdr, lVote))
     (fromInteger committeeSizeEstimated)
     (fromRational votingThreshold)
 

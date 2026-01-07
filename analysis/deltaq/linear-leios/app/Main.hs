@@ -12,6 +12,7 @@ import Leios.Linear.Stats
 import Praos.BlockDiffusion
 import Text.Printf
 
+-- | main
 main :: IO ()
 main =
   mainWith
@@ -44,8 +45,9 @@ mainWith c@Config{..} = do
       toRenderable $
         let xs = [0.50, 0.51 .. 1]
             s = fromInteger committeeSizeEstimated
+            n = fromInteger nPools
             t = fromRational votingThreshold
-            vs = [(x, quorumProbability c x s t) | x <- xs]
+            vs = [(x, quorumProbability n x s t) | x <- xs]
          in do
               layout_title .= "Quorum distribution"
               plot (line "pQuorum" [vs])
@@ -55,10 +57,10 @@ mainWith c@Config{..} = do
 
   printf
     "Probability that a header arrives on time: %.2f\n"
-    $ (fromRational (pHeaderOnTime c) :: Double)
+    $ (fromRational (pHeaderOnTime lHdr) :: Double)
   printf
     "Probability that EB validation is completed before voting is over: %.2f\n"
-    $ (fromRational (pValidating c) :: Double)
+    $ (fromRational (pValidating (lHdr, lVote)) :: Double)
   printf "Probability of Quorum: %.2f\n" (pQuorum c)
   printf
     "Probability that the next Praos block has already been produced after the waiting period: %.4f\n"
