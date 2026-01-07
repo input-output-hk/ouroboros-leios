@@ -5,7 +5,7 @@ The following data describes the joint empirical distribution for several key bl
 Monte-carlo simulations need only sample according to the `Fraction of ...` field in order randomly select metrics. Similarly, the empirical distribution can be directly input into Delta-QSD models.
 
 
-## Blocks
+## Blocks: [block-edf.csv](./block-edf.csv)
 
 | Field                      | Description                                                                |
 |----------------------------|----------------------------------------------------------------------------|
@@ -16,7 +16,7 @@ Monte-carlo simulations need only sample according to the `Fraction of ...` fiel
 | Fraction of blocks [%/100] | Fraction of the blocks observed since Epoch 350 that fall in this bin.     |
 
 
-## Transactions
+## Transactions: [tx-edf.csv](./tx-edf.csv)
 
 | Field                   | Description                                                                  |
 |-------------------------|------------------------------------------------------------------------------|
