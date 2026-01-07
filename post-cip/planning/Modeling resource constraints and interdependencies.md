@@ -30,7 +30,7 @@ The Linear Leios engineering effort and the broader technical community can use 
 
 ### [#655](https://github.com/input-output-hk/ouroboros-leios/issues/655) Empirical foundations on Cardano mainnet
 
-- [ ] [#656](https://github.com/input-output-hk/ouroboros-leios/issues/656) Measure `Apply`, `Reapply`, and their difference for all mainnet transactions.
+- [x] [#656](https://github.com/input-output-hk/ouroboros-leios/issues/656) Measure `Apply`, `Reapply`, and their difference for all mainnet transactions.
 - [x] [#657](https://github.com/input-output-hk/ouroboros-leios/issues/657) Estimate available bandwidth.
 - [x] [#658](https://github.com/input-output-hk/ouroboros-leios/issues/658) Estimate typical latencies.
 
