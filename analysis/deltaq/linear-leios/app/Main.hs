@@ -7,6 +7,7 @@ import DeltaQ
 import Graphics.Rendering.Chart.Backend.Cairo
 import Graphics.Rendering.Chart.Easy
 import Leios.Linear.EbDiffusion
+import Leios.Linear.Probabilities
 import Leios.Linear.Stats
 import Praos.BlockDiffusion
 import Text.Printf
@@ -23,7 +24,7 @@ main =
       , -- estimate
         committeeSizeEstimated = 600
       , -- mainnet
-        lambda = 1 % 20
+        λ = 1 % 20
       , nPools = 2500
       }
 
@@ -42,7 +43,9 @@ mainWith c@Config{..} = do
     renderableToFile def{_fo_format = SVG} "quorumProb.svg" $
       toRenderable $
         let xs = [0.50, 0.51 .. 1]
-            vs = [(x, quorumProbability c x committeeSizeEstimated (fromRational votingThreshold)) | x <- xs]
+            s = fromInteger committeeSizeEstimated
+            t = fromRational votingThreshold
+            vs = [(x, quorumProbability c x s t) | x <- xs]
          in do
               layout_title .= "Quorum distribution"
               plot (line "pQuorum" [vs])
