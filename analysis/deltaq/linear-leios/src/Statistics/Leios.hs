@@ -1,3 +1,7 @@
+-- | The module offers statistics about Ouroboros Leios. The code is taken from
+--
+-- * Peras
+-- * Markov simulation of Leios
 module Statistics.Leios (
   quorumProbability,
 )

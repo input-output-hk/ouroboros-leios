@@ -1,3 +1,4 @@
+-- | The module offers statistics about Ouroboros Praos
 module Statistics.Praos (
   stakeDistribution,
   blockDistribution,

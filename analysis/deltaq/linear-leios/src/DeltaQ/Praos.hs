@@ -1,9 +1,10 @@
-{- Praos block diffusion
-
-The module specifies a model for Block diffusion of Praos.
-See also: Modelling Block Diffusion in Cardano using ∆Q
-https://github.com/IntersectMBO/cardano-formal-specifications
--}
+-- | The module proposes a model for block diffusion of Ouroboros Praos. See also
+-- [Modelling Block Diffusion in Cardano using ∆Q](https://github.com/IntersectMBO/cardano-formal-specifications)
+--
+-- TODO:
+--
+-- * This will be replaced by a new model based on a queing model for the mem-pool, similar
+-- to what is proposed the VECTOR paper.
 module DeltaQ.Praos (
   -- * Types
   BlockSize (..),
