@@ -40,14 +40,16 @@ Requires privileged off-chain position.
 
 | Artifact | On-chain | Collection Difficulty | Current Availability |
 |----------|----------|----------------------|---------------------|
-| **Script failures (phase-2)** | Yes - collateral consumed | Easy | Queryable via DB-Sync |
+| **Script failures (phase-2)** | Yes - for winning tx only | Easy | Queryable via DB-Sync |
 | **Batcher ordering** | Yes - batch internals visible | Easy | Queryable via DB-Sync |
 | **Volume/fee patterns** | Yes | Easy | Queryable via DB-Sync |
-| **UTxO contention losers** | No - only winner recorded | Hard | Requires live monitoring |
+| **UTxO contention losers** | No - rejected at mempool; only in node logs | Hard | Requires live monitoring |
 | **Tx ordering vs submission time** | No - submission time not stored | Hard | Requires live monitoring |
 | **Orphan blocks / slot battles** | No | Hard | Requires live monitoring |
 
 **Hard = no historical data exists.** Would require contacting SPOs who may have stored node logs, or setting up dedicated monitoring infrastructure going forward.
+
+**Note on phase-2 visibility:** Phase-2 validation results (whether the script succeeded or failed, with collateral consumed on failure) are only recorded for the transaction that "won" inclusion in a block. When multiple parties race to spend the same UTxO, losing transactions are rejected when they attempt to enter a node's mempool - these rejections are only recorded in node logs, not on-chain.
 
 **Best candidates for historical MEV analysis:**
 - Batcher ordering patterns (fully on-chain)
