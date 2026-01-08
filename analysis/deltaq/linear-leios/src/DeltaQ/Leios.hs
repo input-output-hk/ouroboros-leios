@@ -1,7 +1,7 @@
 {- Leios EB diffusion
 TODO: model FFD
 -}
-module DeltaQ.Leios.Linear.BlockDiffusion (
+module DeltaQ.Leios (
   -- * DeltaQ
   validateEB,
 
@@ -15,7 +15,7 @@ module DeltaQ.Leios.Linear.BlockDiffusion (
 ) where
 
 import DeltaQ (DQ, DeltaQ (Probability, quantile, successWithin), Outcome (wait, (./\.), (.>>.)), maybeFromEventually, unsafeFromPositiveMeasure)
-import DeltaQ.Praos.BlockDiffusion (BlockSize (B2048, B64), blendedDelay, emitRBHeader, fetchingRBBody)
+import DeltaQ.Praos (BlockSize (B2048, B64), blendedDelay, emitRBHeader, fetchingRBBody)
 import qualified Numeric.Measure.Finite.Mixed as M
 
 fetchingEBHeader :: DQ

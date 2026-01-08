@@ -4,7 +4,7 @@ The module specifies a model for Block diffusion of Praos.
 See also: Modelling Block Diffusion in Cardano using ∆Q
 https://github.com/IntersectMBO/cardano-formal-specifications
 -}
-module DeltaQ.Praos.BlockDiffusion (
+module DeltaQ.Praos (
   -- * Types
   BlockSize (..),
 

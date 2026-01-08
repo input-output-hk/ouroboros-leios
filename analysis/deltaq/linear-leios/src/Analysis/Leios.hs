@@ -10,7 +10,7 @@ Questions to ask:
 2. Expectation of distribution of certified EBs (see throughput analysis)
 3. Probability of safety property violation
 -}
-module DeltaQ.Leios.Linear.Probabilities (
+module Analysis.Leios (
   -- * Types
   Config (..),
 
@@ -21,52 +21,13 @@ module DeltaQ.Leios.Linear.Probabilities (
 
   -- * Expectations
   eCertifiedEB,
-
-  -- * Utils
-  quorumProbability,
 )
 where
 
-import DeltaQ.Leios.Linear.BlockDiffusion (pValidating)
+import DeltaQ.Leios (pValidating)
 import qualified Statistics.Distribution as S
-import qualified Statistics.Distribution.Exponential as S
-import qualified Statistics.Distribution.Normal as S
-
--- | Stake Distribution
--- See: https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/deltaq/linear-leios-preliminaries.md#stake-distribution
-stakeDistribution :: Double -> [Double]
-stakeDistribution n = map f [0, 1 .. n]
- where
-  f k = ((k + 1) / n) ** 10 - (k / n) ** 10
-
-bisectionSearch :: (Double -> Double) -> Double -> Double -> Double -> Integer -> Double
-bisectionSearch _ low high _ 0 = (low + high) / 2
-bisectionSearch f low high eps maxIter =
-  let mid = (low + high) / 2
-   in if high - low < eps || abs (f mid) < eps
-        then mid
-        else
-          if f low * f mid < 0
-            then bisectionSearch f low mid eps (maxIter - 1)
-            else bisectionSearch f mid high eps (maxIter - 1)
-
-calibrateCommittee :: Double -> Double -> Double
-calibrateCommittee n m =
-  let f x = sum (map (\s -> 1 - exp (-x * s)) (stakeDistribution n)) - m
-   in bisectionSearch f m n 0.5 10
-
-committeeDistribution :: Double -> Double -> Double -> (Double, Double)
-committeeDistribution n pSuccessfulVote m =
-  let m' = calibrateCommittee n m
-      ps = map (\s -> pSuccessfulVote * (1 - exp (-m' * s))) (stakeDistribution n)
-      μ = sum ps
-      σ = sqrt $ sum $ map (\p -> p * (1 - p)) ps
-   in (μ, σ)
-
-quorumProbability :: Double -> Double -> Double -> Double -> Double
-quorumProbability n pSuccessfulVote m τ =
-  let (μ, σ) = (committeeDistribution n pSuccessfulVote) m
-   in S.complCumulative (S.normalDistr μ σ) (τ * m)
+import Statistics.Leios (quorumProbability)
+import Statistics.Praos (blockDistribution)
 
 -- | 'Config' is a collection of all parameters that determine the outcome
 -- of the analysis
@@ -87,7 +48,7 @@ data Config = Config
   -- ^ Block production rate parameter
   }
 
--- | Probability that there is a quorum
+-- | Probability of reaching a quorum
 pQuorum :: Config -> Double
 pQuorum Config{..} =
   quorumProbability
@@ -95,12 +56,6 @@ pQuorum Config{..} =
     (fromRational $ pValidating (lHdr, lVote))
     (fromInteger committeeSizeEstimated)
     (fromRational τ)
-
--- | Praos block distribution
--- The poisson schedule for the block production implies that the waiting time for the
--- next block is exponentially distributed with λ (active slot coefficient)
-praosBlockDistr :: Double -> S.ExponentialDistribution
-praosBlockDistr = S.exponential
 
 -- |
 -- The EB is the one announced by the latest RB in the voter's current chain,
@@ -119,7 +74,7 @@ praosBlockDistr = S.exponential
 pBlock :: Config -> Double
 pBlock Config{..} =
   S.cumulative
-    (praosBlockDistr $ fromRational λ)
+    (blockDistribution $ fromRational λ)
     (fromInteger $ 3 * lHdr + lVote + lDiff)
 
 -- |

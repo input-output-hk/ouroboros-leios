@@ -2,13 +2,14 @@
 
 module Main where
 
+import Analysis.Leios
 import Data.Ratio ((%))
 import DeltaQ
-import DeltaQ.Leios.Linear.BlockDiffusion
-import DeltaQ.Leios.Linear.Probabilities
-import DeltaQ.Praos.BlockDiffusion
+import DeltaQ.Leios
+import DeltaQ.Praos
 import Graphics.Rendering.Chart.Backend.Cairo
 import Graphics.Rendering.Chart.Easy
+import Statistics.Leios (quorumProbability)
 import Text.Printf
 
 -- | main
