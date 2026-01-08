@@ -4,12 +4,11 @@ module Main where
 
 import Data.Ratio ((%))
 import DeltaQ
+import DeltaQ.Leios.Linear.BlockDiffusion
+import DeltaQ.Leios.Linear.Probabilities
+import DeltaQ.Praos.BlockDiffusion
 import Graphics.Rendering.Chart.Backend.Cairo
 import Graphics.Rendering.Chart.Easy
-import Leios.Linear.EbDiffusion
-import Leios.Linear.Probabilities
-import Leios.Linear.Stats
-import Praos.BlockDiffusion
 import Text.Printf
 
 -- | main
@@ -21,12 +20,12 @@ main =
         lHdr = 1
       , lVote = 4
       , lDiff = 7
-      , votingThreshold = 3 % 4
+      , τ = 3 % 4
       , -- estimate
         committeeSizeEstimated = 600
       , -- mainnet
         λ = 1 % 20
-      , nPools = 2500
+      , numberSPOs = 2500
       }
 
 mainWith :: Config -> IO ()
@@ -45,8 +44,8 @@ mainWith c@Config{..} = do
       toRenderable $
         let xs = [0.50, 0.51 .. 1]
             s = fromInteger committeeSizeEstimated
-            n = fromInteger nPools
-            t = fromRational votingThreshold
+            n = fromInteger numberSPOs
+            t = fromRational τ
             vs = [(x, quorumProbability n x s t) | x <- xs]
          in do
               layout_title .= "Quorum distribution"

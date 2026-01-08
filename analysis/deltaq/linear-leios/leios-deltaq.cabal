@@ -17,10 +17,9 @@ library
                     , probability-polynomial
                     , statistics
     hs-source-dirs:   src
-    exposed-modules:  Leios.Linear.EbDiffusion
-                    , Leios.Linear.Probabilities
-                    , Leios.Linear.Stats
-                    , Praos.BlockDiffusion
+    exposed-modules:  DeltaQ.Leios.Linear.BlockDiffusion
+                    , DeltaQ.Leios.Linear.Probabilities
+                    , DeltaQ.Praos.BlockDiffusion
     default-language: Haskell2010
 
 executable leios-deltaq-analysis
