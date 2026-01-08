@@ -66,4 +66,4 @@ mainWith c@Config{..} = do
     "Probability that the next Praos block has already been produced after the waiting period: %.4f\n"
     (pInterruptedByNewBlock c)
   printf "Probability that an EB is certified: %.4f\n" (pCertified c)
-  printf "Expected time for certified EB: %.2f slots\n" (1 / (eCertifiedEB c))
+  printf "Expected time for certified EB: %.2f slots\n" (1 / (eCertified c))

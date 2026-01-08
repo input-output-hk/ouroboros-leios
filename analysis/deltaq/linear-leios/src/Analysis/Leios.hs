@@ -24,7 +24,7 @@ module Analysis.Leios (
   pCertified,
 
   -- * Expectations
-  eCertifiedEB,
+  eCertified,
 )
 where
 
@@ -73,5 +73,5 @@ pCertified :: Config -> Double
 pCertified c = (1 - pInterruptedByNewBlock c) * pQuorum c
 
 -- | Expectation for the distribution of certified EBs over time
-eCertifiedEB :: Config -> Double
-eCertifiedEB Config{..} = (fromRational λ) * (1 - (fromRational λ)) ** (fromInteger $ 3 * lHdr + lVote + lDiff)
+eCertified :: Config -> Double
+eCertified Config{..} = (fromRational λ) * (1 - (fromRational λ)) ** (fromInteger $ 3 * lHdr + lVote + lDiff)
