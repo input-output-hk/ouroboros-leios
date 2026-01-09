@@ -28,6 +28,7 @@ module Analysis.Leios (
 )
 where
 
+import DeltaQ (DQ)
 import DeltaQ.Leios (pValidating)
 import qualified Statistics.Distribution as S
 import Statistics.Leios (quorumProbability)
@@ -36,20 +37,24 @@ import Statistics.Praos (blockDistribution)
 -- | 'Config' is a collection of all parameters that determine the outcome
 -- of the analysis
 data Config = Config
-  { lHdr :: Integer
+  { lHdr :: !Integer
   -- ^ \(L_\text{hdr}\) parameter
-  , lVote :: Integer
+  , lVote :: !Integer
   -- ^ \(L_\text{vote}\) parameter
-  , lDiff :: Integer
+  , lDiff :: !Integer
   -- ^ \(L_\text{diff}\) parameter
-  , numberSPOs :: Integer
+  , numberSPOs :: !Integer
   -- ^ Number of stake-pools
-  , committeeSizeEstimated :: Integer
+  , committeeSizeEstimated :: !Integer
   -- ^ Estimation of size of voting committee
-  , τ :: Rational
+  , τ :: !Rational
   -- ^ Voting threshold
-  , λ :: Rational
+  , λ :: !Rational
   -- ^ Block production rate parameter
+  , applyTxs :: !DQ
+  -- ^ DQ for applyTxs
+  , reapplyTxs :: !DQ
+  -- ^ DQ for reapplyTxs
   }
 
 -- | Probability of reaching a quorum
@@ -57,7 +62,7 @@ pQuorum :: Config -> Double
 pQuorum Config{..} =
   quorumProbability
     (fromInteger numberSPOs)
-    (fromRational $ pValidating (lHdr, lVote))
+    (fromRational $ pValidating applyTxs reapplyTxs (lHdr, lVote))
     (fromInteger committeeSizeEstimated)
     (fromRational τ)
 

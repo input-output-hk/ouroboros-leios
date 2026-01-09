@@ -19,6 +19,7 @@ library
     hs-source-dirs:   src
     exposed-modules:  Analysis.Leios
                     , DeltaQ.Leios
+                    , DeltaQ.Leios.EmpiricalDistributions
                     , DeltaQ.Praos
                     , Statistics.Leios
                     , Statistics.Praos
@@ -28,9 +29,13 @@ executable leios-deltaq-analysis
     import:           warnings
     main-is:          Main.hs
     build-depends:    base ^>=4.20.0.0
+                    , bytestring
+                    , cassava
                     , deltaq
                     , leios-deltaq
                     , probability-polynomial
+                    , random
+                    , vector
                     , Chart >= 1.8 && < 2.0
                     , Chart-cairo
     hs-source-dirs:   app
