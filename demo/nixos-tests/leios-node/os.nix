@@ -7,10 +7,10 @@
 {
   imports = [
     (import ../services/simple-cardano-relay.nix {
-      inherit (inputs.cardano-node.packages."${pkgs.system}") cardano-node;
+      inherit (inputs.patched-cardano-node.packages."${pkgs.system}") cardano-node;
     })
   ];
-  environment.systemPackages = [ inputs.cardano-node.packages."${pkgs.system}".cardano-cli ];
+  environment.systemPackages = [ inputs.patched-cardano-node.packages."${pkgs.system}".cardano-cli ];
   cardano.relay = {
     enable = true;
     config = ./config.json;
