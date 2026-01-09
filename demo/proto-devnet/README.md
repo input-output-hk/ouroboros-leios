@@ -9,6 +9,16 @@ A small network of patched cardano nodes that is loaded with synthetically creat
 
 ## Prerequisites
 
-- `cardano-testnet`
+- `cardano-testnet` (recent)
 - Path to patched `cardano-node` set on `CARDANO_NODE`
-- A `cardano-cli` set on `CARDANO_CLI`
+- A compatible `cardano-cli` set on `CARDANO_CLI`
+
+The `nix develop` shell, also available via `direnv allow`, provides all these.
+
+## Start the devnet
+
+``` shell
+cardano-testnet cardano --testnet-magic 164 --output-dir devnet
+```
+
+

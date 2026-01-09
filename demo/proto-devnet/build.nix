@@ -19,7 +19,7 @@
             inputs'.cardano-node.packages.cardano-cli
           ];
           inherit (config.devShells.dev-demo) CARDANO_NODE;
-          CARDANO_CLI = pkgs.lib.getExe inputs'.cardano-node.packages.cardano-cli;
+          CARDANO_CLI = lib.getExe inputs'.cardano-node.packages.cardano-cli;
         };
       };
     };
