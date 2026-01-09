@@ -4,6 +4,7 @@ This is a collection of Leios demonstrations created using specially patched ver
 
 - [2025-10](2025-10/): Minimum viable demo of Leios network traffic interfering with Praos
 - [2025-11](2025-11/): Improvement of MVD using tc and better observability
+- [proto-devnet](proto-devnet/): A leios-enabld devnet created from prototype cardano-nodes
 
 There are other, component-specific demos you might be looking for:
 
