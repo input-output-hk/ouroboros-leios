@@ -23,7 +23,8 @@ Besides collecting node-specific details in this document, we intend to contribu
 This document is a living artifact and will be updated as implementation progresses, new risks are identified, and validation results become available.
 
 | Version | Date       | Changes                                                            |
-|---------|------------|--------------------------------------------------------------------|
+| ------- | ---------- | ------------------------------------------------------------------ |
+| 0.7     | 2025-11-28 | Performance and quality assurance strategy                         |
 | 0.6     | 2025-11-25 | Risks and mitigations with key threats                             |
 | 0.5     | 2025-10-29 | Re-structure and start design chapter with impact analysis content |
 | 0.4     | 2025-10-27 | Add overview chapter                                               |
@@ -707,32 +708,6 @@ The following non-functional requirements ensure the implementation meets perfor
 
 Note that the PoP checks probably are done at the certificate level, and that the above-described API should not be responsible for this. The current code on BLS12-381 already abstracts over both curves `G1`/`G2`, we should maintain this. The `BLST` package also exposes fast verification over many messages and signatures + public keys by doing a combined pairing check. This might be helpful, though it's currently unclear if we can use this speedup. It might be the case, since we have linear Leios, that this is never needed.
 
-## Performance & Tracing (P&T)
-
-> [!WARNING]
->
-> TODO: Mostly content directly taken from [impact analysis](../ImpactAnalysis.md). Expand on motivation and concreteness of changes. We could also consider merging performance engineering aspects into respective layers/components. This also feels a bit ouf of touch with the [implementation plan](#implementation-plan); to be integrated better for a more holistic quality and performance strategy. See also https://github.com/input-output-hk/ouroboros-leios/pull/596 for more notes on performance & tracing.
-
-This outlines Leios impact on the node's tracing system and on dedicated Leios performance testing and benchmarks.
-
-### Tracing
-
-Leios will require a whole new set of observables for a Cardano node, which do not exist for Praos. These observables will need to be exposed - just as the existing ones - via trace evidence and metrics. A specification document will need to be created and maintained, detailing the semantics of those new observables. Some might be specific to the Haskell implementation, some might be generic to any Leios implementation. The work from R&D and the insights gained from Leios simulations will be the input to that document.
-
-During Leios implementation process, P&T will need to oversee that traces are emitted at appropriate source locations wrt. their semantics, as well as properly serialized or captured in a metric in `cardano-node` itself. P&T analysis tooling - mostly the `locli` package - will need significant adjustment to parse, process and extract meaningful performance data from raw trace evidence.
-
-### Performance testing
-
-For a systematic approach to benchmarking, all Leios modes of operation and their respective configurations will need to be captured in P&T's benchmark profile library - the `cardano-profile` package. P&T's `nix` & `Nomad` based automations need to be adjusted to deploy and execute Leios profiles as benchmarks from that library.
-
-On a conceptual level, the challenge to benchmarking Leios - being built for high throughput - is putting it under a stable saturation workload for an extended period of time. By stable, I'm referring to maintaining equal submission pressure over the benchmark's entire duration. These workloads need to be synthetic in nature, as only that way one can reliably and consistently stress specific aspects of the implementation. For Praos benchmarks, they're created dynamically by `tx-generator`. New workloads will need to be implemented, or derived from the existing ones.
-
-Considering all the above, the most promising approach would be finding a model, or symmetrically scaled-down Leios, which is able to reliably predict performance characteristics of the non-scaled down version - exactly as P&T's benchmarking cluster hardware models a larger environment like `mainnet` at scale and is able to predict performance impact based on observations from the cluster. By Leios version above, I'm of course referring to the exact same Leios implementation whose performance characteristics are being measured. Model or scaled versions will have to be realized via configuration or protocol parameters exclusively.
-
-Any Leios option or protocol parameter that allows for sensibly scaling the implementation has to be identified. This will allow for correlating observed performance impact or trade-offs to e.g. linearly scaling some parameter. Comparative benchmarking will require a clearly structured process of integrating new features or changes into the implementation. When many changes are convoluted into one single benchmarkable, it gets increasingly difficult to attribute an observation to a single change - in the worst case, an optimization can obscure a regression when both are introduced in the same benchmarkable.
-
-Finding a model / scaled Leios version is an iterative process which requires continuous validation. It will require P&T to be in constant, close coordination with both implementors and researchers.
-
 ## End-to-end testing
 
 > [!WARNING]
@@ -775,10 +750,62 @@ The suite will perform the following actions:
 > - Mithril, for example, does use N2C `LocalChainSync`, but does not check hash consistency and thus would be compatible with our plans.
 
 
+# Performance and quality assurance strategy
+
+## Observability as a first-class citizen
+
+By implementing evidence of code execution, a well-founded tracing system is the prime provider of observability for a system.
+This observability not only forms the base for monitoring and logging, but also performance and conformance testing.  
+
+For principled Leios quality assurance, a formal specification of existing and additional Leios trace semantics is being created, and will need to be maintained. This specification is language- / implementation-independent, and
+should not be automatically generated by the Node's Haskell reference implementation. It needs to be an independent source of truth for system observables.
+
+Proper emission of those traces true to their semantics will need to be ensured for all prototypes and diverse implementations of Leios.
+
+Last not least, the existing simulations will be maintained and kept operational. Insights based on concrete evidence from testing implementation(s) can be used to further refine their model as Leios is developing.
+
+## Testing during development
+
+Wheras simulations operate on models and are able to falsify hypotheses or assess probability of certain outcomes, evolving
+prototypes and implementations rely on evidence to that end. A dedicated environment suitable for both performance and conformance testing will be created; primarily as feedback for development, but also to provide transparency into the ongoing process.  
+
+This environment serves as a host for operating small testnets. It automates deployment and configuration, and is parametrizable as far as topology, and deployed binaries are concerned. This means it needs to abstract wrt. of configuring
+a specific prototype or implementation. This enables deploying adversarial nodes for the purpose of network conformance testing, as well as performance testing at system integration level. This environment also guarantees the
+observed network behaviour or performance metrics have high confidence, and are reproducible.
+
+Conformance testing can be done on multiple layers. For authoritative end-to-end verification of protocol states, all evidence will need to be processed wrt. the formal specification, keeping track of all states and transitions. A second, complementary
+approach we chose is conformance testing using Linear Temporal Logic (LTL). By formulating LTL propositions that need to hold for observed evidence, one can achieve broad conformance and regression testing without embedding it in protocol semantics;
+this tends to be versatile and fast to evaluate incrementally. This means, system invariants can be tested as part of CI, or even by consuming live output of a running testnet.
+
+Performance testing requires constant submission pressure over an extended period of time. With Leios being built for high throughput, creating submissions fully dynamically (as is the case with Praos benchmarks) is likely
+insufficient to maintain that pressure. We will create a declarative, abstract definition of what constitutes a workload to be submitted. This enables to pre-generate part or all submissions for the benchmarks. Moreover, it guarantees
+identical outcomes regardless of how exactly the workload is generated. These workloads will retain their property of being customizable regarding particular aspects they stress in the system, such as the UTxO set, or Plutus script evaluation.
+
+As raw data from a benchmark / conformance test can be huge, existing analysis tooling will be extended or built, such that extracting key insights from raw data can be automated as much as possible.
+
+This requires the presence of basic observability with shared semantics of traces in all participating prototypes or implementations, as outlined in the previous section.
+
+### Micro-benchmarks
+
+Additionally, smaller units of implementation (vs. full system integration) also deserve a performance safeguard. We will create and executing benchmarks that target isolated components of the system, and do not need a full testnet to run.
+The aim of those microbenchmarks is to provide long-term performance comparability for those components. This entails that the benchmark input needs to be stable across versions; it also requires a stable hardware specification to execute those
+benchmarks on (dynamically allocated environments are not suitable for that purpose). Thus, these microbenchmarks will be automated on fixed hardware - which can be considered a calibrated measurement device - and their artifacts archived and
+conveniently exposed for feedback and transparency.
+
+## Testing a full implementation
+
+This eventual step will stop support for prototypes and instead focus on full implementations of Leios. This will allow
+for a uniform way to operate, and artificially constrain, Leios by configuration while maintaining its performance properties.
+
+Furthermore, this phase will see custom benchmarks that can scale individual aspects of Leios independently (by config or protocol
+parameter), so that the observed change in performance metrics can be clearly correlated to a specific protocol change. This also paves the way for testing hypotheses about the effect of protocol settings or changes based
+on evidence rather than a model.
+
+
 # Glossary
 
 | Term                       | Definition                                                            |
-|----------------------------|-----------------------------------------------------------------------|
+| -------------------------- | --------------------------------------------------------------------- |
 | **RB**                     | Ranking Block - Extended Praos block that announces and certifies EBs |
 | **EB**                     | Endorser Block - Additional block containing transaction references   |
 | **CertRB**                 | Ranking Block containing a certificate                                |
