@@ -28,6 +28,7 @@
         runtimeInputs = config.devShells.dev-demo-proto-devnet.buildInputs;
         runtimeEnv = {
           inherit (config.devShells.dev-demo-proto-devnet) CARDANO_NODE CARDANO_CLI;
+          SCRIPT_DIR = ./.; # FIXME: re-use 2025-11 sql file
         };
         text = builtins.readFile ./start.bash;
       };
