@@ -7,21 +7,23 @@ A small network of patched cardano nodes that is loaded with synthetically creat
 > [!TIP]
 > This is an excalidraw SVG with embedded scene so it can be loaded and edited in [https://excalidraw.com/].
 
-## Prerequisites
+## Getting started
+
+``` shell
+nix run github:input-output-hk/ouroboros-leios#demo-proto-devnet
+```
+
+Or install these prerequisites:
 
 - `cardano-testnet` (recent)
 - Path to patched `cardano-node` set on `CARDANO_NODE`
 - A compatible `cardano-cli` set on `CARDANO_CLI`
 - `jq`
 
-The `nix develop` shell, also available via `direnv allow`, provides all these.
-
-## Start the devnet
-
-We need to create an environment before starting it, because the prototype `cardano-node` is a bit older than `cardano-testnet` and needs patching:
+and run:
 
 ``` shell
-cardano-testnet create-env --output devnet --num-pool-nodes 3 --slot-length 1 --testnet-magic 164 --params-mainnet
-cat devnet/configuration.yaml | jq '.EnableP2P = true' > devnet/configuration-p2p.yaml && mv devnet/configuration{-p2p,}.yaml
-cardano-testnet cardano --node-env devnet --update-time
+./start.bash
 ```
+
+The `nix develop` shell, also available via `direnv allow`, provides all these.
