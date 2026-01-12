@@ -22,6 +22,6 @@ We need to create an environment before starting it, because the prototype `card
 
 ``` shell
 cardano-testnet create-env --output devnet --num-pool-nodes 3 --slot-length 1 --testnet-magic 164 --params-mainnet
-cat devnet/configuration.yaml | jq '.EnableP2P = true' > devnet/configuration.yaml
+cat devnet/configuration.yaml | jq '.EnableP2P = true' > devnet/configuration-p2p.yaml && mv devnet/configuration{-p2p,}.yaml
 cardano-testnet cardano --node-env devnet --update-time
 ```
