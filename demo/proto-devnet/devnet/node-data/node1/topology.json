@@ -1,0 +1,24 @@
+{
+    "bootstrapPeers": null,
+    "localRoots": [
+        {
+            "accessPoints": [
+                "node_2",
+                "node_3"
+            ],
+            "advertise": false,
+            "diffusionMode": "InitiatorAndResponder",
+            "hotValency": 2,
+            "trustable": true,
+            "warmValency": 2
+        }
+    ],
+    "peerSnapshotFile": null,
+    "publicRoots": [
+        {
+            "accessPoints": [],
+            "advertise": false
+        }
+    ],
+    "useLedgerAfterSlot": -1
+}

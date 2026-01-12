@@ -33,3 +33,40 @@ Cleanup to start over can be done by:
 git clean -dxf devnet/
 git restore devnet/
 ```
+
+## Prepare devnet
+
+This command was used to prepare the `--node-env`:
+
+``` shell
+cardano-testnet create-env --output devnet --num-pool-nodes 3 --slot-length 1 --testnet-magic 164 --params-mainnet
+```
+
+We checked this in because the `cardano-node` we are using is older than `cardano-testnet` and the topology files it generates need patching:
+
+```json title="Generated topology.json"
+{
+    "bootstrapPeers": null,
+    "localRoots": [
+        {
+            "accessPoints": [
+                "node_2",
+                "node_3"
+            ],
+            "advertise": false,
+            "diffusionMode": "InitiatorAndResponder",
+            "hotValency": 2,
+            "trustable": true,
+            "warmValency": 2
+        }
+    ],
+    "peerSnapshotFile": null,
+    "publicRoots": [
+        {
+            "accessPoints": [],
+            "advertise": false
+        }
+    ],
+    "useLedgerAfterSlot": -1
+}
+```
