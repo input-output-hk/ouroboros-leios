@@ -22,5 +22,14 @@
           CARDANO_CLI = lib.getExe inputs'.cardano-node.packages.cardano-cli;
         };
       };
+
+      packages.demo-proto-devnet = pkgs.writeShellApplication {
+        name = "leios-demo-proto-devnet";
+        runtimeInputs = config.devShells.dev-demo-proto-devnet.buildInputs;
+        runtimeEnv = {
+          inherit (config.devShells.dev-demo-proto-devnet) CARDANO_NODE CARDANO_CLI;
+        };
+        text = builtins.readFile ./start.bash;
+      };
     };
 }
