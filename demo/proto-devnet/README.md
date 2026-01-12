@@ -17,8 +17,19 @@ The `nix develop` shell, also available via `direnv allow`, provides all these.
 
 ## Start the devnet
 
+We require a prepared devnet setup in `devnet/` so starting it is:
+
 ``` shell
-cardano-testnet cardano --testnet-magic 164 --output-dir devnet
+cardano-testnet cardano --node-env devnet --update-time
 ```
 
+## Restart and cleanup
 
+Once `cardano-testnet` is stopped, restarting is not robustly possible because of dynamically allocated ports by `cardano-testnet`.
+
+Cleanup to start over can be done by:
+
+``` shell
+git clean -dxf devnet/
+git restore devnet/
+```
