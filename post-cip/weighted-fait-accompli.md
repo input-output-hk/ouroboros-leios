@@ -50,10 +50,10 @@ Consider the stake distribution of Epoch 535 of Cardano mainnet and vary the com
 
 - The stake of the persistent seats comprises > 80% of the committee's total weight.
 - The standard deviation of the total weight is nearly 2% for the smaller committees and a small fraction of a percent for larger committees.
-- Noticeable adjustment to the quorum threshold $`\tau`$ is needed to account for a one-in-million chance ("1 ppm tail" in the table) of extremely unlucky sortition (i.e., many fewer seats than expected).
+- Noticeable adjustment to the quorum threshold $`\tau`$ is needed to account for a one-in-million chance ("1 ppm tail" in the table) of extremely unlucky sortition (i.e., far fewer seats than expected).
 	- For a committee size of 700, Peras would need $`\tau \approx 78.52\%`$ and Leios would need $`\tau \approx 53.52\%`$. 
 	- For a committee size of 1000, Peras would need $`\tau \approx 75.76\%`$ and Leios would need $`\tau \approx 50.76\%`$. 
-	- One part per million may would be an overly conservative setting, since it means that a 25% (or 50%) adversary for Peras (or Leios), respectively) would succeed in defeating (or obtaining) a quorum once in a million elections.
+	- One part per million may would be an overly conservative setting, since it means that a 25% (or 50%) adversary for Peras (or Leios) would succeed in defeating (or obtaining) a quorum once in a million elections.
 
 | Committee Size | Persistent Seats | Persistent Weight | Standard Deviation of Total Weight | 1 ppm Tail of Total Weight |
 | -------------: | ---------------: | ----------------: | ---------------------------------: | -------------------------: |
