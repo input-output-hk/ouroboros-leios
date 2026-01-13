@@ -6,53 +6,53 @@ This is an adaption of Figures 7 and 3 of the following paper, but with elaborat
 
 ## Stake distribution
 
-Let $P = (p_1, \ldots, p_{|P|})$ be the set of active stake pools, each with stake $\mathcal{S}(p_i)$, where pools are ordered in a non-increasing fashion, $p_i \geq p_{i+1}$. Furthermore, let $\rho_i = \sum_{j=i}^{|P|} \mathcal{S}(p_j)$ be the total stake for pools $p_i$ and beyond. By definition, the total stake is $\rho_1$.
+Let $`P = (p_1, \ldots, p_{|P|})`$ be the set of active stake pools, each with stake $`\mathcal{S}(p_i)`$, where pools are ordered in a non-increasing fashion, $`p_i \geq p_{i+1}`$. Furthermore, let $`\rho_i = \sum_{j=i}^{|P|} \mathcal{S}(p_j)`$ be the total stake for pools $`p_i`$ and beyond. By definition, the total stake is $`\rho_1`$.
 
 ## Committee size
 
-Let $n$ be the *target* number of seats on the committee. Because of the variability of local sortition, this may not be the exact number of seats determined by the algorithm.
+Let $`n`$ be the *target* number of seats on the committee. Because of the variability of local sortition, this may not be the exact number of seats determined by the algorithm.
 
 ## Persistent seats
 
-The number of persistent seats is $n_1 = i^* - 1 \leq n$, where $i^*$ is the smallest $i \in \mathbb{N}$ such that either $\rho_i = 0$ or $\left( 1 - \frac{\mathcal{S}(p_i)}{\rho_i} \right)^2 \geq \frac{n - i}{n - i + 1}$. The weights of those seats is simply the stake, $w_C(i) = \mathcal{S}(p_i)$ for $i \in [1, n_1]$. Specifically, the first $n_1$ pools have persistent seats.
+The number of persistent seats is $`n_1 = i^* - 1 \leq n`$, where $`i^*`$ is the smallest $`i \in \mathbb{N}`$ such that either $`\rho_i = 0`$ or $`\left( 1 - \frac{\mathcal{S}(p_i)}{\rho_i} \right)^2 \geq \frac{n - i}{n - i + 1}`$. The weights of those seats is simply the stake, $`w_C(i) = \mathcal{S}(p_i)`$ for $`i \in [1, n_1]`$. Specifically, the first $`n_1`$ pools have persistent seats.
 
 ## Non-persistent candidates
 
-The pools $p_i$ for $i \in [i^*, n]$ are all *candidates* for having a non-persistent seat. The stake distribution among the non-persistent pools is defined as $\mathcal{S}_3 = \mathcal{S}(p_i) / \rho_{i^*}$ for $i \in [i^*, n]$. 
+The pools $`p_i`$ for $`i \in [i^*, n]`$ are all *candidates* for having a non-persistent seat. The stake distribution among the non-persistent pools is defined as $`\mathcal{S}_3 = \mathcal{S}(p_i) / \rho_{i^*}`$ for $`i \in [i^*, n]`$. 
 
 ## Local sortition for non-persistent seats
 
-The *target* number of non-persistent seats on the committee will be $n_2 = n - n_1$. Let  $\sigma_i \in [0,1]$ be the VRF value for party $p_i$, derived from their signature on the election identifier and some entropy such as the Praos nonce for the epoch. The number of seats they have on the committee is the value $k_i^*$ for which $P(k_i^*-1) \leq \sigma_i \lt P(k_i^*)$ holds, given $P(k^*) = \sum_{k=0}^{k^*} \frac{(n_2 \cdot \mathcal{S}_3(i))^k \cdot e^{- n_2 \cdot \mathcal{S}_3(i)}}{k!}$ for $k^* \ge 0$ and $P(k^*) = 0$ otherwise. (This is simply sampling from a Poisson distribution with mean $n_2 \cdot \mathcal{S}_3(i)$ according to cumulative probability $\sigma_i$.) Each of those seats has weight $\rho_{i^*} / n_2$.
+The *target* number of non-persistent seats on the committee will be $`n_2 = n - n_1`$. Let  $`\sigma_i \in [0,1]`$ be the VRF value for party $`p_i`$, derived from their signature on the election identifier and some entropy such as the Praos nonce for the epoch. The number of seats they have on the committee is the value $`k_i^*`$ for which $`P(k_i^*-1) \leq \sigma_i \lt P(k_i^*)`$ holds, given $`P(k^*) = \sum_{k=0}^{k^*} \frac{(n_2 \cdot \mathcal{S}_3(i))^k \cdot e^{- n_2 \cdot \mathcal{S}_3(i)}}{k!}`$ for $`k^* \ge 0`$ and $`P(k^*) = 0`$ otherwise. (This is simply sampling from a Poisson distribution with mean $`n_2 \cdot \mathcal{S}_3(i)`$ according to cumulative probability $`\sigma_i`$.) Each of those seats has weight $`\rho_{i^*} / n_2`$.
 
 ## Variability of committee size
 
-The weight of persistent voters is exactly $\rho_1 - \rho_{i^*}$ by construction. Because the sum of Poisson distributions is also Poisson, the expected number of non-persistent seats is $n_2$ and they have total expected weight $n_2 \cdot (\rho_{i^*} / n_2 ) = \rho_{i^*}$. Thus the expected total weight is $\rho_1$, which equals the total active stake.
+The weight of persistent voters is exactly $`\rho_1 - \rho_{i^*}`$ by construction. Because the sum of Poisson distributions is also Poisson, the expected number of non-persistent seats is $`n_2`$ and they have total expected weight $`n_2 \cdot (\rho_{i^*} / n_2 ) = \rho_{i^*}`$. Thus the expected total weight is $`\rho_1`$, which equals the total active stake.
 
-The number of non-persistent seats varies according to the Poisson distribution, having a standard deviation $\sqrt{n_2}$. Thus the standard deviation of the expected non-persistent weight is $\sqrt{n_2} \cdot (\rho_{i^*} / n_2) = \rho_{i^*} / \sqrt{n_2}$ . This is also the standard deviation of the total weight.
+The number of non-persistent seats varies according to the Poisson distribution, having a standard deviation $`\sqrt{n_2}`$. Thus the standard deviation of the expected non-persistent weight is $`\sqrt{n_2} \cdot (\rho_{i^*} / n_2) = \rho_{i^*} / \sqrt{n_2}`$ . This is also the standard deviation of the total weight.
 
-In terms of probability distributions, the total weight is $\rho_1 + \rho_{i^*} \cdot \left( \frac{\mathbf{n_2}}{n_2} - 1\right)$, where $\mathbf{n_2}$ is a Poisson random variable with mean $n_2$.
+In terms of probability distributions, the total weight is $`\rho_1 + \rho_{i^*} \cdot \left( \frac{\mathbf{n_2}}{n_2} - 1\right)`$, where $`\mathbf{n_2}`$ is a Poisson random variable with mean $`n_2`$.
 
 ## Summary
 
-1. The number of persistent seats, $n_1$ is solely determined by the stake distribution.
+1. The number of persistent seats, $`n_1`$ is solely determined by the stake distribution.
 	- A pool only occupies at most one persistent seat and the weight of that seat is equal to their stake.
 	- Persistent seats stay constant over the epoch.
-2. The number of non-persistent seats, whose expectation is $n_2$, varies according to the VRF values $\sigma_i$ used for each pool's eligibility.
+2. The number of non-persistent seats, whose expectation is $`n_2`$, varies according to the VRF values $`\sigma_i`$ used for each pool's eligibility.
 	- A pool may occupy several seats.
-	- Each seat is equally weighted at one $n_2$th of the total non-persistent stake.
-3. The total weight in an election is $\rho_1 \pm \frac{\rho_{i^*}}{\sqrt{n_2}}$. The full probability distribution for the total weight provides guidance on choosing a safe value of the quorum threshold $\tau$.
-	- In Peras, $\tau$ should be chosen so that there is a vanishingly small probability that 25% adversarial stake could obtain a quorum.
-	- In Leios, $\tau$ should be chosen so that there is a vanishingly small probability that 50% adversarial stake could obtain a quorum.
+	- Each seat is equally weighted at one $`n_2`$th of the total non-persistent stake.
+3. The total weight in an election is $`\rho_1 \pm \frac{\rho_{i^*}}{\sqrt{n_2}}`$. The full probability distribution for the total weight provides guidance on choosing a safe value of the quorum threshold $`\tau`$.
+	- In Peras, $`\tau`$ should be chosen so that there is a vanishingly small probability that 25% adversarial stake could obtain a quorum.
+	- In Leios, $`\tau`$ should be chosen so that there is a vanishingly small probability that 50% adversarial stake could obtain a quorum.
 
 ## Numerical example
 
-Consider the stake distribution of Epoch 535 of Cardano mainnet and vary the committee size $n$. The table below[^1] shows that . . .
+Consider the stake distribution of Epoch 535 of Cardano mainnet and vary the committee size $`n`$. The table below[^1] shows that . . .
 
 - The stake of the persistent seats comprises > 80% of the committee's total weight.
 - The standard deviation of the total weight is nearly 2% for the smaller committees and a small fraction of a percent for larger committees.
-- Noticeable adjustment to the quorum threshold $\tau$ is needed to account for a one-in-million chance ("1 ppm tail" in the table) of extremely unlucky sortition (i.e., many fewer seats than expected).
-	- For a committee size of 700, Peras would need $\tau \approx 78.52\%$ and Leios would need $\tau \approx 53.52\%$. 
-	- For a committee size of 1000, Peras would need $\tau \approx 75.76\%$ and Leios would need $\tau \approx 50.76\%$. 
+- Noticeable adjustment to the quorum threshold $`\tau`$ is needed to account for a one-in-million chance ("1 ppm tail" in the table) of extremely unlucky sortition (i.e., many fewer seats than expected).
+	- For a committee size of 700, Peras would need $`\tau \approx 78.52\%`$ and Leios would need $`\tau \approx 53.52\%`$. 
+	- For a committee size of 1000, Peras would need $`\tau \approx 75.76\%`$ and Leios would need $`\tau \approx 50.76\%`$. 
 	- One part per million may would be an overly conservative setting, since it means that a 25% (or 50%) adversary for Peras (or Leios), respectively) would succeed in defeating (or obtaining) a quorum once in a million elections.
 
 | Committee Size | Persistent Seats | Persistent Weight | Standard Deviation of Total Weight | 1 ppm Tail of Total Weight |
