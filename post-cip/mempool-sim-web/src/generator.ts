@@ -1,60 +1,63 @@
-import { UndirectedGraph } from 'graphology';
+import { DirectedGraph } from 'graphology';
 import { MemoryPool } from './mempool.js';
 import { Node, Link } from './types.js';
 
 export function generateNetwork(
   n: number, 
   k: number, 
-  mempool_b: number,
+  mempool_B: number,
   latency_s: number,
-  bandwidth_bps: number,
-): UndirectedGraph<Node, Link> {
+  bandwidth_Bps: number,
+): DirectedGraph<Node, Link> {
   
-  if ((n * k) % 2 !== 0) throw new Error("n * k must be even");
+  if (k >= n) throw new Error("Degree k must be less than number of nodes n.");
 
-  const maxAttempts = 100000;
-  
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const graph = new UndirectedGraph<Node, Link>();
-
-    for (let i = 0; i < n; i++) {
-      const nodeId = i.toString();
-      graph.addNode(nodeId, {
-        honest: true,
-        mempool: new MemoryPool(mempool_b)
-      });
-    }
-
-    let stubs: string[] = [];
-    for (let i = 0; i < n; i++) {
-      for (let j = 0; j < k; j++) stubs.push(i.toString());
-    }
-    for (let i = stubs.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [stubs[i], stubs[j]] = [stubs[j], stubs[i]];
-    }
-
-    let success = true;
-    const edgeSet = new Set<string>();
-
-    while (stubs.length > 0) {
-      const u = stubs.pop()!;
-      const v = stubs.pop()!;
-
-      if (u === v) { success = false; break; }
-      const edgeKey = [u, v].sort().join("-");
-      if (edgeSet.has(edgeKey)) { success = false; break; }
-
-      edgeSet.add(edgeKey);
-      
-      graph.addEdge(u, v, {
-        latency_s,
-        bandwidth_bps,
-      });
-    }
-
-    if (success) return graph;
+  const graph = new DirectedGraph<Node, Link>();
+  for (let i = 0; i < n; i++) {
+    graph.addNode(i.toString(), {
+      honest: true,
+      mempool: new MemoryPool(mempool_B),
+    });
   }
 
-  throw new Error("Failed to generate graph");
+  for (let i = 0; i < n; i++) {
+    for (let offset = 1; offset <= k; offset++) {
+      const target = (i + offset) % n;
+      graph.addDirectedEdge(i.toString(), target.toString(), {
+        latency_s,
+        bandwidth_Bps,
+      });
+    }
+  }
+
+  const iterations = n * k * 1000; 
+  const nodes = graph.nodes();
+
+  for (let step = 0; step < iterations; step++) {
+    const u = nodes[Math.floor(Math.random() * n)];
+    const x = nodes[Math.floor(Math.random() * n)];
+
+    if (u === x) continue;
+
+    const uNeighbors = graph.outNeighbors(u);
+    const xNeighbors = graph.outNeighbors(x);
+
+    const v = uNeighbors[Math.floor(Math.random() * uNeighbors.length)];
+    const y = xNeighbors[Math.floor(Math.random() * xNeighbors.length)];
+
+    if (u === y || x === v) continue;
+    
+    if (graph.hasDirectedEdge(u, y) || graph.hasDirectedEdge(x, v)) continue;
+
+    const attrsUV = graph.getDirectedEdgeAttributes(u, v);
+    const attrsXY = graph.getDirectedEdgeAttributes(x, y);
+
+    graph.dropDirectedEdge(u, v);
+    graph.dropDirectedEdge(x, y);
+
+    graph.addDirectedEdge(u, y, attrsUV);
+    graph.addDirectedEdge(x, v, attrsXY);
+  }
+
+  return graph;
 }
