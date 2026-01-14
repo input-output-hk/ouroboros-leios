@@ -14,9 +14,17 @@ echo "Initializing proto-devnet in $WORKING_DIR"
 # Create working directory
 mkdir -p "$WORKING_DIR"
 
-# Copy genesis files and update time
-# TODO: update time in byron/shelley
+# Copy genesis files and set start time
 cp -a "$CONFIG_DIR/genesis" "$WORKING_DIR/genesis"
+
+startTimeEpoch=$(date +%s)
+startTimeIso=$(date -u -d "@$startTimeEpoch" +"%Y-%m-%dT%H:%M:%SZ")
+
+jq --argjson time "$startTimeEpoch" '.startTime = $time' \
+	"$CONFIG_DIR/genesis/byron-genesis.json" >"$WORKING_DIR/genesis/byron-genesis.json"
+
+jq --arg time "$startTimeIso" '.systemStart = $time' \
+	"$CONFIG_DIR/genesis/shelley-genesis.json" >"$WORKING_DIR/genesis/shelley-genesis.json"
 
 # Set up each node
 nodes=(1 2 3)
