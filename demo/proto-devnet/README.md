@@ -30,11 +30,12 @@ The `nix develop` shell is also available via `direnv allow`.
 
 Install these prerequisites:
 
-- `process-compose` - for orchestrating the demo processes
-- `cardano-node` (patched with Leios support)
-- `cardano-cli` - compatible with the cardano-node version
-- `sqlite3` - for creating Leios databases
-- `tx-generator` (optional) - for generating transaction workload
+- `process-compose` for orchestrating the demo processes
+- `cardano-node` patched with Leios support
+- `cardano-cli` compatible with the cardano-node version
+- `sqlite3` for creating Leios databases
+- `jq` for config modifications
+- `tx-generator` (optional) for generating transaction workload
 
 Set environment variables if the commands are not in your PATH:
 

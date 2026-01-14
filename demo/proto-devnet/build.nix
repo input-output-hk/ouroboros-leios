@@ -17,6 +17,7 @@
           packages = [
             pkgs.process-compose
             pkgs.sqlite
+            pkgs.jq
             inputs'.cardano-node.packages.cardano-testnet
             inputs'.cardano-node.packages.cardano-cli
             inputs'.cardano-node.packages.tx-generator
