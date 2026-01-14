@@ -1,6 +1,6 @@
 # Determining a quorum in weighted Fait Accompli with local sortition
 
-This is an adaption of Figures 7 and 3 of the following paper, but with elaboration and additional explanation.
+This is an adaption of Figures 6 and 3 of the following paper, but with elaboration and additional explanation.
 
 > Peter Gazi, Aggelos Kiayias, and Alexander Russell. 2023. Fait Accompli Committee Selection: Improving the Size-Security Tradeoff of Stake-Based Committees. In Proceedings of the 2023 ACM SIGSAC Conference on Computer and Communications Security (CCS '23). Association for Computing Machinery, New York, NY, USA, 845–858. https://doi.org/10.1145/3576915.3623194.
 
