@@ -1,11 +1,30 @@
 # Leios logbook
 
-> [!IMPORTANT]
+> [!NOTE]
 > 
-> Now that the [Leios CIP](https://github.com/cardano-foundation/CIPs/pull/1078) is under review and implementation work has begun, this Leios logbook has been retired in favor of github tickets in the [Leios implementation roadmap](https://github.com/orgs/input-output-hk/projects/167/views/3).
+> Usage of this Logbook has been greatly reduced in favor of github issues and PRs in the [Leios roadmap](https://github.com/orgs/input-output-hk/projects/167/views/3).
 > 
-> See the [Post-CIP R&D Findings](post-cip/README.md) document for additional (after 2025-11-01) findings and artifacts not directly related to the implementation of Linear Leios.
+> See also the [Post-CIP R&D Findings](post-cip/README.md) document for additional (after 2025-11-01) findings and artifacts not directly related to the implementation of Linear Leios.
 
+## 2026-01-12
+
+### SN on sketching a prototype devnet demo setup
+
+- Related to issue https://github.com/input-output-hk/ouroboros-leios/issues/690
+- As briefly discussed, we need a small network of patched `cardano-node` instances which would produce blocks and load it with more than what Praos can handle, for it to drive EB production, certification and inclusion work on the consensus layer.
+- Starting a devnet is a common thing there should be many tools. I even had built one for hydra (https://github.com/cardano-scaling/hydra/tree/master/hydra-cluster) and sketched a more "batteries included" tool (https://github.com/cardano-scaling/pegasus).
+- There is also [`cardano-testnet`](https://github.com/IntersectMBO/cardano-node/tree/master/cardano-testnet) that is located on the `cardano-node` repository.
+- Decided to give this a spin. On a first try it stops just after starting the nodes
+  - Fixed it in this PR https://github.com/IntersectMBO/cardano-node/pull/6405
+- The tool seems to be in current development / refactor as told by the api/cli team
+- `cardano-testnet`: When invoking it twice it fails with a big error ("testnet" dir exists). Should be more friendly or fallback to just trying to continue the testnet (as if given as –node-env).
+- The patched cardano node seems to have a different topology file format (I got a parsing error) than the latest master (of which I need to be using `cardano-testnet`)
+    - When separating `create-env` from startup, we could modify the topology files and check the whole config in.
+    - Restarting the testnet is not possible at the moment anyways. So instead of `rm -r devnet` we would do `git clean -dxf devnet`.
+    - Turns out I only need to add `EnableP2P` to the node configuaration (defaults to true for 10.6.1)
+- Thomas pointed me to the Mlabs "congested-testnet" setup: <https://github.com/mlabs-haskell/congested-testnet>
+- The prototype nodes start, but fail and this is quite slowly reported by `cardano-testnet`. 
+  - Submitted a PR to improve this https://github.com/IntersectMBO/cardano-node/pull/6408
 
 ## 2025-10-21
 
