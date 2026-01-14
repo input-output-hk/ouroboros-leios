@@ -1,29 +1,39 @@
 import { UndirectedGraph } from 'graphology';
+import { MemoryPool } from './mempool.js';
+import { Node, Link } from './types.js';
 
-export function generateRandomRegularGraph(n: number, k: number, maxAttempts = 100000): UndirectedGraph {
-  // validation
-  if ((n * k) % 2 !== 0) throw new Error("The product of n and k must be even.");
-  if (k >= n) throw new Error("Degree k must be less than number of nodes n.");
+export function generateNetwork(
+  n: number, 
+  k: number, 
+  mempool_b: number,
+  latency_s: number,
+  bandwidth_bps: number,
+): UndirectedGraph<Node, Link> {
+  
+  if ((n * k) % 2 !== 0) throw new Error("n * k must be even");
 
+  const maxAttempts = 100000;
+  
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const graph = new UndirectedGraph();
-    
-    // Add nodes
-    for (let i = 0; i < n; i++) graph.addNode(i.toString());
+    const graph = new UndirectedGraph<Node, Link>();
 
-    // Create stubs
+    for (let i = 0; i < n; i++) {
+      const nodeId = i.toString();
+      graph.addNode(nodeId, {
+        honest: true,
+        mempool: new MemoryPool(mempool_b)
+      });
+    }
+
     let stubs: string[] = [];
     for (let i = 0; i < n; i++) {
       for (let j = 0; j < k; j++) stubs.push(i.toString());
     }
-
-    // Shuffle stubs
     for (let i = stubs.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [stubs[i], stubs[j]] = [stubs[j], stubs[i]];
     }
 
-    // Pair stubs
     let success = true;
     const edgeSet = new Set<string>();
 
@@ -31,17 +41,20 @@ export function generateRandomRegularGraph(n: number, k: number, maxAttempts = 1
       const u = stubs.pop()!;
       const v = stubs.pop()!;
 
-      if (u === v) { success = false; break; } // Self-loop
-
+      if (u === v) { success = false; break; }
       const edgeKey = [u, v].sort().join("-");
-      if (edgeSet.has(edgeKey)) { success = false; break; } // Multi-edge
+      if (edgeSet.has(edgeKey)) { success = false; break; }
 
       edgeSet.add(edgeKey);
-      graph.addEdge(u, v);
+      
+      graph.addEdge(u, v, {
+        latency_s,
+        bandwidth_bps,
+      });
     }
 
     if (success) return graph;
   }
 
-  throw new Error(`Failed to generate graph after ${maxAttempts} attempts.`);
+  throw new Error("Failed to generate graph");
 }

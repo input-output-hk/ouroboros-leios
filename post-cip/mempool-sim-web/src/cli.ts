@@ -1,11 +1,11 @@
-import { generateRandomRegularGraph } from './generator.js';
+import { generateNetwork } from './generator.js';
 
 const NODES = 50;
 const DEGREE = 6;
 
 try {
   console.log(`Generating a ${DEGREE}-regular graph with ${NODES} nodes...`);
-  const graph = generateRandomRegularGraph(NODES, DEGREE);
+  const graph = generateNetwork(NODES, DEGREE);
 
   console.log("✅ Success!");
   console.log(`Nodes: ${graph.order}, Edges: ${graph.size}`);
