@@ -15,11 +15,13 @@
           src = ./.;
           inputsFrom = [ config.devShells.dev-demo ];
           packages = [
+            pkgs.process-compose
+            pkgs.sqlite
             inputs'.cardano-node.packages.cardano-testnet
             inputs'.cardano-node.packages.cardano-cli
             inputs'.cardano-node.packages.tx-generator
           ];
-          # inherit (config.devShells.dev-demo) CARDANO_NODE;
+          # TODO: re-enable patched node inherit (config.devShells.dev-demo) CARDANO_NODE;
           CARDANO_NODE = lib.getExe inputs'.cardano-node.packages.cardano-node;
           CARDANO_CLI = lib.getExe inputs'.cardano-node.packages.cardano-cli;
 
@@ -31,12 +33,28 @@
 
       packages.demo-proto-devnet = pkgs.writeShellApplication {
         name = "leios-demo-proto-devnet";
-        runtimeInputs = config.devShells.dev-demo-proto-devnet.buildInputs;
+        runtimeInputs =
+          config.devShells.dev-demo-proto-devnet.nativeBuildInputs
+          ++ config.devShells.dev-demo-proto-devnet.buildInputs
+          ++ [
+            pkgs.process-compose
+            pkgs.sqlite
+          ];
         runtimeEnv = {
+          # Working directory and scripts location
+          WORKING_DIR = "devnet";
+          SCRIPTS = ./scripts;
+
+          # Configuration
+          CONFIG_DIR = ./config;
+          LEIOS_SCHEMA = ../2025-11/data/leios-schema.sql;
+
+          # Cardano binaries
           inherit (config.devShells.dev-demo-proto-devnet) CARDANO_NODE CARDANO_CLI;
-          SCRIPT_DIR = ./.; # FIXME: re-use 2025-11 sql file
         };
-        text = builtins.readFile ./start.bash;
+        text = ''
+          process-compose --no-server -f ${./process-compose.yaml};
+        '';
       };
     };
 }

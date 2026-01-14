@@ -9,26 +9,55 @@ A small network of patched cardano nodes that is loaded with synthetically creat
 
 ## Getting started
 
+### Using Nix (recommended)
+
+Run the demo with all dependencies automatically provided:
+
 ``` shell
 nix run github:input-output-hk/ouroboros-leios#demo-proto-devnet
 ```
 
-Or install these prerequisites:
-
-- `cardano-testnet` and `tx-generator` (recent)
-- Path to patched `cardano-node` set on `CARDANO_NODE`
-- A compatible `cardano-cli` set on `CARDANO_CLI`
-- `jq`
-
-and run:
+Or enter the development shell and run manually:
 
 ``` shell
-./start.bash
+nix develop .#dev-demo-proto-devnet
+./run.sh
 ```
 
-The `nix develop` shell, also available via `direnv allow`, provides all these.
+The `nix develop` shell is also available via `direnv allow`.
 
-Then, we can launch the transaction workload using `tx-generator`:
+### Without Nix
+
+Install these prerequisites:
+
+- `process-compose` - for orchestrating the demo processes
+- `cardano-node` (patched with Leios support)
+- `cardano-cli` - compatible with the cardano-node version
+- `sqlite3` - for creating Leios databases
+- `tx-generator` (optional) - for generating transaction workload
+
+Set environment variables if the commands are not in your PATH:
+
+``` shell
+export CARDANO_NODE=/path/to/cardano-node
+export CARDANO_CLI=/path/to/cardano-cli
+```
+
+Then run:
+
+``` shell
+./run.sh
+```
+
+## Using the demo
+
+The demo will:
+
+1. Initialize a 3-node cardano testnet in the `devnet/` directory
+2. Create Leios databases for all nodes
+3. Start all three nodes using process-compose
+
+Once running, you can launch the transaction workload using `tx-generator`:
 
 ``` shell
 tx-generator -- json_highlevel gen.json
@@ -42,12 +71,38 @@ export CARDANO_NODE_SOCKET_PATH=devnet/socket/node1/sock
 watch -n1 "cardano-cli query tip && cardano-cli query tx-mempool info"
 ```
 
-## Recreate the config
+## Configuration
 
-We used `cardano-testnet` to bootstrap the original node configuration:
+You can customize the demo by setting environment variables before running. See `run.sh` for available options and their defaults:
+
+``` shell
+export WORKING_DIR=my-devnet
+export CONFIG_DIR=/path/to/my/config
+./run.sh
+```
+
+## Clean up
+
+To reset the demo, simply remove the working directory:
+
+``` shell
+rm -rf devnet
+```
+
+## About the configuration
+
+The `config/` directory contains pre-prepared configuration files for the 3-node devnet:
+
+- Genesis files (shelley, alonzo, conway, dijkstra)
+- Node configuration (`config.json`)
+- Topology template (`topology.template.json`)
+- Pool keys for 3 block-producing nodes (pool1, pool2, pool3)
+- Stake delegators and UTxO keys
+
+The configuration was originally created using `cardano-testnet`:
 
 ``` shell
 cardano-testnet create-env --output config --num-pool-nodes 3 --slot-length 1 --testnet-magic 164 --params-mainnet
 ```
 
-Then, mostly tuned the node configuration and dropped the things we don't need (anything byron or governance related). See yourself by re-creating the config and checking the diff.
+Then tuned to remove unnecessary components (Byron-era and governance-related files).

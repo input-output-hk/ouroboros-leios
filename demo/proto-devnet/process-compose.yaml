@@ -1,0 +1,45 @@
+version: "0.5"
+is_strict: true
+
+processes:
+  Init:
+    command: |
+      bash "${SCRIPTS}/init.sh"
+    availability:
+      restart: "on_failure"
+
+  Node1:
+    environment:
+      - NODE_ID=1
+    command: |
+      bash "${SCRIPTS}/run-node.sh"
+    log_location: "${WORKING_DIR}/node1.log"
+    depends_on:
+      Init:
+        condition: process_completed_successfully
+    availability:
+      restart: "always"
+
+  Node2:
+    environment:
+      - NODE_ID=2
+    command: |
+      bash "${SCRIPTS}/run-node.sh"
+    log_location: "${WORKING_DIR}/node2.log"
+    depends_on:
+      Init:
+        condition: process_completed_successfully
+    availability:
+      restart: "always"
+
+  Node3:
+    environment:
+      - NODE_ID=3
+    command: |
+      bash "${SCRIPTS}/run-node.sh"
+    log_location: "${WORKING_DIR}/node3.log"
+    depends_on:
+      Init:
+        condition: process_completed_successfully
+    availability:
+      restart: "always"
