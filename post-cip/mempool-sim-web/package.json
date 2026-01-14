@@ -12,7 +12,8 @@
   "license": "MIT",
   "type": "module",
   "dependencies": {
-    "graphology": "^0.26.0"
+    "graphology": "^0.26.0",
+    "tinyqueue": "^3.0.0"
   },
   "devDependencies": {
     "@types/node": "^25.0.8",

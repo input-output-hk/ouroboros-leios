@@ -1,4 +1,6 @@
 import { generateNetwork, addAdversaryNode } from './generator.js';
+import { submitTx, handleEvents } from './events.js'
+import type { TxId, Tx } from './types.js'
 
 const NODES = 50;
 const DEGREE = 6;
@@ -11,6 +13,7 @@ const ADVERSARY_COUNT = 2;
 const ADVERSARY_DEGREE = 3 * DEGREE;
 
 try {
+
   console.log(`Generating a ${DEGREE}-regular graph with ${NODES} nodes...`);
   const graph = generateNetwork(NODES, DEGREE, MEMPOOL, LATENCY, BANDWIDTH);
 
@@ -27,6 +30,14 @@ try {
     console.log(`Node ${node}: connected to [${neighbors.join(', ')}]`);
   });
 
+  submitTx(0, "H10", {
+    id: "T1",
+    size_b: 1500,
+    honest: true,
+  });
+
+  handleEvents(graph);
+  
 } catch (error) {
   console.error("❌ Error:", error);
 }
