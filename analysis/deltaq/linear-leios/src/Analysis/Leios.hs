@@ -58,6 +58,7 @@ data Config = Config
   , reapplyTxs :: !DQ
   -- ^ DQ for reapplyTxs
   }
+  deriving (Show, Eq)
 
 -- | Probability of reaching a quorum
 pQuorum :: Config -> Double
