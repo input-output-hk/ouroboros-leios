@@ -9,6 +9,7 @@
 module Main where
 
 import Analysis.Leios
+import Control.Concurrent.Async
 import qualified Data.ByteString.Lazy as BL
 import Data.Csv (FromNamedRecord (..), Header, decodeByName, (.:))
 import Data.Ratio ((%))
@@ -64,22 +65,40 @@ main = do
   let txApplyTimesReduced = sampleElements gen sampleSize txApplyTimes
   let txReapplyTimesReduced = sampleElements gen sampleSize txReapplyTimes
 
-  mainWith
-    Config
-      { -- cip
-        lHdr = 1
-      , lVote = 4
-      , lDiff = 7
-      , τ = 3 % 4
-      , -- estimate
-        committeeSizeEstimated = 600
-      , -- mainnet
-        λ = 1 % 20
-      , numberSPOs = 2500
-      , -- empirical cdf
-        applyTxs = empiricalDQ txApplyTimesReduced
-      , reapplyTxs = empiricalDQ txReapplyTimesReduced
-      }
+  let configs =
+        [ Config
+            { name = "CIP"
+            , lHdr = 1
+            , lVote = 4
+            , lDiff = 7
+            , τ = 3 % 4
+            , -- estimate
+              committeeSizeEstimated = 600
+            , -- mainnet
+              λ = 1 % 20
+            , numberSPOs = 2500
+            , -- empirical cdf
+              applyTxs = DeltaQ.uniform 0 0.5 -- empiricalDQ txApplyTimesReduced
+            , reapplyTxs = DeltaQ.uniform 0 0.4 -- empiricalDQ txReapplyTimesReduced
+            }
+        , Config
+            { name = "Longer lVote"
+            , lHdr = 1
+            , lVote = 7
+            , lDiff = 4
+            , τ = 3 % 4
+            , -- estimate
+              committeeSizeEstimated = 600
+            , -- mainnet
+              λ = 1 % 20
+            , numberSPOs = 2500
+            , -- empirical cdf
+              applyTxs = DeltaQ.uniform 0 0.5 -- empiricalDQ txApplyTimesReduced
+            , reapplyTxs = DeltaQ.uniform 0 0.4 -- empiricalDQ txReapplyTimesReduced
+            }
+        ]
+
+  mapConcurrently_ mainWith configs
 
 mainWith :: Config -> IO ()
 mainWith c@Config{..} = do
@@ -108,18 +127,21 @@ mainWith c@Config{..} = do
   --             layout_title .= "Quorum distribution"
   --             plot (line "pQuorum" [vs])
 
-  maybe (print @String "Nothing") (printf "Estimate for lVote: %d\n") (lVoteEstimated applyTxs reapplyTxs)
-  maybe (print @String "Nothing") (printf "Estimate for lDiff: %d\n") (lDiffEstimated applyTxs reapplyTxs)
+  maybe (print @String "Nothing") (printf "Estimate for lVote (%s): %d\n" name) (lVoteEstimated applyTxs reapplyTxs)
+  maybe (print @String "Nothing") (printf "Estimate for lDiff (%s): %d\n" name) (lDiffEstimated applyTxs reapplyTxs)
 
   printf
-    "Probability that a header arrives on time: %.2f\n"
+    "Probability that a header arrives on time (%s): %.2f\n"
+    name
     $ (fromRational (pHeaderOnTime lHdr) :: Double)
   printf
-    "Probability that EB validation is completed before voting is over: %.2f\n"
+    "Probability that EB validation is completed before voting is over (%s): %.2f\n"
+    name
     $ (fromRational (pValidating applyTxs reapplyTxs (lHdr, lVote)) :: Double)
-  printf "Probability of Quorum: %.2f\n" (pQuorum c)
+  printf "Probability of Quorum (%s): %.2f\n" name (pQuorum c)
   printf
-    "Probability that the next Praos block has already been produced after the waiting period: %.4f\n"
+    "Probability that the next Praos block has already been produced after the waiting period (%s): %.4f\n"
+    name
     (pInterruptedByNewBlock c)
-  printf "Probability that an EB is certified: %.4f\n" (pCertified c)
-  printf "Expected time for certified EB: %.2f slots\n" (1 / (eCertified c))
+  printf "Probability that an EB is certified (%s): %.4f\n" name (pCertified c)
+  printf "Expected time for certified EB (%s): %.2f slots\n" name (1 / (eCertified c))

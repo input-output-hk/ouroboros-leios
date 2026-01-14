@@ -37,7 +37,9 @@ import Statistics.Praos (blockDistribution)
 -- | 'Config' is a collection of all parameters that determine the outcome
 -- of the analysis
 data Config = Config
-  { lHdr :: !Integer
+  { name :: String
+  -- ^ name
+  , lHdr :: !Integer
   -- ^ \(L_\text{hdr}\) parameter
   , lVote :: !Integer
   -- ^ \(L_\text{vote}\) parameter

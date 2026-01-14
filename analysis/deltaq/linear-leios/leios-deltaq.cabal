@@ -10,7 +10,7 @@ build-type:         Simple
 common warnings
     ghc-options: -Wall
 
-library 
+library
     import:           warnings
     build-depends:    base ^>=4.20.0.0
                     , deltaq
@@ -28,7 +28,8 @@ library
 executable leios-deltaq-analysis
     import:           warnings
     main-is:          Main.hs
-    build-depends:    base ^>=4.20.0.0
+    build-depends:    async
+                    , base ^>=4.20.0.0
                     , bytestring
                     , cassava
                     , deltaq
@@ -39,4 +40,5 @@ executable leios-deltaq-analysis
                     , Chart >= 1.8 && < 2.0
                     , Chart-cairo
     hs-source-dirs:   app
+    ghc-options: -threaded
     default-language: Haskell2010
