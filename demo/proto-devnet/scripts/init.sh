@@ -42,6 +42,7 @@ for i in "${nodes[@]}"; do
 		"$CONFIG_DIR/topology.template.json" >"$NODE_DIR/topology.json"
 
 	# Symlink genesis files (shared, read-only)
+	# FIXME: copy them once to WORKING_DIR, update time in byron/shelley and symlink from there
 	ln -s "$CONFIG_DIR/genesis" "$NODE_DIR/genesis"
 
 	# Symlink pool keys (read-only)
