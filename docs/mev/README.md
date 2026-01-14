@@ -70,9 +70,3 @@ eUTxO protections remain effective - classic sandwich attacks still prevented.
 ## 4. Nested Transactions
 
 *Research pending.*
-
-## References
-
-- [CIP-0164](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md) - Leios specification
-- [Threat Model](../threat-model.md) - T16-T19
-- [SundaeSwap](https://docs.sundaeswap.finance/), [Minswap](https://docs.minswap.org/), [Splash](https://docs.splash.trade/), [Liqwid](https://docs.liqwid.finance/)
