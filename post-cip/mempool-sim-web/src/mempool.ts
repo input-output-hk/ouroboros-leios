@@ -1,16 +1,19 @@
 export class MemoryPool<T> {
   private items: T[] = [];
-  public readonly capacity: number;
+  private size_B: number;
+  public readonly capacity_B: number;
 
-  constructor(capacity: number) {
-    this.capacity = capacity;
+  constructor(capacity_B: number) {
+    this.size_B = 0;
+    this.capacity_B = capacity_B;
   }
 
-  enqueue(item: T): boolean {
-    if (this.items.length >= this.capacity) {
-      return false; // Queue is full
+  enqueue(item: T, item_B: number): boolean {
+    if (this.size_B + item_B > this.capacity_B) {
+      return false;
     }
     this.items.push(item);
+    this.size_B += item_B;
     return true;
   }
 
@@ -22,11 +25,8 @@ export class MemoryPool<T> {
     return this.items[0];
   }
 
-  get size(): number {
-    return this.items.length;
+  getSize_B(): number {
+    return this.size_B;
   }
 
-  isFull(): boolean {
-    return this.items.length >= this.capacity;
-  }
 }

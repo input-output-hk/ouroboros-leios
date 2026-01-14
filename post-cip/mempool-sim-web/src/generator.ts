@@ -21,6 +21,7 @@ export function generateNetwork(
     graph.addNode(makeId(i), {
       honest: true,
       mempool: new MemoryPool(mempool_B),
+      backpressure: [],
     });
   }
 
