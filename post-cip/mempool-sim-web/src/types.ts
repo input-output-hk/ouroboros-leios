@@ -15,5 +15,5 @@ export interface Node {
 
 export interface Link {
   latency_s: number;
-  bandwidth_bps: number;
+  bandwidth_Bps: number;
 }

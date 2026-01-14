@@ -12,7 +12,7 @@ try {
   
   console.log("\nAdjacency List:");
   graph.forEachNode((node) => {
-    const neighbors = graph.neighbors(node);
+    const neighbors = graph.outboundNeighbors(node);
     console.log(`Node ${node}: connected to [${neighbors.join(', ')}]`);
   });
 
