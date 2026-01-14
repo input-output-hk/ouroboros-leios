@@ -1,0 +1,22 @@
+{
+  "name": "mempool-sim-web",
+  "version": "1.0.0",
+  "description": "Leios memory pool simulator for web browsers",
+  "main": "index.js",
+  "scripts": {
+    "cli": "tsx src/cli.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "dependencies": {
+    "graphology": "^0.26.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.8",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
