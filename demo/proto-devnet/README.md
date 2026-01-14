@@ -41,3 +41,13 @@ export CARDANO_NODE_NETWORK_ID=164
 export CARDANO_NODE_SOCKET_PATH=devnet/socket/node1/sock
 watch -n1 "cardano-cli query tip && cardano-cli query tx-mempool info"
 ```
+
+## Recreate the config
+
+We used `cardano-testnet` to bootstrap the original node configuration:
+
+``` shell
+cardano-testnet create-env --output config --num-pool-nodes 3 --slot-length 1 --testnet-magic 164 --params-mainnet
+```
+
+Then, mostly tuned the node configuration and dropped the things we don't need (anything byron or governance related). See yourself by re-creating the config and checking the diff.
