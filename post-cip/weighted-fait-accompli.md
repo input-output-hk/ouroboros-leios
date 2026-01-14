@@ -24,7 +24,9 @@ The pools $`p_i`$ for $`i \in [i^*, n]`$ are all *candidates* for having a non-p
 
 The *target* number of non-persistent seats on the committee will be $`n_2 = n - n_1`$. (Figure 6 of the paper uses $`n_2`$ for the *actual* number of non-persistent seats, but the local-sortition approach here differs from the paper in that the actual number of non-persistent seats may differ slightly from the target $`n_2`$.)
 
-Let  $`\sigma_i \in [0,1]`$ be the VRF value for party $`p_i`$, derived from their signature on the election identifier and the Praos nonce for the epoch. The number of seats they have on the committee is the value $`k_i^*`$ for which $`P(k_i^*-1) \leq \sigma_i \lt P(k_i^*)`$ holds, given $`P(k^*) = \sum_{k=0}^{k^*} \frac{(n_2 \cdot \mathcal{S}_3(i))^k \cdot e^{- n_2 \cdot \mathcal{S}_3(i)}}{k!}`$ for $`k^* \ge 0`$ and $`P(k^*) = 0`$ otherwise. (This is simply sampling from a Poisson distribution with mean $`n_2 \cdot \mathcal{S}_3(i)`$ according to cumulative probability $`\sigma_i`$.) Each of those seats has weight $`\rho_{i^*} / n_2`$. (Once again, this scheme differs slightly from the paper in that $`\rho_{i^*}`$ is divided by the *target* number of non-persistent seats, not the *actual* number of non-persistent seats; note that the *actual* number of non-persistent seats is not publicly known because the sortition is *local*.)
+Let  $`\sigma_i \in [0,1]`$ be the VRF value for party $`p_i`$, derived from their signature on the election identifier and the Praos nonce for the epoch.
+
+The number of seats they have on the committee is the value $`k_i^*`$ for which $`P(k_i^*-1) \leq \sigma_i \lt P(k_i^*)`$ holds, given $`P(k^*) = \sum_{k=0}^{k^*} \frac{(n_2 \cdot \mathcal{S}_3(i))^k \cdot e^{- n_2 \cdot \mathcal{S}_3(i)}}{k!}`$ for $`k^* \ge 0`$ and $`P(k^*) = 0`$ otherwise. (This is simply sampling from a Poisson distribution with mean $`n_2 \cdot \mathcal{S}_3(i)`$ according to cumulative probability $`\sigma_i`$.) Each of those seats has weight $`\rho_{i^*} / n_2`$. (Once again, this scheme differs slightly from the paper in that $`\rho_{i^*}`$ is divided by the *target* number of non-persistent seats, not the *actual* number of non-persistent seats; note that the *actual* number of non-persistent seats is not publicly known because the sortition is *local*.)
 
 ## Variability of committee size
 
@@ -43,8 +45,8 @@ In terms of probability distributions, the total weight is $`\rho_1 + \rho_{i^*}
 	- A pool may occupy several seats.
 	- Each seat is equally weighted at one $`n_2`$th of the total non-persistent stake.
 3. The total weight in an election is $`\rho_1 \pm \frac{\rho_{i^*}}{\sqrt{n_2}}`$. The full probability distribution for the total weight provides guidance on choosing a safe value of the quorum threshold $`\tau`$.
-	- In Peras, $`\tau`$ should be chosen so that there is a vanishingly small probability that 25% adversarial stake could obtain a quorum.
-	- In Leios, $`\tau`$ should be chosen so that there is a vanishingly small probability that 50% adversarial stake could obtain a quorum.
+	- In Peras, $`\tau`$ should be chosen so that there is a vanishingly small probability that 25% adversarial stake could veto an otherwise honest quorum.
+	- In Leios, $`\tau`$ should be chosen so that there is a vanishingly small probability that 50% adversarial stake could obtain a quorum or veto an otherwise honest quorum.
 
 ## Numerical example
 
