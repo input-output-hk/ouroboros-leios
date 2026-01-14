@@ -16,7 +16,7 @@ fi
 # We need to create an environment before starting it, because the prototype
 # `cardano-node` is a bit older than `cardano-testnet` and needs patching:
 
-cardano-testnet create-env --output devnet --num-pool-nodes 3 --slot-length 1 --testnet-magic 164 --params-mainnet
+cardano-testnet create-env --output devnet --slot-length 1 --testnet-magic 164 --params-mainnet
 
 cat devnet/configuration.yaml | jq '.EnableP2P = true' >devnet/configuration-p2p.yaml && mv devnet/configuration{-p2p,}.yaml
 

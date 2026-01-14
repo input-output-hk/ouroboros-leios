@@ -15,7 +15,7 @@ nix run github:input-output-hk/ouroboros-leios#demo-proto-devnet
 
 Or install these prerequisites:
 
-- `cardano-testnet` (recent)
+- `cardano-testnet` and `tx-generator` (recent)
 - Path to patched `cardano-node` set on `CARDANO_NODE`
 - A compatible `cardano-cli` set on `CARDANO_CLI`
 - `jq`
@@ -27,3 +27,17 @@ and run:
 ```
 
 The `nix develop` shell, also available via `direnv allow`, provides all these.
+
+Then, we can launch the transaction workload using `tx-generator`:
+
+``` shell
+tx-generator -- json_highlevel gen.json
+```
+
+Observe tip advancing and mempool size:
+
+``` shell
+export CARDANO_NODE_NETWORK_ID=164
+export CARDANO_NODE_SOCKET_PATH=devnet/socket/node1/sock
+watch -n1 "cardano-cli query tip && cardano-cli query tx-mempool info"
+```

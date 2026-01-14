@@ -17,9 +17,15 @@
           packages = [
             inputs'.cardano-node.packages.cardano-testnet
             inputs'.cardano-node.packages.cardano-cli
+            inputs'.cardano-node.packages.tx-generator
           ];
-          inherit (config.devShells.dev-demo) CARDANO_NODE;
+          # inherit (config.devShells.dev-demo) CARDANO_NODE;
+          CARDANO_NODE = lib.getExe inputs'.cardano-node.packages.cardano-node;
           CARDANO_CLI = lib.getExe inputs'.cardano-node.packages.cardano-cli;
+
+          # To easily interact with node1 on the devnet from within the demo dir
+          CARDANO_NODE_NETWORK_ID = 164;
+          CARDANO_NODE_SOCKET_PATH = "./devnet/socket/node1/sock";
         };
       };
 
