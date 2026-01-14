@@ -4,7 +4,7 @@ is_strict: true
 processes:
   Init:
     command: |
-      bash "${SCRIPTS}/init.sh"
+      bash "${SCRIPTS:-scripts}/init.sh"
     availability:
       restart: "on_failure"
 
@@ -12,8 +12,8 @@ processes:
     environment:
       - NODE_ID=1
     command: |
-      bash "${SCRIPTS}/run-node.sh"
-    log_location: "${WORKING_DIR}/node1.log"
+      bash "${SCRIPTS:-scripts}/run-node.sh"
+    log_location: "${WORKING_DIR:-devnet}/node1/node.log"
     depends_on:
       Init:
         condition: process_completed_successfully
@@ -24,8 +24,8 @@ processes:
     environment:
       - NODE_ID=2
     command: |
-      bash "${SCRIPTS}/run-node.sh"
-    log_location: "${WORKING_DIR}/node2.log"
+      bash "${SCRIPTS:-scripts}/run-node.sh"
+    log_location: "${WORKING_DIR:-devnet}/node2/node.log"
     depends_on:
       Init:
         condition: process_completed_successfully
@@ -36,8 +36,8 @@ processes:
     environment:
       - NODE_ID=3
     command: |
-      bash "${SCRIPTS}/run-node.sh"
-    log_location: "${WORKING_DIR}/node3.log"
+      bash "${SCRIPTS:-scripts}/run-node.sh"
+    log_location: "${WORKING_DIR:-devnet}/node3/node.log"
     depends_on:
       Init:
         condition: process_completed_successfully

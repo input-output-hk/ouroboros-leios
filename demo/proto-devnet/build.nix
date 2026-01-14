@@ -27,7 +27,7 @@
 
           # To easily interact with node1 on the devnet from within the demo dir
           CARDANO_NODE_NETWORK_ID = 164;
-          CARDANO_NODE_SOCKET_PATH = "./devnet/socket/node1/sock";
+          CARDANO_NODE_SOCKET_PATH = "./devnet/node1/node.socket";
         };
       };
 
@@ -35,26 +35,17 @@
         name = "leios-demo-proto-devnet";
         runtimeInputs =
           config.devShells.dev-demo-proto-devnet.nativeBuildInputs
-          ++ config.devShells.dev-demo-proto-devnet.buildInputs
-          ++ [
-            pkgs.process-compose
-            pkgs.sqlite
-          ];
+          ++ config.devShells.dev-demo-proto-devnet.buildInputs;
         runtimeEnv = {
-          # Working directory and scripts location
-          WORKING_DIR = "devnet";
+          # Override paths to point to nix store
           SCRIPTS = ./scripts;
-
-          # Configuration
           CONFIG_DIR = ./config;
           LEIOS_SCHEMA = ../2025-11/data/leios-schema.sql;
 
-          # Cardano binaries
+          # Inherit cardano binaries from dev shell
           inherit (config.devShells.dev-demo-proto-devnet) CARDANO_NODE CARDANO_CLI;
         };
-        text = ''
-          process-compose --no-server -f ${./process-compose.yaml};
-        '';
+        text = builtins.readFile ./run.sh;
       };
     };
 }

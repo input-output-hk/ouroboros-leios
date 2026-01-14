@@ -9,28 +9,28 @@ cd "$SCRIPT_DIR"
 
 # Check for required commands
 REQUIRED_COMMANDS=(
-  "process-compose"
-  "cardano-node"
-  "cardano-cli"
-  "sqlite3"
+	"process-compose"
+	"cardano-node"
+	"cardano-cli"
+	"sqlite3"
 )
 
 MISSING_COMMANDS=()
 for cmd in "${REQUIRED_COMMANDS[@]}"; do
-  if ! command -v "$cmd" &> /dev/null; then
-    MISSING_COMMANDS+=("$cmd")
-  fi
+	if ! command -v "$cmd" &>/dev/null; then
+		MISSING_COMMANDS+=("$cmd")
+	fi
 done
 
 if [ ${#MISSING_COMMANDS[@]} -gt 0 ]; then
-  echo "Error: The following required commands are not available:"
-  for cmd in "${MISSING_COMMANDS[@]}"; do
-    echo "  - $cmd"
-  done
-  echo ""
-  echo "Please install the missing commands or use nix:"
-  echo "  nix run github:input-output-hk/ouroboros-leios#demo-proto-devnet"
-  exit 1
+	echo "Error: The following required commands are not available:"
+	for cmd in "${MISSING_COMMANDS[@]}"; do
+		echo "  - $cmd"
+	done
+	echo ""
+	echo "Please install the missing commands or use nix:"
+	echo "  nix run github:input-output-hk/ouroboros-leios#demo-proto-devnet"
+	exit 1
 fi
 
 # Set defaults for all environment variables
@@ -46,4 +46,4 @@ export WORKING_DIR SCRIPTS CARDANO_NODE CARDANO_CLI CONFIG_DIR LEIOS_SCHEMA
 
 # Run process-compose
 echo "Starting proto-devnet with process-compose..."
-exec process-compose --no-server -f process-compose.yaml
+process-compose --no-server -f process-compose.yaml

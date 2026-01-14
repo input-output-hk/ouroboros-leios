@@ -67,7 +67,7 @@ Observe tip advancing and mempool size:
 
 ``` shell
 export CARDANO_NODE_NETWORK_ID=164
-export CARDANO_NODE_SOCKET_PATH=devnet/socket/node1/sock
+export CARDANO_NODE_SOCKET_PATH=devnet/node1/node.socket
 watch -n1 "cardano-cli query tip && cardano-cli query tx-mempool info"
 ```
 

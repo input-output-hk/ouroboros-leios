@@ -1,58 +1,45 @@
 #!/usr/bin/env bash
-set -exuo pipefail
+set -euo pipefail
 
 # Expects WORKING_DIR, CONFIG_DIR, and LEIOS_SCHEMA to be set
-
-echo "Initializing proto-devnet in $WORKING_DIR"
 
 # Check if WORKING_DIR already exists
 if [ -d "$WORKING_DIR" ]; then
 	echo "Working directory already exists: $WORKING_DIR"
-	echo "Please remove it first if you want to reinitialize"
-	exit 1
+	echo "Skipping init"
+	exit 0
 fi
+echo "Initializing proto-devnet in $WORKING_DIR"
 
-# Create working directory structure
-mkdir -p "$WORKING_DIR/node-data"
-mkdir -p "$WORKING_DIR/socket/node1"
-mkdir -p "$WORKING_DIR/socket/node2"
-mkdir -p "$WORKING_DIR/socket/node3"
-
-# Copy genesis files
-echo "Copying genesis files from $CONFIG_DIR"
-mkdir -p "$WORKING_DIR/genesis"
-cp "$CONFIG_DIR"/*-genesis.json "$WORKING_DIR/genesis/"
-chmod -R +rw "$WORKING_DIR/genesis"
+# Create working directory
+mkdir -p "$WORKING_DIR"
 
 # Set up each node
 for i in 1 2 3; do
-	NODE_DIR="$WORKING_DIR/node-data/node$i"
+	NODE_DIR="$WORKING_DIR/node$i"
 	POOL_DIR="$CONFIG_DIR/pools-keys/pool$i"
 
-	echo "Setting up node$i"
-	mkdir -p "$NODE_DIR/shelley"
+	echo "Setting up node$i in $NODE_DIR"
+	mkdir -p "$NODE_DIR"
 
-	# Copy node config
+	# Copy config files
+	# TODO: rename node name and fill in topology
 	cp "$CONFIG_DIR/config.json" "$NODE_DIR/config.json"
-
-	# Copy topology (using template for now, could be customized per-node)
 	cp "$CONFIG_DIR/topology.template.json" "$NODE_DIR/topology.json"
 
-	# Copy pool keys
-	cp "$POOL_DIR/vrf.skey" "$NODE_DIR/shelley/vrf.skey"
-	cp "$POOL_DIR/kes.skey" "$NODE_DIR/shelley/kes.skey"
-	cp "$POOL_DIR/opcert.cert" "$NODE_DIR/shelley/opcert.cert"
+	# Symlink genesis files (shared, read-only)
+	ln -s "$CONFIG_DIR/genesis" "$NODE_DIR/genesis"
+
+	# Symlink pool keys (read-only)
+	ln -s "$POOL_DIR" "$NODE_DIR/keys"
 
 	# Create Leios database
 	if [ -f "$LEIOS_SCHEMA" ]; then
-		cat "$LEIOS_SCHEMA" | sqlite3 "$NODE_DIR/leios.db"
+		sqlite3 "$NODE_DIR/leios.db" <"$LEIOS_SCHEMA"
 		echo "Created leios.db for node$i"
 	else
 		echo "Warning: Leios schema not found at $LEIOS_SCHEMA"
 	fi
-
-	# Ensure everything is writable (important when CONFIG_DIR is in nix store)
-	chmod -R +rw "$NODE_DIR"
 done
 
 echo "Proto-devnet initialized and prepared successfully"
