@@ -1,0 +1,22 @@
+{
+  "debugMode": true,
+  "tx_count": 10000,
+  "tps": 100,
+  "inputs_per_tx": 2,
+  "outputs_per_tx": 2,
+  "tx_fee": 212345,
+  "min_utxo_value": 1000000,
+  "add_tx_size": 39,
+  "init_cooldown": 50,
+  "era": "Conway",
+  "keepalive": 30,
+  "localNodeSocketPath": "devnet/socket/node1/sock",
+  "nodeConfigFile": "devnet/configuration.yaml",
+  "sigKey": "devnet/utxo-keys/utxo1/utxo.skey",
+  "targetNodes": [
+    {"addr": "127.0.0.1", "port": 39623, "name": "node1"},
+    {"addr": "127.0.0.1", "port": 45343, "name": "node2"},
+    {"addr": "127.0.0.1", "port": 34003, "name": "node3"}
+  ],
+  "plutus": null
+}
