@@ -12,9 +12,13 @@ export function generateNetwork(
   
   if (k >= n) throw new Error("Degree k must be less than number of nodes n.");
 
+  const makeId = (i: number): string => {
+    return "H" + (i + 1);
+  };
+
   const graph = new DirectedGraph<Node, Link>();
   for (let i = 0; i < n; i++) {
-    graph.addNode(i.toString(), {
+    graph.addNode(makeId(i), {
       honest: true,
       mempool: new MemoryPool(mempool_B),
     });
@@ -23,7 +27,7 @@ export function generateNetwork(
   for (let i = 0; i < n; i++) {
     for (let offset = 1; offset <= k; offset++) {
       const target = (i + offset) % n;
-      graph.addDirectedEdge(i.toString(), target.toString(), {
+      graph.addDirectedEdge(makeId(i), makeId(target), {
         latency_s,
         bandwidth_Bps,
       });
@@ -60,4 +64,55 @@ export function generateNetwork(
   }
 
   return graph;
+}
+
+
+export function addAdversaryNode(
+  graph: DirectedGraph<Node, Link>,
+  id: string,
+  upstreamCount: number,
+  downstreamCount: number,
+  mempool_B: number,
+  latency_s: number,
+  bandwidth_Bps: number,
+) {
+  if (graph.hasNode(id)) {
+    throw new Error(`Node with ID "${id}" already exists.`);
+  }
+
+  const existingNodes = graph.nodes()
+
+  graph.addNode(id, {
+    honest: false,
+    mempool: new MemoryPool(mempool_B)
+  });
+
+  if (upstreamCount > existingNodes.length || downstreamCount > existingNodes.length) {
+    throw new Error("Cannot connect to more nodes than exist in the graph.");
+  }
+
+  const pickRandomNodes = (count: number): string[] => {
+    const pool = [...existingNodes];
+    for (let i = 0; i < count; i++) {
+      const rand = i + Math.floor(Math.random() * (pool.length - i));
+      [pool[i], pool[rand]] = [pool[rand], pool[i]];
+    }
+    return pool.slice(0, count);
+  };
+
+  const incomingSources = pickRandomNodes(upstreamCount);
+  for (const source of incomingSources) {
+    graph.addDirectedEdge(source, id, {
+      latency_s,
+      bandwidth_Bps,
+    });
+  }
+
+  const outgoingTargets = pickRandomNodes(downstreamCount);
+  for (const target of outgoingTargets) {
+    graph.addDirectedEdge(id, target, {
+      latency_s,
+      bandwidth_Bps,
+    });
+  }
 }
