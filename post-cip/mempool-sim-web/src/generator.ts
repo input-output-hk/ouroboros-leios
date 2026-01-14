@@ -1,6 +1,6 @@
 import { DirectedGraph } from 'graphology';
 import { MemoryPool } from './mempool.js';
-import { Node, Link } from './types.js';
+import type { Node, Link } from './types.js';
 
 export function generateNetwork(
   n: number, 
