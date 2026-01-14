@@ -15,7 +15,8 @@ echo "Initializing proto-devnet in $WORKING_DIR"
 mkdir -p "$WORKING_DIR"
 
 # Set up each node
-for i in 1 2 3; do
+nodes=(1 2 3)
+for i in "${nodes[@]}"; do
 	NODE_NAME="node$i"
 	NODE_DIR="$WORKING_DIR/$NODE_NAME"
 	POOL_DIR="$CONFIG_DIR/pools-keys/pool$i"
@@ -25,8 +26,20 @@ for i in 1 2 3; do
 
 	# Copy config files
 	jq ".TraceOptionNodeName = \"$NODE_NAME\"" "$CONFIG_DIR/config.json" >"$NODE_DIR/config.json"
-	# TODO: fill in topology
-	cp "$CONFIG_DIR/topology.template.json" "$NODE_DIR/topology.json"
+
+	# Generate upstream endpoints to other nodes
+	accessPoints=$(for j in "${nodes[@]}"; do
+		# Except self
+		if [ "$i" -ne "$j" ]; then
+			port="PORT_NODE$j"
+			address="IP_NODE$j"
+			echo "{ \"port\": ${!port}, \"address\": \"${!address}\" }"
+		fi
+	done | jq -s '.')
+	jq \
+		--argjson accessPoints "$accessPoints" \
+		'.localRoots[0].accessPoints = $accessPoints' \
+		"$CONFIG_DIR/topology.template.json" >"$NODE_DIR/topology.json"
 
 	# Symlink genesis files (shared, read-only)
 	ln -s "$CONFIG_DIR/genesis" "$NODE_DIR/genesis"

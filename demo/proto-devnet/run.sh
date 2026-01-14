@@ -36,14 +36,20 @@ fi
 
 # Set defaults for all environment variables
 # These can be overridden by exporting them before running this script
+set -a
 : "${WORKING_DIR:=devnet}"
 : "${SCRIPTS:=./scripts}"
 : "${CARDANO_NODE:=cardano-node}"
 : "${CARDANO_CLI:=cardano-cli}"
 : "${CONFIG_DIR:=config}"
 : "${LEIOS_SCHEMA:=../2025-11/data/leios-schema.sql}"
-
-export WORKING_DIR SCRIPTS CARDANO_NODE CARDANO_CLI CONFIG_DIR LEIOS_SCHEMA
+: "${IP_NODE1:=localhost}"
+: "${PORT_NODE1:=3001}"
+: "${IP_NODE2:=localhost}"
+: "${PORT_NODE2:=3002}"
+: "${IP_NODE3:=localhost}"
+: "${PORT_NODE3:=3003}"
+set +a
 
 # Run process-compose
 echo "Starting proto-devnet with process-compose..."
