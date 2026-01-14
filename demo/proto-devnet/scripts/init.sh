@@ -14,6 +14,10 @@ echo "Initializing proto-devnet in $WORKING_DIR"
 # Create working directory
 mkdir -p "$WORKING_DIR"
 
+# Copy genesis files and update time
+# TODO: update time in byron/shelley
+cp -a "$CONFIG_DIR/genesis" "$WORKING_DIR/genesis"
+
 # Set up each node
 nodes=(1 2 3)
 for i in "${nodes[@]}"; do
@@ -25,7 +29,10 @@ for i in "${nodes[@]}"; do
 	mkdir -p "$NODE_DIR"
 
 	# Copy config files
-	jq ".TraceOptionNodeName = \"$NODE_NAME\"" "$CONFIG_DIR/config.json" >"$NODE_DIR/config.json"
+	cat "$CONFIG_DIR/config.json" |
+		jq ".TraceOptionNodeName = \"$NODE_NAME\"" |
+		jq ".TraceOptions.\"\".backends[1] = \"PrometheusSimple 0.0.0.0 $((12900 + "$i"))\"" \
+			>"$NODE_DIR/config.json"
 
 	# Generate upstream endpoints to other nodes
 	accessPoints=$(for j in "${nodes[@]}"; do
@@ -42,11 +49,14 @@ for i in "${nodes[@]}"; do
 		"$CONFIG_DIR/topology.template.json" >"$NODE_DIR/topology.json"
 
 	# Symlink genesis files (shared, read-only)
-	# FIXME: copy them once to WORKING_DIR, update time in byron/shelley and symlink from there
-	ln -s "$CONFIG_DIR/genesis" "$NODE_DIR/genesis"
+	ln -s "../genesis/byron-genesis.json" "$NODE_DIR/"
+	ln -s "../genesis/shelley-genesis.json" "$NODE_DIR/"
+	ln -s "../genesis/alonzo-genesis.json" "$NODE_DIR/"
+	ln -s "../genesis/conway-genesis.json" "$NODE_DIR/"
+	ln -s "../genesis/dijkstra-genesis.json" "$NODE_DIR/"
 
 	# Symlink pool keys (read-only)
-	ln -s "$POOL_DIR" "$NODE_DIR/keys"
+	ln -s "$(realpath "${POOL_DIR}")" "$NODE_DIR/keys"
 
 	# Create Leios database
 	if [ -f "$LEIOS_SCHEMA" ]; then

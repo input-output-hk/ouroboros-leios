@@ -8,12 +8,17 @@ NODE_DIR="$WORKING_DIR/node${NODE_ID}"
 
 cd "$NODE_DIR"
 
-# Set LEIOS_DB_PATH environment variable for the node
+# Select ip and port from environment variables using NODE_ID
+ip="IP_NODE${NODE_ID}"
+port="PORT_NODE${NODE_ID}"
+
 export LEIOS_DB_PATH="leios.db"
 
 # Run cardano-node
 $CARDANO_NODE run \
 	--config "config.json" \
+	--host-addr "${!ip}" \
+	--port "${!port}" \
 	--topology "topology.json" \
 	--database-path "db" \
 	--socket-path "node.socket" \
