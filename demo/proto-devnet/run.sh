@@ -43,11 +43,11 @@ set -a
 : "${CARDANO_CLI:=cardano-cli}"
 : "${CONFIG_DIR:=config}"
 : "${LEIOS_SCHEMA:=../2025-11/data/leios-schema.sql}"
-: "${IP_NODE1:=localhost}"
+: "${IP_NODE1:=0.0.0.0}"
 : "${PORT_NODE1:=3001}"
-: "${IP_NODE2:=localhost}"
+: "${IP_NODE2:=0.0.0.0}"
 : "${PORT_NODE2:=3002}"
-: "${IP_NODE3:=localhost}"
+: "${IP_NODE3:=0.0.0.0}"
 : "${PORT_NODE3:=3003}"
 set +a
 
