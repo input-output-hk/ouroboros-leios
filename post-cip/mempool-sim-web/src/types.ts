@@ -10,7 +10,8 @@ export interface Tx {
 
 export interface Node {
   honest: boolean;
-  mempool: MemoryPool<TxId>;
+  mempool: MemoryPool<Tx>;
+  backpressure: Tx[];
 }
 
 export interface Link {
