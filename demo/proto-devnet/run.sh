@@ -13,6 +13,7 @@ REQUIRED_COMMANDS=(
 	"cardano-node"
 	"cardano-cli"
 	"sqlite3"
+	"jq"
 )
 
 MISSING_COMMANDS=()

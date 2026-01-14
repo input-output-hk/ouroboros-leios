@@ -16,15 +16,16 @@ mkdir -p "$WORKING_DIR"
 
 # Set up each node
 for i in 1 2 3; do
-	NODE_DIR="$WORKING_DIR/node$i"
+	NODE_NAME="node$i"
+	NODE_DIR="$WORKING_DIR/$NODE_NAME"
 	POOL_DIR="$CONFIG_DIR/pools-keys/pool$i"
 
-	echo "Setting up node$i in $NODE_DIR"
+	echo "Setting up $NODE_NAME in $NODE_DIR"
 	mkdir -p "$NODE_DIR"
 
 	# Copy config files
-	# TODO: rename node name and fill in topology
-	cp "$CONFIG_DIR/config.json" "$NODE_DIR/config.json"
+	jq ".TraceOptionNodeName = \"$NODE_NAME\"" "$CONFIG_DIR/config.json" >"$NODE_DIR/config.json"
+	# TODO: fill in topology
 	cp "$CONFIG_DIR/topology.template.json" "$NODE_DIR/topology.json"
 
 	# Symlink genesis files (shared, read-only)
@@ -36,7 +37,7 @@ for i in 1 2 3; do
 	# Create Leios database
 	if [ -f "$LEIOS_SCHEMA" ]; then
 		sqlite3 "$NODE_DIR/leios.db" <"$LEIOS_SCHEMA"
-		echo "Created leios.db for node$i"
+		echo "Created leios.db for $NODE_NAME"
 	else
 		echo "Warning: Leios schema not found at $LEIOS_SCHEMA"
 	fi
