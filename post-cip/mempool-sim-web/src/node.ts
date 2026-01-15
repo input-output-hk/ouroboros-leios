@@ -35,6 +35,29 @@ export class Node {
     this.known = new Set<TxId>();
   }
 
+  // Log the partial state of the node.
+  public logPartialState(): void {
+    logger.debug({node: this.id, honest: this.honest, mempool: this.mempool.contents()}, "node partial state");
+  }
+
+  // Summarize the memory pool.
+  public mempoolSummary(): any {
+    let honest: number = 0;
+    let adversarial: number = 0;
+    this.mempool.contents().forEach(tx => {
+      if (tx.honest)
+        honest += 1;
+      else
+        adversarial += 1;
+    });    
+    return {node: this.id, mempool_tx_count: {honest, adversarial}};
+  }
+
+  // Log the memory pool summarization.
+  public logMempoolSummary(): void {
+    logger.debug(this.mempoolSummary(), "mempool summary");
+  }
+
   // Submit a transaction to a node, applying backpressure if needed.
   public handleSubmitTx(graph: DirectedGraph<Node, Link>, now: number, tx: Tx): void {
     if (this.known.has(tx.id))
