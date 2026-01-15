@@ -40,4 +40,12 @@ export class MemoryPool {
     return this.txs.filter(tx => tx.id == txId).length > 0;
   }
 
+  get(txId: TxId): Tx | undefined {
+    const matches = this.txs.filter(tx => tx.id == txId);
+    if (matches.length == 0)
+      return undefined;
+    else
+      return matches[0];
+  }
+
 }

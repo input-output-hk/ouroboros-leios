@@ -1,7 +1,7 @@
 import { generateNetwork, addAdversaryNode } from './topology.js';
 import { submitTx, handleEvents } from './events.js'
-import type { TxId, Tx } from './types.js'
 import { logger } from './logger.js'
+import { OVERHEAD_B  } from './link.js';
 
 const NODES = 50;
 const DEGREE = 6;
@@ -22,18 +22,19 @@ try {
     mempool_bytes: MEMPOOL,
     latency_ms: LATENCY / 1000,
     bandwidth_Mbps: BANDWIDTH * 8 / 1000000,
-  }, "Configuration");
+    message_overhead_bytes: OVERHEAD_B,
+  }, "configuration");
   const graph = generateNetwork(NODES, DEGREE, MEMPOOL, LATENCY, BANDWIDTH);
 
-  logger.info({nodes: graph.order, links: graph.size}, "Graph");
+  logger.info(graph, "graph");
   
   for (let i = 0; i < ADVERSARY_COUNT; ++i) {
     addAdversaryNode(graph, "A" + (i + 1), 3 * DEGREE, 3 * DEGREE, MEMPOOL, LATENCY, BANDWIDTH);
   }
 
   graph.forEachNode((node) => {
-    const neighbors = graph.outboundNeighbors(node);
-    logger.info({node: node, downstream_peers: neighbors}, "Topology");
+    const neighbors = graph.outNeighbors(node);
+    logger.info({node: node, downstream_peers: neighbors}, "gopology");
   });
 
   submitTx(1.05, "H20", {
@@ -51,5 +52,5 @@ try {
   handleEvents(graph);
 
 } catch (error) {
-  logger.fatal(error, "Error");
+  console.log(`Fatal: ${error}`);
 }

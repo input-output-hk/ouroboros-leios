@@ -1,8 +1,8 @@
 import { DirectedGraph } from 'graphology';
 import { MemoryPool } from './mempool.js';
-import type { Tx, TxId } from './types.js';
+import { TXID_B, type Tx, type TxId } from './types.js';
 import { Link } from './link.js'
-import { offerTx, requestTx } from './events.js';
+import { offerTx, requestTx, sendTx } from './events.js';
 import { logger } from './logger.js';
 
 
@@ -34,7 +34,7 @@ export class Node {
   // Submit a transaction to a node, applying backpressure if needed.
   public handleSubmitTx(graph: DirectedGraph<Node, Link>, now: number, tx: Tx): void {
     this.backpressure.push(tx);
-    logger.info({clock: now, node: this.id, txId: tx.id}, "Apply backpressure");
+    logger.info({clock: now, node: this.id, txId: tx.id}, "apply backpressure");
     this.fillMemoryPool(graph, now);
   };
 
@@ -48,17 +48,17 @@ export class Node {
       if (!okay)
         break;
       this.backpressure.shift();
-      logger.info({clock: now, node: this.id, txId: tx.id}, "Remove backpressure");
-      logger.info({clock: now, node: this.id, txId: tx.id}, "Insert into memory pool");
+      logger.info({clock: now, node: this.id, txId: tx.id}, "remove backpressure");
+      logger.info({clock: now, node: this.id, txId: tx.id}, "insert into memory pool");
       this.offerUpstream(graph, now, tx);
     }
   }
 
   // Offer a transaction to upstream peers.
   private offerUpstream (graph: DirectedGraph<Node, Link>, now: number, tx: Tx): void {
-    graph.forEachInEdge(this.id, (_link, link, peer, _node) => {
-      logger.info({clock: now, node: this.id, txId: tx.id, upstreamPeer: peer}, "Offer transaction");
-      offerTx(link.computeDelay(now, tx.size_B), this.id, peer, tx.id)
+    graph.forEachInEdge(this.id, (_edge, link, peer, _node) => {
+      logger.info({clock: now, node: this.id, txId: tx.id, upstreamPeer: peer}, "offer transaction");
+      offerTx(link.computeDelay(now, TXID_B), this.id, peer, tx.id)
     });
   }
 
@@ -77,12 +77,43 @@ export class Node {
     while (this.offers.length > 0) {
       const offer = this.offers.shift();
       const txId = offer![0];
-      // FIXME: Should we always take the first offer?
+      // FIXME: Should we always take the first offer? or a random one?
       const peer = offer![1];
       this.offers = this.offers.filter(offer => offer[0] != txId);
-      logger.info({clock: now, node: this.id, peer: peer, txId: txId}, "Request transaction");
-      requestTx(now, this.id, peer, txId);
+      logger.info({clock: now, node: this.id, peer: peer, txId: txId}, "request transaction");
+      const link = this.getDownstreamLink(graph, peer);
+      requestTx(link.computeDelay(now, TXID_B), this.id, peer, txId);
     }
+  }
+
+  // Receive a request for a Tx.
+  public handleRequestTx(graph: DirectedGraph<Node, Link>, now: number, peer: string, txId: TxId): void {
+    const tx = this.mempool.get(txId);
+    if (tx) {
+      logger.info({clock: now, node: this.id, peer: peer, tx: tx}, "send transaction");
+      const link = this.getUpstreamLink(graph, peer);
+      sendTx(link.computeDelay(now, tx.size_B), this.id, peer, tx);
+    } else{
+      logger.warn({clock: now, node: this.id, peer: peer, txId: txId}, "cannnot send transaction");
+    }
+  }
+
+  private getDownstreamLink(graph: DirectedGraph<Node, Link>, peer: string): Link {
+      const link = graph.edge(this.id, peer)
+      if (!link) {
+        logger.fatal({source: peer, target: this.id}, "downstream link not found");
+        throw new Error("downstream link not found");
+      }
+      return graph.getEdgeAttributes(link)
+  }
+
+  private getUpstreamLink(graph: DirectedGraph<Node, Link>, peer: string): Link {
+      const link = graph.edge(peer, this.id)
+      if (!link) {
+        logger.fatal({source: peer, target: this.id}, "upstream link not found");
+        throw new Error("upstream link not found");
+      }
+      return graph.getEdgeAttributes(link)
   }
 
 }

@@ -14,6 +14,7 @@ export type Event =
   | { kind: 'ReceiveTx'; clock: number; from: string; to: string; tx: Tx };
 
 
+// FIXME: This should not be a global variable.
 const EventQueue = new TinyQueue<Event>([], (a, b) => a.clock - b.clock);
 
 
@@ -67,8 +68,10 @@ export const handleEvents = (graph: DirectedGraph<Node, Link>): void => {
     if (!event)
       break;
     const target: Node = graph.getNodeAttributes(event.to);
-    if (!target)
-      throw new Error("Unknown node: ${event.to}");
+    if (!target) {
+      logger.fatal(event, "unknown target node");
+      throw new Error("unknown target node");
+    }
     switch (event.kind) {
       case 'SubmitTx':
         target.handleSubmitTx(graph, event.clock, event.tx);
@@ -76,8 +79,11 @@ export const handleEvents = (graph: DirectedGraph<Node, Link>): void => {
       case 'OfferTx':
         target.handleOfferTx(graph, event.clock, event.from, event.txId);
         break;
+      case 'RequestTx':
+        target.handleRequestTx(graph, event.clock, event.from, event.txId);
+        break;
       default:
-        logger.warn(event, "No handler for event");
+        logger.warn(event, "no handler for event");
     }
   }
 }
