@@ -3,6 +3,7 @@ import { DirectedGraph } from 'graphology';
 import type { TxId, Tx } from './types.js';
 import { Node } from './node.js';
 import { Link } from './link.js';
+import { logger } from './logger.js';
 
 
 export type Event = 
@@ -65,8 +66,7 @@ export const handleEvents = (graph: DirectedGraph<Node, Link>): void => {
     const event = EventQueue.pop();
     if (!event)
       break;
-    console.log("HANDLE EVENT")
-    console.log(event);
+    logger.info(event, "Handle event");
     const target: Node = graph.getNodeAttributes(event.to);
     if (!target)
       throw new Error("Unknown node: ${event.to}");
