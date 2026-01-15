@@ -51,6 +51,19 @@ try {
 
   handleEvents(graph);
 
+  let honest: number = 0;
+  let adversarial: number = 0;
+  graph.forEachNode((node) => {
+    const summary = graph.getNodeAttributes(node).mempoolSummary().mempool_tx_count;
+    logger.debug(summary);
+    honest += summary.honest;
+    adversarial += summary.adversarial;
+  });
+  logger.info({
+    honest_txs: honest / (honest + adversarial), 
+    adversarial_txs: adversarial / (honest + adversarial)
+  }, "mempool honesty");
+
 } catch (error) {
   console.log(`Fatal: ${error}`);
 }

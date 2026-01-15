@@ -48,4 +48,8 @@ export class MemoryPool {
       return matches[0];
   }
 
+  contents(): Tx[] {
+    return this.txs.map(tx => tx);
+  }
+
 }
