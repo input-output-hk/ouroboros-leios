@@ -37,11 +37,11 @@ export class MemoryPool {
   }
 
   contains(txId: TxId): boolean {
-    return this.txs.filter(tx => tx.id == txId).length > 0;
+    return this.txs.filter(tx => tx.txId == txId).length > 0;
   }
 
   get(txId: TxId): Tx | undefined {
-    const matches = this.txs.filter(tx => tx.id == txId);
+    const matches = this.txs.filter(tx => tx.txId == txId);
     if (matches.length == 0)
       return undefined;
     else
