@@ -6,8 +6,6 @@ processes:
     command: |
       set -u
       bash "${SOURCE_DIR}/scripts/init.sh"
-    availability:
-      restart: "on_failure"
 
   Node1:
     environment:
@@ -17,8 +15,6 @@ processes:
     depends_on:
       Init:
         condition: process_completed_successfully
-    availability:
-      restart: "always"
 
   Node2:
     environment:
@@ -28,8 +24,6 @@ processes:
     depends_on:
       Init:
         condition: process_completed_successfully
-    availability:
-      restart: "always"
 
   Node3:
     environment:
@@ -39,11 +33,9 @@ processes:
     depends_on:
       Init:
         condition: process_completed_successfully
-    availability:
-      restart: "always"
 
   TxGenerator:
-    command: tx-generator -- json_highlevel gen.json
+    command: sleep 5 && tx-generator -- json_highlevel gen.json
     working_dir: ${WORKING_DIR}
     depends_on:
       Node1:
@@ -52,5 +44,13 @@ processes:
         condition: process_started
       Node3:
         condition: process_started
-    availability:
-      restart: "on_failure"
+
+  ObserveTip:
+    environment:
+      - CARDANO_NODE_NETWORK_ID=164
+      - CARDANO_NODE_SOCKET_PATH=${WORKING_DIR}/node1/node.socket
+    command: watch -n1 "cardano-cli query tip && cardano-cli query tx-mempool info"
+    is_interactive: true
+    depends_on:
+      Node1:
+        condition: process_started
