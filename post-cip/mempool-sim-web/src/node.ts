@@ -37,20 +37,29 @@ export class Node {
 
   // Log the partial state of the node.
   public logPartialState(): void {
-    logger.debug({node: this.id, honest: this.honest, mempool: this.mempool.contents()}, "node partial state");
+    logger.debug({
+      node: this.id, 
+      honest: this.honest, 
+      mempool: {
+        summary: this.mempoolSummary(), 
+        contents: this.mempool.contents()
+      }
+    }, "node partial state");
   }
 
   // Summarize the memory pool.
   public mempoolSummary(): any {
     let honest: number = 0;
     let adversarial: number = 0;
+    let bytes: number = 0;
     this.mempool.contents().forEach(tx => {
+      bytes += tx.size_B;
       if (tx.frontRuns == "")
         honest += 1;
       else
         adversarial += 1;
     });    
-    return {node: this.id, mempool_tx_count: {honest, adversarial}};
+    return {node: this.id, mempool_bytes: bytes, mempool_tx_count: {honest, adversarial}};
   }
 
   // Log the memory pool summarization.
