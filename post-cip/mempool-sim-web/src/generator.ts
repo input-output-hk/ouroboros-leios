@@ -1,6 +1,7 @@
 import { DirectedGraph } from 'graphology';
 import { MemoryPool } from './mempool.js';
-import type { Node, Link } from './types.js';
+import { Node } from './node.js';
+import { Link } from './link.js'
 
 export function generateNetwork(
   n: number, 
@@ -18,20 +19,16 @@ export function generateNetwork(
 
   const graph = new DirectedGraph<Node, Link>();
   for (let i = 0; i < n; i++) {
-    graph.addNode(makeId(i), {
-      honest: true,
-      mempool: new MemoryPool(mempool_B),
-      backpressure: [],
-    });
+    const id: string = makeId(i);
+    graph.addNode(id, new Node(id, true, mempool_B));
   }
 
   for (let i = 0; i < n; i++) {
     for (let offset = 1; offset <= k; offset++) {
       const target = (i + offset) % n;
-      graph.addDirectedEdge(makeId(i), makeId(target), {
-        latency_s,
+      graph.addDirectedEdge(makeId(i), makeId(target), new Link(latency_s,
         bandwidth_Bps,
-      });
+      ));
     }
   }
 
@@ -83,10 +80,7 @@ export function addAdversaryNode(
 
   const existingNodes = graph.nodes()
 
-  graph.addNode(id, {
-    honest: false,
-    mempool: new MemoryPool(mempool_B)
-  });
+  graph.addNode(id, new Node(id, false, mempool_B));
 
   if (upstreamCount > existingNodes.length || downstreamCount > existingNodes.length) {
     throw new Error("Cannot connect to more nodes than exist in the graph.");
@@ -95,25 +89,28 @@ export function addAdversaryNode(
   const pickRandomNodes = (count: number): string[] => {
     const pool = [...existingNodes];
     for (let i = 0; i < count; i++) {
-      const rand = i + Math.floor(Math.random() * (pool.length - i));
-      [pool[i], pool[rand]] = [pool[rand], pool[i]];
+      const j = i + Math.floor(Math.random() * (pool.length - i));
+      // FIXME: Rewrite to remove this warning on the following.
+      [pool[i], pool[j]] = [pool[j], pool[i]];
     }
     return pool.slice(0, count);
   };
 
   const incomingSources = pickRandomNodes(upstreamCount);
   for (const source of incomingSources) {
-    graph.addDirectedEdge(source, id, {
-      latency_s,
-      bandwidth_Bps,
-    });
+    graph.addDirectedEdge(
+      source, 
+      id, 
+      new Link(latency_s, bandwidth_Bps),
+    );
   }
 
   const outgoingTargets = pickRandomNodes(downstreamCount);
   for (const target of outgoingTargets) {
-    graph.addDirectedEdge(id, target, {
-      latency_s,
-      bandwidth_Bps,
-    });
+    graph.addDirectedEdge(
+      id, 
+      target, 
+      new Link(latency_s, bandwidth_Bps),
+    );
   }
 }

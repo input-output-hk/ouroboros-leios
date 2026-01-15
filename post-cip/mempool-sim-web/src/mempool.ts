@@ -1,6 +1,9 @@
 export class MemoryPool<T> {
+
   private items: T[] = [];
+
   private size_B: number;
+  
   public readonly capacity_B: number;
 
   constructor(capacity_B: number) {

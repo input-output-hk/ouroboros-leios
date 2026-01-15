@@ -4,17 +4,6 @@ export type TxId = string;
 
 export interface Tx {
   id: TxId;
-  size_b: number;
+  size_B: number;
   honest: boolean;
-}
-
-export interface Node {
-  honest: boolean;
-  mempool: MemoryPool<Tx>;
-  backpressure: Tx[];
-}
-
-export interface Link {
-  latency_s: number;
-  bandwidth_Bps: number;
 }
