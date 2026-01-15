@@ -25,7 +25,7 @@ Install these prerequisites:
 - `cardano-node` patched with Leios support
 - `cardano-cli` compatible with the cardano-node version
 - `sqlite3` for creating Leios databases
-- `jq` for config modifications
+- `jq` and `envsubst` for config modifications
 - `tx-generator` (optional) for generating transaction workload
 
 Set environment variables if the commands are not in your PATH:

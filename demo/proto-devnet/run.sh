@@ -11,6 +11,7 @@ REQUIRED_COMMANDS=(
 	"cardano-cli"
 	"sqlite3"
 	"jq"
+	"envsubst"
 )
 
 MISSING_COMMANDS=()

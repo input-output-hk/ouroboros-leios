@@ -18,6 +18,7 @@
             pkgs.process-compose
             pkgs.sqlite
             pkgs.jq
+            pkgs.envsubst
             inputs'.cardano-node.packages.cardano-testnet
             inputs'.cardano-node.packages.cardano-cli
             inputs'.cardano-node.packages.tx-generator
