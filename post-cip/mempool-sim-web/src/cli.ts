@@ -1,6 +1,7 @@
 import { generateNetwork, addAdversaryNode } from './generator.js';
 import { submitTx, handleEvents } from './events.js'
 import type { TxId, Tx } from './types.js'
+import { logger } from './logger.js'
 
 const NODES = 50;
 const DEGREE = 6;
@@ -14,20 +15,18 @@ const ADVERSARY_DEGREE = 3 * DEGREE;
 
 try {
 
-  console.log(`Generating a ${DEGREE}-regular graph with ${NODES} nodes...`);
+  logger.info(`Generating a ${DEGREE}-regular graph with ${NODES} nodes...`);
   const graph = generateNetwork(NODES, DEGREE, MEMPOOL, LATENCY, BANDWIDTH);
 
-  console.log("✅ Success!");
-  console.log(`Nodes: ${graph.order}, Edges: ${graph.size}`);
+  logger.info(`Nodes: ${graph.order}, Edges: ${graph.size}`);
   
   for (let i = 0; i < ADVERSARY_COUNT; ++i) {
     addAdversaryNode(graph, "A" + (i + 1), 3 * DEGREE, 3 * DEGREE, MEMPOOL, LATENCY, BANDWIDTH);
   }
 
-  console.log("\nAdjacency List:");
   graph.forEachNode((node) => {
     const neighbors = graph.outboundNeighbors(node);
-    console.log(`Node ${node}: connected to [${neighbors.join(', ')}]`);
+    logger.info(`Node ${node}: connected to [${neighbors.join(', ')}]`);
   });
 
   submitTx(1.05, "H20", {
@@ -45,5 +44,5 @@ try {
   handleEvents(graph);
 
 } catch (error) {
-  console.error("❌ Error:", error);
+  logger.fatal("❌ Error: ${error}");
 }
