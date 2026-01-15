@@ -36,7 +36,8 @@
         name = "leios-demo-proto-devnet";
         runtimeInputs =
           config.devShells.dev-demo-proto-devnet.nativeBuildInputs
-          ++ config.devShells.dev-demo-proto-devnet.buildInputs;
+          ++ config.devShells.dev-demo-proto-devnet.buildInputs
+          ++ [ pkgs.sqlite ]; # XXX: why is this not picked up from above?
         runtimeEnv = {
           # Override paths to point to nix store
           SCRIPTS = ./scripts;
