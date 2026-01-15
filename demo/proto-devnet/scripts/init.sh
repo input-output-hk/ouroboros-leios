@@ -76,4 +76,9 @@ for i in "${nodes[@]}"; do
 	fi
 done
 
+# Copy utxo-keys for tx-generator and set permissions
+echo "Setting up utxo-keys for tx-generator"
+cp -a "$CONFIG_DIR/utxo-keys" "$WORKING_DIR/utxo-keys"
+find "$WORKING_DIR/utxo-keys" -name "*.skey" -exec chmod 400 {} \;
+
 echo "Proto-devnet initialized and prepared successfully"

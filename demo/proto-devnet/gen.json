@@ -1,6 +1,6 @@
 {
   "debugMode": false,
-  "tx_count": 100,
+  "tx_count": 1000,
   "tps": 10,
   "inputs_per_tx": 2,
   "outputs_per_tx": 2,
@@ -10,13 +10,13 @@
   "init_cooldown": 50,
   "era": "Conway",
   "keepalive": 30,
-  "localNodeSocketPath": "devnet/socket/node1/sock",
-  "nodeConfigFile": "devnet/configuration.yaml",
+  "localNodeSocketPath": "devnet/node1/node.socket",
+  "nodeConfigFile": "devnet/node1/config.json",
   "sigKey": "devnet/utxo-keys/utxo1/utxo.skey",
   "targetNodes": [
-    {"addr": "127.0.0.1", "port": 46397, "name": "node1"},
-    {"addr": "127.0.0.1", "port": 37653, "name": "node2"},
-    {"addr": "127.0.0.1", "port": 34485, "name": "node3"}
+    {"addr": "127.0.0.1", "port": 3001, "name": "node1"},
+    {"addr": "127.0.0.1", "port": 3002, "name": "node2"},
+    {"addr": "127.0.0.1", "port": 3003, "name": "node3"}
   ],
   "plutus": null
 }

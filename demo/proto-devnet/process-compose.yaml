@@ -44,3 +44,16 @@ processes:
         condition: process_completed_successfully
     availability:
       restart: "always"
+
+  TxGenerator:
+    command: |
+      tx-generator -- json_highlevel gen.json
+    depends_on:
+      Node1:
+        condition: process_started
+      Node2:
+        condition: process_started
+      Node3:
+        condition: process_started
+    availability:
+      restart: "on_failure"
