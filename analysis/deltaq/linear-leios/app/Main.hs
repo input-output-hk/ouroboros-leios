@@ -9,6 +9,7 @@
 module Main where
 
 import Analysis.Leios
+import Control.Concurrent
 import Control.Concurrent.Async
 import qualified Data.ByteString.Lazy as BL
 import Data.Csv (DefaultOrdered (..), FromNamedRecord (..), Header, ToNamedRecord (..), decodeByName, encodeDefaultOrderedByName, (.:))
@@ -23,6 +24,7 @@ import Graphics.Rendering.Chart.Backend.Cairo
 import Graphics.Rendering.Chart.Easy
 import Statistics.Leios (quorumProbability)
 import System.Random
+import Text.Printf
 
 data BlockEDF = BlockEDF
   { txCount :: !Int
@@ -58,43 +60,33 @@ main = do
   let txReapplyTimes = V.toList (V.map ((/ 1000) . reapply) edf)
 
   -- Reduce sample size for better performance
-  let sampleSize = 2 -- FIXME: too small
+  let sampleSize = 100
   let seed = 100
   let gen = mkStdGen seed
   let txApplyTimesReduced = sampleElements gen sampleSize txApplyTimes
   let txReapplyTimesReduced = sampleElements gen sampleSize txReapplyTimes
+
+  -- let applyTxs = DeltaQ.uniform 0 0.5
+  -- let reapplyTxs = DeltaQ.uniform 0 0.4
+  let applyTxs = empiricalDQ txApplyTimesReduced
+  let reapplyTxs = empiricalDQ txReapplyTimesReduced
+
+  printf "Complexity applyTxs: %d\n" (complexity applyTxs)
+  printf "Complexity reapplyTxs: %d\n" (complexity reapplyTxs)
+
+  _ <- forkIO $ maybe (print @String "Nothing") (printf "Estimate for lVote: %d\n") (lVoteEstimated applyTxs reapplyTxs)
+  _ <- forkIO $ maybe (print @String "Nothing") (printf "Estimate for lDiff: %d\n") (lDiffEstimated applyTxs reapplyTxs)
+
   let generatePlots = False
   let configs =
-        [ Config
-            { name = "CIP"
-            , lHdr = 1
-            , lVote = 4
-            , lDiff = 7
-            , τ = 3 % 4
-            , -- estimate
-              committeeSizeEstimated = 600
-            , -- mainnet
-              λ = 1 % 20
-            , numberSPOs = 2500
-            , -- empirical cdf
-              applyTxs = empiricalDQ txApplyTimesReduced
-            , reapplyTxs = empiricalDQ txReapplyTimesReduced
-            }
-        , Config
-            { name = "LlP"
-            , lHdr = 1
-            , lVote = 7
-            , lDiff = 10
-            , τ = 3 % 4
-            , -- estimate
-              committeeSizeEstimated = 600
-            , -- mainnet
-              λ = 1 % 20
-            , numberSPOs = 2500
-            , -- empirical cdf
-              applyTxs = DeltaQ.uniform 0 0.5
-            , reapplyTxs = DeltaQ.uniform 0 0.4
-            }
+        [ Config{name = "C113", lHdr = 1, lVote = 1, lDiff = 3, τ = 3 % 4, committeeSizeEstimated = 600, λ = 1 % 20, numberSPOs = 2500, ..}
+        , Config{name = "C124", lHdr = 1, lVote = 2, lDiff = 4, τ = 3 % 4, committeeSizeEstimated = 600, λ = 1 % 20, numberSPOs = 2500, ..}
+        , Config{name = "C135", lHdr = 1, lVote = 3, lDiff = 5, τ = 3 % 4, committeeSizeEstimated = 600, λ = 1 % 20, numberSPOs = 2500, ..}
+        , Config{name = "C145", lHdr = 1, lVote = 4, lDiff = 5, τ = 3 % 4, committeeSizeEstimated = 600, λ = 1 % 20, numberSPOs = 2500, ..}
+        , Config{name = "C147", lHdr = 1, lVote = 4, lDiff = 7, τ = 3 % 4, committeeSizeEstimated = 600, λ = 1 % 20, numberSPOs = 2500, ..}
+        , Config{name = "C155", lHdr = 1, lVote = 5, lDiff = 5, τ = 3 % 4, committeeSizeEstimated = 600, λ = 1 % 20, numberSPOs = 2500, ..}
+        , Config{name = "C165", lHdr = 1, lVote = 6, lDiff = 5, τ = 3 % 4, committeeSizeEstimated = 600, λ = 1 % 20, numberSPOs = 2500, ..}
+        , Config{name = "C999", lHdr = 9, lVote = 9, lDiff = 9, τ = 3 % 4, committeeSizeEstimated = 600, λ = 1 % 20, numberSPOs = 2500, ..}
         ]
   mapConcurrently (mainWith generatePlots) configs >>= printResults
 
@@ -106,11 +98,13 @@ data Result
   = -- | Config name
     Result
     { res_config :: !String
-    -- ^ Estimate for lVote
-    , res_lVoteEstimated :: !(Maybe Integer)
-    -- ^ Estimate for lDiff
-    , res_lDiffEstimated :: !(Maybe Integer)
     -- ^ Probability that a header arrives on time
+    , lHdr :: !Integer
+    -- ^ \(L_\text{hdr}\) parameter
+    , lVote :: !Integer
+    -- ^ \(L_\text{vote}\) parameter
+    , lDiff :: !Integer
+    -- ^ \(L_\text{diff}\) parameter
     , res_pHeaderOnTime :: !Double
     -- ^ Probability that EB validation is completed before voting is over
     , res_pValidating :: !Double
@@ -160,8 +154,6 @@ plots Config{..} = do
 stats :: Config -> Result
 stats config@Config{..} =
   let res_config = name
-      res_lVoteEstimated = lVoteEstimated applyTxs reapplyTxs
-      res_lDiffEstimated = lDiffEstimated applyTxs reapplyTxs
       res_pHeaderOnTime = fromRational (pHeaderOnTime lHdr)
       res_pValidating = fromRational (pValidating applyTxs reapplyTxs (lHdr, lVote))
       res_pQuorum = pQuorum config
