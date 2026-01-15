@@ -9,22 +9,13 @@ A small network of patched cardano nodes that is loaded with synthetically creat
 
 ## Getting started
 
-### Using Nix (recommended)
-
-Run the demo with all dependencies automatically provided:
+Run the demo with all dependencies automatically provided using nix:
 
 ``` shell
 nix run github:input-output-hk/ouroboros-leios#demo-proto-devnet
 ```
 
-Or enter the development shell and run manually:
-
-``` shell
-nix develop .#dev-demo-proto-devnet
-./run.sh
-```
-
-The `nix develop` shell is also available via `direnv allow`.
+Or enter the `nix develop` shell (also available via `direnv allow`) and follow [without nix instructions](#without-nix).
 
 ### Without Nix
 
@@ -50,21 +41,15 @@ Then run:
 ./run.sh
 ```
 
-## Using the demo
+## What's included
 
-The demo will:
+This `process-compose` orchestrated demo will:
 
-1. Initialize a 3-node cardano testnet in the `devnet/` directory
-2. Create Leios databases for all nodes
-3. Start all three nodes using process-compose
+1. Initialize a three node cardano devnet
+2. Start all three nodes
+3. Generate and submit a transaction workload using `tx-generator`
 
-Once running, you can launch the transaction workload using `tx-generator`:
-
-``` shell
-tx-generator -- json_highlevel gen.json
-```
-
-Observe tip advancing and mempool size:
+Observe tip advancing and mempool size (more observability come later):
 
 ``` shell
 export CARDANO_NODE_NETWORK_ID=164
@@ -84,10 +69,10 @@ export CONFIG_DIR=/path/to/my/config
 
 ## Clean up
 
-To reset the demo, simply remove the working directory:
+To reset the demo, simply remove the working directory, for example:
 
 ``` shell
-rm -rf devnet
+rm -rf tmp-devnet
 ```
 
 ## About the configuration
@@ -100,10 +85,12 @@ The `config/` directory contains pre-prepared configuration files for the 3-node
 - Pool keys for 3 block-producing nodes (pool1, pool2, pool3)
 - Stake delegators and UTxO keys
 
-The configuration was originally created using `cardano-testnet`:
+This serves as a starting configuration when intializing the testnet (see `init.sh`), which requires the typical modifications like file permissions, topology wiring and updating the start times.
+
+The template configuration was originally created using `cardano-testnet`:
 
 ``` shell
 cardano-testnet create-env --output config --num-pool-nodes 3 --slot-length 1 --testnet-magic 164 --params-mainnet
 ```
 
-Then tuned to remove unnecessary components (Byron-era and governance-related files).
+Then tuned and removed unnecessary components (Byron-era and governance-related files).
