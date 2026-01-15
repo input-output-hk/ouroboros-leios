@@ -13,7 +13,7 @@ const BANDWIDTH = 1250000; // = 10 Mb/s
 const ADVERSARY_COUNT = 2;
 const ADVERSARY_DEGREE = 3 * DEGREE;
 
-const TX_COUNT = 100;
+const TX_COUNT = 250;
 const TX_LAST_S = 20;
 
 try {
