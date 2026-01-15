@@ -37,7 +37,7 @@ fi
 # Set defaults for all environment variables
 # These can be overridden by exporting them before running this script
 set -a
-: "${WORKING_DIR:=devnet}"
+: "${WORKING_DIR:=tmp-devnet}"
 : "${SCRIPTS:=./scripts}"
 : "${CARDANO_NODE:=cardano-node}"
 : "${CARDANO_CLI:=cardano-cli}"
