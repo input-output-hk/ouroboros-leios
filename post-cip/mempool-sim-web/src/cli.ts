@@ -30,14 +30,20 @@ try {
     console.log(`Node ${node}: connected to [${neighbors.join(', ')}]`);
   });
 
-  submitTx(0, "H10", {
+  submitTx(1.05, "H20", {
     id: "T1",
-    size_b: 1500,
+    size_B: 1500,
+    honest: true,
+  });
+
+  submitTx(0, "H10", {
+    id: "T2",
+    size_B: 1500,
     honest: true,
   });
 
   handleEvents(graph);
-  
+
 } catch (error) {
   console.error("❌ Error:", error);
 }
