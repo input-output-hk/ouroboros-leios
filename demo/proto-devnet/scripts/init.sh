@@ -84,4 +84,7 @@ echo "Setting up utxo-keys for tx-generator"
 cp -r "$CONFIG_DIR/utxo-keys" "$WORKING_DIR/utxo-keys"
 find "$WORKING_DIR/utxo-keys" -name "*.skey" -exec chmod 400 {} \;
 
+# Configure tx-generator
+envsubst <"${SOURCE_DIR}/gen.template.json" >"${WORKING_DIR}/gen.json"
+
 echo "Proto-devnet initialized and prepared successfully"

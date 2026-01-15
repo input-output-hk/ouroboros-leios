@@ -43,7 +43,8 @@ processes:
       restart: "always"
 
   TxGenerator:
-    command: tx-generator -- json_highlevel ${SOURCE_DIR}/gen.json
+    command: tx-generator -- json_highlevel gen.json
+    working_dir: ${WORKING_DIR}
     depends_on:
       Node1:
         condition: process_started
