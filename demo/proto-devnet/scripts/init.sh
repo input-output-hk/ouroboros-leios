@@ -14,8 +14,11 @@ echo "Initializing proto-devnet in $WORKING_DIR"
 # Create working directory
 mkdir -p "$WORKING_DIR"
 
+CONFIG_DIR="${SOURCE_DIR}/config"
+
 # Copy genesis files and set start time
-cp -a "$CONFIG_DIR/genesis" "$WORKING_DIR/genesis"
+cp -r "$CONFIG_DIR/genesis" "$WORKING_DIR/genesis"
+chmod u+w -R "${WORKING_DIR}/genesis"
 
 startTimeEpoch=$(date +%s)
 startTimeIso=$(date -u -d "@$startTimeEpoch" +"%Y-%m-%dT%H:%M:%SZ")
@@ -64,7 +67,7 @@ for i in "${nodes[@]}"; do
 	ln -s "../genesis/dijkstra-genesis.json" "$NODE_DIR/"
 
 	# Copy pool keys and set permissions
-	cp -a "$POOL_DIR" "$NODE_DIR/keys"
+	cp -r "$POOL_DIR" "$NODE_DIR/keys"
 	chmod 400 "$NODE_DIR/keys"/*.skey
 
 	# Create Leios database
@@ -78,7 +81,7 @@ done
 
 # Copy utxo-keys for tx-generator and set permissions
 echo "Setting up utxo-keys for tx-generator"
-cp -a "$CONFIG_DIR/utxo-keys" "$WORKING_DIR/utxo-keys"
+cp -r "$CONFIG_DIR/utxo-keys" "$WORKING_DIR/utxo-keys"
 find "$WORKING_DIR/utxo-keys" -name "*.skey" -exec chmod 400 {} \;
 
 echo "Proto-devnet initialized and prepared successfully"

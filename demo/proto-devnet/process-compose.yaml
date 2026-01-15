@@ -5,15 +5,14 @@ processes:
   Init:
     command: |
       set -u
-      bash "$SCRIPTS/init.sh"
+      bash "${SOURCE_DIR}/scripts/init.sh"
     availability:
       restart: "on_failure"
 
   Node1:
     environment:
       - NODE_ID=1
-    command: |
-      bash "$SCRIPTS/run-node.sh"
+    command: bash "${SOURCE_DIR}/scripts/run-node.sh"
     log_location: "${WORKING_DIR}/node1/node.log"
     depends_on:
       Init:
@@ -24,8 +23,7 @@ processes:
   Node2:
     environment:
       - NODE_ID=2
-    command: |
-      bash "$SCRIPTS/run-node.sh"
+    command: bash "${SOURCE_DIR}/scripts/run-node.sh"
     log_location: "${WORKING_DIR}/node2/node.log"
     depends_on:
       Init:
@@ -36,8 +34,7 @@ processes:
   Node3:
     environment:
       - NODE_ID=3
-    command: |
-      bash "$SCRIPTS/run-node.sh"
+    command: bash "${SOURCE_DIR}/scripts/run-node.sh"
     log_location: "${WORKING_DIR}/node3/node.log"
     depends_on:
       Init:
@@ -46,8 +43,7 @@ processes:
       restart: "always"
 
   TxGenerator:
-    command: |
-      tx-generator -- json_highlevel gen.json
+    command: tx-generator -- json_highlevel ${SOURCE_DIR}/gen.json
     depends_on:
       Node1:
         condition: process_started
