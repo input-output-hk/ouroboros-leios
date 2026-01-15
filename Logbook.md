@@ -6,6 +6,55 @@
 > 
 > See also the [Post-CIP R&D Findings](post-cip/README.md) document for additional (after 2025-11-01) findings and artifacts not directly related to the implementation of Linear Leios.
 
+## 2026-01-14
+
+### SN on prototype devnet setup
+
+- Reflected a bit and not sure what value `cardano-testnet` brings us in the actual execution of the demo. We want to have a definite setup and hence checking things in would make a lot of sense. Then, using a tool that is best in class on supervising processes (e.g. `process-compose` again) would be more appropriate.
+
+- Except..if we'd need some coordination on the network to set up delegations, initiate a hard-fork etc. which we would need to redo in our setup. So, before I pivot away, I decided to check the requirements of our workload generating side and whether these can be easily met with/without `cardano-testnet`.
+
+- `cardano-testnet` even chokes on its own –num-pools option. When set to 3 it fails (with 1 it works):
+
+    ```
+      cardano-testnet: UnliftIO.Exception.throwString called with:
+
+      Expected number of stake pools not found in ledger state
+      Expected:
+      1
+      Actual:
+      3
+    ```
+
+- Trying to use the `tx-generator` -\> outdated README; the `cliArguments` seems not to exist anymore
+
+- I got it running after asking the genie write me some documentation on `tx-generator`. It does a whole lot of setup / splitting which could maybe be reduced? <https://github.com/IntersectMBO/cardano-node/pull/6411>
+
+- After some time (maybe once it was done?) it errored with:
+
+    ```
+      {"at":"2026-01-14T11:49:57.157521028Z","ns":"Benchmark.BenchTxSubError","data":{"kind":"TraceBenchTxSubError","msg":"TxGenError ApiError (\"Cardano.Benchmarking.Script.runScript: AsyncBenchmarkControl absent from map in execScript\")"},"sev":"Info","thread":"4","host":"eiger"}
+      {"at":"2026-01-14T11:49:57.157524678Z","ns":"Benchmark.BenchTxSubError","data":{"kind":"TraceBenchTxSubError","msg":"QRT Last Message. LoggingLayer shutting down ..."},"sev":"Info","thread":"4","host":"eiger"}
+      tx-generator: Cardano.Benchmarking.Script.runScript: AsyncBenchmarkControl uninitialized
+      CallStack (from HasCallStack):
+        error, called at src/Cardano/Benchmarking/Script.hs:52:23 in tx-generator-2.15-LehM4xWuRBYJwq5NgJubEm:Cardano.Benchmarking.Script
+    ```
+
+- Now with the `tx-generator` doing all the heavy lifting, I don't see a reason for keeping `cardano-testnet` (other than maybe generating the config). In fact, the dynamic port allocation when running nodes via `cardano-testnet` is quite annoying for `tx-generator` too.
+
+- After spending longer than I'd like to admit on generating topologies, fixing of how genesis files are copied and updating the start time in them.. I have a block producing devnet that starts quickly and can be easily changed (to use different node implementations and configuration): <https://github.com/input-output-hk/ouroboros-leios/pull/724>
+
+- The `tx-generator` is starting now properly, bootstraps by splitting (a lot of) utxos, but the final submission through N2N seems not to be working?
+
+- Also, lowering the `tx_count` results again in that AsyncBenchmarkControl error:
+
+    ```
+      {"at":"2026-01-15T11:24:16.0328184Z","ns":"Benchmark.BenchTxSubError","data":{"kind":"TraceBenchTxSubError","msg":"TxGenError ApiError (\"Cardano.Benchmarking.Script.runScript: AsyncBenchmarkControl absent from map in execScript\")"},"sev":"Info","thread":"4","host":"eiger"}
+      {"at":"2026-01-15T11:24:16.03282205Z","ns":"Benchmark.BenchTxSubError","data":{"kind":"TraceBenchTxSubError","msg":"QRT Last Message. LoggingLayer shutting down ..."},"sev":"Info","thread":"4","host":"eiger"} tx-generator: Cardano.Benchmarking.Script.runScript: AsyncBenchmarkControl uninitialized
+      CallStack (from HasCallStack):
+        error, called at src/Cardano/Benchmarking/Script.hs:52:23 in tx-generator-2.15-LehM4xWuRBYJwq5NgJubEm:Cardano.Benchmarking.Script
+    ```
+
 ## 2026-01-12
 
 ### SN on sketching a prototype devnet demo setup
