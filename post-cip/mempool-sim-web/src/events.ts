@@ -7,55 +7,55 @@ import { logger } from './logger.js';
 
 
 export type Event = 
-  | { kind: 'SubmitTx'; timestamp: number; to: string; tx: Tx }
-  | { kind: 'OfferTx'; timestamp: number; from: string; to: string; txId: TxId }
-  | { kind: 'RequestTx'; timestamp: number; from: string; to: string; txId: TxId }
-  | { kind: 'SendTx'; timestamp: number; from: string; to: string; tx: Tx }
-  | { kind: 'ReceiveTx'; timestamp: number; from: string; to: string; tx: Tx };
+  | { kind: 'SubmitTx'; clock: number; to: string; tx: Tx }
+  | { kind: 'OfferTx'; clock: number; from: string; to: string; txId: TxId }
+  | { kind: 'RequestTx'; clock: number; from: string; to: string; txId: TxId }
+  | { kind: 'SendTx'; clock: number; from: string; to: string; tx: Tx }
+  | { kind: 'ReceiveTx'; clock: number; from: string; to: string; tx: Tx };
 
 
-const EventQueue = new TinyQueue<Event>([], (a, b) => a.timestamp - b.timestamp);
+const EventQueue = new TinyQueue<Event>([], (a, b) => a.clock - b.clock);
 
 
-export const submitTx = (timestamp: number, to: string, tx: Tx): void =>
+export const submitTx = (clock: number, to: string, tx: Tx): void =>
   EventQueue.push({
     kind: 'SubmitTx',
-    timestamp,
+    clock,
     to,
     tx
   });
 
-export const offerTx = (timestamp: number, from: string, to: string, txId: TxId): void => 
+export const offerTx = (clock: number, from: string, to: string, txId: TxId): void => 
   EventQueue.push({
     kind: 'OfferTx',
-    timestamp,
+    clock,
     from,
     to,
     txId
   });
 
-export const requestTx = (timestamp: number, from: string, to: string, txId: TxId): void => 
+export const requestTx = (clock: number, from: string, to: string, txId: TxId): void => 
   EventQueue.push({
     kind: 'RequestTx',
-    timestamp,
+    clock,
     from,
     to,
     txId
   });
 
-export const sendTx = (timestamp: number, from: string, to: string, tx: Tx): void => 
+export const sendTx = (clock: number, from: string, to: string, tx: Tx): void => 
   EventQueue.push({
     kind: 'SendTx',
-    timestamp,
+    clock,
     from,
     to,
     tx
   });
 
-export const receiveTx = (timestamp: number, from: string, to: string, tx: Tx): void => 
+export const receiveTx = (clock: number, from: string, to: string, tx: Tx): void => 
   EventQueue.push({
     kind: 'ReceiveTx',
-    timestamp,
+    clock,
     from,
     to,
     tx
@@ -72,10 +72,10 @@ export const handleEvents = (graph: DirectedGraph<Node, Link>): void => {
       throw new Error("Unknown node: ${event.to}");
     switch (event.kind) {
       case 'SubmitTx':
-        target.handleSubmitTx(graph, event.timestamp, event.tx);
+        target.handleSubmitTx(graph, event.clock, event.tx);
         break;
       case 'OfferTx':
-        target.handleOfferTx(graph, event.timestamp, event.from, event.txId);
+        target.handleOfferTx(graph, event.clock, event.from, event.txId);
         break;
       default:
         throw new Error("No handler for event.")

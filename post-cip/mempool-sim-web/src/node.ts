@@ -3,6 +3,7 @@ import { MemoryPool } from './mempool.js';
 import type { Tx, TxId } from './types.js';
 import { Link } from './link.js'
 import { offerTx } from './events.js';
+import { logger } from './logger.js';
 
 
 export class Node {
@@ -26,13 +27,14 @@ export class Node {
   }
 
   // Submit a transaction to a node, applying backpressure if needed.
-  handleSubmitTx(graph: DirectedGraph<Node, Link>, now: number, tx: Tx): void {
+  public handleSubmitTx(graph: DirectedGraph<Node, Link>, now: number, tx: Tx): void {
     this.backpressure.push(tx);
+    logger.info({clock: now, node: this.id, txId: tx.id}, "Apply backpressure");
     this.fillMemoryPool(graph, now);
   };
 
   // Move transactions from the client to the memory pool until it is full.
-  fillMemoryPool(graph: DirectedGraph<Node, Link>, now: number): void {
+  private fillMemoryPool(graph: DirectedGraph<Node, Link>, now: number): void {
     while (this.backpressure.length > 0) {
       const tx = this.backpressure[0];
       if (!tx)
@@ -41,20 +43,30 @@ export class Node {
       if (!okay)
         break;
       this.backpressure.pop();
+      logger.info({clock: now, node: this.id, txId: tx.id}, "Remove backpressure");
+      logger.info({clock: now, node: this.id, txId: tx.id}, "Insert into memory pool");
       this.offerUpstream(graph, now, tx);
     }
   }
 
   // Offer a transaction to upstream peers.
-  offerUpstream (graph: DirectedGraph<Node, Link>, now: number, tx: Tx): void {
+  private offerUpstream (graph: DirectedGraph<Node, Link>, now: number, tx: Tx): void {
     graph.forEachInEdge(this.id, (_link, link, peer, _node) => {
+      logger.info({clock: now, node: this.id, txId: tx.id, upstreamPeer: peer}, "Offer transaction");
       offerTx(link.computeDelay(now, tx.size_B), this.id, peer, tx.id)
     });
   }
 
   // Receive an offer of a TxId.
-  handleOfferTx(graph: DirectedGraph<Node, Link>, now: number, peer: string, txId: TxId): void {
+  public handleOfferTx(graph: DirectedGraph<Node, Link>, now: number, peer: string, txId: TxId): void {
     (this.offers.get(txId) ?? this.offers.set(txId, new Set()).get(txId)!).add(peer);
+    this.fetchTxs(graph, now);
+  }
+
+  // Fetch txs from peers.
+  private fetchTxs(graph: DirectedGraph<Node, Link>, now: number): void {
+    if (this.backpressure.length > 0)
+      return;
   }
 
 }
