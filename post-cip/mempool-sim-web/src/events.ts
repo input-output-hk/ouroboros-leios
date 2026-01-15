@@ -10,8 +10,7 @@ export type Event =
   | { kind: 'SubmitTx'; clock: number; to: string; tx: Tx }
   | { kind: 'OfferTx'; clock: number; from: string; to: string; txId: TxId }
   | { kind: 'RequestTx'; clock: number; from: string; to: string; txId: TxId }
-  | { kind: 'SendTx'; clock: number; from: string; to: string; tx: Tx }
-  | { kind: 'ReceiveTx'; clock: number; from: string; to: string; tx: Tx };
+  | { kind: 'SendTx'; clock: number; from: string; to: string; tx: Tx };
 
 
 // FIXME: This should not be a global variable.
@@ -53,15 +52,6 @@ export const sendTx = (clock: number, from: string, to: string, tx: Tx): void =>
     tx
   });
 
-export const receiveTx = (clock: number, from: string, to: string, tx: Tx): void => 
-  EventQueue.push({
-    kind: 'ReceiveTx',
-    clock,
-    from,
-    to,
-    tx
-  });
-
 export const handleEvents = (graph: DirectedGraph<Node, Link>): void => {
   while (EventQueue.length > 0) {
     const event = EventQueue.pop();
@@ -82,8 +72,9 @@ export const handleEvents = (graph: DirectedGraph<Node, Link>): void => {
       case 'RequestTx':
         target.handleRequestTx(graph, event.clock, event.from, event.txId);
         break;
-      default:
-        logger.warn(event, "no handler for event");
+      case 'SendTx':
+        target.handleSendTx(graph, event.clock, event.from, event.tx);
+        break;
     }
   }
 }

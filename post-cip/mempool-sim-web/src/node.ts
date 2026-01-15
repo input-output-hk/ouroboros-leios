@@ -2,7 +2,7 @@ import { DirectedGraph } from 'graphology';
 import { MemoryPool } from './mempool.js';
 import { TXID_B, type Tx, type TxId } from './types.js';
 import { Link } from './link.js'
-import { offerTx, requestTx, sendTx } from './events.js';
+import { offerTx, requestTx, sendTx, submitTx } from './events.js';
 import { logger } from './logger.js';
 
 
@@ -23,18 +23,25 @@ export class Node {
   // Offers of transactions from upstream peers.
   private offers: [TxId, string][];
 
+  // Transactions already known.
+  private known: Set<TxId>;
+
   constructor(id: string, honest: boolean, mempool_B: number) {
     this.id = id;
     this.honest = honest;
     this.mempool = new MemoryPool(mempool_B);
     this.backpressure = [];
     this.offers = [];
+    this.known = new Set<TxId>();
   }
 
   // Submit a transaction to a node, applying backpressure if needed.
   public handleSubmitTx(graph: DirectedGraph<Node, Link>, now: number, tx: Tx): void {
+    if (this.known.has(tx.id))
+      return;
+    this.known.add(tx.id);
     this.backpressure.push(tx);
-    logger.info({clock: now, node: this.id, txId: tx.id}, "apply backpressure");
+    logger.trace({clock: now, node: this.id, txId: tx.id}, "apply backpressure");
     this.fillMemoryPool(graph, now);
   };
 
@@ -48,8 +55,8 @@ export class Node {
       if (!okay)
         break;
       this.backpressure.shift();
-      logger.info({clock: now, node: this.id, txId: tx.id}, "remove backpressure");
-      logger.info({clock: now, node: this.id, txId: tx.id}, "insert into memory pool");
+      logger.trace({clock: now, node: this.id, txId: tx.id}, "remove backpressure");
+      logger.trace({clock: now, node: this.id, txId: tx.id}, "insert into memory pool");
       this.offerUpstream(graph, now, tx);
     }
   }
@@ -57,7 +64,7 @@ export class Node {
   // Offer a transaction to upstream peers.
   private offerUpstream (graph: DirectedGraph<Node, Link>, now: number, tx: Tx): void {
     graph.forEachInEdge(this.id, (_edge, link, peer, _node) => {
-      logger.info({clock: now, node: this.id, txId: tx.id, upstreamPeer: peer}, "offer transaction");
+      logger.trace({clock: now, node: this.id, txId: tx.id, upstreamPeer: peer}, "offer transaction");
       offerTx(link.computeDelay(now, TXID_B), this.id, peer, tx.id)
     });
   }
@@ -80,7 +87,7 @@ export class Node {
       // FIXME: Should we always take the first offer? or a random one?
       const peer = offer![1];
       this.offers = this.offers.filter(offer => offer[0] != txId);
-      logger.info({clock: now, node: this.id, peer: peer, txId: txId}, "request transaction");
+      logger.trace({clock: now, node: this.id, peer: peer, txId: txId}, "request transaction");
       const link = this.getDownstreamLink(graph, peer);
       requestTx(link.computeDelay(now, TXID_B), this.id, peer, txId);
     }
@@ -90,7 +97,7 @@ export class Node {
   public handleRequestTx(graph: DirectedGraph<Node, Link>, now: number, peer: string, txId: TxId): void {
     const tx = this.mempool.get(txId);
     if (tx) {
-      logger.info({clock: now, node: this.id, peer: peer, tx: tx}, "send transaction");
+      logger.trace({clock: now, node: this.id, peer: peer, tx: tx}, "send transaction");
       const link = this.getUpstreamLink(graph, peer);
       sendTx(link.computeDelay(now, tx.size_B), this.id, peer, tx);
     } else{
@@ -98,6 +105,13 @@ export class Node {
     }
   }
 
+  // Receive a Tx.
+  public handleSendTx(graph: DirectedGraph<Node, Link>, now: number, peer: string, tx: Tx): void {
+    logger.trace({clock: now, node: this.id, peer: peer, tx: tx}, "receive transaction");
+    this.handleSubmitTx(graph, now, tx);
+  }
+
+  // Lookup a downstream link by its peer name.
   private getDownstreamLink(graph: DirectedGraph<Node, Link>, peer: string): Link {
       const link = graph.edge(this.id, peer)
       if (!link) {
@@ -107,6 +121,7 @@ export class Node {
       return graph.getEdgeAttributes(link)
   }
 
+  // Lookup an upstream link by its peer name.
   private getUpstreamLink(graph: DirectedGraph<Node, Link>, peer: string): Link {
       const link = graph.edge(peer, this.id)
       if (!link) {
