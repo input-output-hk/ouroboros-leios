@@ -898,16 +898,15 @@
         "utils": "utils"
       },
       "locked": {
-        "lastModified": 1768231990,
-        "narHash": "sha256-55pTt3CGOfdwbXBjiYYwRrv8q/xAuKYyhSYGQJjqc1A=",
+        "lastModified": 1768319716,
+        "narHash": "sha256-m8DBNJQi2VIT5Zpk5e4cUZaukVu7+eFIkHz7AuGrOL8=",
         "owner": "intersectmbo",
         "repo": "cardano-node",
-        "rev": "a215fe71d1318e6b5fe3f7803503c1dff35fab36",
+        "rev": "9cf1e651e9fc3726a5fa9771b0d3479e5b909c6b",
         "type": "github"
       },
       "original": {
         "owner": "intersectmbo",
-        "ref": "ch1bo/cardano-testnet-fail-early",
         "repo": "cardano-node",
         "type": "github"
       }
@@ -5396,11 +5395,11 @@
     },
     "nixpkgs_5": {
       "locked": {
-        "lastModified": 1766399689,
-        "narHash": "sha256-e5sTH5jMB8r3Teo0EYvLMN0YUDJ1TW2ZgUODOUvlY+c=",
+        "lastModified": 1768474748,
+        "narHash": "sha256-wdmtaP6IClMWhsUYJ+RDneFhy63A4lTDG7FhVyoqSRI=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "849bef3b05287ac5fed2cf03b78efeb8aff782a0",
+        "rev": "653966b4aa179ecd54f0cbe0a29e199526b9b086",
         "type": "github"
       },
       "original": {

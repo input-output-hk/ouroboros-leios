@@ -25,8 +25,7 @@
     # Used by demo/
     ouroboros-consensus.url = "github:intersectmbo/ouroboros-consensus?ref=leios-prototype";
     patched-cardano-node.url = "github:intersectmbo/cardano-node?ref=leios-prototype";
-    # TODO: use a ref on cardano-node master again for this
-    cardano-node.url = "github:intersectmbo/cardano-node?ref=ch1bo/cardano-testnet-fail-early"; # For latest cardano-testnet and cardano-cli
+    cardano-node.url = "github:intersectmbo/cardano-node"; # For latest tx-generator and cardano-cli
   };
 
   outputs =
