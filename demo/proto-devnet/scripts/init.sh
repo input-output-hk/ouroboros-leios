@@ -63,8 +63,9 @@ for i in "${nodes[@]}"; do
 	ln -s "../genesis/conway-genesis.json" "$NODE_DIR/"
 	ln -s "../genesis/dijkstra-genesis.json" "$NODE_DIR/"
 
-	# Symlink pool keys (read-only)
-	ln -s "$(realpath "${POOL_DIR}")" "$NODE_DIR/keys"
+	# Copy pool keys and set permissions
+	cp -a "$POOL_DIR" "$NODE_DIR/keys"
+	chmod 400 "$NODE_DIR/keys"/*.skey
 
 	# Create Leios database
 	if [ -f "$LEIOS_SCHEMA" ]; then
