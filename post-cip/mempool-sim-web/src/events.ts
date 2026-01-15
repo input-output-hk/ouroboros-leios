@@ -66,7 +66,6 @@ export const handleEvents = (graph: DirectedGraph<Node, Link>): void => {
     const event = EventQueue.pop();
     if (!event)
       break;
-    logger.info(event, "Handle event");
     const target: Node = graph.getNodeAttributes(event.to);
     if (!target)
       throw new Error("Unknown node: ${event.to}");
@@ -78,7 +77,7 @@ export const handleEvents = (graph: DirectedGraph<Node, Link>): void => {
         target.handleOfferTx(graph, event.clock, event.from, event.txId);
         break;
       default:
-        throw new Error("No handler for event.")
+        logger.warn(event, "No handler for event");
     }
   }
 }
