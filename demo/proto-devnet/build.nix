@@ -40,8 +40,7 @@
           ++ [ pkgs.sqlite ]; # XXX: why is this not picked up from above?
         runtimeEnv = {
           # Override paths to point to nix store
-          SCRIPTS = ./scripts;
-          CONFIG_DIR = ./config;
+          SOURCE_DIR = ./.;
           LEIOS_SCHEMA = ../2025-11/data/leios-schema.sql;
 
           # Inherit cardano binaries from dev shell
