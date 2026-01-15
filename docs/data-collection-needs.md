@@ -5,9 +5,11 @@ This document outlines data collection priorities for analyzing and validating t
 ## Wishlist
 
 - **Mempool statistics**
-  - Transaction rejection counts and reasons
-  - Transaction entry rates
-  - Transaction exit rates (included in blocks vs. expired/evicted)
+  - Transaction arrival rates (to measure mempool consistency across nodes under varying load)
+  - Failed/rejected transaction data (currently lost - only winning transactions are visible)
+
+- **Fork data**
+  - Fork history beyond k blocks (currently lost after stability horizon, limiting attack/chain quality analysis)
 
 - **Transaction propagation tracking**
   - Time for transactions to propagate between nodes
