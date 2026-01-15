@@ -5,7 +5,7 @@ export const TXID_B = 32;
 export type TxId = string; 
 
 export interface Tx {
-  id: TxId;
+  txId: TxId;
   size_B: number;
-  honest: boolean;
+  frontRuns: TxId;
 }

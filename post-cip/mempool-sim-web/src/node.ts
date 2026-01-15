@@ -45,7 +45,7 @@ export class Node {
     let honest: number = 0;
     let adversarial: number = 0;
     this.mempool.contents().forEach(tx => {
-      if (tx.honest)
+      if (tx.frontRuns == "")
         honest += 1;
       else
         adversarial += 1;
@@ -60,11 +60,21 @@ export class Node {
 
   // Submit a transaction to a node, applying backpressure if needed.
   public handleSubmitTx(graph: DirectedGraph<Node, Link>, now: number, tx: Tx): void {
-    if (this.known.has(tx.id))
+    const txAdv = {
+      txId: tx.txId + "adv",
+      size_B: tx.size_B,
+      frontRuns: tx.txId,
+    };
+    // FIXME: Check this logic.
+    if (this.known.has(tx.txId) || this.known.has(tx.frontRuns) || this.known.has(txAdv.txId))
       return;
-    this.known.add(tx.id);
+    this.known.add(tx.txId);
+    if (tx.frontRuns == "" && !this.honest) {
+      tx = txAdv;
+      this.known.add(tx.txId);
+    }
     this.backpressure.push(tx);
-    logger.trace({clock: now, node: this.id, txId: tx.id}, "apply backpressure");
+    logger.trace({clock: now, node: this.id, txId: tx.txId}, "apply backpressure");
     this.fillMemoryPool(graph, now);
   };
 
@@ -74,21 +84,23 @@ export class Node {
       const tx = this.backpressure[0];
       if (!tx)
         break;
-      const okay = this.mempool.enqueue(tx, tx?.size_B)
-      if (!okay)
-        break;
+      if (!this.mempool.contains(tx.txId)) {
+        const okay = this.mempool.enqueue(tx, tx?.size_B)
+        if (!okay)
+          break;
+        logger.trace({clock: now, node: this.id, txId: tx.txId}, "insert into memory pool");
+        this.offerUpstream(graph, now, tx);
+      }
       this.backpressure.shift();
-      logger.trace({clock: now, node: this.id, txId: tx.id}, "remove backpressure");
-      logger.trace({clock: now, node: this.id, txId: tx.id}, "insert into memory pool");
-      this.offerUpstream(graph, now, tx);
+      logger.trace({clock: now, node: this.id, txId: tx.txId}, "remove backpressure");
     }
   }
 
   // Offer a transaction to upstream peers.
   private offerUpstream (graph: DirectedGraph<Node, Link>, now: number, tx: Tx): void {
     graph.forEachInEdge(this.id, (_edge, link, peer, _node) => {
-      logger.trace({clock: now, node: this.id, txId: tx.id, upstreamPeer: peer}, "offer transaction");
-      offerTx(link.computeDelay(now, TXID_B), this.id, peer, tx.id)
+      logger.trace({clock: now, node: this.id, txId: tx.txId, upstreamPeer: peer}, "offer transaction");
+      offerTx(link.computeDelay(now, TXID_B), this.id, peer, tx.txId)
     });
   }
 
