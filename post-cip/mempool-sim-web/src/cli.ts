@@ -15,10 +15,17 @@ const ADVERSARY_DEGREE = 3 * DEGREE;
 
 try {
 
-  logger.info(`Generating a ${DEGREE}-regular graph with ${NODES} nodes...`);
+  logger.info({
+    nodes: {honest: NODES, adversarial: ADVERSARY_COUNT},
+    degree: {honest: DEGREE, adversarial: ADVERSARY_DEGREE},
+    block_bytes: BLOCK,
+    mempool_bytes: MEMPOOL,
+    latency_ms: LATENCY / 1000,
+    bandwidth_Mbps: BANDWIDTH * 8 / 1000000,
+  }, "Configuration");
   const graph = generateNetwork(NODES, DEGREE, MEMPOOL, LATENCY, BANDWIDTH);
 
-  logger.info(`Nodes: ${graph.order}, Edges: ${graph.size}`);
+  logger.info({nodes: graph.order, links: graph.size}, "Graph");
   
   for (let i = 0; i < ADVERSARY_COUNT; ++i) {
     addAdversaryNode(graph, "A" + (i + 1), 3 * DEGREE, 3 * DEGREE, MEMPOOL, LATENCY, BANDWIDTH);
@@ -26,7 +33,7 @@ try {
 
   graph.forEachNode((node) => {
     const neighbors = graph.outboundNeighbors(node);
-    logger.info(`Node ${node}: connected to [${neighbors.join(', ')}]`);
+    logger.info({node: node, downstream_peers: neighbors}, "Topology");
   });
 
   submitTx(1.05, "H20", {
@@ -44,5 +51,5 @@ try {
   handleEvents(graph);
 
 } catch (error) {
-  logger.fatal("❌ Error: ${error}");
+  logger.fatal(error, "Error");
 }
