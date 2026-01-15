@@ -3,7 +3,7 @@ import type { Logger } from 'pino';
 
 
 export const logger: Logger = pino({
-  level: 'info', // trace, debug, info, warn, error, fatal
+  level: 'trace', // trace, debug, info, warn, error, fatal
   transport: {
     target: 'pino-pretty',
   //target: 'pino/file',

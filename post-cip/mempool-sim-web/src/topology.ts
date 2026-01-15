@@ -2,6 +2,7 @@ import { DirectedGraph } from 'graphology';
 import { MemoryPool } from './mempool.js';
 import { Node } from './node.js';
 import { Link } from './link.js'
+import { logger } from './logger.js';
 
 export function generateNetwork(
   n: number, 
@@ -11,7 +12,10 @@ export function generateNetwork(
   bandwidth_Bps: number,
 ): DirectedGraph<Node, Link> {
   
-  if (k >= n) throw new Error("Degree k must be less than number of nodes n.");
+  if (k >= n) {
+    logger.fatal({nodes: n, degree: k}, "degree must be less than number of nodes");
+    throw new Error("degree must be less than number of nodes");
+  }
 
   const makeId = (i: number): string => {
     return "H" + (i + 1);
@@ -75,7 +79,8 @@ export function addAdversaryNode(
   bandwidth_Bps: number,
 ) {
   if (graph.hasNode(id)) {
-    throw new Error(`Node with ID "${id}" already exists.`);
+    logger.fatal({node: id}, "node with ID already exists");
+    throw new Error(`node with ID already exists`);
   }
 
   const existingNodes = graph.nodes()
@@ -83,7 +88,8 @@ export function addAdversaryNode(
   graph.addNode(id, new Node(id, false, mempool_B));
 
   if (upstreamCount > existingNodes.length || downstreamCount > existingNodes.length) {
-    throw new Error("Cannot connect to more nodes than exist in the graph.");
+    logger.fatal("cannot connect to more nodes than exist in the graph.")
+    throw new Error("cannot connect to more nodes than exist in the graph");
   }
 
   const pickRandomNodes = (count: number): string[] => {

@@ -1,4 +1,6 @@
 
+export const OVERHEAD_B: number = 80;
+
 export class Link {
 
   public readonly latency_s: number;
@@ -12,7 +14,7 @@ export class Link {
 
   computeDelay(now: number, size_B: number): number {
     const jitter: number = Math.random() / 1e9; // 1 ns of jitter.
-    return now + this.latency_s + size_B / this.bandwidth_Bps + jitter
+    return now + this.latency_s + (OVERHEAD_B + size_B) / this.bandwidth_Bps + jitter
   }
 
 }
