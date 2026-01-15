@@ -2,28 +2,33 @@ import { DirectedGraph } from 'graphology';
 import { MemoryPool } from './mempool.js';
 import type { Tx, TxId } from './types.js';
 import { Link } from './link.js'
-import { offerTx } from './events.js';
+import { offerTx, requestTx } from './events.js';
 import { logger } from './logger.js';
 
 
 export class Node {
   
+  // The node ID, which is also stored in the graph object.
   public readonly id: string;
   
+  // Whether the node is honest.
   public readonly honest: boolean;
   
-  private readonly mempool: MemoryPool<Tx>;
+  // The memory pool.
+  private mempool: MemoryPool;
   
-  private readonly backpressure: Tx[];
+  // Transactions backup up on the client, awaiting entry to the memory poool.
+  private backpressure: Tx[];
 
-  private readonly offers: Map<TxId, Set<string>>;
+  // Offers of transactions from upstream peers.
+  private offers: [TxId, string][];
 
   constructor(id: string, honest: boolean, mempool_B: number) {
     this.id = id;
     this.honest = honest;
-    this.mempool = new MemoryPool<Tx>(mempool_B);
+    this.mempool = new MemoryPool(mempool_B);
     this.backpressure = [];
-    this.offers = new Map<TxId, Set<string>>();
+    this.offers = [];
   }
 
   // Submit a transaction to a node, applying backpressure if needed.
@@ -42,7 +47,7 @@ export class Node {
       const okay = this.mempool.enqueue(tx, tx?.size_B)
       if (!okay)
         break;
-      this.backpressure.pop();
+      this.backpressure.shift();
       logger.info({clock: now, node: this.id, txId: tx.id}, "Remove backpressure");
       logger.info({clock: now, node: this.id, txId: tx.id}, "Insert into memory pool");
       this.offerUpstream(graph, now, tx);
@@ -59,7 +64,9 @@ export class Node {
 
   // Receive an offer of a TxId.
   public handleOfferTx(graph: DirectedGraph<Node, Link>, now: number, peer: string, txId: TxId): void {
-    (this.offers.get(txId) ?? this.offers.set(txId, new Set()).get(txId)!).add(peer);
+    if (this.mempool.contains(txId))
+      return;
+    this.offers.push([txId, peer]);
     this.fetchTxs(graph, now);
   }
 
@@ -67,6 +74,15 @@ export class Node {
   private fetchTxs(graph: DirectedGraph<Node, Link>, now: number): void {
     if (this.backpressure.length > 0)
       return;
+    while (this.offers.length > 0) {
+      const offer = this.offers.shift();
+      const txId = offer![0];
+      // FIXME: Should we always take the first offer?
+      const peer = offer![1];
+      this.offers = this.offers.filter(offer => offer[0] != txId);
+      logger.info({clock: now, node: this.id, peer: peer, txId: txId}, "Request transaction");
+      requestTx(now, this.id, peer, txId);
+    }
   }
 
 }

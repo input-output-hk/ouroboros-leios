@@ -1,6 +1,10 @@
-export class MemoryPool<T> {
 
-  private items: T[] = [];
+import type { Tx, TxId} from './types.ts'
+
+
+export class MemoryPool {
+
+  private txs: Tx[] = [];
 
   private size_B: number;
   
@@ -11,25 +15,29 @@ export class MemoryPool<T> {
     this.capacity_B = capacity_B;
   }
 
-  enqueue(item: T, item_B: number): boolean {
-    if (this.size_B + item_B > this.capacity_B) {
+  enqueue(tx: Tx, tx_B: number): boolean {
+    if (this.size_B + tx_B > this.capacity_B) {
       return false;
     }
-    this.items.push(item);
-    this.size_B += item_B;
+    this.txs.push(tx);
+    this.size_B += tx_B;
     return true;
   }
 
-  dequeue(): T | undefined {
-    return this.items.shift();
+  dequeue(): Tx | undefined {
+    return this.txs.shift();
   }
 
-  peek(): T | undefined {
-    return this.items[0];
+  peek(): Tx | undefined {
+    return this.txs[0];
   }
 
   getSize_B(): number {
     return this.size_B;
+  }
+
+  contains(txId: TxId): boolean {
+    return this.txs.filter(tx => tx.id == txId).length > 0;
   }
 
 }

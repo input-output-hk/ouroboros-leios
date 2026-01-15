@@ -90,8 +90,7 @@ export function addAdversaryNode(
     const pool = [...existingNodes];
     for (let i = 0; i < count; i++) {
       const j = i + Math.floor(Math.random() * (pool.length - i));
-      // FIXME: Rewrite to remove this warning on the following.
-      [pool[i], pool[j]] = [pool[j], pool[i]];
+      [pool[i], pool[j]] = [pool[j]!, pool[i]!];
     }
     return pool.slice(0, count);
   };

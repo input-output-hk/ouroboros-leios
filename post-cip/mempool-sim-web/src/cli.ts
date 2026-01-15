@@ -1,4 +1,4 @@
-import { generateNetwork, addAdversaryNode } from './generator.js';
+import { generateNetwork, addAdversaryNode } from './topology.js';
 import { submitTx, handleEvents } from './events.js'
 import type { TxId, Tx } from './types.js'
 import { logger } from './logger.js'
