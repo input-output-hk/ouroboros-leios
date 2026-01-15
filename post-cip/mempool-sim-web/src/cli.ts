@@ -13,6 +13,9 @@ const BANDWIDTH = 1250000; // = 10 Mb/s
 const ADVERSARY_COUNT = 2;
 const ADVERSARY_DEGREE = 3 * DEGREE;
 
+const TX_COUNT = 100;
+const TX_LAST_S = 20;
+
 try {
 
   logger.info({
@@ -23,6 +26,8 @@ try {
     latency_ms: LATENCY / 1000,
     bandwidth_Mbps: BANDWIDTH * 8 / 1000000,
     message_overhead_bytes: OVERHEAD_B,
+    tx_count: TX_COUNT,
+    last_tx_seconds: TX_LAST_S,
   }, "configuration");
   const graph = generateNetwork(NODES, DEGREE, MEMPOOL, LATENCY, BANDWIDTH);
 
@@ -37,25 +42,26 @@ try {
     logger.info({node: node, downstream_peers: neighbors}, "gopology");
   });
 
-  submitTx(1.05, "H20", {
-    id: "T1",
-    size_B: 1500,
-    honest: true,
-  });
-
-  submitTx(0, "H10", {
-    id: "T2",
-    size_B: 1500,
-    honest: true,
-  });
+  for (let i = 0; i < TX_COUNT; ++i) {
+    const txId = "T" + i;
+    const node = "H" + Math.ceil(NODES * Math.random());
+    const time = Math.round(TX_LAST_S * Math.random());
+    const size = Math.ceil(16384 * Math.random());
+    submitTx(time, "H20", {
+      txId: txId,
+      size_B: 1500,
+      frontRuns: "",
+    });
+  }
 
   handleEvents(graph);
 
   let honest: number = 0;
   let adversarial: number = 0;
-  graph.forEachNode((node) => {
-    const summary = graph.getNodeAttributes(node).mempoolSummary().mempool_tx_count;
-    logger.debug(summary);
+  graph.forEachNode((nodeId) => {
+    const node = graph.getNodeAttributes(nodeId);
+    node.logPartialState();
+    const summary = node.mempoolSummary().mempool_tx_count;
     honest += summary.honest;
     adversarial += summary.adversarial;
   });
