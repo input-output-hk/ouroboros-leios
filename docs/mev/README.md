@@ -4,6 +4,7 @@ Research and analysis of MEV vulnerabilities in the Linear Leios protocol.
 
 | Version | Date       | Changes       |
 |---------|------------|---------------|
+| 0.2     | 2026-01-16 | Added nested transactions (CIP-0118) analysis |
 | 0.1     | 2025-12-11 | Initial draft |
 
 ## 1. Attack Classification
@@ -69,4 +70,20 @@ eUTxO protections remain effective - classic sandwich attacks still prevented.
 
 ## 4. Nested Transactions
 
-*Research pending.*
+**Finding:** [CIP-0118](https://github.com/cardano-foundation/CIPs/pull/862) nested transactions shift MEV extraction to the assembler layer—off-chain coordinators who batch sub-transactions. This creates infrastructure MEV similar to current DEX batchers.
+
+```
+Users ──(sub-txs)──> Assembler ──(batch)──> Mempool/EB
+                          │
+                    MEV extraction point
+```
+
+**Key Concerns:**
+- **Assembler sandwich**: Like [batcher-level attacks](./attack-vectors/sandwich.md), assemblers control composition and ordering
+- **Leios certification complexity**: Batch dependencies increase L<sub>vote</sub> validation burden
+- **Private distribution trade-off**: Reduces public mempool exposure but concentrates information at assemblers
+- **Guard scripts**: User protection mechanism but requires expertise
+
+**Overall assessment:** ↓ Creates new infrastructure attack vector without eliminating existing MEV. Assembler role parallels current DEX batchers (primary Cardano MEV vector).
+
+→ [Detailed analysis](./nested-transactions.md)
