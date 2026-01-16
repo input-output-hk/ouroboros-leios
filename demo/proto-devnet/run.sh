@@ -1,18 +1,15 @@
 #!/usr/bin/env bash
 set -eo pipefail
 
-# Simple wrapper script to run the proto-devnet demo using process-compose
-# This script sets defaults and runs process-compose
-
+# Simple wrapper script to set defaults and check for requirements and runs the
+# proto-devnet demo using process-compose
+#
 # Set defaults for all environment variables
 # These can be overridden by exporting them before running this script
 set -a
 : "${WORKING_DIR:=tmp-devnet}"
 : "${SOURCE_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
-: "${CARDANO_NODE:=cardano-node}"
-: "${CARDANO_CLI:=cardano-cli}"
-: "${TX_GENERATOR:=tx-generator}"
-: "${LEIOS_SCHEMA:=../2025-11/data/leios-schema.sql}"
+: "${LEIOS_SCHEMA:=$(realpath "${SOURCE_DIR}"/../2025-11/data/leios-schema.sql)}"
 : "${IP_NODE1:=0.0.0.0}"
 : "${PORT_NODE1:=3001}"
 : "${IP_NODE2:=0.0.0.0}"
@@ -27,9 +24,9 @@ REQUIRED_COMMANDS=(
 	"sqlite3"
 	"jq"
 	"envsubst"
-	"${CARDANO_NODE}"
-	"${CARDANO_CLI}"
-	"${TX_GENERATOR}"
+	"cardano-node"
+	"cardano-cli"
+	"tx-generator"
 )
 
 MISSING_COMMANDS=()
@@ -51,5 +48,6 @@ if [ ${#MISSING_COMMANDS[@]} -gt 0 ]; then
 fi
 
 # Run process-compose
+
 echo "Starting proto-devnet with process-compose..."
 process-compose --no-server -f "${SOURCE_DIR}/process-compose.yaml"

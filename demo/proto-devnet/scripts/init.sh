@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Expects WORKING_DIR, CONFIG_DIR, and LEIOS_SCHEMA to be set
+# Expects WORKING_DIR and LEIOS_SCHEMA to be set
 
 # Check if WORKING_DIR already exists
 if [ -d "$WORKING_DIR" ]; then

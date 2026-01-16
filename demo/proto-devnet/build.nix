@@ -41,9 +41,6 @@
           # Override paths to point to nix store
           SOURCE_DIR = ./.;
           LEIOS_SCHEMA = ../2025-11/data/leios-schema.sql;
-
-          # Inherit cardano binaries from dev shell
-          inherit (config.devShells.dev-demo-proto-devnet) CARDANO_NODE CARDANO_CLI;
         };
         text = builtins.readFile ./run.sh;
       };

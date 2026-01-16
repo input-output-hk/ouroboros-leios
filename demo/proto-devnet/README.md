@@ -28,11 +28,10 @@ Install these prerequisites:
 - `jq` and `envsubst` for config modifications
 - `tx-generator` (optional) for generating transaction workload
 
-Set environment variables if the commands are not in your PATH:
+Ensure they are on your PATH, override if needed with something like:
 
 ``` shell
-export CARDANO_NODE=/path/to/cardano-node
-export CARDANO_CLI=/path/to/cardano-cli
+export PATH=/path/to/cardano-node:/path/to/cardano-cli:$PATH
 ```
 
 Then run:
@@ -48,8 +47,7 @@ This `process-compose` orchestrated demo will:
 1. Initialize a three node cardano devnet
 2. Start all three nodes
 3. Generate and submit a transaction workload using `tx-generator`
-
-Observe tip advancing and mempool size (more observability come later):
+4. Observes tip advancing and mempool size (more observability come later):
 
 ``` shell
 export CARDANO_NODE_NETWORK_ID=164
@@ -63,7 +61,6 @@ You can customize the demo by setting environment variables before running. See 
 
 ``` shell
 export WORKING_DIR=my-devnet
-export CONFIG_DIR=/path/to/my/config
 ./run.sh
 ```
 
