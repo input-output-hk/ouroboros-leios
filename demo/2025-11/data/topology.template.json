@@ -1,17 +1,17 @@
 {
-    "bootstrapPeers": [],
-    "localRoots": [
+  "bootstrapPeers": [],
+  "localRoots": [
+    {
+      "accessPoints": [
         {
-            "accessPoints": [
-                {
-                    "address": "#REPLACE#",
-                    "port": "#REPLACE#"
-                }
-            ],
-            "advertise": false,
-            "trustable": true,
-            "valency": 1
+          "address": "#REPLACE#",
+          "port": "#REPLACE#"
         }
-    ],
-    "publicRoots": []
+      ],
+      "advertise": false,
+      "trustable": true,
+      "valency": 1
+    }
+  ],
+  "publicRoots": []
 }
