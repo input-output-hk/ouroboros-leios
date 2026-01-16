@@ -9,8 +9,8 @@
 module Main where
 
 import Analysis.Leios
-import Control.Concurrent
 import Control.Concurrent.Async
+import Control.Monad
 import qualified Data.ByteString.Lazy as BL
 import Data.Csv (DefaultOrdered (..), FromNamedRecord (..), Header, ToNamedRecord (..), decodeByName, encodeDefaultOrderedByName, (.:))
 import Data.Ratio ((%))
@@ -60,38 +60,47 @@ main = do
   let txReapplyTimes = V.toList (V.map ((/ 1000) . reapply) edf)
 
   -- Reduce sample size for better performance
-  let sampleSize = 100
+  let sampleSize = 2 -- FIXME: larger value
   let seed = 100
   let gen = mkStdGen seed
   let txApplyTimesReduced = sampleElements gen sampleSize txApplyTimes
   let txReapplyTimesReduced = sampleElements gen sampleSize txReapplyTimes
 
-  -- let applyTxs = DeltaQ.uniform 0 0.5
-  -- let reapplyTxs = DeltaQ.uniform 0 0.4
-  let applyTxs = empiricalDQ txApplyTimesReduced
-  let reapplyTxs = empiricalDQ txReapplyTimesReduced
+  -- let applyTx = DeltaQ.uniform 0 3.3 -- 0 0.5
+  -- let reapplyTx = DeltaQ.uniform 0 2.1 -- 0 0.4
+  let applyTx = empiricalDQ txApplyTimesReduced
+  let reapplyTx = empiricalDQ txReapplyTimesReduced
 
-  printf "Complexity applyTxs: %d\n" (complexity applyTxs)
-  printf "Complexity reapplyTxs: %d\n" (complexity reapplyTxs)
+  -- (maybe (print @String "Nothing") (printf "Estimate for lVote: %d\n") (lVoteEstimated applyTx reapplyTx))
+  -- (maybe (print @String "Nothing") (printf "Estimate for lDiff: %d\n") (lDiffEstimated applyTx reapplyTx))
 
-  _ <- forkIO $ maybe (print @String "Nothing") (printf "Estimate for lVote: %d\n") (lVoteEstimated applyTxs reapplyTxs)
-  _ <- forkIO $ maybe (print @String "Nothing") (printf "Estimate for lDiff: %d\n") (lDiffEstimated applyTxs reapplyTxs)
+  printf "Complexity applyTx: %d\n" (complexity applyTx)
+  printf "Complexity reapplyTx: %d\n" (complexity reapplyTx)
 
-  let generatePlots = False
+  let committeeSizeEstimated = 600
+  let numberSPOs = 2500
+  let λ = 1 % 20
+  let τ = 3 % 4
+
+  let generatePlots = True
   let configs =
-        [ Config{name = "C113", lHdr = 1, lVote = 1, lDiff = 3, τ = 3 % 4, committeeSizeEstimated = 600, λ = 1 % 20, numberSPOs = 2500, ..}
-        , Config{name = "C124", lHdr = 1, lVote = 2, lDiff = 4, τ = 3 % 4, committeeSizeEstimated = 600, λ = 1 % 20, numberSPOs = 2500, ..}
-        , Config{name = "C135", lHdr = 1, lVote = 3, lDiff = 5, τ = 3 % 4, committeeSizeEstimated = 600, λ = 1 % 20, numberSPOs = 2500, ..}
-        , Config{name = "C145", lHdr = 1, lVote = 4, lDiff = 5, τ = 3 % 4, committeeSizeEstimated = 600, λ = 1 % 20, numberSPOs = 2500, ..}
-        , Config{name = "C147", lHdr = 1, lVote = 4, lDiff = 7, τ = 3 % 4, committeeSizeEstimated = 600, λ = 1 % 20, numberSPOs = 2500, ..}
-        , Config{name = "C155", lHdr = 1, lVote = 5, lDiff = 5, τ = 3 % 4, committeeSizeEstimated = 600, λ = 1 % 20, numberSPOs = 2500, ..}
-        , Config{name = "C165", lHdr = 1, lVote = 6, lDiff = 5, τ = 3 % 4, committeeSizeEstimated = 600, λ = 1 % 20, numberSPOs = 2500, ..}
-        , Config{name = "C999", lHdr = 9, lVote = 9, lDiff = 9, τ = 3 % 4, committeeSizeEstimated = 600, λ = 1 % 20, numberSPOs = 2500, ..}
+        [ Config{name = "C113", lHdr = 1, lVote = 1, lDiff = 3, ..}
+        , Config{name = "C124", lHdr = 1, lVote = 2, lDiff = 4, ..}
+        , Config{name = "C137", lHdr = 1, lVote = 3, lDiff = 7, ..}
+        , Config{name = "C145", lHdr = 1, lVote = 4, lDiff = 5, ..}
+        , Config{name = "C146", lHdr = 1, lVote = 4, lDiff = 6, ..}
+        , Config{name = "C147", lHdr = 1, lVote = 4, lDiff = 7, ..}
+        , Config{name = "C155", lHdr = 1, lVote = 5, lDiff = 5, ..}
+        , Config{name = "C165", lHdr = 1, lVote = 6, lDiff = 5, ..}
+        , Config{name = "C999", lHdr = 9, lVote = 9, lDiff = 9, ..}
         ]
-  mapConcurrently (mainWith generatePlots) configs >>= printResults
+
+  mapConcurrently_ (mainWith generatePlots >=> print) configs
+
+-- mapConcurrently (mainWith generatePlots) configs >>= printResults
 
 mainWith :: Bool -> Config -> IO Result
-mainWith True config = plots config >> mainWith False config
+mainWith True config = snd <$> concurrently (plots config) (mainWith False config)
 mainWith False config = return (stats config)
 
 data Result
@@ -128,7 +137,11 @@ plots Config{..} = do
   _ <-
     renderableToFile def{_fo_format = SVG} (name <> "-tx-apply.svg") $
       toRenderable $
-        plotCDFWithQuantiles "Tx Apply" [0.75, 0.95, 0.99] applyTxs
+        plotCDFWithQuantiles "Tx Apply" [0.75, 0.95, 0.99] applyTx
+  _ <-
+    renderableToFile def{_fo_format = SVG} (name <> "-tx-reapply.svg") $
+      toRenderable $
+        plotCDFWithQuantiles "Tx Reapply" [0.75, 0.95, 0.99] reapplyTx
   _ <-
     renderableToFile def{_fo_format = SVG} (name <> "-block-diffustion.svg") $
       toRenderable $
@@ -137,7 +150,7 @@ plots Config{..} = do
   _ <-
     renderableToFile def{_fo_format = SVG} (name <> "-validateEB.svg") $
       toRenderable $
-        plotCDFWithQuantiles "EB diffusion" [0.75, 0.95, 0.99] (validateEB applyTxs reapplyTxs)
+        plotCDFWithQuantiles "EB diffusion" [0.75, 0.95, 0.99] (validateEB applyTx reapplyTx)
   _ <-
     renderableToFile def{_fo_format = SVG} (name <> "-quorumProb.svg") $
       toRenderable $
@@ -155,7 +168,7 @@ stats :: Config -> Result
 stats config@Config{..} =
   let res_config = name
       res_pHeaderOnTime = fromRational (pHeaderOnTime lHdr)
-      res_pValidating = fromRational (pValidating applyTxs reapplyTxs (lHdr, lVote))
+      res_pValidating = fromRational (pValidating applyTx reapplyTx (lHdr, lVote))
       res_pQuorum = pQuorum config
       res_pInterruptedByNewBlock = pInterruptedByNewBlock config
       res_pCertified = pCertified config

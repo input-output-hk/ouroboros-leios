@@ -17,7 +17,8 @@ module DeltaQ.Leios (
   pHeaderOnTime,
 ) where
 
-import DeltaQ (DQ, DeltaQ (quantile, successWithin), Outcome ((./\.), (.>>.)), ProbabilisticOutcome (Probability), maybeFromEventually, unsafeFromPositiveMeasure)
+import Data.Ratio ((%))
+import DeltaQ (DQ, DeltaQ (quantile, successWithin), Outcome ((./\.), (.>>.)), ProbabilisticOutcome (Probability), choices, maybeFromEventually, unsafeFromPositiveMeasure, wait)
 import DeltaQ.Praos (BlockSize (B2048, B64), blendedDelay, emitRBHeader, fetchingRBBody)
 import qualified Numeric.Measure.Finite.Mixed as M
 
@@ -31,7 +32,7 @@ fetchingEB :: DQ
 fetchingEB = fetchingEBHeader .>>. fetchingEBBody
 
 fetchingTxs :: DQ
-fetchingTxs = unsafeFromPositiveMeasure $ M.add (M.scale 0.2 (M.dirac 0.2)) (M.scale 0.8 (M.uniform 2 4)) -- TODO: use measurements
+fetchingTxs = unsafeFromPositiveMeasure $ M.add (M.scale 0.2 (M.dirac 0.2)) (M.scale 0.8 (M.uniform 3 6)) -- TODO: use measurements
 
 processRBandEB :: DQ -> DQ
 processRBandEB applyTxs = processRB ./\. processEB
@@ -41,20 +42,26 @@ processRBandEB applyTxs = processRB ./\. processEB
 
 -- | Distribution of EB validation time
 validateEB :: DQ -> DQ -> DQ
-validateEB applyTxs reapplyTxs = processRBandEB applyTxs .>>. reapplyTxs
+validateEB applyTx reapplyTx = processRBandEB applyTxs .>>. reapplyTxs
+ where
+  n = 32
+  doAll = foldr (./\.) (wait 0)
+  applyTxs = choices $ map (\i -> (1 % n, doAll (replicate i applyTx))) [1 .. fromInteger n]
+  reapplyTxs = choices $ map (\i -> (1 % n, doAll (replicate i reapplyTx))) [1 .. fromInteger n]
 
 -- | Estimate for the parameter \(L_\text{vote}\) using 'validateEB'
 lVoteEstimated :: DQ -> DQ -> Maybe Integer
-lVoteEstimated applyTxs reapplyTxs = round <$> ((-) <$> q75 <*> (pure 3))
+lVoteEstimated txApply txReapply = round <$> ((-) <$> q75 <*> (pure 3))
  where
-  q75 = maybeFromEventually $ quantile (validateEB applyTxs reapplyTxs) 0.75
+  q75 = maybeFromEventually $ quantile (validateEB txApply txReapply) 0.75
 
 -- | Estimate for the parameter \(L_\text{diff}\) using 'validateEB'
 lDiffEstimated :: DQ -> DQ -> Maybe Integer
-lDiffEstimated applyTxs reapplyTxs = round <$> ((-) <$> q95 <*> q75)
+lDiffEstimated txApply txReapply = round <$> ((-) <$> q95 <*> q75)
  where
-  q75 = maybeFromEventually $ quantile (validateEB applyTxs reapplyTxs) 0.75
-  q95 = maybeFromEventually $ quantile (validateEB applyTxs reapplyTxs) 0.95
+  dq = validateEB txApply txReapply
+  q75 = maybeFromEventually $ quantile dq 0.75
+  q95 = maybeFromEventually $ quantile dq 0.95
 
 -- | Probability that 'emitRBHeader' is within \(L_\text{hdr}\)
 pHeaderOnTime ::
@@ -69,15 +76,15 @@ pHeaderOnTime lHdr =
 
 -- | Probability that 'validateEB' is successful before the end of \(L_\text{vote}\)
 pValidating ::
-  -- | applyTxs
+  -- | txApply
   DQ ->
-  -- | reapplyTxs
+  -- | txReapply
   DQ ->
   -- | \(L_\text{hdr} \times L_\text{vote}\)
   (Integer, Integer) ->
   -- | Probability that the EB validation finisthes before \(3*L_\text{hdr} + L_\text{vote}\)
   Probability DQ
-pValidating applyTxs reapplyTxs (lHdr, lVote) =
+pValidating txApply txReapply (lHdr, lVote) =
   successWithin
-    (validateEB applyTxs reapplyTxs)
+    (validateEB txApply txReapply)
     (toRational $ 3 * lHdr + lVote)

@@ -53,10 +53,10 @@ data Config = Config
   -- ^ Voting threshold
   , λ :: !Rational
   -- ^ Block production rate parameter
-  , applyTxs :: !DQ
-  -- ^ DQ for applyTxs
-  , reapplyTxs :: !DQ
-  -- ^ DQ for reapplyTxs
+  , applyTx :: !DQ
+  -- ^ DQ for applyTx
+  , reapplyTx :: !DQ
+  -- ^ DQ for reapplyTx
   }
   deriving (Show, Eq)
 
@@ -65,7 +65,7 @@ pQuorum :: Config -> Double
 pQuorum Config{..} =
   quorumProbability
     (fromInteger numberSPOs)
-    (fromRational $ pValidating applyTxs reapplyTxs (lHdr, lVote))
+    (fromRational $ pValidating applyTx reapplyTx (lHdr, lVote))
     (fromInteger committeeSizeEstimated)
     (fromRational τ)
 
