@@ -5,7 +5,7 @@ import { OVERHEAD_B  } from './link.js';
 
 const NODES = 50;
 const DEGREE = 6;
-const BLOCK = 90000;
+const BLOCK = 90000; // = 90 kB
 const MEMPOOL = 2 * BLOCK;
 const LATENCY = 0.100; // = 100 ms
 const BANDWIDTH = 1250000; // = 10 Mb/s
@@ -39,7 +39,7 @@ try {
 
   graph.forEachNode((node) => {
     const neighbors = graph.outNeighbors(node);
-    logger.info({node: node, downstream_peers: neighbors}, "gopology");
+    logger.info({node: node, downstream_peers: neighbors}, "topology");
   });
 
   for (let i = 0; i < TX_COUNT; ++i) {
