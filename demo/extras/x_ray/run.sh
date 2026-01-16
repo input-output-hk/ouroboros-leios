@@ -3,15 +3,13 @@
 # Wrapper script to set defaults and run the x_ray observability stack using process-compose
 set -eo pipefail
 
-# Get the directory where this script is located
-SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
 # Set defaults for all environment variables
 # These can be overridden by:
 # 1. Nix (via runtimeEnv in build.nix)
 # 2. User exports before running this script
 set -a
 : "${WORKING_DIR:=tmp-x-ray}"
+: "${SOURCE_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 : "${GRAFANA_INI:=${SOURCE_DIR}/grafana.ini}"
 : "${GRAFANA_HOMEPATH:=${SOURCE_DIR}/grafana}"
 : "${ALLOY_CONFIG:=${SOURCE_DIR}/alloy}"
@@ -34,6 +32,7 @@ if [ -d "$WORKING_DIR" ]; then
   read -r -p "Remove and start fresh? (y/N): " response
   if [[ "$response" =~ ^[Yy]$ ]]; then
     echo "Removing existing working directory..."
+    chmod a+w "${WORKING_DIR}"
     rm -rf "$WORKING_DIR"
   else
     echo "Continuing with existing working directory..."
