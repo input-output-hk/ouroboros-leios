@@ -47,7 +47,10 @@
         name = "leios-ui-live";
         runtimeInputs = [ pkgs.http-server ];
         text = ''
-          http-server ${packages.ui} -o /visualizer/?scenario=2
+          if [[ -n "$1" ]]; then
+             param="?scenario=$1"
+          fi
+          http-server ${packages.ui} -o /visualizer/"$param"
         '';
       };
     };
