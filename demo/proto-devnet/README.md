@@ -91,6 +91,24 @@ To use it:
 
 The generated alloy config is customized for proto-devnet with correct node IPs and Prometheus ports.
 
+### Debugging Alloy log collection
+
+If logs aren't appearing in Grafana, check:
+
+1. View the generated alloy config to see the LOG_PATH (should be absolute):
+   ```shell
+   cat tmp-devnet/alloy | grep -A2 "local.file_match"
+   ```
+
+2. Check Alloy's UI at http://localhost:12345 to see:
+   - What files it's discovering
+   - Any errors in log collection
+
+3. Verify the log files exist and match the pattern:
+   ```shell
+   ls -la tmp-devnet/node*/node.log
+   ```
+
 ## Clean up
 
 To reset the demo, simply remove the working directory, for example:
