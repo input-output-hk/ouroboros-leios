@@ -17,6 +17,12 @@
       "topology": "topologies/prototype.yaml",
       "duration": 300,
       "loki": "localhost:3100"
+    },
+    {
+      "name": "Leios Prototype Devnet",
+      "topology": "topologies/proto-devnet.yaml",
+      "duration": 300,
+      "loki": "localhost:3100"
     }
   ]
 }

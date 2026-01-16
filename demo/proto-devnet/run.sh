@@ -10,11 +10,11 @@ set -a
 : "${WORKING_DIR:=tmp-devnet}"
 : "${SOURCE_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 : "${LEIOS_SCHEMA:=$(realpath "${SOURCE_DIR}"/../2025-11/data/leios-schema.sql)}"
-: "${IP_NODE1:=0.0.0.0}"
+: "${IP_NODE1:=127.0.0.1}"
 : "${PORT_NODE1:=3001}"
-: "${IP_NODE2:=0.0.0.0}"
+: "${IP_NODE2:=127.0.0.1}"
 : "${PORT_NODE2:=3002}"
-: "${IP_NODE3:=0.0.0.0}"
+: "${IP_NODE3:=127.0.0.1}"
 : "${PORT_NODE3:=3003}"
 : "${METRICS_PORT_NODE1:=12901}"
 : "${METRICS_PORT_NODE2:=12902}"
@@ -95,7 +95,7 @@ for i in "${nodes[@]}"; do
 	# Copy config files
 	cat "$CONFIG_DIR/config.json" |
 		jq ".TraceOptionNodeName = \"$NODE_NAME\"" |
-		jq ".TraceOptions.\"\".backends[1] = \"PrometheusSimple 0.0.0.0 $((12900 + "$i"))\"" \
+		jq ".TraceOptions.\"\".backends[1] = \"PrometheusSimple 127.0.0.1 $((12900 + "$i"))\"" \
 			>"$NODE_DIR/config.json"
 
 	# Generate upstream endpoints to other nodes
