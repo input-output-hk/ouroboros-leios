@@ -32,13 +32,8 @@
           name = "x_ray";
           runtimeInputs = config.devShells.dev-demo-extras-x-ray.nativeBuildInputs;
           runtimeEnv = {
+            SOURCE_DIR = ./.;
             GRAFANA_SHARE = "${pkgs.grafana}/share/grafana";
-            GRAFANA_INI = ./grafana.ini;
-            GRAFANA_HOMEPATH = ./grafana;
-            ALLOY_CONFIG = ./alloy;
-            PROMETHEUS_CONFIG = ./prometheus.yaml;
-            LOKI_CONFIG = ./loki.yaml;
-            LOG_PATH = "../../leios-202511-demo/.tmp-leios-202511-demo/*/log";
           };
           text = builtins.readFile ./run.sh;
         };
