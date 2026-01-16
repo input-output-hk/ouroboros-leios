@@ -64,6 +64,33 @@ export WORKING_DIR=my-devnet
 ./run.sh
 ```
 
+## Observability with X-ray
+
+Proto-devnet generates an Alloy configuration for use with the X-ray observability stack.
+
+To use it:
+
+1. Start proto-devnet (using one of the methods above)
+
+2. In another terminal, start x_ray with the generated config:
+
+    **Using nix:**
+
+    ``` shell
+    ALLOY_CONFIG="$(realpath tmp-devnet/alloy)" nix run github:input-output-hk/ouroboros-leios#x_ray
+    ```
+
+    **Without nix:**
+
+    ``` shell
+    cd ../extras/x_ray
+    ALLOY_CONFIG="$(realpath ../../proto-devnet/tmp-devnet/alloy)" ./run.sh
+    ```
+
+3. Access Grafana at <http://localhost:3000>
+
+The generated alloy config is customized for proto-devnet with correct node IPs and Prometheus ports.
+
 ## Clean up
 
 To reset the demo, simply remove the working directory, for example:

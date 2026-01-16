@@ -1,10 +1,6 @@
 version: "0.5"
 
-environment:
-  - "WORKING_DIR=.tmp-x-ray"
-
 processes:
-
   Init:
     command: |
       set -exuo pipefail;
