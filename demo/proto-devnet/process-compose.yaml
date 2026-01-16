@@ -35,7 +35,7 @@ processes:
         condition: process_completed_successfully
 
   TxGenerator:
-    command: sleep 5 && ${TX_GENERATOR} json_highlevel gen.json
+    command: sleep 5 && tx-generator json_highlevel gen.json
     working_dir: ${WORKING_DIR}
     depends_on:
       Node1:
