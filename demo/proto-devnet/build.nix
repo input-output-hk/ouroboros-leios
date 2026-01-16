@@ -27,7 +27,7 @@
           ];
           # To easily interact with node1 on the devnet from within the demo dir
           CARDANO_NODE_NETWORK_ID = 164;
-          CARDANO_NODE_SOCKET_PATH = "./devnet/node1/node.socket";
+          CARDANO_NODE_SOCKET_PATH = "tmp-devnet/node1/node.socket";
         };
       };
 

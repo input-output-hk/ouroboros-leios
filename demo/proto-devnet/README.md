@@ -87,10 +87,10 @@ The `config/` directory contains pre-prepared configuration files for the 3-node
 
 This serves as a starting configuration when intializing the testnet (see `init.sh`), which requires the typical modifications like file permissions, topology wiring and updating the start times.
 
-The template configuration was originally created using `cardano-testnet`:
+The template configuration was originally created using `cardano-cli`:
 
 ``` shell
-cardano-testnet create-env --output config --num-pool-nodes 3 --slot-length 1 --testnet-magic 164 --params-mainnet
+cardano-cli conway genesis create-testnet-data --out-dir config --testnet-magic 164 --pools 3 --total-supply 2000000000000 --delegated-supply 240000000002 --stake-delegators 3 --utxo-keys 3
 ```
 
 Then tuned and removed unnecessary components (Byron-era and governance-related files).

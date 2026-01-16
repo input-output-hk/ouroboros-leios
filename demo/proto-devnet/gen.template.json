@@ -1,7 +1,7 @@
 {
   "debugMode": false,
   "tx_count": 10000,
-  "tps": 10,
+  "tps": 1000,
   "inputs_per_tx": 2,
   "outputs_per_tx": 2,
   "tx_fee": 212345,
