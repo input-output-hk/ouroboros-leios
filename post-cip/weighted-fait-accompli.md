@@ -18,7 +18,7 @@ The number of persistent seats is $`n_1 = i^* - 1 \leq n`$, where $`i^*`$ is the
 
 ## Non-persistent candidates
 
-The pools $`p_i`$ for $`i \in [i^*, n]`$ are all *candidates* for having a non-persistent seat. The stake distribution among the non-persistent pools is defined as $`\mathcal{S}_3 = \mathcal{S}(p_i) / \rho_{i^*}`$ for $`i \in [i^*, n]`$. 
+The pools $`p_i`$ for $`i \in \left[ i^*, |P| \right]`$ are all *candidates* for having a non-persistent seat. The stake distribution among the non-persistent pools is defined as $`\mathcal{S}_3 = \mathcal{S}(p_i) / \rho_{i^*}`$ for $`i \in \left[ i^*, |P| \right]`$. 
 
 ## Local sortition for non-persistent seats
 
