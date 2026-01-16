@@ -36,7 +36,7 @@ export function generateNetwork(
     }
   }
 
-  const iterations = n * k * 1000; 
+  const iterations = n * k * 100; 
   const nodes = graph.nodes();
 
   for (let step = 0; step < iterations; step++) {
