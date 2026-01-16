@@ -45,8 +45,12 @@ In terms of probability distributions, the total weight is $`\rho_1 + \rho_{i^*}
 	- A pool may occupy several seats.
 	- Each seat is equally weighted at one $`n_2`$th of the total non-persistent stake.
 3. The total weight in an election is $`\rho_1 \pm \frac{\rho_{i^*}}{\sqrt{n_2}}`$. The full probability distribution for the total weight provides guidance on choosing a safe value of the quorum threshold $`\tau`$.
-	- In Peras, $`\tau`$ should be chosen so that there is a vanishingly small probability that 25% adversarial stake could veto an otherwise honest quorum.
-	- In Leios, $`\tau`$ should be chosen so that there is a vanishingly small probability that 50% adversarial stake could obtain a quorum or veto an otherwise honest quorum.
+	- In Peras, $`\tau`$ should be chosen with two constraints in mind:
+      1. (safety) The probability that an adversary controlling <50% of stake could, with the help of honest parties, produce two conflicting certificates in the same vote must be vanishingly small. This is because certificate equivocation is assumed to be a negligible-probability event in the protocol's safety argument, which must hold even in face of almost-1/2 adversaries. In more detail, if $`A`$ denotes the fraction of adversarial weight on the committee, then the above constraint results in an inequality $`A + (1-A)/2 < \tau`$ (if the adversary splits honest parties in half and adds his votes to both certificates), which results in $`A < 2\tau - 1`$. Hence, assuming that the adversary has at most $`a`$-fraction of stake in the overall population (with $`a`$ close to $`1/2`$), we need to choose $`\tau`$ so that the probability that the committee selection on $`a`$-corrupted population gives us a $`(2\tau-1)`$-corrupted committee is acceptably small.
+   
+      2. (optimistic liveness) The downward pressure on $`\tau`$ comes from the fact that an adversary controlling more than $`1-\tau`$ weight on the committee can halt certificate creation by just abstaining. This "only" prevents the optimistic path of the protocol, and so it is acceptable to only protect from weaker adversaries here. In particular, one way to parametrize is to first set $`\tau`$ based on the safety requirement above, and then compute the threshold $`\alpha`$ (this will be $`<1/4`$) such that if the corruption in the population is below $`\alpha`$ then except with negligible probability (say admitting the same error as allowed in the safety case) the adversary will not have enough weight on the committee for the abstain attack.
+       
+	- In Leios, $`\tau`$ should be chosen so that there is a vanishingly small probability that <50% adversarial stake could obtain a quorum or veto an otherwise honest quorum.
 
 ## Numerical example
 
