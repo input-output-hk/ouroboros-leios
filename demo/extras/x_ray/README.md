@@ -1,9 +1,21 @@
-# X-RAY - socket stats with Grafana
+# X-RAY - Observability stack with Grafana
+
+X-ray provides a complete observability stack for Leios demos using Grafana, Prometheus, Loki, and Alloy.
+
+## Quick Start
+
+**Using nix:**
+
+```shell
+nix run github:input-output-hk/ouroboros-leios#x_ray
+```
+
+**Without nix:**
 
 Position your terminal into the current directory and enter the shell with
 
 ```shell
-nix develop .#dev-x-ray
+nix develop .#dev-demo-extras-x-ray
 ```
 
 Or if you use Direnv with Nix
@@ -11,6 +23,34 @@ Or if you use Direnv with Nix
 ```shell
 direnv allow
 ```
+
+Then run:
+
+```shell
+./run.sh
+```
+
+## Configuration
+
+You can customize the x_ray stack by setting environment variables before running:
+
+```shell
+export ALLOY_CONFIG=/path/to/custom/alloy
+export LOG_PATH=/path/to/logs/*.log
+./run.sh
+```
+
+Available environment variables:
+- `ALLOY_CONFIG` - Path to Alloy configuration file
+- `LOG_PATH` - Glob pattern for log files to collect
+- `WORKING_DIR` - Working directory for runtime data (default: `tmp-x-ray`)
+- `GRAFANA_INI`, `GRAFANA_HOMEPATH` - Grafana configuration
+- `PROMETHEUS_CONFIG`, `LOKI_CONFIG` - Other service configs
+- `SS_FILTER` - Socket statistics filter expression
+
+All variables have sensible defaults and can be overridden as needed.
+
+## Manual Setup
 
 You can either work with this setup step by step, or use the
 awesome [process-compose](https://f1bonacc1.github.io/process-compose/)
@@ -70,7 +110,13 @@ pkill "socat|grafana|prometheus|alloy"
 
 ## process-compose
 
-Run the setup
+Run the setup using the wrapper script:
+
+```shell
+./run.sh
+```
+
+Or run process-compose directly (requires environment variables to be set):
 
 ```shell
 process-compose -f process-compose.yaml

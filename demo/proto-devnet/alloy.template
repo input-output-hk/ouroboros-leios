@@ -1,0 +1,141 @@
+prometheus.remote_write "prometheus" {
+	endpoint {
+		url = "http://127.0.0.1:9090/api/v1/write"
+	}
+}
+
+prometheus.scrape "cardano_node_exporter" {
+	targets = [
+		{
+			"__address__" = "${IP_NODE1}:${METRICS_PORT_NODE1}",
+			"job"         = "cardano_node_metrics",
+			"instance"    = "localhost",
+			"alias"       = "node1",
+			"process"     = "Node1",
+		},
+		{
+			"__address__" = "${IP_NODE2}:${METRICS_PORT_NODE2}",
+			"job"         = "cardano_node_metrics",
+			"instance"    = "localhost",
+			"alias"       = "node2",
+			"process"     = "Node2",
+		},
+		{
+			"__address__" = "${IP_NODE3}:${METRICS_PORT_NODE3}",
+			"job"         = "cardano_node_metrics",
+			"instance"    = "localhost",
+			"alias"       = "node3",
+			"process"     = "Node3",
+		},
+	]
+
+	metrics_path = "/metrics"
+
+	scrape_timeout  = "1s"
+	scrape_interval = "1s"
+
+	forward_to = [prometheus.remote_write.prometheus.receiver]
+}
+
+loki.write "loki" {
+	endpoint {
+		url        = "http://localhost:3100/loki/api/v1/push"
+		batch_size = "2MB"
+	}
+}
+
+local.file_match "local_files" {
+	path_targets = [{"__path__" = "${LOG_PATH}"}]
+	sync_period  = "5s"
+}
+
+loki.source.file "process_compose_log_scrape" {
+	targets       = local.file_match.local_files.targets
+	forward_to    = [loki.process.extract_process_compose_logs.receiver]
+	tail_from_end = false
+}
+
+loki.process "extract_process_compose_logs" {
+	stage.json {
+		expressions = {
+			level   = "level",
+			process = "process",
+			replica = "replica",
+			message = "message",
+		}
+		drop_malformed = true
+	}
+
+	stage.labels {
+		values = {
+			level   = "level",
+			process = "process",
+			replica = "replica",
+		}
+	}
+
+	stage.static_labels {
+		values = {
+			service = "process-compose",
+			type    = "process-compose",
+		}
+	}
+
+	stage.output {
+		source = "message"
+	}
+
+	forward_to = [
+		loki.write.loki.receiver,
+		loki.process.extract_cardano_node_logs.receiver,
+	]
+}
+
+loki.process "extract_cardano_node_logs" {
+	stage.json {
+		expressions = {
+			at     = "at",
+			sev    = "sev",
+			host   = "host",
+			thread = "thread",
+			ns     = "ns",
+			data   = "data",
+		}
+		drop_malformed = true
+	}
+
+	stage.drop {
+    source = "process"
+    value = "Analyze"
+	}
+
+	stage.timestamp {
+		source = "at"
+		format = "RFC3339"
+	}
+
+	stage.labels {
+		values = {
+			level    = "sev",
+			alias    = "host",
+			host     = "host",
+			instance = "host",
+			sev      = "sev",
+			thread   = "thread",
+			ns       = "ns",
+		}
+	}
+
+	stage.static_labels {
+		values = {
+			service = "cardano-node",
+			type    = "cardano-node",
+		}
+	}
+
+	stage.output {
+		source = "data"
+	}
+
+	forward_to = [loki.write.loki.receiver]
+}

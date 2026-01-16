@@ -94,5 +94,5 @@ To clean up just delete the working directories
 
 ```shell
 rm -fr .tmp-leios-202511-demo
-rm -fr .tmp-x-ray
+rm -fr tmp-x-ray
 ```

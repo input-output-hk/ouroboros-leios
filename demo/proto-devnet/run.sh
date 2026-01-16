@@ -16,6 +16,10 @@ set -a
 : "${PORT_NODE2:=3002}"
 : "${IP_NODE3:=0.0.0.0}"
 : "${PORT_NODE3:=3003}"
+: "${METRICS_PORT_NODE1:=12901}"
+: "${METRICS_PORT_NODE2:=12902}"
+: "${METRICS_PORT_NODE3:=12903}"
+: "${LOG_PATH:=${WORKING_DIR}/node*/node.log}"
 set +a
 
 # Check for required commands
@@ -136,6 +140,9 @@ find "$WORKING_DIR/utxo-keys" -name "*.skey" -exec chmod 400 {} \;
 
 # Configure tx-generator
 envsubst <"${SOURCE_DIR}/gen.template.json" >"${WORKING_DIR}/gen.json"
+
+# Configure alloy for x_ray observability
+envsubst <"${SOURCE_DIR}/alloy.template" >"${WORKING_DIR}/alloy"
 
 echo "Starting proto-devnet with process-compose..."
 process-compose --no-server -f "${SOURCE_DIR}/process-compose.yaml"

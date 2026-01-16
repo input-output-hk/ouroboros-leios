@@ -27,23 +27,23 @@
         };
       };
 
-      packages = lib.optionalAttrs (system == "x86_64-linux") {
-        x_ray = pkgs.writeShellApplication {
+      packages = lib.optionalAttrs (system == "x86_64-linux") rec {
+        x-ray = pkgs.writeShellApplication {
           name = "x_ray";
           runtimeInputs = config.devShells.dev-demo-extras-x-ray.nativeBuildInputs;
           runtimeEnv = {
-            inherit (config.devShells.dev-demo-extras-x-ray) GRAFANA_SHARE;
+            GRAFANA_SHARE = "${pkgs.grafana}/share/grafana";
             GRAFANA_INI = ./grafana.ini;
             GRAFANA_HOMEPATH = ./grafana;
             ALLOY_CONFIG = ./alloy;
             PROMETHEUS_CONFIG = ./prometheus.yaml;
             LOKI_CONFIG = ./loki.yaml;
+            LOG_PATH = "../../leios-202511-demo/.tmp-leios-202511-demo/*/log";
           };
-          text = ''
-            process-compose --no-server -f ${./process-compose.yaml};
-          '';
+          text = builtins.readFile ./run.sh;
         };
-
+        # XXX: Drop once people forgot about it
+        x_ray = x-ray;
       };
     };
 }
