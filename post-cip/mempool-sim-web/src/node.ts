@@ -68,24 +68,54 @@ export class Node {
   }
 
   // Submit a transaction to a node, applying backpressure if needed.
+  // Handles duplicate detection for both honest and adversarial (front-run) transactions.
   public handleSubmitTx(graph: DirectedGraph<Node, Link>, now: number, tx: Tx): void {
-    const txAdv = {
-      txId: tx.txId + "adv",
-      size_B: tx.size_B,
-      frontRuns: tx.txId,
-    };
-    // FIXME: Check this logic.
-    if (this.known.has(tx.txId) || this.known.has(tx.frontRuns) || this.known.has(txAdv.txId))
+    // Already seen this exact transaction
+    if (this.known.has(tx.txId)) {
       return;
-    this.known.add(tx.txId);
-    if (tx.frontRuns == "" && !this.honest) {
-      tx = txAdv;
-      this.known.add(tx.txId);
     }
+
+    const isHonestTx = tx.frontRuns === "";
+
+    if (isHonestTx) {
+      // This is an honest transaction - check if we already have its adversarial version
+      const advTxId = tx.txId + "adv";
+      if (this.known.has(advTxId)) {
+        // We already have the front-run version, reject the original
+        this.known.add(tx.txId);
+        logger.trace({clock: now, node: this.id, txId: tx.txId}, "rejected honest tx (have adversarial version)");
+        return;
+      }
+    } else {
+      // This is an adversarial (front-run) transaction - check if we have the original
+      const originalTxId = tx.frontRuns;
+      if (this.known.has(originalTxId)) {
+        // We already have the honest version, reject the front-run
+        this.known.add(tx.txId);
+        logger.trace({clock: now, node: this.id, txId: tx.txId}, "rejected adversarial tx (have honest version)");
+        return;
+      }
+    }
+
+    // Mark this transaction as known
+    this.known.add(tx.txId);
+
+    // If this node is adversarial and receives an honest tx, front-run it
+    if (isHonestTx && !this.honest) {
+      const txAdv: Tx = {
+        txId: tx.txId + "adv",
+        size_B: tx.size_B,
+        frontRuns: tx.txId,
+      };
+      this.known.add(txAdv.txId);
+      tx = txAdv;
+      logger.trace({clock: now, node: this.id, originalTxId: tx.frontRuns, advTxId: tx.txId}, "front-running transaction");
+    }
+
     this.backpressure.push(tx);
     logger.trace({clock: now, node: this.id, txId: tx.txId}, "apply backpressure");
     this.fillMemoryPool(graph, now);
-  };
+  }
 
   // Move transactions from the client to the memory pool until it is full.
   private fillMemoryPool(graph: DirectedGraph<Node, Link>, now: number): void {
