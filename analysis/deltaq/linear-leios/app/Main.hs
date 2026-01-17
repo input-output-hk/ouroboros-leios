@@ -9,6 +9,7 @@
 module Main where
 
 import Analysis.Leios
+import Control.Concurrent
 import Control.Concurrent.Async
 import Control.Monad
 import qualified Data.ByteString.Lazy as BL
@@ -59,23 +60,19 @@ main = do
   let txApplyTimes = V.toList (V.map ((/ 1000) . apply) edf)
   let txReapplyTimes = V.toList (V.map ((/ 1000) . reapply) edf)
 
-  -- Reduce sample size for better performance
-  let sampleSize = 2 -- FIXME: larger value
   let seed = 100
-  let gen = mkStdGen seed
-  let txApplyTimesReduced = sampleElements gen sampleSize txApplyTimes
-  let txReapplyTimesReduced = sampleElements gen sampleSize txReapplyTimes
+  let g = mkStdGen seed
 
   -- let applyTx = DeltaQ.uniform 0 3.3 -- 0 0.5
   -- let reapplyTx = DeltaQ.uniform 0 2.1 -- 0 0.4
-  let applyTx = empiricalDQ txApplyTimesReduced
-  let reapplyTx = empiricalDQ txReapplyTimesReduced
+  let applyTx = reduceComplexity g 20 $ empiricalDQ txApplyTimes
+  let reapplyTx = reduceComplexity g 20 $ empiricalDQ txReapplyTimes
 
   -- (maybe (print @String "Nothing") (printf "Estimate for lVote: %d\n") (lVoteEstimated applyTx reapplyTx))
   -- (maybe (print @String "Nothing") (printf "Estimate for lDiff: %d\n") (lDiffEstimated applyTx reapplyTx))
 
-  printf "Complexity applyTx: %d\n" (complexity applyTx)
-  printf "Complexity reapplyTx: %d\n" (complexity reapplyTx)
+  _ <- forkIO $ printf "Complexity applyTx: %d\n" (complexity applyTx)
+  _ <- forkIO $ printf "Complexity reapplyTx: %d\n" (complexity reapplyTx)
 
   let committeeSizeEstimated = 600
   let numberSPOs = 2500
@@ -150,7 +147,7 @@ plots Config{..} = do
   _ <-
     renderableToFile def{_fo_format = SVG} (name <> "-validateEB.svg") $
       toRenderable $
-        plotCDFWithQuantiles "EB diffusion" [0.75, 0.95, 0.99] (validateEB applyTx reapplyTx)
+        plotCDFWithQuantiles "EB diffusion" [0.75, 0.95, 0.99] (validateEB g applyTx reapplyTx)
   _ <-
     renderableToFile def{_fo_format = SVG} (name <> "-quorumProb.svg") $
       toRenderable $
@@ -168,7 +165,7 @@ stats :: Config -> Result
 stats config@Config{..} =
   let res_config = name
       res_pHeaderOnTime = fromRational (pHeaderOnTime lHdr)
-      res_pValidating = fromRational (pValidating applyTx reapplyTx (lHdr, lVote))
+      res_pValidating = fromRational (pValidating g applyTx reapplyTx (lHdr, lVote))
       res_pQuorum = pQuorum config
       res_pInterruptedByNewBlock = pInterruptedByNewBlock config
       res_pCertified = pCertified config

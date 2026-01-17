@@ -33,6 +33,7 @@ import DeltaQ.Leios (pValidating)
 import qualified Statistics.Distribution as S
 import Statistics.Leios (quorumProbability)
 import Statistics.Praos (blockDistribution)
+import System.Random (StdGen)
 
 -- | 'Config' is a collection of all parameters that determine the outcome
 -- of the analysis
@@ -57,6 +58,7 @@ data Config = Config
   -- ^ DQ for applyTx
   , reapplyTx :: !DQ
   -- ^ DQ for reapplyTx
+  , g :: !StdGen
   }
   deriving (Show, Eq)
 
@@ -65,7 +67,7 @@ pQuorum :: Config -> Double
 pQuorum Config{..} =
   quorumProbability
     (fromInteger numberSPOs)
-    (fromRational $ pValidating applyTx reapplyTx (lHdr, lVote))
+    (fromRational $ pValidating g applyTx reapplyTx (lHdr, lVote))
     (fromInteger committeeSizeEstimated)
     (fromRational τ)
 
