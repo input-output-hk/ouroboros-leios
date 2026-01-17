@@ -4,10 +4,14 @@ import type { Tx, TxId} from './types.ts'
 
 export class MemoryPool {
 
+  // Ordered queue of transactions (FIFO for block production)
   private txs: Tx[] = [];
 
+  // Index for O(1) lookups by txId
+  private txMap: Map<TxId, Tx> = new Map();
+
   private size_B: number;
-  
+
   public readonly capacity_B: number;
 
   constructor(capacity_B: number) {
@@ -20,12 +24,18 @@ export class MemoryPool {
       return false;
     }
     this.txs.push(tx);
+    this.txMap.set(tx.txId, tx);
     this.size_B += tx_B;
     return true;
   }
 
   dequeue(): Tx | undefined {
-    return this.txs.shift();
+    const tx = this.txs.shift();
+    if (tx) {
+      this.txMap.delete(tx.txId);
+      this.size_B -= tx.size_B;
+    }
+    return tx;
   }
 
   peek(): Tx | undefined {
@@ -37,19 +47,20 @@ export class MemoryPool {
   }
 
   contains(txId: TxId): boolean {
-    return this.txs.filter(tx => tx.txId == txId).length > 0;
+    return this.txMap.has(txId);
   }
 
   get(txId: TxId): Tx | undefined {
-    const matches = this.txs.filter(tx => tx.txId == txId);
-    if (matches.length == 0)
-      return undefined;
-    else
-      return matches[0];
+    return this.txMap.get(txId);
   }
 
   contents(): Tx[] {
-    return this.txs.map(tx => tx);
+    return [...this.txs];
+  }
+
+  // Get count of transactions in the mempool
+  count(): number {
+    return this.txs.length;
   }
 
 }
