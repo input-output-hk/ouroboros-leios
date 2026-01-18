@@ -1,6 +1,6 @@
 import { LRUCache } from 'lru-cache';
 import { MemoryPool } from './mempool.js';
-import { TXID_B, type Tx, type TxId } from './types.js';
+import { TXID_B, type Tx, type TxId, type Block } from './types.js';
 import { Link } from './link.js'
 import { logger } from './logger.js';
 import type { Simulation } from './simulation.js';
@@ -191,6 +191,39 @@ export class Node {
   public handleSendTx(sim: Simulation, now: number, peer: string, tx: Tx): void {
     logger.trace({clock: now, node: this.id, peer: peer, tx: tx}, "receive transaction");
     this.handleSubmitTx(sim, now, tx);
+  }
+
+  // Produce a block by collecting transactions from the mempool.
+  public handleProduceBlock(sim: Simulation, now: number, blockSize_B: number): void {
+    const txs: Tx[] = [];
+    let size = 0;
+    let honest = 0;
+    let adversarial = 0;
+
+    while (size < blockSize_B) {
+      const tx = this.mempool.peek();
+      if (!tx || size + tx.size_B > blockSize_B) break;
+      this.mempool.dequeue();
+      txs.push(tx);
+      size += tx.size_B;
+      if (tx.frontRuns === "") {
+        honest++;
+      } else {
+        adversarial++;
+      }
+    }
+
+    const block: Block = {
+      blockId: `B${sim.blocks.length}`,
+      producer: this.id,
+      timestamp: now,
+      transactions: txs,
+      size_B: size,
+      honestCount: honest,
+      adversarialCount: adversarial
+    };
+
+    sim.recordBlock(block);
   }
 
   // Lookup a downstream link by its peer name.

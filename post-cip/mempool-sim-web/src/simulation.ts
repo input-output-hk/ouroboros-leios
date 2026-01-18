@@ -1,6 +1,6 @@
 import TinyQueue from 'tinyqueue';
 import { DirectedGraph } from 'graphology';
-import type { TxId, Tx } from './types.js';
+import type { TxId, Tx, Block } from './types.js';
 import { Node } from './node.js';
 import { Link } from './link.js';
 import { logger } from './logger.js';
@@ -12,7 +12,8 @@ export type Event =
   | { kind: 'SubmitTx'; clock: number; to: string; tx: Tx }
   | { kind: 'OfferTx'; clock: number; from: string; to: string; txId: TxId }
   | { kind: 'RequestTx'; clock: number; from: string; to: string; txId: TxId }
-  | { kind: 'SendTx'; clock: number; from: string; to: string; tx: Tx };
+  | { kind: 'SendTx'; clock: number; from: string; to: string; tx: Tx }
+  | { kind: 'ProduceBlock'; clock: number; producer: string; blockSize_B: number };
 
 /**
  * Simulation class that encapsulates the network graph and event queue.
@@ -24,6 +25,7 @@ export class Simulation {
   private _graph: DirectedGraph<Node, Link>;
   private _currentTime: number = 0;
   private _eventsProcessed: number = 0;
+  private _blocks: Block[] = [];
 
   constructor(graph: DirectedGraph<Node, Link>) {
     this._graph = graph;
@@ -44,6 +46,10 @@ export class Simulation {
 
   get pendingEvents(): number {
     return this.eventQueue.length;
+  }
+
+  get blocks(): Block[] {
+    return this._blocks;
   }
 
   /**
@@ -98,6 +104,34 @@ export class Simulation {
   }
 
   /**
+   * Schedule block production at a given time.
+   */
+  produceBlock(clock: number, producer: string, blockSize_B: number): void {
+    this.eventQueue.push({
+      kind: 'ProduceBlock',
+      clock,
+      producer,
+      blockSize_B
+    });
+  }
+
+  /**
+   * Record a produced block.
+   */
+  recordBlock(block: Block): void {
+    this._blocks.push(block);
+    logger.info({
+      blockId: block.blockId,
+      producer: block.producer,
+      timestamp: block.timestamp,
+      txCount: block.transactions.length,
+      size_B: block.size_B,
+      honestCount: block.honestCount,
+      adversarialCount: block.adversarialCount
+    }, "block produced");
+  }
+
+  /**
    * Process all events in the queue until empty.
    */
   run(): void {
@@ -118,6 +152,17 @@ export class Simulation {
 
     this._currentTime = event.clock;
     this._eventsProcessed++;
+
+    // Handle ProduceBlock separately since it has 'producer' not 'to'
+    if (event.kind === 'ProduceBlock') {
+      const producer: Node = this._graph.getNodeAttributes(event.producer);
+      if (!producer) {
+        logger.fatal(event, "unknown producer node");
+        throw new Error(`unknown producer node: ${event.producer}`);
+      }
+      producer.handleProduceBlock(this, event.clock, event.blockSize_B);
+      return true;
+    }
 
     const target: Node = this._graph.getNodeAttributes(event.to);
     if (!target) {
@@ -151,5 +196,6 @@ export class Simulation {
     this.eventQueue = new TinyQueue<Event>([], (a, b) => a.clock - b.clock);
     this._currentTime = 0;
     this._eventsProcessed = 0;
+    this._blocks = [];
   }
 }
