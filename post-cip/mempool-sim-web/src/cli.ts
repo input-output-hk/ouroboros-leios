@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { generateNetwork, addAdversaryNode } from './topology.js';
-import { submitTx, handleEvents } from './events.js'
+import { Simulation } from './simulation.js';
 import { logger } from './logger.js'
 import { OVERHEAD_B } from './link.js';
 
@@ -101,25 +101,33 @@ try {
     logger.info({ node: node, downstream_peers: neighbors }, "topology");
   });
 
+  // Create simulation
+  const sim = new Simulation(graph);
+
   // Inject transactions at random honest nodes with random sizes
   for (let i = 0; i < config.txCount; ++i) {
     const txId = "T" + i;
+    // Random honest node (H1 to H{nodes})
     const nodeIndex = Math.ceil(config.nodes * Math.random());
     const node = "H" + nodeIndex;
+    // Random time within tx duration
     const time = Math.round(config.txDuration * Math.random());
+    // Random size within configured range
     const size = config.txSizeMin + Math.floor(Math.random() * (config.txSizeMax - config.txSizeMin));
 
-    submitTx(time, node, {
+    sim.submitTx(time, node, {
       txId: txId,
       size_B: size,
       frontRuns: "",
     });
   }
 
-  logger.info({ txCount: config.txCount }, "transactions submitted");
+  logger.info({ txCount: config.txCount, pendingEvents: sim.pendingEvents }, "transactions submitted");
 
   // Run the simulation
-  handleEvents(graph);
+  sim.run();
+
+  logger.info({ eventsProcessed: sim.eventsProcessed, finalTime: sim.currentTime }, "simulation complete");
 
   // Collect and report statistics
   let totalHonest = 0;
