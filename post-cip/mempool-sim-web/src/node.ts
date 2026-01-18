@@ -1,9 +1,13 @@
+import { LRUCache } from 'lru-cache';
 import { MemoryPool } from './mempool.js';
 import { TXID_B, type Tx, type TxId } from './types.js';
 import { Link } from './link.js'
 import { logger } from './logger.js';
 import type { Simulation } from './simulation.js';
 
+// Maximum entries in the known txId cache per node.
+// Prevents unbounded memory growth during long simulations.
+const KNOWN_CACHE_SIZE = 10000;
 
 export class Node {
 
@@ -22,8 +26,9 @@ export class Node {
   // Offers of transactions from upstream peers.
   private offers: [TxId, string][];
 
-  // Transactions already known (for duplicate detection).
-  private known: Set<TxId>;
+  // LRU cache of known transaction IDs (for duplicate detection).
+  // Bounded to prevent memory growth in long-running simulations.
+  private known: LRUCache<TxId, boolean>;
 
   constructor(id: string, honest: boolean, mempool_B: number) {
     this.id = id;
@@ -31,7 +36,7 @@ export class Node {
     this.mempool = new MemoryPool(mempool_B);
     this.backpressure = [];
     this.offers = [];
-    this.known = new Set<TxId>();
+    this.known = new LRUCache<TxId, boolean>({ max: KNOWN_CACHE_SIZE });
   }
 
   // Log the partial state of the node.
@@ -81,7 +86,7 @@ export class Node {
       const advTxId = tx.txId + "adv";
       if (this.known.has(advTxId)) {
         // We already have the front-run version, reject the original
-        this.known.add(tx.txId);
+        this.known.set(tx.txId, true); // Mark as seen to prevent future processing
         logger.trace({clock: now, node: this.id, txId: tx.txId}, "rejected honest tx (have adversarial version)");
         return;
       }
@@ -90,14 +95,14 @@ export class Node {
       const originalTxId = tx.frontRuns;
       if (this.known.has(originalTxId)) {
         // We already have the honest version, reject the front-run
-        this.known.add(tx.txId);
+        this.known.set(tx.txId, true); // Mark as seen to prevent future processing
         logger.trace({clock: now, node: this.id, txId: tx.txId}, "rejected adversarial tx (have honest version)");
         return;
       }
     }
 
     // Mark this transaction as known
-    this.known.add(tx.txId);
+    this.known.set(tx.txId, true);
 
     // If this node is adversarial and receives an honest tx, front-run it
     if (isHonestTx && !this.honest) {
@@ -106,7 +111,8 @@ export class Node {
         size_B: tx.size_B,
         frontRuns: tx.txId,
       };
-      this.known.add(txAdv.txId);
+      // Also mark the adversarial version as known
+      this.known.set(txAdv.txId, true);
       tx = txAdv;
       logger.trace({clock: now, node: this.id, originalTxId: tx.frontRuns, advTxId: tx.txId}, "front-running transaction");
     }
@@ -159,6 +165,7 @@ export class Node {
     while (this.offers.length > 0) {
       const offer = this.offers.shift();
       const txId = offer![0];
+      // FIXME: Should we always take the first offer? or a random one?
       const peer = offer![1];
       this.offers = this.offers.filter(offer => offer[0] != txId);
       logger.trace({clock: now, node: this.id, peer: peer, txId: txId}, "request transaction");
