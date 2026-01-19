@@ -9,6 +9,7 @@
 module Main where
 
 import Analysis.Leios
+import Control.Concurrent
 import Control.Concurrent.Async
 import Control.Monad
 import qualified Data.ByteString.Lazy as BL
@@ -74,8 +75,8 @@ main = do
   -- (maybe (print @String "Nothing") (printf "Estimate for lVote: %d\n") (lVoteEstimated applyTx reapplyTx))
   -- (maybe (print @String "Nothing") (printf "Estimate for lDiff: %d\n") (lDiffEstimated applyTx reapplyTx))
 
-  printf "Complexity applyTx: %d\n" (complexity applyTx)
-  printf "Complexity reapplyTx: %d\n" (complexity reapplyTx)
+  _ <- forkIO $ printf "Complexity applyTx: %d\n" (complexity applyTx)
+  _ <- forkIO $ printf "Complexity reapplyTx: %d\n" (complexity reapplyTx)
 
   let committeeSizeEstimated = 600
   let numberSPOs = 2500
