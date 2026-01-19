@@ -6,6 +6,26 @@
 > 
 > See also the [Post-CIP R&D Findings](post-cip/README.md) document for additional (after 2025-11-01) findings and artifacts not directly related to the implementation of Linear Leios.
 
+## 2026-01-19
+
+### SN and DP pairing on proto devnet / mempool size increase
+
+
+- Pairing on mempool size increase: There is a mempool capacity we can use https://ouroboros-consensus.cardano.intersectmbo.org/haddocks/ouroboros-consensus/Ouroboros-Consensus-Mempool-Capacity.html#t:MempoolCapacityBytesOverride
+- In the later node implemenation, it would still be a function from protocol parameters, but using the EB size
+- We hard-coded a leios specific value to `mkNodeKernelArgs`
+- It was not picked up in the end-to-end test!
+- Turns out, the `cardano-node` config system does override it even though there was no override in the config. However we could easily adapt the node `config.json` using key: `MempoolCapacityBytesOverride`
+
+## 2026-01-16
+
+### SN on tuning the proto devnet
+
+- The devnet is moving slower than it would because it has too little fundes delegated to the stake pools?
+- `cardano-cli query stake-distribution` reports `6250/37501` splits on the generated config
+- Manually adjusted `maxLovelaceSupply` and `initialFunds` allowed me to do a 30/30/30/10 split
+- Block production became more consistent
+
 ## 2026-01-14
 
 ### SN on prototype devnet setup
