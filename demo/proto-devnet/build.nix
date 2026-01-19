@@ -21,9 +21,9 @@
             pkgs.envsubst
             inputs'.cardano-node.packages.cardano-testnet
             inputs'.cardano-node.packages.cardano-cli
-            # TODO: re-enable patched node inherit (config.devShells.dev-demo) CARDANO_NODE;
-            inputs'.cardano-node.packages.cardano-node
             inputs'.cardano-node.packages.tx-generator
+            # Use the patched cardano-node
+            inputs'.patched-cardano-node.packages.cardano-node
           ];
           # To easily interact with node1 on the devnet from within the demo dir
           CARDANO_NODE_NETWORK_ID = 164;

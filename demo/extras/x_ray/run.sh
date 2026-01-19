@@ -23,20 +23,20 @@ set +a
 
 # Warn if GRAFANA_SHARE is not set (required for Grafana to work)
 if [ -z "${GRAFANA_SHARE}" ]; then
-  echo "Warning: GRAFANA_SHARE not set. Grafana may not work correctly."
+	echo "Warning: GRAFANA_SHARE not set. Grafana may not work correctly."
 fi
 
 # Check if WORKING_DIR already exists
 if [ -d "$WORKING_DIR" ]; then
-  echo "Working directory already exists: $WORKING_DIR"
-  read -r -p "Remove and start fresh? (y/N): " response
-  if [[ "$response" =~ ^[Yy]$ ]]; then
-    echo "Removing existing working directory..."
-    chmod a+w "${WORKING_DIR}"
-    rm -rf "$WORKING_DIR"
-  else
-    echo "Continuing with existing working directory..."
-  fi
+	echo "Working directory already exists: $WORKING_DIR"
+	read -r -p "Remove and start fresh? (Y/n): " response
+	if [[ "$response" =~ ^[Yy]$ || -z "$response" ]]; then
+		echo "Removing existing working directory..."
+		chmod a+w "${WORKING_DIR}"
+		rm -rf "$WORKING_DIR"
+	else
+		echo "Continuing with existing working directory..."
+	fi
 fi
 
 echo "Starting x_ray with process-compose..."
