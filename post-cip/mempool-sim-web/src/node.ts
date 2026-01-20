@@ -39,6 +39,33 @@ export class Node {
     this.known = new LRUCache<TxId, boolean>({ max: KNOWN_CACHE_SIZE });
   }
 
+  // Visualization getters
+  getTransactions(): Tx[] {
+    return this.mempool.contents();
+  }
+
+  getFillPercent(): number {
+    return this.mempool.getFillPercent();
+  }
+
+  hasAdversarialTx(): boolean {
+    return this.mempool.contents().some(tx => tx.frontRuns !== '');
+  }
+
+  removeConfirmedTxs(txIds: string[]): void {
+    for (const txId of txIds) {
+      this.mempool.remove(txId);
+    }
+  }
+
+  // Reset node state for simulation restart (keeps topology)
+  reset(mempool_B: number): void {
+    this.mempool = new MemoryPool(mempool_B);
+    this.backpressure = [];
+    this.offers = [];
+    this.known.clear();
+  }
+
   // Log the partial state of the node.
   public logPartialState(): void {
     logger.debug({

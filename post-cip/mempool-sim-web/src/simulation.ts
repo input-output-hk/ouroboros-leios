@@ -16,6 +16,11 @@ export type Event =
   | { kind: 'ProduceBlock'; clock: number; producer: string; blockSize_B: number };
 
 /**
+ * Event handler callback for visualization or logging purposes.
+ */
+export type SimulationEventHandler = (event: Event) => void;
+
+/**
  * Simulation class that encapsulates the network graph and event queue.
  * This allows running multiple independent simulations and provides
  * better testability than global state.
@@ -26,10 +31,18 @@ export class Simulation {
   private _currentTime: number = 0;
   private _eventsProcessed: number = 0;
   private _blocks: Block[] = [];
+  private _eventHandler: SimulationEventHandler | null = null;
 
   constructor(graph: DirectedGraph<Node, Link>) {
     this._graph = graph;
     this.eventQueue = new TinyQueue<Event>([], (a, b) => a.clock - b.clock);
+  }
+
+  /**
+   * Set an optional event handler for visualization or logging.
+   */
+  setEventHandler(handler: SimulationEventHandler | null): void {
+    this._eventHandler = handler;
   }
 
   get graph(): DirectedGraph<Node, Link> {
@@ -116,7 +129,9 @@ export class Simulation {
   }
 
   /**
-   * Record a produced block.
+   * Record a produced block and remove confirmed transactions from all nodes.
+   * Since honest and adversarial txs share UTxO inputs, when either is confirmed
+   * the other becomes invalid and should be removed from all mempools.
    */
   recordBlock(block: Block): void {
     this._blocks.push(block);
@@ -129,6 +144,26 @@ export class Simulation {
       honestCount: block.honestCount,
       adversarialCount: block.adversarialCount
     }, "block produced");
+
+    // Build list of all txIds to remove (both honest and adversarial variants)
+    const txIdsToRemove: string[] = [];
+    for (const tx of block.transactions) {
+      if (tx.frontRuns === '') {
+        // Honest tx: remove it and its adversarial variant
+        txIdsToRemove.push(tx.txId);
+        txIdsToRemove.push(tx.txId + 'adv');
+      } else {
+        // Adversarial tx: remove it and the original honest tx it front-runs
+        txIdsToRemove.push(tx.txId);
+        txIdsToRemove.push(tx.frontRuns);
+      }
+    }
+
+    // Remove from all nodes' mempools
+    this._graph.forEachNode((nodeId) => {
+      const node = this._graph.getNodeAttributes(nodeId);
+      node.removeConfirmedTxs(txIdsToRemove);
+    });
   }
 
   /**
@@ -152,6 +187,11 @@ export class Simulation {
 
     this._currentTime = event.clock;
     this._eventsProcessed++;
+
+    // Notify event handler if set
+    if (this._eventHandler) {
+      this._eventHandler(event);
+    }
 
     // Handle ProduceBlock separately since it has 'producer' not 'to'
     if (event.kind === 'ProduceBlock') {
@@ -197,5 +237,13 @@ export class Simulation {
     this._currentTime = 0;
     this._eventsProcessed = 0;
     this._blocks = [];
+  }
+
+  /**
+   * Peek at the next event time without processing it.
+   */
+  peekNextEventTime(): number | null {
+    const event = this.eventQueue.peek();
+    return event ? event.clock : null;
   }
 }

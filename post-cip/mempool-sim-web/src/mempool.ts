@@ -63,4 +63,22 @@ export class MemoryPool {
     return this.txs.length;
   }
 
+  // Get fill percentage (for visualization)
+  getFillPercent(): number {
+    return this.capacity_B > 0 ? (this.size_B / this.capacity_B) * 100 : 0;
+  }
+
+  // Remove a transaction by ID (for block confirmation propagation)
+  remove(txId: TxId): boolean {
+    const tx = this.txMap.get(txId);
+    if (!tx) return false;
+    this.txMap.delete(txId);
+    const idx = this.txs.findIndex(t => t.txId === txId);
+    if (idx >= 0) {
+      this.txs.splice(idx, 1);
+      this.size_B -= tx.size_B;
+    }
+    return true;
+  }
+
 }
