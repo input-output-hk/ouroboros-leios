@@ -67,19 +67,8 @@ const config = {
 
 try {
   logger.info({
-    nodes: { honest: config.nodes, adversarial: config.adversaries },
-    degree: { honest: config.degree, adversarial: config.adversaryDegree },
-    block_bytes: config.block,
-    mempool_bytes: config.mempool,
-    latency_s: config.latency,
-    bandwidth_Bps: config.bandwidth,
-    bandwidth_Mbps: config.bandwidth * 8 / 1000000,
-    message_overhead_bytes: OVERHEAD_B,
-    tx_count: config.txCount,
-    tx_duration_s: config.txDuration,
-    tx_size_range: { min: config.txSizeMin, max: config.txSizeMax },
-    slot_duration_s: config.slotDuration,
-    slots: config.slots,
+    ...config,
+    ...{message_overhead_bytes: OVERHEAD_B},
   }, "configuration");
 
   // Generate honest node network
