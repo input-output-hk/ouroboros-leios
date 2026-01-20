@@ -12,7 +12,7 @@ common warnings
 
 library
     import:           warnings
-    build-depends:    base ^>=4.20.0.0
+    build-depends:    base
                     , deltaq
                     , probability-polynomial
                     , statistics
@@ -30,7 +30,7 @@ executable leios-deltaq-analysis
     import:           warnings
     main-is:          Main.hs
     build-depends:    async
-                    , base ^>=4.20.0.0
+                    , base
                     , bytestring
                     , cassava
                     , deltaq
