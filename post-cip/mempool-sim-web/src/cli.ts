@@ -1,4 +1,4 @@
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 import { generateNetwork, addAdversaryNode } from './topology.js';
 import { Simulation } from './simulation.js';
 import { logger } from './logger.js'
@@ -21,6 +21,7 @@ const DEFAULTS = {
   slotDuration: 20,      // seconds per block slot
   slots: 10,             // number of slots to simulate
   adversaryDelay: 0.002, // number of seconds needed to front-run a tx
+  logLevel: 'info',
 };
 
 const program = new Command();
@@ -43,6 +44,11 @@ program
   .option('--tx-size-max <bytes>', 'Maximum transaction size', String(DEFAULTS.txSizeMax))
   .option('--slot-duration <seconds>', 'Block slot duration in seconds', String(DEFAULTS.slotDuration))
   .option('-s, --slots <number>', 'Number of slots to simulate', String(DEFAULTS.slots))
+  .addOption(
+    new Option('--log-level <level>', 'Logging detail')
+    .choices(['fatal', 'error', 'warn', 'info', 'debug', 'trace'])
+    .default(DEFAULTS.logLevel)
+  )
   .parse(process.argv);
 
 const opts = program.opts();
@@ -64,9 +70,13 @@ const config = {
   txSizeMax: parseInt(opts.txSizeMax),
   slotDuration: parseInt(opts.slotDuration),
   slots: parseInt(opts.slots),
+  logLevel: opts.logLevel,
 };
 
 try {
+
+  logger.level = config.logLevel;
+
   logger.info({
     ...config,
     ...{message_overhead_bytes: OVERHEAD_B},
