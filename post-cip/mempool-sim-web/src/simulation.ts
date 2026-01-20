@@ -1,6 +1,6 @@
 import TinyQueue from 'tinyqueue';
 import { DirectedGraph } from 'graphology';
-import type { TxId, Tx, Block } from './types.js';
+import type { TxId, Tx, Block, P2PConfig } from './types.js';
 import { Node } from './node.js';
 import { Link } from './link.js';
 import { logger } from './logger.js';
@@ -13,7 +13,8 @@ export type Event =
   | { kind: 'OfferTx'; clock: number; from: string; to: string; txId: TxId }
   | { kind: 'RequestTx'; clock: number; from: string; to: string; txId: TxId }
   | { kind: 'SendTx'; clock: number; from: string; to: string; tx: Tx }
-  | { kind: 'ProduceBlock'; clock: number; producer: string; blockSize_B: number };
+  | { kind: 'ProduceBlock'; clock: number; producer: string; blockSize_B: number }
+  | { kind: 'PeerChurn'; clock: number; nodeId: string };
 
 /**
  * Event handler callback for visualization or logging purposes.
@@ -32,6 +33,8 @@ export class Simulation {
   private _eventsProcessed: number = 0;
   private _blocks: Block[] = [];
   private _eventHandler: SimulationEventHandler | null = null;
+  private _p2pConfig: P2PConfig | null = null;
+  private _p2pEndTime: number = Infinity;
 
   constructor(graph: DirectedGraph<Node, Link>) {
     this._graph = graph;
@@ -63,6 +66,10 @@ export class Simulation {
 
   get blocks(): Block[] {
     return this._blocks;
+  }
+
+  get p2pConfig(): P2PConfig | null {
+    return this._p2pConfig;
   }
 
   /**
@@ -126,6 +133,58 @@ export class Simulation {
       producer,
       blockSize_B
     });
+  }
+
+  /**
+   * Schedule a peer churn event for a node.
+   * Only schedules if the clock time is before the P2P end time.
+   */
+  schedulePeerChurn(clock: number, nodeId: string): void {
+    if (clock > this._p2pEndTime) {
+      return;
+    }
+    this.eventQueue.push({
+      kind: 'PeerChurn',
+      clock,
+      nodeId
+    });
+  }
+
+  /**
+   * Initialize P2P peer selection for all nodes.
+   * Sets up peer managers and schedules initial churn events.
+   * @param config P2P configuration
+   * @param endTime Maximum simulation time (churn events won't be scheduled beyond this)
+   */
+  initializeP2P(config: P2PConfig, endTime: number = Infinity): void {
+    if (!config.enabled) {
+      return;
+    }
+
+    this._p2pConfig = config;
+    this._p2pEndTime = endTime;
+
+    // Initialize each node's peer manager with topology info
+    this._graph.forEachNode((nodeId) => {
+      const node = this._graph.getNodeAttributes(nodeId);
+
+      // Upstream peers are nodes that have edges TO this node (in-edges)
+      const upstreamPeers: string[] = [];
+      this._graph.forEachInEdge(nodeId, (_edge, _attr, source) => {
+        upstreamPeers.push(source);
+      });
+
+      node.initializeP2P(config.targetActivePeers, config.churnProbability, upstreamPeers);
+
+      // Schedule initial churn event
+      this.schedulePeerChurn(config.churnInterval, nodeId);
+    });
+
+    logger.info({
+      targetActivePeers: config.targetActivePeers,
+      churnInterval: config.churnInterval,
+      churnProbability: config.churnProbability,
+    }, 'P2P peer selection initialized');
   }
 
   /**
@@ -217,6 +276,17 @@ export class Simulation {
       return true;
     }
 
+    // Handle PeerChurn separately since it has 'nodeId' not 'to'
+    if (event.kind === 'PeerChurn') {
+      const node: Node = this._graph.getNodeAttributes(event.nodeId);
+      if (!node) {
+        logger.fatal(event, "unknown node for churn");
+        throw new Error(`unknown node for churn: ${event.nodeId}`);
+      }
+      node.handlePeerChurn(this, event.clock);
+      return true;
+    }
+
     const target: Node = this._graph.getNodeAttributes(event.to);
     if (!target) {
       logger.fatal(event, "unknown target node");
@@ -250,6 +320,7 @@ export class Simulation {
     this._currentTime = 0;
     this._eventsProcessed = 0;
     this._blocks = [];
+    this._p2pConfig = null;
   }
 
   /**
