@@ -1,6 +1,6 @@
 import { LRUCache } from 'lru-cache';
 import { MemoryPool } from './mempool.js';
-import { TXID_B, type Tx, type TxId } from './types.js';
+import { TXID_B, type Tx, type TxId, type Block } from './types.js';
 import { Link } from './link.js'
 import { logger } from './logger.js';
 import type { Simulation } from './simulation.js';
@@ -37,6 +37,33 @@ export class Node {
     this.backpressure = [];
     this.offers = [];
     this.known = new LRUCache<TxId, boolean>({ max: KNOWN_CACHE_SIZE });
+  }
+
+  // Visualization getters
+  getTransactions(): Tx[] {
+    return this.mempool.contents();
+  }
+
+  getFillPercent(): number {
+    return this.mempool.getFillPercent();
+  }
+
+  hasAdversarialTx(): boolean {
+    return this.mempool.contents().some(tx => tx.frontRuns !== '');
+  }
+
+  removeConfirmedTxs(txIds: string[]): void {
+    for (const txId of txIds) {
+      this.mempool.remove(txId);
+    }
+  }
+
+  // Reset node state for simulation restart (keeps topology)
+  reset(mempool_B: number): void {
+    this.mempool = new MemoryPool(mempool_B);
+    this.backpressure = [];
+    this.offers = [];
+    this.known.clear();
   }
 
   // Log the partial state of the node.
@@ -191,6 +218,39 @@ export class Node {
   public handleSendTx(sim: Simulation, now: number, peer: string, tx: Tx): void {
     logger.trace({clock: now, node: this.id, peer: peer, tx: tx}, "receive transaction");
     this.handleSubmitTx(sim, now, tx);
+  }
+
+  // Produce a block by collecting transactions from the mempool.
+  public handleProduceBlock(sim: Simulation, now: number, blockSize_B: number): void {
+    const txs: Tx[] = [];
+    let size = 0;
+    let honest = 0;
+    let adversarial = 0;
+
+    while (size < blockSize_B) {
+      const tx = this.mempool.peek();
+      if (!tx || size + tx.size_B > blockSize_B) break;
+      this.mempool.dequeue();
+      txs.push(tx);
+      size += tx.size_B;
+      if (tx.frontRuns === "") {
+        honest++;
+      } else {
+        adversarial++;
+      }
+    }
+
+    const block: Block = {
+      blockId: `B${sim.blocks.length}`,
+      producer: this.id,
+      timestamp: now,
+      transactions: txs,
+      size_B: size,
+      honestCount: honest,
+      adversarialCount: adversarial
+    };
+
+    sim.diffuseBlock(block);
   }
 
   // Lookup a downstream link by its peer name.

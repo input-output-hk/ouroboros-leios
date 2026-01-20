@@ -1,5 +1,4 @@
 import { DirectedGraph } from 'graphology';
-import { MemoryPool } from './mempool.js';
 import { Node } from './node.js';
 import { Link } from './link.js'
 import { logger } from './logger.js';

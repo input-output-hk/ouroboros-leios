@@ -17,6 +17,8 @@ const DEFAULTS = {
   txDuration: 20,      // seconds over which to inject txs
   txSizeMin: 200,      // minimum tx size in bytes
   txSizeMax: 16384,    // maximum tx size in bytes
+  slotDuration: 20,    // seconds per block slot
+  slots: 10,           // number of slots to simulate
 };
 
 const program = new Command();
@@ -36,6 +38,8 @@ program
   .option('--tx-duration <seconds>', 'Duration over which to inject transactions', String(DEFAULTS.txDuration))
   .option('--tx-size-min <bytes>', 'Minimum transaction size', String(DEFAULTS.txSizeMin))
   .option('--tx-size-max <bytes>', 'Maximum transaction size', String(DEFAULTS.txSizeMax))
+  .option('--slot-duration <seconds>', 'Block slot duration in seconds', String(DEFAULTS.slotDuration))
+  .option('-s, --slots <number>', 'Number of slots to simulate', String(DEFAULTS.slots))
   .parse(process.argv);
 
 const opts = program.opts();
@@ -54,6 +58,8 @@ const config = {
   txDuration: parseInt(opts.txDuration),
   txSizeMin: parseInt(opts.txSizeMin),
   txSizeMax: parseInt(opts.txSizeMax),
+  slotDuration: parseInt(opts.slotDuration),
+  slots: parseInt(opts.slots),
 };
 
 try {
@@ -69,6 +75,8 @@ try {
     tx_count: config.txCount,
     tx_duration_s: config.txDuration,
     tx_size_range: { min: config.txSizeMin, max: config.txSizeMax },
+    slot_duration_s: config.slotDuration,
+    slots: config.slots,
   }, "configuration");
 
   // Generate honest node network
@@ -124,6 +132,15 @@ try {
 
   logger.info({ txCount: config.txCount, pendingEvents: sim.pendingEvents }, "transactions submitted");
 
+  // Schedule rotating block production among honest nodes
+  const honestNodes = Array.from({ length: config.nodes }, (_, i) => `H${i + 1}`);
+  for (let slot = 0; slot < config.slots; slot++) {
+    const producer = honestNodes[slot % honestNodes.length]!;
+    sim.produceBlock(slot * config.slotDuration, producer, config.block);
+  }
+
+  logger.info({ slots: config.slots, slotDuration: config.slotDuration }, "block production scheduled");
+
   // Run the simulation
   sim.run();
 
@@ -151,7 +168,24 @@ try {
     adversarial_tx_fraction: totalTxs > 0 ? totalAdversarial / totalTxs : 0,
     honest_tx_count: totalHonest,
     adversarial_tx_count: totalAdversarial,
-  }, "simulation results");
+  }, "mempool results");
+
+  // Block statistics
+  const blocks = sim.blocks;
+  const totalHonestInBlocks = blocks.reduce((s, b) => s + b.honestCount, 0);
+  const totalAdvInBlocks = blocks.reduce((s, b) => s + b.adversarialCount, 0);
+  const totalInBlocks = totalHonestInBlocks + totalAdvInBlocks;
+
+  logger.info({
+    blocks_produced: blocks.length,
+    txs_in_blocks: totalInBlocks,
+    honest_tx_in_blocks: totalHonestInBlocks,
+    adversarial_tx_in_blocks: totalAdvInBlocks,
+    front_run_rate: totalInBlocks > 0 ? totalAdvInBlocks / totalInBlocks : 0,
+    avg_block_fill_percent: blocks.length > 0
+      ? blocks.reduce((s, b) => s + b.size_B, 0) / (blocks.length * config.block) * 100
+      : 0
+  }, "block statistics");
 
 } catch (error) {
   logger.fatal({ error }, "simulation failed");
