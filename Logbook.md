@@ -1,11 +1,99 @@
 # Leios logbook
 
-> [!IMPORTANT]
+> [!NOTE]
 > 
-> Now that the [Leios CIP](https://github.com/cardano-foundation/CIPs/pull/1078) is under review and implementation work has begun, this Leios logbook has been retired in favor of github tickets in the [Leios implementation roadmap](https://github.com/orgs/input-output-hk/projects/167/views/3).
+> Usage of this Logbook has been greatly reduced in favor of github issues and PRs in the [Leios roadmap](https://github.com/orgs/input-output-hk/projects/167/views/3).
 > 
-> See the [Post-CIP R&D Findings](post-cip/README.md) document for additional (after 2025-11-01) findings and artifacts not directly related to the implementation of Linear Leios.
+> See also the [Post-CIP R&D Findings](post-cip/README.md) document for additional (after 2025-11-01) findings and artifacts not directly related to the implementation of Linear Leios.
 
+## 2026-01-19
+
+### SN and DP pairing on proto devnet / mempool size increase
+
+
+- Pairing on mempool size increase: There is a mempool capacity we can use https://ouroboros-consensus.cardano.intersectmbo.org/haddocks/ouroboros-consensus/Ouroboros-Consensus-Mempool-Capacity.html#t:MempoolCapacityBytesOverride
+- In the later node implemenation, it would still be a function from protocol parameters, but using the EB size
+- We hard-coded a leios specific value to `mkNodeKernelArgs`
+- It was not picked up in the end-to-end test!
+- Turns out, the `cardano-node` config system does override it even though there was no override in the config. However we could easily adapt the node `config.json` using key: `MempoolCapacityBytesOverride`
+
+## 2026-01-16
+
+### SN on tuning the proto devnet
+
+- The devnet is moving slower than it would because it has too little fundes delegated to the stake pools?
+- `cardano-cli query stake-distribution` reports `6250/37501` splits on the generated config
+- Manually adjusted `maxLovelaceSupply` and `initialFunds` allowed me to do a 30/30/30/10 split
+- Block production became more consistent
+
+## 2026-01-14
+
+### SN on prototype devnet setup
+
+- Reflected a bit and not sure what value `cardano-testnet` brings us in the actual execution of the demo. We want to have a definite setup and hence checking things in would make a lot of sense. Then, using a tool that is best in class on supervising processes (e.g. `process-compose` again) would be more appropriate.
+
+- Except..if we'd need some coordination on the network to set up delegations, initiate a hard-fork etc. which we would need to redo in our setup. So, before I pivot away, I decided to check the requirements of our workload generating side and whether these can be easily met with/without `cardano-testnet`.
+
+- `cardano-testnet` even chokes on its own –num-pools option. When set to 3 it fails (with 1 it works):
+
+    ```
+      cardano-testnet: UnliftIO.Exception.throwString called with:
+
+      Expected number of stake pools not found in ledger state
+      Expected:
+      1
+      Actual:
+      3
+    ```
+
+- Trying to use the `tx-generator` -\> outdated README; the `cliArguments` seems not to exist anymore
+
+- I got it running after asking the genie write me some documentation on `tx-generator`. It does a whole lot of setup / splitting which could maybe be reduced? <https://github.com/IntersectMBO/cardano-node/pull/6411>
+
+- After some time (maybe once it was done?) it errored with:
+
+    ```
+      {"at":"2026-01-14T11:49:57.157521028Z","ns":"Benchmark.BenchTxSubError","data":{"kind":"TraceBenchTxSubError","msg":"TxGenError ApiError (\"Cardano.Benchmarking.Script.runScript: AsyncBenchmarkControl absent from map in execScript\")"},"sev":"Info","thread":"4","host":"eiger"}
+      {"at":"2026-01-14T11:49:57.157524678Z","ns":"Benchmark.BenchTxSubError","data":{"kind":"TraceBenchTxSubError","msg":"QRT Last Message. LoggingLayer shutting down ..."},"sev":"Info","thread":"4","host":"eiger"}
+      tx-generator: Cardano.Benchmarking.Script.runScript: AsyncBenchmarkControl uninitialized
+      CallStack (from HasCallStack):
+        error, called at src/Cardano/Benchmarking/Script.hs:52:23 in tx-generator-2.15-LehM4xWuRBYJwq5NgJubEm:Cardano.Benchmarking.Script
+    ```
+
+- Now with the `tx-generator` doing all the heavy lifting, I don't see a reason for keeping `cardano-testnet` (other than maybe generating the config). In fact, the dynamic port allocation when running nodes via `cardano-testnet` is quite annoying for `tx-generator` too.
+
+- After spending longer than I'd like to admit on generating topologies, fixing of how genesis files are copied and updating the start time in them.. I have a block producing devnet that starts quickly and can be easily changed (to use different node implementations and configuration): <https://github.com/input-output-hk/ouroboros-leios/pull/724>
+
+- The `tx-generator` is starting now properly, bootstraps by splitting (a lot of) utxos, but the final submission through N2N seems not to be working?
+
+- Also, lowering the `tx_count` results again in that AsyncBenchmarkControl error:
+
+    ```
+      {"at":"2026-01-15T11:24:16.0328184Z","ns":"Benchmark.BenchTxSubError","data":{"kind":"TraceBenchTxSubError","msg":"TxGenError ApiError (\"Cardano.Benchmarking.Script.runScript: AsyncBenchmarkControl absent from map in execScript\")"},"sev":"Info","thread":"4","host":"eiger"}
+      {"at":"2026-01-15T11:24:16.03282205Z","ns":"Benchmark.BenchTxSubError","data":{"kind":"TraceBenchTxSubError","msg":"QRT Last Message. LoggingLayer shutting down ..."},"sev":"Info","thread":"4","host":"eiger"} tx-generator: Cardano.Benchmarking.Script.runScript: AsyncBenchmarkControl uninitialized
+      CallStack (from HasCallStack):
+        error, called at src/Cardano/Benchmarking/Script.hs:52:23 in tx-generator-2.15-LehM4xWuRBYJwq5NgJubEm:Cardano.Benchmarking.Script
+    ```
+
+## 2026-01-12
+
+### SN on sketching a prototype devnet demo setup
+
+- Related to issue https://github.com/input-output-hk/ouroboros-leios/issues/690
+- As briefly discussed, we need a small network of patched `cardano-node` instances which would produce blocks and load it with more than what Praos can handle, for it to drive EB production, certification and inclusion work on the consensus layer.
+- Starting a devnet is a common thing there should be many tools. I even had built one for hydra (https://github.com/cardano-scaling/hydra/tree/master/hydra-cluster) and sketched a more "batteries included" tool (https://github.com/cardano-scaling/pegasus).
+- There is also [`cardano-testnet`](https://github.com/IntersectMBO/cardano-node/tree/master/cardano-testnet) that is located on the `cardano-node` repository.
+- Decided to give this a spin. On a first try it stops just after starting the nodes
+  - Fixed it in this PR https://github.com/IntersectMBO/cardano-node/pull/6405
+- The tool seems to be in current development / refactor as told by the api/cli team
+- `cardano-testnet`: When invoking it twice it fails with a big error ("testnet" dir exists). Should be more friendly or fallback to just trying to continue the testnet (as if given as –node-env).
+- The patched cardano node seems to have a different topology file format (I got a parsing error) than the latest master (of which I need to be using `cardano-testnet`)
+    - When separating `create-env` from startup, we could modify the topology files and check the whole config in.
+    - Restarting the testnet is not possible at the moment anyways. So instead of `rm -r devnet` we would do `git clean -dxf devnet`.
+    - Turns out I only need to add `EnableP2P` to the node configuaration (defaults to true for 10.6.1)
+- Thomas pointed me to the Mlabs "congested-testnet" setup: <https://github.com/mlabs-haskell/congested-testnet>
+- The prototype nodes start, but fail and this is quite slowly reported by `cardano-testnet`. 
+  - Submitted a PR to improve this https://github.com/IntersectMBO/cardano-node/pull/6408
 
 ## 2025-10-21
 
