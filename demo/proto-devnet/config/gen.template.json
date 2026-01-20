@@ -1,0 +1,22 @@
+{
+  "debugMode": false,
+  "tx_count": 10000,
+  "tps": 1000,
+  "inputs_per_tx": 1,
+  "outputs_per_tx": 1,
+  "tx_fee": 212345,
+  "min_utxo_value": 1000000,
+  "add_tx_size": 100,
+  "init_cooldown": 5,
+  "era": "Conway",
+  "keepalive": 30,
+  "localNodeSocketPath": "node1/node.socket",
+  "nodeConfigFile": "node1/config.json",
+  "sigKey": "utxo-keys/utxo1/utxo.skey",
+  "targetNodes": [
+    {"addr": "${IP_NODE1}", "port": ${PORT_NODE1}, "name": "node1"},
+    {"addr": "${IP_NODE2}", "port": ${PORT_NODE2}, "name": "node2"},
+    {"addr": "${IP_NODE3}", "port": ${PORT_NODE3}, "name": "node3"}
+  ],
+  "plutus": null
+}

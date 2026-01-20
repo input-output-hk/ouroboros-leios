@@ -1,0 +1,48 @@
+version: "0.5"
+is_strict: true
+
+processes:
+  Node1:
+    environment:
+      - NODE_ID=1
+    command: bash "${SOURCE_DIR}/run-node.sh"
+    log_location: "${WORKING_DIR}/node1/node.log"
+    availability:
+      restart: "always"
+
+  Node2:
+    environment:
+      - NODE_ID=2
+    command: bash "${SOURCE_DIR}/run-node.sh"
+    log_location: "${WORKING_DIR}/node2/node.log"
+    availability:
+      restart: "always"
+
+  Node3:
+    environment:
+      - NODE_ID=3
+    command: bash "${SOURCE_DIR}/run-node.sh"
+    log_location: "${WORKING_DIR}/node3/node.log"
+    availability:
+      restart: "always"
+
+  TxGenerator:
+    command: sleep 5 && tx-generator json_highlevel gen.json
+    working_dir: ${WORKING_DIR}
+    depends_on:
+      Node1:
+        condition: process_started
+      Node2:
+        condition: process_started
+      Node3:
+        condition: process_started
+
+  ObserveTip:
+    environment:
+      - CARDANO_NODE_NETWORK_ID=164
+      - CARDANO_NODE_SOCKET_PATH=${WORKING_DIR}/node1/node.socket
+    command: watch -n0.1 "cardano-cli query tip && cardano-cli query tx-mempool info"
+    is_interactive: true
+    depends_on:
+      Node1:
+        condition: process_started
