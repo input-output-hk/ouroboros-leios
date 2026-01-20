@@ -3,7 +3,8 @@ import { MemoryPool } from './mempool.js';
 import { TXID_B, type Tx, type TxId, type Block } from './types.js';
 import { Link } from './link.js'
 import { logger } from './logger.js';
-import { Simulation } from './simulation.js';
+import type { Simulation } from './simulation.js';
+import { PeerManager } from './peer-manager.js';
 
 // Maximum entries in the known txId cache per node.
 // Prevents unbounded memory growth during long simulations.
@@ -32,6 +33,9 @@ export class Node {
   // LRU cache of known transaction IDs (for duplicate detection).
   // Bounded to prevent memory growth in long-running simulations.
   private known: LRUCache<TxId, boolean>;
+
+  // P2P peer manager (null if P2P is disabled)
+  private peerManager: PeerManager | null = null;
 
   constructor(id: string, honest: boolean, frontrunDelay: number, mempool_B: number) {
     this.id = id;
@@ -71,6 +75,32 @@ export class Node {
     this.backpressure = [];
     this.offers = [];
     this.known.clear();
+    if (this.peerManager) {
+      this.peerManager.reset();
+    }
+  }
+
+  // Initialize P2P peer selection for this node
+  initializeP2P(targetActivePeers: number, churnProbability: number, upstreamPeers: string[]): void {
+    this.peerManager = new PeerManager(this.id, targetActivePeers, churnProbability);
+    this.peerManager.initialize(upstreamPeers);
+  }
+
+  // Handle P2P churn event
+  handlePeerChurn(sim: Simulation, now: number): void {
+    if (this.peerManager) {
+      this.peerManager.churn();
+      // Schedule next churn event
+      const config = sim.p2pConfig;
+      if (config && config.enabled) {
+        sim.schedulePeerChurn(now + config.churnInterval, this.id);
+      }
+    }
+  }
+
+  // Get the peer manager (for testing/debugging)
+  getPeerManager(): PeerManager | null {
+    return this.peerManager;
   }
 
   // Log the partial state of the node.
@@ -186,10 +216,25 @@ export class Node {
   // Offer a transaction to upstream peers.
   private offerUpstream(sim: Simulation, now: number, tx: Tx): void {
     const graph = sim.graph;
-    graph.forEachInEdge(this.id, (_edge, link, peer, _node) => {
-      logger.trace({clock: now, node: this.id, txId: tx.txId, upstreamPeer: peer}, "offer transaction");
-      sim.offerTx(link.computeDelay(now, TXID_B), this.id, peer, tx.txId)
-    });
+
+    if (this.peerManager) {
+      // P2P mode: only offer to active upstream peers
+      const activePeers = this.peerManager.getActivePeers();
+      for (const peer of activePeers) {
+        const edgeKey = graph.edge(peer, this.id);
+        if (edgeKey) {
+          const link = graph.getEdgeAttributes(edgeKey);
+          logger.trace({clock: now, node: this.id, txId: tx.txId, upstreamPeer: peer, p2p: true}, "offer transaction");
+          sim.offerTx(link.computeDelay(now, TXID_B), this.id, peer, tx.txId);
+        }
+      }
+    } else {
+      // Static mode: existing behavior (all in-edges)
+      graph.forEachInEdge(this.id, (_edge, link, peer, _node) => {
+        logger.trace({clock: now, node: this.id, txId: tx.txId, upstreamPeer: peer}, "offer transaction");
+        sim.offerTx(link.computeDelay(now, TXID_B), this.id, peer, tx.txId)
+      });
+    }
   }
 
   // Receive an offer of a TxId.

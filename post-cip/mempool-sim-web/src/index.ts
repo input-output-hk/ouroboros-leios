@@ -1,6 +1,10 @@
 // Core types
-export type { TxId, Tx, Block, SimulationConfig, PresetType } from './types.js';
-export { TXID_B, DEFAULT_CONFIG, MINIMAL_CONFIG } from './types.js';
+export type { TxId, Tx, Block, SimulationConfig, PresetType, PeerState, PeerInfo, P2PConfig } from './types.js';
+export { TXID_B, DEFAULT_CONFIG, MINIMAL_CONFIG, DEFAULT_P2P_CONFIG } from './types.js';
+
+// P2P Peer Manager
+export { PeerManager } from './peer-manager.js';
+export type { ChurnResult } from './peer-manager.js';
 
 // Classes
 export { MemoryPool } from './mempool.js';
