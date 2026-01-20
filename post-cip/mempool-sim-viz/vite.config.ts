@@ -4,7 +4,7 @@ import * as path from "path";
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  base: "/mempool-sim/",
+  base: "/mempool-viz/",
   plugins: [react(), tailwindcss()],
   server: {
     port: 5173,
