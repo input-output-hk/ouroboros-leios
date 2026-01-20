@@ -44,7 +44,7 @@
           name = "leios-202510-demo";
 
           runtimeInputs = [
-            inputs'.patched-cardano-node.packages.cardano-node
+            inputs'.cardano-node-leios.packages.cardano-node
             (inputs'.ouroboros-consensus.legacyPackages.hsPkgs.ouroboros-consensus-cardano.getComponent "exe:immdb-server")
             (inputs'.ouroboros-consensus.legacyPackages.hsPkgs.ouroboros-consensus-cardano.getComponent "exe:db-analyser")
             (inputs'.ouroboros-consensus.legacyPackages.hsPkgs.ouroboros-consensus.getComponent "exe:leiosdemo202510")
@@ -67,7 +67,7 @@
             # Set default values for required environment variables
             export SECONDS_UNTIL_REF_SLOT=''${SECONDS_UNTIL_REF_SLOT:-5}
             export REF_SLOT=''${REF_SLOT:-41}
-            export CARDANO_NODE="${pkgs.lib.getExe inputs'.patched-cardano-node.packages.cardano-node}"
+            export CARDANO_NODE="${pkgs.lib.getExe inputs'.cardano-node-leios.packages.cardano-node}"
             export IMMDB_SERVER="${pkgs.lib.getExe (inputs'.ouroboros-consensus.legacyPackages.hsPkgs.ouroboros-consensus-cardano.getComponent "exe:immdb-server")}"
 
             # Copy demo files to a temporary directory

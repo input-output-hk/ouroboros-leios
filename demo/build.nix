@@ -12,7 +12,7 @@
     {
       packages = lib.optionalAttrs (system == "x86_64-linux") (
         {
-          leios-cardano-node = inputs'.patched-cardano-node.packages.cardano-node;
+          cardano-node-leios = inputs'.cardano-node-leios.packages.cardano-node;
         }
         // (with inputs'.ouroboros-consensus.legacyPackages.hsPkgs; {
           leios-immdb-server = ouroboros-consensus-cardano.components.exes.immdb-server;
@@ -34,8 +34,8 @@
           buildInputs =
             config.checks.pre-commit-demo.enabledPackages
             ++ [
-              inputs'.patched-cardano-node.packages.cardano-node
-              inputs'.patched-cardano-node.packages.cardano-tracer
+              inputs'.cardano-node-leios.packages.cardano-node
+              inputs'.cardano-node-leios.packages.cardano-tracer
             ]
             ++ (with inputs'.ouroboros-consensus.legacyPackages.hsPkgs; [
               ouroboros-consensus-cardano.components.exes.immdb-server
@@ -73,7 +73,7 @@
               pkgs.iproute2 # ss
             ];
 
-          CARDANO_NODE = pkgs.lib.getExe inputs'.patched-cardano-node.packages.cardano-node;
+          CARDANO_NODE = pkgs.lib.getExe inputs'.cardano-node-leios.packages.cardano-node;
           IMMDB_SERVER = pkgs.lib.getExe inputs'.ouroboros-consensus.legacyPackages.hsPkgs.ouroboros-consensus-cardano.components.exes.immdb-server;
         };
       };

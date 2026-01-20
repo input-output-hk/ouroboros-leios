@@ -23,7 +23,7 @@
             inputs'.cardano-node.packages.cardano-cli
             inputs'.cardano-node.packages.tx-generator
             # Use the patched cardano-node
-            inputs'.patched-cardano-node.packages.cardano-node
+            inputs'.cardano-node-leios.packages.cardano-node
           ];
           # To easily interact with node1 on the devnet from within the demo dir
           CARDANO_NODE_NETWORK_ID = 164;

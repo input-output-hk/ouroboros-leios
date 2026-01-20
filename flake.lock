@@ -744,11 +744,11 @@
       "inputs": {
         "flake-utils": "flake-utils_9",
         "haskellNix": [
-          "patched-cardano-node",
+          "cardano-node-leios",
           "haskellNix"
         ],
         "nixpkgs": [
-          "patched-cardano-node",
+          "cardano-node-leios",
           "nixpkgs"
         ]
       },
@@ -2415,7 +2415,7 @@
         "ghc910X": "ghc910X_2",
         "ghc911": "ghc911_2",
         "hackage": [
-          "patched-cardano-node",
+          "cardano-node-leios",
           "hackageNix"
         ],
         "hls-1.10": "hls-1.10_6",
@@ -2431,7 +2431,7 @@
         "hydra": "hydra_5",
         "iserv-proxy": "iserv-proxy_6",
         "nixpkgs": [
-          "patched-cardano-node",
+          "cardano-node-leios",
           "nixpkgs"
         ],
         "nixpkgs-2003": "nixpkgs-2003_5",
@@ -3724,7 +3724,7 @@
       "inputs": {
         "nix": "nix_5",
         "nixpkgs": [
-          "patched-cardano-node",
+          "cardano-node-leios",
           "haskellNix",
           "hydra",
           "nix",
@@ -3949,7 +3949,7 @@
       "inputs": {
         "blst": "blst_5",
         "nixpkgs": [
-          "patched-cardano-node",
+          "cardano-node-leios",
           "nixpkgs"
         ],
         "secp256k1": "secp256k1_5",
@@ -5636,7 +5636,7 @@
         "type": "github"
       }
     },
-    "patched-cardano-node": {
+    "cardano-node-leios": {
       "inputs": {
         "CHaP": "CHaP_6",
         "cardano-automation": "cardano-automation_3",
@@ -5649,7 +5649,7 @@
         "incl": "incl_3",
         "iohkNix": "iohkNix_4",
         "nixpkgs": [
-          "patched-cardano-node",
+          "cardano-node-leios",
           "haskellNix",
           "nixpkgs-unstable"
         ],
@@ -5719,7 +5719,7 @@
         "leios-spec": "leios-spec",
         "nixpkgs": "nixpkgs_5",
         "ouroboros-consensus": "ouroboros-consensus",
-        "patched-cardano-node": "patched-cardano-node",
+        "cardano-node-leios": "cardano-node-leios",
         "pre-commit-hooks": "pre-commit-hooks"
       }
     },

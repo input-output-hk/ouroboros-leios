@@ -6,7 +6,7 @@
 {
   imports = [
     (import ../services/simple-cardano-tracer.nix {
-      inherit (inputs.patched-cardano-node.packages."${pkgs.system}") cardano-tracer;
+      inherit (inputs.cardano-node-leios.packages."${pkgs.system}") cardano-tracer;
     })
   ];
 
