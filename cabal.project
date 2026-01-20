@@ -18,6 +18,7 @@ packages:
   simulation
   leios-trace-hs
   analysis/sims/trace-processor
+  analysis/deltaq/linear-leios
   post-cip/tx-measurements/betti0
 
 tests: True
@@ -69,3 +70,13 @@ source-repository-package
     --sha256: YlN8RQ0iuTKiGpBQqfvsogGkgRSK6wRK3yFh3vAJdVA=
     subdir:
       cborg-json
+
+source-repository-package
+    type: git
+    location: https://github.com/DeltaQ-SD/deltaq.git
+    tag: fd9371d174f6333893274253be11f7ece981cf10
+    --sha256: sha256-9MBLy/E1PySUGmVzkayNxmG0z3a1sTT4RDCqIXNdPcw=
+    subdir:
+      lib/deltaq
+      lib/probability-polynomial
+

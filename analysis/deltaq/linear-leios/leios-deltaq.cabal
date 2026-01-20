@@ -1,0 +1,46 @@
+cabal-version:      3.0
+name:               leios-deltaq
+version:            0.1.0.0
+license:            Apache-2.0
+license-file:       LICENSE
+author:             Yves Hauser
+maintainer:         yves.hauser@iohk.io
+build-type:         Simple
+
+common warnings
+    ghc-options: -Wall
+
+library
+    import:           warnings
+    build-depends:    base
+                    , deltaq
+                    , probability-polynomial
+                    , statistics
+    hs-source-dirs:   src
+    exposed-modules:  Analysis.Leios
+                    , DeltaQ.Leios
+                    , DeltaQ.Leios.EmpiricalDistributions
+                    , DeltaQ.Praos
+                    , Statistics.Leios
+                    , Statistics.Praos
+    ghc-options: -O2
+    default-language: Haskell2010
+
+executable leios-deltaq-analysis
+    import:           warnings
+    main-is:          Main.hs
+    build-depends:    async
+                    , base
+                    , bytestring
+                    , cassava
+                    , deltaq
+                    , leios-deltaq
+                    , probability-polynomial
+                    , random
+                    , vector
+                    , Chart >= 1.8 && < 2.0
+                    , Chart-cairo
+    hs-source-dirs:   app
+    -- ghc-options: -O2 -threaded -rtsopts "-with-rtsopts=-N -qb2 -H1G -s"
+    ghc-options: -O2 -threaded -rtsopts "-with-rtsopts=-N -s"
+    default-language: Haskell2010
