@@ -57,6 +57,7 @@ function configsEqual(a: SimulationConfig, b: SimulationConfig): boolean {
     a.degree === b.degree &&
     a.adversaries === b.adversaries &&
     a.adversaryDegree === b.adversaryDegree &&
+    a.adversaryDelay === b.adversaryDelay &&
     a.txCount === b.txCount &&
     a.duration === b.duration &&
     a.blockInterval === b.blockInterval &&
@@ -325,6 +326,16 @@ export function Controls({ onConfigChange, disabled = false, isExpanded, onToggl
               max={maxAdversaryDegree}
               tooltip="How many honest nodes each adversary connects to (in and out)"
               onChange={(v) => updateConfig('adversaryDegree', v)}
+            />
+            <Slider
+              label="Front-run delay"
+              value={Math.round(config.adversaryDelay * 1000000)}
+              min={0}
+              max={5000}
+              step={250}
+              unit="μs"
+              tooltip="How many microseconds it takes the adversary to create a front-run transaction"
+              onChange={(v) => updateConfig('adversaryDelay', v / 1000000)}
             />
           </Section>
 

@@ -27,6 +27,7 @@ export interface SimulationConfig {
   bandwidth: number;
   adversaries: number;
   adversaryDegree: number;
+  adversaryDelay: number;
   txCount: number;
   txSizeMin: number;
   txSizeMax: number;
@@ -43,6 +44,7 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   bandwidth: 1250000,
   adversaries: 2,
   adversaryDegree: 18,
+  adversaryDelay: 0.002,
   txCount: 250,
   txSizeMin: 200,
   txSizeMax: 16384,
@@ -59,6 +61,7 @@ export const MINIMAL_CONFIG: SimulationConfig = {
   bandwidth: 1250000,
   adversaries: 1,
   adversaryDegree: 2,
+  adversaryDelay: 0.002,
   txCount: 50,
   txSizeMin: 200,
   txSizeMax: 16384,

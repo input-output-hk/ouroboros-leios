@@ -222,6 +222,7 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
         `A${i + 1}`,
         safeConfig.adversaryDegree,
         safeConfig.adversaryDegree,
+        safeConfig.adversaryDelay,
         safeConfig.mempool,
         safeConfig.latency,
         safeConfig.bandwidth
