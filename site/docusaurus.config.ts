@@ -110,14 +110,16 @@ const config: Config = {
               href: "https://www.insightmaker.com/insight/4DU4kmFVCFDaq30ux29PCe/Cardano-Throughput-v0-3",
               label: "Simulator",
             },
-            {
-              to: "https://leios.cardano-scaling.org/cost-estimator/",
-              label: "Cost Estimator",
-            },
-            {
-              to: "/traffic-estimator",
-              label: "Traffic Estimator",
-            },
+            // Cost Estimator and Traffic Estimator are based on parallel Leios model,
+            // not Linear Leios with linked EB proposal - hidden to avoid confusion
+            // {
+            //   to: "https://leios.cardano-scaling.org/cost-estimator/",
+            //   label: "Cost Estimator",
+            // },
+            // {
+            //   to: "/traffic-estimator",
+            //   label: "Traffic Estimator",
+            // },
             {
               to: "https://leios.cardano-scaling.org/visualizer",
               label: "Visualizer",
