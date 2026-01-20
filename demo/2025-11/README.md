@@ -49,7 +49,7 @@ Run the Leios X-Ray (Grafana based observability stack)
 
 ```shell
 export LOG_PATH=".tmp-leios-202511-demo/*.log"
-nix run github:input-output-hk/ouroboros-leios#x_ray
+nix run github:input-output-hk/ouroboros-leios#x-ray
 ```
 
 Run the Leios experiment with default configuration

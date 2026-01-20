@@ -72,18 +72,18 @@ To use it:
 
 1. Start proto-devnet (using one of the methods above)
 
-2. In another terminal, start x_ray with the generated config:
+2. In another terminal, start x-ray with the generated config:
 
     **Using nix:**
 
     ``` shell
-    ALLOY_CONFIG="$(realpath tmp-devnet/alloy)" nix run github:input-output-hk/ouroboros-leios#x_ray
+    ALLOY_CONFIG="$(realpath tmp-devnet/alloy)" nix run github:input-output-hk/ouroboros-leios#x-ray
     ```
 
     **Without nix:**
 
     ``` shell
-    cd ../extras/x_ray
+    cd ../extras/x-ray
     ALLOY_CONFIG="$(realpath ../../proto-devnet/tmp-devnet/alloy)" ./run.sh
     ```
 

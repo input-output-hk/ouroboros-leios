@@ -137,14 +137,14 @@ echo "Setting up utxo-keys for tx-generator"
 cp -r "$CONFIG_DIR/utxo-keys" "$WORKING_DIR/utxo-keys"
 find "$WORKING_DIR/utxo-keys" -name "*.skey" -exec chmod 400 {} \;
 
-# Set LOG_PATH to absolute path for x_ray observability
+# Set LOG_PATH to absolute path for x-ray observability
 # Use realpath to resolve WORKING_DIR to absolute path
 export LOG_PATH="${LOG_PATH:-$(realpath "${WORKING_DIR}")/node*/node.log}"
 
 # Configure tx-generator
 envsubst <"${SOURCE_DIR}/gen.template.json" >"${WORKING_DIR}/gen.json"
 
-# Configure alloy for x_ray observability
+# Configure alloy for x-ray observability
 envsubst <"${SOURCE_DIR}/alloy.template" >"${WORKING_DIR}/alloy"
 
 echo "Starting proto-devnet with process-compose..."

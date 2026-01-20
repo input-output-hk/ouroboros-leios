@@ -7,7 +7,7 @@ X-ray provides a complete observability stack for Leios demos using Grafana, Pro
 **Using nix:**
 
 ```shell
-nix run github:input-output-hk/ouroboros-leios#x_ray
+nix run github:input-output-hk/ouroboros-leios#x-ray
 ```
 
 **Without nix:**
@@ -32,7 +32,7 @@ Then run:
 
 ## Configuration
 
-You can customize the x_ray stack by setting environment variables before running:
+You can customize the x-ray stack by setting environment variables before running:
 
 ```shell
 export ALLOY_CONFIG=/path/to/custom/alloy

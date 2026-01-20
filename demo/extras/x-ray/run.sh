@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Wrapper script to set defaults and run the x_ray observability stack using process-compose
+# Wrapper script to set defaults and run the x-ray observability stack using process-compose
 set -eo pipefail
 
 # Set defaults for all environment variables
@@ -39,7 +39,7 @@ if [ -d "$WORKING_DIR" ]; then
 	fi
 fi
 
-echo "Starting x_ray with process-compose..."
+echo "Starting x-ray with process-compose..."
 echo "  ALLOY_CONFIG: ${ALLOY_CONFIG}"
 echo "  LOG_PATH: ${LOG_PATH}"
 echo "  WORKING_DIR: ${WORKING_DIR}"

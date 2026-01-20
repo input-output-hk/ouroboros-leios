@@ -29,7 +29,7 @@
 
       packages = lib.optionalAttrs (system == "x86_64-linux") rec {
         x-ray = pkgs.writeShellApplication {
-          name = "x_ray";
+          name = "x-ray";
           runtimeInputs = config.devShells.dev-demo-extras-x-ray.nativeBuildInputs;
           runtimeEnv = {
             SOURCE_DIR = ./.;
@@ -37,8 +37,6 @@
           };
           text = builtins.readFile ./run.sh;
         };
-        # XXX: Drop once people forgot about it
-        x_ray = x-ray;
       };
     };
 }
