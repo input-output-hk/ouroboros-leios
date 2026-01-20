@@ -8,17 +8,18 @@ import { OVERHEAD_B } from './link.js';
 const DEFAULTS = {
   nodes: 50,
   degree: 6,
-  block: 90000,        // 90 kB
-  latency: 0.100,      // 100 ms
-  bandwidth: 1250000,  // 10 Mb/s
+  block: 90000,          // 90 kB
+  latency: 0.100,        // 100 ms
+  bandwidth: 1250000,    // 10 Mb/s
   adversaries: 2,
-  adversaryDegree: 18, // 3x honest degree
+  adversaryDegree: 18,   // 3x honest degree
   txCount: 250,
-  txDuration: 20,      // seconds over which to inject txs
-  txSizeMin: 200,      // minimum tx size in bytes
-  txSizeMax: 16384,    // maximum tx size in bytes
-  slotDuration: 20,    // seconds per block slot
-  slots: 10,           // number of slots to simulate
+  txDuration: 20,        // seconds over which to inject txs
+  txSizeMin: 200,        // minimum tx size in bytes
+  txSizeMax: 16384,      // maximum tx size in bytes
+  slotDuration: 20,      // seconds per block slot
+  slots: 10,             // number of slots to simulate
+  adversaryDelay: 0.002, // number of seconds needed to front-run a tx
 };
 
 const program = new Command();
@@ -34,6 +35,7 @@ program
   .option('-w, --bandwidth <bps>', 'Bandwidth in bytes per second', String(DEFAULTS.bandwidth))
   .option('-a, --adversaries <number>', 'Number of adversary nodes', String(DEFAULTS.adversaries))
   .option('--adversary-degree <number>', 'Adversary connectivity degree', String(DEFAULTS.adversaryDegree))
+  .option('--adversary-delay <seconds>', 'Time needed for adversary to front-run a transaction', String(DEFAULTS.adversaryDelay))
   .option('-t, --tx-count <number>', 'Number of transactions to inject', String(DEFAULTS.txCount))
   .option('--tx-duration <seconds>', 'Duration over which to inject transactions', String(DEFAULTS.txDuration))
   .option('--tx-size-min <bytes>', 'Minimum transaction size', String(DEFAULTS.txSizeMin))
@@ -54,6 +56,7 @@ const config = {
   bandwidth: parseInt(opts.bandwidth),
   adversaries: parseInt(opts.adversaries),
   adversaryDegree: parseInt(opts.adversaryDegree),
+  adversaryDelay: parseFloat(opts.adversaryDelay),
   txCount: parseInt(opts.txCount),
   txDuration: parseInt(opts.txDuration),
   txSizeMin: parseInt(opts.txSizeMin),
@@ -97,6 +100,7 @@ try {
       "A" + (i + 1),
       config.adversaryDegree,
       config.adversaryDegree,
+      config.adversaryDelay,
       config.mempool,
       config.latency,
       config.bandwidth

@@ -17,6 +17,9 @@ export class Node {
   // Whether the node is honest.
   public readonly honest: boolean;
 
+  // The delay (in seconds) to front-run a transaction.
+  public readonly frontrunDelay: number;
+
   // The memory pool.
   private mempool: MemoryPool;
 
@@ -30,9 +33,10 @@ export class Node {
   // Bounded to prevent memory growth in long-running simulations.
   private known: LRUCache<TxId, boolean>;
 
-  constructor(id: string, honest: boolean, mempool_B: number) {
+  constructor(id: string, honest: boolean, frontrunDelay: number, mempool_B: number) {
     this.id = id;
     this.honest = honest;
+    this.frontrunDelay = frontrunDelay;
     this.mempool = new MemoryPool(mempool_B);
     this.backpressure = [];
     this.offers = [];
@@ -159,8 +163,9 @@ export class Node {
         const okay = this.mempool.enqueue(tx, tx.size_B)
         if (!okay)
           break;
+        let delay = this.honest ? 0 : this.frontrunDelay;
         logger.trace({clock: now, node: this.id, txId: tx.txId}, "insert into memory pool");
-        this.offerUpstream(sim, now, tx);
+        this.offerUpstream(sim, now + delay, tx);
       }
       this.backpressure.shift();
       logger.trace({clock: now, node: this.id, txId: tx.txId}, "remove backpressure");

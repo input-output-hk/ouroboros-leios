@@ -23,7 +23,7 @@ export function generateNetwork(
   const graph = new DirectedGraph<Node, Link>();
   for (let i = 0; i < n; i++) {
     const id: string = makeId(i);
-    graph.addNode(id, new Node(id, true, mempool_B));
+    graph.addNode(id, new Node(id, true, NaN, mempool_B));
   }
 
   for (let i = 0; i < n; i++) {
@@ -73,6 +73,7 @@ export function addAdversaryNode(
   id: string,
   upstreamCount: number,
   downstreamCount: number,
+  frontrunDelay: number,
   mempool_B: number,
   latency_s: number,
   bandwidth_Bps: number,
@@ -84,7 +85,7 @@ export function addAdversaryNode(
 
   const existingNodes = graph.nodes()
 
-  graph.addNode(id, new Node(id, false, mempool_B));
+  graph.addNode(id, new Node(id, false, frontrunDelay, mempool_B));
 
   if (upstreamCount > existingNodes.length || downstreamCount > existingNodes.length) {
     logger.fatal("cannot connect to more nodes than exist in the graph.")
