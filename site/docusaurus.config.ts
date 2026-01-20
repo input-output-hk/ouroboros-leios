@@ -124,6 +124,10 @@ const config: Config = {
               to: "https://leios.cardano-scaling.org/visualizer",
               label: "Visualizer",
             },
+            {
+              to: "https://leios.cardano-scaling.org/mempool-viz/",
+              label: "Mempool Visualizer",
+            },
           ],
         },
         {
