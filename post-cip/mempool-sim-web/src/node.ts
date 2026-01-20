@@ -250,7 +250,7 @@ export class Node {
       adversarialCount: adversarial
     };
 
-    sim.recordBlock(block);
+    sim.diffuseBlock(block);
   }
 
   // Lookup a downstream link by its peer name.

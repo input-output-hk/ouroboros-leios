@@ -129,11 +129,11 @@ export class Simulation {
   }
 
   /**
-   * Record a produced block and remove confirmed transactions from all nodes.
+   * Diffuse a produced block and remove confirmed transactions from all nodes.
    * Since honest and adversarial txs share UTxO inputs, when either is confirmed
    * the other becomes invalid and should be removed from all mempools.
    */
-  recordBlock(block: Block): void {
+  diffuseBlock(block: Block): void {
     this._blocks.push(block);
     logger.info({
       blockId: block.blockId,
