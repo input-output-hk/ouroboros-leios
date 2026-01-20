@@ -120,6 +120,7 @@ pub fn verify_vote(mvk: &PubKey, vote: &Vote) -> bool {
 
 /// Cast all of the votes for an election `eid` on an EB `eb` using the voter registry `reg`.
 pub fn do_voting(reg: &Registry, eid: &Eid, eb: &EbHash) -> Vec<Vote> {
+    let nonpersistent_voters = reg.voters - reg.persistent_id.len();
     let mut votes = Vec::new();
     reg.info.values().for_each(|info| {
         if reg.persistent_id.contains_key(&info.reg.pool) {
@@ -142,7 +143,7 @@ pub fn do_voting(reg: &Registry, eid: &Eid, eb: &EbHash) -> Vec<Vote> {
                 let p = sigma_eid.to_rational();
                 let s = CoinFraction::from_coins(info.stake, 1).to_ratio()
                     / reg.nonpersistent_stake.to_ratio();
-                if voter_check(reg.voters, &s, &p) > 0 {
+                if voter_check(nonpersistent_voters, &s, &p) > 0 {
                     votes.push(vote);
                 }
             }
