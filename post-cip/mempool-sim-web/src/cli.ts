@@ -3,6 +3,7 @@ import { generateNetwork, addAdversaryNode } from './topology.js';
 import { Simulation } from './simulation.js';
 import { logger } from './logger.js'
 import { OVERHEAD_B } from './link.js';
+import type { Tx } from './types.js';
 
 // Default configuration values
 const DEFAULTS = {
@@ -140,28 +141,31 @@ try {
   logger.info({ eventsProcessed: sim.eventsProcessed, finalTime: sim.currentTime }, "simulation complete");
 
   // Collect and report statistics
-  let totalHonest = 0;
-  let totalAdversarial = 0;
-  let totalBytes = 0;
+  let honestTxs = new Set<Tx>();
+  let adversarialTxs = new Set<Tx>();
 
   graph.forEachNode((nodeId) => {
     const node = graph.getNodeAttributes(nodeId);
     node.logPartialState();
-    const summary = node.mempoolSummary();
-    totalHonest += summary.mempool_tx_count.honest;
-    totalAdversarial += summary.mempool_tx_count.adversarial;
-    totalBytes += summary.mempool_bytes;
+    node.logMempoolSummary();
+    node.getTransactions().forEach(tx => {
+      if (tx.frontRuns)
+        adversarialTxs.add(tx);
+      else
+        honestTxs.add(tx);
+    });
   });
 
+  const totalHonest = honestTxs.size;
+  const totalAdversarial = adversarialTxs.size;
   const totalTxs = totalHonest + totalAdversarial;
   logger.info({
-    total_txs_in_mempools: totalTxs,
-    total_bytes_in_mempools: totalBytes,
+    total__unique_txs_in_mempools: totalTxs,
     honest_tx_fraction: totalTxs > 0 ? totalHonest / totalTxs : 0,
     adversarial_tx_fraction: totalTxs > 0 ? totalAdversarial / totalTxs : 0,
-    honest_tx_count: totalHonest,
-    adversarial_tx_count: totalAdversarial,
-  }, "mempool results");
+    honest_unique_tx_count: totalHonest,
+    adversarial_unique_tx_count: totalAdversarial,
+  }, "mempool statistics at simulation end");
 
   // Block statistics
   const blocks = sim.blocks;
