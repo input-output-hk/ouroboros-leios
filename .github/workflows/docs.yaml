@@ -137,29 +137,29 @@ jobs:
     if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - name: 📥 Checkout repository
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
-      - name: 🛠️ Setup Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - name: 📦 Install mempool-sim-web dependencies
+      - name: Install mempool-sim-web dependencies
         working-directory: post-cip/mempool-sim-web
         run: npm install
 
-      - name: 📦 Install mempool-sim-viz dependencies
+      - name: Install mempool-sim-viz dependencies
         working-directory: post-cip/mempool-sim-viz
         run: npm install
 
-      - name: 🏗️ Build mempool visualizer
+      - name: Build mempool visualizer
         working-directory: post-cip/mempool-sim-viz
         run: npm run build
 
-      - name: 🚢 Upload mempool visualizer
+      - name: Upload mempool visualizer
         uses: actions/upload-artifact@v4
         with:
           name: mempool-visualizer
@@ -193,7 +193,7 @@ jobs:
           name: visualizer
           path: site/static/visualizer
 
-      - name: 👁️ Unpack mempool visualizer
+      - name: Unpack mempool visualizer
         uses: actions/download-artifact@v4
         with:
           name: mempool-visualizer
