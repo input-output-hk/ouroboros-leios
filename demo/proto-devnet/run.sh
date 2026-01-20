@@ -142,10 +142,10 @@ find "$WORKING_DIR/utxo-keys" -name "*.skey" -exec chmod 400 {} \;
 export LOG_PATH="${LOG_PATH:-$(realpath "${WORKING_DIR}")/node*/node.log}"
 
 # Configure tx-generator
-envsubst <"${SOURCE_DIR}/gen.template.json" >"${WORKING_DIR}/gen.json"
+envsubst <"${CONFIG_DIR}/gen.template.json" >"${WORKING_DIR}/gen.json"
 
 # Configure alloy for x-ray observability
-envsubst <"${SOURCE_DIR}/alloy.template" >"${WORKING_DIR}/alloy"
+envsubst <"${CONFIG_DIR}/alloy.template" >"${WORKING_DIR}/alloy"
 
 echo "Starting proto-devnet with process-compose..."
 process-compose --no-server -f "${SOURCE_DIR}/process-compose.yaml"
