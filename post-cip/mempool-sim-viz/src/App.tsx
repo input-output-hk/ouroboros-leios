@@ -110,7 +110,17 @@ export default function App() {
 
       {/* Left panel: Title + Controls */}
       <div className="absolute top-2 left-2 z-10 w-60 flex flex-col gap-1 max-h-[calc(100vh-1rem)]">
-        <div className="px-4 py-2">
+        <div className="px-4 py-2 flex items-center gap-2">
+          <a
+            href="https://leios.cardano-scaling.org/"
+            className="hover:opacity-70 transition-opacity"
+            style={{ color: COLORS.textMuted }}
+            title="Back to Leios site"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </a>
           <h1 className="text-lg font-bold" style={{ color: COLORS.text }}>
             Mempool Simulation
           </h1>
