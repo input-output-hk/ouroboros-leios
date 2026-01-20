@@ -44,7 +44,7 @@ validateEB :: DQ -> DQ -> DQ
 validateEB applyTx reapplyTx = processRBandEB applyTxs .>>. reapplyTxs
  where
   -- FIXME: concurrent application
-  applyTxs = applyTx -- hoices $ map (\i -> (1 % n, doAll (replicate i applyTx))) [1 .. fromInteger n]
+  applyTxs = applyTx -- choices $ map (\i -> (1 % n, doAll (replicate i applyTx))) [1 .. fromInteger n]
   reapplyTxs = reapplyTx -- choices $ map (\i -> (1 % n, doAll (replicate i reapplyTx))) [1 .. fromInteger n]
 
 -- | Estimate for the parameter \(L_\text{vote}\) using 'validateEB'
