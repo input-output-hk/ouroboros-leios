@@ -1,0 +1,31 @@
+nodes:
+  Node1:
+    stake: 30000000000000
+    location:
+      - 0
+      - 0
+    producers:
+      Node2:
+        latency-ms: 100.0
+      Node3:
+        latency-ms: 100.0
+  Node2:
+    stake: 30000000000000
+    location:
+      - 0
+      - 100
+    producers:
+      Node1:
+        latency-ms: 100.0
+      Node3:
+        latency-ms: 100.0
+  Node3:
+    stake: 30000000000000
+    location:
+      - 50
+      - 50
+    producers:
+      Node1:
+        latency-ms: 100.0
+      Node2:
+        latency-ms: 100.0
