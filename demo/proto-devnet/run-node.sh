@@ -16,12 +16,12 @@ export LEIOS_DB_PATH="leios.db"
 
 # Run cardano-node
 cardano-node run \
-  --config "config.json" \
-  --host-addr "${!ip}" \
-  --port "${!port}" \
-  --topology "topology.json" \
-  --database-path "db" \
-  --socket-path "node.socket" \
-  --shelley-vrf-key "keys/vrf.skey" \
-  --shelley-kes-key "keys/kes.skey" \
-  --shelley-operational-certificate "keys/opcert.cert"
+	--config "config.yaml" \
+	--host-addr "${!ip}" \
+	--port "${!port}" \
+	--topology "topology.json" \
+	--database-path "db" \
+	--socket-path "node.socket" \
+	--shelley-vrf-key "keys/vrf.skey" \
+	--shelley-kes-key "keys/kes.skey" \
+	--shelley-operational-certificate "keys/opcert.cert"
