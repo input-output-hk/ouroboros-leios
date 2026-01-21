@@ -198,8 +198,8 @@ try {
     honest_tx_in_blocks: totalHonestInBlocks,
     adversarial_tx_in_blocks: totalAdvInBlocks,
     front_run_rate: totalInBlocks > 0 ? totalAdvInBlocks / totalInBlocks : 0,
-    avg_block_fill_percent: blocks.length > 0
-      ? blocks.reduce((s, b) => s + b.size_B, 0) / (blocks.length * config.block) * 100
+    avg_block_fill_fraction: blocks.length > 0
+      ? blocks.reduce((s, b) => s + b.size_B, 0) / (blocks.length * config.block)
       : 0
   }, "block statistics");
 
