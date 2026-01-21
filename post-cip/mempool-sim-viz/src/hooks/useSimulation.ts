@@ -92,6 +92,10 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
   const speedRef = useRef<number>(1);
   const firstFrameRef = useRef<boolean>(true);
   const initialEventsRef = useRef<number>(0);
+  const forceUpdatePendingRef = useRef<boolean>(false);
+  const lastEventLogLengthRef = useRef<number>(0);
+  const lastFullEventLogLengthRef = useRef<number>(0);
+  const lastAnimatedTxCountRef = useRef<number>(0);
 
   const updateStats = useCallback(() => {
     const sim = simRef.current;
@@ -251,7 +255,14 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
         600,
         (positions) => {
           positionsRef.current = positions;
-          updateVisualNodes();
+          // Throttle updates to avoid excessive re-renders during force settling
+          if (!forceUpdatePendingRef.current) {
+            forceUpdatePendingRef.current = true;
+            requestAnimationFrame(() => {
+              forceUpdatePendingRef.current = false;
+              updateVisualNodes();
+            });
+          }
         }
       );
       forceLayoutRef.current = forceLayout;
@@ -320,6 +331,9 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
     fullEventLogRef.current = [];
     logIdCounter.current = 0;
     lastBlockCountRef.current = 0;
+    lastEventLogLengthRef.current = 0;
+    lastFullEventLogLengthRef.current = 0;
+    lastAnimatedTxCountRef.current = 0;
     setEventLog([]);
     setFullEventLog([]);
 
@@ -389,6 +403,9 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
     fullEventLogRef.current = [];
     logIdCounter.current = 0;
     lastBlockCountRef.current = 0;
+    lastEventLogLengthRef.current = 0;
+    lastFullEventLogLengthRef.current = 0;
+    lastAnimatedTxCountRef.current = 0;
     setEventLog([]);
     setFullEventLog([]);
     setBlocks([]);
@@ -437,7 +454,14 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
         600,
         (positions) => {
           positionsRef.current = positions;
-          updateVisualNodes();
+          // Throttle updates to avoid excessive re-renders during force settling
+          if (!forceUpdatePendingRef.current) {
+            forceUpdatePendingRef.current = true;
+            requestAnimationFrame(() => {
+              forceUpdatePendingRef.current = false;
+              updateVisualNodes();
+            });
+          }
         }
       );
       forceLayoutRef.current = forceLayout;
@@ -507,7 +531,12 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
         txAnimationsRef.current.delete(id);
       }
     });
-    setAnimatedTxs(Array.from(txAnimationsRef.current.values()));
+    // Only update animatedTxs state if count changed (avoid re-render when empty)
+    const currentAnimCount = txAnimationsRef.current.size;
+    if (currentAnimCount !== lastAnimatedTxCountRef.current) {
+      lastAnimatedTxCountRef.current = currentAnimCount;
+      setAnimatedTxs(Array.from(txAnimationsRef.current.values()));
+    }
 
     // Fade block flash
     setBlockFlash(prev => {
@@ -519,8 +548,18 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
 
     updateVisualNodes();
     updateStats();
-    setEventLog([...eventLogRef.current]);
-    setFullEventLog([...fullEventLogRef.current]);
+
+    // Only update event logs if length changed
+    const currentEventLogLength = eventLogRef.current.length;
+    if (currentEventLogLength !== lastEventLogLengthRef.current) {
+      lastEventLogLengthRef.current = currentEventLogLength;
+      setEventLog([...eventLogRef.current]);
+    }
+    const currentFullEventLogLength = fullEventLogRef.current.length;
+    if (currentFullEventLogLength !== lastFullEventLogLengthRef.current) {
+      lastFullEventLogLengthRef.current = currentFullEventLogLength;
+      setFullEventLog([...fullEventLogRef.current]);
+    }
 
     if (sim.pendingEvents === 0) {
       txAnimationsRef.current.clear();
