@@ -196,6 +196,5 @@ try {
 
 } catch (error) {
   logger.fatal({ error }, "simulation failed");
-  console.log(`Fatal: ${error}`);
   process.exit(1);
 }

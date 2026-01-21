@@ -66,6 +66,7 @@ export function Canvas({
   const [isPanning, setIsPanning] = useState(false);
   const [draggingNode, setDraggingNode] = useState<string | null>(null);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  const hoveredNodeRef = useRef<string | null>(null);
   const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const dragStartRef = useRef({ x: 0, y: 0 });
 
@@ -156,9 +157,11 @@ export function Canvas({
       const dy = e.clientY - panStartRef.current.y;
       setPanOffset({ x: panStartRef.current.panX + dx, y: panStartRef.current.panY + dy });
     } else {
-      // Update hover state
+      // Update hover state - use ref to avoid draw recreation, state for cursor
       const node = findNodeAtPosition(x, y);
-      setHoveredNode(node?.id ?? null);
+      const newHoveredId = node?.id ?? null;
+      hoveredNodeRef.current = newHoveredId;
+      setHoveredNode(newHoveredId);
     }
   }, [draggingNode, isPanning, onDrag, offset, panOffset, size, zoom, findNodeAtPosition]);
 
@@ -232,6 +235,7 @@ export function Canvas({
       if (onDragEnd) onDragEnd(draggingNode);
       setDraggingNode(null);
     }
+    hoveredNodeRef.current = null;
     setHoveredNode(null);
   }, [isPanning, draggingNode, onDragEnd]);
 
@@ -335,7 +339,7 @@ export function Canvas({
         const y = fromPos.y + (toPos.y - fromPos.y) * tx.progress;
 
         // Check if tx is on a connection of the selected/hovered node
-        const focusNode = selectedNode?.id ?? hoveredNode;
+        const focusNode = selectedNode?.id ?? hoveredNodeRef.current;
         let isRelevant = true;
         if (focusNode) {
           // Tx is relevant if it involves the focus node or travels on its edges
@@ -410,7 +414,7 @@ export function Canvas({
       }
 
       // Hover glow
-      const isHovered = hoveredNode === node.id;
+      const isHovered = hoveredNodeRef.current === node.id;
       if (isHovered && !dimmed) {
         const gradient = ctx.createRadialGradient(x, y, radius, x, y, radius * 2.5);
         gradient.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
@@ -486,11 +490,7 @@ export function Canvas({
       ctx.textBaseline = 'middle';
       ctx.fillText(node.id, x, y + radius + 12 * scale);
     });
-  }, [nodes, edges, animatedTxs, blockFlash, blockCount, selectedNode, hoveredNode, size, offset, zoom]);
-
-  useEffect(() => {
-    draw();
-  }, [draw]);
+  }, [nodes, edges, animatedTxs, blockFlash, blockCount, selectedNode, size, offset, zoom]);
 
   useEffect(() => {
     let frameId: number;
