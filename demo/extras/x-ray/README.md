@@ -41,6 +41,7 @@ export LOG_PATH=/path/to/logs/*.log
 ```
 
 Available environment variables:
+
 - `ALLOY_CONFIG` - Path to Alloy configuration file
 - `LOG_PATH` - Glob pattern for log files to collect (use absolute paths for best results)
 - `WORKING_DIR` - Working directory for runtime data (default: `tmp-x-ray`)

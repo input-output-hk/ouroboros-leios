@@ -75,17 +75,6 @@ nixfmt-rfc-style.........................................................Passed
 shellcheck...............................................................Passed
 ```
 
-or alternatively in the shell
-
-```shell
-$ pre-commit run --all
-black................................................(no files to check)Skipped
-deadnix..................................................................Passed
-markdownlint.............................................................Passed
-nixfmt-rfc-style.........................................................Passed
-shellcheck...............................................................Passed
-```
-
 This repository is using
 [git-hooks.nix](https://github.com/cachix/git-hooks.nix) and you can manage them in:
 

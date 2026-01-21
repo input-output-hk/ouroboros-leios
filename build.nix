@@ -17,6 +17,7 @@
 
       formatter = pkgs.writeShellScriptBin "pre-commit-run" ''
         ${pkgs.lib.getExe config.pre-commit.settings.package} run --all-files --config ${config.pre-commit.settings.configFile}
+        ${pkgs.lib.getExe config.checks.pre-commit-demo.config.package} run $(${pkgs.lib.getExe pkgs.git} ls-files | ${pkgs.lib.getExe pkgs.gnugrep} "^demo/") --config ${config.checks.pre-commit-demo.config.configFile}
       '';
 
       pre-commit.settings = {

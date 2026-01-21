@@ -14,7 +14,7 @@ in
   ];
 
   options.cardano.relay = {
-    enable = lib.mkEnableOption ''Run cardano-node relay as service'';
+    enable = lib.mkEnableOption "Run cardano-node relay as service";
 
     config = lib.mkOption {
       type = lib.types.path;
