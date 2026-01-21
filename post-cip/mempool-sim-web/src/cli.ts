@@ -145,7 +145,9 @@ try {
 
   // Schedule rotating block production among honest nodes
   const honestNodes = Array.from({ length: config.nodes }, (_, i) => `H${i + 1}`);
-  for (let slot = 0; slot < config.slots; slot += config.slotDuration) {
+  for (let slot = 0; slot < config.slots; slot++) {
+    if (Math.random() * config.slotDuration >= 1)
+      continue;
     const producer = honestNodes[Math.floor(Math.random() * honestNodes.length)]!;
     sim.produceBlock(slot, producer, config.block);
   }

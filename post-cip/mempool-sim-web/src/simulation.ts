@@ -138,7 +138,7 @@ export class Simulation {
     logger.info({
       blockId: block.blockId,
       producer: block.producer,
-      timestamp: block.timestamp,
+      clock: block.timestamp,
       txCount: block.transactions.length,
       size_B: block.size_B,
       honestCount: block.honestCount,
