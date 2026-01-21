@@ -23,7 +23,7 @@
             config.packages.ss_http_exporter
           ];
           GRAFANA_SHARE = "${pkgs.grafana}/share/grafana";
-          shellHook = '''';
+          shellHook = "";
         };
       };
 

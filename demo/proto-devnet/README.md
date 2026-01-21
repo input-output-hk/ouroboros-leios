@@ -31,7 +31,7 @@ Install these prerequisites:
 Ensure they are on your PATH, override if needed with something like:
 
 ``` shell
-export PATH=/path/to/cardano-node:/path/to/cardano-cli:$PATH
+export PATH=/path/to/cardano-node-directory:/path/to/cardano-cli-directory:$PATH
 ```
 
 Then run:
@@ -96,15 +96,18 @@ The generated alloy config is customized for proto-devnet with correct node IPs 
 If logs aren't appearing in Grafana, check:
 
 1. View the generated alloy config to see the LOG_PATH (should be absolute):
+
    ```shell
-   cat tmp-devnet/alloy | grep -A2 "local.file_match"
+      cat tmp-devnet/alloy | grep -A2 "local.file_match"
    ```
 
-2. Check Alloy's UI at http://localhost:12345 to see:
+2. Check Alloy's UI at <http://localhost:12345> to see:
+
    - What files it's discovering
    - Any errors in log collection
 
 3. Verify the log files exist and match the pattern:
+
    ```shell
    ls -la tmp-devnet/node*/node.log
    ```

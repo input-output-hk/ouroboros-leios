@@ -14,7 +14,7 @@ in
   ];
 
   options.cardano.immdb-server = {
-    enable = lib.mkEnableOption ''Run ourborous-consensus's immdb-server as a service'';
+    enable = lib.mkEnableOption "Run ourborous-consensus's immdb-server as a service";
 
     db = lib.mkOption {
       type = lib.types.path;
@@ -79,13 +79,13 @@ in
     user = lib.mkOption {
       type = lib.types.str;
       default = "immdb-server";
-      description = ''User to run immdb-server service as'';
+      description = "User to run immdb-server service as";
     };
 
     group = lib.mkOption {
       type = lib.types.str;
       default = "immdb-server";
-      description = ''Group to run immdb-server service as'';
+      description = "Group to run immdb-server service as";
     };
 
   };

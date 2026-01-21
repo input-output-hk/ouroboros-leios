@@ -4,6 +4,7 @@
 
   # Markdown
   markdownlint.enable = true;
+  markdownlint.settings.configuration = builtins.fromJSON (builtins.readFile ./.markdownlint.json);
 
   # Nix
   nixfmt-rfc-style.enable = true;
