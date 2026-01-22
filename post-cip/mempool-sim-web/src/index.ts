@@ -1,5 +1,5 @@
 // Core types
-export type { TxId, Tx, Block, SimulationConfig, PresetType, PeerState, PeerInfo, P2PConfig } from './types.js';
+export type { TxId, Tx, Block, SimulationConfig, PresetType, P2PConfig } from './types.js';
 export { TXID_B, DEFAULT_CONFIG, MINIMAL_CONFIG, DEFAULT_P2P_CONFIG } from './types.js';
 
 // P2P Peer Manager

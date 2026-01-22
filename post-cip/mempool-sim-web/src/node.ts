@@ -81,9 +81,9 @@ export class Node {
   }
 
   // Initialize P2P peer selection for this node
-  initializeP2P(targetActivePeers: number, churnProbability: number, upstreamPeers: string[]): void {
-    this.peerManager = new PeerManager(this.id, targetActivePeers, churnProbability);
-    this.peerManager.initialize(upstreamPeers);
+  initializeP2P(churnProbability: number, upstreamPeers: string[], allNodes: string[]): void {
+    this.peerManager = new PeerManager(this.id, churnProbability);
+    this.peerManager.initialize(upstreamPeers, allNodes);
   }
 
   // Handle P2P churn event
@@ -218,14 +218,21 @@ export class Node {
     const graph = sim.graph;
 
     if (this.peerManager) {
-      // P2P mode: only offer to active upstream peers
-      const activePeers = this.peerManager.getActivePeers();
-      for (const peer of activePeers) {
+      // P2P mode: offer to current peers (may have changed via churn)
+      const peers = this.peerManager.getPeers();
+      for (const peer of peers) {
+        // Get link attributes - peer may be new from churn so we use default latency/bandwidth
         const edgeKey = graph.edge(peer, this.id);
         if (edgeKey) {
           const link = graph.getEdgeAttributes(edgeKey);
           logger.trace({clock: now, node: this.id, txId: tx.txId, upstreamPeer: peer, p2p: true}, "offer transaction");
           sim.offerTx(link.computeDelay(now, TXID_B), this.id, peer, tx.txId);
+        } else {
+          // Peer from churn - no edge exists, use a simple delay estimate
+          // This is a new connection from churn, estimate delay based on tx ID size
+          const estimatedDelay = now + 0.1; // 100ms default latency for new peers
+          logger.trace({clock: now, node: this.id, txId: tx.txId, upstreamPeer: peer, p2p: true, newPeer: true}, "offer transaction to churned peer");
+          sim.offerTx(estimatedDelay, this.id, peer, tx.txId);
         }
       }
     } else {
@@ -257,7 +264,7 @@ export class Node {
       const peer = offer![1];
       this.offers = this.offers.filter(offer => offer[0] != txId);
       logger.trace({clock: now, node: this.id, peer: peer, txId: txId}, "request transaction");
-      const link = this.getDownstreamLink(graph, peer);
+      const link = this.getDownstreamLinkOrDefault(graph, peer);
       sim.requestTx(link.computeDelay(now, TXID_B), this.id, peer, txId);
     }
   }
@@ -268,7 +275,7 @@ export class Node {
     const graph = sim.graph;
     if (tx) {
       logger.trace({clock: now, node: this.id, peer: peer, tx: tx}, "send transaction");
-      const link = this.getUpstreamLink(graph, peer);
+      const link = this.getUpstreamLinkOrDefault(graph, peer);
       sim.sendTx(link.computeDelay(now, tx.size_B), this.id, peer, tx);
     } else {
       logger.warn({clock: now, node: this.id, peer: peer, txId: txId}, "cannot send transaction");
@@ -314,24 +321,27 @@ export class Node {
     sim.diffuseBlock(block);
   }
 
-  // Lookup a downstream link by its peer name.
-  private getDownstreamLink(graph: Simulation['graph'], peer: string): Link {
-    const link = graph.edge(this.id, peer)
+  // Default link for P2P churned peers without topology edges
+  private static readonly DEFAULT_LINK = new Link(0.1, 1250000); // 100ms latency, 10 Mb/s
+
+  // Lookup a downstream link by its peer name, or return default for churned peers.
+  private getDownstreamLinkOrDefault(graph: Simulation['graph'], peer: string): Link {
+    const link = graph.edge(this.id, peer);
     if (!link) {
-      logger.fatal({source: peer, target: this.id}, "downstream link not found");
-      throw new Error("downstream link not found");
+      // P2P churned peer - use default link properties
+      return Node.DEFAULT_LINK;
     }
-    return graph.getEdgeAttributes(link)
+    return graph.getEdgeAttributes(link);
   }
 
-  // Lookup an upstream link by its peer name.
-  private getUpstreamLink(graph: Simulation['graph'], peer: string): Link {
-    const link = graph.edge(peer, this.id)
+  // Lookup an upstream link by its peer name, or return default for churned peers.
+  private getUpstreamLinkOrDefault(graph: Simulation['graph'], peer: string): Link {
+    const link = graph.edge(peer, this.id);
     if (!link) {
-      logger.fatal({source: peer, target: this.id}, "upstream link not found");
-      throw new Error("upstream link not found");
+      // P2P churned peer - use default link properties
+      return Node.DEFAULT_LINK;
     }
-    return graph.getEdgeAttributes(link)
+    return graph.getEdgeAttributes(link);
   }
 
 }

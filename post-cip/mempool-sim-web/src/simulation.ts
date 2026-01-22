@@ -164,6 +164,12 @@ export class Simulation {
     this._p2pConfig = config;
     this._p2pEndTime = endTime;
 
+    // Collect all node IDs for peer selection pool
+    const allNodeIds: string[] = [];
+    this._graph.forEachNode((nodeId) => {
+      allNodeIds.push(nodeId);
+    });
+
     // Initialize each node's peer manager with topology info
     this._graph.forEachNode((nodeId) => {
       const node = this._graph.getNodeAttributes(nodeId);
@@ -174,14 +180,13 @@ export class Simulation {
         upstreamPeers.push(source);
       });
 
-      node.initializeP2P(config.targetActivePeers, config.churnProbability, upstreamPeers);
+      node.initializeP2P(config.churnProbability, upstreamPeers, allNodeIds);
 
       // Schedule initial churn event
       this.schedulePeerChurn(config.churnInterval, nodeId);
     });
 
     logger.info({
-      targetActivePeers: config.targetActivePeers,
       churnInterval: config.churnInterval,
       churnProbability: config.churnProbability,
     }, 'P2P peer selection initialized');

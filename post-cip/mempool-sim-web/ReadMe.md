@@ -66,32 +66,30 @@ Options:
   -s, --slots <number>         Number of slots to simulate (default: "10")
   --log-level <level>          Logging detail (choices: "fatal", "error", "warn", "info", "debug", "trace", default: "info")
   --log-target <target>        Write log to target (choices: "pino-pretty", "pino/file", default: "pino-pretty")
-  --p2p                        Enable P2P peer selection (dynamic topology) (default: false)
-  --p2p-active-peers <number>  Target active peers for P2P (default: "6")
+  --p2p                        Enable P2P peer selection (dynamic topology churn) (default: false)
   --p2p-churn-interval <secs>  P2P churn interval in seconds (default: "5")
-  --p2p-churn-prob <float>     P2P churn probability per peer (default: "0.2")
+  --p2p-churn-prob <float>     P2P churn probability per peer, 0-1 (default: "0.2")
   -h, --help                   display help for command
 ```
 
 ### P2P Peer Selection Options
 
-When `--p2p` is enabled, the simulation models dynamic peer selection with periodic churn:
+When `--p2p` is enabled, the simulation models dynamic topology churn where peers can be replaced over time:
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--p2p` | Enable P2P peer selection mode | `false` (static topology) |
-| `--p2p-active-peers` | Number of active peers each node maintains for tx propagation | `6` |
-| `--p2p-churn-interval` | Seconds between churn events where peers may be replaced | `5` |
-| `--p2p-churn-prob` | Probability that each active peer is replaced during churn | `0.2` |
+| `--p2p` | Enable P2P dynamic topology churn | `false` (static topology) |
+| `--p2p-churn-interval` | Seconds between churn events | `5` |
+| `--p2p-churn-prob` | Probability each peer is replaced during churn (0-1) | `0.2` |
 
-**How P2P peer selection works:**
+**How P2P churn works:**
 
-1. Each node has access to all its topological neighbors but only maintains an "active set" for transaction propagation
-2. Transactions are only sent to peers in the active set
-3. Periodically (at `churn-interval`), each active peer has a `churn-prob` chance of being replaced by a random inactive peer
-4. This models the hot/warm/cold peer dynamics in real Cardano P2P networking
+1. Each node starts with its initial peers from the topology (`--degree` for honest, `--adversary-degree` for adversaries)
+2. Periodically (at `churn-interval`), each peer has a `churn-prob` chance of being replaced by a new random peer from the network
+3. New peers from churn use default network parameters (100ms latency, 10 Mb/s bandwidth)
+4. This models the dynamic peer discovery and selection in real Cardano P2P networking
 
-**Note:** P2P peer selection affects **both honest and adversary nodes**. Adversaries also maintain an active peer set and experience churn, which can limit their propagation advantage since their high connectivity (`--adversary-degree`) is partially negated by only using `--p2p-active-peers` connections at any time.
+**Note:** Both honest and adversary nodes experience churn. Adversaries with higher `--adversary-degree` maintain more concurrent connections and can churn to a wider variety of peers.
 
 ### Examples
 
@@ -115,9 +113,9 @@ High adversary connectivity:
 npm run cli -- -n 50 -a 3 --adversary-degree 30 -t 200
 ```
 
-With P2P peer selection enabled:
+With P2P dynamic topology churn:
 ```bash
-npm run cli -- -n 50 -a 2 -t 200 --p2p --p2p-active-peers 4 --p2p-churn-interval 3 --p2p-churn-prob 0.3
+npm run cli -- -n 50 -a 2 -t 200 --p2p --p2p-churn-interval 3 --p2p-churn-prob 0.3
 ```
 
 P2P with high churn rate:
@@ -129,11 +127,12 @@ npm run cli -- -n 100 -a 3 -t 300 --p2p --p2p-churn-interval 2 --p2p-churn-prob 
 
 1. Generates a random regular graph of honest nodes
 2. Adds adversary nodes with configurable connectivity
-3. If P2P enabled: initializes peer managers with active subsets and schedules churn events
+3. If P2P enabled: initializes peer managers and schedules periodic churn events
 4. Injects transactions at random honest nodes
-5. Transactions propagate via offer/request/send protocol (to active peers only when P2P enabled)
-6. Adversary nodes front-run honest txs by creating adversarial versions
-7. Reports final mempool contents (honest vs adversarial tx counts)
+5. Transactions propagate via offer/request/send protocol
+6. If P2P enabled: peers may change during simulation via churn
+7. Adversary nodes front-run honest txs by creating adversarial versions
+8. Reports final mempool contents (honest vs adversarial tx counts)
 
 ## Output
 
