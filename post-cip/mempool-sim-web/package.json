@@ -8,7 +8,8 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "cli": "tsx src/cli.ts",
+    "build": "NODE_OPTIONS='--max-old-space-size=8192' tsc",
+    "cli": "NODE_OPTIONS='--max-old-space-size=8192' tsx src/cli.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
