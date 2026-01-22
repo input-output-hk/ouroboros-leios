@@ -8,7 +8,7 @@ Simulates how transactions propagate through a network of nodes, where some node
 
 The simulation implements a highly idealized representation of the Cardano mempool protocol rules. It aims to build intuition about the operation of the mempool.
 
-1. The network topology is that of a [Regular Random Graph](https://en.wikipedia.org/wiki/Random_regular_graph). *The churn of hot/warm/cold peers is not modeled.*
+1. The network topology is that of a [Regular Random Graph](https://en.wikipedia.org/wiki/Random_regular_graph). *Optionally, P2P peer selection can be enabled to model dynamic topology churn (see [P2P Options](#p2p-peer-selection-options)).*
 2. Transactions IDs are announced to upstream peers.
 3. Downstream peers download the transaction body from the first upstream peer that announces its ID.
 4. Each node's mempool has a finite, fixed size of twice the size of a block.
@@ -65,8 +65,33 @@ Options:
   --slot-duration <seconds>    Block slot duration in seconds (default: "20")
   -s, --slots <number>         Number of slots to simulate (default: "10")
   --log-level <level>          Logging detail (choices: "fatal", "error", "warn", "info", "debug", "trace", default: "info")
+  --log-target <target>        Write log to target (choices: "pino-pretty", "pino/file", default: "pino-pretty")
+  --p2p                        Enable P2P peer selection (dynamic topology) (default: false)
+  --p2p-active-peers <number>  Target active peers for P2P (default: "6")
+  --p2p-churn-interval <secs>  P2P churn interval in seconds (default: "5")
+  --p2p-churn-prob <float>     P2P churn probability per peer (default: "0.2")
   -h, --help                   display help for command
 ```
+
+### P2P Peer Selection Options
+
+When `--p2p` is enabled, the simulation models dynamic peer selection with periodic churn:
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--p2p` | Enable P2P peer selection mode | `false` (static topology) |
+| `--p2p-active-peers` | Number of active peers each node maintains for tx propagation | `6` |
+| `--p2p-churn-interval` | Seconds between churn events where peers may be replaced | `5` |
+| `--p2p-churn-prob` | Probability that each active peer is replaced during churn | `0.2` |
+
+**How P2P peer selection works:**
+
+1. Each node has access to all its topological neighbors but only maintains an "active set" for transaction propagation
+2. Transactions are only sent to peers in the active set
+3. Periodically (at `churn-interval`), each active peer has a `churn-prob` chance of being replaced by a random inactive peer
+4. This models the hot/warm/cold peer dynamics in real Cardano P2P networking
+
+**Note:** P2P peer selection affects **both honest and adversary nodes**. Adversaries also maintain an active peer set and experience churn, which can limit their propagation advantage since their high connectivity (`--adversary-degree`) is partially negated by only using `--p2p-active-peers` connections at any time.
 
 ### Examples
 
@@ -90,14 +115,25 @@ High adversary connectivity:
 npm run cli -- -n 50 -a 3 --adversary-degree 30 -t 200
 ```
 
+With P2P peer selection enabled:
+```bash
+npm run cli -- -n 50 -a 2 -t 200 --p2p --p2p-active-peers 4 --p2p-churn-interval 3 --p2p-churn-prob 0.3
+```
+
+P2P with high churn rate:
+```bash
+npm run cli -- -n 100 -a 3 -t 300 --p2p --p2p-churn-interval 2 --p2p-churn-prob 0.5
+```
+
 ## How it works
 
 1. Generates a random regular graph of honest nodes
 2. Adds adversary nodes with configurable connectivity
-3. Injects transactions at random honest nodes
-4. Transactions propagate via offer/request/send protocol
-5. Adversary nodes front-run honest txs by creating adversarial versions
-6. Reports final mempool contents (honest vs adversarial tx counts)
+3. If P2P enabled: initializes peer managers with active subsets and schedules churn events
+4. Injects transactions at random honest nodes
+5. Transactions propagate via offer/request/send protocol (to active peers only when P2P enabled)
+6. Adversary nodes front-run honest txs by creating adversarial versions
+7. Reports final mempool contents (honest vs adversarial tx counts)
 
 ## Output
 
