@@ -3,7 +3,7 @@ import { MemoryPool } from './mempool.js';
 import { TXID_B, type Tx, type TxId, type Block } from './types.js';
 import { Link } from './link.js'
 import { logger } from './logger.js';
-import type { Simulation } from './simulation.js';
+import { Simulation } from './simulation.js';
 
 // Maximum entries in the known txId cache per node.
 // Prevents unbounded memory growth during long simulations.
@@ -56,12 +56,13 @@ export class Node {
     return this.mempool.contents().some(tx => tx.frontRuns !== '');
   }
 
-  removeConfirmedTxs(txIds: string[]): void {
+  removeConfirmedTxs(sim: Simulation, now: number, txIds: string[]): void {
     for (const txId of txIds) {
       this.mempool.remove(txId);
     }
     this.backpressure = this.backpressure.filter(tx => !txIds.includes(tx.txId));
     this.offers = this.offers.filter(txId => !txIds.includes(txId[0]!));
+    this.fillMemoryPool(sim, now);
   }
 
   // Reset node state for simulation restart (keeps topology)

@@ -163,7 +163,7 @@ export class Simulation {
     // Remove from all nodes' mempools
     this._graph.forEachNode((nodeId) => {
       const node = this._graph.getNodeAttributes(nodeId);
-      node.removeConfirmedTxs(txIdsToRemove);
+      node.removeConfirmedTxs(this, block.clock, txIdsToRemove);
     });
     
     this.eventQueue.data =
