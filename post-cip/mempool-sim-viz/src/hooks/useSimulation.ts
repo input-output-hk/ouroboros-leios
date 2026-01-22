@@ -516,7 +516,7 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
     while (lastBlockCountRef.current < currentBlocks.length) {
       const block = currentBlocks[lastBlockCountRef.current]!;
       addLogEntry(
-        block.timestamp,
+        block.clock,
         'block',
         `${block.producer} → ${block.honestCount}/${block.adversarialCount} txs`
       );
