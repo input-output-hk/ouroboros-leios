@@ -71,17 +71,15 @@ export const MINIMAL_CONFIG: SimulationConfig = {
 
 export type PresetType = 'minimal' | 'default' | 'custom';
 
-// P2P Peer Selection Types (simplified active set model)
+// P2P Peer Selection Types (dynamic topology churn model)
 export interface P2PConfig {
-  enabled: boolean;           // Toggle static vs dynamic (default: false)
-  targetActivePeers: number;  // How many active peers per node (default: 6)
+  enabled: boolean;           // Toggle static vs dynamic topology (default: false)
   churnInterval: number;      // Seconds between churn events (default: 5)
   churnProbability: number;   // Probability each peer is replaced per churn (default: 0.2)
 }
 
 export const DEFAULT_P2P_CONFIG: P2PConfig = {
   enabled: false,
-  targetActivePeers: 6,
   churnInterval: 5,
   churnProbability: 0.2,
 };

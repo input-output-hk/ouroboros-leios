@@ -24,7 +24,6 @@ const DEFAULTS = {
   logLevel: 'info',
   logTarget: 'pino-pretty',
   // P2P defaults
-  p2pActivePeers: 6,
   p2pChurnInterval: 5,
   p2pChurnProb: 0.2,
 };
@@ -59,10 +58,9 @@ program
     .choices(['pino-pretty', 'pino/file'])
     .default(DEFAULTS.logTarget)
   )
-  .option('--p2p', 'Enable P2P peer selection (dynamic topology)', false)
-  .option('--p2p-active-peers <number>', 'Target active peers for P2P', String(DEFAULTS.p2pActivePeers))
+  .option('--p2p', 'Enable P2P peer selection (dynamic topology churn)', false)
   .option('--p2p-churn-interval <seconds>', 'P2P churn interval in seconds', String(DEFAULTS.p2pChurnInterval))
-  .option('--p2p-churn-prob <float>', 'P2P churn probability per peer', String(DEFAULTS.p2pChurnProb))
+  .option('--p2p-churn-prob <float>', 'P2P churn probability per peer (0-1)', String(DEFAULTS.p2pChurnProb))
   .parse(process.argv);
 
 const opts = program.opts();
@@ -88,7 +86,6 @@ const config = {
   logTarget: opts.logTarget,
   // P2P config
   p2p: opts.p2p === true,
-  p2pActivePeers: parseInt(opts.p2pActivePeers),
   p2pChurnInterval: parseFloat(opts.p2pChurnInterval),
   p2pChurnProb: parseFloat(opts.p2pChurnProb),
 };
@@ -102,7 +99,6 @@ try {
     ...{message_overhead_bytes: OVERHEAD_B},
     p2p: config.p2p ? {
       enabled: true,
-      targetActivePeers: config.p2pActivePeers,
       churnInterval: config.p2pChurnInterval,
       churnProbability: config.p2pChurnProb,
     } : { enabled: false },
@@ -147,7 +143,6 @@ try {
     const simulationEndTime = config.slots * config.slotDuration;
     sim.initializeP2P({
       enabled: true,
-      targetActivePeers: config.p2pActivePeers,
       churnInterval: config.p2pChurnInterval,
       churnProbability: config.p2pChurnProb,
     }, simulationEndTime);
