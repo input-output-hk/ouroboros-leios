@@ -13,7 +13,7 @@ export class Link {
   }
 
   computeDelay(now: number, size_B: number): number {
-    const jitter: number = Math.random() / 1e9; // 1 ns of jitter.
+    const jitter: number = Math.random() * 150e-9; // 150 ns of jitter.
     return now + this.latency_s + (OVERHEAD_B + size_B) / this.bandwidth_Bps + jitter
   }
 

@@ -152,7 +152,7 @@ export class Simulation {
       if (tx.frontRuns === '') {
         // Honest tx: remove it and its adversarial variant
         txIdsToRemove.push(tx.txId);
-        txIdsToRemove.push(tx.txId + 'adv');
+        txIdsToRemove.push(`${tx.txId}adv`);
       } else {
         // Adversarial tx: remove it and the original honest tx it front-runs
         txIdsToRemove.push(tx.txId);
@@ -166,6 +166,7 @@ export class Simulation {
       node.removeConfirmedTxs(this, block.clock, txIdsToRemove);
     });
     
+    // FIXME: Incorporate filtering directly into the queue data structure.
     this.eventQueue.data =
       this.eventQueue.data.filter(e => {
         switch (e.kind) {
