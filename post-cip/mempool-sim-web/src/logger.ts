@@ -6,7 +6,7 @@ const isBrowser = typeof window !== 'undefined';
 // Browser: use pino's built-in browser support (outputs to console)
 // Node.js: use pino-pretty for formatted output
 export let logger: Logger = isBrowser
-  ? pino({ level: 'info', browser: { asObject: false } })
+  ? pino({ level: 'warn', browser: { asObject: false } })
   : pino({
       level: 'info', // trace, debug, info, warn, error, fatal
       transport: {

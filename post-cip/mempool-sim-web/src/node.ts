@@ -168,6 +168,7 @@ export class Node {
         const okay = this.mempool.enqueue(tx, tx.size_B)
         if (!okay) {
         //logger.trace({clock: now, node: this.id, tx: tx, mempool: this.mempool}, "cannot insert into full memory pool");
+          break;
         } else {
           let delay = this.honest ? 0 : this.frontrunDelay;
           this.backpressure.shift();
