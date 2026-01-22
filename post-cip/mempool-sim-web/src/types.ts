@@ -11,7 +11,7 @@ export interface Tx {
 export interface Block {
   blockId: string;
   producer: string;
-  timestamp: number;
+  clock: number;
   transactions: Tx[];
   size_B: number;
   honestCount: number;

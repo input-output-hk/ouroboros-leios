@@ -60,6 +60,8 @@ export class Node {
     for (const txId of txIds) {
       this.mempool.remove(txId);
     }
+    this.backpressure = this.backpressure.filter(tx => !txIds.includes(tx.txId));
+    this.offers = this.offers.filter(txId => !txIds.includes(txId[0]!));
   }
 
   // Reset node state for simulation restart (keeps topology)
@@ -107,6 +109,7 @@ export class Node {
   public handleSubmitTx(sim: Simulation, now: number, tx: Tx): void {
     // Already seen this exact transaction
     if (this.known.has(tx.txId)) {
+      logger.trace({clock: now, node: this.id, txId: tx.txId}, "transaction already known");
       return;
     }
 
@@ -248,7 +251,7 @@ export class Node {
     const block: Block = {
       blockId: `B${sim.blocks.length}`,
       producer: this.id,
-      timestamp: now,
+      clock: now,
       transactions: txs,
       size_B: size,
       honestCount: honest,
