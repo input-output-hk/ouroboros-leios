@@ -160,18 +160,24 @@ export class Node {
   private fillMemoryPool(sim: Simulation, now: number): void {
     while (this.backpressure.length > 0) {
       const tx = this.backpressure[0];
-      if (!tx)
-        break;
+      if (!tx) {
+        logger.fatal({clock: now, node: this.id}, "null transaction in backpressure");
+        throw new Error("null transaction in backpressure");
+      }
       if (!this.mempool.contains(tx.txId)) {
         const okay = this.mempool.enqueue(tx, tx.size_B)
-        if (!okay)
-          break;
-        let delay = this.honest ? 0 : this.frontrunDelay;
-        logger.trace({clock: now, node: this.id, txId: tx.txId}, "insert into memory pool");
-        this.offerUpstream(sim, now + delay, tx);
+        if (!okay) {
+        //logger.trace({clock: now, node: this.id, tx: tx, mempool: this.mempool}, "cannot insert into full memory pool");
+        } else {
+          let delay = this.honest ? 0 : this.frontrunDelay;
+          this.backpressure.shift();
+          logger.trace({clock: now, node: this.id, txId: tx.txId}, "insert into memory pool");
+          this.offerUpstream(sim, now + delay, tx);
+        }
+      } else {
+        this.backpressure.shift();
+        logger.trace({clock: now, node: this.id, tx: tx}, "tx already in memory pool");
       }
-      this.backpressure.shift();
-      logger.trace({clock: now, node: this.id, txId: tx.txId}, "remove backpressure");
     }
   }
 

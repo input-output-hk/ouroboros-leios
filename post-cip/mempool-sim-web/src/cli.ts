@@ -125,7 +125,7 @@ try {
 
   // Inject transactions at random honest nodes with random sizes
   for (let i = 0; i < config.txCount; ++i) {
-    const txId = "T" + i;
+    const txId = `T${i}`;
     // Random honest node (H1 to H{nodes})
     const nodeIndex = Math.ceil(config.nodes * Math.random());
     const node = "H" + nodeIndex;
