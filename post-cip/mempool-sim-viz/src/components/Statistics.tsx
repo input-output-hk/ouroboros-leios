@@ -120,7 +120,7 @@ export function Statistics({ stats, blocks }: StatisticsProps) {
                 className="flex items-center gap-2"
               >
                 <span style={{ color: COLORS.border, minWidth: '20px' }}>{index + 1}.</span>
-                <span style={{ color: COLORS.textMuted }}>{block.timestamp.toFixed(1)}s</span>
+                <span style={{ color: COLORS.textMuted }}>{block.clock.toFixed(1)}s</span>
                 <span style={{ color: COLORS.text }}>{block.producer}</span>
                 <span style={{ color: COLORS.border }}>→</span>
                 <span>

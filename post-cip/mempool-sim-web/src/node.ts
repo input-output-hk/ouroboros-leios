@@ -3,7 +3,7 @@ import { MemoryPool } from './mempool.js';
 import { TXID_B, type Tx, type TxId, type Block } from './types.js';
 import { Link } from './link.js'
 import { logger } from './logger.js';
-import type { Simulation } from './simulation.js';
+import { Simulation } from './simulation.js';
 
 // Maximum entries in the known txId cache per node.
 // Prevents unbounded memory growth during long simulations.
@@ -56,10 +56,13 @@ export class Node {
     return this.mempool.contents().some(tx => tx.frontRuns !== '');
   }
 
-  removeConfirmedTxs(txIds: string[]): void {
+  removeConfirmedTxs(sim: Simulation, now: number, txIds: string[]): void {
     for (const txId of txIds) {
       this.mempool.remove(txId);
     }
+    this.backpressure = this.backpressure.filter(tx => !txIds.includes(tx.txId));
+    this.offers = this.offers.filter(txId => !txIds.includes(txId[0]!));
+    this.fillMemoryPool(sim, now);
   }
 
   // Reset node state for simulation restart (keeps topology)
@@ -107,6 +110,7 @@ export class Node {
   public handleSubmitTx(sim: Simulation, now: number, tx: Tx): void {
     // Already seen this exact transaction
     if (this.known.has(tx.txId)) {
+      logger.trace({clock: now, node: this.id, txId: tx.txId}, "transaction already known");
       return;
     }
 
@@ -157,18 +161,25 @@ export class Node {
   private fillMemoryPool(sim: Simulation, now: number): void {
     while (this.backpressure.length > 0) {
       const tx = this.backpressure[0];
-      if (!tx)
-        break;
+      if (!tx) {
+        logger.fatal({clock: now, node: this.id}, "null transaction in backpressure");
+        throw new Error("null transaction in backpressure");
+      }
       if (!this.mempool.contains(tx.txId)) {
         const okay = this.mempool.enqueue(tx, tx.size_B)
-        if (!okay)
+        if (!okay) {
+        //logger.trace({clock: now, node: this.id, tx: tx, mempool: this.mempool}, "cannot insert into full memory pool");
           break;
-        let delay = this.honest ? 0 : this.frontrunDelay;
-        logger.trace({clock: now, node: this.id, txId: tx.txId}, "insert into memory pool");
-        this.offerUpstream(sim, now + delay, tx);
+        } else {
+          let delay = this.honest ? 0 : this.frontrunDelay;
+          this.backpressure.shift();
+          logger.trace({clock: now, node: this.id, txId: tx.txId}, "insert into memory pool");
+          this.offerUpstream(sim, now + delay, tx);
+        }
+      } else {
+        this.backpressure.shift();
+        logger.trace({clock: now, node: this.id, tx: tx}, "tx already in memory pool");
       }
-      this.backpressure.shift();
-      logger.trace({clock: now, node: this.id, txId: tx.txId}, "remove backpressure");
     }
   }
 
@@ -248,7 +259,7 @@ export class Node {
     const block: Block = {
       blockId: `B${sim.blocks.length}`,
       producer: this.id,
-      timestamp: now,
+      clock: now,
       transactions: txs,
       size_B: size,
       honestCount: honest,

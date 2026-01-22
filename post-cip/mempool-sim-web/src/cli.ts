@@ -1,7 +1,7 @@
 import { Command, Option } from 'commander';
 import { generateNetwork, addAdversaryNode } from './topology.js';
 import { Simulation } from './simulation.js';
-import { logger } from './logger.js'
+import { logger, makeLogger } from './logger.js'
 import { OVERHEAD_B } from './link.js';
 import type { Tx } from './types.js';
 
@@ -9,19 +9,20 @@ import type { Tx } from './types.js';
 const DEFAULTS = {
   nodes: 50,
   degree: 6,
-  block: 90000,          // 90 kB
-  latency: 0.100,        // 100 ms
-  bandwidth: 1250000,    // 10 Mb/s
+  block: 90000,             // 90 kB
+  latency: 0.100,           // 100 ms
+  bandwidth: 1250000,       // 10 Mb/s
   adversaries: 2,
-  adversaryDegree: 18,   // 3x honest degree
+  adversaryDegree: 18,      // 3x honest degree
   txCount: 250,
-  txDuration: 20,        // seconds over which to inject txs
-  txSizeMin: 200,        // minimum tx size in bytes
-  txSizeMax: 16384,      // maximum tx size in bytes
-  slotDuration: 20,      // seconds per block slot
-  slots: 10,             // number of slots to simulate
-  adversaryDelay: 0.002, // number of seconds needed to front-run a tx
+  txDuration: 20,           // seconds over which to inject txs
+  txSizeMin: 200,           // minimum tx size in bytes
+  txSizeMax: 16384,         // maximum tx size in bytes
+  slotDuration: 20,         // seconds per block slot
+  slots: 10,                // number of slots to simulate
+  adversaryDelay: 0.002,    // number of seconds needed to front-run a tx
   logLevel: 'info',
+  logTarget: 'pino-pretty',
 };
 
 const program = new Command();
@@ -49,6 +50,11 @@ program
     .choices(['fatal', 'error', 'warn', 'info', 'debug', 'trace'])
     .default(DEFAULTS.logLevel)
   )
+  .addOption(
+    new Option('--log-target <target>', 'Write log to target')
+    .choices(['pino-pretty', 'pino/file'])
+    .default(DEFAULTS.logTarget)
+  )
   .parse(process.argv);
 
 const opts = program.opts();
@@ -71,11 +77,12 @@ const config = {
   slotDuration: parseInt(opts.slotDuration),
   slots: parseInt(opts.slots),
   logLevel: opts.logLevel,
+  logTarget: opts.logTarget,
 };
 
 try {
 
-  logger.level = config.logLevel;
+  makeLogger(config.logLevel, config.logTarget);
 
   logger.info({
     ...config,
@@ -91,7 +98,7 @@ try {
     config.bandwidth
   );
 
-  logger.info({ nodeCount: graph.order, edgeCount: graph.size }, "graph created");
+  logger.debug({ nodeCount: graph.order, edgeCount: graph.size }, "graph created");
 
   // Add adversary nodes
   for (let i = 0; i < config.adversaries; ++i) {
@@ -110,7 +117,7 @@ try {
   // Log topology
   graph.forEachNode((node) => {
     const neighbors = graph.outNeighbors(node);
-    logger.info({ node: node, downstream_peers: neighbors }, "topology");
+    logger.debug({ node: node, downstream_peers: neighbors }, "topology");
   });
 
   // Create simulation
@@ -118,7 +125,7 @@ try {
 
   // Inject transactions at random honest nodes with random sizes
   for (let i = 0; i < config.txCount; ++i) {
-    const txId = "T" + i;
+    const txId = `T${i}`;
     // Random honest node (H1 to H{nodes})
     const nodeIndex = Math.ceil(config.nodes * Math.random());
     const node = "H" + nodeIndex;
@@ -139,8 +146,10 @@ try {
   // Schedule rotating block production among honest nodes
   const honestNodes = Array.from({ length: config.nodes }, (_, i) => `H${i + 1}`);
   for (let slot = 0; slot < config.slots; slot++) {
-    const producer = honestNodes[slot % honestNodes.length]!;
-    sim.produceBlock(slot * config.slotDuration, producer, config.block);
+    if (Math.random() * config.slotDuration >= 1)
+      continue;
+    const producer = honestNodes[Math.floor(Math.random() * honestNodes.length)]!;
+    sim.produceBlock(slot, producer, config.block);
   }
 
   logger.info({ slots: config.slots, slotDuration: config.slotDuration }, "block production scheduled");
@@ -189,8 +198,8 @@ try {
     honest_tx_in_blocks: totalHonestInBlocks,
     adversarial_tx_in_blocks: totalAdvInBlocks,
     front_run_rate: totalInBlocks > 0 ? totalAdvInBlocks / totalInBlocks : 0,
-    avg_block_fill_percent: blocks.length > 0
-      ? blocks.reduce((s, b) => s + b.size_B, 0) / (blocks.length * config.block) * 100
+    avg_block_fill_fraction: blocks.length > 0
+      ? blocks.reduce((s, b) => s + b.size_B, 0) / (blocks.length * config.block)
       : 0
   }, "block statistics");
 

@@ -138,12 +138,13 @@ export class Simulation {
     logger.info({
       blockId: block.blockId,
       producer: block.producer,
-      timestamp: block.timestamp,
+      clock: block.clock,
       txCount: block.transactions.length,
       size_B: block.size_B,
       honestCount: block.honestCount,
       adversarialCount: block.adversarialCount
     }, "block produced");
+    logger.debug(block, "block contents");
 
     // Build list of all txIds to remove (both honest and adversarial variants)
     const txIdsToRemove: string[] = [];
@@ -162,8 +163,20 @@ export class Simulation {
     // Remove from all nodes' mempools
     this._graph.forEachNode((nodeId) => {
       const node = this._graph.getNodeAttributes(nodeId);
-      node.removeConfirmedTxs(txIdsToRemove);
+      node.removeConfirmedTxs(this, block.clock, txIdsToRemove);
     });
+    
+    this.eventQueue.data =
+      this.eventQueue.data.filter(e => {
+        switch (e.kind) {
+          case 'SubmitTx': return !txIdsToRemove.includes(e.tx.txId);
+          case 'OfferTx': return !txIdsToRemove.includes(e.txId);
+          case 'RequestTx': return !txIdsToRemove.includes(e.txId);
+          case 'SendTx': return !txIdsToRemove.includes(e.tx.txId);
+          case 'ProduceBlock': return true;
+        }
+      });
+    this.eventQueue.length = this.eventQueue.data.length;
   }
 
   /**
