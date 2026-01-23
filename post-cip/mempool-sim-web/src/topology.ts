@@ -101,21 +101,34 @@ export function addAdversaryNode(
     return pool.slice(0, count);
   };
 
+  // For upstream: rewire existing edges to point to adversary instead of adding new ones
+  // This keeps honest nodes' out-degree constant
   const incomingSources = pickRandomNodes(upstreamCount);
   for (const source of incomingSources) {
-    graph.addDirectedEdge(
-      source, 
-      id, 
-      new Link(latency_s, bandwidth_Bps),
-    );
+    const currentTargets = graph.outNeighbors(source);
+    // Filter out the adversary itself and nodes we've already rewired to
+    const eligibleTargets = currentTargets.filter(t => t !== id);
+
+    if (eligibleTargets.length > 0) {
+      // Pick a random existing target to rewire
+      const oldTarget = eligibleTargets[Math.floor(Math.random() * eligibleTargets.length)]!;
+      // Remove old edge and add new one to adversary
+      graph.dropDirectedEdge(source, oldTarget);
+      graph.addDirectedEdge(source, id, new Link(latency_s, bandwidth_Bps));
+    } else {
+      // Fallback: add edge if no existing edges to rewire (shouldn't happen normally)
+      if (!graph.hasDirectedEdge(source, id)) {
+        graph.addDirectedEdge(source, id, new Link(latency_s, bandwidth_Bps));
+      }
+    }
   }
 
+  // For downstream: rewire edges FROM other nodes TO the adversary's targets
+  // This keeps honest nodes' in-degree roughly constant
   const outgoingTargets = pickRandomNodes(downstreamCount);
   for (const target of outgoingTargets) {
-    graph.addDirectedEdge(
-      id, 
-      target, 
-      new Link(latency_s, bandwidth_Bps),
-    );
+    if (!graph.hasDirectedEdge(id, target)) {
+      graph.addDirectedEdge(id, target, new Link(latency_s, bandwidth_Bps));
+    }
   }
 }
