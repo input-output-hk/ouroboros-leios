@@ -37,6 +37,9 @@ export class Node {
   // P2P peer manager (null if P2P is disabled)
   private peerManager: PeerManager | null = null;
 
+  // Set of block IDs this node has already seen (for diffusion deduplication)
+  private seenBlocks: Set<string> = new Set();
+
   constructor(id: string, honest: boolean, frontrunDelay: number, mempool_B: number) {
     this.id = id;
     this.honest = honest;
@@ -75,6 +78,7 @@ export class Node {
     this.backpressure = [];
     this.offers = [];
     this.known.clear();
+    this.seenBlocks.clear();
     if (this.peerManager) {
       this.peerManager.reset();
     }
@@ -321,6 +325,48 @@ export class Node {
     };
 
     sim.diffuseBlock(block);
+  }
+
+  /**
+   * Handle receiving a block (either as producer or via diffusion).
+   * Removes confirmed transactions and propagates to downstream peers.
+   * Blocks flow from upstream to downstream (following edge direction).
+   */
+  public handleReceiveBlock(sim: Simulation, block: Block): void {
+    // Skip if already seen this block
+    if (this.seenBlocks.has(block.blockId)) {
+      return;
+    }
+    this.seenBlocks.add(block.blockId);
+
+    logger.trace({
+      node: this.id,
+      blockId: block.blockId,
+      producer: block.producer,
+      clock: block.clock
+    }, "node received block");
+
+    // Remove confirmed transactions from mempool
+    const txIdsToRemove = sim.buildTxIdsToRemove(block);
+    this.removeConfirmedTxs(sim, block.clock, txIdsToRemove);
+
+    // Remove pending tx events for confirmed transactions (only once per block)
+    if (this.id === block.producer) {
+      sim.removeConfirmedTxEvents(txIdsToRemove);
+    }
+
+    // Propagate to downstream peers (following edge direction: this -> peer)
+    const graph = sim.graph;
+    graph.forEachOutEdge(this.id, (_edge, link, _source, target) => {
+      const delay = link.computeDelay(block.clock, block.size_B);
+      sim.scheduleBlockDiffusion(delay, this.id, target, block);
+      logger.trace({
+        from: this.id,
+        to: target,
+        blockId: block.blockId,
+        delay: delay - block.clock
+      }, "scheduling block diffusion");
+    });
   }
 
   // Default link for P2P churned peers without topology edges
