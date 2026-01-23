@@ -16,6 +16,7 @@ function getEmbedParams() {
   return {
     embed: params.get('embed') === 'true',
     autoPlay: params.get('autoPlay') === 'true',
+    loop: params.get('loop') === 'true',
     hideControls: params.get('hideControls') === 'true',
     hideStats: params.get('hideStats') === 'true',
     hideTimeline: params.get('hideTimeline') === 'true',
@@ -161,6 +162,25 @@ export default function App() {
       triggerAutoPlay();
     }
   }, [initialize, start, setSpeed]);
+
+  // Loop simulation in embed mode: restart when finished
+  useEffect(() => {
+    if (!embedParams.current.loop || !embedParams.current.autoPlay) return;
+    if (!isInitialized || !simulationDuration) return;
+
+    // Check if simulation has finished (not running and time reached end)
+    if (!isRunning && !isPaused && stats.currentTime >= simulationDuration - 0.1) {
+      // Reset and restart after a brief pause
+      const restartTimer = setTimeout(() => {
+        reset();
+        setTimeout(() => {
+          start();
+        }, 300);
+      }, 2000); // 2 second pause before restart
+
+      return () => clearTimeout(restartTimer);
+    }
+  }, [isRunning, isPaused, stats.currentTime, simulationDuration, isInitialized, reset, start]);
 
   // Determine which panels to show
   const showLeftPanel = !isEmbedMode && !embedParams.current.hideControls;

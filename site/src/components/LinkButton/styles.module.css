@@ -12,6 +12,7 @@
   transition: all 0.2s ease;
 }
 
+/* Light mode hover - dark purple gradient */
 .linkButton:hover {
   border: 1px solid transparent;
   background: linear-gradient(135deg, #200830 0%, #3d1259 100%);
@@ -21,6 +22,16 @@
 
 .linkButton:hover svg path {
   fill: #fff;
+}
+
+/* Dark mode hover - bright teal/cyan gradient */
+:global([data-theme="dark"]) .linkButton:hover {
+  background: linear-gradient(135deg, #0d9488 0%, #6effd1 100%);
+  color: #121218;
+}
+
+:global([data-theme="dark"]) .linkButton:hover svg path {
+  fill: #121218;
 }
 
 .linkButton span {

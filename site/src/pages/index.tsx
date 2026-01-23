@@ -418,7 +418,7 @@ function MempoolSimulationSection() {
             </div>
             <div className={styles.mempoolEmbedContainer}>
               <iframe
-                src="https://leios.cardano-scaling.org/mempool-viz/?embed=true&autoPlay=true&speed=2"
+                src="https://leios.cardano-scaling.org/mempool-viz/?embed=true&autoPlay=true&loop=true&speed=2"
                 title="Mempool Simulation Visualization"
                 className={styles.mempoolIframe}
                 loading="lazy"
