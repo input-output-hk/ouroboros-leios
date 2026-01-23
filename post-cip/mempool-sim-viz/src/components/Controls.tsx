@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { type SimulationConfig, type PresetType, DEFAULT_CONFIG, MINIMAL_CONFIG } from '@/simulation';
+import { type SimulationConfig, type PresetType, type P2PConfig, DEFAULT_CONFIG, MINIMAL_CONFIG, DEFAULT_P2P_CONFIG } from '@/simulation';
 
 // Theme colors from Leios site
 const COLORS = {
@@ -173,14 +173,16 @@ function PresetTab({ preset, activePreset, onClick, label }: PresetTabProps) {
 
 interface ControlsProps {
   onConfigChange: (config: SimulationConfig) => void;
+  onP2PConfigChange: (config: P2PConfig) => void;
   disabled?: boolean;
   isExpanded: boolean;
   onToggleExpand: () => void;
 }
 
-export function Controls({ onConfigChange, disabled = false, isExpanded, onToggleExpand }: ControlsProps) {
+export function Controls({ onConfigChange, onP2PConfigChange, disabled = false, isExpanded, onToggleExpand }: ControlsProps) {
   const [config, setConfig] = useState<SimulationConfig>({ ...MINIMAL_CONFIG });
   const [activePreset, setActivePreset] = useState<PresetType>('minimal');
+  const [p2pConfig, setP2PConfig] = useState<P2PConfig>({ ...DEFAULT_P2P_CONFIG, churnInterval: 3 });
 
   // Only call onConfigChange when config changes, not when the callback reference changes
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -188,9 +190,17 @@ export function Controls({ onConfigChange, disabled = false, isExpanded, onToggl
     onConfigChange(config);
   }, [config]);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    onP2PConfigChange(p2pConfig);
+  }, [p2pConfig]);
+
   const handlePresetChange = useCallback((preset: Exclude<PresetType, 'custom'>) => {
     setConfig({ ...PRESETS[preset] });
     setActivePreset(preset);
+    // Update P2P churn interval based on preset
+    const churnInterval = preset === 'minimal' ? 3 : 5;
+    setP2PConfig(prev => ({ ...prev, churnInterval }));
   }, []);
 
   useEffect(() => {
@@ -309,6 +319,61 @@ export function Controls({ onConfigChange, disabled = false, isExpanded, onToggl
               onChange={(v) => updateConfig('degree', v)}
             />
           </Section>
+
+          {/* P2P Section - toggle controls expansion */}
+          <div className="pt-4" style={{ borderTop: `1px solid ${COLORS.border}` }}>
+            <div className="flex items-center justify-between mb-3">
+              <span
+                className="text-sm font-medium flex items-center gap-1"
+                style={{ color: COLORS.text }}
+                title="Enable P2P peer selection with dynamic topology churn"
+              >
+                P2P
+                <span
+                  className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full text-[9px] font-bold cursor-help"
+                  style={{ backgroundColor: COLORS.textMuted, color: COLORS.background }}
+                >
+                  ?
+                </span>
+              </span>
+              <button
+                onClick={() => setP2PConfig(prev => ({ ...prev, enabled: !prev.enabled }))}
+                className="relative w-10 h-5 rounded-full transition-colors cursor-pointer"
+                style={{ backgroundColor: p2pConfig.enabled ? COLORS.accent : COLORS.border }}
+              >
+                <div
+                  className="absolute top-0.5 w-4 h-4 rounded-full transition-transform"
+                  style={{
+                    backgroundColor: COLORS.text,
+                    transform: p2pConfig.enabled ? 'translateX(22px)' : 'translateX(2px)',
+                  }}
+                />
+              </button>
+            </div>
+            {p2pConfig.enabled && (
+              <div className="space-y-4">
+                <Slider
+                  label="Churn Interval"
+                  value={p2pConfig.churnInterval}
+                  min={1}
+                  max={30}
+                  unit="s"
+                  tooltip="Time between peer churn events (seconds)"
+                  onChange={(v) => setP2PConfig(prev => ({ ...prev, churnInterval: v }))}
+                />
+                <Slider
+                  label="Churn Probability"
+                  value={Math.round(p2pConfig.churnProbability * 100)}
+                  min={5}
+                  max={50}
+                  step={5}
+                  unit="%"
+                  tooltip="Probability each peer is replaced during churn"
+                  onChange={(v) => setP2PConfig(prev => ({ ...prev, churnProbability: v / 100 }))}
+                />
+              </div>
+            )}
+          </div>
 
           <Section title="Adversary Settings" titleColor={COLORS.adversary} defaultOpen={true}>
             <Slider

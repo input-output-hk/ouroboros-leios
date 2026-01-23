@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Controls } from '@/components/Controls';
 import { Canvas, type SelectedNodeInfo } from '@/components/Canvas';
 import { Statistics } from '@/components/Statistics';
@@ -7,7 +7,7 @@ import { PeerInfo } from '@/components/PeerInfo';
 import { EventLog } from '@/components/EventLog';
 import { useSimulation } from '@/hooks/useSimulation';
 import { COLORS } from '@/theme';
-import type { SimulationConfig, LayoutType } from '@/simulation';
+import type { SimulationConfig, LayoutType, P2PConfig } from '@/simulation';
 
 export default function App() {
   const [selectedNode, setSelectedNode] = useState<SelectedNodeInfo | null>(null);
@@ -15,6 +15,7 @@ export default function App() {
   const [layoutType, setLayoutType] = useState<LayoutType>('circular');
   const [isInitialized, setIsInitialized] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [currentConfig, setCurrentConfig] = useState<SimulationConfig | null>(null);
   const {
     isRunning,
     isPaused,
@@ -35,6 +36,7 @@ export default function App() {
     reset,
     step,
     setSpeed,
+    setP2PConfig,
     onDragStart,
     onDrag,
     onDragEnd,
@@ -44,12 +46,23 @@ export default function App() {
     // Config changes regenerate topology (only when not actively running)
     if (!isRunning) {
       setSelectedNode(null);
+      setCurrentConfig(config);
       initialize(config);
       if (!isInitialized) {
         setTimeout(() => setIsInitialized(true), 300);
       }
     }
   }, [isRunning, initialize, isInitialized]);
+
+  const handleP2PConfigChange = useCallback((config: P2PConfig) => {
+    setP2PConfig(config);
+    // Reinitialize simulation with new P2P config (if we have a config and not running)
+    if (currentConfig && !isRunning) {
+      setSelectedNode(null);
+      // Small delay to ensure P2P config ref is updated before initialize runs
+      setTimeout(() => initialize(currentConfig), 0);
+    }
+  }, [setP2PConfig, currentConfig, isRunning, initialize]);
 
   const handleReset = useCallback(() => {
     setSelectedNode(null);
@@ -69,6 +82,22 @@ export default function App() {
       });
     }
   }, [nodes, edges]);
+
+  // Update selected node's upstream/downstream when edges change (for P2P churn)
+  useEffect(() => {
+    if (selectedNode) {
+      const upstream = edges.filter(e => e.target === selectedNode.id).map(e => e.source);
+      const downstream = edges.filter(e => e.source === selectedNode.id).map(e => e.target);
+      // Only update if peers actually changed
+      const upstreamChanged = upstream.length !== selectedNode.upstream.length ||
+        upstream.some(p => !selectedNode.upstream.includes(p));
+      const downstreamChanged = downstream.length !== selectedNode.downstream.length ||
+        downstream.some(p => !selectedNode.downstream.includes(p));
+      if (upstreamChanged || downstreamChanged) {
+        setSelectedNode(prev => prev ? { ...prev, upstream, downstream } : null);
+      }
+    }
+  }, [edges, selectedNode]);
 
   return (
     <div className="h-screen w-screen overflow-hidden relative" style={{ backgroundColor: COLORS.background }}>
@@ -128,6 +157,7 @@ export default function App() {
         <div className="overflow-y-auto rounded" style={{ backgroundColor: 'rgba(32, 8, 48, 0.9)' }}>
           <Controls
             onConfigChange={handleConfigChange}
+            onP2PConfigChange={handleP2PConfigChange}
             disabled={isRunning}
             isExpanded={showControls}
             onToggleExpand={() => setShowControls(!showControls)}

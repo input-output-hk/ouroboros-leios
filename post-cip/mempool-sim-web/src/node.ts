@@ -4,7 +4,7 @@ import { TXID_B, type Tx, type TxId, type Block } from './types.js';
 import { Link } from './link.js'
 import { logger } from './logger.js';
 import type { Simulation } from './simulation.js';
-import { PeerManager } from './peer-manager.js';
+import { PeerManager, type ChurnResult } from './peer-manager.js';
 
 // Maximum entries in the known txId cache per node.
 // Prevents unbounded memory growth during long simulations.
@@ -87,15 +87,17 @@ export class Node {
   }
 
   // Handle P2P churn event
-  handlePeerChurn(sim: Simulation, now: number): void {
+  handlePeerChurn(sim: Simulation, now: number): ChurnResult | null {
     if (this.peerManager) {
-      this.peerManager.churn();
+      const result = this.peerManager.churn();
       // Schedule next churn event
       const config = sim.p2pConfig;
       if (config && config.enabled) {
         sim.schedulePeerChurn(now + config.churnInterval, this.id);
       }
+      return result;
     }
+    return null;
   }
 
   // Get the peer manager (for testing/debugging)

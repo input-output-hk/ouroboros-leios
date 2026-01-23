@@ -4,6 +4,7 @@ import type { TxId, Tx, Block, P2PConfig } from './types.js';
 import { Node } from './node.js';
 import { Link } from './link.js';
 import { logger } from './logger.js';
+import type { ChurnResult } from './peer-manager.js';
 
 /**
  * Event types for the discrete event simulation.
@@ -17,9 +18,21 @@ export type Event =
   | { kind: 'PeerChurn'; clock: number; nodeId: string };
 
 /**
+ * Extended PeerChurn event with churn result for visualization.
+ */
+export type PeerChurnEvent = { kind: 'PeerChurn'; clock: number; nodeId: string; churnResult: ChurnResult | null };
+
+/**
+ * Event type passed to handler, which includes churnResult for PeerChurn events.
+ */
+export type HandlerEvent =
+  | Exclude<Event, { kind: 'PeerChurn' }>
+  | PeerChurnEvent;
+
+/**
  * Event handler callback for visualization or logging purposes.
  */
-export type SimulationEventHandler = (event: Event) => void;
+export type SimulationEventHandler = (event: HandlerEvent) => void;
 
 /**
  * Simulation class that encapsulates the network graph and event queue.
@@ -238,6 +251,7 @@ export class Simulation {
           case 'RequestTx': return !txIdsToRemove.includes(e.txId);
           case 'SendTx': return !txIdsToRemove.includes(e.tx.txId);
           case 'ProduceBlock': return true;
+          case 'PeerChurn': return true;
         }
       });
     this.eventQueue.length = this.eventQueue.data.length;
@@ -265,8 +279,8 @@ export class Simulation {
     this._currentTime = event.clock;
     this._eventsProcessed++;
 
-    // Notify event handler if set
-    if (this._eventHandler) {
+    // Notify event handler if set (except PeerChurn which is handled separately with churnResult)
+    if (this._eventHandler && event.kind !== 'PeerChurn') {
       this._eventHandler(event);
     }
 
@@ -288,7 +302,11 @@ export class Simulation {
         logger.fatal(event, "unknown node for churn");
         throw new Error(`unknown node for churn: ${event.nodeId}`);
       }
-      node.handlePeerChurn(this, event.clock);
+      const churnResult = node.handlePeerChurn(this, event.clock);
+      // Notify handler with extended event including churnResult
+      if (this._eventHandler) {
+        this._eventHandler({ ...event, churnResult });
+      }
       return true;
     }
 

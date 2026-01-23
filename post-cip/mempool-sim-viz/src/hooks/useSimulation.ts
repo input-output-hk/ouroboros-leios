@@ -10,7 +10,9 @@ import {
   type VisualNode,
   type VisualEdge,
   type AnimatedTx,
-  type Event,
+  type HandlerEvent,
+  type P2PConfig,
+  DEFAULT_P2P_CONFIG,
   type LayoutType,
   Node,
   Link,
@@ -26,6 +28,11 @@ export interface LogEntry {
 }
 
 const MAX_LOG_ENTRIES = 100;
+
+interface EdgeAnimation {
+  state: 'adding' | 'removing';
+  progress: number;
+}
 
 interface UseSimulationReturn {
   isRunning: boolean;
@@ -47,6 +54,7 @@ interface UseSimulationReturn {
   reset: () => void;
   step: () => void;
   setSpeed: (speed: number) => void;
+  setP2PConfig: (config: P2PConfig) => void;
   onDragStart: (nodeId: string, x: number, y: number) => void;
   onDrag: (nodeId: string, x: number, y: number) => void;
   onDragEnd: (nodeId: string) => void;
@@ -96,6 +104,11 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
   const lastEventLogLengthRef = useRef<number>(0);
   const lastFullEventLogLengthRef = useRef<number>(0);
   const lastAnimatedTxCountRef = useRef<number>(0);
+
+  // P2P state - using refs to avoid triggering re-renders
+  const p2pConfigRef = useRef<P2PConfig>(DEFAULT_P2P_CONFIG);
+  const edgeAnimationsRef = useRef<Map<string, EdgeAnimation>>(new Map());
+  const EDGE_ANIM_DURATION = 0.4; // 400ms
 
   const updateStats = useCallback(() => {
     const sim = simRef.current;
@@ -147,6 +160,66 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
     setNodes(visualNodes);
   }, []);
 
+  // Update edges - either from static topology or dynamic P2P peers
+  const updateEdges = useCallback(() => {
+    const graph = graphRef.current;
+    if (!graph) return;
+
+    const currentP2PConfig = p2pConfigRef.current;
+
+    if (!currentP2PConfig.enabled) {
+      // Static mode: edges from graph topology
+      const visualEdges: VisualEdge[] = [];
+      graph.forEachEdge((_, _attrs, source, target) => {
+        visualEdges.push({ source, target });
+      });
+      setEdges(visualEdges);
+      return;
+    }
+
+    // P2P mode: collect edges from each node's peerManager
+    const visualEdges: VisualEdge[] = [];
+    const seenEdges = new Set<string>();
+
+    graph.forEachNode((nodeId) => {
+      const node = graph.getNodeAttributes(nodeId);
+      const peerManager = node.getPeerManager();
+      if (peerManager) {
+        const peers = peerManager.getPeers();
+        for (const peer of peers) {
+          const edgeKey = `${peer}->${nodeId}`;
+          if (!seenEdges.has(edgeKey)) {
+            seenEdges.add(edgeKey);
+            const animation = edgeAnimationsRef.current.get(edgeKey);
+            visualEdges.push({
+              source: peer,
+              target: nodeId,
+              animationState: animation?.state ?? 'stable',
+              animationProgress: animation?.progress,
+            });
+          }
+        }
+      }
+    });
+
+    // Also include edges that are being removed (not in current peers but have removing animation)
+    edgeAnimationsRef.current.forEach((anim, edgeKey) => {
+      if (anim.state === 'removing' && !seenEdges.has(edgeKey)) {
+        const [source, target] = edgeKey.split('->');
+        if (source && target) {
+          visualEdges.push({
+            source,
+            target,
+            animationState: 'removing',
+            animationProgress: anim.progress,
+          });
+        }
+      }
+    });
+
+    setEdges(visualEdges);
+  }, []);
+
   const addLogEntry = useCallback((time: number, kind: string, message: string, isAdversarial?: boolean) => {
     const entry: LogEntry = {
       id: logIdCounter.current++,
@@ -164,7 +237,7 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
     }
   }, []);
 
-  const handleEvent = useCallback((event: Event) => {
+  const handleEvent = useCallback((event: HandlerEvent) => {
     const graph = graphRef.current;
     if (!graph) return;
 
@@ -178,6 +251,23 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
       case 'SendTx': {
         const isAdv = event.tx.frontRuns !== '';
         addLogEntry(event.clock, 'send', `${event.tx.txId}: ${event.from} → ${event.to}`, isAdv);
+        break;
+      }
+      case 'PeerChurn': {
+        const { churnResult, nodeId } = event;
+        if (churnResult && (churnResult.replaced.length > 0 || churnResult.newPeers.length > 0)) {
+          // Mark removed edges for fade-out animation
+          for (const oldPeer of churnResult.replaced) {
+            const edgeKey = `${oldPeer}->${nodeId}`;
+            edgeAnimationsRef.current.set(edgeKey, { state: 'removing', progress: 0 });
+          }
+          // Mark added edges for fade-in animation
+          for (const newPeer of churnResult.newPeers) {
+            const edgeKey = `${newPeer}->${nodeId}`;
+            edgeAnimationsRef.current.set(edgeKey, { state: 'adding', progress: 0 });
+          }
+          addLogEntry(event.clock, 'churn', `${nodeId}: -${churnResult.replaced.length} +${churnResult.newPeers.length}`);
+        }
         break;
       }
     }
@@ -280,6 +370,12 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
     const sim = new Simulation(graph);
     sim.setEventHandler(handleEvent);
 
+    // Initialize P2P if enabled
+    const currentP2PConfig = p2pConfigRef.current;
+    if (currentP2PConfig.enabled) {
+      sim.initializeP2P(currentP2PConfig, config.duration);
+    }
+
     // Inject transactions uniformly throughout the duration
     for (let i = 0; i < config.txCount; i++) {
       const txId = `T${i}`;
@@ -326,6 +422,7 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
     graphRef.current = graph;
     configRef.current = config;
     txAnimationsRef.current.clear();
+    edgeAnimationsRef.current.clear();
     txIdCounter.current = 0;
     eventLogRef.current = [];
     fullEventLogRef.current = [];
@@ -358,6 +455,12 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
     // Create new simulation with existing graph
     const sim = new Simulation(graph);
     sim.setEventHandler(handleEvent);
+
+    // Initialize P2P if enabled
+    const currentP2PConfig = p2pConfigRef.current;
+    if (currentP2PConfig.enabled) {
+      sim.initializeP2P(currentP2PConfig, config.duration);
+    }
 
     // Inject transactions uniformly throughout the duration
     for (let i = 0; i < config.txCount; i++) {
@@ -398,6 +501,7 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
 
     simRef.current = sim;
     txAnimationsRef.current.clear();
+    edgeAnimationsRef.current.clear();
     txIdCounter.current = 0;
     eventLogRef.current = [];
     fullEventLogRef.current = [];
@@ -538,6 +642,20 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
       setAnimatedTxs(Array.from(txAnimationsRef.current.values()));
     }
 
+    // Update edge animations (for P2P churn)
+    const edgeAnimDelta = deltaSec / EDGE_ANIM_DURATION;
+    const completedEdgeAnims: string[] = [];
+    edgeAnimationsRef.current.forEach((anim, edgeKey) => {
+      anim.progress += edgeAnimDelta;
+      if (anim.progress >= 1) {
+        completedEdgeAnims.push(edgeKey);
+      }
+    });
+    // Remove completed animations
+    for (const key of completedEdgeAnims) {
+      edgeAnimationsRef.current.delete(key);
+    }
+
     // Fade block flash
     setBlockFlash(prev => {
       if (!prev) return null;
@@ -548,6 +666,11 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
 
     updateVisualNodes();
     updateStats();
+
+    // Update edges if P2P is enabled
+    if (p2pConfigRef.current.enabled) {
+      updateEdges();
+    }
 
     // Only update event logs if length changed
     const currentEventLogLength = eventLogRef.current.length;
@@ -568,7 +691,7 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
     } else {
       animationFrameRef.current = requestAnimationFrame(animationLoop);
     }
-  }, [updateVisualNodes, updateStats, addLogEntry]);
+  }, [updateVisualNodes, updateStats, addLogEntry, updateEdges]);
 
   const reset = useCallback(() => {
     if (animationFrameRef.current) {
@@ -650,6 +773,11 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
     }
   }, []);
 
+  // Set P2P config (updates ref)
+  const setP2PConfig = useCallback((config: P2PConfig) => {
+    p2pConfigRef.current = config;
+  }, []);
+
   return {
     isRunning,
     isPaused,
@@ -670,6 +798,7 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
     reset,
     step: stepOnce,
     setSpeed,
+    setP2PConfig,
     onDragStart,
     onDrag,
     onDragEnd,

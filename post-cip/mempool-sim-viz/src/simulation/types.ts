@@ -17,6 +17,8 @@ export interface VisualNode {
 export interface VisualEdge {
   source: string;
   target: string;
+  animationState?: 'stable' | 'adding' | 'removing';
+  animationProgress?: number;
 }
 
 export interface AnimatedTx {

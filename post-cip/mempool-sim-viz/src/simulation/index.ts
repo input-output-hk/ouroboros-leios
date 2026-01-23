@@ -3,6 +3,7 @@ export {
   TXID_B,
   DEFAULT_CONFIG,
   MINIMAL_CONFIG,
+  DEFAULT_P2P_CONFIG,
   MemoryPool,
   Link,
   Node,
@@ -17,7 +18,11 @@ export type {
   Block,
   SimulationConfig,
   PresetType,
+  P2PConfig,
+  ChurnResult,
   Event,
+  HandlerEvent,
+  PeerChurnEvent,
   SimulationEventHandler,
 } from 'mempool-sim-web';
 
