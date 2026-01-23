@@ -65,7 +65,7 @@ export const MINIMAL_CONFIG: SimulationConfig = {
   txCount: 50,
   txSizeMin: 200,
   txSizeMax: 16384,
-  duration: 10,
+  duration: 20,
   blockInterval: 2,
 };
 

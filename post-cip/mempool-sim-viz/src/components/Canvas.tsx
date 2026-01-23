@@ -281,6 +281,24 @@ export function Canvas({
       const fromPos = nodePositions.current.get(edge.source);
       const toPos = nodePositions.current.get(edge.target);
       if (fromPos && toPos) {
+        // Calculate draw parameters based on animation state
+        let opacity = 1;
+        let drawProgress = 1; // How much of the edge to draw (0-1)
+
+        if (edge.animationState === 'adding') {
+          // Grow from source to target
+          drawProgress = edge.animationProgress ?? 1;
+          opacity = 1;
+        } else if (edge.animationState === 'removing') {
+          // Fade out
+          opacity = 1 - (edge.animationProgress ?? 0);
+        }
+        if (opacity <= 0) return; // Skip fully faded edges
+
+        // Calculate end point based on draw progress
+        const endX = fromPos.x + (toPos.x - fromPos.x) * drawProgress;
+        const endY = fromPos.y + (toPos.y - fromPos.y) * drawProgress;
+
         // Highlight edges connected to selected node
         let edgeColor = COLORS.edgeNormal;
         let lineWidth = 1;
@@ -299,15 +317,16 @@ export function Canvas({
           }
         }
 
+        ctx.globalAlpha = opacity;
         ctx.strokeStyle = edgeColor;
         ctx.lineWidth = lineWidth * scale;
         ctx.beginPath();
         ctx.moveTo(fromPos.x, fromPos.y);
-        ctx.lineTo(toPos.x, toPos.y);
+        ctx.lineTo(endX, endY);
         ctx.stroke();
 
-        // Draw arrowhead for highlighted edges
-        if (selectedNode && (edge.target === selectedNode.id || edge.source === selectedNode.id)) {
+        // Draw arrowhead for highlighted edges (only when fully drawn)
+        if (drawProgress >= 1 && selectedNode && (edge.target === selectedNode.id || edge.source === selectedNode.id)) {
           const angle = Math.atan2(toPos.y - fromPos.y, toPos.x - fromPos.x);
           const arrowLen = 10 * scale;
           const arrowX = toPos.x - 12 * scale * Math.cos(angle);
@@ -327,6 +346,7 @@ export function Canvas({
           ctx.fillStyle = edgeColor;
           ctx.fill();
         }
+        ctx.globalAlpha = 1; // Reset alpha
       }
     });
 

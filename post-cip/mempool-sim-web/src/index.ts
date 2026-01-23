@@ -13,7 +13,7 @@ export { Node } from './node.js';
 
 // Simulation
 export { Simulation } from './simulation.js';
-export type { Event, SimulationEventHandler } from './simulation.js';
+export type { Event, HandlerEvent, PeerChurnEvent, SimulationEventHandler } from './simulation.js';
 
 // Network generation
 export { generateNetwork, addAdversaryNode } from './topology.js';
