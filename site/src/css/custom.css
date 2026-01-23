@@ -287,6 +287,19 @@ html[data-theme="dark"] footer {
   background-color: var(--ifm-background-color-secondary);
 }
 
+.homepage-section-featured {
+  background: linear-gradient(180deg, #200830 0%, #2d0a45 100%);
+  color: #fff;
+}
+
+.homepage-section-featured a {
+  color: #6effd1;
+}
+
+.homepage-section-featured h2 {
+  color: #fff;
+}
+
 a {
   text-decoration: underline;
 }

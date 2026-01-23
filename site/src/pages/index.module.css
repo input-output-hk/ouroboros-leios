@@ -43,7 +43,8 @@
 }
 
 .contentWrapper,
-.researchContentWrapper {
+.researchContentWrapper,
+.howLeiosWorksWrapper {
   display: flex;
   flex-direction: row;
   justify-content: space-between;
@@ -51,7 +52,8 @@
 }
 
 .contentWrapper h2,
-.researchContentWrapper h2 {
+.researchContentWrapper h2,
+.howLeiosWorksWrapper h2 {
   margin-bottom: 0;
 }
 
@@ -62,7 +64,8 @@
 }
 
 @media (max-width: 997px) {
-  .researchContentWrapper {
+  .researchContentWrapper,
+  .howLeiosWorksWrapper {
     flex-direction: column-reverse;
   }
 }
@@ -118,9 +121,14 @@
   }
 }
 
+.stayUpToDateContent {
+  color: #fff;
+}
+
 .stayUpToDateContent p {
   font-size: var(--text-xl);
   line-height: var(--line-height-normal);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .reviewMeetingContaner {
@@ -131,8 +139,8 @@
   max-width: 39.25rem;
   padding: 1.375rem 1.75rem;
   gap: 1.5rem;
-  border: 0.5px solid #8b8190;
-  background-color: var(--ifm-background-color-primary);
+  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  background-color: rgba(0, 0, 0, 0.3);
 }
 
 .backgroundGrid {
@@ -152,7 +160,7 @@
   align-items: center;
   width: 100%;
   max-width: 230px;
-  background-color: var(--ifm-background-color-secondary);
+  background-color: rgba(255, 255, 255, 0.05);
 }
 
 .cameraImageContainer img {
@@ -178,12 +186,12 @@
   font-size: var(--text-2xl);
   font-family: var(--font-lexend);
   line-height: var(--text-3xl);
-  color: var(--ifm-font-color-alternate);
+  color: #fff;
   text-decoration: none;
 }
 
 .countdownLabel {
-  color: var(--ifm-font-color-alternate);
+  color: rgba(255, 255, 255, 0.8);
   margin-top: 1.19rem;
   margin-bottom: 1.25rem;
 }
@@ -218,7 +226,7 @@
     width: 100%;
     max-width: 100%;
     height: 12.375rem;
-    background-color: var(--ifm-background-color-secondary);
+    background-color: rgba(255, 255, 255, 0.05);
   }
 }
 
@@ -345,5 +353,155 @@
 @media (max-width: 997px) {
   .svgCaption {
     margin-top: 3rem;
+  }
+}
+
+/* Live Tracker Section Styles - Visual on LEFT, Text on RIGHT */
+.trackerContentWrapper {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  gap: 3rem;
+}
+
+.trackerContentWrapper h2 {
+  margin-bottom: 0;
+}
+
+.trackerContent {
+  width: 100%;
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+}
+
+.trackerLinkButton {
+  max-width: 14rem;
+  margin-top: 1.5rem;
+}
+
+.trackerEmbedContainer {
+  display: block;
+  position: relative;
+  width: 100%;
+  max-width: 550px;
+  height: 380px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  background-color: #1a1a2e;
+  flex-shrink: 0;
+}
+
+.trackerIframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.trackerOverlayLink {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  cursor: pointer;
+}
+
+.trackerImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.trackerEmbedContainer:hover .trackerImage {
+  transform: scale(1.02);
+}
+
+@media (max-width: 997px) {
+  .trackerContentWrapper {
+    flex-direction: column-reverse;
+  }
+  .trackerContent {
+    max-width: 100%;
+  }
+  .trackerLinkButton {
+    max-width: 100%;
+    margin-top: 1.75rem;
+  }
+  .trackerEmbedContainer {
+    max-width: 100%;
+    height: 350px;
+  }
+}
+
+/* Mempool Simulation Section Styles - Text on LEFT, Visual on RIGHT */
+.mempoolContentWrapper {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  gap: 3rem;
+}
+
+.mempoolContentWrapper h2 {
+  margin-bottom: 0;
+}
+
+.mempoolContent {
+  width: 100%;
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+}
+
+.mempoolLinkButton {
+  max-width: 14rem;
+  margin-top: 1.5rem;
+}
+
+.mempoolEmbedContainer {
+  position: relative;
+  width: 100%;
+  max-width: 550px;
+  height: 380px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  background-color: var(--ifm-background-color-secondary);
+  flex-shrink: 0;
+}
+
+.mempoolIframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.mempoolOverlayLink {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  cursor: pointer;
+}
+
+@media (max-width: 997px) {
+  .mempoolContentWrapper {
+    flex-direction: column;
+  }
+  .mempoolContent {
+    max-width: 100%;
+  }
+  .mempoolLinkButton {
+    max-width: 100%;
+    margin-top: 1.75rem;
+  }
+  .mempoolEmbedContainer {
+    max-width: 100%;
+    height: 350px;
   }
 }

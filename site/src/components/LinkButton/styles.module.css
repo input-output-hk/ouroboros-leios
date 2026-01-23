@@ -8,14 +8,19 @@
   border-radius: 0.25rem;
   border: 1px solid var(--ifm-color-primary);
   text-decoration: none;
-  color: var(--ifm-color-primar);
+  color: var(--ifm-color-primary);
+  transition: all 0.2s ease;
 }
 
 .linkButton:hover {
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  background: var(--link-button-background-hover);
+  border: 1px solid transparent;
+  background: linear-gradient(135deg, #200830 0%, #3d1259 100%);
   color: #fff;
   text-decoration: none;
+}
+
+.linkButton:hover svg path {
+  fill: #fff;
 }
 
 .linkButton span {

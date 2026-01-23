@@ -1,4 +1,4 @@
-import { ArrowRightIcon, FileIcon } from "../icons";
+import { ArrowRightIcon } from "../icons";
 import styles from "./styles.module.css";
 
 type LinkButton = {
@@ -11,10 +11,7 @@ type LinkButton = {
 export function LinkButton({ text, url, target, rel }: LinkButton) {
   return (
     <a href={url} className={styles.linkButton} target={target} rel={rel}>
-      <span>
-        <FileIcon />
-        {text}
-      </span>
+      <span>{text}</span>
       <ArrowRightIcon />
     </a>
   );

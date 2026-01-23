@@ -11,6 +11,7 @@ import HowLeiosWorksGraphic from "./HowLeiosWorksGraphic";
 import styles from "./index.module.css";
 import ResearchGraphic from "./ResearchGraphic";
 import VideoCamUrl from "@site/static/img/video-cam.png";
+import LiveTrackerPreview from "@site/static/img/live-tracker-preview.png";
 
 function HomepageHeader() {
   const { siteConfig } = useDocusaurusContext();
@@ -176,7 +177,10 @@ function HowLeiosWorksSection() {
     <section id="how" className="homepage-section-primary">
       <div className="container">
         <div className="container-padding padding-section">
-          <div className={styles.contentWrapper}>
+          <div className={styles.howLeiosWorksWrapper}>
+            <div className={styles.svgContainer}>
+              <HowLeiosWorksGraphic />
+            </div>
             <div className={styles.howLeiosWorksContent}>
               <h2>How Leios Works</h2>
               <p className={styles.subtitle}>
@@ -239,9 +243,6 @@ function HowLeiosWorksSection() {
                 />
               </div>
             </div>
-            <div className={styles.svgContainer}>
-              <HowLeiosWorksGraphic />
-            </div>
           </div>
         </div>
       </div>
@@ -285,7 +286,7 @@ function MonthlyReviewsSection() {
   }, []);
 
   return (
-    <section id="next" className="homepage-section-secondary">
+    <section id="next" className="homepage-section-featured">
       <div className="container">
         <div className="container-padding padding-section">
           <div className={styles.contentWrapper}>
@@ -334,6 +335,107 @@ function MonthlyReviewsSection() {
   );
 }
 
+function LiveTrackerSection() {
+  return (
+    <section id="tracker" className="homepage-section-primary">
+      <div className="container">
+        <div className="container-padding padding-section">
+          <div className={styles.trackerContentWrapper}>
+            <Link
+              to="https://engineering.iog.io/leios"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.trackerEmbedContainer}
+            >
+              <img
+                src={LiveTrackerPreview}
+                alt="Leios Live Development Tracker showing 3D globe with commit locations"
+                className={styles.trackerImage}
+              />
+            </Link>
+            <div className={styles.trackerContent}>
+              <h2>Live Development Tracker</h2>
+              <p className={styles.subtitle}>
+                Follow the real-time progress of Leios development with our
+                interactive tracker
+              </p>
+              <p>
+                Our live tracker provides transparency into the ongoing Leios
+                development work. See current sprint progress, completed
+                milestones, and upcoming tasks as the team builds towards the
+                next generation of Cardano consensus.
+              </p>
+              <p>
+                The tracker observes GitHub commits in real-time, giving you
+                direct insight into the engineering work happening across
+                simulations, specifications, and implementation efforts.
+              </p>
+              <div className={styles.trackerLinkButton}>
+                <LinkButton
+                  text="Open Full Tracker"
+                  url="https://engineering.iog.io/leios"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function MempoolSimulationSection() {
+  return (
+    <section id="mempool" className="homepage-section-secondary">
+      <div className="container">
+        <div className="container-padding padding-section">
+          <div className={styles.mempoolContentWrapper}>
+            <div className={styles.mempoolContent}>
+              <h2>Mempool Simulation</h2>
+              <p className={styles.subtitle}>
+                Explore how transactions propagate through the Cardano network
+                with our interactive simulation tool
+              </p>
+              <p>
+                The mempool simulation visualizes how transactions flow through
+                a simplified model of the Cardano network running Ouroboros
+                Praos. Watch as transactions are submitted, propagated between
+                nodes, and eventually included in blocks.
+              </p>
+              <p>
+                This tool helps illustrate current network behavior and provides
+                a foundation for understanding how Leios will enhance
+                transaction throughput. While it doesn't yet incorporate
+                Leios-specific features, it demonstrates the baseline mempool
+                dynamics that Leios aims to improve.
+              </p>
+              <div className={styles.mempoolLinkButton}>
+                <LinkButton
+                  text="Try It Yourself"
+                  url="https://leios.cardano-scaling.org/mempool-viz/"
+                />
+              </div>
+            </div>
+            <div className={styles.mempoolEmbedContainer}>
+              <iframe
+                src="https://leios.cardano-scaling.org/mempool-viz/?embed=true&autoPlay=true&speed=2"
+                title="Mempool Simulation Visualization"
+                className={styles.mempoolIframe}
+                loading="lazy"
+              />
+              <Link
+                to="https://leios.cardano-scaling.org/mempool-viz/"
+                className={styles.mempoolOverlayLink}
+                aria-label="Open Mempool Simulation"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function Home(): React.ReactElement {
   const { siteConfig } = useDocusaurusContext();
   return (
@@ -347,6 +449,8 @@ export default function Home(): React.ReactElement {
         <LeiosSpecificationSection />
         <HowLeiosWorksSection />
         <MonthlyReviewsSection />
+        <LiveTrackerSection />
+        <MempoolSimulationSection />
       </main>
     </Layout>
   );
