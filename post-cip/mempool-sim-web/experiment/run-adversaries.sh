@@ -14,4 +14,4 @@ do
   echo "npm run cli -- --nodes 10000 --degree 20 --adversaries $ADVERSARIES --adversary-degree 20 --tx-size-min 1500 --tx-size-max 1500 --tx-count $TX_COUNT --tx-duration $TX_DURATION --slots $SLOTS --log-target pino/file | tail -n +5 | gzip -9c > adversaries-$ADVERSARIES.jsonl.gz" >> jobs.list
 done
 
-parallel --jobs=$(($(grep '^processor' /proc/cpuinfo | wc -l) * 1 / 2)) < jobs.list
+parallel --jobs=$(($(grep '^processor' /proc/cpuinfo | wc -l) * 1 / 2)) < jobs-adversaries.list
