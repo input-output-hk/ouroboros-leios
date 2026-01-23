@@ -119,7 +119,7 @@ try {
   for (let i = 0; i < config.adversaries; ++i) {
     addAdversaryNode(
       graph,
-      "A" + (i + 1),
+      `A${i + 1}`,
       config.adversaryDegree,
       config.adversaryDegree,
       config.adversaryDelay,
@@ -150,22 +150,22 @@ try {
 
   // Inject transactions at random honest nodes with random sizes
   for (let i = 0; i < config.txCount; ++i) {
-    const txId = `T${i}`;
+    // FIXME: Should we order these sequentially in time?
+    const txId = `T${i + 1}`;
     // Random honest node (H1 to H{nodes})
     const nodeIndex = Math.ceil(config.nodes * Math.random());
-    const node = "H" + nodeIndex;
+    const node = `H${nodeIndex}`;
     // Random time within tx duration
     const time = Math.round(config.txDuration * Math.random());
     // Random size within configured range
     const size = config.txSizeMin + Math.floor(Math.random() * (config.txSizeMax - config.txSizeMin));
-
+    // Schedule
     sim.submitTx(time, node, {
       txId: txId,
       size_B: size,
       frontRuns: "",
     });
   }
-
   logger.info({ txCount: config.txCount, pendingEvents: sim.pendingEvents }, "transactions submitted");
 
   // Schedule rotating block production among honest nodes
@@ -176,12 +176,10 @@ try {
     const producer = honestNodes[Math.floor(Math.random() * honestNodes.length)]!;
     sim.produceBlock(slot, producer, config.block);
   }
-
   logger.info({ slots: config.slots, slotDuration: config.slotDuration }, "block production scheduled");
 
   // Run the simulation
   sim.run();
-
   logger.info({ eventsProcessed: sim.eventsProcessed, finalTime: sim.currentTime }, "simulation complete");
 
   // Collect and report statistics
@@ -190,8 +188,8 @@ try {
 
   graph.forEachNode((nodeId) => {
     const node = graph.getNodeAttributes(nodeId);
-    node.logPartialState();
-    node.logMempoolSummary();
+    node.logPartialState(sim.currentTime);
+    node.logMempoolSummary(sim.currentTime);
     node.getTransactions().forEach(tx => {
       if (tx.frontRuns)
         adversarialTxs.add(tx);

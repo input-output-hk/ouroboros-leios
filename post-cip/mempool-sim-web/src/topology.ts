@@ -17,7 +17,7 @@ export function generateNetwork(
   }
 
   const makeId = (i: number): string => {
-    return "H" + (i + 1);
+    return `H${i + 1}`;
   };
 
   const graph = new DirectedGraph<Node, Link>();

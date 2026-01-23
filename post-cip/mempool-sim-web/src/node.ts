@@ -106,19 +106,24 @@ export class Node {
   }
 
   // Log the partial state of the node.
-  public logPartialState(): void {
+  public logPartialState(now: number): void {
     logger.debug({
       node: this.id,
       honest: this.honest,
       mempool: {
-        summary: this.mempoolSummary(),
+        summary: this.mempoolSummary(now),
         contents: this.mempool.contents()
       }
     }, "node partial state");
   }
 
+  // Log the contens of the memory pool.
+  public logMempool(now: number): void {
+    logger.debug({clock: now, node: this.id, mempool: this.mempool.contents().map(tx => tx.txId)}, "memory pool contents");
+  }
+
   // Summarize the memory pool.
-  public mempoolSummary(): any {
+  public mempoolSummary(now: number): any {
     let honest: number = 0;
     let adversarial: number = 0;
     let bytes: number = 0;
@@ -129,12 +134,12 @@ export class Node {
       else
         adversarial += 1;
     });
-    return {node: this.id, mempool_bytes: bytes, mempool_tx_count: {honest, adversarial}};
+    return {clock: now, node: this.id, mempool_bytes: bytes, mempool_tx_count: {honest, adversarial}};
   }
 
   // Log the memory pool summarization.
-  public logMempoolSummary(): void {
-    logger.debug(this.mempoolSummary(), "mempool summary");
+  public logMempoolSummary(now: number): void {
+    logger.debug(this.mempoolSummary(now), "mempool summary");
   }
 
   // Submit a transaction to a node, applying backpressure if needed.
@@ -150,7 +155,7 @@ export class Node {
 
     if (isHonestTx) {
       // This is an honest transaction - check if we already have its adversarial version
-      const advTxId = tx.txId + "adv";
+      const advTxId = `${tx.txId}adv`;
       if (this.known.has(advTxId)) {
         // We already have the front-run version, reject the original
         this.known.set(tx.txId, true); // Mark as seen to prevent future processing
@@ -174,7 +179,7 @@ export class Node {
     // If this node is adversarial and receives an honest tx, front-run it
     if (isHonestTx && !this.honest) {
       const txAdv: Tx = {
-        txId: tx.txId + "adv",
+        txId: `${tx.txId}adv`,
         size_B: tx.size_B,
         frontRuns: tx.txId,
       };
@@ -260,11 +265,11 @@ export class Node {
       return;
     const graph = sim.graph;
     while (this.offers.length > 0) {
-      const offer = this.offers.shift();
+      const offer = this.offers![0];
       const txId = offer![0];
-      // FIXME: Should we always take the first offer? or a random one?
-      const peer = offer![1];
+      const choices = this.offers.filter(offer => offer[0] == txId);
       this.offers = this.offers.filter(offer => offer[0] != txId);
+      const peer = choices![Math.floor(choices.length * Math.random())]![1];
       logger.trace({clock: now, node: this.id, peer: peer, txId: txId}, "request transaction");
       const link = this.getDownstreamLinkOrDefault(graph, peer);
       sim.requestTx(link.computeDelay(now, TXID_B), this.id, peer, txId);
