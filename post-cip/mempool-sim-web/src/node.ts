@@ -74,19 +74,24 @@ export class Node {
   }
 
   // Log the partial state of the node.
-  public logPartialState(): void {
+  public logPartialState(now: number): void {
     logger.debug({
       node: this.id,
       honest: this.honest,
       mempool: {
-        summary: this.mempoolSummary(),
+        summary: this.mempoolSummary(now),
         contents: this.mempool.contents()
       }
     }, "node partial state");
   }
 
+  // Log the contens of the memory pool.
+  public logMempool(now: number): void {
+    logger.debug({clock: now, node: this.id, mempool: this.mempool.contents().map(tx => tx.txId)}, "memory pool contents");
+  }
+
   // Summarize the memory pool.
-  public mempoolSummary(): any {
+  public mempoolSummary(now: number): any {
     let honest: number = 0;
     let adversarial: number = 0;
     let bytes: number = 0;
@@ -97,12 +102,12 @@ export class Node {
       else
         adversarial += 1;
     });
-    return {node: this.id, mempool_bytes: bytes, mempool_tx_count: {honest, adversarial}};
+    return {clock: now, node: this.id, mempool_bytes: bytes, mempool_tx_count: {honest, adversarial}};
   }
 
   // Log the memory pool summarization.
-  public logMempoolSummary(): void {
-    logger.debug(this.mempoolSummary(), "mempool summary");
+  public logMempoolSummary(now: number): void {
+    logger.debug(this.mempoolSummary(now), "mempool summary");
   }
 
   // Submit a transaction to a node, applying backpressure if needed.

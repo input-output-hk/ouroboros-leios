@@ -163,8 +163,8 @@ try {
 
   graph.forEachNode((nodeId) => {
     const node = graph.getNodeAttributes(nodeId);
-    node.logPartialState();
-    node.logMempoolSummary();
+    node.logPartialState(sim.currentTime);
+    node.logMempoolSummary(sim.currentTime);
     node.getTransactions().forEach(tx => {
       if (tx.frontRuns)
         adversarialTxs.add(tx);
