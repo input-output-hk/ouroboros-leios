@@ -79,7 +79,7 @@ export interface P2PConfig {
 }
 
 export const DEFAULT_P2P_CONFIG: P2PConfig = {
-  enabled: false,
+  enabled: true,
   churnInterval: 5,
   churnProbability: 0.2,
 };
