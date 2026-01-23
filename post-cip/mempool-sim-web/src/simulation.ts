@@ -15,7 +15,8 @@ export type Event =
   | { kind: 'RequestTx'; clock: number; from: string; to: string; txId: TxId }
   | { kind: 'SendTx'; clock: number; from: string; to: string; tx: Tx }
   | { kind: 'ProduceBlock'; clock: number; producer: string; blockSize_B: number }
-  | { kind: 'PeerChurn'; clock: number; nodeId: string };
+  | { kind: 'PeerChurn'; clock: number; nodeId: string }
+  | { kind: 'DiffuseBlock'; clock: number; from: string; to: string; block: Block };
 
 /**
  * Extended PeerChurn event with churn result for visualization.
@@ -164,6 +165,20 @@ export class Simulation {
   }
 
   /**
+   * Schedule block diffusion from one node to another.
+   * Blocks flow from upstream to downstream (following edge direction).
+   */
+  scheduleBlockDiffusion(clock: number, from: string, to: string, block: Block): void {
+    this.eventQueue.push({
+      kind: 'DiffuseBlock',
+      clock,
+      from,
+      to,
+      block
+    });
+  }
+
+  /**
    * Initialize P2P peer selection for all nodes.
    * Sets up peer managers and schedules initial churn events.
    * @param config P2P configuration
@@ -206,9 +221,9 @@ export class Simulation {
   }
 
   /**
-   * Diffuse a produced block and remove confirmed transactions from all nodes.
-   * Since honest and adversarial txs share UTxO inputs, when either is confirmed
-   * the other becomes invalid and should be removed from all mempools.
+   * Start diffusing a produced block through the network.
+   * Blocks flow from upstream to downstream (following edge direction).
+   * The producer processes the block first, then diffuses to downstream peers.
    */
   diffuseBlock(block: Block): void {
     this._blocks.push(block);
@@ -223,7 +238,16 @@ export class Simulation {
     }, "block produced");
     logger.debug(block, "block contents");
 
-    // Build list of all txIds to remove (both honest and adversarial variants)
+    // Producer processes the block first
+    const producer = this._graph.getNodeAttributes(block.producer);
+    producer.handleReceiveBlock(this, block);
+  }
+
+  /**
+   * Build list of transaction IDs to remove when a block is received.
+   * Includes both honest and adversarial variants.
+   */
+  buildTxIdsToRemove(block: Block): string[] {
     const txIdsToRemove: string[] = [];
     for (const tx of block.transactions) {
       if (tx.frontRuns === '') {
@@ -236,13 +260,14 @@ export class Simulation {
         txIdsToRemove.push(tx.frontRuns);
       }
     }
+    return txIdsToRemove;
+  }
 
-    // Remove from all nodes' mempools
-    this._graph.forEachNode((nodeId) => {
-      const node = this._graph.getNodeAttributes(nodeId);
-      node.removeConfirmedTxs(this, block.clock, txIdsToRemove);
-    });
-    
+  /**
+   * Remove pending events for confirmed transactions.
+   * Called when a node receives a block.
+   */
+  removeConfirmedTxEvents(txIdsToRemove: string[]): void {
     this.eventQueue.data =
       this.eventQueue.data.filter(e => {
         switch (e.kind) {
@@ -252,6 +277,7 @@ export class Simulation {
           case 'SendTx': return !txIdsToRemove.includes(e.tx.txId);
           case 'ProduceBlock': return true;
           case 'PeerChurn': return true;
+          case 'DiffuseBlock': return true;
         }
       });
     this.eventQueue.length = this.eventQueue.data.length;
@@ -328,6 +354,9 @@ export class Simulation {
         break;
       case 'SendTx':
         target.handleSendTx(this, event.clock, event.from, event.tx);
+        break;
+      case 'DiffuseBlock':
+        target.handleReceiveBlock(this, event.block);
         break;
     }
 
