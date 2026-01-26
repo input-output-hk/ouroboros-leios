@@ -1,4 +1,5 @@
 *.jsonl.gz
 *.png
 *.svg
+*.tsv.gz
 jobs-*.list
