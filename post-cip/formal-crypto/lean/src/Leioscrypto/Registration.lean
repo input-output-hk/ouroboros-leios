@@ -29,26 +29,30 @@ deriving Repr, BEq
 structure Registry where
   registrations : List Registration
   pools_unique_keyhash : (registrations.map $ Pool.poolKeyHash ∘ Registration.pool).Nodup
-  pools_unique_blskeys : (registrations.map $ Pool.mvk ∘ Registration.pool).Nodup
+--pools_unique_blskeys : (registrations.map $ Pool.mvk ∘ Registration.pool).Nodup
 deriving Repr
 
 instance : Inhabited Registry where
-  default := ⟨ default , List.nodup_nil , List.nodup_nil ⟩
+  default :=
+    ⟨
+      default
+    , List.nodup_nil
+--  , List.nodup_nil
+    ⟩
 
 
 namespace Registry
 
   def deregister (poolId : PoolKeyHash) (regs : Registry) : Registry :=
     let registrations := regs.registrations
-    let test (reg' : Registration) : Bool := reg'.pool.poolKeyHash == poolId
-    match registrations.find? test with
+    match registrations.find? $ fun reg' ↦ reg'.pool.poolKeyHash == poolId with
     | none => regs
     | some reg =>
         let registrations' := registrations.erase reg
         let sublist_map_nodup {a : Type} (f : Pool → a) (h₀ : (registrations.map $ f ∘ Registration.pool).Nodup) : (registrations'.map $ f ∘ Registration.pool).Nodup :=
-          let xs := registrations.map $ f ∘ Registration.pool
-          let xs' := registrations'.map $ f ∘ Registration.pool
           by
+            let xs := registrations.map $ f ∘ Registration.pool
+            let xs' := registrations'.map $ f ∘ Registration.pool
             have h₁ : registrations'.Sublist registrations := List.erase_sublist
             have h₂ : xs'.Sublist xs :=
               by
@@ -58,12 +62,25 @@ namespace Registry
         ⟨
           registrations'
         , sublist_map_nodup Pool.poolKeyHash regs.pools_unique_keyhash
-        , sublist_map_nodup Pool.mvk regs.pools_unique_blskeys
+--      , sublist_map_nodup Pool.mvk regs.pools_unique_blskeys
         ⟩
 
 
-  def register (regs : Registry) (reg : Registration): Registry :=
-    sorry
+  def register (regs : Registry) (reg : Registration) : Registry :=
+    let poolId : PoolKeyHash := reg.pool.poolKeyHash
+    let registrations := regs.registrations
+    let test (reg' : Registration) : Bool := reg'.pool.poolKeyHash != poolId
+    let registrations' := registrations.filter test
+    let registrations'' := reg :: registrations'
+    ⟨
+      registrations''
+    , by
+        let keyhashes' := registrations'.map $ Pool.poolKeyHash ∘ Registration.pool
+        let h₂ : keyhashes'.Nodup := sorry
+        let keyhashes'' := registrations''.map $ Pool.poolKeyHash ∘ Registration.pool
+        have h₁ : ¬ poolId ∈ keyhashes' ∧ keyhashes'.Nodup := sorry
+        sorry
+    ⟩
 
   def ValidRegistration (reg : Registration) (regs : Registry) : Prop :=
     let test (reg' : Registration) : Bool := reg'.pool.poolKeyHash == reg.pool.poolKeyHash
