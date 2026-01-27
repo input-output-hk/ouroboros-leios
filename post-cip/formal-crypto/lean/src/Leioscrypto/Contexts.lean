@@ -16,7 +16,8 @@ deriving Repr
 
 
 structure EpochContext where
-  pools : List (Pool × Coin)
+  epoch : Nat
+  pools : List (PoolKeyHash × Coin)
   pools_not_duplicated : (pools.map Prod.fst).Nodup
   pools_have_stake : pools.Forall (fun a ↦ a.snd > 0)
   pools_sorted_nonincreasing : pools.Pairwise (fun x y ↦ x.snd ≥ y.snd)
