@@ -19,7 +19,7 @@ structure EpochContext where
   epoch : Nat
   pools : List (PoolKeyHash × Coin)
   pools_not_duplicated : (pools.map Prod.fst).Nodup
-  pools_have_stake : pools.Forall (fun a ↦ a.snd > 0)
+  pools_have_stake : pools.Forall' (fun a ↦ a.snd > 0)
   pools_sorted_nonincreasing : pools.Pairwise (fun x y ↦ x.snd ≥ y.snd)
   slot_range : Slot × Slot
   slot_range_ordered : slot_range.fst ≤ slot_range.snd

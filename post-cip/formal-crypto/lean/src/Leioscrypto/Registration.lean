@@ -1,7 +1,9 @@
 
+import Aesop
 import Leioscrypto.BLS
 import Leioscrypto.Types
 import Leioscrypto.Util
+import Mathlib.Data.List.Nodup
 
 
 namespace Leioscrypto
@@ -74,12 +76,20 @@ namespace Registry
     let registrations'' := reg :: registrations'
     ⟨
       registrations''
-    , by
+    , -- FIXME: Refactor for succinctness and explicitness.
+      by
+        let keyhashes := registrations.map $ Pool.poolKeyHash ∘ Registration.pool
         let keyhashes' := registrations'.map $ Pool.poolKeyHash ∘ Registration.pool
-        let h₂ : keyhashes'.Nodup := sorry
-        let keyhashes'' := registrations''.map $ Pool.poolKeyHash ∘ Registration.pool
-        have h₁ : ¬ poolId ∈ keyhashes' ∧ keyhashes'.Nodup := sorry
-        sorry
+        have h₁ : keyhashes'.Sublist keyhashes :=
+          by
+            rw [List.sublist_map_iff]
+            exists registrations'
+            simp_all only [List.filter_sublist, and_self, registrations', test, poolId, registrations, keyhashes']
+        have h₂ : keyhashes'.Nodup := List.Sublist.nodup h₁ regs.pools_unique_keyhash
+        have h₃ : ¬ poolId ∈ keyhashes' ∧ keyhashes'.Nodup :=
+          by
+            simp_all [keyhashes', registrations', test, poolId, registrations]
+        simp_all only [Function.comp_apply, not_false_eq_true, List.map_cons, List.nodup_cons, and_self, keyhashes', registrations', test, poolId, registrations, registrations'']
     ⟩
 
   def ValidRegistration (reg : Registration) (regs : Registry) : Prop :=
