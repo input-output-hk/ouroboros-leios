@@ -1,5 +1,5 @@
 {
-  pkgs ? import <nixpkgs> { },
+  pkgs ? import <nixos-25.11> { },
 }:
 
 pkgs.mkShell {
