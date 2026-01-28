@@ -29,8 +29,14 @@ deriving Repr
 
 namespace EpochContext
 
+  def Valid (reg: Registry) (ctx : EpochContext) : Prop :=
+    ∀ p ∈ ctx.pools.map Prod.fst, p ∈ reg.registrations.map (Pool.poolKeyHash ∘ Registration.pool)
+
   def lookup (ctx : EpochContext) (i : Nat) (h : i < ctx.pools.length) : PoolKeyHash × Coin :=
     ctx.pools.get ⟨ i, h ⟩
+
+  def lookupPoolId (ctx : EpochContext) (i : Nat) (h : i < ctx.pools.length) : PoolKeyHash :=
+    Prod.fst $ ctx.pools.get ⟨ i, h ⟩
 
 end EpochContext
 
@@ -39,6 +45,8 @@ structure ElectionContext where
   epochContext : EpochContext
   slot : Slot
   slot_in_epoch : epochContext.slot_range.fst ≤ slot ∧ slot ≤ epochContext.slot_range.snd
+  electionId : ElectionId
+  electionId_eq_slot : electionId = slot
   ebHash : BlockHash
 deriving Repr
 

@@ -22,12 +22,19 @@ namespace G2
 end G2
 
 
-def PubKey := G2.Point
+def PublicKey := G2.Point
   deriving Repr, BEq
 
 
 def PoP := G2.Point
   deriving Repr, BEq
+
+
+def Signature := G1.Point
+  deriving Repr
+
+
+opaque verify : ByteArray → PublicKey → Signature → Prop
 
 
 end Leioscrypto.BLS

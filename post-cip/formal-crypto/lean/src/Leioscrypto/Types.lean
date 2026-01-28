@@ -19,11 +19,19 @@ def BlockHash := BitVec 256
 
 
 def PoolKeyHash := BitVec 224
-  deriving Repr, BEq
+  deriving Repr, BEq, LawfulBEq
 
 
 def ColdKeySignature := BitVec 256
   deriving Repr, BEq
+
+
+def PoolIndex := Nat
+  deriving Repr
+
+
+def ElectionId := Nat
+  deriving Repr
 
 
 end Leioscrypto
