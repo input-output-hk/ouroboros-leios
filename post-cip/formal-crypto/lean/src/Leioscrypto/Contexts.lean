@@ -29,7 +29,7 @@ structure EpochContext where
 namespace EpochContext
 
   def Valid (reg: Registry) (ctx : EpochContext) : Prop :=
-    ∀ p ∈ ctx.pools.map Prod.fst, p ∈ reg.registrations.map (Pool.poolKeyHash ∘ Registration.pool)
+    ∀ p ∈ ctx.pools.map Prod.fst, p ∈ reg.map (Pool.poolKeyHash ∘ Registration.pool)
 
   def lookup (ctx : EpochContext) (i : Nat) (h : i < ctx.pools.length) : PoolKeyHash × Coin :=
     ctx.pools.get ⟨ i, h ⟩

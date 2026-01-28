@@ -41,19 +41,18 @@ namespace Registration
 end Registration
 
 
-structure Registry where
-  registrations : List Registration
-deriving Inhabited
+def Registry := List Registration
+deriving Inhabited, Membership
 
 namespace Registry
 
   structure WellFormed (r : Registry) : Prop where
-    wf_registrations : ∀ p ∈ r.registrations, p.WellFormed
-    unique_hashes : (r.registrations.map $ Pool.poolKeyHash ∘ Registration.pool).Nodup
+    wf_registrations : ∀ p ∈ r, p.WellFormed
+    unique_hashes : (r.map $ Pool.poolKeyHash ∘ Registration.pool).Nodup
 
-  def lookup (poolId : PoolKeyHash) (regs : Registry) (h : poolId ∈ regs.registrations.map (Pool.poolKeyHash ∘ Registration.pool)) : Pool :=
+  def lookup (poolId : PoolKeyHash) (regs : Registry) (h : poolId ∈ regs.map (Pool.poolKeyHash ∘ Registration.pool)) : Pool :=
     let test (reg : Registration) : Bool := reg.pool.poolKeyHash == poolId
-    match h_find : regs.registrations.find? test with
+    match h_find : regs.find? test with
     | some reg => reg.pool
     | none =>
         have impossible : False :=
@@ -68,10 +67,9 @@ namespace Registry
         impossible.elim
 
   def deregister (poolId : PoolKeyHash) (regs : Registry) : Registry :=
-    let registrations := regs.registrations
-    match registrations.find? $ fun reg' ↦ reg'.pool.poolKeyHash == poolId with
+    match regs.find? $ fun reg' ↦ reg'.pool.poolKeyHash == poolId with
     | none => regs
-    | some reg => ⟨ registrations.erase reg ⟩
+    | some reg => regs.erase reg
 
   theorem deregister_wf (poolId : PoolKeyHash) (regs :Registry) (h : regs.WellFormed) : (deregister poolId regs).WellFormed :=
     sorry
@@ -100,9 +98,8 @@ namespace Registry
 
   def register (reg : Registration) (regs : Registry) : Registry :=
     let poolId : PoolKeyHash := reg.pool.poolKeyHash
-    let registrations := regs.registrations
     let test (reg' : Registration) : Bool := reg'.pool.poolKeyHash != poolId
-    ⟨ registrations.filter test ⟩
+    regs.filter test
 
   theorem register_wf (reg : Registration) (regs : Registry) (h : regs.WellFormed) : (register reg regs).WellFormed :=
     sorry
@@ -135,7 +132,7 @@ namespace Registry
 
   def ValidRegistration (reg : Registration) (regs : Registry) : Prop :=
     let test (reg' : Registration) : Bool := reg'.pool.poolKeyHash == reg.pool.poolKeyHash
-    match regs.registrations.find? test with
+    match regs.find? test with
     | none => True
     | some reg' => reg'.issueCounter > reg.issueCounter
 
