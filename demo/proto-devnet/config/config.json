@@ -19,6 +19,7 @@
     "SnapshotInterval": 4230
   },
 
+  "MempoolCapacityBytesOverride": 25000000,
   "EnableP2P": true,
   "PeerSharing": false,
   "SyncTargetNumberOfActivePeers": 15,
