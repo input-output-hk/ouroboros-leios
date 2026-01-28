@@ -19,7 +19,15 @@ Ideally, of course, the same voting and certificate infrastructure would be used
 
 ## BLS certificate scheme
 
+
 Consider the following voting and certificate scheme for Leios:
+
+### BLS instantiation for Leios
+
+Leios adopts the **BLS12‑381 MinSig variant**, where signatures are 48 bytes
+and public keys are 96 bytes. This choice reduces certificate size because
+eligibility proofs are non‑aggregatable and must be included one‑by‑one in
+the certificate for non‑persistent voters.
 
 1. Stake pools register BLS keys for use in voting and prove possession of those keys.
 2. Nodes verify the proofs of possession of the keys they receive.
@@ -98,7 +106,9 @@ The certificate must contain the following information:
     - Non-persistent voters prove eligibility with a 48 byte (compressed) BLS signature on the message, occupying $48 \cdot (n - m)$ bytes total.
 - Aggregate signatures
     - *Signed message:* This aggregate BLS signature on the message is 48 bytes (compressed).
-    - *Signed election proofs:* Perhaps not strictly necessary, but another 48 byte (compressed) BLS signature can attest to the proof of the eligibility, see **BLS.BSig** in [the Leios paper](https://iohk.io/en/research/library/papers/high-throughput-blockchain-consensus-under-realistic-network-assumptions/).
+    - *Signed election proofs:* Leios does **not** aggregate eligibility proofs.  
+      Each non-persistent voter provides a 48-byte eligibility signature, which
+      must be verified independently to enforce the sortition threshold.
     
 Thus the total certificate size is
 
