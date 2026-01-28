@@ -14,7 +14,7 @@ opaque validColdSignature (α : Type) (x : α) : PoolKeyHash → ColdKeySignatur
 
 structure Pool where
   poolKeyHash : PoolKeyHash
-  mvk : BLS.PubKey
+  mvk : BLS.PublicKey
   mvk_valid : mvk.valid
   mu : BLS.PoP
   mu_valid : mu.valid
@@ -31,19 +31,28 @@ deriving Repr, BEq
 structure Registry where
   registrations : List Registration
   pools_unique_keyhash : (registrations.map $ Pool.poolKeyHash ∘ Registration.pool).Nodup
---pools_unique_blskeys : (registrations.map $ Pool.mvk ∘ Registration.pool).Nodup
 deriving Repr
 
 instance : Inhabited Registry where
-  default :=
-    ⟨
-      default
-    , List.nodup_nil
---  , List.nodup_nil
-    ⟩
-
+  default := ⟨ default , List.nodup_nil ⟩
 
 namespace Registry
+
+  def lookup (poolId : PoolKeyHash) (regs : Registry) (h : poolId ∈ regs.registrations.map (Pool.poolKeyHash ∘ Registration.pool)) : Pool :=
+    let test (reg : Registration) : Bool := reg.pool.poolKeyHash == poolId
+    match h_find : regs.registrations.find? test with
+    | some reg => reg.pool
+    | none =>
+        have impossible : False :=
+          by
+            simp only [List.mem_map, Function.comp_apply] at h
+            obtain ⟨r, r_in_list, r_has_id⟩ := h
+            rw [List.find?_eq_none] at h_find
+            specialize h_find r r_in_list
+            rw [beq_iff_eq] at h_find
+            rw [r_has_id] at h_find
+            simp at h_find
+        impossible.elim
 
   def deregister (poolId : PoolKeyHash) (regs : Registry) : Registry :=
     let registrations := regs.registrations
@@ -64,7 +73,6 @@ namespace Registry
         ⟨
           registrations'
         , sublist_map_nodup Pool.poolKeyHash regs.pools_unique_keyhash
---      , sublist_map_nodup Pool.mvk regs.pools_unique_blskeys
         ⟩
 
 
