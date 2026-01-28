@@ -15,28 +15,41 @@ opaque validColdSignature (α : Type) (x : α) : PoolKeyHash → ColdKeySignatur
 structure Pool where
   poolKeyHash : PoolKeyHash
   mvk : BLS.PublicKey
-  mvk_valid : mvk.valid
   mu : BLS.PoP
-  mu_valid : mu.valid
-deriving Repr, BEq
+deriving BEq
+
+namespace Pool
+
+  structure WellFormed (p : Pool) : Prop where
+    wf_mvk : p.mvk.WellFormed
+    wf_mu : p.mu.WellFormed
+
+end Pool
 
 
 structure Registration where
   pool : Pool
   issueCounter : Nat
   signature : ColdKeySignature
-deriving Repr, BEq
+deriving BEq
+
+namespace Registration
+
+  structure WellFormed (r : Registration) : Prop where
+    wf_pool : r.pool.WellFormed
+
+end Registration
 
 
 structure Registry where
   registrations : List Registration
-  pools_unique_keyhash : (registrations.map $ Pool.poolKeyHash ∘ Registration.pool).Nodup
-deriving Repr
-
-instance : Inhabited Registry where
-  default := ⟨ default , List.nodup_nil ⟩
+deriving Inhabited
 
 namespace Registry
+
+  structure WellFormed (r : Registry) : Prop where
+    wf_registrations : ∀ p ∈ r.registrations, p.WellFormed
+    unique_hashes : (r.registrations.map $ Pool.poolKeyHash ∘ Registration.pool).Nodup
 
   def lookup (poolId : PoolKeyHash) (regs : Registry) (h : poolId ∈ regs.registrations.map (Pool.poolKeyHash ∘ Registration.pool)) : Pool :=
     let test (reg : Registration) : Bool := reg.pool.poolKeyHash == poolId
@@ -58,6 +71,15 @@ namespace Registry
     let registrations := regs.registrations
     match registrations.find? $ fun reg' ↦ reg'.pool.poolKeyHash == poolId with
     | none => regs
+    | some reg => ⟨ registrations.erase reg ⟩
+
+  theorem deregister_wf (poolId : PoolKeyHash) (regs :Registry) (h : regs.WellFormed) : (deregister poolId regs).WellFormed :=
+    sorry
+/-
+  def deregister' (poolId : PoolKeyHash) (regs : Registry) : Registry :=
+    let registrations := regs.registrations
+    match registrations.find? $ fun reg' ↦ reg'.pool.poolKeyHash == poolId with
+    | none => regs
     | some reg =>
         let registrations' := registrations.erase reg
         let sublist_map_nodup {a : Type} (f : Pool → a) (h₀ : (registrations.map $ f ∘ Registration.pool).Nodup) : (registrations'.map $ f ∘ Registration.pool).Nodup :=
@@ -74,8 +96,17 @@ namespace Registry
           registrations'
         , sublist_map_nodup Pool.poolKeyHash regs.pools_unique_keyhash
         ⟩
+-/
 
+  def register (reg : Registration) (regs : Registry) : Registry :=
+    let poolId : PoolKeyHash := reg.pool.poolKeyHash
+    let registrations := regs.registrations
+    let test (reg' : Registration) : Bool := reg'.pool.poolKeyHash != poolId
+    ⟨ registrations.filter test ⟩
 
+  theorem register_wf (reg : Registration) (regs : Registry) (h : regs.WellFormed) : (register reg regs).WellFormed :=
+    sorry
+  /-
   def register (regs : Registry) (reg : Registration) : Registry :=
     let poolId : PoolKeyHash := reg.pool.poolKeyHash
     let registrations := regs.registrations
@@ -99,6 +130,8 @@ namespace Registry
             simp_all [keyhashes', registrations', test, poolId, registrations]
         simp_all only [Function.comp_apply, not_false_eq_true, List.map_cons, List.nodup_cons, and_self, keyhashes', registrations', test, poolId, registrations, registrations'']
     ⟩
+
+  -/
 
   def ValidRegistration (reg : Registration) (regs : Registry) : Prop :=
     let test (reg' : Registration) : Bool := reg'.pool.poolKeyHash == reg.pool.poolKeyHash

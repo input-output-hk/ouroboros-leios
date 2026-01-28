@@ -5,9 +5,9 @@ namespace Leioscrypto.BLS
 namespace G1
 
   def Point := Fin (2^192)
-  deriving Repr, BEq
+  deriving BEq
 
-  opaque Point.valid : Point → Prop
+  opaque Point.WellFormed : Point → Prop
 
 end G1
 
@@ -15,24 +15,28 @@ end G1
 namespace G2
 
   def Point := Fin (2^96)
-  deriving Repr, BEq
+  deriving BEq
 
-  opaque Point.valid : Point → Prop
+  opaque Point.WellFormed : Point → Prop
 
 end G2
 
 
 def PublicKey := G2.Point
-  deriving Repr, BEq
+  deriving BEq
 
 
 def PoP := G2.Point
-  deriving Repr, BEq
+  deriving BEq
 
 
 def Signature := G1.Point
-  deriving Repr
 
+namespace Signature
+
+  def WellFormed : Signature → Prop := G1.Point.WellFormed
+
+end Signature
 
 opaque verify : ByteArray → PublicKey → Signature → Prop
 

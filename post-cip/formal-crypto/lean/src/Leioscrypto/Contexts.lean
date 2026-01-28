@@ -25,7 +25,6 @@ structure EpochContext where
   slot_range : Slot × Slot
   slot_range_ordered : slot_range.fst ≤ slot_range.snd
   nonce : PraosNonce
-deriving Repr
 
 namespace EpochContext
 
@@ -48,7 +47,6 @@ structure ElectionContext where
   electionId : ElectionId
   electionId_eq_slot : electionId = slot
   ebHash : BlockHash
-deriving Repr
 
 
 end Leioscrypto

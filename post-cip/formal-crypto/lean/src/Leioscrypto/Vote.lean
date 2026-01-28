@@ -12,7 +12,6 @@ namespace Leioscrypto
 inductive Vote where
 | PersistentVote : ElectionId → BlockHash → PoolIndex → BLS.Signature → Vote
 | NonpersistentVote : ElectionId → BlockHash → PoolIndex → BLS.Signature → BLS.Signature → Vote
-deriving Repr
 
 namespace Vote
 
