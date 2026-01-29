@@ -41,7 +41,20 @@ const config: Config = {
   staticDirectories: ["static", "public"],
 
   // Configure plugins
-  plugins: [],
+  plugins: [
+    [
+      "@docusaurus/plugin-client-redirects",
+      {
+        redirects: [
+          // Weekly updates replaced by monthly reviews (2026-01-29)
+          {
+            from: "/news",
+            to: "/docs/development/monthly-reviews",
+          },
+        ],
+      },
+    ],
+  ],
 
   presets: [
     [

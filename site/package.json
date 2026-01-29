@@ -16,14 +16,15 @@
   },
   "dependencies": {
     "@docusaurus/core": "^3.9.2",
+    "@docusaurus/plugin-client-redirects": "^3.9.2",
     "@docusaurus/preset-classic": "^3.9.2",
     "@mdx-js/react": "^3.0.0",
     "clsx": "^2.0.0",
+    "framer-motion": "^12.23.25",
     "prism-react-renderer": "^2.3.0",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
-    "undici": "^7.2.3",
-    "framer-motion": "^12.23.25"
+    "undici": "^7.2.3"
   },
   "devDependencies": {
     "@docusaurus/module-type-aliases": "3.4.0",
@@ -33,7 +34,11 @@
     "typescript": "~5.2.2"
   },
   "browserslist": {
-    "production": [">0.5%", "not dead", "not op_mini all"],
+    "production": [
+      ">0.5%",
+      "not dead",
+      "not op_mini all"
+    ],
     "development": [
       "last 3 chrome version",
       "last 3 firefox version",
