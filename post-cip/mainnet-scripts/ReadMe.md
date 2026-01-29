@@ -1,6 +1,11 @@
 # Statistics for Plutus usage on Cardano mainnet
 
 
+## Method
+
+The script [redeemer-stats.sql](./redeemer-stats.sql) was executed on a `cardano-db-sync` database for Cardano `mainnet`.
+
+
 ## Data files
 
 - [redeemer-stats.csv.gz](./redeemer-stats.csv.gz): full dataset
