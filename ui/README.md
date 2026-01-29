@@ -5,13 +5,6 @@ prototypes and node implementations.
 
 ## Getting started
 
-Example traces are available via Git LFS. Fetch them first:
-
-```bash
-git lfs fetch
-git lfs checkout
-```
-
 Install dependencies and build the project with:
 
 ```bash
@@ -49,12 +42,11 @@ cat ../analysis/sims/cip/experiments/NA,0.200/config.yaml \
 ../sim-rs/target/release/sim-cli -p public/traces/config-200txkbs.json public/topologies/small.yaml public/traces/small-200txkbs.jsonl -s 120
 ```
 
-You might want to filter out `Cpu` events (not visualized) and, in case you want to store it, use gzip and git lfs:
+You might want to filter out `Cpu` events (not visualized) and compress the trace:
 
 ```bash
 grep -v 'Cpu' < public/traces/small-200txkbs.jsonl > public/traces/small-200txkbs-nocpu.jsonl
 gzip public/traces/small-200txkbs-nocpu.jsonl
-git lfs track public/traces/small-200txkbs-nocpu.jsonl.gz
 ```
 
 Then update `public/scenarios.json` accordingly:
