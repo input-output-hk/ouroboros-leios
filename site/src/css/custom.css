@@ -46,9 +46,6 @@
 
   --ifm-footer-link-hover-color: rgba(255, 255, 255, 0.6);
 
-  --ifm-navbar-padding-vertical: 0;
-  --ifm-navbar-item-padding-vertical: 0;
-  --ifm-navbar-item-padding-horizontal: 0;
   --ifm-spacing-horizontal: 0;
   --ifm-heading-font-weight: 500;
 
@@ -133,14 +130,6 @@ html[data-theme="dark"] footer {
   }
 }
 
-.navbar,
-.navbar__inner,
-.navbar__items,
-.navbar__items--right {
-  padding: 0 !important;
-  margin: 0 !important;
-}
-
 .navbar {
   display: flex;
   align-items: center;
@@ -148,7 +137,7 @@ html[data-theme="dark"] footer {
 
 .navbar__inner {
   display: flex;
-  justify-content: space-between;
+  /* justify-content: space-between; */
   align-items: center;
   height: 100%;
   flex-wrap: nowrap;
@@ -156,7 +145,6 @@ html[data-theme="dark"] footer {
 
 .navbar__non_homepage {
   display: flex;
-  justify-content: space-between;
   width: 100%;
   padding: 0.5rem 1rem;
 }
@@ -176,7 +164,6 @@ html[data-theme="dark"] footer {
   max-width: 978px;
   width: 100%;
   flex-shrink: 1;
-  justify-content: space-between;
 }
 
 .navbar_item_menu {
@@ -262,7 +249,8 @@ html[data-theme="dark"] footer {
 
 .hero {
   padding: 0;
-  background: linear-gradient(0deg, #200830 0%, rgba(32, 8, 48, 0) 39.98%),
+  background:
+    linear-gradient(0deg, #200830 0%, rgba(32, 8, 48, 0) 39.98%),
     url("/static/img/homepage-background.png"), #200830;
 
   background-size: cover, cover, auto;
@@ -271,7 +259,8 @@ html[data-theme="dark"] footer {
 
 @media (max-width: 768px) {
   .hero {
-    background: linear-gradient(0deg, #200830 0%, rgba(32, 8, 48, 0) 39.98%),
+    background:
+      linear-gradient(0deg, #200830 0%, rgba(32, 8, 48, 0) 39.98%),
       url("/static/img/homepage-background-mobile.png"), #200830;
 
     background-size: cover, cover, auto;
