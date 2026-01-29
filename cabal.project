@@ -73,9 +73,9 @@ source-repository-package
 
 source-repository-package
     type: git
-    location: https://github.com/DeltaQ-SD/deltaq.git
-    tag: fd9371d174f6333893274253be11f7ece981cf10
-    --sha256: sha256-9MBLy/E1PySUGmVzkayNxmG0z3a1sTT4RDCqIXNdPcw=
+    location: https://github.com/yveshauser/deltaq.git
+    tag: 65ef7fb47fc1791f969634d91f132d9625c9c4ae
+    --sha256: sha256-Tc/F7CfdBjblPkwx7qIHFmSkXJ1X5JhBE6BCAfaCiCU=
     subdir:
       lib/deltaq
       lib/probability-polynomial

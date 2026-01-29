@@ -17,9 +17,8 @@ module DeltaQ.Leios (
   pHeaderOnTime,
 ) where
 
-import DeltaQ (DQ, DeltaQ (quantile, successWithin), Outcome ((./\.), (.>>.)), ProbabilisticOutcome (Probability), maybeFromEventually, unsafeFromPositiveMeasure)
+import DeltaQ (DQ, DeltaQ (quantile, successWithin), Outcome ((./\.), (.>>.)), ProbabilisticOutcome (Probability), maybeFromEventually, wait)
 import DeltaQ.Praos (BlockSize (B2048, B64), blendedDelay, emitRBHeader, fetchingRBBody)
-import qualified Numeric.Measure.Finite.Mixed as M
 
 fetchingEBHeader :: DQ
 fetchingEBHeader = blendedDelay B64
@@ -31,7 +30,7 @@ fetchingEB :: DQ
 fetchingEB = fetchingEBHeader .>>. fetchingEBBody
 
 fetchingTxs :: DQ
-fetchingTxs = unsafeFromPositiveMeasure $ M.add (M.scale 0.2 (M.dirac 0.2)) (M.scale 0.8 (M.uniform 3 6)) -- TODO: use measurements
+fetchingTxs = wait 1 -- FIXME
 
 processRBandEB :: DQ -> DQ
 processRBandEB applyTxs = processRB ./\. processEB

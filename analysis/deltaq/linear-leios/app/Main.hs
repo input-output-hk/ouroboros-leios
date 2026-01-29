@@ -9,9 +9,7 @@
 module Main where
 
 import Analysis.Leios
-import Control.Concurrent
 import Control.Concurrent.Async
-import Control.Monad
 import qualified Data.ByteString.Lazy as BL
 import Data.Csv (DefaultOrdered (..), FromNamedRecord (..), Header, ToNamedRecord (..), decodeByName, encodeDefaultOrderedByName, (.:))
 import Data.Ratio ((%))
@@ -59,24 +57,11 @@ main = do
   Right (_, edf) <- readFromFile
   let txApplyTimes = V.toList (V.map ((/ 1000) . apply) edf)
   let txReapplyTimes = V.toList (V.map ((/ 1000) . reapply) edf)
+  let applyTx = empiricalDQ txApplyTimes
+  let reapplyTx = empiricalDQ txReapplyTimes
 
-  -- Reduce sample size for better performance
-  let sampleSize = 2 -- FIXME: larger value
-  let seed = 100
-  let gen = mkStdGen seed
-  let txApplyTimesReduced = sampleElements gen sampleSize txApplyTimes
-  let txReapplyTimesReduced = sampleElements gen sampleSize txReapplyTimes
-
-  -- let applyTx = DeltaQ.uniform 0 3.3 -- 0 0.5
-  -- let reapplyTx = DeltaQ.uniform 0 2.1 -- 0 0.4
-  let applyTx = empiricalDQ txApplyTimesReduced
-  let reapplyTx = empiricalDQ txReapplyTimesReduced
-
-  -- (maybe (print @String "Nothing") (printf "Estimate for lVote: %d\n") (lVoteEstimated applyTx reapplyTx))
-  -- (maybe (print @String "Nothing") (printf "Estimate for lDiff: %d\n") (lDiffEstimated applyTx reapplyTx))
-
-  _ <- forkIO $ printf "Complexity applyTx: %d\n" (complexity applyTx)
-  _ <- forkIO $ printf "Complexity reapplyTx: %d\n" (complexity reapplyTx)
+  (maybe (print @String "Nothing") (printf "Estimate for lVote: %d\n") (lVoteEstimated applyTx reapplyTx))
+  (maybe (print @String "Nothing") (printf "Estimate for lDiff: %d\n") (lDiffEstimated applyTx reapplyTx))
 
   let committeeSizeEstimated = 600
   let numberSPOs = 2500
@@ -95,10 +80,7 @@ main = do
         , Config{name = "C165", lHdr = 1, lVote = 6, lDiff = 5, ..}
         , Config{name = "C999", lHdr = 9, lVote = 9, lDiff = 9, ..}
         ]
-
-  mapConcurrently_ (mainWith generatePlots >=> print) configs
-
--- mapConcurrently (mainWith generatePlots) configs >>= printResults
+  mapConcurrently (mainWith generatePlots) configs >>= printResults
 
 mainWith :: Bool -> Config -> IO Result
 mainWith True config = snd <$> concurrently (plots config) (mainWith False config)
