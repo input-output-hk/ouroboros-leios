@@ -33,6 +33,9 @@ _build
 # npm packages
 node_modules/
 
+# Generated formal-spec HTML (built on-demand from nix)
+site/static/formal-spec/
+
 # direnv caches
 **/.direnv/
 
