@@ -111,6 +111,8 @@ jobs:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
         with:
+          # LFS disabled: trace files are now stored as regular git files (not LFS)
+          # to avoid exceeding GitHub's LFS bandwidth quota
           lfs: false
           fetch-depth: 2
 
