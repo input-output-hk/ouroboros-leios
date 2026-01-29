@@ -1,17 +1,10 @@
----
-sidebar_position: 6
----
-
-# Monthly review videos
+# Monthly reviews
 
 Every last Wednesday of the month, the Leios team hosts a public review meeting to share progress, foster transparency, and invite early feedback from everyone – node developers, dapp builders, SPOs, and curious community members. 
 
 These sessions usually cover demos and updates from each workstream, followed by an open Q&A where anyone can ask questions about Leios. The goal is to keep the community informed and engaged as the project evolves.
 
-:::info
-Until the end of 2024, Leios monthly review meetings were recorded using Google Meet and shared via links. Beginning in 2025, these sessions have been live streamed on [YouTube](https://www.youtube.com/playlist?list=PLnPTB0CuBOBzWWpnojAK3ZaFy9RdofP6l) to improve accessibility and transparency. In some months, due to technical issues (such as screen sharing or audio problems), a fallback Google Meet recording may be provided instead of the YouTube stream.
-:::
-
+- **January 2026:** [YouTube](https://www.youtube.com/live/TrLFL34BYBQ) | [Recording](https://drive.google.com/file/d/14QL2k61sPc3p1N7tWpV4H6FhI0B0MstG/view?t=88s) | [Slides](https://docs.google.com/presentation/d/1b5drDHtKoQuI5qm30cinyvmsDJe4ipXglJ-gd79Lp4k) | [Notes](https://docs.google.com/document/d/1UxhgmyDy0WVL8k8ULlZoN9x8snx57mRJfGSbl5wjzDE)
 - **December 2025:** [YouTube](https://youtube.com/live/K-gv8Kci1t4) | [Recording](https://drive.google.com/file/d/1M0pAVBN0rz98_EkSmc8Qzizq7GGorX5u/view) | [Slides](https://docs.google.com/presentation/d/1IFtgXyrZOWLHQONReVIxqAxDdmUZ6TiaIwdYsPQwe3U) | [Notes](https://docs.google.com/document/d/1PMyxaDpSz30uDJEYSVTbe5d1f9Ip08USgKdn1I7fDu8)
 - **November 2025:** [YouTube](https://youtube.com/live/rraKzt-JIqM) | [Recording](https://drive.google.com/file/d/1O8nZOE0eeWzHjz6jXDyxgrBbwTY10435/view) | [Slides](https://docs.google.com/presentation/d/14_CQDb5AAPh9YqUKrQq72nhukneC66QiPX7KaYYomug) | [Notes](https://docs.google.com/document/d/1ln11jgave65u5Om90lE-qiRwaMQiV6yHEfTV07fCUDk)
 - **October 2025:** [YouTube](https://www.youtube.com/watch?v=5baqGY7WXAc) | [Recording](https://drive.google.com/file/d/1mZ8eJm7DxSBzeHg6U_Fk2m5eTY-_yfD9/view?usp=sharing) | [Slides](https://docs.google.com/presentation/d/1qUl5QmDTAzEcZw2vtv59jZgvhSqE2PVKxdhU-rvM3r4/edit?usp=sharing) | [Notes](https://docs.google.com/document/d/1CqxhgZF8WsLodYoxvpVqA66jxEMCCr-3tyWcV2Evhcw/edit?usp=sharing)
@@ -24,6 +17,12 @@ Until the end of 2024, Leios monthly review meetings were recorded using Google 
 - **March 2025:** [YouTube](https://www.youtube.com/watch?v=7K6qXiVsMXg&list=PLnPTB0CuBOBzWWpnojAK3ZaFy9RdofP6l&index=3) | [Google Meet](https://drive.google.com/file/d/1aCM-RJql7nX1MpMOG3pO9A-qTkpivzIT/view?usp=sharing) | [Slides](https://docs.google.com/presentation/d/1C99KT5wOR-Gq7lKXgD8MHDms4tmQH5nZIhOZbc4_5wg/edit?usp=sharing)
 - **February 2025:** [YouTube](https://www.youtube.com/watch?v=7Ze9iVs-bI4&list=PLnPTB0CuBOBzWWpnojAK3ZaFy9RdofP6l&index=4) | [Google Meet](https://drive.google.com/file/d/17f5OtHEsKuUPRdbwQn9wJtdffBiPbJK7/view?usp=sharing) | [Slides](https://docs.google.com/presentation/d/1yrgOv3OnDEHxoxtpc5OV043-T3RPZ66ZtHKWVGMz25c/edit?usp=sharing)
 - **January 2025:** [YouTube](https://www.youtube.com/watch?v=6ovcWDCdqFU&list=PLnPTB0CuBOBzWWpnojAK3ZaFy9RdofP6l&index=5) | [Google Meet](https://drive.google.com/file/d/1e7YVDUWw945zQL3j0LrUwr42lXpJf4cK/view?usp=sharing) | [Slides](https://docs.google.com/presentation/d/1qKXe3CvAvJGVWAssjrKpRrRABMT6I39E1FxUWQ_PZzo/edit?usp=sharing)
+
+:::info
+Until the end of 2024, Leios monthly review meetings were recorded using Google Meet and shared via links. Beginning in 2025, these sessions have been live streamed on [YouTube](https://www.youtube.com/playlist?list=PLnPTB0CuBOBzWWpnojAK3ZaFy9RdofP6l) to improve accessibility and transparency. In some months, due to technical issues (such as screen sharing or audio problems), a fallback Google Meet recording may be provided instead of the YouTube stream.
+:::
+
 - **December 2024**: [Google Meet](https://drive.google.com/file/d/1F07oKxBgdOEasGcstxEavkPCgr58sbIO/view?usp=sharing) | [Slides](https://docs.google.com/presentation/d/1LwpcXnXLgrYTSDalJY1SfpeyU_4lIkYhyMy5Kv0Huzw/edit?usp=sharing)
 - **November 2024**: [Google Meet](https://drive.google.com/file/d/1W4iu4MwOXILXes1Zi43MeM505KAOHXso/view?usp=sharing) | [Slides](https://docs.google.com/presentation/d/11LHQeUuv-TQfiy9GwXkrffSimFjSq8tdTB8qIB-Pk3U/edit?usp=sharing)
 - **October 2024**: [Google Meet](https://drive.google.com/file/d/12VE0__S0knHqXXpIVdXGWvDipK0g89p_/view?usp=sharing) | [Slides](https://docs.google.com/presentation/d/1KgjJyP6yZyZKCGum3deoIyooYUOretA9W6dTtXv1fso/edit?usp=sharing)
+

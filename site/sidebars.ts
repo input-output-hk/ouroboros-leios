@@ -13,6 +13,17 @@ import type { SidebarsConfig } from "@docusaurus/plugin-content-docs";
 const sidebars: SidebarsConfig = {
   documentationSidebar: ["roadmap", "strategy", "resources", "faq", "glossary"],
   developmentSidebar: [
+    "development/monthly-reviews",
+    {
+      type: "link",
+      href: "https://leios.cardano-scaling.org/leios-design.pdf",
+      label: "Technical Design",
+    },
+    {
+      type: "link",
+      href: "https://leios.cardano-scaling.org/visualizer",
+      label: "Visualizer",
+    },
     {
       type: "category",
       label: "Research and Development",
@@ -21,18 +32,7 @@ const sidebars: SidebarsConfig = {
         "development/throughput-simulation",
         "development/simulation-demonstration",
         "development/cost-estimator",
-        {
-          type: "link",
-          href: "https://leios.cardano-scaling.org/visualizer",
-          label: "Visualizer",
-        },
       ],
-    },
-    "development/monthly-reviews",
-    {
-      type: "link",
-      href: "https://leios.cardano-scaling.org/leios-design.pdf",
-      label: "Technical Design",
     },
   ],
 };
