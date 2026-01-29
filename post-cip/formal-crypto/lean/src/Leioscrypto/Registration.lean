@@ -50,28 +50,20 @@ namespace Registry
     wf_registrations : ∀ p ∈ r, p.WellFormed
     unique_hashes : (r.map $ Pool.poolKeyHash ∘ Registration.pool).Nodup
 
-  def lookup (poolId : PoolKeyHash) (regs : Registry) (h : poolId ∈ regs.map (Pool.poolKeyHash ∘ Registration.pool)) : Pool :=
-    let test (reg : Registration) : Bool := reg.pool.poolKeyHash == poolId
-    match h_find : regs.find? test with
-    | some reg => reg.pool
-    | none =>
-        have impossible : False :=
-          by
-            simp only [List.mem_map, Function.comp_apply] at h
-            obtain ⟨r, r_in_list, r_has_id⟩ := h
-            rw [List.find?_eq_none] at h_find
-            specialize h_find r r_in_list
-            rw [beq_iff_eq] at h_find
-            rw [r_has_id] at h_find
-            simp at h_find
-        impossible.elim
+  theorem wf_empty : (default : Registry).WellFormed :=
+    ⟨
+      by
+        intro p h
+        contradiction
+    , List.nodup_nil
+    ⟩
 
   def deregister (poolId : PoolKeyHash) (regs : Registry) : Registry :=
     match regs.find? $ fun reg' ↦ reg'.pool.poolKeyHash == poolId with
     | none => regs
     | some reg => regs.erase reg
 
-  theorem deregister_wf (poolId : PoolKeyHash) (regs :Registry) (h : regs.WellFormed) : (deregister poolId regs).WellFormed :=
+  theorem wf_deregister (poolId : PoolKeyHash) (regs :Registry) (h : regs.WellFormed) : (deregister poolId regs).WellFormed :=
     sorry
 /-
   def deregister' (poolId : PoolKeyHash) (regs : Registry) : Registry :=
@@ -101,7 +93,7 @@ namespace Registry
     let test (reg' : Registration) : Bool := reg'.pool.poolKeyHash != poolId
     regs.filter test
 
-  theorem register_wf (reg : Registration) (regs : Registry) (h : regs.WellFormed) : (register reg regs).WellFormed :=
+  theorem wf_register (reg : Registration) (regs : Registry) (h : regs.WellFormed) : (register reg regs).WellFormed :=
     sorry
   /-
   def register (regs : Registry) (reg : Registration) : Registry :=
@@ -130,19 +122,40 @@ namespace Registry
 
   -/
 
-  def ValidRegistration (reg : Registration) (regs : Registry) : Prop :=
-    let test (reg' : Registration) : Bool := reg'.pool.poolKeyHash == reg.pool.poolKeyHash
-    match regs.find? test with
-    | none => True
-    | some reg' => reg'.issueCounter > reg.issueCounter
+  def lookup (poolId : PoolKeyHash) (regs : Registry) (h : poolId ∈ regs.map (Pool.poolKeyHash ∘ Registration.pool)) : Pool :=
+    let test (reg : Registration) : Bool := reg.pool.poolKeyHash == poolId
+    match h_find : regs.find? test with
+    | some reg => reg.pool
+    | none =>
+        have impossible : False :=
+          by
+            simp only [List.mem_map, Function.comp_apply] at h
+            obtain ⟨r, r_in_list, r_has_id⟩ := h
+            rw [List.find?_eq_none] at h_find
+            specialize h_find r r_in_list
+            rw [beq_iff_eq] at h_find
+            rw [r_has_id] at h_find
+            simp at h_find
+        impossible.elim
 
 end Registry
+
+
+namespace Registration
+
+  def Valid (reg : Registration) (regs : Registry) : Prop :=
+    let test (reg' : Registration) : Bool := reg'.pool.poolKeyHash == reg.pool.poolKeyHash
+    match regs.find? test with
+    | none => reg.WellFormed
+    | some reg' => reg.WellFormed ∧ reg'.issueCounter > reg.issueCounter
+
+end Registration
 
 
 inductive IsValidRegistry : Registry → Prop
 | empty : IsValidRegistry default
 | deregister (regs : Registry) (poolId : PoolKeyHash) : IsValidRegistry regs → IsValidRegistry (regs.deregister poolId)
-| register (regs : Registry) (reg : Registration) : IsValidRegistry regs → regs.ValidRegistration reg → IsValidRegistry (regs.register reg)
+| register (regs : Registry) (reg : Registration) : IsValidRegistry regs → reg.Valid regs → IsValidRegistry (regs.register reg)
 
 
 end Leioscrypto
