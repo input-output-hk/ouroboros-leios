@@ -99,17 +99,11 @@ const config: Config = {
           label: "Formal Specification",
           position: "right",
         },
-        { to: "/docs/roadmap", label: "Roadmap", position: "right" },
-        { to: "/news", label: "Weekly updates", position: "right" },
         {
           type: "dropdown",
           label: "Tools",
           position: "right",
           items: [
-            {
-              href: "https://www.insightmaker.com/insight/4DU4kmFVCFDaq30ux29PCe/Cardano-Throughput-v0-3",
-              label: "Simulator",
-            },
             // Cost Estimator and Traffic Estimator are based on parallel Leios model,
             // not Linear Leios with linked EB proposal - hidden to avoid confusion
             // {
@@ -127,6 +121,10 @@ const config: Config = {
             {
               to: "https://leios.cardano-scaling.org/mempool-viz/",
               label: "Mempool Visualizer",
+            },
+            {
+              href: "https://www.insightmaker.com/insight/4DU4kmFVCFDaq30ux29PCe/Cardano-Throughput-v0-3",
+              label: "Throughput model",
             },
           ],
         },
