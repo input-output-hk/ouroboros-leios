@@ -50,15 +50,6 @@ const config: Config = {
         docs: {
           sidebarPath: "./sidebars.ts",
         },
-        blog: {
-          path: "news/",
-          routeBasePath: "news",
-          blogTitle: "News",
-          blogSidebarTitle: "Weekly updates",
-          sortPosts: "descending",
-          showReadingTime: true,
-          authorsMapPath: "../authors.yaml",
-        },
         theme: {
           customCss: "./src/css/custom.css",
         },
