@@ -2,18 +2,13 @@
 namespace Leioscrypto.BLS
 
 
-def dstLeios : ByteArray := "Leios".toUTF8
-
-
-def SecretKey := Vector UInt8 256
-deriving Inhabited
-
-
 namespace Spec
 
+  -- Scalars for G1 and G2.
   def Scalar := Vector UInt8 256
   deriving Inhabited
 
+  -- Compressed representation of G1.
   def G1.Point := Vector UInt8 48
   deriving Inhabited
 
@@ -23,6 +18,7 @@ namespace Spec
   -- Multiply a group element by a scalar.
   opaque G1.power : Scalar → G1.Point → G1.Point
 
+  -- Compressed representation of G2.
   def G2.Point := Vector UInt8 96
   deriving Inhabited
 
@@ -32,8 +28,13 @@ namespace Spec
   -- Multiply a group element by a scalar.
   opaque G2.power : Scalar → G2.Point → G2.Point
 
+  -- The secret key is just a scalar.
+  abbrev SecretKey := Scalar
+
+  -- Use the larger G2 for the public keys.
   abbrev PublicKey := G2.Point
 
+  -- Use the smaller G1 for the signatures.
   abbrev Signature := G1.Point
 
   -- https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-06#name-keygen
@@ -45,6 +46,9 @@ namespace Spec
   -- https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-06#name-keyvalidate
   opaque KeyValidate : PublicKey → Prop
 
+  -- This is the analog of `KeyValidate`, but in the other group.
+  opaque SignatureValidate : Signature → Prop
+
   -- https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-06#name-coresign
   opaque CoreSign : SecretKey → ByteArray → Signature
 
@@ -55,6 +59,13 @@ namespace Spec
   opaque sha256 : ByteArray → Scalar
 
 end Spec
+
+
+def dstLeios : ByteArray := "Leios".toUTF8
+
+
+def SecretKey := Spec.SecretKey
+deriving Inhabited
 
 
 def PublicKey := Spec.G2.Point
@@ -75,17 +86,22 @@ private def PublicKey.popMessage (mvk : PublicKey) : ByteArray :=
 def KeyGen (sk : SecretKey) : PublicKey × ProofOfPossession :=
   let mvk : PublicKey := Spec.SkToPk sk
   let μ₁ := Spec.CoreSign sk mvk.popMessage
+  -- Note that the following line differs from the original Leios paper, but is equivalent to it.
   let μ₂ := Spec.CoreSign sk dstLeios
   ⟨ mvk , ⟨ μ₁ , μ₂ ⟩ ⟩
 
 def Check : PublicKey → ProofOfPossession → Prop
 | mvk , ⟨ μ₁ , μ₂ ⟩ =>
     let b₁ := Spec.CoreVerify mvk mvk.popMessage μ₁
+  -- Note that the following line differs from the original Leios paper, but is equivalent to it.
     let b₂ := Spec.CoreVerify mvk dstLeios μ₂
     b₁ ∧ b₂
 
 
 def Signature := Spec.G1.Point
+
+def Signagure.WellFormed : Signature → Prop :=
+  Spec.SignatureValidate
 
 private def Signature.toByteArray : Signature → ByteArray :=
   ByteArray.mk ∘ Vector.toArray
