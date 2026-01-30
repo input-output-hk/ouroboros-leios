@@ -17,7 +17,8 @@ module DeltaQ.Leios (
   pHeaderOnTime,
 ) where
 
-import DeltaQ (DQ, DeltaQ (quantile, successWithin), Outcome ((./\.), (.>>.)), ProbabilisticOutcome (Probability), maybeFromEventually, wait)
+import Data.Ratio ((%))
+import DeltaQ (DQ, DeltaQ (quantile, successWithin), Outcome ((./\.), (.>>.)), ProbabilisticOutcome (Probability), choices, maybeFromEventually, wait)
 import DeltaQ.Praos (BlockSize (B2048, B64), blendedDelay, emitRBHeader, fetchingRBBody)
 
 fetchingEBHeader :: DQ
@@ -42,9 +43,13 @@ processRBandEB applyTxs = processRB ./\. processEB
 validateEB :: DQ -> DQ -> DQ
 validateEB applyTx reapplyTx = processRBandEB applyTxs .>>. reapplyTxs
  where
-  -- FIXME: concurrent application
-  applyTxs = applyTx -- choices $ map (\i -> (1 % n, doAll (replicate i applyTx))) [1 .. fromInteger n]
-  reapplyTxs = reapplyTx -- choices $ map (\i -> (1 % n, doAll (replicate i reapplyTx))) [1 .. fromInteger n]
+  doAll :: [DQ] -> DQ
+  doAll = foldr (./\.) (wait 0)
+
+  n = 64
+
+  applyTxs = choices $ map (\i -> (1 % n, doAll (replicate i applyTx))) [1 .. fromInteger n]
+  reapplyTxs = choices $ map (\i -> (1 % n, doAll (replicate i reapplyTx))) [1 .. fromInteger n]
 
 -- | Estimate for the parameter \(L_\text{vote}\) using 'validateEB'
 lVoteEstimated :: DQ -> DQ -> Maybe Integer

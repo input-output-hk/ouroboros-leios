@@ -22,6 +22,7 @@ import GHC.Generics
 import Graphics.Rendering.Chart.Backend.Cairo
 import Graphics.Rendering.Chart.Easy
 import Statistics.Leios (quorumProbability)
+import System.Environment (getArgs)
 import System.Random
 import Text.Printf
 
@@ -60,15 +61,11 @@ main = do
   let applyTx = empiricalDQ txApplyTimes
   let reapplyTx = empiricalDQ txReapplyTimes
 
-  (maybe (print @String "Nothing") (printf "Estimate for lVote: %d\n") (lVoteEstimated applyTx reapplyTx))
-  (maybe (print @String "Nothing") (printf "Estimate for lDiff: %d\n") (lDiffEstimated applyTx reapplyTx))
-
   let committeeSizeEstimated = 600
   let numberSPOs = 2500
   let λ = 1 % 20
   let τ = 3 % 4
 
-  let generatePlots = True
   let configs =
         [ Config{name = "C113", lHdr = 1, lVote = 1, lDiff = 3, ..}
         , Config{name = "C124", lHdr = 1, lVote = 2, lDiff = 4, ..}
@@ -80,11 +77,16 @@ main = do
         , Config{name = "C165", lHdr = 1, lVote = 6, lDiff = 5, ..}
         , Config{name = "C999", lHdr = 9, lVote = 9, lDiff = 9, ..}
         ]
-  mapConcurrently (mainWith generatePlots) configs >>= printResults
 
-mainWith :: Bool -> Config -> IO Result
-mainWith True config = snd <$> concurrently (plots config) (mainWith False config)
-mainWith False config = return (stats config)
+  args <- getArgs
+  case args of
+    ["estimates"] ->
+      concurrently_
+        (maybe (print @String "Nothing") (printf "Estimate for lVote: %d\n") (lVoteEstimated applyTx reapplyTx))
+        (maybe (print @String "Nothing") (printf "Estimate for lDiff: %d\n") (lDiffEstimated applyTx reapplyTx))
+    ["plots"] -> mapConcurrently_ plots configs
+    ["stats"] -> mapConcurrently (return . stats) configs >>= writeResults
+    _ -> putStrLn "options are: estimates, plots, stats"
 
 data Result
   = -- | Config name
@@ -145,7 +147,7 @@ plots Config{..} = do
          in do
               layout_title .= "Quorum distribution"
               plot (line "pQuorum" [vs])
-  pure ()
+  return ()
 
 stats :: Config -> Result
 stats config@Config{..} =
@@ -158,5 +160,5 @@ stats config@Config{..} =
       res_eCertified = 1 / (eCertified config)
    in Result{..}
 
-printResults :: [Result] -> IO ()
-printResults = BL.writeFile "output.csv" . encodeDefaultOrderedByName
+writeResults :: [Result] -> IO ()
+writeResults = BL.writeFile "output.csv" . encodeDefaultOrderedByName
