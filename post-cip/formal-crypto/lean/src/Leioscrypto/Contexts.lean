@@ -27,18 +27,21 @@ structure Epoch where
   pools_not_duplicated : (pools.map Prod.fst).Nodup
   pools_have_stake : ∀ stake ∈ pools.map Prod.snd, stake > 0
   pools_sorted_nonincreasing : (pools.map Prod.snd).Pairwise (· ≥ ·)
-  pools_valid_indices : ∀ p ∈ pools.map Prod.fst, p ∈ registry.map Registration.poolId
+  pools_valid_ids : ∀ p ∈ pools.map Prod.fst, p ∈ registry.map Registration.poolId
   slot_range : Slot × Slot
   slot_range_ordered : slot_range.fst ≤ slot_range.snd
   nonce : PraosNonce
 
 namespace Epoch
 
-  def lookup (ctx : Epoch) (i : Nat) (h : i < ctx.pools.length) : PoolKeyHash × Coin :=
-    ctx.pools.get ⟨ i, h ⟩
+  def lookup (epoch : Epoch) (i : Nat) (h : i < epoch.pools.length) : PoolKeyHash × Coin :=
+    epoch.pools.get ⟨ i, h ⟩
 
-  def lookupPoolId (ctx : Epoch) (i : Nat) (h : i < ctx.pools.length) : PoolKeyHash :=
-    Prod.fst $ ctx.pools.get ⟨ i, h ⟩
+  def lookupPoolId (epoch : Epoch) (i : Nat) (h : i < epoch.pools.length) : PoolKeyHash :=
+    Prod.fst $ epoch.pools.get ⟨ i, h ⟩
+
+  theorem poolId_in_pools (epoch : Epoch) (i : Nat) (h : i < epoch.pools.length) : lookupPoolId epoch i h ∈ epoch.pools.map Prod.fst :=
+    sorry
 
 end Epoch
 
