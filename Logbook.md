@@ -6,10 +6,39 @@
 > 
 > See also the [Post-CIP R&D Findings](post-cip/README.md) document for additional (after 2025-11-01) findings and artifacts not directly related to the implementation of Linear Leios.
 
+## 2026-01-29
+
+### SN on EB production
+
+- Fixed the shelley forging implementation to only call `mkLeiosEb` when there are indeed transactions in the second list. Using a `NonEmpty (Tx era)` on `mkLeiosEb` makes good sense now too.
+- When running this, I see EBs being forged, but not as much as I expected? .. I realized that it is just fine in the logs, but something in x-ray stops so things don't show up?
+- I decide to push forward on the branch that introduced `LeiosDbHandle` to try store it .. so we see a block diffused!
+- When fixing `forgeDualByronBlock`: Changing the `forgeBlock` interface feels really wrong by now .. we likely should have added a Leios specific type class and only instantiate it for only supported block types / protocols. Then again, fixing existing call sites is easier than standing up a new hard-fork combined interface. So.. likely fine for the prototype.
+
+## 2026-01-22
+
+### SN on Threadnet tests
+
+- The EB production ticket mentions `Threadnet` tests. I set off to explore that test suite first to do the EB production in a test driven way.
+- The `src/unstable-diffusion-testlib` does not compile on the leios prototype branch
+- The actual threadnet tests are in o-c-cardano:test:shelley-test
+- However, there `mock-test` in o-c-diffusion already fail with kernel construction missing fields
+- I see property-based testing infrastructure that sets up tests given generated starting conditions and collects test output to express properties about. Nice!
+- All the heavy lifting of starting the simulated network is in the namesake `runThreadNetwork`
+- Found that we use a custom `ResourceT` kind of registry: <https://hackage.haskell.org/package/resource-registry>
+- THe threadNet uses a `customForgeBlock` wrapper when running block forging
+- The `demoNewLeiosDbConnectionIO` is wired through the `RunNodeArgs` into `NodeKernelArgs` from where its actually then used in `initInternalState`. One reason could be that the latter is in an `IOLike m`, but the actual implementation is `IO`?
+- We can't use the real database setup in `runThreadNetwork` because that one is `runSimOrThrow` using `IOSim`
+- How is the chainDB initialized in the threadNet io-sim context?
+  - The `ChainDB` contains the `ImmutableDB` and that one ultimately writes to disk via `HasFS` .. which is stored in an existential `SomeHasFS` in the `ImmutableDbArgs` / `ChainDbArgs`
+  - Hence, the storage can be configured via the `TestConfigMB` handle / the `ProtocolInfo` type?
+  - Found the `fromMinimalChainDbArgs` that sets a `SomeHasFS` using `simHasFS` in `ouroboros-consensus/ouroboros-consensus/src/unstable-consensus-testlib/Test/Util/ChainDB.hs`
+- I opted for asking the genie to refactor the `LeiosDb` handle to a higher level `LeiosDbHandle` that provides higher level domain specific functions about what we need to to store/retrieve from persistence. This is not as flexible as dirctly using SQLite functions, but should document nicely the requirements onto, potentially dedicated, persistence components (EBStore, TxCache).
+- This led to an in-memory implementation of `LeiosDbHandle` that can be used in `ThreadNet`
+
 ## 2026-01-19
 
 ### SN and DP pairing on proto devnet / mempool size increase
-
 
 - Pairing on mempool size increase: There is a mempool capacity we can use https://ouroboros-consensus.cardano.intersectmbo.org/haddocks/ouroboros-consensus/Ouroboros-Consensus-Mempool-Capacity.html#t:MempoolCapacityBytesOverride
 - In the later node implemenation, it would still be a function from protocol parameters, but using the EB size
