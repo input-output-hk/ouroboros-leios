@@ -31,7 +31,7 @@ fetchingEB :: DQ
 fetchingEB = fetchingEBHeader .>>. fetchingEBBody
 
 fetchingTxs :: DQ
-fetchingTxs = wait 1 -- FIXME
+fetchingTxs = blendedDelay B64 -- TODO
 
 processRBandEB :: DQ -> DQ
 processRBandEB applyTxs = processRB ./\. processEB
@@ -46,8 +46,7 @@ validateEB applyTx reapplyTx = processRBandEB applyTxs .>>. reapplyTxs
   doAll :: [DQ] -> DQ
   doAll = foldr (./\.) (wait 0)
 
-  n = 64
-
+  n = 64 -- TODO: total number of transactions
   applyTxs = choices $ map (\i -> (1 % n, doAll (replicate i applyTx))) [1 .. fromInteger n]
   reapplyTxs = choices $ map (\i -> (1 % n, doAll (replicate i reapplyTx))) [1 .. fromInteger n]
 
