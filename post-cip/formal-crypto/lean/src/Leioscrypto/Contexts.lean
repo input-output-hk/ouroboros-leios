@@ -8,6 +8,9 @@ import Mathlib.Data.List.Defs
 namespace Leioscrypto
 
 
+-- Note that these contextual types are correct by construction because they are not deserialized from data provided by potentially corrupt parties.
+
+
 structure LeiosParameters where
   τ : Rat
   τ_bounded : (1 : Rat) / 2 < τ ∧ τ ≤ 1
@@ -16,34 +19,34 @@ structure LeiosParameters where
 deriving Repr
 
 
-structure EpochContext where
-  epoch : Nat
+structure Epoch where
+  registry : Registry
+  wf_registry : registry.WellFormed
+  number : Nat
   pools : List (PoolKeyHash × Coin)
   pools_not_duplicated : (pools.map Prod.fst).Nodup
-  pools_have_stake : pools.Forall (fun a ↦ a.snd > 0)
-  pools_sorted_nonincreasing : pools.Pairwise (fun x y ↦ x.snd ≥ y.snd)
+  pools_have_stake : ∀ stake ∈ pools.map Prod.snd, stake > 0
+  pools_sorted_nonincreasing : (pools.map Prod.snd).Pairwise (· ≥ ·)
+  pools_valid_indices : ∀ p ∈ pools.map Prod.fst, p ∈ registry.map Registration.poolId
   slot_range : Slot × Slot
   slot_range_ordered : slot_range.fst ≤ slot_range.snd
   nonce : PraosNonce
 
-namespace EpochContext
+namespace Epoch
 
-  def Valid (reg: Registry) (ctx : EpochContext) : Prop :=
-    ∀ p ∈ ctx.pools.map Prod.fst, p ∈ reg.map (Pool.poolKeyHash ∘ Registration.pool)
-
-  def lookup (ctx : EpochContext) (i : Nat) (h : i < ctx.pools.length) : PoolKeyHash × Coin :=
+  def lookup (ctx : Epoch) (i : Nat) (h : i < ctx.pools.length) : PoolKeyHash × Coin :=
     ctx.pools.get ⟨ i, h ⟩
 
-  def lookupPoolId (ctx : EpochContext) (i : Nat) (h : i < ctx.pools.length) : PoolKeyHash :=
+  def lookupPoolId (ctx : Epoch) (i : Nat) (h : i < ctx.pools.length) : PoolKeyHash :=
     Prod.fst $ ctx.pools.get ⟨ i, h ⟩
 
-end EpochContext
+end Epoch
 
 
-structure ElectionContext where
-  epochContext : EpochContext
+structure Election where
+  epoch : Epoch
   slot : Slot
-  slot_in_epoch : epochContext.slot_range.fst ≤ slot ∧ slot ≤ epochContext.slot_range.snd
+  slot_in_epoch : epoch.slot_range.fst ≤ slot ∧ slot ≤ epoch.slot_range.snd
   electionId : ElectionId
   electionId_eq_slot : electionId = slot
   ebHash : BlockHash
