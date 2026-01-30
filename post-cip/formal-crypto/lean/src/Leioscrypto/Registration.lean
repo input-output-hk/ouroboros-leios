@@ -35,8 +35,8 @@ deriving BEq
 
 namespace Registration
 
-  structure WellFormed (r : Registration) : Prop where
-    wf_pool : r.pool.WellFormed
+  structure WellFormed (reg : Registration) : Prop where
+    wf_pool : reg.pool.WellFormed
 
 end Registration
 
@@ -46,9 +46,9 @@ deriving Inhabited, Membership
 
 namespace Registry
 
-  structure WellFormed (r : Registry) : Prop where
-    wf_registrations : ∀ p ∈ r, p.WellFormed
-    unique_hashes : (r.map $ Pool.poolId ∘ Registration.pool).Nodup
+  structure WellFormed (rgy : Registry) : Prop where
+    wf_registrations : ∀ p ∈ rgy, p.WellFormed
+    unique_hashes : (rgy.map $ Pool.poolId ∘ Registration.pool).Nodup
 
   theorem wf_empty : (default : Registry).WellFormed :=
     ⟨
@@ -58,12 +58,13 @@ namespace Registry
     , List.nodup_nil
     ⟩
 
-  def deregister (poolId : PoolKeyHash) (regs : Registry) : Registry :=
-    match regs.find? $ fun reg' ↦ reg'.pool.poolId == poolId with
-    | none => regs
-    | some reg => regs.erase reg
+  def deregister (poolId : PoolKeyHash) (rgy : Registry) : Registry :=
+    let present (reg : Registration) : Bool := reg.pool.poolId == poolId
+    match rgy.find? present with
+    | none => rgy
+    | some reg => rgy.erase reg
 
-  theorem wf_deregister (poolId : PoolKeyHash) (regs :Registry) (h : regs.WellFormed) : (deregister poolId regs).WellFormed :=
+  theorem wf_deregister (poolId : PoolKeyHash) (rgy :Registry) (h : rgy.WellFormed) : (deregister poolId rgy).WellFormed :=
     sorry
 /-
   def deregister' (poolId : PoolKeyHash) (regs : Registry) : Registry :=
@@ -88,12 +89,12 @@ namespace Registry
         ⟩
 -/
 
-  def register (reg : Registration) (regs : Registry) : Registry :=
+  def register (reg : Registration) (rgy : Registry) : Registry :=
     let poolId : PoolKeyHash := reg.pool.poolId
-    let test (reg' : Registration) : Bool := reg'.pool.poolId != poolId
-    regs.filter test
+    let absent (reg' : Registration) : Bool := reg'.pool.poolId != poolId
+    rgy.filter absent
 
-  theorem wf_register (reg : Registration) (regs : Registry) (h : regs.WellFormed) : (register reg regs).WellFormed :=
+  theorem wf_register (reg : Registration) (rgy : Registry) (h : rgy.WellFormed) : (register reg rgy).WellFormed :=
     sorry
   /-
   def register (regs : Registry) (reg : Registration) : Registry :=
@@ -122,9 +123,9 @@ namespace Registry
 
   -/
 
-  def lookup (poolId : PoolKeyHash) (regs : Registry) (h : poolId ∈ regs.map (Pool.poolId ∘ Registration.pool)) : Pool :=
-    let test (reg : Registration) : Bool := reg.pool.poolId == poolId
-    match h_find : regs.find? test with
+  def lookup (poolId : PoolKeyHash) (rgy : Registry) (h : poolId ∈ rgy.map (Pool.poolId ∘ Registration.pool)) : Pool :=
+    let present (reg : Registration) : Bool := reg.pool.poolId == poolId
+    match h_find : rgy.find? present with
     | some reg => reg.pool
     | none =>
         have impossible : False :=
@@ -143,9 +144,9 @@ end Registry
 
 namespace Registration
 
-  def Valid (reg : Registration) (regs : Registry) : Prop :=
-    let test (reg' : Registration) : Bool := reg'.pool.poolId == reg.pool.poolId
-    match regs.find? test with
+  def Valid (reg : Registration) (rgy : Registry) : Prop :=
+    let present (reg' : Registration) : Bool := reg'.pool.poolId == reg.pool.poolId
+    match rgy.find? present with
     | none => reg.WellFormed
     | some reg' => reg.WellFormed ∧ reg'.issueCounter > reg.issueCounter
 
@@ -154,8 +155,8 @@ end Registration
 
 inductive IsValidRegistry : Registry → Prop
 | empty : IsValidRegistry default
-| deregister (regs : Registry) (poolId : PoolKeyHash) : IsValidRegistry regs → IsValidRegistry (regs.deregister poolId)
-| register (regs : Registry) (reg : Registration) : IsValidRegistry regs → reg.Valid regs → IsValidRegistry (regs.register reg)
+| deregister (rgy : Registry) (poolId : PoolKeyHash) : IsValidRegistry rgy → IsValidRegistry (rgy.deregister poolId)
+| register (rgy : Registry) (reg : Registration) : IsValidRegistry rgy → reg.Valid rgy → IsValidRegistry (rgy.register reg)
 
 
 end Leioscrypto
