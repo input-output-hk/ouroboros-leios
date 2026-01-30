@@ -10,7 +10,7 @@ namespace Spec
 
   -- Compressed representation of G1.
   def G1.Point := Vector UInt8 48
-  deriving Inhabited
+  deriving Inhabited, BEq
 
   -- Sum of group elements.
   opaque G1.product : List G1.Point → G1.Point
@@ -20,7 +20,7 @@ namespace Spec
 
   -- Compressed representation of G2.
   def G2.Point := Vector UInt8 96
-  deriving Inhabited
+  deriving Inhabited, BEq
 
   -- Sum of group elements.
   opaque G2.product : List G2.Point → G2.Point
@@ -69,6 +69,7 @@ deriving Inhabited
 
 
 def PublicKey := Spec.G2.Point
+deriving BEq
 
 def PublicKey.WellFormed : PublicKey → Prop :=
   Spec.KeyValidate
@@ -79,6 +80,10 @@ private def PublicKey.toByteArray : PublicKey → ByteArray :=
 structure ProofOfPossession where
   μ₁ : Spec.G1.Point
   μ₂ : Spec.G1.Point
+deriving BEq
+
+def ProofOfPossession.WellFormed : ProofOfPossession → Prop
+| ⟨ μ₁ , μ₂ ⟩ => Spec.SignatureValidate μ₁ ∧ Spec.SignatureValidate μ₂
 
 private def PublicKey.popMessage (mvk : PublicKey) : ByteArray :=
   dstLeios ++ "PoP".toUTF8 ++ mvk.toByteArray
@@ -100,7 +105,7 @@ def Check : PublicKey → ProofOfPossession → Prop
 
 def Signature := Spec.G1.Point
 
-def Signagure.WellFormed : Signature → Prop :=
+def Signature.WellFormed : Signature → Prop :=
   Spec.SignatureValidate
 
 private def Signature.toByteArray : Signature → ByteArray :=
