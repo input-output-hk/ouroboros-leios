@@ -13,16 +13,16 @@ opaque validColdSignature (α : Type) (x : α) : PoolKeyHash → ColdKeySignatur
 
 
 structure Pool where
-  poolKeyHash : PoolKeyHash
+  poolId : PoolKeyHash
   mvk : BLS.PublicKey
-  mu : BLS.PoP
+  μ : BLS.ProofOfPossession
 deriving BEq
 
 namespace Pool
 
   structure WellFormed (p : Pool) : Prop where
     wf_mvk : p.mvk.WellFormed
-    wf_mu : p.mu.WellFormed
+    wf_μ : p.μ.WellFormed
 
 end Pool
 
@@ -48,7 +48,7 @@ namespace Registry
 
   structure WellFormed (r : Registry) : Prop where
     wf_registrations : ∀ p ∈ r, p.WellFormed
-    unique_hashes : (r.map $ Pool.poolKeyHash ∘ Registration.pool).Nodup
+    unique_hashes : (r.map $ Pool.poolId ∘ Registration.pool).Nodup
 
   theorem wf_empty : (default : Registry).WellFormed :=
     ⟨
@@ -59,7 +59,7 @@ namespace Registry
     ⟩
 
   def deregister (poolId : PoolKeyHash) (regs : Registry) : Registry :=
-    match regs.find? $ fun reg' ↦ reg'.pool.poolKeyHash == poolId with
+    match regs.find? $ fun reg' ↦ reg'.pool.poolId == poolId with
     | none => regs
     | some reg => regs.erase reg
 
@@ -89,8 +89,8 @@ namespace Registry
 -/
 
   def register (reg : Registration) (regs : Registry) : Registry :=
-    let poolId : PoolKeyHash := reg.pool.poolKeyHash
-    let test (reg' : Registration) : Bool := reg'.pool.poolKeyHash != poolId
+    let poolId : PoolKeyHash := reg.pool.poolId
+    let test (reg' : Registration) : Bool := reg'.pool.poolId != poolId
     regs.filter test
 
   theorem wf_register (reg : Registration) (regs : Registry) (h : regs.WellFormed) : (register reg regs).WellFormed :=
@@ -122,8 +122,8 @@ namespace Registry
 
   -/
 
-  def lookup (poolId : PoolKeyHash) (regs : Registry) (h : poolId ∈ regs.map (Pool.poolKeyHash ∘ Registration.pool)) : Pool :=
-    let test (reg : Registration) : Bool := reg.pool.poolKeyHash == poolId
+  def lookup (poolId : PoolKeyHash) (regs : Registry) (h : poolId ∈ regs.map (Pool.poolId ∘ Registration.pool)) : Pool :=
+    let test (reg : Registration) : Bool := reg.pool.poolId == poolId
     match h_find : regs.find? test with
     | some reg => reg.pool
     | none =>
@@ -144,7 +144,7 @@ end Registry
 namespace Registration
 
   def Valid (reg : Registration) (regs : Registry) : Prop :=
-    let test (reg' : Registration) : Bool := reg'.pool.poolKeyHash == reg.pool.poolKeyHash
+    let test (reg' : Registration) : Bool := reg'.pool.poolId == reg.pool.poolId
     match regs.find? test with
     | none => reg.WellFormed
     | some reg' => reg.WellFormed ∧ reg'.issueCounter > reg.issueCounter
