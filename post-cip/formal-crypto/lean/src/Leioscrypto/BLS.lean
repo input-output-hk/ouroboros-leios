@@ -11,17 +11,26 @@ deriving Inhabited
 
 namespace Spec
 
+  def Scalar := Vector UInt8 256
+  deriving Inhabited
+
   def G1.Point := Vector UInt8 48
   deriving Inhabited
 
-  -- Group multiplication.
+  -- Sum of group elements.
   opaque G1.product : List G1.Point → G1.Point
+
+  -- Multiply a group element by a scalar.
+  opaque G1.power : Scalar → G1.Point → G1.Point
 
   def G2.Point := Vector UInt8 96
   deriving Inhabited
 
-  -- Group multiplication.
+  -- Sum of group elements.
   opaque G2.product : List G2.Point → G2.Point
+
+  -- Multiply a group element by a scalar.
+  opaque G2.power : Scalar → G2.Point → G2.Point
 
   abbrev PublicKey := G2.Point
 
@@ -41,6 +50,9 @@ namespace Spec
 
   -- https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-06#name-coreverify
   opaque CoreVerify : PublicKey → ByteArray → Signature → Prop
+
+  -- https://datatracker.ietf.org/doc/html/rfc6234#section-4.1
+  opaque sha256 : ByteArray → Scalar
 
 end Spec
 
@@ -93,6 +105,27 @@ def AKey : List PublicKey → PublicKey :=
 
 def ASig : List Signature → Signature :=
   Spec.G1.product
+
+
+private def hashSignatures : List Signature → Spec.Scalar :=
+  Spec.sha256 ∘ List.foldl (fun acc sig ↦ acc ++ sig.toByteArray) default
+
+private def hashNat (n : Nat) : ByteArray :=
+  let b0 := n.toUInt8
+  let b1 := (n >>> 8).toUInt8
+  let b2 := (n >>> 16).toUInt8
+  let b3 := (n >>> 24).toUInt8
+  ByteArray.mk #[b0, b1, b2, b3]
+
+private def hashWithIndex (n : Nat) (bytes : ByteArray) : Spec.Scalar :=
+  Spec.sha256 $ hashNat n ++ bytes
+
+def BKey (mvks : List PublicKey) (σs : List Signature) : PublicKey :=
+  let e_σ := ByteArray.mk (hashSignatures σs).toArray
+  Spec.G2.product
+    $ List.map (fun ⟨ mvk , i ⟩ ↦ Spec.G2.power (hashWithIndex i e_σ) mvk)
+    $ mvks.zip
+    $ List.range mvks.length
 
 
 end Leioscrypto.BLS
