@@ -38,6 +38,9 @@ namespace Registration
   structure WellFormed (reg : Registration) : Prop where
     wf_pool : reg.pool.WellFormed
 
+  def poolId : Registration → PoolKeyHash :=
+    Pool.poolId ∘ Registration.pool
+
 end Registration
 
 
@@ -48,7 +51,7 @@ namespace Registry
 
   structure WellFormed (rgy : Registry) : Prop where
     wf_registrations : ∀ p ∈ rgy, p.WellFormed
-    unique_hashes : (rgy.map $ Pool.poolId ∘ Registration.pool).Nodup
+    unique_hashes : (rgy.map Registration.poolId).Nodup
 
   theorem wf_empty : (default : Registry).WellFormed :=
     ⟨
@@ -59,7 +62,7 @@ namespace Registry
     ⟩
 
   def deregister (poolId : PoolKeyHash) (rgy : Registry) : Registry :=
-    let present (reg : Registration) : Bool := reg.pool.poolId == poolId
+    let present (reg : Registration) : Bool := reg.poolId == poolId
     match rgy.find? present with
     | none => rgy
     | some reg => rgy.erase reg
@@ -90,8 +93,8 @@ namespace Registry
 -/
 
   def register (reg : Registration) (rgy : Registry) : Registry :=
-    let poolId : PoolKeyHash := reg.pool.poolId
-    let absent (reg' : Registration) : Bool := reg'.pool.poolId != poolId
+    let poolId : PoolKeyHash := reg.poolId
+    let absent (reg' : Registration) : Bool := reg'.poolId != poolId
     rgy.filter absent
 
   theorem wf_register (reg : Registration) (rgy : Registry) (h : rgy.WellFormed) : (register reg rgy).WellFormed :=
@@ -123,14 +126,14 @@ namespace Registry
 
   -/
 
-  def lookup (poolId : PoolKeyHash) (rgy : Registry) (h : poolId ∈ rgy.map (Pool.poolId ∘ Registration.pool)) : Pool :=
-    let present (reg : Registration) : Bool := reg.pool.poolId == poolId
+  def lookupRegistration (poolId : PoolKeyHash) (rgy : Registry) (h : poolId ∈ rgy.map Registration.poolId) : Registration :=
+    let present (reg : Registration) : Bool := reg.poolId == poolId
     match h_find : rgy.find? present with
-    | some reg => reg.pool
+    | some reg => reg
     | none =>
         have impossible : False :=
           by
-            simp only [List.mem_map, Function.comp_apply] at h
+            simp only [List.mem_map] at h
             obtain ⟨r, r_in_list, r_has_id⟩ := h
             rw [List.find?_eq_none] at h_find
             specialize h_find r r_in_list
@@ -145,7 +148,7 @@ end Registry
 namespace Registration
 
   def Valid (reg : Registration) (rgy : Registry) : Prop :=
-    let present (reg' : Registration) : Bool := reg'.pool.poolId == reg.pool.poolId
+    let present (reg' : Registration) : Bool := reg'.poolId == reg.poolId
     match rgy.find? present with
     | none => reg.WellFormed
     | some reg' => reg.WellFormed ∧ reg'.issueCounter > reg.issueCounter
