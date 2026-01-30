@@ -110,7 +110,8 @@ def ASig : List Signature → Signature :=
 private def hashSignatures : List Signature → Spec.Scalar :=
   Spec.sha256 ∘ List.foldl (fun acc sig ↦ acc ++ sig.toByteArray) default
 
-private def hashNat (n : Nat) : ByteArray :=
+private def natToBytes (n : Nat) : ByteArray :=
+  -- There's no point in expanding to more bytes because that would be larger than the scalar.
   let b0 := n.toUInt8
   let b1 := (n >>> 8).toUInt8
   let b2 := (n >>> 16).toUInt8
@@ -118,7 +119,7 @@ private def hashNat (n : Nat) : ByteArray :=
   ByteArray.mk #[b0, b1, b2, b3]
 
 private def hashWithIndex (n : Nat) (bytes : ByteArray) : Spec.Scalar :=
-  Spec.sha256 $ hashNat n ++ bytes
+  Spec.sha256 $ natToBytes n ++ bytes
 
 def BKey (mvks : List PublicKey) (σs : List Signature) : PublicKey :=
   let e_σ := ByteArray.mk (hashSignatures σs).toArray
@@ -126,6 +127,13 @@ def BKey (mvks : List PublicKey) (σs : List Signature) : PublicKey :=
     $ List.map (fun ⟨ mvk , i ⟩ ↦ Spec.G2.power (hashWithIndex i e_σ) mvk)
     $ mvks.zip
     $ List.range mvks.length
+
+def BSig (σs : List Signature) : Signature :=
+  let e_σ := ByteArray.mk (hashSignatures σs).toArray
+  Spec.G1.product
+    $ List.map (fun ⟨ σ , i ⟩ ↦ Spec.G1.power (hashWithIndex i e_σ) σ)
+    $ σs.zip
+    $ List.range σs.length
 
 
 end Leioscrypto.BLS
