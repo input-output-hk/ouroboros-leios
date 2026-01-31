@@ -2,7 +2,6 @@
 import Aesop
 import Leioscrypto.BLS
 import Leioscrypto.Types
-import Leioscrypto.Util
 import Mathlib.Data.List.Nodup
 
 
