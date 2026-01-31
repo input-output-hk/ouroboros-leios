@@ -18,3 +18,4 @@ jobs:
       - uses: leanprover/lean-action@v1
         with:
           lake-package-directory: "post-cip/formal-crypto/lean"
+          use-github-cache: false
