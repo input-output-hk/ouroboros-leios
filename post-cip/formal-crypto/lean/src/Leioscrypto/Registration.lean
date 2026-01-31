@@ -9,7 +9,7 @@ import Mathlib.Data.List.Nodup
 namespace Leioscrypto
 
 
-opaque validColdSignature (α : Type) (x : α) : PoolKeyHash → ColdKeySignature → Prop
+opaque verifyColdSignature : PoolKeyHash → ColdKeySignature → Prop
 
 
 structure Pool where
@@ -41,6 +41,10 @@ namespace Registration
   def poolId : Registration → PoolKeyHash :=
     Pool.poolId ∘ Registration.pool
 
+  structure Authentic (reg : Registration) : Prop where
+    signed_by_cold_key : verifyColdSignature reg.poolId reg.signature
+    proven_possession : BLS.Check reg.pool.mvk reg.pool.μ
+
 end Registration
 
 
@@ -50,8 +54,11 @@ deriving Inhabited, Membership
 namespace Registry
 
   structure WellFormed (rgy : Registry) : Prop where
-    wf_registrations : ∀ p ∈ rgy, p.WellFormed
+    wf_registrations : ∀ reg ∈ rgy, reg.WellFormed
     unique_hashes : (rgy.map Registration.poolId).Nodup
+
+  structure Authentic (rgy : Registry) : Prop where
+    authentic_registrations : ∀ r ∈ rgy, r.Authentic
 
   theorem wf_empty : (default : Registry).WellFormed :=
     ⟨
@@ -153,13 +160,20 @@ namespace Registration
     | none => reg.WellFormed
     | some reg' => reg.WellFormed ∧ reg'.issueCounter > reg.issueCounter
 
+  def Checked (reg : Registration) (rgy : Registry) : Prop :=
+    reg.WellFormed ∧ reg.Valid rgy ∧ reg.Authentic
+
 end Registration
 
 
-inductive IsValidRegistry : Registry → Prop
-| empty : IsValidRegistry default
-| deregister (rgy : Registry) (poolId : PoolKeyHash) : IsValidRegistry rgy → IsValidRegistry (rgy.deregister poolId)
-| register (rgy : Registry) (reg : Registration) : IsValidRegistry rgy → reg.Valid rgy → IsValidRegistry (rgy.register reg)
+namespace Registry
+
+  inductive IsValidRegistry : Registry → Prop
+  | empty : IsValidRegistry default
+  | deregister (rgy : Registry) (poolId : PoolKeyHash) : IsValidRegistry rgy → IsValidRegistry (rgy.deregister poolId)
+  | register (rgy : Registry) (reg : Registration) : IsValidRegistry rgy → reg.Checked rgy → IsValidRegistry (rgy.register reg)
+
+end Registry
 
 
 end Leioscrypto
