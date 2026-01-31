@@ -38,7 +38,7 @@ def BlockHash.toByteArray : BlockHash → ByteArray :=
 
 
 def PoolKeyHash := BitVec 224
- deriving BEq, LawfulBEq
+ deriving BEq, LT
 
 
 def ColdKeySignature := BitVec 256

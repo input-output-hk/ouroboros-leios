@@ -26,7 +26,7 @@ structure Epoch where
   pools : List (PoolKeyHash × Coin)
   pools_not_duplicated : (pools.map Prod.fst).Nodup
   pools_have_stake : ∀ stake ∈ pools.map Prod.snd, stake > 0
-  pools_sorted_nonincreasing : (pools.map Prod.snd).Pairwise (· ≥ ·)
+  pools_sorted_nonincreasing : pools.Pairwise (fun ⟨ poolId₁ , stake₁ ⟩ ⟨ poolId₂ , stake₂ ⟩ ↦ stake₁ > stake₂ ∨ stake₁ = stake₂ ∧ poolId₁ > poolId₂)
   pools_valid_ids : ∀ p ∈ pools.map Prod.fst, p ∈ registry.map Registration.poolId
   slot_range : Slot × Slot
   slot_range_ordered : slot_range.fst ≤ slot_range.snd
