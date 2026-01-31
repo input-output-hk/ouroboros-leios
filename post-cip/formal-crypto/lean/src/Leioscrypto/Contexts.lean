@@ -1,4 +1,5 @@
 
+import Aesop
 import Leioscrypto.Registration
 import Leioscrypto.Types
 import Leioscrypto.Util
@@ -21,7 +22,7 @@ deriving Repr
 
 structure Epoch where
   registry : Registry
-  wf_registry : registry.WellFormed
+  valid_registry : registry.IsValidRegistry
   number : Nat
   pools : List (PoolKeyHash × Coin)
   pools_not_duplicated : (pools.map Prod.fst).Nodup
@@ -38,10 +39,14 @@ namespace Epoch
     epoch.pools.get ⟨ i, h ⟩
 
   def lookupPoolId (epoch : Epoch) (i : Nat) (h : i < epoch.pools.length) : PoolKeyHash :=
-    Prod.fst $ epoch.pools.get ⟨ i, h ⟩
+    Prod.fst $ epoch.pools[i]
 
   theorem poolId_in_pools (epoch : Epoch) (i : Nat) (h : i < epoch.pools.length) : lookupPoolId epoch i h ∈ epoch.pools.map Prod.fst :=
-    sorry
+    by
+      let poolId := epoch.lookupPoolId i h
+      rw [lookupPoolId]
+      apply List.mem_map_of_mem
+      apply List.get_mem
 
 end Epoch
 
