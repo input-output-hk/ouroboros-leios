@@ -41,6 +41,5 @@ executable leios-deltaq-analysis
                     , Chart >= 1.8 && < 2.0
                     , Chart-cairo
     hs-source-dirs:   app
-    -- ghc-options: -O2 -threaded -rtsopts "-with-rtsopts=-N -qb2 -H1G -s"
     ghc-options: -O2 -threaded -rtsopts "-with-rtsopts=-N -s"
     default-language: Haskell2010
