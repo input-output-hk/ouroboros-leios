@@ -50,22 +50,47 @@ end StakeDistribution
 def PoolWeights := List (PoolKeyHash × Rat)
 deriving Inhabited
 
-def persistentSeatCount (n : Nat) (stakes : StakeDistribution) : Nat :=
-  let test : (PoolKeyHash × Nat) × (Nat × Nat) → Bool
-    | ⟨ ⟨ _ , S ⟩ , ⟨ ρ , i ⟩ ⟩ => (n - i + 1) * (ρ - S)^2 ≥ (n - i) * ρ^2
-  List.length
-    $ List.takeWhile test
-    $ stakes.pools.zip
+private def persistenceTest (n : Nat) : (PoolKeyHash × Nat) × (Nat × Nat) → Bool
+| ⟨ ⟨ _ , S ⟩ , ⟨ ρ , i ⟩ ⟩ => (n - i + 1) * (ρ - S)^2 ≥ (n - i) * ρ^2
+
+private def persistenceMetric (stakes : StakeDistribution) : List ((PoolKeyHash × Nat) × (Nat × Nat)) :=
+  stakes.pools.zip
     $ stakes.remaining.zip
     $ (List.range stakes.pools.length).map (· + 1)
+
+def persistentSeatCount (n : Nat) (stakes : StakeDistribution) : Nat :=
+  List.length
+    $ List.takeWhile (persistenceTest n)
+    $ persistenceMetric stakes
 
 def nonpersistentWeights (n : Nat) (stakes : StakeDistribution) : PoolWeights :=
   let n₁ := persistentSeatCount n stakes
   match h₁ : n₁ with
   | 0 => default
   | Nat.succ iStar =>
+      let pm := persistenceMetric stakes
+      let pt := persistenceTest n
       let h₂ : iStar < stakes.remaining.length :=
-        sorry
+        by
+          have h_bound : List.length (List.takeWhile pt pm) ≤ List.length pm :=
+            by
+              induction pm with
+              | nil =>
+                simp
+              | cons head tail ih =>
+                simp [List.takeWhile]
+                split
+                · apply Nat.succ_le_succ
+                  exact ih
+                · apply Nat.zero_le
+          change n₁ ≤ _ at h_bound
+          rw [h₁] at h_bound
+          dsimp [pm, persistenceMetric] at h_bound
+          rw [List.length_zip, List.length_zip] at h_bound
+          apply Nat.lt_of_succ_le
+          apply Nat.le_trans h_bound
+          apply Nat.le_trans (Nat.min_le_right _ _)
+          apply Nat.min_le_left
       let ρStar : Rat := stakes.remaining[iStar].cast
       (stakes.pools.drop n₁).map
         $ fun ⟨ poolId , S ⟩ ↦ ⟨ poolId , Rat.div S.cast ρStar ⟩
