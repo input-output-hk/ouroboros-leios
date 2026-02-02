@@ -24,15 +24,15 @@ namespace Vote
   def Valid (election : Election) (vote : Vote) : Prop :=
     let correctElection := vote.electionId = election.electionId
     let correctBlock := vote.ebHash = election.ebHash
-    let validIndex := vote.poolIndex < election.epoch.pools.length
+    let validIndex := vote.poolIndex < election.epoch.stakes.pools.length
     correctElection ∧ correctBlock ∧ validIndex
 
   def Authentic (election : Election) (vote : Vote) (valid : vote.Valid election) : Prop :=
     let epoch := election.epoch
     let registry := epoch.registry
     let poolExists := valid.right.right
-    let poolId := epoch.lookupPoolId vote.poolIndex poolExists
-    let poolInEpoch : poolId ∈ epoch.pools.map Prod.fst := epoch.poolId_in_pools vote.poolIndex poolExists
+    let poolId := epoch.stakes.lookupPoolId vote.poolIndex poolExists
+    let poolInEpoch : poolId ∈ epoch.stakes.pools.map Prod.fst := epoch.stakes.poolId_in_pools vote.poolIndex poolExists
     let validId := epoch.pools_valid_ids poolId poolInEpoch
     let registration : Registration := registry.lookupRegistration poolId validId
     let mvk := registration.pool.mvk
