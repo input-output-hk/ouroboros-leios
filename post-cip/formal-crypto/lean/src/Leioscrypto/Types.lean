@@ -22,7 +22,7 @@ def Slot.toByteArray : Slot → ByteArray :=
 
 
 def Coin := Nat
-deriving OfNat, LT, LE, Add, Sub, Mul
+deriving OfNat, LT, LE, Add
 
 
 def PraosNonce := Vector UInt8 32

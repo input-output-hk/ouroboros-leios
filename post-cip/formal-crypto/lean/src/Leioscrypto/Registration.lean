@@ -74,7 +74,8 @@ namespace Registry
     | some reg => rgy.erase reg
 
   theorem wf_deregister (poolId : PoolKeyHash) (rgy :Registry) (h : rgy.WellFormed) : (deregister poolId rgy).WellFormed :=
-    sorry
+    by
+      sorry
 /-
   def deregister' (poolId : PoolKeyHash) (regs : Registry) : Registry :=
     let registrations := regs.registrations
@@ -104,7 +105,8 @@ namespace Registry
     rgy.filter absent
 
   theorem wf_register (reg : Registration) (rgy : Registry) (h : rgy.WellFormed) : (register reg rgy).WellFormed :=
-    sorry
+    by
+      sorry
   /-
   def register (regs : Registry) (reg : Registration) : Registry :=
     let poolId : PoolKeyHash := reg.pool.poolKeyHash

@@ -108,7 +108,7 @@ def Signature := Spec.G1.Point
 def Signature.WellFormed : Signature → Prop :=
   Spec.SignatureValidate
 
-private def Signature.toByteArray : Signature → ByteArray :=
+def Signature.toByteArray : Signature → ByteArray :=
   ByteArray.mk ∘ Vector.toArray
 
 private def sigMessage (m : ByteArray) : ByteArray :=
