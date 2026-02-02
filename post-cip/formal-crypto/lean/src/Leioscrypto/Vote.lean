@@ -54,13 +54,14 @@ namespace Vote
     let validId : poolId ∈ registry.map Registration.poolId :=
      by
       cases vote
-      case PersistentVote eid poolIndex eb sig =>
-        sorry
-      case NonpersistentVote eid pId sig1 eb sig2 =>
+      case PersistentVote _ poolIndex _ _ =>
+        apply epoch.pools_valid_ids
         let h₁ := valid.valid_pool
         simp [*] at h₁
+        apply epoch.stakes.poolId_in_pools poolIndex h₁
+      case NonpersistentVote _ _ _ _ _ =>
         apply epoch.pools_valid_ids
-        sorry
+        apply valid.valid_pool
     let registration : Registration := registry.lookupRegistration poolId validId
     let mvk := registration.pool.mvk
     let eid := election.electionId.toByteArray
