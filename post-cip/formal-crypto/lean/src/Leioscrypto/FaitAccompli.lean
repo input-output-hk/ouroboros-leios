@@ -26,7 +26,6 @@ namespace StakeDistribution
       apply List.mem_map_of_mem
       apply List.get_mem
 
-
   def total (stakes : StakeDistribution): Coin :=
     (stakes.pools.map Prod.snd).sum
 
@@ -40,12 +39,14 @@ namespace StakeDistribution
 end StakeDistribution
 
 
-/-
 def persistentSeatCount (n : Nat) (stakes : StakeDistribution) : Nat :=
-  let test (i : Nat) (S : Nat) (ρ : Nat) : Bool :=
-    (n - i + 1) * (ρ - S)^2 ≥ (n - i) * ρ^2
-  let ρs := stakes.remaining
-  sorry
--/
+  let test : (PoolKeyHash × Nat) × (Nat × Nat) → Bool
+        | ⟨ ⟨ _ , S ⟩ , ⟨ ρ , i ⟩ ⟩ => (n - i + 1) * (ρ - S)^2 ≥ (n - i) * ρ^2
+  List.length
+    $ List.takeWhile test
+    $ stakes.pools.zip
+    $ stakes.remaining.zip
+    $ (List.range stakes.pools.length).map (· + 1)
+
 
 end Leioscrypto
