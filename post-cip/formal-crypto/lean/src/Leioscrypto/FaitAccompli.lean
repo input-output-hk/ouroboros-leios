@@ -63,7 +63,7 @@ def persistentSeatCount (n : Nat) (stakes : StakeDistribution) : Nat :=
     $ List.takeWhile (persistenceTest n)
     $ persistenceMetric stakes
 
-def nonpersistentWeights (n : Nat) (stakes : StakeDistribution) : PoolWeights :=
+def nonpersistentWeights (n : Nat) (stakes : StakeDistribution) : Rat × PoolWeights :=
   let n₁ := persistentSeatCount n stakes
   match h₁ : n₁ with
   | 0 => default
@@ -92,8 +92,24 @@ def nonpersistentWeights (n : Nat) (stakes : StakeDistribution) : PoolWeights :=
           apply Nat.le_trans (Nat.min_le_right _ _)
           apply Nat.min_le_left
       let ρStar : Rat := stakes.remaining[iStar].cast
-      (stakes.pools.drop n₁).map
-        $ fun ⟨ poolId , S ⟩ ↦ ⟨ poolId , Rat.div S.cast ρStar ⟩
+      ⟨
+        ρStar
+      , (stakes.pools.drop n₁).map $ fun ⟨ poolId , S ⟩ ↦ ⟨ poolId , Rat.div S.cast ρStar ⟩
+      ⟩
+
+
+structure FaitAccompli where
+  stakes : StakeDistribution
+  seats : Nat
+  n₁ : Nat
+  valid_persistent_seats : n₁ = persistentSeatCount seats stakes
+  persistentStake : List (PoolKeyHash × Rat)
+  valid_persistent_stake : persistentStake = (stakes.pools.take n₁).map (fun ⟨ poolId , s ⟩ ↦ ⟨ poolId , s.cast ⟩)
+  nonpersistentStake : Rat
+  nonpersistentCandidates : List (PoolKeyHash × Rat)
+  valid_nonpersistent_seats : ⟨ nonpersistentStake , nonpersistentCandidates ⟩ = nonpersistentWeights seats stakes
+  n₂ : Nat
+  valid_seats : n₁ + n₂ = seats
 
 
 end Leioscrypto

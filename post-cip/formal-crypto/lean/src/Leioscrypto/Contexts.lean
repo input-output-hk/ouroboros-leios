@@ -20,6 +20,7 @@ structure LeiosParameters where
 
 
 structure Epoch where
+  protocol : LeiosParameters
   registry : Registry
   valid_registry : registry.IsValidRegistry
   number : Nat
@@ -28,6 +29,8 @@ structure Epoch where
   slot_range : Slot × Slot
   slot_range_ordered : slot_range.fst ≤ slot_range.snd
   nonce : PraosNonce
+  fa : FaitAccompli
+  valid_fait_accompli : fa.stakes = stakes ∧ fa.seats = protocol.n
 
 namespace Epoch
 
