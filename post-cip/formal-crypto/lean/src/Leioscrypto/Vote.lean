@@ -8,32 +8,59 @@ import Leioscrypto.Types
 namespace Leioscrypto
 
 
-structure Vote where
-  electionId : ElectionId
-  ebHash : BlockHash
-  poolIndex : PoolIndex
-  σ_eid : Option BLS.Signature
-  σ_m : BLS.Signature
+inductive Vote where
+| PersistentVote : ElectionId → PoolIndex → BlockHash → BLS.Signature → Vote
+| NonpersistentVote : ElectionId → PoolKeyHash → BLS.Signature → BlockHash → BLS.Signature → Vote
 
 namespace Vote
 
-  structure WellFormed (v : Vote) : Prop where
-    wf_σ_eid : v.σ_eid.elim True BLS.Signature.WellFormed
-    wf_σ_m : v.σ_m.WellFormed
+  def electionId : Vote → ElectionId
+  | PersistentVote eid _ _ _ => eid
+  | NonpersistentVote eid _ _ _ _ => eid
 
-  def Valid (election : Election) (vote : Vote) : Prop :=
-    let correctElection := vote.electionId = election.electionId
-    let correctBlock := vote.ebHash = election.ebHash
-    let validIndex := vote.poolIndex < election.epoch.stakes.pools.length
-    correctElection ∧ correctBlock ∧ validIndex
+  def ebHash : Vote → BlockHash
+  | PersistentVote _ _ bh _ => bh
+  | NonpersistentVote _ _ _ bh _ => bh
+
+  def σ_eid : Vote → Option BLS.Signature
+  | PersistentVote _ _ _ _ => none
+  | NonpersistentVote _ _ sig _ _ => some sig
+
+  def σ_m : Vote → BLS.Signature
+  | PersistentVote _ _ _ sig => sig
+  | NonpersistentVote _ _ _ _ sig => sig
+
+  structure WellFormed (vote : Vote) : Prop where
+    wf_σ_eid : vote.σ_eid.elim True BLS.Signature.WellFormed
+    wf_σ_m : vote.σ_m.WellFormed
+
+  structure Valid (election : Election) (vote : Vote) : Prop where
+    correct_election : vote.electionId = election.electionId
+    correct_block : vote.ebHash = election.ebHash
+    valid_pool :
+      match vote with
+      | PersistentVote _ poolIndex _ _ => election.epoch.valid_index poolIndex
+      | NonpersistentVote _ poolId _ _ _ => election.epoch.valid_poolid poolId
+
+  def lookupPool (election : Election) (vote : Vote) (valid : vote.Valid election) : PoolKeyHash :=
+    match vote with
+    | PersistentVote _ poolIndex _ _ => election.epoch.stakes.lookupPoolId poolIndex valid.valid_pool
+    | NonpersistentVote _ poolId _ _ _ => poolId
 
   def Authentic (election : Election) (vote : Vote) (valid : vote.Valid election) : Prop :=
     let epoch := election.epoch
     let registry := epoch.registry
-    let poolExists := valid.right.right
-    let poolId := epoch.stakes.lookupPoolId vote.poolIndex poolExists
-    let poolInEpoch : poolId ∈ epoch.stakes.pools.map Prod.fst := epoch.stakes.poolId_in_pools vote.poolIndex poolExists
-    let validId := epoch.pools_valid_ids poolId poolInEpoch
+    let poolId := vote.lookupPool election valid
+    let validId : poolId ∈ registry.map Registration.poolId :=
+     by
+      cases vote
+      case PersistentVote eid poolIndex eb sig =>
+        sorry
+      case NonpersistentVote eid pId sig1 eb sig2 =>
+        let h₁ := valid.valid_pool
+        simp [*] at h₁
+        apply epoch.pools_valid_ids
+        sorry
     let registration : Registration := registry.lookupRegistration poolId validId
     let mvk := registration.pool.mvk
     let eid := election.electionId.toByteArray

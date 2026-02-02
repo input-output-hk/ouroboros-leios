@@ -29,6 +29,14 @@ structure Epoch where
   slot_range_ordered : slot_range.fst ≤ slot_range.snd
   nonce : PraosNonce
 
+namespace Epoch
+
+  def valid_index (epoch : Epoch) : PoolIndex → Prop := epoch.stakes.valid_index
+
+  def valid_poolid (epoch : Epoch) : PoolKeyHash → Prop := epoch.stakes.valid_id
+
+end Epoch
+
 
 structure Election where
   epoch : Epoch

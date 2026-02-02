@@ -14,16 +14,20 @@ structure StakeDistribution where
 
 namespace StakeDistribution
 
-  def lookup (stakes : StakeDistribution) (i : Nat) (h : i < stakes.pools.length) : PoolKeyHash × Coin :=
+  def valid_id (stakes : StakeDistribution) (poolId : PoolKeyHash) : Prop := poolId ∈ stakes.pools.map Prod.fst
+
+  def valid_index (stakes : StakeDistribution) (i : PoolIndex) : Prop := i < stakes.pools.length
+
+  def lookup (stakes : StakeDistribution) (i : PoolIndex) (h : i < stakes.pools.length) : PoolKeyHash × Coin :=
     stakes.pools.get ⟨ i, h ⟩
 
-  def lookupPoolId (stakes : StakeDistribution) (i : Nat) (h : i < stakes.pools.length) : PoolKeyHash :=
+  def lookupPoolId (stakes : StakeDistribution) (i : PoolIndex) (h : i < stakes.pools.length) : PoolKeyHash :=
     Prod.fst $ stakes.pools.get ⟨ i , h ⟩
 
   def lookupStake (stakes : StakeDistribution) (poolId : PoolKeyHash) : Coin :=
     (stakes.pools.find? (fun x ↦ x.fst == poolId)).elim 0 Prod.snd
 
-  theorem poolId_in_pools (stakes : StakeDistribution) (i : Nat) (h : i < stakes.pools.length) : lookupPoolId stakes i h ∈ stakes.pools.map Prod.fst :=
+  theorem poolId_in_pools (stakes : StakeDistribution) (i : PoolIndex) (h : i < stakes.pools.length) : lookupPoolId stakes i h ∈ stakes.pools.map Prod.fst :=
     by
       let poolId := stakes.lookupPoolId i h
       rw [lookupPoolId]
