@@ -1,4 +1,5 @@
 
+import Aesop
 import Leioscrypto.Types
 
 
@@ -18,6 +19,9 @@ namespace StakeDistribution
 
   def lookupPoolId (stakes : StakeDistribution) (i : Nat) (h : i < stakes.pools.length) : PoolKeyHash :=
     Prod.fst $ stakes.pools.get ⟨ i , h ⟩
+
+  def lookupStake (stakes : StakeDistribution) (poolId : PoolKeyHash) : Coin :=
+    (stakes.pools.find? (fun x ↦ x.fst == poolId)).elim 0 Prod.snd
 
   theorem poolId_in_pools (stakes : StakeDistribution) (i : Nat) (h : i < stakes.pools.length) : lookupPoolId stakes i h ∈ stakes.pools.map Prod.fst :=
     by
@@ -39,14 +43,28 @@ namespace StakeDistribution
 end StakeDistribution
 
 
+def PoolWeights := List (PoolKeyHash × Rat)
+deriving Inhabited
+
 def persistentSeatCount (n : Nat) (stakes : StakeDistribution) : Nat :=
   let test : (PoolKeyHash × Nat) × (Nat × Nat) → Bool
-        | ⟨ ⟨ _ , S ⟩ , ⟨ ρ , i ⟩ ⟩ => (n - i + 1) * (ρ - S)^2 ≥ (n - i) * ρ^2
+    | ⟨ ⟨ _ , S ⟩ , ⟨ ρ , i ⟩ ⟩ => (n - i + 1) * (ρ - S)^2 ≥ (n - i) * ρ^2
   List.length
     $ List.takeWhile test
     $ stakes.pools.zip
     $ stakes.remaining.zip
     $ (List.range stakes.pools.length).map (· + 1)
+
+def nonpersistentWeights (n : Nat) (stakes : StakeDistribution) : PoolWeights :=
+  let n₁ := persistentSeatCount n stakes
+  match h₁ : n₁ with
+  | 0 => default
+  | Nat.succ iStar =>
+      let h₂ : iStar < stakes.remaining.length :=
+        sorry
+      let ρStar : Rat := stakes.remaining[iStar].cast
+      (stakes.pools.drop n₁).map
+        $ fun ⟨ poolId , S ⟩ ↦ ⟨ poolId , Rat.div S.cast ρStar ⟩
 
 
 end Leioscrypto
