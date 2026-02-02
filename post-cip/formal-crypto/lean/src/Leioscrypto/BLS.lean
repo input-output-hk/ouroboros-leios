@@ -98,7 +98,7 @@ def KeyGen (sk : SecretKey) : PublicKey × ProofOfPossession :=
 def Check : PublicKey → ProofOfPossession → Prop
 | mvk , ⟨ μ₁ , μ₂ ⟩ =>
     let b₁ := Spec.CoreVerify mvk mvk.popMessage μ₁
-  -- Note that the following line differs from the original Leios paper, but is equivalent to it.
+  -- Note that the following line differs from the original Leios paper, but its implication is equivalent.
     let b₂ := Spec.CoreVerify mvk dstLeios μ₂
     b₁ ∧ b₂
 

@@ -44,7 +44,6 @@ namespace Vote
     ver_eid ∧ ver_m
 
     def Checked (election : Election) (vote : Vote) (valid : vote.Valid election) : Prop :=
-      --FIXME: Why can't eliminate the `valid` argument and instead use something like `let valid := vote.Valid election`?
       vote.WellFormed ∧ vote.Authentic election valid
 
 end Vote
