@@ -28,5 +28,7 @@ lean_exe «leioscrypto_test» where
 require mathlib from git
   "https://github.com/leanprover-community/mathlib4" @ "v4.25.0"
 
+/-
 require aesop from git
   "https://github.com/leanprover-community/aesop" @ "v4.25.0"
+-/

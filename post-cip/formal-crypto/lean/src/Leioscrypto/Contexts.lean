@@ -1,5 +1,4 @@
 
-import Aesop
 import Leioscrypto.FaitAccompli
 import Leioscrypto.Registration
 import Leioscrypto.Types
