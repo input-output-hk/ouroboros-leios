@@ -1,18 +1,20 @@
-> [!NOTE]
-This is work in progress.
-
 # DeltaQ / Statistics library for Ourobors Praos and Leios
 
 The library provides a [∆Q](https://github.com/DeltaQ-SD/deltaq/) model for Linear Leios.
 
-> [!CAUTION]
-∆Q is [not built for modeling complex systems](https://github.com/DeltaQ-SD/deltaq/blob/main/doc/reports/artefact-A4.md#conclusion-and-next-steps).
-Due to this restricution, running a complex model, like the one required for Linear Leios, is unfeasible. The issue is tracked here: https://github.com/DeltaQ-SD/deltaq/issues/134
+## DeltaQ backend
+The piecewise-polynomial backed in DeltaQ is [not built for modeling complex systems](https://github.com/DeltaQ-SD/deltaq/blob/main/doc/reports/artefact-A4.md#conclusion-and-next-steps). Due to this restriction, for running the model for Linear Leios we implemented a new, [experimental backend](https://github.com/yveshauser/deltaq/blob/experimental/lib/deltaq/src/DeltaQ/Sampled.hs) for DeltaQ that operates on discrete values representing a probability distribution.
 
 ## Running the code
 
-Run the analysis and generate diagrams as follows:
+Run the analysis generate diagrams as follows:
 
 ```
-$ cabal run leios-deltaq-analysis
+$ cabal run leios-deltaq-analysis stats
+```
+```
+$ cabal run leios-deltaq-analysis plots
+```
+```
+$ cabal run leios-deltaq-analysis estimates
 ```
