@@ -29,11 +29,16 @@ The first item depends on the block/vote diffusion times, whereas second item de
 
 ### Statistics
 
-* pValidating: probability that an EB can be validated
-* pQuorum: probability of reaching a quorum
-* pInterruptedByNewBlock: probability of getting a new block too early
-* pCertified: probability that there is a certificate in the next RB
-* eCertified: expected time for next certified block
+The statistisics depend on the protocol parameters and other configurations. The following values are calculated
+
+|statistic|dependencies|description|
+|---|---|---|
+|`pHeaderOnTime`|$L\_{hdr}$|probability that an EB arrives on time|
+|`pValidating`|$L\_{hdr}$, $L\_{vote}$|probability that an EB can be validated on time|
+|`pQuorum`|`pValidating`, committee size, number SPO|probability of reaching a quorum|
+|`pInterruptedByNewBlock`|$L\_{hdr}$, $L\_{vote}$, $L\_{diff}$|probability of getting a new block too early|
+|`pCertified`|`pInterruptedByNewBlock`, `pQuorum`|probability that there is a certificate in the next RB|
+|`eCertified`|$L\_{hdr}$, $L\_{vote}$, $L\_{diff}$|expected time for next certified block|
 
 ### Plots
 
