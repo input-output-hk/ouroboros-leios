@@ -7,24 +7,18 @@ processes:
       - NODE_ID=1
     command: bash "${SOURCE_DIR}/run-node.sh"
     log_location: "${WORKING_DIR}/node1/node.log"
-    availability:
-      restart: "always"
 
   Node2:
     environment:
       - NODE_ID=2
     command: bash "${SOURCE_DIR}/run-node.sh"
     log_location: "${WORKING_DIR}/node2/node.log"
-    availability:
-      restart: "always"
 
   Node3:
     environment:
       - NODE_ID=3
     command: bash "${SOURCE_DIR}/run-node.sh"
     log_location: "${WORKING_DIR}/node3/node.log"
-    availability:
-      restart: "always"
 
   TxGenerator:
     command: sleep 5 && tx-generator json_highlevel gen.json
