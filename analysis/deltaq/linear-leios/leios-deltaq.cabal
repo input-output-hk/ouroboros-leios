@@ -14,7 +14,6 @@ library
     import:           warnings
     build-depends:    base
                     , deltaq
-                    , probability-polynomial
                     , statistics
     hs-source-dirs:   src
     exposed-modules:  Analysis.Leios
@@ -35,7 +34,6 @@ executable leios-deltaq-analysis
                     , cassava
                     , deltaq
                     , leios-deltaq
-                    , probability-polynomial
                     , random
                     , vector
                     , Chart >= 1.8 && < 2.0
