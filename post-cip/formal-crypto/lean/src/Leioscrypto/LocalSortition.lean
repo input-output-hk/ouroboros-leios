@@ -1,5 +1,4 @@
 
-import Batteries.Data.Rat.Float
 import Leioscrypto.BLS
 
 
@@ -47,7 +46,7 @@ private partial def trialEstimate (y : Rat) (x : Rat) (k : Nat) (n : Nat) : Orde
     else if  y > estimate + error
       then Ordering.gt
       else trialEstimate y x k $ n + 1
--- FIXME: The termination proof would require Leibniz's theorem (alternating series estimation theorem).
+-- FIXME: The termination proof is equivalent to Leibniz's theorem (the alternating series estimation theorem).
 
 def comparePoisson (y : Rat) (x : Rat) (k : Nat) : Ordering :=
   -- At least $\lfloor x \rfloor$ terms must be evaluated.
@@ -55,25 +54,19 @@ def comparePoisson (y : Rat) (x : Rat) (k : Nat) : Ordering :=
 -- Note that the test suite includes `LSpec` tests for this function.
 
 
-private partial def checkSeats (vrf : Rat) (x : Rat) (seats : Nat) : Nat :=
-  let lower := comparePoisson vrf x seats == Ordering.gt
-  let upper := comparePoisson vrf x (seats + 1) == Ordering.lt
-  dbg_trace s!"The value of z is: {vrf} {x} {seats} {lower} {upper}"
-  if lower ∧ upper
+private def allowsSeats (maxSeats : Nat) (vrf : Rat) (x : Rat) (seats : Nat) : Nat :=
+  if seats ≥ maxSeats
     then seats
-    else checkSeats vrf x $ seats + 1
+    else if comparePoisson vrf x (seats + 1) == Ordering.lt
+      then seats
+      else allowsSeats maxSeats vrf x $ seats + 1
 
-private partial def checkSeats' (vrf : Rat) (x : Rat) (seats : Nat) : Bool × Bool × Bool :=
-  let lower := comparePoisson vrf x seats == Ordering.gt
-  let upper := comparePoisson vrf x (seats + 1) == Ordering.lt
-  ⟨ lower , upper , lower ∧ upper ⟩
 
 private def evalSeats (n₂ : Nat) (𝒮 : Rat) (vrf : Rat) : Nat :=
   let x : Rat := (n₂ : Rat) * (𝒮 : Rat)
   if comparePoisson vrf x 0 == Ordering.lt
     then 0
-    else checkSeats vrf x 0
--- FIXME: Another complicated termination proof is needed here.
+    else allowsSeats n₂ vrf x 0
 
 def countSeats (n₂ : Nat) (𝒮 : Rat) (σ_eid : BLS.Signature) : Nat :=
   let num : Nat := σ_eid.toByteArray.foldl (fun acc b => (acc <<< 8) + b.toNat) 0
