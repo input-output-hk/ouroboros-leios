@@ -1,4 +1,6 @@
 
+import Leioscrypto.BLS
+import Leioscrypto.LocalSortition
 import Leioscrypto.Types
 
 
@@ -109,6 +111,20 @@ structure FaitAccompli where
   valid_nonpersistent_seats : ⟨ nonpersistentStake , nonpersistentCandidates ⟩ = nonpersistentWeights seats stakes
   n₂ : Nat
   valid_seats : n₁ + n₂ = seats
+
+namespace FaitAccompli
+
+  def voteWeight (fa : FaitAccompli) (poolId : PoolKeyHash) : Option BLS.Signature → Option Rat
+  | none =>
+      Prod.snd <$> fa.persistentStake.find? (fun ⟨ poolId' , _ ⟩ ↦ poolId' == poolId)
+  | some σ_eid =>
+      do
+        let 𝒮 ← Prod.snd <$> fa.nonpersistentCandidates.find? (fun ⟨ poolId' , _ ⟩ ↦ poolId' == poolId)
+        let seats := countSeats fa.n₂ 𝒮 σ_eid
+        guard $ seats > 0
+        pure $ fa.nonpersistentStake * seats
+
+end FaitAccompli
 
 
 end Leioscrypto

@@ -72,6 +72,7 @@ def countSeats (n₂ : Nat) (𝒮 : Rat) (σ_eid : BLS.Signature) : Nat :=
   let num : Nat := σ_eid.toByteArray.foldl (fun acc b => (acc <<< 8) + b.toNat) 0
   let den : Nat := 2 ^ 384
   let vrf : Rat := num.cast / den
+  -- FIXME: We should probably prove `0 ≤ vrf < 1`.
   evalSeats n₂ 𝒮 vrf
 
 

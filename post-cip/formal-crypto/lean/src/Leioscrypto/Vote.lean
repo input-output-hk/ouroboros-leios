@@ -69,7 +69,8 @@ namespace Vote
     let ver_eid := vote.σ_eid.elim True $ BLS.Ver mvk msg_eid
     let msg_m := eid ++ election.ebHash.toByteArray
     let ver_m := BLS.Ver mvk msg_m vote.σ_m
-    ver_eid ∧ ver_m
+    let has_seats := epoch.fa.voteWeight poolId vote.σ_eid ≠ none
+    ver_eid ∧ ver_m ∧ has_seats
 
     def Checked (election : Election) (vote : Vote) (valid : vote.Valid election) : Prop :=
       vote.WellFormed ∧ vote.Authentic election valid
