@@ -114,6 +114,12 @@ structure FaitAccompli where
 
 namespace FaitAccompli
 
+  def valid_persistent_id (fa : FaitAccompli) (poolIndex : PoolIndex) : Prop :=
+    poolIndex < fa.n₁
+
+  def valid_nonpersistent_pool (fa : FaitAccompli) (poolId : PoolKeyHash) : Prop :=
+    poolId ∈ fa.nonpersistentCandidates.map Prod.fst
+
   def voteWeight (fa : FaitAccompli) (poolId : PoolKeyHash) : Option BLS.Signature → Option Rat
   | none =>
       Prod.snd <$> fa.persistentStake.find? (fun ⟨ poolId' , _ ⟩ ↦ poolId' == poolId)
