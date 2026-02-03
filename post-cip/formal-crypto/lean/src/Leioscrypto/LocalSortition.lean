@@ -1,5 +1,4 @@
 
-import Batteries.Data.Rat.Float
 import Leioscrypto.BLS
 
 
@@ -56,8 +55,6 @@ def comparePoisson (y : Rat) (x : Rat) (k : Nat) : Ordering :=
 
 private def evalSeats (n₂ : Nat) (𝒮 : Rat) (vrf : Rat) : Nat :=
   let x : Rat := n₂ * 𝒮
-  let kₘᵢₙ : Int := x.floor
-
   sorry
 
 
