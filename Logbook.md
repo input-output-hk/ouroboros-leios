@@ -6,6 +6,26 @@
 > 
 > See also the [Post-CIP R&D Findings](post-cip/README.md) document for additional (after 2025-11-01) findings and artifacts not directly related to the implementation of Linear Leios.
 
+## 2026-02-02
+
+### SN on storing EBs
+
+- I wonder what the `EbId` is for and how it is different to `EbHash`; just shorter / easier to work with?
+- It is actually used as a key on the `ebTxs` table.. I must be careful not to change the db schema at this point.
+- There is a connetion to `SlotNo` even? `ebIdSlot :: EbId -> SlotNo`
+- I just realized that we already have the insert operations.. obviously as we were able to fetch bodies.
+- Okay .. so EBs are stored now and I can see the log + the sqlite entries.
+- Something is wrong with grafana.. I don't see the Leios blocks forged anymore, but only the notification stuff with the `"Leios"` filter?
+- The traces are definitely contained in the logs though.. let's use normal cat/jq/grep then..
+- I was expecting the fetching logic thread traces, but could not find them. Are these threads even running / progressing?
+- Could it be that they both lock on these `MVar` and wait for being ready?
+- Found another call site where EBs are already stored (in the fetch client). Here we also update an `MVar LeiosEbBodies` which seems to be an in-memory index of what EBs we know? This is quite fragile as the persisted and indexed state can go out of sync. Anyhow, this call site also shows how the notification is created and should trigger the `NotifyServer`
+- Instead of shovin that `MVar` for peer specific `LeiosNotification` state into the block forging loop, I decided to have the `LeiosDbHandle` provide a means to subscribe to such notifications (like I expect the latter `EBStore` will do).
+- Designed a subscription mechanism to the `LeiosDbHandle`
+- Turns out the `LeiosEbBodies` were used to resolve `EbId -> LeiosPoint`. Let's move the latter into notifications directly.
+- This results in the `LeiosDbHandle` needing to resolve `EbId -> LeiosPoint` now when issuing notifications.
+- Asked others and the `EbId` was likely a premature optimization for smaller indices on EBs.
+
 ## 2026-01-29
 
 ### SN on EB production
