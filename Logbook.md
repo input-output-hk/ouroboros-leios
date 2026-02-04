@@ -6,6 +6,38 @@
 > 
 > See also the [Post-CIP R&D Findings](post-cip/README.md) document for additional (after 2025-11-01) findings and artifacts not directly related to the implementation of Linear Leios.
 
+## 2026-02-03
+
+### Discussion on Leios block structure (EB headers)
+
+- When exploring EB production in the prototype, I raise that I would find it more intuitive to have a separate EB header instead of modifying the praos header for announcement
+
+- If it appears simpler in the prototype, it might appear more intuitive for other implementors too? Also: separation of concerns / more clearly "overlay" protocol
+
+- Other possible benefits? size and time (to sign/verify)
+
+- If the EB header is a separate entitity, we could be using the BLS key to authorize it
+
+  - We do not need forward security on EB announcements (and votes) because both are only valid in a limited time range; the resulting certificate is authorized by the RB that includes it
+  - Key rotation would be a non-issue if using KES keys obviously, if we'd be using BLS keys, equivocations due to compromised keys would be detected automatically -\> existing mechanism and analogous for voting
+  - Consequence: cannot contribute to Leios until next epoch (after re-registering the rotated BLS key)
+
+- Size: Would the EB header be much smaller?
+
+  - Not notably as we would need the same identifying bits as we sign with the KES key
+  - Several hundred bytes saving if using BLS as the hot key
+  - However, any size \< 1200 bytes (MTU) would not matter too much anyways
+
+- Time:
+
+  - Signing with hot (KES) key turns out to be ~10x more expensive than with a BLS key (which is another 10x more than with Ed25519)
+  - Verification is only about 25% difference
+  - Could shave off a few miliseconds on the EB header diffusion (only verification is on the critical path)
+
+- Further discussion (other topic?) about actively "no" voting to detect equivocated votes (in the case of compromised keys)
+
+- Conclusion: It *may* be more intuitive and enable different crypto, but the latter might be YAGNI
+
 ## 2026-02-02
 
 ### SN on storing EBs
