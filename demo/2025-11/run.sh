@@ -17,7 +17,7 @@ set -a
 : "${LEIOS_SCHEMA:=${DATA_DIR}/leios-schema.sql}"
 
 # Timing configuration
-: "${REF_SLOT:=11}"
+: "${REF_SLOT:=120}"
 : "${SECONDS_UNTIL_REF_SLOT:=10}"
 
 # Node ports
