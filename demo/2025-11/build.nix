@@ -42,17 +42,6 @@
             DATA_DIR = ./data;
             LEIOS_MANIFEST = ./manifest.json;
             CLUSTER_RUN = ./data/2025-10-10-13-29-24641-1050-50-blocks-50-coay-sup;
-            # Nix-specific defaults (slower network simulation)
-            RATE_UP_TO_N0 = "10Mbps";
-            DELAY_UP_TO_N0 = "200ms";
-            RATE_N0_TO_UP = "10Mbps";
-            DELAY_N0_TO_UP = "200ms";
-            RATE_N0_TO_DOWN = "10Mbps";
-            DELAY_N0_TO_DOWN = "200ms";
-            RATE_DOWN_TO_N0 = "10Mbps";
-            DELAY_DOWN_TO_N0 = "200ms";
-            SECONDS_UNTIL_REF_SLOT = "10";
-            REF_SLOT = "11";
           };
           text = builtins.readFile ./run.sh;
         };
