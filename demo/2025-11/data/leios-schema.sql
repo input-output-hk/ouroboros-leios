@@ -12,12 +12,10 @@ CREATE TABLE ebPoints (
   ,
     ebHashBytes BLOB NOT NULL
   ,
-    ebId INTEGER NOT NULL
-  ,
     PRIMARY KEY (ebSlot, ebHashBytes)
   ) WITHOUT ROWID;
 CREATE TABLE ebTxs (
-    ebId INTEGER NOT NULL   -- foreign key ebPoints.ebId
+    ebHashBytes BLOB NOT NULL   -- foreign key ebPoints.ebHashBytes
   ,
     txOffset INTEGER NOT NULL
   ,
@@ -27,15 +25,15 @@ CREATE TABLE ebTxs (
   ,
     txBytes BLOB   -- valid CBOR
   ,
-    PRIMARY KEY (ebId, txOffset)
+    PRIMARY KEY (ebHashBytes, txOffset)
   ) WITHOUT ROWID;
 CREATE INDEX ebPointsExpiry
-    ON ebPoints (ebSlot ASC, ebId ASC);
+    ON ebPoints (ebSlot ASC, ebHashBytes ASC);
 CREATE INDEX txCacheExpiry
     ON txCache (expiryUnixEpoch ASC, txHashBytes);
 CREATE INDEX missingEbTxs
-    ON ebTxs (ebId DESC, txOffset ASC)
+    ON ebTxs (ebHashBytes DESC, txOffset ASC)
     WHERE txBytes IS NULL;
 CREATE INDEX acquiredEbTxs
-    ON ebTxs (ebId DESC, txOffset ASC)
+    ON ebTxs (ebHashBytes DESC, txOffset ASC)
     WHERE txBytes IS NOT NULL;
