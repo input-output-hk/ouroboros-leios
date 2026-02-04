@@ -1,5 +1,8 @@
 set -exuo pipefail
-set -a && source "$WORKING_DIR/.env" && set +a
+
+# Defaults for variables that may not be passed through sudo
+: "${PORT_UPSTREAM_NODE:=3001}"
+: "${IP_UPSTREAM_NODE:=10.0.0.1}"
 
 if [ -d "$NODE0_DIR" ]; then
   echo "Removing old $NODE0_DIR"
