@@ -38,7 +38,12 @@ namespace Epoch
   def valid_poolid (epoch : Epoch) : PoolKeyHash → Prop := epoch.stakes.valid_poolid
 
   def lookupRegistration (epoch : Epoch) (poolId : PoolKeyHash) (h : epoch.valid_poolid poolId) : Registration :=
-    sorry
+    let registry := epoch.registry
+    let h₁ : registry.valid_poolid poolId :=
+      by
+        apply epoch.pools_valid_ids poolId
+        apply h
+    registry.lookupRegistration poolId h₁
 
 end Epoch
 
