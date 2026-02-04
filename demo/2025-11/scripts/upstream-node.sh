@@ -1,8 +1,10 @@
 set -exuo pipefail
-set -a && source "$WORKING_DIR/.env" && set +a
+
+# Defaults for variables that may not be passed through sudo
+: "${PORT_UPSTREAM_NODE:=3001}"
 
 cd "$UPSTREAM_NODE_DIR"
-$IMMDB_SERVER \
+immdb-server \
   --db "immutable/" \
   --config "config.json" \
   --initial-slot "$REF_SLOT" \

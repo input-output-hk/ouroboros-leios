@@ -1,5 +1,17 @@
 set -exuo pipefail
-set -a && source "$WORKING_DIR/.env" && set +a
+
+# Set defaults for variables that may not be passed through sudo
+: "${RATE_UP_TO_N0:=100Mbps}"
+: "${DELAY_UP_TO_N0:=20ms}"
+: "${RATE_N0_TO_UP:=100Mbps}"
+: "${DELAY_N0_TO_UP:=20ms}"
+: "${RATE_N0_TO_DOWN:=100Mbps}"
+: "${DELAY_N0_TO_DOWN:=20ms}"
+: "${RATE_DOWN_TO_N0:=100Mbps}"
+: "${DELAY_DOWN_TO_N0:=20ms}"
+: "${IP_UPSTREAM_NODE:=10.0.0.1}"
+: "${IP_NODE0:=10.0.0.2}"
+: "${IP_DOWNSTREAM_NODE:=10.0.0.3}"
 
 NS_PREFIX="leios-experiment"
 NS_UPSTREAM="${NS_PREFIX}:upstream"
