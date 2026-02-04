@@ -95,14 +95,11 @@ if [ ! -d "$WORKING_DIR/genesis" ]; then
 	chmod -R +rw "$WORKING_DIR/genesis"
 fi
 
-# Set derived variables (in set -a block to ensure they're exported)
-set -a
-UPSTREAM_NODE_DIR="$WORKING_DIR/upstream-node"
-NODE0_DIR="$WORKING_DIR/node0"
-DOWNSTREAM_NODE_DIR="$WORKING_DIR/downstream-node"
-ONSET_OF_REF_SLOT=$(($(date +%s) + SECONDS_UNTIL_REF_SLOT))
-LOG_PATH="${LOG_PATH:-$(realpath "${WORKING_DIR}")/*.log}"
-set +a
+# Set derived variables
+export UPSTREAM_NODE_DIR="$WORKING_DIR/upstream-node"
+export NODE0_DIR="$WORKING_DIR/node0"
+export DOWNSTREAM_NODE_DIR="$WORKING_DIR/downstream-node"
+export ONSET_OF_REF_SLOT=$(($(date +%s) + SECONDS_UNTIL_REF_SLOT))
 
 echo "Starting 2025-11 demo with process-compose..."
 echo "  WORKING_DIR: $WORKING_DIR"
