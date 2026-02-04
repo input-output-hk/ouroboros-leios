@@ -17,8 +17,8 @@ set -a
 : "${LEIOS_SCHEMA:=${DATA_DIR}/leios-schema.sql}"
 
 # Timing configuration
-: "${REF_SLOT:=41}"
-: "${SECONDS_UNTIL_REF_SLOT:=5}"
+: "${REF_SLOT:=11}"
+: "${SECONDS_UNTIL_REF_SLOT:=10}"
 
 # Node ports
 : "${PORT_UPSTREAM_NODE:=3001}"
@@ -31,14 +31,14 @@ set -a
 : "${IP_DOWNSTREAM_NODE:=10.0.0.3}"
 
 # Traffic control settings
-: "${RATE_UP_TO_N0:=100Mbps}"
-: "${DELAY_UP_TO_N0:=20ms}"
-: "${RATE_N0_TO_UP:=100Mbps}"
-: "${DELAY_N0_TO_UP:=20ms}"
-: "${RATE_N0_TO_DOWN:=100Mbps}"
-: "${DELAY_N0_TO_DOWN:=20ms}"
-: "${RATE_DOWN_TO_N0:=100Mbps}"
-: "${DELAY_DOWN_TO_N0:=20ms}"
+: "${RATE_UP_TO_N0:=10Mbps}"
+: "${DELAY_UP_TO_N0:=200ms}"
+: "${RATE_N0_TO_UP:=10Mbps}"
+: "${DELAY_N0_TO_UP:=200ms}"
+: "${RATE_N0_TO_DOWN:=10Mbps}"
+: "${DELAY_N0_TO_DOWN:=200ms}"
+: "${RATE_DOWN_TO_N0:=10Mbps}"
+: "${DELAY_DOWN_TO_N0:=200ms}"
 set +a
 
 # Check for required commands
