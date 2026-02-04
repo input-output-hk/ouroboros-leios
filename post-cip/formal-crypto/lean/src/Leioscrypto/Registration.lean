@@ -1,6 +1,7 @@
 
 import Leioscrypto.BLS
 import Leioscrypto.Types
+import Leioscrypto.Util
 import Mathlib.Data.List.Nodup
 
 
@@ -57,6 +58,9 @@ namespace Registry
 
   structure Authentic (rgy : Registry) : Prop where
     authentic_registrations : ∀ r ∈ rgy, r.Authentic
+
+  def valid_poolid (rgy : Registry) (poolId : PoolKeyHash) : Prop :=
+    poolId ∈ rgy.map Registration.poolId
 
   theorem wf_empty : (default : Registry).WellFormed :=
     ⟨
@@ -133,21 +137,8 @@ namespace Registry
 
   -/
 
-  def lookupRegistration (poolId : PoolKeyHash) (rgy : Registry) (h : poolId ∈ rgy.map Registration.poolId) : Registration :=
-    let present (reg : Registration) : Bool := reg.poolId == poolId
-    match h_find : rgy.find? present with
-    | some reg => reg
-    | none =>
-        have impossible : False :=
-          by
-            simp only [List.mem_map] at h
-            obtain ⟨r, r_in_list, r_has_id⟩ := h
-            rw [List.find?_eq_none] at h_find
-            specialize h_find r r_in_list
-            rw [beq_iff_eq] at h_find
-            rw [r_has_id] at h_find
-            simp at h_find
-        impossible.elim
+  def lookupRegistration (poolId : PoolKeyHash) (rgy : Registry) (h : rgy.valid_poolid poolId) : Registration :=
+    lookup₀ Registration.poolId rgy poolId h
 
 end Registry
 

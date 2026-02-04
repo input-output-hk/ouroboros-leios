@@ -4,6 +4,7 @@ import Leioscrypto.Contexts
 import Leioscrypto.FaitAccompli
 import Leioscrypto.LocalSortition
 import Leioscrypto.Registration
+import Leioscrypto.StakeDistribution
 import Leioscrypto.Types
 import Leioscrypto.Vote
 

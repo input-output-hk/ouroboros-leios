@@ -58,7 +58,7 @@ namespace Vote
         apply epoch.pools_valid_ids
         let h₁ := valid.valid_pool
         simp [*] at h₁
-        apply epoch.stakes.poolId_in_pools poolIndex h₁
+        apply epoch.stakes.poolindex_in_pools poolIndex h₁
       case NonpersistentVote _ _ _ _ _ =>
         apply epoch.pools_valid_ids
         apply valid.valid_pool

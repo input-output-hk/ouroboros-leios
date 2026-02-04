@@ -24,7 +24,7 @@ structure Epoch where
   valid_registry : registry.IsValidRegistry
   number : Nat
   stakes : StakeDistribution
-  pools_valid_ids : ∀ p ∈ stakes.pools.map Prod.fst, p ∈ registry.map Registration.poolId
+  pools_valid_ids : ∀ poolId ∈ stakes.pools.map Prod.fst, registry.valid_poolid poolId
   slot_range : Slot × Slot
   slot_range_ordered : slot_range.fst ≤ slot_range.snd
   nonce : PraosNonce
@@ -33,9 +33,12 @@ structure Epoch where
 
 namespace Epoch
 
-  def valid_index (epoch : Epoch) : PoolIndex → Prop := epoch.stakes.valid_index
+  def valid_index (epoch : Epoch) : PoolIndex → Prop := epoch.stakes.valid_poolindex
 
-  def valid_poolid (epoch : Epoch) : PoolKeyHash → Prop := epoch.stakes.valid_id
+  def valid_poolid (epoch : Epoch) : PoolKeyHash → Prop := epoch.stakes.valid_poolid
+
+  def lookupRegistration (epoch : Epoch) (poolId : PoolKeyHash) (h : epoch.valid_poolid poolId) : Registration :=
+    sorry
 
 end Epoch
 
