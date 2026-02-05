@@ -46,11 +46,22 @@ namespace Epoch
     registry.lookupRegistration poolId h₁
 
   theorem valid_persistent_index_in_registry (epoch : Epoch) (poolIndex : PoolIndex) (valid : epoch.fa.valid_persistent_poolindex poolIndex) (h : epoch.fa.stakes.valid_poolindex poolIndex) : epoch.registry.valid_poolid (epoch.fa.stakes.lookupPoolId poolIndex h) :=
-    sorry
-  #check valid_persistent_index_in_registry
+    by
+      let ⟨h_stakes_eq, _⟩ := epoch.valid_fait_accompli
+      let p := epoch.fa.stakes.lookupPoolId poolIndex h
+      have h_in_fa : p ∈ epoch.fa.stakes.pools.map Prod.fst :=
+        epoch.fa.stakes.poolindex_in_pools poolIndex h
+      rw [h_stakes_eq] at h_in_fa
+      apply epoch.pools_valid_ids
+      exact h_in_fa
 
   theorem valid_nonpersistent_id_in_registry (epoch : Epoch) (poolId : PoolKeyHash) (valid : epoch.fa.valid_nonpersistent_poolid poolId) : epoch.registry.valid_poolid poolId :=
-    sorry
+  by
+      obtain ⟨h_in_stakes, _⟩ := valid
+      obtain ⟨h_stakes_eq, _⟩ := epoch.valid_fait_accompli
+      rw [h_stakes_eq] at h_in_stakes
+      apply epoch.pools_valid_ids
+      exact h_in_stakes
 
 end Epoch
 
