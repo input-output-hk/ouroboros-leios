@@ -58,13 +58,6 @@ Identification of high-activity Plutus scripts by MEV relevance. Data sourced fr
 | **MEDIUM** | NFT marketplaces, oracle-dependent | JPG Store listings |
 | **LOW** | Staking, governance, minting | Reward validators |
 
-## Methodology
-
-1. Queried top 100 scripts by redeemer count (on-chain data)
-2. Matched against StricaHQ registry, Cardanoscan, protocol GitHub repos
-3. CBOR decoded unknown scripts to extract error strings for identification
-4. Classified by MEV relevance based on contract function
-
 ## Tools
 
 - [UPLC Analyzer](https://uplc.pages.dev) — Decode and inspect script bytecode
