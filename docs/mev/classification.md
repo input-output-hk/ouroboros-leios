@@ -2,72 +2,55 @@
 
 Operational analysis: what attacks require and what traces they leave.
 
-## Requirements by Actor
+## Requirements by Behavior
 
-### Block Producer Attacks
+### Network Racing
 
-Requires winning slot leadership election.
-
-| Attack | Additional Requirements |
-|--------|------------------------|
-| [Skip-the-line](./attack-vectors/front-running.md#skip-the-line) | Mempool visibility, own MEV-extracting tx ready |
-| [Displacement](./attack-vectors/front-running.md#displacement) | Mempool visibility, competing tx for same UTxO |
-| [Insertion](./attack-vectors/front-running.md#insertion) | Mempool visibility, knowledge of victim's intent |
-| [Censorship](./attack-vectors/censorship.md) | Sustained attack needs multiple consecutive slots |
-
-### Searcher Attacks
-
-No stake required - anyone with mempool access can compete.
+Observe mempool, submit faster. Primary actors: Searchers, Batchers.
 
 | Attack | Requirements |
-|--------|-------------|
-| [Arbitrage](./attack-vectors/back-running.md#arbitrage) | Trading capital, price monitoring across DEXes |
+|--------|--------------|
+| [Front-running](./attack-vectors/front-running.md) | Mempool visibility, fast tx construction |
+| [Sandwich](./attack-vectors/sandwich.md) | Batcher role (classic sandwich not feasible—eUTxO contention) |
+
+### Competitive Arbitrage
+
+Profit from price moves after trades. Primary actors: Searchers.
+
+| Attack | Requirements |
+|--------|--------------|
+| [Arbitrage](./attack-vectors/back-running.md#arbitrage) | Trading capital, cross-DEX price monitoring |
 | [Liquidation](./attack-vectors/back-running.md#liquidation) | Liquidation capital, position monitoring |
-| [Classic sandwich](./attack-vectors/sandwich.md#classic) | *Not feasible on Cardano - eUTxO contention* |
 
-### Infrastructure Attacks
+### Stake-Based Control
 
-Requires privileged off-chain position.
+Use block production power. Primary actors: Block Producers (SPOs).
 
-| Attack | Position Required |
-|--------|------------------|
-| [Batcher sandwich](./attack-vectors/sandwich.md#batcher-level) | DEX batcher operator role |
+| Attack | Requirements |
+|--------|--------------|
+| [Censorship](./attack-vectors/censorship.md) | Slot leadership; sustained attack needs consecutive slots |
 | [Time-bandit](./attack-vectors/time-bandit.md) | Substantial stake for sustained fork |
 
 ---
 
 ## Observable Artifacts
 
-| Artifact | On-chain | Collection Difficulty | Current Availability |
-|----------|----------|----------------------|---------------------|
-| **Script failures (phase-2)** | Yes - for winning tx only | Easy | Queryable via DB-Sync |
-| **Batcher ordering** | Yes - batch internals visible | Easy | Queryable via DB-Sync |
-| **Volume/fee patterns** | Yes | Easy | Queryable via DB-Sync |
-| **UTxO contention losers** | No - rejected at mempool; only in node logs | Hard | Requires live monitoring |
-| **Tx ordering vs submission time** | No - submission time not stored | Hard | Requires live monitoring |
-| **Orphan blocks / slot battles** | No | Hard | Requires live monitoring |
+| Artifact | On-chain | Collection |
+|----------|----------|------------|
+| Batcher ordering | Yes | Easy (DB-Sync) |
+| Script failures (phase-2) | Yes | Easy (DB-Sync) |
+| Volume/fee patterns | Yes | Easy (DB-Sync) |
+| UTxO contention losers | No | Hard (node logs) |
+| Tx submission timing | No | Hard (live monitoring) |
 
-**Hard = no historical data exists.** Would require contacting SPOs who may have stored node logs, or setting up dedicated monitoring infrastructure going forward.
-
-**Note on phase-2 visibility:** Phase-2 validation results (whether the script succeeded or failed, with collateral consumed on failure) are only recorded for the transaction that "won" inclusion in a block. When multiple parties race to spend the same UTxO, losing transactions are rejected when they attempt to enter a node's mempool - these rejections are only recorded in node logs, not on-chain.
-
-**Best candidates for historical MEV analysis:**
-- Batcher ordering patterns (fully on-chain)
-- Phase-2 script failures with collateral loss
-- Fee/volume anomalies around oracle updates, liquidations
+**Best candidates for MEV analysis:** Batcher ordering patterns, phase-2 failures with collateral loss, fee anomalies around oracle updates.
 
 ---
 
-## Leios-Specific Considerations
+## Leios Considerations
 
-### Block Capacity Scaling
-
-Leios EBs (~512 kB) are larger than Praos blocks (~90 kB). This is a **proportional increase** in MEV attack surface - more transactions per block means more selection/reordering opportunities - but does not introduce fundamentally new attack vectors.
-
-### Extended Observation Window
-
-Leios introduces additional time between EB announcement and finality (see [protocol parameters](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#protocol-parameters): L<sub>hdr</sub>, L<sub>vote</sub>, L<sub>diff</sub>). During this window, EB contents are visible to the network, giving searchers more time to identify MEV opportunities and construct counter-transactions for subsequent EBs.
-
-### RB-Only Bypass
-
-High-value transactions can be included directly in RBs, bypassing EB exposure ([T19](../threat-model.md)). This reduces MEV exposure but is self-limiting - RB capacity constraints prevent widespread use.
+| Factor | Impact |
+|--------|--------|
+| EB capacity (512kB vs 90kB) | More txs per block = more reordering opportunity |
+| L<sub>vote</sub> window | Extended observation time before finality |
+| RB bypass | High-value txs can skip EB exposure ([T19](../threat-model.md)) |
