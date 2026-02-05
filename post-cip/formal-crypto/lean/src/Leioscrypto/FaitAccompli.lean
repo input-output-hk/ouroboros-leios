@@ -4,14 +4,11 @@ import Leioscrypto.LocalSortition
 import Leioscrypto.Registration
 import Leioscrypto.StakeDistribution
 import Leioscrypto.Types
+import Leioscrypto.Util
 
 
 namespace Leioscrypto
 
-
-structure WeightedPublicKey where
-  publicKey : BLS.PublicKey
-  weight : Rat
 
 def PoolWeights := List (PoolKeyHash × Rat)
 deriving Inhabited
@@ -29,7 +26,20 @@ def persistentSeatCount (n : Nat) (stakes : StakeDistribution) : Nat :=
     $ List.takeWhile (persistenceTest n)
     $ persistenceMetric stakes
 
-def nonpersistentWeights (n : Nat) (stakes : StakeDistribution) : Rat × PoolWeights :=
+theorem persistent_seats_le_pools (n : Nat) (stakes : StakeDistribution) : persistentSeatCount n stakes ≤ stakes.pools.length :=
+  by
+    rw [persistentSeatCount]
+    have h₁ : (List.takeWhile (persistenceTest n) (persistenceMetric stakes)).length ≤ (persistenceMetric stakes).length :=
+      by
+        apply length_takeWhile_le
+    have h₂ : (persistenceMetric stakes).length ≤ stakes.pools.length :=
+      by
+        rw [persistenceMetric]
+        simp [List.length_zip]
+        omega
+    omega
+
+def nonpersistentSeatCount (n : Nat) (stakes : StakeDistribution) : Nat × Rat :=
   let n₁ := persistentSeatCount n stakes
   match h₁ : n₁ with
   | 0 => default
@@ -59,34 +69,50 @@ def nonpersistentWeights (n : Nat) (stakes : StakeDistribution) : Rat × PoolWei
           apply Nat.min_le_left
       let ρStar : Rat := stakes.remaining[iStar].cast
       ⟨
-        ρStar
-      , (stakes.pools.drop n₁).map $ fun ⟨ poolId , S ⟩ ↦ ⟨ poolId , Rat.div S.cast ρStar ⟩
+        n - n₁
+      , ρStar
       ⟩
 
 
 structure FaitAccompli where
   stakes : StakeDistribution
   seats : Nat
+  ρStar : Rat
   n₁ : Nat
-  valid_persistent_seats : n₁ = persistentSeatCount seats stakes
-  persistentStake : List (PoolKeyHash × Rat)
-  valid_persistent_stake : persistentStake = (stakes.pools.take n₁).map (fun ⟨ poolId , s ⟩ ↦ ⟨ poolId , s.cast ⟩)
-  nonpersistentStake : Rat
-  nonpersistentCandidates : List (PoolKeyHash × Rat)
-  valid_nonpersistent_seats : ⟨ nonpersistentStake , nonpersistentCandidates ⟩ = nonpersistentWeights seats stakes
   n₂ : Nat
-  valid_seats : n₁ + n₂ = seats
+  valid_persistent_seats : n₁ = persistentSeatCount seats stakes
+  valid_nonpersistent_seats : ⟨ n₂ , ρStar ⟩ = nonpersistentSeatCount seats stakes
 
 namespace FaitAccompli
 
-  def valid_persistent_id (fa : FaitAccompli) (poolIndex : PoolIndex) : Prop :=
+  def valid_persistent_poolindex (fa : FaitAccompli) (poolIndex : PoolIndex) : Prop :=
     poolIndex < fa.n₁
 
-  def valid_nonpersistent_pool (fa : FaitAccompli) (poolId : PoolKeyHash) : Prop :=
-    poolId ∈ fa.nonpersistentCandidates.map Prod.fst
+  def valid_nonpersistent_poolid (fa : FaitAccompli) (poolId : PoolKeyHash) (h : fa.stakes.valid_poolid poolId) : Prop :=
+    fa.stakes.lookupPoolIndex poolId h ≥ fa.n₁
+
+  theorem persistent_index_is_valid_index (fa : FaitAccompli) (poolIndex : PoolIndex) (h : fa.valid_persistent_poolindex poolIndex) : fa.stakes.valid_poolindex poolIndex :=
+    by
+      simp [persistent_seats_le_pools, h]
+      sorry
+
+  def persistentWeight (fa : FaitAccompli) (poolIndex : PoolIndex) (h : fa.valid_persistent_poolindex poolIndex) : Rat :=
+    let stakes := fa.stakes
+    let h₁ : stakes.valid_poolindex poolIndex := fa.persistent_index_is_valid_index poolIndex h
+    let stake : Coin := stakes.lookupStakeByIndex poolIndex h₁
+    stake.cast
+
+  def nonpersistentWeight (fa : FaitAccompli) (poolId : PoolKeyHash) (h : fa.stakes.valid_poolid poolId) (σ_eid : BLS.Signature) : Rat :=
+    let stakes := fa.stakes
+    let stake : Coin := stakes.lookupStake poolId h
+    let 𝒮 : Rat := stake.cast / fa.ρStar
+    let seats := countSeats fa.n₂ 𝒮 σ_eid
+    fa.ρStar * seats
 
   def voteWeight (fa : FaitAccompli) (poolId : PoolKeyHash) : Option BLS.Signature → Option Rat
   | none =>
+      fa.stakes.lookupStake poolId
+      let poolIndex : Nat := fa.stakes.l
       Prod.snd <$> fa.persistentStake.find? (fun ⟨ poolId' , _ ⟩ ↦ poolId' == poolId)
   | some σ_eid =>
       do
@@ -94,12 +120,6 @@ namespace FaitAccompli
         let seats := countSeats fa.n₂ 𝒮 σ_eid
         guard $ seats > 0
         pure $ fa.nonpersistentStake * seats
-
-  def weighPersistent (fa : FaitAccompli) (poolIndex : PoolIndex) (h : fa.valid_persistent_id poolIndex) : WeightedPublicKey :=
-    sorry
-
-  def weighNonpersistent (fa : FaitAccompli) (poolId : PoolKeyHash) : WeightedPublicKey :=
-    sorry
 
 end FaitAccompli
 
