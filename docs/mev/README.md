@@ -8,7 +8,7 @@ Research and analysis of MEV vulnerabilities in the Linear Leios protocol.
 | 0.2     | 2026-01-16 | Added nested transactions (CIP-0118) analysis |
 | 0.1     | 2025-12-11 | Initial draft |
 
-## 1. Attack Behaviors
+## 1. Adversary Behaviors
 
 MEV attacks group into three observable behaviors:
 
