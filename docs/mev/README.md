@@ -4,75 +4,47 @@ Research and analysis of MEV vulnerabilities in the Linear Leios protocol.
 
 | Version | Date       | Changes       |
 |---------|------------|---------------|
-| 0.3     | 2026-02-05 | Added behavior-based attack grouping, mempool analysis links |
+| 0.3     | 2026-02-05 | Consolidated attack behaviors, added mempool analysis and script mapping |
 | 0.2     | 2026-01-16 | Added nested transactions (CIP-0118) analysis |
 | 0.1     | 2025-12-11 | Initial draft |
 
 ## 1. Attack Behaviors
 
-MEV attacks group into three observable behaviors, each mapping to specific attack vectors:
+MEV attacks group into three observable behaviors:
 
-| Behavior | Mechanism | Attack Vectors |
-|----------|-----------|----------------|
-| **Network Racing** | Observe mempool, submit faster | [Front-running](./attack-vectors/front-running.md), [Sandwich](./attack-vectors/sandwich.md) |
-| **Competitive Arbitrage** | Profit from price moves after trades | [Back-running](./attack-vectors/back-running.md) |
-| **Stake-Based Control** | Use block production power | [Censorship](./attack-vectors/censorship.md), [Time-Bandit](./attack-vectors/time-bandit.md) |
+| Behavior | Mechanism | Attack Vectors | Primary Actor |
+|----------|-----------|----------------|---------------|
+| **Network Racing** | Observe mempool, submit faster | [Front-running](./attack-vectors/front-running.md), [Sandwich](./attack-vectors/sandwich.md) | Searchers, Batchers |
+| **Competitive Arbitrage** | Profit from price moves after trades | [Back-running](./attack-vectors/back-running.md) | Searchers |
+| **Stake-Based Control** | Use block production power | [Censorship](./attack-vectors/censorship.md), [Time-Bandit](./attack-vectors/time-bandit.md) | Block Producers |
+
+Block producer attacks map to [T16-T18](../threat-model.md). On Cardano, DEX batchers are the primary MEV vector (infrastructure-level control over tx ordering).
+
+→ [Detailed classification](./classification.md) | [Attack vectors](./attack-vectors/)
 
 ### The Mempool as Observation Surface
 
-The mempool is the first design component that enables adversaries to observe opportunities:
+The mempool is the design component that enables adversaries to observe opportunities:
 
 ```
 User tx → Mempool (visible ~20s) → Block Producer → Chain
               │
-        Observation window for attackers
+        Observation window
 ```
 
-**Key insight:** All network racing attacks require mempool visibility. Fragmentation and consistency of mempool state determine attack feasibility.
-
-### Mempool Simulation Work
-
-Mempool behavior under load has been analyzed via discrete-event simulation:
+Mempool behavior under load analyzed via simulation:
 
 | Tool | Purpose | Location |
 |------|---------|----------|
-| **mempool-sim-web** | CLI simulator with realistic topology | [post-cip/mempool-sim-web](../../post-cip/mempool-sim-web) |
+| **mempool-sim-web** | CLI with realistic topology | [post-cip/mempool-sim-web](../../post-cip/mempool-sim-web) |
 | **mempool-sim-viz** | Interactive web UI | [post-cip/mempool-sim-viz](../../post-cip/mempool-sim-viz) |
 
 **Key findings:**
-- Mempool synchronization degrades rapidly with load (at 2x capacity, only 50% tx overlap between nodes)
-- Fragmentation creates asymmetric information (some nodes see txs others don't)
-- Front-running success scales linearly with adversarial node count (~3% txs front-run with 3% adversarial nodes)
+- Synchronization degrades with load (at 2x capacity, only 50% tx overlap between nodes)
+- Fragmentation creates asymmetric information
+- Front-running scales linearly with adversarial nodes (~3% nodes → ~3% txs front-run)
 
-## 2. Actor Classification
-
-**Finding:** MEV attacks divide into three actor categories with distinct resource requirements.
-
-| Actor | Attacks | Leios Impact |
-|-------|---------|--------------|
-| **Block Producer** | Reordering, insertion, censorship | Larger EBs extend advantage |
-| **Searcher** | Arbitrage, liquidation | Competitive, often beneficial |
-| **Infrastructure** | Batcher sandwich | Primary Cardano MEV vector |
-
-Block producer attacks map to [T16-T18](../threat-model.md). Searcher attacks are mempool races—competitive but not extractive on Cardano due to eUTxO.
-
-→ [Detailed classification](./classification.md) | [Attack vectors](./attack-vectors/) | [Script mapping](./script-mapping.md)
-
-## 3. On-Chain Vulnerability Surface
-
-**Finding:** 61% of top script activity is DEX-related (HIGH MEV risk).
-
-| Category | Redeemers | % of Top 100 | MEV Risk |
-|----------|-----------|--------------|----------|
-| DEX | 21.0M | 61% | HIGH |
-| NFT | 8.0M | 23% | MEDIUM |
-| Unknown | 5.4M | 16% | Variable |
-
-Top protocols by activity: Minswap (62% of DEX), WingRiders (13%), SundaeSwap (9%), Splash (8%).
-
-→ [Full script mapping](./script-mapping.md)
-
-## 2. Vulnerable Transaction Types
+## 2. Vulnerable Transactions
 
 **Finding:** DEX batchers are the primary MEV surface on Cardano.
 
@@ -80,31 +52,27 @@ Top protocols by activity: Minswap (62% of DEX), WingRiders (13%), SundaeSwap (9
 |-----|----------|--------------|
 | SundaeSwap | FIFO | Lower |
 | Minswap | FIFO | Lower |
-| WingRiders | FIFO + DAO-enforced compliance | Lower |
+| WingRiders | FIFO + DAO-enforced | Lower |
 | MuesliSwap | Profit-maximizing | Higher |
-| Splash | Execution Engine Operators + reputation | Variable |
+| Splash | Execution Engine + reputation | Variable |
 
-Slippage tolerance directly impacts extraction room: 1-10% standard, up to 100% for volatile tokens.
+Other patterns: liquidation races (Liqwid), oracle front-running, auction displacement.
 
-Other vulnerable patterns:
-- **Lending protocols** - liquidation races (Liqwid)
-- **Oracle-dependent apps** - front-running price updates
-- **Auction contracts** - displacement attacks on bids
+### On-Chain Activity
 
-### Attack Targets: Honest vs Conflicting Transactions
+| Category | Redeemers | % of Top 100 | MEV Risk |
+|----------|-----------|--------------|----------|
+| DEX | 21.0M | 61% | HIGH |
+| NFT | 8.0M | 23% | MEDIUM |
+| Unknown | 5.4M | 16% | Variable |
 
-MEV attacks target transactions at two distinct points:
+Top DEX by volume: Minswap (62%), WingRiders (13%), SundaeSwap (9%).
 
-| Target | Attack | Mechanism |
-|--------|--------|-----------|
-| **Honest tx in mempool** | Insertion, sandwich | Attacker observes victim's tx and positions around it |
-| **Attacker-created conflicting tx** | Displacement | Attacker creates tx consuming same UTxO as victim |
+→ [Script mapping](./script-mapping.md)
 
-On Cardano, displacement is particularly relevant due to eUTxO contention - only one transaction can consume a given UTxO. See [front-running attacks](./attack-vectors/front-running.md) for details.
+## 3. Leios Considerations
 
-## 3. Leios-Specific Considerations
-
-**Finding:** [L<sub>vote</sub>](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#protocol-parameters) creates an observation window where EB contents are visible before finality.
+**Finding:** L<sub>vote</sub> creates an observation window where EB contents are visible before finality.
 
 ```
 EB announced ──── L_vote ──── certified
@@ -117,11 +85,11 @@ Implications:
 - Counter-transactions can target announced EBs
 - High-value txs may route via RB ([T19](../threat-model.md))
 
-eUTxO protections remain effective - classic sandwich attacks still prevented.
+eUTxO protections remain effective—classic sandwich attacks still prevented.
 
 ## 4. Nested Transactions
 
-**Finding:** [CIP-0118](https://github.com/cardano-foundation/CIPs/pull/862) nested transactions shift MEV extraction to the assembler layer—off-chain coordinators who batch sub-transactions. This creates infrastructure MEV similar to current DEX batchers.
+**Finding:** [CIP-0118](https://github.com/cardano-foundation/CIPs/pull/862) shifts MEV extraction to the assembler layer.
 
 ```
 Users ──(sub-txs)──> Assembler ──(batch)──> Mempool/EB
@@ -129,12 +97,6 @@ Users ──(sub-txs)──> Assembler ──(batch)──> Mempool/EB
                     MEV extraction point
 ```
 
-**Key Concerns:**
-- **Assembler sandwich**: Like [batcher-level attacks](./attack-vectors/sandwich.md), assemblers control composition and ordering
-- **Leios certification complexity**: Batch dependencies increase L<sub>vote</sub> validation burden
-- **Private distribution trade-off**: Reduces public mempool exposure but concentrates information at assemblers
-- **Guard scripts**: User protection mechanism but requires expertise
-
-**Overall assessment:** ↓ Creates new infrastructure attack vector without eliminating existing MEV. Assembler role parallels current DEX batchers (primary Cardano MEV vector).
+Assemblers control composition and ordering, paralleling current DEX batchers.
 
 → [Detailed analysis](./nested-transactions.md)
