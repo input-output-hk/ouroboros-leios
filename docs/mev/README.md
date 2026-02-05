@@ -56,7 +56,21 @@ Mempool behavior under load has been analyzed via discrete-event simulation:
 
 Block producer attacks map to [T16-T18](../threat-model.md). Searcher attacks are mempool races—competitive but not extractive on Cardano due to eUTxO.
 
-→ [Detailed classification](./classification.md) | [Attack vectors](./attack-vectors/)
+→ [Detailed classification](./classification.md) | [Attack vectors](./attack-vectors/) | [Script mapping](./script-mapping.md)
+
+## 3. On-Chain Vulnerability Surface
+
+**Finding:** 61% of top script activity is DEX-related (HIGH MEV risk).
+
+| Category | Redeemers | % of Top 100 | MEV Risk |
+|----------|-----------|--------------|----------|
+| DEX | 21.0M | 61% | HIGH |
+| NFT | 8.0M | 23% | MEDIUM |
+| Unknown | 5.4M | 16% | Variable |
+
+Top protocols by activity: Minswap (62% of DEX), WingRiders (13%), SundaeSwap (9%), Splash (8%).
+
+→ [Full script mapping](./script-mapping.md)
 
 ## 2. Vulnerable Transaction Types
 
