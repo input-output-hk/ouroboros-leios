@@ -1,0 +1,79 @@
+FROM ghcr.io/blinklabs-io/haskell:9.6.6-3.12.1.0-3 AS immdb-server-build
+
+RUN echo "Building leios-prototype branch..." \
+    && git clone https://github.com/intersectmbo/ouroboros-consensus.git \
+    && cd ouroboros-consensus \
+    && git fetch --all --recurse-submodules --tags \
+    && git checkout leios-prototype \
+    && echo "with-compiler: ghc-${GHC_VERSION}" >> cabal.project.local \
+    && echo "tests: False" >> cabal.project.local \
+    && cabal update \
+    && cabal build ouroboros-consensus-cardano:exe:immdb-server \
+    && cabal build ouroboros-consensus:exe:leiosdemo202510 \
+    && mkdir -p /root/.local/bin/ \
+    && cp -p "$(find dist-newstyle -name immdb-server -type f -executable | head -1)" /root/.local/bin/ \
+    && cp -p "$(find dist-newstyle -name leiosdemo202510 -type f -executable | head -1)" /root/.local/bin/ \
+    && rm -rf /root/.cabal/packages \
+    && rm -rf /usr/local/lib/ghc-${GHC_VERSION}/ /usr/local/share/doc/ghc-${GHC_VERSION}/ \
+    && rm -rf /code/ouroboros-consensus/dist-newstyle/ \
+    && rm -rf /root/.cabal/store/ghc-${GHC_VERSION}
+
+FROM debian:bookworm-slim AS immdb-server
+
+ENV LD_LIBRARY_PATH="/usr/local/lib:$LD_LIBRARY_PATH"
+ENV PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH"
+
+COPY --from=immdb-server-build /usr/local/lib/ /usr/local/lib/
+COPY --from=immdb-server-build /usr/local/include/ /usr/local/include/
+COPY --from=immdb-server-build /root/.local/bin/immdb-server /usr/local/bin/
+COPY --from=immdb-server-build /root/.local/bin/leiosdemo202510 /usr/local/bin/
+
+RUN apt-get update -y && \
+    apt-get install -y \
+      bc \
+      curl \
+      iproute2 \
+      jq \
+      libffi8 \
+      libgmp10 \
+      liblmdb0 \
+      libncursesw5 \
+      libnuma1 \
+      libsystemd0 \
+      libssl3 \
+      libtinfo6 \
+      llvm-14-runtime \
+      lsof \
+      netbase \
+      pkg-config \
+      procps \
+      socat \
+      sqlite3 \
+      wget \
+      zlib1g && \
+    rm -rf /var/lib/apt/lists/* && \
+    ldconfig
+
+# Create directories for Leios
+RUN mkdir -p /app/config /app/genesis /app/scripts /data /logs
+
+# Copy genesis files (baked in)
+COPY demo/2025-11/data/2025-10-10-13-29-24641-1050-50-blocks-50-coay-sup/genesis/*.json /app/genesis/
+
+# Copy immutable chain data (baked in)
+COPY demo/2025-11/data/2025-10-10-13-29-24641-1050-50-blocks-50-coay-sup/immutable.tar.gz /app/config/
+
+# Copy config files
+COPY demo/2025-11/data/upstream-node/config.json /app/config/upstream-config.json
+COPY demo/2025-11/manifest.json /app/config/manifest.json
+
+# Copy scripts
+COPY antithesis/scripts/init-upstream.sh /app/scripts/
+COPY antithesis/scripts/run-upstream.sh /app/scripts/
+COPY antithesis/scripts/setup-wan-emulation.sh /app/scripts/
+
+RUN chmod +x /app/scripts/*.sh /usr/local/bin/*
+
+WORKDIR /data
+
+CMD ["/app/scripts/run-upstream.sh"]
