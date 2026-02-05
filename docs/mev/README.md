@@ -34,10 +34,10 @@ User tx → Mempool (visible ~20s) → Block Producer → Chain
 
 Mempool behavior under load analyzed via simulation:
 
-| Tool | Purpose | Location |
-|------|---------|----------|
-| **mempool-sim-web** | CLI with realistic topology | [post-cip/mempool-sim-web](../../post-cip/mempool-sim-web) |
-| **mempool-sim-viz** | Interactive web UI | [post-cip/mempool-sim-viz](../../post-cip/mempool-sim-viz) |
+| Tool | Purpose | Location | Live |
+|------|---------|----------|------|
+| **mempool-sim-web** | CLI with realistic topology | [post-cip/mempool-sim-web](../../post-cip/mempool-sim-web) | — |
+| **mempool-sim-viz** | Interactive web UI | [post-cip/mempool-sim-viz](../../post-cip/mempool-sim-viz) | [leios.cardano-scaling.org](https://leios.cardano-scaling.org/mempool-viz/) |
 
 **Key findings:**
 - Synchronization degrades with load (at 2x capacity, only 50% tx overlap between nodes)
