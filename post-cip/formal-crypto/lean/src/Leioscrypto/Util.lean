@@ -41,4 +41,17 @@ def lookup₄ {α : Type} [BEq α] [LawfulBEq α] {β : Type} (kvs : List (α ×
   lookup₃ Prod.fst kvs k h
 
 
+theorem length_takeWhile_le {α : Type} (xs : List α) (test : α → Bool) :
+  (xs.takeWhile test).length ≤ xs.length := by
+  induction xs with
+  | nil =>
+    simp
+  | cons x xs ih =>
+    simp [List.takeWhile]
+    split
+    · simp [List.length]
+      exact ih
+    · simp
+
+
 end Leioscrypto

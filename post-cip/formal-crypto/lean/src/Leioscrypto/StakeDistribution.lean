@@ -18,11 +18,14 @@ namespace StakeDistribution
 
   def valid_poolindex (stakes : StakeDistribution) (poolIndex : PoolIndex) : Prop := poolIndex < stakes.pools.length
 
-  def lookupPoolId (stakes : StakeDistribution) (poolIndex : PoolIndex) (h : poolIndex < stakes.pools.length) : PoolKeyHash :=
+  def lookupPoolId (stakes : StakeDistribution) (poolIndex : PoolIndex) (h : stakes.valid_poolindex poolIndex) : PoolKeyHash :=
     Prod.fst $ stakes.pools.get ⟨ poolIndex , h ⟩
 
   def lookupStake (stakes : StakeDistribution) (poolId : PoolKeyHash) (h : stakes.valid_poolid poolId) : Coin :=
     lookup₁ stakes.pools poolId h
+
+  def lookupStakeByIndex (stakes : StakeDistribution) (poolIndex : PoolIndex) (h : stakes.valid_poolindex poolIndex) : Coin :=
+    Prod.snd $ stakes.pools.get ⟨ poolIndex , h ⟩
 
   def lookupPoolIndex (stakes : StakeDistribution) (poolId : PoolKeyHash) (h : stakes.valid_poolid poolId) : PoolIndex :=
     lookup₄ stakes.pools poolId h

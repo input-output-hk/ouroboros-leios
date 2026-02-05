@@ -46,7 +46,7 @@ deriving BEq
 
 
 def PoolIndex := Nat
-deriving LT
+deriving BEq, LT, LE
 
 
 def ElectionId := UInt64

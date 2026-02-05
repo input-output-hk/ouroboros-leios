@@ -35,7 +35,7 @@ namespace Epoch
 
   def valid_index (epoch : Epoch) : PoolIndex → Prop := epoch.stakes.valid_poolindex
 
-  def valid_poolid (epoch : Epoch) : PoolKeyHash → Prop := epoch.stakes.valid_poolid
+  def valid_poolid (epoch : Epoch) (poolId : PoolKeyHash) : Prop := epoch.stakes.valid_poolid poolId
 
   def lookupRegistration (epoch : Epoch) (poolId : PoolKeyHash) (h : epoch.valid_poolid poolId) : Registration :=
     let registry := epoch.registry
@@ -44,6 +44,13 @@ namespace Epoch
         apply epoch.pools_valid_ids poolId
         apply h
     registry.lookupRegistration poolId h₁
+
+  theorem valid_persistent_index_in_registry (epoch : Epoch) (poolIndex : PoolIndex) (valid : epoch.fa.valid_persistent_poolindex poolIndex) (h : epoch.fa.stakes.valid_poolindex poolIndex) : epoch.registry.valid_poolid (epoch.fa.stakes.lookupPoolId poolIndex h) :=
+    sorry
+  #check valid_persistent_index_in_registry
+
+  theorem valid_nonpersistent_id_in_registry (epoch : Epoch) (poolId : PoolKeyHash) (valid : epoch.fa.valid_nonpersistent_poolid poolId) : epoch.registry.valid_poolid poolId :=
+    sorry
 
 end Epoch
 

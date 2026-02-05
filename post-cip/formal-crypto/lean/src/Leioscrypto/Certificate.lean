@@ -27,8 +27,8 @@ namespace Certificate
     unique_persistent_voters : c.persistentVotes.Nodup
     unique_nonpersistent_voters : (c.nonpersistentVotes.map Prod.fst).Nodup
     valid_persistent_ids : ∀ poolIndex ∈ c.persistentVotes, election.epoch.valid_index poolIndex
-    valid_persistent_voters : ∀ poolIndex ∈ c.persistentVotes, election.epoch.fa.valid_persistent_id poolIndex
-    valid_nonpersistent_candidates : ∀ poolId ∈ c.nonpersistentVotes.map Prod.fst, election.epoch.fa.valid_nonpersistent_pool poolId
+    valid_persistent_voters : ∀ poolIndex ∈ c.persistentVotes, election.epoch.fa.valid_persistent_poolindex poolIndex
+    valid_nonpersistent_candidates : ∀ poolId ∈ c.nonpersistentVotes.map Prod.fst, election.epoch.fa.valid_nonpersistent_poolid poolId
 
   def Authentic (c : Certificate) (election : Election) : Prop :=
     let epoch := election.epoch

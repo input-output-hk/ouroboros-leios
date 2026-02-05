@@ -88,8 +88,10 @@ namespace FaitAccompli
   def valid_persistent_poolindex (fa : FaitAccompli) (poolIndex : PoolIndex) : Prop :=
     poolIndex < fa.n₁
 
-  def valid_nonpersistent_poolid (fa : FaitAccompli) (poolId : PoolKeyHash) (h : fa.stakes.valid_poolid poolId) : Prop :=
-    fa.stakes.lookupPoolIndex poolId h ≥ fa.n₁
+  structure valid_nonpersistent_poolid (fa : FaitAccompli) (poolId : PoolKeyHash) : Prop where
+  --FIXME: Experiment with rewriting this using `∃` and `def` instead of `structure`.
+    valid₁ : fa.stakes.valid_poolid poolId
+    valid₂ : fa.stakes.lookupPoolIndex poolId valid₁ ≥ fa.n₁
 
   theorem persistent_index_is_valid_index (fa : FaitAccompli) (poolIndex : PoolIndex) (h : fa.valid_persistent_poolindex poolIndex) : fa.stakes.valid_poolindex poolIndex :=
     by
@@ -115,18 +117,6 @@ namespace FaitAccompli
     let 𝒮 : Rat := stake.cast / fa.ρStar
     let seats := countSeats fa.n₂ 𝒮 σ_eid
     fa.ρStar * seats
-
-  def voteWeight (fa : FaitAccompli) (poolId : PoolKeyHash) : Option BLS.Signature → Option Rat
-  | none =>
-      fa.stakes.lookupStake poolId
-      let poolIndex : Nat := fa.stakes.l
-      Prod.snd <$> fa.persistentStake.find? (fun ⟨ poolId' , _ ⟩ ↦ poolId' == poolId)
-  | some σ_eid =>
-      do
-        let 𝒮 ← Prod.snd <$> fa.nonpersistentCandidates.find? (fun ⟨ poolId' , _ ⟩ ↦ poolId' == poolId)
-        let seats := countSeats fa.n₂ 𝒮 σ_eid
-        guard $ seats > 0
-        pure $ fa.nonpersistentStake * seats
 
 end FaitAccompli
 
