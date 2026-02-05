@@ -4,20 +4,57 @@ Research and analysis of MEV vulnerabilities in the Linear Leios protocol.
 
 | Version | Date       | Changes       |
 |---------|------------|---------------|
+| 0.3     | 2026-02-05 | Added behavior-based attack grouping, mempool analysis links |
 | 0.2     | 2026-01-16 | Added nested transactions (CIP-0118) analysis |
 | 0.1     | 2025-12-11 | Initial draft |
 
-## 1. Attack Classification
+## 1. Attack Behaviors
+
+MEV attacks group into three observable behaviors, each mapping to specific attack vectors:
+
+| Behavior | Mechanism | Attack Vectors |
+|----------|-----------|----------------|
+| **Network Racing** | Observe mempool, submit faster | [Front-running](./attack-vectors/front-running.md), [Sandwich](./attack-vectors/sandwich.md) |
+| **Competitive Arbitrage** | Profit from price moves after trades | [Back-running](./attack-vectors/back-running.md) |
+| **Stake-Based Control** | Use block production power | [Censorship](./attack-vectors/censorship.md), [Time-Bandit](./attack-vectors/time-bandit.md) |
+
+### The Mempool as Observation Surface
+
+The mempool is the first design component that enables adversaries to observe opportunities:
+
+```
+User tx → Mempool (visible ~20s) → Block Producer → Chain
+              │
+        Observation window for attackers
+```
+
+**Key insight:** All network racing attacks require mempool visibility. Fragmentation and consistency of mempool state determine attack feasibility.
+
+### Mempool Simulation Work
+
+Mempool behavior under load has been analyzed via discrete-event simulation:
+
+| Tool | Purpose | Location |
+|------|---------|----------|
+| **mempool-sim-web** | CLI simulator with realistic topology | [post-cip/mempool-sim-web](../../post-cip/mempool-sim-web) |
+| **mempool-sim-viz** | Interactive web UI | [post-cip/mempool-sim-viz](../../post-cip/mempool-sim-viz) |
+
+**Key findings:**
+- Mempool synchronization degrades rapidly with load (at 2x capacity, only 50% tx overlap between nodes)
+- Fragmentation creates asymmetric information (some nodes see txs others don't)
+- Front-running success scales linearly with adversarial node count (~3% txs front-run with 3% adversarial nodes)
+
+## 2. Actor Classification
 
 **Finding:** MEV attacks divide into three actor categories with distinct resource requirements.
 
 | Actor | Attacks | Leios Impact |
 |-------|---------|--------------|
-| **Block Producer** | Reordering, insertion, censorship | ↑ Larger EBs extend advantage |
-| **Searcher** | Arbitrage, liquidation | = Competitive, often beneficial |
-| **Infrastructure** | Batcher sandwich | ↑ Primary Cardano MEV vector |
+| **Block Producer** | Reordering, insertion, censorship | Larger EBs extend advantage |
+| **Searcher** | Arbitrage, liquidation | Competitive, often beneficial |
+| **Infrastructure** | Batcher sandwich | Primary Cardano MEV vector |
 
-Block producer attacks map to [T16-T18](../threat-model.md). Searcher attacks are mempool races - competitive but not extractive on Cardano due to eUTxO.
+Block producer attacks map to [T16-T18](../threat-model.md). Searcher attacks are mempool races—competitive but not extractive on Cardano due to eUTxO.
 
 → [Detailed classification](./classification.md) | [Attack vectors](./attack-vectors/)
 
