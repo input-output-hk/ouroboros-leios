@@ -93,8 +93,15 @@ namespace FaitAccompli
 
   theorem persistent_index_is_valid_index (fa : FaitAccompli) (poolIndex : PoolIndex) (h : fa.valid_persistent_poolindex poolIndex) : fa.stakes.valid_poolindex poolIndex :=
     by
-      simp [persistent_seats_le_pools, h]
-      sorry
+      let stakes := fa.stakes
+      have h₁ : poolIndex < persistentSeatCount fa.seats fa.stakes :=
+        by
+          rw [←fa.valid_persistent_seats]
+          exact h
+      have h₂ : persistentSeatCount fa.seats fa.stakes ≤ stakes.pools.length :=
+        by
+          apply persistent_seats_le_pools
+      apply Nat.lt_of_lt_of_le h₁ h₂
 
   def persistentWeight (fa : FaitAccompli) (poolIndex : PoolIndex) (h : fa.valid_persistent_poolindex poolIndex) : Rat :=
     let stakes := fa.stakes
