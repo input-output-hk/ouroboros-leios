@@ -24,6 +24,9 @@ namespace StakeDistribution
   def lookupStake (stakes : StakeDistribution) (poolId : PoolKeyHash) (h : stakes.valid_poolid poolId) : Coin :=
     lookup₁ stakes.pools poolId h
 
+  def lookupPoolIndex (stakes : StakeDistribution) (poolId : PoolKeyHash) (h : stakes.valid_poolid poolId) : PoolIndex :=
+    lookup₄ stakes.pools poolId h
+
   theorem poolindex_in_pools (stakes : StakeDistribution) (poolId : PoolIndex) (h : stakes.valid_poolindex poolId) : lookupPoolId stakes poolId h ∈ stakes.pools.map Prod.fst :=
     by
       let poolId := stakes.lookupPoolId poolId h
