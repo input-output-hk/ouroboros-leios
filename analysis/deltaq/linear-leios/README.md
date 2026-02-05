@@ -31,16 +31,18 @@ The first item depends on the block/vote diffusion times, whereas second item de
 
 The statistisics depend on the protocol parameters and other configurations. The following values are calculated
 
-|statistic|dependencies|description|
+|Statistic|Dependencies|Description|
 |---|---|---|
-|`pHeaderOnTime`|$L\_{hdr}$|probability that an EB arrives on time|
-|`pValidating`|$L\_{hdr}$, $L\_{vote}$|probability that an EB can be validated on time|
-|`pQuorum`|`pValidating`, committee size, number SPO|probability of reaching a quorum|
-|`pInterruptedByNewBlock`|$L\_{hdr}$, $L\_{vote}$, $L\_{diff}$|probability of getting a new block too early|
-|`pCertified`|`pInterruptedByNewBlock`, `pQuorum`|probability that there is a certificate in the next RB|
+|`pHeaderOnTime`|$L\_{hdr}$|Probability that an RB header arrives during $L\_{hdr}$|
+|`pValidating`|$L\_{hdr}$, $L\_{vote}$|Probability that an EB can be validated on time|
+|`pQuorum`|`pValidating`, committee size, number SPO|Probability of reaching a quorum|
+|`pInterruptedByNewBlock`|$L\_{hdr}$, $L\_{vote}$, $L\_{diff}$|Probability of getting a new block too early|
+|`pCertified`|`pInterruptedByNewBlock`, `pQuorum`|Probability that there is a certificate in the next RB|
 |`eCertified`|$L\_{hdr}$, $L\_{vote}$, $L\_{diff}$|expected time for next certified block|
 
 ### Plots
+
+![](docs/validateEB.svg)
 
 ## Running the code
 
