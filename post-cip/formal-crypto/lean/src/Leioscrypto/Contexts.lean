@@ -45,7 +45,7 @@ namespace Epoch
         apply h
     registry.lookupRegistration poolId h₁
 
-  theorem valid_persistent_index_in_registry (epoch : Epoch) (poolIndex : PoolIndex) (valid : epoch.fa.valid_persistent_poolindex poolIndex) (h : epoch.fa.stakes.valid_poolindex poolIndex) : epoch.registry.valid_poolid (epoch.fa.stakes.lookupPoolId poolIndex h) :=
+  theorem valid_persistent_index_in_registry (epoch : Epoch) (poolIndex : PoolIndex) (h : epoch.fa.stakes.valid_poolindex poolIndex) : epoch.registry.valid_poolid (epoch.fa.stakes.lookupPoolId poolIndex h) :=
     by
       let ⟨h_stakes_eq, _⟩ := epoch.valid_fait_accompli
       let p := epoch.fa.stakes.lookupPoolId poolIndex h

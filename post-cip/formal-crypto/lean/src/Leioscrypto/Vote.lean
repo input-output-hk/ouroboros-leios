@@ -52,7 +52,7 @@ namespace Vote
         apply fa.persistent_index_is_valid_index
         apply h
     let poolId : PoolKeyHash := stakes.lookupPoolId poolIndex validIndex
-    let validId : registry.valid_poolid poolId := epoch.valid_persistent_index_in_registry poolIndex h validIndex
+    let validId : registry.valid_poolid poolId := epoch.valid_persistent_index_in_registry poolIndex validIndex
     let registration : Registration := registry.lookupRegistration poolId validId
     let eid := election.electionId.toByteArray
     let mvk := registration.pool.mvk

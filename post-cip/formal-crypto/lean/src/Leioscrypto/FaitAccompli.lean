@@ -10,9 +10,6 @@ import Leioscrypto.Util
 namespace Leioscrypto
 
 
-def PoolWeights := List (PoolKeyHash × Rat)
-deriving Inhabited
-
 private def persistenceTest (n : Nat) : (PoolKeyHash × Nat) × (Nat × Nat) → Bool
 | ⟨ ⟨ _ , S ⟩ , ⟨ ρ , i ⟩ ⟩ => (n - i + 1) * (ρ - S)^2 ≥ (n - i) * ρ^2
 

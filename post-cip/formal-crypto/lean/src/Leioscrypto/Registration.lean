@@ -44,25 +44,26 @@ namespace Registration
     signed_by_cold_key : verifyColdSignature reg.poolId reg.signature
     proven_possession : BLS.Check reg.pool.mvk reg.pool.μ
 
+  def Checked (reg : Registration) : Prop :=
+    reg.WellFormed ∧ reg.Authentic
+
 end Registration
 
 
 def Registry := List Registration
 deriving Inhabited, Membership
 
+
 namespace Registry
 
-  structure WellFormed (rgy : Registry) : Prop where
-    wf_registrations : ∀ reg ∈ rgy, reg.WellFormed
+  structure Checked (rgy : Registry) : Prop where
+    checked_registrations : ∀ reg ∈ rgy, reg.Checked
     unique_hashes : (rgy.map Registration.poolId).Nodup
-
-  structure Authentic (rgy : Registry) : Prop where
-    authentic_registrations : ∀ r ∈ rgy, r.Authentic
 
   def valid_poolid (rgy : Registry) (poolId : PoolKeyHash) : Prop :=
     poolId ∈ rgy.map Registration.poolId
 
-  theorem wf_empty : (default : Registry).WellFormed :=
+  theorem wf_empty : (default : Registry).Checked :=
     ⟨
       by
         intro p h
@@ -76,41 +77,39 @@ namespace Registry
     | none => rgy
     | some reg => rgy.erase reg
 
-  theorem wf_deregister (poolId : PoolKeyHash) (rgy :Registry) (h : rgy.WellFormed) : (deregister poolId rgy).WellFormed :=
+  theorem checked_deregister (poolId : PoolKeyHash) (rgy :Registry) (h : rgy.Checked) : (deregister poolId rgy).Checked :=
     by
-      sorry
-/-
-  def deregister' (poolId : PoolKeyHash) (regs : Registry) : Registry :=
-    let registrations := regs.registrations
-    match registrations.find? $ fun reg' ↦ reg'.pool.poolKeyHash == poolId with
-    | none => regs
-    | some reg =>
-        let registrations' := registrations.erase reg
-        let sublist_map_nodup {a : Type} (f : Pool → a) (h₀ : (registrations.map $ f ∘ Registration.pool).Nodup) : (registrations'.map $ f ∘ Registration.pool).Nodup :=
-          by
-            let xs := registrations.map $ f ∘ Registration.pool
-            let xs' := registrations'.map $ f ∘ Registration.pool
-            have h₁ : registrations'.Sublist registrations := List.erase_sublist
-            have h₂ : xs'.Sublist xs :=
-              by
-                rw [List.sublist_map_iff]
-                exists registrations'
-            apply List.Nodup.sublist h₂ h₀
-        ⟨
-          registrations'
-        , sublist_map_nodup Pool.poolKeyHash regs.pools_unique_keyhash
-        ⟩
--/
+      dsimp [deregister]
+      split
+      · exact h
+      · next reg _ =>
+          let rgy' := rgy.erase reg
+          have h₁ : rgy'.Sublist rgy := List.erase_sublist
+          exact ⟨
+            by
+              intro r hr
+              have h_mem_orig : r ∈ rgy := List.Sublist.mem hr h₁
+              have x : r.Checked := h.checked_registrations r h_mem_orig
+              simp_all
+          , by
+              let xs := rgy.map Registration.poolId
+              let xs' := rgy'.map Registration.poolId
+              have h₂ : xs'.Sublist xs :=
+                by
+                  rw [List.sublist_map_iff]
+                  exists rgy'
+              apply List.Nodup.sublist h₂ h.unique_hashes
+          ⟩
 
+  --FIXME: Include constraint on issue counter.
   def register (reg : Registration) (rgy : Registry) : Registry :=
     let poolId : PoolKeyHash := reg.poolId
     let absent (reg' : Registration) : Bool := reg'.poolId != poolId
-    rgy.filter absent
+    reg :: rgy.filter absent
 
-  theorem wf_register (reg : Registration) (rgy : Registry) (h : rgy.WellFormed) : (register reg rgy).WellFormed :=
-    by
-      sorry
-  /-
+  theorem checked_register (reg : Registration) (rgy : Registry) (h : rgy.Checked) : (register reg rgy).Checked :=
+    sorry
+/-
   def register (regs : Registry) (reg : Registration) : Registry :=
     let poolId : PoolKeyHash := reg.pool.poolKeyHash
     let registrations := regs.registrations
@@ -135,34 +134,15 @@ namespace Registry
         simp_all only [Function.comp_apply, not_false_eq_true, List.map_cons, List.nodup_cons, and_self, keyhashes', registrations', test, poolId, registrations, registrations'']
     ⟩
 
-  -/
+-/
 
   def lookupRegistration (poolId : PoolKeyHash) (rgy : Registry) (h : rgy.valid_poolid poolId) : Registration :=
     lookup₀ Registration.poolId rgy poolId h
 
-end Registry
-
-
-namespace Registration
-
-  def Valid (reg : Registration) (rgy : Registry) : Prop :=
-    let present (reg' : Registration) : Bool := reg'.poolId == reg.poolId
-    match rgy.find? present with
-    | none => reg.WellFormed
-    | some reg' => reg.WellFormed ∧ reg'.issueCounter > reg.issueCounter
-
-  def Checked (reg : Registration) (rgy : Registry) : Prop :=
-    reg.WellFormed ∧ reg.Valid rgy ∧ reg.Authentic
-
-end Registration
-
-
-namespace Registry
-
   inductive IsValidRegistry : Registry → Prop
   | empty : IsValidRegistry default
   | deregister (rgy : Registry) (poolId : PoolKeyHash) : IsValidRegistry rgy → IsValidRegistry (rgy.deregister poolId)
-  | register (rgy : Registry) (reg : Registration) : IsValidRegistry rgy → reg.Checked rgy → IsValidRegistry (rgy.register reg)
+  | register (rgy : Registry) (reg : Registration) : IsValidRegistry rgy → reg.Checked → IsValidRegistry (rgy.register reg)
 
 end Registry
 
