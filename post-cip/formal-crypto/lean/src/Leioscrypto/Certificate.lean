@@ -74,26 +74,14 @@ namespace Certificate
       List.sum
         $ cert.persistentVotes.attach.map
           fun ⟨ poolIndex , h₁ ⟩ ↦
-            let h₂ : fa.valid_persistent_poolindex poolIndex :=
-              by
-                have h₃ : election.epoch.fa.valid_persistent_poolindex poolIndex :=
-                  by
-                    apply valid.valid_persistent_voters poolIndex
-                    apply h₁
-                apply h₃
+            let h₂ := valid.valid_persistent_voters poolIndex h₁
             fa.persistentWeight poolIndex h₂
     let nonpersistentWeight : Rat :=
       List.sum
         $ cert.nonpersistentVotes.attach.map
           fun ⟨ ⟨ poolId , σ_eid ⟩ , h₁ ⟩ ↦
-            let h₂ : fa.stakes.valid_poolid poolId :=
-              by
-                have h₃ : election.epoch.fa.valid_nonpersistent_poolid poolId :=
-                  by
-                    apply valid.valid_nonpersistent_candidates
-                    apply List.mem_map_of_mem h₁
-                apply h₃.valid₁
-            fa.nonpersistentWeight poolId h₂ σ_eid
+            let h₂ := valid.valid_nonpersistent_candidates poolId (List.mem_map_of_mem h₁)
+            fa.nonpersistentWeight poolId h₂.valid₁ σ_eid
     let has_quorum : Prop := (persistentWeight + nonpersistentWeight) ≥ stakes.total.cast * epoch.protocol.τ
     -- Final constraints.
     ver_σ_tilde_eid ∧ ver_σ_tilde_m ∧ has_quorum
