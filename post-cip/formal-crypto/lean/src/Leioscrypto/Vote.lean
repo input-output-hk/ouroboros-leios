@@ -106,6 +106,19 @@ namespace Vote
         constructor
       · apply BLS.wf_sign
 
+  theorem valid_make_persistent_vote
+      (election : Election)
+      (poolIndex : PoolIndex)
+      (secret : BLS.SecretKey)
+      (h : election.epoch.fa.valid_persistent_poolindex poolIndex)
+    : (makePersistentVote election poolIndex secret h).Valid election :=
+    by
+      constructor
+      · dsimp [makePersistentVote]
+        simp_all
+      · rfl
+      · constructor
+
   def makeNonpersistentVote (election : Election) (poolId : PoolKeyHash) (secret : BLS.SecretKey) (_ : election.epoch.fa.valid_nonpersistent_poolid poolId) : Vote :=
     NonpersistentVote
       election.electionId
@@ -124,6 +137,19 @@ namespace Vote
       constructor
       · apply BLS.wf_sign
       · apply BLS.wf_sign
+
+  theorem valid_make_nonpersistent_vote
+      (election : Election)
+      (poolId : PoolKeyHash)
+      (secret : BLS.SecretKey)
+      (h : election.epoch.fa.valid_nonpersistent_poolid poolId)
+    : (makeNonpersistentVote election poolId secret h).Valid election :=
+    by
+      constructor
+      · dsimp [makeNonpersistentVote]
+        simp_all
+      · rfl
+      · constructor
 
 end Vote
 
