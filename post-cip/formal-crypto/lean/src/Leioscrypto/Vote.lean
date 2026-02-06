@@ -119,6 +119,25 @@ namespace Vote
       · rfl
       · constructor
 
+theorem authentic_make_persistent_vote
+      (election : Election)
+      (poolIndex : PoolIndex)
+      (secret : BLS.SecretKey)
+      (h_idx : election.epoch.fa.valid_persistent_poolindex poolIndex)
+      (h_val : (makePersistentVote election poolIndex secret h_idx).Valid election)
+      (h_seats : election.epoch.fa.persistentWeight poolIndex h_idx > 0)
+      (h_key : ∀ (h_s : election.epoch.fa.stakes.valid_poolindex poolIndex)
+                 (h_r : election.epoch.registry.valid_poolid (election.epoch.fa.stakes.lookupPoolId poolIndex h_s)),
+                 (election.epoch.registry.lookupRegistration _ h_r).pool.mvk = BLS.Spec.SkToPk secret)
+    : (makePersistentVote election poolIndex secret h_idx).Authentic election h_val :=
+    by
+      unfold Authentic
+      unfold AuthenticPersistent
+      constructor
+      · rw [h_key]
+        apply BLS.verify_sign
+      · exact h_seats
+
   def makeNonpersistentVote (election : Election) (poolId : PoolKeyHash) (secret : BLS.SecretKey) (_ : election.epoch.fa.valid_nonpersistent_poolid poolId) : Vote :=
     NonpersistentVote
       election.electionId
@@ -150,6 +169,26 @@ namespace Vote
         simp_all
       · rfl
       · constructor
+
+  theorem authentic_make_nonpersistent_vote
+      (election : Election)
+      (poolId : PoolKeyHash)
+      (secret : BLS.SecretKey)
+      (h_id : election.epoch.fa.valid_nonpersistent_poolid poolId)
+      (h_val : (makeNonpersistentVote election poolId secret h_id).Valid election)
+      (h_seats : election.epoch.fa.nonpersistentWeight poolId h_id.valid₁ (BLS.Sign secret election.eligibilityMessage) > 0)
+      (h_key : ∀ (h_r : election.epoch.registry.valid_poolid poolId), (election.epoch.registry.lookupRegistration poolId h_r).pool.mvk = BLS.Spec.SkToPk secret)
+    : (makeNonpersistentVote election poolId secret h_id).Authentic election h_val :=
+    by
+      unfold Authentic
+      simp only [makeNonpersistentVote]
+      unfold AuthenticNonpersistent
+      dsimp
+      simp only [h_key]
+      refine ⟨?_, ?_, ?_⟩
+      · apply BLS.verify_sign
+      · apply BLS.verify_sign
+      · exact h_seats
 
 end Vote
 
