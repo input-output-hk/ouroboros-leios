@@ -23,7 +23,17 @@ namespace Pool
     wf_mvk : p.mvk.WellFormed
     wf_μ : p.μ.WellFormed
 
-  -- TODO: Create a valid pool.
+  def makePool (poolId : PoolKeyHash) (secret : BLS.SecretKey) : Pool :=
+    let ⟨ mvk , μ ⟩ := BLS.KeyGen secret
+    ⟨ poolId , mvk , μ ⟩
+
+  theorem wf_makepool (poolId : PoolKeyHash) (secret : BLS.SecretKey) : (makePool poolId secret).WellFormed :=
+    by
+      dsimp [makePool]
+      obtain ⟨h_mvk, h_μ⟩ := BLS.wf_keygen secret
+      constructor
+      · exact h_mvk
+      · exact h_μ
 
 end Pool
 

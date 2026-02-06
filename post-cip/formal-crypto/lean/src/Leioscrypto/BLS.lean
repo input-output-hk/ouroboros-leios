@@ -95,6 +95,8 @@ def KeyGen (sk : SecretKey) : PublicKey × ProofOfPossession :=
   let μ₂ := Spec.CoreSign sk dstLeios
   ⟨ mvk , ⟨ μ₁ , μ₂ ⟩ ⟩
 
+axiom wf_keygen (sk : SecretKey) : (KeyGen sk).fst.WellFormed ∧ (KeyGen sk).snd.WellFormed
+
 def Check : PublicKey → ProofOfPossession → Prop
 | mvk , ⟨ μ₁ , μ₂ ⟩ =>
     let b₁ := Spec.CoreVerify mvk mvk.popMessage μ₁
