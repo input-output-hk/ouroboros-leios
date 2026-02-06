@@ -27,7 +27,7 @@ namespace Pool
     let ⟨ mvk , μ ⟩ := BLS.KeyGen secret
     ⟨ poolId , mvk , μ ⟩
 
-  theorem wf_makepool (poolId : PoolKeyHash) (secret : BLS.SecretKey) : (makePool poolId secret).WellFormed :=
+  theorem wf_make_pool (poolId : PoolKeyHash) (secret : BLS.SecretKey) : (makePool poolId secret).WellFormed :=
     by
       dsimp [makePool]
       obtain ⟨h_mvk, h_μ⟩ := BLS.wf_keygen secret
@@ -58,8 +58,6 @@ namespace Registration
 
   def Checked (reg : Registration) : Prop :=
     reg.WellFormed ∧ reg.Authentic
-
-  -- TODO: Create a valid registration.
 
 end Registration
 

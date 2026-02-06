@@ -122,6 +122,9 @@ def Sign (sk : SecretKey) (m : ByteArray) : Signature :=
 def Ver (mvk : PublicKey) (m : ByteArray) (σ : Signature) : Prop :=
   Spec.CoreVerify mvk (sigMessage m) σ
 
+axiom wf_sign (sk : SecretKey) (m : ByteArray) : (Sign sk m).WellFormed
+
+axiom verify_sign (sk : SecretKey) (m : ByteArray) : Ver (Spec.SkToPk sk) m (Sign sk m)
 
 def AKey : List PublicKey → PublicKey :=
   Spec.G2.product

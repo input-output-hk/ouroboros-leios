@@ -82,12 +82,48 @@ namespace Vote
     | PersistentVote _ poolIndex _ σ_m => AuthenticPersistent election poolIndex σ_m $ by apply valid.valid_pool
     | NonpersistentVote _ poolId σ_eid _ σ_m => AuthenticNonpersistent election poolId σ_eid σ_m $ by apply valid.valid_pool
 
-    structure Checked (election : Election) (vote : Vote) : Prop where
-      wf : vote.WellFormed
-      valid : vote.Valid election
-      authentic: vote.Authentic election valid
+  structure Checked (election : Election) (vote : Vote) : Prop where
+    wf : vote.WellFormed
+    valid : vote.Valid election
+    authentic: vote.Authentic election valid
 
-  -- TODO: Create a valid vote.
+  def makePersistentVote (election : Election) (poolIndex : PoolIndex) (secret : BLS.SecretKey) (_ : election.epoch.fa.valid_persistent_poolindex poolIndex) : Vote :=
+    PersistentVote
+      election.electionId
+      poolIndex
+      election.ebHash
+      (BLS.Sign secret election.blockMessage)
+
+  theorem wf_make_persistent_vote
+      (election : Election)
+      (poolIndex : PoolIndex)
+      (secret : BLS.SecretKey)
+      (h : election.epoch.fa.valid_persistent_poolindex poolIndex)
+    : (makePersistentVote election poolIndex secret h).WellFormed :=
+    by
+      constructor
+      · simp only [Option.elim]
+        constructor
+      · apply BLS.wf_sign
+
+  def makeNonpersistentVote (election : Election) (poolId : PoolKeyHash) (secret : BLS.SecretKey) (_ : election.epoch.fa.valid_nonpersistent_poolid poolId) : Vote :=
+    NonpersistentVote
+      election.electionId
+      poolId
+      (BLS.Sign secret election.eligibilityMessage)
+      election.ebHash
+      (BLS.Sign secret election.blockMessage)
+
+  theorem wf_make_nonpersistent_vote
+      (election : Election)
+      (poolId : PoolKeyHash)
+      (secret : BLS.SecretKey)
+      (h : election.epoch.fa.valid_nonpersistent_poolid poolId)
+    : (makeNonpersistentVote election poolId secret h).WellFormed :=
+    by
+      constructor
+      · apply BLS.wf_sign
+      · apply BLS.wf_sign
 
 end Vote
 
