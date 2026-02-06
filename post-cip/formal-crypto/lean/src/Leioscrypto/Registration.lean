@@ -150,6 +150,16 @@ theorem checked_register (reg : Registration) (h₁ : reg.Checked) (rgy : Regist
   | deregister (rgy : Registry) (poolId : PoolKeyHash) : IsValidRegistry rgy → IsValidRegistry (rgy.deregister poolId)
   | register (rgy : Registry) (reg : Registration) (_ : reg.Checked) (h : rgy.later_registration reg): IsValidRegistry rgy → IsValidRegistry (rgy.register reg h)
 
+  theorem is_valid_implies_checked (rgy : Registry) (h : IsValidRegistry rgy) : rgy.Checked :=
+    by
+      induction h with
+      | empty =>
+          exact wf_empty
+      | deregister rgy' poolId _ ih =>
+          apply checked_deregister poolId rgy' ih
+      | register rgy' reg reg_checked later _ ih =>
+          apply checked_register reg reg_checked rgy' ih later
+
 end Registry
 
 
