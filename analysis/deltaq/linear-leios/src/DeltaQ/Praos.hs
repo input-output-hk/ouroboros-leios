@@ -10,8 +10,8 @@ module DeltaQ.Praos (
   BlockSize (..),
 
   -- * DeltaQ
-  emitRBHeader,
-  fetchingRBBody,
+  sendRBHeader,
+  sendRBBody,
 
   -- * Utils
   blockSizes,
@@ -62,8 +62,8 @@ blendedDelay b = choices $ map (\(n, p) -> (p, hops n b)) hopCount
   -- values are taken from topology checker tool
   hopCount = [(1, 1909), (2, 3867), (3, 2826), (4, 1068), (5, 214), (6, 16)]
 
-emitRBHeader :: DQ
-emitRBHeader = blendedDelay B64
+sendRBHeader :: DQ
+sendRBHeader = blendedDelay B64
 
-fetchingRBBody :: DQ
-fetchingRBBody = blendedDelay B1024
+sendRBBody :: DQ
+sendRBBody = blendedDelay B1024

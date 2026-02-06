@@ -38,7 +38,7 @@ The statistisics depend on the protocol parameters and other configurations. The
 |`pQuorum`|`pValidating`, committee size, number SPO|Probability of reaching a quorum|
 |`pInterruptedByNewBlock`|$L\_{hdr}$, $L\_{vote}$, $L\_{diff}$|Probability of getting a new block too early|
 |`pCertified`|`pInterruptedByNewBlock`, `pQuorum`|Probability that there is a certificate in the next RB|
-|`eCertified`|$L\_{hdr}$, $L\_{vote}$, $L\_{diff}$|expected time for next certified block|
+|`eCertified`|$L\_{hdr}$, $L\_{vote}$, $L\_{diff}$|Expected time for next certified block|
 
 ### Plots
 

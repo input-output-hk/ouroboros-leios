@@ -152,8 +152,8 @@ plots Config{..} = do
 stats :: Config -> Result
 stats config@Config{..} =
   let res_config = name
-      res_pHeaderOnTime = fromRational (pHeaderOnTime lHdr)
-      res_pValidating = fromRational (pValidating applyTx reapplyTx (lHdr, lVote))
+      res_pHeaderOnTime = pHeaderOnTime lHdr
+      res_pValidating = pValidating applyTx reapplyTx (lHdr, lVote)
       res_pQuorum = pQuorum config
       res_pInterruptedByNewBlock = pInterruptedByNewBlock config
       res_pCertified = pCertified config

@@ -5,10 +5,9 @@ module DeltaQ.Leios.EmpiricalDistributions (
 ) where
 
 import Data.List (sort)
-import Data.Ratio ((%))
 import DeltaQ
 
-type Measurements = [(Rational, Rational)]
+type Measurements = [(Double, Double)]
 
 -- | 'measuredDQ'
 -- https://github.com/DeltaQ-SD/deltaq/issues/75#issuecomment-3334080165
@@ -31,5 +30,5 @@ empiricalDQ :: [Double] -> DQ
 empiricalDQ ms =
   measuredDQ $
     zip
-      (map toRational [0, (1 % length ms) .. 1])
-      (map toRational $ sort ms)
+      ([0, (1 / fromIntegral (length ms)) .. 1])
+      (sort ms)

@@ -65,7 +65,7 @@ pQuorum :: Config -> Double
 pQuorum Config{..} =
   quorumProbability
     (fromInteger numberSPOs)
-    (fromRational $ pValidating applyTx reapplyTx (lHdr, lVote))
+    (pValidating applyTx reapplyTx (lHdr, lVote))
     (fromInteger committeeSizeEstimated)
     (fromRational τ)
 

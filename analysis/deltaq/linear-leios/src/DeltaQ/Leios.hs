@@ -17,9 +17,26 @@ module DeltaQ.Leios (
   pHeaderOnTime,
 ) where
 
-import Data.Ratio ((%))
-import DeltaQ (DQ, DeltaQ (quantile, successWithin), Outcome ((./\.), (.>>.)), ProbabilisticOutcome (Probability), choices, maybeFromEventually, wait)
-import DeltaQ.Praos (BlockSize (B2048, B64), blendedDelay, emitRBHeader, fetchingRBBody)
+import DeltaQ (
+  DQ,
+  DeltaQ (quantile, successWithin),
+  Outcome ((./\.), (.>>.)),
+  ProbabilisticOutcome (Probability),
+  choices,
+  maybeFromEventually,
+  wait,
+ )
+import DeltaQ.Praos (
+  BlockSize (..),
+  blendedDelay,
+  sendRBHeader,
+  sendRBBody,
+ )
+
+maxTxsInRB, maxTxRefsInEB, maxTxsFetched :: Integer
+maxTxsInRB = 32
+maxTxRefsInEB = 128
+maxTxsFetched = 16
 
 fetchingEBHeader :: DQ
 fetchingEBHeader = blendedDelay B64
@@ -30,35 +47,42 @@ fetchingEBBody = blendedDelay B2048
 fetchingEB :: DQ
 fetchingEB = fetchingEBHeader .>>. fetchingEBBody
 
+doAll :: [DQ] -> DQ
+doAll = foldr (./\.) (wait 0)
+
+concurrentUpToN :: Integer -> DQ -> DQ
+concurrentUpToN n dq = choices $ map f [1 .. fromInteger n]
+ where
+  f i = (1.0 / fromIntegral n, doAll (replicate i dq))
+
+fetchingTx :: DQ
+fetchingTx = blendedDelay B256 -- TODO: Tx size
+
 fetchingTxs :: DQ
-fetchingTxs = blendedDelay B64 -- TODO
+fetchingTxs = concurrentUpToN maxTxsFetched fetchingTx
 
 processRBandEB :: DQ -> DQ
 processRBandEB applyTxs = processRB ./\. processEB
  where
-  processRB = fetchingRBBody .>>. applyTxs
+  processRB = sendRBBody .>>. applyTxs
   processEB = fetchingEB .>>. fetchingTxs
 
 -- | Distribution of EB validation time
 validateEB :: DQ -> DQ -> DQ
 validateEB applyTx reapplyTx = processRBandEB applyTxs .>>. reapplyTxs
  where
-  doAll :: [DQ] -> DQ
-  doAll = foldr (./\.) (wait 0)
-
-  n = 64 -- TODO: total number of transactions
-  applyTxs = choices $ map (\i -> (1 % n, doAll (replicate i applyTx))) [1 .. fromInteger n]
-  reapplyTxs = choices $ map (\i -> (1 % n, doAll (replicate i reapplyTx))) [1 .. fromInteger n]
+  applyTxs = concurrentUpToN maxTxsInRB applyTx
+  reapplyTxs = concurrentUpToN maxTxRefsInEB reapplyTx
 
 -- | Estimate for the parameter \(L_\text{vote}\) using 'validateEB'
 lVoteEstimated :: DQ -> DQ -> Maybe Integer
-lVoteEstimated txApply txReapply = round <$> ((-) <$> q75 <*> (pure 3))
+lVoteEstimated txApply txReapply = ceiling <$> ((-) <$> q75 <*> (pure 3))
  where
   q75 = maybeFromEventually $ quantile (validateEB txApply txReapply) 0.75
 
 -- | Estimate for the parameter \(L_\text{diff}\) using 'validateEB'
 lDiffEstimated :: DQ -> DQ -> Maybe Integer
-lDiffEstimated txApply txReapply = round <$> ((-) <$> q95 <*> q75)
+lDiffEstimated txApply txReapply = ceiling <$> ((-) <$> q95 <*> q75)
  where
   dq = validateEB txApply txReapply
   q75 = maybeFromEventually $ quantile dq 0.75
@@ -72,8 +96,8 @@ pHeaderOnTime ::
   Probability DQ
 pHeaderOnTime lHdr =
   successWithin
-    emitRBHeader
-    (toRational lHdr)
+    sendRBHeader
+    (fromIntegral lHdr)
 
 -- | Probability that 'validateEB' is successful before the end of \(L_\text{vote}\)
 pValidating ::
@@ -88,4 +112,4 @@ pValidating ::
 pValidating txApply txReapply (lHdr, lVote) =
   successWithin
     (validateEB txApply txReapply)
-    (toRational $ 3 * lHdr + lVote)
+    (fromIntegral $ 3 * lHdr + lVote)
