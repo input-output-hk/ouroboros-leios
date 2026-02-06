@@ -105,13 +105,19 @@ namespace Registry
               apply List.Nodup.sublist pools'_sublist_pools h.unique_hashes
           ⟩
 
-  --FIXME: Include constraint on issue counter.
-  def register (reg : Registration) (rgy : Registry) : Registry :=
+  def later_registration (rgy : Registry) (reg : Registration) : Prop :=
+    let poolId : PoolKeyHash := reg.poolId
+    let present (reg' : Registration) : Bool := reg'.poolId != poolId
+    match rgy.find? present with
+    | none => True
+    | some reg' => reg'.issueCounter < reg.issueCounter
+
+  def register (reg : Registration) (rgy : Registry) (_ : rgy.later_registration reg) : Registry :=
     let poolId : PoolKeyHash := reg.poolId
     let absent (reg' : Registration) : Bool := reg'.poolId != poolId
     reg :: rgy.filter absent
 
-  theorem checked_register (reg : Registration) (h₁ : reg.Checked) (rgy : Registry) (h₂ : rgy.Checked) : (register reg rgy).Checked :=
+  theorem checked_register (reg : Registration) (h₁ : reg.Checked) (rgy : Registry) (h₂ : rgy.Checked) (h₃ : rgy.later_registration reg) : (register reg rgy h₃).Checked :=
     by
       let poolId : PoolKeyHash := reg.poolId
       let absent (reg' : Registration) : Bool := reg'.poolId != poolId
@@ -155,7 +161,7 @@ namespace Registry
   inductive IsValidRegistry : Registry → Prop
   | empty : IsValidRegistry default
   | deregister (rgy : Registry) (poolId : PoolKeyHash) : IsValidRegistry rgy → IsValidRegistry (rgy.deregister poolId)
-  | register (rgy : Registry) (reg : Registration) : IsValidRegistry rgy → reg.Checked → IsValidRegistry (rgy.register reg)
+  | register (rgy : Registry) (reg : Registration) (_ : reg.Checked) (h : rgy.later_registration reg): IsValidRegistry rgy → IsValidRegistry (rgy.register reg h)
 
 end Registry
 
