@@ -16,7 +16,7 @@ I draw the current design from the CIP-164 using excalidraw:
 
 And also the alternative with dedicated EB headers:
 
-![](./images/leios-block-structure-eb-header.excalidraw.svg)
+![](./images/leios-block-structure-eb-headers.excalidraw.svg)
 
 ## 2026-02-03
 
