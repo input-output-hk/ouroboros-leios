@@ -35,11 +35,21 @@ namespace Certificate
   def Authentic (cert : Certificate) (election : Election) (valid : cert.Valid election) : Prop :=
     let epoch := election.epoch
     let registry := epoch.registry
+    let fa := epoch.fa
+    let stakes := fa.stakes
     -- Public keys.
     let persistentKeys : List BLS.PublicKey :=
-      cert.persistentVotes.map
-        fun poolIndex ↦
-          sorry
+      cert.persistentVotes.attach.map
+        fun ⟨ poolIndex , h₁ ⟩ ↦
+          let validIndex : stakes.valid_poolindex poolIndex :=
+            by
+              apply fa.persistent_index_is_valid_index
+              apply valid.valid_persistent_voters
+              exact h₁
+          let poolId : PoolKeyHash := stakes.lookupPoolId poolIndex validIndex
+          let validId : registry.valid_poolid poolId := epoch.valid_persistent_index_in_registry poolIndex validIndex
+          let registration : Registration := registry.lookupRegistration poolId validId
+          registration.pool.mvk
     let nonpersistentKeys : List BLS.PublicKey :=
       cert.nonpersistentVotes.attach.map
         fun ⟨ ⟨ poolId , _ ⟩ , h₁ ⟩ ↦
@@ -60,8 +70,6 @@ namespace Certificate
     let akey : BLS.PublicKey := BLS.AKey keys
     let ver_σ_tilde_m : Prop := BLS.Ver akey election.blockMessage cert.σ_tilde_m
     -- Quorum computation.
-    let fa := epoch.fa
-    let stakes := fa.stakes
     let persistentWeight : Rat :=
       List.sum
         $ cert.persistentVotes.map
