@@ -19,26 +19,37 @@ structure Certificate where
 
 namespace Certificate
 
-  structure WellFormed (c : Certificate) : Prop where
-    wf_σ_tilde_eid : c.σ_tilde_eid.elim True BLS.Signature.WellFormed
-    wf_σ_tilde_m : c.σ_tilde_m.WellFormed
+  structure WellFormed (cert : Certificate) : Prop where
+    wf_σ_tilde_eid : cert.σ_tilde_eid.elim True BLS.Signature.WellFormed
+    wf_σ_tilde_m : cert.σ_tilde_m.WellFormed
 
-  structure Valid (c : Certificate) (election : Election) : Prop where
-    correct_election : c.electionId = election.electionId
-    correct_ebhash : c.ebHash = election.ebHash
-    unique_persistent_voters : c.persistentVotes.Nodup
-    unique_nonpersistent_voters : (c.nonpersistentVotes.map Prod.fst).Nodup
-    valid_persistent_ids : ∀ poolIndex ∈ c.persistentVotes, election.epoch.valid_index poolIndex
-    valid_persistent_voters : ∀ poolIndex ∈ c.persistentVotes, election.epoch.fa.valid_persistent_poolindex poolIndex
-    valid_nonpersistent_candidates : ∀ poolId ∈ c.nonpersistentVotes.map Prod.fst, election.epoch.fa.valid_nonpersistent_poolid poolId
+  structure Valid (cert : Certificate) (election : Election) : Prop where
+    correct_election : cert.electionId = election.electionId
+    correct_ebhash : cert.ebHash = election.ebHash
+    unique_persistent_voters : cert.persistentVotes.Nodup
+    unique_nonpersistent_voters : (cert.nonpersistentVotes.map Prod.fst).Nodup
+    valid_persistent_ids : ∀ poolIndex ∈ cert.persistentVotes, election.epoch.valid_index poolIndex
+    valid_persistent_voters : ∀ poolIndex ∈ cert.persistentVotes, election.epoch.fa.valid_persistent_poolindex poolIndex
+    valid_nonpersistent_candidates : ∀ poolId ∈ cert.nonpersistentVotes.map Prod.fst, election.epoch.fa.valid_nonpersistent_poolid poolId
 
   def Authentic (cert : Certificate) (election : Election) (valid : cert.Valid election) : Prop :=
     let epoch := election.epoch
+    let registry := epoch.registry
     -- Public keys.
     let persistentKeys : List BLS.PublicKey :=
-      sorry
+      cert.persistentVotes.map
+        fun poolIndex ↦
+          sorry
     let nonpersistentKeys : List BLS.PublicKey :=
-      sorry
+      cert.nonpersistentVotes.attach.map
+        fun ⟨ ⟨ poolId , _ ⟩ , h₁ ⟩ ↦
+          let validId : registry.valid_poolid poolId :=
+            by
+              apply epoch.valid_nonpersistent_id_in_registry
+              apply valid.valid_nonpersistent_candidates
+              apply List.mem_map_of_mem h₁
+          let reg := registry.lookupRegistration poolId validId
+          reg.pool.mvk
     let keys : List BLS.PublicKey := persistentKeys ++ nonpersistentKeys
     -- Verify signature on eligibility.
     let σ_eid : List BLS.Signature := cert.nonpersistentVotes.map Prod.snd
@@ -66,6 +77,11 @@ namespace Certificate
     let has_quorum : Prop := (persistentWeight + nonpersistentWeight) ≥ stakes.total.cast * epoch.protocol.τ
     -- Final constraints.
     ver_σ_tilde_eid ∧ ver_σ_tilde_m ∧ has_quorum
+
+  structure Checked (cert : Certificate) (election : Election) where
+    wf : cert.WellFormed
+    valid : cert.Valid election
+    authentic : cert.Authentic election valid
 
 end Certificate
 

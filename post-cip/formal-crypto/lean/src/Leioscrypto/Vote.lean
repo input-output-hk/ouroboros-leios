@@ -84,10 +84,7 @@ namespace Vote
     | PersistentVote _ poolIndex _ σ_m => AuthenticPersistent election poolIndex σ_m $ by apply valid.valid_pool
     | NonpersistentVote _ poolId σ_eid _ σ_m => AuthenticNonpersistent election poolId σ_eid σ_m $ by apply valid.valid_pool
 
-    def Checked (election : Election) (vote : Vote) (valid : vote.Valid election) : Prop :=
-      vote.WellFormed ∧ vote.Authentic election valid
-
-    structure Checked' (election : Election) (vote : Vote) : Prop where
+    structure Checked (election : Election) (vote : Vote) : Prop where
       wf : vote.WellFormed
       valid : vote.Valid election
       authentic: vote.Authentic election valid
