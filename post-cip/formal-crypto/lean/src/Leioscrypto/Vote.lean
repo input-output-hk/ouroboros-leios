@@ -119,7 +119,7 @@ namespace Vote
       · rfl
       · constructor
 
-theorem authentic_make_persistent_vote
+  theorem authentic_make_persistent_vote
       (election : Election)
       (poolIndex : PoolIndex)
       (secret : BLS.SecretKey)
@@ -137,6 +137,24 @@ theorem authentic_make_persistent_vote
       · rw [h_key]
         apply BLS.verify_sign
       · exact h_seats
+
+  theorem check_make_persistent_vote
+      (election : Election)
+      (poolIndex : PoolIndex)
+      (secret : BLS.SecretKey)
+      (h_idx : election.epoch.fa.valid_persistent_poolindex poolIndex)
+      (h_seats : election.epoch.fa.persistentWeight poolIndex h_idx > 0)
+      (h_key : ∀ (h_s : election.epoch.fa.stakes.valid_poolindex poolIndex)
+                 (h_r : election.epoch.registry.valid_poolid (election.epoch.fa.stakes.lookupPoolId poolIndex h_s)),
+                 (election.epoch.registry.lookupRegistration _ h_r).pool.mvk = BLS.Spec.SkToPk secret)
+    : (makePersistentVote election poolIndex secret h_idx).Checked election :=
+    by
+      have h_val := valid_make_persistent_vote election poolIndex secret h_idx
+      exact ⟨
+        wf_make_persistent_vote election poolIndex secret h_idx,
+        h_val,
+        authentic_make_persistent_vote election poolIndex secret h_idx h_val h_seats h_key
+      ⟩
 
   def makeNonpersistentVote (election : Election) (poolId : PoolKeyHash) (secret : BLS.SecretKey) (_ : election.epoch.fa.valid_nonpersistent_poolid poolId) : Vote :=
     NonpersistentVote
@@ -189,6 +207,23 @@ theorem authentic_make_persistent_vote
       · apply BLS.verify_sign
       · apply BLS.verify_sign
       · exact h_seats
+
+  theorem check_make_nonpersistent_vote
+      (election : Election)
+      (poolId : PoolKeyHash)
+      (secret : BLS.SecretKey)
+      (h_id : election.epoch.fa.valid_nonpersistent_poolid poolId)
+      (h_seats : election.epoch.fa.nonpersistentWeight poolId h_id.valid₁ (BLS.Sign secret election.eligibilityMessage) > 0)
+      (h_key : ∀ (h_r : election.epoch.registry.valid_poolid poolId),
+                 (election.epoch.registry.lookupRegistration poolId h_r).pool.mvk = BLS.Spec.SkToPk secret)
+    : (makeNonpersistentVote election poolId secret h_id).Checked election :=
+    by
+      have h_val := valid_make_nonpersistent_vote election poolId secret h_id
+      exact ⟨
+        wf_make_nonpersistent_vote election poolId secret h_id,
+        h_val,
+        authentic_make_nonpersistent_vote election poolId secret h_id h_val h_seats h_key
+      ⟩
 
 end Vote
 
