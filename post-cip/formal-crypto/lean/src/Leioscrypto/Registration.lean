@@ -17,6 +17,8 @@ structure Pool where
   μ : BLS.ProofOfPossession
 deriving BEq
 
+-- TODO: Create a valid pool.
+
 namespace Pool
 
   structure WellFormed (p : Pool) : Prop where
@@ -31,6 +33,8 @@ structure Registration where
   issueCounter : Nat
   signature : ColdKeySignature
 deriving BEq
+
+-- TODO: Create a valid registration.
 
 namespace Registration
 
@@ -84,21 +88,21 @@ namespace Registry
       · exact h
       · next reg _ =>
           let rgy' := rgy.erase reg
-          have h₁ : rgy'.Sublist rgy := List.erase_sublist
+          have rgy_sublist_rgy' : rgy'.Sublist rgy := List.erase_sublist
           exact ⟨
             by
-              intro r hr
-              have h_mem_orig : r ∈ rgy := List.Sublist.mem hr h₁
-              have x : r.Checked := h.checked_registrations r h_mem_orig
+              intro reg' h₂
+              have reg'_mem_rgy : reg' ∈ rgy := List.Sublist.mem h₂ rgy_sublist_rgy'
+              have _ : reg'.Checked := h.checked_registrations reg' reg'_mem_rgy
               simp_all
           , by
-              let xs := rgy.map Registration.poolId
-              let xs' := rgy'.map Registration.poolId
-              have h₂ : xs'.Sublist xs :=
+              let pools := rgy.map Registration.poolId
+              let pools' := rgy'.map Registration.poolId
+              have pools'_sublist_pools : pools'.Sublist pools :=
                 by
                   rw [List.sublist_map_iff]
                   exists rgy'
-              apply List.Nodup.sublist h₂ h.unique_hashes
+              apply List.Nodup.sublist pools'_sublist_pools h.unique_hashes
           ⟩
 
   --FIXME: Include constraint on issue counter.
@@ -107,34 +111,43 @@ namespace Registry
     let absent (reg' : Registration) : Bool := reg'.poolId != poolId
     reg :: rgy.filter absent
 
-  theorem checked_register (reg : Registration) (rgy : Registry) (h : rgy.Checked) : (register reg rgy).Checked :=
-    sorry
-/-
-  def register (regs : Registry) (reg : Registration) : Registry :=
-    let poolId : PoolKeyHash := reg.pool.poolKeyHash
-    let registrations := regs.registrations
-    let test (reg' : Registration) : Bool := reg'.pool.poolKeyHash != poolId
-    let registrations' := registrations.filter test
-    let registrations'' := reg :: registrations'
-    ⟨
-      registrations''
-    , -- FIXME: Refactor for succinctness and explicitness.
-      by
-        let keyhashes := registrations.map $ Pool.poolKeyHash ∘ Registration.pool
-        let keyhashes' := registrations'.map $ Pool.poolKeyHash ∘ Registration.pool
-        have h₁ : keyhashes'.Sublist keyhashes :=
+  theorem checked_register (reg : Registration) (h₁ : reg.Checked) (rgy : Registry) (h₂ : rgy.Checked) : (register reg rgy).Checked :=
+    by
+      let poolId : PoolKeyHash := reg.poolId
+      let absent (reg' : Registration) : Bool := reg'.poolId != poolId
+      let rgy' := rgy.filter absent
+      let rgy'' := reg :: rgy'
+      have rgy'_sublist_rgy : rgy'.Sublist rgy :=
+        by
+          simp [rgy', List.filter_sublist]
+      exact ⟨
+        by
+          let pools := rgy.map Registration.poolId
+          let pools' := rgy'.map Registration.poolId
+          let pools'' := rgy'.map Registration.poolId
+          have pools'_sublist_pools : pools'.Sublist pools :=
           by
             rw [List.sublist_map_iff]
-            exists registrations'
-            simp_all only [List.filter_sublist, and_self, registrations', test, poolId, registrations, keyhashes']
-        have h₂ : keyhashes'.Nodup := List.Sublist.nodup h₁ regs.pools_unique_keyhash
-        have h₃ : ¬ poolId ∈ keyhashes' ∧ keyhashes'.Nodup :=
+            exists rgy'
+          have pools'_nodup : pools'.Nodup := List.Sublist.nodup pools'_sublist_pools h₂.unique_hashes
+          intros reg' h₆
+          have reg'_mem_rgy'' : reg' ∈ rgy'' := h₆
+          sorry
+      , by
+          let pools := rgy.map Registration.poolId
+          let pools' := rgy'.map Registration.poolId
+          let pools'' := rgy'.map Registration.poolId
+          have pools'_sublist_pools : pools'.Sublist pools :=
           by
-            simp_all [keyhashes', registrations', test, poolId, registrations]
-        simp_all only [Function.comp_apply, not_false_eq_true, List.map_cons, List.nodup_cons, and_self, keyhashes', registrations', test, poolId, registrations, registrations'']
-    ⟩
-
--/
+            rw [List.sublist_map_iff]
+            exists rgy'
+          have pools'_nodup : pools'.Nodup := List.Sublist.nodup pools'_sublist_pools h₂.unique_hashes
+          have poolid_notin_pools' : ¬ poolId ∈ pools' :=
+            by
+              simp_all [pools', rgy', absent, poolId]
+--        simp_all only [Function.comp_apply, not_false_eq_true, List.map_cons, List.nodup_cons, and_self, keyhashes', registrations', test, poolId, registrations, registrations'']
+          sorry
+      ⟩
 
   def lookupRegistration (poolId : PoolKeyHash) (rgy : Registry) (h : rgy.valid_poolid poolId) : Registration :=
     lookup₀ Registration.poolId rgy poolId h

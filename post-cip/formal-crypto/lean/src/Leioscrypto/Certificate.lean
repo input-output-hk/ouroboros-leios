@@ -15,6 +15,8 @@ structure Certificate where
   σ_tilde_eid : Option BLS.Signature
   σ_tilde_m : BLS.Signature
 
+-- TODO: Create a valid certificate.
+
 namespace Certificate
 
   structure WellFormed (c : Certificate) : Prop where
