@@ -72,11 +72,16 @@ namespace Certificate
     -- Quorum computation.
     let persistentWeight : Rat :=
       List.sum
-        $ cert.persistentVotes.map
-          fun poolIndex ↦
-            let h : fa.valid_persistent_poolindex poolIndex :=
-              sorry
-            fa.persistentWeight poolIndex h
+        $ cert.persistentVotes.attach.map
+          fun ⟨ poolIndex , h₁ ⟩ ↦
+            let h₂ : fa.valid_persistent_poolindex poolIndex :=
+              by
+                have h₃ : election.epoch.fa.valid_persistent_poolindex poolIndex :=
+                  by
+                    apply valid.valid_persistent_voters poolIndex
+                    apply h₁
+                apply h₃
+            fa.persistentWeight poolIndex h₂
     let nonpersistentWeight : Rat :=
       List.sum
         $ cert.nonpersistentVotes.attach.map
