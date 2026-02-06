@@ -32,24 +32,40 @@ namespace Certificate
     valid_persistent_voters : ∀ poolIndex ∈ c.persistentVotes, election.epoch.fa.valid_persistent_poolindex poolIndex
     valid_nonpersistent_candidates : ∀ poolId ∈ c.nonpersistentVotes.map Prod.fst, election.epoch.fa.valid_nonpersistent_poolid poolId
 
-  def Authentic (c : Certificate) (election : Election) : Prop :=
+  def Authentic (cert : Certificate) (election : Election) (valid : cert.Valid election) : Prop :=
     let epoch := election.epoch
+    -- Public keys.
+    let persistentKeys : List BLS.PublicKey :=
+      sorry
+    let nonpersistentKeys : List BLS.PublicKey :=
+      sorry
+    let keys : List BLS.PublicKey := persistentKeys ++ nonpersistentKeys
+    -- Verify signature on eligibility.
+    let σ_eid : List BLS.Signature := cert.nonpersistentVotes.map Prod.snd
+    let bkey : BLS.PublicKey := BLS.BKey nonpersistentKeys σ_eid
+    let bsig : BLS.Signature := BLS.BSig σ_eid
+    let ver_σ_tilde_eid : Prop := BLS.Ver bkey election.eligibilityMessage bsig
+    -- Verify signature on block.
+    let akey : BLS.PublicKey := BLS.AKey keys
+    let ver_σ_tilde_m : Prop := BLS.Ver akey election.blockMessage cert.σ_tilde_m
+    -- Quorum computation.
     let fa := epoch.fa
-
-/-
-    let σ_m : BLS.Signature := BLS.AKey c.persistentVotes
-    let weighPersistent (poolIndex : PoolIndex) : Option Rat :=
-      do
-        sorry
-    let persistentWeight : Option Rat :=
-      List.sum <$> c.persistentVotes.mapM weighPersistent
-    let weighNonpersistent : PoolKeyHash × BLS.Signature → Option Rat
-    | ⟨ poolId , σ_eid ⟩ => fa.voteWeight poolId (some σ_eid)
-    let nonpersistentWeight : Option Rat :=
-      List.sum <$> c.nonpersistentVotes.mapM weighNonpersistent
--/
-    let has_quorum := sorry
-    has_quorum
+    let stakes := fa.stakes
+    let persistentWeight : Rat :=
+      List.sum
+        $ cert.persistentVotes.map
+          fun poolIndex ↦
+            let h : fa.valid_persistent_poolindex poolIndex := sorry
+            fa.persistentWeight poolIndex h
+    let nonpersistentWeight : Rat :=
+      List.sum
+        $ cert.nonpersistentVotes.map
+          fun ⟨ poolId , σ_eid ⟩ ↦
+            let h : fa.stakes.valid_poolid poolId := sorry
+            fa.nonpersistentWeight poolId h σ_eid
+    let has_quorum : Prop := (persistentWeight + nonpersistentWeight) ≥ stakes.total.cast * epoch.protocol.τ
+    -- Final constraints.
+    ver_σ_tilde_eid ∧ ver_σ_tilde_m ∧ has_quorum
 
 end Certificate
 

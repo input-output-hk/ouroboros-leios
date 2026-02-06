@@ -74,5 +74,17 @@ structure Election where
   electionId_eq_slot : electionId = slot
   ebHash : BlockHash
 
+namespace Election
+
+  def blockMessage (election : Election) : ByteArray :=
+    let eid := election.electionId.toByteArray
+    eid ++ election.ebHash.toByteArray
+
+  def eligibilityMessage (election : Election) : ByteArray :=
+    let eid := election.electionId.toByteArray
+    eid ++ election.epoch.nonce.toByteArray
+
+end Election
+
 
 end Leioscrypto
