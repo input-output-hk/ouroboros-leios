@@ -12,8 +12,6 @@ inductive Vote where
 | PersistentVote : ElectionId → PoolIndex → BlockHash → BLS.Signature → Vote
 | NonpersistentVote : ElectionId → PoolKeyHash → BLS.Signature → BlockHash → BLS.Signature → Vote
 
--- TODO: Create a valid vote.
-
 namespace Vote
 
   def electionId : Vote → ElectionId
@@ -88,6 +86,8 @@ namespace Vote
       wf : vote.WellFormed
       valid : vote.Valid election
       authentic: vote.Authentic election valid
+
+  -- TODO: Create a valid vote.
 
 end Vote
 
