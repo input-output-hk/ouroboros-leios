@@ -1,0 +1,20 @@
+# Dockerfile for Python analysis sidecar
+# Part of Leios Antithesis project
+
+FROM python:3.11-slim
+
+# Install pip dependencies
+RUN pip install --no-cache-dir pandas matplotlib antithesis
+
+# Create working directory
+WORKDIR /app
+
+# Copy analysis scripts
+COPY antithesis/analyse.py /app/analyse.py
+COPY antithesis/entrypoint-analysis.py /app/entrypoint-analysis.py
+
+# Make entrypoint executable
+RUN chmod +x /app/entrypoint-analysis.py
+
+# Set entrypoint to the analysis script
+ENTRYPOINT ["python", "-u", "/app/entrypoint-analysis.py"]
