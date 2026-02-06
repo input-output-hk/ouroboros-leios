@@ -6,6 +6,18 @@
 > 
 > See also the [Post-CIP R&D Findings](post-cip/README.md) document for additional (after 2025-11-01) findings and artifacts not directly related to the implementation of Linear Leios.
 
+## 2026-02-04
+
+### SN on Leios block structure
+
+I draw the current design from the CIP-164 using excalidraw:
+
+![](./images/leios-block-structure-enhanced-header.excalidraw.svg)
+
+And also the alternative with dedicated EB headers:
+
+![](./images/leios-block-structure-eb-header.excalidraw.svg)
+
 ## 2026-02-03
 
 ### Discussion on Leios block structure (EB headers)
