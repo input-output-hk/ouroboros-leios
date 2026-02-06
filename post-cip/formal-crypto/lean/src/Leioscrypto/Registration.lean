@@ -119,45 +119,28 @@ namespace Registry
 
 theorem checked_register (reg : Registration) (h₁ : reg.Checked) (rgy : Registry) (h₂ : rgy.Checked) (h₃ : rgy.later_registration reg) : (register reg rgy h₃).Checked :=
     by
-      let poolId : PoolKeyHash := reg.poolId
-      let absent (reg' : Registration) : Bool := reg'.poolId != poolId
-      let rgy' := rgy.filter absent
-      let rgy'' := reg :: rgy'
-      have rgy'_sublist_rgy : rgy'.Sublist rgy :=
-        by
-          simp [rgy', List.filter_sublist]
-      exact ⟨
-        by
-          intros reg' h₆
-          cases h₆ with
-          | head =>
+      dsimp [register]
+      constructor
+      · intros reg' reg'_in_rgy''
+        cases reg'_in_rgy'' with
+        | head =>
             exact h₁
-          | tail _ h_mem =>
+        | tail _ reg'_mem =>
+            let rgy' := rgy.filter fun reg' ↦ reg'.poolId != reg.poolId
+            have rgy'_sublist_rgy : rgy'.Sublist rgy :=
+              by
+                simp [rgy', List.filter_sublist]
             apply h₂.checked_registrations
-            exact List.Sublist.mem h_mem rgy'_sublist_rgy
-      , by
-          let pools := rgy.map Registration.poolId
-          let pools' := rgy'.map Registration.poolId
-          have pools'_sublist_pools : pools'.Sublist pools :=
-            by
-              rw [List.sublist_map_iff]
-              exists rgy'
-          have pools'_nodup : pools'.Nodup :=
-            List.Sublist.nodup pools'_sublist_pools h₂.unique_hashes
-          have poolid_notin_pools' : ¬ poolId ∈ pools' :=
-            by
-              dsimp [pools', rgy', absent]
-              rw [List.mem_map]
-              intro h_contra
-              obtain ⟨x, h_in_filter, h_id_eq⟩ := h_contra
-              rw [List.mem_filter] at h_in_filter
-              have h_ne := h_in_filter.2
-              rw [h_id_eq] at h_ne
-              simp at h_ne
-          dsimp [register]
-          simp [List.nodup_cons]
-          apply pools'_nodup
-      ⟩
+            exact List.Sublist.mem reg'_mem rgy'_sublist_rgy
+      · rw [List.map_cons, List.nodup_cons]
+        constructor
+        · intro h_contra
+          simp only [List.mem_map, List.mem_filter] at h_contra
+          obtain ⟨_, ⟨_, h_ne⟩, h_eq⟩ := h_contra
+          simp [h_eq] at h_ne
+        · apply List.Sublist.nodup _ h₂.unique_hashes
+          apply List.Sublist.map
+          apply List.filter_sublist
 
   def lookupRegistration (poolId : PoolKeyHash) (rgy : Registry) (h : rgy.valid_poolid poolId) : Registration :=
     lookup₀ Registration.poolId rgy poolId h
