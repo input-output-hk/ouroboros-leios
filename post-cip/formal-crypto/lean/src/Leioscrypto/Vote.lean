@@ -225,6 +225,109 @@ namespace Vote
         authentic_make_nonpersistent_vote election poolId secret h_id h_val h_seats h_key
       ⟩
 
+  def makeVote (election : Election) (poolId : PoolKeyHash) (sk : BLS.SecretKey) : Option Vote :=
+    match checkEligibility election poolId with
+    | Eligibility.is_persistent index h =>
+        some (makePersistentVote election index sk h)
+    | Eligibility.is_nonpersistent h =>
+        some (makeNonpersistentVote election poolId sk h)
+    | Eligibility.none =>
+        none
+
+  theorem check_make_vote''
+    (election : Election)
+    (poolId : PoolKeyHash)
+    (sk : BLS.SecretKey)
+    (vote : Vote)
+    (h_some : makeVote election poolId sk = some vote)
+    (h_seats_p : ∀ i h, election.epoch.fa.persistentWeight i h > 0)
+    (h_seats_n : ∀ id h sig, election.epoch.fa.nonpersistentWeight id h sig > 0)
+    (h_key : ∀ (h_r : election.epoch.registry.valid_poolid poolId),
+               (election.epoch.registry.lookupRegistration poolId h_r).pool.mvk = BLS.Spec.SkToPk sk)
+  : vote.Checked election :=
+  by
+    unfold makeVote at h_some
+    match h_elig : checkEligibility election poolId with
+    | Eligibility.is_persistent index h_idx =>
+      -- Case A: Persistent
+      rw [h_elig] at h_some
+      simp only [Option.some.injEq] at h_some
+      rw [← h_some]
+
+      -- Use 'refine' to explicitly pass arguments in correct order:
+      -- 1. election, index, sk, h_idx are passed directly.
+      -- 2. The weight proof is passed directly.
+      -- 3. The key proof is left as a goal (?_).
+      refine check_make_persistent_vote election index sk h_idx (h_seats_p index h_idx) ?_
+
+      -- Now we prove the Key Ownership (h_key)
+      intro h_s h_r
+
+      -- We need to show that the pool at 'index' is indeed 'poolId'.
+      -- We get this fact from the 'checkEligibility' match.
+      have h_eq : election.epoch.fa.stakes.lookupPoolId index h_s = poolId :=
+        by
+          unfold checkEligibility at h_elig
+          -- We split the if/match in checkEligibility to find the case where it returned 'is_persistent'
+          let z := election.epoch.fa.stakes.poolindex_in_pools index h_s
+
+          --simp [StakeDistribution.poolindex_in_pools]
+          split at h_elig
+          · next h_find =>
+            -- If findIdx? returns 'some', the element at that index satisfies the predicate.
+            -- Predicate: (fun p => p.1 == poolId)
+            have h_found := List.findIdx?_get h_find
+            dsimp [StakeDistribution.lookupPoolId]
+            simp only [beq_iff_eq] at h_found
+            exact h_found
+          · -- The 'none' case
+            contradiction
+      simp_all
+
+    | Eligibility.is_nonpersistent h_id =>
+      rw [h_elig] at h_some
+      simp only [Option.some.injEq] at h_some
+      rw [← h_some]
+      refine check_make_nonpersistent_vote election poolId sk h_id ?_ ?_
+      · apply h_seats_n
+      · apply h_key
+    | Eligibility.none =>
+      rw [h_elig] at h_some
+      contradiction
+
+  theorem check_make_vote'
+      (election : Election)
+      (poolId : PoolKeyHash)
+      (sk : BLS.SecretKey)
+      (vote : Vote)
+      (h_some : makeVote election poolId sk = some vote)
+      (h_seats_p : ∀ i h, election.epoch.fa.persistentWeight i h > 0)
+      (h_seats_n : ∀ id h sig, election.epoch.fa.nonpersistentWeight id h sig > 0)
+      (h_key : ∀ (h_r : election.epoch.registry.valid_poolid poolId),
+                 (election.epoch.registry.lookupRegistration poolId h_r).pool.mvk = BLS.Spec.SkToPk sk)
+    : vote.Checked election :=
+    by
+      unfold makeVote at h_some
+      match h_elig : checkEligibility election poolId with
+      | Eligibility.is_persistent index h_idx =>
+        rw [h_elig] at h_some
+        simp only [Option.some.injEq] at h_some
+        rw [← h_some]
+        apply check_make_persistent_vote
+        · apply h_seats_p
+        · have h_eq : election.epoch.fa.stakes.lookupPoolId index h_s = poolId := sorry
+          simp_all
+      | Eligibility.is_nonpersistent h_id =>
+        rw [h_elig] at h_some
+        simp only [Option.some.injEq] at h_some
+        rw [← h_some]
+        apply check_make_nonpersistent_vote
+        · apply h_seats_n
+        · apply h_key
+      | Eligibility.none =>
+        rw [h_elig] at h_some
+        contradiction
+
 end Vote
 
 
