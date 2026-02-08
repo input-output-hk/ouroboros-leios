@@ -226,12 +226,14 @@ namespace Vote
       ⟩
 
   def makeVote (election : Election) (poolId : PoolKeyHash) (sk : BLS.SecretKey) : Option Vote :=
-    match checkEligibility election poolId with
-    | Eligibility.is_persistent index h =>
-        some (makePersistentVote election index sk h)
-    | Eligibility.is_nonpersistent h =>
-        some (makeNonpersistentVote election poolId sk h)
-    | Eligibility.none =>
+    match election.isEligible poolId with
+    | Election.Eligible.IsPersistent h =>
+        let fa := election.epoch.fa
+        let poolIndex : PoolIndex := fa.stakes.lookupPoolIndex poolId h.valid₁
+        some $ makePersistentVote election poolIndex sk h.valid₂
+    | Election.Eligible.IsNonpersistent h =>
+        some $ makeNonpersistentVote election poolId sk h
+    | Election.Eligible.NotElibible =>
         none
 
   theorem check_make_vote''

@@ -84,6 +84,54 @@ namespace Election
     let eid := election.electionId.toByteArray
     eid ++ election.epoch.nonce.toByteArray
 
+  inductive Eligible (election : Election) (poolId : PoolKeyHash) where
+  | IsPersistent (h : election.epoch.fa.valid_persistent_poolid poolId) : Eligible election poolId
+  | IsNonpersistent (h : election.epoch.fa.valid_nonpersistent_poolid poolId) : Eligible election poolId
+  | NotElibible : Eligible election poolId
+
+  def isEligible (election : Election) (poolId : PoolKeyHash) : Eligible election poolId :=
+    let fa := election.epoch.fa
+    let stakes := fa.stakes
+    let pools := stakes.pools
+    let poolIds := pools.map Prod.fst
+    let test (entry : PoolKeyHash × Coin) : Bool := entry.fst == poolId
+    let test' (poolId' : PoolKeyHash) : Bool := poolId' == poolId
+    match h_idx : pools.findIdx? test with
+    | some poolIndex =>
+        have h_le : stakes.valid_poolindex poolIndex :=
+          by
+            rw [StakeDistribution.valid_poolindex]
+            rw [List.findIdx?_eq_some_iff_findIdx_eq] at h_idx
+            aesop
+        have h_eq_id : stakes.lookupPoolId poolIndex h_le = poolId :=
+          by
+            rw [StakeDistribution.lookupPoolId]
+            rw [List.findIdx?_eq_some_iff_getElem] at h_idx
+            aesop
+        have valid₁ : stakes.valid_poolid poolId :=
+          by
+            let zw := stakes.poolindex_in_pools poolIndex h_le
+            rw [h_eq_id] at zw
+            simp_all
+        have h_eq_index : fa.stakes.lookupPoolIndex poolId valid₁ = poolIndex :=
+          by
+            simp [StakeDistribution.lookupPoolIndex, lookup₄, lookup₃]
+            aesop
+        if h_persistent : poolIndex < fa.n₁
+          then
+            have valid₂ : fa.valid_persistent_poolindex $ fa.stakes.lookupPoolIndex poolId valid₁ :=
+              by
+                rw [h_eq_index, FaitAccompli.valid_persistent_poolindex]
+                simp_all
+            Eligible.IsPersistent ⟨ valid₁ , valid₂ ⟩
+          else
+            have valid₂ : fa.stakes.lookupPoolIndex poolId valid₁ ≥ fa.n₁ :=
+              by
+                rw [h_eq_index]
+                simp_all
+            Eligible.IsNonpersistent ⟨ valid₁ , valid₂ ⟩
+    | none => Eligible.NotElibible
+
 end Election
 
 

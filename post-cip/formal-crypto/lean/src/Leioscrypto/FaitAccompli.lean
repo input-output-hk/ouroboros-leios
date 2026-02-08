@@ -85,8 +85,11 @@ namespace FaitAccompli
   def valid_persistent_poolindex (fa : FaitAccompli) (poolIndex : PoolIndex) : Prop :=
     poolIndex < fa.n₁
 
+  structure valid_persistent_poolid (fa : FaitAccompli) (poolId : PoolKeyHash) : Prop where
+    valid₁ : fa.stakes.valid_poolid poolId
+    valid₂ : fa.valid_persistent_poolindex $ fa.stakes.lookupPoolIndex poolId valid₁
+
   structure valid_nonpersistent_poolid (fa : FaitAccompli) (poolId : PoolKeyHash) : Prop where
-  --FIXME: Experiment with rewriting this using `∃` and `def` instead of `structure`.
     valid₁ : fa.stakes.valid_poolid poolId
     valid₂ : fa.stakes.lookupPoolIndex poolId valid₁ ≥ fa.n₁
 

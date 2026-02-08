@@ -30,9 +30,9 @@ namespace StakeDistribution
   def lookupPoolIndex (stakes : StakeDistribution) (poolId : PoolKeyHash) (h : stakes.valid_poolid poolId) : PoolIndex :=
     lookup₄ stakes.pools poolId h
 
-  theorem poolindex_in_pools (stakes : StakeDistribution) (poolId : PoolIndex) (h : stakes.valid_poolindex poolId) : lookupPoolId stakes poolId h ∈ stakes.pools.map Prod.fst :=
+  theorem poolindex_in_pools (stakes : StakeDistribution) (poolIndex : PoolIndex) (h : stakes.valid_poolindex poolIndex) : stakes.valid_poolid (lookupPoolId stakes poolIndex h) :=
     by
-      let poolId := stakes.lookupPoolId poolId h
+      let poolId := stakes.lookupPoolId poolIndex h
       rw [lookupPoolId]
       apply List.mem_map_of_mem
       apply List.get_mem
