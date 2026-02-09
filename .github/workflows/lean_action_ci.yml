@@ -26,8 +26,19 @@ jobs:
     if: true
     runs-on: ubuntu-latest
     steps:
+      - name: Install Elan
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
+          echo "$HOME/.elan/bin" >> $GITHUB_PATH
+      - name: Build ProofWidgets
+        run: |
+          npm --version
+          cd post-cip/formal-crypto/lean
+          lake update
+          cd .lake/packages/proofwidgets
+          lake build
       - uses: actions/checkout@v4
       - uses: leanprover/lean-action@v1
         with:
           lake-package-directory: post-cip/formal-crypto/lean
-          use-github-cache: false
+          use-github-cache: true
