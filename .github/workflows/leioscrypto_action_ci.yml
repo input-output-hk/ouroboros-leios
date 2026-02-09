@@ -11,7 +11,11 @@ on:
       - "post-cip/formal-crypto/lean/**"
 
 jobs:
-  build:
+  - name: Install ProofWidgets NPM dependencies
+    run: |
+      cd .lake/packages/proofwidgets/widget
+      npm clean-install
+  - name: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
