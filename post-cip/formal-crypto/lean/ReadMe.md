@@ -3,25 +3,110 @@
 See [the read-me in the parent folder](../ReadMe.md) for context and further references.
 
 
+## Status
+
+This formal specification is a **non-normative** attempt to disambiguate and clarify concepts and relationships in [the original normative specifications](../ReadMe.md).
+
+
 ## Type relationships
 
 ```mermaid
 classDiagram
-    Certificate "1" --> "*" Vote : contains
-    
+    %% --- Core Election Structures ---
+    class Election {
+        +Epoch epoch
+        +Slot slot
+        +ElectionId electionId
+        +BlockHash ebHash
+    }
+
+    class Epoch {
+        +LeiosParameters protocol
+        +Registry registry
+        +Nat number
+        +StakeDistribution stakes
+        +SlotRange slot_range
+        +PraosNonce nonce
+        +FaitAccompli fa
+    }
+
+    class LeiosParameters {
+        +Rat τ
+        +Nat n
+    }
+
+    class FaitAccompli {
+        +StakeDistribution stakes
+        +Nat seats
+        +Rat ρStar
+        +Nat n₁
+        +Nat n₂
+    }
+
+    %% --- Identity and Stakes ---
+    class StakeDistribution {
+        +List~PoolKeyHash, Coin~ pools
+    }
+
+    class Registry {
+        %% Registry is defined as List Registration
+        +List~Registration~ entries
+    }
+
+    class Registration {
+        +Pool pool
+        +Nat issueCounter
+        +ColdKeySignature signature
+    }
+
+    class Pool {
+        +PoolKeyHash poolId
+        +PublicKey mvk
+        +ProofOfPossession μ
+    }
+
+    %% --- Certificates and Votes ---
     class Certificate {
         +ElectionId electionId
         +BlockHash ebHash
         +List~PoolIndex~ persistentVotes
-        +List~NonpersistentEntry~ nonpersistentVotes
+        +List~PoolKeyHash, Signature~ nonpersistentVotes
+        +Option~Signature~ σ_tilde_eid
         +Signature σ_tilde_m
     }
-    
+
     class Vote {
-        +ElectionId electionId
-        +PoolKeyHash voterId
-        +Signature σ_m
+        <<Inductive>>
+        +PersistentVote(ElectionId, PoolIndex, BlockHash, Signature)
+        +NonpersistentVote(ElectionId, PoolKeyHash, Signature, BlockHash, Signature)
     }
+
+    class Eligible {
+        <<Inductive>>
+        +IsPersistent(Proof)
+        +IsNonpersistent(Proof)
+        +NotEligible
+    }
+
+    %% --- Relationships ---
+    Election *-- Epoch
+    Epoch *-- LeiosParameters
+    Epoch *-- Registry
+    Epoch *-- StakeDistribution
+    Epoch *-- FaitAccompli
+    
+    %% FaitAccompli references the same stake distribution
+    FaitAccompli --> StakeDistribution 
+    
+    Registry o-- Registration
+    Registration *-- Pool
+    
+    %% Conceptual Links
+    Certificate --> Election : validates
+    Certificate ..> Vote : aggregates (conceptual)
+    
+    Vote --> Election : targets
+    Eligible --> Election : predicate on
 ```
 
 
