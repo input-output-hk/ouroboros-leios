@@ -82,4 +82,4 @@ In addition to informing research and networking experts, memory pool modeling a
 
 ### Stretch goals (uncommitted)
 
-- [ ] Simulator that is approximately faithful to the node's p2p network logic.
+- [x] Simulator that is approximately faithful to the node's p2p network logic.

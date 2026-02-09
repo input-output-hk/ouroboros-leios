@@ -50,6 +50,17 @@ In terms of probability distributions, the total weight is $`\rho_1 + \rho_{i^*}
       2. (optimistic liveness) The downward pressure on $`\tau`$ comes from the fact that an adversary controlling more than $`1-\tau`$ weight on the committee can halt certificate creation by just abstaining. This "only" prevents the optimistic path of the protocol, and so it is acceptable to only protect from weaker adversaries here. In particular, one way to parametrize is to first set $`\tau`$ based on the safety requirement above, and then compute the threshold $`\alpha`$ (this will be $`<1/4`$) such that if the corruption in the population is below $`\alpha`$ then except with negligible probability (say admitting the same error as allowed in the safety case) the adversary will not have enough weight on the committee for the abstain attack.
 	- In Leios, $`\tau`$ should be chosen so that there is a vanishingly small probability that <50% adversarial stake could obtain a quorum or veto an otherwise honest quorum.
 
+## Opportunities for parallelization
+
+1. The BLS signatures of votes can be verified as soon as they are received.
+2. The aggregate BLS signature on the block-hash message can be incrementally updated as soon as a vote is newly received. The BLS group operations allow aggregation in any order.
+3. Similarly, the aggregate BLS public key can be incrementally updated as soon as a vote is newly received.
+4. The non-persistent voter eligibility check can be performed in parallel with the verification of the two BLS signatures in the vote.
+5. The eligibility checks of the BLS signatures in a certificate can be performed in parallel with each other and with the aggregate signature verifications.
+6. The two aggregate signatures in a signature can be checked in parallel.
+7. Unfortunately, the aggregate eligibility public key and signature cannot start to be computed until all of the signatures have been received.
+8. The construction of aggregate keys and signatures can be done in parallel using a tree of depth logarithmic in the number of updates.
+
 ## Numerical example
 
 Consider the stake distribution of Epoch 535 of Cardano mainnet and vary the committee size $`n`$. The table below[^1] shows that . . .
@@ -71,5 +82,9 @@ Consider the stake distribution of Epoch 535 of Cardano mainnet and vary the com
 |           1000 |              903 |         0.9864321 |                       0.0013776087 |                0.007553248 |
 |           1100 |             1007 |         0.9921898 |                       0.0008098848 |                0.004283038 |
 |           1200 |             1107 |         0.9954256 |                       0.0004743450 |                0.002508552 |
+
+## Non-normative formal specification
+
+See [formal/crypto/](./formal/crypto/ReadMe.md) for a *non-normative, draft* formal specification of Leios cryptography.
 
 [^1]: See [this Jupyter notebook](./weighted-fait-accompli.ipynb) for details of the computations.
