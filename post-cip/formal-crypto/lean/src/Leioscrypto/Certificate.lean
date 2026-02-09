@@ -2,6 +2,7 @@
 import Leioscrypto.BLS
 import Leioscrypto.Contexts
 import Leioscrypto.Types
+import Leioscrypto.Vote
 
 
 namespace Leioscrypto
@@ -89,7 +90,24 @@ namespace Certificate
     valid : cert.Valid election
     authentic : cert.Authentic election valid
 
-  -- TODO: Create a valid certificate.
+  def makeCertificate
+      (election : Election)
+      (votes : List Vote)
+    : Option Certificate :=
+    -- FIXME: Needs implementation.
+    sorry
+
+  theorem check_make_certificate
+      (election : Election)
+      (votes : List Vote)
+      (checked_votes : ∀vote ∈ votes, vote.Checked election)
+      (unique_voters : (votes.map Vote.voter).Nodup)
+      (cert : Certificate)
+      (h_some : makeCertificate election votes = some cert)
+      (h_checked : ∀ vote ∈ votes, vote.Checked election)
+    : cert.Checked election :=
+    -- FIXME: Needs proof.
+    sorry
 
 end Certificate
 

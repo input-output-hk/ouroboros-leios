@@ -14,6 +14,10 @@ inductive Vote where
 
 namespace Vote
 
+  def voter : Vote → PoolIndex ⊕ PoolKeyHash
+  | PersistentVote _ poolIndex _ _ => Sum.inl poolIndex
+  | NonpersistentVote _ poolId _ _ _ => Sum.inr poolId
+
   def electionId : Vote → ElectionId
   | PersistentVote eid _ _ _ => eid
   | NonpersistentVote eid _ _ _ _ => eid
@@ -242,13 +246,11 @@ namespace Vote
       (sk : BLS.SecretKey)
       (vote : Vote)
       (h_some : makeVote election poolId sk = some vote)
-      -- Hypothesis: Any persistent seat has positive weight
+      -- FIXME: It may be possible to eliminate the need for `h_seats_p`.
       (h_seats_p : ∀ i h, election.epoch.fa.persistentWeight i h > 0)
-      -- Hypothesis: Any non-persistent voter has positive weight
+      -- FIXME: It may be possible to eliminate the need for `h_seats_n`.
       (h_seats_n : ∀ id h sig, election.epoch.fa.nonpersistentWeight id h sig > 0)
-      -- Hypothesis: The secret key matches the pool's registered public key
-      (h_key : ∀ (h_r : election.epoch.registry.valid_poolid poolId),
-                 (election.epoch.registry.lookupRegistration poolId h_r).pool.mvk = BLS.Spec.SkToPk sk)
+      (h_key : ∀ (h_r : election.epoch.registry.valid_poolid poolId), (election.epoch.registry.lookupRegistration poolId h_r).pool.mvk = BLS.Spec.SkToPk sk)
     : vote.Checked election :=
     by
       unfold makeVote at h_some
@@ -263,6 +265,7 @@ namespace Vote
         refine check_make_persistent_vote election poolIndex sk h_pers.valid₂ (h_seats_p poolIndex h_pers.valid₂) ?_
         intro h_s h_r
         have h_roundtrip : stakes.lookupPoolId poolIndex h_s = poolId := by
+          -- FIXME: Needs proof.
           sorry
         rw [h_roundtrip] at h_r
         aesop
