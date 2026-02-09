@@ -6,6 +6,7 @@ pkgs.mkShell {
   buildInputs = with pkgs; [
     lean4
     elan
+    nodejs_24
     vscode
   ];
   shellHook = ''
