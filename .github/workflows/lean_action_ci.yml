@@ -15,7 +15,7 @@ on:
 jobs:
 
   markov-simulator:
-    if: false
+    if: true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,4 +32,5 @@ jobs:
       - uses: leanprover/lean-action@v1
         with:
           lake-package-directory: post-cip/formal-crypto/lean
+          use-mathlib-cache: false
           use-github-cache: false
