@@ -26,7 +26,7 @@ structure Certificate where
   /-- Aggregate signature on the votes. -/
   σ_tilde_eid : Option BLS.Signature
   /-- Aggregate signature on the eligibility. -/
-  σ_tilde_m : BLS.Signature
+  σ_tilde_m : BLS.Signature -- NOTE: This is not included in the Leios CIP CDDL, but (arguably) improves efficiency.
 
 namespace Certificate
 

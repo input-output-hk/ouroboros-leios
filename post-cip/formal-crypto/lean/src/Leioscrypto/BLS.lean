@@ -8,8 +8,10 @@ namespace Leioscrypto.BLS
 
 namespace Spec
 
+  -- NOTE: This differs from the IETF draft that is implemented in `cardano-base`.
+
   /-- Scalars for G1 and G2. -/
-  def Scalar := Vector UInt8 256
+  def Scalar := Vector UInt8 255
   deriving Inhabited
 
   /-- Compressed representation of G1. -/
