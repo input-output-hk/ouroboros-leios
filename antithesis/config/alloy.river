@@ -1,0 +1,53 @@
+// Alloy configuration for collecting logs from Leios nodes
+
+// Discover log files
+local.file_match "logs" {
+  path_targets = [
+    {__path__ = "/logs/*.log", job = "leios-nodes"},
+  ]
+}
+
+// Read log files
+loki.source.file "logs" {
+  targets    = local.file_match.logs.targets
+  forward_to = [loki.process.logs.receiver]
+}
+
+// Process logs - extract node name from filename
+loki.process "logs" {
+  forward_to = [loki.write.loki.receiver]
+
+  stage.regex {
+    expression = "(?P<filename>[^/]+)\\.log$"
+    source     = "filename"
+  }
+
+  stage.labels {
+    values = {
+      node = "filename",
+    }
+  }
+
+  // Parse JSON logs if present
+  stage.json {
+    expressions = {
+      level   = "level",
+      message = "msg",
+      slot    = "slot",
+      block   = "block",
+    }
+  }
+
+  stage.labels {
+    values = {
+      level = "",
+    }
+  }
+}
+
+// Send to Loki
+loki.write "loki" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
