@@ -84,10 +84,16 @@ namespace Election
     let eid := election.electionId.toByteArray
     eid ++ election.epoch.nonce.toByteArray
 
-  inductive Eligible (election : Election) (poolId : PoolKeyHash) where
-  | IsPersistent (h : election.epoch.fa.valid_persistent_poolid poolId) : Eligible election poolId
-  | IsNonpersistent (h : election.epoch.fa.valid_nonpersistent_poolid poolId) : Eligible election poolId
-  | NotElibible : Eligible election poolId
+end Election
+
+
+inductive Eligible (election : Election) (poolId : PoolKeyHash) where
+| IsPersistent (h : election.epoch.fa.valid_persistent_poolid poolId) : Eligible election poolId
+| IsNonpersistent (h : election.epoch.fa.valid_nonpersistent_poolid poolId) : Eligible election poolId
+| NotElibible : Eligible election poolId
+
+
+namespace Election
 
   def isEligible (election : Election) (poolId : PoolKeyHash) : Eligible election poolId :=
     let fa := election.epoch.fa

@@ -40,7 +40,6 @@ def lookup₃ {α : Type} [BEq α] [LawfulBEq α] {β : Type} (p : β → α) (x
 def lookup₄ {α : Type} [BEq α] [LawfulBEq α] {β : Type} (kvs : List (α × β)) (k : α) (h : k ∈ kvs.map Prod.fst) : Nat :=
   lookup₃ Prod.fst kvs k h
 
-
 theorem length_takeWhile_le {α : Type} (xs : List α) (test : α → Bool) :
   (xs.takeWhile test).length ≤ xs.length := by
   induction xs with
