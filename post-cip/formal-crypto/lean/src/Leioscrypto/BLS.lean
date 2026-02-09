@@ -161,5 +161,25 @@ def BSig (σs : List Signature) : Signature :=
     $ σs.zip
     $ List.range σs.length
 
+-- FIXME: Needs review.
+axiom verify_aggregate_signatures
+    (keys : List PublicKey)
+    (sigs : List Signature)
+    (msg : ByteArray)
+    (h_len : keys.length = sigs.length)
+    (h_valid : ∀ i (h : i < keys.length),
+    Ver (keys.get ⟨i, h⟩) msg (sigs.get ⟨i, by rw [←h_len]; exact h⟩))
+  : Ver (AKey keys) msg (ASig sigs)
+
+-- FIXME: Needs review.
+axiom verify_eligibility_aggregate
+    (keys : List PublicKey)
+    (sigs : List Signature)
+    (msg : ByteArray)
+    (h_len : keys.length = sigs.length)
+    (h_valid : ∀ i (h : i < keys.length),
+       Ver (keys.get ⟨i, h⟩) msg (sigs.get ⟨i, by rw [←h_len]; exact h⟩))
+  : Ver (BKey keys sigs) msg (BSig sigs)
+
 
 end Leioscrypto.BLS
