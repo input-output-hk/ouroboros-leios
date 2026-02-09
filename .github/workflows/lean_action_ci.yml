@@ -13,7 +13,8 @@ on:
       - "post-cip/formal-crypto/lean/**"
 
 jobs:
-  - name: Markov simulator
+
+  markov-simulator:
     if: false
     runs-on: ubuntu-latest
     steps:
@@ -22,10 +23,12 @@ jobs:
         with:
           lake-package-directory: analysis/markov
           use-github-cache: true
-  - name: Formal spec for sortition, voting, certificates
+
+  leioscrypto-spec:
     if: true
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - name: Install Elan
         run: |
           curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
@@ -37,7 +40,6 @@ jobs:
           lake update
           cd .lake/packages/proofwidgets
           lake build
-      - uses: actions/checkout@v4
       - uses: leanprover/lean-action@v1
         with:
           lake-package-directory: post-cip/formal-crypto/lean

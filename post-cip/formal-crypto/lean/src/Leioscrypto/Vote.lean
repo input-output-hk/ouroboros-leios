@@ -260,59 +260,6 @@ namespace Vote
         authentic_make_nonpersistent_vote election poolId secret h_id h_val h_seats h_key
       ⟩
 
-  /-- Create a vote, if possible. -/
-  def makeVote (election : Election) (poolId : PoolKeyHash) (sk : BLS.SecretKey) : Option Vote :=
-    match election.isEligible poolId with
-    | Eligible.IsPersistent h =>
-        let fa := election.epoch.fa
-        let poolIndex : PoolIndex := fa.stakes.lookupPoolIndex poolId h.valid₁
-        some $ makePersistentVote election poolIndex sk h.valid₂
-    | Eligible.IsNonpersistent h =>
-        some $ makeNonpersistentVote election poolId sk h
-    | Eligible.NotElibible =>
-        none
-
-  /-- A created vote is checked. -/
-  theorem check_make_vote
-      (election : Election)
-      (poolId : PoolKeyHash)
-      (sk : BLS.SecretKey)
-      (vote : Vote)
-      (h_some : makeVote election poolId sk = some vote)
-      -- FIXME: It may be possible to eliminate the need for `h_seats_p`.
-      (h_seats_p : ∀ i h, election.epoch.fa.persistentWeight i h > 0)
-      -- FIXME: It may be possible to eliminate the need for `h_seats_n`.
-      (h_seats_n : ∀ id h sig, election.epoch.fa.nonpersistentWeight id h sig > 0)
-      (h_key : ∀ (h_r : election.epoch.registry.valid_poolid poolId), (election.epoch.registry.lookupRegistration poolId h_r).pool.mvk = BLS.Spec.SkToPk sk)
-    : vote.Checked election :=
-    by
-      unfold makeVote at h_some
-      match h_elig : election.isEligible poolId with
-      | Eligible.IsPersistent h_pers =>
-        simp only [h_elig] at h_some
-        simp only [Option.some.injEq] at h_some
-        rw [← h_some]
-        let fa := election.epoch.fa
-        let stakes := fa.stakes
-        let poolIndex := stakes.lookupPoolIndex poolId h_pers.valid₁
-        refine check_make_persistent_vote election poolIndex sk h_pers.valid₂ (h_seats_p poolIndex h_pers.valid₂) ?_
-        intro h_s h_r
-        have h_roundtrip : stakes.lookupPoolId poolIndex h_s = poolId := by
-          -- FIXME: Needs proof.
-          sorry
-        rw [h_roundtrip] at h_r
-        aesop
-      | Eligible.IsNonpersistent h_non =>
-        simp only [h_elig] at h_some
-        simp only [Option.some.injEq] at h_some
-        rw [← h_some]
-        refine check_make_nonpersistent_vote election poolId sk h_non ?_ ?_
-        · apply h_seats_n
-        · apply h_key
-      | Eligible.NotElibible =>
-        simp only [h_elig] at h_some
-        contradiction
-
 end Vote
 
 
