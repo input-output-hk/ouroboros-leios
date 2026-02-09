@@ -8,6 +8,11 @@ open LSpec
 open Leioscrypto (comparePoisson)
 
 
+/-!
+Property-based tests for Leios cryptography.
+-/
+
+-- Property-based tests are provided here for the rational representation of the Poisson distribution because theorems were not proved for it.
 section
 
 structure TestCase where

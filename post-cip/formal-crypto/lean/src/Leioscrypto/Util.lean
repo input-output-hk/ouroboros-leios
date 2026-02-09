@@ -1,7 +1,13 @@
 
+/-!
+Miscellaneous functions and theorems.
+-/
+
+
 namespace Leioscrypto
 
 
+/-- Look up using a filter. -/
 def lookup₀ {α : Type} [BEq α] [LawfulBEq α] {β : Type} (p : β → α) (xs : List β) (k : α) (h : k ∈ xs.map p) : β :=
   let test (k' : β) : Bool := p k' == k
   match h_find : xs.find? test with
@@ -18,9 +24,11 @@ def lookup₀ {α : Type} [BEq α] [LawfulBEq α] {β : Type} (p : β → α) (x
           simp at h_find
       impossible.elim
 
+/-- Look up by key in an association list. -/
 def lookup₁ {α : Type} [BEq α] [LawfulBEq α] {β : Type} (kvs : List (α × β)) (k : α) (h : k ∈ kvs.map Prod.fst) : β :=
   Prod.snd $ lookup₀ Prod.fst kvs k h
 
+/-- Look up an index using a filter. -/
 def lookup₃ {α : Type} [BEq α] [LawfulBEq α] {β : Type} (p : β → α) (xs : List β) (k : α) (h : k ∈ xs.map p) : Nat :=
   let test (k' : β) : Bool := p k' == k
   match h_find : xs.findIdx? test with
@@ -37,9 +45,11 @@ def lookup₃ {α : Type} [BEq α] [LawfulBEq α] {β : Type} (p : β → α) (x
           simp at h_find
       impossible.elim
 
+/-- Look up an index in an association list. -/
 def lookup₄ {α : Type} [BEq α] [LawfulBEq α] {β : Type} (kvs : List (α × β)) (k : α) (h : k ∈ kvs.map Prod.fst) : Nat :=
   lookup₃ Prod.fst kvs k h
 
+/-- Taking items from a list is not longer than the original list. -/
 theorem length_takeWhile_le {α : Type} (xs : List α) (test : α → Bool) :
   (xs.takeWhile test).length ≤ xs.length := by
   induction xs with

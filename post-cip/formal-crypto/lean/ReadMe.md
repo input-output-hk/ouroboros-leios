@@ -1,4 +1,4 @@
-# Non-normative formal specifications for Leios sortition, votes, and certificates in Lean4
+# Non-normative formal specification for Leios sortition, votes, and certificates in Lean4
 
 See [the read-me in the parent folder](../ReadMe.md) for context and further references.
 
@@ -6,6 +6,15 @@ See [the read-me in the parent folder](../ReadMe.md) for context and further ref
 ## Status
 
 This formal specification is a **non-normative** attempt to disambiguate and clarify concepts and relationships in [the original normative specifications](../ReadMe.md).
+
+Future potential development:
+
+- [ ] Refactor constraint structure for improved clarity.
+- [ ] Add hyperlinks to normative specifications.
+- [ ] Simplify proofs.
+- [ ] Separate lemmas from larger proofs.
+- [ ] Minimize use of `simp`, `omega`, and `aesop` tactics in proofs.
+- [ ] Translate into Agda.
 
 
 ## Type relationships

@@ -5,32 +5,54 @@ import Leioscrypto.Types
 import Leioscrypto.Vote
 
 
+/-!
+Leios certificates.
+-/
+
+
 namespace Leioscrypto
 
 
+/-- Leios certificate. -/
 structure Certificate where
+  /-- The election identifier. -/
   electionId : ElectionId
+  /-- The hash of the EB being certified. -/
   ebHash : BlockHash
+  /-- List of persistent voters. -/
   persistentVotes : List PoolIndex
+  /-- List of non-persistent voters and their eligibility proof. -/
   nonpersistentVotes : List (PoolKeyHash × BLS.Signature)
+  /-- Aggregate signature on the votes. -/
   σ_tilde_eid : Option BLS.Signature
+  /-- Aggregate signature on the eligibility. -/
   σ_tilde_m : BLS.Signature
 
 namespace Certificate
 
+  /-- A well-formed certificate contains valid BLS points. -/
   structure WellFormed (cert : Certificate) : Prop where
     wf_σ_tilde_eid : cert.σ_tilde_eid.elim True BLS.Signature.WellFormed
     wf_σ_tilde_m : cert.σ_tilde_m.WellFormed
 
+  /-- A valid certificate is constistent with its corresponding election. -/
   structure Valid (cert : Certificate) (election : Election) : Prop where
+    /-- The certificate is for the correct election. -/
     correct_election : cert.electionId = election.electionId
+    /-- The certificate is for the correct EB hash. -/
     correct_ebhash : cert.ebHash = election.ebHash
+    /-- Persistent voters vote no more than once. -/
     unique_persistent_voters : cert.persistentVotes.Nodup
+    /-- Non-persistent voters vote no more than once. -/
     unique_nonpersistent_voters : (cert.nonpersistentVotes.map Prod.fst).Nodup
+    /-- Persistent voters have valid indices into the epoch stake distribution. -/
     valid_persistent_ids : ∀ poolIndex ∈ cert.persistentVotes, election.epoch.valid_index poolIndex
+    /-- Persistent voters are indeed persistent in the epoch. -/
     valid_persistent_voters : ∀ poolIndex ∈ cert.persistentVotes, election.epoch.fa.valid_persistent_poolindex poolIndex
+    /-- Non-persistent voters are indeed non-persistent in the epoch. -/
     valid_nonpersistent_candidates : ∀ poolId ∈ cert.nonpersistentVotes.map Prod.fst, election.epoch.fa.valid_nonpersistent_poolid poolId
 
+  /-- An authentic certificate passes cryptographic verification. -/
   def Authentic (cert : Certificate) (election : Election) (valid : cert.Valid election) : Prop :=
     let epoch := election.epoch
     let registry := epoch.registry
@@ -85,11 +107,13 @@ namespace Certificate
     -- Final constraints.
     ver_σ_tilde_eid ∧ ver_σ_tilde_m ∧ has_quorum
 
+  /-- A checked certificate is well-formed, valid, and authentic. -/
   structure Checked (cert : Certificate) (election : Election) where
     wf : cert.WellFormed
     valid : cert.Valid election
     authentic : cert.Authentic election valid
 
+  /-- Create a certificate. -/
   def makeCertificate
       (election : Election)
       (votes : List Vote)
@@ -97,6 +121,7 @@ namespace Certificate
     -- FIXME: Needs implementation.
     sorry
 
+  /-- Created certificates are also well-formed, valid, and authentic. -/
   theorem check_make_certificate
       (election : Election)
       (votes : List Vote)
