@@ -61,6 +61,12 @@ In terms of probability distributions, the total weight is $`\rho_1 + \rho_{i^*}
 7. Unfortunately, the aggregate eligibility public key and signature cannot start to be computed until all of the signatures have been received.
 8. The construction of aggregate keys and signatures can be done in parallel using a tree of depth logarithmic in the number of updates.
 
+## Opportunities for pre-computation
+
+1. Once the stake distribution of the epoch is known, the list of persistent voters and non-persistent potential voters can be constructed.
+2. Similarly, the potential weights of all voters need only be computed once per epoch.
+3. Moreover, for non-persistent candidate voters, the numeric thresholds for their having 0, 1, 2, 3, . . . seats in an election can be precomputed and cached. This reduces the per-election eligibility check to a simple table lookup once the voter's VRF is known for a particular election.
+
 ## Numerical example
 
 Consider the stake distribution of Epoch 535 of Cardano mainnet and vary the committee size $`n`$. The table below[^1] shows that . . .
