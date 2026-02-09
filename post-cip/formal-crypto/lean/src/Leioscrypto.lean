@@ -7,6 +7,11 @@ import Leioscrypto.Registration
 import Leioscrypto.StakeDistribution
 import Leioscrypto.Types
 import Leioscrypto.Vote
+import Mathlib.Tactic.Linter
+
+
+#lint
+
 
 /-!
 # Leioscrypto: formalization of Leios cryptography.

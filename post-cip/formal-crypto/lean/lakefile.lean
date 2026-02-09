@@ -2,6 +2,15 @@ import Lake
 
 open Lake DSL
 
+abbrev linter : Array LeanOption := #[
+    ⟨`linter.longLine, true⟩,
+--  (`linter.style.multiGoal, true),
+--  (`linter.textBased.trailingWhitespace, true),
+--  (`linter.defLemma, true),
+    ⟨`linter.missingEnd, true⟩,
+    ⟨`linter.setOption, true⟩
+]
+
 package «leioscrypto» where
   version := StdVer.mk (SemVerCore.mk 0 1 0) ""
   testDriver := "leioscrypto_test"
@@ -12,7 +21,7 @@ package «leioscrypto» where
     ⟨`autoImplicit, false⟩,
     -- suppresses the checkBinderAnnotations error/warning
     ⟨`checkBinderAnnotations, false⟩,
-  ]
+  ] ++ linter.map fun s ↦ { s with name := `weak ++ s.name }
   moreServerOptions := #[
     ⟨`trace.debug, true⟩,
   ]

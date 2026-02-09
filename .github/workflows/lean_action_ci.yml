@@ -25,7 +25,7 @@ jobs:
           use-github-cache: true
 
   leioscrypto-spec:
-    if: true
+    if: false  # Turn off because the `proofwidgets` dependency fails to build due to an `npm` dependency.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
