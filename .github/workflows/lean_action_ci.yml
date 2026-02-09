@@ -4,17 +4,30 @@ on:
   pull_request:
     paths:
       - "analysis/markov/**"
+      - "post-cip/formal-crypto/lean/**"
   push:
     branches:
       - main
     paths:
       - "analysis/markov/**"
+      - "post-cip/formal-crypto/lean/**"
 
 jobs:
-  build:
+  - name: Markov simulator
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: leanprover/lean-action@v1
         with:
           lake-package-directory: analysis/markov
+          use-github-cache: true
+  - name: Formal spec for sortition, voting, certificates
+    if: true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: post-cip/formal-crypto/lean
+          use-github-cache: false
