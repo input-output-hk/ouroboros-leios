@@ -29,9 +29,7 @@ require mathlib from git
   "https://github.com/leanprover-community/mathlib4" @ "v4.25.0"
 
 require LSpec from git
-  "https://github.com/argumentcomputer/LSpec" @ "fdf848d6cda9f080a09e49e760e2d6f70878800b"
+  "https://github.com/argumentcomputer/LSpec" @ "b05e6b83798bce0887eb5001cb10fdcbe675dde3"
 
-/-
-require aesop from git
-  "https://github.com/leanprover-community/aesop" @ "v4.25.0"
--/
+require «doc-gen4» from git
+  "https://github.com/leanprover/doc-gen4" @ "v4.25.0"
