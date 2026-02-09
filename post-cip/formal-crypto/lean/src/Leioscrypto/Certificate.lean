@@ -52,13 +52,12 @@ namespace Certificate
     /-- Non-persistent voters are indeed non-persistent in the epoch. -/
     valid_nonpersistent_candidates : ∀ poolId ∈ cert.nonpersistentVotes.map Prod.fst, election.epoch.fa.valid_nonpersistent_poolid poolId
 
-  /-- An authentic certificate passes cryptographic verification. -/
-  def Authentic (cert : Certificate) (election : Election) (valid : cert.Valid election) : Prop :=
+  /-- Compute the aggregate public keys. -/
+  private def aggregatePublicKeys (cert : Certificate) (election : Election) (valid : cert.Valid election) : BLS.PublicKey × BLS.PublicKey :=
     let epoch := election.epoch
     let registry := epoch.registry
     let fa := epoch.fa
     let stakes := fa.stakes
-    -- Public keys.
     let persistentKeys : List BLS.PublicKey :=
       cert.persistentVotes.attach.map
         fun ⟨ poolIndex , h₁ ⟩ ↦
@@ -82,13 +81,20 @@ namespace Certificate
           let reg := registry.lookupRegistration poolId validId
           reg.pool.mvk
     let keys : List BLS.PublicKey := persistentKeys ++ nonpersistentKeys
+    let σ_eid : List BLS.Signature := cert.nonpersistentVotes.map Prod.snd
+    ⟨ BLS.AKey keys , BLS.BKey nonpersistentKeys σ_eid ⟩
+
+  /-- An authentic certificate passes cryptographic verification. -/
+  def Authentic (cert : Certificate) (election : Election) (valid : cert.Valid election) : Prop :=
+    let epoch := election.epoch
+    let fa := epoch.fa
+    let stakes := fa.stakes
+    let ⟨ akey , bkey ⟩ := cert.aggregatePublicKeys election valid
     -- Verify signature on eligibility.
     let σ_eid : List BLS.Signature := cert.nonpersistentVotes.map Prod.snd
-    let bkey : BLS.PublicKey := BLS.BKey nonpersistentKeys σ_eid
     let bsig : BLS.Signature := BLS.BSig σ_eid
     let ver_σ_tilde_eid : Prop := BLS.Ver bkey election.eligibilityMessage bsig
     -- Verify signature on block.
-    let akey : BLS.PublicKey := BLS.AKey keys
     let ver_σ_tilde_m : Prop := BLS.Ver akey election.blockMessage cert.σ_tilde_m
     -- Quorum computation.
     let persistentWeight : Rat :=
@@ -119,6 +125,7 @@ namespace Certificate
       (votes : List Vote)
     : Option Certificate :=
     -- FIXME: Needs implementation.
+    let persistentVotes := votes.filter Vote.isPersistent
     sorry
 
   /-- Created certificates are also well-formed, valid, and authentic. -/

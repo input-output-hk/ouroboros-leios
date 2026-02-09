@@ -47,6 +47,16 @@ namespace Vote
   | PersistentVote _ _ _ sig => sig
   | NonpersistentVote _ _ _ _ sig => sig
 
+  /-- Is a vote persistent? -/
+  def isPersistent : Vote → Bool
+  | PersistentVote _ _ _ _ => true
+  | _ => false
+
+  /-- Is a vote non- persistent? -/
+  def isNonpersistent : Vote → Bool
+  | NonpersistentVote __ _ _ _ _ => true
+  | _ => false
+
   /-- A vote has valid BLS points.-/
   structure WellFormed (vote : Vote) : Prop where
     wf_σ_eid : vote.σ_eid.elim True BLS.Signature.WellFormed
