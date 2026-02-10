@@ -46,6 +46,13 @@ class Metrics:
 
 def parse_timestamp(ts_str: str) -> Optional[datetime]:
     """Parse various timestamp formats from logs."""
+    # Handle nanosecond precision by truncating to microseconds
+    # e.g., "2026-02-10T16:43:28.304578293Z" -> "2026-02-10T16:43:28.304578Z"
+    if '.' in ts_str and ts_str.endswith('Z'):
+        parts = ts_str[:-1].split('.')
+        if len(parts) == 2 and len(parts[1]) > 6:
+            ts_str = parts[0] + '.' + parts[1][:6] + 'Z'
+
     formats = [
         "%Y-%m-%dT%H:%M:%S.%fZ",
         "%Y-%m-%dT%H:%M:%SZ",
@@ -69,54 +76,99 @@ def parse_log_line(line: str, node_name: str) -> Optional[BlockEvent]:
         if not ts:
             return None
 
-        msg = data.get('msg', data.get('message', ''))
+        # Get namespace and nested data
+        ns = data.get('ns', '')
+        event_data = data.get('data', {})
+        msg = data.get('msg', {})
+        if not isinstance(msg, dict):
+            msg = {}
+        if not isinstance(event_data, dict):
+            event_data = {}
 
-        # Praos block events
-        if 'TraceAddBlockEvent' in str(data) or 'AddedToCurrentChain' in msg:
+        # Praos block adopted (cardano-node format)
+        # ns: "ChainDB.AddBlockEvent.AddedToCurrentChain"
+        # data.newtip: "hash@slot"
+        if 'AddedToCurrentChain' in ns:
+            newtip = event_data.get('newtip', '')
+            if '@' in newtip:
+                block_hash, slot_str = newtip.rsplit('@', 1)
+                try:
+                    slot = int(slot_str)
+                except ValueError:
+                    slot = 0
+            else:
+                block_hash = newtip
+                slot = 0
             return BlockEvent(
                 timestamp=ts,
                 node=node_name,
                 event_type='adopted',
-                block_hash=data.get('block', data.get('hash', 'unknown')),
-                slot=data.get('slot', 0),
+                block_hash=block_hash,
+                slot=slot,
+                block_type='praos'
+            )
+
+        # Block fetch completed (received from peer)
+        # ns: "BlockFetch.Client.CompletedBlockFetch"
+        # data.block: "hash"
+        if 'CompletedBlockFetch' in ns:
+            block_hash = event_data.get('block', 'unknown')
+            return BlockEvent(
+                timestamp=ts,
+                node=node_name,
+                event_type='received',
+                block_hash=block_hash,
+                slot=0,
+                block_type='praos'
+            )
+
+        # Upstream MsgBlock send (immdb-server format)
+        # msg.kind: "MsgBlock", msg.blockHash: "hash"
+        if isinstance(msg, dict) and msg.get('kind') == 'MsgBlock':
+            block_hash = msg.get('blockHash', 'unknown')
+            return BlockEvent(
+                timestamp=ts,
+                node=node_name,
+                event_type='created',  # upstream is the source
+                block_hash=block_hash,
+                slot=0,
                 block_type='praos'
             )
 
         # Leios IB events
-        if 'InputBlock' in msg or 'IB' in msg:
-            event_type = 'created' if 'created' in msg.lower() else 'received'
-            return BlockEvent(
-                timestamp=ts,
-                node=node_name,
-                event_type=event_type,
-                block_hash=data.get('hash', 'unknown'),
-                slot=data.get('slot', 0),
-                block_type='ib'
-            )
-
-        # Leios EB events
-        if 'EndorserBlock' in msg or 'EB' in msg:
-            event_type = 'created' if 'created' in msg.lower() else 'received'
-            return BlockEvent(
-                timestamp=ts,
-                node=node_name,
-                event_type=event_type,
-                block_hash=data.get('hash', 'unknown'),
-                slot=data.get('slot', 0),
-                block_type='eb'
-            )
-
-        # Leios vote events
-        if 'Vote' in msg:
-            event_type = 'created' if 'created' in msg.lower() else 'received'
-            return BlockEvent(
-                timestamp=ts,
-                node=node_name,
-                event_type=event_type,
-                block_hash=data.get('hash', 'unknown'),
-                slot=data.get('slot', 0),
-                block_type='vote'
-            )
+        # ns: "Consensus.LeiosKernel" with IB in data
+        if 'LeiosKernel' in ns or 'LeiosPeer' in ns:
+            kind = event_data.get('kind', '')
+            if 'IB' in kind or 'InputBlock' in kind:
+                event_type = 'created' if 'created' in kind.lower() or 'generate' in kind.lower() else 'received'
+                return BlockEvent(
+                    timestamp=ts,
+                    node=node_name,
+                    event_type=event_type,
+                    block_hash=event_data.get('hash', event_data.get('id', 'unknown')),
+                    slot=event_data.get('slot', 0),
+                    block_type='ib'
+                )
+            if 'EB' in kind or 'EndorserBlock' in kind:
+                event_type = 'created' if 'created' in kind.lower() or 'generate' in kind.lower() else 'received'
+                return BlockEvent(
+                    timestamp=ts,
+                    node=node_name,
+                    event_type=event_type,
+                    block_hash=event_data.get('hash', event_data.get('id', 'unknown')),
+                    slot=event_data.get('slot', 0),
+                    block_type='eb'
+                )
+            if 'Vote' in kind:
+                event_type = 'created' if 'created' in kind.lower() or 'generate' in kind.lower() else 'received'
+                return BlockEvent(
+                    timestamp=ts,
+                    node=node_name,
+                    event_type=event_type,
+                    block_hash=event_data.get('hash', event_data.get('id', 'unknown')),
+                    slot=event_data.get('slot', 0),
+                    block_type='vote'
+                )
 
     except json.JSONDecodeError:
         # Try regex patterns for non-JSON logs

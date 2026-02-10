@@ -23,8 +23,10 @@ mkdir -p "$DATA_DIR"
 # Generate leios.db and base schedule using leiosdemo202510
 echo "Generating leios.db and schedule..."
 if [ -f "$CONFIG_DIR/manifest.json" ] && command -v leiosdemo202510 &> /dev/null; then
-    # Clean up any existing database (leiosdemo202510 requires path to not exist)
+    # Clean up any existing files (leiosdemo202510 requires paths to not exist)
     rm -f "$DATA_DIR/leios.db"
+    rm -f "$DATA_DIR/base-schedule.json"
+    rm -f "$DATA_DIR/schedule.json"
 
     leiosdemo202510 generate \
         "$DATA_DIR/leios.db" \
@@ -33,7 +35,8 @@ if [ -f "$CONFIG_DIR/manifest.json" ] && command -v leiosdemo202510 &> /dev/null
     echo "  leios.db and base-schedule.json created"
 
     # Adjust schedule timing (default release time)
-    RELEASE_TIME="${LEIOS_RELEASE_TIME:-128.9}"
+    # Default to 10 seconds for faster testing; original demo used 128.9
+    RELEASE_TIME="${LEIOS_RELEASE_TIME:-10}"
     jq "map(.[0] = $RELEASE_TIME)" "$DATA_DIR/base-schedule.json" > "$DATA_DIR/schedule.json"
     echo "  schedule.json created with release time $RELEASE_TIME"
 else
