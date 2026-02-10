@@ -4,6 +4,14 @@ This is an adaption of Figures 6 and 3 of the following paper, but with elaborat
 
 > Peter Gazi, Aggelos Kiayias, and Alexander Russell. 2023. Fait Accompli Committee Selection: Improving the Size-Security Tradeoff of Stake-Based Committees. In Proceedings of the 2023 ACM SIGSAC Conference on Computer and Communications Security (CCS '23). Association for Computing Machinery, New York, NY, USA, 845–858. https://doi.org/10.1145/3576915.3623194.
 
+## Note on terminology
+
+There is some ambiguity in the term "non-persistent voter" so we use the term "non-persistent candidate" for a pool that may be lucky enough to cast a non-persistent vote during one of the elections in an epoch. The ambiguity hinges upon whether one considers a pool to be a "voter" in situations where their voting weight is zero and their "vote" would not be included in the certificate. The Venn diagram below illustrates relationships between pools, voting, and certificates.
+- A *persistent voter* is eligible to cast a vote in every election during the epoch. The weight of their vote is simply their stake. There is no concept of a persistent voter having a particular number of *seats*.
+- *A non-persistent voter* is only eligible to cast a vote in an election if their VRF for that election entitles them to at least one *seat*. The weight of their vote is proportional to the number of seats they win and the total active stake not held by persistent voters.
+
+![Relationship between voters and stake pools](./weighted-fait-accompli-venn.svg)
+
 ## Stake distribution
 
 Let $`P = (p_1, \ldots, p_{|P|})`$ be the set of active stake pools, each with stake $`\mathcal{S}(p_i)`$, where pools are ordered in a non-increasing fashion, $`p_i \geq p_{i+1}`$. Furthermore, let $`\rho_i = \sum_{j=i}^{|P|} \mathcal{S}(p_j)`$ be the total stake for pools $`p_i`$ and beyond. By definition, the total stake is $`\rho_1`$.
@@ -91,6 +99,6 @@ Consider the stake distribution of Epoch 535 of Cardano mainnet and vary the com
 
 ## Non-normative formal specification
 
-See [formal/crypto/](./formal/crypto/ReadMe.md) for a *non-normative, draft* formal specification of Leios cryptography.
+See [formal/crypto/](./formal/crypto/ReadMe.md) for a *non-normative draft* formal specification of Leios cryptography.
 
 [^1]: See [this Jupyter notebook](./weighted-fait-accompli.ipynb) for details of the computations.
