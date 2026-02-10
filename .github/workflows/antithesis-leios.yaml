@@ -1,0 +1,130 @@
+name: "antithesis-leios"
+
+on:
+  pull_request:
+    paths:
+      - "antithesis/**"
+  push:
+    branches:
+      - main
+    paths:
+      - "antithesis/**"
+  workflow_dispatch:
+    inputs:
+      push_images:
+        description: 'Push images to GHCR'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository }}
+
+jobs:
+  build-images:
+    name: "Build Antithesis Docker images"
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to Container Registry
+        if: github.event_name == 'push' || github.event.inputs.push_images == 'true'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for cardano-node-leios
+        id: meta-cardano-node
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/cardano-node-leios
+          tags: |
+            type=sha
+            type=ref,event=branch
+            type=ref,event=pr
+
+      - name: Build cardano-node-leios image
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
+        with:
+          context: ./antithesis
+          file: ./antithesis/Dockerfile.cardano-node
+          push: ${{ github.event_name == 'push' || github.event.inputs.push_images == 'true' }}
+          tags: ${{ steps.meta-cardano-node.outputs.tags }}
+          labels: ${{ steps.meta-cardano-node.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Extract metadata for immdb-server
+        id: meta-immdb-server
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/immdb-server
+          tags: |
+            type=sha
+            type=ref,event=branch
+            type=ref,event=pr
+
+      - name: Build immdb-server image
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
+        with:
+          context: ./antithesis
+          file: ./antithesis/Dockerfile.immdb-server
+          push: ${{ github.event_name == 'push' || github.event.inputs.push_images == 'true' }}
+          tags: ${{ steps.meta-immdb-server.outputs.tags }}
+          labels: ${{ steps.meta-immdb-server.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Extract metadata for analysis
+        id: meta-analysis
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/leios-analysis
+          tags: |
+            type=sha
+            type=ref,event=branch
+            type=ref,event=pr
+
+      - name: Build analysis image
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
+        with:
+          context: ./antithesis
+          file: ./antithesis/Dockerfile.analysis
+          push: ${{ github.event_name == 'push' || github.event.inputs.push_images == 'true' }}
+          tags: ${{ steps.meta-analysis.outputs.tags }}
+          labels: ${{ steps.meta-analysis.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  test-local:
+    name: "Test local docker-compose stack"
+    runs-on: ubuntu-22.04
+    needs: build-images
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Run local test
+        working-directory: ./antithesis
+        run: |
+          ./scripts/test-local.sh
+        env:
+          TEST_DURATION: 30
+          STARTUP_TIMEOUT: 300
+          ENABLE_WAN_EMULATION: true
