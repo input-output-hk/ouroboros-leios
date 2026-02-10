@@ -1,6 +1,6 @@
 import { LRUCache } from 'lru-cache';
 import { MemoryPool } from './mempool.js';
-import { TXID_B, type Tx, type TxId, type Block } from './types.js';
+import { TXID_B, type Tx, type TxId, type Block, type EndorserBlock, type TxCacheMode } from './types.js';
 import { Link } from './link.js'
 import { logger } from './logger.js';
 import type { Simulation } from './simulation.js';
@@ -39,6 +39,12 @@ export class Node {
 
   // Set of block IDs this node has already seen (for diffusion deduplication)
   private seenBlocks: Set<string> = new Set();
+
+  // Separate cache for EB-discovered transactions
+  public txCache: Map<TxId, Tx> = new Map();
+
+  // Dedup for EB diffusion
+  public seenEBs: Set<string> = new Set();
 
   constructor(id: string, honest: boolean, frontrunDelay: number, mempool_B: number) {
     this.id = id;
@@ -79,6 +85,8 @@ export class Node {
     this.offers = [];
     this.known.clear();
     this.seenBlocks.clear();
+    this.txCache.clear();
+    this.seenEBs.clear();
     if (this.peerManager) {
       this.peerManager.reset();
     }
@@ -367,6 +375,91 @@ export class Node {
         delay: delay - block.clock
       }, "scheduling block diffusion");
     });
+  }
+
+  /**
+   * Produce an Endorser Block from remaining mempool txs (those not in the just-produced RB).
+   */
+  public handleProduceEB(sim: Simulation, clock: number, ebSize_B: number): void {
+    const txRefs: TxId[] = [];
+    let size = 0;
+    // Peek at remaining mempool contents without removing them
+    for (const tx of this.mempool.contents()) {
+      if (size + TXID_B > ebSize_B) break;
+      txRefs.push(tx.txId);
+      size += TXID_B;
+    }
+
+    const eb: EndorserBlock = {
+      ebId: `EB${sim.endorserBlocks.length}`,
+      producer: this.id,
+      clock,
+      txRefs,
+      size_B: size,
+    };
+
+    sim.diffuseEB(eb);
+  }
+
+  /**
+   * Receive an EB via diffusion. Fetch unknown txs and propagate.
+   */
+  public handleReceiveEB(sim: Simulation, eb: EndorserBlock): void {
+    if (this.seenEBs.has(eb.ebId)) return;
+    this.seenEBs.add(eb.ebId);
+
+    logger.trace({ node: this.id, ebId: eb.ebId, producer: eb.producer }, "node received EB");
+
+    // For each tx ref, if unknown, schedule fetch from a peer
+    for (const txId of eb.txRefs) {
+      const inMempool = this.mempool.contains(txId) || this.mempool.contains(txId + 'adv');
+      const inCache = this.txCache.has(txId);
+      const inKnown = this.known.has(txId);
+      if (!inMempool && !inCache && !inKnown) {
+        // Pick a peer to fetch from (use first in-edge neighbor as simple heuristic)
+        const graph = sim.graph;
+        let fetchPeer: string | null = null;
+        graph.forEachInEdge(this.id, (_edge, _link, source) => {
+          if (!fetchPeer) fetchPeer = source;
+        });
+        if (fetchPeer) {
+          const link = this.getUpstreamLinkOrDefault(graph, fetchPeer);
+          sim.scheduleFetchEBTx(link.computeDelay(eb.clock, TXID_B), this.id, fetchPeer, txId, eb.ebId);
+        }
+      }
+    }
+
+    // Propagate EB to downstream peers
+    const graph = sim.graph;
+    graph.forEachOutEdge(this.id, (_edge, link, _source, target) => {
+      const delay = link.computeDelay(eb.clock, eb.size_B);
+      sim.scheduleEBDiffusion(delay, this.id, target, eb);
+    });
+  }
+
+  /**
+   * Receive a fetched tx from an EB reference. Route based on txCacheMode.
+   * Note: EB-fetched txs arrive as already-formed — adversary nodes do NOT front-run them.
+   */
+  public handleReceiveEBTx(sim: Simulation, clock: number, tx: Tx, cacheMode: TxCacheMode): void {
+    switch (cacheMode) {
+      case 'cache-only':
+        this.txCache.set(tx.txId, tx);
+        break;
+      case 'mempool':
+        // Route through normal submission but skip adversary front-running
+        // We mark as known first so the tx is treated as already-seen if adversary tries to front-run
+        this.known.set(tx.txId, true);
+        this.backpressure.push(tx);
+        this.fillMemoryPool(sim, clock);
+        break;
+      case 'both':
+        this.txCache.set(tx.txId, tx);
+        this.known.set(tx.txId, true);
+        this.backpressure.push(tx);
+        this.fillMemoryPool(sim, clock);
+        break;
+    }
   }
 
   // Default link for P2P churned peers without topology edges

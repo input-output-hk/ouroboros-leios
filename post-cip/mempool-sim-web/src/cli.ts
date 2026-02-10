@@ -61,6 +61,13 @@ program
   .option('--p2p', 'Enable P2P peer selection (dynamic topology churn)', false)
   .option('--p2p-churn-interval <seconds>', 'P2P churn interval in seconds', String(DEFAULTS.p2pChurnInterval))
   .option('--p2p-churn-prob <float>', 'P2P churn probability per peer (0-1)', String(DEFAULTS.p2pChurnProb))
+  .option('--eb', 'Enable Endorser Block (EB) production (Leios)', false)
+  .option('--eb-size <bytes>', 'EB max size in bytes (default = block size)')
+  .addOption(
+    new Option('--tx-cache-mode <mode>', 'How EB-fetched txs are handled')
+      .choices(['cache-only', 'mempool', 'both'])
+      .default('mempool')
+  )
   .parse(process.argv);
 
 const opts = program.opts();
@@ -88,6 +95,10 @@ const config = {
   p2p: opts.p2p === true,
   p2pChurnInterval: parseFloat(opts.p2pChurnInterval),
   p2pChurnProb: parseFloat(opts.p2pChurnProb),
+  // Leios EB config
+  eb: opts.eb === true,
+  ebSize: opts.ebSize ? parseInt(opts.ebSize) : 10_000_000,  // 10 MB default per CIP-0164
+  txCacheMode: opts.txCacheMode as 'cache-only' | 'mempool' | 'both',
 };
 
 try {
@@ -104,11 +115,16 @@ try {
     } : { enabled: false },
   }, "configuration");
 
+  // Leios mempool: 2 × (RB_size + EB_size), Praos mempool: 2 × RB_size
+  const effectiveMempool = config.eb
+    ? (config.block + config.ebSize) * 2
+    : config.mempool;
+
   // Generate honest node network
   const graph = generateNetwork(
     config.nodes,
     config.degree,
-    config.mempool,
+    effectiveMempool,
     config.latency,
     config.bandwidth
   );
@@ -123,7 +139,7 @@ try {
       config.adversaryDegree,
       config.adversaryDegree,
       config.adversaryDelay,
-      config.mempool,
+      effectiveMempool,
       config.latency,
       config.bandwidth
     );
@@ -137,6 +153,16 @@ try {
 
   // Create simulation
   const sim = new Simulation(graph);
+
+  // Configure Leios EBs if enabled
+  if (config.eb) {
+    sim.configureEB(true, config.ebSize, config.txCacheMode);
+    logger.info({
+      ebSize: config.ebSize,
+      txCacheMode: config.txCacheMode,
+      effectiveMempool,
+    }, 'Leios EB production enabled');
+  }
 
   // Initialize P2P if enabled
   if (config.p2p) {
@@ -216,6 +242,17 @@ try {
   const totalHonestInBlocks = blocks.reduce((s, b) => s + b.honestCount, 0);
   const totalAdvInBlocks = blocks.reduce((s, b) => s + b.adversarialCount, 0);
   const totalInBlocks = totalHonestInBlocks + totalAdvInBlocks;
+
+  // EB statistics
+  if (config.eb) {
+    const ebs = sim.endorserBlocks;
+    const totalEBTxRefs = ebs.reduce((s, eb) => s + eb.txRefs.length, 0);
+    logger.info({
+      ebs_produced: ebs.length,
+      total_tx_refs_in_ebs: totalEBTxRefs,
+      avg_tx_refs_per_eb: ebs.length > 0 ? totalEBTxRefs / ebs.length : 0,
+    }, "endorser block statistics");
+  }
 
   logger.info({
     blocks_produced: blocks.length,
