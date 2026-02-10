@@ -36,7 +36,7 @@ Let  $`\sigma_i \in [0,1]`$ be the VRF value for party $`p_i`$, derived from the
 
 The number of seats they have on the committee is the value $`k_i^*`$ for which $`P(k_i^*-1) \leq \sigma_i \lt P(k_i^*)`$ holds, given $`P(k^*) = \sum_{k=0}^{k^*} \frac{(n_2 \cdot \mathcal{S}_3(i))^k \cdot e^{- n_2 \cdot \mathcal{S}_3(i)}}{k!}`$ for $`k^* \ge 0`$ and $`P(k^*) = 0`$ otherwise. (This is simply sampling from a Poisson distribution with mean $`n_2 \cdot \mathcal{S}_3(i)`$ according to cumulative probability $`\sigma_i`$.) Each of those seats has weight $`\rho_{i^*} / n_2`$. (Once again, this scheme differs slightly from the paper in that $`\rho_{i^*}`$ is divided by the *target* number of non-persistent seats, not the *actual* number of non-persistent seats; note that the *actual* number of non-persistent seats is not publicly known because the sortition is *local*.)
 
-The number of seats can be computed using rational arithmetic in a manner that is independent of the numeric precision of the compiler or hardware: see [Appendix: Calculating the number of seats](#appendix-calculating-the-number-of-seats).
+The number of seats can be computed using rational arithmetic in a manner that is independent of the numeric precision of the compiler or hardware: see [Appendix: Calculating the number of seats in local sortition](#appendix-calculating-the-number-of-seats-in-local-sortition).
 
 ## Variability of committee size
 
@@ -103,9 +103,9 @@ Consider the stake distribution of Epoch 535 of Cardano mainnet and vary the com
 
 See [formal/crypto/](./formal/crypto/ReadMe.md) for a *non-normative draft* formal specification of Leios cryptography.
 
-## Appendix: Calculating the number of seats
+## Appendix: Calculating the number of seats in local sortition
 
-Using the Taylor-series expansion for the exponential function and the error-bounding property of convergent alternating infinite series, the number of seats can be computed using rational arithmetic in a manner that is independent of the numeric precision of the compiler or hardware.
+Using the Taylor-series expansion for the exponential function and the error-bounding property of convergent alternating infinite series (Leibniz's theore), the number of seats can be computed using rational arithmetic in a manner that is independent of the numeric precision of the compiler or hardware.
 
 ```lean
 /-- Track error associated with a rational number. -/
@@ -156,7 +156,6 @@ private partial def trialEstimate (y : Rat) (x : Rat) (k : Nat) (n : Nat) : Orde
     else if  y > estimate + error
       then Ordering.gt
       else trialEstimate y x k $ n + 1
--- FIXME: The termination proof is equivalent to Leibniz's theorem (the alternating series estimation theorem).
 
 /-- Inverse of the Possion distribution. -/
 def comparePoisson (y : Rat) (x : Rat) (k : Nat) : Ordering :=
