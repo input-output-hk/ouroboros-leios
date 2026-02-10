@@ -1,5 +1,7 @@
 # Mathematical model of the memory pool
 
+This document describes a simple mathematical model of the Ouroboros memory-pool behavior, and suitable for idealized analyses of Praos and Leios. We apply it to the problem of memory-pool poisoning by adversarial nodes that attempt to front-run honest transactions that they receive.
+
 ## Variables
 
 | Symbol      | Units     | Description                                     |
@@ -39,11 +41,23 @@ $$
 H_i = \frac{N}{1 + \left( \frac{N}{H_0} - 1 \right) k^{-i}} ,
 $$
 
-which happens to be a [logistic distribution](https://en.wikipedia.org/wiki/Logistic_distribution) with mean $`\log_k N`$ and scale $`(\ln k)^{-1}`$.
+which happens to be a [logistic distribution](https://en.wikipedia.org/wiki/Logistic_distribution) with mean $`\log_k N`$ and scale $`(\ln k)^{-1}`$. Under the RRG assumption we have $`\lambda = \log_k N`$.
 
 For Cardano `mainnet` the recommended active peers[^2] is $`k = 20`$ and there are roughly $`N = 25000`$ nodes participating in the network. The recursion relation yields a mean number of hops of $`3.75 \text{ hops}`$, but the approximate method yields a mean $`\log_k N \approx 3.44 \text{ hops}`$ and standard deviation $`\frac{\pi}{k \cdot \sqrt{3}} \approx 0.61 \text{ hops}`$. The following plot illustrates that the recursion relation yields a more rapid diffusion and saturation. This roughly agrees with the anecdotal diameter of five or six for `mainnet`: the transaction reaches 24% of the network in three hops and 99% of it in four hops. A reasonable value for the typical number of hops for transaction diffusion is $`\lambda = 4 \text{ hops}`$.
 
 ![Transaction diffusion on a directed regular random graph with k = 20 and N = 30,000](./diffusion.svg)
+
+## Poisoned memory pools
+
+Now consider the scenario where there is a fraction of the nodes, $`p_\text{adv}`$, are adversarial in that when an adversarial node receives a transaction, it _does not announce it to its upstream peers_: instead, it creates a new, conflicting transaction and announces that instead. This scenario aims to mimic front-running or MEV (miner extractable value): the adversarial node replaces each transaction with one to its own advantage. _In real life, of course, only a fraction of transactions (arbitrage opportunities, entries in order books, etc.) might be susceptible to such front running._
+
+The front-run transactions compete with the original honest ones to diffuse faster to the block-producing node. Because the honest and front-run version of the transaction conflict with one another (i.e., consume at least one common input), only one of them can be accepted into a node's memory pool. Honest nodes accept transactions on a first-come first-serve basis, but will not accept a transaction that conflicts with its memory pool. We consider a memory pool to be "poisoned" if it contains the dishonest replacement of the transaction. Under the RRG assumption, the probability of an honest memory pool having been poisoned is the sum up to the graph's diameter of the fraction of nodes a given number of hops away times the probability of any intermediate node having been poisoned:
+
+$$
+p_\text{poison} \approx \sum_{i=1}^\lambda \frac{h_i}{N - 1} \left( 1 - \left( 1 - p_\text{adv} \right) ^ {i - 1}) \right) \approx 1 - \left( 1 - p_\text{adv} \right)^{\lambda-1} .
+$$
+
+For a small fraction of adversaries, this reduces to $`p_\text{adv} \cdot (\lambda - 1)`$.
 
 [^1]: See [Introduction to the design of the Data Diffusion and Networking for Cardano Shelley](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-design/network-design.pdf) and [Ouroboros Network Specification](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf.).
 [^2]: See [the default mainnet configuration file for cardano-node](https://github.com/IntersectMBO/cardano-node/blob/9cf1e651e9fc3726a5fa9771b0d3479e5b909c6b/configuration/cardano/mainnet-config.yaml#L49).
