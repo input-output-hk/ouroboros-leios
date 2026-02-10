@@ -36,6 +36,8 @@ Let  $`\sigma_i \in [0,1]`$ be the VRF value for party $`p_i`$, derived from the
 
 The number of seats they have on the committee is the value $`k_i^*`$ for which $`P(k_i^*-1) \leq \sigma_i \lt P(k_i^*)`$ holds, given $`P(k^*) = \sum_{k=0}^{k^*} \frac{(n_2 \cdot \mathcal{S}_3(i))^k \cdot e^{- n_2 \cdot \mathcal{S}_3(i)}}{k!}`$ for $`k^* \ge 0`$ and $`P(k^*) = 0`$ otherwise. (This is simply sampling from a Poisson distribution with mean $`n_2 \cdot \mathcal{S}_3(i)`$ according to cumulative probability $`\sigma_i`$.) Each of those seats has weight $`\rho_{i^*} / n_2`$. (Once again, this scheme differs slightly from the paper in that $`\rho_{i^*}`$ is divided by the *target* number of non-persistent seats, not the *actual* number of non-persistent seats; note that the *actual* number of non-persistent seats is not publicly known because the sortition is *local*.)
 
+The number of seats can be computed using rational arithmetic in a manner that is independent of the numeric precision of the compiler or hardware: see [Appendix: Calculating the number of seats](#appendix-calculating-the-number-of-seats).
+
 ## Variability of committee size
 
 The weight of persistent voters is exactly $`\rho_1 - \rho_{i^*}`$ by construction. Because the sum of Poisson distributions is also Poisson, the expected number of non-persistent seats is $`n_2`$ and they have total expected weight $`n_2 \cdot (\rho_{i^*} / n_2 ) = \rho_{i^*}`$. Thus the expected total weight is $`\rho_1`$, which equals the total active stake.
@@ -100,5 +102,129 @@ Consider the stake distribution of Epoch 535 of Cardano mainnet and vary the com
 ## Non-normative formal specification
 
 See [formal/crypto/](./formal/crypto/ReadMe.md) for a *non-normative draft* formal specification of Leios cryptography.
+
+## Appendix: Calculating the number of seats
+
+Using the Taylor-series expansion for the exponential function and the error-bounding property of convergent alternating infinite series, the number of seats can be computed using rational arithmetic in a manner that is independent of the numeric precision of the compiler or hardware.
+
+```lean
+/-- Track error associated with a rational number. -/
+private structure ValueWithError where
+  value : Rat
+  error : Rat
+
+/-- Absolute value of a rational number. -/
+private def absRat (x : Rat) : Rat :=
+  if x ≥ 0
+  then x
+  else - x
+
+/-- Error-aware multiplication of rational numbers. -/
+instance : HMul Rat ValueWithError ValueWithError where
+  hMul
+  | x, ⟨ value , error ⟩ => ⟨ x * value , absRat x * error ⟩
+
+/-- A term in the Taylor expansion of an exponential. -/
+private def expTerm (x : Rat) : Nat → Rat
+| 0 => 1
+| k + 1 => expTerm x k * x / (k + 1)
+
+/-- The Taylor expansion of an exponential. -/
+private def expTaylor (x : Rat) (n : Nat) : ValueWithError :=
+  ⟨
+    List.sum
+      $ List.map (fun k ↦ expTerm x k)
+      $ List.range (n + 1)
+  , let error := expTerm x (n + 1)
+    absRat error
+  ⟩
+
+/-- Poisson probability using a Taylor expansion. -/
+private def poissonTaylor (x : Rat) (k : Nat) (n : Nat) : ValueWithError :=
+  -- Exact value of $\sum_{m=0}^k x^m / m!$.
+  let a := ValueWithError.value $ expTaylor x k
+  -- Taylor approximation of $e^{-x}$.
+  let b := expTaylor (- x) n
+  -- The $n + 1$ term approximation of the Possion distribution for $k$ events with mean $x$.
+  a * b
+
+/-- Determine whether a Taylor expansion for a Possion distribution is sufficiently converged. -/
+private partial def trialEstimate (y : Rat) (x : Rat) (k : Nat) (n : Nat) : Ordering :=
+  let ⟨ estimate , error ⟩ := poissonTaylor x k n
+  if y < estimate - error
+    then Ordering.lt
+    else if  y > estimate + error
+      then Ordering.gt
+      else trialEstimate y x k $ n + 1
+-- FIXME: The termination proof is equivalent to Leibniz's theorem (the alternating series estimation theorem).
+
+/-- Inverse of the Possion distribution. -/
+def comparePoisson (y : Rat) (x : Rat) (k : Nat) : Ordering :=
+  -- At least $\lfloor x \rfloor$ terms must be evaluated.
+  trialEstimate y x k x.floor.toNat
+-- Note that the test suite includes `LSpec` tests for this function.
+
+/-- Determine whether the specified number of voting seats are allowed for a particular VRF value-/
+private def allowsSeats (maxSeats : Nat) (vrf : Rat) (x : Rat) (seats : Nat) : Nat :=
+  if seats ≥ maxSeats
+    then seats
+    else if comparePoisson vrf x (seats + 1) == Ordering.lt
+      then seats
+      else allowsSeats maxSeats vrf x $ seats + 1
+
+/-- Determine the number of seats for a particular VRF value. -/
+private def evalSeats (n₂ : Nat) (𝒮 : Rat) (vrf : Rat) : Nat :=
+  let x : Rat := (n₂ : Rat) * (𝒮 : Rat)
+  if comparePoisson vrf x 0 == Ordering.lt
+    then 0
+    else allowsSeats n₂ vrf x 0
+
+/-- Count a voter's seats. -/
+def countSeats (n₂ : Nat) (𝒮 : Rat) (σ_eid : BLS.Signature) : Nat :=
+  let num : Nat := σ_eid.toByteArray.foldl (fun acc b => (acc <<< 8) + b.toNat) 0
+  let den : Nat := 2 ^ 384
+  let vrf : Rat := num.cast / den
+  evalSeats n₂ 𝒮 vrf
+  
+-- Property-based tests are provided here for the rational representation of the Poisson distribution.
+
+section
+
+structure TestCase where
+  x : Rat
+  y : Rat
+  k : Nat
+deriving Repr
+
+instance : SlimCheck.Shrinkable TestCase where
+  shrink _ := []
+
+instance : SlimCheck.SampleableExt TestCase :=
+  SlimCheck.SampleableExt.mkSelfContained $
+    do
+      let den' : Nat := 1000000000
+      let den : Rat := den'
+      let x : Rat ← SlimCheck.Gen.choose Nat 0 den'
+      let y : Rat ← SlimCheck.Gen.choose Nat 0 den'
+      let k : Nat ← SlimCheck.Gen.choose Nat 0 15
+      pure ⟨ x / den , y / den , k⟩
+
+def poisson (x : Float) (k : Nat) : Float :=
+  let a := Float.exp (- x)
+  let bs :=
+    (List.range (k + 1)).map
+      $ fun n ↦ x.pow n.toFloat / n.factorial.toFloat
+  a * bs.sum
+
+#lspec
+  check "Poisson comparison" (
+    ∀ tc : TestCase
+  , let actual := Float.decLt tc.y.toFloat $ poisson tc.x tc.k
+    let expected := comparePoisson tc.y tc.x tc.k = Ordering.lt
+    expected == actual.decide
+  )
+
+end
+```
 
 [^1]: See [this Jupyter notebook](./weighted-fait-accompli.ipynb) for details of the computations.
