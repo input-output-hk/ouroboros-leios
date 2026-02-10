@@ -1,5 +1,3 @@
-version: "3.8"
-
 # Leios Antithesis Docker Compose Stack
 # Usage:
 #   Local testing with WAN emulation + observability:
