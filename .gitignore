@@ -41,3 +41,6 @@ result
 result-*
 
 /.dir-locals.el
+
+# Vite dev cache
+.vite/
