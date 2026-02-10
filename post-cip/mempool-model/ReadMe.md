@@ -63,6 +63,17 @@ The figure below compares the hypergeometric model to simulation experiments for
 
 ![Comparison of theory and experiment for memory pool fragmentation](./fragmentation-load-loess-theory.svg)
 
+### Generalization to near capacity limit
+
+Since transactions do not propagate instantly, some may not be available for inclusion at particular nodes: the previous not only model assumes randomness in arrival but also that any transaction is available for potential inclusion in the memory pool. We can generalize beyond this by letting $`k`$ be the transactions that are available for inclusion in any pair of pools, but $`k_A`$ and $`k_B`$ are additional transactions that are only available for inclusion in pools $`A`$ or $`B`$. This can model situations such as locally private memory pools or draining of the memory pool by short local forks. For $`s`$ transactions in common and $`s_A`$ and $`s_B`$ in $`A`$ or $`B`$ drawn from the shared pool, we have
+
+$$
+\mathbb{P}[s] = \sum_{s_A} \sum_{s_B} \underbrace{\mathbb{P}[s | s_A, s_B]}_{\text{Intersection}} \cdot \underbrace{\mathbb{P}[s_A]}_{\text{Node A}} \cdot \underbrace{\mathbb{P}[s_B]}_{\text{Node B}} , 
+$$
+where $`\mathbb{P}[s_A] = \left. \binom{k}{s_A} \cdot \binom{s_A}{m-s_A} \middle/ \binom{k+k_A}{m} \right.`$, $`\mathbb{P}[s_B] = \left. \binom{k}{s_B} \cdot \binom{k_B}{m-s_B} \middle/ \binom{k+k_B}{m} \right.`$, and $`\mathbb{P}[s | s_A, s_B] = \left. \binom{s_A}{s} \cdot \binom{k-s_A}{s_B-x} \middle/ \binom{k}{s_B} \right.`$. These are all hypergeometric distributions. For the mean we have $`\mathbb{E}[s] = \frac{m^2 k}{(k + k_A)(k + k_B)}`$, which reduces to the previous result when $`k_A = k_B = 0`$. Thus the expected number of common transactions among the $`A`$ and $`B`$ memory pools is proportional to the dilutions $`\frac{k}{k+k_A}`$ and $`\frac{k}{k+k_B}`$.
+
+In the simulation example of the previous section we see that at $`\xi = 1`$, the expected commonality is reduced from 100% to approximately 81%. This implies that $`k_A = k_B = \frac{k}{9}`$, or that approximately 10% of the transactions are in some sense "private" to a node. This is roughly consistent with a typical diffusion time of $`\tau \approx 2 \text{ s}`$, given the active slot coefficient of $`\alpha = \frac{1 \text{ block}}{20 \text{ s}}`$: namely, we would expect about 10% of the transactions to be "captured" by a nearby block and not propagate globally among all memory pools. Presumably we can interpret this as $`k_A = k_B = \frac{m}{9}`$ because the transactions that do not propagate far because of block production are relative to the size $`m`$ of the memory pool, not relative to the global transactions $`k`$. Therefore for much larger $`k`$, the private transactions become less important in the factor $`\frac{k}{k + \frac{m}{9}}`$ and predictions approach the original case of uniformly at-random diffusion.
+
 ## Poisoned memory pools
 
 Now consider the scenario where there is a fraction of the nodes, $`p_\text{adv}`$, are adversarial in that when an adversarial node receives a transaction, it _does not announce it to its upstream peers_: instead, it creates a new, conflicting transaction and announces that instead. This scenario aims to mimic front-running or MEV (miner extractable value): the adversarial node replaces each transaction with one to its own advantage. _In real life, of course, only a fraction of transactions (arbitrage opportunities, entries in order books, etc.) might be susceptible to such front running._
