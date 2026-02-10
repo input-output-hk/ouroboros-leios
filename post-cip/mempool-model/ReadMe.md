@@ -59,5 +59,16 @@ $$
 
 For a small fraction of adversaries, this reduces to $`p_\text{adv} \cdot (\lambda - 1)`$.
 
+### Comparison with simulation experiments
+
+We can compare the previous result to [simulation experiments](../mempool-sim-web/experiment). Consider varying the fraction of adversarial nodes in two experiments:
+
+1. **No delay:** The adversarial node forwards their front-run transaction without any delay. *This conforms the the mathematical model above and creates unbiased competition between honest and front-run transactions.* We should expect a fraction $`p_\text{adv} \cdot (\lambda - 1)`$ of the memory pool to become poisoned.
+2. **Substantial delay:** The adversarial node waits two milliseconds before forwarding their front-run transaction. *This permits honest nodes to diffuse the honest transaction before receiving the front-run one.* We should expect a fraction $`p_\text{adv}`$ of the memory pool to become poisoned because only the honesty of the final node matters.
+
+Set $`N=10\,000`$ and $`k = 20`$, so $`\lambda \doteq 3.074`$. Thus, when plotting the fraction of memory pools poisoned as a function of the fraction of adversaries, we expect a slope of $`2.074`$ in the no-delay case and a slope of $`1`$ in the substantial-delay case. These slopes agree with the experimental results illustrated below.
+
+![Front-running transactions in a memory-pool simulation](./adversarial-scatter.svg)
+
 [^1]: See [Introduction to the design of the Data Diffusion and Networking for Cardano Shelley](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-design/network-design.pdf) and [Ouroboros Network Specification](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf.).
 [^2]: See [the default mainnet configuration file for cardano-node](https://github.com/IntersectMBO/cardano-node/blob/9cf1e651e9fc3726a5fa9771b0d3479e5b909c6b/configuration/cardano/mainnet-config.yaml#L49).
