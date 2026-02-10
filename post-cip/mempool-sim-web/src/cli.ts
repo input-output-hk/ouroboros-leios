@@ -68,7 +68,6 @@ program
       .choices(['cache-only', 'mempool', 'both'])
       .default('mempool')
   )
-  .option('--leios-mempool-multiplier <number>', 'Mempool capacity multiplier for Leios', '1')
   .parse(process.argv);
 
 const opts = program.opts();
@@ -100,7 +99,6 @@ const config = {
   eb: opts.eb === true,
   ebSize: opts.ebSize ? parseInt(opts.ebSize) : parseInt(opts.block),
   txCacheMode: opts.txCacheMode as 'cache-only' | 'mempool' | 'both',
-  leiosMempoolMultiplier: parseFloat(opts.leiosMempoolMultiplier),
 };
 
 try {
@@ -117,9 +115,9 @@ try {
     } : { enabled: false },
   }, "configuration");
 
-  // Apply Leios mempool multiplier
+  // Leios mempool: 2 × (RB_size + EB_size), Praos mempool: 2 × RB_size
   const effectiveMempool = config.eb
-    ? config.mempool * config.leiosMempoolMultiplier
+    ? (config.block + config.ebSize) * 2
     : config.mempool;
 
   // Generate honest node network
@@ -162,7 +160,6 @@ try {
     logger.info({
       ebSize: config.ebSize,
       txCacheMode: config.txCacheMode,
-      mempoolMultiplier: config.leiosMempoolMultiplier,
       effectiveMempool,
     }, 'Leios EB production enabled');
   }

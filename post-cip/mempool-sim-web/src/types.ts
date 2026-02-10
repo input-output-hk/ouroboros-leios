@@ -36,7 +36,6 @@ export interface SimulationConfig {
   ebEnabled: boolean;              // Enable Endorser Block production (Leios)
   ebSize: number;                  // Max bytes of tx refs per EB
   txCacheMode: TxCacheMode;        // How EB-fetched txs are handled
-  leiosMempoolMultiplier: number;  // Multiplier for mempool capacity under Leios
 }
 
 export const DEFAULT_CONFIG: SimulationConfig = {
@@ -57,7 +56,6 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   ebEnabled: false,
   ebSize: 90000,
   txCacheMode: 'mempool',
-  leiosMempoolMultiplier: 1,
 };
 
 export const MINIMAL_CONFIG: SimulationConfig = {
@@ -78,7 +76,6 @@ export const MINIMAL_CONFIG: SimulationConfig = {
   ebEnabled: false,
   ebSize: 90000,
   txCacheMode: 'mempool',
-  leiosMempoolMultiplier: 1,
 };
 
 export interface EndorserBlock {
