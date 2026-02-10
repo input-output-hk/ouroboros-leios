@@ -57,6 +57,12 @@ $$
 
 The mean is $`\mathbb{E}[s]= \frac{m^2}{k}`$ and the standard deviation is $`\sqrt{\mathbb{Var}[s]} = \frac{m \cdot (k - m)}{k \cdot \sqrt{k - 1}} \approx \frac{m \cdot (k - m)}{k^{3/2}}`$, but if we define $`\xi = \frac{k}{m}`$ as the "overburden" of transactions relative to the memory-pool capacity, we have $`\mathbb{E}[s] = \frac{m}{\xi}`$ and  $`\sqrt{\mathbb{Var}[s]} = \frac{\xi - 1}{\xi} \cdot \sqrt{\frac{m}{\xi}}`$. The maximum standard deviation occurs at $`\xi = 3`$ but the maximum standard deviation relative to the mean is unbounded. At $`\xi = 1`$ there is no variance.
 
+### Comparison with simulation experiments
+
+The figure below compares the hypergeometric model to simulation experiments for memory pool fragmentation. As expected, the theory does not fit well when the number of globally available transactions is approximately the same as the number that fit in a memory pool. Once the transactions exceed the capacity by 50% (i.e., $`\xi \geq \frac{3}{2}`$), agreement is good.
+
+![Comparison of theory and experiment for memory pool fragmentation](./fragmentation-load-loess-theory.svg)
+
 ## Poisoned memory pools
 
 Now consider the scenario where there is a fraction of the nodes, $`p_\text{adv}`$, are adversarial in that when an adversarial node receives a transaction, it _does not announce it to its upstream peers_: instead, it creates a new, conflicting transaction and announces that instead. This scenario aims to mimic front-running or MEV (miner extractable value): the adversarial node replaces each transaction with one to its own advantage. _In real life, of course, only a fraction of transactions (arbitrage opportunities, entries in order books, etc.) might be susceptible to such front running._
