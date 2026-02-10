@@ -54,7 +54,7 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   duration: 20,
   blockInterval: 1,
   ebEnabled: false,
-  ebSize: 90000,
+  ebSize: 10_000_000,    // 10 MB — CIP-0164 default
   txCacheMode: 'mempool',
 };
 
@@ -74,7 +74,7 @@ export const MINIMAL_CONFIG: SimulationConfig = {
   duration: 20,
   blockInterval: 2,
   ebEnabled: false,
-  ebSize: 90000,
+  ebSize: 10_000_000,    // 10 MB — CIP-0164 default
   txCacheMode: 'mempool',
 };
 

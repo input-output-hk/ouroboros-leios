@@ -97,7 +97,7 @@ const config = {
   p2pChurnProb: parseFloat(opts.p2pChurnProb),
   // Leios EB config
   eb: opts.eb === true,
-  ebSize: opts.ebSize ? parseInt(opts.ebSize) : parseInt(opts.block),
+  ebSize: opts.ebSize ? parseInt(opts.ebSize) : 10_000_000,  // 10 MB default per CIP-0164
   txCacheMode: opts.txCacheMode as 'cache-only' | 'mempool' | 'both',
 };
 
