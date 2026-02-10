@@ -32,7 +32,7 @@ Start with the assumption that the Ouroboros topology approximates a *directed* 
 Consider the diffusion of a transaction from the node where it is submitted to the rest of the nodes. Let $`h_i`$ be the number of nodes it has reached in the $`i`$th hop and $`H_i = \sum_{j=0}^i h_j = H_{i-1} + h_i`$ be the cumulative number of nodes it has reached by the $`i`$th hop. The transaction starts with $`h_0 = 1`$ and $`H_0 = 1`$. For a directed RRG the expected number of hops will be
 
 $$
-E \left[ h_{i+1} \right] = \left( N - H_i \right) \left( 1 - \left( 1 - \frac{1}{N} \right) ^ {h_i k^\prime} \right)
+\mathbb{E} \left[ h_{i+1} \right] = \left( N - H_i \right) \left( 1 - \left( 1 - \frac{1}{N} \right) ^ {h_i k^\prime} \right)
 $$
 
 where the effective degree $`k^\prime = k - \frac{k}{N - k} = k \cdot \frac{N - 2}{N - 1} \approx k`$, for large $N$, accounts for possibility that a downstream peer is also an upstream peer. The first factor represents the number of nodes to which the transaction has not already diffused and the second factor is the probability that at least one of the $`k^\prime`$ neighbors of the $`n_i`$ nodes hasn't received the transactions. If we replace the expectation by $`h_{i+1}`$ itself, then for large $N$ we can approximate the cumulative number of nodes diffused to as
@@ -46,6 +46,16 @@ which happens to be a [logistic distribution](https://en.wikipedia.org/wiki/Logi
 For Cardano `mainnet` the recommended active peers[^2] is $`k = 20`$ and there are roughly $`N = 25000`$ nodes participating in the network. The recursion relation yields a mean number of hops of $`3.75 \text{ hops}`$, but the approximate method yields a mean $`\log_k N \approx 3.44 \text{ hops}`$ and standard deviation $`\frac{\pi}{k \cdot \sqrt{3}} \approx 0.61 \text{ hops}`$. The following plot illustrates that the recursion relation yields a more rapid diffusion and saturation. This roughly agrees with the anecdotal diameter of five or six for `mainnet`: the transaction reaches 24% of the network in three hops and 99% of it in four hops. A reasonable value for the typical number of hops for transaction diffusion is $`\lambda = 4 \text{ hops}`$.
 
 ![Transaction diffusion on a directed regular random graph with k = 20 and N = 30,000](./diffusion.svg)
+
+## Overlap between memory pools
+
+First consider the situation where each node's memory pool can hold $`m`$ unique transactions of the $`k`$ transactions that are available globally. Under the assumption of uniform at-random diffusion of transactions, the number of transactions $`s`$ shared between any pair of nodes' memory pools conforms to a hypergeometric distribution,
+
+$$
+\mathbb{P} (s \text{ transactions in common}) = \frac{{m \choose s} \cdot {k - m \choose m - s}}{k \choose m} .
+$$
+
+The mean is $`\mathbb{E}[s]= \frac{m^2}{k}`$ and the standard deviation is $`\sqrt{\mathbb{Var}[s]} = \frac{m \cdot (k - m)}{k \cdot \sqrt{k - 1}} \approx \frac{m \cdot (k - m)}{k^{3/2}}`$, but if we define $`\xi = \frac{k}{m}`$ as the "overburden" of transactions relative to the memory-pool capacity, we have $`\mathbb{E}[s] = \frac{m}{\xi}`$ and  $`\sqrt{\mathbb{Var}[s]} = \frac{\xi - 1}{\xi} \cdot \sqrt{\frac{m}{\xi}}`$. The maximum standard deviation occurs at $`\xi = 3`$ but the maximum standard deviation relative to the mean is unbounded. At $`\xi = 1`$ there is no variance.
 
 ## Poisoned memory pools
 
@@ -66,7 +76,7 @@ We can compare the previous result to [simulation experiments](../mempool-sim-we
 1. **No delay:** The adversarial node forwards their front-run transaction without any delay. *This conforms the the mathematical model above and creates unbiased competition between honest and front-run transactions.* We should expect a fraction $`p_\text{adv} \cdot (\lambda - 1)`$ of the memory pool to become poisoned.
 2. **Substantial delay:** The adversarial node waits two milliseconds before forwarding their front-run transaction. *This permits honest nodes to diffuse the honest transaction before receiving the front-run one.* We should expect a fraction $`p_\text{adv}`$ of the memory pool to become poisoned because only the honesty of the final node matters.
 
-Set $`N=10\,000`$ and $`k = 20`$, so $`\lambda \doteq 3.074`$. Thus, when plotting the fraction of memory pools poisoned as a function of the fraction of adversaries, we expect a slope of $`2.074`$ in the no-delay case and a slope of $`1`$ in the substantial-delay case. These slopes agree with the experimental results illustrated below.
+Set $`N=10\,000`$ and $`k = 20`$, which implies $`\lambda \doteq 3.074`$. Thus, when plotting the fraction of memory pools poisoned as a function of the fraction of adversaries, we expect a slope of $`2.074`$ in the no-delay case and a slope of $`1`$ in the substantial-delay case. These slopes agree with the experimental results illustrated below.
 
 ![Front-running transactions in a memory-pool simulation](./adversarial-scatter.svg)
 
