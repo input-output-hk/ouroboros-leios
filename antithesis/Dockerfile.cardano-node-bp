@@ -1,0 +1,98 @@
+# Block Producer Node Dockerfile for Proto-Devnet
+# Builds cardano-node with tx-generator and cardano-cli from leios-prototype branch
+# Includes proto-devnet genesis files, pool keys, and configuration
+
+FROM ghcr.io/blinklabs-io/haskell:9.6.6-3.12.1.0-3 AS cardano-node-build
+
+ARG OUROBOROS_CONSENSUS_REF=4f20aeb08b4f8eaf20fd2762e7ffc5738e7d05af
+
+RUN echo "Building leios-prototype branch..." \
+    && git clone https://github.com/intersectmbo/cardano-node.git \
+    && cd cardano-node \
+    && git fetch --all --recurse-submodules --tags \
+    && git checkout leios-prototype \
+    && echo "with-compiler: ghc-${GHC_VERSION}" >> cabal.project.local \
+    && echo "tests: False" >> cabal.project.local \
+    && sed -i "s|tag: 8f0e1423c99bcfa0025ae5476a5467a4af0d2828|tag: ${OUROBOROS_CONSENSUS_REF}|g" cabal.project \
+    && cabal update \
+    && cabal build exe:cardano-node exe:cardano-cli exe:tx-generator \
+    && mkdir -p /root/.local/bin/ \
+    && cp -p "$(find dist-newstyle -name cardano-node -type f -executable | head -1)" /root/.local/bin/ \
+    && cp -p "$(find dist-newstyle -name cardano-cli -type f -executable | head -1)" /root/.local/bin/ \
+    && cp -p "$(find dist-newstyle -name tx-generator -type f -executable | head -1)" /root/.local/bin/ \
+    && rm -rf /root/.cabal/packages \
+    && rm -rf /usr/local/lib/ghc-${GHC_VERSION}/ /usr/local/share/doc/ghc-${GHC_VERSION}/ \
+    && rm -rf dist-newstyle/ \
+    && rm -rf /root/.cabal/store/ghc-${GHC_VERSION}
+
+FROM debian:bookworm-slim AS cardano-node-bp
+
+ENV LD_LIBRARY_PATH="/usr/local/lib:$LD_LIBRARY_PATH"
+ENV PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH"
+
+COPY --from=cardano-node-build /usr/local/lib/ /usr/local/lib/
+COPY --from=cardano-node-build /usr/local/include/ /usr/local/include/
+COPY --from=cardano-node-build /root/.local/bin/cardano-* /usr/local/bin/
+COPY --from=cardano-node-build /root/.local/bin/tx-generator /usr/local/bin/
+
+RUN apt-get update -y && \
+    apt-get install -y \
+      bc \
+      curl \
+      iproute2 \
+      jq \
+      libffi8 \
+      libgmp10 \
+      liblmdb0 \
+      libncursesw5 \
+      libnuma1 \
+      libsystemd0 \
+      libssl3 \
+      libtinfo6 \
+      llvm-14-runtime \
+      lsof \
+      netbase \
+      pkg-config \
+      procps \
+      socat \
+      sqlite3 \
+      wget \
+      zlib1g && \
+    rm -rf /var/lib/apt/lists/* && \
+    ldconfig
+
+# Create directories
+RUN mkdir -p /app/config /app/genesis /app/scripts /app/pools-keys /app/utxo-keys /data /logs
+
+# Copy proto-devnet genesis files
+COPY demo/proto-devnet/config/genesis/*.json /app/genesis/
+
+# Copy proto-devnet config
+COPY demo/proto-devnet/config/config.json /app/config/config.json
+COPY demo/proto-devnet/config/topology.template.json /app/config/topology.template.json
+
+# Copy pool keys for all 3 pools
+COPY demo/proto-devnet/config/pools-keys/pool1/ /app/pools-keys/pool1/
+COPY demo/proto-devnet/config/pools-keys/pool2/ /app/pools-keys/pool2/
+COPY demo/proto-devnet/config/pools-keys/pool3/ /app/pools-keys/pool3/
+
+# Copy utxo-keys for tx-generator
+COPY demo/proto-devnet/config/utxo-keys/ /app/utxo-keys/
+
+# Copy tx-generator template
+COPY demo/proto-devnet/config/gen.template.json /app/config/gen.template.json
+
+# Copy leios schema if it exists (optional for proto-devnet)
+COPY demo/2025-11/data/leios-schema.sql /app/config/leios-schema.sql
+
+# Copy scripts
+COPY antithesis/scripts/init-pool-node.sh /app/scripts/
+COPY antithesis/scripts/run-pool-node.sh /app/scripts/
+COPY antithesis/scripts/run-tx-generator.sh /app/scripts/
+COPY antithesis/scripts/setup-wan-emulation.sh /app/scripts/
+
+RUN chmod +x /app/scripts/*.sh /usr/local/bin/*
+
+WORKDIR /data
+
+CMD ["/app/scripts/run-pool-node.sh", "pool1"]

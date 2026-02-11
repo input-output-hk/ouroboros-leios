@@ -1,13 +1,32 @@
 # Leios Antithesis Docker Compose Stack
+#
+# Two configurations available:
+#   1. Proto-devnet (default): 3 block-producing pools with tx-generator
+#   2. ImmDB mock (--profile immdb): upstream/node0/downstream with immdb-server
+#
 # Usage:
-#   Local testing with WAN emulation + observability:
-#     ENABLE_WAN_EMULATION=true docker compose --profile observability up
-#   For Antithesis (no WAN emulation, no observability):
+#   Default (proto-devnet with 3 pools):
 #     docker compose up
+#   With immdb-server mock setup:
+#     docker compose --profile immdb up
+#   With observability stack:
+#     docker compose --profile observability up
+#   Combined profiles:
+#     docker compose --profile immdb --profile observability up
+#   With WAN emulation:
+#     ENABLE_WAN_EMULATION=true docker compose up
 
 x-common-env: &common-env
   ENABLE_WAN_EMULATION: ${ENABLE_WAN_EMULATION:-false}
   REF_SLOT: ${REF_SLOT:-11}
+
+x-pool-ips: &pool-ips
+  IP_POOL1: "172.28.0.10"
+  IP_POOL2: "172.28.0.20"
+  IP_POOL3: "172.28.0.30"
+  PORT_POOL1: "3001"
+  PORT_POOL2: "3002"
+  PORT_POOL3: "3003"
 
 x-wan-env-upstream: &wan-env-upstream
   RATE: ${RATE_UP_TO_N0:-10Mbps}
@@ -27,9 +46,202 @@ x-wan-env-downstream: &wan-env-downstream
 
 services:
   # ==========================================================================
-  # Init Containers
+  # Proto-Devnet: Init Containers
+  # ==========================================================================
+  init-pool1:
+    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
+    build:
+      context: ..
+      dockerfile: antithesis/Dockerfile.cardano-node-bp
+    command: ["/app/scripts/init-pool-node.sh", "1"]
+    environment:
+      <<: [*common-env, *pool-ips]
+    volumes:
+      - pool1-data:/data
+      - genesis-shared:/shared-genesis
+      - logs:/logs
+    networks:
+      - leios-net
+
+  init-pool2:
+    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
+    build:
+      context: ..
+      dockerfile: antithesis/Dockerfile.cardano-node-bp
+    command: ["/app/scripts/init-pool-node.sh", "2"]
+    depends_on:
+      init-pool1:
+        condition: service_completed_successfully
+    environment:
+      <<: [*common-env, *pool-ips]
+    volumes:
+      - pool2-data:/data
+      - genesis-shared:/shared-genesis
+      - logs:/logs
+    networks:
+      - leios-net
+
+  init-pool3:
+    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
+    build:
+      context: ..
+      dockerfile: antithesis/Dockerfile.cardano-node-bp
+    command: ["/app/scripts/init-pool-node.sh", "3"]
+    depends_on:
+      init-pool1:
+        condition: service_completed_successfully
+    environment:
+      <<: [*common-env, *pool-ips]
+    volumes:
+      - pool3-data:/data
+      - genesis-shared:/shared-genesis
+      - logs:/logs
+    networks:
+      - leios-net
+
+  # ==========================================================================
+  # Proto-Devnet: Block Producer Nodes (3 pools in mesh topology)
+  # ==========================================================================
+  pool1:
+    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
+    build:
+      context: ..
+      dockerfile: antithesis/Dockerfile.cardano-node-bp
+    command: ["/app/scripts/run-pool-node.sh", "pool1"]
+    depends_on:
+      init-pool1:
+        condition: service_completed_successfully
+    cap_add:
+      - NET_ADMIN
+    environment:
+      <<: *common-env
+      PORT: "3001"
+    volumes:
+      - pool1-data:/data
+      - logs:/logs
+    networks:
+      leios-net:
+        ipv4_address: 172.28.0.10
+    healthcheck:
+      test: ["CMD", "test", "-S", "/data/socket"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 30s
+
+  pool2:
+    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
+    build:
+      context: ..
+      dockerfile: antithesis/Dockerfile.cardano-node-bp
+    command: ["/app/scripts/run-pool-node.sh", "pool2"]
+    depends_on:
+      init-pool2:
+        condition: service_completed_successfully
+      pool1:
+        condition: service_started
+    cap_add:
+      - NET_ADMIN
+    environment:
+      <<: *common-env
+      PORT: "3002"
+    volumes:
+      - pool2-data:/data
+      - logs:/logs
+    networks:
+      leios-net:
+        ipv4_address: 172.28.0.20
+    healthcheck:
+      test: ["CMD", "test", "-S", "/data/socket"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 30s
+
+  pool3:
+    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
+    build:
+      context: ..
+      dockerfile: antithesis/Dockerfile.cardano-node-bp
+    command: ["/app/scripts/run-pool-node.sh", "pool3"]
+    depends_on:
+      init-pool3:
+        condition: service_completed_successfully
+      pool1:
+        condition: service_started
+    cap_add:
+      - NET_ADMIN
+    environment:
+      <<: *common-env
+      PORT: "3003"
+    volumes:
+      - pool3-data:/data
+      - logs:/logs
+    networks:
+      leios-net:
+        ipv4_address: 172.28.0.30
+    healthcheck:
+      test: ["CMD", "test", "-S", "/data/socket"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 30s
+
+  # ==========================================================================
+  # Proto-Devnet: TX Generator
+  # ==========================================================================
+  tx-generator:
+    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
+    build:
+      context: ..
+      dockerfile: antithesis/Dockerfile.cardano-node-bp
+    command: ["/app/scripts/run-tx-generator.sh"]
+    depends_on:
+      pool1:
+        condition: service_healthy
+      pool2:
+        condition: service_healthy
+      pool3:
+        condition: service_healthy
+    environment:
+      <<: *pool-ips
+    volumes:
+      - txgen-data:/data
+      - genesis-shared:/shared-genesis:ro
+      - logs:/logs
+    networks:
+      - leios-net
+
+  # ==========================================================================
+  # Proto-Devnet: Analysis Container
+  # ==========================================================================
+  analysis:
+    image: ghcr.io/input-output-hk/ouroboros-leios/leios-analysis:${GIT_SHA:-latest}
+    build:
+      context: ..
+      dockerfile: antithesis/Dockerfile.analysis
+    depends_on:
+      pool1:
+        condition: service_healthy
+      pool2:
+        condition: service_healthy
+      pool3:
+        condition: service_healthy
+    environment:
+      <<: *common-env
+      PRAOS_LATENCY_THRESHOLD_MS: ${PRAOS_LATENCY_THRESHOLD_MS:-5000}
+      CHECK_INTERVAL_SECONDS: ${CHECK_INTERVAL_SECONDS:-5}
+      INITIAL_WAIT_SECONDS: ${INITIAL_WAIT_SECONDS:-30}
+    volumes:
+      - logs:/logs:ro
+    networks:
+      - leios-net
+
+  # ==========================================================================
+  # ImmDB Profile: Init Containers (use --profile immdb)
   # ==========================================================================
   init-upstream:
+    profiles: ["immdb"]
     image: ghcr.io/input-output-hk/ouroboros-leios/immdb-server:${GIT_SHA:-latest}
     build:
       context: ..
@@ -44,6 +256,7 @@ services:
       - leios-net
 
   init-node0:
+    profiles: ["immdb"]
     image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-leios:${GIT_SHA:-latest}
     build:
       context: ..
@@ -60,6 +273,7 @@ services:
       - leios-net
 
   init-downstream:
+    profiles: ["immdb"]
     image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-leios:${GIT_SHA:-latest}
     build:
       context: ..
@@ -76,9 +290,10 @@ services:
       - leios-net
 
   # ==========================================================================
-  # Main Services
+  # ImmDB Profile: Main Services (use --profile immdb)
   # ==========================================================================
   upstream:
+    profiles: ["immdb"]
     image: ghcr.io/input-output-hk/ouroboros-leios/immdb-server:${GIT_SHA:-latest}
     build:
       context: ..
@@ -107,6 +322,7 @@ services:
       start_period: 10s
 
   node0:
+    profiles: ["immdb"]
     image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-leios:${GIT_SHA:-latest}
     build:
       context: ..
@@ -136,6 +352,7 @@ services:
       start_period: 30s
 
   downstream:
+    profiles: ["immdb"]
     image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-leios:${GIT_SHA:-latest}
     build:
       context: ..
@@ -165,9 +382,10 @@ services:
       start_period: 30s
 
   # ==========================================================================
-  # Analysis Container
+  # ImmDB Profile: Analysis Container (use --profile immdb)
   # ==========================================================================
-  analysis:
+  analysis-immdb:
+    profiles: ["immdb"]
     image: ghcr.io/input-output-hk/ouroboros-leios/leios-analysis:${GIT_SHA:-latest}
     build:
       context: ..
@@ -190,7 +408,7 @@ services:
       - leios-net
 
   # ==========================================================================
-  # Observability Stack (optional, use --profile observability)
+  # Observability Stack (use --profile observability)
   # ==========================================================================
   prometheus:
     image: prom/prometheus:latest
@@ -252,9 +470,17 @@ services:
       - leios-net
 
 volumes:
+  # Proto-devnet volumes
+  pool1-data:
+  pool2-data:
+  pool3-data:
+  txgen-data:
+  genesis-shared:
+  # ImmDB profile volumes
   upstream-data:
   node0-data:
   downstream-data:
+  # Shared volumes
   logs:
   prometheus-data:
   loki-data:
