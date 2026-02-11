@@ -64,7 +64,7 @@ In addition to informing research and networking experts, memory pool modeling a
 	- [ ] Coherence between local and global memory pools.
 	- [ ] Variability of mempool synchronization.
 	- [x] Time delays between transaction arrival and block arrival.
-	- [ ] Frequency of long hops.
+	- [x] Frequency of long hops.
 - [x] [#669](https://github.com/input-output-hk/ouroboros-leios/issues/669) Mathematical model of memory pool behavior.
 	- Model definition.
 		- Independent variables.

@@ -114,6 +114,11 @@ The difference between the time a transaction reaches a memory pool and the time
 
 ### Frequency of long hops
 
+Approximately half of transactions travel more that 7000 km to their upstream peer. Traffic is concentrated in the northern hemisphere.
+
+![Distance traveled by transactions from remote peer to local mempool](../mempool-measurements/mempool-distance-cumulative.svg)
+
+![Distance traveled by transactions from remote peer to local mempool](../mempool-measurements/mempool-distance-map.svg)
 
 [^1]: See [Introduction to the design of the Data Diffusion and Networking for Cardano Shelley](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-design/network-design.pdf) and [Ouroboros Network Specification](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf.).
 [^2]: See [the default mainnet configuration file for cardano-node](https://github.com/IntersectMBO/cardano-node/blob/9cf1e651e9fc3726a5fa9771b0d3479e5b909c6b/configuration/cardano/mainnet-config.yaml#L49).
