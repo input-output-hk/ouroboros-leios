@@ -104,6 +104,16 @@ One can also use business-as-usual measurements on Cardano mainnet to develop st
 
 ### Coherence between local and global memory pools
 
+Without extensive telemetry, the coherence between local and global memory pools is difficult to estimate. Empirical measurements on three nodes (Europe, North America, East Asia) suggest the presence of highly connected nodes: 22% of transactions were served by a common 9% of remote peers. This indicates that mainnet topology may have some of the characteristics of a small-world graph and be less like an RRG than expected theoretically: this could be due to the fact that the peer-connectivity configuration of nodes can be customized by operators and are not enforced at the protocol level.
+
+| Number shared peers | Fraction of txs | Fraction of remote peers |
+| ------------------: | --------------: | -----------------------: |
+|                   1 |           0.487 |                    0.672 |
+|                   2 |           0.290 |                    0.235 |
+|                   3 |           0.223 |                    0.094 |
+
+![Topology of mempool tx requests](../mempool-measurements/mempool-distance-graph.svg)
+
 ### Variability of mempool synchronization
 
 ### Time delays between transaction arrival and block arrival
