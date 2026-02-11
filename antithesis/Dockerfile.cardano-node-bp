@@ -1,12 +1,17 @@
 # Block Producer Node Dockerfile for Proto-Devnet
-# Builds cardano-node with tx-generator and cardano-cli from leios-prototype branch
+# Builds cardano-node from leios-prototype branch
+# Builds tx-generator from stable cardano-node (leios-prototype has API incompatibility)
+# Fetches cardano-cli from blink labs pre-built image
 # Includes proto-devnet genesis files, pool keys, and configuration
 
+FROM ghcr.io/blinklabs-io/cardano-cli:10.14.0.0-1 AS cardano-cli
+
+# Build cardano-node from leios-prototype
 FROM ghcr.io/blinklabs-io/haskell:9.6.6-3.12.1.0-3 AS cardano-node-build
 
 ARG OUROBOROS_CONSENSUS_REF=4f20aeb08b4f8eaf20fd2762e7ffc5738e7d05af
 
-RUN echo "Building leios-prototype branch..." \
+RUN echo "Building cardano-node from leios-prototype..." \
     && git clone https://github.com/intersectmbo/cardano-node.git \
     && cd cardano-node \
     && git fetch --all --recurse-submodules --tags \
@@ -15,13 +20,31 @@ RUN echo "Building leios-prototype branch..." \
     && echo "tests: False" >> cabal.project.local \
     && sed -i "s|tag: 8f0e1423c99bcfa0025ae5476a5467a4af0d2828|tag: ${OUROBOROS_CONSENSUS_REF}|g" cabal.project \
     && cabal update \
-    && cabal build exe:cardano-node exe:cardano-cli exe:tx-generator \
+    && cabal build exe:cardano-node \
     && mkdir -p /root/.local/bin/ \
     && cp -p "$(find dist-newstyle -name cardano-node -type f -executable | head -1)" /root/.local/bin/ \
-    && cp -p "$(find dist-newstyle -name cardano-cli -type f -executable | head -1)" /root/.local/bin/ \
-    && cp -p "$(find dist-newstyle -name tx-generator -type f -executable | head -1)" /root/.local/bin/ \
     && rm -rf /root/.cabal/packages \
     && rm -rf /usr/local/lib/ghc-${GHC_VERSION}/ /usr/local/share/doc/ghc-${GHC_VERSION}/ \
+    && rm -rf dist-newstyle/ \
+    && rm -rf /root/.cabal/store/ghc-${GHC_VERSION}
+
+# Build tx-generator from stable branch (leios-prototype tx-generator has API issues)
+FROM ghcr.io/blinklabs-io/haskell:9.6.6-3.12.1.0-3 AS tx-generator-build
+
+ARG CARDANO_NODE_VERSION=10.5.4
+
+RUN echo "Building tx-generator from cardano-node ${CARDANO_NODE_VERSION}..." \
+    && git clone https://github.com/intersectmbo/cardano-node.git \
+    && cd cardano-node \
+    && git fetch --all --tags \
+    && git checkout ${CARDANO_NODE_VERSION} \
+    && echo "with-compiler: ghc-${GHC_VERSION}" >> cabal.project.local \
+    && echo "tests: False" >> cabal.project.local \
+    && cabal update \
+    && cabal build exe:tx-generator \
+    && mkdir -p /root/.local/bin/ \
+    && cp -p "$(find dist-newstyle -name tx-generator -type f -executable | head -1)" /root/.local/bin/ \
+    && rm -rf /root/.cabal/packages \
     && rm -rf dist-newstyle/ \
     && rm -rf /root/.cabal/store/ghc-${GHC_VERSION}
 
@@ -32,8 +55,9 @@ ENV PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH"
 
 COPY --from=cardano-node-build /usr/local/lib/ /usr/local/lib/
 COPY --from=cardano-node-build /usr/local/include/ /usr/local/include/
-COPY --from=cardano-node-build /root/.local/bin/cardano-* /usr/local/bin/
-COPY --from=cardano-node-build /root/.local/bin/tx-generator /usr/local/bin/
+COPY --from=cardano-node-build /root/.local/bin/cardano-node /usr/local/bin/
+COPY --from=tx-generator-build /root/.local/bin/tx-generator /usr/local/bin/
+COPY --from=cardano-cli /usr/local/bin/cardano-cli /usr/local/bin/
 
 RUN apt-get update -y && \
     apt-get install -y \
