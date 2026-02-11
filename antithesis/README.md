@@ -4,14 +4,16 @@ Docker Compose orchestration for testing Leios consensus using [Antithesis](http
 
 ## Configurations
 
-Two network configurations are available:
+Two mutually exclusive network configurations are available:
 
-1. Proto-devnet (default): 3 block-producing pools with tx-generator
-2. ImmDB mock (--profile immdb): upstream/node0/downstream with immdb-server
+1. Proto-devnet (`--profile devnet`): 3 block-producing pools with tx-generator
+2. ImmDB mock (`--profile immdb`): upstream/node0/downstream with immdb-server
+
+These are separate test environments and should not be run together.
 
 ## Architecture
 
-### Proto-Devnet (Default)
+### Proto-Devnet (`--profile devnet`)
 
 3 block-producing pool nodes in a mesh topology with transaction load:
 
@@ -59,39 +61,40 @@ Linear topology with immdb-server providing mock blocks:
 
 | Service | IP Address | Port | Purpose |
 |---------|------------|------|---------|
-| upstream | 172.28.0.10 | 3001 | immdb-server block source |
-| node0 | 172.28.0.20 | 3002 | Leios-enabled cardano-node |
-| downstream | 172.28.0.30 | 3003 | Receiving cardano-node |
+| upstream | 172.28.0.110 | 3001 | immdb-server block source |
+| node0 | 172.28.0.120 | 3002 | Leios-enabled cardano-node |
+| downstream | 172.28.0.130 | 3003 | Receiving cardano-node |
 | analysis-immdb | dynamic | - | Metrics analysis |
 
 ## Quick Start
 
 ```bash
-# Proto-devnet (default)
-docker compose up
+# Proto-devnet (3 block-producing pools)
+docker compose --profile devnet up
 
 # ImmDB mock setup
 docker compose --profile immdb up
 
 # Build images only
-docker compose build
+docker compose --profile devnet build
+docker compose --profile immdb build
 
 # Start in background
-docker compose up -d
+docker compose --profile devnet up -d
 
 # View logs
-docker compose logs -f
+docker compose --profile devnet logs -f
 
 # Stop and clean up
-docker compose down -v
+docker compose --profile devnet down -v
 ```
 
 ## Usage
 
-### Default Mode (Proto-Devnet)
+### Proto-Devnet Mode
 
 ```bash
-docker compose up
+docker compose --profile devnet up
 ```
 
 ### ImmDB Mock Mode
@@ -104,7 +107,7 @@ docker compose --profile immdb up
 
 ```bash
 # Proto-devnet with observability
-docker compose --profile observability up
+docker compose --profile devnet --profile observability up
 
 # ImmDB with observability
 docker compose --profile immdb --profile observability up
@@ -123,7 +126,7 @@ Access Grafana at http://localhost:3000 (no login required).
 ### With WAN Emulation
 
 ```bash
-ENABLE_WAN_EMULATION=true docker compose up
+ENABLE_WAN_EMULATION=true docker compose --profile devnet up
 ```
 
 Enables network latency/bandwidth simulation using tc.
@@ -193,11 +196,11 @@ antithesis/
 
 | Volume | Profile | Purpose |
 |--------|---------|---------|
-| pool1-data | default | Pool1 node data |
-| pool2-data | default | Pool2 node data |
-| pool3-data | default | Pool3 node data |
-| txgen-data | default | TX generator working directory |
-| genesis-shared | default | Shared genesis files |
+| pool1-data | devnet | Pool1 node data |
+| pool2-data | devnet | Pool2 node data |
+| pool3-data | devnet | Pool3 node data |
+| txgen-data | devnet | TX generator working directory |
+| genesis-shared | devnet | Shared genesis files |
 | upstream-data | immdb | Upstream immdb-server data |
 | node0-data | immdb | Node0 data |
 | downstream-data | immdb | Downstream node data |
@@ -209,16 +212,16 @@ antithesis/
 
 ```bash
 # Check all services are healthy
-docker compose ps
+docker compose --profile devnet ps
 
 # Verify blocks are being produced
-docker compose logs pool1 | grep -i "AddedToCurrentChain"
+docker compose --profile devnet logs pool1 | grep -i "AddedToCurrentChain"
 
 # Check tx-generator
-docker compose logs tx-generator
+docker compose --profile devnet logs tx-generator
 
 # View analysis output
-docker compose logs analysis
+docker compose --profile devnet logs analysis
 ```
 
 ### ImmDB Profile
@@ -253,14 +256,14 @@ When running outside Antithesis, assertions are logged to stdout.
 
 Check topology configuration:
 ```bash
-docker compose exec pool1 cat /data/topology.json
+docker compose --profile devnet exec pool1 cat /data/topology.json
 ```
 
 ### No blocks being produced (proto-devnet)
 
 Verify genesis timestamp is recent:
 ```bash
-docker compose exec pool1 cat /data/genesis/shelley-genesis.json | jq '.systemStart'
+docker compose --profile devnet exec pool1 cat /data/shelley-genesis.json | jq '.systemStart'
 ```
 
 ### Upstream not serving blocks (immdb)
@@ -274,9 +277,9 @@ docker compose --profile immdb exec upstream cat /data/schedule.json
 
 Clean rebuild:
 ```bash
-docker compose down -v
-docker compose build --no-cache
-docker compose up
+docker compose --profile devnet down -v
+docker compose --profile devnet build --no-cache
+docker compose --profile devnet up
 ```
 
 ## Development
@@ -284,14 +287,14 @@ docker compose up
 ### Rebuilding a single service
 
 ```bash
-docker compose build pool1
-docker compose up -d pool1
+docker compose --profile devnet build pool1
+docker compose --profile devnet up -d pool1
 ```
 
 ### Accessing a container
 
 ```bash
-docker compose exec pool1 bash
+docker compose --profile devnet exec pool1 bash
 ```
 
 ## Related Documentation
