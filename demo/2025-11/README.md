@@ -43,56 +43,90 @@ Highlights include the following.
 - The `ss` tool is being used to sample socket statistics throughout the demo's execution, so that the TCP algorithm's state can be monitored.
   For example, the `rtt` and `notsent` fields are directly related to bufferbloat.
 
-## Running the Leios 202511 demo
+## Getting started
 
-Run the Leios X-Ray (Grafana based observability stack)
-
-```shell
-export LOG_PATH=".tmp-leios-202511-demo/*.log"
-nix run github:input-output-hk/ouroboros-leios#x-ray
-```
-
-Run the Leios experiment with default configuration
+Run the demo with all dependencies automatically provided using nix:
 
 ```shell
 nix run github:input-output-hk/ouroboros-leios#demo-2025-11
 ```
 
-If you want to further configure the experiment set the following environment
-variables:
+Or enter the `nix develop` shell (also available via `direnv allow`) and follow [without nix instructions](#without-nix).
+
+### Without Nix
+
+Install these prerequisites:
+
+- `process-compose` for orchestrating the demo processes
+- `cardano-node` patched with Leios support
+- `immdb-server` for the upstream node (mock server)
+- `leiosdemo202510` for generating Leios schedules
+- `ss_http_exporter` for socket statistics monitoring
+- `sqlite3` for creating Leios databases
+- `jq` for config modifications
+- `python` with `pandas` and `matplotlib` for analysis
+
+Ensure they are on your PATH, override if needed with something like:
 
 ```shell
-CARDANO_NODE=cardano-node
-IMMDB_SERVER=immdb-server
-
-DATA_DIR=data
-CLUSTER_RUN=data/2025-10-10-13-29-24641-1050-50-blocks-50-coay-sup
-REF_SLOT=41
-SECONDS_UNTIL_REF_SLOT=5
-LEIOS_MANIFEST=manifest.json
-
-ANALYSE_PY=analyse.py
-PYTHON3=python
-
-RATE_UP_TO_N0="100Mbps";
-DELAY_UP_TO_N0="20ms";
-RATE_N0_TO_UP="100Mbps";
-DELAY_N0_TO_UP="20ms";
-RATE_N0_TO_DOWN="100Mbps";
-DELAY_N0_TO_DOWN="20ms";
-RATE_DOWN_TO_N0="100Mbps";
+export PATH=/path/to/cardano-node:/path/to/immdb-server:$PATH
 ```
 
-To use a locally built `cardano-node` and `immdb-server` (using your own paths to the codebase):
+Then run:
 
 ```shell
-export CARDANO_NODE=$(cd ~/code/iog/cardano-node; cabal list-bin cardano-node)
-export IMMDB_SERVER=$(cd ~/code/iog/ouroboros-consensus; cabal list-bin immdb-server)
+./run.sh
 ```
 
-To clean up just delete the working directories
+## Configuration
+
+You can customize the demo by setting environment variables before running. See `run.sh` for available options and their defaults:
 
 ```shell
-rm -fr .tmp-leios-202511-demo
-rm -fr tmp-x-ray
+# Network simulation parameters
+export RATE_UP_TO_N0="100Mbps"
+export DELAY_UP_TO_N0="20ms"
+export RATE_N0_TO_UP="100Mbps"
+export DELAY_N0_TO_UP="20ms"
+export RATE_N0_TO_DOWN="100Mbps"
+export DELAY_N0_TO_DOWN="20ms"
+export RATE_DOWN_TO_N0="100Mbps"
+export DELAY_DOWN_TO_N0="20ms"
+
+# Timing
+export REF_SLOT=41
+export SECONDS_UNTIL_REF_SLOT=5
+
+# Working directory
+export WORKING_DIR=my-experiment
+
+./run.sh
+```
+
+To use locally built binaries, simply adjust your PATH:
+
+```shell
+export PATH=$(cd ~/code/iog/cardano-node; dirname $(cabal list-bin cardano-node)):$PATH
+export PATH=$(cd ~/code/iog/ouroboros-consensus; dirname $(cabal list-bin immdb-server)):$PATH
+./run.sh
+```
+
+## Observability with X-ray
+
+Run the Leios X-Ray (Grafana based observability stack) in a separate terminal:
+
+```shell
+export LOG_PATH="tmp-leios-202511-demo/*.log"
+nix run github:input-output-hk/ouroboros-leios#x-ray
+```
+
+Access Grafana at <http://localhost:3000>
+
+## Clean up
+
+To reset the demo, simply remove the working directories:
+
+```shell
+rm -rf tmp-leios-202511-demo
+rm -rf tmp-x-ray
 ```
