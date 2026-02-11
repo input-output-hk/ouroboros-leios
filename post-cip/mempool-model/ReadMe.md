@@ -114,7 +114,21 @@ Without extensive telemetry, the coherence between local and global memory pools
 
 ![Topology of mempool tx requests](../mempool-measurements/mempool-distance-graph.svg)
 
+Under typical conditions the memory pools different regions are more than 90% synchronized.
+
+![Conditional probabilities of transactions in mempools across regions](../mempool-measurements/conditional-probability-regions.svg)
+
+As block utilization increases, the level of synchronization drops notably between some regions.
+
+![Conditional probabilities of transactions in mempools across regions](../mempool-measurements/conditional-probability-utilization-regions.svg)
+
 ### Variability of mempool synchronization
+
+Under non-congested conditions (i.e., block utilization less than 85%), close to 90% of blocks contain all of the transactions in a node's memory pool. When blocks are congested, that coherence does not drop much.
+
+![Fraction of transactions in block previously seen in mempool](../mempool-measurements/block-fraction.svg)
+
+![Conditional probabilities for transactions being seen in the mempool before in a block](../mempool-measurements/conditional-probability-mempool-block.svg)
 
 ### Time delays between transaction arrival and block arrival
 

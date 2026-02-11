@@ -60,9 +60,9 @@ In addition to informing research and networking experts, memory pool modeling a
 
 ### [#667](https://github.com/input-output-hk/ouroboros-leios/issues/667) Modeling the memory pools and their spatio-temporal correlations
 
-- [ ] [#668](https://github.com/input-output-hk/ouroboros-leios/issues/668) Regression models of mempool behavior under normal operating conditions.
+- [x] [#668](https://github.com/input-output-hk/ouroboros-leios/issues/668) Regression models of mempool behavior under normal operating conditions.
 	- [x] Coherence between local and global memory pools.
-	- [ ] Variability of mempool synchronization.
+	- [x] Variability of mempool synchronization.
 	- [x] Time delays between transaction arrival and block arrival.
 	- [x] Frequency of long hops.
 - [x] [#669](https://github.com/input-output-hk/ouroboros-leios/issues/669) Mathematical model of memory pool behavior.
