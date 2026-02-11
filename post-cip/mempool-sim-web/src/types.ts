@@ -1,105 +1,54 @@
 export const TXID_B = 32;
 
-export type TxId = string;
+export type TxIdx = number;  // compact index into global tx array
 
-export interface Tx {
-  txId: TxId;
+export interface GlobalTx {
+  idx: number;
+  txId: string;
   size_B: number;
-  frontRuns: TxId;
+  isAdversarial: boolean;
+  honestCounterpart: number;  // idx of honest tx this front-runs (-1 if honest)
+  adversarialVariant: number; // idx of adversarial variant (-1 if none created yet)
+  includedInBlock: number;    // block index where this was included (-1 if not)
 }
 
 export interface Block {
   blockId: string;
-  producer: string;
+  producer: number;        // node index
   clock: number;
-  transactions: Tx[];
+  txIndices: number[];     // indices into global tx array
   size_B: number;
   honestCount: number;
   adversarialCount: number;
 }
 
-export interface SimulationConfig {
-  nodes: number;
-  degree: number;
-  block: number;
-  mempool: number;
-  latency: number;
-  bandwidth: number;
-  adversaries: number;
-  adversaryDegree: number;
-  adversaryDelay: number;
-  txCount: number;
-  txSizeMin: number;
-  txSizeMax: number;
-  duration: number;       // Total simulation duration in seconds
-  blockInterval: number;  // Average interval between blocks (Poisson rate)
-  ebEnabled: boolean;              // Enable Endorser Block production (Leios)
-  ebSize: number;                  // Max bytes of tx refs per EB
-  txCacheMode: TxCacheMode;        // How EB-fetched txs are handled
-}
-
-export const DEFAULT_CONFIG: SimulationConfig = {
-  nodes: 50,
-  degree: 6,
-  block: 90000,
-  mempool: 180000,
-  latency: 0.100,
-  bandwidth: 1250000,
-  adversaries: 2,
-  adversaryDegree: 18,
-  adversaryDelay: 0.002,
-  txCount: 250,
-  txSizeMin: 200,
-  txSizeMax: 16384,
-  duration: 20,
-  blockInterval: 1,
-  ebEnabled: false,
-  ebSize: 10_000_000,    // 10 MB — CIP-0164 default
-  txCacheMode: 'mempool',
-};
-
-export const MINIMAL_CONFIG: SimulationConfig = {
-  nodes: 10,
-  degree: 3,
-  block: 90000,
-  mempool: 180000,
-  latency: 0.100,
-  bandwidth: 1250000,
-  adversaries: 1,
-  adversaryDegree: 2,
-  adversaryDelay: 0.002,
-  txCount: 50,
-  txSizeMin: 200,
-  txSizeMax: 16384,
-  duration: 20,
-  blockInterval: 2,
-  ebEnabled: false,
-  ebSize: 10_000_000,    // 10 MB — CIP-0164 default
-  txCacheMode: 'mempool',
-};
-
 export interface EndorserBlock {
   ebId: string;
-  producer: string;
+  producer: number;        // node index
   clock: number;
-  txRefs: TxId[];    // tx hashes referenced by this EB
+  txRefs: number[];        // indices into global tx array
   size_B: number;
 }
 
-// Cache mode for EB-fetched transactions
 export type TxCacheMode = 'cache-only' | 'mempool' | 'both';
 
-export type PresetType = 'minimal' | 'default' | 'custom';
-
-// P2P Peer Selection Types (dynamic topology churn model)
-export interface P2PConfig {
-  enabled: boolean;           // Toggle static vs dynamic topology (default: false)
-  churnInterval: number;      // Seconds between churn events (default: 5)
-  churnProbability: number;   // Probability each peer is replaced per churn (default: 0.2)
+export interface SimulationConfig {
+  nodes: number;
+  degree: number;
+  blockSize_B: number;
+  mempoolCapacity_B: number;
+  latency_s: number;
+  bandwidth_Bps: number;
+  adversaries: number;
+  adversaryDegree: number;
+  adversaryDelay_s: number;
+  txCount: number;
+  txSizeMin_B: number;
+  txSizeMax_B: number;
+  duration_s: number;
+  blockInterval_s: number;
+  // Leios
+  ebEnabled: boolean;
+  ebSize_B: number;
+  txCacheMode: TxCacheMode;
 }
-
-export const DEFAULT_P2P_CONFIG: P2PConfig = {
-  enabled: true,
-  churnInterval: 5,
-  churnProbability: 0.2,
-};
