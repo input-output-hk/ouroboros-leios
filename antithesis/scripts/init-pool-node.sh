@@ -33,10 +33,10 @@ echo "  SHARED_GENESIS_DIR: $SHARED_GENESIS_DIR"
 
 # Create data directory if needed
 mkdir -p "$DATA_DIR"
-mkdir -p "$DATA_DIR/genesis"
 mkdir -p "$DATA_DIR/keys"
 
 # Handle genesis files - pool1 creates them, others wait and copy
+# Genesis files go directly in $DATA_DIR since config.json uses relative paths
 if [ "$POOL_NUM" = "1" ]; then
     echo "Pool1: Creating genesis files with current timestamp..."
 
@@ -48,20 +48,20 @@ if [ "$POOL_NUM" = "1" ]; then
 
     # Update byron-genesis.json with startTime
     jq --argjson time "$startTimeEpoch" '.startTime = $time' \
-        "$GENESIS_DIR/byron-genesis.json" > "$DATA_DIR/genesis/byron-genesis.json"
+        "$GENESIS_DIR/byron-genesis.json" > "$DATA_DIR/byron-genesis.json"
 
     # Update shelley-genesis.json with systemStart
     jq --arg time "$startTimeIso" '.systemStart = $time' \
-        "$GENESIS_DIR/shelley-genesis.json" > "$DATA_DIR/genesis/shelley-genesis.json"
+        "$GENESIS_DIR/shelley-genesis.json" > "$DATA_DIR/shelley-genesis.json"
 
     # Copy remaining genesis files unchanged
-    cp "$GENESIS_DIR/alonzo-genesis.json" "$DATA_DIR/genesis/"
-    cp "$GENESIS_DIR/conway-genesis.json" "$DATA_DIR/genesis/"
-    cp "$GENESIS_DIR/dijkstra-genesis.json" "$DATA_DIR/genesis/"
+    cp "$GENESIS_DIR/alonzo-genesis.json" "$DATA_DIR/"
+    cp "$GENESIS_DIR/conway-genesis.json" "$DATA_DIR/"
+    cp "$GENESIS_DIR/dijkstra-genesis.json" "$DATA_DIR/"
 
     # Share genesis files with other pools via shared volume
     mkdir -p "$SHARED_GENESIS_DIR"
-    cp "$DATA_DIR/genesis/"*.json "$SHARED_GENESIS_DIR/"
+    cp "$DATA_DIR/"*-genesis.json "$SHARED_GENESIS_DIR/"
 
     # Create a marker to signal genesis is ready
     touch "$SHARED_GENESIS_DIR/.genesis-ready"
@@ -84,7 +84,7 @@ else
     fi
 
     # Copy genesis files from shared volume
-    cp "$SHARED_GENESIS_DIR/"*.json "$DATA_DIR/genesis/"
+    cp "$SHARED_GENESIS_DIR/"*-genesis.json "$DATA_DIR/"
     echo "  Genesis files copied from pool1"
 fi
 

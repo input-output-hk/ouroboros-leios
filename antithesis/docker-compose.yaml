@@ -264,7 +264,7 @@ services:
     command: /app/scripts/init-node0.sh
     environment:
       <<: *common-env
-      IP_UPSTREAM_NODE: "172.28.0.10"
+      IP_UPSTREAM_NODE: "172.28.0.110"
       PORT_UPSTREAM_NODE: "3001"
     volumes:
       - node0-data:/data
@@ -281,7 +281,7 @@ services:
     command: /app/scripts/init-downstream.sh
     environment:
       <<: *common-env
-      IP_NODE0: "172.28.0.20"
+      IP_NODE0: "172.28.0.120"
       PORT_NODE0: "3002"
     volumes:
       - downstream-data:/data
@@ -313,7 +313,7 @@ services:
       - logs:/logs
     networks:
       leios-net:
-        ipv4_address: 172.28.0.10
+        ipv4_address: 172.28.0.110
     healthcheck:
       test: ["CMD", "test", "-f", "/data/schedule.json"]
       interval: 5s
@@ -343,7 +343,7 @@ services:
       - logs:/logs
     networks:
       leios-net:
-        ipv4_address: 172.28.0.20
+        ipv4_address: 172.28.0.120
     healthcheck:
       test: ["CMD", "test", "-S", "/data/socket"]
       interval: 5s
@@ -373,7 +373,7 @@ services:
       - logs:/logs
     networks:
       leios-net:
-        ipv4_address: 172.28.0.30
+        ipv4_address: 172.28.0.130
     healthcheck:
       test: ["CMD", "test", "-S", "/data/socket"]
       interval: 5s

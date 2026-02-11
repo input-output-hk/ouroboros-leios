@@ -28,7 +28,7 @@ mkdir -p "$LOG_DIR"
 export LEIOS_DB_PATH="$DATA_DIR/leios.db"
 
 # Verify required files exist
-for required_file in config.json topology.json genesis/shelley-genesis.json keys/vrf.skey keys/kes.skey keys/opcert.cert; do
+for required_file in config.json topology.json shelley-genesis.json keys/vrf.skey keys/kes.skey keys/opcert.cert; do
     if [ ! -f "$DATA_DIR/$required_file" ]; then
         echo "ERROR: Required file not found: $DATA_DIR/$required_file"
         exit 1
