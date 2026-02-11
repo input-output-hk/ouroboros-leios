@@ -1,20 +1,19 @@
 # Leios Antithesis Docker Compose Stack
 #
-# Two configurations available:
-#   1. Proto-devnet (default): 3 block-producing pools with tx-generator
+# Two mutually exclusive configurations available:
+#   1. Proto-devnet (--profile devnet): 3 block-producing pools with tx-generator
 #   2. ImmDB mock (--profile immdb): upstream/node0/downstream with immdb-server
 #
 # Usage:
-#   Default (proto-devnet with 3 pools):
-#     docker compose up
-#   With immdb-server mock setup:
+#   Proto-devnet with 3 pools:
+#     docker compose --profile devnet up
+#   ImmDB mock setup:
 #     docker compose --profile immdb up
 #   With observability stack:
-#     docker compose --profile observability up
-#   Combined profiles:
+#     docker compose --profile devnet --profile observability up
 #     docker compose --profile immdb --profile observability up
 #   With WAN emulation:
-#     ENABLE_WAN_EMULATION=true docker compose up
+#     ENABLE_WAN_EMULATION=true docker compose --profile devnet up
 
 x-common-env: &common-env
   ENABLE_WAN_EMULATION: ${ENABLE_WAN_EMULATION:-false}
@@ -46,9 +45,10 @@ x-wan-env-downstream: &wan-env-downstream
 
 services:
   # ==========================================================================
-  # Proto-Devnet: Init Containers
+  # Proto-Devnet: Init Containers (use --profile devnet)
   # ==========================================================================
   init-pool1:
+    profiles: ["devnet"]
     image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
     build:
       context: ..
@@ -64,6 +64,7 @@ services:
       - leios-net
 
   init-pool2:
+    profiles: ["devnet"]
     image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
     build:
       context: ..
@@ -82,6 +83,7 @@ services:
       - leios-net
 
   init-pool3:
+    profiles: ["devnet"]
     image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
     build:
       context: ..
@@ -100,9 +102,10 @@ services:
       - leios-net
 
   # ==========================================================================
-  # Proto-Devnet: Block Producer Nodes (3 pools in mesh topology)
+  # Proto-Devnet: Block Producer Nodes (use --profile devnet)
   # ==========================================================================
   pool1:
+    profiles: ["devnet"]
     image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
     build:
       context: ..
@@ -130,6 +133,7 @@ services:
       start_period: 30s
 
   pool2:
+    profiles: ["devnet"]
     image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
     build:
       context: ..
@@ -159,6 +163,7 @@ services:
       start_period: 30s
 
   pool3:
+    profiles: ["devnet"]
     image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
     build:
       context: ..
@@ -188,9 +193,10 @@ services:
       start_period: 30s
 
   # ==========================================================================
-  # Proto-Devnet: TX Generator
+  # Proto-Devnet: TX Generator (use --profile devnet)
   # ==========================================================================
   tx-generator:
+    profiles: ["devnet"]
     image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
     build:
       context: ..
@@ -213,9 +219,10 @@ services:
       - leios-net
 
   # ==========================================================================
-  # Proto-Devnet: Analysis Container
+  # Proto-Devnet: Analysis Container (use --profile devnet)
   # ==========================================================================
   analysis:
+    profiles: ["devnet"]
     image: ghcr.io/input-output-hk/ouroboros-leios/leios-analysis:${GIT_SHA:-latest}
     build:
       context: ..
