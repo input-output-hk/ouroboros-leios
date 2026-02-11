@@ -98,5 +98,22 @@ Set $`N=10\,000`$ and $`k = 20`$, which implies $`\lambda \doteq 3.074`$. Thus, 
 
 ![Front-running transactions in a memory-pool simulation](./adversarial-scatter.svg)
 
+## Statistical models based on empirical measurments
+
+One can also use business-as-usual measurements on Cardano mainnet to develop statistical models of memory-pool behavior: see [Exploratory Analysis](../mempool-measurements/exploratory-analysis.ipynb) for detailed analysis. Based on that, we have the following "rules of thumb" for the business-as-usual (optimistic) operation of memory pools.
+
+### Coherence between local and global memory pools
+
+### Variability of mempool synchronization
+
+### Time delays between transaction arrival and block arrival
+
+The difference between the time a transaction reaches a memory pool and the time it appears in a block is well represented by the geometric distribution corresponding to the active-slot coefficient, as expected theoretically. Transaction diffusion is fast enough that deviations from this idealization are not readily measurable.
+
+![Arrival-time distribution of transactions reaching the memory pool](../mempool-measurements/transaction-arrival.svg)
+
+### Frequency of long hops
+
+
 [^1]: See [Introduction to the design of the Data Diffusion and Networking for Cardano Shelley](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-design/network-design.pdf) and [Ouroboros Network Specification](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf.).
 [^2]: See [the default mainnet configuration file for cardano-node](https://github.com/IntersectMBO/cardano-node/blob/9cf1e651e9fc3726a5fa9771b0d3479e5b909c6b/configuration/cardano/mainnet-config.yaml#L49).
