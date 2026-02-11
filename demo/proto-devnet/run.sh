@@ -9,7 +9,6 @@ set -eo pipefail
 set -a
 : "${WORKING_DIR:=tmp-devnet}"
 : "${SOURCE_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
-: "${LEIOS_SCHEMA:=$(realpath "${SOURCE_DIR}"/../2025-11/data/leios-schema.sql)}"
 : "${IP_NODE1:=127.0.0.1}"
 : "${PORT_NODE1:=3001}"
 : "${IP_NODE2:=127.0.0.1}"
@@ -123,14 +122,6 @@ for i in "${nodes[@]}"; do
 	# Copy pool keys and set permissions
 	cp -r "$POOL_DIR" "$NODE_DIR/keys"
 	chmod 400 "$NODE_DIR/keys"/*.skey
-
-	# Create Leios database
-	if [ -f "$LEIOS_SCHEMA" ]; then
-		sqlite3 "$NODE_DIR/leios.db" <"$LEIOS_SCHEMA"
-		echo "Created leios.db for $NODE_NAME"
-	else
-		echo "Warning: Leios schema not found at $LEIOS_SCHEMA"
-	fi
 done
 
 # Copy utxo-keys for tx-generator and set permissions
