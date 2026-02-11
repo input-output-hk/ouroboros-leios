@@ -98,5 +98,51 @@ Set $`N=10\,000`$ and $`k = 20`$, which implies $`\lambda \doteq 3.074`$. Thus, 
 
 ![Front-running transactions in a memory-pool simulation](./adversarial-scatter.svg)
 
+## Statistical models based on empirical measurments
+
+One can also use business-as-usual measurements on Cardano mainnet to develop statistical models of memory-pool behavior: see [Exploratory Analysis](../mempool-measurements/exploratory-analysis.ipynb) for detailed analysis. Based on that, we have the following "rules of thumb" for the business-as-usual (optimistic) operation of memory pools.
+
+### Coherence between local and global memory pools
+
+Without extensive telemetry, the coherence between local and global memory pools is difficult to estimate. Empirical measurements on three nodes (Europe, North America, East Asia) suggest the presence of highly connected nodes: 22% of transactions were served by a common 9% of remote peers. This indicates that mainnet topology may have some of the characteristics of a small-world graph and be less like an RRG than expected theoretically: this could be due to the fact that the peer-connectivity configuration of nodes can be customized by operators and are not enforced at the protocol level.
+
+| Number shared peers | Fraction of txs | Fraction of remote peers |
+| ------------------: | --------------: | -----------------------: |
+|                   1 |           0.487 |                    0.672 |
+|                   2 |           0.290 |                    0.235 |
+|                   3 |           0.223 |                    0.094 |
+
+![Topology of mempool tx requests](../mempool-measurements/mempool-distance-graph.svg)
+
+Under typical conditions the memory pools different regions are more than 90% synchronized.
+
+![Conditional probabilities of transactions in mempools across regions](../mempool-measurements/conditional-probability-regions.svg)
+
+As block utilization increases, the level of synchronization drops notably between some regions.
+
+![Conditional probabilities of transactions in mempools across regions](../mempool-measurements/conditional-probability-utilization-regions.svg)
+
+### Variability of mempool synchronization
+
+Under non-congested conditions (i.e., block utilization less than 85%), close to 90% of blocks contain all of the transactions in a node's memory pool. When blocks are congested, that coherence does not drop much.
+
+![Fraction of transactions in block previously seen in mempool](../mempool-measurements/block-fraction.svg)
+
+![Conditional probabilities for transactions being seen in the mempool before in a block](../mempool-measurements/conditional-probability-mempool-block.svg)
+
+### Time delays between transaction arrival and block arrival
+
+The difference between the time a transaction reaches a memory pool and the time it appears in a block is well represented by the geometric distribution corresponding to the active-slot coefficient, as expected theoretically. Transaction diffusion is fast enough that deviations from this idealization are not readily measurable.
+
+![Arrival-time distribution of transactions reaching the memory pool](../mempool-measurements/transaction-arrival.svg)
+
+### Frequency of long hops
+
+Approximately half of transactions travel more that 7000 km to their upstream peer. Traffic is concentrated in the northern hemisphere.
+
+![Distance traveled by transactions from remote peer to local mempool](../mempool-measurements/mempool-distance-cumulative.svg)
+
+![Distance traveled by transactions from remote peer to local mempool](../mempool-measurements/mempool-distance-map.svg)
+
 [^1]: See [Introduction to the design of the Data Diffusion and Networking for Cardano Shelley](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-design/network-design.pdf) and [Ouroboros Network Specification](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf.).
 [^2]: See [the default mainnet configuration file for cardano-node](https://github.com/IntersectMBO/cardano-node/blob/9cf1e651e9fc3726a5fa9771b0d3479e5b909c6b/configuration/cardano/mainnet-config.yaml#L49).

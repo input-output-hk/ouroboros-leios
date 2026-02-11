@@ -60,12 +60,12 @@ In addition to informing research and networking experts, memory pool modeling a
 
 ### [#667](https://github.com/input-output-hk/ouroboros-leios/issues/667) Modeling the memory pools and their spatio-temporal correlations
 
-- [ ] [#668](https://github.com/input-output-hk/ouroboros-leios/issues/668) Regression models of mempool behavior under normal operating conditions.
-	- [ ] Coherence between local and global memory pools.
-	- [ ] Variability of mempool synchronization.
-	- [ ] Time delays between transaction arrival and block arrival.
-	- [ ] Frequency of long hops.
-- [ ] [#669](https://github.com/input-output-hk/ouroboros-leios/issues/669) Mathematical model of memory pool behavior.
+- [x] [#668](https://github.com/input-output-hk/ouroboros-leios/issues/668) Regression models of mempool behavior under normal operating conditions.
+	- [x] Coherence between local and global memory pools.
+	- [x] Variability of mempool synchronization.
+	- [x] Time delays between transaction arrival and block arrival.
+	- [x] Frequency of long hops.
+- [x] [#669](https://github.com/input-output-hk/ouroboros-leios/issues/669) Mathematical model of memory pool behavior.
 	- Model definition.
 		- Independent variables.
 			- Network topology.
@@ -82,4 +82,4 @@ In addition to informing research and networking experts, memory pool modeling a
 
 ### Stretch goals (uncommitted)
 
-- [ ] Simulator that is approximately faithful to the node's p2p network logic.
+- [x] Simulator that is approximately faithful to the node's p2p network logic.
