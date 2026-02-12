@@ -30,7 +30,8 @@ export default function NavbarLayout({ children }: Props): JSX.Element {
   const mobileSidebar = useNavbarMobileSidebar();
   const { navbarRef } = useHideableNavbar(hideOnScroll);
   const location = useLocation();
-  const isHomepage = location.pathname === "/";
+  const isHomepage =
+    location.pathname === "/" || location.pathname === "/guide";
 
   const { scrollY } = useScroll();
   const [isVisible, setIsVisible] = useState(true);
