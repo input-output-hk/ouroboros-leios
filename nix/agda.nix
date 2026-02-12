@@ -14,9 +14,10 @@ let
       if pkgs.system == "x86_64-linux" then "${pkgs.glibcLocales}/lib/locale/locale-archive" else "";
   };
 
-  inherit (inputs.leios-spec.packages)
+  inherit (inputs.leios-spec.packages.${pkgs.system})
     agdaWithPkgs
     leiosSpec
+    leiosDocs
     ;
 
   agdaWithDeps = agdaWithPkgs.withPackages (p: [
@@ -64,6 +65,7 @@ in
 {
   inherit
     leiosSpec
+    leiosDocs
     agdaWithDeps
     agdaTraceParser
     hsTraceParser
