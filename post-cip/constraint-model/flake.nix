@@ -1,5 +1,5 @@
 {
-  description = "Mathematical Modeling Environment (Python + HiGHS + CBC)";
+  description = "Mathematical Modeling Environment (Python + OR-Tools + HiGHS)";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -13,37 +13,43 @@
       in
       {
         devShells.default = pkgs.mkShell {
-          # The packages available in the environment
+          # 1. Packages available in the environment
           buildInputs = with pkgs; [
             python3
             highs
             cbc
+            # Libraries often needed by Python wheels
+            stdenv.cc.cc.lib  # libstdc++
+            zlib              # libz
           ];
 
-          # This script runs every time you enter 'nix develop'
+          # 2. Shell Hook to set up venv and library paths
           shellHook = ''
-            echo "🛠️  Setting up MIP Environment..."
+            echo "🛠️  Setting up OR-Tools Environment..."
 
-            # 1. Create venv if it doesn't exist
+            # --- A. Setup Venv ---
             if [ ! -d ".venv" ]; then
               echo "Creating new virtual environment in .venv..."
               python3 -m venv .venv
             fi
-
-            # 2. Activate the venv
             source .venv/bin/activate
 
-            # 3. Ensure pip is installed/upgraded
-            # (Nix's python sometimes creates venvs without pip, ensures it works)
+            # Ensure pip is installed
             if ! command -v pip &> /dev/null; then
                python -m ensurepip
             fi
 
-            # 4. Set LD_LIBRARY_PATH so Python ctypes can find solver libraries if needed
+            # --- B. Fix Binary Linking (The Critical Fix) ---
+            # This makes the C++ standard library available to pip-installed wheels (numpy, ortools)
+            export LD_LIBRARY_PATH=${pkgs.stdenv.cc.cc.lib}/lib:${pkgs.zlib}/lib:$LD_LIBRARY_PATH
+            
+            # Also include HiGHS/CBC libs if you use them via ctypes later
             export LD_LIBRARY_PATH=${pkgs.highs}/lib:${pkgs.cbc}/lib:$LD_LIBRARY_PATH
 
-            echo "✅ Environment ready! (Python $(python --version), HiGHS $(highs --version))"
-            echo "   Type 'pip install pulp' to get started."
+            echo "✅ Environment ready!"
+            echo "   Python: $(python --version)"
+            echo "   LD_LIBRARY_PATH set for libstdc++ and zlib."
+            echo "   Run: pip install pulp ortools networkx numpy"
           '';
         };
       }
