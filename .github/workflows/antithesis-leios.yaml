@@ -57,7 +57,7 @@ jobs:
       - name: Build cardano-node-leios image
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
         with:
-          context: ./antithesis
+          context: .
           file: ./antithesis/Dockerfile.cardano-node
           push: ${{ github.event_name == 'push' || github.event.inputs.push_images == 'true' }}
           tags: ${{ steps.meta-cardano-node.outputs.tags }}
@@ -78,7 +78,7 @@ jobs:
       - name: Build immdb-server image
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
         with:
-          context: ./antithesis
+          context: .
           file: ./antithesis/Dockerfile.immdb-server
           push: ${{ github.event_name == 'push' || github.event.inputs.push_images == 'true' }}
           tags: ${{ steps.meta-immdb-server.outputs.tags }}
@@ -99,7 +99,7 @@ jobs:
       - name: Build analysis image
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
         with:
-          context: ./antithesis
+          context: .
           file: ./antithesis/Dockerfile.analysis
           push: ${{ github.event_name == 'push' || github.event.inputs.push_images == 'true' }}
           tags: ${{ steps.meta-analysis.outputs.tags }}
