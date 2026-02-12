@@ -6,6 +6,18 @@
 > 
 > See also the [Post-CIP R&D Findings](post-cip/README.md) document for additional (after 2025-11-01) findings and artifacts not directly related to the implementation of Linear Leios.
 
+## 2026-02-12
+
+### SN on prototype diffusing EBs
+
+- Last night I realized that the notifications were not working because the call sites of `LeiosDbHandle` were each creating a new connection + notification channel. The name `getLeiosNewDbConnection` did suggest "new connection", but this is more now. In fact we even had 1-2 todos mentioning whether we should share connections across threads? An obvious down-side is that transactions over the same connection would be blocking each other. If we eventually move to WAL mode, we might want to have multipl `LeiosDbConnection` again, but for now sharing the `LeiosDbHandle` is the way to go so we can leverage the notification channel. The `InMemory` implementaiton variant was also never going to work across multiple threads (in the `ThreadNet` tests) if each thread creates it own "database" in memory without a shared view on it.
+- After sharing the `LeiosDbHandle` the 2025-11 demo was not working because I forgot to update the `leiosdemo202510 generate` command to the new schema.
+- I get a `MsgLeiosBlock size mismatch` after updating the scheduled eb generation to the new scheama..
+  - I found a bug in the computation of the leios eb byte size that led to these mismatches. Added a property test to assert consistency with the actual encoder we use.
+- The proto devnet was also choking loki to the limits which we needed to increase.
+- Now EBs are travelling through the `proto-devnet` :tada:
+- I realized that no transactions were submitted and quickly determined that it must be becaus we don't store them in the database when forging.. obviously.
+
 ## 2026-02-09
 
 ### SN on prototype storage / notifications
