@@ -236,6 +236,7 @@ jobs:
           nix build .#leiosDocs
           mkdir -p formal-spec-html
           cp -r result/html/* formal-spec-html/
+          chmod -R +w formal-spec-html/
           ls -la formal-spec-html/
 
       - name: 🔄 Enhance formal-spec with interactive features
