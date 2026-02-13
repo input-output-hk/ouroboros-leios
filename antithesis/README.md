@@ -4,16 +4,16 @@ Docker Compose orchestration for testing Leios consensus using [Antithesis](http
 
 ## Configurations
 
-Two mutually exclusive network configurations are available:
+Two separate compose stacks are available:
 
-1. Proto-devnet (`--profile devnet`): 3 block-producing pools with tx-generator
-2. ImmDB mock (`--profile immdb`): upstream/node0/downstream with immdb-server
+1. Proto-devnet (`docker-compose.devnet.yaml`): 3 block-producing pools with tx-generator
+2. ImmDB mock (`docker-compose.immdb.yaml`): upstream/node0/downstream with immdb-server
 
-These are separate test environments and should not be run together.
+An optional observability overlay (`docker-compose.observability.yaml`) can be layered onto either stack.
 
 ## Architecture
 
-### Proto-Devnet (`--profile devnet`)
+### Proto-Devnet
 
 3 block-producing pool nodes in a full mesh topology (each pool connects to
 every other pool) with transaction load:
@@ -49,7 +49,7 @@ Features:
 - Transaction load testing
 - Mesh topology with full connectivity
 
-### ImmDB Mock (--profile immdb)
+### ImmDB Mock
 
 Linear topology with immdb-server providing mock blocks:
 
@@ -71,23 +71,23 @@ Linear topology with immdb-server providing mock blocks:
 
 ```bash
 # Proto-devnet (3 block-producing pools)
-docker compose --profile devnet up
+docker compose -f docker-compose.devnet.yaml up
 
 # ImmDB mock setup
-docker compose --profile immdb up
+docker compose -f docker-compose.immdb.yaml up
 
 # Build images only
-docker compose --profile devnet build
-docker compose --profile immdb build
+docker compose -f docker-compose.devnet.yaml build
+docker compose -f docker-compose.immdb.yaml build
 
 # Start in background
-docker compose --profile devnet up -d
+docker compose -f docker-compose.devnet.yaml up -d
 
 # View logs
-docker compose --profile devnet logs -f
+docker compose -f docker-compose.devnet.yaml logs -f
 
 # Stop and clean up
-docker compose --profile devnet down -v
+docker compose -f docker-compose.devnet.yaml down -v
 ```
 
 ## Usage
@@ -95,23 +95,23 @@ docker compose --profile devnet down -v
 ### Proto-Devnet Mode
 
 ```bash
-docker compose --profile devnet up
+docker compose -f docker-compose.devnet.yaml up
 ```
 
 ### ImmDB Mock Mode
 
 ```bash
-docker compose --profile immdb up
+docker compose -f docker-compose.immdb.yaml up
 ```
 
 ### With Observability Stack
 
 ```bash
 # Proto-devnet with observability
-docker compose --profile devnet --profile observability up
+docker compose -f docker-compose.devnet.yaml -f docker-compose.observability.yaml up
 
 # ImmDB with observability
-docker compose --profile immdb --profile observability up
+docker compose -f docker-compose.immdb.yaml -f docker-compose.observability.yaml up
 ```
 
 Adds Prometheus, Loki, Alloy, and Grafana:
@@ -127,7 +127,7 @@ Access Grafana at http://localhost:3000 (no login required).
 ### With WAN Emulation
 
 ```bash
-ENABLE_WAN_EMULATION=true docker compose --profile devnet up
+ENABLE_WAN_EMULATION=true docker compose -f docker-compose.devnet.yaml up
 ```
 
 Enables network latency/bandwidth simulation using tc.
@@ -144,7 +144,7 @@ Enables network latency/bandwidth simulation using tc.
 | CHECK_INTERVAL_SECONDS | 5 | Analysis check interval |
 | INITIAL_WAIT_SECONDS | 30 | Wait before first analysis |
 
-### WAN Emulation Variables (ImmDB profile)
+### WAN Emulation Variables (ImmDB stack)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -169,34 +169,37 @@ Genesis parameters in `demo/proto-devnet/config/genesis/`:
 
 ```
 antithesis/
-├── docker-compose.yaml          # Main orchestration
-├── Dockerfile.cardano-node-bp   # Block producer image (proto-devnet)
-├── Dockerfile.cardano-node      # Leios node image (immdb)
-├── Dockerfile.immdb-server      # ImmDB server image (immdb)
-├── Dockerfile.analysis          # Analysis container image
-├── analyse.py                   # Log parsing and metrics
-├── entrypoint-analysis.py       # Analysis main loop
+├── docker-compose.devnet.yaml        # Proto-devnet stack (3 pools)
+├── docker-compose.immdb.yaml         # ImmDB mock stack
+├── docker-compose.observability.yaml # Observability overlay (Prometheus, Loki, Grafana)
+├── Dockerfile.cardano-node-bp        # Block producer image (proto-devnet)
+├── Dockerfile.cardano-node           # Leios node image (immdb)
+├── Dockerfile.immdb-server           # ImmDB server image (immdb)
+├── Dockerfile.analysis               # Analysis container image
+├── analyse.py                        # Log parsing and metrics
+├── entrypoint-analysis.py            # Analysis main loop
 ├── scripts/
-│   ├── init-pool-node.sh        # Pool initialization (proto-devnet)
-│   ├── run-pool-node.sh         # Pool runtime (proto-devnet)
-│   ├── run-tx-generator.sh      # TX generator (proto-devnet)
-│   ├── init-node0.sh            # Node0 initialization (immdb)
-│   ├── init-downstream.sh       # Downstream initialization (immdb)
-│   ├── init-upstream.sh         # Upstream initialization (immdb)
-│   ├── run-cardano-node.sh      # Node runtime (immdb)
-│   ├── run-upstream.sh          # Upstream runtime (immdb)
-│   └── setup-wan-emulation.sh   # Network simulation
+│   ├── init-pool-node.sh             # Pool initialization (proto-devnet)
+│   ├── run-pool-node.sh              # Pool runtime (proto-devnet)
+│   ├── run-tx-generator.sh           # TX generator (proto-devnet)
+│   ├── init-node0.sh                 # Node0 initialization (immdb)
+│   ├── init-downstream.sh            # Downstream initialization (immdb)
+│   ├── init-upstream.sh              # Upstream initialization (immdb)
+│   ├── run-cardano-node.sh           # Node runtime (immdb)
+│   ├── run-upstream.sh               # Upstream runtime (immdb)
+│   ├── test-local.sh                 # Local test script
+│   └── setup-wan-emulation.sh        # Network simulation
 └── config/
-    ├── prometheus.yml           # Prometheus scrape config
-    ├── loki.yml                 # Loki configuration
-    ├── alloy.river              # Alloy log collection
-    └── grafana/                 # Grafana provisioning
+    ├── prometheus.yml                # Prometheus scrape config
+    ├── loki.yml                      # Loki configuration
+    ├── alloy.river                   # Alloy log collection
+    └── grafana/                      # Grafana provisioning
 ```
 
 ## Volumes
 
-| Volume | Profile | Purpose |
-|--------|---------|---------|
+| Volume | Stack | Purpose |
+|--------|-------|---------|
 | pool1-data | devnet | Pool1 node data |
 | pool2-data | devnet | Pool2 node data |
 | pool3-data | devnet | Pool3 node data |
@@ -213,32 +216,32 @@ antithesis/
 
 ```bash
 # Check all services are healthy
-docker compose --profile devnet ps
+docker compose -f docker-compose.devnet.yaml ps
 
 # Verify blocks are being produced
-docker compose --profile devnet logs pool1 | grep -i "AddedToCurrentChain"
+docker compose -f docker-compose.devnet.yaml logs pool1 | grep -i "AddedToCurrentChain"
 
 # Check tx-generator
-docker compose --profile devnet logs tx-generator
+docker compose -f docker-compose.devnet.yaml logs tx-generator
 
 # View analysis output
-docker compose --profile devnet logs analysis
+docker compose -f docker-compose.devnet.yaml logs analysis
 ```
 
-### ImmDB Profile
+### ImmDB Stack
 
 ```bash
 # Check services
-docker compose --profile immdb ps
+docker compose -f docker-compose.immdb.yaml ps
 
 # Verify upstream is serving blocks
-docker compose --profile immdb logs upstream
+docker compose -f docker-compose.immdb.yaml logs upstream
 
 # Check node0 is receiving
-docker compose --profile immdb logs node0 | grep -i "AddedToCurrentChain"
+docker compose -f docker-compose.immdb.yaml logs node0 | grep -i "AddedToCurrentChain"
 
 # View analysis
-docker compose --profile immdb logs analysis-immdb
+docker compose -f docker-compose.immdb.yaml logs analysis-immdb
 ```
 
 ## Antithesis Integration
@@ -257,30 +260,30 @@ When running outside Antithesis, assertions are logged to stdout.
 
 Check topology configuration:
 ```bash
-docker compose --profile devnet exec pool1 cat /data/topology.json
+docker compose -f docker-compose.devnet.yaml exec pool1 cat /data/topology.json
 ```
 
 ### No blocks being produced (proto-devnet)
 
 Verify genesis timestamp is recent:
 ```bash
-docker compose --profile devnet exec pool1 cat /data/shelley-genesis.json | jq '.systemStart'
+docker compose -f docker-compose.devnet.yaml exec pool1 cat /data/shelley-genesis.json | jq '.systemStart'
 ```
 
 ### Upstream not serving blocks (immdb)
 
 Check schedule file exists:
 ```bash
-docker compose --profile immdb exec upstream cat /data/schedule.json
+docker compose -f docker-compose.immdb.yaml exec upstream cat /data/schedule.json
 ```
 
 ### Build issues
 
 Clean rebuild:
 ```bash
-docker compose --profile devnet down -v
-docker compose --profile devnet build --no-cache
-docker compose --profile devnet up
+docker compose -f docker-compose.devnet.yaml down -v
+docker compose -f docker-compose.devnet.yaml build --no-cache
+docker compose -f docker-compose.devnet.yaml up
 ```
 
 ## Development
@@ -288,14 +291,24 @@ docker compose --profile devnet up
 ### Rebuilding a single service
 
 ```bash
-docker compose --profile devnet build pool1
-docker compose --profile devnet up -d pool1
+docker compose -f docker-compose.devnet.yaml build pool1
+docker compose -f docker-compose.devnet.yaml up -d pool1
 ```
 
 ### Accessing a container
 
 ```bash
-docker compose --profile devnet exec pool1 bash
+docker compose -f docker-compose.devnet.yaml exec pool1 bash
+```
+
+### Local test script
+
+```bash
+# Test devnet stack (default)
+./scripts/test-local.sh
+
+# Test immdb stack
+./scripts/test-local.sh immdb
 ```
 
 ## Related Documentation
