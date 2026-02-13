@@ -1,0 +1,71 @@
+# Leios Antithesis Docker Compose Stack — Observability
+#
+# Prometheus, Loki, Alloy, and Grafana for monitoring.
+# Layer onto a running stack:
+#   docker compose -f docker-compose.devnet.yaml -f docker-compose.observability.yaml up
+#   docker compose -f docker-compose.immdb.yaml -f docker-compose.observability.yaml up
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - leios-net
+
+  loki:
+    image: grafana/loki:latest
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./config/loki.yml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    ports:
+      - "3100:3100"
+    networks:
+      - leios-net
+
+  alloy:
+    image: grafana/alloy:latest
+    command:
+      - run
+      - /etc/alloy/config.river
+    volumes:
+      - ./config/alloy.river:/etc/alloy/config.river:ro
+      - logs:/logs:ro
+    depends_on:
+      - loki
+    networks:
+      - leios-net
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+    volumes:
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+      - loki
+    networks:
+      - leios-net
+
+volumes:
+  prometheus-data:
+  loki-data:
+  grafana-data:
+  logs:
+
+networks:
+  leios-net:

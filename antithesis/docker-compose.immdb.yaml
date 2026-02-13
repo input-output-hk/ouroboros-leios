@@ -1,0 +1,207 @@
+# Leios Antithesis Docker Compose Stack — ImmDB Mock
+#
+# Linear topology: upstream (immdb-server) → node0 → downstream
+#
+# Usage:
+#   docker compose -f docker-compose.immdb.yaml up
+#   With observability:
+#     docker compose -f docker-compose.immdb.yaml -f docker-compose.observability.yaml up
+#   With WAN emulation:
+#     ENABLE_WAN_EMULATION=true docker compose -f docker-compose.immdb.yaml up
+
+x-common-env: &common-env
+  ENABLE_WAN_EMULATION: ${ENABLE_WAN_EMULATION:-false}
+  REF_SLOT: ${REF_SLOT:-11}
+
+x-wan-env-upstream: &wan-env-upstream
+  RATE: ${RATE_UP_TO_N0:-10Mbps}
+  DELAY: ${DELAY_UP_TO_N0:-200ms}
+
+x-wan-env-node0-up: &wan-env-node0-up
+  RATE: ${RATE_N0_TO_UP:-10Mbps}
+  DELAY: ${DELAY_N0_TO_UP:-200ms}
+
+x-wan-env-node0-down: &wan-env-node0-down
+  RATE: ${RATE_N0_TO_DOWN:-10Mbps}
+  DELAY: ${DELAY_N0_TO_DOWN:-200ms}
+
+x-wan-env-downstream: &wan-env-downstream
+  RATE: ${RATE_DOWN_TO_N0:-10Mbps}
+  DELAY: ${DELAY_DOWN_TO_N0:-200ms}
+
+services:
+  # ==========================================================================
+  # Init Containers
+  # ==========================================================================
+  init-upstream:
+    image: ghcr.io/input-output-hk/ouroboros-leios/immdb-server:${GIT_SHA:-latest}
+    build:
+      context: ..
+      dockerfile: antithesis/Dockerfile.immdb-server
+    command: /app/scripts/init-upstream.sh
+    environment:
+      <<: *common-env
+    volumes:
+      - upstream-data:/data
+      - logs:/logs
+    networks:
+      - leios-net
+
+  init-node0:
+    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-leios:${GIT_SHA:-latest}
+    build:
+      context: ..
+      dockerfile: antithesis/Dockerfile.cardano-node
+    command: /app/scripts/init-node0.sh
+    environment:
+      <<: *common-env
+      IP_UPSTREAM_NODE: "172.28.0.110"
+      PORT_UPSTREAM_NODE: "3001"
+    volumes:
+      - node0-data:/data
+      - logs:/logs
+    networks:
+      - leios-net
+
+  init-downstream:
+    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-leios:${GIT_SHA:-latest}
+    build:
+      context: ..
+      dockerfile: antithesis/Dockerfile.cardano-node
+    command: /app/scripts/init-downstream.sh
+    environment:
+      <<: *common-env
+      IP_NODE0: "172.28.0.120"
+      PORT_NODE0: "3002"
+    volumes:
+      - downstream-data:/data
+      - logs:/logs
+    networks:
+      - leios-net
+
+  # ==========================================================================
+  # Main Services
+  # ==========================================================================
+  upstream:
+    image: ghcr.io/input-output-hk/ouroboros-leios/immdb-server:${GIT_SHA:-latest}
+    build:
+      context: ..
+      dockerfile: antithesis/Dockerfile.immdb-server
+    command: /app/scripts/run-upstream.sh
+    depends_on:
+      init-upstream:
+        condition: service_completed_successfully
+    cap_add:
+      - NET_ADMIN
+    environment:
+      <<: [*common-env, *wan-env-upstream]
+      PORT: "3001"
+      ONSET_OF_REF_SLOT: ${ONSET_OF_REF_SLOT:-}
+    volumes:
+      - upstream-data:/data
+      - logs:/logs
+    networks:
+      leios-net:
+        ipv4_address: 172.28.0.110
+    healthcheck:
+      test: ["CMD", "test", "-f", "/data/schedule.json"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
+  node0:
+    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-leios:${GIT_SHA:-latest}
+    build:
+      context: ..
+      dockerfile: antithesis/Dockerfile.cardano-node
+    command: ["/app/scripts/run-cardano-node.sh", "node0"]
+    depends_on:
+      init-node0:
+        condition: service_completed_successfully
+      upstream:
+        condition: service_healthy
+    cap_add:
+      - NET_ADMIN
+    environment:
+      <<: [*common-env, *wan-env-node0-up]
+      PORT: "3002"
+    volumes:
+      - node0-data:/data
+      - logs:/logs
+    networks:
+      leios-net:
+        ipv4_address: 172.28.0.120
+    healthcheck:
+      test: ["CMD", "test", "-S", "/data/socket"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 30s
+
+  downstream:
+    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-leios:${GIT_SHA:-latest}
+    build:
+      context: ..
+      dockerfile: antithesis/Dockerfile.cardano-node
+    command: ["/app/scripts/run-cardano-node.sh", "downstream"]
+    depends_on:
+      init-downstream:
+        condition: service_completed_successfully
+      node0:
+        condition: service_healthy
+    cap_add:
+      - NET_ADMIN
+    environment:
+      <<: [*common-env, *wan-env-downstream]
+      PORT: "3003"
+    volumes:
+      - downstream-data:/data
+      - logs:/logs
+    networks:
+      leios-net:
+        ipv4_address: 172.28.0.130
+    healthcheck:
+      test: ["CMD", "test", "-S", "/data/socket"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 30s
+
+  # ==========================================================================
+  # Analysis Container
+  # ==========================================================================
+  analysis-immdb:
+    image: ghcr.io/input-output-hk/ouroboros-leios/leios-analysis:${GIT_SHA:-latest}
+    build:
+      context: ..
+      dockerfile: antithesis/Dockerfile.analysis
+    depends_on:
+      upstream:
+        condition: service_healthy
+      node0:
+        condition: service_healthy
+      downstream:
+        condition: service_healthy
+    environment:
+      <<: *common-env
+      PRAOS_LATENCY_THRESHOLD_MS: ${PRAOS_LATENCY_THRESHOLD_MS:-5000}
+      CHECK_INTERVAL_SECONDS: ${CHECK_INTERVAL_SECONDS:-5}
+      INITIAL_WAIT_SECONDS: ${INITIAL_WAIT_SECONDS:-30}
+    volumes:
+      - logs:/logs:ro
+    networks:
+      - leios-net
+
+volumes:
+  upstream-data:
+  node0-data:
+  downstream-data:
+  logs:
+
+networks:
+  leios-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24

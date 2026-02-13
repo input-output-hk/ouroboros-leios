@@ -1,0 +1,230 @@
+# Leios Antithesis Docker Compose Stack — Proto-Devnet
+#
+# 3 block-producing pools with tx-generator and analysis.
+#
+# Usage:
+#   docker compose -f docker-compose.devnet.yaml up
+#   With observability:
+#     docker compose -f docker-compose.devnet.yaml -f docker-compose.observability.yaml up
+#   With WAN emulation:
+#     ENABLE_WAN_EMULATION=true docker compose -f docker-compose.devnet.yaml up
+
+x-common-env: &common-env
+  ENABLE_WAN_EMULATION: ${ENABLE_WAN_EMULATION:-false}
+  REF_SLOT: ${REF_SLOT:-11}
+
+x-pool-ips: &pool-ips
+  IP_POOL1: "172.28.0.10"
+  IP_POOL2: "172.28.0.20"
+  IP_POOL3: "172.28.0.30"
+  PORT_POOL1: "3001"
+  PORT_POOL2: "3002"
+  PORT_POOL3: "3003"
+
+services:
+  # ==========================================================================
+  # Init Containers
+  # ==========================================================================
+  init-pool1:
+    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
+    build:
+      context: ..
+      dockerfile: antithesis/Dockerfile.cardano-node-bp
+    command: ["/app/scripts/init-pool-node.sh", "1"]
+    environment:
+      <<: [*common-env, *pool-ips]
+    volumes:
+      - pool1-data:/data
+      - genesis-shared:/shared-genesis
+      - logs:/logs
+    networks:
+      - leios-net
+
+  init-pool2:
+    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
+    build:
+      context: ..
+      dockerfile: antithesis/Dockerfile.cardano-node-bp
+    command: ["/app/scripts/init-pool-node.sh", "2"]
+    depends_on:
+      init-pool1:
+        condition: service_completed_successfully
+    environment:
+      <<: [*common-env, *pool-ips]
+    volumes:
+      - pool2-data:/data
+      - genesis-shared:/shared-genesis
+      - logs:/logs
+    networks:
+      - leios-net
+
+  init-pool3:
+    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
+    build:
+      context: ..
+      dockerfile: antithesis/Dockerfile.cardano-node-bp
+    command: ["/app/scripts/init-pool-node.sh", "3"]
+    depends_on:
+      init-pool1:
+        condition: service_completed_successfully
+    environment:
+      <<: [*common-env, *pool-ips]
+    volumes:
+      - pool3-data:/data
+      - genesis-shared:/shared-genesis
+      - logs:/logs
+    networks:
+      - leios-net
+
+  # ==========================================================================
+  # Block Producer Nodes
+  # ==========================================================================
+  pool1:
+    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
+    build:
+      context: ..
+      dockerfile: antithesis/Dockerfile.cardano-node-bp
+    command: ["/app/scripts/run-pool-node.sh", "pool1"]
+    depends_on:
+      init-pool1:
+        condition: service_completed_successfully
+    cap_add:
+      - NET_ADMIN
+    environment:
+      <<: *common-env
+      PORT: "3001"
+    volumes:
+      - pool1-data:/data
+      - logs:/logs
+    networks:
+      leios-net:
+        ipv4_address: 172.28.0.10
+    healthcheck:
+      test: ["CMD", "test", "-S", "/data/socket"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 30s
+
+  pool2:
+    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
+    build:
+      context: ..
+      dockerfile: antithesis/Dockerfile.cardano-node-bp
+    command: ["/app/scripts/run-pool-node.sh", "pool2"]
+    depends_on:
+      init-pool2:
+        condition: service_completed_successfully
+      pool1:
+        condition: service_started
+    cap_add:
+      - NET_ADMIN
+    environment:
+      <<: *common-env
+      PORT: "3002"
+    volumes:
+      - pool2-data:/data
+      - logs:/logs
+    networks:
+      leios-net:
+        ipv4_address: 172.28.0.20
+    healthcheck:
+      test: ["CMD", "test", "-S", "/data/socket"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 30s
+
+  pool3:
+    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
+    build:
+      context: ..
+      dockerfile: antithesis/Dockerfile.cardano-node-bp
+    command: ["/app/scripts/run-pool-node.sh", "pool3"]
+    depends_on:
+      init-pool3:
+        condition: service_completed_successfully
+      pool1:
+        condition: service_started
+    cap_add:
+      - NET_ADMIN
+    environment:
+      <<: *common-env
+      PORT: "3003"
+    volumes:
+      - pool3-data:/data
+      - logs:/logs
+    networks:
+      leios-net:
+        ipv4_address: 172.28.0.30
+    healthcheck:
+      test: ["CMD", "test", "-S", "/data/socket"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 30s
+
+  # ==========================================================================
+  # TX Generator
+  # ==========================================================================
+  tx-generator:
+    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
+    build:
+      context: ..
+      dockerfile: antithesis/Dockerfile.cardano-node-bp
+    command: ["/app/scripts/run-tx-generator.sh"]
+    depends_on:
+      pool1:
+        condition: service_healthy
+      pool2:
+        condition: service_healthy
+      pool3:
+        condition: service_healthy
+    environment:
+      <<: *pool-ips
+    volumes:
+      - txgen-data:/data
+      - genesis-shared:/shared-genesis:ro
+      - logs:/logs
+    networks:
+      - leios-net
+
+  # ==========================================================================
+  # Analysis Container
+  # ==========================================================================
+  analysis:
+    image: ghcr.io/input-output-hk/ouroboros-leios/leios-analysis:${GIT_SHA:-latest}
+    build:
+      context: ..
+      dockerfile: antithesis/Dockerfile.analysis
+    depends_on:
+      pool1:
+        condition: service_healthy
+      pool2:
+        condition: service_healthy
+      pool3:
+        condition: service_healthy
+    environment:
+      <<: *common-env
+      PRAOS_LATENCY_THRESHOLD_MS: ${PRAOS_LATENCY_THRESHOLD_MS:-5000}
+      CHECK_INTERVAL_SECONDS: ${CHECK_INTERVAL_SECONDS:-5}
+      INITIAL_WAIT_SECONDS: ${INITIAL_WAIT_SECONDS:-30}
+    volumes:
+      - logs:/logs:ro
+    networks:
+      - leios-net
+
+volumes:
+  pool1-data:
+  pool2-data:
+  pool3-data:
+  txgen-data:
+  genesis-shared:
+  logs:
+
+networks:
+  leios-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
