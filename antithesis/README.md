@@ -15,7 +15,8 @@ These are separate test environments and should not be run together.
 
 ### Proto-Devnet (`--profile devnet`)
 
-3 block-producing pool nodes in a mesh topology with transaction load:
+3 block-producing pool nodes in a full mesh topology (each pool connects to
+every other pool) with transaction load:
 
 ```
 ┌─────────┐     ┌─────────┐     ┌─────────┐
@@ -246,7 +247,7 @@ The analysis container reports assertions to Antithesis SDK:
 
 - always: Praos block diffusion p95 latency < threshold
 - always: Praos blocks are received when created
-- sometimes: Leios blocks (IBs, EBs) are created
+- sometimes: Leios endorser blocks (EBs) are created
 
 When running outside Antithesis, assertions are logged to stdout.
 
