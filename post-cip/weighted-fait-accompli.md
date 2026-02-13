@@ -7,7 +7,7 @@ This is an adaption of Figures 6 and 3 of the following paper, but with elaborat
 ## Note on terminology
 
 There is some ambiguity in the term "non-persistent voter" so we use the term "non-persistent candidate" for a pool that may be lucky enough to cast a non-persistent vote during one of the elections in an epoch. The ambiguity hinges upon whether one considers a pool to be a "voter" in situations where their voting weight is zero and their "vote" would not be included in the certificate. The Venn diagram below illustrates relationships between pools, voting, and certificates.
-- A *persistent voter* is eligible to cast a vote in every election during the epoch. The weight of their vote is simply their stake. There is no concept of a persistent voter having a particular number of *seats*.
+- A *persistent voter* is eligible to cast a vote in every election during the epoch. The weight of their vote is simply their stake. Conceptually, a persistent voter has a single *seat* on the committee.
 - *A non-persistent voter* is only eligible to cast a vote in an election if their VRF for that election entitles them to at least one *seat*. The weight of their vote is proportional to the number of seats they win and the total active stake not held by persistent voters.
 
 ![Relationship between voters and stake pools](./weighted-fait-accompli-venn.svg)
@@ -36,7 +36,7 @@ Let  $`\sigma_i \in [0,1]`$ be the VRF value for party $`p_i`$, derived from the
 
 The number of seats they have on the committee is the value $`k_i^*`$ for which $`P(k_i^*-1) \leq \sigma_i \lt P(k_i^*)`$ holds, given $`P(k^*) = \sum_{k=0}^{k^*} \frac{(n_2 \cdot \mathcal{S}_3(i))^k \cdot e^{- n_2 \cdot \mathcal{S}_3(i)}}{k!}`$ for $`k^* \ge 0`$ and $`P(k^*) = 0`$ otherwise. (This is simply sampling from a Poisson distribution with mean $`n_2 \cdot \mathcal{S}_3(i)`$ according to cumulative probability $`\sigma_i`$.) Each of those seats has weight $`\rho_{i^*} / n_2`$. (Once again, this scheme differs slightly from the paper in that $`\rho_{i^*}`$ is divided by the *target* number of non-persistent seats, not the *actual* number of non-persistent seats; note that the *actual* number of non-persistent seats is not publicly known because the sortition is *local*.)
 
-The number of seats can be computed using rational arithmetic in a manner that is independent of the numeric precision of the compiler or hardware: see [Appendix: Calculating the number of seats in local sortition](#appendix-calculating-the-number-of-seats-in-local-sortition).
+The number of seats a non-persistent candidate has in an election can be computed using rational arithmetic in a manner that is independent of the numeric precision of the compiler or hardware: see [Appendix: Calculating the number of seats in local sortition](#appendix-calculating-the-number-of-seats-in-local-sortition).
 
 ## Variability of committee size
 
@@ -63,7 +63,7 @@ In terms of probability distributions, the total weight is $`\rho_1 + \rho_{i^*}
 ## Opportunities for parallelization
 
 1. The BLS signatures of votes can be verified as soon as they are received.
-2. The aggregate BLS signature on the block-hash message can be incrementally updated as soon as a vote is newly received. The BLS group operations allow aggregation in any order.
+2. The aggregate BLS signature on the endorser block-hash message can be incrementally updated as soon as a vote is newly received. The BLS group operations allow aggregation in any order.
 3. Similarly, the aggregate BLS public key can be incrementally updated as soon as a vote is newly received.
 4. The non-persistent voter eligibility check can be performed in parallel with the verification of the two BLS signatures in the vote.
 5. The eligibility checks of the BLS signatures in a certificate can be performed in parallel with each other and with the aggregate signature verifications.
@@ -76,6 +76,7 @@ In terms of probability distributions, the total weight is $`\rho_1 + \rho_{i^*}
 1. Once the stake distribution of the epoch is known, the list of persistent voters and non-persistent potential voters can be constructed.
 2. Similarly, the potential weights of all voters need only be computed once per epoch.
 3. Moreover, for non-persistent candidate voters, the numeric thresholds for their having 0, 1, 2, 3, . . . seats in an election can be precomputed and cached. This reduces the per-election eligibility check to a simple table lookup once the voter's VRF is known for a particular election.
+4. As soon as the nonce for the upcoming epoch is known, a non-persistent candidate can pre-compute, for every slot in the epoch, whether they will be eligible to cast a vote if an EB is produced in that slot.
 
 ## Numerical example
 
@@ -105,7 +106,7 @@ See [formal/crypto/](./formal/crypto/ReadMe.md) for a *non-normative draft* form
 
 ## Appendix: Calculating the number of seats in local sortition
 
-Using the Taylor-series expansion for the exponential function and the error-bounding property of convergent alternating infinite series (Leibniz's theore), the number of seats can be computed using rational arithmetic in a manner that is independent of the numeric precision of the compiler or hardware.
+Using the Taylor-series expansion for the exponential function and the error-bounding property of convergent alternating infinite series (Leibniz's theore), the number of seats of each non-persistent voter can be computed using rational arithmetic in a manner that is independent of the numeric precision of the compiler or hardware.
 
 ```lean
 /-- Track error associated with a rational number. -/
