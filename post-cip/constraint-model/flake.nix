@@ -46,6 +46,8 @@
             # Also include HiGHS/CBC libs if you use them via ctypes later
             export LD_LIBRARY_PATH=${pkgs.highs}/lib:${pkgs.cbc}/lib:$LD_LIBRARY_PATH
 
+            export PS1="\[\e[1;32m\][nix-shell:\w]$\[\e[m\] "
+
             echo "✅ Environment ready!"
             echo "   Python: $(python --version)"
             echo "   LD_LIBRARY_PATH set for libstdc++ and zlib."
