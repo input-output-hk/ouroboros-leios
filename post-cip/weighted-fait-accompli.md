@@ -4,6 +4,14 @@ This is an adaption of Figures 6 and 3 of the following paper, but with elaborat
 
 > Peter Gazi, Aggelos Kiayias, and Alexander Russell. 2023. Fait Accompli Committee Selection: Improving the Size-Security Tradeoff of Stake-Based Committees. In Proceedings of the 2023 ACM SIGSAC Conference on Computer and Communications Security (CCS '23). Association for Computing Machinery, New York, NY, USA, 845–858. https://doi.org/10.1145/3576915.3623194.
 
+## Note on terminology
+
+There is some ambiguity in the term "non-persistent voter" so we use the term "non-persistent candidate" for a pool that may be lucky enough to cast a non-persistent vote during one of the elections in an epoch. The ambiguity hinges upon whether one considers a pool to be a "voter" in situations where their voting weight is zero and their "vote" would not be included in the certificate. The Venn diagram below illustrates relationships between pools, voting, and certificates.
+- A *persistent voter* is eligible to cast a vote in every election during the epoch. The weight of their vote is simply their stake. Conceptually, a persistent voter has a single *seat* on the committee.
+- *A non-persistent voter* is only eligible to cast a vote in an election if their VRF for that election entitles them to at least one *seat*. The weight of their vote is proportional to the number of seats they win and the total active stake not held by persistent voters.
+
+![Relationship between voters and stake pools](./weighted-fait-accompli-venn.svg)
+
 ## Stake distribution
 
 Let $`P = (p_1, \ldots, p_{|P|})`$ be the set of active stake pools, each with stake $`\mathcal{S}(p_i)`$, where pools are ordered in a non-increasing fashion, $`p_i \geq p_{i+1}`$. Furthermore, let $`\rho_i = \sum_{j=i}^{|P|} \mathcal{S}(p_j)`$ be the total stake for pools $`p_i`$ and beyond. By definition, the total stake is $`\rho_1`$.
@@ -28,6 +36,8 @@ Let  $`\sigma_i \in [0,1]`$ be the VRF value for party $`p_i`$, derived from the
 
 The number of seats they have on the committee is the value $`k_i^*`$ for which $`P(k_i^*-1) \leq \sigma_i \lt P(k_i^*)`$ holds, given $`P(k^*) = \sum_{k=0}^{k^*} \frac{(n_2 \cdot \mathcal{S}_3(i))^k \cdot e^{- n_2 \cdot \mathcal{S}_3(i)}}{k!}`$ for $`k^* \ge 0`$ and $`P(k^*) = 0`$ otherwise. (This is simply sampling from a Poisson distribution with mean $`n_2 \cdot \mathcal{S}_3(i)`$ according to cumulative probability $`\sigma_i`$.) Each of those seats has weight $`\rho_{i^*} / n_2`$. (Once again, this scheme differs slightly from the paper in that $`\rho_{i^*}`$ is divided by the *target* number of non-persistent seats, not the *actual* number of non-persistent seats; note that the *actual* number of non-persistent seats is not publicly known because the sortition is *local*.)
 
+The number of seats a non-persistent candidate has in an election can be computed using rational arithmetic in a manner that is independent of the numeric precision of the compiler or hardware: see [Appendix: Calculating the number of seats in local sortition](#appendix-calculating-the-number-of-seats-in-local-sortition).
+
 ## Variability of committee size
 
 The weight of persistent voters is exactly $`\rho_1 - \rho_{i^*}`$ by construction. Because the sum of Poisson distributions is also Poisson, the expected number of non-persistent seats is $`n_2`$ and they have total expected weight $`n_2 \cdot (\rho_{i^*} / n_2 ) = \rho_{i^*}`$. Thus the expected total weight is $`\rho_1`$, which equals the total active stake.
@@ -50,6 +60,24 @@ In terms of probability distributions, the total weight is $`\rho_1 + \rho_{i^*}
       2. (optimistic liveness) The downward pressure on $`\tau`$ comes from the fact that an adversary controlling more than $`1-\tau`$ weight on the committee can halt certificate creation by just abstaining. This "only" prevents the optimistic path of the protocol, and so it is acceptable to only protect from weaker adversaries here. In particular, one way to parametrize is to first set $`\tau`$ based on the safety requirement above, and then compute the threshold $`\alpha`$ (this will be $`<1/4`$) such that if the corruption in the population is below $`\alpha`$ then except with negligible probability (say admitting the same error as allowed in the safety case) the adversary will not have enough weight on the committee for the abstain attack.
 	- In Leios, $`\tau`$ should be chosen so that there is a vanishingly small probability that <50% adversarial stake could obtain a quorum or veto an otherwise honest quorum.
 
+## Opportunities for parallelization
+
+1. The BLS signatures of votes can be verified as soon as they are received.
+2. The aggregate BLS signature on the endorser block-hash message can be incrementally updated as soon as a vote is newly received. The BLS group operations allow aggregation in any order.
+3. Similarly, the aggregate BLS public key can be incrementally updated as soon as a vote is newly received.
+4. The non-persistent voter eligibility check can be performed in parallel with the verification of the two BLS signatures in the vote.
+5. The eligibility checks of the BLS signatures in a certificate can be performed in parallel with each other and with the aggregate signature verifications.
+6. The two aggregate signatures in a signature can be checked in parallel.
+7. Unfortunately, the aggregate eligibility public key and signature cannot start to be computed until all of the signatures have been received.
+8. The construction of aggregate keys and signatures can be done in parallel using a tree of depth logarithmic in the number of updates.
+
+## Opportunities for pre-computation
+
+1. Once the stake distribution of the epoch is known, the list of persistent voters and non-persistent potential voters can be constructed.
+2. Similarly, the potential weights of all voters need only be computed once per epoch.
+3. Moreover, for non-persistent candidate voters, the numeric thresholds for their having 0, 1, 2, 3, . . . seats in an election can be precomputed and cached. This reduces the per-election eligibility check to a simple table lookup once the voter's VRF is known for a particular election.
+4. As soon as the nonce for the upcoming epoch is known, a non-persistent candidate can pre-compute, for every slot in the epoch, whether they will be eligible to cast a vote if an EB is produced in that slot.
+
 ## Numerical example
 
 Consider the stake distribution of Epoch 535 of Cardano mainnet and vary the committee size $`n`$. The table below[^1] shows that . . .
@@ -71,5 +99,132 @@ Consider the stake distribution of Epoch 535 of Cardano mainnet and vary the com
 |           1000 |              903 |         0.9864321 |                       0.0013776087 |                0.007553248 |
 |           1100 |             1007 |         0.9921898 |                       0.0008098848 |                0.004283038 |
 |           1200 |             1107 |         0.9954256 |                       0.0004743450 |                0.002508552 |
+
+## Non-normative formal specification
+
+See [formal/crypto/](./formal/crypto/ReadMe.md) for a *non-normative draft* formal specification of Leios cryptography.
+
+## Appendix: Calculating the number of seats in local sortition
+
+Using the Taylor-series expansion for the exponential function and the error-bounding property of convergent alternating infinite series (Leibniz's theore), the number of seats of each non-persistent voter can be computed using rational arithmetic in a manner that is independent of the numeric precision of the compiler or hardware.
+
+```lean
+/-- Track error associated with a rational number. -/
+private structure ValueWithError where
+  value : Rat
+  error : Rat
+
+/-- Absolute value of a rational number. -/
+private def absRat (x : Rat) : Rat :=
+  if x ≥ 0
+  then x
+  else - x
+
+/-- Error-aware multiplication of rational numbers. -/
+instance : HMul Rat ValueWithError ValueWithError where
+  hMul
+  | x, ⟨ value , error ⟩ => ⟨ x * value , absRat x * error ⟩
+
+/-- A term in the Taylor expansion of an exponential. -/
+private def expTerm (x : Rat) : Nat → Rat
+| 0 => 1
+| k + 1 => expTerm x k * x / (k + 1)
+
+/-- The Taylor expansion of an exponential. -/
+private def expTaylor (x : Rat) (n : Nat) : ValueWithError :=
+  ⟨
+    List.sum
+      $ List.map (fun k ↦ expTerm x k)
+      $ List.range (n + 1)
+  , let error := expTerm x (n + 1)
+    absRat error
+  ⟩
+
+/-- Poisson probability using a Taylor expansion. -/
+private def poissonTaylor (x : Rat) (k : Nat) (n : Nat) : ValueWithError :=
+  -- Exact value of $\sum_{m=0}^k x^m / m!$.
+  let a := ValueWithError.value $ expTaylor x k
+  -- Taylor approximation of $e^{-x}$.
+  let b := expTaylor (- x) n
+  -- The $n + 1$ term approximation of the Possion distribution for $k$ events with mean $x$.
+  a * b
+
+/-- Determine whether a Taylor expansion for a Possion distribution is sufficiently converged. -/
+private partial def trialEstimate (y : Rat) (x : Rat) (k : Nat) (n : Nat) : Ordering :=
+  let ⟨ estimate , error ⟩ := poissonTaylor x k n
+  if y < estimate - error
+    then Ordering.lt
+    else if  y > estimate + error
+      then Ordering.gt
+      else trialEstimate y x k $ n + 1
+
+/-- Inverse of the Possion distribution. -/
+def comparePoisson (y : Rat) (x : Rat) (k : Nat) : Ordering :=
+  -- At least $\lfloor x \rfloor$ terms must be evaluated.
+  trialEstimate y x k x.floor.toNat
+-- Note that the test suite includes `LSpec` tests for this function.
+
+/-- Determine whether the specified number of voting seats are allowed for a particular VRF value-/
+private def allowsSeats (maxSeats : Nat) (vrf : Rat) (x : Rat) (seats : Nat) : Nat :=
+  if seats ≥ maxSeats
+    then seats
+    else if comparePoisson vrf x (seats + 1) == Ordering.lt
+      then seats
+      else allowsSeats maxSeats vrf x $ seats + 1
+
+/-- Determine the number of seats for a particular VRF value. -/
+private def evalSeats (n₂ : Nat) (𝒮 : Rat) (vrf : Rat) : Nat :=
+  let x : Rat := (n₂ : Rat) * (𝒮 : Rat)
+  if comparePoisson vrf x 0 == Ordering.lt
+    then 0
+    else allowsSeats n₂ vrf x 0
+
+/-- Count a voter's seats. -/
+def countSeats (n₂ : Nat) (𝒮 : Rat) (σ_eid : BLS.Signature) : Nat :=
+  let num : Nat := σ_eid.toByteArray.foldl (fun acc b => (acc <<< 8) + b.toNat) 0
+  let den : Nat := 2 ^ 384
+  let vrf : Rat := num.cast / den
+  evalSeats n₂ 𝒮 vrf
+  
+-- Property-based tests are provided here for the rational representation of the Poisson distribution.
+
+section
+
+structure TestCase where
+  x : Rat
+  y : Rat
+  k : Nat
+deriving Repr
+
+instance : SlimCheck.Shrinkable TestCase where
+  shrink _ := []
+
+instance : SlimCheck.SampleableExt TestCase :=
+  SlimCheck.SampleableExt.mkSelfContained $
+    do
+      let den' : Nat := 1000000000
+      let den : Rat := den'
+      let x : Rat ← SlimCheck.Gen.choose Nat 0 den'
+      let y : Rat ← SlimCheck.Gen.choose Nat 0 den'
+      let k : Nat ← SlimCheck.Gen.choose Nat 0 15
+      pure ⟨ x / den , y / den , k⟩
+
+def poisson (x : Float) (k : Nat) : Float :=
+  let a := Float.exp (- x)
+  let bs :=
+    (List.range (k + 1)).map
+      $ fun n ↦ x.pow n.toFloat / n.factorial.toFloat
+  a * bs.sum
+
+#lspec
+  check "Poisson comparison" (
+    ∀ tc : TestCase
+  , let actual := Float.decLt tc.y.toFloat $ poisson tc.x tc.k
+    let expected := comparePoisson tc.y tc.x tc.k = Ordering.lt
+    expected == actual.decide
+  )
+
+end
+```
 
 [^1]: See [this Jupyter notebook](./weighted-fait-accompli.ipynb) for details of the computations.

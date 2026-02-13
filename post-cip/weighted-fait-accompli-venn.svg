@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="750"
+   height="450"
+   viewBox="0 0 750 450"
+   version="1.1"
+   id="svg8"
+   sodipodi:docname="weighted-fait-accompli-venn.svg"
+   inkscape:version="1.4.2 (ebf0e940d0, 2025-05-08)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs8" />
+  <sodipodi:namedview
+     id="namedview8"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     showgrid="false"
+     inkscape:zoom="1.2185714"
+     inkscape:cx="425.08793"
+     inkscape:cy="350.00001"
+     inkscape:window-width="1889"
+     inkscape:window-height="1056"
+     inkscape:window-x="31"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="left-branch" />
+  <style
+     id="style1">
+    .label { font-family: sans-serif; font-size: 14px; fill: #222; font-weight: 600; text-anchor: middle; pointer-events: none; }
+    .title-label { font-size: 16px; font-weight: bold; fill: #000; }
+    .sub-label { font-size: 12px; fill: #333; }
+    /* Common style for all movable rectangles */
+    .movable-rect { stroke-width: 2px; fill-opacity: 0.7; }
+  </style>
+  <rect
+     style="fill:#ffffff;fill-rule:evenodd;stroke:none;stroke-width:1.965;stroke-linecap:square;stroke-opacity:0.277095;stroke-dasharray:none"
+     id="rect11"
+     width="750"
+     height="450"
+     x="0"
+     y="0"
+     rx="0" />
+  <rect
+     x="25.922485"
+     y="25.689117"
+     width="698.15503"
+     height="398.62177"
+     rx="25.234518"
+     fill="#f8f9fa"
+     stroke="#555555"
+     stroke-width="1.83415"
+     stroke-dasharray="8, 5"
+     id="rect1" />
+  <text
+     x="375.33984"
+     y="54.761562"
+     class="label title-label"
+     id="text1">All Stakepools</text>
+  <rect
+     x="38.172638"
+     y="74.434196"
+     width="673.65472"
+     height="323.65472"
+     rx="34.109097"
+     fill="#e3f2fd"
+     stroke="#1e88e5"
+     class="movable-rect"
+     id="rect2" />
+  <text
+     x="375.33984"
+     y="104.76157"
+     class="label title-label"
+     fill="#0d47a1"
+     id="text2"
+     style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:16px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Bold';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-anchor:middle;fill:#000000"><tspan
+       sodipodi:role="line"
+       id="tspan8"
+       x="375.33984"
+       y="104.76157">Active Stakepools</tspan></text>
+  <g
+     id="left-branch"
+     transform="matrix(0.99337748,0,0,0.99337748,-0.10927501,-8.2516807)">
+    <rect
+       x="59.845547"
+       y="149.84555"
+       width="300.3089"
+       height="249.97557"
+       rx="30.03089"
+       fill="#ffccbc"
+       stroke="#d84315"
+       class="movable-rect"
+       id="rect3" />
+    <text
+       x="209.68896"
+       y="180"
+       class="label"
+       id="text3"
+       style="-inkscape-font-specification:'sans-serif, Semi-Bold';font-family:sans-serif;font-weight:600;font-style:normal;font-stretch:normal;font-variant:normal;font-size:14.0933px;font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-anchor:middle;fill:#222222">Persistent Voters</text>
+    <rect
+       x="110.59824"
+       y="225.76491"
+       width="249.13687"
+       height="123.30354"
+       rx="31.142109"
+       fill="#ffab91"
+       stroke="#bf360c"
+       class="movable-rect"
+       id="rect4" />
+    <text
+       x="234.90009"
+       y="254.6057"
+       class="label sub-label"
+       id="text4"
+       style="-inkscape-font-specification:'sans-serif, Semi-Bold';font-family:sans-serif;font-weight:600;font-style:normal;font-stretch:normal;font-variant:normal;font-size:12.08px;font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-anchor:middle;fill:#333333">PV who cast votes</text>
+  </g>
+  <g
+     id="right-branch"
+     transform="translate(-100.5,-9.2384357)">
+    <rect
+       x="459.74371"
+       y="149.74371"
+       width="330.51257"
+       height="248.51257"
+       rx="30.046598"
+       fill="#c8e6c9"
+       stroke="#2e7d32"
+       class="movable-rect"
+       id="rect5" />
+    <text
+       x="624.68896"
+       y="180"
+       class="label"
+       id="text5"
+       style="font-style:normal;font-variant:normal;font-weight:600;font-stretch:normal;font-size:14px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Semi-Bold';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-anchor:middle;fill:#222222"><tspan
+         sodipodi:role="line"
+         id="tspan1">Non-Persistent Voter Candidates</tspan></text>
+    <rect
+       x="459.74115"
+       y="199.74115"
+       width="273.5177"
+       height="173.5177"
+       rx="25.325716"
+       fill="#a5d6a7"
+       stroke="#1b5e20"
+       class="movable-rect"
+       id="rect6" />
+    <text
+       x="596.18896"
+       y="222.80016"
+       class="label"
+       id="text6"
+       style="font-style:normal;font-variant:normal;font-weight:600;font-stretch:normal;font-size:14px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Semi-Bold';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-anchor:middle;fill:#222222"><tspan
+         sodipodi:role="line"
+         id="tspan10"
+         x="596.18896"
+         y="222.80016">Non-Persistent Voters</tspan></text>
+    <rect
+       x="460.00522"
+       y="250.00522"
+       width="197.98956"
+       height="97.989563"
+       rx="24.748695"
+       fill="#81c784"
+       stroke="#1b5e20"
+       class="movable-rect"
+       id="rect7" />
+    <text
+       x="558.7334"
+       y="269.09729"
+       class="label sub-label"
+       id="text7">NPV who cast votes</text>
+    <text
+       x="596.42676"
+       y="238.55566"
+       class="label sub-label"
+       id="text7-5"
+       style="font-style:normal;font-variant:normal;font-weight:600;font-stretch:normal;font-size:12px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Semi-Bold';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;text-anchor:middle;fill:#333333"><tspan
+         sodipodi:role="line"
+         id="tspan2"
+         x="596.42676"
+         y="238.55566">who have at least one seat</tspan></text>
+  </g>
+  <rect
+     x="225.81779"
+     y="278.07938"
+     width="298.36441"
+     height="35.864407"
+     rx="46.619434"
+     fill="#d1c4e9"
+     stroke="#512da8"
+     class="movable-rect"
+     id="rect8" />
+  <text
+     x="375.3042"
+     y="301.2308"
+     class="label"
+     id="text8">Votes in Certificate</text>
+</svg>
