@@ -474,6 +474,14 @@ The existing block production thread must be updated to generate an EB at the sa
 
 The Mempool capacity should be increased (**UPD-LeiosBiggerMempool**) to hold enough valid transactions for the block producer to issue a full EB alongside a full RB. The Mempool capacity should at least be twice the capacity of an EB, so that the stake pool issuing a CertRB for a full EB would still be able to issue a full EB alongside that CertRB (TxRB's have less transaction capacity than the EB certified by a CertRB). In general, SPOs are indirectly incentivized to maximize the size of the EB, just like TxRBs—so that more fees are included in the epoch's reward calculation.
 
+For the block production thread to determine which transactions can go into an RB, which overflow into an EB and how many can fit into the EB, a new capacity measure analogous to the existing `blockCapacityTxMeasure` will be needed for EBs (**NEW-LeiosEbCapacityMeasure**). The EB capacity measure must incorporate the new EB-specific block limit [protocol parameters](#new-protocol-parameters) from the ledger state, much like the existing Praos block capacity is also determined by protocol parameters.
+
+Furthermore, the existing `forgeBlock` method and/or the `BlockForging` interface must be extended (**UPD-LeiosForgeBlock**) to optionally produce an EB for a given block type (`blk`).
+
+> [!WARNING]
+>
+> TBD: Separate, new method or extending forgeBlock in `BlockForging`?
+
 ### Vote production and storage
 
 A new thread dedicated to Leios vote production (**NEW-LeiosVoteProductionThread**) will wake up when the closure of an EB is newly available. If the voting rules would require the stake pool to vote (now or soon) for this EB if it's valid, then this thread will begin validating it. Note if multiple closures arrive simultaneously, at most one of them could be eligible for a vote, since the voting rules require the EB to be announced by the tip of the node's current selection. If the validation succeeds while the voting rules still require the stake pool to vote for this EB (TODO even if it has since switched its selection?), the thread will issue that vote.
