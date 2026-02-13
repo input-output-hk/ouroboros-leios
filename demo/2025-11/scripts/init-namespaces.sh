@@ -1,5 +1,4 @@
 set -exuo pipefail
-set -a && source "$WORKING_DIR/.env" && set +a
 
 NS_PREFIX="leios-experiment"
 NS_UPSTREAM="${NS_PREFIX}:upstream"

@@ -1,5 +1,4 @@
 set -exuo pipefail
-set -a && source "$WORKING_DIR/.env" && set +a
 
 if [ -d "$NODE0_DIR" ]; then
   echo "Removing old $NODE0_DIR"

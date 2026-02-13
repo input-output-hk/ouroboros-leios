@@ -22,4 +22,10 @@
 
   # Yaml
   yamllint.enable = true;
+  yamllint.settings.configuration = ''
+    extends: relaxed
+    rules:
+      line-length:
+        max: 120
+  '';
 }

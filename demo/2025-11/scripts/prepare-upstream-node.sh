@@ -1,5 +1,4 @@
 set -exuo pipefail
-set -a && source "$WORKING_DIR/.env" && set +a
 
 if [ -d "$UPSTREAM_NODE_DIR" ]; then
   echo "Removing old $UPSTREAM_NODE_DIR"

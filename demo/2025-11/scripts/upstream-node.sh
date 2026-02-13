@@ -1,8 +1,7 @@
 set -exuo pipefail
-set -a && source "$WORKING_DIR/.env" && set +a
 
 cd "$UPSTREAM_NODE_DIR"
-$IMMDB_SERVER \
+immdb-server \
   --db "immutable/" \
   --config "config.json" \
   --initial-slot "$REF_SLOT" \

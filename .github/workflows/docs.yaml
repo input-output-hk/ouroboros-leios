@@ -201,28 +201,41 @@ jobs:
           name: mempool-visualizer
           path: site/static/mempool-viz
 
-      - name: Find leios design build artifact
-        id: leios-design-workflow
-        uses: actions/github-script@v7
+      - name: 🔧 Setup Nix
+        uses: cachix/install-nix-action@v24
         with:
-          script: |
-            let res = await github.rest.actions.listWorkflowRuns({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                workflow_id: 'leios-design.yaml',
-                branch: 'main',
-                status: 'success'
-            });
-            return res.data.workflow_runs[0].id;
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
 
-      - name: 📥 Download built leios design
-        uses: actions/download-artifact@v4
+      - name: 🏗️ Build leios design pdf
+        run: |
+          nix build .#leiosDesignPdf -L
+          cp result/leios-design.pdf site/static/ 
+          ls -la site/static/leios-design.pdf
+
+      - name: 📚 Build formal-spec HTML documentation
+        run: |
+          nix build .#leiosDocs
+          mkdir -p formal-spec-html
+          cp -r result/html/* formal-spec-html/
+          chmod -R +w formal-spec-html/
+          ls -la formal-spec-html/
+
+      - name: 🔄 Enhance formal-spec with interactive features
+        uses: will-break-it/agda-web-docs-lib@v1
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN || github.token }}
-          run-id: ${{steps.leios-design-workflow.outputs.result}}
-          pattern: leios-design-pdf*
-          merge-multiple: true
-          path: site/static
+          input-dir: formal-spec-html
+          config-file: site/agda-docs.config.json
+          cache-dependency-path: site/package-lock.json
+          node-options: "--max-old-space-size=8192 --expose-gc"
+
+      - name: 📦 Copy enhanced formal-spec to site
+        run: |
+          mkdir -p site/static/formal-spec
+          cp -r formal-spec-html/* site/static/formal-spec/
+          echo "Formal spec files copied:"
+          ls -la site/static/formal-spec/ | head -20
 
       - name: 🏗️ Build Docusaurus site
         working-directory: site

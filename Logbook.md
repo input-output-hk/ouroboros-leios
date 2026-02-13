@@ -6,7 +6,47 @@
 > 
 > See also the [Post-CIP R&D Findings](post-cip/README.md) document for additional (after 2025-11-01) findings and artifacts not directly related to the implementation of Linear Leios.
 
+## 2026-02-12
+
+### SN on prototype diffusing EBs
+
+- Last night I realized that the notifications were not working because the call sites of `LeiosDbHandle` were each creating a new connection + notification channel. The name `getLeiosNewDbConnection` did suggest "new connection", but this is more now. In fact we even had 1-2 todos mentioning whether we should share connections across threads? An obvious down-side is that transactions over the same connection would be blocking each other. If we eventually move to WAL mode, we might want to have multipl `LeiosDbConnection` again, but for now sharing the `LeiosDbHandle` is the way to go so we can leverage the notification channel. The `InMemory` implementaiton variant was also never going to work across multiple threads (in the `ThreadNet` tests) if each thread creates it own "database" in memory without a shared view on it.
+- After sharing the `LeiosDbHandle` the 2025-11 demo was not working because I forgot to update the `leiosdemo202510 generate` command to the new schema.
+- I get a `MsgLeiosBlock size mismatch` after updating the scheduled eb generation to the new scheama..
+  - I found a bug in the computation of the leios eb byte size that led to these mismatches. Added a property test to assert consistency with the actual encoder we use.
+- The proto devnet was also choking loki to the limits which we needed to increase.
+- Now EBs are travelling through the `proto-devnet` :tada:
+- I realized that no transactions were submitted and quickly determined that it must be becaus we don't store them in the database when forging.. obviously.
+
+## 2026-02-09
+
+### SN on prototype storage / notifications
+
+- Exploring ways to make the `updateEbTxs` faster. Moving the prepare statements out of the function makes no significant impact.
+- Using `leiosDbInsertTxCache` as proxy for how an insert statement would perform differently.
+- The `txCache` is basically what a txs-only table would be and we could make `ebTxs` the n:m resolution table between ebs and txs.
+- Nope, `INSERT INTO` has the same performance as `UPDATE` statement
+- Realized that the forwarding logic is broken since a while (and was not working on the `EbId` refactor). Trying to find out when `2025-11` demo stopped forwarding ebs using `git bisect`.
+  - I can compile `immdb-server` from within `cardano-node` which saved me some rebuilds (of the o-c dist-newstyle).
+  - The bisecting was pointless as it the problem was happening only occasionally -\> flaky
+- Looking at the logs I was at first puzzled why the downstream node would not fetch the offered ebs.
+- With some AI analysis help, it turned out that the node0 errored and the connection reset. This had the downstream node get offers for EBTxs it did not know the EBs for -\> no decision to fetch.
+- The root cause for the error in node0 was a "database is locked" ExitFailure 1 exception, which did not kill the process, but just result in a printed log in one of the network threads -\> this is not structure and thus not picked up by alloy/grafana!
+- Raising a proper exception and tracing it should help in detecting this. Also, the root cause can be addressed via WAL mode or a single writer connection (application-level queuing of writes).
+- Of course.. after adding the tracing of the exception, it does not happen anymore
+- Saw it now again. The exception is in the logs and shows up on grafana. However detected_level is still INFO.
+
 ## 2026-02-04
+
+### SN on refactoring EbId in prototype
+
+- When removing the `EbId` I stumbled over a dirty hack of deriving a slot from an `EbId`. I usually attempted to translate `EbId -> EbHash`, but it turns out that these places are most likely needing a `LeiosPoint` (which contains the slot of the EB).
+- These `LeiosEbBodies` are also less and less needed (was this in part just an in-memory index from `EbId -> LeiosPoint`?)
+- I'm a bit surprised by the `LeiosBlockTxsOffer`. It was using an `EbId` before, and I migrated this to be a `LeiosPoint` now. Which follows the mini protocol design (indicates uniquely for which EB we have all txs now). However, the `ebIdSlot` hack was obfuscating the behavior how those notifications would now be yielded. The fetching logic keeps all kinds of state for what to still fetch. This as all using `EbId` and I moved this to be `EbHash`. However, that means we lose the information which points these EBs correspond to. I *think* the existing logic was notifying which EBs are ready to be offered in `LeiosDemoLogic` via the `newNotifications` variable. So I think I have two options now: Bring back some lookup from `EbHash -> SlotNo` available to the fetching logic (like the `LeiosEbBodies`?) or change the indices we keep track of in the fetching logic to be `LeiosPoint` instead of only `EbHash`.
+- It's even more dire for the `doCacheCopy` function where we do not have any point/slot context.
+- Let's work backwards from the notifications and see what we need to keep track of for knowing which EB is ready to be offered.
+- After updating the db schema, we don't have a nice ordering anymore on `ebTxs` if only `ebHashBytes` is the primary key (e.g. in a visual viewer). Would this be different if our primary key for `ebTxs` would be `(ebSlot, ebHashBytes)` (the point)? (Answer: no)
+- Finally, I could get rid of all `EbId` and it uncovered a few places where not only a hash, but also the corresponding slot was needed -> a `LeiosPoint`.
 
 ### SN on Leios block structure
 

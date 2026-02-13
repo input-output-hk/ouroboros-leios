@@ -1,24 +1,29 @@
 version: "0.5"
 is_strict: true
 
-processes:
-  Init:
-    command: |
-      bash "${SCRIPTS}/init.sh"
-    availability:
-      restart: "on_failure"
+# NOTE: Elevated processes (is_elevated: true) run via sudo, which does not
+# preserve environment variables. We must explicitly pass needed variables
+# inline in the command for them to be available in elevated scripts.
 
+processes:
   InitNamespaces:
     is_elevated: true
     command: |
-      bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/init-namespaces.sh"
-    depends_on:
-      Init:
-        condition: process_completed_successfully
+      RATE_UP_TO_N0="${RATE_UP_TO_N0}" \
+      DELAY_UP_TO_N0="${DELAY_UP_TO_N0}" \
+      RATE_N0_TO_UP="${RATE_N0_TO_UP}" \
+      DELAY_N0_TO_UP="${DELAY_N0_TO_UP}" \
+      RATE_N0_TO_DOWN="${RATE_N0_TO_DOWN}" \
+      DELAY_N0_TO_DOWN="${DELAY_N0_TO_DOWN}" \
+      RATE_DOWN_TO_N0="${RATE_DOWN_TO_N0}" \
+      DELAY_DOWN_TO_N0="${DELAY_DOWN_TO_N0}" \
+      IP_UPSTREAM_NODE="${IP_UPSTREAM_NODE}" \
+      IP_NODE0="${IP_NODE0}" \
+      IP_DOWNSTREAM_NODE="${IP_DOWNSTREAM_NODE}" \
+      bash "${SOURCE_DIR}/scripts/init-namespaces.sh"
 
   PrepareUpstreamNode:
-    command: |
-      bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/prepare-upstream-node.sh"
+    command: bash "${SOURCE_DIR}/scripts/prepare-upstream-node.sh"
     depends_on:
       InitNamespaces:
         condition: process_completed_successfully
@@ -28,7 +33,11 @@ processes:
   UpstreamNode:
     is_elevated: true
     command: |
-      ip netns exec leios-experiment:upstream bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/upstream-node.sh"
+      UPSTREAM_NODE_DIR="${UPSTREAM_NODE_DIR}" \
+      REF_SLOT="${REF_SLOT}" \
+      ONSET_OF_REF_SLOT="${ONSET_OF_REF_SLOT}" \
+      PORT_UPSTREAM_NODE="${PORT_UPSTREAM_NODE}" \
+      ip netns exec leios-experiment:upstream bash "${SOURCE_DIR}/scripts/upstream-node.sh"
     log_location: "${WORKING_DIR}/upstream-node.log"
     depends_on:
       PrepareUpstreamNode:
@@ -39,7 +48,11 @@ processes:
   PrepareNode0:
     is_elevated: true
     command: |
-      bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/prepare-node0.sh"
+      NODE0_DIR="${NODE0_DIR}" \
+      DATA_DIR="${DATA_DIR}" \
+      PORT_UPSTREAM_NODE="${PORT_UPSTREAM_NODE}" \
+      IP_UPSTREAM_NODE="${IP_UPSTREAM_NODE}" \
+      bash "${SOURCE_DIR}/scripts/prepare-node0.sh"
     depends_on:
       InitNamespaces:
         condition: process_completed_successfully
@@ -49,7 +62,9 @@ processes:
   Node0:
     is_elevated: true
     command: |
-      ip netns exec leios-experiment:node0 bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/node0.sh"
+      NODE0_DIR="${NODE0_DIR}" \
+      PORT_NODE0="${PORT_NODE0}" \
+      ip netns exec leios-experiment:node0 bash "${SOURCE_DIR}/scripts/node0.sh"
     log_location: "${WORKING_DIR}/node0.log"
     depends_on:
       PrepareNode0:
@@ -60,7 +75,11 @@ processes:
   PrepareDownstreamNode:
     is_elevated: true
     command: |
-      bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/prepare-downstream-node.sh"
+      DOWNSTREAM_NODE_DIR="${DOWNSTREAM_NODE_DIR}" \
+      DATA_DIR="${DATA_DIR}" \
+      PORT_NODE0="${PORT_NODE0}" \
+      IP_NODE0="${IP_NODE0}" \
+      bash "${SOURCE_DIR}/scripts/prepare-downstream-node.sh"
     depends_on:
       InitNamespaces:
         condition: process_completed_successfully
@@ -70,7 +89,9 @@ processes:
   DownstreamNode:
     is_elevated: true
     command: |
-      ip netns exec leios-experiment:downstream bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/downstream-node.sh"
+      DOWNSTREAM_NODE_DIR="${DOWNSTREAM_NODE_DIR}" \
+      PORT_DOWNSTREAM_NODE="${PORT_DOWNSTREAM_NODE}" \
+      ip netns exec leios-experiment:downstream bash "${SOURCE_DIR}/scripts/downstream-node.sh"
     log_location: "${WORKING_DIR}/downstream-node.log"
     depends_on:
       PrepareDownstreamNode:
@@ -81,7 +102,10 @@ processes:
   SSOnUpstreamNode:
     is_elevated: true
     command: |
-      ip netns exec leios-experiment:upstream bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/ss-on-upstream.sh"
+      IP_UPSTREAM_NODE="${IP_UPSTREAM_NODE}" \
+      PORT_UPSTREAM_NODE="${PORT_UPSTREAM_NODE}" \
+      PORT_NODE0="${PORT_NODE0}" \
+      ip netns exec leios-experiment:upstream bash "${SOURCE_DIR}/scripts/ss-on-upstream.sh"
     depends_on:
       UpstreamNode:
         condition: "process_started"
@@ -91,7 +115,11 @@ processes:
   SSOnNode0:
     is_elevated: true
     command: |
-      ip netns exec leios-experiment:node0 bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/ss-on-node0.sh"
+      IP_NODE0="${IP_NODE0}" \
+      PORT_NODE0="${PORT_NODE0}" \
+      PORT_UPSTREAM_NODE="${PORT_UPSTREAM_NODE}" \
+      PORT_DOWNSTREAM_NODE="${PORT_DOWNSTREAM_NODE}" \
+      ip netns exec leios-experiment:node0 bash "${SOURCE_DIR}/scripts/ss-on-node0.sh"
     depends_on:
       Node0:
         condition: "process_started"
@@ -101,7 +129,10 @@ processes:
   SSOnDownstreamNode:
     is_elevated: true
     command: |
-      ip netns exec leios-experiment:downstream bash -c "export WORKING_DIR=${WORKING_DIR}; ${SCRIPTS}/ss-on-downstream.sh"
+      IP_DOWNSTREAM_NODE="${IP_DOWNSTREAM_NODE}" \
+      PORT_NODE0="${PORT_NODE0}" \
+      PORT_DOWNSTREAM_NODE="${PORT_DOWNSTREAM_NODE}" \
+      ip netns exec leios-experiment:downstream bash "${SOURCE_DIR}/scripts/ss-on-downstream.sh"
     depends_on:
       DownstreamNode:
         condition: "process_started"
@@ -111,11 +142,9 @@ processes:
   Analyze:
     command: |
       set -exuo pipefail;
-      set -a && source "$WORKING_DIR/.env" && set +a;
-
       while true; do
         sleep 1
-        "$PYTHON3" "$ANALYSE_PY" \
+        python "${SOURCE_DIR}/analyse.py" \
           "$REF_SLOT" "$ONSET_OF_REF_SLOT" \
           "$UPSTREAM_NODE_DIR/schedule.json" \
           "$WORKING_DIR/upstream-node.log" \
@@ -132,19 +161,5 @@ processes:
         condition: process_started
       DownstreamNode:
         condition: process_started
-    availability:
-      restart: "always"
-
-  Test:
-    command: |
-      set -exuo pipefail;
-
-      while true; do
-        cat "$WORKING_DIR/.env";
-        ls -la;
-      done;
-    depends_on:
-      Init:
-        condition: process_completed_successfully
     availability:
       restart: "always"
