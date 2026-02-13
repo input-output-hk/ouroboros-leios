@@ -589,7 +589,7 @@ The first will not need to change functionally, while the latter two will need t
 
 - **REQ-LedgerNewEra** The ledger must be prepared with a new era that includes all changes required by CIP-164.
 
-For the remainder of this document, let's assume the changes will go into the `Euler` era, where `Conway` is currently the latest and `Dijkstra` is in preparation at the time of writing.
+See [Era and hard-fork coordination](#era-and-hard-fork-coordination) for a discussion on which era to target. For the remainder of this document, let's assume the changes will go into the `Dijkstra` era.
 
 ### Transaction validation levels
 
@@ -646,7 +646,7 @@ CIP-164 introduces several new protocol parameters that may be updated via on-ch
 - **REQ-LedgerProtocolParameterAccess** The ledger must provide access to all new protocol parameters via existing interfaces.
 - **REQ-LedgerProtocolParameterUpdate** The ledger must be able to update all new protocol parameters via on-chain governance.
 
-Concretely, this means defining the `PParams` and `PParamsUpdate` types for the `Euler` era to include the new parameters, as well as providing access via the `EulerPParams` and other type classes.
+Concretely, this means defining the `PParams` and `PParamsUpdate` types for the `Dijkstra` era to include the new parameters, as well as providing access via the `DijkstraPParams` and other type classes.
 
 ### Serialization
 
