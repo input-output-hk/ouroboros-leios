@@ -8,6 +8,8 @@ author:
   - Thomas Vellekoop <thomas.vellekoop@iohk.io>
   - Michael Karg <michael.karg@iohk.io>
   - Martin Kourim <martin.kourim@iohk.io>
+  - Gamze Orhon Kılıç <gamze.kilic@iohk.io>
+  - Hamza Jeljeli <hamza.jeljeli@iohk.io>
 ---
 
 # Introduction
@@ -666,46 +668,338 @@ Corresponding types with instances of `EncCBOR` and `DecCBOR` must be provided i
 
 > [!WARNING]
 >
-> TODO: Mostly content directly taken from [impact analysis](../ImpactAnalysis.md). Expand on motivation and concreteness of changes.
+> Work in progress. Content is created based on [impact analysis](../ImpactAnalysis.md), [Leios crypto project board](https://github.com/orgs/IntersectMBO/projects/75), and [CIP](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md).
 
-The security of the votes cast and the certificates that Leios uses to accept EB blocks depends on the usage of the pairing-based BLS12-381 signature scheme (BLS). This scheme is useful, as it allows for aggregation of public keys and signatures, allowing a big group to signal their approval with one compact artifact. Besides Leios, it is also likely that [Peras](https://github.com/tweag/cardano-peras/issues/128) will use this scheme.
 
-This section derives requirements for adding BLS signatures to `cardano-base` and sketches changes to satisfy them. The scope is limited to cryptographic primitives and their integration into existing classes; vote construction/logic is out of scope. This work should align with [this IETF draft](https://www.ietf.org/archive/id/draft-irtf-cfrg-bls-signature-05.html).
+In Leios, EBs are compactly certified for inclusion in RBs. 
+Certification is achieved through a voting mechanism in which committee members cast votes referencing specific EBs, and these votes are then aggregated into compact certificates. 
 
-> Note that with the implementation of [CIP-0381](https://cips.cardano.org/cip/CIP-0381) `cardano-base` already contains basic utility functions needed to create these bindings; the work below is thus expanding on that. The impact of the below requirements thus only extends to [this](https://github.com/IntersectMBO/cardano-base/blob/82e09945726a7650540e0656f01331d09018ac97/cardano-crypto-class/src/Cardano/Crypto/EllipticCurve/BLS12_381/Internal.hs) module and probably [this](https://github.com/IntersectMBO/cardano-base/blob/82e09945726a7650540e0656f01331d09018ac97/cardano-crypto-class/src/Cardano/Crypto/DSIGN/Class.hs) outward facing class.
+To participate in the Leios protocol as a voting member or block-producing node, stake pool operators must register an additional cryptographic key dedicated to the voting scheme, alongside their existing VRF and KES keys.
+Two types of voters contribute to EB validation, ensuring a balance between security, decentralization, and efficiency. 
+Persistent voters are selected once per epoch and participate in every election, identified by compact identifiers. 
+Non-persistent voters, on the other hand, are selected independently for each EB via local sortition. 
+Registered voters can generate and cast votes, each including an `endorser_block_hash` field that uniquely identifies the target EB. 
+Collected votes are then aggregated into a compact certificate.
 
-### Core functionality
+### Leios Voting in a Nutshell
 
-The following functional requirements define the core BLS signature functionality needed:
+#### Key Generation
+- A secret key ($sk$) is created to generate signatures for the corresponding signature scheme.  
+- The public key ($pk$) is securely derived from $sk$ and used to verify the corresponding signatures.  
+- A proof of possession ($PoP$) is generated for $sk$ to ensure key ownership.  
+> Note that keys are not rotated periodically, as forward security is not required for IBs, EBs, or votes.
 
-- **REQ-BlsTypes** Introduce opaque types for `SecretKey`, `PublicKey`, `Signature`, and `AggSignature` (if needed by consensus).
-- **REQ-BlsKeyGenSecure** Provide secure key generation with strong randomness requirements, resistance to side-channel leakage.
-- **REQ-BlsVariantAbstraction** Support both BLS variants—small public key and small signature—behind a single abstraction. Public APIs are variant-agnostic.
-- **REQ-BlsPoP** Proof-of-Possession creation and verification to mitigate rogue-key attacks.
-- **REQ-BlsSkToPk** Deterministic sk → pk derivation for the chosen variant.
-- **REQ-BlsSignVerify** Signature generation and verification APIs, variant-agnostic and domain-separated (DST supplied by caller). Besides the DST, the interface should also implement a per message augmentation.
-- **REQ-BlsAggregateSignatures** Aggregate a list of public keys and signatures into one.
-- **REQ-BlsBatchVerify** Batch verification API for efficient verification of many `(pk, msg, sig)` messages.
-- **REQ-BlsDSIGNIntegration** Provide a `DSIGN` instance so consensus can use BLS via the existing `DSIGN` class, including aggregation-capable helpers where appropriate.
-- **REQ-BlsSerialisation** Deterministic serialisation: `ToCBOR`/`FromCBOR` and raw-bytes for keys/signatures; strict length/subgroup/infinity checks; canonical compressed encodings as per the [Zcash](https://github.com/zcash/librustzcash/blob/6e0364cd42a2b3d2b958a54771ef51a8db79dd29/pairing/src/bls12_381/README.md#serialization) standard for BLS points.
-- **REQ-BlsConformanceVectors** Add conformance tests using test vectors from the [initial](https://github.com/input-output-hk/ouroboros-leios/tree/main/crypto-benchmarks.rs) Rust implementation to ensure cross-impl compatibility.
+#### Key Registration 
+- The registration process is responsible for storing public keys and verifying proof of possession.  
+- Each stake pool registers with the following information:  
+  - A unique identifier (Pool ID or similar)  
+  - $pk$  
+  - $PoP$  
+  - A KES signature over the Pool ID, $pk$, and $PoP$  
+- Nodes verify the $PoP$s of all received $pk$s to confirm their validity.
 
-### Performance and quality
+#### Voter Determination
+- For each epoch, *persistent voters* are selected based on the stake distribution and participate in every election during that epoch.  
+- Within the same epoch, *non-persistent voters* are chosen randomly and independently for each election.
+
+#### Voting
+- Voters sign the election ID and the EB hash with their $sk$.  
+- Each vote includes the election ID, the EB hash, and the corresponding signature.  
+- Persistent votes additionally include an epoch-specific identifier of the stake pool.  
+- Non-persistent votes include the Pool ID and an eligibility signature on the election ID.
+
+#### Certificate Generation
+- Upon receiving votes, both voter identities and their signatures are verified.  
+- Non-persistent votes are further validated for eligibility.  
+- Once a quorum of valid votes is collected, a certificate can be generated.  
+- The certificate includes:  
+  - The election ID and the message (the hash of the EB)  
+  - The identities of participating voters  
+  - Eligibility proofs for non-persistent voters  
+  - An aggregate signature combining all individual voter signatures
+
+### Requirements
+
+The voting and certificate scheme in Leios must satisfy key requirements to ensure security, efficiency, and practical deployability.
+
+Key registration should be lightweight, requiring minimal data exchange or coordination among participants. 
+Ideally, it should be integrated into the existing operational certificate framework to keep certificates compact and avoid unnecessary complexity.
+
+Periodic rotation of cryptographic keys for signing Leios votes and certificates is unnecessary. 
+The timing of voting rounds and the key rotation already present in Praos provide sufficient protection against replay and key compromise attacks.
+
+Deterministic signatures, while useful against weak randomness, are not required for Leios. 
+Deterministic randomness is only essential in the lottery mechanism, which is securely implemented through VRFs.
+
+The voting committee must be selected locally and unpredictably to resist adversarial interference.
+The process should not be overly deterministic or publicly visible, preventing targeted attacks such as denial-of-service or node subversion. 
+The protocol must also preserve liveness and soundness—adversaries with significant stake (e.g., over 35%) should not block honest quorums, and even near-majority holders (around 49%) must be unable to form malicious ones.
+
+Because voting occurs frequently and adds notable network load, votes and certificates must remain compact. 
+The large size of Praos KES signatures makes them unsuitable, highlighting the need for more space-efficient schemes that fit easily within Praos blocks while leaving room for other transactions.
+
+Lastly, the cryptographic operations for eligibility verification, vote generation, and certificate validation must be highly efficient. 
+The total workload should stay well within the CPU budget for Leios stages, ensuring strong performance and scalability under real-world conditions.
+
+### Design Choices
+
+Several certificate schemes were evaluated for Leios, including ALBA variants, SNARK-based voting schemes, and BLS-based certificates, with the goal of identifying a design that best satisfies the security, efficiency, and deployability requirements described above. 
+After comparison, BLS certificates based on the *Fait Accompli* sortition scheme were selected as the preferred approach. 
+Although this choice requires the registration of additional keys and occasional key rotation, it provides a strong balance between efficiency and practicality, producing certificates smaller than 10 kB.
+
+Other voting mechanisms could be considered preferable if they met the following conditions: no need for new key registration (i.e., reusing existing VRF and KES keys for voting), a certificate size well below the 90,112-byte limit of a Praos block, and proof generation and verification times that remain within the CPU budget of the `cardano-node`. 
+However, among the schemes analyzed, BLS certificates offered the most favorable trade-offs across these dimensions.
+
+The BLS voting mechanism relies on a pairing-based signature scheme defined over the BLS12-381 elliptic curve. 
+This approach is advantageous because it enables the aggregation of public keys and signatures, allowing large groups of participants to collectively signal approval through a single compact artifact. 
+Beyond Leios, the BLS mechanism is also relevant to other Cardano subsystems; Mithril already employs BLS-based aggregation, and Peras is expected to adopt a similar approach in future implementations.
+
+#### Choice of BLS Variant
+
+BLS12-381 signatures can be instantiated in two variants that differ only in which group is used for public keys and which is used for signatures. Both variants are equivalent in security and share the same API surface; they differ only in the size of the encoded artifacts:
+- **MinPk variant**: public keys are 48 bytes, signatures are 96 bytes, and a proof of possession is 2 times 96 bytes.
+- **MinSig variant**: signatures are 48 bytes, public keys are 96 bytes, and a proof of possession is 2 times 48 bytes.
+This creates a straightforward trade-off: either public keys are smaller (MinPk) or signatures are smaller (MinSig).
+
+For Leios, this choice affects the size of voting certificates, which in turn impacts bandwidth, storage, and block propagation. Note that proofs of possession are only used at key registration time, so their size has negligible impact on steady-state bandwidth, storage. They therefore do not weigh into the choice between the two variants.
+
+The certificate and vote schemes we use follows those defined in CIP-0164 together with the more detailed description in
+[Specification.md](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md).
+
+For **persistent voters**, a vote contains:
+- common fields (election ID, EB hash, vote signature), and
+- a 2-byte epoch-specific pool identifier.
+
+For **non-persistent voters**, a vote contains:
+- the same common fields as above,
+- a 28-byte Pool ID, and
+- a separate eligibility signature.
+
+At a high level, a certificate records:
+
+- the election identifier (8 bytes) and EB hash (32 bytes),
+- a bitset of persistent voters, of size \(m / 8\) bytes,
+- for each **non-persistent voter**:
+  - the Pool ID,
+  - its **eligibility proof**, an individual BLS signature of size S_sig,
+- one **aggregate vote signature** on the EB (a single BLS signature of size S_sig).
+
+A key point is that **eligibility proofs remain non-aggregated**: the block producer must be able to verify each proof individually against the Fait-Accompli sortition condition. Only the vote signatures on the EB are aggregated.
+
+Under these assumptions, the total certificate size is
+
+```text
+certificate_bytes = 40 + 2 * S_sig + m / 8 + (28 + S_sig) * (n - m).
+```
+
+Current sortition simulations tune the number of non-persistent seats to roughly 100 across the committee sizes we care about. Concretely, we assume:
+- for n = 500, we have m ≈ 400 persistent voters,
+- for n = 1000, we have m ≈ 900 persistent voters,
+
+**Impact on vote size**
+
+- **Votes from persistent voters**: With MinSig the size is 90 bytes. With MinPk, the vote grows to 138 bytes. MinSig therefore makes persistent votes about **35% smaller** than MinPk.
+
+- **Votes from non-persistent voters**: With MinSig the size is 164 bytes. With MinPk, the vote grows to 260 bytes. MinSig therefore makes persistent votes about **37% smaller** than MinPk.
+
+For a 1000-seat committee with 900 persistent, this translates to roughly 97 kB of vote traffic per EB with MinSig versus about 150 kB with MinPk, i.e. MinSig reduces vote-related bandwidth by roughly one third per election round.
+
+**Impact on certificate size**
+
+For a 1000-seat committee with ≈900 persistent voters:
+
+- **MinSig**:
+
+  ```text
+   certificate_bytes = 40 + 2 * 48 + 113 + (28 + 48) * 100 = 136 + 113 + 7600 = 7849 bytes.
+  ```
+
+- **MinPk**:
+
+  ```text
+  certificate_bytes = 40 + 2 * 96 + 113 + (28 + 96) * 100 = 232 + 113 + 12400 = 12745 bytes.
+  ```
+
+So, for n = 1000 and \(n - m ≈ 100\), MinPk certificates are about 4.9 kB larger, which is roughly a **60% increase** over MinSig.
+
+We also evaluated the 500-seat case. The percentage increase from MinSig to MinPk is essentially the same (~60%).
+
+**Interpretation for Leios**
+
+- With MinSig, **both votes and certificates** are significantly smaller. For a 1000-seat committee, total vote traffic per EB drops from ~150 kB to ~97 kB, and certificates stay comfortably below **8 kB**, keeping propagation and storage lightweight.
+- With MinPk, sizes of both votes and certificates are significantly worse for bandwidth, storage, and diffusion, especially given the number of votes and certificates the system will handle over time.
+- Since Leios produces far more **signatures** than public keys, the overall cost is driven by signature size rather than key size.
+
+In summary, the Leios cryptography design therefore **fixes MinSig as the BLS12-381 variant**.
+
+### Implementation
+
+To implement the linear Leios design, efficient BLS signature functionality is essential for achieving fast and compact certificate generation. 
+With the adoption of [CIP-0381](https://cips.cardano.org/cip/CIP-0381), `cardano-base` already provides foundational utilities for BLS operations, offering a solid basis for this integration. 
+Building on these capabilities, the implementation plan introduces additional bindings and helper modules to ensure smooth interaction with the Leios protocol within the Haskell node. 
+
+This section presents the implementation plan for extending `cardano-base` with BLS signature support and outlines the modifications required to satisfy Leios-specific needs. 
+The requirements are organized into two main categories: **core functionality**, which defines the essential BLS operations needed, and **performance and quality**, which ensures the implementation meets the expected efficiency, reliability, and maintainability standards.
+
+#### Core functionality
+- **BLS types** 
+  - The `BLS12_381.Internal` module in `cardano-base` already provides a comprehensive set of types designed for safe interaction with the linked C functions from the `blst` library. 
+  - As part of the integration effort, it is necessary to evaluate which additional types should be introduced beyond those already defined, ensuring full support for the BLS functionality required by Leios.
+
+- **Key generation** 
+  - Secure key generation must ensure strong randomness and resilience against side-channel attacks. To achieve this, an integration with the `blst` library through a FFI is required. This involves adding the necessary foreign function imports to the `BLS12_381.Internal` module and implementing the corresponding `SecretKey` type to enable safe and efficient handling of secret keys within the Haskell environment.
+  - The `blst` library exposes a key-generation function [`blst_keygen`](https://github.com/supranational/blst/blob/e7f90de551e8df682f3cc99067d204d8b90d27ad/bindings/blst.h#L330) 
+    ```C
+    void blst_keygen(blst_scalar *out_SK, const byte *IKM, size_t IKM_len, const byte *info DEFNULL, size_t info_len DEFNULL);
+    ```
+    which derives a secret key from input keying material (IKM) and optional `info`. To use this safely in `cardano-base`, we need to clarify the security guarantees of this construction: what qualifies as a cryptographically secure IKM (length, entropy, generation source) and how `info` should be used (additional entropy vs. domain/context bytes). In parallel, we should examine how `cardano-base` currently sources seeds for other schemes in the `DSIGN` class, review the `blst` keygen C implementation to assess robustness and side-channel posture, align our requirements with the IETF BLS draft’s guidance on key generation (see the “KeyGen” section in the CFRG draft), and determine whether `info` is treated as entropy input or merely contextual/domain-separation data; documenting these findings will let us standardize secure IKM generation and `info` usage for BLS within `cardano-base`.
+
+- **Proof-of-Possession** 
+  - The `blst` C library does not provide a direct interface for generating a proof of possession ($PoP$). 
+  - This functionality must be implemented manually in `cardano-base`, leveraging the existing `blst` bindings and will be exposed as part of the BLS signing interface.
+  - For each BLS keypair `(sk_bls, pk_bls)`, let `pk_bytes` be the canonical compressed encoding of `pk_bls`.  
+  - The PoP is defined as a BLS signature over the fixed message: `msg_pop = “PoP” || pk_bytes` where `"PoP"` is a fixed ASCII tag. This ensures that PoP messages are clearly separated from vote messages and cannot be confused with them.
+  - PoP generation and verification are performed through dedicated PoP helper functions in the BLS signing module. Although the exact API shape differs by implementation language, the logical interface follows:
+    ```
+    pop  = derive_pop(sk_bls, context_pop)
+    ok   = verify_pop(pk_bls, pop, context_pop)
+    ```
+    where `context_pop` provides the domain-separation settings (e.g., DST).
+  - The PoP and vote-signature domains must be distinct.  
+Leios **must** use a PoP-specific domain separation tag (`DST_POP`) that differs from the tag used for vote signatures (`DST_VOTE`).  
+This prevents PoPs from being repurposed as votes and preserves the security separation between registration and voting.
+  - The current BLS implementation in Cardano uses the base domain-separation tag: `“BLS_DST_CARDANO_BASE_V1”`
+
+    For Leios, we recommend deriving protocol-specific DSTs from this base value, for example:
+    ```
+    DST_POP  = “BLS_DST_CARDANO_BASE_LEIOS_POP_V1”
+    DST_VOTE = “BLS_DST_CARDANO_BASE_LEIOS_VOTE_V1”
+    ```
+
+- **Public key derivation** 
+  - Implement deterministic derivation of the public key ($pk$) from the corresponding secret key ($sk$) for the selected BLS variant. 
+  - This requires adding a FFI binding to the `blst` library to enable secure and efficient key derivation within `cardano-base`.
+    ```C
+    void blst_sk_to_pk_in_g1(blst_p1 *out_pk, const blst_scalar *SK);
+    void blst_sk_to_pk_in_g2(blst_p2 *out_pk, const blst_scalar *SK);
+    ```
+
+- **Signature** 
+  - Implement signature generation and verification APIs that are variant-agnostic and support domain separation, with DST supplied by the caller. This functionality requires integrating with the `blst` library through FFI bindings, using the following functions:
+    ```C
+    void blst_sign_pk_in_g1(blst_p2 *out_sig, const blst_p2 *hash, const blst_scalar *SK);
+    void blst_sign_pk_in_g2(blst_p1 *out_sig, const blst_p1 *hash, const blst_scalar *SK);
+    ```
+    For single-signature verification, correctness can be established through a standard pairing check between the signature, message hash, and public key. See [this](https://www.ietf.org/archive/id/draft-irtf-cfrg-bls-signature-05.html#name-verify).
+
+- **Aggregation** 
+
+  The Leios EB certificate contains a single aggregated BLS signature over the message 
+  ```
+  msg_vote = (election_id, EB_hash)
+  ```
+  All valid votes from both **persistent** and **non-persistent** voters can be combined into the same aggregated signature.
+
+  - **Persistent voters**  
+  These are always eligible and require only their public key and signature.
+
+  - **Non-persistent voters**  
+  These voters succeed in a sortition and must also provide an eligibility proof.  
+ 
+  To support this functionality, several helper functions should be implemented:
+  - A function to aggregate multiple public keys into a single aggregated key.  
+  - A function to aggregate multiple signatures into a single aggregated signature.  
+  - A function that, given a message and multiple $(pk, sig)$ pairs over that message, performs batch verification.
+
+  The first two functions are particularly useful for building an accumulator that locally tallies Leios votes and aggregates them in advance for block production. The third provides a one-shot approach for efficient verification. Since the optimal aggregation strategy depends on when and how votes are combined, all three functions should be implemented to support flexible and efficient use within Leios.
+
+- **Batch verification** 
+  - Implement a batch verification API to efficiently verify multiple $(pk, msg, sig)$ tuples. 
+  - This requires adding FFI bindings to the `blst` library. 
+  - The underlying C functions can be composed to load multiple $(pk, msg, sig)$ combinations into a single pairing context for verification. 
+  - When many of the messages are identical, it becomes more efficient to merge them beforehand. 
+    - It is advisable to use a key-value data structure where each $msg$ serves as the key, and the corresponding values are the multiple $(pk, sig)$ pairs that can be aggregated using the existing aggregation functions.
+
+- **DSIGN integration**
+  - Integrate the internal BLS signature implementation into the `DSIGN` class. 
+  - Once completed, the `cardano-base` module `BLS12_381.Internal` will expose a comprehensive set of utility functions for setting up and managing the BLS signature scheme—similar to how `DSIGN.Ed25519` provides utilities for Ed25519 signatures. 
+  - End users will not interact directly with this low-level API but will instead use the higher-level `DSIGN` class interface. 
+  - As part of this integration, a new `DSIGN` instance must be defined for BLS signatures, specifying the minimal required functions and their corresponding type signatures.
+
+- **Serialization**
+  - Implement deterministic serialization by providing `ToCBOR` and `FromCBOR` instances, as well as raw byte encodings for keys and signatures. 
+  - Enforce strict validation through length, subgroup membership, and infinity checks.
+  - Ensure canonical compressed encodings following the Zcash standard for BLS points.
+
+- **Conformance vectors**
+  - Add conformance tests using test vectors from the initial Rust implementation to ensure cross-impl compatibility.
+
+#### Performance and quality
+- **Performance benchmarks**
+  - Benchmark single-verify, aggregate-verify, and batch-verify; report the impact of batching vs individual verification.
+  - Ensure that certificate generation and certificate verification both fit comfortably within protocol deadlines.
+  - Provide comparable measurements across implementations (Haskell, Rust, and future node variants).
+  - Track performance evolution over time on stable, dedicated hardware.
+
+- **Rust parity**
+  - Compare performance against the Rust implementation; document gaps and ensure functional parity on vectors.
+
+- **Determinism portability**
+  - Deterministic results across platforms/architectures; outputs independent of CPU feature detection.
+
+- **Documentation**
+  - Document the outward facing API in cardano-base and provide example usages. Additionally add a section on do's and don'ts with regards to security of this scheme outside the context of Leios.
+
+#### Other utilities
+- Registration: See [this](https://github.com/input-output-hk/ouroboros-leios/blob/d5f1a9bc940e69f406c3e25c0d7d9aa58cf701f8/crypto-benchmarks.rs/Specification.md#key-registration)
+- Sortition: See [this](https://github.com/input-output-hk/ouroboros-leios/blob/d5f1a9bc940e69f406c3e25c0d7d9aa58cf701f8/crypto-benchmarks.rs/Specification.md#sortition)
+
+#### Implementation notes
+- The $PoP$ verification is likely performed at the certificate level; therefore, the API described above should not handle it directly.  
+  - The existing `BLS12_381` code already abstracts over both $G_1$ and $G_2$ curves, and this abstraction should be preserved.  
+- The `blst` library provides optimized verification for multiple messages, signatures, and public keys using a combined pairing check.  
+  - While this functionality could offer performance benefits, it remains uncertain whether it will be necessary for linear Leios, where such batch verification may not provide a meaningful speedup.
+
+### Potential Risks and Mitigations
 
 > [!WARNING]
 >
-> TODO: Move to performance or testing sections?
+> TODO: Contribution from crypto team.
 
-The following non-functional requirements ensure the implementation meets performance and quality standards:
+### Roadmap
 
-- **REQ-BlsPerfBenchmarks** Benchmark single-verify, aggregate-verify, and batch-verify; report the impact of batching vs individual verification.
-- **REQ-BlsRustParity** Compare performance against the Rust implementation; document gaps and ensure functional parity on vectors.
-- **REQ-BlsDeterminismPortability** Deterministic results across platforms/architectures; outputs independent of CPU feature detection.
-- **REQ-BlsDocumentation** Document the outward facing API in cardano-base and provide example usages. Additionally add a section on do's and don'ts with regards to security of this scheme outside the context of Leios.
+This roadmap outlines the planned tasks and milestones for integrating BLS functionality into `cardano-base` to support the Leios protocol. 
+The implementation is divided into four delivery cycles, progressing from foundational FFI bindings to code audit.
 
-### Implementation notes
+#### Core Bindings and Setup
+<!-- Delivery cycle 1 -->
+*Establish the foundational Haskell ↔ C interoperability layer for BLS operations.*
+- Create Haskell ↔ C bindings for the following functionalities:
+  - Key generation,
+  - Public key derivation,
+  - Signature generation and verification.
+- Create a Haskell function for Proof-of-Possession functionality using existing `blst` primitives.  
 
-Note that the PoP checks probably are done at the certificate level, and that the above-described API should not be responsible for this. The current code on BLS12-381 already abstracts over both curves `G1`/`G2`, we should maintain this. The `BLST` package also exposes fast verification over many messages and signatures + public keys by doing a combined pairing check. This might be helpful, though it's currently unclear if we can use this speedup. It might be the case, since we have linear Leios, that this is never needed.
+#### Functional Expansion and Integration
+<!-- Delivery cycle 2 -->
+*Extend BLS functionality with aggregation and batch verification support, and integrate it into the DSIGN interface.*
+- Create Haskell functions for aggregation logic over multiple signatures and public keys to enable compact certificates.
+- Create Haskell ↔ C bindings for batch verification support for efficient validation of multiple $(pk, msg, sig)$ triples.
+- Define and add any missing types and helpers needed for safe and ergonomic BLS operations.
+- Add the internal BLS signature implementation to the `DSIGN` class and extend the DSIGN API with BLS-specific utilities (e.g., PoP helpers and aggregation helpers).
+
+#### Internal Security Review and Quality Assurance
+<!-- Delivery cycle 3 -->
+*Validate the security and robustness of the BLS integration and prepare it for consensus use.*
+- Check the security of the key generation function in the C implementation and assess its adherence to the IETF BLS standard for secure IKM handling.
+- Consolidate and extend tests for the new BLS utilities and DSIGN integration.
+- Conduct an internal review by the Leios core team to validate correctness and readiness for upstream consensus integration.
+
+#### External Audit and Hardening
+<!-- Delivery cycle 4 -->
+*Obtain independent assurance on security and implementation quality and apply any required fixes.*
+- Commission an external audit covering the BLS implementation end-to-end, including cryptographic soundness, FFI and memory-safety of the `blst` bindings, and the exposed Haskell APIs.
+- Address audit findings and finalize the BLS module as production-ready infrastructure for Leios and related protocols.
 
 ## Performance & Tracing (P&T)
 
