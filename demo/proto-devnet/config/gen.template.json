@@ -11,7 +11,7 @@
   "era": "Conway",
   "keepalive": 30,
   "localNodeSocketPath": "node1/node.socket",
-  "nodeConfigFile": "node1/config.json",
+  "nodeConfigFile": "node1/config.yaml",
   "sigKey": "utxo-keys/utxo1/utxo.skey",
   "targetNodes": [
     {"addr": "${IP_NODE1}", "port": ${PORT_NODE1}, "name": "node1"},

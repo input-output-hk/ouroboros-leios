@@ -8,8 +8,6 @@ fi
 mkdir "$NODE0_DIR"
 echo "Working directory created for node0: $NODE0_DIR"
 
-cat "$DATA_DIR/leios-schema.sql" | sqlite3 "$NODE0_DIR/leios.db"
-
 jq \
   --argjson port "$PORT_UPSTREAM_NODE" \
   --arg address "$IP_UPSTREAM_NODE" \
