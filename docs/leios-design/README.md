@@ -508,17 +508,28 @@ Even the first version of LeiosFetch decision logic should consider EBs that are
 > [!WARNING]
 >
 > TODO: Discuss fetch decision logic for caught-up vs bulk syncing nodes, conservative pipelining depths, server-side reordering options.
+>  - fetch range via points
+> TODO: what about newly synced nodes that need to acquire all EBs up to the immutable tip, how?
+>  - might demand a different mini-protocol design
+>  - query points of volatile suffix and request missing subset of it (like tx submission for the mempool)
 
 ### Endorser block storage
 
-Unlike votes, a node should retain the closures of older EBs (**NEW-LeiosEbStore**), because Praos allows for occasional deep forks, the most extreme of which could require the closure of an EB that was announced by the youngest block in the Praos Common Prefix. On Cardano mainnet, that RB is usually 12 hours old, but could be up to 36 hours old before [CIP-0135 Disaster Recovery Plan](https://cips.cardano.org/cip/CIP-0135) is triggered. Thus, EB closures are not only large but also have a prohibitively long lifetime even when they're ultimately not immortalized by the historical chain. This component therefore stores EBs on disk just as the ChainDB already does for RBs. The volatile and immutable dichotomy can even be managed the same way it is for RBs.
+Unlike votes, a node should retain the closures of older EBs (**NEW-LeiosEbStore**), because Praos allows for occasional deep forks, the most extreme of which could require the closure of an EB that was announced by the youngest block in the Praos Common Prefix. On Cardano mainnet, that RB is usually 12 hours old, but could be up to 36 hours old before [CIP-0135 Disaster Recovery Plan](https://cips.cardano.org/cip/CIP-0135) is triggered. Thus, EB closures are not only large but also have a prohibitively long lifetime even when they're ultimately not immortalized by the historical chain.
 
-- **REQ-ArchiveLeiosBlocks** The node must retain each EB's closure indefinitely when the immutable Praos chain certifies it.
+- **REQ-StoreLeiosBlocks** The node must retain all EBs and their closures up to the immutable tip, independent whether certified or not.
+- **REQ-ArchiveLeiosBlocks** The node must retain each EBs and their closures indefinitely when the immutable Praos chain certifies them.
+
+This component therefore stores EBs on disk just as the ChainDB already does for RBs. The volatile and immutable dichotomy can even be managed the same way it is for RBs.
 
 > [!WARNING]
 >
 > TODO: discuss sizing and access patterns
-> TODO: separate volatile/immutable stores?
+>  - up to 11k block opportunities within 12h? -> see nfrisby's eb storage document
+> TODO: separate volatile/immutable stores? why?
+>  - having an immutable EBs table or database should bound access times on EBs
+>    and closures of the volatile part (which should be log n, thus bounding n
+>    is desirable)
 > TODO: interaction with mempool (here or above) 
 
 ### Voting
