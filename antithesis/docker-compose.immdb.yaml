@@ -126,6 +126,7 @@ services:
     environment:
       <<: [*common-env, *wan-env-node0-up]
       PORT: "3002"
+      HOST_ADDR: "172.28.0.120"
     volumes:
       - node0-data:/data
       - logs:/logs
@@ -155,6 +156,7 @@ services:
     environment:
       <<: [*common-env, *wan-env-downstream]
       PORT: "3003"
+      HOST_ADDR: "172.28.0.130"
     volumes:
       - downstream-data:/data
       - logs:/logs

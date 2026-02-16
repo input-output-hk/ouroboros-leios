@@ -93,6 +93,7 @@ services:
     environment:
       <<: *common-env
       PORT: "3001"
+      HOST_ADDR: "172.28.0.10"
     volumes:
       - pool1-data:/data
       - logs:/logs
@@ -122,6 +123,7 @@ services:
     environment:
       <<: *common-env
       PORT: "3002"
+      HOST_ADDR: "172.28.0.20"
     volumes:
       - pool2-data:/data
       - logs:/logs
@@ -151,6 +153,7 @@ services:
     environment:
       <<: *common-env
       PORT: "3003"
+      HOST_ADDR: "172.28.0.30"
     volumes:
       - pool3-data:/data
       - logs:/logs

@@ -8,6 +8,7 @@ NODE_NAME="${1:-node0}"
 DATA_DIR="${DATA_DIR:-/data}"
 LOG_DIR="${LOG_DIR:-/logs}"
 PORT="${PORT:-3002}"
+HOST_ADDR="${HOST_ADDR:-0.0.0.0}"
 
 echo "=== Starting cardano-node ($NODE_NAME) ==="
 
@@ -28,6 +29,7 @@ echo "  NODE_NAME: $NODE_NAME"
 echo "  DATA_DIR: $DATA_DIR"
 echo "  LOG_DIR: $LOG_DIR"
 echo "  PORT: $PORT"
+echo "  HOST_ADDR: $HOST_ADDR"
 echo "  LEIOS_DB_PATH: $LEIOS_DB_PATH"
 
 # Run cardano-node with tee to both stdout and log file
@@ -36,6 +38,6 @@ exec cardano-node run \
     --topology "$DATA_DIR/topology.json" \
     --database-path "$DATA_DIR/db" \
     --socket-path "$DATA_DIR/socket" \
-    --host-addr 0.0.0.0 \
+    --host-addr "$HOST_ADDR" \
     --port "$PORT" \
     2>&1 | tee "$LOG_DIR/${NODE_NAME}.log"

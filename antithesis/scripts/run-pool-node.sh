@@ -12,6 +12,7 @@ POOL_NUM="${POOL_NAME#pool}"
 DATA_DIR="${DATA_DIR:-/data}"
 LOG_DIR="${LOG_DIR:-/logs}"
 PORT="${PORT:-3001}"
+HOST_ADDR="${HOST_ADDR:-0.0.0.0}"
 
 echo "=== Starting cardano-node ($POOL_NAME) as block producer ==="
 
@@ -40,6 +41,7 @@ echo "  POOL_NAME: $POOL_NAME"
 echo "  DATA_DIR: $DATA_DIR"
 echo "  LOG_DIR: $LOG_DIR"
 echo "  PORT: $PORT"
+echo "  HOST_ADDR: $HOST_ADDR"
 echo "  LEIOS_DB_PATH: $LEIOS_DB_PATH"
 
 # Run cardano-node as block producer with pool credentials
@@ -48,7 +50,7 @@ exec cardano-node run \
     --topology "$DATA_DIR/topology.json" \
     --database-path "$DATA_DIR/db" \
     --socket-path "$DATA_DIR/socket" \
-    --host-addr 0.0.0.0 \
+    --host-addr "$HOST_ADDR" \
     --port "$PORT" \
     --shelley-vrf-key "$DATA_DIR/keys/vrf.skey" \
     --shelley-kes-key "$DATA_DIR/keys/kes.skey" \
