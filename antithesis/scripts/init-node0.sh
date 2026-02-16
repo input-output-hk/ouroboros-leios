@@ -1,6 +1,6 @@
 #!/bin/bash
 # Initialize node0 data directory
-# Creates leios.db and topology.json
+# Creates topology.json and copies genesis/config files
 
 set -euo pipefail
 

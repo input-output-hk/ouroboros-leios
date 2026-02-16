@@ -9,8 +9,6 @@ FROM ghcr.io/blinklabs-io/cardano-cli:10.14.0.0-1 AS cardano-cli
 # Build cardano-node from leios-prototype
 FROM ghcr.io/blinklabs-io/haskell:9.6.6-3.12.1.0-3 AS cardano-node-build
 
-ARG OUROBOROS_CONSENSUS_REF=4f20aeb08b4f8eaf20fd2762e7ffc5738e7d05af
-
 RUN echo "Building cardano-node from leios-prototype..." \
     && git clone https://github.com/intersectmbo/cardano-node.git \
     && cd cardano-node \
@@ -18,7 +16,6 @@ RUN echo "Building cardano-node from leios-prototype..." \
     && git checkout leios-prototype \
     && echo "with-compiler: ghc-${GHC_VERSION}" >> cabal.project.local \
     && echo "tests: False" >> cabal.project.local \
-    && sed -i "s|tag: 8f0e1423c99bcfa0025ae5476a5467a4af0d2828|tag: ${OUROBOROS_CONSENSUS_REF}|g" cabal.project \
     && cabal update \
     && cabal build exe:cardano-node \
     && mkdir -p /root/.local/bin/ \
