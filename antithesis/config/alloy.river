@@ -28,6 +28,13 @@ loki.process "logs" {
     }
   }
 
+  stage.static_labels {
+    values = {
+      service = "cardano-node",
+      type    = "cardano-node",
+    }
+  }
+
   // Parse JSON logs if present
   stage.json {
     expressions = {
@@ -35,12 +42,14 @@ loki.process "logs" {
       message = "msg",
       slot    = "slot",
       block   = "block",
+	  ns      = "ns",
     }
   }
 
   stage.labels {
     values = {
       level = "",
+	  ns = "ns",
     }
   }
 }
