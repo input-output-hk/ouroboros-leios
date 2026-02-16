@@ -395,6 +395,7 @@ export default function App() {
               <TxCache
                 nodeIdx={selectedNode.idx}
                 getCache={getSelectedNodeCache}
+                tick={stats.eventsProcessed}
               />
             </div>
           )}
