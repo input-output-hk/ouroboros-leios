@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Local test script for Leios Antithesis stack
 # Tests that the docker-compose stack works correctly
 #
