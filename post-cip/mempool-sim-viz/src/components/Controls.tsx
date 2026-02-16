@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { type SimulationConfig, type PresetType, type TxCacheMode, DEFAULT_CONFIG, MINIMAL_CONFIG, LARGE_CONFIG } from '@/simulation';
+import { type SimulationConfig, type PresetType, DEFAULT_CONFIG, MINIMAL_CONFIG, LARGE_CONFIG } from '@/simulation';
 
 // Theme colors from Leios site
 const COLORS = {
@@ -68,7 +68,6 @@ function configsEqual(a: SimulationConfig, b: SimulationConfig): boolean {
     a.bandwidth === b.bandwidth &&
     a.ebEnabled === b.ebEnabled &&
     a.ebSize === b.ebSize &&
-    a.txCacheMode === b.txCacheMode &&
     a.ebAnnouncementRate === b.ebAnnouncementRate &&
     a.ebCertificationRate === b.ebCertificationRate &&
     a.peerChurnEnabled === b.peerChurnEnabled &&
@@ -457,33 +456,6 @@ export function Controls({ onConfigChange, disabled = false, isExpanded, onToggl
                   tooltip="Probability that an announced EB gets certified (uncertified EBs cause one empty block)"
                   onChange={(v) => updateConfig('ebCertificationRate', v / 100)}
                 />
-                <div className="flex flex-col gap-2">
-                  <span className="text-xs flex items-center gap-1" style={{ color: COLORS.textMuted }}>
-                    Tx Cache Mode
-                    <span
-                      className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full text-[9px] font-bold cursor-help"
-                      style={{ backgroundColor: COLORS.textMuted, color: COLORS.background }}
-                      title="Where EB-fetched txs go. Cache-only: separate store, no mempool pressure. Mempool: counts against capacity, available for blocks. Both: stored in both."
-                    >
-                      ?
-                    </span>
-                  </span>
-                  <select
-                    value={config.txCacheMode}
-                    onChange={(e) => updateConfig('txCacheMode', e.target.value as TxCacheMode)}
-                    className="w-full text-xs rounded px-2 py-1.5 cursor-pointer"
-                    style={{
-                      backgroundColor: COLORS.border,
-                      color: COLORS.text,
-                      border: 'none',
-                      outline: 'none',
-                    }}
-                  >
-                    <option value="cache-only">Cache Only</option>
-                    <option value="mempool">Mempool</option>
-                    <option value="both">Both</option>
-                  </select>
-                </div>
               </div>
             )}
           </div>

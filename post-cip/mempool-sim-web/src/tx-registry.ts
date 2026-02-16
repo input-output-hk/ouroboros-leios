@@ -12,7 +12,6 @@ export class TxRegistry {
   // Per-tx bitmaps
   readonly inMempool: BitSet[] = [];   // node has tx in mempool
   readonly known: BitSet[] = [];       // node has seen tx (offered/received)
-  readonly inCache: BitSet[] = [];     // node has tx in EB cache
 
   constructor(nodeCount: number) {
     this.nodeCount = nodeCount;
@@ -31,7 +30,6 @@ export class TxRegistry {
     });
     this.inMempool.push(new BitSet(this.nodeCount));
     this.known.push(new BitSet(this.nodeCount));
-    this.inCache.push(new BitSet(this.nodeCount));
     return idx;
   }
 

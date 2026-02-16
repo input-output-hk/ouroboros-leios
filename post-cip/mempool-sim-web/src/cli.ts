@@ -3,8 +3,6 @@ import { generateNetwork, addAdversaryNode } from './topology.js';
 import { Simulation } from './simulation.js';
 import { logger, makeLogger } from './logger.js';
 import { OVERHEAD_B } from './link.js';
-import type { TxCacheMode } from './types.js';
-
 const DEFAULTS = {
   nodes: 50,
   degree: 6,
@@ -23,7 +21,6 @@ const DEFAULTS = {
   logLevel: 'info',
   logTarget: 'pino-pretty',
   ebSize: 10_000_000,
-  txCacheMode: 'mempool' as TxCacheMode,
 };
 
 const program = new Command();
@@ -58,11 +55,8 @@ program
   )
   .option('--eb', 'Enable endorser blocks (Leios)', false)
   .option('--eb-size <bytes>', 'Endorser block size in bytes', String(DEFAULTS.ebSize))
-  .addOption(
-    new Option('--tx-cache-mode <mode>', 'Where EB-fetched txs go')
-      .choices(['cache-only', 'mempool', 'both'])
-      .default(DEFAULTS.txCacheMode)
-  )
+  .option('--eb-announcement-rate <rate>', 'EB announcement probability (0-1)', '1.0')
+  .option('--eb-certification-rate <rate>', 'EB certification probability (0-1)', '1.0')
   .parse(process.argv);
 
 const opts = program.opts();
@@ -86,7 +80,8 @@ const config = {
   logTarget: opts.logTarget as string,
   eb: opts.eb === true,
   ebSize: parseInt(opts.ebSize),
-  txCacheMode: opts.txCacheMode as TxCacheMode,
+  ebAnnouncementRate: parseFloat(opts.ebAnnouncementRate),
+  ebCertificationRate: parseFloat(opts.ebCertificationRate),
 };
 
 const mempool = config.eb
@@ -136,7 +131,8 @@ try {
   const sim = new Simulation(nodes, links);
   sim.ebEnabled = config.eb;
   sim.ebSize_B = config.ebSize;
-  sim.txCacheMode = config.txCacheMode;
+  sim.ebAnnouncementRate = config.ebAnnouncementRate;
+  sim.ebCertificationRate = config.ebCertificationRate;
 
   // Register and inject transactions
   const honestCount = config.nodes;
@@ -221,11 +217,65 @@ try {
 
   if (config.eb) {
     const ebs = sim.endorserBlocks;
+    const certifiedCount = ebs.filter(eb => eb.certified).length;
     logger.info({
       endorser_blocks_produced: ebs.length,
+      certified: certifiedCount,
+      uncertified: ebs.length - certifiedCount,
       total_eb_txRefs: ebs.reduce((s, eb) => s + eb.txRefs.length, 0),
     }, 'endorser block statistics');
   }
+
+  // Compute p_poison: for each honest tx with an adversarial variant,
+  // what fraction of honest nodes have the adversarial version in mempool?
+  // This is the metric Brian's analytical model predicts.
+  const reg2 = sim.registry;
+  const honestNodeIndices = sim.nodes
+    .map((n, i) => n.honest ? i : -1)
+    .filter(i => i >= 0);
+  const honestNodeCount2 = honestNodeIndices.length;
+
+  let pPoisonSum = 0;
+  let pPoisonCount = 0;
+  let reachSum = 0; // fraction of honest nodes that have EITHER version
+
+  for (const tx of reg2.txs) {
+    if (tx.isAdversarial) continue; // skip adversarial variants
+    if (tx.adversarialVariant < 0) continue; // no adversarial variant created
+
+    const advIdx = tx.adversarialVariant;
+    let advInHonest = 0;
+    let honestInHonest = 0;
+
+    for (const ni of honestNodeIndices) {
+      if (reg2.inMempool[advIdx]!.get(ni)) advInHonest++;
+      if (reg2.inMempool[tx.idx]!.get(ni)) honestInHonest++;
+    }
+
+    const reached = advInHonest + honestInHonest;
+    if (reached > 0) {
+      pPoisonSum += advInHonest / reached;
+      reachSum += reached / honestNodeCount2;
+      pPoisonCount++;
+    }
+  }
+
+  const pPoison = pPoisonCount > 0 ? pPoisonSum / pPoisonCount : 0;
+  const avgReach = pPoisonCount > 0 ? reachSum / pPoisonCount : 0;
+  const pAdv = config.adversaries / (config.nodes + config.adversaries);
+  const lambda = Math.log(config.nodes + config.adversaries) / Math.log(config.degree);
+  const theoryNoDelay = 1 - Math.pow(1 - pAdv, lambda - 1);
+  const theoryDelay = pAdv;
+
+  logger.info({
+    p_poison: pPoison,
+    p_poison_count: pPoisonCount,
+    avg_reach: avgReach,
+    p_adv: pAdv,
+    lambda,
+    theory_no_delay: theoryNoDelay,
+    theory_delay: theoryDelay,
+  }, 'poisoning analysis');
 
   // Memory usage
   const mem = process.memoryUsage();

@@ -6,7 +6,6 @@ import { Statistics } from '@/components/Statistics';
 import { Timeline } from '@/components/Timeline';
 import { PeerInfo } from '@/components/PeerInfo';
 import { EventLog } from '@/components/EventLog';
-import { TxCache } from '@/components/TxCache';
 import { useSimulation } from '@/hooks/useSimulation';
 import { COLORS } from '@/theme';
 import type { SimulationConfig, LayoutType } from '@/simulation';
@@ -65,7 +64,6 @@ export default function App() {
     reset,
     step,
     setSpeed,
-    getSelectedNodeCache,
     onDragStart,
     onDrag,
     onDragEnd,
@@ -387,15 +385,6 @@ export default function App() {
                 selectedNode={selectedNode}
                 onClose={() => setSelectedNode(null)}
                 onSelectPeer={handleSelectPeer}
-              />
-            </div>
-          )}
-          {selectedNode && ebEnabled && (
-            <div className="rounded backdrop-blur-md" style={{ backgroundColor: 'rgba(32, 8, 48, 0.75)' }}>
-              <TxCache
-                nodeIdx={selectedNode.idx}
-                getCache={getSelectedNodeCache}
-                tick={stats.eventsProcessed}
               />
             </div>
           )}

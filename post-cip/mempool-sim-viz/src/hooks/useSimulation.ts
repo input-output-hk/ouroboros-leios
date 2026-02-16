@@ -14,7 +14,6 @@ import {
   type AnimatedTx,
   type AnimatedBlock,
   type BlockDisplay,
-  type CacheTxInfo,
   type LayoutType,
 } from '@/simulation';
 import { computeCircularLayout, createForceLayout, type ForceLayoutController } from '@/simulation/layout';
@@ -52,7 +51,6 @@ interface UseSimulationReturn {
   reset: () => void;
   step: () => void;
   setSpeed: (speed: number) => void;
-  getSelectedNodeCache: (nodeIdx: number) => CacheTxInfo[];
   onDragStart: (nodeId: string, x: number, y: number) => void;
   onDrag: (nodeId: string, x: number, y: number) => void;
   onDragEnd: (nodeId: string) => void;
@@ -170,7 +168,6 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
         mempoolFillPercent: sim.getNodeFillPercent(node.idx),
         txCount: sim.getNodeTxCount(node.idx),
         isPoisoned: sim.isNodePoisoned(node.idx),
-        cacheCount: sim.getNodeCacheCount(node.idx),
       };
     });
     setNodes(visualNodes);
@@ -425,7 +422,6 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
     const sim = new Simulation(lightNodes, links);
     sim.ebEnabled = safeConfig.ebEnabled;
     sim.ebSize_B = safeConfig.ebSize;
-    sim.txCacheMode = safeConfig.txCacheMode;
     sim.ebAnnouncementRate = safeConfig.ebAnnouncementRate;
     sim.ebCertificationRate = safeConfig.ebCertificationRate;
     sim.peerChurnEnabled = safeConfig.peerChurnEnabled;
@@ -508,7 +504,6 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
     const sim = new Simulation(nodeList, linkMap);
     sim.ebEnabled = config.ebEnabled;
     sim.ebSize_B = config.ebSize;
-    sim.txCacheMode = config.txCacheMode;
     sim.ebAnnouncementRate = config.ebAnnouncementRate;
     sim.ebCertificationRate = config.ebCertificationRate;
     sim.peerChurnEnabled = config.peerChurnEnabled;
@@ -747,7 +742,7 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
       setFullEventLog([...fullEventLogRef.current]);
     }
 
-    if (sim.pendingEvents === 0) {
+    if (sim.pendingEvents === 0 || sim.currentTime >= actualDurationRef.current) {
       txAnimationsRef.current.clear();
       blockAnimationsRef.current.clear();
       setAnimatedTxs([]);
@@ -815,21 +810,6 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
     setSpeedState(newSpeed);
   }, []);
 
-  const getSelectedNodeCache = useCallback((nodeIdx: number): CacheTxInfo[] => {
-    const sim = simRef.current;
-    if (!sim) return [];
-    const txIndices = sim.getNodeCacheTxIndices(nodeIdx);
-    return txIndices.map(i => {
-      const tx = sim.registry.txs[i]!;
-      return {
-        txIdx: i,
-        txId: tx.txId,
-        size_B: tx.size_B,
-        isAdversarial: tx.isAdversarial,
-      };
-    });
-  }, []);
-
   const simulationDuration = actualDurationRef.current;
 
   // Force layout drag handlers
@@ -876,7 +856,6 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
     reset,
     step: stepOnce,
     setSpeed,
-    getSelectedNodeCache,
     onDragStart,
     onDrag,
     onDragEnd,

@@ -28,9 +28,8 @@ export interface EndorserBlock {
   clock: number;
   txRefs: number[];        // indices into global tx array
   size_B: number;
+  certified: boolean;
 }
-
-export type TxCacheMode = 'cache-only' | 'mempool' | 'both';
 
 export interface SimulationConfig {
   nodes: number;
@@ -50,5 +49,4 @@ export interface SimulationConfig {
   // Leios
   ebEnabled: boolean;
   ebSize_B: number;
-  txCacheMode: TxCacheMode;
 }
