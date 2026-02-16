@@ -13,7 +13,7 @@ loki.source.file "logs" {
   forward_to = [loki.process.logs.receiver]
 }
 
-// Process logs - extract node name from filename
+// Process logs - extract node name from filename and parse cardano-node JSON
 loki.process "logs" {
   forward_to = [loki.write.loki.receiver]
 
@@ -28,28 +28,35 @@ loki.process "logs" {
     }
   }
 
-  stage.static_labels {
-    values = {
-      service = "cardano-node",
-      type    = "cardano-node",
-    }
-  }
-
-  // Parse JSON logs if present
+  // Parse cardano-node JSON logs
   stage.json {
     expressions = {
-      level   = "level",
+      level   = "sev",
       message = "msg",
       slot    = "slot",
       block   = "block",
-	  ns      = "ns",
+      ns      = "ns",
+      host    = "host",
+      thread  = "thread",
     }
   }
 
   stage.labels {
     values = {
-      level = "",
-	  ns = "ns",
+      level    = "sev",
+      alias    = "host",
+      host     = "host",
+      instance = "host",
+      sev      = "sev",
+      thread   = "thread",
+      ns       = "ns",
+    }
+  }
+
+  stage.static_labels {
+    values = {
+      service = "cardano-node",
+      type    = "cardano-node",
     }
   }
 }
