@@ -17,8 +17,11 @@ cd "$ANTITHESIS_DIR"
 # Stack selection
 STACK="${1:-devnet}"
 case "$STACK" in
-    devnet|immdb) ;;
-    *) echo "ERROR: Unknown stack '$STACK'. Use 'devnet' or 'immdb'."; exit 1 ;;
+devnet | immdb) ;;
+*)
+	echo "ERROR: Unknown stack '$STACK'. Use 'devnet' or 'immdb'."
+	exit 1
+	;;
 esac
 COMPOSE_FILE="docker-compose.${STACK}.yaml"
 
@@ -39,9 +42,9 @@ echo "=============================================="
 
 # Cleanup function
 cleanup() {
-    echo ""
-    echo "Cleaning up..."
-    docker compose -f "$COMPOSE_FILE" down -v 2>/dev/null || true
+	echo ""
+	echo "Cleaning up..."
+	docker compose -f "$COMPOSE_FILE" down -v 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -62,47 +65,47 @@ echo ""
 echo ">>> Waiting for services to be healthy (timeout: ${STARTUP_TIMEOUT}s)..."
 start_time=$(date +%s)
 while true; do
-    elapsed=$(($(date +%s) - start_time))
-    if [ $elapsed -gt $STARTUP_TIMEOUT ]; then
-        echo "ERROR: Timeout waiting for services to be healthy"
-        echo ""
-        echo "Service status:"
-        docker compose -f "$COMPOSE_FILE" ps
-        echo ""
-        echo "Logs:"
-        docker compose -f "$COMPOSE_FILE" logs --tail=50
-        exit 1
-    fi
+	elapsed=$(($(date +%s) - start_time))
+	if [ $elapsed -gt $STARTUP_TIMEOUT ]; then
+		echo "ERROR: Timeout waiting for services to be healthy"
+		echo ""
+		echo "Service status:"
+		docker compose -f "$COMPOSE_FILE" ps
+		echo ""
+		echo "Logs:"
+		docker compose -f "$COMPOSE_FILE" logs --tail=50
+		exit 1
+	fi
 
-    # Check if all main services are healthy
-    healthy_count=$(docker compose -f "$COMPOSE_FILE" ps --format json 2>/dev/null | grep -c '"Health":"healthy"' || echo 0)
-    if [ "$healthy_count" -ge 3 ]; then
-        echo "All services healthy after ${elapsed}s"
-        break
-    fi
+	# Check if all main services are healthy
+	healthy_count=$(docker compose -f "$COMPOSE_FILE" ps --format json 2>/dev/null | grep -c '"Health":"healthy"' || echo 0)
+	if [ "$healthy_count" -ge 3 ]; then
+		echo "All services healthy after ${elapsed}s"
+		break
+	fi
 
-    echo "  Waiting... (${elapsed}s elapsed, $healthy_count/3 healthy)"
-    sleep 5
+	echo "  Waiting... (${elapsed}s elapsed, $healthy_count/3 healthy)"
+	sleep 5
 done
 
 # Determine analysis container name based on stack
 if [ "$STACK" = "immdb" ]; then
-    ANALYSIS_SERVICE="analysis-immdb"
+	ANALYSIS_SERVICE="analysis-immdb"
 else
-    ANALYSIS_SERVICE="analysis"
+	ANALYSIS_SERVICE="analysis"
 fi
 
 # Check analysis container started
 echo ""
 echo ">>> Checking analysis container..."
-sleep 10  # Give analysis container time to initialize
+sleep 10 # Give analysis container time to initialize
 
 if docker compose -f "$COMPOSE_FILE" logs "$ANALYSIS_SERVICE" 2>/dev/null | grep -q "setup_complete\|Setup complete"; then
-    echo "Analysis container signaled setup_complete"
+	echo "Analysis container signaled setup_complete"
 else
-    echo "WARNING: Analysis container may not have signaled setup_complete yet"
-    echo "Analysis logs:"
-    docker compose -f "$COMPOSE_FILE" logs "$ANALYSIS_SERVICE" --tail=20
+	echo "WARNING: Analysis container may not have signaled setup_complete yet"
+	echo "Analysis logs:"
+	docker compose -f "$COMPOSE_FILE" logs "$ANALYSIS_SERVICE" --tail=20
 fi
 
 # Run for test duration
@@ -121,18 +124,18 @@ docker compose -f "$COMPOSE_FILE" logs "$ANALYSIS_SERVICE" --tail=30
 
 # Check if Praos latency assertions passed
 if docker compose -f "$COMPOSE_FILE" logs "$ANALYSIS_SERVICE" 2>/dev/null | grep -q "Praos block diffusion"; then
-    echo ""
-    echo "Praos latency assertions found in logs"
+	echo ""
+	echo "Praos latency assertions found in logs"
 else
-    echo ""
-    echo "WARNING: No Praos latency assertions found in logs"
+	echo ""
+	echo "WARNING: No Praos latency assertions found in logs"
 fi
 
 # Check if Leios blocks were received
 if docker compose -f "$COMPOSE_FILE" logs "$ANALYSIS_SERVICE" 2>/dev/null | grep -q "Leios blocks"; then
-    echo "Leios block assertions found in logs"
+	echo "Leios block assertions found in logs"
 else
-    echo "WARNING: No Leios block assertions found in logs"
+	echo "WARNING: No Leios block assertions found in logs"
 fi
 
 # Final status
@@ -144,9 +147,9 @@ echo "=============================================="
 
 # Check for any errors
 if docker compose -f "$COMPOSE_FILE" ps --format json 2>/dev/null | grep -q '"Health":"unhealthy"'; then
-    echo ""
-    echo "ERROR: Some services are unhealthy"
-    exit 1
+	echo ""
+	echo "ERROR: Some services are unhealthy"
+	exit 1
 fi
 
 echo ""

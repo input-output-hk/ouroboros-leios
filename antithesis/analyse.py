@@ -7,8 +7,6 @@ Adapted from demo/2025-11/analysis scripts.
 """
 
 import json
-import os
-import re
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -18,6 +16,7 @@ from typing import Optional
 @dataclass
 class BlockEvent:
     """Represents a block creation or reception event."""
+
     timestamp: datetime
     node: str
     event_type: str  # 'created', 'received', 'adopted'
@@ -29,6 +28,7 @@ class BlockEvent:
 @dataclass
 class Metrics:
     """Computed metrics from log analysis."""
+
     praos_blocks_created: int = 0
     praos_blocks_received: int = 0
     leios_ibs_created: int = 0
@@ -48,10 +48,10 @@ def parse_timestamp(ts_str: str) -> Optional[datetime]:
     """Parse various timestamp formats from logs."""
     # Handle nanosecond precision by truncating to microseconds
     # e.g., "2026-02-10T16:43:28.304578293Z" -> "2026-02-10T16:43:28.304578Z"
-    if '.' in ts_str and ts_str.endswith('Z'):
-        parts = ts_str[:-1].split('.')
+    if "." in ts_str and ts_str.endswith("Z"):
+        parts = ts_str[:-1].split(".")
         if len(parts) == 2 and len(parts[1]) > 6:
-            ts_str = parts[0] + '.' + parts[1][:6] + 'Z'
+            ts_str = parts[0] + "." + parts[1][:6] + "Z"
 
     formats = [
         "%Y-%m-%dT%H:%M:%S.%fZ",
@@ -72,14 +72,14 @@ def parse_log_line(line: str, node_name: str) -> Optional[BlockEvent]:
     try:
         # Try JSON format first
         data = json.loads(line)
-        ts = parse_timestamp(data.get('at', data.get('timestamp', '')))
+        ts = parse_timestamp(data.get("at", data.get("timestamp", "")))
         if not ts:
             return None
 
         # Get namespace and nested data
-        ns = data.get('ns', '')
-        event_data = data.get('data', {})
-        msg = data.get('msg', {})
+        ns = data.get("ns", "")
+        event_data = data.get("data", {})
+        msg = data.get("msg", {})
         if not isinstance(msg, dict):
             msg = {}
         if not isinstance(event_data, dict):
@@ -88,10 +88,10 @@ def parse_log_line(line: str, node_name: str) -> Optional[BlockEvent]:
         # Praos block adopted (cardano-node format)
         # ns: "ChainDB.AddBlockEvent.AddedToCurrentChain"
         # data.newtip: "hash@slot"
-        if 'AddedToCurrentChain' in ns:
-            newtip = event_data.get('newtip', '')
-            if '@' in newtip:
-                block_hash, slot_str = newtip.rsplit('@', 1)
+        if "AddedToCurrentChain" in ns:
+            newtip = event_data.get("newtip", "")
+            if "@" in newtip:
+                block_hash, slot_str = newtip.rsplit("@", 1)
                 try:
                     slot = int(slot_str)
                 except ValueError:
@@ -102,72 +102,84 @@ def parse_log_line(line: str, node_name: str) -> Optional[BlockEvent]:
             return BlockEvent(
                 timestamp=ts,
                 node=node_name,
-                event_type='adopted',
+                event_type="adopted",
                 block_hash=block_hash,
                 slot=slot,
-                block_type='praos'
+                block_type="praos",
             )
 
         # Block fetch completed (received from peer)
         # ns: "BlockFetch.Client.CompletedBlockFetch"
         # data.block: "hash"
-        if 'CompletedBlockFetch' in ns:
-            block_hash = event_data.get('block', 'unknown')
+        if "CompletedBlockFetch" in ns:
+            block_hash = event_data.get("block", "unknown")
             return BlockEvent(
                 timestamp=ts,
                 node=node_name,
-                event_type='received',
+                event_type="received",
                 block_hash=block_hash,
                 slot=0,
-                block_type='praos'
+                block_type="praos",
             )
 
         # Upstream MsgBlock send (immdb-server format)
         # msg.kind: "MsgBlock", msg.blockHash: "hash"
-        if isinstance(msg, dict) and msg.get('kind') == 'MsgBlock':
-            block_hash = msg.get('blockHash', 'unknown')
+        if isinstance(msg, dict) and msg.get("kind") == "MsgBlock":
+            block_hash = msg.get("blockHash", "unknown")
             return BlockEvent(
                 timestamp=ts,
                 node=node_name,
-                event_type='created',  # upstream is the source
+                event_type="created",  # upstream is the source
                 block_hash=block_hash,
                 slot=0,
-                block_type='praos'
+                block_type="praos",
             )
 
         # Leios IB events
         # ns: "Consensus.LeiosKernel" with IB in data
-        if 'LeiosKernel' in ns or 'LeiosPeer' in ns:
-            kind = event_data.get('kind', '')
-            if 'IB' in kind or 'InputBlock' in kind:
-                event_type = 'created' if 'created' in kind.lower() or 'generate' in kind.lower() else 'received'
-                return BlockEvent(
-                    timestamp=ts,
-                    node=node_name,
-                    event_type=event_type,
-                    block_hash=event_data.get('hash', event_data.get('id', 'unknown')),
-                    slot=event_data.get('slot', 0),
-                    block_type='ib'
+        if "LeiosKernel" in ns or "LeiosPeer" in ns:
+            kind = event_data.get("kind", "")
+            if "IB" in kind or "InputBlock" in kind:
+                event_type = (
+                    "created"
+                    if "created" in kind.lower() or "generate" in kind.lower()
+                    else "received"
                 )
-            if 'EB' in kind or 'EndorserBlock' in kind:
-                event_type = 'created' if 'created' in kind.lower() or 'generate' in kind.lower() else 'received'
                 return BlockEvent(
                     timestamp=ts,
                     node=node_name,
                     event_type=event_type,
-                    block_hash=event_data.get('hash', event_data.get('id', 'unknown')),
-                    slot=event_data.get('slot', 0),
-                    block_type='eb'
+                    block_hash=event_data.get("hash", event_data.get("id", "unknown")),
+                    slot=event_data.get("slot", 0),
+                    block_type="ib",
                 )
-            if 'Vote' in kind:
-                event_type = 'created' if 'created' in kind.lower() or 'generate' in kind.lower() else 'received'
+            if "EB" in kind or "EndorserBlock" in kind:
+                event_type = (
+                    "created"
+                    if "created" in kind.lower() or "generate" in kind.lower()
+                    else "received"
+                )
                 return BlockEvent(
                     timestamp=ts,
                     node=node_name,
                     event_type=event_type,
-                    block_hash=event_data.get('hash', event_data.get('id', 'unknown')),
-                    slot=event_data.get('slot', 0),
-                    block_type='vote'
+                    block_hash=event_data.get("hash", event_data.get("id", "unknown")),
+                    slot=event_data.get("slot", 0),
+                    block_type="eb",
+                )
+            if "Vote" in kind:
+                event_type = (
+                    "created"
+                    if "created" in kind.lower() or "generate" in kind.lower()
+                    else "received"
+                )
+                return BlockEvent(
+                    timestamp=ts,
+                    node=node_name,
+                    event_type=event_type,
+                    block_hash=event_data.get("hash", event_data.get("id", "unknown")),
+                    slot=event_data.get("slot", 0),
+                    block_type="vote",
                 )
 
     except json.JSONDecodeError:
@@ -181,7 +193,7 @@ def parse_log_file(log_path: Path, node_name: str) -> list[BlockEvent]:
     """Parse all block events from a log file."""
     events = []
     try:
-        with open(log_path, 'r') as f:
+        with open(log_path, "r") as f:
             for line in f:
                 line = line.strip()
                 if not line:
@@ -217,18 +229,18 @@ def compute_metrics(log_dir: str = "/logs") -> Metrics:
 
         for event in events:
             # Count events
-            if event.block_type == 'praos':
-                if event.event_type == 'created':
+            if event.block_type == "praos":
+                if event.event_type == "created":
                     metrics.praos_blocks_created += 1
                     block_created_times[event.block_hash] = event.timestamp
-                elif event.event_type in ('received', 'adopted'):
+                elif event.event_type in ("received", "adopted"):
                     metrics.praos_blocks_received += 1
                     if event.block_hash not in block_received_times:
                         block_received_times[event.block_hash] = []
                     block_received_times[event.block_hash].append(event.timestamp)
 
-            elif event.block_type == 'ib':
-                if event.event_type == 'created':
+            elif event.block_type == "ib":
+                if event.event_type == "created":
                     metrics.leios_ibs_created += 1
                     block_created_times[event.block_hash] = event.timestamp
                 else:
@@ -236,12 +248,12 @@ def compute_metrics(log_dir: str = "/logs") -> Metrics:
                         block_received_times[event.block_hash] = []
                     block_received_times[event.block_hash].append(event.timestamp)
 
-            elif event.block_type == 'eb':
-                if event.event_type == 'created':
+            elif event.block_type == "eb":
+                if event.event_type == "created":
                     metrics.leios_ebs_created += 1
 
-            elif event.block_type == 'vote':
-                if event.event_type == 'created':
+            elif event.block_type == "vote":
+                if event.event_type == "created":
                     metrics.leios_votes_created += 1
 
     # Compute latencies
@@ -251,7 +263,11 @@ def compute_metrics(log_dir: str = "/logs") -> Metrics:
                 latency_ms = (received_time - created_time).total_seconds() * 1000
                 if latency_ms > 0:  # Only positive latencies
                     # Determine block type from hash pattern (simplified)
-                    if any(e.block_type == 'praos' for e in events if e.block_hash == block_hash):
+                    if any(
+                        e.block_type == "praos"
+                        for e in events
+                        if e.block_hash == block_hash
+                    ):
                         metrics.praos_latencies_ms.append(latency_ms)
                     else:
                         metrics.leios_latencies_ms.append(latency_ms)
@@ -263,26 +279,26 @@ def get_latency_stats(latencies: list[float]) -> dict:
     """Compute statistics from latency measurements."""
     if not latencies:
         return {
-            'count': 0,
-            'min_ms': None,
-            'max_ms': None,
-            'avg_ms': None,
-            'p50_ms': None,
-            'p95_ms': None,
-            'p99_ms': None,
+            "count": 0,
+            "min_ms": None,
+            "max_ms": None,
+            "avg_ms": None,
+            "p50_ms": None,
+            "p95_ms": None,
+            "p99_ms": None,
         }
 
     sorted_latencies = sorted(latencies)
     n = len(sorted_latencies)
 
     return {
-        'count': n,
-        'min_ms': sorted_latencies[0],
-        'max_ms': sorted_latencies[-1],
-        'avg_ms': sum(sorted_latencies) / n,
-        'p50_ms': sorted_latencies[n // 2],
-        'p95_ms': sorted_latencies[int(n * 0.95)],
-        'p99_ms': sorted_latencies[int(n * 0.99)],
+        "count": n,
+        "min_ms": sorted_latencies[0],
+        "max_ms": sorted_latencies[-1],
+        "avg_ms": sum(sorted_latencies) / n,
+        "p50_ms": sorted_latencies[n // 2],
+        "p95_ms": sorted_latencies[int(n * 0.95)],
+        "p99_ms": sorted_latencies[int(n * 0.99)],
     }
 
 
