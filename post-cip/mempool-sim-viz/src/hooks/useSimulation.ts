@@ -1,21 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { DirectedGraph } from 'graphology';
 import {
   Simulation,
+  LightNode,
+  Link,
   generateNetwork,
   addAdversaryNode,
+  type Event,
+  type EndorserBlock,
   type SimulationConfig,
-  type Block,
   type SimulationStats,
   type VisualNode,
   type VisualEdge,
   type AnimatedTx,
-  type HandlerEvent,
-  type P2PConfig,
-  DEFAULT_P2P_CONFIG,
+  type AnimatedBlock,
+  type BlockDisplay,
+  type CacheTxInfo,
   type LayoutType,
-  Node,
-  Link,
 } from '@/simulation';
 import { computeCircularLayout, createForceLayout, type ForceLayoutController } from '@/simulation/layout';
 
@@ -29,11 +29,6 @@ export interface LogEntry {
 
 const MAX_LOG_ENTRIES = 100;
 
-interface EdgeAnimation {
-  state: 'adding' | 'removing';
-  progress: number;
-}
-
 interface UseSimulationReturn {
   isRunning: boolean;
   isPaused: boolean;
@@ -43,21 +38,27 @@ interface UseSimulationReturn {
   nodes: VisualNode[];
   edges: VisualEdge[];
   animatedTxs: AnimatedTx[];
-  blocks: Block[];
+  animatedBlocks: AnimatedBlock[];
+  blocks: BlockDisplay[];
+  endorserBlocks: EndorserBlock[];
   blockFlash: { nodeId: string; opacity: number } | null;
   eventLog: LogEntry[];
   fullEventLog: LogEntry[];
   initialize: (config: SimulationConfig) => void;
+  applyConfig: (config: SimulationConfig) => void;
   start: () => void;
   pause: () => void;
   resume: () => void;
   reset: () => void;
   step: () => void;
   setSpeed: (speed: number) => void;
-  setP2PConfig: (config: P2PConfig) => void;
+  getSelectedNodeCache: (nodeIdx: number) => CacheTxInfo[];
   onDragStart: (nodeId: string, x: number, y: number) => void;
   onDrag: (nodeId: string, x: number, y: number) => void;
   onDragEnd: (nodeId: string) => void;
+  getSimRef: () => Simulation | null;
+  nodeOrder: number[];
+  honestCount: number;
 }
 
 export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulationReturn {
@@ -69,6 +70,7 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
     currentTime: 0,
     progress: 0,
     blocksProduced: 0,
+    endorserBlocksProduced: 0,
     totalHonestInBlocks: 0,
     totalAdversarialInBlocks: 0,
     frontRunRate: 0,
@@ -77,38 +79,43 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
   const [nodes, setNodes] = useState<VisualNode[]>([]);
   const [edges, setEdges] = useState<VisualEdge[]>([]);
   const [animatedTxs, setAnimatedTxs] = useState<AnimatedTx[]>([]);
-  const [blocks, setBlocks] = useState<Block[]>([]);
+  const [animatedBlocks, setAnimatedBlocks] = useState<AnimatedBlock[]>([]);
+  const [blocks, setBlocks] = useState<BlockDisplay[]>([]);
+  const [endorserBlocks, setEndorserBlocks] = useState<EndorserBlock[]>([]);
   const [blockFlash, setBlockFlash] = useState<{ nodeId: string; opacity: number } | null>(null);
   const [eventLog, setEventLog] = useState<LogEntry[]>([]);
   const [fullEventLog, setFullEventLog] = useState<LogEntry[]>([]);
+  const [nodeOrder, setNodeOrder] = useState<number[]>([]);
+  const [honestNodeCount, setHonestNodeCount] = useState(0);
 
   const simRef = useRef<Simulation | null>(null);
+  const nodesRef = useRef<LightNode[]>([]);
+  const linksRef = useRef<Map<string, Link>>(new Map());
   const eventLogRef = useRef<LogEntry[]>([]);
   const fullEventLogRef = useRef<LogEntry[]>([]);
   const logIdCounter = useRef<number>(0);
   const lastBlockCountRef = useRef<number>(0);
+  const lastEBCountRef = useRef<number>(0);
   const forceLayoutRef = useRef<ForceLayoutController | null>(null);
-  const graphRef = useRef<DirectedGraph<Node, Link> | null>(null);
   const configRef = useRef<SimulationConfig | null>(null);
   const positionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
   const animationFrameRef = useRef<number | null>(null);
   const lastFrameTimeRef = useRef<number>(0);
   const actualDurationRef = useRef<number>(0);
   const txAnimationsRef = useRef<Map<string, AnimatedTx>>(new Map());
+  const blockAnimationsRef = useRef<Map<string, AnimatedBlock>>(new Map());
   const txIdCounter = useRef<number>(0);
+  const blockAnimCounter = useRef<number>(0);
   const isPausedRef = useRef<boolean>(false);
   const speedRef = useRef<number>(1);
   const firstFrameRef = useRef<boolean>(true);
   const initialEventsRef = useRef<number>(0);
   const forceUpdatePendingRef = useRef<boolean>(false);
+  const layoutTypeRef = useRef<LayoutType>(layoutType);
   const lastEventLogLengthRef = useRef<number>(0);
   const lastFullEventLogLengthRef = useRef<number>(0);
   const lastAnimatedTxCountRef = useRef<number>(0);
-
-  // P2P state - using refs to avoid triggering re-renders
-  const p2pConfigRef = useRef<P2PConfig>(DEFAULT_P2P_CONFIG);
-  const edgeAnimationsRef = useRef<Map<string, EdgeAnimation>>(new Map());
-  const EDGE_ANIM_DURATION = 0.4; // 400ms
+  const lastAnimatedBlockCountRef = useRef<number>(0);
 
   const updateStats = useCallback(() => {
     const sim = simRef.current;
@@ -120,16 +127,17 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
     const total = totalHonest + totalAdv;
     const config = configRef.current;
 
-    // Calculate progress based on events processed (smooth) rather than time (jumpy)
     const initialEvents = initialEventsRef.current;
     const eventsProcessed = sim.eventsProcessed;
     const progress = initialEvents > 0 ? Math.min(100, (eventsProcessed / initialEvents) * 100) : 0;
 
+    const nodeList = nodesRef.current;
     setStats({
       eventsProcessed,
       currentTime: sim.currentTime,
       progress,
       blocksProduced: blockList.length,
+      endorserBlocksProduced: sim.endorserBlocks.length,
       totalHonestInBlocks: totalHonest,
       totalAdversarialInBlocks: totalAdv,
       frontRunRate: total > 0 ? totalAdv / total : 0,
@@ -137,87 +145,35 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
         ? (blockList.reduce((s, b) => s + b.size_B, 0) / (blockList.length * config.block)) * 100
         : 0,
     });
-    setBlocks([...blockList]);
+    // Convert blocks to display format (producer index → node ID string)
+    setBlocks(blockList.map(b => ({
+      blockId: b.blockId,
+      producer: nodeList[b.producer]?.id ?? `#${b.producer}`,
+      clock: b.clock,
+      honestCount: b.honestCount,
+      adversarialCount: b.adversarialCount,
+      size_B: b.size_B,
+    })));
   }, []);
 
   const updateVisualNodes = useCallback(() => {
-    const graph = graphRef.current;
-    if (!graph) return;
+    const sim = simRef.current;
+    const nodeList = nodesRef.current;
+    if (!sim || nodeList.length === 0) return;
 
-    const visualNodes: VisualNode[] = [];
-    graph.forEachNode((id) => {
-      const node = graph.getNodeAttributes(id);
-      const pos = positionsRef.current.get(id) || { x: 0, y: 0 };
-      visualNodes.push({
-        id,
+    const visualNodes: VisualNode[] = nodeList.map(node => {
+      const pos = positionsRef.current.get(node.id) || { x: 0, y: 0 };
+      return {
+        id: node.id,
         honest: node.honest,
         position: pos,
-        mempoolFillPercent: node.getFillPercent(),
-        txCount: node.getTransactions().length,
-        isPoisoned: node.hasAdversarialTx(),
-      });
+        mempoolFillPercent: sim.getNodeFillPercent(node.idx),
+        txCount: sim.getNodeTxCount(node.idx),
+        isPoisoned: sim.isNodePoisoned(node.idx),
+        cacheCount: sim.getNodeCacheCount(node.idx),
+      };
     });
     setNodes(visualNodes);
-  }, []);
-
-  // Update edges - either from static topology or dynamic P2P peers
-  const updateEdges = useCallback(() => {
-    const graph = graphRef.current;
-    if (!graph) return;
-
-    const currentP2PConfig = p2pConfigRef.current;
-
-    if (!currentP2PConfig.enabled) {
-      // Static mode: edges from graph topology
-      const visualEdges: VisualEdge[] = [];
-      graph.forEachEdge((_, _attrs, source, target) => {
-        visualEdges.push({ source, target });
-      });
-      setEdges(visualEdges);
-      return;
-    }
-
-    // P2P mode: collect edges from each node's peerManager
-    const visualEdges: VisualEdge[] = [];
-    const seenEdges = new Set<string>();
-
-    graph.forEachNode((nodeId) => {
-      const node = graph.getNodeAttributes(nodeId);
-      const peerManager = node.getPeerManager();
-      if (peerManager) {
-        const peers = peerManager.getPeers();
-        for (const peer of peers) {
-          const edgeKey = `${peer}->${nodeId}`;
-          if (!seenEdges.has(edgeKey)) {
-            seenEdges.add(edgeKey);
-            const animation = edgeAnimationsRef.current.get(edgeKey);
-            visualEdges.push({
-              source: peer,
-              target: nodeId,
-              animationState: animation?.state ?? 'stable',
-              animationProgress: animation?.progress,
-            });
-          }
-        }
-      }
-    });
-
-    // Also include edges that are being removed (not in current peers but have removing animation)
-    edgeAnimationsRef.current.forEach((anim, edgeKey) => {
-      if (anim.state === 'removing' && !seenEdges.has(edgeKey)) {
-        const [source, target] = edgeKey.split('->');
-        if (source && target) {
-          visualEdges.push({
-            source,
-            target,
-            animationState: 'removing',
-            animationProgress: anim.progress,
-          });
-        }
-      }
-    });
-
-    setEdges(visualEdges);
   }, []);
 
   const addLogEntry = useCallback((time: number, kind: string, message: string, isAdversarial?: boolean) => {
@@ -228,257 +184,347 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
       message,
       isAdversarial,
     };
-    // Add to full log (no limit)
     fullEventLogRef.current.push(entry);
-    // Add to display log (limited)
     eventLogRef.current.push(entry);
     if (eventLogRef.current.length > MAX_LOG_ENTRIES) {
       eventLogRef.current.shift();
     }
   }, []);
 
-  const handleEvent = useCallback((event: HandlerEvent) => {
-    const graph = graphRef.current;
-    if (!graph) return;
+  const buildEdges = useCallback((): VisualEdge[] => {
+    const nodeList = nodesRef.current;
+    const linkMap = linksRef.current;
+    const visualEdges: VisualEdge[] = [];
 
-    // Log the event (blocks are logged separately after creation to include contents)
+    linkMap.forEach((_, key) => {
+      const parts = key.split('-');
+      const fromIdx = parseInt(parts[0]!, 10);
+      const toIdx = parseInt(parts[1]!, 10);
+      const fromName = nodeList[fromIdx]?.id;
+      const toName = nodeList[toIdx]?.id;
+      if (fromName && toName) {
+        visualEdges.push({ source: fromName, target: toName });
+      }
+    });
+
+    return visualEdges;
+  }, []);
+
+  const processSimEvent = useCallback((event: Event) => {
+    const nodeList = nodesRef.current;
+
     switch (event.kind) {
       case 'SubmitTx': {
-        const isAdv = event.tx.frontRuns !== '';
-        addLogEntry(event.clock, 'submit', `${event.tx.txId} → ${event.to}`, isAdv);
+        const sim = simRef.current;
+        if (!sim) break;
+        const tx = sim.registry.txs[event.txIdx]!;
+        const nodeName = nodeList[event.nodeIdx]?.id ?? `#${event.nodeIdx}`;
+        addLogEntry(event.clock, 'submit', `${tx.txId} → ${nodeName}`, tx.isAdversarial);
         break;
       }
+
       case 'SendTx': {
-        const isAdv = event.tx.frontRuns !== '';
-        addLogEntry(event.clock, 'send', `${event.tx.txId}: ${event.from} → ${event.to}`, isAdv);
+        const sim = simRef.current;
+        if (!sim) break;
+        const tx = sim.registry.txs[event.txIdx]!;
+        const fromName = nodeList[event.from]?.id ?? `#${event.from}`;
+        const toName = nodeList[event.to]?.id ?? `#${event.to}`;
+        addLogEntry(event.clock, 'send', `${tx.txId}: ${fromName} → ${toName}`, tx.isAdversarial);
+
+        // Create tx animation (skip in matrix mode)
+        if (layoutTypeRef.current !== 'matrix') {
+          const fromPos = positionsRef.current.get(fromName);
+          const toPos = positionsRef.current.get(toName);
+          if (fromPos && toPos) {
+            const animId = `tx-${txIdCounter.current++}`;
+            txAnimationsRef.current.set(animId, {
+              id: animId,
+              txId: tx.txId,
+              fromNode: fromName,
+              toNode: toName,
+              progress: 0,
+              isAdversarial: tx.isAdversarial,
+            });
+          }
+        }
         break;
       }
+
+      case 'ProduceBlock': {
+        const producerName = nodeList[event.producerIdx]?.id ?? `#${event.producerIdx}`;
+        setBlockFlash({ nodeId: producerName, opacity: 1 });
+        break;
+      }
+
+      case 'DiffuseBlock': {
+        const fromName = nodeList[event.from]?.id ?? `#${event.from}`;
+        const toName = nodeList[event.to]?.id ?? `#${event.to}`;
+        const sim = simRef.current;
+        const blockId = sim ? sim.blocks[event.blockIdx]?.blockId ?? `B${event.blockIdx}` : `B${event.blockIdx}`;
+        addLogEntry(event.clock, 'diffuse-rb', `${blockId}: ${fromName} → ${toName}`);
+
+        if (layoutTypeRef.current !== 'matrix') {
+          const fromPos = positionsRef.current.get(fromName);
+          const toPos = positionsRef.current.get(toName);
+          if (fromPos && toPos) {
+            const animId = `rb-${blockAnimCounter.current++}`;
+            blockAnimationsRef.current.set(animId, {
+              id: animId,
+              blockId,
+              fromNode: fromName,
+              toNode: toName,
+              progress: 0,
+              type: 'rb',
+            });
+          }
+        }
+        break;
+      }
+
+      case 'DiffuseEB': {
+        const fromName = nodeList[event.from]?.id ?? `#${event.from}`;
+        const toName = nodeList[event.to]?.id ?? `#${event.to}`;
+        const sim = simRef.current;
+        const ebId = sim ? sim.endorserBlocks[event.ebIdx]?.ebId ?? `EB${event.ebIdx}` : `EB${event.ebIdx}`;
+        addLogEntry(event.clock, 'diffuse-eb', `${ebId}: ${fromName} → ${toName}`);
+
+        if (layoutTypeRef.current !== 'matrix') {
+          const fromPos = positionsRef.current.get(fromName);
+          const toPos = positionsRef.current.get(toName);
+          if (fromPos && toPos) {
+            const animId = `eb-${blockAnimCounter.current++}`;
+            blockAnimationsRef.current.set(animId, {
+              id: animId,
+              blockId: ebId,
+              fromNode: fromName,
+              toNode: toName,
+              progress: 0,
+              type: 'eb',
+            });
+          }
+        }
+        break;
+      }
+
+      case 'SendEBTx': {
+        const sim = simRef.current;
+        if (!sim) break;
+        const tx = sim.registry.txs[event.txIdx]!;
+        const fromName = nodeList[event.from]?.id ?? `#${event.from}`;
+        const toName = nodeList[event.to]?.id ?? `#${event.to}`;
+        addLogEntry(event.clock, 'eb-tx', `${tx.txId}: ${fromName} → ${toName}`);
+
+        if (layoutTypeRef.current !== 'matrix') {
+          const fromPos = positionsRef.current.get(fromName);
+          const toPos = positionsRef.current.get(toName);
+          if (fromPos && toPos) {
+            const animId = `tx-${txIdCounter.current++}`;
+            txAnimationsRef.current.set(animId, {
+              id: animId,
+              txId: tx.txId,
+              fromNode: fromName,
+              toNode: toName,
+              progress: 0,
+              isAdversarial: tx.isAdversarial,
+            });
+          }
+        }
+        break;
+      }
+
       case 'PeerChurn': {
-        const { churnResult, nodeId } = event;
-        if (churnResult && (churnResult.replaced.length > 0 || churnResult.newPeers.length > 0)) {
-          // Mark removed edges for fade-out animation
-          for (const oldPeer of churnResult.replaced) {
-            const edgeKey = `${oldPeer}->${nodeId}`;
-            edgeAnimationsRef.current.set(edgeKey, { state: 'removing', progress: 0 });
-          }
-          // Mark added edges for fade-in animation
-          for (const newPeer of churnResult.newPeers) {
-            const edgeKey = `${newPeer}->${nodeId}`;
-            edgeAnimationsRef.current.set(edgeKey, { state: 'adding', progress: 0 });
-          }
-          addLogEntry(event.clock, 'churn', `${nodeId}: -${churnResult.replaced.length} +${churnResult.newPeers.length}`);
+        addLogEntry(event.clock, 'churn', 'Edge swap');
+        // In graph mode, rebuild edges
+        if (layoutTypeRef.current !== 'matrix') {
+          setEdges(buildEdges());
         }
         break;
       }
     }
-
-    if (event.kind === 'SendTx') {
-      const fromPos = positionsRef.current.get(event.from);
-      const toPos = positionsRef.current.get(event.to);
-      if (fromPos && toPos) {
-        const animId = `tx-${txIdCounter.current++}`;
-        const isAdversarial = event.tx.frontRuns !== '';
-        txAnimationsRef.current.set(animId, {
-          id: animId,
-          txId: event.tx.txId,
-          fromNode: event.from,
-          toNode: event.to,
-          progress: 0,
-          isAdversarial,
-        });
-      }
-    } else if (event.kind === 'ProduceBlock') {
-      setBlockFlash({ nodeId: event.producer, opacity: 1 });
-    }
-  }, [addLogEntry]);
+  }, [addLogEntry, buildEdges]);
 
   const initialize = useCallback((config: SimulationConfig) => {
-    // Validate and clamp config values to prevent errors
+    // Validate and clamp config values
     const safeConfig = {
       ...config,
       degree: Math.min(config.degree, config.nodes - 1),
       adversaryDegree: Math.min(config.adversaryDegree, config.nodes),
     };
 
-    // Generate network
-    const graph = generateNetwork(
+    // Generate network using bitmap engine
+    const { nodes: lightNodes, links } = generateNetwork(
       safeConfig.nodes,
       safeConfig.degree,
       safeConfig.mempool,
       safeConfig.latency,
-      safeConfig.bandwidth
+      safeConfig.bandwidth,
     );
 
     // Add adversary nodes
     for (let i = 0; i < safeConfig.adversaries; i++) {
       addAdversaryNode(
-        graph,
-        `A${i + 1}`,
+        lightNodes,
+        links,
         safeConfig.adversaryDegree,
         safeConfig.adversaryDegree,
         safeConfig.adversaryDelay,
         safeConfig.mempool,
         safeConfig.latency,
-        safeConfig.bandwidth
+        safeConfig.bandwidth,
       );
     }
 
-    // Extract edges first (needed for force layout)
-    const visualEdges: VisualEdge[] = [];
-    graph.forEachEdge((_, _attrs, source, target) => {
-      visualEdges.push({ source, target });
-    });
+    // Store refs
+    nodesRef.current = lightNodes;
+    linksRef.current = links;
+
+    // Build edges from links Map
+    const visualEdges = buildEdges();
     setEdges(visualEdges);
 
-    // Compute layout based on type
-    const nodeIds = graph.nodes();
-    if (layoutType === 'force') {
-      // Stop any existing force layout
-      if (forceLayoutRef.current) {
-        forceLayoutRef.current.stop();
-      }
-      // Create new force layout
-      const forceLayout = createForceLayout(
-        nodeIds,
-        visualEdges,
-        600,
-        600,
-        (positions) => {
-          positionsRef.current = positions;
-          // Throttle updates to avoid excessive re-renders during force settling
-          if (!forceUpdatePendingRef.current) {
-            forceUpdatePendingRef.current = true;
-            requestAnimationFrame(() => {
-              forceUpdatePendingRef.current = false;
-              updateVisualNodes();
-            });
-          }
+    // Compute layout (skip for matrix mode — no node positions needed)
+    if (layoutType !== 'matrix') {
+      const nodeIds = lightNodes.map(n => n.id);
+      if (layoutType === 'force') {
+        if (forceLayoutRef.current) {
+          forceLayoutRef.current.stop();
         }
-      );
-      forceLayoutRef.current = forceLayout;
-      positionsRef.current = forceLayout.getPositions();
+        const forceLayout = createForceLayout(
+          nodeIds,
+          visualEdges,
+          600,
+          600,
+          (positions) => {
+            positionsRef.current = positions;
+            if (!forceUpdatePendingRef.current) {
+              forceUpdatePendingRef.current = true;
+              requestAnimationFrame(() => {
+                forceUpdatePendingRef.current = false;
+                updateVisualNodes();
+              });
+            }
+          }
+        );
+        forceLayoutRef.current = forceLayout;
+        positionsRef.current = forceLayout.getPositions();
+      } else {
+        if (forceLayoutRef.current) {
+          forceLayoutRef.current.stop();
+          forceLayoutRef.current = null;
+        }
+        positionsRef.current = computeCircularLayout(nodeIds, 600, 600);
+      }
     } else {
-      // Stop any existing force layout
       if (forceLayoutRef.current) {
         forceLayoutRef.current.stop();
         forceLayoutRef.current = null;
       }
-      positionsRef.current = computeCircularLayout(nodeIds, 600, 600);
     }
 
     // Create simulation
-    const sim = new Simulation(graph);
-    sim.setEventHandler(handleEvent);
+    const sim = new Simulation(lightNodes, links);
+    sim.ebEnabled = safeConfig.ebEnabled;
+    sim.ebSize_B = safeConfig.ebSize;
+    sim.txCacheMode = safeConfig.txCacheMode;
+    sim.ebAnnouncementRate = safeConfig.ebAnnouncementRate;
+    sim.ebCertificationRate = safeConfig.ebCertificationRate;
+    sim.peerChurnEnabled = safeConfig.peerChurnEnabled;
+    sim.peerChurnInterval_s = safeConfig.peerChurnInterval;
+    sim.peerChurnRate = safeConfig.peerChurnRate;
 
-    // Initialize P2P if enabled
-    const currentP2PConfig = p2pConfigRef.current;
-    if (currentP2PConfig.enabled) {
-      sim.initializeP2P(currentP2PConfig, config.duration);
-    }
-
-    // Inject transactions uniformly throughout the duration
-    for (let i = 0; i < config.txCount; i++) {
+    // Inject transactions
+    for (let i = 0; i < safeConfig.txCount; i++) {
       const txId = `T${i}`;
-      const nodeIndex = Math.ceil(config.nodes * Math.random());
-      const node = `H${nodeIndex}`;
-      const time = Math.round(config.duration * Math.random());
-      const size = config.txSizeMin + Math.floor(Math.random() * (config.txSizeMax - config.txSizeMin));
-
-      sim.submitTx(time, node, {
-        txId,
-        size_B: size,
-        frontRuns: '',
-      });
+      const nodeIndex = Math.floor(Math.random() * safeConfig.nodes);
+      const time = Math.round(safeConfig.duration * Math.random());
+      const size = safeConfig.txSizeMin + Math.floor(Math.random() * (safeConfig.txSizeMax - safeConfig.txSizeMin));
+      sim.submitTx(time, nodeIndex, txId, size);
     }
 
-    // Schedule block production using Poisson process within fixed duration
-    // blockInterval is the average time between blocks
-    const honestNodes = Array.from({ length: config.nodes }, (_, i) => `H${i + 1}`);
-
-    // Generate block times using exponential inter-arrival times until we exceed duration
+    // Schedule block production using Poisson process
     const blockTimes: number[] = [];
     let currentTime = 0;
-    while (currentTime < config.duration) {
-      // Exponential distribution: -ln(U) * mean, where U is uniform(0,1)
-      const interval = -Math.log(1 - Math.random()) * config.blockInterval;
+    while (currentTime < safeConfig.duration) {
+      const interval = -Math.log(1 - Math.random()) * safeConfig.blockInterval;
       currentTime += interval;
-      if (currentTime < config.duration) {
+      if (currentTime < safeConfig.duration) {
         blockTimes.push(currentTime);
       }
     }
 
-    // Schedule blocks with random producers
     for (const time of blockTimes) {
-      const producer = honestNodes[Math.floor(Math.random() * honestNodes.length)]!;
-      sim.produceBlock(time, producer, config.block);
+      const producerIdx = Math.floor(Math.random() * safeConfig.nodes);
+      sim.produceBlock(time, producerIdx, safeConfig.block);
     }
 
-    // Duration is fixed from config
-    actualDurationRef.current = config.duration;
-    // Track initial event count for smooth progress calculation
+    // Schedule peer churn if enabled
+    if (safeConfig.peerChurnEnabled) {
+      sim.schedulePeerChurn(0);
+    }
+
+    actualDurationRef.current = safeConfig.duration;
     initialEventsRef.current = sim.pendingEvents;
 
     simRef.current = sim;
-    graphRef.current = graph;
-    configRef.current = config;
+    configRef.current = safeConfig;
+    setNodeOrder(sim.getNodeOrder());
+    setHonestNodeCount(sim.honestCount);
     txAnimationsRef.current.clear();
-    edgeAnimationsRef.current.clear();
+    blockAnimationsRef.current.clear();
     txIdCounter.current = 0;
+    blockAnimCounter.current = 0;
     eventLogRef.current = [];
     fullEventLogRef.current = [];
     logIdCounter.current = 0;
     lastBlockCountRef.current = 0;
+    lastEBCountRef.current = 0;
     lastEventLogLengthRef.current = 0;
     lastFullEventLogLengthRef.current = 0;
     lastAnimatedTxCountRef.current = 0;
+    lastAnimatedBlockCountRef.current = 0;
     setEventLog([]);
     setFullEventLog([]);
+    setEndorserBlocks([]);
 
     updateVisualNodes();
     updateStats();
     setIsRunning(false);
     setIsPaused(false);
-  }, [handleEvent, updateVisualNodes, updateStats, layoutType]);
+  }, [updateVisualNodes, updateStats, layoutType, buildEdges]);
 
   // Reinitialize simulation events without regenerating topology
   const reinitializeEvents = useCallback(() => {
-    const graph = graphRef.current;
+    const nodeList = nodesRef.current;
+    const linkMap = linksRef.current;
     const config = configRef.current;
-    if (!graph || !config) return;
+    if (nodeList.length === 0 || !config) return;
 
-    // Reset all nodes (clears mempool, backpressure, offers, and known tx cache)
-    graph.forEachNode((id) => {
-      const node = graph.getNodeAttributes(id);
-      node.reset(config.mempool);
-    });
-
-    // Create new simulation with existing graph
-    const sim = new Simulation(graph);
-    sim.setEventHandler(handleEvent);
-
-    // Initialize P2P if enabled
-    const currentP2PConfig = p2pConfigRef.current;
-    if (currentP2PConfig.enabled) {
-      sim.initializeP2P(currentP2PConfig, config.duration);
+    // Reset all nodes
+    for (const node of nodeList) {
+      node.reset();
     }
 
-    // Inject transactions uniformly throughout the duration
+    // Create new simulation with existing topology
+    const sim = new Simulation(nodeList, linkMap);
+    sim.ebEnabled = config.ebEnabled;
+    sim.ebSize_B = config.ebSize;
+    sim.txCacheMode = config.txCacheMode;
+    sim.ebAnnouncementRate = config.ebAnnouncementRate;
+    sim.ebCertificationRate = config.ebCertificationRate;
+    sim.peerChurnEnabled = config.peerChurnEnabled;
+    sim.peerChurnInterval_s = config.peerChurnInterval;
+    sim.peerChurnRate = config.peerChurnRate;
+
+    // Inject transactions
     for (let i = 0; i < config.txCount; i++) {
       const txId = `T${i}`;
-      const nodeIndex = Math.ceil(config.nodes * Math.random());
-      const node = `H${nodeIndex}`;
+      const nodeIndex = Math.floor(Math.random() * config.nodes);
       const time = Math.round(config.duration * Math.random());
       const size = config.txSizeMin + Math.floor(Math.random() * (config.txSizeMax - config.txSizeMin));
-
-      sim.submitTx(time, node, {
-        txId,
-        size_B: size,
-        frontRuns: '',
-      });
+      sim.submitTx(time, nodeIndex, txId, size);
     }
 
-    // Schedule block production using Poisson process within fixed duration
-    const honestNodes = Array.from({ length: config.nodes }, (_, i) => `H${i + 1}`);
+    // Schedule block production
     const blockTimes: number[] = [];
     let currentTime = 0;
     while (currentTime < config.duration) {
@@ -490,38 +536,46 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
     }
 
     for (const time of blockTimes) {
-      const producer = honestNodes[Math.floor(Math.random() * honestNodes.length)]!;
-      sim.produceBlock(time, producer, config.block);
+      const producerIdx = Math.floor(Math.random() * config.nodes);
+      sim.produceBlock(time, producerIdx, config.block);
     }
 
-    // Duration is fixed from config
+    // Schedule peer churn if enabled
+    if (config.peerChurnEnabled) {
+      sim.schedulePeerChurn(0);
+    }
+
     actualDurationRef.current = config.duration;
-    // Track initial event count for smooth progress calculation
     initialEventsRef.current = sim.pendingEvents;
 
     simRef.current = sim;
     txAnimationsRef.current.clear();
-    edgeAnimationsRef.current.clear();
+    blockAnimationsRef.current.clear();
     txIdCounter.current = 0;
+    blockAnimCounter.current = 0;
     eventLogRef.current = [];
     fullEventLogRef.current = [];
     logIdCounter.current = 0;
     lastBlockCountRef.current = 0;
+    lastEBCountRef.current = 0;
     lastEventLogLengthRef.current = 0;
     lastFullEventLogLengthRef.current = 0;
     lastAnimatedTxCountRef.current = 0;
+    lastAnimatedBlockCountRef.current = 0;
     setEventLog([]);
     setFullEventLog([]);
     setBlocks([]);
     setAnimatedTxs([]);
+    setAnimatedBlocks([]);
     setBlockFlash(null);
+    setEndorserBlocks([]);
 
-    // Explicitly reset stats to initial values (don't rely on async updateStats)
     setStats({
       eventsProcessed: 0,
       currentTime: 0,
       progress: 0,
       blocksProduced: 0,
+      endorserBlocksProduced: 0,
       totalHonestInBlocks: 0,
       totalAdversarialInBlocks: 0,
       frontRunRate: 0,
@@ -532,25 +586,31 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
     setIsRunning(false);
     setIsPaused(false);
     isPausedRef.current = false;
-  }, [handleEvent, updateVisualNodes]);
+  }, [updateVisualNodes]);
+
+  // Apply a new config without regenerating topology — updates configRef and reinitializes events
+  const applyConfig = useCallback((config: SimulationConfig) => {
+    configRef.current = config;
+    reinitializeEvents();
+  }, [reinitializeEvents]);
+
+  // Keep layout type ref in sync
+  useEffect(() => {
+    layoutTypeRef.current = layoutType;
+  }, [layoutType]);
 
   // Handle layout type changes without regenerating the simulation
   useEffect(() => {
-    const graph = graphRef.current;
-    if (!graph) return;
+    const nodeList = nodesRef.current;
+    if (nodeList.length === 0) return;
 
-    const nodeIds = graph.nodes();
-    const visualEdges: VisualEdge[] = [];
-    graph.forEachEdge((_, _attrs, source, target) => {
-      visualEdges.push({ source, target });
-    });
+    const nodeIds = nodeList.map(n => n.id);
+    const visualEdges = buildEdges();
 
     if (layoutType === 'force') {
-      // Stop any existing force layout
       if (forceLayoutRef.current) {
         forceLayoutRef.current.stop();
       }
-      // Create new force layout
       const forceLayout = createForceLayout(
         nodeIds,
         visualEdges,
@@ -558,7 +618,6 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
         600,
         (positions) => {
           positionsRef.current = positions;
-          // Throttle updates to avoid excessive re-renders during force settling
           if (!forceUpdatePendingRef.current) {
             forceUpdatePendingRef.current = true;
             requestAnimationFrame(() => {
@@ -571,7 +630,6 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
       forceLayoutRef.current = forceLayout;
       positionsRef.current = forceLayout.getPositions();
     } else {
-      // Stop any existing force layout
       if (forceLayoutRef.current) {
         forceLayoutRef.current.stop();
         forceLayoutRef.current = null;
@@ -580,17 +638,12 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
     }
 
     updateVisualNodes();
-  }, [layoutType, updateVisualNodes]);
+  }, [layoutType, updateVisualNodes, buildEdges]);
 
   const animationLoop = useCallback((timestamp: number) => {
     const sim = simRef.current;
-    if (!sim) {
-      return;
-    }
+    if (!sim) return;
 
-    // On first frame, just initialize timing - don't call updateStats() here.
-    // reinitializeEvents() already sets correct initial stats with progress: 0.
-    // Calling updateStats() again could cause timing issues with React batching.
     if (firstFrameRef.current) {
       firstFrameRef.current = false;
       lastFrameTimeRef.current = timestamp;
@@ -608,52 +661,68 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
     lastFrameTimeRef.current = timestamp;
     const deltaSec = deltaMs / 1000;
 
-    // Process events - speed controls how many events per frame
-    // At 1x: ~10 events/frame, at 10x: ~100 events/frame
-    const eventsPerFrame = Math.ceil(speedRef.current * 10);
+    // Process events — scale up for large networks
+    const isMatrixMode = layoutType === 'matrix';
+    const nodeCount = nodesRef.current.length;
+    const baseEvents = Math.ceil(speedRef.current * 10);
+    const eventsPerFrame = nodeCount > 500 ? baseEvents * 100 : baseEvents;
     for (let i = 0; i < eventsPerFrame && sim.pendingEvents > 0; i++) {
-      sim.step();
+      const event = sim.step();
+      if (event) {
+        processSimEvent(event);
+      }
     }
 
-    // Log any new blocks that were created
+    // Log any new blocks
     const currentBlocks = sim.blocks;
+    const nodeList = nodesRef.current;
     while (lastBlockCountRef.current < currentBlocks.length) {
       const block = currentBlocks[lastBlockCountRef.current]!;
+      const producerName = nodeList[block.producer]?.id ?? `#${block.producer}`;
       addLogEntry(
         block.clock,
         'block',
-        `${block.producer} → ${block.honestCount}/${block.adversarialCount} txs`
+        `${producerName} → ${block.honestCount}/${block.adversarialCount} txs`
       );
       lastBlockCountRef.current++;
     }
 
-    // Update tx animations
-    const animDelta = deltaSec * speedRef.current * 2;
-    txAnimationsRef.current.forEach((anim, id) => {
-      anim.progress += animDelta;
-      if (anim.progress >= 1) {
-        txAnimationsRef.current.delete(id);
-      }
-    });
-    // Only update animatedTxs state if count changed (avoid re-render when empty)
-    const currentAnimCount = txAnimationsRef.current.size;
-    if (currentAnimCount !== lastAnimatedTxCountRef.current) {
-      lastAnimatedTxCountRef.current = currentAnimCount;
-      setAnimatedTxs(Array.from(txAnimationsRef.current.values()));
+    // Track new endorser blocks
+    if (sim.endorserBlocks.length > lastEBCountRef.current) {
+      lastEBCountRef.current = sim.endorserBlocks.length;
+      setEndorserBlocks([...sim.endorserBlocks]);
     }
 
-    // Update edge animations (for P2P churn)
-    const edgeAnimDelta = deltaSec / EDGE_ANIM_DURATION;
-    const completedEdgeAnims: string[] = [];
-    edgeAnimationsRef.current.forEach((anim, edgeKey) => {
-      anim.progress += edgeAnimDelta;
-      if (anim.progress >= 1) {
-        completedEdgeAnims.push(edgeKey);
+    if (!isMatrixMode) {
+      // Update tx animations
+      const animDelta = deltaSec * speedRef.current * 2;
+      txAnimationsRef.current.forEach((anim, id) => {
+        anim.progress += animDelta;
+        if (anim.progress >= 1) {
+          txAnimationsRef.current.delete(id);
+        }
+      });
+      const currentAnimCount = txAnimationsRef.current.size;
+      if (currentAnimCount !== lastAnimatedTxCountRef.current) {
+        lastAnimatedTxCountRef.current = currentAnimCount;
+        setAnimatedTxs(Array.from(txAnimationsRef.current.values()));
       }
-    });
-    // Remove completed animations
-    for (const key of completedEdgeAnims) {
-      edgeAnimationsRef.current.delete(key);
+
+      // Update block/EB animations (slightly slower than tx)
+      const blockAnimDelta = deltaSec * speedRef.current * 1.5;
+      blockAnimationsRef.current.forEach((anim, id) => {
+        anim.progress += blockAnimDelta;
+        if (anim.progress >= 1) {
+          blockAnimationsRef.current.delete(id);
+        }
+      });
+      const currentBlockAnimCount = blockAnimationsRef.current.size;
+      if (currentBlockAnimCount !== lastAnimatedBlockCountRef.current) {
+        lastAnimatedBlockCountRef.current = currentBlockAnimCount;
+        setAnimatedBlocks(Array.from(blockAnimationsRef.current.values()));
+      }
+
+      updateVisualNodes();
     }
 
     // Fade block flash
@@ -664,13 +733,7 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
       return { ...prev, opacity: newOpacity };
     });
 
-    updateVisualNodes();
     updateStats();
-
-    // Update edges if P2P is enabled
-    if (p2pConfigRef.current.enabled) {
-      updateEdges();
-    }
 
     // Only update event logs if length changed
     const currentEventLogLength = eventLogRef.current.length;
@@ -686,18 +749,20 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
 
     if (sim.pendingEvents === 0) {
       txAnimationsRef.current.clear();
+      blockAnimationsRef.current.clear();
       setAnimatedTxs([]);
+      setAnimatedBlocks([]);
       setIsRunning(false);
     } else {
       animationFrameRef.current = requestAnimationFrame(animationLoop);
     }
-  }, [updateVisualNodes, updateStats, addLogEntry, updateEdges]);
+  }, [updateVisualNodes, updateStats, addLogEntry, processSimEvent]);
 
   const reset = useCallback(() => {
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
     }
-    if (graphRef.current && configRef.current) {
+    if (nodesRef.current.length > 0 && configRef.current) {
       reinitializeEvents();
     }
   }, [reinitializeEvents]);
@@ -705,7 +770,6 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
   const start = useCallback(() => {
     if (!simRef.current) return;
 
-    // If simulation completed, reset first (same as pressing stop)
     if (simRef.current.pendingEvents === 0) {
       reset();
     }
@@ -726,9 +790,7 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
   const resume = useCallback(() => {
     isPausedRef.current = false;
     setIsPaused(false);
-    // Reset frame time but keep simElapsedRef (accumulated progress)
     lastFrameTimeRef.current = performance.now();
-    // Ensure animation loop is running
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
     }
@@ -738,18 +800,36 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
   const stepOnce = useCallback(() => {
     const sim = simRef.current;
     if (!sim || sim.pendingEvents === 0) return;
-    sim.step();
+    const event = sim.step();
+    if (event) {
+      processSimEvent(event);
+    }
     updateVisualNodes();
     updateStats();
     setAnimatedTxs(Array.from(txAnimationsRef.current.values()));
-  }, [updateVisualNodes, updateStats]);
+    setAnimatedBlocks(Array.from(blockAnimationsRef.current.values()));
+  }, [updateVisualNodes, updateStats, processSimEvent]);
 
   const setSpeed = useCallback((newSpeed: number) => {
     speedRef.current = newSpeed;
     setSpeedState(newSpeed);
   }, []);
 
-  // Use actual duration computed from scheduled events
+  const getSelectedNodeCache = useCallback((nodeIdx: number): CacheTxInfo[] => {
+    const sim = simRef.current;
+    if (!sim) return [];
+    const txIndices = sim.getNodeCacheTxIndices(nodeIdx);
+    return txIndices.map(i => {
+      const tx = sim.registry.txs[i]!;
+      return {
+        txIdx: i,
+        txId: tx.txId,
+        size_B: tx.size_B,
+        isAdversarial: tx.isAdversarial,
+      };
+    });
+  }, []);
+
   const simulationDuration = actualDurationRef.current;
 
   // Force layout drag handlers
@@ -767,16 +847,11 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
 
   const onDragEnd = useCallback((_nodeId: string) => {
     if (forceLayoutRef.current) {
-      // Keep the node pinned where it was dropped - don't unpin
-      // This lets users arrange the graph like an untangle puzzle
       forceLayoutRef.current.endDrag(_nodeId);
     }
   }, []);
 
-  // Set P2P config (updates ref)
-  const setP2PConfig = useCallback((config: P2PConfig) => {
-    p2pConfigRef.current = config;
-  }, []);
+  const getSimRef = useCallback(() => simRef.current, []);
 
   return {
     isRunning,
@@ -787,20 +862,26 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
     nodes,
     edges,
     animatedTxs,
+    animatedBlocks,
     blocks,
+    endorserBlocks,
     blockFlash,
     eventLog,
     fullEventLog,
     initialize,
+    applyConfig,
     start,
     pause,
     resume,
     reset,
     step: stepOnce,
     setSpeed,
-    setP2PConfig,
+    getSelectedNodeCache,
     onDragStart,
     onDrag,
     onDragEnd,
+    getSimRef,
+    nodeOrder,
+    honestCount: honestNodeCount,
   };
 }
