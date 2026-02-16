@@ -22,7 +22,7 @@ class BlockEvent:
     event_type: str  # 'created', 'received', 'adopted'
     block_hash: str
     slot: int
-    block_type: str  # 'praos', 'ib', 'eb', 'vote'
+    block_type: str  # 'praos', 'eb', 'vote'
 
 
 @dataclass
@@ -31,17 +31,13 @@ class Metrics:
 
     praos_blocks_created: int = 0
     praos_blocks_received: int = 0
-    leios_ibs_created: int = 0
     leios_ebs_created: int = 0
     leios_votes_created: int = 0
     praos_latencies_ms: list = None
-    leios_latencies_ms: list = None
 
     def __post_init__(self):
         if self.praos_latencies_ms is None:
             self.praos_latencies_ms = []
-        if self.leios_latencies_ms is None:
-            self.leios_latencies_ms = []
 
 
 def parse_timestamp(ts_str: str) -> Optional[datetime]:
@@ -135,24 +131,10 @@ def parse_log_line(line: str, node_name: str) -> Optional[BlockEvent]:
                 block_type="praos",
             )
 
-        # Leios IB events
-        # ns: "Consensus.LeiosKernel" with IB in data
+        # Leios events
+        # ns: "Consensus.LeiosKernel" with EB/Vote in data
         if "LeiosKernel" in ns or "LeiosPeer" in ns:
             kind = event_data.get("kind", "")
-            if "IB" in kind or "InputBlock" in kind:
-                event_type = (
-                    "created"
-                    if "created" in kind.lower() or "generate" in kind.lower()
-                    else "received"
-                )
-                return BlockEvent(
-                    timestamp=ts,
-                    node=node_name,
-                    event_type=event_type,
-                    block_hash=event_data.get("hash", event_data.get("id", "unknown")),
-                    slot=event_data.get("slot", 0),
-                    block_type="ib",
-                )
             if "EB" in kind or "EndorserBlock" in kind:
                 event_type = (
                     "created"
@@ -239,15 +221,6 @@ def compute_metrics(log_dir: str = "/logs") -> Metrics:
                         block_received_times[event.block_hash] = []
                     block_received_times[event.block_hash].append(event.timestamp)
 
-            elif event.block_type == "ib":
-                if event.event_type == "created":
-                    metrics.leios_ibs_created += 1
-                    block_created_times[event.block_hash] = event.timestamp
-                else:
-                    if event.block_hash not in block_received_times:
-                        block_received_times[event.block_hash] = []
-                    block_received_times[event.block_hash].append(event.timestamp)
-
             elif event.block_type == "eb":
                 if event.event_type == "created":
                     metrics.leios_ebs_created += 1
@@ -256,21 +229,13 @@ def compute_metrics(log_dir: str = "/logs") -> Metrics:
                 if event.event_type == "created":
                     metrics.leios_votes_created += 1
 
-    # Compute latencies
+    # Compute Praos latencies
     for block_hash, created_time in block_created_times.items():
         if block_hash in block_received_times:
             for received_time in block_received_times[block_hash]:
                 latency_ms = (received_time - created_time).total_seconds() * 1000
                 if latency_ms > 0:  # Only positive latencies
-                    # Determine block type from hash pattern (simplified)
-                    if any(
-                        e.block_type == "praos"
-                        for e in events
-                        if e.block_hash == block_hash
-                    ):
-                        metrics.praos_latencies_ms.append(latency_ms)
-                    else:
-                        metrics.leios_latencies_ms.append(latency_ms)
+                    metrics.praos_latencies_ms.append(latency_ms)
 
     return metrics
 
@@ -307,7 +272,6 @@ if __name__ == "__main__":
     metrics = compute_metrics()
     print(f"Praos blocks created: {metrics.praos_blocks_created}")
     print(f"Praos blocks received: {metrics.praos_blocks_received}")
-    print(f"Leios IBs created: {metrics.leios_ibs_created}")
     print(f"Leios EBs created: {metrics.leios_ebs_created}")
     print(f"Leios votes created: {metrics.leios_votes_created}")
 

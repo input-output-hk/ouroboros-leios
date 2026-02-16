@@ -56,20 +56,16 @@ def report_assertions(metrics, praos_threshold_ms: float):
             log(f"[{status}] {message}")
 
     # Leios blocks received assertion (sometimes)
-    leios_total = metrics.leios_ibs_created + metrics.leios_ebs_created
     if ANTITHESIS_AVAILABLE:
         sometimes(
-            leios_total > 0,
-            "Leios blocks were created",
+            metrics.leios_ebs_created > 0,
+            "Leios endorser blocks (EBs) were created",
             {
-                "ibs_created": metrics.leios_ibs_created,
                 "ebs_created": metrics.leios_ebs_created,
             },
         )
     else:
-        log(
-            f"Leios blocks created: IBs={metrics.leios_ibs_created}, EBs={metrics.leios_ebs_created}"
-        )
+        log(f"Leios blocks created: EBs={metrics.leios_ebs_created}")
 
     # Praos blocks flowing assertion
     if ANTITHESIS_AVAILABLE:
@@ -131,7 +127,7 @@ def main():
                 f"Praos blocks: created={metrics.praos_blocks_created}, received={metrics.praos_blocks_received}"
             )
             log(
-                f"Leios: IBs={metrics.leios_ibs_created}, EBs={metrics.leios_ebs_created}, votes={metrics.leios_votes_created}"
+                f"Leios: EBs={metrics.leios_ebs_created}, votes={metrics.leios_votes_created}"
             )
 
             praos_stats = get_latency_stats(metrics.praos_latencies_ms)
