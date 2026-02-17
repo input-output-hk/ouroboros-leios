@@ -41,10 +41,17 @@ def read_scenario(filepath):
     
     G = nx.DiGraph()
     
+    # Global defaults for fallback
+    default_verify = params.get('cost_verify', 0)
+    default_apply = params.get('cost_apply', 0)
+    
     for tx_hash, attrs in raw_dag.items():
         G.add_node(tx_hash, 
                    type=attrs['type'], 
-                   arrival_delay=attrs.get('arrival_delay', 0))
+                   arrival_delay=attrs.get('arrival_delay', 0),
+                   # Read per-transaction costs, fall back to global default
+                   cost_verify=attrs.get('cost_verify', default_verify),
+                   cost_apply=attrs.get('cost_apply', default_apply))
         
         inputs = attrs.get('inputs', {})
         if isinstance(inputs, dict):
@@ -56,7 +63,7 @@ def read_scenario(filepath):
             
         for parent_hash in parents:
             G.add_edge(parent_hash, tx_hash)
-            
+
     return params, G
 
 def generate_dummy_file(filepath):
@@ -67,16 +74,41 @@ def generate_dummy_file(filepath):
             "delta_rh": 10000,
             "delta_rb": 5000,
             "delta_eh": 5000,
+            # Global defaults (optional, used if not on node)
             "cost_verify": 4000,
             "cost_apply": 6000,
             "cost_vote": 2000
         },
         "dag": {
-            "0xRB_Root1": {"type": "RB", "arrival_delay": 0, "inputs": []},
-            "0xRB_Root2": {"type": "RB", "arrival_delay": 0, "inputs": []},
-            "0xEH_Child1": {"type": "EH", "arrival_delay": 2000, "inputs": {"0": "0xRB_Root1", "1": "0xRB_Root2"}},
-            "0xEH_Child2": {"type": "EH", "arrival_delay": 8000, "inputs": {"0": "0xRB_Root2"}},
-            "0xEH_GrandChild1": {"type": "EH", "arrival_delay": 12000, "inputs": {"0": "0xEH_Child1"}}
+            "0xRB_Root1": {
+                "type": "RB", 
+                "arrival_delay": 1230, 
+                "inputs": [],
+                "cost_verify": 3500, # Specific cost
+                "cost_apply": 5500
+            },
+            "0xRB_Root2": {
+                "type": "RB", 
+                "arrival_delay": 4710, 
+                "inputs": [] # Uses defaults
+            },
+            "0xEH_Child1": {
+                "type": "EH", 
+                "arrival_delay": 2000, 
+                "inputs": {"0": "0xRB_Root1", "1": "0xRB_Root2"},
+                "cost_verify": 4200,
+                "cost_apply": 6100
+            },
+            "0xEH_Child2": {
+                "type": "EH", 
+                "arrival_delay": 8000, 
+                "inputs": {"0": "0xRB_Root2"}
+            },
+            "0xEH_GrandChild1": {
+                "type": "EH", 
+                "arrival_delay": 12000, 
+                "inputs": {"0": "0xEH_Child1"}
+            }
         }
     }
     
@@ -319,8 +351,13 @@ def solve_system(params, dag):
     t_rb = t_rh + params['delta_rb']
     t_eh = t_rh + params['delta_eh']
     
+    # Calculate Horizon
+    # We now must sum up individual costs since they vary
+    total_verify = sum(d['cost_verify'] for n, d in dag.nodes(data=True))
+    total_apply = sum(d['cost_apply'] for n, d in dag.nodes(data=True))
+    total_ops = total_verify + total_apply + params['cost_vote']
+    
     count_tx = len(dag.nodes)
-    total_ops = count_tx * (params['cost_verify'] + params['cost_apply']) + params['cost_vote']
     max_node_delay = max([d['arrival_delay'] for n, d in dag.nodes(data=True)]) if count_tx > 0 else 0
     max_arrival = max(t_rb, t_eh + max_node_delay)
     
@@ -334,6 +371,10 @@ def solve_system(params, dag):
         attrs = dag.nodes[node_id]
         node_type = attrs['type']
         
+        # Get specific costs (already populated by read_scenario)
+        cost_v = attrs['cost_verify']
+        cost_a = attrs['cost_apply']
+        
         if node_type == 'RB':
             arrival_time = t_rb
         else:
@@ -342,14 +383,14 @@ def solve_system(params, dag):
         # Verify
         v_start = model.NewIntVar(arrival_time, horizon, f'v_s_{node_id}')
         v_end = model.NewIntVar(0, horizon, f'v_e_{node_id}')
-        v_interval = model.NewIntervalVar(v_start, params['cost_verify'], v_end, f'iv_v_{node_id}')
+        v_interval = model.NewIntervalVar(v_start, cost_v, v_end, f'iv_v_{node_id}')
         all_intervals.append(v_interval)
         task_metadata[f'iv_v_{node_id}'] = {'type': 'Ver', 'id': node_id}
 
         # Apply
         a_start = model.NewIntVar(0, horizon, f'a_s_{node_id}')
         a_end = model.NewIntVar(0, horizon, f'a_e_{node_id}')
-        a_interval = model.NewIntervalVar(a_start, params['cost_apply'], a_end, f'iv_a_{node_id}')
+        a_interval = model.NewIntervalVar(a_start, cost_a, a_end, f'iv_a_{node_id}')
         all_intervals.append(a_interval)
         apply_end_vars[node_id] = a_end
         task_metadata[f'iv_a_{node_id}'] = {'type': 'App', 'id': node_id}
