@@ -191,27 +191,31 @@ def compute_schedule(solver, meta, intervals, makespan_var, params):
         
     return solver.Value(makespan_var), tasks
 
-def print_schedule(makespan, tasks, stats):
-    print(f"\nFinal t1 (Makespan): {makespan} µs")
-    print("-" * 75)
-    print(f"{'CPU':<4} | {'Time (µs)':<15} | {'Task'}")
-    print("-" * 75)
+def print_schedule_table(tasks, file=sys.stdout):
+    """Prints the detailed schedule table."""
+    print(f"\nSCHEDULE TABLE", file=file)
+    print("-" * 75, file=file)
+    print(f"{'CPU':<4} | {'Time (µs)':<15} | {'Task'}", file=file)
+    print("-" * 75, file=file)
     tasks_sorted = sorted(tasks, key=lambda x: (x['cpu'], x['start']))
     for t in tasks_sorted:
         time_str = f"{t['start']} -> {t['end']}"
-        print(f"{t['cpu']:<4} | {time_str:<15} | {t['desc']}")
-    
-    print("\n" + "="*40)
-    print("PERFORMANCE STATISTICS")
-    print("="*40)
-    print(f"CPU Utilization:       {stats['cpu_utilization']:.1%}")
-    print(f"Wallclock Idle:        {stats['fraction_wallclock_idle']:.1%} ({stats['wallclock_idle']} µs)")
-    print("-" * 40)
-    print(f"{'Phase':<6} | {'Work %':<8} | {'Parallelism':<11}")
-    print("-" * 40)
+        print(f"{t['cpu']:<4} | {time_str:<15} | {t['desc']}", file=file)
+
+def print_statistics(makespan, stats, file=sys.stderr):
+    """Prints the summary statistics."""
+    print(f"\nFinal t1 (Makespan): {makespan} µs", file=file)
+    print("="*40, file=file)
+    print("PERFORMANCE STATISTICS", file=file)
+    print("="*40, file=file)
+    print(f"CPU Utilization:       {stats['cpu_utilization']:.1%}", file=file)
+    print(f"Wallclock Idle:        {stats['fraction_wallclock_idle']:.1%} ({stats['wallclock_idle']} µs)", file=file)
+    print("-" * 40, file=file)
+    print(f"{'Phase':<6} | {'Work %':<8} | {'Parallelism':<11}", file=file)
+    print("-" * 40, file=file)
     for p, data in stats['phases'].items():
-        print(f"{p:<6} | {data['fraction_of_total_work']:<8.1%} | {data['avg_parallelism']:<11.2f}")
-    print("="*40)
+        print(f"{p:<6} | {data['fraction_of_total_work']:<8.1%} | {data['avg_parallelism']:<11.2f}", file=file)
+    print("="*40, file=file)
 
 def write_schedule_yaml(filepath, makespan, tasks, params, stats):
     if yaml is None: return
@@ -375,7 +379,7 @@ def solve_system(params, dag):
         stats = calculate_statistics(makespan, schedule, params)
         return makespan, schedule, stats
     else:
-        print("No optimal solution found.")
+        print("No optimal solution found.", file=sys.stderr)
         return None
 
 # ==========================================
@@ -410,24 +414,27 @@ def main():
         sys.exit(0)
 
     # 1. Read
-    print(f"Reading scenario from {args.input_file}...")
+    print(f"Reading scenario from {args.input_file}...", file=sys.stderr)
     try:
         params, dag = read_scenario(args.input_file)
     except FileNotFoundError:
-        print(f"Error: File '{args.input_file}' not found.")
+        print(f"Error: File '{args.input_file}' not found.", file=sys.stderr)
         sys.exit(1)
     
     # 2. Solve
-    print(f"Solving for {len(dag.nodes)} transactions on {params['n_cpu']} CPUs...")
+    print(f"Solving for {len(dag.nodes)} transactions on {params['n_cpu']} CPUs...", file=sys.stderr)
     result = solve_system(params, dag)
     
     if result:
         makespan, schedule, stats = result
-        print(f"Success! Minimum Makespan: {makespan} µs")
         
         # 3. Output
+        # Statistics always go to stderr
+        print_statistics(makespan, stats, file=sys.stderr)
+        
+        # Verbose schedule always goes to stdout
         if args.verbose:
-            print_schedule(makespan, schedule, stats)
+            print_schedule_table(schedule, file=sys.stdout)
             
         if args.out_yaml:
             write_schedule_yaml(args.out_yaml, makespan, schedule, params, stats)
@@ -440,10 +447,6 @@ def main():
             
         if args.out_csv:
             write_csv(args.out_csv, schedule)
-            
-        # If no output flags given, suggest verbose
-        if not (args.out_yaml or args.out_trace or args.out_gantt or args.out_csv or args.verbose):
-            print("Note: No output files specified. Use -v to see schedule or --out-yaml/trace/gantt/csv to save.")
             
     else:
         sys.exit(1)
