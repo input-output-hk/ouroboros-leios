@@ -1,6 +1,7 @@
 import json
 import sys
 import csv
+import argparse
 import networkx as nx
 from ortools.sat.python import cp_model
 
@@ -63,19 +64,19 @@ def generate_dummy_file(filepath):
     data = {
         "parameters": {
             "n_cpu": 2,
-            "delta_rh": 10,
-            "delta_rb": 5,
-            "delta_eh": 5,
-            "cost_verify": 4,
-            "cost_apply": 6,
-            "cost_vote": 2
+            "delta_rh": 10000,
+            "delta_rb": 5000,
+            "delta_eh": 5000,
+            "cost_verify": 4000,
+            "cost_apply": 6000,
+            "cost_vote": 2000
         },
         "dag": {
             "0xRB_Root1": {"type": "RB", "arrival_delay": 0, "inputs": []},
             "0xRB_Root2": {"type": "RB", "arrival_delay": 0, "inputs": []},
-            "0xEH_Child1": {"type": "EH", "arrival_delay": 2, "inputs": {"0": "0xRB_Root1", "1": "0xRB_Root2"}},
-            "0xEH_Child2": {"type": "EH", "arrival_delay": 8, "inputs": {"0": "0xRB_Root2"}},
-            "0xEH_GrandChild1": {"type": "EH", "arrival_delay": 12, "inputs": {"0": "0xEH_Child1"}}
+            "0xEH_Child1": {"type": "EH", "arrival_delay": 2000, "inputs": {"0": "0xRB_Root1", "1": "0xRB_Root2"}},
+            "0xEH_Child2": {"type": "EH", "arrival_delay": 8000, "inputs": {"0": "0xRB_Root2"}},
+            "0xEH_GrandChild1": {"type": "EH", "arrival_delay": 12000, "inputs": {"0": "0xEH_Child1"}}
         }
     }
     
@@ -110,7 +111,6 @@ def calculate_statistics(makespan, tasks, params):
     }
     
     # Phase Analysis
-    # We group by type: 'Ver', 'App', 'Vote'
     phases = ['Ver', 'App', 'Vote']
     phase_stats = {}
     
@@ -138,8 +138,7 @@ def calculate_statistics(makespan, tasks, params):
         }
     stats["phases"] = phase_stats
     
-    # Wallclock Idle Time (Time where 0 CPUs are active)
-    # Calculated by merging all task intervals and subtracting from makespan
+    # Wallclock Idle Time
     sorted_tasks = sorted(tasks, key=lambda x: x['start'])
     active_ranges = []
     
@@ -147,10 +146,8 @@ def calculate_statistics(makespan, tasks, params):
         curr_start, curr_end = sorted_tasks[0]['start'], sorted_tasks[0]['end']
         for t in sorted_tasks[1:]:
             if t['start'] < curr_end:
-                # Overlap or adjacent, extend current range
                 curr_end = max(curr_end, t['end'])
             else:
-                # Gap detected, save current range
                 active_ranges.append((curr_start, curr_end))
                 curr_start, curr_end = t['start'], t['end']
         active_ranges.append((curr_start, curr_end))
@@ -195,20 +192,20 @@ def compute_schedule(solver, meta, intervals, makespan_var, params):
     return solver.Value(makespan_var), tasks
 
 def print_schedule(makespan, tasks, stats):
-    print(f"\nFinal t1 (Makespan): {makespan}")
+    print(f"\nFinal t1 (Makespan): {makespan} µs")
     print("-" * 75)
-    print(f"{'CPU':<4} | {'Time':<12} | {'Task'}")
+    print(f"{'CPU':<4} | {'Time (µs)':<15} | {'Task'}")
     print("-" * 75)
     tasks_sorted = sorted(tasks, key=lambda x: (x['cpu'], x['start']))
     for t in tasks_sorted:
         time_str = f"{t['start']} -> {t['end']}"
-        print(f"{t['cpu']:<4} | {time_str:<12} | {t['desc']}")
+        print(f"{t['cpu']:<4} | {time_str:<15} | {t['desc']}")
     
     print("\n" + "="*40)
     print("PERFORMANCE STATISTICS")
     print("="*40)
     print(f"CPU Utilization:       {stats['cpu_utilization']:.1%}")
-    print(f"Wallclock Idle:        {stats['fraction_wallclock_idle']:.1%} ({stats['wallclock_idle']} ticks)")
+    print(f"Wallclock Idle:        {stats['fraction_wallclock_idle']:.1%} ({stats['wallclock_idle']} µs)")
     print("-" * 40)
     print(f"{'Phase':<6} | {'Work %':<8} | {'Parallelism':<11}")
     print("-" * 40)
@@ -240,7 +237,8 @@ def write_schedule_yaml(filepath, makespan, tasks, params, stats):
 def write_chrome_trace(filepath, tasks):
     trace_events = []
     for t in tasks:
-        scale = 1000
+        # Scale = 1 because units are already microseconds
+        scale = 1
         event = {
             "name": t['desc'],
             "cat": t['type'],
@@ -292,8 +290,8 @@ def plot_gantt(tasks, makespan, params, filename="gantt.png"):
     ax.set_ylim(-1, params['n_cpu'])
     ax.set_yticks(range(params['n_cpu']))
     ax.set_yticklabels([f"CPU {i}" for i in range(params['n_cpu'])])
-    ax.set_xlabel("Time (ticks)")
-    ax.set_title(f"Transaction Processing Schedule (Makespan: {makespan})")
+    ax.set_xlabel("Time (µs)")
+    ax.set_title(f"Transaction Processing Schedule (Makespan: {makespan} µs)")
     ax.grid(True, axis='x', linestyle='--', alpha=0.5)
     ax.legend(handles=legend_patches, loc='upper right')
     
@@ -304,7 +302,13 @@ def plot_gantt(tasks, makespan, params, filename="gantt.png"):
 # ==========================================
 # 3. SOLVER
 # ==========================================
-def solve_system(params, dag, output_yaml_path=None, trace_path=None, gantt_path=None, csv_path=None):
+def solve_system(params, dag):
+    """
+    Solves the scheduling problem.
+    Returns (makespan, schedule_list, stats_dict) on success.
+    Returns None on failure.
+    Does NO file I/O.
+    """
     model = cp_model.CpModel()
     
     t_rh = params['delta_rh']
@@ -369,33 +373,80 @@ def solve_system(params, dag, output_yaml_path=None, trace_path=None, gantt_path
     if status == cp_model.OPTIMAL:
         makespan, schedule = compute_schedule(solver, task_metadata, all_intervals, vt_end, params)
         stats = calculate_statistics(makespan, schedule, params)
-        
-        print_schedule(makespan, schedule, stats)
-        
-        if output_yaml_path:
-            write_schedule_yaml(output_yaml_path, makespan, schedule, params, stats)
-        if trace_path:
-            write_chrome_trace(trace_path, schedule)
-        if gantt_path:
-            plot_gantt(schedule, makespan, params, gantt_path)
-        if csv_path:
-            write_csv(csv_path, schedule)
+        return makespan, schedule, stats
     else:
         print("No optimal solution found.")
+        return None
 
 # ==========================================
-# MAIN
+# MAIN (CLI)
 # ==========================================
-if __name__ == "__main__":
-    input_yaml = "scenario.yaml"
-    output_yaml = "results.yaml"
-    trace_json = "trace.json"
-    gantt_png = "schedule.png"
-    results_csv = "schedule.csv"
+def main():
+    parser = argparse.ArgumentParser(description="Blockchain Transaction Scheduler")
+    parser.add_argument("input_file", nargs='?', help="Input scenario file (JSON/YAML)")
     
-    generate_dummy_file(input_yaml)
-    print(f"Reading scenario from {input_yaml}...")
-    params, dag = read_scenario(input_yaml)
+    # Utilities
+    parser.add_argument("--generate-dummy", metavar="FILE", help="Generate a dummy input file and exit")
     
+    # Outputs
+    parser.add_argument("--out-yaml", metavar="FILE", help="Path to output YAML results")
+    parser.add_argument("--out-trace", metavar="FILE", help="Path to output Chrome Trace JSON")
+    parser.add_argument("--out-gantt", metavar="FILE", help="Path to output Gantt chart PNG")
+    parser.add_argument("--out-csv", metavar="FILE", help="Path to output CSV results")
+    
+    # Flags
+    parser.add_argument("-v", "--verbose", action="store_true", help="Print schedule to stdout")
+    
+    args = parser.parse_args()
+    
+    # Mode 1: Generator
+    if args.generate_dummy:
+        generate_dummy_file(args.generate_dummy)
+        return
+
+    # Mode 2: Solver
+    if not args.input_file:
+        parser.print_help()
+        sys.exit(0)
+
+    # 1. Read
+    print(f"Reading scenario from {args.input_file}...")
+    try:
+        params, dag = read_scenario(args.input_file)
+    except FileNotFoundError:
+        print(f"Error: File '{args.input_file}' not found.")
+        sys.exit(1)
+    
+    # 2. Solve
     print(f"Solving for {len(dag.nodes)} transactions on {params['n_cpu']} CPUs...")
-    solve_system(params, dag, output_yaml, trace_json, gantt_png, results_csv)
+    result = solve_system(params, dag)
+    
+    if result:
+        makespan, schedule, stats = result
+        print(f"Success! Minimum Makespan: {makespan} µs")
+        
+        # 3. Output
+        if args.verbose:
+            print_schedule(makespan, schedule, stats)
+            
+        if args.out_yaml:
+            write_schedule_yaml(args.out_yaml, makespan, schedule, params, stats)
+            
+        if args.out_trace:
+            write_chrome_trace(args.out_trace, schedule)
+            
+        if args.out_gantt:
+            plot_gantt(schedule, makespan, params, args.out_gantt)
+            
+        if args.out_csv:
+            write_csv(args.out_csv, schedule)
+            
+        # If no output flags given, suggest verbose
+        if not (args.out_yaml or args.out_trace or args.out_gantt or args.out_csv or args.verbose):
+            print("Note: No output files specified. Use -v to see schedule or --out-yaml/trace/gantt/csv to save.")
+            
+    else:
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
