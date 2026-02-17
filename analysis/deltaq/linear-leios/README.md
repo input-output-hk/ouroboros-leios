@@ -3,7 +3,11 @@
 The library provides a [DeltaQ](https://github.com/DeltaQ-SD/deltaq/) model for Linear Leios.
 
 ## DeltaQ backend
-The piecewise-polynomial backend in DeltaQ is [not built for modeling complex systems](https://github.com/DeltaQ-SD/deltaq/blob/main/doc/reports/artefact-A4.md#conclusion-and-next-steps). Due to this restriction, for running the model for Linear Leios we implemented a new, [experimental backend](https://github.com/yveshauser/deltaq/blob/experimental/lib/deltaq/src/DeltaQ/Sampled.hs) for DeltaQ that operates on discrete values representing a probability distribution.
+The piecewise-polynomial backend in DeltaQ is [not built for modeling complex systems](https://github.com/DeltaQ-SD/deltaq/blob/main/doc/reports/artefact-A4.md#conclusion-and-next-steps). In order to allow running complex models as well we implemented an [approximation backend](https://github.com/yveshauser/deltaq/blob/experimental/lib/deltaq/src/DeltaQ/Sampled.hs) for DeltaQ that operates on discrete values representing a probability distribution.
+
+## Praos DeltaQ analysis
+
+The block diffusion model used in this library has been taken from the [Praos model](https://github.com/intersectMBO/cardano-formal-specifications/src/performance/app/PraosModel.lhs) and updated with estimates from the Leios topology-checker tools. The Praos model will be replaced with new, accurate model that takes into account the transactions and the mem-pool, as soon as this is available.
 
 ## Linear Leios DeltaQ analysis
 
@@ -14,7 +18,15 @@ The DeltaQ analysis of linear Leios validates the following assumptions:
 
 ### Parameter estimates
 
+Running the parameter estimation is done as follows:
+
+```
+$ cabal run leios-deltaq-analysis estimates
+```
+
 #### $L\_{hdr}$
+
+The parameter $L\_{hdr}$ needs to be large enough to allow successful RB header diffusion.
 
 #### $L\_{vote}$
 
@@ -26,6 +38,8 @@ The parameter $L\_{vote}$ needs to be chosen carefully, because if the length of
 The first item depends on the block/vote diffusion times, whereas second item depends only on the Praos schedule.
 
 #### $L\_{diff}$
+
+$L\_{diff}$ ...
 
 ### Statistics
 
@@ -40,20 +54,18 @@ The statistisics depend on the protocol parameters and other configurations. The
 |`pCertified`|`pInterruptedByNewBlock`, `pQuorum`|Probability that there is a certificate in the next RB|
 |`eCertified`|$L\_{hdr}$, $L\_{vote}$, $L\_{diff}$|Expected time for next certified block|
 
-### Plots
-
-![](docs/validateEB.svg)
-
-## Running the code
-
-Run the analysis generate diagrams as follows:
+Run the statistics as follows:
 
 ```
 $ cabal run leios-deltaq-analysis stats
 ```
+
+### Plots
+
+![](docs/validateEB.svg)
+
+Generate the diagrams as follows:
+
 ```
 $ cabal run leios-deltaq-analysis plots
-```
-```
-$ cabal run leios-deltaq-analysis estimates
 ```
