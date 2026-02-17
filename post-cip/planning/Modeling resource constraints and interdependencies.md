@@ -37,7 +37,7 @@ The Linear Leios engineering effort and the broader technical community can use 
 ### [#659](https://github.com/input-output-hk/ouroboros-leios/issues/659) Modeling resource constraints
 
 - [x] [#660](https://github.com/input-output-hk/ouroboros-leios/issues/660) Regression models for `Apply`, `Reapply`, and their difference.
-- [ ] [#661](https://github.com/input-output-hk/ouroboros-leios/issues/661) Mathematical model of constraints on Linear Leios.
+- [x] [#661](https://github.com/input-output-hk/ouroboros-leios/issues/661) Mathematical model of constraints on Linear Leios.
 	- Model definition
 		- Independent variables.
 			- Protocol parameters
