@@ -1,5 +1,6 @@
 import json
 import sys
+import csv  # Added csv module
 import networkx as nx
 from ortools.sat.python import cp_model
 
@@ -189,6 +190,20 @@ def write_chrome_trace(filepath, tasks):
     print(f"Chrome Trace written to: {filepath}")
     print("  -> Open https://ui.perfetto.dev/ and load this file to visualize.")
 
+def write_csv(filepath, tasks):
+    """
+    Writes the schedule to CSV format. 
+    Compatible with Grafana/Excel/Pandas.
+    """
+    with open(filepath, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['TaskID', 'Type', 'Description', 'CPU', 'Start', 'End', 'Duration'])
+        for t in tasks:
+            writer.writerow([
+                t['raw_id'], t['type'], t['desc'], t['cpu'], t['start'], t['end'], t['end'] - t['start']
+            ])
+    print(f"CSV results written to: {filepath}")
+
 def plot_gantt(tasks, makespan, params, filename="gantt.png"):
     """Generates a static Gantt chart using Matplotlib."""
     if not MATPLOTLIB_AVAILABLE:
@@ -237,7 +252,7 @@ def plot_gantt(tasks, makespan, params, filename="gantt.png"):
 # ==========================================
 # 3. SOLVER
 # ==========================================
-def solve_system(params, dag, output_yaml_path=None, trace_path=None, gantt_path=None):
+def solve_system(params, dag, output_yaml_path=None, trace_path=None, gantt_path=None, csv_path=None):
     model = cp_model.CpModel()
     
     t_rh = params['delta_rh']
@@ -309,6 +324,8 @@ def solve_system(params, dag, output_yaml_path=None, trace_path=None, gantt_path
             write_chrome_trace(trace_path, schedule)
         if gantt_path:
             plot_gantt(schedule, makespan, params, gantt_path)
+        if csv_path:
+            write_csv(csv_path, schedule)
     else:
         print("No optimal solution found.")
 
@@ -320,6 +337,7 @@ if __name__ == "__main__":
     output_yaml = "results.yaml"
     trace_json = "trace.json"
     gantt_png = "schedule.png"
+    results_csv = "schedule.csv"
     
     # 1. Create dummy file if needed
     generate_dummy_file(input_yaml)
@@ -330,4 +348,4 @@ if __name__ == "__main__":
     
     # 3. Solve
     print(f"Solving for {len(dag.nodes)} transactions on {params['n_cpu']} CPUs...")
-    solve_system(params, dag, output_yaml, trace_json, gantt_png)
+    solve_system(params, dag, output_yaml, trace_json, gantt_png, results_csv)
