@@ -25,3 +25,127 @@
 
 Overall, we have a large DAG of computations where the `RB` event reveals the DAG, but the individual `TBi` events incrementally extend the DAG. The `TBi` events occur in an arbitrary, externally specified sequence after the `EH` event. The $c_\text{verify}$ process can occur completely in parallel after either the `RB` or `TBi` event, but the $c_\text{apply}$ process can only occur after the upstream part of the DAG is applied. All of the time delays and CPU delays are specified externally. We want to schedule the work subject to the $n_\text{CPU}$ constraint in order to minimize $t_1$.
 
+## Mathematical model
+
+This document describes the Constraint Programming (CP) model used to schedule the validation and application of blockchain transactions on a finite number of CPUs.
+
+### Parameters and constants
+
+#### System configuration
+
+- $N_{CPU}$: The number of available CPUs.
+- $T_0 = 0$: System start time.
+
+#### Event triggers
+
+- $\Delta t_{RH}$: Delay until Reference Header ($RH$) arrival.
+- $\Delta t_{RB}$: Delay from $RH$ until Reference Block ($RB$) arrival.
+- $\Delta t_{EH}$: Delay from $RH$ until Endorsement Header ($EH$) arrival.
+  
+#### Transaction data
+
+Let $\mathcal{T}$ be the set of all transactions. For each transaction $i \in \mathcal{T}$:
+
+- $Type_i \in \{RB, EH\}$: The source type of the transaction.
+- $\Delta t_{TB,i}$: Additional arrival delay for transaction $i$ (only relevant if $Type_i = EH$; for RB, this is effectively 0).
+- $D_{V,i}$: CPU time required to verify transaction $i$ ($c_{\text{verify}, i}$).
+- $D_{A,i}$: CPU time required to apply transaction $i$ to the ledger ($c_{\text{apply}, i}$).
+- $\mathcal{P}_i$: The set of parent transactions (inputs) that $i$ depends on in the DAG.
+
+####  Global tasks
+
+- $D_{Vote}$: CPU time required for the final voting step ($c_{\text{vote}}$).
+
+### Derived parameters
+
+#### Absolute arrival times
+
+The time at which the data for transaction $i$ is physically available to the system, denoted as $Arr_i$:
+
+$$T_{RH} = \Delta t_{RH}$$$$T_{RB} = T_{RH} + \Delta t_{RB}$$$$T_{EH} = T_{RH} + \Delta t_{EH}$$$$Arr_i = \begin{cases} T_{RB} & \text{if } Type_i = RB \\ T_{EH} + \Delta t_{TB,i} & \text{if } Type_i = EH \end{cases}$$
+
+### Decision variables
+
+We define interval variables representing the start ($s$) and end ($e$) times for the tasks associated with each transaction. For each transaction $i \in \mathcal{T}$:
+
+- **Verification task**: $V_i = [s_{V,i}, e_{V,i})$  
+- **Application task**: $A_i = [s_{A,i}, e_{A,i})$  
+  
+For the global process:
+
+- **Vote task**: $VT = [s_{VT}, e_{VT})$  
+
+### Constraints
+
+#### Interval consistency
+
+Tasks must run for their specified durations.
+
+$$e_{V,i} = s_{V,i} + D_{V,i} \quad \forall i \in \mathcal{T}$$$$e_{A,i} = s_{A,i} + D_{A,i} \quad \forall i \in \mathcal{T}$$$$e_{VT} = s_{VT} + D_{Vote}$$
+
+#### Data availability (verification)
+
+Verification cannot start before the transaction data arrives.
+
+$$s_{V,i} \ge Arr_i \quad \forall i \in \mathcal{T}$$
+
+#### Pipeline dependency (verify ⟶ apply)
+
+A transaction cannot be applied to the ledger until its cryptographic verification is complete.
+
+$$s_{A,i} \ge e_{V,i} \quad \forall i \in \mathcal{T}$$
+
+#### DAG dependency (UTXO logic)
+
+A transaction cannot be applied to the ledger until all its inputs (parents) have been applied.
+
+$$s_{A,i} \ge e_{A,j} \quad \forall i \in \mathcal{T}, \forall j \in \mathcal{P}_i$$
+
+#### Global synchronization (vote)
+
+The final vote can only occur after all transactions have been applied to the ledger.
+
+$$s_{VT} \ge e_{A,i} \quad \forall i \in \mathcal{T}$$
+
+#### Cumulative resource constraint
+
+At any instant in time $t$, the number of active tasks must not exceed the number of CPUs. Let $\mathbb{1}_I(t)$ be an indicator function that is 1 if time $t$ falls within interval $I$, and 0 otherwise.
+
+$$\sum_{i \in \mathcal{T}} \left( \mathbb{1}_{V_i}(t) + \mathbb{1}_{A_i}(t) \right) + \mathbb{1}_{VT}(t) \le N_{CPU} \quad \forall t \ge 0$$
+
+### Objective function
+
+We seek to minimize the final completion time ("makespan") of the entire process, defined as the end time of the voting task.
+
+$$\text{Minimize } \quad e_{VT}$$
+
+### Performance statistics
+
+After the schedule is determined, we compute the following post-hoc statistics to analyze system efficiency.
+
+#### Basic metrics
+
+- **Makespan (**$M$**)**: The final completion time,$M = e_{VT}$.
+- **Total Capacity (**$C_{total}$**)**: The total CPU cycles available during the makespan,$C_{total} = M \times N_{CPU}$.
+- **Total Work (**$W_{total}$**)**: The sum of all processing durations, $W_{total} = \sum_{i \in \mathcal{T}} (D_{V,i} + D_{A,i}) + D_{Vote}$.
+- **CPU Utilization (**$U$**)**: The fraction of total capacity that was actively used, $U = \frac{W_{total}}{C_{total}}$.
+
+#### Idle time
+
+- **Wallclock idle time (**$I_{wall}$**)**: The total duration where _zero_ CPUs were active, $I_{wall} = M - \text{Measure}\left( \bigcup_{I \in \mathcal{I}_{all}} I \right)$, where $\mathcal{I}_{all}$ is the set of all task intervals $\{V_i\} \cup \{A_i\} \cup \{VT\}$.
+
+#### Phase analysis
+
+We define three phases: $\Phi_{Ver} = \{V_i\}_{\forall i}$, $\Phi_{App} = \{A_i\}_{\forall i}$, and $\Phi_{Vote} = \{VT\}$. For each phase $P \in \{\Phi_{Ver}, \Phi_{App}, \Phi_{Vote}\}$:
+
+- **Phase work (**$W_P$**)**:$W_P = \sum_{task \in P} D_{task}$.
+- **Phase fraction (**$F_P$**)**:$F_P = \frac{W_P}{W_{total}}$.
+- **Phase wallclock Duration (**$L_P$**)**: $L_P = \max_{task \in P}(e_{task}) - \min_{task \in P}(s_{task})$.
+- **Average Parallelism (**$\pi_P$**)**: $\pi_P = \frac{W_P}{L_P}$.
+
+## Solution Method
+
+This problem is modeled as a **Constraint Programming (CP)** problem and solved using the **Google OR-Tools CP-SAT Solver**. The CP-SAT solver utilizes **Lazy Clause Generation (LCG)**, a hybrid technique that combines the high-level modeling power of Constraint Programming with the efficient search capabilities of Boolean Satisfiability (SAT) solvers. Instead of statically converting the entire problem into boolean clauses, the solver lazily generates clauses during the search process to explain variable domain reductions and conflicts. Key components of the solution method include:
+
+- **Cumulative Constraint Propagators**: The resource limit ($N_{CPU}$) is enforced using specialized propagators such as **Time Tabling** and **Edge Finding**. These algorithms analyze the energy of tasks within a time window to deduce stronger bounds on start times (e.g., proving that a subset of tasks cannot possibly start before a certain time $t$ without violating the resource limit).
+- **Conflict-Driven Clause Learning (CDCL)**: When the solver encounters an infeasible state (conflict), it analyzes the implication graph to learn a new "nogood" clause. This clause permanently prunes the search space, preventing the solver from making the same combination of mistakes again.
