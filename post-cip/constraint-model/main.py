@@ -25,6 +25,8 @@ def read_scenario(filepath):
     """
     Reads parameters and DAG from a JSON or YAML file.
     Supports .json, .yaml, and .yml extensions.
+    
+    Raises ValueError if required attributes or parameters are missing.
     """
     if filepath.lower().endswith(('.yaml', '.yml')):
         if yaml is None:
@@ -36,34 +38,70 @@ def read_scenario(filepath):
         with open(filepath, 'r') as f:
             data = json.load(f)
 
+    # 1. Validate Top-Level Sections
+    if 'parameters' not in data:
+        raise ValueError(f"Input file '{filepath}' is missing the 'parameters' section.")
+    if 'dag' not in data:
+        raise ValueError(f"Input file '{filepath}' is missing the 'dag' section.")
+
     params = data['parameters']
     raw_dag = data['dag']
+
+    # 2. Validate Global Parameters
+    # cost_verify/apply are optional here if they exist on every node, 
+    # but the core timing params are mandatory.
+    required_params = ['n_cpu', 'delta_rh', 'delta_rb', 'delta_eh', 'cost_vote']
+    for p in required_params:
+        if p not in params:
+            raise ValueError(f"Missing required global parameter '{p}'.")
+
+    # Global defaults for fallback
+    default_verify = params.get('cost_verify')
+    default_apply = params.get('cost_apply')
     
     G = nx.DiGraph()
     
-    # Global defaults for fallback
-    default_verify = params.get('cost_verify', 0)
-    default_apply = params.get('cost_apply', 0)
-    
     for tx_hash, attrs in raw_dag.items():
+        # 3. Validate Node Attributes
+        required_node_attrs = ['type', 'arrival_delay', 'inputs']
+        for attr in required_node_attrs:
+            if attr not in attrs:
+                raise ValueError(f"Transaction '{tx_hash}' is missing required attribute '{attr}'.")
+
+        # 4. Resolve Costs (Strict check)
+        # Must exist on node OR exist globally
+        cost_verify = attrs.get('cost_verify')
+        if cost_verify is None:
+            if default_verify is not None:
+                cost_verify = default_verify
+            else:
+                raise ValueError(f"Transaction '{tx_hash}' missing 'cost_verify' and no global default provided.")
+
+        cost_apply = attrs.get('cost_apply')
+        if cost_apply is None:
+            if default_apply is not None:
+                cost_apply = default_apply
+            else:
+                raise ValueError(f"Transaction '{tx_hash}' missing 'cost_apply' and no global default provided.")
+
         G.add_node(tx_hash, 
                    type=attrs['type'], 
-                   arrival_delay=attrs.get('arrival_delay', 0),
-                   # Read per-transaction costs, fall back to global default
-                   cost_verify=attrs.get('cost_verify', default_verify),
-                   cost_apply=attrs.get('cost_apply', default_apply))
+                   arrival_delay=attrs['arrival_delay'],
+                   cost_verify=cost_verify,
+                   cost_apply=cost_apply)
         
-        inputs = attrs.get('inputs', {})
+        inputs = attrs['inputs']
+        
         if isinstance(inputs, dict):
             parents = inputs.values()
         elif isinstance(inputs, list):
             parents = inputs
         else:
-            parents = []
+            raise ValueError(f"Attribute 'inputs' for transaction '{tx_hash}' must be a list or a dictionary.")
             
         for parent_hash in parents:
             G.add_edge(parent_hash, tx_hash)
-
+            
     return params, G
 
 def generate_dummy_file(filepath):
@@ -82,14 +120,14 @@ def generate_dummy_file(filepath):
         "dag": {
             "0xRB_Root1": {
                 "type": "RB", 
-                "arrival_delay": 1230, 
+                "arrival_delay": 0, 
                 "inputs": [],
                 "cost_verify": 3500, # Specific cost
                 "cost_apply": 5500
             },
             "0xRB_Root2": {
                 "type": "RB", 
-                "arrival_delay": 4710, 
+                "arrival_delay": 0, 
                 "inputs": [] # Uses defaults
             },
             "0xEH_Child1": {
@@ -458,8 +496,8 @@ def main():
     print(f"Reading scenario from {args.input_file}...", file=sys.stderr)
     try:
         params, dag = read_scenario(args.input_file)
-    except FileNotFoundError:
-        print(f"Error: File '{args.input_file}' not found.", file=sys.stderr)
+    except (FileNotFoundError, ValueError) as e:
+        print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
     
     # 2. Solve
