@@ -1,4 +1,3 @@
-import { useLocation } from "@docusaurus/router";
 import type { Props } from "@theme/Footer/Layout";
 import clsx from "clsx";
 import { JSX } from "react";
@@ -9,26 +8,23 @@ export default function FooterLayout({
   logo,
   copyright,
 }: Props): JSX.Element {
-  const location = useLocation();
   return (
-    location.pathname !== "/" && (
-      <footer
-        className={clsx("footer", {
-          "footer--dark": style === "dark",
-        })}
-      >
-        <div className="container">
-          <div className="container-padding">
-            {links}
-            {(logo || copyright) && (
-              <div className="footer__bottom">
-                {logo && logo}
-                {copyright}
-              </div>
-            )}
-          </div>
+    <footer
+      className={clsx("footer", {
+        "footer--dark": style === "dark",
+      })}
+    >
+      <div className="container">
+        <div className="container-padding">
+          {links}
+          {(logo || copyright) && (
+            <div className="footer__bottom">
+              {logo && logo}
+              {copyright}
+            </div>
+          )}
         </div>
-      </footer>
-    )
+      </div>
+    </footer>
   );
 }
