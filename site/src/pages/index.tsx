@@ -449,11 +449,7 @@ export default function Home(): React.ReactElement {
         <iframe
           src="https://engineering.iog.io/leios"
           title="Leios"
-          style={{
-            width: "100%",
-            height: "5580px",
-            border: "none",
-          }}
+          className={styles.devTracker}
         />
         <LeiosSpecificationSection />
         <HowLeiosWorksSection />
