@@ -189,6 +189,51 @@ def write_chrome_trace(filepath, tasks):
     print(f"Chrome Trace written to: {filepath}")
     print("  -> Open https://ui.perfetto.dev/ and load this file to visualize.")
 
+def plot_gantt(tasks, makespan, params, filename="gantt.png"):
+    """Generates a static Gantt chart using Matplotlib."""
+    if not MATPLOTLIB_AVAILABLE:
+        print("Warning: Matplotlib not installed. Skipping Gantt chart.")
+        return
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+    
+    # Colors for different task types
+    colors = {'Ver': 'tab:blue', 'App': 'tab:orange', 'Vote': 'tab:green'}
+    legend_patches = []
+    for k, v in colors.items():
+        legend_patches.append(mpatches.Patch(color=v, label=k))
+
+    # Y-axis is CPU ID
+    # X-axis is Time
+    
+    for t in tasks:
+        c = colors.get(t['type'], 'gray')
+        # (start_time, cpu_index, duration, height)
+        # We plot bars horizontally
+        # y = t['cpu'], width = duration, left = start
+        ax.broken_barh([(t['start'], t['end'] - t['start'])], 
+                       (t['cpu'] - 0.4, 0.8), 
+                       facecolors=c, edgecolors='white')
+        
+        # Optional: Add text label if duration is long enough
+        if (t['end'] - t['start']) > 2:
+            mid_x = t['start'] + (t['end'] - t['start'])/2
+            mid_y = t['cpu']
+            ax.text(mid_x, mid_y, t['type'], ha='center', va='center', 
+                    color='white', fontsize=8, fontweight='bold')
+
+    ax.set_ylim(-1, params['n_cpu'])
+    ax.set_yticks(range(params['n_cpu']))
+    ax.set_yticklabels([f"CPU {i}" for i in range(params['n_cpu'])])
+    ax.set_xlabel("Time (ticks)")
+    ax.set_title(f"Transaction Processing Schedule (Makespan: {makespan})")
+    ax.grid(True, axis='x', linestyle='--', alpha=0.5)
+    ax.legend(handles=legend_patches, loc='upper right')
+    
+    plt.tight_layout()
+    plt.savefig(filename)
+    print(f"Gantt chart saved to: {filename}")
+
 # ==========================================
 # 3. SOLVER
 # ==========================================
