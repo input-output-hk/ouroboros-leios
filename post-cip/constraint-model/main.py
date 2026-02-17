@@ -1,6 +1,6 @@
 import json
 import sys
-import csv  # Added csv module
+import csv
 import networkx as nx
 from ortools.sat.python import cp_model
 
@@ -91,8 +91,78 @@ def generate_dummy_file(filepath):
     print(f"Generated sample file: {filepath}")
 
 # ==========================================
-# 2. OUTPUT & VISUALIZATION
+# 2. STATISTICS & OUTPUT
 # ==========================================
+def calculate_statistics(makespan, tasks, params):
+    """
+    Computes detailed performance metrics.
+    """
+    n_cpu = params['n_cpu']
+    total_capacity = makespan * n_cpu
+    total_work = sum(t['end'] - t['start'] for t in tasks)
+    
+    stats = {
+        "makespan": makespan,
+        "n_cpu": n_cpu,
+        "total_capacity_cycles": total_capacity,
+        "total_work_cycles": total_work,
+        "cpu_utilization": total_work / total_capacity if total_capacity > 0 else 0.0,
+    }
+    
+    # Phase Analysis
+    # We group by type: 'Ver', 'App', 'Vote'
+    phases = ['Ver', 'App', 'Vote']
+    phase_stats = {}
+    
+    for p in phases:
+        p_tasks = [t for t in tasks if t['type'] == p]
+        if not p_tasks:
+            phase_stats[p] = {
+                "work_cycles": 0, 
+                "fraction_of_total_work": 0.0, 
+                "avg_parallelism": 0.0
+            }
+            continue
+            
+        work = sum(t['end'] - t['start'] for t in p_tasks)
+        start_t = min(t['start'] for t in p_tasks)
+        end_t = max(t['end'] for t in p_tasks)
+        wallclock_dur = end_t - start_t
+        
+        phase_stats[p] = {
+            "work_cycles": work,
+            "fraction_of_total_work": work / total_work if total_work > 0 else 0.0,
+            # Parallelism = Total CPU Time / Wallclock Time
+            "avg_parallelism": work / wallclock_dur if wallclock_dur > 0 else 0.0,
+            "phase_wallclock_duration": wallclock_dur
+        }
+    stats["phases"] = phase_stats
+    
+    # Wallclock Idle Time (Time where 0 CPUs are active)
+    # Calculated by merging all task intervals and subtracting from makespan
+    sorted_tasks = sorted(tasks, key=lambda x: x['start'])
+    active_ranges = []
+    
+    if sorted_tasks:
+        curr_start, curr_end = sorted_tasks[0]['start'], sorted_tasks[0]['end']
+        for t in sorted_tasks[1:]:
+            if t['start'] < curr_end:
+                # Overlap or adjacent, extend current range
+                curr_end = max(curr_end, t['end'])
+            else:
+                # Gap detected, save current range
+                active_ranges.append((curr_start, curr_end))
+                curr_start, curr_end = t['start'], t['end']
+        active_ranges.append((curr_start, curr_end))
+    
+    total_active_wallclock = sum(end - start for start, end in active_ranges)
+    wallclock_idle = makespan - total_active_wallclock
+    
+    stats["wallclock_idle"] = wallclock_idle
+    stats["fraction_wallclock_idle"] = wallclock_idle / makespan if makespan > 0 else 0.0
+    
+    return stats
+
 def compute_schedule(solver, meta, intervals, makespan_var, params):
     tasks = []
     for iv in intervals:
@@ -124,7 +194,7 @@ def compute_schedule(solver, meta, intervals, makespan_var, params):
         
     return solver.Value(makespan_var), tasks
 
-def print_schedule(makespan, tasks):
+def print_schedule(makespan, tasks, stats):
     print(f"\nFinal t1 (Makespan): {makespan}")
     print("-" * 75)
     print(f"{'CPU':<4} | {'Time':<12} | {'Task'}")
@@ -133,16 +203,29 @@ def print_schedule(makespan, tasks):
     for t in tasks_sorted:
         time_str = f"{t['start']} -> {t['end']}"
         print(f"{t['cpu']:<4} | {time_str:<12} | {t['desc']}")
+    
+    print("\n" + "="*40)
+    print("PERFORMANCE STATISTICS")
+    print("="*40)
+    print(f"CPU Utilization:       {stats['cpu_utilization']:.1%}")
+    print(f"Wallclock Idle:        {stats['fraction_wallclock_idle']:.1%} ({stats['wallclock_idle']} ticks)")
+    print("-" * 40)
+    print(f"{'Phase':<6} | {'Work %':<8} | {'Parallelism':<11}")
+    print("-" * 40)
+    for p, data in stats['phases'].items():
+        print(f"{p:<6} | {data['fraction_of_total_work']:<8.1%} | {data['avg_parallelism']:<11.2f}")
+    print("="*40)
 
-def write_schedule_yaml(filepath, makespan, tasks, params):
+def write_schedule_yaml(filepath, makespan, tasks, params, stats):
     if yaml is None: return
     output_data = {
         "parameters": params,
-        "results": {"makespan": makespan, "schedule": []}
+        "statistics": stats,
+        "schedule": []
     }
     tasks_sorted = sorted(tasks, key=lambda x: x['start'])
     for t in tasks_sorted:
-        output_data["results"]["schedule"].append({
+        output_data["schedule"].append({
             "id": t['raw_id'],
             "type": t['type'],
             "cpu": t['cpu'],
@@ -155,46 +238,27 @@ def write_schedule_yaml(filepath, makespan, tasks, params):
     print(f"YAML results written to: {filepath}")
 
 def write_chrome_trace(filepath, tasks):
-    """
-    Writes the schedule to Chrome Tracing JSON format.
-    Load this file in ui.perfetto.dev or chrome://tracing
-    """
     trace_events = []
-    
     for t in tasks:
-        # Chrome trace uses microseconds, we multiply by 1000 for visibility
         scale = 1000
-        
-        # Color ID mappings (cname is optional, but cat helps)
-        # Categories: Verify, Apply, Vote
-        
         event = {
             "name": t['desc'],
             "cat": t['type'],
-            "ph": "X",          # Phase: Complete Event
+            "ph": "X",
             "ts": t['start'] * scale,
             "dur": (t['end'] - t['start']) * scale,
-            "pid": 1,           # Process ID (The blockchain node)
-            "tid": t['cpu'],    # Thread ID (The CPU core)
-            "args": {
-                "raw_id": str(t['raw_id'])
-            }
+            "pid": 1,
+            "tid": t['cpu'],
+            "args": {"raw_id": str(t['raw_id'])}
         }
         trace_events.append(event)
         
     wrapper = {"traceEvents": trace_events}
-    
     with open(filepath, 'w') as f:
         json.dump(wrapper, f)
-    
     print(f"Chrome Trace written to: {filepath}")
-    print("  -> Open https://ui.perfetto.dev/ and load this file to visualize.")
 
 def write_csv(filepath, tasks):
-    """
-    Writes the schedule to CSV format. 
-    Compatible with Grafana/Excel/Pandas.
-    """
     with open(filepath, 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(['TaskID', 'Type', 'Description', 'CPU', 'Start', 'End', 'Duration'])
@@ -205,32 +269,20 @@ def write_csv(filepath, tasks):
     print(f"CSV results written to: {filepath}")
 
 def plot_gantt(tasks, makespan, params, filename="gantt.png"):
-    """Generates a static Gantt chart using Matplotlib."""
     if not MATPLOTLIB_AVAILABLE:
         print("Warning: Matplotlib not installed. Skipping Gantt chart.")
         return
 
     fig, ax = plt.subplots(figsize=(12, 6))
-    
-    # Colors for different task types
     colors = {'Ver': 'tab:blue', 'App': 'tab:orange', 'Vote': 'tab:green'}
-    legend_patches = []
-    for k, v in colors.items():
-        legend_patches.append(mpatches.Patch(color=v, label=k))
+    legend_patches = [mpatches.Patch(color=v, label=k) for k,v in colors.items()]
 
-    # Y-axis is CPU ID
-    # X-axis is Time
-    
     for t in tasks:
         c = colors.get(t['type'], 'gray')
-        # (start_time, cpu_index, duration, height)
-        # We plot bars horizontally
-        # y = t['cpu'], width = duration, left = start
         ax.broken_barh([(t['start'], t['end'] - t['start'])], 
                        (t['cpu'] - 0.4, 0.8), 
                        facecolors=c, edgecolors='white')
         
-        # Optional: Add text label if duration is long enough
         if (t['end'] - t['start']) > 2:
             mid_x = t['start'] + (t['end'] - t['start'])/2
             mid_y = t['cpu']
@@ -316,10 +368,12 @@ def solve_system(params, dag, output_yaml_path=None, trace_path=None, gantt_path
 
     if status == cp_model.OPTIMAL:
         makespan, schedule = compute_schedule(solver, task_metadata, all_intervals, vt_end, params)
-        print_schedule(makespan, schedule)
+        stats = calculate_statistics(makespan, schedule, params)
+        
+        print_schedule(makespan, schedule, stats)
         
         if output_yaml_path:
-            write_schedule_yaml(output_yaml_path, makespan, schedule, params)
+            write_schedule_yaml(output_yaml_path, makespan, schedule, params, stats)
         if trace_path:
             write_chrome_trace(trace_path, schedule)
         if gantt_path:
@@ -339,13 +393,9 @@ if __name__ == "__main__":
     gantt_png = "schedule.png"
     results_csv = "schedule.csv"
     
-    # 1. Create dummy file if needed
     generate_dummy_file(input_yaml)
-    
-    # 2. Read
     print(f"Reading scenario from {input_yaml}...")
     params, dag = read_scenario(input_yaml)
     
-    # 3. Solve
     print(f"Solving for {len(dag.nodes)} transactions on {params['n_cpu']} CPUs...")
     solve_system(params, dag, output_yaml, trace_json, gantt_png, results_csv)
