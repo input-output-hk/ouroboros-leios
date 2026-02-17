@@ -25,8 +25,6 @@ def read_scenario(filepath):
     """
     Reads parameters and DAG from a JSON or YAML file.
     Supports .json, .yaml, and .yml extensions.
-    
-    Raises ValueError if required attributes or parameters are missing.
     """
     if filepath.lower().endswith(('.yaml', '.yml')):
         if yaml is None:
@@ -38,7 +36,6 @@ def read_scenario(filepath):
         with open(filepath, 'r') as f:
             data = json.load(f)
 
-    # 1. Validate Top-Level Sections
     if 'parameters' not in data:
         raise ValueError(f"Input file '{filepath}' is missing the 'parameters' section.")
     if 'dag' not in data:
@@ -47,59 +44,66 @@ def read_scenario(filepath):
     params = data['parameters']
     raw_dag = data['dag']
 
-    # 2. Validate Global Parameters
-    # cost_verify/apply are optional here if they exist on every node, 
-    # but the core timing params are mandatory.
+    # Validate Global Parameters
     required_params = ['n_cpu', 'delta_rh', 'delta_rb', 'delta_eh', 'cost_vote']
     for p in required_params:
         if p not in params:
             raise ValueError(f"Missing required global parameter '{p}'.")
 
-    # Global defaults for fallback
+    # Global defaults
     default_verify = params.get('cost_verify')
     default_apply = params.get('cost_apply')
     
     G = nx.DiGraph()
     
     for tx_hash, attrs in raw_dag.items():
-        # 3. Validate Node Attributes
-        required_node_attrs = ['type', 'arrival_delay', 'inputs']
-        for attr in required_node_attrs:
-            if attr not in attrs:
-                raise ValueError(f"Transaction '{tx_hash}' is missing required attribute '{attr}'.")
+        node_type = attrs.get('type')
+        if not node_type:
+            raise ValueError(f"Transaction '{tx_hash}' missing required attribute 'type'.")
 
-        # 4. Resolve Costs (Strict check)
-        # Must exist on node OR exist globally
+        # --- LG (Ledger) Nodes ---
+        if node_type == 'LG':
+            # LG nodes are roots/state. They don't need costs or delays.
+            G.add_node(tx_hash, type='LG')
+            # LG nodes typically don't have inputs, but if they do, we ignore them or process them.
+            # Here we assume they are roots.
+            continue
+
+        # --- RB / EH Nodes ---
+        # These require full attributes
+        if 'arrival_delay' not in attrs:
+            raise ValueError(f"Transaction '{tx_hash}' ({node_type}) missing 'arrival_delay'.")
+
+        # Resolve Costs
         cost_verify = attrs.get('cost_verify')
         if cost_verify is None:
             if default_verify is not None:
                 cost_verify = default_verify
             else:
-                raise ValueError(f"Transaction '{tx_hash}' missing 'cost_verify' and no global default provided.")
+                raise ValueError(f"Transaction '{tx_hash}' missing 'cost_verify'.")
 
         cost_apply = attrs.get('cost_apply')
         if cost_apply is None:
             if default_apply is not None:
                 cost_apply = default_apply
             else:
-                raise ValueError(f"Transaction '{tx_hash}' missing 'cost_apply' and no global default provided.")
+                raise ValueError(f"Transaction '{tx_hash}' missing 'cost_apply'.")
 
         G.add_node(tx_hash, 
-                   type=attrs['type'], 
+                   type=node_type, 
                    arrival_delay=attrs['arrival_delay'],
                    cost_verify=cost_verify,
                    cost_apply=cost_apply)
         
-        inputs = attrs['inputs']
+        # Process Inputs (Dependencies)
+        # Expected format: "inputs": ["parent_hash1", "parent_hash2"]
+        inputs = attrs.get('inputs', [])
         
-        if isinstance(inputs, dict):
-            parents = inputs.values()
-        elif isinstance(inputs, list):
-            parents = inputs
-        else:
-            raise ValueError(f"Attribute 'inputs' for transaction '{tx_hash}' must be a list or a dictionary.")
+        if not isinstance(inputs, list):
+            raise ValueError(f"Attribute 'inputs' for '{tx_hash}' must be a list of strings.")
             
-        for parent_hash in parents:
+        for parent_hash in inputs:
+            # Add dependency: Parent -> Current
             G.add_edge(parent_hash, tx_hash)
             
     return params, G
@@ -112,40 +116,47 @@ def generate_dummy_file(filepath):
             "delta_rh": 10000,
             "delta_rb": 5000,
             "delta_eh": 5000,
-            # Global defaults (optional, used if not on node)
             "cost_verify": 4000,
             "cost_apply": 6000,
             "cost_vote": 2000
         },
         "dag": {
-            "0xRB_Root1": {
+            # --- LG (Previous Ledger State) ---
+            "0xUTXO_1": {"type": "LG"},
+            "0xUTXO_2": {"type": "LG"},
+            
+            # --- RB TRANSACTIONS ---
+            # Now inputs are lists of hash strings
+            "0xRB_Tx1": {
                 "type": "RB", 
                 "arrival_delay": 0, 
-                "inputs": [],
-                "cost_verify": 3500, # Specific cost
+                "inputs": ["0xUTXO_1"],
+                "cost_verify": 3500,
                 "cost_apply": 5500
             },
-            "0xRB_Root2": {
+            "0xRB_Tx2": {
                 "type": "RB", 
                 "arrival_delay": 0, 
-                "inputs": [] # Uses defaults
+                "inputs": ["0xUTXO_2"]
             },
-            "0xEH_Child1": {
+            
+            # --- EH TRANSACTIONS ---
+            "0xEH_Tx1": {
                 "type": "EH", 
                 "arrival_delay": 2000, 
-                "inputs": {"0": "0xRB_Root1", "1": "0xRB_Root2"},
+                "inputs": ["0xRB_Tx1", "0xRB_Tx2"],
                 "cost_verify": 4200,
                 "cost_apply": 6100
             },
-            "0xEH_Child2": {
+            "0xEH_Tx2": {
                 "type": "EH", 
                 "arrival_delay": 8000, 
-                "inputs": {"0": "0xRB_Root2"}
+                "inputs": ["0xRB_Tx2"]
             },
-            "0xEH_GrandChild1": {
+            "0xEH_Tx3": {
                 "type": "EH", 
                 "arrival_delay": 12000, 
-                "inputs": {"0": "0xEH_Child1"}
+                "inputs": ["0xEH_Tx1"]
             }
         }
     }
@@ -165,9 +176,6 @@ def generate_dummy_file(filepath):
 # 2. STATISTICS & OUTPUT
 # ==========================================
 def calculate_statistics(makespan, tasks, params):
-    """
-    Computes detailed performance metrics.
-    """
     n_cpu = params['n_cpu']
     total_capacity = makespan * n_cpu
     total_work = sum(t['end'] - t['start'] for t in tasks)
@@ -180,7 +188,6 @@ def calculate_statistics(makespan, tasks, params):
         "cpu_utilization": total_work / total_capacity if total_capacity > 0 else 0.0,
     }
     
-    # Phase Analysis
     phases = ['Ver', 'App', 'Vote']
     phase_stats = {}
     
@@ -202,7 +209,6 @@ def calculate_statistics(makespan, tasks, params):
         phase_stats[p] = {
             "work_cycles": work,
             "fraction_of_total_work": work / total_work if total_work > 0 else 0.0,
-            # Parallelism = Total CPU Time / Wallclock Time
             "avg_parallelism": work / wallclock_dur if wallclock_dur > 0 else 0.0,
             "phase_wallclock_duration": wallclock_dur
         }
@@ -246,7 +252,6 @@ def compute_schedule(solver, meta, intervals, makespan_var, params):
                 'raw_id': info['id']
             })
             
-    # Greedy CPU Assignment
     tasks.sort(key=lambda x: x['start'])
     cpu_timeline = [0] * params['n_cpu']
     
@@ -262,7 +267,6 @@ def compute_schedule(solver, meta, intervals, makespan_var, params):
     return solver.Value(makespan_var), tasks
 
 def print_schedule_table(tasks, file=sys.stdout):
-    """Prints the detailed schedule table."""
     print(f"\nSCHEDULE TABLE", file=file)
     print("-" * 75, file=file)
     print(f"{'CPU':<4} | {'Time (µs)':<15} | {'Task'}", file=file)
@@ -273,7 +277,6 @@ def print_schedule_table(tasks, file=sys.stdout):
         print(f"{t['cpu']:<4} | {time_str:<15} | {t['desc']}", file=file)
 
 def print_statistics(makespan, stats, file=sys.stderr):
-    """Prints the summary statistics."""
     print(f"\nFinal t1 (Makespan): {makespan} µs", file=file)
     print("="*40, file=file)
     print("PERFORMANCE STATISTICS", file=file)
@@ -311,7 +314,6 @@ def write_schedule_yaml(filepath, makespan, tasks, params, stats):
 def write_chrome_trace(filepath, tasks):
     trace_events = []
     for t in tasks:
-        # Scale = 1 because units are already microseconds
         scale = 1
         event = {
             "name": t['desc'],
@@ -377,12 +379,6 @@ def plot_gantt(tasks, makespan, params, filename="gantt.png"):
 # 3. SOLVER
 # ==========================================
 def solve_system(params, dag):
-    """
-    Solves the scheduling problem.
-    Returns (makespan, schedule_list, stats_dict) on success.
-    Returns None on failure.
-    Does NO file I/O.
-    """
     model = cp_model.CpModel()
     
     t_rh = params['delta_rh']
@@ -390,13 +386,14 @@ def solve_system(params, dag):
     t_eh = t_rh + params['delta_eh']
     
     # Calculate Horizon
-    # We now must sum up individual costs since they vary
-    total_verify = sum(d['cost_verify'] for n, d in dag.nodes(data=True))
-    total_apply = sum(d['cost_apply'] for n, d in dag.nodes(data=True))
+    # LG nodes have no cost, so we must filter them out of the sum
+    active_nodes = [d for n, d in dag.nodes(data=True) if d['type'] != 'LG']
+    
+    total_verify = sum(d['cost_verify'] for d in active_nodes)
+    total_apply = sum(d['cost_apply'] for d in active_nodes)
     total_ops = total_verify + total_apply + params['cost_vote']
     
-    count_tx = len(dag.nodes)
-    max_node_delay = max([d['arrival_delay'] for n, d in dag.nodes(data=True)]) if count_tx > 0 else 0
+    max_node_delay = max([d['arrival_delay'] for d in active_nodes]) if active_nodes else 0
     max_arrival = max(t_rb, t_eh + max_node_delay)
     
     horizon = max_arrival + total_ops + 20
@@ -409,12 +406,15 @@ def solve_system(params, dag):
         attrs = dag.nodes[node_id]
         node_type = attrs['type']
         
-        # Get specific costs (already populated by read_scenario)
+        # LG nodes are state roots; they don't produce tasks.
+        if node_type == 'LG':
+            continue
+
         cost_v = attrs['cost_verify']
         cost_a = attrs['cost_apply']
         
         if node_type == 'RB':
-            arrival_time = t_rb
+            arrival_time = t_rb + attrs.get('arrival_delay', 0)
         else:
             arrival_time = t_eh + attrs['arrival_delay']
 
@@ -434,18 +434,26 @@ def solve_system(params, dag):
         task_metadata[f'iv_a_{node_id}'] = {'type': 'App', 'id': node_id}
 
         model.Add(a_start >= v_end)
+        
+        # DAG Dependencies (Parent Apply -> Child Apply)
         for parent in dag.predecessors(node_id):
-            model.Add(a_start >= apply_end_vars[parent])
+            parent_type = dag.nodes[parent]['type']
+            # If parent is LG, it is a state root (available at t=0). No constraint needed.
+            # If parent is RB/EH, we must wait for its application.
+            if parent_type != 'LG':
+                model.Add(a_start >= apply_end_vars[parent])
 
-    # Vote
+    # Vote (Global Task)
     vt_start = model.NewIntVar(0, horizon, 'vt_s')
     vt_end = model.NewIntVar(0, horizon, 'vt_e')
     vt_interval = model.NewIntervalVar(vt_start, params['cost_vote'], vt_end, 'iv_vt')
     all_intervals.append(vt_interval)
     task_metadata['iv_vt'] = {'type': 'Vote', 'id': 'Global'}
 
+    # Vote must wait for all Apply tasks
     for node_id in dag.nodes():
-        model.Add(vt_start >= apply_end_vars[node_id])
+        if dag.nodes[node_id]['type'] != 'LG':
+            model.Add(vt_start >= apply_end_vars[node_id])
 
     model.AddCumulative(all_intervals, [1] * len(all_intervals), params['n_cpu'])
     model.Minimize(vt_end)
@@ -482,17 +490,14 @@ def main():
     
     args = parser.parse_args()
     
-    # Mode 1: Generator
     if args.generate_dummy:
         generate_dummy_file(args.generate_dummy)
         return
 
-    # Mode 2: Solver
     if not args.input_file:
         parser.print_help()
         sys.exit(0)
 
-    # 1. Read
     print(f"Reading scenario from {args.input_file}...", file=sys.stderr)
     try:
         params, dag = read_scenario(args.input_file)
@@ -500,33 +505,24 @@ def main():
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
     
-    # 2. Solve
     print(f"Solving for {len(dag.nodes)} transactions on {params['n_cpu']} CPUs...", file=sys.stderr)
     result = solve_system(params, dag)
     
     if result:
         makespan, schedule, stats = result
-        
-        # 3. Output
-        # Statistics always go to stderr
         print_statistics(makespan, stats, file=sys.stderr)
         
-        # Verbose schedule always goes to stdout
         if args.verbose:
             print_schedule_table(schedule, file=sys.stdout)
             
         if args.out_yaml:
             write_schedule_yaml(args.out_yaml, makespan, schedule, params, stats)
-            
         if args.out_trace:
             write_chrome_trace(args.out_trace, schedule)
-            
         if args.out_gantt:
             plot_gantt(schedule, makespan, params, args.out_gantt)
-            
         if args.out_csv:
             write_csv(args.out_csv, schedule)
-            
     else:
         sys.exit(1)
 
