@@ -15,6 +15,7 @@ module DeltaQ.Leios (
   -- * Probabilities
   pValidating,
   pHeaderOnTime,
+  pEBOnTime,
 ) where
 
 import DeltaQ (
@@ -38,14 +39,8 @@ maxTxsInRB = 32
 maxTxRefsInEB = 128
 maxTxsFetched = 16
 
-fetchingEBHeader :: DQ
-fetchingEBHeader = blendedDelay B64
-
-fetchingEBBody :: DQ
-fetchingEBBody = blendedDelay B2048
-
 fetchingEB :: DQ
-fetchingEB = fetchingEBHeader .>>. fetchingEBBody
+fetchingEB = blendedDelay B2048
 
 doAll :: [DQ] -> DQ
 doAll = foldr (./\.) (wait 0)
@@ -98,6 +93,17 @@ pHeaderOnTime lHdr =
   successWithin
     sendRBHeader
     (fromIntegral lHdr)
+
+-- | Probability that 'emitRBHeader' is within \(L_\text{hdr}\)
+pEBOnTime ::
+  -- | \(L_\text{hdr}\)
+  Integer ->
+  -- | Probability that the RB header is within \(L_\text{hdr}\)
+  Probability DQ
+pEBOnTime lHdr =
+  successWithin
+    fetchingEB
+    (toRational lHdr)
 
 -- | Probability that 'validateEB' is successful before the end of \(L_\text{vote}\)
 pValidating ::
