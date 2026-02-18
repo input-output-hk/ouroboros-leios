@@ -379,7 +379,7 @@ def plot_gantt(tasks, makespan, params, filename="gantt.png"):
 # ==========================================
 # 3. SOLVER
 # ==========================================
-def solve_system(params, dag):
+def solve_system(params, dag, log_progress=False):
     """
     Solves the scheduling problem.
     Returns (makespan, schedule_list, stats_dict) on success.
@@ -467,6 +467,9 @@ def solve_system(params, dag):
     model.Minimize(vt_end)
 
     solver = cp_model.CpSolver()
+    if log_progress:
+        solver.parameters.log_search_progress = True
+        
     status = solver.Solve(model)
 
     if status == cp_model.OPTIMAL:
@@ -495,6 +498,7 @@ def main():
     
     # Flags
     parser.add_argument("-v", "--verbose", action="store_true", help="Print schedule to stdout")
+    parser.add_argument("--log-solver", action="store_true", help="Enable internal solver progress logging")
     
     args = parser.parse_args()
     
@@ -514,7 +518,7 @@ def main():
         sys.exit(1)
     
     print(f"Solving for {len(dag.nodes)} transactions on {params['n_cpu']} CPUs...", file=sys.stderr)
-    result = solve_system(params, dag)
+    result = solve_system(params, dag, log_progress=args.log_solver)
     
     if result:
         makespan, schedule, stats = result
