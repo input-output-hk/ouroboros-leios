@@ -11,11 +11,10 @@ select
   , encode(hash, 'hex') as tx_hash
   , size as tx_size
   from tx
-  where id between 118811946 and 118822448
---where id between 118811946 and 118813000
+  where id between 118811946 and 118822448 -- 12 MB scenario
+--where id between 118811946 and 118813600 --  2 MB scenario
 order by tx_id
 ;
-
 
 select
     block_type
@@ -86,5 +85,5 @@ select
   ) t
 ;
 
-\copy leios_scenario TO 'mainnet-scenario.json' WITH (FORMAT text)
+\copy leios_scenario TO 'scenario.json' WITH (FORMAT text)
 
