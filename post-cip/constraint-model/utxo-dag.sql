@@ -12,12 +12,14 @@ select
   , size as tx_size
   from tx
   where id between 118811946 and 118822448
+--where id between 118811946 and 118813000
 order by tx_id
 ;
 
 
 select
     block_type
+  , count(*) as block_txs
   , sum(tx_size) as block_size
   from leios_tx
   group by block_type
@@ -46,35 +48,43 @@ select
 ;
 
 
-drop table if exists leios_dag;
+drop table if exists leios_scenario;
 
-create temporary table leios_dag as
+create temporary table leios_scenario as
 select
     json_build_object(
-      left(tx_in_hash, 8)
-    , json_build_object(
-        'type', 'LG'
-      )
-    ) as tx
-  from (
-    select tx_in_hash from leios_txin
-    except
-    select tx_hash from leios_tx
-  ) ledger
-union all
-select
-  json_build_object(
-    left(tx_hash, 8)
-  , json_build_object(
-      'type', block_type
-    , 'arrival_delay', round(10000 + (2000000 - 10000) * random())
-    , 'cost_verify', 2000
-    , 'cost_apply', 3000
-    , 'inputs', json_agg(left(tx_in_hash, 8))
+      'parameters', json_build_object(
+        'n_cpu', 8
+      , 'delta_rh', 1000000
+      , 'delta_rb', 1250000
+      , 'delta_eh', 1500000
+      , 'cost_vote', 300000
     )
-  ) as tx
-  from leios_txin
-  group by tx_hash, block_type
+    , 'dag', json_object_agg(tx_hash8, tx_info)
+  ) as scenario
+  from (
+    select
+        left(tx_in_hash, 8) as tx_hash8
+      , json_build_object('type', 'LG') as tx_info
+      from (
+        select tx_in_hash from leios_txin
+        except
+        select tx_hash from leios_tx
+      ) ledger
+    union all
+    select
+        left(tx_hash, 8) as tx_hash8
+      , json_build_object(
+          'type', block_type
+          , 'arrival_delay', case when block_type = 'RB' then 0 else round(10000 + (2000000 - 10000) * random()) end
+        , 'cost_verify', round(120000 + 47 * avg(tx_size) + 8 * count(*) + 0.61 * sum(ksteps))
+        , 'cost_apply', round(35000 + 2.8 * avg(tx_size) + 5200 * count(*))
+        , 'inputs', json_agg(left(tx_in_hash, 8))
+        ) as tx_info
+      from leios_txin
+      group by tx_hash, block_type
+  ) t
 ;
 
+\copy leios_scenario TO 'mainnet-scenario.json' WITH (FORMAT text)
 
