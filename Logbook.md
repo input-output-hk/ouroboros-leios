@@ -6,7 +6,39 @@
 > 
 > See also the [Post-CIP R&D Findings](post-cip/README.md) document for additional (after 2025-11-01) findings and artifacts not directly related to the implementation of Linear Leios.
 
+## 2026-02-18
+
+### SN on fixing nested sqlite transactions
+
+- I saw database errors today: "cannot start a transaction within a transaction". At first I thought we were missing a `dbWithBEGIN`, but all scopes are fine.
+- A possible reason could be that now that the `LeiosDbHandle` is shared across threads, the `sqlite-direct` calls to `exec "BEGIN"` get interleaved on the same connection.
+- I used the "leios write lock" to confirm this suspicion.
+- Compiling the `cardano-node` with local packages pointing to local consensus changes did result in a node not doing anything leios related??
+- No .. it still crashes. Have I not be guarding all database accesses using the mutex?
+- Found the `SQLOpenFullMutex` option and trying this now.. before we obviously going to untangle this.
+
+<https://hackage-content.haskell.org/package/direct-sqlite-2.3.29/docs/Database-SQLite3.html#t:SQLOpenFlag>
+
+- Full mutex mode avoided the "transaction in transaction" problem.
+- I wondered whether the directly throwing functions of `direct-sqlite` would have given more context?
+- Lies.. full mutex was stil resulting in the error!
+- The directly throwing sqlite functions do provide the tried query, but not the callstack.
+- Adding more `HasCallStack` helps in narrowing down the source..
+- So the source seems to be from the leios fetch `BlockRequest` processing. This is guarded by the `MVar` though .. soo :thinking:
+- The error is not only raised on leiosDbLookupEbBody, but also on leiosDbFilterMissingEbBodies in some nodes, sometimes!
+- Aha! The `leiosWriteLock` used bye the fetch server is a different one than the one used by the fetch logic :facepalm:
+- Nevermind.. that was the immdb-server..
+- The freakin :genie: found it in 1m30s by going through all call sites of the leiosDb functions and found that obviously the block forging is not guarded by this mutex
+- Progress.. I now hit an impossible lookup in the `missingEbTxs` fetch state
+
 ## 2026-02-12
+
+### SN on prototype diffusing tx closures
+
+- Wanted to fix `LeiosTx` to just carry pre-encoded cbor transactions. For now we would not need to decode them to validate or so. However, I do stumble over the network protocols demanding an `Encoding` that can be run through a `Decoder`. While encoding pre-encoded CBOR is done with `encodePreEncoded`, a `Decoder` cannot easily be written about that (without knowing the outer structure of what was originally encoded from the `Tx era`).
+- I resorted to cbor-in-cbor via `encodeBytes` such that the decoder can use `decodeBytes`. In practice this means we do prefix the cbor bytes with the bytes tag and also peel that off on this half-decoding into `LeiosTx`.
+- Getting a exception with reason `LeiosDb: ErrorConstraint` when trying to store a fetched EB body. After forging a leios EB, another peer offers us the block we already produced and the fetching logic does download it. This results in a duplicate insert here. We can of course make the database ignore the duplicates, but we should have not even fetched it.
+- I should also check the numbers of counted logs in the visualizer, it jumps from 1 to 6 EBs submitted instantly
 
 ### SN on prototype diffusing EBs
 

@@ -40,7 +40,6 @@
         runtimeEnv = {
           # Override paths to point to nix store
           SOURCE_DIR = ./.;
-          LEIOS_SCHEMA = ../2025-11/data/leios-schema.sql;
         };
         text = builtins.readFile ./run.sh;
       };
