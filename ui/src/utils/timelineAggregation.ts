@@ -141,6 +141,7 @@ const createMessageAnimation = (
   sentTime: number,
   targetTime: number,
   travelTime: number,
+  sizeBytes: number,
 ) => {
   const estimatedReceiveTime = sentTime + travelTime;
 
@@ -188,6 +189,7 @@ const createMessageAnimation = (
       sentTime,
       receivedTime: estimatedReceiveTime,
       progress,
+      sizeBytes,
     });
   }
   // Note: We don't handle the "completed" case here since we need to process
@@ -402,6 +404,7 @@ export const computeAggregatedDataAtTime = (
           event.time_s,
           targetTime,
           travelTime,
+          getMessageBytes(EMessageType.TX, message.id),
         );
         break;
       }
@@ -443,9 +446,9 @@ export const computeAggregatedDataAtTime = (
       }
 
       case EServerMessageType.EBSent: {
+        const msgBytes = getMessageBytes(EMessageType.EB, message.id);
         const stats = nodeStats.get(message.sender);
         if (stats) {
-          const msgBytes = getMessageBytes(EMessageType.EB, message.id);
           if (!stats.sent.has(EMessageType.EB)) {
             stats.sent.set(EMessageType.EB, { count: 0, bytes: 0 });
           }
@@ -481,14 +484,15 @@ export const computeAggregatedDataAtTime = (
           event.time_s,
           targetTime,
           travelTime,
+          msgBytes,
         );
         break;
       }
 
       case EServerMessageType.EBReceived: {
+        const msgBytes = getMessageBytes(EMessageType.EB, message.id);
         const stats = nodeStats.get(message.recipient);
         if (stats) {
-          const msgBytes = getMessageBytes(EMessageType.EB, message.id);
           if (!stats.received.has(EMessageType.EB)) {
             stats.received.set(EMessageType.EB, { count: 0, bytes: 0 });
           }
@@ -510,13 +514,13 @@ export const computeAggregatedDataAtTime = (
       }
 
       case EServerMessageType.RBGenerated: {
+        setMessageBytes(EMessageType.RB, message.id, message.size_bytes);
         const stats = nodeStats.get(message.producer);
         if (stats) {
           stats.generated.set(
             EMessageType.RB,
             (stats.generated.get(EMessageType.RB) || 0) + 1,
           );
-          setMessageBytes(EMessageType.RB, message.id, message.size_bytes);
         }
 
         // Track last activity for node coloring
@@ -532,9 +536,9 @@ export const computeAggregatedDataAtTime = (
       }
 
       case EServerMessageType.RBSent: {
+        const msgBytes = getMessageBytes(EMessageType.RB, message.id);
         const stats = nodeStats.get(message.sender);
         if (stats) {
-          const msgBytes = getMessageBytes(EMessageType.RB, message.id);
           if (!stats.sent.has(EMessageType.RB)) {
             stats.sent.set(EMessageType.RB, { count: 0, bytes: 0 });
           }
@@ -570,14 +574,15 @@ export const computeAggregatedDataAtTime = (
           event.time_s,
           targetTime,
           travelTime,
+          msgBytes,
         );
         break;
       }
 
       case EServerMessageType.RBReceived: {
+        const msgBytes = getMessageBytes(EMessageType.RB, message.id);
         const stats = nodeStats.get(message.recipient);
         if (stats) {
-          const msgBytes = getMessageBytes(EMessageType.RB, message.id);
           if (!stats.received.has(EMessageType.RB)) {
             stats.received.set(EMessageType.RB, { count: 0, bytes: 0 });
           }
@@ -599,21 +604,21 @@ export const computeAggregatedDataAtTime = (
       }
 
       case EServerMessageType.VTBundleGenerated: {
+        setMessageBytes(EMessageType.Votes, message.id, message.size_bytes);
         const stats = nodeStats.get(message.producer);
         if (stats) {
           stats.generated.set(
             EMessageType.Votes,
             (stats.generated.get(EMessageType.Votes) || 0) + 1,
           );
-          setMessageBytes(EMessageType.Votes, message.id, message.size_bytes);
         }
         break;
       }
 
       case EServerMessageType.VTBundleSent: {
+        const msgBytes = getMessageBytes(EMessageType.Votes, message.id);
         const stats = nodeStats.get(message.sender);
         if (stats) {
-          const msgBytes = getMessageBytes(EMessageType.Votes, message.id);
           if (!stats.sent.has(EMessageType.Votes)) {
             stats.sent.set(EMessageType.Votes, { count: 0, bytes: 0 });
           }
@@ -640,14 +645,15 @@ export const computeAggregatedDataAtTime = (
           event.time_s,
           targetTime,
           travelTime,
+          msgBytes,
         );
         break;
       }
 
       case EServerMessageType.VTBundleReceived: {
+        const msgBytes = getMessageBytes(EMessageType.Votes, message.id);
         const stats = nodeStats.get(message.recipient);
         if (stats) {
-          const msgBytes = getMessageBytes(EMessageType.Votes, message.id);
           if (!stats.received.has(EMessageType.Votes)) {
             stats.received.set(EMessageType.Votes, { count: 0, bytes: 0 });
           }

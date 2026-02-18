@@ -185,7 +185,26 @@ export const useHandlers = () => {
         senderNode.fy + (recipientNode.fy - senderNode.fy) * message.progress;
 
       // Draw colored rectangle based on message type (consistent with pie chart colors)
-      const rectSize = Math.min((0.8 / canvasScale) * 6, 0.8);
+      const rectHeight = Math.min((0.8 / canvasScale) * 6, 0.8);
+
+      // Scale length by transmission time relative to travel time:
+      // transmissionTime = sizeBytes / bandwidth, fraction = transmissionTime / travelTime
+      const linkIds = [message.sender, message.recipient].sort();
+      const linkKey = `${linkIds[0]}|${linkIds[1]}`;
+      const link = topography.links.get(linkKey);
+      const bandwidth = link?.bandwidthBytesPerSecond;
+      const travelTime = message.receivedTime - message.sentTime;
+
+      // Visual length as fraction of edge length
+      const dx = recipientNode.fx - senderNode.fx;
+      const dy = recipientNode.fy - senderNode.fy;
+      const edgeLength = Math.sqrt(dx * dx + dy * dy);
+
+      let rectLength = rectHeight;
+      if (message.sizeBytes > 0 && bandwidth && bandwidth > 0 && travelTime > 0) {
+        const transmissionFraction = message.sizeBytes / bandwidth / travelTime;
+        rectLength = Math.max(rectHeight, edgeLength * transmissionFraction);
+      }
 
       switch (message.type) {
         case EMessageType.TX:
@@ -201,7 +220,14 @@ export const useHandlers = () => {
           context.fillStyle = EMessageColor.RB;
           break;
       }
-      context.fillRect(x - rectSize / 2, y - rectSize / 2, rectSize, rectSize);
+
+      // Orient rectangle along travel direction
+      const angle = Math.atan2(dy, dx);
+      context.save();
+      context.translate(x, y);
+      context.rotate(angle);
+      context.fillRect(-rectLength / 2, -rectHeight / 2, rectLength, rectHeight);
+      context.restore();
     });
 
     context.restore();

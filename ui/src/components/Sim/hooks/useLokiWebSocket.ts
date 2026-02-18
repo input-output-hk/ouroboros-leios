@@ -2,8 +2,10 @@ import { useSimContext } from "@/contexts/SimContext/context";
 import {
   IServerMessage,
   EServerMessageType,
+  IRankingBlockGenerated,
   IRankingBlockSent,
   IRankingBlockReceived,
+  IEndorserBlockGenerated,
   IEndorserBlockSent,
   IEndorserBlockReceived,
   ITransactionSent,
@@ -35,6 +37,42 @@ const getRemoteFromConnection = (connectionId: string | undefined): string => {
   }
 
   return "UNKNOWN";
+};
+
+const parseRankingBlockGenerated = (
+  streamLabels: any,
+  timestamp: number,
+  logLine: string,
+): IServerMessage | null => {
+  try {
+    const log = JSON.parse(logLine);
+
+    // {"forgedBlock":{"newBlockHash":"c036...","newBlockSize":{"txCount":293,"txSize":{"txSizeBytes":88842},...},...},"kind":"TraceForgedBlock","slot":1561}
+    if (log.kind === "TraceForgedBlock" && log.forgedBlock) {
+      const block = log.forgedBlock;
+      const txSizeBytes = block.newBlockSize?.txSize?.txSizeBytes ?? 0;
+
+      const message: IRankingBlockGenerated = {
+        type: EServerMessageType.RBGenerated,
+        id: block.newBlockHash,
+        slot: log.slot,
+        producer: streamLabels.process,
+        size_bytes: txSizeBytes,
+        header_bytes: 0, // TODO: used? have we access to the header?
+        endorsement: null,
+        transactions: [], // TODO: used?
+      };
+
+      return {
+        time_s: timestamp,
+        message,
+      };
+    }
+  } catch (error) {
+    console.warn("Failed to parse TraceForgedBlock log line:", logLine, error);
+  }
+
+  return null;
 };
 
 const parseRankingBlockSent = (
@@ -124,6 +162,39 @@ const parseRankingBlockReceived = (
       logLine,
       error,
     );
+  }
+
+  return null;
+};
+
+const parseEndorserBlockGenerated = (
+  streamLabels: any,
+  timestamp: number,
+  logLine: string,
+): IServerMessage | null => {
+  try {
+    const log = JSON.parse(logLine);
+
+    // {"kind":"LeiosBlockForged","mempoolRestSize":304114,"numTxs":293,"slot":1311,"closureSize":88835,"ebSize":10844,"hash":"cb73e5ef..."}
+    if (log.kind === "LeiosBlockForged") {
+      const message: IEndorserBlockGenerated = {
+        type: EServerMessageType.EBGenerated,
+        id: log.hash,
+        slot: log.slot,
+        producer: streamLabels.process,
+        size_bytes: log.ebSize,
+        pipeline: 0, // XXX: unused
+        transactions: [], // TODO: used?
+        endorser_blocks: [], // XXX: not relevant for linear leios
+      };
+
+      return {
+        time_s: timestamp,
+        message,
+      };
+    }
+  } catch (error) {
+    console.warn("Failed to parse LeiosBlockForged log line:", logLine, error);
   }
 
   return null;
@@ -311,7 +382,7 @@ function connectLokiWebSocket(lokiHost: string, dispatch: any): () => void {
   // 3. Loki naturally returns results in chronological order within a single stream
   // 4. Sorting large event arrays in the reducer is too expensive for dense simulation data
   const query =
-    '{service="cardano-node"} |~ "BlockFetchServer|MsgBlock|CompletedBlockFetch|MsgLeiosBlock|MsgLeiosBlockTxs"';
+    '{service="cardano-node"} |~ "BlockFetchServer|MsgBlock|CompletedBlockFetch|MsgLeiosBlock|MsgLeiosBlockTxs|LeiosBlockForged|TraceForgedBlock"';
   const wsUrl = `ws://${lokiHost}/loki/api/v1/tail?query=${encodeURIComponent(query)}&limit=5000`;
 
   let hasAutoStartedPlayback = false;
@@ -360,8 +431,10 @@ function connectLokiWebSocket(lokiHost: string, dispatch: any): () => void {
 
                   // TODO: simplify and push further upstream (e.g. into alloy)
                   const event =
+                    parseRankingBlockGenerated(stream.stream, ts, logLine) ||
                     parseRankingBlockSent(stream.stream, ts, logLine) ||
                     parseRankingBlockReceived(stream.stream, ts, logLine) ||
+                    parseEndorserBlockGenerated(stream.stream, ts, logLine) ||
                     parseEndorserBlockSent(stream.stream, ts, logLine) ||
                     parseEndorserBlockReceived(stream.stream, ts, logLine) ||
                     parseTransactionSent(stream.stream, ts, logLine) ||

@@ -29,7 +29,12 @@ export const SimWrapper: FC = () => {
       const nodes = new Map<string, ITransformedNode>();
       const links = new Map<
         string,
-        { source: string; target: string; latencyMs?: number }
+        {
+          source: string;
+          target: string;
+          latencyMs?: number;
+          bandwidthBytesPerSecond?: number;
+        }
       >();
       for (const [id, node] of Object.entries<Node<Coord2D>>(
         topography.nodes,
@@ -48,10 +53,13 @@ export const SimWrapper: FC = () => {
           const linkIds = [id, peerId].sort();
           const linkKey = `${linkIds[0]}|${linkIds[1]}`;
 
-          // Store latency from this node to the peer
+          // Store latency and bandwidth from this node to the peer
           const latencyMs = (peerData as any)?.["latency-ms"];
+          const bandwidthBytesPerSecond = (peerData as any)?.[
+            "bandwidth-bytes-per-second"
+          ];
 
-          // Only set latency if we haven't seen this link before, or if this latency is valid
+          // Only set if we haven't seen this link before, or if this data is valid
           if (
             !links.has(linkKey) ||
             (latencyMs !== undefined && latencyMs !== null)
@@ -60,6 +68,7 @@ export const SimWrapper: FC = () => {
               source: linkIds[0],
               target: linkIds[1],
               latencyMs: latencyMs,
+              bandwidthBytesPerSecond: bandwidthBytesPerSecond,
             });
           }
         }
