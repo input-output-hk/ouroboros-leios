@@ -311,7 +311,8 @@ const parseTransactionSent = (
         log.peer?.connectionId || log.connectionId,
       );
 
-      // FIXME: msg.txs is always elided
+      // FIXME: msg.txs is always elided, this makes all visualization of
+      // individual tx (fetches) unreliable
       const txId = nextTxId[sender] || 0;
       nextTxId[sender] = txId + 1;
 
@@ -320,6 +321,7 @@ const parseTransactionSent = (
         id: txId.toString(),
         sender,
         recipient,
+        msg_size_bytes: log.msg.txsBytesSize,
       };
 
       return {

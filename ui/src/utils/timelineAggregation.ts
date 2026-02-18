@@ -363,21 +363,23 @@ export const computeAggregatedDataAtTime = (
 
     switch (message.type) {
       case EServerMessageType.TransactionGenerated: {
+        setMessageBytes(EMessageType.TX, message.id, message.size_bytes);
         const stats = nodeStats.get(message.publisher);
         if (stats) {
           stats.generated.set(
             EMessageType.TX,
             (stats.generated.get(EMessageType.TX) || 0) + 1,
           );
-          setMessageBytes(EMessageType.TX, message.id, message.size_bytes);
         }
         break;
       }
 
       case EServerMessageType.TransactionSent: {
+        const msgBytes = message.msg_size_bytes;
+        // XXX: needed because TransactionReceived does not have a size
+        setMessageBytes(EMessageType.TX, message.id, msgBytes);
         const stats = nodeStats.get(message.sender);
         if (stats) {
-          const msgBytes = getMessageBytes(EMessageType.TX, message.id);
           if (!stats.sent.has(EMessageType.TX)) {
             stats.sent.set(EMessageType.TX, { count: 0, bytes: 0 });
           }
@@ -404,7 +406,7 @@ export const computeAggregatedDataAtTime = (
           event.time_s,
           targetTime,
           travelTime,
-          getMessageBytes(EMessageType.TX, message.id),
+          msgBytes,
         );
         break;
       }

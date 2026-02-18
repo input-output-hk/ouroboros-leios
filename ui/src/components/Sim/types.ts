@@ -90,6 +90,7 @@ export interface ITransactionSent {
   id: string;
   sender: string;
   recipient: string;
+  msg_size_bytes: number;
 }
 
 export interface IRankingBlockGenerated {
