@@ -14,7 +14,6 @@ set -a
 : "${DATA_DIR:=${SOURCE_DIR}/data}"
 : "${CLUSTER_RUN:=${DATA_DIR}/2025-10-10-13-29-24641-1050-50-blocks-50-coay-sup}"
 : "${LEIOS_MANIFEST:=${SOURCE_DIR}/manifest.json}"
-: "${LEIOS_SCHEMA:=${DATA_DIR}/leios-schema.sql}"
 
 # Timing configuration
 : "${REF_SLOT:=120}"
