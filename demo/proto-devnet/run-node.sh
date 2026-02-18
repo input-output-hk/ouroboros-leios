@@ -1,24 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Generic node run script that uses NODE_ID environment variable
-# Expects WORKING_DIR and NODE_ID to be set
-
-NODE_DIR="$WORKING_DIR/node${NODE_ID}"
+# Generic node run script
+# Expects NODE_DIR, IP, and PORT to be set
 
 cd "$NODE_DIR"
-
-# Select ip and port from environment variables using NODE_ID
-ip="IP_NODE${NODE_ID}"
-port="PORT_NODE${NODE_ID}"
 
 export LEIOS_DB_PATH="leios.db"
 
 # Run cardano-node
 cardano-node run \
   --config "config.yaml" \
-  --host-addr "${!ip}" \
-  --port "${!port}" \
+  --host-addr "$IP" \
+  --port "$PORT" \
   --topology "topology.json" \
   --database-path "db" \
   --socket-path "node.socket" \

@@ -20,10 +20,9 @@ processes:
   Node1:
     is_elevated: true
     command: |
-      WORKING_DIR="${WORKING_DIR}" \
-      NODE_ID=1 \
-      IP_NODE1="${IP_NODE1}" \
-      PORT_NODE1="${PORT_NODE1}" \
+      NODE_DIR="${WORKING_DIR}/node1" \
+      IP="${IP_NODE1}" \
+      PORT="${PORT_NODE1}" \
       ip netns exec proto-devnet:node1 bash "${SOURCE_DIR}/run-node.sh"
     log_location: "${WORKING_DIR}/node1/node.log"
     depends_on:
@@ -33,10 +32,9 @@ processes:
   Node2:
     is_elevated: true
     command: |
-      WORKING_DIR="${WORKING_DIR}" \
-      NODE_ID=2 \
-      IP_NODE2="${IP_NODE2}" \
-      PORT_NODE2="${PORT_NODE2}" \
+      NODE_DIR="${WORKING_DIR}/node2" \
+      IP="${IP_NODE2}" \
+      PORT="${PORT_NODE2}" \
       ip netns exec proto-devnet:node2 bash "${SOURCE_DIR}/run-node.sh"
     log_location: "${WORKING_DIR}/node2/node.log"
     depends_on:
@@ -46,10 +44,9 @@ processes:
   Node3:
     is_elevated: true
     command: |
-      WORKING_DIR="${WORKING_DIR}" \
-      NODE_ID=3 \
-      IP_NODE3="${IP_NODE3}" \
-      PORT_NODE3="${PORT_NODE3}" \
+      NODE_DIR="${WORKING_DIR}/node3" \
+      IP="${IP_NODE3}" \
+      PORT="${PORT_NODE3}" \
       ip netns exec proto-devnet:node3 bash "${SOURCE_DIR}/run-node.sh"
     log_location: "${WORKING_DIR}/node3/node.log"
     depends_on:
