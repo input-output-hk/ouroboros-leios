@@ -51,7 +51,7 @@
             echo "✅ Environment ready!"
             echo "   Python: $(python --version)"
             echo "   LD_LIBRARY_PATH set for libstdc++ and zlib."
-            echo "   Run: pip install pulp ortools networkx numpy"
+            echo "   Run: pip install matplotlib networkx numpy ortools pulp pyyaml"
           '';
         };
       }
