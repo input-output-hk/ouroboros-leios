@@ -22,7 +22,7 @@ then
   rm scenario.json
 fi
 
-MEM=$(($(sed -n -e '/^MemTotal:/{s/^[^ ]* *\([^ ]*\) .*$/\1/;p}' /proc/meminfo) * 75 / 100))
+MEM=$(($(sed -n -e '/^MemTotal:/{s/^[^ ]* *\([^ ]*\) .*$/\1/;p}' /proc/meminfo) * 85 / 100))
 ulimit -S -m $MEM -v $MEM
 
 nice python main.py \
