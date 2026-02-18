@@ -41,7 +41,7 @@ This document describes the Constraint Programming (CP) model used to schedule t
 - $\Delta t_{RH}$: Delay until Reference Header ($RH$) arrival.
 - $\Delta t_{RB}$: Delay from $RH$ until Reference Block ($RB$) arrival.
 - $\Delta t_{EH}$: Delay from $RH$ until Endorsement Header ($EH$) arrival.
-  
+
 #### Transaction data
 
 Let $\mathcal{T}$ be the set of all transactions. For each transaction $i \in \mathcal{T}$:
@@ -68,12 +68,12 @@ $$T_{RH} = \Delta t_{RH}$$$$T_{RB} = T_{RH} + \Delta t_{RB}$$$$T_{EH} = T_{RH} +
 
 We define interval variables representing the start ($s$) and end ($e$) times for the tasks associated with each transaction. For each transaction $i \in \mathcal{T}$:
 
-- **Verification task**: $V_i = [s_{V,i}, e_{V,i})$  
-- **Application task**: $A_i = [s_{A,i}, e_{A,i})$  
-  
+- **Verification task**: $V_i = [s_{V,i}, e_{V,i})$
+- **Application task**: $A_i = [s_{A,i}, e_{A,i})$
+
 For the global process:
 
-- **Vote task**: $VT = [s_{VT}, e_{VT})$  
+- **Vote task**: $VT = [s_{VT}, e_{VT})$
 
 ### Constraints
 
@@ -143,9 +143,121 @@ We define three phases: $\Phi_{Ver} = \{V_i\}_{\forall i}$, $\Phi_{App} = \{A_i\
 - **Phase wallclock Duration (**$L_P$**)**: $L_P = \max_{task \in P}(e_{task}) - \min_{task \in P}(s_{task})$.
 - **Average Parallelism (**$\pi_P$**)**: $\pi_P = \frac{W_P}{L_P}$.
 
-## Solution Method
+## Solution method
 
 This problem is modeled as a **Constraint Programming (CP)** problem and solved using the **Google OR-Tools CP-SAT Solver**. The CP-SAT solver utilizes **Lazy Clause Generation (LCG)**, a hybrid technique that combines the high-level modeling power of Constraint Programming with the efficient search capabilities of Boolean Satisfiability (SAT) solvers. Instead of statically converting the entire problem into boolean clauses, the solver lazily generates clauses during the search process to explain variable domain reductions and conflicts. Key components of the solution method include:
 
 - **Cumulative Constraint Propagators**: The resource limit ($N_{CPU}$) is enforced using specialized propagators such as **Time Tabling** and **Edge Finding**. These algorithms analyze the energy of tasks within a time window to deduce stronger bounds on start times (e.g., proving that a subset of tasks cannot possibly start before a certain time $t$ without violating the resource limit).
 - **Conflict-Driven Clause Learning (CDCL)**: When the solver encounters an infeasible state (conflict), it analyzes the implication graph to learn a new "nogood" clause. This clause permanently prunes the search space, preventing the solver from making the same combination of mistakes again.
+
+## Running the constraint solver
+
+The Python program [main.py](./main.py) solves the scheduling constraints for a Leios scenario.
+
+```console
+$ python main.py
+
+usage: main.py [-h] [--generate-dummy FILE] [--out-yaml FILE] [--out-trace FILE] [--out-gantt FILE] [--out-csv FILE] [-v]
+               [--log-solver] [--gap GAP] [--abs-gap ABS_GAP]
+               [input_file]
+
+Blockchain Transaction Scheduler
+
+positional arguments:
+  input_file            Input scenario file (JSON/YAML)
+
+options:
+  -h, --help            show this help message and exit
+  --generate-dummy FILE
+                        Generate a dummy input file and exit
+  --out-yaml FILE       Path to output YAML results
+  --out-trace FILE      Path to output Chrome Trace JSON
+  --out-gantt FILE      Path to output Gantt chart PNG
+  --out-csv FILE        Path to output CSV results
+  -v, --verbose         Print schedule to stdout
+  --log-solver          Enable internal solver progress logging
+  --gap GAP             Relative gap tolerance (e.g. 0.01 for 1%)
+  --abs-gap ABS_GAP     Absolute gap tolerance in microseconds
+```
+
+The output YAML file contains the schedule of all operations, and the Chrome Trace JSON formats that for use in the [Perfetto Viewer](https://ui.perfetto.dev). Beware that producing a Gantt chart for a large block takes a long time. The CSV output file can be imported into [Grafana](https://grafana.com/).
+
+Two scenarios are provided, but `python main.py --generate-dummy` will create a small example.
+
+- [scenario-2MB.yaml](./scenario-2MB.yaml): the first 2 MB of transactions from Cardano mainnet starting at Epoch 600.
+- [scenario-12MB.yaml](./scenario-12MB.yaml): the first 12 MB of transactions from Cardano mainnet starting at Epoch 600.
+
+The smaller example runs quickly:
+
+```console
+$ python main.py --out-yaml results-2MB.yaml --out-trace results-2MB.json scenario-2MB.yaml
+
+Reading scenario from scenario-2MB.yaml...
+Solving for 3477 transactions on 4 CPUs...
+
+Final t1 (Makespan): 4368925 µs
+
+========================================
+PERFORMANCE STATISTICS
+========================================
+CPU Utilization:       4.5%
+Wallclock Idle:        83.8% (3660619 µs)
+----------------------------------------
+Phase  | Work %   | Parallelism
+----------------------------------------
+Ver    | 50.5%    | 0.14
+App    | 11.1%    | 0.03
+Vote   | 38.5%    | 1.00
+========================================
+
+YAML results written to: results-2MB.yaml
+Chrome Trace written to: results-2MB.json
+```
+
+Use the `--log-solver` flag to monitor the progress for large scenarios. One can interrupt the result with `^C`, which will cause the current best solution to be output. The message `best:4413340 next:[4413326,4413339]` below indicates that the best solution so far is `4413340 µs` and that the optimal solution falls in the interval `[4413326 µs,4413339 µs]`.
+
+```console
+$ python main.py --out-yaml results-12MB.yaml --out-trace results-2MB.json scenario-2MB.yaml
+
+Reading scenario from scenario-12MB.yaml...
+Solving for 19812 transactions on 4 CPUs...
+
+Starting CP-SAT solver v9.15.6755
+
+. . .
+
+Starting search at 6.41s with 16 workers.
+11 full problem subsolvers: [default_lp, fixed, lb_tree_search, max_lp, no_lp, objective_lb_search, probing, pseudo_costs, quick_restart, quick_restart_no_lp, reduced_costs]
+5 first solution subsolvers: [fj(2), fs_random, fs_random_no_lp, fs_random_quick_restart_no_lp]
+14 interleaved subsolvers: [feasibility_pump, graph_arc_lns, graph_cst_lns, graph_dec_lns, graph_var_lns, lb_relax_lns, ls, ls_lin, rins/rens, rnd_cst_lns, rnd_var_lns, scheduling_intervals_lns, scheduling_precedences_lns, scheduling_time_window_lns]
+3 helper subsolvers: [neighborhood_helper, synchronization_agent, update_gap_integral]
+
+#Bound  16.54s best:inf   next:[4413326,7338749] reduced_costs
+#1      70.51s best:4413961 next:[4413326,4413960] fs_random_quick_restart_no_lp
+#2      91.50s best:4413340 next:[4413326,4413339] no_lp
+^C
+
+. . .
+
+Final t1 (Makespan): 4413961 µs
+
+========================================
+PERFORMANCE STATISTICS
+========================================
+CPU Utilization:       18.5%
+Wallclock Idle:        58.4% (2578290 µs)
+----------------------------------------
+Phase  | Work %   | Parallelism
+----------------------------------------
+Ver    | 74.2%    | 0.89
+App    | 16.6%    | 0.20
+Vote   | 9.2%     | 1.00
+========================================
+
+YAML results written to: results-12MB.yaml
+Chrome Trace written to: results-12MB.json
+```
+
+Results for the two examples are available at [ipfs://bafybeidmyotni665ze2ii3kez6r7r5afv3xdpuplrsxf4vmijbw4umzfze](https://ipfs.functionally.io/ipfs/bafybeidmyotni665ze2ii3kez6r7r5afv3xdpuplrsxf4vmijbw4umzfze/).
+
+![Perfetto trace for 12 MB scenario](./perfetto-12MB.png)
