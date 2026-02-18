@@ -221,12 +221,15 @@ export const useHandlers = () => {
           break;
       }
 
-      // Orient rectangle along travel direction
+      // Orient rectangle along travel direction, clipped to edge bounds
       const angle = Math.atan2(dy, dx);
+      // Clip so the rectangle doesn't extend past sender or recipient nodes
+      const halfForward = Math.min(rectLength / 2, (1.0 - message.progress) * edgeLength);
+      const halfBackward = Math.min(rectLength / 2, message.progress * edgeLength);
       context.save();
       context.translate(x, y);
       context.rotate(angle);
-      context.fillRect(-rectLength / 2, -rectHeight / 2, rectLength, rectHeight);
+      context.fillRect(-halfBackward, -rectHeight / 2, halfForward + halfBackward, rectHeight);
       context.restore();
     });
 
