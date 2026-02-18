@@ -313,6 +313,20 @@ def write_schedule_yaml(filepath, makespan, tasks, params, stats):
 
 def write_chrome_trace(filepath, tasks):
     trace_events = []
+    
+    # 1. Anchor Event: Force timeline to start at 0
+    trace_events.append({
+        "name": "Block Produced",
+        "cat": "__metadata",
+        "ph": "I",  # Instant Event
+        "ts": 0,
+        "pid": 1,
+        "tid": 0,
+        "s": "g",   # Global scope
+        "args": {"desc": "T=0 Anchor"}
+    })
+
+    # 2. Task Events
     for t in tasks:
         # Scale = 1 because units are already microseconds
         scale = 1
