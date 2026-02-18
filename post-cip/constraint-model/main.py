@@ -379,7 +379,7 @@ def plot_gantt(tasks, makespan, params, filename="gantt.png"):
 # ==========================================
 # 3. SOLVER
 # ==========================================
-def solve_system(params, dag, log_progress=False):
+def solve_system(params, dag, log_progress=False, gap=None, abs_gap=None):
     """
     Solves the scheduling problem.
     Returns (makespan, schedule_list, stats_dict) on success.
@@ -470,14 +470,28 @@ def solve_system(params, dag, log_progress=False):
     if log_progress:
         solver.parameters.log_search_progress = True
         
+    # Handle environment-specific missing attributes gracefully
+    if gap is not None:
+        try:
+            solver.parameters.relative_gap_tolerance = gap
+        except AttributeError:
+            print(f"Warning: This OR-Tools build does not support 'relative_gap_tolerance'. Ignoring --gap {gap}.", file=sys.stderr)
+
+    if abs_gap is not None:
+        try:
+            solver.parameters.absolute_gap_tolerance = abs_gap
+        except AttributeError:
+            print(f"Warning: This OR-Tools build does not support 'absolute_gap_tolerance'. Ignoring --abs-gap {abs_gap}.", file=sys.stderr)
+
     status = solver.Solve(model)
 
-    if status == cp_model.OPTIMAL:
+    # Accept both OPTIMAL and FEASIBLE (if stopped by tolerance or time)
+    if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
         makespan, schedule = compute_schedule(solver, task_metadata, all_intervals, vt_end, params)
         stats = calculate_statistics(makespan, schedule, params)
         return makespan, schedule, stats
     else:
-        print("No optimal solution found.", file=sys.stderr)
+        print("No solution found.", file=sys.stderr)
         return None
 
 # ==========================================
@@ -499,6 +513,8 @@ def main():
     # Flags
     parser.add_argument("-v", "--verbose", action="store_true", help="Print schedule to stdout")
     parser.add_argument("--log-solver", action="store_true", help="Enable internal solver progress logging")
+    parser.add_argument("--gap", type=float, help="Relative gap tolerance (e.g. 0.01 for 1%%)")
+    parser.add_argument("--abs-gap", type=float, help="Absolute gap tolerance in microseconds")
     
     args = parser.parse_args()
     
@@ -518,7 +534,7 @@ def main():
         sys.exit(1)
     
     print(f"Solving for {len(dag.nodes)} transactions on {params['n_cpu']} CPUs...", file=sys.stderr)
-    result = solve_system(params, dag, log_progress=args.log_solver)
+    result = solve_system(params, dag, log_progress=args.log_solver, gap=args.gap, abs_gap=args.abs_gap)
     
     if result:
         makespan, schedule, stats = result
