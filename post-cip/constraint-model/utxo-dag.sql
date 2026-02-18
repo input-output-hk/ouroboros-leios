@@ -37,7 +37,7 @@ select
   , tx_size
   , encode(tx.hash, 'hex') as tx_in_hash
   , tx_in.tx_out_index as tx_in_index
-  , coalesce(redeemer.unit_steps :: numeric, 0) / 1000 as ksteps
+  , coalesce(redeemer.unit_steps :: numeric, 0) as steps
   from leios_tx
   inner join tx_in
     on tx_in.tx_in_id = leios_tx.tx_id
@@ -54,10 +54,10 @@ create temporary table leios_scenario as
 select
     json_build_object(
       'parameters', json_build_object(
-        'n_cpu', 8
-      , 'delta_rh', 1000000
-      , 'delta_rb', 1250000
-      , 'delta_eh', 1500000
+        'n_cpu', 4
+      , 'delta_rh', round(500000 + 1000000 * random())
+      , 'delta_rb', round(500000 + 1500000 * random())
+      , 'delta_eh', round(500000 + 2000000 * random())
       , 'cost_vote', 300000
     )
     , 'dag', json_object_agg(tx_hash8, tx_info)
@@ -76,9 +76,9 @@ select
         left(tx_hash, 8) as tx_hash8
       , json_build_object(
           'type', block_type
-          , 'arrival_delay', case when block_type = 'RB' then 0 else round(10000 + (2000000 - 10000) * random()) end
-        , 'cost_verify', round(120000 + 47 * avg(tx_size) + 8 * count(*) + 0.61 * sum(ksteps))
-        , 'cost_apply', round(35000 + 2.8 * avg(tx_size) + 5200 * count(*))
+        , 'arrival_delay', case when block_type = 'RB' then 0 else round(10000 + (2000000 - 10000) * random()) end
+        , 'cost_verify', round((1.2e8 + 4.7e4 * avg(tx_size) + 8.0e3 * count(*) + 0.61e0 * sum(steps)) / 1e6)
+        , 'cost_apply', round((3.5e7 + 2.8e3 * avg(tx_size) + 5.2e6 * count(*)) / 1e6)
         , 'inputs', json_agg(left(tx_in_hash, 8))
         ) as tx_info
       from leios_txin
