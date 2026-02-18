@@ -54,12 +54,8 @@ processes:
         condition: process_completed_successfully
 
   TxGenerator:
-    # Elevated to access root-owned node socket
-    is_elevated: true
-    command: bash -c "while [ ! -S ${WORKING_DIR}/node1/node.socket ]; do sleep 0.5; done && cd ${WORKING_DIR} && tx-generator json_highlevel gen.json"
+    command: while [ ! -S ${WORKING_DIR}/node1/node.socket ]; do sleep 0.5; done && cd ${WORKING_DIR} && tx-generator json_highlevel gen.json
     depends_on:
-      InitNamespaces:
-        condition: process_completed_successfully
       Node1:
         condition: process_started
       Node2:
@@ -68,16 +64,11 @@ processes:
         condition: process_started
 
   ObserveTip:
-    # Elevated to access root-owned node socket
-    is_elevated: true
     environment:
-    command: |
-      CARDANO_NODE_NETWORK_ID=164 \
-      CARDANO_NODE_SOCKET_PATH=${WORKING_DIR}/node1/node.socket \
-      watch -n0.1 "cardano-cli query tip && cardano-cli query tx-mempool info"
+      - CARDANO_NODE_NETWORK_ID=164
+      - CARDANO_NODE_SOCKET_PATH=${WORKING_DIR}/node1/node.socket
+    command: watch -n0.1 "cardano-cli query tip && cardano-cli query tx-mempool info"
     is_interactive: true
     depends_on:
-      InitNamespaces:
-        condition: process_completed_successfully
       Node1:
         condition: process_started

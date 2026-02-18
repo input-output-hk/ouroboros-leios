@@ -8,6 +8,9 @@ cd "$NODE_DIR"
 
 export LEIOS_DB_PATH="leios.db"
 
+# Make socket accessible to non-root (node runs elevated for namespace access)
+(while [ ! -S "node.socket" ]; do sleep 0.1; done; chmod a+rw "node.socket") &
+
 # Run cardano-node
 cardano-node run \
   --config "config.yaml" \
