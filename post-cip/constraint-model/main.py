@@ -314,6 +314,7 @@ def write_schedule_yaml(filepath, makespan, tasks, params, stats):
 def write_chrome_trace(filepath, tasks):
     trace_events = []
     for t in tasks:
+        # Scale = 1 because units are already microseconds
         scale = 1
         event = {
             "name": t['desc'],
@@ -379,6 +380,12 @@ def plot_gantt(tasks, makespan, params, filename="gantt.png"):
 # 3. SOLVER
 # ==========================================
 def solve_system(params, dag):
+    """
+    Solves the scheduling problem.
+    Returns (makespan, schedule_list, stats_dict) on success.
+    Returns None on failure.
+    Does NO file I/O.
+    """
     model = cp_model.CpModel()
     
     t_rh = params['delta_rh']
@@ -402,7 +409,8 @@ def solve_system(params, dag):
     apply_end_vars = {}
     task_metadata = {}
 
-    for node_id in dag.nodes():
+    # Topological sort ensures we process parents before children
+    for node_id in nx.topological_sort(dag):
         attrs = dag.nodes[node_id]
         node_type = attrs['type']
         
