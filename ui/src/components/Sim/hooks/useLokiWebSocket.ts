@@ -224,7 +224,7 @@ const parseEndorserBlockSent = (
 
       const message: IEndorserBlockSent = {
         type: EServerMessageType.EBSent,
-        slot: 0, // FIXME: drop as not available/needed
+        slot: 0, // TODO: add slot (full point) to logs?
         id: log.msg.ebHash,
         sender,
         recipient,
@@ -311,14 +311,11 @@ const parseTransactionSent = (
         log.peer?.connectionId || log.connectionId,
       );
 
-      // FIXME: msg.txs is always elided, this makes all visualization of
-      // individual tx (fetches) unreliable
-      const txId = nextTxId[sender] || 0;
-      nextTxId[sender] = txId + 1;
+      const txId = `${log.msg.ebHash}-${log.msg.bitmaps.reduce((acc: string, bitmap: any) => acc + bitmap, "")}`;
 
       const message: ITransactionSent = {
         type: EServerMessageType.TransactionSent,
-        id: txId.toString(),
+        id: txId,
         sender,
         recipient,
         msg_size_bytes: log.msg.txsBytesSize,
