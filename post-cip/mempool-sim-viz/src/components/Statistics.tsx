@@ -65,7 +65,7 @@ export function Statistics({ stats, blocks, ebEnabled, endorserBlocks = [] }: St
           value={stats.blocksProduced}
         />
         <StatCard
-          label="Block Fill"
+          label="Avg Block Fill"
           value={`${fillPercent}%`}
         />
         {ebEnabled && (
@@ -78,7 +78,7 @@ export function Statistics({ stats, blocks, ebEnabled, endorserBlocks = [] }: St
             <StatCard
               label="Uncertified EBs"
               value={endorserBlocks.filter(eb => !eb.certified).length}
-              color={COLORS.adversary}
+              color={COLORS.textMuted}
             />
           </>
         )}
