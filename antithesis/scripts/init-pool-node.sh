@@ -42,7 +42,8 @@ if [ "$POOL_NUM" = "1" ]; then
 
 	# Get current time for genesis
 	startTimeEpoch=$(date +%s)
-	startTimeIso=$(date -u -d "@$startTimeEpoch" +"%Y-%m-%dT%H:%M:%SZ")
+	# GNU date uses -d, BSD/macOS date uses -r for epoch conversion
+	startTimeIso=$(date -u -d "@$startTimeEpoch" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -r "$startTimeEpoch" +"%Y-%m-%dT%H:%M:%SZ")
 
 	echo "  systemStart: $startTimeIso (epoch: $startTimeEpoch)"
 
