@@ -103,7 +103,7 @@ pEBOnTime ::
 pEBOnTime lHdr =
   successWithin
     fetchingEB
-    (toRational lHdr)
+    (fromIntegral lHdr)
 
 -- | Probability that 'validateEB' is successful before the end of \(L_\text{vote}\)
 pValidating ::
