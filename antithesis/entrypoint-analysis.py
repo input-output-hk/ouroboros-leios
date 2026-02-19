@@ -12,7 +12,7 @@ from datetime import datetime
 
 # Import Antithesis SDK - handles gracefully if not available
 try:
-    from antithesis import setup_complete
+    from antithesis.lifecycle import setup_complete
     from antithesis.assertions import always, sometimes
 
     ANTITHESIS_AVAILABLE = True
