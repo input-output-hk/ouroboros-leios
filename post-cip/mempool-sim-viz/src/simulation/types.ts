@@ -125,14 +125,14 @@ export const DEFAULT_CONFIG: SimulationConfig = {
 };
 
 export const LARGE_CONFIG: SimulationConfig = {
-  nodes: 500,
-  degree: 6,
+  nodes: 300,
+  degree: 8,
   block: 90_112,
   mempool: 180_224,
   latency: 0.05,
   bandwidth: 12_500_000,
-  adversaries: 10,
-  adversaryDegree: 10,
+  adversaries: 25,
+  adversaryDegree: 20,
   adversaryDelay: 0.000001,
   txLoad_KBps: 15,
   txSize: 512,

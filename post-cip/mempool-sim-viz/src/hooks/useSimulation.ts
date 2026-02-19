@@ -670,7 +670,9 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
     const isMatrixMode = layoutType === 'matrix';
     const nodeCount = nodesRef.current.length;
     const baseEvents = Math.ceil(speedRef.current * 10);
-    const eventsPerFrame = nodeCount > 500 ? baseEvents * 100 : baseEvents;
+    const eventsPerFrame = nodeCount > 500 ? baseEvents * 200
+      : nodeCount > 100 ? baseEvents * 20
+      : baseEvents;
     for (let i = 0; i < eventsPerFrame && sim.pendingEvents > 0; i++) {
       const event = sim.step();
       if (event) {

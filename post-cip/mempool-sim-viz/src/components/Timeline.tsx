@@ -133,7 +133,7 @@ export function Timeline({
         {/* Speed - cycles through options on click */}
         <IconButton
           onClick={() => {
-            const speeds = [0.5, 1, 2, 5, 10];
+            const speeds = [0.5, 1, 2, 5, 10, 25, 50, 100];
             const currentIndex = speeds.indexOf(speed);
             const nextIndex = (currentIndex + 1) % speeds.length;
             onSpeedChange(speeds[nextIndex]!);
