@@ -88,13 +88,21 @@ When EB mode is enabled, endorser blocks are produced alongside regular blocks. 
 
 **EB size on the wire:** `32 × txRefCount` bytes (just the tx ID hashes).
 
+**EB announcement and certification flow:**
+
+1. RB1 is produced. If the producer's mempool has overflow (txs remaining after filling RB1), EB1 is announced referencing those txs. Empty EBs are never announced.
+2. RB2 is produced by the next block producer. If a pending EB1 exists, certification is decided by coin flip (`ebCertificationRate`, default 50%):
+   - **Certified:** RB2 carries only the EB1 certificate (no txs). EB1's referenced txs are removed from all mempools (considered "in the chain" via the EB).
+   - **Not certified:** RB2 fills with txs normally. EB1's txs that weren't included in RB2 remain available for future blocks or EBs.
+3. In both cases, if the producer still has remaining mempool txs, a new EB2 is announced alongside RB2.
+
 | Simplification | Description | Impact |
 |----------------|-------------|--------|
-| EB timing | Produced alongside a block only when producer has mempool overflow (txs remaining after block fill); empty EBs are never announced | Real Leios has a separate EB production schedule independent of blocks |
-| EB content | References all remaining txs in producer's mempool (post-block) up to `ebSize` | Real EB construction may be more selective |
-| Certification | Instant coin flip (`ebCertificationRate`) at production time | Real certification involves a voting protocol among multiple nodes over time |
-| Uncertified EB penalty | Next block after an uncertified EB is forced empty | Placeholder — real penalty mechanism TBD in Leios spec |
-| EB-to-block pipeline | Not modeled — EBs and blocks interact only through the empty-block penalty | Real Leios has Input Blocks → Endorser Blocks → Voting → Ranking Blocks pipeline |
+| EB timing | Produced alongside a block when producer has mempool overflow; whether EBs appear is an emergent property of tx load vs block capacity | Real Leios has a separate EB production schedule independent of blocks |
+| EB content | References all remaining txs in producer's mempool (post-block, post-certification) up to `ebSize` | Real EB construction may be more selective |
+| Certification | Coin flip at next block production time (`ebCertificationRate`) | Real certification involves a voting protocol among multiple nodes over time |
+| Certified RB content | RB carries only the certificate — no txs, certified EB's txs removed from all mempools | Matches Leios intent: certified EBs obviate tx inclusion in RBs |
+| EB-to-block pipeline | Simplified to EB → next-RB certification → certificate-only or normal RB | Real Leios has Input Blocks → Endorser Blocks → Voting → Ranking Blocks pipeline |
 
 #### EB Transaction Fetching
 

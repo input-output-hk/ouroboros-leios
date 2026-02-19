@@ -284,18 +284,67 @@ export class Simulation {
     this.push({ kind: 'ProduceBlock', clock, producerIdx, blockSize_B });
   }
 
+  /**
+   * Remove a tx (and its counterpart) from all mempools, marking it as resolved.
+   */
+  private consumeTx(txIdx: number, resolvedAt: number): void {
+    const reg = this.registry;
+    const tx = reg.txs[txIdx]!;
+    if (tx.includedInBlock >= 0) return; // already consumed
+    tx.includedInBlock = resolvedAt;
+
+    reg.inMempool[txIdx]!.forEach((nodeIdx) => {
+      this.nodes[nodeIdx]!.removeFromMempool(tx.size_B);
+    });
+    reg.inMempool[txIdx]!.reset();
+
+    // Also remove counterpart
+    if (tx.isAdversarial && tx.honestCounterpart >= 0) {
+      const cp = tx.honestCounterpart;
+      const cpTx = reg.txs[cp]!;
+      if (cpTx.includedInBlock < 0) {
+        cpTx.includedInBlock = resolvedAt;
+        reg.inMempool[cp]!.forEach((nodeIdx) => {
+          this.nodes[nodeIdx]!.removeFromMempool(cpTx.size_B);
+        });
+        reg.inMempool[cp]!.reset();
+      }
+    } else if (!tx.isAdversarial && tx.adversarialVariant >= 0) {
+      const av = tx.adversarialVariant;
+      const avTx = reg.txs[av]!;
+      if (avTx.includedInBlock < 0) {
+        avTx.includedInBlock = resolvedAt;
+        reg.inMempool[av]!.forEach((nodeIdx) => {
+          this.nodes[nodeIdx]!.removeFromMempool(avTx.size_B);
+        });
+        reg.inMempool[av]!.reset();
+      }
+    }
+  }
+
   private handleProduceBlock(producerIdx: number, clock: number, blockSize_B: number): void {
     const reg = this.registry;
     const producer = this.nodes[producerIdx]!;
     const blockIdx = this.blocks.length;
 
-    // When ebEnabled: only the block IMMEDIATELY after an uncertified EB is empty
-    const canIncludeTxs = !this.ebEnabled || !this.lastEB || this.lastEB.certified;
-    if (this.lastEB && !this.lastEB.certified) {
-      this.lastEB = null; // clear so only ONE empty block per uncertified EB
+    // Step 1: Certify pending EB from previous block (if any)
+    let canIncludeTxs = true;
+    if (this.ebEnabled && this.lastEB) {
+      const certified = Math.random() < this.ebCertificationRate;
+      this.lastEB.certified = certified;
+      if (certified) {
+        // Certified EB: this RB carries only the certificate, no txs
+        canIncludeTxs = false;
+        // Remove certified EB's txs from all mempools — they're in the chain via the EB
+        for (const txIdx of this.lastEB.txRefs) {
+          this.consumeTx(txIdx, blockIdx);
+        }
+      }
+      // EB is resolved regardless of certification outcome
+      this.lastEB = null;
     }
 
-    // Collect txs from producer's mempool up to block size
+    // Step 2: Fill block from producer's mempool (skip if carrying a certificate)
     const txIndices: number[] = [];
     let size = 0;
     let honestCount = 0;
@@ -334,44 +383,19 @@ export class Simulation {
         size_B: size,
         honestCount,
         adversarialCount,
+        certified: !canIncludeTxs,
       }, 'block produced');
     }
 
-    // Remove included txs from ALL nodes' mempools
+    // Step 3: Remove block txs from all mempools
     for (const txIdx of txIndices) {
-      const tx = reg.txs[txIdx]!;
-      tx.includedInBlock = blockIdx;
-
-      // Sweep mempool bitmap — remove from every node
-      reg.inMempool[txIdx]!.forEach((nodeIdx) => {
-        this.nodes[nodeIdx]!.removeFromMempool(tx.size_B);
-      });
-      reg.inMempool[txIdx]!.reset();
-
-      // Also remove counterpart
-      if (tx.isAdversarial && tx.honestCounterpart >= 0) {
-        const cp = tx.honestCounterpart;
-        const cpTx = reg.txs[cp]!;
-        cpTx.includedInBlock = blockIdx; // mark as resolved
-        reg.inMempool[cp]!.forEach((nodeIdx) => {
-          this.nodes[nodeIdx]!.removeFromMempool(cpTx.size_B);
-        });
-        reg.inMempool[cp]!.reset();
-      } else if (!tx.isAdversarial && tx.adversarialVariant >= 0) {
-        const av = tx.adversarialVariant;
-        const avTx = reg.txs[av]!;
-        avTx.includedInBlock = blockIdx;
-        reg.inMempool[av]!.forEach((nodeIdx) => {
-          this.nodes[nodeIdx]!.removeFromMempool(avTx.size_B);
-        });
-        reg.inMempool[av]!.reset();
-      }
+      this.consumeTx(txIdx, blockIdx);
     }
 
     // Producer marks block seen
     producer.seenBlocks.add(block.blockId);
 
-    // Produce EB if enabled and producer still has mempool overflow after block
+    // Step 4: Announce EB if producer still has mempool txs remaining
     if (this.ebEnabled && producer.mempoolBytes > 0) {
       this.push({
         kind: 'ProduceEB',
@@ -381,7 +405,7 @@ export class Simulation {
       });
     }
 
-    // Diffuse block to downstream peers
+    // Step 5: Diffuse block to downstream peers
     for (const peerIdx of producer.downstreamPeers) {
       const link = this.getLink(producerIdx, peerIdx);
       if (!link) continue;
@@ -467,7 +491,7 @@ export class Simulation {
       clock,
       txRefs,
       size_B: size,
-      certified: Math.random() < this.ebCertificationRate,
+      certified: false, // pending — decided at next block production
     };
     this.endorserBlocks.push(eb);
     this.lastEB = eb;
