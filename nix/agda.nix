@@ -1,22 +1,20 @@
 {
   pkgs,
   inputs,
-  lib,
   system,
   ...
 }:
 
-with pkgs;
 let
 
   locales = {
     LANG = "en_US.UTF-8";
     LC_ALL = "en_US.UTF-8";
     LOCALE_ARCHIVE =
-      if pkgs.system == "x86_64-linux" then "${pkgs.glibcLocales}/lib/locale/locale-archive" else "";
+      if system == "x86_64-linux" then "${pkgs.glibcLocales}/lib/locale/locale-archive" else "";
   };
 
-  inherit (inputs.leios-spec.packages.${pkgs.system})
+  inherit (inputs.leios-spec.packages.${system})
     agdaWithPkgs
     leiosSpec
     leiosDocs
@@ -64,7 +62,7 @@ let
     '';
   };
 in
-lib.optionalAttrs (system == "x86_64-linux") {
+{
   inherit
     leiosSpec
     leiosDocs

@@ -8,7 +8,7 @@
 
 let
 
-  agda = import ./agda.nix { inherit pkgs lib inputs; };
+  inherit (repoRoot.nix) agda;
 
   sources = pkgs.stdenv.mkDerivation {
     name = "leios-hs-sources";

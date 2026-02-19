@@ -1,21 +1,20 @@
 {
   repoRoot,
-  inputs,
   pkgs,
   lib,
+  system,
   ...
 }:
 
 let
 
-  inherit (repoRoot.nix) project;
-  agda = import ./agda.nix { inherit pkgs lib inputs; };
+  inherit (repoRoot.nix) project agda;
   artifacts = import ./artifacts.nix { inherit pkgs; };
 
 in
 
 [
-  project.flake
+  (lib.optionalAttrs (system == "x86_64-linux") project.flake)
   {
     packages = agda // artifacts;
   }

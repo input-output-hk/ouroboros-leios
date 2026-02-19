@@ -1,10 +1,8 @@
 # Docs for this file: https://github.com/input-output-hk/iogx/blob/main/doc/api.md#mkhaskellprojectinshellargs
 # See `shellArgs` in `mkHaskellProject` in ./project.nix for more details.
-
 {
-  inputs,
+  repoRoot,
   pkgs,
-  lib,
   ...
 }:
 
@@ -14,7 +12,7 @@
 _cabalProject:
 
 let
-  agda = import ./agda.nix { inherit pkgs lib inputs; };
+  inherit (repoRoot.nix) agda;
   emacsWithPackages = pkgs.emacs.pkgs.withPackages (epkgs: [
     epkgs.agda2-mode
     pkgs.mononoki
