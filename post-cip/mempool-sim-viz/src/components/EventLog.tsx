@@ -10,6 +10,8 @@ const COLORS = {
   adversary: '#ef4444',
   frontrun: '#f97316',
   block: '#fbbf24',
+  rb: '#fbbf24',
+  eb: '#22d3ee',
 };
 
 interface EventLogProps {
@@ -34,7 +36,6 @@ export function EventLog({ entries, fullLog, maxHeight = 200 }: EventLogProps) {
   const handleScroll = () => {
     const container = scrollRef.current;
     if (container) {
-      // If user is near the bottom, enable auto-scroll
       const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 50;
       autoScrollRef.current = isNearBottom;
     }
@@ -42,7 +43,7 @@ export function EventLog({ entries, fullLog, maxHeight = 200 }: EventLogProps) {
 
   const handleCopy = useCallback(() => {
     const text = fullLog.map(entry => {
-      const kind = entry.kind === 'submit' ? 'SUB' : entry.kind === 'send' ? 'TX' : entry.kind === 'block' ? 'BLK' : entry.kind.toUpperCase();
+      const kind = getKindLabel(entry.kind);
       const adv = entry.isAdversarial ? ' [ADV]' : '';
       return `${entry.time.toFixed(2)}s ${kind} ${entry.message}${adv}`;
     }).join('\n');
@@ -55,17 +56,11 @@ export function EventLog({ entries, fullLog, maxHeight = 200 }: EventLogProps) {
 
   const getKindColor = (kind: string, isAdversarial?: boolean) => {
     if (kind === 'block') return COLORS.block;
+    if (kind === 'diffuse-rb') return COLORS.rb;
+    if (kind === 'diffuse-eb') return COLORS.eb;
+    if (kind === 'eb-tx') return COLORS.eb;
     if (isAdversarial) return COLORS.frontrun;
     return COLORS.honest;
-  };
-
-  const getKindLabel = (kind: string) => {
-    switch (kind) {
-      case 'submit': return 'SUB';
-      case 'send': return 'TX';
-      case 'block': return 'BLK';
-      default: return kind.toUpperCase().slice(0, 3);
-    }
   };
 
   return (
@@ -115,4 +110,17 @@ export function EventLog({ entries, fullLog, maxHeight = 200 }: EventLogProps) {
       </div>
     </div>
   );
+}
+
+function getKindLabel(kind: string): string {
+  switch (kind) {
+    case 'submit': return 'SUB';
+    case 'send': return 'TX';
+    case 'block': return 'BLK';
+    case 'diffuse-rb': return 'RB';
+    case 'diffuse-eb': return 'EB';
+    case 'eb-tx': return 'EBT';
+    case 'churn': return 'CHN';
+    default: return kind.toUpperCase().slice(0, 3);
+  }
 }

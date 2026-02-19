@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "d3-force": "^3.0.0",
-    "graphology": "^0.26.0",
     "mempool-sim-web": "file:../mempool-sim-web",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"

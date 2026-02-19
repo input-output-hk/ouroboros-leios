@@ -1,7 +1,7 @@
 import { forceSimulation, forceLink, forceManyBody, forceCollide, type Simulation as D3Simulation } from 'd3-force';
 import type { VisualEdge } from './types';
 
-export type LayoutType = 'circular' | 'force';
+export type LayoutType = 'circular' | 'force' | 'matrix';
 
 export function computeCircularLayout(
   nodeIds: string[],

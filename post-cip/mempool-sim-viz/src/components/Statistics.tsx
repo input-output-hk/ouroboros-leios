@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'react';
-import type { SimulationStats, Block } from '@/simulation';
+import type { SimulationStats, BlockDisplay, EndorserBlock } from '@/simulation';
 
 // Theme colors from Leios site
 const COLORS = {
@@ -10,6 +10,7 @@ const COLORS = {
   textMuted: '#8f6dae',
   honest: '#6effd1',
   adversary: '#ef4444',
+  eb: '#22d3ee',
 };
 
 interface StatCardProps {
@@ -29,10 +30,12 @@ function StatCard({ label, value, color }: StatCardProps) {
 
 interface StatisticsProps {
   stats: SimulationStats;
-  blocks: Block[];
+  blocks: BlockDisplay[];
+  ebEnabled?: boolean;
+  endorserBlocks?: EndorserBlock[];
 }
 
-export function Statistics({ stats, blocks }: StatisticsProps) {
+export function Statistics({ stats, blocks, ebEnabled, endorserBlocks = [] }: StatisticsProps) {
   const frontRunPercent = (stats.frontRunRate * 100).toFixed(1);
   const fillPercent = stats.avgBlockFillPercent.toFixed(1);
   const traceRef = useRef<HTMLDivElement>(null);
@@ -65,6 +68,20 @@ export function Statistics({ stats, blocks }: StatisticsProps) {
           label="Block Fill"
           value={`${fillPercent}%`}
         />
+        {ebEnabled && (
+          <>
+            <StatCard
+              label="Certified EBs"
+              value={endorserBlocks.filter(eb => eb.certified).length}
+              color={COLORS.eb}
+            />
+            <StatCard
+              label="Uncertified EBs"
+              value={endorserBlocks.filter(eb => !eb.certified).length}
+              color={COLORS.adversary}
+            />
+          </>
+        )}
       </div>
 
       <div className="pt-3 mb-3" style={{ borderTop: `1px solid ${COLORS.border}` }}>

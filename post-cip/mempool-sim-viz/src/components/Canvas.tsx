@@ -1,8 +1,9 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
-import type { VisualNode, VisualEdge, AnimatedTx, LayoutType } from '@/simulation';
+import type { VisualNode, VisualEdge, AnimatedTx, AnimatedBlock, LayoutType } from '@/simulation';
 
 export interface SelectedNodeInfo {
   id: string;
+  idx: number;
   honest: boolean;
   upstream: string[];   // nodes that send TO this node
   downstream: string[]; // nodes this node sends TO
@@ -12,6 +13,7 @@ interface CanvasProps {
   nodes: VisualNode[];
   edges: VisualEdge[];
   animatedTxs: AnimatedTx[];
+  animatedBlocks: AnimatedBlock[];
   blockFlash: { nodeId: string; opacity: number } | null;
   blockCount: number;
   selectedNode: SelectedNodeInfo | null;
@@ -22,6 +24,7 @@ interface CanvasProps {
   layoutType: LayoutType;
   zoom: number;
   onZoomChange: (zoom: number) => void;
+  onRegisterFitView?: (fn: () => void) => void;
 }
 
 // Theme colors from Leios site
@@ -41,12 +44,15 @@ const COLORS = {
   selection: '#ffffff',
   blockFlash: 'rgba(110, 255, 209, 0.5)',
   poisoned: '#f97316',  // orange - matches frontrun tx color
+  rb: '#fbbf24',         // gold/amber for regular blocks
+  eb: '#22d3ee',         // cyan for endorser blocks
 };
 
 export function Canvas({
   nodes,
   edges,
   animatedTxs,
+  animatedBlocks,
   blockFlash,
   blockCount,
   selectedNode,
@@ -57,6 +63,7 @@ export function Canvas({
   layoutType,
   zoom,
   onZoomChange,
+  onRegisterFitView,
 }: CanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const nodePositions = useRef<Map<string, { x: number; y: number }>>(new Map());
@@ -122,7 +129,6 @@ export function Canvas({
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    // Check if clicking on a node (for force layout dragging)
     const clickedNode = findNodeAtPosition(x, y);
 
     if (clickedNode && layoutType === 'force' && onDragStart) {
@@ -130,7 +136,6 @@ export function Canvas({
       dragStartRef.current = { x, y };
       onDragStart(clickedNode.id, clickedNode.position.x, clickedNode.position.y);
     } else {
-      // Start panning
       setIsPanning(true);
       panStartRef.current = { x: e.clientX, y: e.clientY, panX: panOffset.x, panY: panOffset.y };
     }
@@ -145,7 +150,6 @@ export function Canvas({
     const y = e.clientY - rect.top;
 
     if (draggingNode && onDrag) {
-      // Convert screen coords back to sim coords
       const graphSize = Math.min(size.width, size.height) * 0.85 * zoom;
       const scale = graphSize / 640;
       const simX = (x - offset.x - panOffset.x) / scale;
@@ -157,7 +161,6 @@ export function Canvas({
       const dy = e.clientY - panStartRef.current.y;
       setPanOffset({ x: panStartRef.current.panX + dx, y: panStartRef.current.panY + dy });
     } else {
-      // Update hover state - use ref to avoid draw recreation, state for cursor
       const node = findNodeAtPosition(x, y);
       const newHoveredId = node?.id ?? null;
       hoveredNodeRef.current = newHoveredId;
@@ -173,7 +176,6 @@ export function Canvas({
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    // If we were dragging, check if it was just a click (minimal movement)
     if (draggingNode) {
       const dx = x - dragStartRef.current.x;
       const dy = y - dragStartRef.current.y;
@@ -182,16 +184,15 @@ export function Canvas({
       if (onDragEnd) onDragEnd(draggingNode);
       setDraggingNode(null);
 
-      // If moved more than a few pixels, it was a drag - don't select
       if (distance > 5) return;
 
-      // It was a click - select the node
       const clickedNode = findNodeAtPosition(x, y);
       if (clickedNode) {
         const upstream = edges.filter(e => e.target === clickedNode.id).map(e => e.source);
         const downstream = edges.filter(e => e.source === clickedNode.id).map(e => e.target);
         onNodeSelect({
           id: clickedNode.id,
+          idx: nodes.indexOf(clickedNode),
           honest: clickedNode.honest,
           upstream,
           downstream,
@@ -200,18 +201,15 @@ export function Canvas({
       return;
     }
 
-    // If we were panning, check if it was just a click (minimal movement)
     if (isPanning) {
       setIsPanning(false);
       const dx = e.clientX - panStartRef.current.x;
       const dy = e.clientY - panStartRef.current.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
 
-      // If moved more than a few pixels, it was a pan - don't select
       if (distance > 5) return;
     }
 
-    // Handle click/selection
     const clickedNode = findNodeAtPosition(x, y);
 
     if (clickedNode) {
@@ -220,6 +218,7 @@ export function Canvas({
 
       onNodeSelect({
         id: clickedNode.id,
+        idx: nodes.indexOf(clickedNode),
         honest: clickedNode.honest,
         upstream,
         downstream,
@@ -227,7 +226,7 @@ export function Canvas({
     } else {
       onNodeSelect(null);
     }
-  }, [draggingNode, isPanning, findNodeAtPosition, edges, onNodeSelect, onDragEnd]);
+  }, [draggingNode, isPanning, findNodeAtPosition, edges, nodes, onNodeSelect, onDragEnd]);
 
   const handleMouseLeave = useCallback(() => {
     if (isPanning) setIsPanning(false);
@@ -240,10 +239,19 @@ export function Canvas({
   }, [isPanning, draggingNode, onDragEnd]);
 
   const handleDoubleClick = useCallback(() => {
-    // Reset pan and zoom
     setPanOffset({ x: 0, y: 0 });
     onZoomChange(1);
   }, [onZoomChange]);
+
+  // Register fitView for external callers
+  useEffect(() => {
+    if (onRegisterFitView) {
+      onRegisterFitView(() => {
+        setPanOffset({ x: 0, y: 0 });
+        onZoomChange(1);
+      });
+    }
+  }, [onRegisterFitView, onZoomChange]);
 
   // Mouse wheel zoom
   useEffect(() => {
@@ -281,35 +289,15 @@ export function Canvas({
       const fromPos = nodePositions.current.get(edge.source);
       const toPos = nodePositions.current.get(edge.target);
       if (fromPos && toPos) {
-        // Calculate draw parameters based on animation state
-        let opacity = 1;
-        let drawProgress = 1; // How much of the edge to draw (0-1)
-
-        if (edge.animationState === 'adding') {
-          // Grow from source to target
-          drawProgress = edge.animationProgress ?? 1;
-          opacity = 1;
-        } else if (edge.animationState === 'removing') {
-          // Fade out
-          opacity = 1 - (edge.animationProgress ?? 0);
-        }
-        if (opacity <= 0) return; // Skip fully faded edges
-
-        // Calculate end point based on draw progress
-        const endX = fromPos.x + (toPos.x - fromPos.x) * drawProgress;
-        const endY = fromPos.y + (toPos.y - fromPos.y) * drawProgress;
-
         // Highlight edges connected to selected node
         let edgeColor = COLORS.edgeNormal;
         let lineWidth = 1;
 
         if (selectedNode) {
           if (edge.target === selectedNode.id) {
-            // Upstream edge (pointing TO selected node)
             edgeColor = COLORS.edgeHighlight;
             lineWidth = 2;
           } else if (edge.source === selectedNode.id) {
-            // Downstream edge (FROM selected node)
             edgeColor = COLORS.textMuted;
             lineWidth = 2;
           } else {
@@ -317,16 +305,15 @@ export function Canvas({
           }
         }
 
-        ctx.globalAlpha = opacity;
         ctx.strokeStyle = edgeColor;
         ctx.lineWidth = lineWidth * scale;
         ctx.beginPath();
         ctx.moveTo(fromPos.x, fromPos.y);
-        ctx.lineTo(endX, endY);
+        ctx.lineTo(toPos.x, toPos.y);
         ctx.stroke();
 
-        // Draw arrowhead for highlighted edges (only when fully drawn)
-        if (drawProgress >= 1 && selectedNode && (edge.target === selectedNode.id || edge.source === selectedNode.id)) {
+        // Draw arrowhead for highlighted edges
+        if (selectedNode && (edge.target === selectedNode.id || edge.source === selectedNode.id)) {
           const angle = Math.atan2(toPos.y - fromPos.y, toPos.x - fromPos.x);
           const arrowLen = 10 * scale;
           const arrowX = toPos.x - 12 * scale * Math.cos(angle);
@@ -346,7 +333,6 @@ export function Canvas({
           ctx.fillStyle = edgeColor;
           ctx.fill();
         }
-        ctx.globalAlpha = 1; // Reset alpha
       }
     });
 
@@ -358,11 +344,9 @@ export function Canvas({
         const x = fromPos.x + (toPos.x - fromPos.x) * tx.progress;
         const y = fromPos.y + (toPos.y - fromPos.y) * tx.progress;
 
-        // Check if tx is on a connection of the selected/hovered node
         const focusNode = selectedNode?.id ?? hoveredNodeRef.current;
         let isRelevant = true;
         if (focusNode) {
-          // Tx is relevant if it involves the focus node or travels on its edges
           const focusUpstream = selectedNode?.upstream ?? [];
           const focusDownstream = selectedNode?.downstream ?? [];
           const isDirectlyConnected =
@@ -374,7 +358,6 @@ export function Canvas({
           isRelevant = isDirectlyConnected || isOnFocusEdge;
         }
 
-        // Relevant txs are normal size, others are smaller and faded
         const txRadius = isRelevant ? 4 * scale : 2 * scale;
         ctx.beginPath();
         ctx.arc(x, y, txRadius, 0, 2 * Math.PI);
@@ -387,6 +370,51 @@ export function Canvas({
       }
     });
 
+    // Draw animated blocks (RB + EB)
+    animatedBlocks.forEach(block => {
+      const fromPos = nodePositions.current.get(block.fromNode);
+      const toPos = nodePositions.current.get(block.toNode);
+      if (fromPos && toPos) {
+        const x = fromPos.x + (toPos.x - fromPos.x) * block.progress;
+        const y = fromPos.y + (toPos.y - fromPos.y) * block.progress;
+
+        const focusNode = selectedNode?.id ?? hoveredNodeRef.current;
+        let isRelevant = true;
+        if (focusNode) {
+          const isDirectlyConnected =
+            block.fromNode === focusNode ||
+            block.toNode === focusNode;
+          isRelevant = isDirectlyConnected;
+        }
+
+        const blockSize = isRelevant ? 6 * scale : 3 * scale;
+
+        if (block.type === 'rb') {
+          // Gold/amber square for regular blocks
+          ctx.save();
+          if (isRelevant) {
+            ctx.fillStyle = COLORS.rb;
+          } else {
+            ctx.fillStyle = 'rgba(251, 191, 36, 0.15)';
+          }
+          ctx.fillRect(x - blockSize, y - blockSize, blockSize * 2, blockSize * 2);
+          ctx.restore();
+        } else {
+          // Cyan diamond for endorser blocks
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(Math.PI / 4);
+          if (isRelevant) {
+            ctx.fillStyle = COLORS.eb;
+          } else {
+            ctx.fillStyle = 'rgba(34, 211, 238, 0.15)';
+          }
+          ctx.fillRect(-blockSize, -blockSize, blockSize * 2, blockSize * 2);
+          ctx.restore();
+        }
+      }
+    });
+
     // Draw nodes
     nodes.forEach(node => {
       const pos = nodePositions.current.get(node.id);
@@ -396,13 +424,11 @@ export function Canvas({
       const fillBonus = (node.mempoolFillPercent / 100) * 6 * scale;
       const radius = baseRadius + fillBonus;
 
-      // Check if this node is related to selection
       const isSelected = selectedNode?.id === node.id;
       const isUpstream = selectedNode?.upstream.includes(node.id);
       const isDownstream = selectedNode?.downstream.includes(node.id);
       const isRelated = isSelected || isUpstream || isDownstream;
 
-      // Dim unrelated nodes when something is selected
       const dimmed = selectedNode && !isRelated;
 
       // Draw glow for nodes with high mempool fill
@@ -425,7 +451,6 @@ export function Canvas({
         ctx.fillStyle = `rgba(110, 255, 209, ${0.5 * opacity})`;
         ctx.fill();
 
-        // "Block #N" label
         ctx.font = `bold ${12 * scale}px monospace`;
         ctx.fillStyle = `rgba(110, 255, 209, ${opacity})`;
         ctx.textAlign = 'left';
@@ -445,7 +470,7 @@ export function Canvas({
         ctx.fill();
       }
 
-      // Poisoned ring (honest nodes with adversarial txs in mempool)
+      // Poisoned ring
       if (node.honest && node.isPoisoned && !dimmed) {
         ctx.beginPath();
         ctx.arc(x, y, radius + 8 * scale, 0, 2 * Math.PI);
@@ -462,21 +487,18 @@ export function Canvas({
         ctx.lineWidth = 3 * scale;
         ctx.stroke();
       } else if (isUpstream) {
-        // Ring for upstream peers
         ctx.beginPath();
         ctx.arc(x, y, radius + 4 * scale, 0, 2 * Math.PI);
         ctx.strokeStyle = COLORS.edgeHighlight;
         ctx.lineWidth = 2 * scale;
         ctx.stroke();
       } else if (isDownstream) {
-        // Ring for downstream peers
         ctx.beginPath();
         ctx.arc(x, y, radius + 4 * scale, 0, 2 * Math.PI);
         ctx.strokeStyle = COLORS.textMuted;
         ctx.lineWidth = 2 * scale;
         ctx.stroke();
       } else if (isHovered && !dimmed) {
-        // Hover ring
         ctx.beginPath();
         ctx.arc(x, y, radius + 4 * scale, 0, 2 * Math.PI);
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
@@ -510,7 +532,7 @@ export function Canvas({
       ctx.textBaseline = 'middle';
       ctx.fillText(node.id, x, y + radius + 12 * scale);
     });
-  }, [nodes, edges, animatedTxs, blockFlash, blockCount, selectedNode, size, offset, zoom]);
+  }, [nodes, edges, animatedTxs, animatedBlocks, blockFlash, blockCount, selectedNode, size, offset, zoom]);
 
   useEffect(() => {
     let frameId: number;
