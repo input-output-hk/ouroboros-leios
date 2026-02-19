@@ -62,8 +62,29 @@ jobs:
           push: ${{ github.event_name == 'push' || github.event.inputs.push_images == 'true' }}
           tags: ${{ steps.meta-cardano-node.outputs.tags }}
           labels: ${{ steps.meta-cardano-node.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=cardano-node-leios
+          cache-to: type=gha,mode=max,scope=cardano-node-leios
+
+      - name: Extract metadata for cardano-node-bp
+        id: meta-cardano-node-bp
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/cardano-node-bp
+          tags: |
+            type=sha
+            type=ref,event=branch
+            type=ref,event=pr
+
+      - name: Build cardano-node-bp image
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
+        with:
+          context: .
+          file: ./antithesis/Dockerfile.cardano-node-bp
+          push: ${{ github.event_name == 'push' || github.event.inputs.push_images == 'true' }}
+          tags: ${{ steps.meta-cardano-node-bp.outputs.tags }}
+          labels: ${{ steps.meta-cardano-node-bp.outputs.labels }}
+          cache-from: type=gha,scope=cardano-node-bp
+          cache-to: type=gha,mode=max,scope=cardano-node-bp
 
       - name: Extract metadata for immdb-server
         id: meta-immdb-server
@@ -83,8 +104,8 @@ jobs:
           push: ${{ github.event_name == 'push' || github.event.inputs.push_images == 'true' }}
           tags: ${{ steps.meta-immdb-server.outputs.tags }}
           labels: ${{ steps.meta-immdb-server.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=immdb-server
+          cache-to: type=gha,mode=max,scope=immdb-server
 
       - name: Extract metadata for analysis
         id: meta-analysis
@@ -104,14 +125,14 @@ jobs:
           push: ${{ github.event_name == 'push' || github.event.inputs.push_images == 'true' }}
           tags: ${{ steps.meta-analysis.outputs.tags }}
           labels: ${{ steps.meta-analysis.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=leios-analysis
+          cache-to: type=gha,mode=max,scope=leios-analysis
 
   test-local:
     name: "Test local docker-compose stack"
     runs-on: ubuntu-22.04
     needs: build-images
-    if: github.event_name == 'pull_request'
+    timeout-minutes: 120
 
     steps:
       - name: Checkout repository
