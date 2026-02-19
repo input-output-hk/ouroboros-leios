@@ -104,6 +104,20 @@ def parse_log_line(line: str, node_name: str) -> Optional[BlockEvent]:
                 block_type="praos",
             )
 
+        # Praos block forged (cardano-node forge loop)
+        # ns: "Forge.Loop.ForgedBlock"
+        if "ForgedBlock" in ns:
+            block_hash = event_data.get("block", event_data.get("blockHash", "unknown"))
+            slot = event_data.get("slot", 0)
+            return BlockEvent(
+                timestamp=ts,
+                node=node_name,
+                event_type="created",
+                block_hash=block_hash,
+                slot=slot,
+                block_type="praos",
+            )
+
         # Block fetch completed (received from peer)
         # ns: "BlockFetch.Client.CompletedBlockFetch"
         # data.block: "hash"
