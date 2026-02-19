@@ -5656,16 +5656,16 @@
         "nixpkgs-unstable": "nixpkgs-unstable_7"
       },
       "locked": {
-        "lastModified": 1771492142,
-        "narHash": "sha256-IYEzFF1WVgqq62CYDtw2WsbHdZFEhOdDwHP0mcnV5U0=",
+        "lastModified": 1771492532,
+        "narHash": "sha256-bPJOByDmBZ07WVUjT1oaQsBc/lfUZcxLrOTJ7levlp4=",
         "owner": "intersectmbo",
         "repo": "ouroboros-consensus",
-        "rev": "48a0e11eff86a58fa7e1f06150549d85ded12bdb",
+        "rev": "628b07449a0fe3a5aa52e370468425385deca926",
         "type": "github"
       },
       "original": {
         "owner": "intersectmbo",
-        "ref": "leios-prototype",
+        "ref": "ch1bo/refactor-fetching-logic",
         "repo": "ouroboros-consensus",
         "type": "github"
       }
