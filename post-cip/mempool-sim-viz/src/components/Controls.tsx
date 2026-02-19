@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { type SimulationConfig, type PresetType, type P2PConfig, DEFAULT_CONFIG, MINIMAL_CONFIG, DEFAULT_P2P_CONFIG } from '@/simulation';
+import { type SimulationConfig, type PresetType, DEFAULT_CONFIG, MINIMAL_CONFIG, LARGE_CONFIG } from '@/simulation';
 
 // Theme colors from Leios site
 const COLORS = {
@@ -9,6 +9,7 @@ const COLORS = {
   textMuted: '#8f6dae',
   accent: '#6effd1',
   adversary: '#ef4444',
+  eb: '#22d3ee',
 };
 
 // Custom slider styles
@@ -49,6 +50,7 @@ const sliderStyles = `
 const PRESETS: Record<Exclude<PresetType, 'custom'>, SimulationConfig> = {
   minimal: MINIMAL_CONFIG,
   default: DEFAULT_CONFIG,
+  large: LARGE_CONFIG,
 };
 
 function configsEqual(a: SimulationConfig, b: SimulationConfig): boolean {
@@ -63,13 +65,21 @@ function configsEqual(a: SimulationConfig, b: SimulationConfig): boolean {
     a.blockInterval === b.blockInterval &&
     a.block === b.block &&
     a.latency === b.latency &&
-    a.bandwidth === b.bandwidth
+    a.bandwidth === b.bandwidth &&
+    a.ebEnabled === b.ebEnabled &&
+    a.ebSize === b.ebSize &&
+    a.ebAnnouncementRate === b.ebAnnouncementRate &&
+    a.ebCertificationRate === b.ebCertificationRate &&
+    a.peerChurnEnabled === b.peerChurnEnabled &&
+    a.peerChurnInterval === b.peerChurnInterval &&
+    a.peerChurnRate === b.peerChurnRate
   );
 }
 
 function detectPreset(config: SimulationConfig): PresetType {
   if (configsEqual(config, MINIMAL_CONFIG)) return 'minimal';
   if (configsEqual(config, DEFAULT_CONFIG)) return 'default';
+  if (configsEqual(config, LARGE_CONFIG)) return 'large';
   return 'custom';
 }
 
@@ -81,10 +91,62 @@ interface SliderProps {
   step?: number;
   unit?: string;
   tooltip?: string;
+  /** Power curve exponent for non-linear mapping (e.g. 2.5). Fine control at low end, coarse at high. */
+  power?: number;
   onChange: (value: number) => void;
 }
 
-function Slider({ label, value, min, max, step = 1, unit = '', tooltip, onChange }: SliderProps) {
+// Non-linear slider helpers
+function valueToSlider(value: number, min: number, max: number, power: number): number {
+  const t = Math.max(0, Math.min(1, (value - min) / (max - min)));
+  return Math.round(Math.pow(t, 1 / power) * 1000);
+}
+
+function sliderToValue(pos: number, min: number, max: number, power: number, step: number): number {
+  const t = pos / 1000;
+  const raw = min + (max - min) * Math.pow(t, power);
+  return Math.round(raw / step) * step;
+}
+
+function Slider({ label, value, min, max, step = 1, unit = '', tooltip, power, onChange }: SliderProps) {
+  if (power) {
+    // Non-linear slider: internal range 0-1000 mapped through power curve
+    const sliderPos = valueToSlider(value, min, max, power);
+    return (
+      <div className="flex flex-col gap-2" title={tooltip}>
+        <div className="flex justify-between items-baseline">
+          <span className="text-xs flex items-center gap-1" style={{ color: COLORS.textMuted }}>
+            {label}
+            {tooltip && (
+              <span
+                className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full text-[9px] font-bold cursor-help"
+                style={{ backgroundColor: COLORS.textMuted, color: COLORS.background }}
+                title={tooltip}
+              >
+                ?
+              </span>
+            )}
+          </span>
+          <span className="text-sm font-mono font-medium" style={{ color: COLORS.text }}>
+            {value.toLocaleString()}{unit}
+          </span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={1000}
+          step={1}
+          value={sliderPos}
+          onChange={(e) => {
+            const v = sliderToValue(Number(e.target.value), min, max, power, step);
+            onChange(Math.max(min, Math.min(max, v)));
+          }}
+          className="w-full appearance-none cursor-pointer bg-transparent"
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-2" title={tooltip}>
       <div className="flex justify-between items-baseline">
@@ -173,16 +235,14 @@ function PresetTab({ preset, activePreset, onClick, label }: PresetTabProps) {
 
 interface ControlsProps {
   onConfigChange: (config: SimulationConfig) => void;
-  onP2PConfigChange: (config: P2PConfig) => void;
   disabled?: boolean;
   isExpanded: boolean;
   onToggleExpand: () => void;
 }
 
-export function Controls({ onConfigChange, onP2PConfigChange, disabled = false, isExpanded, onToggleExpand }: ControlsProps) {
+export function Controls({ onConfigChange, disabled = false, isExpanded, onToggleExpand }: ControlsProps) {
   const [config, setConfig] = useState<SimulationConfig>({ ...MINIMAL_CONFIG });
   const [activePreset, setActivePreset] = useState<PresetType>('minimal');
-  const [p2pConfig, setP2PConfig] = useState<P2PConfig>({ ...DEFAULT_P2P_CONFIG, churnInterval: 3 });
 
   // Only call onConfigChange when config changes, not when the callback reference changes
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -190,17 +250,9 @@ export function Controls({ onConfigChange, onP2PConfigChange, disabled = false, 
     onConfigChange(config);
   }, [config]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    onP2PConfigChange(p2pConfig);
-  }, [p2pConfig]);
-
   const handlePresetChange = useCallback((preset: Exclude<PresetType, 'custom'>) => {
     setConfig({ ...PRESETS[preset] });
     setActivePreset(preset);
-    // Update P2P churn interval based on preset
-    const churnInterval = preset === 'minimal' ? 3 : 5;
-    setP2PConfig(prev => ({ ...prev, churnInterval }));
   }, []);
 
   useEffect(() => {
@@ -227,7 +279,23 @@ export function Controls({ onConfigChange, onP2PConfigChange, disabled = false, 
       const next = { ...prev, [key]: value };
 
       if (key === 'block') {
-        next.mempool = (value as number) * 2;
+        // When EB is enabled, mempool = 2 * (block + ebSize), otherwise 2 * block
+        if (next.ebEnabled) {
+          next.mempool = 2 * ((value as number) + next.ebSize);
+        } else {
+          next.mempool = (value as number) * 2;
+        }
+      }
+
+      if (key === 'ebEnabled' && value === true) {
+        // Auto-update mempool when EB is toggled on
+        next.mempool = 2 * (next.block + next.ebSize);
+      } else if (key === 'ebEnabled' && value === false) {
+        next.mempool = next.block * 2;
+      }
+
+      if (key === 'ebSize' && next.ebEnabled) {
+        next.mempool = 2 * (next.block + (value as number));
       }
 
       if (next.degree >= next.nodes) {
@@ -245,8 +313,8 @@ export function Controls({ onConfigChange, onP2PConfigChange, disabled = false, 
     });
   };
 
-  const maxDegree = Math.min(10, config.nodes - 1);
-  const maxAdversaryDegree = Math.min(50, config.nodes);
+  const maxDegree = Math.min(20, config.nodes - 1);
+  const maxAdversaryDegree = Math.min(100, config.nodes);
 
   return (
     <div
@@ -285,13 +353,19 @@ export function Controls({ onConfigChange, onP2PConfigChange, disabled = false, 
               preset="minimal"
               activePreset={activePreset}
               onClick={() => handlePresetChange('minimal')}
-              label="Minimal"
+              label="S"
             />
             <PresetTab
               preset="default"
               activePreset={activePreset}
               onClick={() => handlePresetChange('default')}
-              label="Default"
+              label="M"
+            />
+            <PresetTab
+              preset="large"
+              activePreset={activePreset}
+              onClick={() => handlePresetChange('large')}
+              label="L"
             />
             <PresetTab
               preset="custom"
@@ -306,7 +380,9 @@ export function Controls({ onConfigChange, onP2PConfigChange, disabled = false, 
               label="Honest Nodes"
               value={config.nodes}
               min={10}
-              max={250}
+              max={900}
+              step={config.nodes >= 100 ? 10 : 1}
+              power={2}
               tooltip="Number of honest nodes in the network that follow the protocol"
               onChange={(v) => updateConfig('nodes', v)}
             />
@@ -320,56 +396,120 @@ export function Controls({ onConfigChange, onP2PConfigChange, disabled = false, 
             />
           </Section>
 
-          {/* P2P Section - toggle controls expansion */}
+          {/* Leios (EB) Section */}
           <div className="pt-4" style={{ borderTop: `1px solid ${COLORS.border}` }}>
             <div className="flex items-center justify-between mb-3">
               <span
                 className="text-sm font-medium flex items-center gap-1"
-                style={{ color: COLORS.text }}
-                title="Enable P2P peer selection with dynamic topology churn"
+                style={{ color: COLORS.eb }}
+                title="Enable Leios Endorser Block (EB) mode with transaction caching"
               >
-                P2P
+                Leios EB
                 <span
                   className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full text-[9px] font-bold cursor-help"
                   style={{ backgroundColor: COLORS.textMuted, color: COLORS.background }}
+                  title="Endorser Blocks reference mempool txs without removing them. Certified EBs trigger tx fetching across the network."
                 >
                   ?
                 </span>
               </span>
               <button
-                onClick={() => setP2PConfig(prev => ({ ...prev, enabled: !prev.enabled }))}
+                onClick={() => updateConfig('ebEnabled', !config.ebEnabled)}
                 className="relative w-10 h-5 rounded-full transition-colors cursor-pointer"
-                style={{ backgroundColor: p2pConfig.enabled ? COLORS.accent : COLORS.border }}
+                style={{ backgroundColor: config.ebEnabled ? COLORS.eb : COLORS.border }}
               >
                 <div
                   className="absolute top-0.5 w-4 h-4 rounded-full transition-transform"
                   style={{
                     backgroundColor: COLORS.text,
-                    transform: p2pConfig.enabled ? 'translateX(22px)' : 'translateX(2px)',
+                    transform: config.ebEnabled ? 'translateX(22px)' : 'translateX(2px)',
                   }}
                 />
               </button>
             </div>
-            {p2pConfig.enabled && (
+            {config.ebEnabled && (
+              <div className="space-y-4">
+                <Slider
+                  label="EB Ref Capacity"
+                  value={Math.round(config.ebSize / 1_000_000)}
+                  min={1}
+                  max={20}
+                  unit=" MB"
+                  tooltip="Max total bytes of transactions an EB can reference — the EB body itself is just tx hashes"
+                  onChange={(v) => updateConfig('ebSize', v * 1_000_000)}
+                />
+                <Slider
+                  label="Announcement Rate"
+                  value={Math.round(config.ebAnnouncementRate * 100)}
+                  min={0}
+                  max={100}
+                  unit="%"
+                  tooltip="Probability an EB is produced alongside each block — lower values mean fewer EBs in the network"
+                  onChange={(v) => updateConfig('ebAnnouncementRate', v / 100)}
+                />
+                <Slider
+                  label="Certification Rate"
+                  value={Math.round(config.ebCertificationRate * 100)}
+                  min={0}
+                  max={100}
+                  unit="%"
+                  tooltip="Probability that an announced EB gets certified (uncertified EBs cause one empty block)"
+                  onChange={(v) => updateConfig('ebCertificationRate', v / 100)}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Peer Churn Section */}
+          <div className="pt-4" style={{ borderTop: `1px solid ${COLORS.border}` }}>
+            <div className="flex items-center justify-between mb-3">
+              <span
+                className="text-sm font-medium flex items-center gap-1"
+                style={{ color: COLORS.textMuted }}
+                title="Enable periodic edge swapping to evolve network topology over time"
+              >
+                Peer Churn
+                <span
+                  className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full text-[9px] font-bold cursor-help"
+                  style={{ backgroundColor: COLORS.textMuted, color: COLORS.background }}
+                  title="Periodically swaps random edges to simulate peer topology changes"
+                >
+                  ?
+                </span>
+              </span>
+              <button
+                onClick={() => updateConfig('peerChurnEnabled', !config.peerChurnEnabled)}
+                className="relative w-10 h-5 rounded-full transition-colors cursor-pointer"
+                style={{ backgroundColor: config.peerChurnEnabled ? COLORS.accent : COLORS.border }}
+              >
+                <div
+                  className="absolute top-0.5 w-4 h-4 rounded-full transition-transform"
+                  style={{
+                    backgroundColor: COLORS.text,
+                    transform: config.peerChurnEnabled ? 'translateX(22px)' : 'translateX(2px)',
+                  }}
+                />
+              </button>
+            </div>
+            {config.peerChurnEnabled && (
               <div className="space-y-4">
                 <Slider
                   label="Churn Interval"
-                  value={p2pConfig.churnInterval}
+                  value={config.peerChurnInterval}
                   min={1}
                   max={30}
                   unit="s"
-                  tooltip="Time between peer churn events (seconds)"
-                  onChange={(v) => setP2PConfig(prev => ({ ...prev, churnInterval: v }))}
+                  tooltip="How often peer churn fires (edge swaps happen at this interval)"
+                  onChange={(v) => updateConfig('peerChurnInterval', v)}
                 />
                 <Slider
-                  label="Churn Probability"
-                  value={Math.round(p2pConfig.churnProbability * 100)}
-                  min={5}
-                  max={50}
-                  step={5}
+                  label="Churn Rate"
+                  value={Math.round(config.peerChurnRate * 100)}
+                  min={1}
+                  max={20}
                   unit="%"
-                  tooltip="Probability each peer is replaced during churn"
-                  onChange={(v) => setP2PConfig(prev => ({ ...prev, churnProbability: v / 100 }))}
+                  tooltip="Probability each edge is selected for swap per churn interval"
+                  onChange={(v) => updateConfig('peerChurnRate', v / 100)}
                 />
               </div>
             )}
@@ -380,7 +520,8 @@ export function Controls({ onConfigChange, onP2PConfigChange, disabled = false, 
               label="Adversary Nodes"
               value={config.adversaries}
               min={0}
-              max={50}
+              max={100}
+              step={1}
               tooltip="Number of adversary nodes that attempt to front-run transactions"
               onChange={(v) => updateConfig('adversaries', v)}
             />
@@ -398,7 +539,7 @@ export function Controls({ onConfigChange, onP2PConfigChange, disabled = false, 
               min={0}
               max={5000}
               step={250}
-              unit="μs"
+              unit="us"
               tooltip="How many microseconds it takes the adversary to create a front-run transaction"
               onChange={(v) => updateConfig('adversaryDelay', v / 1000000)}
             />

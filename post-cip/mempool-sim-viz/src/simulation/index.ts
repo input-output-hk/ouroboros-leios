@@ -1,32 +1,22 @@
-// Re-export from simulation package
+// Re-export from simulation package (bitmap engine)
 export {
-  TXID_B,
-  DEFAULT_CONFIG,
-  MINIMAL_CONFIG,
-  DEFAULT_P2P_CONFIG,
-  MemoryPool,
-  Link,
-  Node,
   Simulation,
+  LightNode,
+  Link,
+  TxRegistry,
   generateNetwork,
   addAdversaryNode,
-  logger,
+  TXID_B,
 } from 'mempool-sim-web';
 export type {
-  TxId,
-  Tx,
-  Block,
-  SimulationConfig,
-  PresetType,
-  P2PConfig,
-  ChurnResult,
   Event,
-  HandlerEvent,
-  PeerChurnEvent,
-  SimulationEventHandler,
+  GlobalTx,
+  Block,
+  EndorserBlock,
+  TopologyResult,
 } from 'mempool-sim-web';
 
-// Visual types
+// Visual types (including viz-facing config)
 export * from './types';
 
 // Layout utilities
