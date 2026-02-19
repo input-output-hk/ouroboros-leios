@@ -90,8 +90,8 @@ When EB mode is enabled, endorser blocks are produced alongside regular blocks. 
 
 | Simplification | Description | Impact |
 |----------------|-------------|--------|
-| EB timing | Produced probabilistically alongside each block (`ebAnnouncementRate`) | Real Leios has a separate EB production schedule independent of blocks |
-| EB content | References all txs in producer's mempool up to `ebSize` | Real EB construction may be more selective |
+| EB timing | Produced alongside a block only when producer has mempool overflow (txs remaining after block fill); empty EBs are never announced | Real Leios has a separate EB production schedule independent of blocks |
+| EB content | References all remaining txs in producer's mempool (post-block) up to `ebSize` | Real EB construction may be more selective |
 | Certification | Instant coin flip (`ebCertificationRate`) at production time | Real certification involves a voting protocol among multiple nodes over time |
 | Uncertified EB penalty | Next block after an uncertified EB is forced empty | Placeholder — real penalty mechanism TBD in Leios spec |
 | EB-to-block pipeline | Not modeled — EBs and blocks interact only through the empty-block penalty | Real Leios has Input Blocks → Endorser Blocks → Voting → Ranking Blocks pipeline |
@@ -215,8 +215,7 @@ Options:
                                    default: "pino-pretty")
   --eb                             Enable endorser blocks (Leios) (default: false)
   --eb-size <bytes>                Endorser block size in bytes (default: "10000000")
-  --eb-announcement-rate <rate>    EB announcement probability 0-1 (default: "1.0")
-  --eb-certification-rate <rate>   EB certification probability 0-1 (default: "1.0")
+  --eb-certification-rate <rate>   EB certification probability 0-1 (default: "0.5")
   -h, --help                       display help for command
 ```
 
@@ -239,7 +238,7 @@ npm run cli -- -n 100 -a 5 -t 200 --tx-size 512
 
 With endorser blocks:
 ```bash
-npm run cli -- -n 50 -a 2 -t 100 --eb --eb-announcement-rate 0.5
+npm run cli -- -n 50 -a 2 -t 100 --eb --eb-certification-rate 0.5
 ```
 
 ## How it works

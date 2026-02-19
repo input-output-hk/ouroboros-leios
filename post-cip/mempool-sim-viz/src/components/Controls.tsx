@@ -69,7 +69,6 @@ function configsEqual(a: SimulationConfig, b: SimulationConfig): boolean {
     a.bandwidth === b.bandwidth &&
     a.ebEnabled === b.ebEnabled &&
     a.ebSize === b.ebSize &&
-    a.ebAnnouncementRate === b.ebAnnouncementRate &&
     a.ebCertificationRate === b.ebCertificationRate &&
     a.peerChurnEnabled === b.peerChurnEnabled &&
     a.peerChurnInterval === b.peerChurnInterval &&
@@ -438,15 +437,6 @@ export function Controls({ onConfigChange, disabled = false, isExpanded, onToggl
                   unit=" MB"
                   tooltip="Max total bytes of transactions an EB can reference — the EB body itself is just tx hashes"
                   onChange={(v) => updateConfig('ebSize', v * 1_000_000)}
-                />
-                <Slider
-                  label="Announcement Rate"
-                  value={Math.round(config.ebAnnouncementRate * 100)}
-                  min={0}
-                  max={100}
-                  unit="%"
-                  tooltip="Probability an EB is produced alongside each block — lower values mean fewer EBs in the network"
-                  onChange={(v) => updateConfig('ebAnnouncementRate', v / 100)}
                 />
                 <Slider
                   label="Certification Rate"

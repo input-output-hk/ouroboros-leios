@@ -32,7 +32,6 @@ export class Simulation {
   // Leios config
   ebEnabled = false;
   ebSize_B = 10_000_000;
-  ebAnnouncementRate = 1.0;
   ebCertificationRate = 1.0;
   private lastEB: EndorserBlock | null = null;
 
@@ -372,8 +371,8 @@ export class Simulation {
     // Producer marks block seen
     producer.seenBlocks.add(block.blockId);
 
-    // Produce EB if enabled (probabilistic announcement)
-    if (this.ebEnabled && Math.random() < this.ebAnnouncementRate) {
+    // Produce EB if enabled and producer still has mempool overflow after block
+    if (this.ebEnabled && producer.mempoolBytes > 0) {
       this.push({
         kind: 'ProduceEB',
         clock,
@@ -458,6 +457,9 @@ export class Simulation {
       txRefs.push(i);
       size += tx.size_B;
     }
+
+    // Never announce an empty EB
+    if (txRefs.length === 0) return;
 
     const eb: EndorserBlock = {
       ebId: `EB${ebIdx}`,

@@ -53,8 +53,7 @@ program
   )
   .option('--eb', 'Enable endorser blocks (Leios)', false)
   .option('--eb-size <bytes>', 'Endorser block size in bytes', String(DEFAULTS.ebSize))
-  .option('--eb-announcement-rate <rate>', 'EB announcement probability (0-1)', '1.0')
-  .option('--eb-certification-rate <rate>', 'EB certification probability (0-1)', '1.0')
+  .option('--eb-certification-rate <rate>', 'EB certification probability (0-1)', '0.5')
   .parse(process.argv);
 
 const opts = program.opts();
@@ -77,7 +76,6 @@ const config = {
   logTarget: opts.logTarget as string,
   eb: opts.eb === true,
   ebSize: parseInt(opts.ebSize),
-  ebAnnouncementRate: parseFloat(opts.ebAnnouncementRate),
   ebCertificationRate: parseFloat(opts.ebCertificationRate),
 };
 
@@ -129,7 +127,6 @@ try {
   const sim = new Simulation(nodes, links);
   sim.ebEnabled = config.eb;
   sim.ebSize_B = config.ebSize;
-  sim.ebAnnouncementRate = config.ebAnnouncementRate;
   sim.ebCertificationRate = config.ebCertificationRate;
 
   // Register and inject transactions (byte-budget from KB/s load)

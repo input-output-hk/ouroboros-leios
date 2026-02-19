@@ -68,7 +68,6 @@ export interface SimulationConfig {
   // Leios
   ebEnabled: boolean;
   ebSize: number;      // EB size in bytes
-  ebAnnouncementRate: number;   // 0-1
   ebCertificationRate: number;  // 0-1
   // Peer churn
   peerChurnEnabled: boolean;
@@ -94,8 +93,7 @@ export const MINIMAL_CONFIG: SimulationConfig = {
   blockInterval: 3,
   ebEnabled: false,
   ebSize: 10_000_000,
-  ebAnnouncementRate: 0.5,
-  ebCertificationRate: 0.8,
+  ebCertificationRate: 0.5,
   peerChurnEnabled: false,
   peerChurnInterval: 5,
   peerChurnRate: 0.05,
@@ -117,8 +115,7 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   blockInterval: 3,
   ebEnabled: false,
   ebSize: 10_000_000,
-  ebAnnouncementRate: 0.5,
-  ebCertificationRate: 0.8,
+  ebCertificationRate: 0.5,
   peerChurnEnabled: false,
   peerChurnInterval: 5,
   peerChurnRate: 0.05,
@@ -140,8 +137,7 @@ export const LARGE_CONFIG: SimulationConfig = {
   blockInterval: 3,
   ebEnabled: false,
   ebSize: 10_000_000,
-  ebAnnouncementRate: 0.5,
-  ebCertificationRate: 0.8,
+  ebCertificationRate: 0.5,
   peerChurnEnabled: false,
   peerChurnInterval: 5,
   peerChurnRate: 0.05,
