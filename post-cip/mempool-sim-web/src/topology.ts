@@ -1,6 +1,5 @@
 import { LightNode } from './node.js';
 import { Link } from './link.js';
-import { logger } from './logger.js';
 
 export interface TopologyResult {
   nodes: LightNode[];
@@ -103,7 +102,6 @@ export function addAdversaryNode(
   bandwidth_Bps: number,
 ): LightNode {
   const idx = nodes.length;
-  const id = `A${idx - nodes.filter(n => !n.honest).length + 1}`;
   // count existing adversaries for naming
   let advCount = 0;
   for (const nd of nodes) if (!nd.honest) advCount++;

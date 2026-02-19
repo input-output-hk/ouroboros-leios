@@ -555,9 +555,7 @@ export function MatrixCanvas({
     const canvas = canvasRef.current;
     const rect = canvas?.getBoundingClientRect();
     if (!rect || !canvas || !sim || nodeOrder.length === 0) return;
-    const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
-    const mx = (e.clientX - rect.left) * scaleX;
     const my = (e.clientY - rect.top) * scaleY;
 
     const cs = isBinned ? 1 : cellSize;
