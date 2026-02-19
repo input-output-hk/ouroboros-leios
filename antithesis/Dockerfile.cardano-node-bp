@@ -78,6 +78,7 @@ RUN apt-get update -y && \
       socat \
       sqlite3 \
       wget \
+      yq \
       zlib1g && \
     rm -rf /var/lib/apt/lists/* && \
     ldconfig
@@ -89,7 +90,7 @@ RUN mkdir -p /app/config /app/genesis /app/scripts /app/pools-keys /app/utxo-key
 COPY demo/proto-devnet/config/genesis/*.json /app/genesis/
 
 # Copy proto-devnet config
-COPY demo/proto-devnet/config/config.json /app/config/config.json
+COPY demo/proto-devnet/config/config.yaml /app/config/config.yaml
 COPY demo/proto-devnet/config/topology.template.json /app/config/topology.template.json
 
 # Copy pool keys for all 3 pools
@@ -102,9 +103,6 @@ COPY demo/proto-devnet/config/utxo-keys/ /app/utxo-keys/
 
 # Copy tx-generator template
 COPY demo/proto-devnet/config/gen.template.json /app/config/gen.template.json
-
-# Copy leios schema if it exists (optional for proto-devnet)
-COPY demo/2025-11/data/leios-schema.sql /app/config/leios-schema.sql
 
 # Copy scripts
 COPY antithesis/scripts/init-pool-node.sh /app/scripts/
