@@ -7,17 +7,19 @@ import shutil
 # 1. SETUP & DATA GENERATION
 # ==========================================
 
+
 def generate_dag(n_tasks, density=0.3, max_duration=5):
     """Generates a random DAG and random durations."""
     G = nx.gnp_random_graph(n_tasks, density, directed=True)
     DAG = nx.DiGraph([(u, v) for (u, v) in G.edges() if u < v])
-    
+
     # Ensure all nodes exist
     for i in range(n_tasks):
         DAG.add_node(i)
-        
+
     durations = {i: random.randint(1, max_duration) for i in range(n_tasks)}
     return DAG, durations
+
 
 # User Parameters
 N_TRANSACTIONS = 8
@@ -48,10 +50,10 @@ Times = list(range(HORIZON))
 # --- VARIABLES ---
 
 # x[i][t] = 1 if task i STARTS at time t
-x = pulp.LpVariable.dicts("start", (Tasks, Times), cat='Binary')
+x = pulp.LpVariable.dicts("start", (Tasks, Times), cat="Binary")
 
 # C_max: The makespan (Objective)
-C_max = pulp.LpVariable("C_max", lowBound=0, upBound=HORIZON, cat='Continuous')
+C_max = pulp.LpVariable("C_max", lowBound=0, upBound=HORIZON, cat="Continuous")
 
 # --- CONSTRAINTS ---
 
@@ -61,7 +63,7 @@ for i in Tasks:
 
 # 2. Precedence Constraints (DAG)
 # If i -> j, then Start(j) >= Start(i) + Duration(i)
-for (i, j) in dag.edges():
+for i, j in dag.edges():
     start_i = pulp.lpSum([t * x[i][t] for t in Times])
     start_j = pulp.lpSum([t * x[j][t] for t in Times])
     prob += start_j >= start_i + durations[i]
@@ -76,7 +78,7 @@ for t in Times:
         # We sum the start variables in that window
         valid_start_times = range(max(0, t - p_i + 1), t + 1)
         active_tasks.append(pulp.lpSum([x[i][k] for k in valid_start_times]))
-    
+
     prob += pulp.lpSum(active_tasks) <= CPU_LIMIT
 
 # 4. Define Makespan
@@ -94,7 +96,11 @@ prob += C_max
 
 # Setup Solver (HiGHS)
 highs_path = shutil.which("highs")
-solver = pulp.HiGHS_CMD(path=highs_path, msg=False) if highs_path else pulp.PULP_CBC_CMD(msg=False)
+solver = (
+    pulp.HiGHS_CMD(path=highs_path, msg=False)
+    if highs_path
+    else pulp.PULP_CBC_CMD(msg=False)
+)
 
 print(f"Solving with {solver.__class__.__name__}...")
 prob.solve(solver)
@@ -105,7 +111,7 @@ prob.solve(solver)
 
 print(f"Status: {pulp.LpStatus[prob.status]}")
 print(f"Min Wallclock Time (Makespan): {pulp.value(C_max)}")
-print(f"Total CPU Time Used: {total_cpu_work}") 
+print(f"Total CPU Time Used: {total_cpu_work}")
 # Note: Total CPU time is constant for a fixed set of tasks, regardless of schedule.
 
 print("\nSchedule:")

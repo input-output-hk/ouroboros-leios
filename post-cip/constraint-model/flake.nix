@@ -6,8 +6,13 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs =
+    {
+      nixpkgs,
+      flake-utils,
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
         pkgs = import nixpkgs { inherit system; };
       in
@@ -19,8 +24,8 @@
             highs
             cbc
             # Libraries often needed by Python wheels
-            stdenv.cc.cc.lib  # libstdc++
-            zlib              # libz
+            stdenv.cc.cc.lib # libstdc++
+            zlib # libz
           ];
 
           # 2. Shell Hook to set up venv and library paths
@@ -42,7 +47,7 @@
             # --- B. Fix Binary Linking (The Critical Fix) ---
             # This makes the C++ standard library available to pip-installed wheels (numpy, ortools)
             export LD_LIBRARY_PATH=${pkgs.stdenv.cc.cc.lib}/lib:${pkgs.zlib}/lib:$LD_LIBRARY_PATH
-            
+
             # Also include HiGHS/CBC libs if you use them via ctypes later
             export LD_LIBRARY_PATH=${pkgs.highs}/lib:${pkgs.cbc}/lib:$LD_LIBRARY_PATH
 
