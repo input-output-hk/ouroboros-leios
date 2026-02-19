@@ -1,6 +1,6 @@
 import TinyQueue from 'tinyqueue';
 import { DirectedGraph } from 'graphology';
-import type { TxId, Tx, Block, P2PConfig } from './types.js';
+import type { TxId, Tx, Block, P2PConfig, EndorserBlock, TxCacheMode } from './types.js';
 import { Node } from './node.js';
 import { Link } from './link.js';
 import { logger } from './logger.js';
@@ -16,7 +16,11 @@ export type Event =
   | { kind: 'SendTx'; clock: number; from: string; to: string; tx: Tx }
   | { kind: 'ProduceBlock'; clock: number; producer: string; blockSize_B: number }
   | { kind: 'PeerChurn'; clock: number; nodeId: string }
-  | { kind: 'DiffuseBlock'; clock: number; from: string; to: string; block: Block };
+  | { kind: 'DiffuseBlock'; clock: number; from: string; to: string; block: Block }
+  | { kind: 'ProduceEB'; clock: number; producer: string; ebSize_B: number }
+  | { kind: 'DiffuseEB'; clock: number; from: string; to: string; eb: EndorserBlock }
+  | { kind: 'FetchEBTx'; clock: number; from: string; to: string; txId: TxId; ebId: string }
+  | { kind: 'SendEBTx'; clock: number; from: string; to: string; tx: Tx };
 
 /**
  * Extended PeerChurn event with churn result for visualization.
@@ -49,6 +53,10 @@ export class Simulation {
   private _eventHandler: SimulationEventHandler | null = null;
   private _p2pConfig: P2PConfig | null = null;
   private _p2pEndTime: number = Infinity;
+  private _endorserBlocks: EndorserBlock[] = [];
+  private _ebEnabled: boolean = false;
+  private _ebSize: number = 90000;
+  private _txCacheMode: TxCacheMode = 'mempool';
 
   constructor(graph: DirectedGraph<Node, Link>) {
     this._graph = graph;
@@ -84,6 +92,27 @@ export class Simulation {
 
   get p2pConfig(): P2PConfig | null {
     return this._p2pConfig;
+  }
+
+  get endorserBlocks(): EndorserBlock[] {
+    return this._endorserBlocks;
+  }
+
+  get ebEnabled(): boolean {
+    return this._ebEnabled;
+  }
+
+  get txCacheMode(): TxCacheMode {
+    return this._txCacheMode;
+  }
+
+  /**
+   * Configure Leios EB settings.
+   */
+  configureEB(enabled: boolean, ebSize: number, txCacheMode: TxCacheMode): void {
+    this._ebEnabled = enabled;
+    this._ebSize = ebSize;
+    this._txCacheMode = txCacheMode;
   }
 
   /**
@@ -176,6 +205,44 @@ export class Simulation {
       to,
       block
     });
+  }
+
+  /**
+   * Schedule EB production.
+   */
+  scheduleEBProduction(clock: number, producer: string, ebSize_B: number): void {
+    this.eventQueue.push({ kind: 'ProduceEB', clock, producer, ebSize_B });
+  }
+
+  /**
+   * Diffuse an EB through the network (producer processes first).
+   */
+  diffuseEB(eb: EndorserBlock): void {
+    this._endorserBlocks.push(eb);
+    logger.info({ ebId: eb.ebId, producer: eb.producer, clock: eb.clock, txRefs: eb.txRefs.length }, "EB produced");
+    const producer = this._graph.getNodeAttributes(eb.producer);
+    producer.handleReceiveEB(this, eb);
+  }
+
+  /**
+   * Schedule EB diffusion from one node to another.
+   */
+  scheduleEBDiffusion(clock: number, from: string, to: string, eb: EndorserBlock): void {
+    this.eventQueue.push({ kind: 'DiffuseEB', clock, from, to, eb });
+  }
+
+  /**
+   * Schedule fetching a tx referenced by an EB.
+   */
+  scheduleFetchEBTx(clock: number, from: string, to: string, txId: TxId, ebId: string): void {
+    this.eventQueue.push({ kind: 'FetchEBTx', clock, from, to, txId, ebId });
+  }
+
+  /**
+   * Schedule sending a tx fetched via EB reference.
+   */
+  scheduleSendEBTx(clock: number, from: string, to: string, tx: Tx): void {
+    this.eventQueue.push({ kind: 'SendEBTx', clock, from, to, tx });
   }
 
   /**
@@ -278,6 +345,10 @@ export class Simulation {
           case 'ProduceBlock': return true;
           case 'PeerChurn': return true;
           case 'DiffuseBlock': return true;
+          case 'ProduceEB': return true;
+          case 'DiffuseEB': return true;
+          case 'FetchEBTx': return !txIdsToRemove.includes(e.txId);
+          case 'SendEBTx': return !txIdsToRemove.includes(e.tx.txId);
         }
       });
     this.eventQueue.length = this.eventQueue.data.length;
@@ -306,7 +377,7 @@ export class Simulation {
     this._eventsProcessed++;
 
     // Notify event handler if set (except PeerChurn which is handled separately with churnResult)
-    if (this._eventHandler && event.kind !== 'PeerChurn') {
+    if (this._eventHandler && event.kind !== 'PeerChurn' && event.kind !== 'ProduceEB') {
       this._eventHandler(event);
     }
 
@@ -318,6 +389,17 @@ export class Simulation {
         throw new Error(`unknown producer node: ${event.producer}`);
       }
       producer.handleProduceBlock(this, event.clock, event.blockSize_B);
+      // If Leios EBs enabled, also schedule EB production
+      if (this._ebEnabled) {
+        this.scheduleEBProduction(event.clock, event.producer, this._ebSize);
+      }
+      return true;
+    }
+
+    // Handle ProduceEB
+    if (event.kind === 'ProduceEB') {
+      const producer: Node = this._graph.getNodeAttributes(event.producer);
+      producer.handleProduceEB(this, event.clock, event.ebSize_B);
       return true;
     }
 
@@ -358,6 +440,25 @@ export class Simulation {
       case 'DiffuseBlock':
         target.handleReceiveBlock(this, event.block);
         break;
+      case 'DiffuseEB':
+        target.handleReceiveEB(this, event.eb);
+        break;
+      case 'FetchEBTx': {
+        // Target node receives a fetch request — find the tx and send it back
+        const tx = target.getTransactions().find(t => t.txId === event.txId)
+          || target.txCache.get(event.txId);
+        if (tx) {
+          const link = this._graph.edge(event.to, event.from);
+          const delay = link
+            ? this._graph.getEdgeAttributes(link).computeDelay(event.clock, tx.size_B)
+            : event.clock + 0.1;
+          this.scheduleSendEBTx(delay, event.to, event.from, tx);
+        }
+        break;
+      }
+      case 'SendEBTx':
+        target.handleReceiveEBTx(this, event.clock, event.tx, this._txCacheMode);
+        break;
     }
 
     return true;
@@ -372,6 +473,7 @@ export class Simulation {
     this._currentTime = 0;
     this._eventsProcessed = 0;
     this._blocks = [];
+    this._endorserBlocks = [];
     this._p2pConfig = null;
   }
 

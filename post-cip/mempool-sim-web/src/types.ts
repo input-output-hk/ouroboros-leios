@@ -33,6 +33,9 @@ export interface SimulationConfig {
   txSizeMax: number;
   duration: number;       // Total simulation duration in seconds
   blockInterval: number;  // Average interval between blocks (Poisson rate)
+  ebEnabled: boolean;              // Enable Endorser Block production (Leios)
+  ebSize: number;                  // Max bytes of tx refs per EB
+  txCacheMode: TxCacheMode;        // How EB-fetched txs are handled
 }
 
 export const DEFAULT_CONFIG: SimulationConfig = {
@@ -50,6 +53,9 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   txSizeMax: 16384,
   duration: 20,
   blockInterval: 1,
+  ebEnabled: false,
+  ebSize: 10_000_000,    // 10 MB — CIP-0164 default
+  txCacheMode: 'mempool',
 };
 
 export const MINIMAL_CONFIG: SimulationConfig = {
@@ -67,7 +73,21 @@ export const MINIMAL_CONFIG: SimulationConfig = {
   txSizeMax: 16384,
   duration: 20,
   blockInterval: 2,
+  ebEnabled: false,
+  ebSize: 10_000_000,    // 10 MB — CIP-0164 default
+  txCacheMode: 'mempool',
 };
+
+export interface EndorserBlock {
+  ebId: string;
+  producer: string;
+  clock: number;
+  txRefs: TxId[];    // tx hashes referenced by this EB
+  size_B: number;
+}
+
+// Cache mode for EB-fetched transactions
+export type TxCacheMode = 'cache-only' | 'mempool' | 'both';
 
 export type PresetType = 'minimal' | 'default' | 'custom';
 
