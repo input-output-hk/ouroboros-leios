@@ -60,7 +60,8 @@ function configsEqual(a: SimulationConfig, b: SimulationConfig): boolean {
     a.adversaries === b.adversaries &&
     a.adversaryDegree === b.adversaryDegree &&
     a.adversaryDelay === b.adversaryDelay &&
-    a.txCount === b.txCount &&
+    a.txLoad_KBps === b.txLoad_KBps &&
+    a.txSize === b.txSize &&
     a.duration === b.duration &&
     a.blockInterval === b.blockInterval &&
     a.block === b.block &&
@@ -556,13 +557,25 @@ export function Controls({ onConfigChange, disabled = false, isExpanded, onToggl
               onChange={(v) => updateConfig('duration', v)}
             />
             <Slider
-              label="Transaction Count"
-              value={config.txCount}
-              min={50}
-              max={500}
-              step={10}
-              tooltip="Total number of honest transactions to inject into the network"
-              onChange={(v) => updateConfig('txCount', v)}
+              label="Tx Load"
+              value={config.txLoad_KBps}
+              min={1}
+              max={300}
+              step={1}
+              unit=" KB/s"
+              power={2}
+              tooltip="Transaction throughput — Praos today ≈ 4.5 KB/s; Leios target ≈ 140–300 KB/s"
+              onChange={(v) => updateConfig('txLoad_KBps', v)}
+            />
+            <Slider
+              label="Tx Size"
+              value={config.txSize}
+              min={128}
+              max={16384}
+              step={128}
+              unit=" B"
+              tooltip="Uniform size of each transaction in bytes"
+              onChange={(v) => updateConfig('txSize', v)}
             />
           </Section>
 

@@ -61,9 +61,8 @@ export interface SimulationConfig {
   adversaries: number;
   adversaryDegree: number;
   adversaryDelay: number; // in seconds
-  txCount: number;
-  txSizeMin: number;
-  txSizeMax: number;
+  txLoad_KBps: number;  // transaction load in KB/s
+  txSize: number;       // uniform tx size in bytes
   duration: number;    // in seconds
   blockInterval: number; // in seconds
   // Leios
@@ -89,9 +88,8 @@ export const MINIMAL_CONFIG: SimulationConfig = {
   adversaries: 2,
   adversaryDegree: 3,
   adversaryDelay: 0.000001,
-  txCount: 100,
-  txSizeMin: 300,
-  txSizeMax: 1500,
+  txLoad_KBps: 5,
+  txSize: 512,
   duration: 20,
   blockInterval: 3,
   ebEnabled: false,
@@ -113,9 +111,8 @@ export const DEFAULT_CONFIG: SimulationConfig = {
   adversaries: 5,
   adversaryDegree: 10,
   adversaryDelay: 0.000001,
-  txCount: 250,
-  txSizeMin: 300,
-  txSizeMax: 1500,
+  txLoad_KBps: 8,
+  txSize: 512,
   duration: 30,
   blockInterval: 3,
   ebEnabled: false,
@@ -137,9 +134,8 @@ export const LARGE_CONFIG: SimulationConfig = {
   adversaries: 10,
   adversaryDegree: 10,
   adversaryDelay: 0.000001,
-  txCount: 1000,
-  txSizeMin: 300,
-  txSizeMax: 1500,
+  txLoad_KBps: 15,
+  txSize: 512,
   duration: 60,
   blockInterval: 3,
   ebEnabled: false,

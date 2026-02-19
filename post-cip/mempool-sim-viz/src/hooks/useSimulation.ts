@@ -428,13 +428,18 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
     sim.peerChurnInterval_s = safeConfig.peerChurnInterval;
     sim.peerChurnRate = safeConfig.peerChurnRate;
 
-    // Inject transactions
-    for (let i = 0; i < safeConfig.txCount; i++) {
-      const txId = `T${i}`;
+    // Inject transactions (byte-budget from KB/s load)
+    const totalBytes = safeConfig.txLoad_KBps * 1024 * safeConfig.duration;
+    let bytesInjected = 0;
+    let txI = 0;
+    const MAX_TXS = 50_000; // safety cap
+    while (bytesInjected < totalBytes && txI < MAX_TXS) {
+      const txId = `T${txI}`;
       const nodeIndex = Math.floor(Math.random() * safeConfig.nodes);
-      const time = Math.round(safeConfig.duration * Math.random());
-      const size = safeConfig.txSizeMin + Math.floor(Math.random() * (safeConfig.txSizeMax - safeConfig.txSizeMin));
-      sim.submitTx(time, nodeIndex, txId, size);
+      const time = safeConfig.duration * Math.random();
+      sim.submitTx(time, nodeIndex, txId, safeConfig.txSize);
+      bytesInjected += safeConfig.txSize;
+      txI++;
     }
 
     // Schedule block production using Poisson process
@@ -510,13 +515,18 @@ export function useSimulation(layoutType: LayoutType = 'circular'): UseSimulatio
     sim.peerChurnInterval_s = config.peerChurnInterval;
     sim.peerChurnRate = config.peerChurnRate;
 
-    // Inject transactions
-    for (let i = 0; i < config.txCount; i++) {
-      const txId = `T${i}`;
+    // Inject transactions (byte-budget from KB/s load)
+    const totalBytes = config.txLoad_KBps * 1024 * config.duration;
+    let bytesInjected = 0;
+    let txI = 0;
+    const MAX_TXS = 50_000; // safety cap
+    while (bytesInjected < totalBytes && txI < MAX_TXS) {
+      const txId = `T${txI}`;
       const nodeIndex = Math.floor(Math.random() * config.nodes);
-      const time = Math.round(config.duration * Math.random());
-      const size = config.txSizeMin + Math.floor(Math.random() * (config.txSizeMax - config.txSizeMin));
-      sim.submitTx(time, nodeIndex, txId, size);
+      const time = config.duration * Math.random();
+      sim.submitTx(time, nodeIndex, txId, config.txSize);
+      bytesInjected += config.txSize;
+      txI++;
     }
 
     // Schedule block production

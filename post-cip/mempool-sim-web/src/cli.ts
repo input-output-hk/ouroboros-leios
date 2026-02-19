@@ -11,10 +11,9 @@ const DEFAULTS = {
   bandwidth: 1_250_000,
   adversaries: 2,
   adversaryDegree: 18,
-  txCount: 250,
+  txLoad_KBps: 100,
+  txSize: 512,
   txDuration: 20,
-  txSizeMin: 200,
-  txSizeMax: 16_384,
   slotDuration: 20,
   slots: 10,
   adversaryDelay: 0.002,
@@ -37,10 +36,9 @@ program
   .option('-a, --adversaries <number>', 'Number of adversary nodes', String(DEFAULTS.adversaries))
   .option('--adversary-degree <number>', 'Adversary connectivity degree', String(DEFAULTS.adversaryDegree))
   .option('--adversary-delay <seconds>', 'Adversary front-run delay', String(DEFAULTS.adversaryDelay))
-  .option('-t, --tx-count <number>', 'Number of transactions to inject', String(DEFAULTS.txCount))
+  .option('-t, --tx-load <kbps>', 'Transaction load in KB/s', String(DEFAULTS.txLoad_KBps))
+  .option('--tx-size <bytes>', 'Uniform tx size in bytes', String(DEFAULTS.txSize))
   .option('--tx-duration <seconds>', 'Duration over which to inject txs', String(DEFAULTS.txDuration))
-  .option('--tx-size-min <bytes>', 'Min tx size', String(DEFAULTS.txSizeMin))
-  .option('--tx-size-max <bytes>', 'Max tx size', String(DEFAULTS.txSizeMax))
   .option('--slot-duration <seconds>', 'Block slot duration', String(DEFAULTS.slotDuration))
   .option('-s, --slots <number>', 'Number of slots to simulate', String(DEFAULTS.slots))
   .addOption(
@@ -70,10 +68,9 @@ const config = {
   adversaries: parseInt(opts.adversaries),
   adversaryDegree: parseInt(opts.adversaryDegree),
   adversaryDelay: parseFloat(opts.adversaryDelay),
-  txCount: parseInt(opts.txCount),
+  txLoad_KBps: parseInt(opts.txLoad),
+  txSize: parseInt(opts.txSize),
   txDuration: parseInt(opts.txDuration),
-  txSizeMin: parseInt(opts.txSizeMin),
-  txSizeMax: parseInt(opts.txSizeMax),
   slotDuration: parseInt(opts.slotDuration),
   slots: parseInt(opts.slots),
   logLevel: opts.logLevel as string,
@@ -93,8 +90,9 @@ try {
 
   // Memory estimate
   const totalNodes = config.nodes + config.adversaries;
+  const expectedTxCount = Math.ceil(config.txLoad_KBps * 1024 * config.txDuration / config.txSize);
   const bitmapBytesPerTx = Math.ceil(totalNodes / 32) * 4 * 3; // 3 bitmaps
-  const estimatedMB = (config.txCount * 2 * bitmapBytesPerTx) / (1024 * 1024); // *2 for adversarial variants
+  const estimatedMB = (expectedTxCount * 2 * bitmapBytesPerTx) / (1024 * 1024); // *2 for adversarial variants
   logger.info({
     ...config,
     mempool_B: mempool,
@@ -134,23 +132,28 @@ try {
   sim.ebAnnouncementRate = config.ebAnnouncementRate;
   sim.ebCertificationRate = config.ebCertificationRate;
 
-  // Register and inject transactions
+  // Register and inject transactions (byte-budget from KB/s load)
   const honestCount = config.nodes;
-  for (let i = 0; i < config.txCount; i++) {
-    const txId = `T${i}`;
-    const size = config.txSizeMin + Math.floor(Math.random() * (config.txSizeMax - config.txSizeMin));
-    const txIdx = sim.registry.register(txId, size, false, -1);
-    const nodeIndex = Math.floor(Math.random() * honestCount); // honest nodes are 0..honestCount-1
-    const time = Math.round(config.txDuration * Math.random());
+  const totalBytes = config.txLoad_KBps * 1024 * config.txDuration;
+  let bytesInjected = 0;
+  let txI = 0;
+  const MAX_TXS = 50_000; // safety cap
+  while (bytesInjected < totalBytes && txI < MAX_TXS) {
+    const txId = `T${txI}`;
+    const txIdx = sim.registry.register(txId, config.txSize, false, -1);
+    const nodeIndex = Math.floor(Math.random() * honestCount);
+    const time = config.txDuration * Math.random();
     sim.push({
       kind: 'SubmitTx',
       clock: time,
       nodeIdx: nodeIndex,
       txIdx,
     });
+    bytesInjected += config.txSize;
+    txI++;
   }
 
-  logger.info({ txCount: config.txCount, pendingEvents: sim.pendingEvents }, 'transactions submitted');
+  logger.info({ txLoad_KBps: config.txLoad_KBps, txCount: txI, pendingEvents: sim.pendingEvents }, 'transactions submitted');
 
   // Schedule block production (matching original: slot index as clock, probabilistic)
   for (let slot = 0; slot < config.slots; slot++) {
