@@ -3,10 +3,12 @@
     {
       pkgs,
       config,
+      lib,
+      system,
       inputs',
       ...
     }:
-    {
+    lib.optionalAttrs (system == "x86_64-linux") {
       devShells.dev-demo-proto-devnet = pkgs.mkShell {
         name = "dev-demo-proto-devnet";
         src = ./.;
