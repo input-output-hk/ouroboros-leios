@@ -1,6 +1,8 @@
 {
   pkgs,
   inputs,
+  lib,
+  system,
   ...
 }:
 
@@ -62,7 +64,7 @@ let
     '';
   };
 in
-{
+lib.optionalAttrs (system == "x86_64-linux") {
   inherit
     leiosSpec
     leiosDocs
