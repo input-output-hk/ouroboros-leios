@@ -7,7 +7,7 @@
   markdownlint.settings.configuration = builtins.fromJSON (builtins.readFile ./.markdownlint.json);
 
   # Nix
-  nixfmt-rfc-style.enable = true;
+  nixfmt.enable = true;
   deadnix.enable = true;
   statix.enable = true;
 
