@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # WAN Emulation setup using tc (traffic control)
 # Only runs if ENABLE_WAN_EMULATION=true
 

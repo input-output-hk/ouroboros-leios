@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Initialize pool node data directory for proto-devnet
 # Creates genesis with current timestamp, copies pool keys, generates topology, creates leios.db
 #

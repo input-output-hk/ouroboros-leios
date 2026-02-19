@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Run cardano-node with proper logging
 # Usage: run-cardano-node.sh [node-name]
 

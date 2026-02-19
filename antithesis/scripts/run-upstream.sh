@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Run immdb-server (upstream mock peer)
 
 set -euo pipefail

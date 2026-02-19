@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Initialize upstream (immdb-server) data directory
 # Generates leios.db and schedule.json using leiosdemo202510
 

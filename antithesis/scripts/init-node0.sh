@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Initialize node0 data directory
 # Creates topology.json and copies genesis/config files
 

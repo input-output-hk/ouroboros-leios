@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Run tx-generator for load testing
 # Waits for pool nodes to be ready, generates config, then runs tx-generator
 

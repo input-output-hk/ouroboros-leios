@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Run cardano-node as block producer with pool credentials
 # Usage: run-pool-node.sh [pool-name]
 # Example: run-pool-node.sh pool1

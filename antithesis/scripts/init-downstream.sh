@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Initialize downstream node data directory
 # Creates leios.db and topology.json (connecting to node0)
 
