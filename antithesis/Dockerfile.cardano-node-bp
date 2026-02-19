@@ -17,9 +17,7 @@ RUN echo "Building cardano-node from leios-prototype..." \
     && echo "with-compiler: ghc-${GHC_VERSION}" >> cabal.project.local \
     && echo "tests: False" >> cabal.project.local \
     && cabal update \
-    && cabal build exe:cardano-node \
-    && mkdir -p /root/.local/bin/ \
-    && cp -p "$(find dist-newstyle -name cardano-node -type f -executable | head -1)" /root/.local/bin/ \
+    && cabal install exe:cardano-node --install-method=copy --installdir=/root/.local/bin/ \
     && rm -rf /root/.cabal/packages \
     && rm -rf /usr/local/lib/ghc-${GHC_VERSION}/ /usr/local/share/doc/ghc-${GHC_VERSION}/ \
     && rm -rf dist-newstyle/ \
@@ -38,9 +36,7 @@ RUN echo "Building tx-generator from cardano-node ${CARDANO_NODE_VERSION}..." \
     && echo "with-compiler: ghc-${GHC_VERSION}" >> cabal.project.local \
     && echo "tests: False" >> cabal.project.local \
     && cabal update \
-    && cabal build exe:tx-generator \
-    && mkdir -p /root/.local/bin/ \
-    && cp -p "$(find dist-newstyle -name tx-generator -type f -executable | head -1)" /root/.local/bin/ \
+    && cabal install exe:tx-generator --install-method=copy --installdir=/root/.local/bin/ \
     && rm -rf /root/.cabal/packages \
     && rm -rf dist-newstyle/ \
     && rm -rf /root/.cabal/store/ghc-${GHC_VERSION}
