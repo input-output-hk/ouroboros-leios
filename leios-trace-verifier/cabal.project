@@ -1,3 +1,6 @@
 packages:
   dist/haskell
   ../leios-trace-hs
+
+-- This was added to switch from GHC 9.10.1 (with ghc-prim 0.11) to GHC 9.10.3 (with ghc-prim 0.12)
+allow-newer: *:ghc-prim
