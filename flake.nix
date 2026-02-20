@@ -14,7 +14,11 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs";
 
-    iogx.url = "github:input-output-hk/iogx";
+    # Pinning this version until the nix code in this repo is updated to support newer versions
+    iogx.url = "github:input-output-hk/iogx/0cec4b1b2b7dcaf3653fc32b3ff246e2ff173bb7";
+    # Allowing haskell.nix to be updated
+    haskell-nix.url = "github:input-output-hk/haskell.nix";
+    iogx.inputs.haskell-nix.follows = "haskell-nix";
 
     leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?rev=a654a1761476fcf8e6a43aeedbc1455bd7ad77db";
 
