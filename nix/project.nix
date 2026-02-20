@@ -27,10 +27,10 @@ let
 
   ouroboros-leios-sim-src = pkgs.runCommand "ouroboros-leios-sim-src" { } ''
     # Copy the original source.
-    cp -r ${./simulation} $out
+    cp -r ${../simulation} $out
     # Clean up troublesome symbolic links.
     rm -r $out/test/data
-    cp -r ${./data} $out/test/
+    cp -r ${../data} $out/test/
   '';
 
   cabalProject' = pkgs.haskell-nix.cabalProject' {
