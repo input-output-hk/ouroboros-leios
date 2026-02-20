@@ -50,7 +50,7 @@ let
       {
         # We can wait and replace the `ouroboros-leios-sim` source here
         # because we do not need to change the `.cabal` file.
-        packages.ouroboros-leios-sim.src = ouroboros-leios-sim-src;
+        packages.ouroboros-leios-sim.src = lib.mkForce ouroboros-leios-sim-src;
       }
     ];
   };
