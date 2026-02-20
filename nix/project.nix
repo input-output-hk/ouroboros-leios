@@ -40,7 +40,7 @@ let
       "https://chap.intersectmbo.org/" = inputs.iogx.inputs.CHaP;
     };
     name = "ouroboros-leios";
-    compiler-nix-name = lib.mkDefault "ghc9101";
+    compiler-nix-name = lib.mkDefault "ghc9103";
     # Add trace-parser in the cabalProjectLocal as we need the generated
     # `.cabal` file for the cabal planner to work.
     cabalProjectLocal = ''
