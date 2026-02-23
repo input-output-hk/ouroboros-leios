@@ -76,8 +76,9 @@ select
       , json_build_object(
           'type', block_type
         , 'arrival_delay', case when block_type = 'RB' then 0 else round(10000 + (2000000 - 10000) * random()) end
-        , 'cost_verify', round((1.2e8 + 4.7e4 * avg(tx_size) + 8.0e3 * count(*) + 0.61e0 * sum(steps)) / 1e6)
-        , 'cost_apply', round((3.5e7 + 2.8e3 * avg(tx_size) + 5.2e6 * count(*)) / 1e6)
+        , 'cost_verify' , round((0.2e8 +                        1.0e3 * count(*)                      ) / 1e6)
+        , 'cost_apply'  , round((1.0e8 + 4.7e4 * avg(tx_size) + 7.0e3 * count(*) + 0.61e0 * sum(steps)) / 1e6)
+        , 'cost_reapply', round((3.5e7 + 2.8e3 * avg(tx_size) + 5.2e6 * count(*)                      ) / 1e6)
         , 'inputs', json_agg(left(tx_in_hash, 8))
         ) as tx_info
       from leios_txin
