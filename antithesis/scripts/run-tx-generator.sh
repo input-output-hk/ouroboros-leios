@@ -43,13 +43,20 @@ if [ ! -f "$SHARED_GENESIS_DIR/.genesis-ready" ]; then
     exit 1
 fi
 
-# Copy genesis files
-mkdir -p "$DATA_DIR/genesis"
-cp "$SHARED_GENESIS_DIR/"*.json "$DATA_DIR/genesis/"
+# Copy genesis files alongside config (config.yaml uses relative paths)
+cp "$SHARED_GENESIS_DIR/"*.json "$DATA_DIR/"
 echo "  Genesis files copied"
 
-# Copy config for cardano-cli
-cp "$CONFIG_DIR/config.json" "$DATA_DIR/config.json"
+# Copy node config for cardano-cli / tx-generator
+# Proto-devnet uses config.yaml; other stacks may use config.json
+if [ -f "$CONFIG_DIR/config.yaml" ]; then
+    cp "$CONFIG_DIR/config.yaml" "$DATA_DIR/config.yaml"
+elif [ -f "$CONFIG_DIR/config.json" ]; then
+    cp "$CONFIG_DIR/config.json" "$DATA_DIR/config.yaml"
+else
+    echo "ERROR: No node config found in $CONFIG_DIR"
+    exit 1
+fi
 
 # Copy utxo-keys
 mkdir -p "$DATA_DIR/utxo-keys"
@@ -99,8 +106,8 @@ if [ -f "$CONFIG_DIR/gen.template.json" ]; then
         sed "s/\${PORT_NODE1}/$PORT_POOL1/g" | \
         sed "s/\${PORT_NODE2}/$PORT_POOL2/g" | \
         sed "s/\${PORT_NODE3}/$PORT_POOL3/g" | \
-        jq '.localNodeSocketPath = null' | \
-        jq '.nodeConfigFile = "/data/config.json"' | \
+        jq '.localNodeSocketPath = "/pool1-data/socket"' | \
+        jq '.nodeConfigFile = "/data/config.yaml"' | \
         jq '.sigKey = "/data/utxo-keys/utxo1/utxo.skey"' \
         > "$DATA_DIR/gen.json"
     echo "  gen.json created"
@@ -114,8 +121,6 @@ echo "Waiting 10s for nodes to stabilize..."
 sleep 10
 
 echo "Starting tx-generator..."
-exec tx-generator run-script \
-    --config "$DATA_DIR/gen.json" \
-    --genesis-alonzo "$DATA_DIR/genesis/alonzo-genesis.json" \
-    --genesis-conway "$DATA_DIR/genesis/conway-genesis.json" \
-    --genesis-shelley "$DATA_DIR/genesis/shelley-genesis.json"
+exec tx-generator json_highlevel \
+    "$DATA_DIR/gen.json" \
+    --nodeConfig "$DATA_DIR/config.yaml"

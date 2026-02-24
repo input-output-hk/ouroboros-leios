@@ -188,6 +188,7 @@ services:
     volumes:
       - txgen-data:/data
       - genesis-shared:/shared-genesis:ro
+      - pool1-data:/pool1-data:ro
       - logs:/logs
     networks:
       - leios-net

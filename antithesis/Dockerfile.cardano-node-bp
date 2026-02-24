@@ -26,7 +26,7 @@ RUN echo "Building cardano-node from leios-prototype..." \
 # Build tx-generator from stable branch (leios-prototype tx-generator has API issues)
 FROM ghcr.io/blinklabs-io/haskell:9.6.6-3.12.1.0-3 AS tx-generator-build
 
-ARG CARDANO_NODE_VERSION=9cf1e651e9fc3726a5fa9771b0d3479e5b909c6b
+ARG CARDANO_NODE_VERSION=bd3e580eab25afab55085e981d2e3db74498aa2c
 
 RUN echo "Building tx-generator from cardano-node ${CARDANO_NODE_VERSION}..." \
     && git clone https://github.com/intersectmbo/cardano-node.git \
