@@ -15,15 +15,17 @@ then
       .[]
     | .value
     | select(.type != "LG")
-    | (.cost_verify + .cost_apply)
+    | (.cost_verify + .cost_apply + .cost_reapply)
     ]
   | add
   ' scenario.json
   rm scenario.json
 fi
 
-MEM=$(($(sed -n -e '/^MemTotal:/{s/^[^ ]* *\([^ ]*\) .*$/\1/;p}' /proc/meminfo) * 85 / 100))
-ulimit -S -m $MEM -v $MEM
+ulimit \
+  -m $(($(sed -n -e '/^MemTotal:/{s/^[^ ]* *\([^ ]*\) .*$/\1/;p}' /proc/meminfo) *  85 / 100))$MEM \
+  -v $(($(sed -n -e '/^MemTotal:/{s/^[^ ]* *\([^ ]*\) .*$/\1/;p}' /proc/meminfo) * 125 / 100))$MEM \
+  -S
 
 nice python main.py \
   --log-solver \

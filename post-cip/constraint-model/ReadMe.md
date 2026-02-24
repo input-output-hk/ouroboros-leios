@@ -204,26 +204,27 @@ $ python main.py --out-yaml results-2MB.yaml --out-trace results-2MB.json scenar
 Reading scenario from scenario-2MB.yaml...
 Solving for 3477 transactions on 4 CPUs...
 
-Final t1 (Makespan): 4368925 µs
+Final t1 (Makespan): 4904844 µs
 
 ========================================
 PERFORMANCE STATISTICS
 ========================================
-CPU Utilization:       4.5%
-Wallclock Idle:        83.8% (3660619 µs)
+CPU Utilization:       4.0%
+Wallclock Idle:        88.6% (4345530 µs)
 ----------------------------------------
-Phase  | Work %   | Parallelism
+Phase      | Work %   | Parallelism
 ----------------------------------------
-Ver    | 50.5%    | 0.14
-App    | 11.1%    | 0.03
-Vote   | 38.5%    | 1.00
+Verify     | 4.2%     | 0.01       
+Apply      | 46.2%    | 0.12       
+Reapply    | 11.1%    | 0.03       
+Vote       | 38.5%    | 1.00       
 ========================================
 
 YAML results written to: results-2MB.yaml
 Chrome Trace written to: results-2MB.json
 ```
 
-Use the `--log-solver` flag to monitor the progress for large scenarios. One can interrupt the result with `^C`, which will cause the current best solution to be output. The message `best:4413340 next:[4413326,4413339]` below indicates that the best solution so far is `4413340 µs` and that the optimal solution falls in the interval `[4413326 µs,4413339 µs]`.
+Use the `--log-solver` flag to monitor the progress for large scenarios. One can interrupt the result with `^C`, which will cause the current best solution to be output. The message `best:3740829 next:[3740821,3740828]` below indicates that the best solution so far is `3740829 µs` and that the optimal solution falls in the interval `[3740821 µs, 3740828 µs]`. Note that running this scenario requires approximately 90 GB of memory and 4.5 hours on 24 CPUs.
 
 ```console
 $ python main.py --out-yaml results-12MB.yaml --out-trace results-2MB.json scenario-2MB.yaml
@@ -235,34 +236,36 @@ Starting CP-SAT solver v9.15.6755
 
 . . .
 
-Starting search at 6.41s with 16 workers.
-11 full problem subsolvers: [default_lp, fixed, lb_tree_search, max_lp, no_lp, objective_lb_search, probing, pseudo_costs, quick_restart, quick_restart_no_lp, reduced_costs]
-5 first solution subsolvers: [fj(2), fs_random, fs_random_no_lp, fs_random_quick_restart_no_lp]
-14 interleaved subsolvers: [feasibility_pump, graph_arc_lns, graph_cst_lns, graph_dec_lns, graph_var_lns, lb_relax_lns, ls, ls_lin, rins/rens, rnd_cst_lns, rnd_var_lns, scheduling_intervals_lns, scheduling_precedences_lns, scheduling_time_window_lns]
+15 full problem subsolvers: [default_lp, fixed, lb_tree_search, max_lp_sym, no_lp, objective_lb_search, objective_shaving_max_lp, objective_shaving_no_lp, probing, probing_max_lp, probing_no_lp, pseudo_costs, quick_restart, quick_restart_no_lp, reduced_costs]
+9 first solution subsolvers: [fj(3), fj_lin, fs_random, fs_random_no_lp(2), fs_random_quick_restart, fs_random_quick_restart_no_lp]
+16 interleaved subsolvers: [feasibility_pump, graph_arc_lns, graph_cst_lns, graph_dec_lns, graph_var_lns, lb_relax_lns, ls(2), ls_lin, rins/rens, rnd_cst_lns, rnd_var_lns, scheduling_intervals_lns, scheduling_precedences_lns, scheduling_time_window_lns, variables_shaving]
 3 helper subsolvers: [neighborhood_helper, synchronization_agent, update_gap_integral]
 
-#Bound  16.54s best:inf   next:[4413326,7338749] reduced_costs
-#1      70.51s best:4413961 next:[4413326,4413960] fs_random_quick_restart_no_lp
-#2      91.50s best:4413340 next:[4413326,4413339] no_lp
-^C
+#Bound  19.67s best:inf   next:[3480871,6416378] objective_shaving_no_lp (vars=31501 csts=77322)
+#Bound  21.62s best:inf   next:[3740821,6416378] probing_no_lp (initial_propagation)
+#1     1699.51s best:3740829 next:[3740821,3740828] fs_random_no_lp
+#2     1699.93s best:3740823 next:[3740821,3740822] no_lp
+#3     14011.17s best:3740822 next:[3740821,3740821] scheduling_time_window_lns (d=1.27e-03 s=112470 t=0.10 p=0.00 stall=0 h=base) [hint]
+#Model 14082.17s var:31500/31501 constraints:56322/77322
+#4     16500.48s best:3740821 next:[]         scheduling_precedences_lns (d=3.16e-04 s=527912 t=0.10 p=0.06 stall=0 h=base) [hint]
 
 . . .
 
-Final t1 (Makespan): 4413961 µs
+Final t1 (Makespan): 3740821 µs
 
 ========================================
 PERFORMANCE STATISTICS
 ========================================
-CPU Utilization:       18.5%
-Wallclock Idle:        58.4% (2578290 µs)
+CPU Utilization:       21.9%
+Wallclock Idle:        61.2% (2289582 µs)
 ----------------------------------------
-Phase  | Work %   | Parallelism
+Phase      | Work %   | Parallelism
 ----------------------------------------
-Ver    | 74.2%    | 0.89
-App    | 16.6%    | 0.20
-Vote   | 9.2%     | 1.00
+Verify     | 6.4%     | 0.09       
+Apply      | 67.8%    | 0.98       
+Reapply    | 16.6%    | 0.24       
+Vote       | 9.2%     | 1.00       
 ========================================
-
 YAML results written to: results-12MB.yaml
 Chrome Trace written to: results-12MB.json
 ```
