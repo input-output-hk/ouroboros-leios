@@ -2,8 +2,10 @@ import { useSimContext } from "@/contexts/SimContext/context";
 import {
   IServerMessage,
   EServerMessageType,
+  IRankingBlockGenerated,
   IRankingBlockSent,
   IRankingBlockReceived,
+  IEndorserBlockGenerated,
   IEndorserBlockSent,
   IEndorserBlockReceived,
   ITransactionSent,
@@ -19,9 +21,9 @@ const HOST_PORT_TO_NODE: Record<string, string> = {
   "10.0.0.2:3002": "Node0",
   "10.0.0.3:3003": "DownstreamNode",
   // demo-proto-devnet
-  "127.0.0.1:3001": "Node1",
-  "127.0.0.1:3002": "Node2",
-  "127.0.0.1:3003": "Node3",
+  "172.28.0.10:3001": "Node1",
+  "172.28.0.20:3002": "Node2",
+  "172.28.0.30:3003": "Node3",
   // Add more mappings as needed
 };
 
@@ -35,6 +37,42 @@ const getRemoteFromConnection = (connectionId: string | undefined): string => {
   }
 
   return "UNKNOWN";
+};
+
+const parseRankingBlockGenerated = (
+  streamLabels: any,
+  timestamp: number,
+  logLine: string,
+): IServerMessage | null => {
+  try {
+    const log = JSON.parse(logLine);
+
+    // {"forgedBlock":{"newBlockHash":"c036...","newBlockSize":{"txCount":293,"txSize":{"txSizeBytes":88842},...},...},"kind":"TraceForgedBlock","slot":1561}
+    if (log.kind === "TraceForgedBlock" && log.forgedBlock) {
+      const block = log.forgedBlock;
+      const txSizeBytes = block.newBlockSize?.txSize?.txSizeBytes ?? 0;
+
+      const message: IRankingBlockGenerated = {
+        type: EServerMessageType.RBGenerated,
+        id: block.newBlockHash,
+        slot: log.slot,
+        producer: streamLabels.process,
+        size_bytes: txSizeBytes,
+        header_bytes: 0, // TODO: used? have we access to the header?
+        endorsement: null,
+        transactions: [], // TODO: used?
+      };
+
+      return {
+        time_s: timestamp,
+        message,
+      };
+    }
+  } catch (error) {
+    console.warn("Failed to parse TraceForgedBlock log line:", logLine, error);
+  }
+
+  return null;
 };
 
 const parseRankingBlockSent = (
@@ -129,6 +167,39 @@ const parseRankingBlockReceived = (
   return null;
 };
 
+const parseEndorserBlockGenerated = (
+  streamLabels: any,
+  timestamp: number,
+  logLine: string,
+): IServerMessage | null => {
+  try {
+    const log = JSON.parse(logLine);
+
+    // {"kind":"LeiosBlockForged","mempoolRestSize":304114,"numTxs":293,"slot":1311,"closureSize":88835,"ebSize":10844,"hash":"cb73e5ef..."}
+    if (log.kind === "LeiosBlockForged") {
+      const message: IEndorserBlockGenerated = {
+        type: EServerMessageType.EBGenerated,
+        id: log.hash,
+        slot: log.slot,
+        producer: streamLabels.process,
+        size_bytes: log.ebSize,
+        pipeline: 0, // XXX: unused
+        transactions: [], // TODO: used?
+        endorser_blocks: [], // XXX: not relevant for linear leios
+      };
+
+      return {
+        time_s: timestamp,
+        message,
+      };
+    }
+  } catch (error) {
+    console.warn("Failed to parse LeiosBlockForged log line:", logLine, error);
+  }
+
+  return null;
+};
+
 const parseEndorserBlockSent = (
   streamLabels: any,
   timestamp: number,
@@ -153,7 +224,7 @@ const parseEndorserBlockSent = (
 
       const message: IEndorserBlockSent = {
         type: EServerMessageType.EBSent,
-        slot: 0, // FIXME: drop as not available/needed
+        slot: 0, // TODO: add slot (full point) to logs?
         id: log.msg.ebHash,
         sender,
         recipient,
@@ -240,15 +311,14 @@ const parseTransactionSent = (
         log.peer?.connectionId || log.connectionId,
       );
 
-      // FIXME: msg.txs is always elided
-      const txId = nextTxId[sender] || 0;
-      nextTxId[sender] = txId + 1;
+      const txId = `${log.msg.ebHash}-${log.msg.bitmaps.reduce((acc: string, bitmap: any) => acc + bitmap, "")}`;
 
       const message: ITransactionSent = {
         type: EServerMessageType.TransactionSent,
-        id: txId.toString(),
+        id: txId,
         sender,
         recipient,
+        msg_size_bytes: log.msg.txsBytesSize,
       };
 
       return {
@@ -311,7 +381,7 @@ function connectLokiWebSocket(lokiHost: string, dispatch: any): () => void {
   // 3. Loki naturally returns results in chronological order within a single stream
   // 4. Sorting large event arrays in the reducer is too expensive for dense simulation data
   const query =
-    '{service="cardano-node"} |~ "BlockFetchServer|MsgBlock|CompletedBlockFetch|MsgLeiosBlock|MsgLeiosBlockTxs"';
+    '{service="cardano-node"} |~ "BlockFetchServer|MsgBlock|CompletedBlockFetch|MsgLeiosBlock|MsgLeiosBlockTxs|LeiosBlockForged|TraceForgedBlock"';
   const wsUrl = `ws://${lokiHost}/loki/api/v1/tail?query=${encodeURIComponent(query)}&limit=5000`;
 
   let hasAutoStartedPlayback = false;
@@ -360,8 +430,10 @@ function connectLokiWebSocket(lokiHost: string, dispatch: any): () => void {
 
                   // TODO: simplify and push further upstream (e.g. into alloy)
                   const event =
+                    parseRankingBlockGenerated(stream.stream, ts, logLine) ||
                     parseRankingBlockSent(stream.stream, ts, logLine) ||
                     parseRankingBlockReceived(stream.stream, ts, logLine) ||
+                    parseEndorserBlockGenerated(stream.stream, ts, logLine) ||
                     parseEndorserBlockSent(stream.stream, ts, logLine) ||
                     parseEndorserBlockReceived(stream.stream, ts, logLine) ||
                     parseTransactionSent(stream.stream, ts, logLine) ||

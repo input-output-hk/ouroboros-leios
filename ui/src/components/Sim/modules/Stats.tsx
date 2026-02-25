@@ -2,6 +2,22 @@ import { FC } from "react";
 
 import { useSimContext } from "@/contexts/SimContext/context";
 import { EServerMessageType } from "../types";
+import { EMessageColor } from "@/utils/colors";
+
+const EVENT_TYPE_COLOR: Partial<Record<EServerMessageType, string>> = {
+  [EServerMessageType.TransactionGenerated]: EMessageColor.TX,
+  [EServerMessageType.TransactionSent]: EMessageColor.TX,
+  [EServerMessageType.TransactionReceived]: EMessageColor.TX,
+  [EServerMessageType.EBGenerated]: EMessageColor.EB,
+  [EServerMessageType.EBSent]: EMessageColor.EB,
+  [EServerMessageType.EBReceived]: EMessageColor.EB,
+  [EServerMessageType.RBGenerated]: EMessageColor.RB,
+  [EServerMessageType.RBSent]: EMessageColor.RB,
+  [EServerMessageType.RBReceived]: EMessageColor.RB,
+  [EServerMessageType.VTBundleGenerated]: EMessageColor.VOTES,
+  [EServerMessageType.VTBundleSent]: EMessageColor.VOTES,
+  [EServerMessageType.VTBundleReceived]: EMessageColor.VOTES,
+};
 
 export const Stats: FC = () => {
   const {
@@ -53,6 +69,12 @@ export const Stats: FC = () => {
                       className="flex justify-between text-sm items-center"
                     >
                       <span className="flex items-center gap-1">
+                        {EVENT_TYPE_COLOR[eventType] && (
+                          <span
+                            className="inline-block w-2.5 h-2.5 rounded-sm flex-shrink-0"
+                            style={{ backgroundColor: EVENT_TYPE_COLOR[eventType] }}
+                          />
+                        )}
                         {eventType}:
                         {isTxReceived && (
                           <span

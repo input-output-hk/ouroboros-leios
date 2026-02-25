@@ -41,6 +41,7 @@ export interface IMessageAnimation {
   sentTime: number;
   receivedTime: number;
   progress: number; // 0-1, calculated based on current timeline position
+  sizeBytes: number; // payload size for visual scaling
 }
 
 export interface IMessageTypeCounts {

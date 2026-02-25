@@ -45,7 +45,15 @@ export type TLinkMapId = string;
 
 export interface ITransformedNodeMap {
   nodes: Map<string, ITransformedNode>;
-  links: Map<string, { source: string; target: string; latencyMs?: number }>;
+  links: Map<
+    string,
+    {
+      source: string;
+      target: string;
+      latencyMs?: number;
+      bandwidthBytesPerSecond?: number;
+    }
+  >;
 }
 
 export enum EServerMessageType {
@@ -82,6 +90,7 @@ export interface ITransactionSent {
   id: string;
   sender: string;
   recipient: string;
+  msg_size_bytes: number;
 }
 
 export interface IRankingBlockGenerated {

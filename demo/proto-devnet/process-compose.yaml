@@ -1,28 +1,60 @@
 version: "0.5"
 is_strict: true
 
+# NOTE: Elevated processes (is_elevated: true) run via sudo, which does not
+# preserve environment variables. We must explicitly pass needed variables
+# inline in the command for them to be available in elevated scripts.
+
 processes:
+  InitNamespaces:
+    is_elevated: true
+    command: |
+      RATE="${RATE}" \
+      DELAY="${DELAY}" \
+      IP_NODE1="${IP_NODE1}" \
+      IP_NODE2="${IP_NODE2}" \
+      IP_NODE3="${IP_NODE3}" \
+      IP_HOST="${IP_HOST}" \
+      bash "${SOURCE_DIR}/scripts/init-namespaces.sh"
+
   Node1:
-    environment:
-      - NODE_ID=1
-    command: bash "${SOURCE_DIR}/run-node.sh"
+    is_elevated: true
+    command: |
+      NODE_DIR="${WORKING_DIR}/node1" \
+      IP="${IP_NODE1}" \
+      PORT="${PORT_NODE1}" \
+      ip netns exec proto-devnet:node1 bash "${SOURCE_DIR}/run-node.sh"
     log_location: "${WORKING_DIR}/node1/node.log"
+    depends_on:
+      InitNamespaces:
+        condition: process_completed_successfully
 
   Node2:
-    environment:
-      - NODE_ID=2
-    command: bash "${SOURCE_DIR}/run-node.sh"
+    is_elevated: true
+    command: |
+      NODE_DIR="${WORKING_DIR}/node2" \
+      IP="${IP_NODE2}" \
+      PORT="${PORT_NODE2}" \
+      ip netns exec proto-devnet:node2 bash "${SOURCE_DIR}/run-node.sh"
     log_location: "${WORKING_DIR}/node2/node.log"
+    depends_on:
+      InitNamespaces:
+        condition: process_completed_successfully
 
   Node3:
-    environment:
-      - NODE_ID=3
-    command: bash "${SOURCE_DIR}/run-node.sh"
+    is_elevated: true
+    command: |
+      NODE_DIR="${WORKING_DIR}/node3" \
+      IP="${IP_NODE3}" \
+      PORT="${PORT_NODE3}" \
+      ip netns exec proto-devnet:node3 bash "${SOURCE_DIR}/run-node.sh"
     log_location: "${WORKING_DIR}/node3/node.log"
+    depends_on:
+      InitNamespaces:
+        condition: process_completed_successfully
 
   TxGenerator:
-    command: sleep 5 && tx-generator json_highlevel gen.json
-    working_dir: ${WORKING_DIR}
+    command: while [ ! -S ${WORKING_DIR}/node1/node.socket ]; do sleep 0.5; done && cd ${WORKING_DIR} && tx-generator json_highlevel gen.json
     depends_on:
       Node1:
         condition: process_started

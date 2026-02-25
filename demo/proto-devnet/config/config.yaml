@@ -89,7 +89,7 @@ TraceOptions:
   ChainSync.Client:
     severity: Debug
   ChainSync.Local:
-    severity: Notice
+    severity: Silence
   ChainSync.Remote:
     severity: Notice
   ChainSync.Remote.Serialised:
@@ -123,7 +123,7 @@ TraceOptions:
   Net.AcceptPolicy:
     severity: Debug
   Net.ConnectionManager.Local:
-    severity: Debug
+    severity: Silence
   Net.ConnectionManager.Remote:
     severity: Debug
   Net.ConnectionManager.Remote.ConnectionManagerCounters:
@@ -137,19 +137,19 @@ TraceOptions:
   Net.ErrorPolicy.Remote:
     severity: Debug
   Net.Handshake.Local:
-    severity: Debug
+    severity: Silence
   Net.Handshake.Remote:
     severity: Debug
   Net.InboundGovernor:
     severity: Warning
   Net.InboundGovernor.Local:
-    severity: Debug
+    severity: Silence
   Net.InboundGovernor.Remote:
     severity: Debug
   Net.InboundGovernor.Transition:
     severity: Debug
   Net.Mux.Local:
-    severity: Notice
+    severity: Silence
   Net.Mux.Remote:
     severity: Notice
   Net.PeerSelection:
@@ -174,7 +174,7 @@ TraceOptions:
   Net.Peers.PublicRoot:
     severity: Debug
   Net.Server.Local:
-    severity: Debug
+    severity: Silence
   Net.Server.Remote:
     severity: Debug
   Net.Subscription.DNS:
@@ -194,9 +194,9 @@ TraceOptions:
   StateQueryServer:
     severity: Notice
   TxSubmission.Local:
-    severity: Notice
+    severity: Silence
   TxSubmission.LocalServer:
-    severity: Notice
+    severity: Silence
   TxSubmission.MonitorClient:
     severity: Notice
   TxSubmission.Remote:

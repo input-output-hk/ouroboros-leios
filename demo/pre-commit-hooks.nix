@@ -26,6 +26,6 @@
     extends: relaxed
     rules:
       line-length:
-        max: 120
+        max: 180
   '';
 }
