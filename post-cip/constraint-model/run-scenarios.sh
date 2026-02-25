@@ -2,8 +2,9 @@
 
 set -eo pipefail
 
-if true
+if hostname | grep -v '^ip-.*\.compute\.internal' > /dev/null
 then
+  echo "Setting memory limits . . ."
   ulimit \
     -m $(($(sed -n -e '/^MemTotal:/{s/^[^ ]* *\([^ ]*\) .*$/\1/;p}' /proc/meminfo) *  85 / 100)) \
     -v $(($(sed -n -e '/^MemTotal:/{s/^[^ ]* *\([^ ]*\) .*$/\1/;p}' /proc/meminfo) * 115 / 100)) \
@@ -32,26 +33,12 @@ do
     rm scenario.json
   fi
 
-  `which time` --verbose python main.py \
-    --log-solver \
-    --out-yaml results-$SCENARIO.yaml \
-    --out-trace results-$SCENARIO.json \
-    scenario-$SCENARIO.yaml \
-  |& tee results-$SCENARIO.log
-
   if [ ! -f scenario-$SCENARIO-1cpu.yaml ]
   then
-    sed -e 's/^  n_cpu:.*/  n_cpu: 1' \
+    sed -e 's/^  n_cpu:.*/  n_cpu: 1/' \
         scenario-$SCENARIO.yaml \
     > scenario-$SCENARIO-1cpu.yaml
   fi
-
-  `which time` --verbose python main.py \
-    --log-solver \
-    --out-yaml results-$SCENARIO-1cpu.yaml \
-    --out-trace results-$SCENARIO-1cpu.json \
-    scenario-$SCENARIO-1cpu.yaml \
-  |& tee results-$SCENARIO-1cpu.log
 
   if [ ! -f scenario-$SCENARIO-adv.yaml ]
   then
@@ -63,12 +50,25 @@ do
     > scenario-$SCENARIO-adv.yaml
   fi
 
-  `which time` --verbose python main.py \
-    --log-solver \
-    --out-yaml results-$SCENARIO-adv.yaml \
-    --out-trace results-$SCENARIO-adv.json \
-    scenario-$SCENARIO-adv.yaml \
-  |& tee results-$SCENARIO-adv.log
+  for SUFFIX in "" "-1cpu" "-adv"
+  do
+    if [ ! -f results-$SCENARIO$SUFFIX.yaml ]
+    then
+      if `which time` --verbose python main.py \
+            --log-solver \
+            --out-yaml results-$SCENARIO$SUFFIX.yaml \
+            --out-trace results-$SCENARIO$SUFFIX.json \
+            scenario-$SCENARIO$SUFFIX.yaml \
+          |& tee results-$SCENARIO$SUFFIX.log
+      then
+        echo "Complete: $SCENARIO$SUFFIX"
+      else
+        echo "Failed: $SCENARIO$SUFFIX"
+      fi
+    else
+      echo "Skip: $SCENARIO$SUFFIX"
+    fi
+  done
 
 done
 
