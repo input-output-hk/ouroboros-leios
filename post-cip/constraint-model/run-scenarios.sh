@@ -10,7 +10,7 @@ then
     -S
 fi
 
-for SCENARIO in 2MB 12MB
+for SCENARIO in 6MB
 do
 
   if [ ! -f scenario-$SCENARIO.yaml ]
@@ -38,6 +38,20 @@ do
     --out-trace results-$SCENARIO.json \
     scenario-$SCENARIO.yaml \
   |& tee results-$SCENARIO.log
+
+  if [ ! -f scenario-$SCENARIO-adv.yaml ]
+  then
+    sed -e 's/^  n_cpu:.*/  n_cpu: 1' \
+        scenario-$SCENARIO.yaml \
+    > scenario-$SCENARIO-adv.yaml
+  fi
+
+  `which time` --verbose python main.py \
+    --log-solver \
+    --out-yaml results-$SCENARIO-1cpu.yaml \
+    --out-trace results-$SCENARIO-1cpu.json \
+    scenario-$SCENARIO-1cpu.yaml \
+  |& tee results-$SCENARIO-1cpu.log
 
   if [ ! -f scenario-$SCENARIO-adv.yaml ]
   then

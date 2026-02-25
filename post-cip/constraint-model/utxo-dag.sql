@@ -12,8 +12,15 @@ select
   , size as tx_size
   from tx
 --where id between 118811946 and 118822448 -- 12MB scenario
+--where id between 118811946 and 118817053 -- 6MB scenario
 --where id between 118811946 and 118813600 -- 2MB scenario
 order by tx_id
+;
+
+select
+    count(*) as block_txs
+  , sum(tx_size) as block_size
+  from leios_tx
 ;
 
 select
