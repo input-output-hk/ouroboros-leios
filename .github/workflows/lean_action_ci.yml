@@ -4,17 +4,33 @@ on:
   pull_request:
     paths:
       - "analysis/markov/**"
+      - "post-cip/formal-crypto/lean/**"
   push:
     branches:
       - main
     paths:
       - "analysis/markov/**"
+      - "post-cip/formal-crypto/lean/**"
 
 jobs:
-  build:
+
+  markov-simulator:
+    if: true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: leanprover/lean-action@v1
         with:
           lake-package-directory: analysis/markov
+          use-github-cache: true
+
+  leioscrypto-spec:
+    if: false  # Turn off because the `proofwidgets` dependency fails to build due to an `npm` dependency.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: post-cip/formal-crypto/lean
+          use-mathlib-cache: false
+          use-github-cache: false
