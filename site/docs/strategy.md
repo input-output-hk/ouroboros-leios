@@ -1,104 +1,82 @@
 # Strategy
 
-This document lays out the vision, mission and strategy which we follow to
-[build our roadmap](./roadmap.md) to the Leios consensus upgrade for Cardano.
-While this is covers the _why_ we are doing this, _how_ we aim to succeed, the
-[roadmap](./roadmap.md) is about _what_ we plan to do.
+This document outlines the vision, mission, and strategy guiding the development of Ouroboros Linear Leios – the consensus upgrade that will deliver world-class scalability to Cardano. While this document explains _why_ we are building Leios and _how_ we intend to succeed, the separate [roadmap](./roadmap.md) details _what_ we will deliver and _when_.
 
-## Vision & Mission
+## Vision and mission 
 
-Leios supports Cardano’s vision to be recognized as the _best-in-class_ blockchain, renowned for performance, reliability, and scalability.
+**Vision**
 
-Our mission is to drive **greater adoption** of the Cardano network by building a blockchain that is:
+Leios supports Cardano’s vision to be recognised as the best-in-class blockchain – renowned for performance, reliability, security, and true decentralization.
 
-- *Scalable and reliable*, enabling innovation and sustainable growth for developers, businesses, and communities.
+**Mission**
 
-- *Economically sustainable*, ensuring long-term viability and trust, so that projects choose Cardano as the natural home for decentralized applications and enterprise solutions.
+The mission is to drive widespread adoption of the Cardano network by delivering a blockchain that is:
 
-This mission positions Leios as the engine powering Cardano’s global impact.
+-   **Scalable and reliable**, enabling innovation and sustainable growth for developers, businesses, and communities worldwide.
+-   **Economically sustainable**, ensuring long-term viability so that stake pool operators (SPOs) remain profitable and the network continues to attract high-quality projects and enterprise solutions.
+    
+Leios, together with Peras, is the engine that will power Cardano’s global impact.
 
-### Strategy
+## Strategy
 
-To fulfil our mission, Leios will pursue a strategy built on three pillars:
+To achieve Leios’ mission, the strategy builds on three interconnected pillars:
 
-- **Technical leadership**
+**1. Technical leadership**
 
-  We will continuously advance Cardano’s core protocol and supporting infrastructure to deliver world-class performance. This means investing in innovations that raise transaction throughput, reduce latency, and strengthen network resilience. By setting the technical benchmark in both research and implementation, Leios will ensure Cardano remains at the forefront of blockchain platforms.
+Cardano’s core protocol and supporting infrastructure will continue to advance to deliver industry-leading performance. This includes delivering Ouroboros Linear Leios for massive throughput gains and pairing it with Peras for fast finality, while maintaining Ouroboros’ proven security guarantees. By combining rigorous research, formal methods, and continuous simulation-driven validation, Leios is positioned to set the technical benchmark for scalable, decentralized blockchains.
 
-- **Market repositioning**
+**2. Market repositioning**
 
-  Beyond technical progress, we will reposition Cardano in the marketplace as a blockchain capable of handling the most demanding use cases. By publishing transparent benchmarks, compelling visualizations, and a clear roadmap of improvements, we can shift perceptions about scalability and reliability. This narrative will attract developers, businesses, and enterprises looking for a secure and future-proof platform.
+Cardano is targeted to become the blockchain that can handle real-world scale without compromise for developers, businesses, and institutions. Through transparent benchmarks, compelling visualizations, clear progress updates, and real-world performance data, perceptions will shift from ‘academic and slow’ to ‘fast, secure, and ready for mass adoption.’
 
-- **Sustainable decentralization**
+**3. Sustainable decentralization**
 
-  Scaling the network must not come at the cost of centralization. Our strategy ensures throughput grows while hardware requirements remain reasonable, so that Stake Pool Operators (SPOs) can remain profitable and engaged. By keeping operational costs sustainable _relative_ to on-chain revenues, we preserve one of Cardano’s greatest strengths—its unmatched decentralization. A healthy, diverse SPO ecosystem guarantees resilience, fairness, and long-term trust.
+Scaling must never come at the expense of decentralization. Leios is designed to increase throughput significantly while keeping hardware and operational requirements for SPOs modest and sustainable. By keeping node costs aligned with growing on-chain revenue, Cardano protects its greatest strength: its unmatched, permissionless, and geographically diverse SPO ecosystem.
 
-### Principles
+## Principles
 
-These are the guiding principles we aim to uphold while executing our strategy, ensuring that our actions align with both our mission and the expectations of the Cardano community.
+These principles guide every decision in the development of Leios:
 
-- **Validate early**
+-   **Early validation**: testing ideas and designs as early as possible through simulations, prototypes, and formal verification. This reduces risk and allows the community to provide meaningful feedback before significant resources are committed.
+-   **Continuous delivery**: delivering visible value frequently – whether through incremental protocol improvements, new tools, documentation, or educational content – to build trust, maintain momentum, and keep the community engaged.
+- **Transparency to ensure acceptance**: operating openly by sharing decisions, data, rationale, and results. This empowers the Cardano community to participate meaningfully in governance and builds broad acceptance for Leios as the foundation of Cardano’s future.
 
-  Because Leios is pioneering novel work, it is essential that ideas and technical approaches are tested and validated as early as possible. This reduces risk, encourages experimentation, and ensures that what we build is not only theoretically sound but also practically viable. Early validation allows the community and stakeholders to give feedback before changes become costly or disruptive, and gives us the opportunity to validate assumptions as early as possible in case the design needs to be adjusted, underlying architectures revised, or implementations adapted.
-
-
-- **Continuously deliver**
-
-  Progress must be visible and tangible. By continuously delivering value to the community—whether through incremental improvements, new features, marketing content, or learning materials as Leios develops—we build trust and momentum. Frequent delivery demonstrates accountability, keeps developers and the community engaged, and ensures Cardano evolves in step with real user needs.
+## Key performance indicators (KPIs)
 
 
-- **Transparency to ensure acceptance**
+The following metrics are tracked to measure success and maintain transparency:
 
-  For decentralized governance to flourish, transparency must be at the core of everything we do. Sharing decisions, rationale, data, and results openly not only builds credibility but also empowers the community to participate meaningfully in governance. Clear communication and openness transform stakeholders into active collaborators, ensuring broad acceptance of Leios as a foundation for Cardano’s future.
+### Throughput and performance
 
-### Key Performance Indicators (KPIs)
+-   **Transaction data throughput (TxB/s)**: target 140–300+ TxB/s (30–65× current Praos levels)
+-   **Peak TPS**: up to 1,500+ transactions per second under realistic conditions
+-   **Inclusion latency**: average time from mempool to ledger inclusion
+-   **Finalization time**: ~2 minutes for high-confidence settlement (with Peras)
 
-To measure the success of Leios and ensure alignment with our mission, we will track a set of technically rigorous KPIs across performance, efficiency, security, adoption, cost, and scalability. These indicators provide objective evidence of improvements and maintain transparency with the Cardano community, developers, and stakeholders.
+### Network efficiency
 
-#### Throughput and Performance
+-   **Resource utilization**: modest increase in CPU/bandwidth per transaction
+-   **Block propagation time**: target <5 seconds for global diffusion
+-   **Spatial and temporal efficiency**: high ratio of useful transactions to total block data
 
-- **Transaction Data Throughput (TxB/s):** The volume of transaction data (in bytes) successfully processed and added to the ledger per second. This metric provides a more accurate measure of system capacity than raw TPS, as Cardano’s eUTXO model allows transactions to vary in complexity and size.
+### Security and decentralization
 
-- **Script Throughput:** The aggregate amount of computation performed on transactions, measured by total script execution units processed per second.
-- **Inclusion Latency:** Average time for a transaction to be included in the ledger under both high-demand and low-demand conditions.
+-   **Network participation**: a high number of active nodes in block production and endorsement
+-   **Consensus integrity**: full preservation of Ouroboros Praos/Genesis security guarantees
+-   **SPO hardware requirements**: 6+ cores, 100 Mbps+ bandwidth, SSD storage (modest upgrade)
 
-- **Block Propagation Time:** Duration required for new blocks to be propagated across the network.
+### User and developer adoption
 
-- **Transaction Finalization Time:** Time until transactions are considered finalized and economically irreversible.
+-   **Wallet and decentralized applications (DApp) integration**: a number of major wallets and applications supporting Leios
+-   **User experience**: significant reduction in congestion-related complaints
+-   **SPO adoption rate**: percentage of stake actively running Leios nodes
+    
+### Economic and cost efficiency
 
-#### Network Efficiency
-- **Resource Utilization:** Reduction in computational and bandwidth overhead per transaction.
+-   **Transaction fee stability**: predictable and competitive fees even under high load
+-   **Node operating costs**: sustainable relative to on-chain revenue growth
 
-- **Synchronization Speed:** Time required for a new node to fully synchronize with the current blockchain state.
+### Scalability and future-proofing
 
-- **Endorser Efficiency:** Percentage of transactions endorsed prior to block inclusion.
-
-#### Security and Decentralization
-
-- **Network Participation:** Number of active nodes engaged in endorsement and block production.
-
-- **Consensus Integrity:** Preservation of Ouroboros Praos/Genesis-level security guarantees.
-
-- **Resistance to Attacks:** Absence of vulnerabilities that could compromise availability, consistency, or safety.
-
-#### User and Developer Adoption
-
-- **Wallet and DApp Integration:** Number of wallets and decentralized applications integrated with Leios.
-
-- **User Experience Feedback:** Decrease in complaints regarding transaction delays or network congestion.
-
-- **Stake Pool Adoption:** Percentage of stake pools adopting Leios for transaction processing.
-
-#### Economic and Cost Efficiency
-
-- **Transaction Fee Variability:** Stability or reduction of transaction fees under varying network load.
-
-- **Smart Contract Execution Costs:** Lower average consumption of execution units per Plutus script.
-
-- **Sustainability:** Ability to keep node infrastructure costs balanced relative to on-chain revenues.
-
-#### Scalability and Future-Proofing
-
-- **Capacity for Future Growth:** Ability to maintain low-latency, high-throughput performance as transaction demand rises.
-
-- **Protocol Upgrade Success:** Seamless integration of Leios with existing Cardano infrastructure and tooling without causing network fragmentation.
+-   **Capacity for future growth**: ability to handle increasing demand with minimal latency impact
+-   **Protocol upgrade success**: seamless integration with existing Cardano infrastructure and tooling
