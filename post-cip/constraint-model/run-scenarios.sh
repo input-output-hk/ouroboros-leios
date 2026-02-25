@@ -10,7 +10,7 @@ then
     -S
 fi
 
-for SCENARIO in 6MB
+for SCENARIO in 2MB 6MB 12MB
 do
 
   if [ ! -f scenario-$SCENARIO.yaml ]
@@ -39,11 +39,11 @@ do
     scenario-$SCENARIO.yaml \
   |& tee results-$SCENARIO.log
 
-  if [ ! -f scenario-$SCENARIO-adv.yaml ]
+  if [ ! -f scenario-$SCENARIO-1cpu.yaml ]
   then
     sed -e 's/^  n_cpu:.*/  n_cpu: 1' \
         scenario-$SCENARIO.yaml \
-    > scenario-$SCENARIO-adv.yaml
+    > scenario-$SCENARIO-1cpu.yaml
   fi
 
   `which time` --verbose python main.py \
