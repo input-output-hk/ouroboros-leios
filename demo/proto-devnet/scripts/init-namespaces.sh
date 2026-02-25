@@ -39,47 +39,47 @@ ip netns exec "$NS_NODE3" ip link set "n3->n2" up
 
 # Create VETH links from host to each node (for metrics, socket access)
 for i in 1 2 3; do
-	ns_var="NS_NODE${i}"
-	ip link add "host->n${i}" type veth peer name "n${i}->host"
-	ip link set "n${i}->host" netns "${!ns_var}"
-	ip link set "host->n${i}" up
-	ip netns exec "${!ns_var}" ip link set "n${i}->host" up
+  ns_var="NS_NODE${i}"
+  ip link add "host->n${i}" type veth peer name "n${i}->host"
+  ip link set "n${i}->host" netns "${!ns_var}"
+  ip link set "host->n${i}" up
+  ip netns exec "${!ns_var}" ip link set "n${i}->host" up
 done
 
 # Configure IFB devices and traffic control for ingress
 # Each entry: "namespace device"
 EDGES=(
-	"$NS_NODE1 n1->n2"
-	"$NS_NODE1 n1->n3"
-	"$NS_NODE2 n2->n1"
-	"$NS_NODE2 n2->n3"
-	"$NS_NODE3 n3->n1"
-	"$NS_NODE3 n3->n2"
+  "$NS_NODE1 n1->n2"
+  "$NS_NODE1 n1->n3"
+  "$NS_NODE2 n2->n1"
+  "$NS_NODE2 n2->n3"
+  "$NS_NODE3 n3->n1"
+  "$NS_NODE3 n3->n2"
 )
 
 limit_rate() {
-	local ns="$1" dev="$2" rate="$3"
-	ip netns exec "$ns" tc qdisc add dev "$dev" root handle 1: htb default 1
-	ip netns exec "$ns" tc class add dev "$dev" parent 1: classid 1:1 htb rate "$rate"
-	ip netns exec "$ns" tc qdisc add dev "$dev" parent 1:1 handle 10: fq_codel
+  local ns="$1" dev="$2" rate="$3"
+  ip netns exec "$ns" tc qdisc add dev "$dev" root handle 1: htb default 1
+  ip netns exec "$ns" tc class add dev "$dev" parent 1: classid 1:1 htb rate "$rate"
+  ip netns exec "$ns" tc qdisc add dev "$dev" parent 1:1 handle 10: fq_codel
 }
 
 add_delay() {
-	local ns="$1" dev="$2" delay="$3"
-	ip netns exec "$ns" tc qdisc add dev "$dev" handle ffff: ingress
-	ip netns exec "$ns" tc filter add dev "$dev" parent ffff: protocol ip u32 match u32 0 0 action mirred egress redirect dev "ifb!${dev}"
-	ip netns exec "$ns" tc qdisc add dev "ifb!${dev}" root netem delay "$delay"
+  local ns="$1" dev="$2" delay="$3"
+  ip netns exec "$ns" tc qdisc add dev "$dev" handle ffff: ingress
+  ip netns exec "$ns" tc filter add dev "$dev" parent ffff: protocol ip u32 match u32 0 0 action mirred egress redirect dev "ifb!${dev}"
+  ip netns exec "$ns" tc qdisc add dev "ifb!${dev}" root netem delay "$delay"
 }
 
 for edge in "${EDGES[@]}"; do
-	ns="${edge%% *}"
-	dev="${edge#* }"
-	# IFB device for ingress TC
-	ip netns exec "$ns" ip link add "ifb!${dev}" type ifb
-	ip netns exec "$ns" ip link set "ifb!${dev}" up
-	# Apply symmetric rate limit and delay
-	limit_rate "$ns" "$dev" "$RATE"
-	add_delay "$ns" "$dev" "$DELAY"
+  ns="${edge%% *}"
+  dev="${edge#* }"
+  # IFB device for ingress TC
+  ip netns exec "$ns" ip link add "ifb!${dev}" type ifb
+  ip netns exec "$ns" ip link set "ifb!${dev}" up
+  # Apply symmetric rate limit and delay
+  limit_rate "$ns" "$dev" "$RATE"
+  add_delay "$ns" "$dev" "$DELAY"
 done
 
 # Configure IP addresses using point-to-point addressing
