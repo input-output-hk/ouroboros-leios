@@ -11,8 +11,8 @@ select
   , encode(hash, 'hex') as tx_hash
   , size as tx_size
   from tx
-  where id between 118811946 and 118822448 -- 12 MB scenario
---where id between 118811946 and 118813600 --  2 MB scenario
+--where id between 118811946 and 118822448 -- 12MB scenario
+--where id between 118811946 and 118813600 -- 2MB scenario
 order by tx_id
 ;
 
