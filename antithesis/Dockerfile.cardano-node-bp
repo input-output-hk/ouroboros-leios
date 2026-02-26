@@ -104,6 +104,7 @@ COPY demo/proto-devnet/config/gen.template.json /app/config/gen.template.json
 COPY antithesis/scripts/init-pool-node.sh /app/scripts/
 COPY antithesis/scripts/run-pool-node.sh /app/scripts/
 COPY antithesis/scripts/run-tx-generator.sh /app/scripts/
+COPY antithesis/scripts/run-tx-generator-loop.sh /app/scripts/
 COPY antithesis/scripts/setup-wan-emulation.sh /app/scripts/
 
 RUN chmod +x /app/scripts/*.sh /usr/local/bin/*
