@@ -319,6 +319,19 @@ moog requester create-test \
 moog facts test-runs --test-run-id <id>
 ```
 
+### CI Integration
+
+The `antithesis-leios` GitHub Actions workflow automatically submits tests on push to `main` when Moog secrets are configured. Required GitHub configuration:
+
+| Type | Name | Description |
+|------|------|-------------|
+| Secret | `MOOG_GITHUB_PAT` | GitHub PAT for Moog API access |
+| Secret | `MOOG_REQUESTER_WALLET` | Base64-encoded Cardano preprod wallet JSON |
+| Variable | `MOOG_MPFS_HOST` | MPFS service URL (e.g., `https://mpfs.plutimus.com`) |
+| Variable | `MOOG_REQUESTER` | GitHub username registered as Moog requester |
+
+The job is gated on `MOOG_GITHUB_PAT` — it silently skips if secrets are not configured.
+
 ### Validating the Antithesis Compose Locally
 
 ```bash
