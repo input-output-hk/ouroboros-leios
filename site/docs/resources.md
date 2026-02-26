@@ -14,7 +14,9 @@ technical papers, presentations, and videos.
 - [CPS-18: Greater transaction
   throughput](https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md) - Cardano Problem Statement (CPS) summarizing why more throughput is needed on Cardano.
 
-- [High-Throughput Blockchain Consensus under Realistic Network Assumptions](https://iohk.io/en/research/library/papers/high-throughput-permissionless-blockchain-consensus-under-realistic-network-assumptions/) (August 2025, Crypto '25) — Sandro Coretti, Matthias Fitzi, Aggelos Kiayias, Giorgos Panagiotakos, and Alexander Russell - Research paper on which the Leios consensus upgrade for Cardano is based.
+- [High-Throughput Blockchain Consensus under Realistic Network Assumptions](https://www.iog.io/papers/high-throughput-permissionless-blockchain-consensus-under-realistic-network-assumptions) (August 2025, Crypto '25) — Sandro Coretti, Matthias Fitzi, Aggelos Kiayias, Giorgos Panagiotakos, and Alexander Russell - Research paper on which the Leios consensus upgrade for Cardano is based.
+  
+- [Leios technical design and implementation plan](https://leios.cardano-scaling.org/leios-design.pdf) – this technical design document connects the protocol-level specification (CIP-164) to its implementation in `cardano-node`, providing practical guidance on how to implement Leios reliably.
 
 ## Formal specifications
 
