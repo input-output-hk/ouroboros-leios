@@ -153,3 +153,73 @@ jobs:
           TEST_DURATION: 30
           STARTUP_TIMEOUT: 300
           ENABLE_WAN_EMULATION: true
+
+  # ==========================================================================
+  # Submit to Antithesis via Moog
+  # ==========================================================================
+  # Requires the following GitHub configuration:
+  #
+  # Secrets:
+  #   MOOG_GITHUB_PAT        - GitHub PAT for Moog API access
+  #   MOOG_REQUESTER_WALLET  - Base64-encoded Cardano preprod wallet JSON
+  #
+  # Variables:
+  #   MOOG_MPFS_HOST         - MPFS service URL (e.g., https://mpfs.plutimus.com)
+  #   MOOG_REQUESTER         - GitHub username registered as Moog requester
+  #
+  # Prerequisites:
+  #   - Requester registered with Moog (Ed25519 keypair, CODEOWNERS entry)
+  #   - CF Moog agent has whitelisted this repository
+  #
+  submit-antithesis:
+    name: "Submit Antithesis test via Moog"
+    runs-on: ubuntu-latest
+    needs: build-images
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.MOOG_GITHUB_PAT != ''
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Get latest Moog release tag
+        id: moog-release
+        run: |
+          TAG=$(gh api repos/cardano-foundation/moog/releases/latest --jq '.tag_name')
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Moog release: $TAG"
+        env:
+          GH_TOKEN: ${{ secrets.MOOG_GITHUB_PAT }}
+
+      - name: Download and install Moog
+        run: |
+          gh release download "$MOOG_TAG" \
+            -R cardano-foundation/moog \
+            -p "moog-*-linux64.tar.gz" -O moog.tar.gz
+          tar xzf moog.tar.gz
+          sudo mv moog /usr/local/bin/
+          moog --version
+        env:
+          GH_TOKEN: ${{ secrets.MOOG_GITHUB_PAT }}
+          MOOG_TAG: ${{ steps.moog-release.outputs.tag }}
+
+      - name: Configure wallet
+        run: echo "$MOOG_WALLET" | base64 -d > wallet.json
+        env:
+          MOOG_WALLET: ${{ secrets.MOOG_REQUESTER_WALLET }}
+
+      - name: Submit test to Antithesis
+        run: |
+          echo "Submitting Antithesis test for commit ${GITHUB_SHA}..."
+          moog requester create-test \
+            -d "antithesis/testnets/leios-devnet" \
+            -c "${GITHUB_SHA}" \
+            -r "${GITHUB_REPOSITORY}" \
+            -t 30
+        env:
+          MOOG_GITHUB_PAT: ${{ secrets.MOOG_GITHUB_PAT }}
+          MOOG_WALLET_FILE: wallet.json
+          MOOG_MPFS_HOST: ${{ vars.MOOG_MPFS_HOST }}
+          MOOG_PLATFORM: github
+          MOOG_REQUESTER: ${{ vars.MOOG_REQUESTER }}
