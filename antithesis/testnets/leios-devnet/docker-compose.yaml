@@ -1,0 +1,225 @@
+# Leios Antithesis Docker Compose — Proto-Devnet (Moog-compatible)
+#
+# 3 block-producing pools with randomized tx-generator and analysis.
+# Designed for submission to Antithesis via Cardano Foundation Moog service.
+#
+# Requirements:
+#   - All images must be pre-built and pushed to GHCR
+#   - Moog agent will sed '${INTERNAL_NETWORK}' to 'false'
+#   - No internet access inside Antithesis environment
+
+x-common-env: &common-env
+  ENABLE_WAN_EMULATION: "false"
+  REF_SLOT: ${REF_SLOT:-11}
+
+x-pool-hosts: &pool-hosts
+  IP_POOL1: "pool1"
+  IP_POOL2: "pool2"
+  IP_POOL3: "pool3"
+  PORT_POOL1: "3001"
+  PORT_POOL2: "3002"
+  PORT_POOL3: "3003"
+
+x-node-image: &node-image
+  image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${IMAGE_TAG:-latest}
+
+services:
+  # ==========================================================================
+  # Init Containers
+  # ==========================================================================
+  init-pool1:
+    <<: *node-image
+    container_name: init-pool1
+    hostname: init-pool1
+    init: true
+    command: ["/app/scripts/init-pool-node.sh", "1"]
+    environment:
+      <<: [*common-env, *pool-hosts]
+    volumes:
+      - pool1-data:/data
+      - genesis-shared:/shared-genesis
+      - logs:/logs
+    networks:
+      - leios-net
+
+  init-pool2:
+    <<: *node-image
+    container_name: init-pool2
+    hostname: init-pool2
+    init: true
+    command: ["/app/scripts/init-pool-node.sh", "2"]
+    depends_on:
+      init-pool1:
+        condition: service_completed_successfully
+    environment:
+      <<: [*common-env, *pool-hosts]
+    volumes:
+      - pool2-data:/data
+      - genesis-shared:/shared-genesis
+      - logs:/logs
+    networks:
+      - leios-net
+
+  init-pool3:
+    <<: *node-image
+    container_name: init-pool3
+    hostname: init-pool3
+    init: true
+    command: ["/app/scripts/init-pool-node.sh", "3"]
+    depends_on:
+      init-pool1:
+        condition: service_completed_successfully
+    environment:
+      <<: [*common-env, *pool-hosts]
+    volumes:
+      - pool3-data:/data
+      - genesis-shared:/shared-genesis
+      - logs:/logs
+    networks:
+      - leios-net
+
+  # ==========================================================================
+  # Block Producer Nodes
+  # ==========================================================================
+  pool1:
+    <<: *node-image
+    container_name: pool1
+    hostname: pool1
+    init: true
+    command: ["/app/scripts/run-pool-node.sh", "pool1"]
+    depends_on:
+      init-pool1:
+        condition: service_completed_successfully
+    environment:
+      <<: *common-env
+      PORT: "3001"
+      HOST_ADDR: "0.0.0.0"
+    volumes:
+      - pool1-data:/data
+      - logs:/logs
+    networks:
+      - leios-net
+    healthcheck:
+      test: ["CMD", "test", "-S", "/data/socket"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 30s
+
+  pool2:
+    <<: *node-image
+    container_name: pool2
+    hostname: pool2
+    init: true
+    command: ["/app/scripts/run-pool-node.sh", "pool2"]
+    depends_on:
+      init-pool2:
+        condition: service_completed_successfully
+      pool1:
+        condition: service_started
+    environment:
+      <<: *common-env
+      PORT: "3002"
+      HOST_ADDR: "0.0.0.0"
+    volumes:
+      - pool2-data:/data
+      - logs:/logs
+    networks:
+      - leios-net
+    healthcheck:
+      test: ["CMD", "test", "-S", "/data/socket"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 30s
+
+  pool3:
+    <<: *node-image
+    container_name: pool3
+    hostname: pool3
+    init: true
+    command: ["/app/scripts/run-pool-node.sh", "pool3"]
+    depends_on:
+      init-pool3:
+        condition: service_completed_successfully
+      pool1:
+        condition: service_started
+    environment:
+      <<: *common-env
+      PORT: "3003"
+      HOST_ADDR: "0.0.0.0"
+    volumes:
+      - pool3-data:/data
+      - logs:/logs
+    networks:
+      - leios-net
+    healthcheck:
+      test: ["CMD", "test", "-S", "/data/socket"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 30s
+
+  # ==========================================================================
+  # TX Generator (randomized loop for Antithesis)
+  # ==========================================================================
+  tx-generator:
+    <<: *node-image
+    container_name: tx-generator
+    hostname: tx-generator
+    init: true
+    command: ["/app/scripts/run-tx-generator-loop.sh"]
+    depends_on:
+      pool1:
+        condition: service_healthy
+      pool2:
+        condition: service_healthy
+      pool3:
+        condition: service_healthy
+    environment:
+      <<: *pool-hosts
+    volumes:
+      - txgen-data:/data
+      - genesis-shared:/shared-genesis:ro
+      - pool1-data:/pool1-data:ro
+      - logs:/logs
+    networks:
+      - leios-net
+
+  # ==========================================================================
+  # Analysis Container (Antithesis assertions)
+  # ==========================================================================
+  analysis:
+    image: ghcr.io/input-output-hk/ouroboros-leios/leios-analysis:${IMAGE_TAG:-latest}
+    container_name: analysis
+    hostname: analysis
+    init: true
+    depends_on:
+      pool1:
+        condition: service_healthy
+      pool2:
+        condition: service_healthy
+      pool3:
+        condition: service_healthy
+    environment:
+      <<: *common-env
+      PRAOS_LATENCY_THRESHOLD_MS: ${PRAOS_LATENCY_THRESHOLD_MS:-5000}
+      CHECK_INTERVAL_SECONDS: ${CHECK_INTERVAL_SECONDS:-5}
+      INITIAL_WAIT_SECONDS: ${INITIAL_WAIT_SECONDS:-30}
+    volumes:
+      - logs:/logs:ro
+    networks:
+      - leios-net
+
+volumes:
+  pool1-data:
+  pool2-data:
+  pool3-data:
+  txgen-data:
+  genesis-shared:
+  logs:
+
+networks:
+  leios-net:
+    driver: bridge
+    internal: ${INTERNAL_NETWORK}
