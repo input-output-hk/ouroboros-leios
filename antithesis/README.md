@@ -4,12 +4,22 @@ Docker Compose orchestration for testing Leios consensus using [Antithesis](http
 
 ## Configurations
 
-Two separate compose stacks are available:
+### Local Development Stacks
+
+Two compose stacks for local testing:
 
 1. Proto-devnet (`docker-compose.devnet.yaml`): 3 block-producing pools with tx-generator
 2. ImmDB mock (`docker-compose.immdb.yaml`): upstream/node0/downstream with immdb-server
 
 An optional observability overlay (`docker-compose.observability.yaml`) can be layered onto either stack.
+
+### Antithesis via Moog
+
+Moog-compatible compose files for submission to [Antithesis](https://antithesis.com/) via the Cardano Foundation's [Moog](https://github.com/cardano-foundation/moog) service:
+
+1. Leios devnet (`testnets/leios-devnet/docker-compose.yaml`): 3-pool mesh with randomized tx-generator
+
+These files differ from local stacks: no `build:` directives (pre-built GHCR images only), hostname-based DNS, `init: true` on all services, and `${INTERNAL_NETWORK}` for Moog's config image generation. See [Antithesis Deployment](#antithesis-deployment) for details.
 
 ## Architecture
 
@@ -170,8 +180,8 @@ Genesis parameters in `demo/proto-devnet/config/genesis/`:
 
 ```
 antithesis/
-├── docker-compose.devnet.yaml        # Proto-devnet stack (3 pools)
-├── docker-compose.immdb.yaml         # ImmDB mock stack
+├── docker-compose.devnet.yaml        # Proto-devnet stack (3 pools) — local
+├── docker-compose.immdb.yaml         # ImmDB mock stack — local
 ├── docker-compose.observability.yaml # Observability overlay (Prometheus, Loki, Grafana)
 ├── Dockerfile.cardano-node-bp        # Block producer image (proto-devnet)
 ├── Dockerfile.cardano-node           # Leios node image (immdb)
@@ -179,10 +189,14 @@ antithesis/
 ├── Dockerfile.analysis               # Analysis container image
 ├── analyse.py                        # Log parsing and metrics
 ├── entrypoint-analysis.py            # Analysis main loop
+├── testnets/
+│   └── leios-devnet/
+│       └── docker-compose.yaml       # Antithesis/Moog devnet compose
 ├── scripts/
 │   ├── init-pool-node.sh             # Pool initialization (proto-devnet)
 │   ├── run-pool-node.sh              # Pool runtime (proto-devnet)
-│   ├── run-tx-generator.sh           # TX generator (proto-devnet)
+│   ├── run-tx-generator.sh           # TX generator — static batch (local)
+│   ├── run-tx-generator-loop.sh      # TX generator — randomized loop (Antithesis)
 │   ├── init-node0.sh                 # Node0 initialization (immdb)
 │   ├── init-downstream.sh            # Downstream initialization (immdb)
 │   ├── init-upstream.sh              # Upstream initialization (immdb)
@@ -255,6 +269,64 @@ The analysis container reports assertions to Antithesis SDK:
 
 When running outside Antithesis, assertions are logged to stdout.
 
+## Antithesis Deployment
+
+### Overview
+
+Tests are submitted to Antithesis via the Cardano Foundation's [Moog](https://github.com/cardano-foundation/moog) service. Moog clones this repo at a specific commit, extracts the `docker-compose.yaml` from a `testnets/` subdirectory, wraps it in a config image (performing `sed -i 's/${INTERNAL_NETWORK}/false/g'`), and submits it to Antithesis along with pre-built images from GHCR.
+
+### Antithesis Compose vs Local Compose
+
+The `testnets/` compose files are adapted for the Antithesis environment:
+
+| Aspect | Local (`docker-compose.devnet.yaml`) | Antithesis (`testnets/leios-devnet/`) |
+|--------|--------------------------------------|---------------------------------------|
+| Images | Built locally via `build:` | Pre-built on GHCR, `${IMAGE_TAG}` |
+| Networking | Static IPs, `ipam` subnet | Hostname-based DNS via `container_name` |
+| Fault injection | Manual WAN emulation (`tc`) | Antithesis-managed (partitions, congestion, etc.) |
+| `init: true` | Not set | Set on all services (required for core dumps) |
+| `container_name`/`hostname` | Not set | Set and matching on all services |
+| Network isolation | `bridge` | `internal: ${INTERNAL_NETWORK}` |
+| TX generator | Static batch (10k txs) | Randomized loop (100-100k txs per batch) |
+
+### Randomized TX Generator
+
+The Antithesis compose uses `run-tx-generator-loop.sh` instead of the one-shot `run-tx-generator.sh`. Each iteration:
+
+1. Picks random `tx_count` (100-100,000), `tps` (100-10,000), and cooldown (1-60s)
+2. Random values sourced from `/dev/urandom`, which Antithesis replaces with a deterministic source it can learn from and replay
+3. Generates config, runs tx-generator to completion, sleeps, loops
+
+Ranges are configurable via environment variables: `TX_COUNT_MIN`, `TX_COUNT_MAX`, `TPS_MIN`, `TPS_MAX`, `COOLDOWN_MIN`, `COOLDOWN_MAX`.
+
+### Submitting a Test via Moog
+
+Prerequisites:
+- Images pushed to GHCR (the `antithesis-leios` CI workflow handles this on push to `main`)
+- Moog CLI installed ([releases](https://github.com/cardano-foundation/moog/releases))
+- Moog requester registered (Ed25519 keypair, CODEOWNERS entry, Cardano preprod wallet)
+- CF Moog agent has whitelisted the repository
+
+```bash
+# Submit a test (30-minute duration)
+moog requester create-test \
+  -d "antithesis/testnets/leios-devnet" \
+  -c <commit-sha> \
+  -r "input-output-hk/ouroboros-leios" \
+  -t 30
+
+# Check test status
+moog facts test-runs --test-run-id <id>
+```
+
+### Validating the Antithesis Compose Locally
+
+```bash
+# Validate syntax (INTERNAL_NETWORK must be set)
+INTERNAL_NETWORK=true IMAGE_TAG=latest \
+  docker compose -f testnets/leios-devnet/docker-compose.yaml config --quiet
+```
+
 ## Troubleshooting
 
 ### Pools not connecting (proto-devnet)
@@ -318,3 +390,5 @@ docker compose -f docker-compose.devnet.yaml exec pool1 bash
 - [2025-11 Demo](../demo/2025-11/README.md)
 - [Ouroboros Leios Specification](https://leios.cardano-scaling.org)
 - [Antithesis Documentation](https://antithesis.com/docs/)
+- [Cardano Foundation Moog](https://github.com/cardano-foundation/moog)
+- [Cardano Node Antithesis (reference)](https://github.com/cardano-foundation/cardano-node-antithesis)
