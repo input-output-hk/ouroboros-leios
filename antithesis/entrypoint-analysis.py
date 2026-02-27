@@ -29,9 +29,11 @@ def log(msg: str):
     print(f"[{ts}] {msg}", flush=True)
 
 
-def report_assertions(metrics, praos_threshold_ms: float):
+def report_assertions(metrics, praos_threshold_ms: float, prev_max_slot: int):
     """Report assertions to Antithesis SDK or stdout."""
     praos_stats = get_latency_stats(metrics.praos_latencies_ms)
+
+    # --- Existing assertions ---
 
     # Praos block diffusion latency assertion
     if praos_stats["count"] > 0:
@@ -55,7 +57,7 @@ def report_assertions(metrics, praos_threshold_ms: float):
             status = "PASS" if praos_ok else "FAIL"
             log(f"[{status}] {message}")
 
-    # Leios blocks received assertion (sometimes)
+    # Leios EBs created assertion (sometimes)
     if ANTITHESIS_AVAILABLE:
         sometimes(
             metrics.leios_ebs_created > 0,
@@ -80,6 +82,50 @@ def report_assertions(metrics, praos_threshold_ms: float):
     else:
         if metrics.praos_blocks_created > 0 and metrics.praos_blocks_received == 0:
             log("[WARN] Praos blocks created but none received")
+
+    # --- New assertions ---
+
+    # Per-pool block production (sometimes) — chain quality
+    for pool_name in ["pool1", "pool2", "pool3"]:
+        pool_count = metrics.blocks_created_by_node.get(pool_name, 0)
+        if ANTITHESIS_AVAILABLE:
+            sometimes(
+                pool_count > 0,
+                f"{pool_name} produces blocks",
+                {
+                    "pool": pool_name,
+                    "blocks_created": pool_count,
+                },
+            )
+        else:
+            log(f"  {pool_name} blocks created: {pool_count}")
+
+    # Chain growth (sometimes) — chain tip advances between checks
+    chain_advanced = metrics.max_slot_seen > prev_max_slot
+    if ANTITHESIS_AVAILABLE:
+        sometimes(
+            chain_advanced,
+            "Chain tip advances between checks",
+            {
+                "prev_max_slot": prev_max_slot,
+                "current_max_slot": metrics.max_slot_seen,
+            },
+        )
+    else:
+        status = "advancing" if chain_advanced else "stalled"
+        log(f"  Chain: slot {prev_max_slot} -> {metrics.max_slot_seen} ({status})")
+
+    # Leios votes created (sometimes)
+    if ANTITHESIS_AVAILABLE:
+        sometimes(
+            metrics.leios_votes_created > 0,
+            "Leios votes were created",
+            {
+                "votes_created": metrics.leios_votes_created,
+            },
+        )
+    else:
+        log(f"  Leios votes created: {metrics.leios_votes_created}")
 
 
 def main():
@@ -114,6 +160,7 @@ def main():
     log("Setup complete - starting analysis loop")
 
     iteration = 0
+    prev_max_slot = 0
     while True:
         iteration += 1
         log(f"--- Analysis iteration {iteration} ---")
@@ -129,6 +176,9 @@ def main():
             log(
                 f"Leios: EBs={metrics.leios_ebs_created}, votes={metrics.leios_votes_created}"
             )
+            log(
+                f"Per-pool: {dict(metrics.blocks_created_by_node)}"
+            )
 
             praos_stats = get_latency_stats(metrics.praos_latencies_ms)
             if praos_stats["count"] > 0:
@@ -137,7 +187,8 @@ def main():
                 )
 
             # Report assertions
-            report_assertions(metrics, praos_threshold_ms)
+            report_assertions(metrics, praos_threshold_ms, prev_max_slot)
+            prev_max_slot = metrics.max_slot_seen
 
         except Exception as e:
             log(f"Error in analysis: {e}")
