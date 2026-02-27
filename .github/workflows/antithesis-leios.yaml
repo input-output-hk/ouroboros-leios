@@ -1,0 +1,225 @@
+name: "antithesis-leios"
+
+on:
+  pull_request:
+    paths:
+      - "antithesis/**"
+  push:
+    branches:
+      - main
+    paths:
+      - "antithesis/**"
+  workflow_dispatch:
+    inputs:
+      push_images:
+        description: 'Push images to GHCR'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository }}
+
+jobs:
+  build-images:
+    name: "Build Antithesis Docker images"
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to Container Registry
+        if: github.event_name == 'push' || github.event.inputs.push_images == 'true'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for cardano-node-leios
+        id: meta-cardano-node
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/cardano-node-leios
+          tags: |
+            type=sha
+            type=ref,event=branch
+            type=ref,event=pr
+
+      - name: Build cardano-node-leios image
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
+        with:
+          context: .
+          file: ./antithesis/Dockerfile.cardano-node
+          platforms: linux/amd64
+          push: ${{ github.event_name == 'push' || github.event.inputs.push_images == 'true' }}
+          tags: ${{ steps.meta-cardano-node.outputs.tags }}
+          labels: ${{ steps.meta-cardano-node.outputs.labels }}
+          cache-from: type=gha,scope=cardano-node-leios
+          cache-to: type=gha,mode=max,scope=cardano-node-leios
+
+      - name: Extract metadata for cardano-node-bp
+        id: meta-cardano-node-bp
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/cardano-node-bp
+          tags: |
+            type=sha
+            type=ref,event=branch
+            type=ref,event=pr
+
+      - name: Build cardano-node-bp image
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
+        with:
+          context: .
+          file: ./antithesis/Dockerfile.cardano-node-bp
+          platforms: linux/amd64
+          push: ${{ github.event_name == 'push' || github.event.inputs.push_images == 'true' }}
+          tags: ${{ steps.meta-cardano-node-bp.outputs.tags }}
+          labels: ${{ steps.meta-cardano-node-bp.outputs.labels }}
+          cache-from: type=gha,scope=cardano-node-bp
+          cache-to: type=gha,mode=max,scope=cardano-node-bp
+
+      - name: Extract metadata for immdb-server
+        id: meta-immdb-server
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/immdb-server
+          tags: |
+            type=sha
+            type=ref,event=branch
+            type=ref,event=pr
+
+      - name: Build immdb-server image
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
+        with:
+          context: .
+          file: ./antithesis/Dockerfile.immdb-server
+          platforms: linux/amd64
+          push: ${{ github.event_name == 'push' || github.event.inputs.push_images == 'true' }}
+          tags: ${{ steps.meta-immdb-server.outputs.tags }}
+          labels: ${{ steps.meta-immdb-server.outputs.labels }}
+          cache-from: type=gha,scope=immdb-server
+          cache-to: type=gha,mode=max,scope=immdb-server
+
+      - name: Extract metadata for analysis
+        id: meta-analysis
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/leios-analysis
+          tags: |
+            type=sha
+            type=ref,event=branch
+            type=ref,event=pr
+
+      - name: Build analysis image
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
+        with:
+          context: .
+          file: ./antithesis/Dockerfile.analysis
+          platforms: linux/amd64
+          push: ${{ github.event_name == 'push' || github.event.inputs.push_images == 'true' }}
+          tags: ${{ steps.meta-analysis.outputs.tags }}
+          labels: ${{ steps.meta-analysis.outputs.labels }}
+          cache-from: type=gha,scope=leios-analysis
+          cache-to: type=gha,mode=max,scope=leios-analysis
+
+  test-local:
+    name: "Test local docker-compose stack"
+    runs-on: ubuntu-22.04
+    needs: build-images
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Run local test
+        working-directory: ./antithesis
+        run: |
+          ./scripts/test-local.sh
+        env:
+          TEST_DURATION: 30
+          STARTUP_TIMEOUT: 300
+          ENABLE_WAN_EMULATION: true
+
+  # ==========================================================================
+  # Submit to Antithesis via Moog
+  # ==========================================================================
+  # Requires the following GitHub configuration:
+  #
+  # Secrets:
+  #   MOOG_GITHUB_PAT        - GitHub PAT for Moog API access
+  #   MOOG_REQUESTER_WALLET  - Base64-encoded Cardano preprod wallet JSON
+  #
+  # Variables:
+  #   MOOG_MPFS_HOST         - MPFS service URL (default: https://mpfs.plutimus.com)
+  #   MOOG_REQUESTER         - GitHub username registered as Moog requester
+  #
+  # Prerequisites:
+  #   - Requester registered with Moog (Ed25519 keypair, CODEOWNERS entry)
+  #   - CF Moog agent has whitelisted this repository
+  #
+  submit-antithesis:
+    name: "Submit Antithesis test via Moog"
+    runs-on: ubuntu-latest
+    needs: build-images
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.MOOG_GITHUB_PAT != ''
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Get latest Moog release tag
+        id: moog-release
+        run: |
+          TAG=$(gh api repos/cardano-foundation/moog/releases/latest --jq '.tag_name')
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Moog release: $TAG"
+        env:
+          GH_TOKEN: ${{ secrets.MOOG_GITHUB_PAT }}
+
+      - name: Download and install Moog
+        run: |
+          gh release download "$MOOG_TAG" \
+            -R cardano-foundation/moog \
+            -p "moog-*-linux64.tar.gz" -O moog.tar.gz
+          tar xzf moog.tar.gz
+          sudo mv moog /usr/local/bin/
+          moog --version
+        env:
+          GH_TOKEN: ${{ secrets.MOOG_GITHUB_PAT }}
+          MOOG_TAG: ${{ steps.moog-release.outputs.tag }}
+
+      - name: Configure wallet
+        run: echo "$MOOG_WALLET" | base64 -d > wallet.json
+        env:
+          MOOG_WALLET: ${{ secrets.MOOG_REQUESTER_WALLET }}
+
+      - name: Submit test to Antithesis
+        run: |
+          echo "Submitting Antithesis test for commit ${GITHUB_SHA}..."
+          moog requester create-test \
+            -d "antithesis/testnets/leios-devnet" \
+            -c "${GITHUB_SHA}" \
+            -r "${GITHUB_REPOSITORY}" \
+            -t 30
+        env:
+          MOOG_GITHUB_PAT: ${{ secrets.MOOG_GITHUB_PAT }}
+          MOOG_WALLET_FILE: wallet.json
+          MOOG_MPFS_HOST: ${{ vars.MOOG_MPFS_HOST || 'https://mpfs.plutimus.com' }}
+          MOOG_PLATFORM: github
+          MOOG_REQUESTER: ${{ vars.MOOG_REQUESTER }}

@@ -24,19 +24,21 @@ const HOST_PORT_TO_NODE: Record<string, string> = {
   "172.28.0.10:3001": "Node1",
   "172.28.0.20:3002": "Node2",
   "172.28.0.30:3003": "Node3",
+  // docker immdb mock
+  "172.28.0.110:3001": "UpstreamNode",
+  "172.28.0.120:3002": "Node0",
+  "172.28.0.130:3003": "DownstreamNode",
   // Add more mappings as needed
 };
 
-const getRemoteFromConnection = (connectionId: string | undefined): string => {
-  if (!connectionId) return "UNKNOWN";
-
-  const endpoints = connectionId.split(" ");
-  if (endpoints.length === 2) {
-    const targetEndpoint = endpoints[1];
-    return HOST_PORT_TO_NODE[targetEndpoint] || "UNKNOWN";
+const getNodesFromConnection = (connectionId: string): [string, string] => {
+  if (connectionId) {
+    const endpoints = connectionId.split(" ");
+    if (endpoints.length === 2) {
+      return [HOST_PORT_TO_NODE[endpoints[0]], HOST_PORT_TO_NODE[endpoints[1]]];
+    }
   }
-
-  return "UNKNOWN";
+  return ["UNKNOWN", "UNKNOWN"];
 };
 
 const parseRankingBlockGenerated = (
@@ -76,7 +78,6 @@ const parseRankingBlockGenerated = (
 };
 
 const parseRankingBlockSent = (
-  streamLabels: any,
   timestamp: number,
   logLine: string,
 ): IServerMessage | null => {
@@ -86,8 +87,9 @@ const parseRankingBlockSent = (
     // From cardano-node ns=BlockFetch.Server.SendBlock
     // {"block": "23b021f8e2c06e64b10647d9eeb5c9f11e50181f5a569424e49f2448f6d5f8a8", "kind": "BlockFetchServer", "peer": {"connectionId": "10.0.0.2:3002 10.0.0.3:3003"}}
     if (log.kind === "BlockFetchServer" && log.peer && log.block) {
-      const sender = streamLabels.process;
-      const recipient = getRemoteFromConnection(log.peer.connectionId);
+      const [sender, recipient] = getNodesFromConnection(
+        log.peer?.connectionId || log.connectionId,
+      );
 
       const message: IRankingBlockSent = {
         type: EServerMessageType.RBSent,
@@ -106,8 +108,9 @@ const parseRankingBlockSent = (
     // From immdb-server (no ns)
     // {"at":"2025-12-16T11:35:30.0472Z","connectionId":"0.0.0.0:3001 10.0.0.2:3002","direction":"Send","msg":{"blockHash":"23b021f8e2c06e64b10647d9eeb5c9f11e50181f5a569424e49f2448f6d5f8a8","kind":"MsgBlock"},"mux_at":null,"prevCount":0}
     if (log.direction === "Send" && log.msg && log.msg.kind === "MsgBlock") {
-      const sender = streamLabels.process;
-      const recipient = getRemoteFromConnection(log.connectionId);
+      const [sender, recipient] = getNodesFromConnection(
+        log.peer?.connectionId || log.connectionId,
+      );
 
       const message: IRankingBlockSent = {
         type: EServerMessageType.RBSent,
@@ -130,7 +133,6 @@ const parseRankingBlockSent = (
 };
 
 const parseRankingBlockReceived = (
-  streamLabels: any,
   timestamp: number,
   logLine: string,
 ): IServerMessage | null => {
@@ -140,8 +142,9 @@ const parseRankingBlockReceived = (
     // ns=BlockFetch.Client.CompletedBlockFetch
     // {"block":"56515bfd5751ca2c1ca0f21050cdb1cd020e396c623a16a2274528f643d4b5fd","delay":4985924.003937032,"kind":"CompletedBlockFetch","peer":{"connectionId":"127.0.0.1:3003 127.0.0.1:3002"},"size":862}
     if (log.kind === "CompletedBlockFetch" && log.peer && log.block) {
-      const recipient = streamLabels.process;
-      const sender = getRemoteFromConnection(log.peer.connectionId);
+      const [recipient, sender] = getNodesFromConnection(
+        log.peer?.connectionId || log.connectionId,
+      );
 
       const message: IRankingBlockReceived = {
         type: EServerMessageType.RBReceived,
@@ -201,7 +204,6 @@ const parseEndorserBlockGenerated = (
 };
 
 const parseEndorserBlockSent = (
-  streamLabels: any,
   timestamp: number,
   logLine: string,
 ): IServerMessage | null => {
@@ -217,8 +219,7 @@ const parseEndorserBlockSent = (
       log.msg &&
       log.msg.kind === "MsgLeiosBlock"
     ) {
-      const sender = streamLabels.process;
-      const recipient = getRemoteFromConnection(
+      const [sender, recipient] = getNodesFromConnection(
         log.peer?.connectionId || log.connectionId,
       );
 
@@ -247,7 +248,6 @@ const parseEndorserBlockSent = (
 };
 
 const parseEndorserBlockReceived = (
-  streamLabels: any,
   timestamp: number,
   logLine: string,
 ): IServerMessage | null => {
@@ -257,8 +257,9 @@ const parseEndorserBlockReceived = (
     // From cardano-node ns=LeiosFetch.Remote.Receive.Block
     // {"kind":"Recv","msg":{"ebBytesSize":27471,"ebHash":"320648bc67a2a160bda3ca52cdf1fe05b3cee404da82fb98e5fa02b2fb970741","kind":"MsgLeiosBlock"},"mux_at":"2025-12-15T15:18:49.13935251Z","peer":{"connectionId":"10.0.0.2:3002 10.0.0.1:3001"}}
     if (log.kind === "Recv" && log.msg && log.msg.kind === "MsgLeiosBlock") {
-      const recipient = streamLabels.process;
-      const sender = getRemoteFromConnection(log.peer.connectionId);
+      const [recipient, sender] = getNodesFromConnection(
+        log.peer?.connectionId || log.connectionId,
+      );
 
       const message: IEndorserBlockReceived = {
         type: EServerMessageType.EBReceived,
@@ -288,7 +289,6 @@ const parseEndorserBlockReceived = (
 const nextTxId: Record<string, number> = {};
 
 const parseTransactionSent = (
-  streamLabels: any,
   timestamp: number,
   logLine: string,
 ): IServerMessage | null => {
@@ -306,8 +306,7 @@ const parseTransactionSent = (
       log.msg &&
       log.msg.kind === "MsgLeiosBlockTxs"
     ) {
-      const sender = streamLabels.process;
-      const recipient = getRemoteFromConnection(
+      const [sender, recipient] = getNodesFromConnection(
         log.peer?.connectionId || log.connectionId,
       );
 
@@ -334,7 +333,6 @@ const parseTransactionSent = (
 };
 
 const parseTransactionReceived = (
-  streamLabels: any,
   timestamp: number,
   logLine: string,
 ): IServerMessage | null => {
@@ -344,8 +342,9 @@ const parseTransactionReceived = (
     // From cardano-node ns=LeiosFetch.Remote.Receive.BlockTxs
     // {"mux_at":"2025-12-05T14:06:12.52499731Z","peer":{"connectionId":"127.0.0.1:3003 127.0.0.1:3002"},"kind":"Recv","msg":{"txsBytesSize":491520,"kind":"MsgLeiosBlockTxs","numTxs":30,"txs":"\u003celided\u003e"}}
     if (log.kind === "Recv" && log.msg && log.msg.kind === "MsgLeiosBlockTxs") {
-      const recipient = streamLabels.process;
-      const sender = getRemoteFromConnection(log.peer?.connectionId);
+      const [recipient, sender] = getNodesFromConnection(
+        log.peer?.connectionId,
+      );
 
       // FIXME: msg.txs is always elided
       const txId = nextTxId[recipient] || 0;
@@ -431,13 +430,13 @@ function connectLokiWebSocket(lokiHost: string, dispatch: any): () => void {
                   // TODO: simplify and push further upstream (e.g. into alloy)
                   const event =
                     parseRankingBlockGenerated(stream.stream, ts, logLine) ||
-                    parseRankingBlockSent(stream.stream, ts, logLine) ||
-                    parseRankingBlockReceived(stream.stream, ts, logLine) ||
+                    parseRankingBlockSent(ts, logLine) ||
+                    parseRankingBlockReceived(ts, logLine) ||
                     parseEndorserBlockGenerated(stream.stream, ts, logLine) ||
-                    parseEndorserBlockSent(stream.stream, ts, logLine) ||
-                    parseEndorserBlockReceived(stream.stream, ts, logLine) ||
-                    parseTransactionSent(stream.stream, ts, logLine) ||
-                    parseTransactionReceived(stream.stream, ts, logLine);
+                    parseEndorserBlockSent(ts, logLine) ||
+                    parseEndorserBlockReceived(ts, logLine) ||
+                    parseTransactionSent(ts, logLine) ||
+                    parseTransactionReceived(ts, logLine);
                   if (event) {
                     console.warn(
                       "Parsed",
