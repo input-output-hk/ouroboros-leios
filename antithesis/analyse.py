@@ -34,10 +34,14 @@ class Metrics:
     leios_ebs_created: int = 0
     leios_votes_created: int = 0
     praos_latencies_ms: list = None
+    blocks_created_by_node: dict = None
+    max_slot_seen: int = 0
 
     def __post_init__(self):
         if self.praos_latencies_ms is None:
             self.praos_latencies_ms = []
+        if self.blocks_created_by_node is None:
+            self.blocks_created_by_node = {}
 
 
 def parse_timestamp(ts_str: str) -> Optional[datetime]:
@@ -229,11 +233,16 @@ def compute_metrics(log_dir: str = "/logs") -> Metrics:
                 if event.event_type == "created":
                     metrics.praos_blocks_created += 1
                     block_created_times[event.block_hash] = event.timestamp
+                    metrics.blocks_created_by_node[event.node] = (
+                        metrics.blocks_created_by_node.get(event.node, 0) + 1
+                    )
                 elif event.event_type in ("received", "adopted"):
                     metrics.praos_blocks_received += 1
                     if event.block_hash not in block_received_times:
                         block_received_times[event.block_hash] = []
                     block_received_times[event.block_hash].append(event.timestamp)
+                if event.slot > metrics.max_slot_seen:
+                    metrics.max_slot_seen = event.slot
 
             elif event.block_type == "eb":
                 if event.event_type == "created":
