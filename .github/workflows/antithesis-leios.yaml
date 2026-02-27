@@ -164,7 +164,7 @@ jobs:
   #   MOOG_REQUESTER_WALLET  - Base64-encoded Cardano preprod wallet JSON
   #
   # Variables:
-  #   MOOG_MPFS_HOST         - MPFS service URL (e.g., https://mpfs.plutimus.com)
+  #   MOOG_MPFS_HOST         - MPFS service URL (default: https://mpfs.plutimus.com)
   #   MOOG_REQUESTER         - GitHub username registered as Moog requester
   #
   # Prerequisites:
@@ -220,6 +220,6 @@ jobs:
         env:
           MOOG_GITHUB_PAT: ${{ secrets.MOOG_GITHUB_PAT }}
           MOOG_WALLET_FILE: wallet.json
-          MOOG_MPFS_HOST: ${{ vars.MOOG_MPFS_HOST }}
+          MOOG_MPFS_HOST: ${{ vars.MOOG_MPFS_HOST || 'https://mpfs.plutimus.com' }}
           MOOG_PLATFORM: github
           MOOG_REQUESTER: ${{ vars.MOOG_REQUESTER }}
