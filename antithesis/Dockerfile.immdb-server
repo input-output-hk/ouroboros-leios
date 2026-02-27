@@ -1,10 +1,13 @@
 FROM ghcr.io/blinklabs-io/haskell:9.6.6-3.12.1.0-3 AS immdb-server-build
 
-RUN echo "Building leios-prototype branch..." \
+# From intersectmbo/ouroboros-consensus leios-prototype branch
+ARG OUROBOROS_CONSENSUS_VERSION=20ce8a278abdf77ad906fdc0fcc045e59a2f631c
+
+RUN echo "Building ouroboros-consensus ${OUROBOROS_CONSENSUS_VERSION}..." \
     && git clone https://github.com/intersectmbo/ouroboros-consensus.git \
     && cd ouroboros-consensus \
     && git fetch --all --recurse-submodules --tags \
-    && git checkout leios-prototype \
+    && git checkout ${OUROBOROS_CONSENSUS_VERSION} \
     && echo "with-compiler: ghc-${GHC_VERSION}" >> cabal.project.local \
     && echo "tests: False" >> cabal.project.local \
     && cabal update \

@@ -1,10 +1,13 @@
 FROM ghcr.io/blinklabs-io/haskell:9.6.6-3.12.1.0-3 AS cardano-node-build
 
-RUN echo "Building leios-prototype branch..." \
+# From intersectmbo/cardano-node leios-prototype branch
+ARG CARDANO_NODE_VERSION=1ce288a676ca019df3ea2e10f32e55b5e41b448b
+
+RUN echo "Building cardano-node ${CARDANO_NODE_VERSION}..." \
     && git clone https://github.com/intersectmbo/cardano-node.git \
     && cd cardano-node \
     && git fetch --all --recurse-submodules --tags \
-    && git checkout leios-prototype \
+    && git checkout ${CARDANO_NODE_VERSION} \
     && echo "with-compiler: ghc-${GHC_VERSION}" >> cabal.project.local \
     && echo "tests: False" >> cabal.project.local \
     && cabal update \
