@@ -36,12 +36,25 @@ class Metrics:
     praos_latencies_ms: list = None
     blocks_created_by_node: dict = None
     max_slot_seen: int = 0
+    # Safety violation tracking
+    equivocations: list = None
+    duplicate_creators: list = None
+    slot_regressions: list = None
+    orphan_block_hashes: set = None
 
     def __post_init__(self):
         if self.praos_latencies_ms is None:
             self.praos_latencies_ms = []
         if self.blocks_created_by_node is None:
             self.blocks_created_by_node = {}
+        if self.equivocations is None:
+            self.equivocations = []
+        if self.duplicate_creators is None:
+            self.duplicate_creators = []
+        if self.slot_regressions is None:
+            self.slot_regressions = []
+        if self.orphan_block_hashes is None:
+            self.orphan_block_hashes = set()
 
 
 def parse_timestamp(ts_str: str) -> Optional[datetime]:
