@@ -266,6 +266,9 @@ The analysis container reports assertions to Antithesis SDK:
 - always: Praos block diffusion p95 latency < threshold
 - always: Praos blocks are received when created
 - sometimes: Leios endorser blocks (EBs) are created
+- sometimes: Each pool produces blocks (pool1, pool2, pool3)
+- sometimes: Chain tip advances between checks
+- sometimes: Leios votes were created
 
 When running outside Antithesis, assertions are logged to stdout.
 
