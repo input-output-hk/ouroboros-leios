@@ -235,6 +235,13 @@ def compute_metrics(log_dir: str = "/logs") -> Metrics:
     block_created_times: dict[str, datetime] = {}
     block_received_times: dict[str, list[datetime]] = {}
 
+    # Safety invariant tracking
+    slots_forged: dict[str, dict[int, str]] = {}  # node -> {slot -> hash}
+    block_creator: dict[str, str] = {}  # hash -> creator node
+    last_forged_slot: dict[str, int] = {}  # node -> last slot forged
+    created_hashes: set[str] = set()
+    received_hashes: set[str] = set()
+
     # Parse all log files
     for log_file in log_path.glob("*.log"):
         node_name = log_file.stem
@@ -249,11 +256,37 @@ def compute_metrics(log_dir: str = "/logs") -> Metrics:
                     metrics.blocks_created_by_node[event.node] = (
                         metrics.blocks_created_by_node.get(event.node, 0) + 1
                     )
+                    created_hashes.add(event.block_hash)
+                    # Equivocation: same node, same slot, different hash
+                    if event.node not in slots_forged:
+                        slots_forged[event.node] = {}
+                    prev_hash = slots_forged[event.node].get(event.slot)
+                    if prev_hash is not None and prev_hash != event.block_hash:
+                        metrics.equivocations.append(
+                            (event.node, event.slot, prev_hash, event.block_hash)
+                        )
+                    slots_forged[event.node][event.slot] = event.block_hash
+                    # Duplicate creators: same hash, different node
+                    prev_creator = block_creator.get(event.block_hash)
+                    if prev_creator is not None and prev_creator != event.node:
+                        metrics.duplicate_creators.append(
+                            (event.block_hash, prev_creator, event.node)
+                        )
+                    block_creator[event.block_hash] = event.node
+                    # Slot monotonicity: forged slot should not decrease
+                    prev_slot = last_forged_slot.get(event.node)
+                    if prev_slot is not None and event.slot < prev_slot:
+                        metrics.slot_regressions.append(
+                            (event.node, prev_slot, event.slot)
+                        )
+                    last_forged_slot[event.node] = event.slot
                 elif event.event_type in ("received", "adopted"):
                     metrics.praos_blocks_received += 1
                     if event.block_hash not in block_received_times:
                         block_received_times[event.block_hash] = []
                     block_received_times[event.block_hash].append(event.timestamp)
+                    if event.slot > 0:
+                        received_hashes.add(event.block_hash)
                 if event.slot > metrics.max_slot_seen:
                     metrics.max_slot_seen = event.slot
 
@@ -272,6 +305,9 @@ def compute_metrics(log_dir: str = "/logs") -> Metrics:
                 latency_ms = (received_time - created_time).total_seconds() * 1000
                 if latency_ms > 0:  # Only positive latencies
                     metrics.praos_latencies_ms.append(latency_ms)
+
+    # Orphan blocks: received but never created (excluding genesis)
+    metrics.orphan_block_hashes = received_hashes - created_hashes
 
     return metrics
 
