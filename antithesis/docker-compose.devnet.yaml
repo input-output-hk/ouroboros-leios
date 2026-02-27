@@ -175,7 +175,7 @@ services:
     build:
       context: ..
       dockerfile: antithesis/Dockerfile.cardano-node-bp
-    command: ["/app/scripts/run-tx-generator.sh"]
+    command: ["${TX_GENERATOR_SCRIPT:-/app/scripts/run-tx-generator.sh}"]
     depends_on:
       pool1:
         condition: service_healthy
