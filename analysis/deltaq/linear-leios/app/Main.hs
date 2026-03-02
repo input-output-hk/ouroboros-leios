@@ -12,7 +12,6 @@ import Analysis.Leios
 import Control.Concurrent.Async
 import qualified Data.ByteString.Lazy as BL
 import Data.Csv (DefaultOrdered (..), FromNamedRecord (..), Header, ToNamedRecord (..), decodeByName, encodeDefaultOrderedByName, (.:))
-import Data.Ratio ((%))
 import qualified Data.Vector as V
 import DeltaQ
 import DeltaQ.Leios
@@ -63,8 +62,8 @@ main = do
 
   let committeeSizeEstimated = 600
   let numberSPOs = 2500
-  let λ = 1 % 20
-  let τ = 3 % 4
+  let λ = 1 / 20
+  let τ = 3 / 4
 
   let configs =
         [ Config{name = "C113", lHdr = 1, lVote = 1, lDiff = 3, ..}
@@ -142,8 +141,7 @@ plots Config{..} = do
         let xs = [0.50, 0.51 .. 1]
             s = fromInteger committeeSizeEstimated
             n = fromInteger numberSPOs
-            t = fromRational τ
-            vs = [(x, quorumProbability n x s t) | x <- xs]
+            vs = [(x, quorumProbability n x s τ) | x <- xs]
          in do
               layout_title .= "Quorum distribution"
               plot (line "pQuorum" [vs])
