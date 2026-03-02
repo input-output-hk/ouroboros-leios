@@ -35,12 +35,12 @@ import DeltaQ.Praos (
  )
 
 maxTxsInRB, maxTxRefsInEB, maxTxsFetched :: Integer
-maxTxsInRB = 32
-maxTxRefsInEB = 128
-maxTxsFetched = 16
+maxTxsInRB = 4
+maxTxRefsInEB = 8
+maxTxsFetched = 2
 
 fetchingEB :: DQ
-fetchingEB = blendedDelay B2048
+fetchingEB = blendedDelay B2048 -- TODO: Model FFD
 
 doAll :: [DQ] -> DQ
 doAll = foldr (./\.) (wait 0)
@@ -54,7 +54,7 @@ fetchingTx :: DQ
 fetchingTx = blendedDelay B256 -- TODO: Tx size
 
 fetchingTxs :: DQ
-fetchingTxs = concurrentUpToN maxTxsFetched fetchingTx
+fetchingTxs = concurrentUpToN maxTxsFetched fetchingTx -- TODO: Model Tx Cache
 
 processRBandEB :: DQ -> DQ
 processRBandEB applyTxs = processRB ./\. processEB

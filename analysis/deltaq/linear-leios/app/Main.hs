@@ -62,7 +62,7 @@ main = do
 
   let committeeSizeEstimated = 600
   let numberSPOs = 2500
-  let λ = 1 / 20
+  let f = 1 / 20
   let τ = 3 / 4
 
   let configs =
@@ -155,7 +155,7 @@ stats config@Config{..} =
       res_pQuorum = pQuorum config
       res_pInterruptedByNewBlock = pInterruptedByNewBlock config
       res_pCertified = pCertified config
-      res_eCertified = 1 / (eCertified config)
+      res_eCertified = eCertified config
    in Result{..}
 
 writeResults :: [Result] -> IO ()

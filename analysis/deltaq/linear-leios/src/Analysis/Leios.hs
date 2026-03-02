@@ -51,8 +51,8 @@ data Config = Config
   -- ^ Estimation of size of voting committee
   , τ :: !Double
   -- ^ Voting threshold
-  , λ :: !Double
-  -- ^ Block production rate parameter
+  , f :: !Double
+  -- ^ Active slot coefficient
   , applyTx :: !DQ
   -- ^ DQ for applyTx
   , reapplyTx :: !DQ
@@ -73,7 +73,7 @@ pQuorum Config{..} =
 pInterruptedByNewBlock :: Config -> Double
 pInterruptedByNewBlock Config{..} =
   S.cumulative
-    (blockDistribution λ)
+    (blockDistribution f)
     (fromInteger $ 3 * lHdr + lVote + lDiff)
 
 -- | Probability that an EB will be certified
@@ -81,5 +81,9 @@ pCertified :: Config -> Double
 pCertified c = (1 - pInterruptedByNewBlock c) * pQuorum c
 
 -- | Expectation for the distribution of certified EBs over time
+--
+-- \(E = \frac{1}{\lambda}\), where \(\lambda\) is the block production rate
 eCertified :: Config -> Double
-eCertified Config{..} = λ * (1 - λ) ** (fromInteger $ 3 * lHdr + lVote + lDiff)
+eCertified Config{..} =
+  let λ  = f * (1 - f) ** (fromInteger $ 3 * lHdr + lVote + lDiff)
+  in 1 / λ
