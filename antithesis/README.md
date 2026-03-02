@@ -265,6 +265,10 @@ The analysis container reports assertions to Antithesis SDK:
 
 - always: Praos block diffusion p95 latency < threshold
 - always: Praos blocks are received when created
+- always: No node forges two blocks in the same slot
+- always: Each block has exactly one creator
+- always: Forged block slots never decrease within a node
+- always: All received blocks were created by a known node
 - sometimes: Leios endorser blocks (EBs) are created
 - sometimes: Each pool produces blocks (pool1, pool2, pool3)
 - sometimes: Chain tip advances between checks
