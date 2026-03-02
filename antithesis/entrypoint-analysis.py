@@ -127,6 +127,74 @@ def report_assertions(metrics, praos_threshold_ms: float, prev_max_slot: int):
     else:
         log(f"  Leios votes created: {metrics.leios_votes_created}")
 
+    # --- Safety assertions ---
+
+    # No equivocation: no node forges two blocks in same slot
+    no_equivocation = len(metrics.equivocations) == 0
+    if ANTITHESIS_AVAILABLE:
+        always(
+            no_equivocation,
+            "No node forges two blocks in the same slot",
+            {
+                "equivocations": [
+                    {"node": n, "slot": s, "hash1": h1, "hash2": h2}
+                    for n, s, h1, h2 in metrics.equivocations[:5]
+                ],
+            },
+        )
+    else:
+        if not no_equivocation:
+            log(f"[FAIL] Equivocations detected: {metrics.equivocations}")
+
+    # No duplicate creators: each block hash has one creator
+    no_dup_creators = len(metrics.duplicate_creators) == 0
+    if ANTITHESIS_AVAILABLE:
+        always(
+            no_dup_creators,
+            "Each block has exactly one creator",
+            {
+                "duplicates": [
+                    {"hash": h, "node1": n1, "node2": n2}
+                    for h, n1, n2 in metrics.duplicate_creators[:5]
+                ],
+            },
+        )
+    else:
+        if not no_dup_creators:
+            log(f"[FAIL] Duplicate block creators: {metrics.duplicate_creators}")
+
+    # Slot monotonicity: forged slots never decrease within a node
+    no_regressions = len(metrics.slot_regressions) == 0
+    if ANTITHESIS_AVAILABLE:
+        always(
+            no_regressions,
+            "Forged block slots never decrease within a node",
+            {
+                "regressions": [
+                    {"node": n, "prev_slot": ps, "new_slot": ns}
+                    for n, ps, ns in metrics.slot_regressions[:5]
+                ],
+            },
+        )
+    else:
+        if not no_regressions:
+            log(f"[FAIL] Slot regressions: {metrics.slot_regressions}")
+
+    # No orphan blocks: all received blocks were created by a known node
+    no_orphans = len(metrics.orphan_block_hashes) == 0
+    if ANTITHESIS_AVAILABLE:
+        always(
+            no_orphans,
+            "All received blocks were created by a known node",
+            {
+                "orphan_count": len(metrics.orphan_block_hashes),
+                "orphan_sample": list(metrics.orphan_block_hashes)[:5],
+            },
+        )
+    else:
+        if not no_orphans:
+            log(f"[FAIL] Orphan blocks: {list(metrics.orphan_block_hashes)[:5]}")
+
 
 def main():
     """Main analysis loop."""
@@ -178,6 +246,12 @@ def main():
             )
             log(
                 f"Per-pool: {dict(metrics.blocks_created_by_node)}"
+            )
+            log(
+                f"Safety: equivocations={len(metrics.equivocations)}, "
+                f"dup_creators={len(metrics.duplicate_creators)}, "
+                f"slot_regressions={len(metrics.slot_regressions)}, "
+                f"orphan_blocks={len(metrics.orphan_block_hashes)}"
             )
 
             praos_stats = get_latency_stats(metrics.praos_latencies_ms)
