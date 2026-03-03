@@ -53,8 +53,8 @@ The Linear Leios engineering effort and the broader technical community can use 
 		- *Forward:* predict dependent variables from independent ones.
 		- *Reverse:* estimate protocol parameters and hardware requirements for a specified level of performance.
 		- *Mapping:* find boundaries around feasible regions of performance in parameter space.
-- [ ] [#662](https://github.com/input-output-hk/ouroboros-leios/issues/662) Executable realization of the mathematical model.
-- [ ] [#664](https://github.com/input-output-hk/ouroboros-leios/issues/663) Numerical study of feasible protocol parameters hardware requirements.
+- [x] [#662](https://github.com/input-output-hk/ouroboros-leios/issues/662) Executable realization of the mathematical model.
+- [x] [#664](https://github.com/input-output-hk/ouroboros-leios/issues/663) Numerical study of feasible protocol parameters hardware requirements.
 
 ### Stretch goal (uncommitted)
 
