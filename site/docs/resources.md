@@ -9,7 +9,7 @@ technical papers, presentations, and videos.
 
 ## Technical documentation
 
-- [CIP-164: Ouroboros Leios - Greater transaction throughput](https://github.com/cardano-foundation/CIPs/pull/1078) - Cardano Improvement Proposal (CIP) about the concrete Leios protocol changes to Cardano.
+- [CIP-164: Ouroboros Leios - Greater transaction throughput](https://cips.cardano.org/cip/CIP-0164) - Cardano Improvement Proposal (CIP) about the concrete Leios protocol changes to Cardano.
 
 - [CPS-18: Greater Transaction
   throughput](https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md) - Cardano Problem Statement (CPS) summarizing why more throughput is needed on Cardano.
