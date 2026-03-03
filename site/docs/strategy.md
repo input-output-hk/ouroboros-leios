@@ -1,6 +1,6 @@
 # Strategy
 
-This document outlines the vision, mission, and strategy guiding the development of Ouroboros Linear Leios – the consensus upgrade that will deliver world-class scalability to Cardano. While this document explains _why_ we are building Leios and _how_ we intend to succeed, the separate [roadmap](./roadmap.md) details _what_ we will deliver and _when_.
+This document outlines the vision, mission, and strategy guiding the development of Ouroboros Leios – the consensus upgrade that will deliver world-class scalability to Cardano. While this document explains _why_ we are building Leios and _how_ we intend to succeed, the separate [roadmap](./roadmap.md) details _what_ we will deliver and _when_.
 
 ## Vision and mission 
 
@@ -56,7 +56,7 @@ The following metrics are tracked to measure success and maintain transparency:
 ### Network efficiency
 
 -   **Resource utilization**: modest increase in CPU/bandwidth per transaction
--   **Block propagation time**: target <5 seconds for global diffusion
+ -   **Block propagation time**: target less than 5 seconds for global diffusion
 -   **Spatial and temporal efficiency**: high ratio of useful transactions to total block data
 
 ### Security and decentralization
