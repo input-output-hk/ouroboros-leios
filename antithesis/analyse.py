@@ -123,8 +123,15 @@ def parse_log_line(line: str, node_name: str) -> Optional[BlockEvent]:
 
         # Praos block forged (cardano-node forge loop)
         # ns: "Forge.Loop.ForgedBlock"
+        # data: {"forgedBlock": {"newBlockHash": "abc..."}, "kind": "TraceForgedBlock", "slot": 102}
         if "ForgedBlock" in ns:
-            block_hash = event_data.get("block", event_data.get("blockHash", "unknown"))
+            forged_data = event_data.get("forgedBlock", {})
+            if not isinstance(forged_data, dict):
+                forged_data = {}
+            block_hash = forged_data.get(
+                "newBlockHash",
+                event_data.get("block", event_data.get("blockHash", "unknown")),
+            )
             slot = event_data.get("slot", 0)
             return BlockEvent(
                 timestamp=ts,
