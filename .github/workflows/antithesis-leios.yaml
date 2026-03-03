@@ -171,11 +171,29 @@ jobs:
   #   - Requester registered with Moog (Ed25519 keypair, CODEOWNERS entry)
   #   - CF Moog agent has whitelisted this repository
   #
+  check-moog-secrets:
+    name: "Check Moog secrets"
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    outputs:
+      available: ${{ steps.check.outputs.available }}
+    steps:
+      - id: check
+        env:
+          MOOG_PAT: ${{ secrets.MOOG_GITHUB_PAT }}
+        run: |
+          if [ -n "$MOOG_PAT" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Moog secrets not configured — skipping submission"
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
   submit-antithesis:
     name: "Submit Antithesis test via Moog"
     runs-on: ubuntu-latest
-    needs: build-images
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.MOOG_GITHUB_PAT != ''
+    needs: [build-images, check-moog-secrets]
+    if: needs.check-moog-secrets.outputs.available == 'true'
     permissions:
       contents: read
 
