@@ -257,8 +257,9 @@ The output YAML file contains the schedule of all operations, and the Chrome Tra
 
 Two scenarios are provided, but `python main.py --generate-dummy` will create a small example.
 
-- [scenario-2MB.yaml](https://www.google.com/search?q=./scenario-2MB.yaml "null"): the first 2 MB of transactions from Cardano mainnet starting at Epoch 600.
-- [scenario-12MB.yaml](https://www.google.com/search?q=./scenario-12MB.yaml "null"): the first 12 MB of transactions from Cardano mainnet starting at Epoch 600.
+- [scenario-2MB.yaml](./scenario-2MB.yaml): the first 2 MB of transactions from Cardano mainnet starting at Epoch 600.
+- [scenario-6MB.yaml](./scenario-6MB.yaml): the first 2 MB of transactions from Cardano mainnet starting at Epoch 600.
+- [scenario-12MB.yaml](./scenario-12MB.yaml): the first 12 MB of transactions from Cardano mainnet starting at Epoch 600.
 
 The smaller example runs quickly:
 
@@ -334,5 +335,29 @@ YAML results written to: results-12MB.yaml
 Chrome Trace written to: results-12MB.json
 ```
 
-Results for the two examples are available at [ipfs://bafybeidmyotni665ze2ii3kez6r7r5afv3xdpuplrsxf4vmijbw4umzfze](https://ipfs.functionally.io/ipfs/bafybeidmyotni665ze2ii3kez6r7r5afv3xdpuplrsxf4vmijbw4umzfze/ "null").
+Results for the two examples are available at [ipfs://QmYpmGeHvNmWxk3fwbrY8vq9jJSG89DzDGT2fUQ6Nqon4p](https://ipfs.functionally.io/ipfs/QmYpmGeHvNmWxk3fwbrY8vq9jJSG89DzDGT2fUQ6Nqon4p/).
 
+## Experimental results
+
+### CPU: 1 core vs 4 cores
+
+In this experiment, CPU utilization scales less and less than linearly as the EB size increases. Three CPUs are sufficient to handle the workload and most of the time is spent waiting for transaction bodies to arrive.
+
+| EB size |    Wallclock | CPU utilization | Verify parallelism | Apply parallelism | Reapply parallelism |
+| ------: | -----------: | --------------: | -----------------: | ----------------: | ------------------: |
+|    2 MB | 4 989 006 µs |           15.6% |               0.01 |              0.12 |                0.03 |
+|         | 4 904 844 µs |            4.0% |               0.01 |              0.12 |                0.03 |
+|    6 MB | 5 924 047 µs |           29.3% |               0.03 |              0.36 |                0.09 |
+|         | 5 483 392 µs |            7.9% |               0.04 |              0.42 |                0.11 |
+|   12 MB | 5 067 936 µs |           64.5% |               0.06 |              0.63 |                0.15 |
+|         | 3 740 821 µs |           21.9% |               0.09 |              0.98 |                0.24 |
+
+### Adversarial delay
+
+In this experiment, the adversary releases all of the EB transaction bodies at the same time, forcing the receiving node to process them starting at the same moment. Four CPUs are sufficient and the computation can be completed within about two seconds of the last transaction body's arrival.
+
+| EB size |  CPUs | Wallclock after last tx arrival | CPU utilization after last tx arrival |
+| ------: | ----: | ------------------------------: | ------------------------------------: |
+|    2 MB | 4 CPU |                    1 415 249 µs |                                   10% |
+|    6 MB | 4 CPU |                    1 654 208 µs |                                   22% |
+|   12 MB | 4 CPU |                    2 037 688 µs |                                   42% |
