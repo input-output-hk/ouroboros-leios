@@ -193,7 +193,7 @@ jobs:
     name: "Submit Antithesis test via Moog"
     runs-on: ubuntu-latest
     needs: [build-images, check-moog-secrets]
-    if: needs.check-moog-secrets.outputs.available == 'true'
+    if: needs['check-moog-secrets'].outputs.available == 'true'
     permissions:
       contents: read
 
