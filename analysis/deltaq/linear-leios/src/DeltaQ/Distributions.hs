@@ -33,22 +33,20 @@ measuredDQ delays = choices dataPoints
 pairList :: [Double] -> (Double -> Double) -> [(Double, Double)]
 pairList l f = map (\x -> (f x, x)) l
 
--- steps for discretization
-numberSteps :: Double
-numberSteps = 10.0
+-- DQ from distribution
+distDQ :: S.ContDistr p => p -> DQ
+distDQ dist =
+  let d = S.cumulative dist
+      q = S.quantile dist 0.99
+   in measuredDQ $ pairList [0.0, q / numberSteps .. q] d
+ where
+  numberSteps :: Double
+  numberSteps = 10.0
 
 -- DQ for log-normal distribution
 logNormalDQ :: Double -> Double -> DQ
-logNormalDQ x y =
-  let dist = S.lognormalDistr x y
-      d = S.cumulative dist
-      q = S.quantile dist 0.99
-   in measuredDQ $ pairList [0.0, q / numberSteps .. q] d
+logNormalDQ μ σ = distDQ $ S.lognormalDistr μ σ
 
 -- DQ for exponential distribution
 expDQ :: Double -> DQ
-expDQ r =
-  let dist = S.exponential r
-      d = S.cumulative dist
-      q = S.quantile dist 0.99
-   in measuredDQ $ pairList [0.0, q / numberSteps .. q] d
+expDQ = distDQ . S.exponential
