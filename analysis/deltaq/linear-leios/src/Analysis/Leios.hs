@@ -28,7 +28,6 @@ module Analysis.Leios (
 )
 where
 
-import DeltaQ (DQ)
 import DeltaQ.Leios (pValidating)
 import qualified Statistics.Distribution as S
 import Statistics.Leios (quorumProbability)
@@ -53,10 +52,6 @@ data Config = Config
   -- ^ Voting threshold
   , f :: !Rational
   -- ^ Active slot coefficient
-  , applyTx :: !DQ
-  -- ^ DQ for applyTx
-  , reapplyTx :: !DQ
-  -- ^ DQ for reapplyTx
   }
   deriving (Show)
 
@@ -65,7 +60,7 @@ pQuorum :: Config -> Double
 pQuorum Config{..} =
   quorumProbability
     (fromInteger numberSPOs)
-    (fromRational $ pValidating applyTx reapplyTx (lHdr, lVote))
+    (fromRational $ pValidating (lHdr, lVote))
     (fromInteger committeeSizeEstimated)
     (fromRational τ)
 

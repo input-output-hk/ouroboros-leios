@@ -16,6 +16,10 @@ module DeltaQ.Leios (
   pValidating,
   pHeaderOnTime,
   pEBOnTime,
+
+  -- * DQs
+  applyTx,
+  reapplyTx,
 ) where
 
 import DeltaQ (
@@ -35,13 +39,13 @@ import DeltaQ.Praos (
   sendRBHeader,
  )
 
-maxTxsInRB, maxTxRefsInEB, maxTxsFetched :: Integer
+maxTxsInRB, maxTxRefsInEB, maxTxsFetched :: Int
 maxTxsInRB = 4
 maxTxRefsInEB = 8
 maxTxsFetched = 2
 
 fetchingEB :: DQ
-fetchingEB = blendedDelay B2048 -- TODO: Model FFD
+fetchingEB = choices [(1, blendedDelay B512), (1, blendedDelay B1024), (1, blendedDelay B2048)] -- TODO: Model FFD
 
 {-
 doAll :: [DQ] -> DQ
@@ -59,32 +63,40 @@ fetchingTx = blendedDelay B256 -- TODO: Tx size
 fetchingTxs :: DQ
 fetchingTxs = logNormalDQ 0 1 -- FIXME: Model Tx Cache
 
-processRBandEB :: DQ -> DQ
-processRBandEB applyTxs = processRB ./\. processEB
+applyTx :: DQ
+applyTx = logNormalDQ 0 1 -- FIXME: concurrentUpToN maxTxRefsInEB reapplyTx
+
+reapplyTx :: DQ
+reapplyTx = logNormalDQ 0 1 -- FIXME: concurrentUpToN maxTxRefsInEB reapplyTx
+
+applyTxs :: DQ
+applyTxs = logNormalDQ 0 1 -- FIXME: concurrentUpToN maxTxRefsInEB reapplyTx
+
+reapplyTxs :: DQ
+reapplyTxs = logNormalDQ 0 1 -- FIXME: concurrentUpToN maxTxRefsInEB reapplyTx
+
+processRBandEB :: DQ
+processRBandEB = processRB ./\. processEB
  where
   processRB = sendRBBody .>>. applyTxs
   processEB = fetchingEB .>>. fetchingTxs
 
 -- | Distribution of EB validation time
-validateEB :: DQ -> DQ -> DQ
-validateEB applyTx reapplyTx = processRBandEB applyTxs .>>. reapplyTxs
- where
-  applyTxs = logNormalDQ 0 1 -- FIXME: concurrentUpToN maxTxsInRB applyTx
-  reapplyTxs = logNormalDQ 0 1 -- FIXME: concurrentUpToN maxTxRefsInEB reapplyTx
+validateEB :: DQ
+validateEB = processRBandEB .>>. reapplyTxs
 
 -- | Estimate for the parameter \(L_\text{vote}\) using 'validateEB'
-lVoteEstimated :: DQ -> DQ -> Maybe Integer
-lVoteEstimated txApply txReapply = ceiling <$> ((-) <$> q75 <*> (pure 3))
+lVoteEstimated :: Maybe Integer
+lVoteEstimated = ceiling <$> ((-) <$> q75 <*> (pure 3))
  where
-  q75 = maybeFromEventually $ quantile (validateEB txApply txReapply) 0.75
+  q75 = maybeFromEventually $ quantile validateEB 0.75
 
 -- | Estimate for the parameter \(L_\text{diff}\) using 'validateEB'
-lDiffEstimated :: DQ -> DQ -> Maybe Integer
-lDiffEstimated txApply txReapply = ceiling <$> ((-) <$> q95 <*> q75)
+lDiffEstimated :: Maybe Integer
+lDiffEstimated = ceiling <$> ((-) <$> q95 <*> q75)
  where
-  dq = validateEB txApply txReapply
-  q75 = maybeFromEventually $ quantile dq 0.75
-  q95 = maybeFromEventually $ quantile dq 0.95
+  q75 = maybeFromEventually $ quantile validateEB 0.75
+  q95 = maybeFromEventually $ quantile validateEB 0.95
 
 -- | Probability that 'emitRBHeader' is within \(L_\text{hdr}\)
 pHeaderOnTime ::
@@ -110,15 +122,9 @@ pEBOnTime lHdr =
 
 -- | Probability that 'validateEB' is successful before the end of \(L_\text{vote}\)
 pValidating ::
-  -- | txApply
-  DQ ->
-  -- | txReapply
-  DQ ->
   -- | \(L_\text{hdr} \times L_\text{vote}\)
   (Integer, Integer) ->
   -- | Probability that the EB validation finisthes before \(3*L_\text{hdr} + L_\text{vote}\)
   Probability DQ
-pValidating txApply txReapply (lHdr, lVote) =
-  successWithin
-    (validateEB txApply txReapply)
-    (fromIntegral $ 3 * lHdr + lVote)
+pValidating (lHdr, lVote) =
+  successWithin validateEB (fromIntegral $ 3 * lHdr + lVote)

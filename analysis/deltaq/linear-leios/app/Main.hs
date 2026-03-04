@@ -11,19 +11,16 @@ module Main where
 import Analysis.Leios
 import Control.Concurrent.Async
 import qualified Data.ByteString.Lazy as BL
-import Data.Csv (DefaultOrdered (..), FromNamedRecord (..), Header, ToNamedRecord (..), decodeByName, encodeDefaultOrderedByName, (.:))
+import Data.Csv (DefaultOrdered (..), FromNamedRecord (..), ToNamedRecord (..), encodeDefaultOrderedByName, (.:))
 import Data.Ratio ((%))
-import qualified Data.Vector as V
 import DeltaQ
 import DeltaQ.Leios
-import DeltaQ.Leios.EmpiricalDistributions (empiricalDQ)
 import DeltaQ.Praos
 import GHC.Generics
 import Graphics.Rendering.Chart.Backend.Cairo
 import Graphics.Rendering.Chart.Easy
 import Statistics.Leios (quorumProbability)
 import System.Environment (getArgs)
-import System.Random
 import Text.Printf
 
 data BlockEDF = BlockEDF
@@ -44,23 +41,9 @@ instance FromNamedRecord BlockEDF where
       <*> m .: "Reapply [ms]"
       <*> m .: "Fraction of blocks [%/100]"
 
-readFromFile :: IO (Either String (Header, V.Vector BlockEDF))
-readFromFile = decodeByName @BlockEDF <$> BL.readFile "../../../post-cip/empirical-distributions/block-edf.csv"
-
-sampleElements :: RandomGen g => g -> Int -> [a] -> [a]
-sampleElements g n xs =
-  let is = take n $ randomRs (0, length xs - 1) g
-   in [xs !! i | i <- is]
-
 -- | main
 main :: IO ()
 main = do
-  Right (_, edf) <- readFromFile
-  let txApplyTimes = V.toList (V.map (toRational . (/ 1000) . apply) edf)
-  let txReapplyTimes = V.toList (V.map (toRational . (/ 1000) . reapply) edf)
-  let applyTx = empiricalDQ txApplyTimes
-  let reapplyTx = empiricalDQ txReapplyTimes
-
   let committeeSizeEstimated = 600
   let numberSPOs = 2500
   let f = 1 % 20
@@ -82,9 +65,9 @@ main = do
   case args of
     ["estimates"] ->
       concurrently_
-        (maybe (print @String "Nothing") (printf "Estimate for lVote: %d\n") (lVoteEstimated applyTx reapplyTx))
-        (maybe (print @String "Nothing") (printf "Estimate for lDiff: %d\n") (lDiffEstimated applyTx reapplyTx))
-    ["plots"] -> mapConcurrently_ plots configs
+        (maybe (print @String "Nothing") (printf "Estimate for lVote: %d\n") lVoteEstimated)
+        (maybe (print @String "Nothing") (printf "Estimate for lDiff: %d\n") lDiffEstimated)
+    ["plots"] -> plots committeeSizeEstimated numberSPOs τ
     ["stats"] -> mapConcurrently (return . stats) configs >>= writeResults
     _ -> putStrLn "options are: estimates, plots, stats"
 
@@ -117,27 +100,27 @@ instance FromNamedRecord Result
 instance ToNamedRecord Result
 instance DefaultOrdered Result
 
-plots :: Config -> IO ()
-plots Config{..} = do
+plots :: Integer -> Integer -> Rational -> IO ()
+plots committeeSizeEstimated numberSPOs τ = do
   _ <-
-    renderableToFile def{_fo_format = SVG} (name <> "-tx-apply.svg") $
+    renderableToFile def{_fo_format = SVG} ("tx-apply.svg") $
       toRenderable $
         plotCDFWithQuantiles "Tx Apply" [0.75, 0.95, 0.99] applyTx
   _ <-
-    renderableToFile def{_fo_format = SVG} (name <> "-tx-reapply.svg") $
+    renderableToFile def{_fo_format = SVG} ("tx-reapply.svg") $
       toRenderable $
         plotCDFWithQuantiles "Tx Reapply" [0.75, 0.95, 0.99] reapplyTx
   _ <-
-    renderableToFile def{_fo_format = SVG} (name <> "-block-diffustion.svg") $
+    renderableToFile def{_fo_format = SVG} ("block-diffustion.svg") $
       toRenderable $
         plotCDFs "Block diffusion" $
           zip (map show blockSizes) (map blendedDelay blockSizes)
   _ <-
-    renderableToFile def{_fo_format = SVG} (name <> "-validateEB.svg") $
+    renderableToFile def{_fo_format = SVG} ("validateEB.svg") $
       toRenderable $
-        plotCDFWithQuantiles "EB diffusion" [0.75, 0.95, 0.99] (validateEB applyTx reapplyTx)
+        plotCDFWithQuantiles "EB diffusion" [0.75, 0.95, 0.99] validateEB
   _ <-
-    renderableToFile def{_fo_format = SVG} (name <> "-quorumProb.svg") $
+    renderableToFile def{_fo_format = SVG} ("quorumProb.svg") $
       toRenderable $
         let xs = [0.50, 0.51 .. 1]
             s = fromInteger committeeSizeEstimated
@@ -152,7 +135,7 @@ stats :: Config -> Result
 stats config@Config{..} =
   let res_config = name
       res_pHeaderOnTime = fromRational $ pHeaderOnTime lHdr
-      res_pValidating = fromRational $ pValidating applyTx reapplyTx (lHdr, lVote)
+      res_pValidating = fromRational $ pValidating (lHdr, lVote)
       res_pQuorum = pQuorum config
       res_pInterruptedByNewBlock = pInterruptedByNewBlock config
       res_pCertified = pCertified config
