@@ -31,6 +31,7 @@ import DeltaQ (
   maybeFromEventually,
   wait,
  )
+import DeltaQ.Common (doAll, doSequentially)
 import DeltaQ.Distributions (logNormalDQ)
 import DeltaQ.Praos (
   BlockSize (..),
@@ -42,20 +43,10 @@ import DeltaQ.Praos (
 maxTxsInRB, maxTxRefsInEB, maxTxsFetched :: Int
 maxTxsInRB = 4
 maxTxRefsInEB = 8
-maxTxsFetched = 64
+maxTxsFetched = 4
 
 fetchingEB :: DQ
 fetchingEB = choices [(1, blendedDelay B512), (1, blendedDelay B1024), (1, blendedDelay B2048)] -- TODO: Model FFD
-
-doAll :: [DQ] -> DQ
-doAll = foldr (./\.) (wait 0)
-
-{-
-concurrentUpToN :: Integer -> DQ -> DQ
-concurrentUpToN n dq = choices $ map f [1 .. fromInteger n]
- where
-  f i = (1.0 / fromIntegral n, doAll (replicate i dq))
--}
 
 -- Markov model that was presented by Nick in the Leios monthly
 -- meeting in February:
@@ -72,7 +63,6 @@ concurrentUpToN n dq = choices $ map f [1 .. fromInteger n]
 --    π_2 = 2p/(2+p)
 --
 -- +-----+-------+-------+
-
 -- | p   | π_1   | π_p   |
 -- |-----+-------+-------|
 -- | 0.1 | 0.905 | 0.095 |
@@ -94,7 +84,10 @@ fetchingTx p =
     ]
 
 fetchingTxs :: DQ
-fetchingTxs = doAll $ replicate maxTxsFetched (fetchingTx 1.0)
+fetchingTxs =
+  let b = doAll (replicate maxTxsFetched (fetchingTx 1.0))
+   in b -- TODO: in batches
+        -- doSequentially (replicate 4 b)
 
 applyTx :: DQ
 applyTx = logNormalDQ 0 1 -- FIXME: concurrentUpToN maxTxRefsInEB reapplyTx

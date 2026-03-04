@@ -19,6 +19,7 @@ module DeltaQ.Praos (
 ) where
 
 import DeltaQ (DQ, Outcome (wait, (.>>.)), ProbabilisticOutcome (choices))
+import DeltaQ.Common
 
 data BlockSize = B64 | B256 | B512 | B1024 | B2048
   deriving (Show, Eq)
@@ -52,9 +53,6 @@ hop b = choices [(1, short b), (1, medium b), (1, long b)]
 
 hops :: Int -> BlockSize -> DQ
 hops n b = doSequentially (replicate n (hop b))
- where
-  doSequentially :: [DQ] -> DQ
-  doSequentially = foldr (.>>.) (wait 0)
 
 blendedDelay :: BlockSize -> DQ
 blendedDelay b = choices $ map (\(n, p) -> (p, hops n b)) hopCount
