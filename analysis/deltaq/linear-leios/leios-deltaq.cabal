@@ -17,6 +17,7 @@ library
                     , statistics
     hs-source-dirs:   src
     exposed-modules:  Analysis.Leios
+                    , DeltaQ.Distributions
                     , DeltaQ.Leios
                     , DeltaQ.Leios.EmpiricalDistributions
                     , DeltaQ.Praos
