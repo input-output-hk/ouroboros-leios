@@ -42,26 +42,59 @@ import DeltaQ.Praos (
 maxTxsInRB, maxTxRefsInEB, maxTxsFetched :: Int
 maxTxsInRB = 4
 maxTxRefsInEB = 8
-maxTxsFetched = 2
+maxTxsFetched = 64
 
 fetchingEB :: DQ
 fetchingEB = choices [(1, blendedDelay B512), (1, blendedDelay B1024), (1, blendedDelay B2048)] -- TODO: Model FFD
 
-{-
 doAll :: [DQ] -> DQ
 doAll = foldr (./\.) (wait 0)
 
+{-
 concurrentUpToN :: Integer -> DQ -> DQ
 concurrentUpToN n dq = choices $ map f [1 .. fromInteger n]
  where
   f i = (1.0 / fromIntegral n, doAll (replicate i dq))
 -}
 
-fetchingTx :: DQ
-fetchingTx = blendedDelay B256 -- TODO: Tx size
+-- Markov model that was presented by Nick in the Leios monthly
+-- meeting in February:
+--
+-- Transition matrix M:
+--
+-- [ 1−p    p   ]
+-- [ 1-p/2  p/2 ]
+--
+-- Stationary condition: π*M = π
+--
+-- Solution:
+--    π_1 = (2-p)/(2+p)
+--    π_2 = 2p/(2+p)
+--
+-- +-----+-------+-------+
+
+-- | p   | π_1   | π_p   |
+-- |-----+-------+-------|
+-- | 0.1 | 0.905 | 0.095 |
+-- | 0.3 | 0.778 | 0.222 |
+-- | 0.5 | 0.600 | 0.400 |
+-- | 0.8 | 0.385 | 0.615 |
+-- | 1.0 | 0.333 | 0.667 |
+-- +-----+-------+-------+
+
+-- Steady-state hit rate
+hitRate :: Double -> Rational
+hitRate p = toRational $ 2 * p / (2 + p)
+
+fetchingTx :: Double -> DQ
+fetchingTx p =
+  choices
+    [ (hitRate p, wait 0.001)
+    , (1 - hitRate p, blendedDelay B1024)
+    ]
 
 fetchingTxs :: DQ
-fetchingTxs = logNormalDQ 0 1 -- FIXME: Model Tx Cache
+fetchingTxs = doAll $ replicate maxTxsFetched (fetchingTx 1.0)
 
 applyTx :: DQ
 applyTx = logNormalDQ 0 1 -- FIXME: concurrentUpToN maxTxRefsInEB reapplyTx
