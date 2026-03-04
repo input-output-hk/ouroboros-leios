@@ -74,7 +74,7 @@ sharding, but it is not yet part of Leios.
 
 #### How do I estimate node operating costs for Leios?
 
-Latest simulations show only modest hardware upgrades are needed (6+ cores, 100 Mbps+ bandwidth, SSD storage). Detailed cost estimates are available in the (Leios CIP)[https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md] .
+Latest simulations show only modest hardware upgrades are needed (6+ cores, 100 Mbps+ bandwidth, SSD storage). Detailed cost estimates are available in the [Leios CIP](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md).
 
 #### How do I keep track of Leios's progress and updates?
 
@@ -82,7 +82,7 @@ You can follow:
 
 - Leios documentation on this site
 - [Leios development tracker](https://engineering.iog.io/leios)
-- [Monthly reviews](/site/docs/development/monthly-reviews.md)
+- [Monthly reviews](/docs/development/monthly-reviews.md)
 - GitHub discussions in the [repository](https://github.com/input-output-hk/ouroboros-leios/discussions)
 
 These resources provide transparency and regular updates on ongoing development.

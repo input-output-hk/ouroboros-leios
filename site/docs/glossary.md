@@ -60,10 +60,6 @@ The hybrid sortition mechanism used in Leios that combines deterministic persist
 
 A diffusion policy that prioritises newer blocks or transactions.
 
-#### Input block (IB)
-
-The basic unit of transaction collection in Leios. Produced frequently (up to ~5 per second) by nodes that win the IB sortition lottery.
-
 #### Linear Leios
 
 The current production-oriented variant of Ouroboros Leios (CIP-0164). It retains the IB/EB/RB structure but simplifies the design for easier implementation, indexing, and deployment while maintaining high throughput.
