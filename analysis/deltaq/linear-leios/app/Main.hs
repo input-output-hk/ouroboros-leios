@@ -12,6 +12,7 @@ import Analysis.Leios
 import Control.Concurrent.Async
 import qualified Data.ByteString.Lazy as BL
 import Data.Csv (DefaultOrdered (..), FromNamedRecord (..), Header, ToNamedRecord (..), decodeByName, encodeDefaultOrderedByName, (.:))
+import Data.Ratio ((%))
 import qualified Data.Vector as V
 import DeltaQ
 import DeltaQ.Leios
@@ -55,15 +56,15 @@ sampleElements g n xs =
 main :: IO ()
 main = do
   Right (_, edf) <- readFromFile
-  let txApplyTimes = V.toList (V.map ((/ 1000) . apply) edf)
-  let txReapplyTimes = V.toList (V.map ((/ 1000) . reapply) edf)
+  let txApplyTimes = V.toList (V.map (toRational . (/ 1000) . apply) edf)
+  let txReapplyTimes = V.toList (V.map (toRational . (/ 1000) . reapply) edf)
   let applyTx = empiricalDQ txApplyTimes
   let reapplyTx = empiricalDQ txReapplyTimes
 
   let committeeSizeEstimated = 600
   let numberSPOs = 2500
-  let f = 1 / 20
-  let τ = 3 / 4
+  let f = 1 % 20
+  let τ = 3 % 4
 
   let configs =
         [ Config{name = "C113", lHdr = 1, lVote = 1, lDiff = 3, ..}
@@ -141,7 +142,7 @@ plots Config{..} = do
         let xs = [0.50, 0.51 .. 1]
             s = fromInteger committeeSizeEstimated
             n = fromInteger numberSPOs
-            vs = [(x, quorumProbability n x s τ) | x <- xs]
+            vs = [(x, quorumProbability n x s (fromRational τ)) | x <- xs]
          in do
               layout_title .= "Quorum distribution"
               plot (line "pQuorum" [vs])
@@ -150,8 +151,8 @@ plots Config{..} = do
 stats :: Config -> Result
 stats config@Config{..} =
   let res_config = name
-      res_pHeaderOnTime = pHeaderOnTime lHdr
-      res_pValidating = pValidating applyTx reapplyTx (lHdr, lVote)
+      res_pHeaderOnTime = fromRational $ pHeaderOnTime lHdr
+      res_pValidating = fromRational $ pValidating applyTx reapplyTx (lHdr, lVote)
       res_pQuorum = pQuorum config
       res_pInterruptedByNewBlock = pInterruptedByNewBlock config
       res_pCertified = pCertified config

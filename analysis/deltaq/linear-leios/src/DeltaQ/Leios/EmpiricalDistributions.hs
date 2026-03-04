@@ -8,7 +8,7 @@ import DeltaQ
 import DeltaQ.Distributions
 
 -- | 'empiricalDQ'
-empiricalDQ :: [Double] -> DQ
+empiricalDQ :: [Rational] -> DQ
 empiricalDQ ms =
   measuredDQ $
     zip

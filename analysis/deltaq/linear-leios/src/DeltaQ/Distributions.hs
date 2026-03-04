@@ -11,7 +11,7 @@ import qualified Statistics.Distribution as S
 import qualified Statistics.Distribution.Exponential as S
 import qualified Statistics.Distribution.Lognormal as S
 
-type Measurements = [(Double, Double)]
+type Measurements = [(Rational, Rational)]
 
 -- | 'measuredDQ'
 -- https://github.com/DeltaQ-SD/deltaq/issues/75#issuecomment-3334080165
@@ -30,23 +30,23 @@ measuredDQ delays = choices dataPoints
   delayComponent d1 d2 = if d1 == d2 then wait d1 else uniform d1 d2
 
 -- given a list and a function f, create list of pairs (f x, x)
-pairList :: [Double] -> (Double -> Double) -> [(Double, Double)]
+pairList :: [Rational] -> (Rational -> Rational) -> [(Rational, Rational)]
 pairList l f = map (\x -> (f x, x)) l
 
 -- DQ from distribution
 distDQ :: S.ContDistr p => p -> DQ
 distDQ dist =
-  let d = S.cumulative dist
-      q = S.quantile dist 0.99
-   in measuredDQ $ pairList [0.0, q / numberSteps .. q] d
+  let d = toRational . S.cumulative dist . fromRational
+      q = toRational $ S.quantile dist 0.99
+   in measuredDQ (pairList [0.0, q / numberSteps .. q] d)
  where
-  numberSteps :: Double
+  numberSteps :: Rational
   numberSteps = 10.0
 
 -- DQ for log-normal distribution
-logNormalDQ :: Double -> Double -> DQ
-logNormalDQ μ σ = distDQ $ S.lognormalDistr μ σ
+logNormalDQ :: Rational -> Rational -> DQ
+logNormalDQ μ σ = distDQ $ S.lognormalDistr (fromRational μ) (fromRational σ)
 
 -- DQ for exponential distribution
-expDQ :: Double -> DQ
-expDQ = distDQ . S.exponential
+expDQ :: Rational -> DQ
+expDQ = distDQ . S.exponential . fromRational

@@ -49,9 +49,9 @@ data Config = Config
   -- ^ Number of stake-pools
   , committeeSizeEstimated :: !Integer
   -- ^ Estimation of size of voting committee
-  , τ :: !Double
+  , τ :: !Rational
   -- ^ Voting threshold
-  , f :: !Double
+  , f :: !Rational
   -- ^ Active slot coefficient
   , applyTx :: !DQ
   -- ^ DQ for applyTx
@@ -65,15 +65,15 @@ pQuorum :: Config -> Double
 pQuorum Config{..} =
   quorumProbability
     (fromInteger numberSPOs)
-    (pValidating applyTx reapplyTx (lHdr, lVote))
+    (fromRational $ pValidating applyTx reapplyTx (lHdr, lVote))
     (fromInteger committeeSizeEstimated)
-    τ
+    (fromRational τ)
 
 -- | Probability that validation is done before there is new block
 pInterruptedByNewBlock :: Config -> Double
 pInterruptedByNewBlock Config{..} =
   S.cumulative
-    (blockDistribution f)
+    (blockDistribution $ fromRational f)
     (fromInteger $ 3 * lHdr + lVote + lDiff)
 
 -- | Probability that an EB will be certified
@@ -85,5 +85,5 @@ pCertified c = (1 - pInterruptedByNewBlock c) * pQuorum c
 -- \(E = \frac{1}{\lambda}\), where \(\lambda\) is the block production rate
 eCertified :: Config -> Double
 eCertified Config{..} =
-  let λ  = f * (1 - f) ** (fromInteger $ 3 * lHdr + lVote + lDiff)
-  in 1 / λ
+  let λ = (fromRational f) * (1 - (fromRational f)) ** (fromInteger $ 3 * lHdr + lVote + lDiff)
+   in 1 / λ

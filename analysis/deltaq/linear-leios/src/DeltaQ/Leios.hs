@@ -30,8 +30,8 @@ import DeltaQ (
 import DeltaQ.Praos (
   BlockSize (..),
   blendedDelay,
-  sendRBHeader,
   sendRBBody,
+  sendRBHeader,
  )
 
 maxTxsInRB, maxTxRefsInEB, maxTxsFetched :: Integer
