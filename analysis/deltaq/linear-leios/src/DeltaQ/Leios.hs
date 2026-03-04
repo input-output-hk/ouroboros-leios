@@ -32,7 +32,12 @@ import DeltaQ (
   wait,
  )
 import DeltaQ.Common (doAll, doSequentially)
-import DeltaQ.Distributions (logNormalDQ)
+import DeltaQ.Leios.EmpiricalDistributions (
+  applyTx,
+  applyTxs,
+  reapplyTx,
+  reapplyTxs,
+ )
 import DeltaQ.Praos (
   BlockSize (..),
   blendedDelay,
@@ -43,7 +48,7 @@ import DeltaQ.Praos (
 maxTxsInRB, maxTxRefsInEB, maxTxsFetched :: Int
 maxTxsInRB = 4
 maxTxRefsInEB = 8
-maxTxsFetched = 4
+maxTxsFetched = 1
 
 fetchingEB :: DQ
 fetchingEB = choices [(1, blendedDelay B512), (1, blendedDelay B1024), (1, blendedDelay B2048)] -- TODO: Model FFD
@@ -88,18 +93,6 @@ fetchingTxs =
   let b = doAll (replicate maxTxsFetched (fetchingTx 1.0))
    in b -- TODO: in batches
         -- doSequentially (replicate 4 b)
-
-applyTx :: DQ
-applyTx = logNormalDQ 0 1 -- FIXME: concurrentUpToN maxTxRefsInEB reapplyTx
-
-reapplyTx :: DQ
-reapplyTx = logNormalDQ 0 1 -- FIXME: concurrentUpToN maxTxRefsInEB reapplyTx
-
-applyTxs :: DQ
-applyTxs = logNormalDQ 0 1 -- FIXME: concurrentUpToN maxTxRefsInEB reapplyTx
-
-reapplyTxs :: DQ
-reapplyTxs = logNormalDQ 0 1 -- FIXME: concurrentUpToN maxTxRefsInEB reapplyTx
 
 processRBandEB :: DQ
 processRBandEB = processRB ./\. processEB
