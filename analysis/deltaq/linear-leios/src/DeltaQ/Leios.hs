@@ -27,6 +27,7 @@ import DeltaQ (
   maybeFromEventually,
   wait,
  )
+import DeltaQ.Distributions (logNormalDQ)
 import DeltaQ.Praos (
   BlockSize (..),
   blendedDelay,
@@ -42,6 +43,7 @@ maxTxsFetched = 2
 fetchingEB :: DQ
 fetchingEB = blendedDelay B2048 -- TODO: Model FFD
 
+{-
 doAll :: [DQ] -> DQ
 doAll = foldr (./\.) (wait 0)
 
@@ -49,12 +51,13 @@ concurrentUpToN :: Integer -> DQ -> DQ
 concurrentUpToN n dq = choices $ map f [1 .. fromInteger n]
  where
   f i = (1.0 / fromIntegral n, doAll (replicate i dq))
+-}
 
 fetchingTx :: DQ
 fetchingTx = blendedDelay B256 -- TODO: Tx size
 
 fetchingTxs :: DQ
-fetchingTxs = concurrentUpToN maxTxsFetched fetchingTx -- TODO: Model Tx Cache
+fetchingTxs = logNormalDQ 0 1 -- FIXME: Model Tx Cache
 
 processRBandEB :: DQ -> DQ
 processRBandEB applyTxs = processRB ./\. processEB
@@ -66,8 +69,8 @@ processRBandEB applyTxs = processRB ./\. processEB
 validateEB :: DQ -> DQ -> DQ
 validateEB applyTx reapplyTx = processRBandEB applyTxs .>>. reapplyTxs
  where
-  applyTxs = concurrentUpToN maxTxsInRB applyTx
-  reapplyTxs = concurrentUpToN maxTxRefsInEB reapplyTx
+  applyTxs = logNormalDQ 0 1 -- FIXME: concurrentUpToN maxTxsInRB applyTx
+  reapplyTxs = logNormalDQ 0 1 -- FIXME: concurrentUpToN maxTxRefsInEB reapplyTx
 
 -- | Estimate for the parameter \(L_\text{vote}\) using 'validateEB'
 lVoteEstimated :: DQ -> DQ -> Maybe Integer
