@@ -28,7 +28,11 @@ The published [Leios CIP](https://github.com/cardano-foundation/CIPs/pull/1078) 
 -   Transaction structures remain familiar, supporting ecosystem compatibility
 -   Deployment is realistic within 1–1.5 years, compared with 2.5–3 years for higher-concurrency alternatives.
 
-![](https://ucarecdn.com/d2f45ccc-5bcf-42b0-a4f2-1ac01d7d7d64/)
+<img
+  src="/img/research-graphic.svg"
+  alt="From research to reality graphic"
+  style={{ display: "block", margin: "0 auto", maxWidth: "100%", height: "auto" }}
+/>
 
 By situating Leios within the context of Praos and Peras and outlining these strategic trade-offs, it becomes clear that Leios is a deliberate step toward scaling Cardano without compromising its security, decentralization, or ecosystem usability.
 
@@ -40,6 +44,8 @@ To ensure data availability and correctness, EBs undergo [committee validation](
 
 EB inclusion is opportunistic rather than guaranteed, depending on the random timing of block production relative to the certification process. This approach preserves the existing Praos chain structure while adding substantial transaction capacity through the secondary validation pathway.
 
-![](https://ucarecdn.com/ae403693-2f59-48d5-a795-390d073fb9cb/)
-
-Protocol timing showing the sequential process from RB announcement through EB validation to certificate inclusion. Key parameters: [Lhdr](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#l-hdr) ([header diffusion](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#equivocation-detection)), [Lvote](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#l-vote) ([voting period](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#voting-period)), [Ldiff](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#l-diff) ([diffusion period](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#diffusion-period)).
+<img
+  src="/img/how-leios-works-graphic.svg"
+  alt="How Leios works protocol timing graphic"
+  style={{ display: "block", margin: "0 auto", maxWidth: "100%", height: "auto" }}
+/>
