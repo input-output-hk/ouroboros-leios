@@ -2,6 +2,12 @@
 
 During the April 2025 status meeting, Input Output presented preliminary cost estimates for operating nodes under the proposed Leios protocol. The following section summarizes those estimates in a structured manner, compares expected operating costs under Leios with those of the current Ouroboros Praos protocol, and outlines indicative transaction-fee revenue assumptions.
 
+:::note
+
+The information in this section reflects the April 2025 analysis and may be out of date. Please refer to the [Leios CIP](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md) for the most recent details.
+
+:::
+
 ## Why does it matter?
 
 Under the current Ouroboros Praos protocol, the network produces one block approximately every 20 seconds, resulting in an average throughput of around 3.5 TPS for typical transaction sizes. Leios introduces additional block types, including input blocks (IBs), which decouple transaction dissemination from final ordering. This design aims to support substantially higher throughput, potentially reaching hundreds or thousands of TPS, depending on configuration and network conditions. If realized in practice, this increase in capacity would provide greater headroom for decentralized applications and broader ecosystem growth, while maintaining the underlying security model of Cardano’s consensus layer.

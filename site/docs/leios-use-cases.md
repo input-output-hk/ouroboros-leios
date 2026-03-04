@@ -1,4 +1,4 @@
-# Use cases powered by Ouroboros Leios
+# Use cases
 
 Leios aims to increase throughput from approximately 5-10 transactions per second (TPS) to around 100 TPS, with a longer-term target of 1,000 TPS or more, subject to validation and parameter selection. This projected increase in capacity, combined with Cardano’s emphasis on security, predictable fees, and a distributed network of approximately 3,000 stake pools, would expand the range of feasible use cases. The following sections outline five areas where higher throughput could have a meaningful impact.
 

@@ -11,22 +11,11 @@ import type { SidebarsConfig } from "@docusaurus/plugin-content-docs";
  Create as many sidebars as you want.
  */
 const sidebars: SidebarsConfig = {
-  documentationSidebar: ["roadmap", "strategy", "resources", "faq", "glossary"],
+  documentationSidebar: ["what-is-leios", "leios-use-cases", "roadmap", "resources", "development/monthly-reviews", "faq", "glossary"],
   developmentSidebar: [
-    "development/monthly-reviews",
-    {
-      type: "link",
-      href: "https://leios.cardano-scaling.org/leios-design.pdf",
-      label: "Technical Design",
-    },
-    {
-      type: "link",
-      href: "https://leios.cardano-scaling.org/visualizer",
-      label: "Visualizer",
-    },
     {
       type: "category",
-      label: "Research and Development",
+      label: "Research and development",
       items: [
         "development/overview",
         "development/throughput-simulation",
