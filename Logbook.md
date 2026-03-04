@@ -6,6 +6,25 @@
 > 
 > See also the [Post-CIP R&D Findings](post-cip/README.md) document for additional (after 2025-11-01) findings and artifacts not directly related to the implementation of Linear Leios.
 
+## 2026-03-01
+
+### SN on threadnet test suite
+
+- Created Leios ThreadNet test suite that uses io-sim's traceM to capture and assert behavior using contra-tracer messages.
+- After a few test runs, I encountered an interesting seed where one of the threads crashes and provides me with a seed to reproduce:
+
+```
+    :main -p Leios --quickcheck-replay "(SMGen 15344034192415298418 16568234585262675843,60)"
+    cardano
+      Leios ThreadNet
+        EB production: FAIL (5.51s)
+          *** Failed! Exception: 'FailureException (ExceptionInLinkedThread "ThreadId [5]" (MiniProtocolFatalException {mpfeType = TxSubmissionProtocolError, mpfeExn = ProtocolErrorRequestedUnavailableTx, mpfeClient = CoreNodeId 0, mpfeServer = CoreNodeId 2}))' (after 1 test):
+          Seed 6871614696739348899
+          Use --quickcheck-replay="(SMGen 15344034192415298418 16568234585262675843,60)" to reprodu
+```
+
+- I want to access that particular node's traces easily to debug this. The current `traceOfType` interface does not allow that and I wanted to make it less "magic" anyways.
+
 ## 2026-02-18
 
 ### SN on fixing nested sqlite transactions
