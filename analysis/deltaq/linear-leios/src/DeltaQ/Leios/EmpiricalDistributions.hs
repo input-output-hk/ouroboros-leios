@@ -74,8 +74,10 @@ reapplyTx =
 -- numbers in the csv file:
 --
 -- \(\mu = 10.59939845, \sigma = 25.48883812\)
+--
+-- Assuming 100 transactions
 applyTxs :: DQ
-applyTxs = normalDQ 0.01059939845 0.02548883812
+applyTxs = normalDQ (100 * 0.01059939845) (10 * 0.02548883812)
 
 -- | reapply
 --
@@ -84,5 +86,7 @@ applyTxs = normalDQ 0.01059939845 0.02548883812
 -- numbers in the csv file:
 --
 -- \(\mu = 2.711165479, \sigma = 24.41685076\)
+--
+-- Assuming 625 transactions
 reapplyTxs :: DQ
-reapplyTxs = normalDQ 0.002711165479 0.02441685076
+reapplyTxs = normalDQ (625 * 0.002711165479) (25 * 0.02441685076)
