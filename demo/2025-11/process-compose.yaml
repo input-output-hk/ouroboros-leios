@@ -36,7 +36,6 @@ processes:
       UPSTREAM_NODE_DIR="${UPSTREAM_NODE_DIR}" \
       REF_SLOT="${REF_SLOT}" \
       ONSET_OF_REF_SLOT="${ONSET_OF_REF_SLOT}" \
-      PORT_UPSTREAM_NODE="${PORT_UPSTREAM_NODE}" \
       ip netns exec leios-experiment:upstream bash -c "env PATH="$PATH" ${SOURCE_DIR}/scripts/upstream-node.sh"
     log_location: "${WORKING_DIR}/upstream-node.log"
     depends_on:
@@ -50,7 +49,6 @@ processes:
     command: |
       NODE0_DIR="${NODE0_DIR}" \
       DATA_DIR="${DATA_DIR}" \
-      PORT_UPSTREAM_NODE="${PORT_UPSTREAM_NODE}" \
       IP_UPSTREAM_NODE="${IP_UPSTREAM_NODE}" \
       bash "${SOURCE_DIR}/scripts/prepare-node0.sh"
     depends_on:
@@ -63,7 +61,6 @@ processes:
     is_elevated: true
     command: |
       NODE0_DIR="${NODE0_DIR}" \
-      PORT_NODE0="${PORT_NODE0}" \
       ip netns exec leios-experiment:node0 bash -c "env PATH="$PATH" ${SOURCE_DIR}/scripts/node0.sh"
     log_location: "${WORKING_DIR}/node0.log"
     depends_on:
@@ -77,7 +74,6 @@ processes:
     command: |
       DOWNSTREAM_NODE_DIR="${DOWNSTREAM_NODE_DIR}" \
       DATA_DIR="${DATA_DIR}" \
-      PORT_NODE0="${PORT_NODE0}" \
       IP_NODE0="${IP_NODE0}" \
       bash "${SOURCE_DIR}/scripts/prepare-downstream-node.sh"
     depends_on:
@@ -102,9 +98,8 @@ processes:
   SSOnUpstreamNode:
     is_elevated: true
     command: |
+      IP_NODE0="${IP_NODE0}" \
       IP_UPSTREAM_NODE="${IP_UPSTREAM_NODE}" \
-      PORT_UPSTREAM_NODE="${PORT_UPSTREAM_NODE}" \
-      PORT_NODE0="${PORT_NODE0}" \
       ip netns exec leios-experiment:upstream bash "${SOURCE_DIR}/scripts/ss-on-upstream.sh"
     depends_on:
       UpstreamNode:
@@ -115,10 +110,9 @@ processes:
   SSOnNode0:
     is_elevated: true
     command: |
+      IP_UPSTREAM_NODE="${IP_UPSTREAM_NODE}" \
+      IP_DOWNSTREAM_NODE="${IP_DOWNSTREAM_NODE}" \
       IP_NODE0="${IP_NODE0}" \
-      PORT_NODE0="${PORT_NODE0}" \
-      PORT_UPSTREAM_NODE="${PORT_UPSTREAM_NODE}" \
-      PORT_DOWNSTREAM_NODE="${PORT_DOWNSTREAM_NODE}" \
       ip netns exec leios-experiment:node0 bash "${SOURCE_DIR}/scripts/ss-on-node0.sh"
     depends_on:
       Node0:
@@ -129,9 +123,8 @@ processes:
   SSOnDownstreamNode:
     is_elevated: true
     command: |
+      IP_NODE0="${IP_NODE0}" \
       IP_DOWNSTREAM_NODE="${IP_DOWNSTREAM_NODE}" \
-      PORT_NODE0="${PORT_NODE0}" \
-      PORT_DOWNSTREAM_NODE="${PORT_DOWNSTREAM_NODE}" \
       ip netns exec leios-experiment:downstream bash "${SOURCE_DIR}/scripts/ss-on-downstream.sh"
     depends_on:
       DownstreamNode:
