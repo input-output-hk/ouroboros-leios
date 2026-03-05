@@ -91,11 +91,22 @@ fetchingTx p =
     hitRate :: Rational
     hitRate = toRational $ 2 * p / (2 + p)
 
+-- | fetchingTxs
+--
+-- Geometric Batch Size Model
 fetchingTxs :: DQ
 fetchingTxs =
-  let b = doAll (replicate maxTxsFetched (fetchingTx 1.0))
-   in b -- TODO: in batches
-        -- doSequentially (replicate 4 b)
+  choices
+    [ (hitRate, wait 0.001)
+    , (1 - hitRate, blendedDelay B1024)
+    ]
+  where
+    π_1 = (2 -p) / (2 + p)
+    π_2 = 2 * p / (2 + p)
+    p = 1.0
+
+    hitRate :: Rational
+    hitRate = π_2 * p + π_1 * (1 - p)
 
 processRBandEB :: DQ
 processRBandEB = processRB ./\. processEB
