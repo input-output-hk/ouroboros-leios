@@ -39,15 +39,15 @@ if [ "$TC" = "1" ]; then
   : "${IP_NODE0:=10.0.0.2}"
   : "${IP_DOWNSTREAM_NODE:=10.0.0.3}"
 
-  # Traffic control settings
-  : "${RATE_UP_TO_N0:=10Mbps}"
-  : "${DELAY_UP_TO_N0:=200ms}"
-  : "${RATE_N0_TO_UP:=10Mbps}"
-  : "${DELAY_N0_TO_UP:=200ms}"
-  : "${RATE_N0_TO_DOWN:=10Mbps}"
-  : "${DELAY_N0_TO_DOWN:=200ms}"
-  : "${RATE_DOWN_TO_N0:=10Mbps}"
-  : "${DELAY_DOWN_TO_N0:=200ms}"
+# Traffic control settings
+: "${RATE_UP_TO_N0:=10mbit}"
+: "${DELAY_UP_TO_N0:=200}"
+: "${RATE_N0_TO_UP:=10mbit}"
+: "${DELAY_N0_TO_UP:=200}"
+: "${RATE_N0_TO_DOWN:=10mbit}"
+: "${DELAY_N0_TO_DOWN:=200}"
+: "${RATE_DOWN_TO_N0:=10mbit}"
+: "${DELAY_DOWN_TO_N0:=200}"
 else
   # Each node on its own loopback IP — cardano-node uses host-addr as
   # the source IP for outbound sockets, so sharing 127.0.0.1 would
@@ -122,6 +122,7 @@ echo "Starting burst demo with process-compose..."
 echo "  WORKING_DIR: $WORKING_DIR"
 echo "  CLUSTER_RUN: $CLUSTER_RUN"
 echo "  REF_SLOT: $REF_SLOT"
+echo "  Traffic control: ${RATE_UP_TO_N0} / ${DELAY_UP_TO_N0}ms"
 if [ "$TC" = "1" ]; then
   echo "  Traffic control: enabled TC=${TC} (${RATE_UP_TO_N0} / ${DELAY_UP_TO_N0})"
   PC_FILE="process-compose.yaml"
