@@ -231,13 +231,22 @@ export interface Config {
   "eb-referenced-txs-max-size-bytes": bigint;
 
   // Vote Configuration
-  "vote-generation-probability": number;
-  "vote-generation-cpu-time-ms-constant": number;
+  "persistent-vote-generation-probability": number;
+  "non-persistent-vote-generation-probability": number;
+  "persistent-vote-generation-cpu-time-ms": number;
+  "non-persistent-vote-generation-cpu-time-ms": number;
   "vote-generation-cpu-time-ms-per-ib": number;
   "vote-generation-cpu-time-ms-per-tx": number;
-  "vote-validation-cpu-time-ms": number;
+  "persistent-vote-validation-cpu-time-ms": number;
+  "non-persistent-vote-validation-cpu-time-ms": number;
   "vote-threshold": bigint;
   "vote-bundle-size-bytes-constant": bigint;
+  "persistent-vote-bundle-size-bytes-per-eb": bigint;
+  "non-persistent-vote-bundle-size-bytes-per-eb": bigint;
+  // Grandfathered for Haskell sim.
+  "vote-generation-probability": number;
+  "vote-generation-cpu-time-ms-constant": number;
+  "vote-validation-cpu-time-ms": number;
   "vote-bundle-size-bytes-per-eb": bigint;
   /** Only supported by Haskell simulation. */
   "vote-diffusion-strategy": DiffusionStrategy;
