@@ -1,3 +1,3 @@
 set -exuo pipefail
 
-ss_http_exporter "$IP_DOWNSTREAM_NODE" 9100 "( sport = $PORT_NODE0 and dport = $PORT_DOWNSTREAM_NODE ) or ( sport = $PORT_DOWNSTREAM_NODE and dport = $PORT_NODE0 )"
+ss_http_exporter "$IP_DOWNSTREAM_NODE" 9100 "( dst = $IP_NODE0 )"
