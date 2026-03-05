@@ -7,4 +7,4 @@ cardano-node run \
   --topology "topology.json" \
   --database-path "db" \
   --socket-path "socket" \
-  --host-addr 0.0.0.0 --port "$PORT_NODE0"
+  --host-addr 0.0.0.0 --port 3001
