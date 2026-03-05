@@ -2,6 +2,7 @@
 module DeltaQ.Distributions (
   measuredDQ,
   expDQ,
+  normalDQ,
   logNormalDQ,
 ) where
 
@@ -9,6 +10,7 @@ import DeltaQ
 
 import qualified Statistics.Distribution as S
 import qualified Statistics.Distribution.Exponential as S
+import qualified Statistics.Distribution.Normal as S
 import qualified Statistics.Distribution.Lognormal as S
 
 type Measurements = [(Rational, Rational)]
@@ -44,9 +46,13 @@ distDQ dist =
   numberSteps = 10.0
 
 -- DQ for log-normal distribution
-logNormalDQ :: Rational -> Rational -> DQ
-logNormalDQ μ σ = distDQ $ S.lognormalDistr (fromRational μ) (fromRational σ)
+normalDQ :: Double -> Double -> DQ
+normalDQ μ σ = distDQ $ S.normalDistr μ σ
+
+-- DQ for log-normal distribution
+logNormalDQ :: Double -> Double -> DQ
+logNormalDQ μ σ = distDQ $ S.lognormalDistr μ σ
 
 -- DQ for exponential distribution
-expDQ :: Rational -> DQ
-expDQ = distDQ . S.exponential . fromRational
+expDQ :: Double -> DQ
+expDQ = distDQ . S.exponential

@@ -20,9 +20,6 @@ module DeltaQ.Leios (
   pHeaderOnTime,
   pEBOnTime,
 
-  -- * DQs
-  applyTx,
-  reapplyTx,
 ) where
 
 import DeltaQ (
@@ -34,11 +31,8 @@ import DeltaQ (
   maybeFromEventually,
   wait,
  )
-import DeltaQ.Common (doAll, doSequentially)
 import DeltaQ.Leios.EmpiricalDistributions (
-  applyTx,
   applyTxs,
-  reapplyTx,
   reapplyTxs,
  )
 import DeltaQ.Praos (

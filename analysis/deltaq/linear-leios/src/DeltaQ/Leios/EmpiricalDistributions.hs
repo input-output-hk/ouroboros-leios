@@ -8,8 +8,8 @@ module DeltaQ.Leios.EmpiricalDistributions (
 ) where
 
 import Data.List (sort)
-import DeltaQ (DQ, choices)
-import DeltaQ.Distributions (logNormalDQ, measuredDQ)
+import DeltaQ (DQ)
+import DeltaQ.Distributions (normalDQ, measuredDQ)
 
 -- | 'empiricalDQ'
 empiricalDQ :: [Rational] -> DQ
@@ -38,9 +38,9 @@ applyTx :: DQ
 applyTx =
   measuredDQ
     [ (28.20, 0.005)
-    , (37.32, 0.01)
-    , (26.68, 0.02)
-    , (7.80, 0.03)
+    , (65.52, 0.01)
+    , (92.20, 0.02)
+    , (100, 0.03)
     ]
 
 -- | reapplyTx
@@ -62,13 +62,27 @@ reapplyTx :: DQ
 reapplyTx =
   measuredDQ
     [ (41.85, 0.001)
-    , (48.99, 0.003)
-    , (7.98, 0.01)
-    , (1.17, 0.02)
+    , (90.84, 0.003)
+    , (98.82, 0.01)
+    , (100, 0.02)
     ]
 
+-- | applyTx
+--
+-- We make use of the central limit theorem.
+-- Mean and standard derivation of the corresponding
+-- numbers in the csv file:
+--
+-- \(\mu = 10.59939845, \sigma = 25.48883812\)
 applyTxs :: DQ
-applyTxs = logNormalDQ 0 1 -- FIXME: concurrentUpToN maxTxRefsInEB reapplyTx
+applyTxs = normalDQ 0.01059939845 0.02548883812
 
+-- | reapply
+--
+-- We make use of the central limit theorem
+-- Mean and standard derivation of the corresponding
+-- numbers in the csv file:
+--
+-- \(\mu = 2.711165479, \sigma = 24.41685076\)
 reapplyTxs :: DQ
-reapplyTxs = logNormalDQ 0 1 -- FIXME: concurrentUpToN maxTxRefsInEB reapplyTx
+reapplyTxs = normalDQ 0.002711165479 0.02441685076
