@@ -37,7 +37,7 @@ processes:
       REF_SLOT="${REF_SLOT}" \
       ONSET_OF_REF_SLOT="${ONSET_OF_REF_SLOT}" \
       PORT_UPSTREAM_NODE="${PORT_UPSTREAM_NODE}" \
-      ip netns exec leios-experiment:upstream bash "${SOURCE_DIR}/scripts/upstream-node.sh"
+      ip netns exec leios-experiment:upstream bash -c "env PATH="$PATH" ${SOURCE_DIR}/scripts/upstream-node.sh"
     log_location: "${WORKING_DIR}/upstream-node.log"
     depends_on:
       PrepareUpstreamNode:
@@ -64,7 +64,7 @@ processes:
     command: |
       NODE0_DIR="${NODE0_DIR}" \
       PORT_NODE0="${PORT_NODE0}" \
-      ip netns exec leios-experiment:node0 bash "${SOURCE_DIR}/scripts/node0.sh"
+      ip netns exec leios-experiment:node0 bash -c "env PATH="$PATH" ${SOURCE_DIR}/scripts/node0.sh"
     log_location: "${WORKING_DIR}/node0.log"
     depends_on:
       PrepareNode0:
@@ -91,7 +91,7 @@ processes:
     command: |
       DOWNSTREAM_NODE_DIR="${DOWNSTREAM_NODE_DIR}" \
       PORT_DOWNSTREAM_NODE="${PORT_DOWNSTREAM_NODE}" \
-      ip netns exec leios-experiment:downstream bash "${SOURCE_DIR}/scripts/downstream-node.sh"
+      ip netns exec leios-experiment:downstream bash -c "env PATH="$PATH" ${SOURCE_DIR}/scripts/downstream-node.sh"
     log_location: "${WORKING_DIR}/downstream-node.log"
     depends_on:
       PrepareDownstreamNode:
