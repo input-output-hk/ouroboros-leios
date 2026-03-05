@@ -30,14 +30,14 @@ set -a
 : "${IP_DOWNSTREAM_NODE:=10.0.0.3}"
 
 # Traffic control settings
-: "${RATE_UP_TO_N0:=10Mbps}"
-: "${DELAY_UP_TO_N0:=200ms}"
-: "${RATE_N0_TO_UP:=10Mbps}"
-: "${DELAY_N0_TO_UP:=200ms}"
-: "${RATE_N0_TO_DOWN:=10Mbps}"
-: "${DELAY_N0_TO_DOWN:=200ms}"
-: "${RATE_DOWN_TO_N0:=10Mbps}"
-: "${DELAY_DOWN_TO_N0:=200ms}"
+: "${RATE_UP_TO_N0:=10mbit}"
+: "${DELAY_UP_TO_N0:=200}"
+: "${RATE_N0_TO_UP:=10mbit}"
+: "${DELAY_N0_TO_UP:=200}"
+: "${RATE_N0_TO_DOWN:=10mbit}"
+: "${DELAY_N0_TO_DOWN:=200}"
+: "${RATE_DOWN_TO_N0:=10mbit}"
+: "${DELAY_DOWN_TO_N0:=200}"
 set +a
 
 # Check for required commands
@@ -104,6 +104,6 @@ echo "Starting burst demo with process-compose..."
 echo "  WORKING_DIR: $WORKING_DIR"
 echo "  CLUSTER_RUN: $CLUSTER_RUN"
 echo "  REF_SLOT: $REF_SLOT"
-echo "  Traffic control: ${RATE_UP_TO_N0} / ${DELAY_UP_TO_N0}"
+echo "  Traffic control: ${RATE_UP_TO_N0} / ${DELAY_UP_TO_N0}ms"
 
 process-compose --no-server -f "${SOURCE_DIR}/process-compose.yaml"

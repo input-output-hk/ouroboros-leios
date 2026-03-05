@@ -114,14 +114,14 @@ You can customize the demo by setting environment variables before running. See 
 
 ```shell
 # Network simulation parameters
-export RATE_UP_TO_N0="100Mbps"
-export DELAY_UP_TO_N0="20ms"
-export RATE_N0_TO_UP="100Mbps"
-export DELAY_N0_TO_UP="20ms"
-export RATE_N0_TO_DOWN="100Mbps"
-export DELAY_N0_TO_DOWN="20ms"
-export RATE_DOWN_TO_N0="100Mbps"
-export DELAY_DOWN_TO_N0="20ms"
+export RATE_UP_TO_N0="10mbit"
+export DELAY_UP_TO_N0="200"
+export RATE_N0_TO_UP="10mbit"
+export DELAY_N0_TO_UP="200"
+export RATE_N0_TO_DOWN="10mbit"
+export DELAY_N0_TO_DOWN="200"
+export RATE_DOWN_TO_N0="10mbit"
+export DELAY_DOWN_TO_N0="200"
 
 # Timing
 export REF_SLOT=41
