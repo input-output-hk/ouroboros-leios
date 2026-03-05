@@ -2,13 +2,12 @@
 
 set -eo pipefail
 
-TX_DURATION=1200
-TX_DURATION=60
+TX_DURATION=300
 TX_SIZE=1500
-TX_RATE=3
+TX_RATE=6
 TX_COUNT=$((TX_RATE * TX_DURATION))
 TX_LOAD=$((TX_RATE * TX_SIZE / 1000))
-SLOTS=$((TX_DURATION + 120))
+SLOTS=$((TX_DURATION + 60))
 
 truncate -s 0 jobs-adversaries.list
 
