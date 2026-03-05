@@ -15,6 +15,7 @@ import Data.Csv (DefaultOrdered (..), FromNamedRecord (..), ToNamedRecord (..), 
 import Data.Ratio ((%))
 import DeltaQ
 import DeltaQ.Leios
+import DeltaQ.Leios.EmpiricalDistributions
 import DeltaQ.Praos
 import GHC.Generics
 import Graphics.Rendering.Chart.Backend.Cairo
