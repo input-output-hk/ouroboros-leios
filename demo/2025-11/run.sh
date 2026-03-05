@@ -30,14 +30,14 @@ set -a
 : "${IP_DOWNSTREAM_NODE:=10.0.0.3}"
 
 # Traffic control settings
-: "${RATE_UP_TO_N0:=10Mbps}"
-: "${DELAY_UP_TO_N0:=200ms}"
-: "${RATE_N0_TO_UP:=10Mbps}"
-: "${DELAY_N0_TO_UP:=200ms}"
-: "${RATE_N0_TO_DOWN:=10Mbps}"
-: "${DELAY_N0_TO_DOWN:=200ms}"
-: "${RATE_DOWN_TO_N0:=10Mbps}"
-: "${DELAY_DOWN_TO_N0:=200ms}"
+: "${RATE_UP_TO_N0:=10mbit}"
+: "${DELAY_UP_TO_N0:=100ms}"
+: "${RATE_N0_TO_UP:=10mbit}"
+: "${DELAY_N0_TO_UP:=100ms}"
+: "${RATE_N0_TO_DOWN:=10mbit}"
+: "${DELAY_N0_TO_DOWN:=100ms}"
+: "${RATE_DOWN_TO_N0:=10mbit}"
+: "${DELAY_DOWN_TO_N0:=100ms}"
 set +a
 
 # Check for required commands
