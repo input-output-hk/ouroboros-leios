@@ -48,6 +48,15 @@ Others arise from resource usage that was more concrete than the scope of the in
 - All of the above must be satsified even during "worst-case" scenarios (eg very dense leader schedules) including a barely-tolerable adversary, up to some small failure probability; something like 10^-200 would be comfortable.
 - Don't introduce an unbearable maintenance burden.
 
+Because an analogous document does not yet exist for LeiosNotify, it's helpful to list some requirements that LeiosFetch does not have, because LeiosNotify will handle them.
+
+- LeiosNotify will decide which EBs are worth acquiring.
+  In particular, it suppresses all but the first EB among equivocating EBs.
+  (It also knows to not ignore EBs just because they're from a chain that is not _yet_ the local node's selection.)
+- Thus, LeiosFetch will simply acquire whichever EBs that LeiosNotify tells it about.
+- TODO as a later optimization, LeiosNotify could signal to LeiosFetch to stop acquiring some EB (if an equivocating EbAnnouncement arrives very soon after the first).
+  But the worst-case load doesn't involve such cancellations, so they're not necessary for an MVP.
+
 ## Diagram
 
 This diagram is a useful map to consult to undertand the components of the design specified below.
