@@ -395,6 +395,7 @@ This workstream can continue in March 2026 by progressing on the following front
   Some benchmarks as well, including some load scenarios comparable to the worst-case cardinalities.
 - Finalizing the details of the storage manager will require the assessment of various trade-offs.
     - Is the bespoke in-memory/on-disk WipEB caching framed above too much of a maintenance burden as-is?
+        - In other words, how much simplification would be gained from an embedded database?
     - Would it be sufficiently performant as-is, even in the worst-case loads?
       Are there simplifications that would still be sufficiently performant?
     - How much performance improvement could come with an embedded database?
