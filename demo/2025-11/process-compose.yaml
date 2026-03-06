@@ -43,6 +43,8 @@ processes:
     depends_on:
       PrepareUpstreamNode:
         condition: process_completed_successfully
+      Upstreampcap:
+        condition: process_started
     availability:
       restart: "always"
 
@@ -69,6 +71,8 @@ processes:
     depends_on:
       PrepareNode0:
         condition: process_completed_successfully
+      Node0pcap:
+        condition: process_started
     availability:
       restart: "always"
 
@@ -96,8 +100,37 @@ processes:
     depends_on:
       PrepareDownstreamNode:
         condition: process_completed_successfully
+      Downstreampcap:
+        condition: process_started
     availability:
       restart: "always"
+
+  Node0pcap:
+    is_elevated: true
+    command: |
+      ip netns exec leios-experiment:node0 env PATH=$PATH \
+      tcpdump -w "${WORKING_DIR}/node_0.pcap" -s 0
+    depends_on:
+      InitNamespaces:
+        condition: process_completed_successfully
+
+  Upstreampcap:
+    is_elevated: true
+    command: |
+      ip netns exec leios-experiment:upstream env PATH=$PATH \
+      tcpdump -w "${WORKING_DIR}/upstream.pcap" -s 0
+    depends_on:
+      InitNamespaces:
+        condition: process_completed_successfully
+
+  Downstreampcap:
+    is_elevated: true
+    command: |
+      ip netns exec leios-experiment:downstream env PATH=$PATH \
+      tcpdump -w "${WORKING_DIR}/downstream.pcap" -s 0
+    depends_on:
+      InitNamespaces:
+        condition: process_completed_successfully
 
   SSOnUpstreamNode:
     is_elevated: true
