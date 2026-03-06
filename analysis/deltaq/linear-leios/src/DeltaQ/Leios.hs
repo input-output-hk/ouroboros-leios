@@ -86,6 +86,9 @@ fetchingTx p =
 -- | fetchingTxs
 --
 -- Batch processing of transactions
+--
+-- We consider batches of transactions to be looked up in the cache simultaniously.
+-- The hit-rate then becomes: \(r = \pi_1 \times (1-p) + \pi_2 \times p\)
 fetchingTxs :: DQ
 fetchingTxs =
   choices
