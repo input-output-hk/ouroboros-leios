@@ -53,9 +53,11 @@ Others arise from resource usage that was more concrete than the scope of the in
 This diagram is a useful map to consult to undertand the components of the design specified below.
 
 - Every arrow in this diagram represents flow of some transaction's bytes.
-- The thread that is actually making the LeiosFetch decisions is not shown; its job is to orchestrate everything shown.
-- It has sole ownership of the memory elements that have no connecting edges.
-- It uses message passing to coordindate all the other threads.
+- The central decision logic's thread is shown here because it reads from the Mempool.
+- It has crucial other activites, not shown as edges in this diagram for the sake of legibility.
+  But none of those include directly reading or writing transactions.
+    - It orchestrates all the other threads.
+    - It solely maintains the memory elements shown in this diagram that have no connecting edges.
 
 ```mermaid
 flowchart TD
