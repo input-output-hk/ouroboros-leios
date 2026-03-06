@@ -28,6 +28,8 @@ export interface EndorserBlock {
   clock: number;
   txRefs: number[];        // indices into global tx array
   size_B: number;
+  honestCount: number;
+  adversarialCount: number;
   certified: boolean;
 }
 

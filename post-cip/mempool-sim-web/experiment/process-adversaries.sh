@@ -4,7 +4,7 @@ set -eo pipefail
 
 (
 
-echo $'Adversarial nodes\tBlock ID\tTxs\tHonest txs\tAdversarial txs'
+echo $'Adversarial nodes\tType\tID\tTxs\tHonest txs\tAdversarial txs'
 for f in adversaries-*.jsonl.gz
 do
   zcat $f \
@@ -12,7 +12,14 @@ do
     .[0].adversaries as $adversaries
   | .[]
   | select(.msg == "block produced")
-  | [$adversaries, .blockId, .txCount, .honestCount, .adversarialCount]
+  | (
+      [$adversaries, "RB", .blockId, .txCount, .honestCount, .adversarialCount],
+      (
+        .certifiedEB as $eb
+        | select($eb != null)
+        | [$adversaries, "EB", $eb.ebId, (($eb.txRefs // []) | length), $eb.honestCount, $eb.adversarialCount]
+      )
+    )
   | @tsv
 '
 done
