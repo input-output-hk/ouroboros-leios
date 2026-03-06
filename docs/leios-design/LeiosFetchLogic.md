@@ -9,8 +9,8 @@ If a different space-time trade-off is subsequently determined to be favorable, 
 
 This design involves some details that would preferable be left abstract, such as the explicit management of in-memory copies of on-disk data.
 That obligation and possibly others would be much more convenient to offload to an embedded database such as SQLite.
-However, a baseline design that handles the lower-level details is the first step to assessing whether features such as SQLite's page cache is indeed compatible with our resource utilization requirements
-Performance-focused general features like that page cache often prioritize the average-case over the worst-case.
+However, a baseline design that handles the lower-level details is the first step to assessing whether features such as SQLite's page cache is indeed compatible with our resource utilization requirements.
+Features focused on general-case performance like that page cache often prioritize the average-case over the worst-case.
 A later section in the document compares with SQLite specifically.
 
 ## Requirements
