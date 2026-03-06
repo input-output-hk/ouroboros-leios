@@ -42,13 +42,11 @@ import DeltaQ.Praos (
   sendRBHeader,
  )
 
-maxTxsInRB, maxTxRefsInEB, maxTxsFetched :: Int
-maxTxsInRB = 4
-maxTxRefsInEB = 8
-maxTxsFetched = 1
-
+-- | fetchingEB
+--
+-- TODO: Model FFD
 fetchingEB :: DQ
-fetchingEB = choices [(1, blendedDelay B512), (1, blendedDelay B1024), (1, blendedDelay B2048)] -- TODO: Model FFD
+fetchingEB = choices [(1, blendedDelay B512), (1, blendedDelay B1024), (1, blendedDelay B2048)]
 
 -- | fetchingTx
 --
@@ -87,7 +85,7 @@ fetchingTx p =
 
 -- | fetchingTxs
 --
--- Geometric Batch Size Model
+-- Batch processing of transactions
 fetchingTxs :: DQ
 fetchingTxs =
   choices
@@ -97,7 +95,7 @@ fetchingTxs =
  where
   π_1 = (2 - p) / (2 + p)
   π_2 = 2 * p / (2 + p)
-  p = 1.0
+  p = 0.75
 
   hitRate :: Rational
   hitRate = π_2 * p + π_1 * (1 - p)
