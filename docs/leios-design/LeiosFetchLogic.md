@@ -218,6 +218,9 @@ Each iteration involves the following steps; the InFlightMap and the TxCache are
               So if we could retain the EbBody part separately from retaining the WipEB, such peers wouldn't need to retain the WipEB any more.
               Maybe that EbBody field of the WipEB is a ByteArray on the Haskell heap and each peer simply has a reference to it?
               Recall that this field of the WipEB is immutable.)
+	    - (TODO also signal to the Leios voting logic that the EB is fully acquired?
+	       Should this happen whenever the next-leftmost tx of the EB arrives?
+	       How to balance that batching trade-off?)
         - If it's not retained by any peers:
             - If it's dirty, schedule it to be flushed to disk.
     - TODO also schedule "idle-timer" flushing of dirty EBs even while still retained?
