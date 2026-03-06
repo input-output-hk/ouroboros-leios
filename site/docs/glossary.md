@@ -4,169 +4,139 @@ sidebar_position: 5
 
 # Glossary
 
-- **50% disk compression**: A default estimate in Leios cost calculations that estimates storage savings through compression techniques.
+#### 50% disk compression
 
-- **Approximate Lower Bound Argument (ALBA)**: A cryptographic technique allowing a prover to succinctly demonstrate knowledge of a large dataset to a verifier, with a small approximation gap enabling efficient proof generation and verification. One of the proposed certificate schemes for Leios voting.
+A default assumption in Leios cost modelling that estimates storage savings through compression techniques.
 
-- **Blacklisting**: A mechanism in Leios mempool design where UTxOs appearing in certified endorser blocks are temporarily marked as unavailable to prevent double-spending until they are included in ranking blocks.
+#### Approximate Lower Bound Argument (ALBA)
 
-- **Blob Leios**: A variant of Leios that provides data availability without processing Cardano transactions, useful for applications like governance voting or bulletin boards.
+A cryptographic technique allowing a prover to succinctly demonstrate knowledge of a large dataset to a verifier. One of the proposed certificate schemes for Leios voting.
 
-- **Boneh-Lynn-Shacham (BLS)**: A cryptographic signature scheme that allows for efficient aggregation of signatures. Used in the proposed Leios voting and certificate system.
+#### Blacklisting
 
-- **Central processing unit (CPU) and cumulative distribution function (CDF) usage**: A performance metric that tracks CPU consumption across various simulation stages.
+A mempool mechanism where UTXOs appearing in certified endorser blocks are temporarily marked as unavailable to prevent double-spending until they are included in a ranking block.
 
-- **Certificate**: A cryptographic proof that attests to the validity of blocks or transactions. In Leios, certificates are created when a quorum of votes is reached for an endorser block and are included in ranking blocks.
+#### Boneh-Lynn-Shacham (BLS)
 
-- **Collateral marking**: A mechanism where UTxOs used as collateral are explicitly marked to ensure they cannot be transferred while serving as collateral for transaction conflict resolution.
+A cryptographic signature scheme that allows efficient aggregation of multiple signatures into one. Used in Leios for committee voting and certificate creation.
 
-- **Committee**: The set of stake pool operators selected as eligible voters for a particular Leios election, typically consisting of around 500 voters.
+#### Certificate
 
-- **Conformance events**: Standardized event outputs from Leios simulations used for testing and verification that implementations conform to protocol specifications.
+A compact cryptographic proof that a quorum of votes has been reached for an endorser block. Certificates are included in ranking blocks to provide finality.
 
-- **Decentralization parameter**: A measure of how distributed the control of the network is among its participants. Currently set to 500 on Cardano mainnet.
+#### Committee
 
-- **DeltaQ model**: A framework for analyzing and predicting network quality of service (QoS) used to assess delay, loss, and other performance factors in Leios simulations.
+The set of stake pool operators selected as eligible voters for a given Leios election (typically ~500 voters).
 
-- **Deterministic transactions**: A property of Cardano where transactions either succeed completely or have no effect on the ledger, unlike Ethereum where failed transactions still consume gas fees. Leios aims to preserve this property while enabling high throughput.
+#### DeltaQ model
 
-- **Diffusion strategy**: The method used to propagate blocks and votes through the network. Strategies include:
-  - Oldest-first strategy – prioritizes older blocks for diffusion.
-  - Freshest-first strategy – prioritizes newer blocks for diffusion.
-  - Peer-order strategy – requests blocks in the order they were announced by peers.
+A mathematical framework used in Leios simulations to analyse and predict real-world network behaviour (delay, loss, jitter).
 
-- **Diffusion time**: The time required for a block to propagate to all nodes in the network, typically around 5 seconds for Cardano.
+#### Deterministic transactions
 
-- **Election ID**: An 8-byte identifier used in Leios voting to uniquely identify a specific voting round, typically derived from the slot number.
+A core Cardano property preserved in Leios: transactions either succeed completely or have no effect on the ledger (no partial execution or wasted fees).
 
-- **Eligibility proof**: A cryptographic proof that demonstrates a node's right to participate in sortition for block production or voting, using VRF outputs and stake information.
+#### Diffusion strategy
 
-- **Endorser block (EB)**: A block that references one or more input blocks (IBs) and undergoes a voting process for certification. Produced by nodes that win the EB sortition lottery.
+The method used to propagate blocks and votes across the network. Supported strategies include:
 
-- **Epoch**: A fixed period in the blockchain during which specific processes or calculations are performed.
+-   Oldest-first
+-   Freshest-first
+-   Peer-order
 
-- **Equivocation**: The act of producing conflicting blocks or messages in a blockchain network.
+#### Election ID
 
-- **Executable specification**: A formally defined, executable model of a system that ensures an implementation conforms to its intended design.
+An 8-byte identifier used to uniquely identify a voting round (typically derived from the slot number).
 
-- **Fait accompli sortition**: A cryptographic selection process that creates a hybrid committee containing both deterministic persistent voters and randomly selected non-persistent voters, ensuring fairness and verifiability when choosing validators.
+#### Endorser block (EB)
 
-- **Freshest first**: A policy for prioritizing newer blocks or transactions over older ones.
+A block that references one or more input blocks and undergoes committee voting for certification. Produced approximately every five seconds.
 
-- **Frontrunning**: An attack vector in Leios where a stake pool operator delays input block production to observe other blocks in the same pipeline, potentially gaining information advantage. The opportunity is bounded by stage lengths (several seconds).
+#### Fait accompli sortition
 
-- **Full Leios**: The complete version of the Leios protocol that provides robust throughput guarantees by allowing endorser blocks to reference other endorser blocks, unlike Short Leios.
+The hybrid sortition mechanism used in Leios that combines deterministic persistent voters with randomly selected non-persistent voters for each election.
 
-- **Full Sharding**: A Leios ledger design approach where each input block is assigned a shard-id, UTxOs are labeled with shard-ids, and transactions can only spend UTxOs from the same shard, preventing conflicts but introducing inclusion delays.
+#### Freshest-first
 
-- **Haskell simulation**: A high-fidelity simulation of the Leios protocol in Haskell, used for latency measurement, event logging, and parameter tuning with detailed TCP implementation.
+A diffusion policy that prioritises newer blocks or transactions.
 
-- **Header diffusion time**: The specific time parameter for propagating block headers through the network, typically faster than full block diffusion.
+#### Linear Leios
 
-- **Input block (IB)**: A block that contains transactions and is produced by nodes that win the IB sortition lottery. The basic unit for transaction processing in Leios.
+The current production-oriented variant of Ouroboros Leios (CIP-0164). It retains the IB/EB/RB structure but simplifies the design for easier implementation, indexing, and deployment while maintaining high throughput.
 
-- **IB ordering**: The sequence in which input blocks are arranged within endorser blocks. Currently under specification, with proposals ranging from slot-ascending order to EB producer discretion, with implications for frontrunning prevention.
+#### Mempool snapshotting
 
-- **IB sharding**: A mechanism where input blocks are assigned to specific shards based on their VRF values, with parameters controlling shard period length and group count to manage transaction distribution.
+The process of capturing the current state of pending transactions for inclusion in an input block (~72 ms in current implementations).
 
-- **Late IB inclusion**: An extension to Full Leios that allows referencing input blocks from older pipelines that didn't have endorser blocks, significantly improving transaction inclusion rates.
+#### Mithril
 
-- **Latency**: The delay between the submission of a transaction and its confirmation on the blockchain.
+A stake-based threshold multisignature protocol that may be used for efficient voting and proof aggregation in Leios.
 
-- **Leios cost calculator**: An online tool that estimates the computational and financial costs of running Leios nodes, supporting both hyperscale and discount cloud providers.
+#### MUSEN
 
-- **Leios transaction lifecycle**: The complete journey of a transaction through the Leios protocol, from submission to final confirmation, typically involving seven stages from memory pool to ranking block inclusion.
+MUlti-Stage key-Evolving verifiable random fuNctions – one of the proposed certificate schemes for Leios voting.
 
-- **Leios-stage-active-voting-slots**: A parameter that configures the duration of active voting stages in the Leios protocol.
+#### One EB per RB
 
-- **Leios-vote-send-recv-stages**: A configuration setting that defines the voting stages in the Leios protocol, including the send and receive phases.
+Current design constraint in Linear Leios: each ranking block contains at most one endorsed endorser block, keeping the chain linear and simple.
 
-- **Local sortition**: A mechanism for selecting non-persistent voters for each election using VRF-based random selection, complementing the deterministic persistent voters from Fait Accompli sortition.
+#### Persistent / Non-persistent voters
 
-- **Lovelace**: The smallest unit of the Cardano cryptocurrency, named after Ada Lovelace.
+Persistent voters are selected deterministically for the entire epoch; non-persistent voters are chosen per election via local sortition.
 
-- **Max window size**: A diffusion protocol parameter that limits the number of blocks that can be requested or held in memory during block propagation.
+#### Pipeline
 
-- **Mempool snapshotting**: The process of capturing the current state of pending transactions for inclusion in a block, taking approximately 72ms in current Cardano implementations.
+A sequence of stages in Leios where input blocks, endorser blocks, and ranking blocks are produced and processed in parallel to maximise throughput.
 
-- **Miniprotocols**: The specific network communication protocols used for different types of block and vote diffusion in Leios, each optimized for particular message types.
+#### Praos
 
-- **Mithril**: A protocol for stake-based threshold multisignatures that could be used for voting and cryptographic proofs in the Leios framework.
+The current live version of Ouroboros (Ouroboros Praos) that Leios builds upon and extends.
 
-- **MUSEN**: MUlti-Stage key-Evolving verifiable random fuNctions - a cryptographic protocol that combines VRFs with key evolution and signature aggregation capabilities. One of the proposed certificate schemes for Leios.
+#### Quorum
 
-- **Non-persistent voters**: Voters selected through local sortition for individual elections, as opposed to persistent voters who participate in all elections during an epoch.
+The minimum number of votes required to certify an endorser block (typically 60% of the committee).
 
-- **One EB per RB**: The current design constraint that each ranking block contains at most one endorsement, simplifying the protocol structure while allowing recursive EBs to represent multiple input blocks.
+#### Ranking block (RB)
 
-- **Optimistic validation**: A mechanism that allows transactions to reference UTxOs from not-yet-settled blocks, with the caveat that fees must still be paid if the referenced transaction is not executed.
+The final anchoring block produced every ~20 seconds using Praos mechanics. It ranks endorsed blocks and provides the secure, linear chain.
 
-- **Organic topology generator**: A tool that creates network topologies based on real-world stake pool and relay connections to simulate actual network behavior.
+#### Send-recv voting
 
-- **Overcollateralization**: A strategy in Leios where transactions pay additional fees to compensate for potential conflicts and duplicates in the mempool, particularly relevant in shardless scenarios. One of the three main ledger design proposals.
+A two-stage voting mechanism (send phase followed by receive phase) used to improve vote propagation reliability.
 
-- **Persistent voters**: Voters selected deterministically through Fait Accompli sortition who participate in all elections during an epoch, reducing certificate size requirements.
+#### Sharding (input block sharding)
 
-- **Phase 1 validation**: The initial, computationally cheaper validation of a transaction that checks basic formatting and collateral availability before more expensive processing.
+Current Leios approach that assigns input blocks to shards via VRF-derived shard-ids to reduce conflicts. Full ledger sharding is not part of Linear Leios.
 
-- **Phase 2 validation**: The computationally expensive validation of a transaction including full script execution and ledger state updates.
+#### Sortition
 
-- **Pipeline**: A sequence of stages in the Leios protocol where different types of blocks are produced and processed in parallel to maximize throughput.
+The cryptographic process (using VRFs) for fairly selecting nodes to produce blocks or participate in voting based on stake.
 
-- **Praos**: The current version of the Ouroboros consensus protocol that Leios builds upon and extends.
+#### Spatial efficiency
 
-- **Proof of possession**: A cryptographic proof that demonstrates ownership of a private key corresponding to a registered public key, required for BLS key registration in Leios voting.
+The ratio of useful transaction data included in the ledger versus the total size of all blocks (IBs, EBs, RBs).
 
-- **Quorum**: The minimum number of votes required to certify an endorser block, typically set at 60% of the voting committee in Leios.
+#### Temporal efficiency
 
-- **Ranking block (RB)**: A Praos-style block that ranks and orders other blocks as part of the consensus mechanism. Contains certificates for endorsed blocks and maintains the main blockchain.
+The fraction of submitted transactions that successfully make it into the final ledger.
 
-- **Rational arithmetic**: A method used in Leios sortition to replace quad-precision floating-point calculations, improving precision and computational efficiency.
+#### Throughput
 
-- **Relay strategy**: The method used by nodes to forward blocks and votes through the network topology, affecting diffusion performance and resource usage.
+The rate at which transactions are processed, measured in transactions per second (TPS). Linear Leios targets up to 1,500+ TPS.
 
-- **Rust simulation**: A high-performance simulation of the Leios protocol implemented in Rust, focusing on graph generation, topology creation, and performance visualization.
+#### UTXO-HD (UTXO on hard disk)
 
-- **Send-recv voting**: A structured two-stage voting mechanism where nodes send and receive votes in separate phases.
+A Cardano node optimisation that stores UTXO data on disk to reduce RAM usage, beneficial for Leios node operators.
 
-- **Shard-id**: An identifier assigned to input blocks and UTxOs in the Full Sharding approach, ensuring that transactions can only spend UTxOs from the same shard to prevent conflicts.
+#### Verifiable Random Function (VRF)
 
-- **Sharding**: A method of partitioning data or transactions to improve scalability and performance and reduce duplication. In Leios ledger design, refers to assigning transactions and UTxOs to specific shards to prevent conflicts.
+A cryptographic primitive used in Leios for sortition, leader election, and eligibility proofs. The output is publicly verifiable but unpredictable.
 
-- **Short Leios**: A simplified variant of Leios that doesn't allow endorser blocks to reference other endorser blocks. If an EB is not certified by a ranking block, it and the input blocks it references are not recorded in the ledger.
+#### Vote bundling
 
-- **Simplified Leios**: The most basic variant of Leios with simplified mechanisms for block production and validation.
+Aggregating multiple votes for the same endorser block to reduce network traffic and certificate size.
 
-- **Slot timing relationships**: The critical constraints governing when input blocks from slot N can appear in ranking blocks, ensuring proper diffusion and voting time while preventing future references in the blockchain.
+#### Vote weight
 
-- **Sortition**: A probabilistic method for selecting nodes to perform specific roles (IB production, EB production, voting) based on their stake using verifiable random functions.
+The stake-weighted value of each vote. Persistent voters carry full stake weight; non-persistent voters carry weight based on expected committee composition.
 
-- **Spatial efficiency**: The ratio of the size of transactions included in the ledger divided by the total size of input blocks, endorser blocks, and ranking blocks constituting the ledger.
-
-- **Stake**: The amount of cryptocurrency a node holds, which influences its probability of being selected in sortition.
-
-- **Storage cost amortization**: A feature in the cost calculator that spreads storage costs over time, reducing upfront expenses.
-
-- **Temporal efficiency**: The fraction of submitted transactions that successfully make it into the ledger.
-
-- **Throughput**: The rate at which transactions are processed by the network, measured in transactions per second (TPS).
-
-- **Throughput simulator**: A system that models the transaction processing rate of Cardano nodes, aligned with the Leios framework.
-
-- **Tiebreaking rules**: Mechanisms for resolving conflicts when multiple input blocks have the same slot number, potentially using VRF outputs to provide objective randomness and prevent manipulation.
-
-- **Tombstoning**: A storage optimization technique where duplicate or conflicting transactions are marked but not fully stored, saving space while maintaining references for validation.
-
-- **Transaction lifecycle**: The complete process a transaction goes through in Leios, from submission to final inclusion in a ranking block, involving multiple stages and timing constraints.
-
-- **UTxO-HD (UTxO on Hard Disk)**: A Cardano node optimization that reduces RAM requirements by storing UTxO data on disk, potentially reducing the cost of running stake pools and improving network sustainability.
-
-- **UTxO labeling**: A mechanism in the Full Sharding approach where UTxOs are explicitly assigned shard-ids to control which input blocks can spend them, preventing conflicts between concurrent blocks.
-
-- **Validation rules**: The specific criteria that endorser blocks, input blocks, and votes must satisfy to be considered valid, including structural, cryptographic, and timing requirements.
-
-- **Verifiable Random Function (VRF)**: A cryptographic function that produces a random output that can be verified. Used in Leios for sortition and block production.
-
-- **Vote bundling**: The process of aggregating multiple votes for the same endorser block to reduce network traffic and certificate size.
-
-- **Vote weight**: The stake-based weight assigned to each vote in Leios, where persistent voters have weight equal to their stake and non-persistent voters have weight based on expected committee composition.
