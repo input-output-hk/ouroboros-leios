@@ -162,7 +162,7 @@ WipEBs will also be temporarily stored in-memory, for at least the following rea
 - It's preferable to orchestrate writes from multiple LeiosFetch client threads to the shared buffer in-memory rather than to a shared buffer on-disk.
     - Each in-memory WipEB will have a single mutex, and threads will only hold it long enough for memory reads/writes.
 - Batching Leios disk reads/writes minimizes disruption of Praos disk traffic.
-    - Each in-memory WipEB will have a dirty flag (TODO bitmap?) if it has been written to since it was last synchronized with disk.
+    - Each in-memory WipEB will have a dirty flag (TODO dirty bitmap?) if it has been written to since it was last synchronized with disk.
 
 Thus the on-disk WipEB is not always the most up-to-date value for that WipEB.
 
