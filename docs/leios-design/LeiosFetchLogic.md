@@ -85,10 +85,10 @@ flowchart TD
     end
 
     subgraph MEMORY
-        MemWipEBs[("in-memory WipEBs<br>(~600 MB)")]
+        MemWipEBs[("in-memory WipEBs<br>(~600 MB<br>fixed size)")]
 
-        TxCacheIndex[("TxCache index<br>(~201 MB)")]
-        InFlightMap[("InFlightMap<br>(~84 MB)")]
+        TxCacheIndex[("TxCache index<br>(~201 MB<br>fixed size)")]
+        InFlightMap[("InFlightMap<br>(~84 MB<br>fixed size)")]
         WipEbIndex[("on-disk WipEBs index<br>(small)")]
 
         Mempool[("Mempool<br>(small)")]
