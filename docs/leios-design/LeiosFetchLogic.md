@@ -301,6 +301,7 @@ The TxCache also tracks individual transactions by hash.
     - The 32 byte hash of a transaction (same as in the EbBody).
     - The 8 byte slot of the freshest EB to have touched this entry in the TxCache.
     - The 4 byte starting offset of the transaction within a very large on-disk file.
+    - TODO the voting logic is also supposed to use the TxCache to avoid revalidating txs that have already been validated (esp those from the Mempool).
 - The on-disk file is garbage collected via a straight-forward instantiation of the Baker (1978) incremental algorithm.
     - Baker's algorithm requires the total space to be double the maximum live space.
     - The maximum live space is 128 × 12e6 = 1.536e9 bytes, so the file size is ~3e9 bytes, which is why the offsets in the hash table are 32 bits = 4 bytes.
