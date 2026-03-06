@@ -145,7 +145,7 @@ The anti-equivocation rules of Leios ensure a node won't need more than that man
 - The node maintains the WipEBs themselves on-disk.
   Again, ~10000 is small enough that there could simply be one file per EB, with the slot-and-hash as its filename.
 - The node also maintains an in-memory index of which WipEBs it has on-disk.
-  Since there will be ≤ ~10000 at once and their anticipated average arrival rate is a slow 1 per 20 seconds, it's acceptable for the in-memory index to simply be a `SlotMap (NonEmptySet EbHash)` on the Haskell heap.
+  Since there will be ≤ ~10000 at once and their anticipated average arrival rate is a slow 1 per 20 seconds, it's acceptable for the in-memory index to simply be a `SlotMap (NonEmptySet EbHash)` on a GC'd heap.
 - The node would promptly delete an EB as soon as that EB's slots is ≤ the slot of the immutable tip (ie the k + 1st = 2161st block on the node's current selection).
 
 The index can be reconstructed from the files in the directory, if need be.
@@ -184,7 +184,7 @@ The limits of ≤ 2 × N total and ≤ 2 per peer ensure peers do not contend fo
       Is 2 WipEB per peer enough?
       Maybe the delay for the third will be acceptable, because LeiosFetchMultiplicity spread the first two EB's requests over enough peers?
 
-The large fields within an in-memory WipEB are not stored on the Haskell heap.
+The large fields within an in-memory WipEB are not stored on a heap managed by a general-purpose garbage collector.
 
 - Each of the ~50 WipEBs could contain several thousand transactions; that's too much pressure on the garbage collector.
 - In this particular use case, losing the benefits of persisent immutable data structures does not cause much extra complexity.
@@ -216,7 +216,7 @@ Each iteration involves the following steps; the InFlightMap and the TxCache are
             - (TODO if it's clean and in AcquiredSet, it'd be nice to evict it promptly.
               The only reason not to evict it is so that peers who are still awaiting replies for this EB will be able to use the WipEB's EbBody to validate MsgLeiosBlockTxs message.
               So if we could retain the EbBody part separately from retaining the WipEB, such peers wouldn't need to retain the WipEB any more.
-              Maybe that EbBody field of the WipEB is a ByteArray on the Haskell heap and each peer simply has a reference to it?
+              Maybe that EbBody field of the WipEB is an immutable byte array on the GC'd heap and each peer simply holds a reference to it?
               Recall that this field of the WipEB is immutable.)
 	    - (TODO also signal to the Leios voting logic that the EB is fully acquired?
 	       Should this happen whenever the next-leftmost tx of the EB arrives?
@@ -380,7 +380,8 @@ These time- and space- claims require at least a microbenchmark comparison again
 There will be no opportunity to VACUUM these databases, but it seems very unlikely that the SQLite page allocator is leaky.
 The overhead of retaining the max usage indefinitely is tolerable, again comparable to the hash table's ~50% load factor.
 
-For all uses, the run-time overhead and cognitive load of maintaining the SQL queries and indirecting through the Haskell bindings will have a non-trivial cost.
+For all uses, the run-time overhead and cognitive load of maintaining the SQL queries and indirecting through the language (eg Haskell) bindings will have a non-trivial cost.
+Those overheads are probaly small compared to the cognitive load reduction from not having to implement caching, ACI(D) invariants, etc.
 
 In conclusion, there appear to be three degrees of SQLite usage to consider.
 
