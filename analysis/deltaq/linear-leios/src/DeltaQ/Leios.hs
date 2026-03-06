@@ -1,9 +1,5 @@
 -- | Leios EB diffusion
 --
--- TODO:
---
--- * Model freshest first delivery (ffd)
--- * Use measurements to build DQs
 module DeltaQ.Leios (
   -- * DeltaQ
   validateEB,

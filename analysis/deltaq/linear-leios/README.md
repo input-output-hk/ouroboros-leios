@@ -2,12 +2,9 @@
 
 The library provides a [DeltaQ](https://github.com/DeltaQ-SD/deltaq/) model for Linear Leios.
 
-## DeltaQ backend
-The piecewise-polynomial backend in DeltaQ is [not built for modeling complex systems](https://github.com/DeltaQ-SD/deltaq/blob/main/doc/reports/artefact-A4.md#conclusion-and-next-steps). In order to allow running complex models as well we implemented an [approximation backend](https://github.com/yveshauser/deltaq/blob/experimental/lib/deltaq/src/DeltaQ/Sampled.hs) for DeltaQ that operates on discrete values representing a probability distribution.
-
 ## Praos DeltaQ analysis
 
-The block diffusion model used in this library has been taken from the [Praos model](https://github.com/intersectMBO/cardano-formal-specifications/src/performance/app/PraosModel.lhs) and updated with estimates from the Leios topology-checker tools. The Praos model will be replaced with new, accurate model that takes into account the transactions and the mem-pool, as soon as this is available.
+The block diffusion model used in this library has been taken from the [Praos model](https://github.com/intersectMBO/cardano-formal-specifications/src/performance/app/PraosModel.lhs) and updated with estimates from the Leios topology-checker tools.
 
 ## Linear Leios DeltaQ analysis
 
@@ -39,7 +36,8 @@ The first item depends on the block/vote diffusion times, whereas second item de
 
 #### $L\_{diff}$
 
-$L\_{diff}$ ...
+The parameter $L\_{diff}$ is important in order to allow remaining nodes, after a quorum has been reached, receive
+the EB, in order for the security guarantees to hold.
 
 ### Statistics
 
@@ -61,6 +59,8 @@ $ cabal run leios-deltaq-analysis stats
 ```
 
 ### Plots
+
+The plot shows the CDF for the EB diffusion times. We see in the diagram, that an EB with convincing probability arrived within 14 (= 3*1 + 4 + 7) slots.
 
 ![](docs/validateEB.svg)
 
