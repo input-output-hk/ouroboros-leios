@@ -194,7 +194,7 @@ Each iteration involves the following steps; the InFlightMap and the TxCache are
     - Process new MsgLeiosBlockTxOffer messages from LeiosNotify.
     - Process writebacks from the LeiosFetch client threads.
     - Process writebacks from the TxCache copier thread.
-    - A writeback has two affects.
+    - A writeback has two effects.
         - They update the InFlightMap.
         - They update/maintain the TxCache.
 - Trim the AcquiredSet by slot.
