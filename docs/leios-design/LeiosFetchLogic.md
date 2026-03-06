@@ -48,6 +48,50 @@ Others arise from resource usage that was more concrete than the scope of the in
 - All of the above must be satsified even during "worst-case" scenarios (eg very dense leader schedules) including a barely-tolerable adversary, up to some small failure probability; something like 10^-200 would be comfortable.
 - Don't introduce an unbearable maintenance burden.
 
+## Diagram
+
+This diagram is a useful map to consult to undertand the components of the design specified below.
+
+- Every arrow in this diagram represents flow of some transaction's bytes.
+- The thread that is actually making the LeiosFetch decisions is not shown; its job is to orchestrate everything shown.
+- It has sole ownership of the memory elements that have no connecting edges.
+- It uses message passing to coordindate all the other threads.
+
+```mermaid
+flowchart TD
+    ClientThreads["client threads"] --> MemWipEBs
+    Mempool --> Decider["decision logic<br>iteration"] --> MemWipEBs
+
+    MemWipEBs --> TxCacheAdder["TxCache adder"] -->|overwrites| TxCache
+    TxCache --> TxCacheCopier["TxCache copier"] --> MemWipEBs
+
+    MemWipEBs --> Flusher["WipEB flusher"] -->|overwrites| DiskWipEBs
+    DiskWipEBs --> Loader["WipEB loader"] --> MemWipEBs
+
+    subgraph DISK
+        DiskWipEBs[("on-disk WipEBs<br>(~120 GB<br>fixed size)")]
+        TxCache[("TxCache<br>(2 × ~1.5 GB<br>fixed size)")]
+    end
+
+    subgraph MEMORY
+        MemWipEBs[("in-memory WipEBs<br>(~600 MB)")]
+
+        TxCacheIndex[("TxCache index<br>(~201 MB)")]
+        InFlightMap[("InFlightMap<br>(~84 MB)")]
+        WipEbIndex[("on-disk WipEBs index<br>(small)")]
+
+        Mempool[("Mempool<br>(small)")]
+    end
+
+    %% layout tweaks
+    Decider ~~~ ClientThreads
+    Mempool ~~~ InFlightMap ~~~ MemWipEBs
+    Mempool ~~~ TxCacheIndex ~~~ MemWipEBs
+    Mempool ~~~ WipEbIndex ~~~ MemWipEBs
+
+    %% no styling so that light/dark theme switching will be automated
+```
+
 ## The EbBody-EbClosure Split
 
 An EB is realized in two usefully distinct ways, an EbBody and an EbClosure.
