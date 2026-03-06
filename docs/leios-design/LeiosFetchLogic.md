@@ -108,9 +108,9 @@ flowchart TD
 An EB is realized in two usefully distinct ways, an EbBody and an EbClosure.
 
 - The EbBody is a sequence of pairs, each a 32 byte hash and a 2 byte size.
-  It's ≤ 512e3 bytes, according to the feasible parameters recommended in CIP-164.
+  It's ≤ 512 kB, according to the feasible parameters recommended in CIP-164.
 - The EbClosure is a sequence of transactions, matching the hashes and sizes in the EbBody.
-  It's ≤ 12e6 bytes, according to the feasible parameters recommended in CIP-164.
+  It's ≤ 12 MB, according to the feasible parameters recommended in CIP-164.
 
 ## Work-in-Progress EBs
 
@@ -169,7 +169,7 @@ Thus the on-disk WipEB is not always the most up-to-date value for that WipEB.
 Each upstream peer is allowed to retain ≤ 2 in-memory WipEBs.
 
 - A typical upstream peer count is N=25.
-- 2 × N × ~12e6 is ≤ ~600e6 bytes of memory.
+- 2 × N × ~12 MB is ≤ ~600 MB of memory.
 - There is ≤ 1 WipEB per EB, and multiple peers can retain the same WipEB.
 
 The limits of ≤ 2 × N total and ≤ 2 per peer ensure peers do not contend for memory.
@@ -278,24 +278,24 @@ Fortunately, they do not need to be persisted between node executions.
 
 The InFlightMap tracks individual transactions by hash.
 
-- In the worst-case, it could contain ~1e6 entries at once.
+- In the worst-case, it could contain ~1 million entries at once.
 - Each entry records a small bitmap of which of the ≤ 25 current peers are currently awaiting this transaction.
     - (When a peer disconnects, it must clear those bits as part of its shutdown logic.)
 - To minimize latency, a hash table is necessary.
-- It would have 2^21 = ~2e6 buckets in order to keep its load factor < ~50%, a salted hash to prevent adversarial collisions, linear probing to handle collisions, and backshifting on deletes.
+- It would have 2^21 = ~2 million buckets in order to keep its load factor < ~50%, a salted hash to prevent adversarial collisions, linear probing to handle collisions, and backshifting on deletes.
 - A microbenchmark shows that a burst of ~15000 insertions/lookups/deletions takes ≤ 3 milliseconds even when loaded with ~1 million transactions.
     - TODO I used my iohk.io account's Gemini Pro access to implement this hash table in ~150 lines of C.
       So far I've only tested via some sanity checks as part of the benchmarks, but any bugs not revealed by that are unlikely to significantly alter the benchmark results.
       It chose SipHash, for the record.
-- Total size is 2^21 × (32 + 8) = ~84e6 bytes.
+- Total size is 2^21 × (32 + 8) = ~84 MB.
 
 The TxCache also tracks individual transactions by hash.
 
-- Its in-memory index must retain the ≤ ~2e6 transactions that are referenced by the freshest 128 EBs.
+- Its in-memory index must retain the ≤ ~2 million transactions that are referenced by the freshest 128 EBs.
     - The necessity and sufficiency of 128 is motivated during the ~20 minute explanation in the 2026 February episode of the Leios Monthly Review.
       It starts at the [17:08 mark in the YouTube video](https://www.youtube.com/watch?v=5uAJ-XBAysY&t=17m8s).
     - The key motivation is that a strong majority of the EBs issued by a group of nodes that control a ≥~5% relative stake would still be accelerated by the rest of the network's TxCache a majority of the time even if this group's mempools were partitioned from the rest of the network's mempools.
-- It'd therefore have 2^22 = ~4e6 buckets, but is otherwise nearly the same as the InFlightMap, and so will have similar latency.
+- It'd therefore have 2^22 = ~4 million buckets, but is otherwise nearly the same as the InFlightMap, and so will have similar latency.
   The only difference is the implicit deletion, detailed below.
 - Each entry records the following.
     - The 32 byte hash of a transaction (same as in the EbBody).
@@ -304,11 +304,11 @@ The TxCache also tracks individual transactions by hash.
     - TODO the voting logic is also supposed to use the TxCache to avoid revalidating txs that have already been validated (esp those from the Mempool).
 - The on-disk file is garbage collected via a straight-forward instantiation of the Baker (1978) incremental algorithm.
     - Baker's algorithm requires the total space to be double the maximum live space.
-    - The maximum live space is 128 × 12e6 = 1.536e9 bytes, so the file size is ~3e9 bytes, which is why the offsets in the hash table are 32 bits = 4 bytes.
+    - The maximum live space is 128 × 12 MB = 1.536 GB, so the file size is ~3 GB, which is why the offsets in the hash table are 32 bits = 4 bytes.
     - TODO will this be too concentrated of SSD wear and tear?
       Need to move this file around occasionally?
     - TODO would it be more helpful to call it a "smart ring buffer" instead of name-dropping Baker?
-- Total size of the hash table is 2^22 × (32 + 8 + 8) = ~201e6 bytes (the 4 byte offset was rounded up to 64 bits to be word-aligned).
+- Total size of the hash table is 2^22 × (32 + 8 + 8) = ~201 MB bytes (the 4 byte offset was rounded up to 64 bits to be word-aligned).
     - TODO Maybe figure out how to use only 4 bytes for the slot, since any execution of the node won't last for more than 2^32 slots (ie ~136 years)?
       Would remove one of those 8s, which saves ~33 megabytes and slightly improves locality of probing.
 - Some simple logic tracks the slot of the 129th-youngest EB to have been announced during this node process's lifetime.
@@ -332,11 +332,11 @@ That is: choose how to rate-limit it; it merely has to exhibit disk latency rath
 
 The size of each in-memory bulk data structure above is as follows.
 
-- ~600e6 bytes for the 2 × N in-memory WipEBs.
-- ~84e6 bytes for the ~1e6 entry InFlightMap.
-- ~201e6 bytes for the ~2e6 entry TxCache index.
+- ~600 MB for the 2 × N in-memory WipEBs.
+- ~84 MB for the ~1 million entry InFlightMap.
+- ~201 MB for the ~2 million entry TxCache index.
 
-Reserving a grand total of ~1e9 bytes of memory to---even in the worst-case----minimize the latencies within the hot loops of the ≥10 Hz centralized LeiosFetch decision logic seems worthwhile.
+Reserving a grand total of ~1 GB of memory to---even in the worst-case----minimize the latencies within the hot loops of the ≥10 Hz centralized LeiosFetch decision logic seems worthwhile.
 
 ## SQLite Usage Opportunities
 
