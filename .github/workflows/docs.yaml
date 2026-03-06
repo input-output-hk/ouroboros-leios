@@ -33,7 +33,11 @@ concurrency:
 jobs:
   docs-generate-d2-diagrams:
     name: "Generate D2 Diagrams"
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    # Fork PRs cannot be pushed back to, so skip this auto-commit job for them.
+    if: >
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     permissions:
       contents: write
