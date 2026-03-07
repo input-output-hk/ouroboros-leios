@@ -1,7 +1,7 @@
 ---
 title: Leios technical design and implementation plan
 status: Draft
-version: 0.7
+version: 0.9
 author:
   - Sebastian Nagel <sebastian.nagel@iohk.io>
   - Nicolas Frisby <nick.frisby@iohk.io>
@@ -24,6 +24,7 @@ This document is a living artifact and will be updated as implementation progres
 
 | Version | Date       | Changes                                                            |
 | ------- | ---------- | ------------------------------------------------------------------ |
+| 0.9     | 2026-03-05 | Add LeiosFetchLogic.md                                             |
 | 0.8     | 2026-03-02 | Performance and quality assurance strategy                         |
 | 0.7     | 2026-02-13 | Re-order technical design and add notes from prototyping           |
 | 0.6     | 2025-11-25 | Risks and mitigations with key threats                             |
@@ -513,6 +514,8 @@ Even the first version of LeiosFetch decision logic should consider EBs that are
 > TODO: what about newly synced nodes that need to acquire all EBs up to the immutable tip, how?
 >  - might demand a different mini-protocol design
 >  - query points of volatile suffix and request missing subset of it (like tx submission for the mempool)
+
+The current iteration of the EB diffusion for the Leios prototype node can be found in the adjacent <./LeiosFetchLogic.md> file.
 
 ### Endorser block storage
 
