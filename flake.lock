@@ -931,16 +931,16 @@
         "utils": "utils_2"
       },
       "locked": {
-        "lastModified": 1772712138,
-        "narHash": "sha256-yreM14x34NnOxKxFA6A9y55wJ5WT4njv2Xpb+Io5Ggg=",
+        "lastModified": 1773766217,
+        "narHash": "sha256-MgAi7oSG4F7/runQ2QO7fedqN1W52Vj3kaqU1Z4vaVU=",
         "owner": "intersectmbo",
         "repo": "cardano-node",
-        "rev": "75881ef42e9f699039a6cea03222c8a1690bc40f",
+        "rev": "f1402ffc7758f33632195e2bb5a9e92607e43005",
         "type": "github"
       },
       "original": {
         "owner": "intersectmbo",
-        "ref": "leios-prototype",
+        "ref": "mw/leios-prototype",
         "repo": "cardano-node",
         "type": "github"
       }
@@ -5656,16 +5656,16 @@
         "nixpkgs-unstable": "nixpkgs-unstable_7"
       },
       "locked": {
-        "lastModified": 1772712092,
-        "narHash": "sha256-nCYHfLPAGFNop6OuPpte05yAjGnezWN20fCbDdE5Vmk=",
+        "lastModified": 1773766063,
+        "narHash": "sha256-ozcchi1NwjJSICq6Hw12kaETA80kmfqr44czH/ojOHY=",
         "owner": "intersectmbo",
         "repo": "ouroboros-consensus",
-        "rev": "f93c731d665326481cbd846b91c19e7f3b7a8fde",
+        "rev": "2a9b5eb559758477db5a8879621a4f31a990c74a",
         "type": "github"
       },
       "original": {
         "owner": "intersectmbo",
-        "ref": "leios-prototype",
+        "ref": "mw/leios-prototype",
         "repo": "ouroboros-consensus",
         "type": "github"
       }
