@@ -231,7 +231,7 @@ Each iteration involves the following steps; the InFlightMap and the TxCache are
             - If there is an in-memory WipEB for this EB, this peer is now retaining it.
             - If there is no in-memory WipEB for this EB, schedule it to be loaded from disk (evicting the oldest in-memory WipEB that is not retained as soon as it's no longer dirty).
         - If the peer is not already retaining an in-memory WipEB for this EB, skip this EB.
-        - For each of this WipEB's missing transactions, leftmost first:
+        - For each of this WipEB's missing transactions, according to their order in the EbBody:
             - (TODO instead of "leftmost first", pickup where we left off when last visiting this WipEB?
               That way we'll request every tx at least once, likely from multiple peers, before requesting any a second time.)
             - If the transaction is currently in the Mempool snapshot, with the mutex, copy it to the WipEB (TODO and also the TxCache).
