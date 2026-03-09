@@ -103,6 +103,7 @@ export class Simulation {
     // 6. Add to mempool
     reg.inMempool[activeTxIdx]!.set(nodeIdx);
     node.addToMempool(tx.size_B);
+    node.addTxToOrder(activeTxIdx);
 
     // 7. Propagate OfferTx to upstream peers
     const delay_base = node.honest ? 0 : node.frontrunDelay_s;
@@ -295,6 +296,7 @@ export class Simulation {
 
     reg.inMempool[txIdx]!.forEach((nodeIdx) => {
       this.nodes[nodeIdx]!.removeFromMempool(tx.size_B);
+      this.nodes[nodeIdx]!.removeTxFromOrder(txIdx);
     });
     reg.inMempool[txIdx]!.reset();
 
@@ -306,6 +308,7 @@ export class Simulation {
         cpTx.includedInBlock = resolvedAt;
         reg.inMempool[cp]!.forEach((nodeIdx) => {
           this.nodes[nodeIdx]!.removeFromMempool(cpTx.size_B);
+          this.nodes[nodeIdx]!.removeTxFromOrder(cp);
         });
         reg.inMempool[cp]!.reset();
       }
@@ -316,6 +319,7 @@ export class Simulation {
         avTx.includedInBlock = resolvedAt;
         reg.inMempool[av]!.forEach((nodeIdx) => {
           this.nodes[nodeIdx]!.removeFromMempool(avTx.size_B);
+          this.nodes[nodeIdx]!.removeTxFromOrder(av);
         });
         reg.inMempool[av]!.reset();
       }
@@ -335,6 +339,19 @@ export class Simulation {
       const certified = Math.random() < this.ebCertificationRate;
       pendingEB.certified = certified;
       if (certified) {
+        let certifiedHonestCount = 0;
+        let certifiedAdversarialCount = 0;
+        for (const txIdx of this.lastEB.txRefs) {
+          if (reg.txs[txIdx]!.isAdversarial) certifiedAdversarialCount++;
+          else certifiedHonestCount++;
+        }
+        certifiedEB = {
+          ebId: this.lastEB.ebId,
+          txRefs: this.lastEB.txRefs,
+          honestCount: certifiedHonestCount,
+          adversarialCount: certifiedAdversarialCount,
+        };
+
         // Certified EB: this RB carries only the certificate, no txs
         canIncludeTxs = false;
         certifiedEB = pendingEB;
@@ -354,16 +371,22 @@ export class Simulation {
     let adversarialCount = 0;
 
     if (canIncludeTxs) {
-      for (let i = 0; i < reg.txs.length; i++) {
-        const tx = reg.txs[i]!;
-        if (tx.includedInBlock >= 0) continue;
-        if (!reg.inMempool[i]!.get(producerIdx)) continue;
-        if (size + tx.size_B > blockSize_B) continue;
-        txIndices.push(i);
+      producer.scanTxOrder((txIdx) => {
+        const tx = reg.txs[txIdx]!;
+        if (tx.includedInBlock >= 0 || !reg.inMempool[txIdx]!.get(producerIdx)) {
+          producer.removeTxFromOrder(txIdx);
+          return true;
+        }
+
+        // FIFO semantics: if next tx does not fit, stop considering later arrivals.
+        if (size + tx.size_B > blockSize_B) return false;
+
+        txIndices.push(txIdx);
         size += tx.size_B;
         if (tx.isAdversarial) adversarialCount++;
         else honestCount++;
-      }
+        return true;
+      });
     }
 
     const block: Block = {
@@ -438,6 +461,7 @@ export class Simulation {
       if (reg.inMempool[txIdx]!.get(nodeIdx)) {
         reg.inMempool[txIdx]!.clear(nodeIdx);
         node.removeFromMempool(tx.size_B);
+        node.removeTxFromOrder(txIdx);
       }
       // Also counterpart
       if (tx.isAdversarial && tx.honestCounterpart >= 0) {
@@ -445,12 +469,14 @@ export class Simulation {
         if (reg.inMempool[cp]!.get(nodeIdx)) {
           reg.inMempool[cp]!.clear(nodeIdx);
           node.removeFromMempool(reg.txs[cp]!.size_B);
+          node.removeTxFromOrder(cp);
         }
       } else if (!tx.isAdversarial && tx.adversarialVariant >= 0) {
         const av = tx.adversarialVariant;
         if (reg.inMempool[av]!.get(nodeIdx)) {
           reg.inMempool[av]!.clear(nodeIdx);
           node.removeFromMempool(reg.txs[av]!.size_B);
+          node.removeTxFromOrder(av);
         }
       }
     }
@@ -479,16 +505,19 @@ export class Simulation {
     let honestCount = 0;
     let adversarialCount = 0;
 
-    for (let i = 0; i < reg.txs.length; i++) {
-      const tx = reg.txs[i]!;
-      if (tx.includedInBlock >= 0) continue;
-      if (!reg.inMempool[i]!.get(producerIdx)) continue;
-      if (size + tx.size_B > ebSize_B) continue;
-      txRefs.push(i);
+    producer.scanTxOrder((txIdx) => {
+      const tx = reg.txs[txIdx]!;
+      if (tx.includedInBlock >= 0 || !reg.inMempool[txIdx]!.get(producerIdx)) {
+        producer.removeTxFromOrder(txIdx);
+        return true;
+      }
+      if (size + tx.size_B > ebSize_B) return false;
+      txRefs.push(txIdx);
       size += tx.size_B;
       if (tx.isAdversarial) adversarialCount++;
       else honestCount++;
-    }
+      return true;
+    });
 
     // Never announce an empty EB
     if (txRefs.length === 0) return;
