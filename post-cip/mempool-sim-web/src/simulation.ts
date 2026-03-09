@@ -33,6 +33,9 @@ export class Simulation {
   ebEnabled = false;
   ebSize_B = 10_000_000;
   ebCertificationRate = 1.0;
+  // When true, EB-fetched txs enter mempool and propagate via normal gossip.
+  // Disable to remove this additional EB-driven backpressure effect.
+  ebTxCacheEnabled = true;
   private lastEB: EndorserBlock | null = null;
 
   // Peer churn config
@@ -219,9 +222,14 @@ export class Simulation {
       }
 
       case 'SendEBTx':
-        // EB-fetched txs enter the mempool via the normal acceptTx path,
-        // creating backpressure that defends against adversary front-running
-        this.acceptTx(event.to, event.txIdx, event.clock);
+        if (this.ebTxCacheEnabled) {
+          // EB-fetched txs enter the mempool via the normal acceptTx path,
+          // creating backpressure that defends against adversary front-running.
+          this.acceptTx(event.to, event.txIdx, event.clock);
+        } else {
+          // Record as known to avoid repeated fetches, but do not cache/gossip.
+          this.registry.known[event.txIdx]!.set(event.to);
+        }
         break;
 
       case 'PeerChurn':
