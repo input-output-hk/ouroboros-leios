@@ -30,7 +30,7 @@ test('Leios total rate includes certified EB payload', () => {
     { blockId: 'B0', producer: 0, clock: 0, txIndices: [1], size_B: 1, honestCount: 1, adversarialCount: 0 },
   ];
   const ebs: EndorserBlock[] = [
-    { ebId: 'EB0', producer: 0, clock: 0, txRefs: [0, 2], size_B: 2, certified: true },
+    { ebId: 'EB0', producer: 0, clock: 0, txRefs: [0, 2], size_B: 2, honestCount: 1, adversarialCount: 1, certified: true },
   ];
 
   const stats = computeFrontRunStats(txs, blocks, ebs, true);

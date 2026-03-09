@@ -55,6 +55,7 @@ program
   .option('--eb', 'Enable endorser blocks (Leios)', false)
   .option('--eb-size <bytes>', 'Endorser block size in bytes', String(DEFAULTS.ebSize))
   .option('--eb-certification-rate <rate>', 'EB certification probability (0-1)', '0.5')
+  .option('--no-eb-tx-cache', 'Do not cache/gossip EB-fetched txs into mempools')
   .parse(process.argv);
 
 const opts = program.opts();
@@ -78,6 +79,7 @@ const config = {
   eb: opts.eb === true,
   ebSize: parseInt(opts.ebSize),
   ebCertificationRate: parseFloat(opts.ebCertificationRate),
+  ebTxCache: opts.ebTxCache as boolean,
 };
 
 const mempool = config.eb
@@ -129,6 +131,7 @@ try {
   sim.ebEnabled = config.eb;
   sim.ebSize_B = config.ebSize;
   sim.ebCertificationRate = config.ebCertificationRate;
+  sim.ebTxCacheEnabled = config.ebTxCache;
 
   // Register and inject transactions (byte-budget from KB/s load)
   const honestCount = config.nodes;
