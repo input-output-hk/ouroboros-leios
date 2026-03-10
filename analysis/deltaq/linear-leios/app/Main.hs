@@ -9,22 +9,19 @@
 module Main where
 
 import Analysis.Leios
-import Control.Concurrent
 import Control.Concurrent.Async
-import Control.Monad
 import qualified Data.ByteString.Lazy as BL
-import Data.Csv (DefaultOrdered (..), FromNamedRecord (..), Header, ToNamedRecord (..), decodeByName, encodeDefaultOrderedByName, (.:))
+import Data.Csv (DefaultOrdered (..), FromNamedRecord (..), ToNamedRecord (..), encodeDefaultOrderedByName, (.:))
 import Data.Ratio ((%))
-import qualified Data.Vector as V
 import DeltaQ
 import DeltaQ.Leios
-import DeltaQ.Leios.EmpiricalDistributions (empiricalDQ)
+import DeltaQ.Leios.EmpiricalDistributions
 import DeltaQ.Praos
 import GHC.Generics
 import Graphics.Rendering.Chart.Backend.Cairo
 import Graphics.Rendering.Chart.Easy
 import Statistics.Leios (quorumProbability)
-import System.Random
+import System.Environment (getArgs)
 import Text.Printf
 
 data BlockEDF = BlockEDF
@@ -45,45 +42,14 @@ instance FromNamedRecord BlockEDF where
       <*> m .: "Reapply [ms]"
       <*> m .: "Fraction of blocks [%/100]"
 
-readFromFile :: IO (Either String (Header, V.Vector BlockEDF))
-readFromFile = decodeByName @BlockEDF <$> BL.readFile "../../../post-cip/empirical-distributions/block-edf.csv"
-
-sampleElements :: RandomGen g => g -> Int -> [a] -> [a]
-sampleElements g n xs =
-  let is = take n $ randomRs (0, length xs - 1) g
-   in [xs !! i | i <- is]
-
 -- | main
 main :: IO ()
 main = do
-  Right (_, edf) <- readFromFile
-  let txApplyTimes = V.toList (V.map ((/ 1000) . apply) edf)
-  let txReapplyTimes = V.toList (V.map ((/ 1000) . reapply) edf)
-
-  -- Reduce sample size for better performance
-  let sampleSize = 2 -- FIXME: larger value
-  let seed = 100
-  let gen = mkStdGen seed
-  let txApplyTimesReduced = sampleElements gen sampleSize txApplyTimes
-  let txReapplyTimesReduced = sampleElements gen sampleSize txReapplyTimes
-
-  -- let applyTx = DeltaQ.uniform 0 3.3 -- 0 0.5
-  -- let reapplyTx = DeltaQ.uniform 0 2.1 -- 0 0.4
-  let applyTx = empiricalDQ txApplyTimesReduced
-  let reapplyTx = empiricalDQ txReapplyTimesReduced
-
-  -- (maybe (print @String "Nothing") (printf "Estimate for lVote: %d\n") (lVoteEstimated applyTx reapplyTx))
-  -- (maybe (print @String "Nothing") (printf "Estimate for lDiff: %d\n") (lDiffEstimated applyTx reapplyTx))
-
-  _ <- forkIO $ printf "Complexity applyTx: %d\n" (complexity applyTx)
-  _ <- forkIO $ printf "Complexity reapplyTx: %d\n" (complexity reapplyTx)
-
   let committeeSizeEstimated = 600
   let numberSPOs = 2500
-  let λ = 1 % 20
+  let f = 1 % 20
   let τ = 3 % 4
 
-  let generatePlots = True
   let configs =
         [ Config{name = "C113", lHdr = 1, lVote = 1, lDiff = 3, ..}
         , Config{name = "C124", lHdr = 1, lVote = 2, lDiff = 4, ..}
@@ -96,13 +62,15 @@ main = do
         , Config{name = "C999", lHdr = 9, lVote = 9, lDiff = 9, ..}
         ]
 
-  mapConcurrently_ (mainWith generatePlots >=> print) configs
-
--- mapConcurrently (mainWith generatePlots) configs >>= printResults
-
-mainWith :: Bool -> Config -> IO Result
-mainWith True config = snd <$> concurrently (plots config) (mainWith False config)
-mainWith False config = return (stats config)
+  args <- getArgs
+  case args of
+    ["estimates"] ->
+      concurrently_
+        (maybe (print @String "Nothing") (printf "Estimate for lVote: %d\n") lVoteEstimated)
+        (maybe (print @String "Nothing") (printf "Estimate for lDiff: %d\n") lDiffEstimated)
+    ["plots"] -> plots committeeSizeEstimated numberSPOs τ
+    ["stats"] -> mapConcurrently (return . stats) configs >>= writeResults
+    _ -> putStrLn "options are: estimates, plots, stats"
 
 data Result
   = -- | Config name
@@ -133,48 +101,47 @@ instance FromNamedRecord Result
 instance ToNamedRecord Result
 instance DefaultOrdered Result
 
-plots :: Config -> IO ()
-plots Config{..} = do
+plots :: Integer -> Integer -> Rational -> IO ()
+plots committeeSizeEstimated numberSPOs τ = do
   _ <-
-    renderableToFile def{_fo_format = SVG} (name <> "-tx-apply.svg") $
+    renderableToFile def{_fo_format = SVG} ("tx-apply.svg") $
       toRenderable $
         plotCDFWithQuantiles "Tx Apply" [0.75, 0.95, 0.99] applyTx
   _ <-
-    renderableToFile def{_fo_format = SVG} (name <> "-tx-reapply.svg") $
+    renderableToFile def{_fo_format = SVG} ("tx-reapply.svg") $
       toRenderable $
         plotCDFWithQuantiles "Tx Reapply" [0.75, 0.95, 0.99] reapplyTx
   _ <-
-    renderableToFile def{_fo_format = SVG} (name <> "-block-diffustion.svg") $
+    renderableToFile def{_fo_format = SVG} ("block-diffustion.svg") $
       toRenderable $
         plotCDFs "Block diffusion" $
           zip (map show blockSizes) (map blendedDelay blockSizes)
   _ <-
-    renderableToFile def{_fo_format = SVG} (name <> "-validateEB.svg") $
+    renderableToFile def{_fo_format = SVG} ("validateEB.svg") $
       toRenderable $
-        plotCDFWithQuantiles "EB diffusion" [0.75, 0.95, 0.99] (validateEB applyTx reapplyTx)
+        plotCDFWithQuantiles "EB diffusion" [0.75, 0.95, 0.99] validateEB
   _ <-
-    renderableToFile def{_fo_format = SVG} (name <> "-quorumProb.svg") $
+    renderableToFile def{_fo_format = SVG} ("quorumProb.svg") $
       toRenderable $
         let xs = [0.50, 0.51 .. 1]
             s = fromInteger committeeSizeEstimated
             n = fromInteger numberSPOs
-            t = fromRational τ
-            vs = [(x, quorumProbability n x s t) | x <- xs]
+            vs = [(x, quorumProbability n x s (fromRational τ)) | x <- xs]
          in do
               layout_title .= "Quorum distribution"
               plot (line "pQuorum" [vs])
-  pure ()
+  return ()
 
 stats :: Config -> Result
 stats config@Config{..} =
   let res_config = name
-      res_pHeaderOnTime = fromRational (pHeaderOnTime lHdr)
-      res_pValidating = fromRational (pValidating applyTx reapplyTx (lHdr, lVote))
+      res_pHeaderOnTime = fromRational $ pHeaderOnTime lHdr
+      res_pValidating = fromRational $ pValidating (lHdr, lVote)
       res_pQuorum = pQuorum config
       res_pInterruptedByNewBlock = pInterruptedByNewBlock config
       res_pCertified = pCertified config
-      res_eCertified = 1 / (eCertified config)
+      res_eCertified = eCertified config
    in Result{..}
 
-printResults :: [Result] -> IO ()
-printResults = BL.writeFile "output.csv" . encodeDefaultOrderedByName
+writeResults :: [Result] -> IO ()
+writeResults = BL.writeFile "output.csv" . encodeDefaultOrderedByName

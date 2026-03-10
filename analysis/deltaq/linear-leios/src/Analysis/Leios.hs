@@ -28,7 +28,6 @@ module Analysis.Leios (
 )
 where
 
-import DeltaQ (DQ)
 import DeltaQ.Leios (pValidating)
 import qualified Statistics.Distribution as S
 import Statistics.Leios (quorumProbability)
@@ -51,21 +50,17 @@ data Config = Config
   -- ^ Estimation of size of voting committee
   , τ :: !Rational
   -- ^ Voting threshold
-  , λ :: !Rational
-  -- ^ Block production rate parameter
-  , applyTx :: !DQ
-  -- ^ DQ for applyTx
-  , reapplyTx :: !DQ
-  -- ^ DQ for reapplyTx
+  , f :: !Rational
+  -- ^ Active slot coefficient
   }
-  deriving (Show, Eq)
+  deriving (Show)
 
 -- | Probability of reaching a quorum
 pQuorum :: Config -> Double
 pQuorum Config{..} =
   quorumProbability
     (fromInteger numberSPOs)
-    (fromRational $ pValidating applyTx reapplyTx (lHdr, lVote))
+    (fromRational $ pValidating (lHdr, lVote))
     (fromInteger committeeSizeEstimated)
     (fromRational τ)
 
@@ -73,7 +68,7 @@ pQuorum Config{..} =
 pInterruptedByNewBlock :: Config -> Double
 pInterruptedByNewBlock Config{..} =
   S.cumulative
-    (blockDistribution $ fromRational λ)
+    (blockDistribution $ fromRational f)
     (fromInteger $ 3 * lHdr + lVote + lDiff)
 
 -- | Probability that an EB will be certified
@@ -81,5 +76,9 @@ pCertified :: Config -> Double
 pCertified c = (1 - pInterruptedByNewBlock c) * pQuorum c
 
 -- | Expectation for the distribution of certified EBs over time
+--
+-- \(E = \frac{1}{\lambda}\), where \(\lambda\) is the block production rate
 eCertified :: Config -> Double
-eCertified Config{..} = (fromRational λ) * (1 - (fromRational λ)) ** (fromInteger $ 3 * lHdr + lVote + lDiff)
+eCertified Config{..} =
+  let λ = (fromRational f) * (1 - (fromRational f)) ** (fromInteger $ 3 * lHdr + lVote + lDiff)
+   in 1 / λ

@@ -1,24 +1,23 @@
--- | The module proposes a model for block diffusion of Ouroboros Praos. See also
--- [Modelling Block Diffusion in Cardano using ∆Q](https://github.com/IntersectMBO/cardano-formal-specifications)
+-- | The module proposes a model for block diffusion of Ouroboros Praos.
 --
--- TODO:
---
--- * This will be replaced by a new model based on a queing model for the mem-pool, similar
--- to what is proposed the VECTOR paper.
+-- Most of the code is from [Modelling Block Diffusion in Cardano using ∆Q](https://github.com/IntersectMBO/cardano-formal-specifications)
 module DeltaQ.Praos (
   -- * Types
   BlockSize (..),
 
   -- * DeltaQ
-  emitRBHeader,
-  fetchingRBBody,
+  sendRBHeader,
+  sendRBBody,
 
   -- * Utils
   blockSizes,
   blendedDelay,
+  hopCount,
+  lengthProbsNode10,
 ) where
 
-import DeltaQ (DQ, Outcome (wait, (.>>.)), ProbabilisticOutcome (choices))
+import DeltaQ (DQ, Outcome (wait), ProbabilisticOutcome (choices))
+import DeltaQ.Common (doSequentially)
 
 data BlockSize = B64 | B256 | B512 | B1024 | B2048
   deriving (Show, Eq)
@@ -52,18 +51,26 @@ hop b = choices [(1, short b), (1, medium b), (1, long b)]
 
 hops :: Int -> BlockSize -> DQ
 hops n b = doSequentially (replicate n (hop b))
- where
-  doSequentially :: [DQ] -> DQ
-  doSequentially = foldr (.>>.) (wait 0)
 
+-- | hopCount
+--
+-- Values are taken from [topology checker](https://github.com/input-output-hk/ouroboros-leios/tree/main/topology-checker)
+-- tool in the ouroboros-leios project generated with the mainnet like network topology
+hopCount :: [(Int, Rational)]
+hopCount = [(1, 1909), (2, 3867), (3, 2826), (4, 1068), (5, 214), (6, 16)]
+
+-- | lengthProbsNode10
+--
+-- The original Praos model
+lengthProbsNode10 :: [(Int, Rational)]
+lengthProbsNode10 = [(1, 0.40), (2, 3.91), (3, 31.06), (4, 61.85), (5, 2.78)]
+
+-- | blendedDelay
 blendedDelay :: BlockSize -> DQ
-blendedDelay b = choices $ map (\(n, p) -> (p, hops n b)) hopCount
- where
-  -- values are taken from topology checker tool
-  hopCount = [(1, 1909), (2, 3867), (3, 2826), (4, 1068), (5, 214), (6, 16)]
+blendedDelay b = choices $ map (\(n, p) -> (p, hops n b)) lengthProbsNode10 -- hopCount
 
-emitRBHeader :: DQ
-emitRBHeader = blendedDelay B64
+sendRBHeader :: DQ
+sendRBHeader = blendedDelay B64
 
-fetchingRBBody :: DQ
-fetchingRBBody = blendedDelay B1024
+sendRBBody :: DQ
+sendRBBody = blendedDelay B1024
