@@ -33,6 +33,9 @@ export class Simulation {
   ebEnabled = false;
   ebSize_B = 10_000_000;
   ebCertificationRate = 1.0;
+  // When true, EB-fetched txs enter mempool and propagate via normal gossip.
+  // Disable to remove this additional EB-driven backpressure effect.
+  ebTxCacheEnabled = true;
   private lastEB: EndorserBlock | null = null;
 
   // Peer churn config
@@ -103,6 +106,7 @@ export class Simulation {
     // 6. Add to mempool
     reg.inMempool[activeTxIdx]!.set(nodeIdx);
     node.addToMempool(tx.size_B);
+    node.addTxToOrder(activeTxIdx);
 
     // 7. Propagate OfferTx to upstream peers
     const delay_base = node.honest ? 0 : node.frontrunDelay_s;
@@ -218,9 +222,14 @@ export class Simulation {
       }
 
       case 'SendEBTx':
-        // EB-fetched txs enter the mempool via the normal acceptTx path,
-        // creating backpressure that defends against adversary front-running
-        this.acceptTx(event.to, event.txIdx, event.clock);
+        if (this.ebTxCacheEnabled) {
+          // EB-fetched txs enter the mempool via the normal acceptTx path,
+          // creating backpressure that defends against adversary front-running.
+          this.acceptTx(event.to, event.txIdx, event.clock);
+        } else {
+          // Record as known to avoid repeated fetches, but do not cache/gossip.
+          this.registry.known[event.txIdx]!.set(event.to);
+        }
         break;
 
       case 'PeerChurn':
@@ -295,6 +304,7 @@ export class Simulation {
 
     reg.inMempool[txIdx]!.forEach((nodeIdx) => {
       this.nodes[nodeIdx]!.removeFromMempool(tx.size_B);
+      this.nodes[nodeIdx]!.removeTxFromOrder(txIdx);
     });
     reg.inMempool[txIdx]!.reset();
 
@@ -306,6 +316,7 @@ export class Simulation {
         cpTx.includedInBlock = resolvedAt;
         reg.inMempool[cp]!.forEach((nodeIdx) => {
           this.nodes[nodeIdx]!.removeFromMempool(cpTx.size_B);
+          this.nodes[nodeIdx]!.removeTxFromOrder(cp);
         });
         reg.inMempool[cp]!.reset();
       }
@@ -316,6 +327,7 @@ export class Simulation {
         avTx.includedInBlock = resolvedAt;
         reg.inMempool[av]!.forEach((nodeIdx) => {
           this.nodes[nodeIdx]!.removeFromMempool(avTx.size_B);
+          this.nodes[nodeIdx]!.removeTxFromOrder(av);
         });
         reg.inMempool[av]!.reset();
       }
@@ -329,10 +341,29 @@ export class Simulation {
 
     // Step 1: Certify pending EB from previous block (if any)
     let canIncludeTxs = true;
+    let certifiedEB: {
+      ebId: string;
+      txRefs: number[];
+      honestCount: number;
+      adversarialCount: number;
+    } | null = null;
     if (this.ebEnabled && this.lastEB) {
       const certified = Math.random() < this.ebCertificationRate;
       this.lastEB.certified = certified;
       if (certified) {
+        let certifiedHonestCount = 0;
+        let certifiedAdversarialCount = 0;
+        for (const txIdx of this.lastEB.txRefs) {
+          if (reg.txs[txIdx]!.isAdversarial) certifiedAdversarialCount++;
+          else certifiedHonestCount++;
+        }
+        certifiedEB = {
+          ebId: this.lastEB.ebId,
+          txRefs: this.lastEB.txRefs,
+          honestCount: certifiedHonestCount,
+          adversarialCount: certifiedAdversarialCount,
+        };
+
         // Certified EB: this RB carries only the certificate, no txs
         canIncludeTxs = false;
         // Remove certified EB's txs from all mempools — they're in the chain via the EB
@@ -351,16 +382,22 @@ export class Simulation {
     let adversarialCount = 0;
 
     if (canIncludeTxs) {
-      for (let i = 0; i < reg.txs.length; i++) {
-        const tx = reg.txs[i]!;
-        if (tx.includedInBlock >= 0) continue;
-        if (!reg.inMempool[i]!.get(producerIdx)) continue;
-        if (size + tx.size_B > blockSize_B) continue;
-        txIndices.push(i);
+      producer.scanTxOrder((txIdx) => {
+        const tx = reg.txs[txIdx]!;
+        if (tx.includedInBlock >= 0 || !reg.inMempool[txIdx]!.get(producerIdx)) {
+          producer.removeTxFromOrder(txIdx);
+          return true;
+        }
+
+        // FIFO semantics: if next tx does not fit, stop considering later arrivals.
+        if (size + tx.size_B > blockSize_B) return false;
+
+        txIndices.push(txIdx);
         size += tx.size_B;
         if (tx.isAdversarial) adversarialCount++;
         else honestCount++;
-      }
+        return true;
+      });
     }
 
     const block: Block = {
@@ -384,6 +421,7 @@ export class Simulation {
         honestCount,
         adversarialCount,
         certified: !canIncludeTxs,
+        certifiedEB,
       }, 'block produced');
     }
 
@@ -434,6 +472,7 @@ export class Simulation {
       if (reg.inMempool[txIdx]!.get(nodeIdx)) {
         reg.inMempool[txIdx]!.clear(nodeIdx);
         node.removeFromMempool(tx.size_B);
+        node.removeTxFromOrder(txIdx);
       }
       // Also counterpart
       if (tx.isAdversarial && tx.honestCounterpart >= 0) {
@@ -441,12 +480,14 @@ export class Simulation {
         if (reg.inMempool[cp]!.get(nodeIdx)) {
           reg.inMempool[cp]!.clear(nodeIdx);
           node.removeFromMempool(reg.txs[cp]!.size_B);
+          node.removeTxFromOrder(cp);
         }
       } else if (!tx.isAdversarial && tx.adversarialVariant >= 0) {
         const av = tx.adversarialVariant;
         if (reg.inMempool[av]!.get(nodeIdx)) {
           reg.inMempool[av]!.clear(nodeIdx);
           node.removeFromMempool(reg.txs[av]!.size_B);
+          node.removeTxFromOrder(av);
         }
       }
     }
@@ -473,14 +514,17 @@ export class Simulation {
     const txRefs: number[] = [];
     let size = 0;
 
-    for (let i = 0; i < reg.txs.length; i++) {
-      const tx = reg.txs[i]!;
-      if (tx.includedInBlock >= 0) continue;
-      if (!reg.inMempool[i]!.get(producerIdx)) continue;
-      if (size + tx.size_B > ebSize_B) continue;
-      txRefs.push(i);
+    producer.scanTxOrder((txIdx) => {
+      const tx = reg.txs[txIdx]!;
+      if (tx.includedInBlock >= 0 || !reg.inMempool[txIdx]!.get(producerIdx)) {
+        producer.removeTxFromOrder(txIdx);
+        return true;
+      }
+      if (size + tx.size_B > ebSize_B) return false;
+      txRefs.push(txIdx);
       size += tx.size_B;
-    }
+      return true;
+    });
 
     // Never announce an empty EB
     if (txRefs.length === 0) return;
