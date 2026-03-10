@@ -55,6 +55,7 @@ function UTCDateTime(year, month, day, hour, minute = 0, second = 0) {
 let exceptions = {
   "2025-9": UTCDateTime(2025, 9, 1, 14),
   "2025-12": UTCDateTime(2025, 11, 17, 14),
+  "2026-3": UTCDateTime(2026, 3, 1, 14),
 };
 
 function getNextMeeting(now = new Date()) {
@@ -68,8 +69,8 @@ function getNextMeeting(now = new Date()) {
   }
 
   // Unless there is an exception for next meeting
-  const exception =
-    exceptions[`${nextMeeting.getFullYear()}-${nextMeeting.getMonth() + 1}`];
+  const nextMonth = `${nextMeeting.getFullYear()}-${nextMeeting.getMonth() + 1}`;
+  const exception = exceptions[nextMonth];
   if (exception) {
     nextMeeting = exception;
   }
