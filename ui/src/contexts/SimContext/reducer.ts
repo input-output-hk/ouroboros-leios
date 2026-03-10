@@ -54,6 +54,7 @@ export const reducer = (
         currentTime: 0,
         minTime: 0,
         maxTime: scenario.duration,
+        layoutMode: "original",
       };
     }
 
@@ -208,6 +209,26 @@ export const reducer = (
         ...state,
         lokiConnectionState: action.payload,
       };
+
+    case "SET_LAYOUT_MODE":
+      return {
+        ...state,
+        layoutMode: action.payload,
+      };
+
+    case "SET_NODE_POSITIONS": {
+      const newNodes = new Map(state.topography.nodes);
+      for (const [id, pos] of action.payload) {
+        const existing = newNodes.get(id);
+        if (existing) {
+          newNodes.set(id, { ...existing, fx: pos.fx, fy: pos.fy });
+        }
+      }
+      return {
+        ...state,
+        topography: { ...state.topography, nodes: newNodes },
+      };
+    }
 
     default:
       return state;

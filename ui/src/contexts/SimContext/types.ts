@@ -82,6 +82,8 @@ export interface IGraphContextState {
   currentNode?: string;
 }
 
+export type LayoutMode = "original" | "auto";
+
 export enum EConnectionState {
   NotConnected = "NotConnected",
   Connecting = "Connecting",
@@ -108,6 +110,7 @@ export interface ISimContextState {
   topography: ITransformedNodeMap;
   topologyPath: string;
   topologyLoaded: boolean;
+  layoutMode: LayoutMode;
   events: IServerMessage[];
   currentTime: number;
   minTime: number;
@@ -139,7 +142,9 @@ export type TSimContextActions =
   | { type: "SET_TIMELINE_PLAYING"; payload: boolean }
   | { type: "SET_TIMELINE_SPEED"; payload: number }
   | { type: "RESET_TIMELINE" }
-  | { type: "SET_LOKI_CONNECTION_STATE"; payload: EConnectionState };
+  | { type: "SET_LOKI_CONNECTION_STATE"; payload: EConnectionState }
+  | { type: "SET_LAYOUT_MODE"; payload: LayoutMode }
+  | { type: "SET_NODE_POSITIONS"; payload: Map<string, { fx: number; fy: number }> };
 
 export interface ISimContext {
   state: ISimContextState;

@@ -18,6 +18,7 @@ export const Canvas: FC = () => {
         currentNode,
       },
       topography,
+      layoutMode,
     },
     dispatch,
   } = useSimContext();
@@ -48,7 +49,7 @@ export const Canvas: FC = () => {
         canvasOffsetY: offsetY,
       },
     });
-  }, []);
+  }, [layoutMode]);
 
   const handleClick = useCallback(
     (ev: PointerEvent) => {

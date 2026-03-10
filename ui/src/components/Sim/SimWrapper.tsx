@@ -9,13 +9,17 @@ import { Scenario } from "./modules/Scenario";
 import { TimelineSlider } from "./modules/TimelineSlider";
 import { Playback } from "./modules/Playback";
 import { Stats } from "./modules/Stats";
+import { LayoutSelector } from "./modules/LayoutSelector";
 import { ITransformedNode } from "./types";
+import { useForceLayout } from "@/hooks/useForceLayout";
 
 export const SimWrapper: FC = () => {
   const {
     state: { topologyPath, topologyLoaded },
     dispatch,
   } = useSimContext();
+
+  useForceLayout();
 
   // Load topology if it has changed
   useEffect(() => {
@@ -87,6 +91,7 @@ export const SimWrapper: FC = () => {
     <div className="relative h-screen w-screen">
       <div className="flex flex-col items-start gap-4 z-10 absolute left-10 top-10">
         <Scenario />
+        <LayoutSelector />
         <Stats />
       </div>
       {topologyLoaded ? <GraphWrapper /> : null}
