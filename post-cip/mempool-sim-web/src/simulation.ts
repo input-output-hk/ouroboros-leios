@@ -329,14 +329,17 @@ export class Simulation {
 
     // Step 1: Certify pending EB from previous block (if any)
     let canIncludeTxs = true;
+    let certifiedEB: EndorserBlock | null = null;
     if (this.ebEnabled && this.lastEB) {
+      const pendingEB = this.lastEB;
       const certified = Math.random() < this.ebCertificationRate;
-      this.lastEB.certified = certified;
+      pendingEB.certified = certified;
       if (certified) {
         // Certified EB: this RB carries only the certificate, no txs
         canIncludeTxs = false;
+        certifiedEB = pendingEB;
         // Remove certified EB's txs from all mempools — they're in the chain via the EB
-        for (const txIdx of this.lastEB.txRefs) {
+        for (const txIdx of pendingEB.txRefs) {
           this.consumeTx(txIdx, blockIdx);
         }
       }
@@ -384,6 +387,7 @@ export class Simulation {
         honestCount,
         adversarialCount,
         certified: !canIncludeTxs,
+        certifiedEB,
       }, 'block produced');
     }
 
@@ -472,6 +476,8 @@ export class Simulation {
 
     const txRefs: number[] = [];
     let size = 0;
+    let honestCount = 0;
+    let adversarialCount = 0;
 
     for (let i = 0; i < reg.txs.length; i++) {
       const tx = reg.txs[i]!;
@@ -480,6 +486,8 @@ export class Simulation {
       if (size + tx.size_B > ebSize_B) continue;
       txRefs.push(i);
       size += tx.size_B;
+      if (tx.isAdversarial) adversarialCount++;
+      else honestCount++;
     }
 
     // Never announce an empty EB
@@ -491,6 +499,8 @@ export class Simulation {
       clock,
       txRefs,
       size_B: size,
+      honestCount,
+      adversarialCount,
       certified: false, // pending — decided at next block production
     };
     this.endorserBlocks.push(eb);
@@ -505,6 +515,8 @@ export class Simulation {
         clock,
         txCount: txRefs.length,
         size_B: size,
+        honestCount,
+        adversarialCount,
       }, 'endorser block produced');
     }
 
