@@ -53,6 +53,41 @@ function circularLayout(topography: ITransformedNodeMap): PositionMap {
   return positions;
 }
 
+function mercatorLayout(topography: ITransformedNodeMap): PositionMap {
+  // First pass: project all nodes
+  const projected: { id: string; fx: number; fy: number }[] = [];
+  for (const [id, node] of topography.nodes) {
+    const lat = node.data.location[0];
+    const lon = node.data.location[1];
+    const latRad = (lat * Math.PI) / 180;
+    const fx = lon;
+    // Negate so north is up (canvas y increases downward)
+    const fy = -Math.log(Math.tan(Math.PI / 4 + latRad / 2)) * (180 / Math.PI);
+    projected.push({ id, fx, fy });
+  }
+
+  // Normalize y to match x span so the aspect ratio is reasonable
+  const xs = projected.map((p) => p.fx);
+  const ys = projected.map((p) => p.fy);
+  const xMin = Math.min(...xs);
+  const xMax = Math.max(...xs);
+  const yMin = Math.min(...ys);
+  const yMax = Math.max(...ys);
+  const xSpan = xMax - xMin || 1;
+  const ySpan = yMax - yMin || 1;
+  const yMid = (yMin + yMax) / 2;
+  const scale = xSpan / ySpan;
+
+  const positions: PositionMap = new Map();
+  for (const p of projected) {
+    positions.set(p.id, {
+      fx: p.fx,
+      fy: yMid + (p.fy - yMid) * scale,
+    });
+  }
+  return positions;
+}
+
 function forceLayout(
   topography: ITransformedNodeMap,
   onTick: (positions: PositionMap) => void,
@@ -126,6 +161,9 @@ export const useGraphLayout = () => {
         break;
       case "circular":
         applyPositions(circularLayout(topography));
+        break;
+      case "mercator":
+        applyPositions(mercatorLayout(topography));
         break;
       case "auto": {
         const sim = forceLayout(topography, applyPositions);

@@ -82,7 +82,7 @@ export interface IGraphContextState {
   currentNode?: string;
 }
 
-export type LayoutMode = "original" | "auto" | "circular";
+export type LayoutMode = "original" | "auto" | "circular" | "mercator";
 
 export enum EConnectionState {
   NotConnected = "NotConnected",

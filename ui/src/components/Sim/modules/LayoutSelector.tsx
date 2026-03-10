@@ -27,6 +27,7 @@ export const LayoutSelector: FC = () => {
         <option value="original">Original</option>
         <option value="auto">Auto</option>
         <option value="circular">Circular</option>
+        <option value="mercator">Mercator</option>
       </select>
     </div>
   );
