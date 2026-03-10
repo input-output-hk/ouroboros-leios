@@ -5,7 +5,7 @@ set -eo pipefail
 (
 
 echo $'Adversarial nodes\tRB ID\tRB honest txs\tRB adversarial txs\tEB ID\tEB honest txs\tEB adversarial txs'
-for f in adversaries-*.jsonl.gz
+for f in $(find -cnewer jobs-adversaries.list -size +1 -name adversaries-\*.jsonl.gz)
 do
   zcat $f \
 | jq -rs '
