@@ -230,6 +230,18 @@ export const reducer = (
       };
     }
 
+    case "SET_MERCATOR_PARAMS":
+      return {
+        ...state,
+        mercatorParams: action.payload,
+      };
+
+    case "SET_MAP_GEOJSON":
+      return {
+        ...state,
+        mapGeoJson: action.payload,
+      };
+
     default:
       return state;
   }

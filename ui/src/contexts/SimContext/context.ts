@@ -41,6 +41,8 @@ export const defaultState: ISimContextState = {
   topologyPath: "",
   topologyLoaded: false,
   layoutMode: "original",
+  mercatorParams: null,
+  mapGeoJson: null,
   events: [],
   currentTime: 0,
   minTime: 0,

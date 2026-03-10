@@ -84,6 +84,13 @@ export interface IGraphContextState {
 
 export type LayoutMode = "original" | "auto" | "circular" | "mercator";
 
+export interface MercatorParams {
+  xOffset: number;
+  xScale: number;
+  yOffset: number;
+  yScale: number;
+}
+
 export enum EConnectionState {
   NotConnected = "NotConnected",
   Connecting = "Connecting",
@@ -111,6 +118,8 @@ export interface ISimContextState {
   topologyPath: string;
   topologyLoaded: boolean;
   layoutMode: LayoutMode;
+  mercatorParams: MercatorParams | null;
+  mapGeoJson: GeoJSON.FeatureCollection | null;
   events: IServerMessage[];
   currentTime: number;
   minTime: number;
@@ -144,7 +153,9 @@ export type TSimContextActions =
   | { type: "RESET_TIMELINE" }
   | { type: "SET_LOKI_CONNECTION_STATE"; payload: EConnectionState }
   | { type: "SET_LAYOUT_MODE"; payload: LayoutMode }
-  | { type: "SET_NODE_POSITIONS"; payload: Map<string, { fx: number; fy: number }> };
+  | { type: "SET_NODE_POSITIONS"; payload: Map<string, { fx: number; fy: number }> }
+  | { type: "SET_MERCATOR_PARAMS"; payload: MercatorParams | null }
+  | { type: "SET_MAP_GEOJSON"; payload: GeoJSON.FeatureCollection };
 
 export interface ISimContext {
   state: ISimContextState;

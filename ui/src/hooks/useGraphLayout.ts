@@ -10,6 +10,7 @@ import {
 } from "d3-force";
 import { useSimContext } from "@/contexts/SimContext/context";
 import { ITransformedNodeMap } from "@/components/Sim/types";
+import { MercatorParams } from "@/contexts/SimContext/types";
 
 type PositionMap = Map<string, { fx: number; fy: number }>;
 
@@ -53,39 +54,72 @@ function circularLayout(topography: ITransformedNodeMap): PositionMap {
   return positions;
 }
 
-function mercatorLayout(topography: ITransformedNodeMap): PositionMap {
-  // First pass: project all nodes
-  const projected: { id: string; fx: number; fy: number }[] = [];
+/** Raw Mercator: lat → y (before linear mapping) */
+function rawMercatorY(lat: number): number {
+  const latRad = (lat * Math.PI) / 180;
+  return -Math.log(Math.tan(Math.PI / 4 + latRad / 2)) * (180 / Math.PI);
+}
+
+/** Project real-world lat/lon to the same coordinate space as the nodes */
+export function mercatorProject(
+  lat: number,
+  lon: number,
+  params: MercatorParams,
+): { x: number; y: number } {
+  return {
+    x: params.xOffset + lon * params.xScale,
+    y: params.yOffset + rawMercatorY(lat) * params.yScale,
+  };
+}
+
+function mercatorLayout(
+  topography: ITransformedNodeMap,
+): { positions: PositionMap; params: MercatorParams } {
+  // Project all nodes using raw Mercator
+  const projected: { id: string; nodeLon: number; rawY: number }[] = [];
   for (const [id, node] of topography.nodes) {
     const lat = node.data.location[0];
     const lon = node.data.location[1];
-    const latRad = (lat * Math.PI) / 180;
-    const fx = lon;
-    // Negate so north is up (canvas y increases downward)
-    const fy = -Math.log(Math.tan(Math.PI / 4 + latRad / 2)) * (180 / Math.PI);
-    projected.push({ id, fx, fy });
+    projected.push({ id, nodeLon: lon, rawY: rawMercatorY(lat) });
   }
 
-  // Normalize y to match x span so the aspect ratio is reasonable
-  const xs = projected.map((p) => p.fx);
-  const ys = projected.map((p) => p.fy);
-  const xMin = Math.min(...xs);
-  const xMax = Math.max(...xs);
-  const yMin = Math.min(...ys);
-  const yMax = Math.max(...ys);
-  const xSpan = xMax - xMin || 1;
-  const ySpan = yMax - yMin || 1;
-  const yMid = (yMin + yMax) / 2;
-  const scale = xSpan / ySpan;
+  // Node coordinate ranges (topology space)
+  const nodeLons = projected.map((p) => p.nodeLon);
+  const rawYs = projected.map((p) => p.rawY);
+  const nodeXMin = Math.min(...nodeLons);
+  const nodeXMax = Math.max(...nodeLons);
+  const rawYMin = Math.min(...rawYs);
+  const rawYMax = Math.max(...rawYs);
+  const nodeXSpan = nodeXMax - nodeXMin || 1;
+  const rawYSpan = rawYMax - rawYMin || 1;
+
+  // x mapping: real longitude [-180, 180] → node x range [nodeXMin, nodeXMax]
+  const xScale = nodeXSpan / 360;
+  const xOffset = nodeXMin - -180 * xScale;
+
+  // y mapping: raw Mercator y → scaled y, preserving aspect ratio with x
+  // Scale raw y so that the node y span matches the node x span
+  const yScale = nodeXSpan / rawYSpan;
+  // Center the y range on the same midpoint as x
+  const nodeYMid = (nodeXMin + nodeXMax) / 2;
+  const rawYMid = (rawYMin + rawYMax) / 2;
+  const yOffsetCentered = nodeYMid - rawYMid * yScale;
+
+  const params: MercatorParams = {
+    xOffset,
+    xScale,
+    yOffset: yOffsetCentered,
+    yScale,
+  };
 
   const positions: PositionMap = new Map();
   for (const p of projected) {
     positions.set(p.id, {
-      fx: p.fx,
-      fy: yMid + (p.fy - yMid) * scale,
+      fx: p.nodeLon,
+      fy: yOffsetCentered + p.rawY * yScale,
     });
   }
-  return positions;
+  return { positions, params };
 }
 
 function forceLayout(
@@ -139,10 +173,26 @@ function forceLayout(
 
 export const useGraphLayout = () => {
   const {
-    state: { layoutMode, topography, topologyLoaded },
+    state: { layoutMode, topography, topologyLoaded, mapGeoJson },
     dispatch,
   } = useSimContext();
   const simRef = useRef<Simulation<ForceNode, SimulationLinkDatum<ForceNode>> | null>(null);
+
+  // Fetch world map GeoJSON once
+  useEffect(() => {
+    if (mapGeoJson) return;
+    fetch("data/ne_110m_admin_0_countries.geojson")
+      .then((res) => {
+        if (!res.ok) return null;
+        return res.json();
+      })
+      .then((data) => {
+        if (data) {
+          dispatch({ type: "SET_MAP_GEOJSON", payload: data });
+        }
+      })
+      .catch(() => {});
+  }, [mapGeoJson]);
 
   useEffect(() => {
     if (!topologyLoaded || topography.nodes.size === 0) return;
@@ -157,15 +207,21 @@ export const useGraphLayout = () => {
 
     switch (layoutMode) {
       case "original":
+        dispatch({ type: "SET_MERCATOR_PARAMS", payload: null });
         applyPositions(originalLayout(topography));
         break;
       case "circular":
+        dispatch({ type: "SET_MERCATOR_PARAMS", payload: null });
         applyPositions(circularLayout(topography));
         break;
-      case "mercator":
-        applyPositions(mercatorLayout(topography));
+      case "mercator": {
+        const { positions, params } = mercatorLayout(topography);
+        dispatch({ type: "SET_MERCATOR_PARAMS", payload: params });
+        applyPositions(positions);
         break;
+      }
       case "auto": {
+        dispatch({ type: "SET_MERCATOR_PARAMS", payload: null });
         const sim = forceLayout(topography, applyPositions);
         simRef.current = sim;
         sim.on("end", () => {

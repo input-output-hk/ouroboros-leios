@@ -1,6 +1,7 @@
 import { useSimContext } from "@/contexts/SimContext/context";
-import { EMessageType } from "@/contexts/SimContext/types";
+import { EMessageType, MercatorParams } from "@/contexts/SimContext/types";
 import { ELinkColor, EMessageColor, ENodeColor } from "@/utils/colors";
+import { mercatorProject } from "@/hooks/useGraphLayout";
 import { useCallback } from "react";
 
 // Import helper function from timelineAggregation
@@ -22,6 +23,45 @@ const getHighestPriorityMessageType = (counts: {
   return null;
 };
 
+function drawMapBackground(
+  ctx: CanvasRenderingContext2D,
+  geoJson: GeoJSON.FeatureCollection,
+  params: MercatorParams,
+  canvasScale: number,
+) {
+  ctx.strokeStyle = "#ccc";
+  ctx.fillStyle = "#f0f0f0";
+  ctx.lineWidth = Math.min((0.2 / canvasScale) * 6, 0.2);
+
+  for (const feature of geoJson.features) {
+    const geometry = feature.geometry;
+    if (!geometry) continue;
+
+    const rings: number[][][] =
+      geometry.type === "Polygon"
+        ? (geometry as GeoJSON.Polygon).coordinates
+        : geometry.type === "MultiPolygon"
+          ? (geometry as GeoJSON.MultiPolygon).coordinates.flat()
+          : [];
+
+    for (const ring of rings) {
+      ctx.beginPath();
+      for (let i = 0; i < ring.length; i++) {
+        const [lon, lat] = ring[i];
+        const { x, y } = mercatorProject(lat, lon, params);
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+}
+
 export const useHandlers = () => {
   const {
     state: {
@@ -36,6 +76,8 @@ export const useHandlers = () => {
       },
       maxTime,
       topography,
+      mercatorParams,
+      mapGeoJson,
     },
   } = useSimContext();
 
@@ -59,6 +101,11 @@ export const useHandlers = () => {
     // Apply translation and scaling
     context.translate(canvasOffsetX, canvasOffsetY);
     context.scale(canvasScale, canvasScale);
+
+    // Draw world map background when in Mercator mode
+    if (mercatorParams && mapGeoJson) {
+      drawMapBackground(context, mapGeoJson, mercatorParams, canvasScale);
+    }
 
     // Draw the links
     topography.links.forEach((link) => {
@@ -244,6 +291,8 @@ export const useHandlers = () => {
     canvasOffsetX,
     canvasOffsetY,
     canvasScale,
+    mercatorParams,
+    mapGeoJson,
   ]);
 
   return {

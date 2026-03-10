@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@types/d3-force": "^3.0.10",
+    "@types/geojson": "^7946.0.16",
     "cborg": "^4.2.18",
     "classnames": "^2.5.1",
     "d3-force": "^3.0.0",
