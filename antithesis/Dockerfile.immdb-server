@@ -1,18 +1,18 @@
 FROM ghcr.io/blinklabs-io/haskell:9.6.6-3.12.1.0-3 AS immdb-server-build
 
-RUN echo "Building leios-prototype branch..." \
-    && git clone https://github.com/intersectmbo/ouroboros-consensus.git \
+RUN git clone https://github.com/intersectmbo/ouroboros-consensus.git \
     && cd ouroboros-consensus \
     && git fetch --all --recurse-submodules --tags \
     && git checkout leios-prototype \
     && echo "with-compiler: ghc-${GHC_VERSION}" >> cabal.project.local \
-    && echo "tests: False" >> cabal.project.local \
+    && echo "tests: False" >> cabal.project.local
+
+RUN --mount=type=cache,target=/root/.cabal/store,id=cabal-store-immdb-server \
+    --mount=type=cache,target=/root/.cabal/packages,id=cabal-packages \
+    --mount=type=cache,target=/ouroboros-consensus/dist-newstyle,id=dist-immdb-server \
+    cd ouroboros-consensus \
     && cabal update \
-    && cabal install exe:immdb-server exe:leiosdemo202510 --install-method=copy --installdir=/root/.local/bin/ \
-    && rm -rf /root/.cabal/packages \
-    && rm -rf /usr/local/lib/ghc-${GHC_VERSION}/ /usr/local/share/doc/ghc-${GHC_VERSION}/ \
-    && rm -rf dist-newstyle/ \
-    && rm -rf /root/.cabal/store/ghc-${GHC_VERSION}
+    && cabal install exe:immdb-server exe:leiosdemo202510 --install-method=copy --installdir=/root/.local/bin/
 
 FROM debian:bookworm-slim AS immdb-server
 
