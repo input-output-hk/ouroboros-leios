@@ -5,6 +5,7 @@ This document catalogs Leios-related findings and artifacts that were created su
 1. [Markovian model of Linear Leios](#markovian-model-of-linear-leios)
 2. [Analysis of UTxO set size and UTxO lifetime](#analysis-of-utxo-set-size-and-utxo-lifetime)
 3. [CPU cost of `Apply`, `Reapply`, and Plutus ledger operations](#analysis-of-utxo-set-size-and-utxo-lifetime)
+4. [Mempool and constraint modeling](#mempool-and-constraint-modeling)
 
 ---
 
@@ -60,3 +61,46 @@ The left plot is on a square-root scale horizontally, so one can see how big the
 | ![Distribution of UTxO lifetime on mainnet (square-root scale)](../post-cip/tx-measurements/utxo-lifetime-days-sqrt.svg) | ![Distribution of UTxO lifetime on mainnet (logarithmic scale)](../post-cip/tx-measurements/utxo-lifetime-days-log10.svg) |
 
 ---
+
+## Mempool and constraint modeling
+
+### Findings from idealized modeling of memory pools
+
+Simulation studies indicate that the high connectivity of the network topology promotes rapid diffusion, resists fragmentation, and thwarts adversaries.
+
+|                        | Demand ≲ Capacity | Demand ≳ Capacity                       | Demand ≫ Capacity                       |
+| ---------------------- | ----------------- | --------------------------------------- | --------------------------------------- |
+| Speed of diffusion     | fast              | fast                                    | may degrade                             |
+| Global synchronization | ≳ 90%             | inversely proportional to global demand | inversely proportional to global demand |
+| Fragmentation          | ≲ 10%             | proportional to global demand           | proportional to global demand           |
+
+Implications for protocol parameters:
+- In the absense of adversaries, transactions soon arrive at non-voting nodes.  
+- In the presence of adversaries, Ldiff must account for intentional late release of transaction bodies.
+
+### Findings regarding front-running and MEV
+
+- Only a fraction of transactions are susceptible to front running.
+	- The attack surface also depends upon the dapp design.
+- Front-running a transaction in the memory pool critically depends upon how quickly an adversary can craft a competing transaction.
+
+| Locus of front running | Required resources | Success rate                                                                             |
+| ---------------------- | ------------------ | ---------------------------------------------------------------------------------------- |
+| Memory pool            | Relay nodes        | Depends upon the number of relays and upon how fast the competing transaction is crafted |
+| Block producer         | Stake              | Proportional to stake                                                                    |
+
+Implications for protocol parameters: none.
+
+### Findings from resource-constraint analyses
+
+- There are two major sources of time delays:
+	- Waiting for transaction bodies.  
+	- Applying transactions to the ledger.
+- Signature verification and Plutus execution tend not to cause delays because they are parallelizable.
+- Ledger application is modestly parallelizable except in adversity.
+- 3 CPU cores are sufficient for typical 12 MB endorser blocks.
+- Adversarial late release of transaction bodies can double peak CPU.
+
+Implications for protocol parameters:
+
+- Maximum transactions per EB, maximum EB size, and Plutus limits must accord with CPU resources.
