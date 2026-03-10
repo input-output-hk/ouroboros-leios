@@ -30,7 +30,7 @@ function drawMapBackground(
   canvasScale: number,
 ) {
   ctx.strokeStyle = "#ccc";
-  ctx.fillStyle = "#f0f0f0";
+  ctx.fillStyle = "#e8f5e9";
   ctx.lineWidth = Math.min((0.2 / canvasScale) * 6, 0.2);
 
   for (const feature of geoJson.features) {
