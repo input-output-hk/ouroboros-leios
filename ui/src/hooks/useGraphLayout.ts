@@ -72,14 +72,24 @@ export function mercatorProject(
   };
 }
 
+/** Detect whether location is [lat, lon] or [lon, lat] */
+function isLocationSwapped(topography: ITransformedNodeMap): boolean {
+  for (const [, node] of topography.nodes) {
+    if (Math.abs(node.data.location[0]) > 90) return true;
+  }
+  return false;
+}
+
 function mercatorLayout(
   topography: ITransformedNodeMap,
 ): { positions: PositionMap; params: MercatorParams } {
+  const swapped = isLocationSwapped(topography);
+
   // Project all nodes using raw Mercator
   const projected: { id: string; nodeLon: number; rawY: number }[] = [];
   for (const [id, node] of topography.nodes) {
-    const lat = node.data.location[0];
-    const lon = node.data.location[1];
+    const lat = swapped ? node.data.location[1] : node.data.location[0];
+    const lon = swapped ? node.data.location[0] : node.data.location[1];
     projected.push({ id, nodeLon: lon, rawY: rawMercatorY(lat) });
   }
 
@@ -91,16 +101,15 @@ function mercatorLayout(
   const rawYMin = Math.min(...rawYs);
   const rawYMax = Math.max(...rawYs);
   const nodeXSpan = nodeXMax - nodeXMin || 1;
-  const rawYSpan = rawYMax - rawYMin || 1;
 
   // x mapping: real longitude [-180, 180] → node x range [nodeXMin, nodeXMax]
   const xScale = nodeXSpan / 360;
   const xOffset = nodeXMin - -180 * xScale;
 
-  // y mapping: raw Mercator y → scaled y, preserving aspect ratio with x
-  // Scale raw y so that the node y span matches the node x span
-  const yScale = nodeXSpan / rawYSpan;
-  // Center the y range on the same midpoint as x
+  // y mapping: use same scale as x to preserve Mercator aspect ratio
+  // (raw Mercator Y is in degrees, same unit as longitude)
+  const yScale = xScale;
+  // Center y on the same midpoint as x
   const nodeYMid = (nodeXMin + nodeXMax) / 2;
   const rawYMid = (rawYMin + rawYMax) / 2;
   const yOffsetCentered = nodeYMid - rawYMid * yScale;
