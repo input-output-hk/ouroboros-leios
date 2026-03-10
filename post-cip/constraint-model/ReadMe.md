@@ -343,14 +343,14 @@ Results for the two examples are available at [ipfs://QmYpmGeHvNmWxk3fwbrY8vq9jJ
 
 In this experiment, CPU utilization scales less and less than linearly as the EB size increases. Three CPUs are sufficient to handle the workload and most of the time is spent waiting for transaction bodies to arrive.
 
-| EB size |    Wallclock | CPU utilization | Verify parallelism | Apply parallelism | Reapply parallelism |
-| ------: | -----------: | --------------: | -----------------: | ----------------: | ------------------: |
-|    2 MB | 4 989 006 µs |           15.6% |               0.01 |              0.12 |                0.03 |
-|         | 4 904 844 µs |            4.0% |               0.01 |              0.12 |                0.03 |
-|    6 MB | 5 924 047 µs |           29.3% |               0.03 |              0.36 |                0.09 |
-|         | 5 483 392 µs |            7.9% |               0.04 |              0.42 |                0.11 |
-|   12 MB | 5 067 936 µs |           64.5% |               0.06 |              0.63 |                0.15 |
-|         | 3 740 821 µs |           21.9% |               0.09 |              0.98 |                0.24 |
+| EB size | CPUs |    Wallclock | CPU utilization | Verify parallelism | Apply parallelism | Reapply parallelism |
+| ------: | ---: | -----------: | --------------: | -----------------: | ----------------: | ------------------: |
+|    2 MB |    1 | 4 989 006 µs |           15.6% |               0.01 |              0.12 |                0.03 |
+|         |    4 | 4 904 844 µs |            4.0% |               0.01 |              0.12 |                0.03 |
+|    6 MB |    1 | 5 924 047 µs |           29.3% |               0.03 |              0.36 |                0.09 |
+|         |    4 | 5 483 392 µs |            7.9% |               0.04 |              0.42 |                0.11 |
+|   12 MB |    1 | 5 067 936 µs |           64.5% |               0.06 |              0.63 |                0.15 |
+|         |    4 | 3 740 821 µs |           21.9% |               0.09 |              0.98 |                0.24 |
 
 ### Adversarial delay
 
