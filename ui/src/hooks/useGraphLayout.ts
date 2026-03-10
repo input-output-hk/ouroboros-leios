@@ -124,7 +124,7 @@ function mercatorLayout(
   const positions: PositionMap = new Map();
   for (const p of projected) {
     positions.set(p.id, {
-      fx: p.nodeLon,
+      fx: xOffset + p.nodeLon * xScale,
       fy: yOffsetCentered + p.rawY * yScale,
     });
   }

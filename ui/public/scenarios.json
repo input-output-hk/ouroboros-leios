@@ -18,6 +18,16 @@
       "duration": 120
     },
     {
+      "name": "Mini Mainnet (750 nodes)",
+      "topology": "topologies/topology-v2.yaml",
+      "duration": 120
+    },
+    {
+      "name": "Pseudo Mainnet (10k nodes)",
+      "topology": "topologies/topology-v1.yaml",
+      "duration": 120
+    },
+    {
       "name": "Leios Demo 202511",
       "topology": "topologies/prototype.yaml",
       "duration": 300,
