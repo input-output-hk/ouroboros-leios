@@ -72,6 +72,8 @@ Therefore, the table sizes are as follows.
 - The TX table has ≤ ~150 million rows.
 
 But those limits can only be maintained overtime if the tables are regularly pruned.
+
+**Pruning EB and EB2TX.**
 The EB table and therefore the EB2TX table can be pruned according to ebSlot.
 Since ebSlot is the first component of the primary key, a matching index necessarily exists and so this is a inexpensive operation.
 As long as its done "often enough" per 36 hr window, it'll be sufficient; the effective bound on the number of EB rows will be slightly inflated.
@@ -84,6 +86,7 @@ DELETE FROM EB2TX
 WHERE ebSlot < TheCurrentCutoff;
 ```
 
+**Pruning TX.**
 The TX table is more difficult to prune, because the lifetimes are dynamically determined by the contents of EB2TX.
 As a starting point, the following SQL statement would remove TXs that are no longer referenced by EB2TX.
 
@@ -105,7 +108,9 @@ CREATE INDEX idx_EB2TX_txHash ON EB2TX(txHash);
 ```
 
 Second, that now-accelerated subquery is still happening once for each of the ≤ 150 million rows of TX.
-That full scan can be avoided since a row in TX can only become orphaned when an referencing EB is pruned from EB2TX.
+That full scan can be avoided since a row in TX can only become orphaned when a referencing EB is pruned from EB2TX.
+
+**Pruning all three in a cascade.**
 Thus, the minimal-traffic "reverse cascade" logic could be achieved as follows.
 
 ```
@@ -145,7 +150,7 @@ However, it also contains much more beyond that---it indexes all ≤ ~10000 EBs 
 It therefore runs the risk of spanning too many pages to always be fully retained in memory, which in turn means querying it would risk disk-levels of latency within the LeiosFetch hot loop.
 
 An explicitly bounded portion of that index can therefore be manually maintained in-memory.
-It could an in-memory database table or a bespoke data structure, whichever is easier.
+It could be an in-memory database table or a bespoke data structure, whichever is easier.
 
 ```mermaid
 erDiagram
@@ -189,7 +194,7 @@ erDiagram
 
 ### Adding the bitmaps
 
-TODO
+TODO worth putting in the table?
 
 ```mermaid
 erDiagram
@@ -201,3 +206,6 @@ erDiagram
         bytes[2000] bitmap
     }
 ```
+
+TODO maybe they don't need to be persisted at all?
+They can just be rebuilt via scans on node init?
