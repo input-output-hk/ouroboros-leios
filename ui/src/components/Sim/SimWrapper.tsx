@@ -11,7 +11,7 @@ import { Playback } from "./modules/Playback";
 import { Stats } from "./modules/Stats";
 import { LayoutSelector } from "./modules/LayoutSelector";
 import { ITransformedNode } from "./types";
-import { useForceLayout } from "@/hooks/useForceLayout";
+import { useGraphLayout } from "@/hooks/useGraphLayout";
 
 export const SimWrapper: FC = () => {
   const {
@@ -19,7 +19,7 @@ export const SimWrapper: FC = () => {
     dispatch,
   } = useSimContext();
 
-  useForceLayout();
+  useGraphLayout();
 
   // Load topology if it has changed
   useEffect(() => {
