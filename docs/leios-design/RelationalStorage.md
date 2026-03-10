@@ -147,7 +147,7 @@ It therefore runs the risk of spanning too many pages to always be fully retaine
 An explicitly bounded portion of that index can therefore be manually maintained in-memory.
 It could an in-memory database table or a bespoke data structure, whichever is easier.
 
-```
+```mermaid
 erDiagram
     %% Just a slot-hash pair, aka point.
     %% TODO length field too, since EbAnnouncement could have that?
@@ -191,7 +191,7 @@ erDiagram
 
 TODO
 
-```
+```mermaid
 erDiagram
     %% Just a slot-hash pair, aka point.
     %% TODO length field too, since EbAnnouncement could have that?
