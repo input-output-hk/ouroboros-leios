@@ -13,19 +13,10 @@
       "trace": "traces/small-1txkbs-nocpu.jsonl.gz"
     },
     {
-      "name": "Micro Mainnet (100 nodes)",
+      "name": "Linear Leios Micro Mainnet (100 nodes)",
       "topology": "topologies/topology-v3.yaml",
-      "duration": 120
-    },
-    {
-      "name": "Mini Mainnet (750 nodes)",
-      "topology": "topologies/topology-v2.yaml",
-      "duration": 120
-    },
-    {
-      "name": "Pseudo Mainnet (10k nodes)",
-      "topology": "topologies/topology-v1.yaml",
-      "duration": 120
+      "duration": 120,
+      "trace": "traces/micro-mainnet-linear-nocpu.jsonl.gz"
     },
     {
       "name": "Leios Demo 202511",
