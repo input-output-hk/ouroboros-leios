@@ -77,6 +77,7 @@ Simulation studies indicate that the high connectivity of the network topology p
 Implications for protocol parameters:
 - In the absense of adversaries, transactions soon arrive at non-voting nodes.  
 - In the presence of adversaries, Ldiff must account for intentional late release of transaction bodies.
+- Larger mempools result in less fragmentation.
 
 ### Findings regarding front-running and MEV
 
