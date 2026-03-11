@@ -270,6 +270,7 @@ The analysis container reports assertions to Antithesis SDK:
 - always: Forged block slots never decrease within a node
 - always_or_unreachable: All received blocks were created by a known node
 - sometimes: Leios endorser blocks (EBs) are created
+- always: No pool produces more than 60% of blocks (chain quality)
 - sometimes: Each pool produces blocks (pool1, pool2, pool3)
 - sometimes: Chain tip advances between checks
 - sometimes: Leios votes were created

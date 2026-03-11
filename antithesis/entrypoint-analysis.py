@@ -100,6 +100,25 @@ def report_assertions(metrics, praos_threshold_ms: float, prev_max_slot: int):
         else:
             log(f"  {pool_name} blocks created: {pool_count}")
 
+    # Chain quality / fairness: no single pool dominates block production
+    total_blocks = sum(metrics.blocks_created_by_node.values())
+    if total_blocks > 10:
+        max_share = max(metrics.blocks_created_by_node.values()) / total_blocks
+        fair = max_share <= 0.6
+        if ANTITHESIS_AVAILABLE:
+            always(
+                fair,
+                "No pool produces more than 60% of blocks",
+                {
+                    "max_share": round(max_share, 3),
+                    "total_blocks": total_blocks,
+                    "per_pool": dict(metrics.blocks_created_by_node),
+                },
+            )
+        else:
+            status = "PASS" if fair else "FAIL"
+            log(f"[{status}] Max pool share: {max_share:.1%} (threshold 60%)")
+
     # Chain growth (sometimes) — chain tip advances between checks
     chain_advanced = metrics.max_slot_seen > prev_max_slot
     if ANTITHESIS_AVAILABLE:
