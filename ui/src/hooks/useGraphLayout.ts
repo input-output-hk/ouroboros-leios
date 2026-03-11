@@ -216,11 +216,9 @@ export const useGraphLayout = () => {
 
     switch (layoutMode) {
       case "original":
-        dispatch({ type: "SET_MERCATOR_PARAMS", payload: null });
         applyPositions(originalLayout(topography));
         break;
       case "circular":
-        dispatch({ type: "SET_MERCATOR_PARAMS", payload: null });
         applyPositions(circularLayout(topography));
         break;
       case "mercator": {
@@ -230,7 +228,6 @@ export const useGraphLayout = () => {
         break;
       }
       case "auto": {
-        dispatch({ type: "SET_MERCATOR_PARAMS", payload: null });
         const sim = forceLayout(topography, applyPositions);
         simRef.current = sim;
         sim.on("end", () => {

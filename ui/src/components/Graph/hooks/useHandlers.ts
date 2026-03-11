@@ -76,6 +76,7 @@ export const useHandlers = () => {
       },
       maxTime,
       topography,
+      layoutMode,
       mercatorParams,
       mapGeoJson,
     },
@@ -103,7 +104,7 @@ export const useHandlers = () => {
     context.scale(canvasScale, canvasScale);
 
     // Draw world map background when in Mercator mode
-    if (mercatorParams && mapGeoJson) {
+    if (layoutMode === "mercator" && mercatorParams && mapGeoJson) {
       drawMapBackground(context, mapGeoJson, mercatorParams, canvasScale);
     }
 
@@ -291,6 +292,7 @@ export const useHandlers = () => {
     canvasOffsetX,
     canvasOffsetY,
     canvasScale,
+    layoutMode,
     mercatorParams,
     mapGeoJson,
   ]);
