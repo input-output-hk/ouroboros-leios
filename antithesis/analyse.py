@@ -43,6 +43,7 @@ class Metrics:
     orphan_block_hashes: set = None
     max_slot_by_node: dict = None
     mempool_txs_added: int = 0
+    chain_tip_by_node: dict = None
 
     def __post_init__(self):
         if self.praos_latencies_ms is None:
@@ -59,6 +60,8 @@ class Metrics:
             self.orphan_block_hashes = set()
         if self.max_slot_by_node is None:
             self.max_slot_by_node = {}
+        if self.chain_tip_by_node is None:
+            self.chain_tip_by_node = {}
 
 
 def parse_timestamp(ts_str: str) -> Optional[datetime]:
@@ -313,6 +316,11 @@ def compute_metrics(log_dir: str = "/logs") -> Metrics:
                     block_received_times[event.block_hash].append(event.timestamp)
                     if event.slot > 0:
                         received_hashes.add(event.block_hash)
+                    # Track chain tip per node (from adopted/AddedToCurrentChain)
+                    if event.event_type == "adopted" and event.slot > 0:
+                        cur = metrics.chain_tip_by_node.get(event.node)
+                        if cur is None or event.slot > cur[0]:
+                            metrics.chain_tip_by_node[event.node] = (event.slot, event.block_hash)
                 if event.slot > metrics.max_slot_seen:
                     metrics.max_slot_seen = event.slot
                 if event.slot > 0:

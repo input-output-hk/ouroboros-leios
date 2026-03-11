@@ -153,6 +153,7 @@ Enables network latency/bandwidth simulation using tc.
 | PRAOS_LATENCY_THRESHOLD_MS | 5000 | Latency threshold for assertions |
 | CHECK_INTERVAL_SECONDS | 5 | Analysis check interval |
 | INITIAL_WAIT_SECONDS | 30 | Wait before first analysis |
+| MAX_FORK_DEPTH | 10 | Max allowed chain tip divergence (slots) |
 | GRAFANA_PORT | 3000 | Host port for Grafana (observability stack) |
 
 ### WAN Emulation Variables (ImmDB stack)
@@ -269,6 +270,7 @@ The analysis container reports assertions to Antithesis SDK:
 - always: Each block has exactly one creator
 - always: Forged block slots never decrease within a node
 - always_or_unreachable: All received blocks were created by a known node
+- always_or_unreachable: Chain tip divergence is less than k slots (common prefix)
 - sometimes: Leios endorser blocks (EBs) are created
 - always: No pool produces more than 60% of blocks (chain quality)
 - sometimes: Each pool produces blocks (pool1, pool2, pool3)

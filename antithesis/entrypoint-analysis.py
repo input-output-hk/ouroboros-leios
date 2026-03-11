@@ -248,6 +248,27 @@ def report_assertions(metrics, praos_threshold_ms: float, prev_max_slot: int, pr
             if not no_orphans:
                 log(f"[FAIL] Orphan blocks: {list(metrics.orphan_block_hashes)[:5]}")
 
+    # Common prefix: no forks beyond depth k
+    max_fork_depth = int(os.environ.get("MAX_FORK_DEPTH", "10"))
+    tips = metrics.chain_tip_by_node
+    if len(tips) >= 2:
+        slots = [slot for slot, _ in tips.values()]
+        max_divergence = max(slots) - min(slots)
+        within_k = max_divergence < max_fork_depth
+        if ANTITHESIS_AVAILABLE:
+            always_or_unreachable(
+                within_k,
+                f"Chain tip divergence is less than k={max_fork_depth} slots",
+                {
+                    "max_divergence": max_divergence,
+                    "k": max_fork_depth,
+                    "tips": {n: {"slot": s, "hash": h} for n, (s, h) in tips.items()},
+                },
+            )
+        else:
+            status = "PASS" if within_k else "FAIL"
+            log(f"[{status}] Max chain divergence: {max_divergence} slots (k={max_fork_depth})")
+
 
 def main():
     """Main analysis loop."""
