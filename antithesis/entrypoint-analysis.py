@@ -166,6 +166,18 @@ def report_assertions(metrics, praos_threshold_ms: float, prev_max_slot: int, pr
     else:
         log(f"  Leios votes created: {metrics.leios_votes_created}")
 
+    # Tx throughput: transactions are entering the mempool
+    if ANTITHESIS_AVAILABLE:
+        sometimes(
+            metrics.mempool_txs_added > 0,
+            "Transactions are entering the mempool",
+            {
+                "mempool_txs_added": metrics.mempool_txs_added,
+            },
+        )
+    else:
+        log(f"  Mempool txs added: {metrics.mempool_txs_added}")
+
     # --- Safety assertions ---
 
     # No equivocation: no node forges two blocks in same slot

@@ -42,6 +42,7 @@ class Metrics:
     slot_regressions: list = None
     orphan_block_hashes: set = None
     max_slot_by_node: dict = None
+    mempool_txs_added: int = 0
 
     def __post_init__(self):
         if self.praos_latencies_ms is None:
@@ -170,6 +171,21 @@ def parse_log_line(line: str, node_name: str) -> Optional[BlockEvent]:
                 block_hash=block_hash,
                 slot=0,
                 block_type="praos",
+            )
+
+        # Mempool tx additions
+        # ns: "Mempool" with AddedToCurrentMempool or TraceMempoolAddedTx
+        if "Mempool" in ns and (
+            "AddedToCurrentMempool" in ns
+            or "TraceMempoolAddedTx" in str(event_data.get("kind", ""))
+        ):
+            return BlockEvent(
+                timestamp=ts,
+                node=node_name,
+                event_type="mempool_tx",
+                block_hash="",
+                slot=0,
+                block_type="tx",
             )
 
         # Leios events
@@ -303,6 +319,10 @@ def compute_metrics(log_dir: str = "/logs") -> Metrics:
                     prev = metrics.max_slot_by_node.get(event.node, 0)
                     if event.slot > prev:
                         metrics.max_slot_by_node[event.node] = event.slot
+
+            elif event.block_type == "tx":
+                if event.event_type == "mempool_tx":
+                    metrics.mempool_txs_added += 1
 
             elif event.block_type == "eb":
                 if event.event_type == "created":

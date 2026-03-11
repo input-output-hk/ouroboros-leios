@@ -275,6 +275,7 @@ The analysis container reports assertions to Antithesis SDK:
 - sometimes: Chain tip advances between checks
 - sometimes: Per-pool slot advances between checks (pool1, pool2, pool3)
 - sometimes: Leios votes were created
+- sometimes: Transactions are entering the mempool
 
 When running outside Antithesis, assertions are logged to stdout.
 
