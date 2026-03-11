@@ -13,7 +13,7 @@ from datetime import datetime
 # Import Antithesis SDK - handles gracefully if not available
 try:
     from antithesis.lifecycle import setup_complete
-    from antithesis.assertions import always, always_or_unreachable, sometimes
+    from antithesis.assertions import always, always_or_unreachable, reachable, sometimes
 
     ANTITHESIS_AVAILABLE = True
 except ImportError:
@@ -268,6 +268,32 @@ def report_assertions(metrics, praos_threshold_ms: float, prev_max_slot: int, pr
         else:
             status = "PASS" if within_k else "FAIL"
             log(f"[{status}] Max chain divergence: {max_divergence} slots (k={max_fork_depth})")
+
+    # --- Reachable guards: ensure key code paths are exercised ---
+    if ANTITHESIS_AVAILABLE:
+        if metrics.praos_blocks_created > 0:
+            reachable(
+                "Analysis parsed ForgedBlock events",
+                {"praos_blocks_created": metrics.praos_blocks_created},
+            )
+        if metrics.praos_blocks_received > 0:
+            reachable(
+                "Analysis parsed block reception events",
+                {"praos_blocks_received": metrics.praos_blocks_received},
+            )
+        if len(metrics.blocks_created_by_node) >= 2:
+            reachable(
+                "Analysis observed multiple pools producing",
+                {"pools": list(metrics.blocks_created_by_node.keys())},
+            )
+        if metrics.leios_ebs_created > 0 or metrics.leios_votes_created > 0:
+            reachable(
+                "Analysis observed Leios activity",
+                {
+                    "ebs_created": metrics.leios_ebs_created,
+                    "votes_created": metrics.leios_votes_created,
+                },
+            )
 
 
 def main():

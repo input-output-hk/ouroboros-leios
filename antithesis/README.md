@@ -279,6 +279,11 @@ The analysis container reports assertions to Antithesis SDK:
 - sometimes: Leios votes were created
 - sometimes: Transactions are entering the mempool
 
+- reachable: Analysis parsed ForgedBlock events
+- reachable: Analysis parsed block reception events
+- reachable: Analysis observed multiple pools producing
+- reachable: Analysis observed Leios activity
+
 When running outside Antithesis, assertions are logged to stdout.
 
 ## Antithesis Deployment
