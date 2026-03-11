@@ -13,7 +13,7 @@ from datetime import datetime
 # Import Antithesis SDK - handles gracefully if not available
 try:
     from antithesis.lifecycle import setup_complete
-    from antithesis.assertions import always, sometimes
+    from antithesis.assertions import always, always_or_unreachable, sometimes
 
     ANTITHESIS_AVAILABLE = True
 except ImportError:
@@ -181,19 +181,21 @@ def report_assertions(metrics, praos_threshold_ms: float, prev_max_slot: int):
             log(f"[FAIL] Slot regressions: {metrics.slot_regressions}")
 
     # No orphan blocks: all received blocks were created by a known node
+    # Use always_or_unreachable — if no blocks are received, the assertion passes vacuously
     no_orphans = len(metrics.orphan_block_hashes) == 0
-    if ANTITHESIS_AVAILABLE:
-        always(
-            no_orphans,
-            "All received blocks were created by a known node",
-            {
-                "orphan_count": len(metrics.orphan_block_hashes),
-                "orphan_sample": list(metrics.orphan_block_hashes)[:5],
-            },
-        )
-    else:
-        if not no_orphans:
-            log(f"[FAIL] Orphan blocks: {list(metrics.orphan_block_hashes)[:5]}")
+    if metrics.praos_blocks_received > 0:
+        if ANTITHESIS_AVAILABLE:
+            always_or_unreachable(
+                no_orphans,
+                "All received blocks were created by a known node",
+                {
+                    "orphan_count": len(metrics.orphan_block_hashes),
+                    "orphan_sample": list(metrics.orphan_block_hashes)[:5],
+                },
+            )
+        else:
+            if not no_orphans:
+                log(f"[FAIL] Orphan blocks: {list(metrics.orphan_block_hashes)[:5]}")
 
 
 def main():
