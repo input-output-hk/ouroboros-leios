@@ -273,6 +273,7 @@ The analysis container reports assertions to Antithesis SDK:
 - always: No pool produces more than 60% of blocks (chain quality)
 - sometimes: Each pool produces blocks (pool1, pool2, pool3)
 - sometimes: Chain tip advances between checks
+- sometimes: Per-pool slot advances between checks (pool1, pool2, pool3)
 - sometimes: Leios votes were created
 
 When running outside Antithesis, assertions are logged to stdout.

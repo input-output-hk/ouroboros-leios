@@ -29,7 +29,7 @@ def log(msg: str):
     print(f"[{ts}] {msg}", flush=True)
 
 
-def report_assertions(metrics, praos_threshold_ms: float, prev_max_slot: int):
+def report_assertions(metrics, praos_threshold_ms: float, prev_max_slot: int, prev_max_slot_by_node: dict = None):
     """Report assertions to Antithesis SDK or stdout."""
     praos_stats = get_latency_stats(metrics.praos_latencies_ms)
 
@@ -133,6 +133,26 @@ def report_assertions(metrics, praos_threshold_ms: float, prev_max_slot: int):
     else:
         status = "advancing" if chain_advanced else "stalled"
         log(f"  Chain: slot {prev_max_slot} -> {metrics.max_slot_seen} ({status})")
+
+    # Per-node slot advancement (sometimes) — no stuck nodes
+    if prev_max_slot_by_node is not None:
+        for pool_name in ["pool1", "pool2", "pool3"]:
+            cur_slot = metrics.max_slot_by_node.get(pool_name, 0)
+            prev_slot = prev_max_slot_by_node.get(pool_name, 0)
+            advanced = cur_slot > prev_slot
+            if ANTITHESIS_AVAILABLE:
+                sometimes(
+                    advanced,
+                    f"{pool_name} slot advances between checks",
+                    {
+                        "pool": pool_name,
+                        "prev_slot": prev_slot,
+                        "current_slot": cur_slot,
+                    },
+                )
+            else:
+                status = "advancing" if advanced else "stalled"
+                log(f"  {pool_name}: slot {prev_slot} -> {cur_slot} ({status})")
 
     # Leios votes created (sometimes)
     if ANTITHESIS_AVAILABLE:
@@ -250,6 +270,7 @@ def main():
 
     iteration = 0
     prev_max_slot = 0
+    prev_max_slot_by_node = None
     while True:
         iteration += 1
         log(f"--- Analysis iteration {iteration} ---")
@@ -282,8 +303,9 @@ def main():
                 )
 
             # Report assertions
-            report_assertions(metrics, praos_threshold_ms, prev_max_slot)
+            report_assertions(metrics, praos_threshold_ms, prev_max_slot, prev_max_slot_by_node)
             prev_max_slot = metrics.max_slot_seen
+            prev_max_slot_by_node = dict(metrics.max_slot_by_node)
 
         except Exception as e:
             log(f"Error in analysis: {e}")

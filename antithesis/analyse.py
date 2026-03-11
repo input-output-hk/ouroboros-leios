@@ -41,6 +41,7 @@ class Metrics:
     duplicate_creators: list = None
     slot_regressions: list = None
     orphan_block_hashes: set = None
+    max_slot_by_node: dict = None
 
     def __post_init__(self):
         if self.praos_latencies_ms is None:
@@ -55,6 +56,8 @@ class Metrics:
             self.slot_regressions = []
         if self.orphan_block_hashes is None:
             self.orphan_block_hashes = set()
+        if self.max_slot_by_node is None:
+            self.max_slot_by_node = {}
 
 
 def parse_timestamp(ts_str: str) -> Optional[datetime]:
@@ -296,6 +299,10 @@ def compute_metrics(log_dir: str = "/logs") -> Metrics:
                         received_hashes.add(event.block_hash)
                 if event.slot > metrics.max_slot_seen:
                     metrics.max_slot_seen = event.slot
+                if event.slot > 0:
+                    prev = metrics.max_slot_by_node.get(event.node, 0)
+                    if event.slot > prev:
+                        metrics.max_slot_by_node[event.node] = event.slot
 
             elif event.block_type == "eb":
                 if event.event_type == "created":
