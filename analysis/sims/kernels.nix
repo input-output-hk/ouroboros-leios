@@ -11,6 +11,7 @@
     enable = true;
     extraRPackages =
       p: with p; [
+        arules
         bit64
         cowplot
         curl

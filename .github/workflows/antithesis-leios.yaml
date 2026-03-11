@@ -170,6 +170,7 @@ jobs:
   # Variables:
   #   MOOG_MPFS_HOST         - MPFS service URL (default: https://mpfs.plutimus.com)
   #   MOOG_REQUESTER         - GitHub username registered as Moog requester
+  #   MOOG_TOKEN_ID          - ID for Antithesis tenant (default is CF's)
   #
   # Prerequisites:
   #   - Requester registered with Moog (Ed25519 keypair, CODEOWNERS entry)
@@ -245,3 +246,4 @@ jobs:
           MOOG_MPFS_HOST: ${{ vars.MOOG_MPFS_HOST || 'https://mpfs.plutimus.com' }}
           MOOG_PLATFORM: github
           MOOG_REQUESTER: ${{ vars.MOOG_REQUESTER }}
+          MOOG_TOKEN_ID: ${{ vars.MOOG_TOKEN_ID || '21c523c3b4565f1fc1ad7e54e82ca976f60997d8e7e9946826813fabf341069b' }} # not a secret
