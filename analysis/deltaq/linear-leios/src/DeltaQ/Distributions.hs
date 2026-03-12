@@ -4,18 +4,20 @@ module DeltaQ.Distributions (
   expDQ,
   normalDQ,
   logNormalDQ,
+  scaleMixtureDQ,
 ) where
 
 import DeltaQ
 
 import qualified Statistics.Distribution as S
 import qualified Statistics.Distribution.Exponential as S
-import qualified Statistics.Distribution.Normal as S
 import qualified Statistics.Distribution.Lognormal as S
+import qualified Statistics.Distribution.Normal as S
 
 type Measurements = [(Rational, Rational)]
 
 -- | 'measuredDQ'
+--
 -- https://github.com/DeltaQ-SD/deltaq/issues/75#issuecomment-3334080165
 measuredDQ :: Measurements -> DQ
 -- we have a (non-empty) list of (probability, delay), ordered on the delays,
@@ -45,14 +47,44 @@ distDQ dist =
   numberSteps :: Rational
   numberSteps = 10.0
 
+-- | normalDQ
+--
 -- DQ for log-normal distribution
 normalDQ :: Double -> Double -> DQ
 normalDQ μ σ = distDQ $ S.normalDistr μ σ
 
+-- | logNormalDQ
+--
 -- DQ for log-normal distribution
 logNormalDQ :: Double -> Double -> DQ
 logNormalDQ μ σ = distDQ $ S.lognormalDistr μ σ
 
+-- | expDQ
+--
 -- DQ for exponential distribution
 expDQ :: Double -> DQ
 expDQ = distDQ . S.exponential
+
+-- | scaleMixtureDQ
+--
+-- DQ for scale mixture distribution
+scaleMixtureDQ :: Integer -> Double -> Double -> DQ
+scaleMixtureDQ n μ σ =
+  measuredDQ
+    ( pairList [0.0, upper / numberSteps .. upper] $
+        toRational . scaleMixtureCDF . fromRational
+    )
+ where
+  numberSteps = 10.0
+  upper = toRational $ (fromIntegral n) * μ + 3 * (sqrt (fromIntegral n)) * σ
+
+  scaleMixtureCDF :: Double -> Double
+  scaleMixtureCDF x =
+    sum
+      ( map
+          ( \k ->
+              S.cumulative (S.normalDistr ((fromInteger k) * μ) ((fromInteger k) * σ)) x
+          )
+          [1 .. n]
+      )
+      / fromInteger n
