@@ -416,6 +416,10 @@
       "$ref": "#/definitions/EBPropagationCriteria",
       "description": "Which conditions must be met before a node will send an EB to peers?\n - \"eb-received\": the EB must only go through basic validation\n - \"txs-received\": all TXs in the EB must have been received\n - \"fully-valid\": the EB must be fully validated"
     },
+    "linear-tx-max-age-slots": {
+      "description": "Maximum age (in slots) before a transaction can be pruned from node memory. When set, transactions older than this that are no longer in the mempool will be removed. Set to null to disable pruning.",
+      "type": ["number", "null"]
+    },
     "linear-vote-stage-length-slots": {
       "additionalProperties": false,
       "description": "How long the EB voting stage is allowed to last.\nShould be more than 3x leios-header-diffusion-time-ms.\nMatches L_vote from the paper.",
