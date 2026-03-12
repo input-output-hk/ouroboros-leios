@@ -20,7 +20,6 @@ Rust toolchain: **1.88** (edition 2024). CI runs on Ubuntu 22.04.
 The `sim-cli` binary takes a topology YAML, optional output path, and flags:
 - `-p <file>` — parameter overrides (layered via figment on top of `parameters/config.default.yaml`)
 - `-s <n>` — number of slots to simulate
-- `-t <f>` — timescale multiplier
 - `--trace-node <id>` — enable per-node tracing
 - `-c` — conformance events mode
 - `-a` — aggregate events mode
