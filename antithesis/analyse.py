@@ -36,12 +36,32 @@ class Metrics:
     praos_latencies_ms: list = None
     blocks_created_by_node: dict = None
     max_slot_seen: int = 0
+    # Safety violation tracking
+    equivocations: list = None
+    duplicate_creators: list = None
+    slot_regressions: list = None
+    orphan_block_hashes: set = None
+    max_slot_by_node: dict = None
+    mempool_txs_added: int = 0
+    chain_tip_by_node: dict = None
 
     def __post_init__(self):
         if self.praos_latencies_ms is None:
             self.praos_latencies_ms = []
         if self.blocks_created_by_node is None:
             self.blocks_created_by_node = {}
+        if self.equivocations is None:
+            self.equivocations = []
+        if self.duplicate_creators is None:
+            self.duplicate_creators = []
+        if self.slot_regressions is None:
+            self.slot_regressions = []
+        if self.orphan_block_hashes is None:
+            self.orphan_block_hashes = set()
+        if self.max_slot_by_node is None:
+            self.max_slot_by_node = {}
+        if self.chain_tip_by_node is None:
+            self.chain_tip_by_node = {}
 
 
 def parse_timestamp(ts_str: str) -> Optional[datetime]:
@@ -110,8 +130,15 @@ def parse_log_line(line: str, node_name: str) -> Optional[BlockEvent]:
 
         # Praos block forged (cardano-node forge loop)
         # ns: "Forge.Loop.ForgedBlock"
+        # data: {"forgedBlock": {"newBlockHash": "abc..."}, "kind": "TraceForgedBlock", "slot": 102}
         if "ForgedBlock" in ns:
-            block_hash = event_data.get("block", event_data.get("blockHash", "unknown"))
+            forged_data = event_data.get("forgedBlock", {})
+            if not isinstance(forged_data, dict):
+                forged_data = {}
+            block_hash = forged_data.get(
+                "newBlockHash",
+                event_data.get("block", event_data.get("blockHash", "unknown")),
+            )
             slot = event_data.get("slot", 0)
             return BlockEvent(
                 timestamp=ts,
@@ -147,6 +174,21 @@ def parse_log_line(line: str, node_name: str) -> Optional[BlockEvent]:
                 block_hash=block_hash,
                 slot=0,
                 block_type="praos",
+            )
+
+        # Mempool tx additions
+        # ns: "Mempool" with AddedToCurrentMempool or TraceMempoolAddedTx
+        if "Mempool" in ns and (
+            "AddedToCurrentMempool" in ns
+            or "TraceMempoolAddedTx" in str(event_data.get("kind", ""))
+        ):
+            return BlockEvent(
+                timestamp=ts,
+                node=node_name,
+                event_type="mempool_tx",
+                block_hash="",
+                slot=0,
+                block_type="tx",
             )
 
         # Leios events
@@ -222,6 +264,13 @@ def compute_metrics(log_dir: str = "/logs") -> Metrics:
     block_created_times: dict[str, datetime] = {}
     block_received_times: dict[str, list[datetime]] = {}
 
+    # Safety invariant tracking
+    slots_forged: dict[str, dict[int, str]] = {}  # node -> {slot -> hash}
+    block_creator: dict[str, str] = {}  # hash -> creator node
+    last_forged_slot: dict[str, int] = {}  # node -> last slot forged
+    created_hashes: set[str] = set()
+    received_hashes: set[str] = set()
+
     # Parse all log files
     for log_file in log_path.glob("*.log"):
         node_name = log_file.stem
@@ -236,13 +285,52 @@ def compute_metrics(log_dir: str = "/logs") -> Metrics:
                     metrics.blocks_created_by_node[event.node] = (
                         metrics.blocks_created_by_node.get(event.node, 0) + 1
                     )
+                    created_hashes.add(event.block_hash)
+                    # Equivocation: same node, same slot, different hash
+                    if event.node not in slots_forged:
+                        slots_forged[event.node] = {}
+                    prev_hash = slots_forged[event.node].get(event.slot)
+                    if prev_hash is not None and prev_hash != event.block_hash:
+                        metrics.equivocations.append(
+                            (event.node, event.slot, prev_hash, event.block_hash)
+                        )
+                    slots_forged[event.node][event.slot] = event.block_hash
+                    # Duplicate creators: same hash, different node
+                    prev_creator = block_creator.get(event.block_hash)
+                    if prev_creator is not None and prev_creator != event.node:
+                        metrics.duplicate_creators.append(
+                            (event.block_hash, prev_creator, event.node)
+                        )
+                    block_creator[event.block_hash] = event.node
+                    # Slot monotonicity: forged slot should not decrease
+                    prev_slot = last_forged_slot.get(event.node)
+                    if prev_slot is not None and event.slot < prev_slot:
+                        metrics.slot_regressions.append(
+                            (event.node, prev_slot, event.slot)
+                        )
+                    last_forged_slot[event.node] = event.slot
                 elif event.event_type in ("received", "adopted"):
                     metrics.praos_blocks_received += 1
                     if event.block_hash not in block_received_times:
                         block_received_times[event.block_hash] = []
                     block_received_times[event.block_hash].append(event.timestamp)
+                    if event.slot > 0:
+                        received_hashes.add(event.block_hash)
+                    # Track chain tip per node (from adopted/AddedToCurrentChain)
+                    if event.event_type == "adopted" and event.slot > 0:
+                        cur = metrics.chain_tip_by_node.get(event.node)
+                        if cur is None or event.slot > cur[0]:
+                            metrics.chain_tip_by_node[event.node] = (event.slot, event.block_hash)
                 if event.slot > metrics.max_slot_seen:
                     metrics.max_slot_seen = event.slot
+                if event.slot > 0:
+                    prev = metrics.max_slot_by_node.get(event.node, 0)
+                    if event.slot > prev:
+                        metrics.max_slot_by_node[event.node] = event.slot
+
+            elif event.block_type == "tx":
+                if event.event_type == "mempool_tx":
+                    metrics.mempool_txs_added += 1
 
             elif event.block_type == "eb":
                 if event.event_type == "created":
@@ -259,6 +347,9 @@ def compute_metrics(log_dir: str = "/logs") -> Metrics:
                 latency_ms = (received_time - created_time).total_seconds() * 1000
                 if latency_ms > 0:  # Only positive latencies
                     metrics.praos_latencies_ms.append(latency_ms)
+
+    # Orphan blocks: received but never created (excluding genesis)
+    metrics.orphan_block_hashes = received_hashes - created_hashes
 
     return metrics
 

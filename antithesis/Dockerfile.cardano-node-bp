@@ -6,13 +6,16 @@
 
 FROM ghcr.io/blinklabs-io/cardano-cli:10.14.0.0-1 AS cardano-cli
 
-# Build cardano-node from leios-prototype
+# Build cardano-node from leios-prototype branch
 FROM ghcr.io/blinklabs-io/haskell:9.6.6-3.12.1.0-3 AS cardano-node-build
+
+# From intersectmbo/cardano-node leios-prototype branch
+ARG CARDANO_NODE_VERSION_LEIOS=75881ef42e9f699039a6cea03222c8a1690bc40f
 
 RUN git clone https://github.com/intersectmbo/cardano-node.git \
     && cd cardano-node \
     && git fetch --all --recurse-submodules --tags \
-    && git checkout leios-prototype \
+    && git checkout ${CARDANO_NODE_VERSION_LEIOS} \
     && echo "with-compiler: ghc-${GHC_VERSION}" >> cabal.project.local \
     && echo "tests: False" >> cabal.project.local
 
@@ -26,12 +29,13 @@ RUN --mount=type=cache,target=/root/.cabal/store,id=cabal-store-cardano-node \
 # Build tx-generator from stable branch (leios-prototype tx-generator has API issues)
 FROM ghcr.io/blinklabs-io/haskell:9.6.6-3.12.1.0-3 AS tx-generator-build
 
-ARG CARDANO_NODE_VERSION=bd3e580eab25afab55085e981d2e3db74498aa2c
+# From intersectmbo/cardano-node master branch
+ARG CARDANO_NODE_VERSION_TXGEN=bd3e580eab25afab55085e981d2e3db74498aa2c
 
 RUN git clone https://github.com/intersectmbo/cardano-node.git \
     && cd cardano-node \
     && git fetch --all --tags \
-    && git checkout ${CARDANO_NODE_VERSION} \
+    && git checkout ${CARDANO_NODE_VERSION_TXGEN} \
     && echo "with-compiler: ghc-${GHC_VERSION}" >> cabal.project.local \
     && echo "tests: False" >> cabal.project.local
 
