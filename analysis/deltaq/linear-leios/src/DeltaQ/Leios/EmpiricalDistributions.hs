@@ -1,4 +1,7 @@
 -- | Empirical distributions
+--
+-- The module provides empirical DQs for apply and reapply transactions
+-- based on measurements, see linked files in the comments below.
 module DeltaQ.Leios.EmpiricalDistributions (
   empiricalDQ,
   applyTx,
@@ -9,9 +12,12 @@ module DeltaQ.Leios.EmpiricalDistributions (
 
 import Data.List (sort)
 import DeltaQ (DQ)
-import DeltaQ.Distributions (normalDQ, measuredDQ)
+import DeltaQ.Distributions (
+  measuredDQ,
+  scaleMixtureDQ,
+ )
 
--- | 'empiricalDQ'
+-- | Helper function for building a DQ from empirical data
 empiricalDQ :: [Rational] -> DQ
 empiricalDQ ms =
   measuredDQ $
@@ -19,7 +25,7 @@ empiricalDQ ms =
       ([0, (1 / fromIntegral (length ms)) .. 1])
       (sort ms)
 
--- | applyTx
+-- | DQ for applyTx
 --
 -- Data from [block-edf.csv](https://github.com/input-output-hk/ouroboros-leios/blob/main/post-cip/empirical-distributions/block-edf.csv)
 --
@@ -43,7 +49,7 @@ applyTx =
     , (100, 0.03)
     ]
 
--- | reapplyTx
+-- | DQ for reapplyTx
 --
 -- Data from [block-edf.csv](https://github.com/input-output-hk/ouroboros-leios/blob/main/post-cip/empirical-distributions/block-edf.csv)
 --
@@ -67,26 +73,46 @@ reapplyTx =
     , (100, 0.02)
     ]
 
--- | applyTx
+-- | DQ for sequential 'applyTx'
 --
--- We make use of the central limit theorem.
--- Mean and standard derivation of the corresponding
--- numbers in the csv file:
+-- We make use of the central limit theorem and get the following normal distribution
+-- as distribution of sequential application of 'applyTx'
+--
+-- \(nZ \sim \mathcal{N}(\mu,\,\sigma^{2})\)
+--
+-- where \(n\) is the number of transactions. Mean and standard derivation
+-- from the corresponding numbers in the csv file are:
 --
 -- \(\mu = 10.59939845, \sigma = 25.48883812\)
 --
--- Assuming 100 transactions
-applyTxs :: DQ
-applyTxs = normalDQ (100 * 0.01059939845) (10 * 0.02548883812)
-
--- | reapply
+-- We assume a uniform distribution for the number of transactions \(n \sim \mathcal{U}(1,N)\)
+-- upto \(N=100\).
 --
--- We make use of the central limit theorem
--- Mean and standard derivation of the corresponding
--- numbers in the csv file:
+-- The resulting distribution function is the scale mixture distribution
+-- and the cumulative distribution function is:
+--
+-- \(F(x) = \frac{1}{N} \sum_1^N \Phi\!\left(\frac{x - n\mu}{n\sigma}\right)\)
+applyTxs :: DQ
+applyTxs = scaleMixtureDQ 100 0.01059939845 0.02548883812
+
+-- | DQ for sequential 'reapplyTx'
+--
+-- We make use of the central limit theorem and get the following normal distribution
+-- as distribution of sequential application of 'reapplyTx'
+--
+-- \(nZ \sim \mathcal{N}(\mu,\,\sigma^{2})\)
+--
+-- where \(n\) is the number of transactions. Mean and standard derivation
+-- from the corresponding numbers in the csv file are:
 --
 -- \(\mu = 2.711165479, \sigma = 24.41685076\)
 --
--- Assuming 625 transactions
+-- We assume a uniform distribution for the number of transactions \(n \sim \mathcal{U}(1,N)\)
+-- upto \(N=2500\).
+--
+-- The resulting distribution function is the scale mixture distribution
+-- and the cumulative distribution function is:
+--
+-- \(F(x) = \frac{1}{N} \sum_1^N \Phi\!\left(\frac{x - n\mu}{n\sigma}\right)\)
 reapplyTxs :: DQ
-reapplyTxs = normalDQ (625 * 0.002711165479) (25 * 0.02441685076)
+reapplyTxs = scaleMixtureDQ 2500 0.002711165479 0.02441685076
