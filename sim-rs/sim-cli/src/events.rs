@@ -12,7 +12,7 @@ use sim_core::{
     clock::Timestamp,
     config::{LeiosVariant, NodeId, SimConfiguration},
     events::{BlockRef, Event, Node},
-    model::{BlockId, TransactionId},
+    model::{BlockId, NoVoteReason, TransactionId},
 };
 use tokio::{
     fs::{self, File},
@@ -106,6 +106,7 @@ impl EventMonitor {
         let mut ib_messages = MessageStats::default();
         let mut eb_messages = MessageStats::default();
         let mut vote_messages = MessageStats::default();
+        let mut no_vote_reasons: BTreeMap<NoVoteReason, u64> = BTreeMap::new();
 
         // Pretty print options for bytes
         let pbo = Some(PrettyBytesOptions {
@@ -388,7 +389,9 @@ impl EventMonitor {
                     }
                 }
                 Event::NoVTBundleGenerated { .. } => {}
-                Event::VTBundleNotGenerated { .. } => {}
+                Event::VTBundleNotGenerated { reason, .. } => {
+                    *no_vote_reasons.entry(reason).or_default() += 1;
+                }
                 Event::VTBundleSent { .. } => {
                     vote_messages.sent += 1;
                 }
@@ -577,6 +580,13 @@ impl EventMonitor {
                 votes_per_eb.mean, votes_per_eb.std_dev);
             info!("There were {bundle_count} bundle(s) of votes. Each bundle contained {:.3} vote(s) (stddev {:.3}).",
                 votes_per_bundle.mean, votes_per_bundle.std_dev);
+            if !no_vote_reasons.is_empty() {
+                let total: u64 = no_vote_reasons.values().sum();
+                info!("{total} vote(s) were not generated due to validation failures:");
+                for (reason, count) in &no_vote_reasons {
+                    info!("  {reason:?}: {count}");
+                }
+            }
             info!("{} L1 block(s) had a Leios endorsement.", leios_blocks_with_endorsements);
             info!("{} tx(s) ({}) were referenced by a Leios endorsement.", leios_txs, pretty_bytes(leios_tx_bytes, pbo.clone()));
             info!("{} tx(s) ({}) were included directly in a Praos block.", praos_txs, pretty_bytes(praos_tx_bytes, pbo.clone()));
