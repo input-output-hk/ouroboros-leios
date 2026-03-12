@@ -1,2 +1,9 @@
 leios-variant: linear
 timestamp-resolution-ms: 0.05
+leios-header-diffusion-time-ms: 3000.0
+# Prune transactions from node memory after this many slots.
+# = linear-vote-stage-length-slots (5)
+# + linear-diffuse-stage-length-slots (5)
+# + ceil(leios-header-diffusion-time-ms / 1000) * 3 (3)
+# + buffer (10)
+linear-tx-max-age-slots: 23
