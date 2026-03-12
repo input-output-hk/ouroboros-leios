@@ -48,6 +48,7 @@ pub struct EventMonitor {
     pool_ids: Vec<NodeId>,
     maximum_ib_age: u64,
     maximum_eb_age: u64,
+    vote_threshold: u64,
     events_source: LivenessMonitor,
     output_path: Option<PathBuf>,
     aggregate: bool,
@@ -73,6 +74,7 @@ impl EventMonitor {
             pool_ids,
             maximum_ib_age,
             maximum_eb_age: config.max_eb_age,
+            vote_threshold: config.vote_threshold,
             events_source: LivenessMonitor::new(config, events_source),
             output_path,
             aggregate: config.aggregate_events,
@@ -501,6 +503,9 @@ impl EventMonitor {
                     .map(|id| seen_ibs.get(id).copied().unwrap_or_default()),
             );
             let votes_per_pool = compute_stats(votes_per_pool.into_values());
+            let uncertified_ebs = ebs.keys()
+                .filter(|id| eb_votes.get(id).copied().unwrap_or(0.0) < self.vote_threshold as f64)
+                .count();
             let votes_per_eb = compute_stats(eb_votes.into_values());
             let votes_per_bundle = compute_stats(votes_per_bundle.into_values());
 
@@ -586,6 +591,10 @@ impl EventMonitor {
                 for (reason, count) in &no_vote_reasons {
                     info!("  {reason:?}: {count}");
                 }
+            }
+            if uncertified_ebs > 0 {
+                info!("{uncertified_ebs} out of {} EB(s) did not reach the vote threshold ({}).",
+                    ebs.len(), self.vote_threshold);
             }
             info!("{} L1 block(s) had a Leios endorsement.", leios_blocks_with_endorsements);
             info!("{} tx(s) ({}) were referenced by a Leios endorsement.", leios_txs, pretty_bytes(leios_tx_bytes, pbo.clone()));
