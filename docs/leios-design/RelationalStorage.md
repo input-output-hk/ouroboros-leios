@@ -1,3 +1,9 @@
+# On Relation Storage for LeiosFetch
+
+## Introduction
+
+This document characterizes the data that LeiosFetch needs to manage, its access patterns and requirements (eg amount of memory), and throughout sketches the corresponding requirements for a storage layer implemented either via OS syscalls or SQLite.
+
 ## Entity-Relationship Diagrams (ER Diagrams)
 
 The EbBody-EbClosure split can be usefully visualized with the following ER Diagrams.
