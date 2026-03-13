@@ -25,7 +25,7 @@ technical papers, presentations, and videos.
 
 ## Presentations and videos
 
-- [Monthly review videos](./development/monthly-reviews.md) – latest information
+- [Monthly review videos](./monthly-reviews.md) – latest information
   and news on Leios Research  and development progress
 
 - [Scaling Cardano with Leios](https://www.youtube.com/watch?v=Czmg9WmSCcI) –

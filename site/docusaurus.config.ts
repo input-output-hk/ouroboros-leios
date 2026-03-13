@@ -49,7 +49,17 @@ const config: Config = {
           // Weekly updates replaced by monthly reviews (2026-01-29)
           {
             from: "/news",
-            to: "/docs/development/monthly-reviews",
+            to: "/docs/monthly-reviews",
+          },
+          // Strategy integrated with roadmap (2026-03-13)
+          {
+            from: "/docs/strategy",
+            to: "/docs/roadmap",
+          },
+          // Monthly reviews moved to top-level (2026-03-13)
+          {
+            from: "/docs/development/monthly-reviews",
+            to: "/docs/monthly-reviews",
           },
         ],
       },
@@ -176,7 +186,7 @@ const config: Config = {
           items: [
             {
               label: "Monthly review meetings",
-              to: "/docs/development/monthly-reviews",
+              to: "/docs/monthly-reviews",
             },
             {
               label: "GitHub discussions",

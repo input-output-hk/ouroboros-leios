@@ -7,7 +7,7 @@ levels](https://committees.docs.intersectmbo.org/intersect-technical-steering-co
 
 Following our [strategy](#strategy), we identified several key **objectives**. While these objectives are broadly ordered and not strictly sequential, each gives rise to a set of **marketable features** that will be defined, developed, and delivered throughout the project lifecycle.
 
-Together, these objectives and features form the product roadmap, which will be updated and [reported on monthly](./development/monthly-reviews.md) via this [GitHub project](https://github.com/orgs/input-output-hk/projects/167)￼.
+Together, these objectives and features form the product roadmap, which will be updated and [reported on monthly](./monthly-reviews.md) via this [GitHub project](https://github.com/orgs/input-output-hk/projects/167)￼.
 
 <a href="https://github.com/orgs/input-output-hk/projects/167">
 

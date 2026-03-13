@@ -11,7 +11,15 @@ import type { SidebarsConfig } from "@docusaurus/plugin-content-docs";
  Create as many sidebars as you want.
  */
 const sidebars: SidebarsConfig = {
-  documentationSidebar: ["what-is-leios", "leios-use-cases", "roadmap", "resources", "development/monthly-reviews", "faq", "glossary"],
+  documentationSidebar: [
+    "what-is-leios",
+    "leios-use-cases",
+    "roadmap",
+    "resources",
+    "monthly-reviews",
+    "faq",
+    "glossary",
+  ],
   developmentSidebar: [
     {
       type: "category",

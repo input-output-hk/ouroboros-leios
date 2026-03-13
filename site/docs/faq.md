@@ -82,7 +82,7 @@ You can follow:
 
 - Leios documentation on this site
 - [Leios development tracker](https://engineering.iog.io/leios)
-- [Monthly reviews](/docs/development/monthly-reviews.md)
+- [Monthly reviews](/docs/monthly-reviews.md)
 - GitHub discussions in the [repository](https://github.com/input-output-hk/ouroboros-leios/discussions)
 
 These resources provide transparency and regular updates on ongoing development.
