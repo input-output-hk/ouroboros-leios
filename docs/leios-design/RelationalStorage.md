@@ -17,7 +17,7 @@ erDiagram
     EB {
         uint64 ebSlot PK
         byte[32] ebHash PK
-        uint32 txCount PK
+        XXX txReferences FK
     }
 
     TX {
