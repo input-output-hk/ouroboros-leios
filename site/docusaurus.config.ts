@@ -90,18 +90,13 @@ const config: Config = {
           type: "docSidebar",
           sidebarId: "documentationSidebar",
           position: "right",
-          label: "Documentation",
+          label: "About Leios",
         },
         {
           type: "docSidebar",
           sidebarId: "developmentSidebar",
           position: "right",
-          label: "Development",
-        },
-        {
-          to: "/formal-spec/",
-          label: "Formal Specification",
-          position: "right",
+          label: "Research and development",
         },
         {
           type: "dropdown",
@@ -124,23 +119,13 @@ const config: Config = {
             },
             {
               to: "https://leios.cardano-scaling.org/mempool-viz/",
-              label: "Mempool Visualizer",
+              label: "Mempool visualizer",
             },
             {
               href: "https://www.insightmaker.com/insight/4DU4kmFVCFDaq30ux29PCe/Cardano-Throughput-v0-3",
               label: "Throughput model",
             },
           ],
-        },
-        {
-          href: "https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md",
-          label: "CIP",
-          position: "right",
-        },
-        {
-          href: "https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md",
-          label: "CPS",
-          position: "right",
         },
         {
           href: "https://github.com/input-output-hk/ouroboros-leios",
@@ -169,7 +154,7 @@ const config: Config = {
           title: "Docs",
           items: [
             {
-              label: "Formal Specification",
+              label: "Formal specification",
               to: "/formal-spec/",
             },
             {
@@ -194,7 +179,7 @@ const config: Config = {
               to: "/docs/development/monthly-reviews",
             },
             {
-              label: "GitHub Discussions",
+              label: "GitHub discussions",
               href: "https://github.com/input-output-hk/ouroboros-leios/discussions",
             },
           ],
@@ -203,11 +188,11 @@ const config: Config = {
           title: "Legal",
           items: [
             {
-              label: "Terms & Conditions",
+              label: "Terms and conditions",
               to: "https://static.iohk.io/terms/iohktermsandconditions.pdf",
             },
             {
-              label: "Privacy Policy",
+              label: "Privacy policy",
               to: "https://static.iohk.io/terms/iog-privacy-policy.pdf",
             },
             {
