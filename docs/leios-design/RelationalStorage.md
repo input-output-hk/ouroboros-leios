@@ -321,10 +321,10 @@ TODO will the "acceptable race conditions" described above be entirely contained
 The Durability property has two components: risk of losing recent writes and risk of corruption.
 For Leios, as with Praos, losing some of the most recent data is acceptable, since it can be reacquired from the decentralized network.
 It's unrealistic to assume a caught-up node would remain _exactly_ as caught-up even if its OS/hardware crashes/loses power.
-Thus, risk of corruption is the concern.
+Thus, risk of corruption is the remaining concern.
 
 Corruption in this case would mean that some subsequent accesses to the database would fail.
-Only realizing some older data that the seems to be available actually isn't is unacceptable.
+Only realizing some older data that seems to be available actually isn't is unacceptable.
 
 That said, the StillMissing and TxCacheIndex themselves don't need to be durable, because they can be reconstructed as part of initialization, from whatever was successfully persisted to disk (TODO is that reconstruction slow enough to justify avoiding it after a clean shutdown?).
 In the case of SQLite, the risk of database corruption is already very well mitigated.
@@ -333,4 +333,4 @@ In the case of manually managed files, a file format that begins with the size a
 If a node's persistent storage somehow fails without the node process immediately crashing (eg the HDD locks up), then that node is already doomed.
 It will be able to rejoin the network after repairs, thanks to decentralization.
 The most the node design could do in that scenario would be to crash sooner rather than later and with as useful of an error message as possible.
-Cardano does not claim to resist an adversary that can simultaenously destroy the storage of a arbitrary nodes.
+Cardano does not claim to resist an adversary that can simultaenously destroy the storage of an arbitrary number of nodes.
