@@ -1,4 +1,4 @@
-# On Relation Storage for LeiosFetch
+# On Relational Storage for LeiosFetch
 
 ## Introduction
 
