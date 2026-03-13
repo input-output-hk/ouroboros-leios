@@ -79,6 +79,24 @@ services:
     networks:
       - leios-net
 
+  init-dingo:
+    # Dingo uses the same configs and sits in the same place in the topology as 'node0', so
+    # we reuse the image and scripts
+    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-leios:${GIT_SHA:-latest}
+    build:
+      context: ..
+      dockerfile: antithesis/Dockerfile.cardano-node
+    command: /app/scripts/init-node0.sh
+    environment:
+      <<: *common-env
+      IP_UPSTREAM_NODE: "172.28.0.110"
+      PORT_UPSTREAM_NODE: "3001"
+    volumes:
+      - dingo-data:/data
+      - logs:/logs
+    networks:
+      - leios-net
+
   # ==========================================================================
   # Main Services
   # ==========================================================================
@@ -170,6 +188,36 @@ services:
       retries: 60
       start_period: 30s
 
+  dingo:
+    image: ghcr.io/blinklabs-io/dingo:${DINGO_VERSION:-0.24.1}
+    depends_on:
+      init-dingo:
+        condition: service_completed_successfully
+      node0:
+        condition: service_healthy
+    cap_add:
+      - NET_ADMIN
+    environment:
+      <<: [*common-env, *wan-env-downstream]
+      CARDANO_PORT: "3004"
+      CARDANO_CONFIG: /data/config.json
+      CARDANO_TOPOLOGY: /data/topology.json
+      CARDANO_NODE_SOCKET_PATH: /data/dingo.socket
+      CARDANO_NETWORK: devnet
+      DINGO_RUN_MODE: leios
+    volumes:
+      - dingo-data:/data
+      - logs:/logs
+    networks:
+      leios-net:
+        ipv4_address: 172.28.0.140
+    healthcheck:
+      test: ["CMD", "test", "-S", "/data/dingo.socket"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 30s
+
   # ==========================================================================
   # Analysis Container
   # ==========================================================================
@@ -199,6 +247,7 @@ volumes:
   upstream-data:
   node0-data:
   downstream-data:
+  dingo-data:
   logs:
 
 networks:
