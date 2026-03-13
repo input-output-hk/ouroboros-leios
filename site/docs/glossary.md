@@ -62,7 +62,7 @@ A diffusion policy that prioritises newer blocks or transactions.
 
 #### Linear Leios
 
-The current production-oriented variant of Ouroboros Leios (CIP-0164). It retains the IB/EB/RB structure but simplifies the design for easier implementation, indexing, and deployment while maintaining high throughput.
+The current production-oriented variant of Ouroboros Leios (CIP-0164). It retains the overall protocol structure but avoids some problems by design, allows for easier implementation and deployment while maintaining high throughput.
 
 #### Mempool snapshotting
 
@@ -114,7 +114,7 @@ The cryptographic process (using VRFs) for fairly selecting nodes to produce blo
 
 #### Spatial efficiency
 
-The ratio of useful transaction data included in the ledger versus the total size of all blocks (IBs, EBs, RBs).
+The ratio of useful transaction data included in the ledger versus the total size of all blocks.
 
 #### Temporal efficiency
 
