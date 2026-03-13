@@ -8,7 +8,7 @@ The security of the Linear Leios protocol depends on Δ\_EB, the time within whi
 
 Early simulations suggested Δ\_EB is manageable under happy-path conditions. This report validates that assumption using a ΔQ System Development model.
 
-Using the model, we can rule out infeasible parameters without running simulations. The role of this ΔQ model is therefore to complement the Haskell and Rust simulations.
+Using the model, we can rule out infeasible parameters without running simulations. The role of this ΔQ model is therefore to complement the Haskell and Rust simulations and gain confidence in the parameter selection for Linear Leios.
 
 ## 2. Background
 
@@ -19,16 +19,38 @@ Linear Leios (CIP-164) is a variant of Ouroboros Leios designed around a key ins
 In Linear Leios there are two block types:
 
 - **EB (Endorser Block):** Contains transaction references only. EBs are subject to a vote-based certification process requiring a quorum of the voting committee.
-- **RB (Ranking Block):** A standard Praos block, which in addition can include a certificate for an endorsed EB.
+- **RB (Ranking Block):** A standard Praos block, which in addition can reference an EB or include a certificate for an endorsed EB.
 
 The security constraint is that each EB must diffuse to all honest nodes within TODO
 
+The DeltaQ analysis of linear Leios validates the following assumptions:
+
+* Reapplying a certified EB cannot cost more than standard transaction processing
+* Any certified EB referenced by an RB must be transmitted before that RB is processed
+
+#### 2.1.1 Parameter $L\_{hdr}$
+
+The parameter $L\_{hdr}$ needs to be large enough to allow successful RB header diffusion.
+
+#### 2.1.2 Parameter $L\_{vote}$
+
+The parameter $L\_{vote}$ needs to be chosen carefully, because if the length of the interval is
+
+* too short, then there is probably not enough time to get sufficient votes to reach a quorum
+* too long, then there is probably already a new RB/EB before all votes are delivered
+
+The first item depends on the block/vote diffusion times, whereas second item depends only on the Praos schedule.
+
+#### 2.1.3 Parameter $L\_{diff}$
+
+The parameter $L\_{diff}$ is important in order to allow remaining nodes, after a quorum has been reached, receive
+the EB, in order for the security guarantees to hold.
+
 ### 2.2 ΔQ System Development
 
-> ∆Q System Development is a paradigm for developing distributed systems that meet performance requirements.
-> [ref](https://github.com/DeltaQ-SD/deltaq/#:~:text=%E2%88%86Q%20System%20Development%20is%20a%20paradigm%20for%20developing%20distributed%20systems%20that%20meet%20performance%20requirements.)
+∆Q is a modelling tool to analyse the performance characteristics of a distributed system. Outcomes in ΔQ are represented as probability distributions of completion times.
 
-ΔQ represents outcomes as probability distributions of completion times. In the library ΔQ is implemented as a domain specific language (DSL) providing the following constructors
+ΔQ is implemented as a domain specific language (DSL) providing the following constructors
 
 | Constructor | Meaning |
 |---|---|
@@ -36,7 +58,7 @@ The security constraint is that each EB must diffuse to all honest nodes within 
 | `wait t` | Deterministic delay of `t` seconds |
 | `uniform t s` | Uniform distribution between `t` `s` |
 
-and combinators to build more complex abstractions out of simpler ones:
+and combinators to build complex abstractions:
 
 | Operator | Meaning |
 |---|---|
@@ -45,7 +67,16 @@ and combinators to build more complex abstractions out of simpler ones:
 | `a ./\. b` | Last to finish: both, `a` and `b` |
 | `p a b` | Probabilistic choice: `a` with probability `p`, `b` with probabilty `1 - p` |
 
+The ΔQ library is built with a backend abstraction for running the computations. The library provides the *piecewise-polynomials* backend. For running complex models we implemented an new backend *sampled*. They compare as follows:
+
+- *piecewise-polynomials* is an analytic backend, i.e., exact results, but the computational complexity of the backend does not allow running complex models
+- *sampled* is an approximation backend with efficient computation, but accuracy is hard to control
+
 ## 3. Network Model
+
+### 3.1 Network
+
+The block diffusion model used in this library has been taken from the [Praos performance model](https://github.com/intersectMBO/cardano-formal-specifications/src/performance/app/PraosModel.lhs) and updated with estimates from the Leios topology-checker tools.
 
 ### 3.1 Topology
 
@@ -53,9 +84,17 @@ TODO
 
 ### 3.2 Stake Distribution
 
-Stake is distributed across nodes in a pattern derived from mainnet. The stake distribution determines the EB production rate: nodes with more stake win the EB sortition lottery more frequently.
+Stake is distributed across nodes in a pattern derived from mainnet. The stake distribution determines the RB production rate: nodes with more stake win the RB sortition lottery more frequently.
 
 ## 4. ΔQ Model of EB Diffusion
+
+TODO
+
+### 4.1 Empirical distributions
+
+TODO
+
+### 4.2 Markov model for TxCache
 
 TODO
 
@@ -90,6 +129,7 @@ The ΔQ model confirms that the Linear Leios protocol can satisfy its Δ\_EB sec
 ## 8. Limitations and Future Work
 
 - This model assumes honest node behavior. Adversarial delay of EBs — for example, an adversary deliberately withholding an EB until just before the voting deadline — is not captured here. Security under such scenarios is treated analytically in the CIP-164 security proof.
+- With the `piecewise-polynomial` ΔQ backend computational complexity is hard to control, where as with the `sampled` backend it is the accuracy of the results. For this analysis to be successful, we built probabilistic models and then combined those using ΔQ in order to get a model with low complexity to be executable with the default backend.
 - Future work should integrate this EB diffusion model with the broader transaction lifecycle ΔQ model (`analysis/deltaq/tx-lifecycle.ipynb`) to produce an end-to-end latency estimate from mempool submission to RB inclusion under Linear Leios.
 
 ## Appendix A: Haskell Source
@@ -111,8 +151,6 @@ cabal run linear-leios-analysis stats
 ## Appendix B: References
 
 - [CIP-164 – Ouroboros Leios](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md)
-- [Technical Report #1](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-1.md)
-- [Technical Report #2](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-2.md)
 - [Supporting information for modeling Linear Leios](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/)
-- [Praos performance ΔQ model](https://github.com/IntersectMBO/cardano-formal-specifications/tree/main/src/performance)
+- [Praos performance model](https://github.com/IntersectMBO/cardano-formal-specifications/tree/main/src/performance)
 - [deltaq Haskell package](https://hackage.haskell.org/package/deltaq)
