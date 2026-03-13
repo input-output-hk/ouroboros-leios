@@ -1,7 +1,6 @@
 # ΔQ Model for Δ\_EB in Linear Leios
 
-> **Related issue:** [#543 – Create ΔQ model to investigate Δ\_EB and protocol parameters](https://github.com/input-output-hk/ouroboros-leios/issues/543)
-> **Source:** [`analysis/deltaq/linear-leios/`](https://github.com/input-output-hk/ouroboros-leios/tree/main/analysis/deltaq/linear-leios)
+*Related issue:* [#543 – Create ΔQ model to investigate Δ\_EB and protocol parameters](https://github.com/input-output-hk/ouroboros-leios/issues/543)
 
 ## 1. Motivation
 
