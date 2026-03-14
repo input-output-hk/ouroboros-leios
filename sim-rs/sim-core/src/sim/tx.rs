@@ -77,6 +77,17 @@ impl TransactionProducer {
         });
         let node_lookup = WeightedLookup::new(node_weights);
 
+        if node_lookup.is_empty() {
+            tracing::warn!(
+                "No nodes have tx_generation_weight > 0; \
+                 skipping transaction generation. \
+                 (Hint: topologies where all nodes have stake > 0 need \
+                 explicit tx-generation-weight on at least one node.)"
+            );
+            self.clock.wait_forever().await;
+            return Ok(());
+        }
+
         loop {
             let node_id = node_lookup.sample(rng).unwrap();
             let node = self.nodes.get(node_id).unwrap();
@@ -122,7 +133,14 @@ impl<T> WeightedLookup<T> {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.elements.is_empty()
+    }
+
     pub fn sample<R: Rng>(&self, rng: &mut R) -> Option<&T> {
+        if self.total_weight == 0 {
+            return None;
+        }
         let choice = rng.random_range(0..self.total_weight);
         match self
             .elements
