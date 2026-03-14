@@ -528,7 +528,14 @@
     },
     "vote-bundle-size-bytes-per-eb": {
       "additionalProperties": false,
+      "description": "Grandfathered for Haskell sim.",
       "properties": {},
+      "type": "number"
+    },
+    "persistent-vote-bundle-size-bytes-per-eb": {
+      "type": "number"
+    },
+    "non-persistent-vote-bundle-size-bytes-per-eb": {
       "type": "number"
     },
     "vote-diffusion-max-bodies-to-request": {
@@ -554,6 +561,13 @@
       "description": "Only supported by Haskell simulation."
     },
     "vote-generation-cpu-time-ms-constant": {
+      "description": "Grandfathered for Haskell sim.",
+      "type": "number"
+    },
+    "persistent-vote-generation-cpu-time-ms": {
+      "type": "number"
+    },
+    "non-persistent-vote-generation-cpu-time-ms": {
       "type": "number"
     },
     "vote-generation-cpu-time-ms-per-ib": {
@@ -563,6 +577,13 @@
       "type": "number"
     },
     "vote-generation-probability": {
+      "description": "Grandfathered for Haskell sim.",
+      "type": "number"
+    },
+    "persistent-vote-generation-probability": {
+      "type": "number"
+    },
+    "non-persistent-vote-generation-probability": {
       "type": "number"
     },
     "vote-threshold": {
@@ -571,6 +592,13 @@
       "type": "number"
     },
     "vote-validation-cpu-time-ms": {
+      "description": "Grandfathered for Haskell sim.",
+      "type": "number"
+    },
+    "persistent-vote-validation-cpu-time-ms": {
+      "type": "number"
+    },
+    "non-persistent-vote-validation-cpu-time-ms": {
       "type": "number"
     }
   },

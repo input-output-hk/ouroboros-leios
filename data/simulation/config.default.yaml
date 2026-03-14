@@ -191,31 +191,42 @@ eb-body-avg-size-bytes: 2500000
 ################################################################################
 
 # Cryptography related values taken from [vote-spec](crypto-benchmarks.rs/Specification.md)
-# using weighted averages of 80% persistent and 20% non-persistent.
+# with separate persistent and non-persistent voter parameters.
 
-# vote-spec#Committe and quorum size
+# vote-spec#Committee and quorum size
 #
-# Note: this is used as the expected amount of total weight of
-# generated votes in the sims.
-vote-generation-probability: 500.0
-# vote-spec#"Committe and quorum size"
-# 60% of `vote-generation-probability`
+# Note: total vote-generation-probability is the sum of persistent and
+# non-persistent probabilities.
+persistent-vote-generation-probability: 400.0
+non-persistent-vote-generation-probability: 100.0
+# vote-spec#"Committee and quorum size"
+# 60% of total vote-generation-probability
 vote-threshold: 300
-# vote-spec#"Generate vote" 0.8*135e-3 + 0.2*280e-3
-vote-generation-cpu-time-ms-constant: 164e-3
+# vote-spec#"Generate vote"
+persistent-vote-generation-cpu-time-ms: 135e-3
+non-persistent-vote-generation-cpu-time-ms: 280e-3
 # No benchmark yet.
 vote-generation-cpu-time-ms-per-ib: 0
 # No benchmark yet.
 vote-generation-cpu-time-ms-per-tx: 0
-# vote-spec#"Verify vote" 0.8*670e-3 + 0.2*1.4
-vote-validation-cpu-time-ms: 816e-3
+# vote-spec#"Verify vote"
+persistent-vote-validation-cpu-time-ms: 670e-3
+non-persistent-vote-validation-cpu-time-ms: 1.4
 # The `Vote` structure counted in the -per-eb already identifies slot
 # (in Eid) and voter. We can assume a vote bundle is all for the same
 # voter and slot, so for non-persistent voters we could factor their
 # PoolKeyHash (28bytes) here, but that is for 20% of cases.
 # More relevant if EB generation is very high.
 vote-bundle-size-bytes-constant: 0
-# vote-spec#Votes 0.8*90 + 0.2*164
+# vote-spec#Votes
+persistent-vote-bundle-size-bytes-per-eb: 90
+non-persistent-vote-bundle-size-bytes-per-eb: 164
+
+# Grandfathered weighted averages for Haskell sim compatibility.
+# These are computed as 0.8*persistent + 0.2*non-persistent.
+vote-generation-probability: 500.0
+vote-generation-cpu-time-ms-constant: 164e-3
+vote-validation-cpu-time-ms: 816e-3
 vote-bundle-size-bytes-per-eb: 105
 
 vote-diffusion-strategy: "peer-order"
