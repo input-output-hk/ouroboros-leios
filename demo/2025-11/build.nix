@@ -18,6 +18,7 @@
             pkgs.iproute2
             pkgs.sqlite
             pkgs.jq
+            pkgs.tcpdump
             config.packages.ss_http_exporter
             (pkgs.python3.withPackages (
               ps: with ps; [
