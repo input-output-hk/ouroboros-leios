@@ -21,6 +21,9 @@ packages:
   analysis/deltaq/linear-leios
   post-cip/tx-measurements/betti0
 
+-- This was added to switch from GHC 9.10.1 (with ghc-prim 0.11) to GHC 9.10.3 (with ghc-prim 0.12)
+allow-newer: *:ghc-prim
+
 tests: True
 
 source-repository-package
