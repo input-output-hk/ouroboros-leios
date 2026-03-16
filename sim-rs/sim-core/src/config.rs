@@ -65,6 +65,8 @@ pub struct RawParameters {
     pub relay_strategy: RelayStrategy,
     pub simulate_transactions: bool,
     pub timestamp_resolution_ms: f64,
+    #[serde(default = "default_shard_count")]
+    pub shard_count: usize,
 
     // Leios protocol configuration
     pub leios_stage_length_slots: u64,
@@ -736,6 +738,7 @@ impl LateTXAttackConfig {
 pub struct SimConfiguration {
     pub seed: u64,
     pub timestamp_resolution: Duration,
+    pub shard_count: usize,
     pub slots: Option<u64>,
     pub emit_conformance_events: bool,
     pub aggregate_events: bool,
@@ -807,6 +810,7 @@ impl SimConfiguration {
         Ok(Self {
             seed: 0,
             timestamp_resolution: duration_ms(params.timestamp_resolution_ms),
+            shard_count: params.shard_count.max(1),
             slots: None,
             emit_conformance_events: false,
             aggregate_events: false,
@@ -856,6 +860,10 @@ impl SimConfiguration {
 
 fn duration_ms(ms: f64) -> Duration {
     Duration::from_secs_f64(ms / 1000.0)
+}
+
+fn default_shard_count() -> usize {
+    1
 }
 
 #[derive(Debug, Clone)]

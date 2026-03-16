@@ -1,4 +1,10 @@
-use std::{cmp::Reverse, collections::HashMap, fmt::Debug, hash::Hash, time::Duration};
+use std::{
+    cmp::Reverse,
+    collections::{HashMap, HashSet},
+    fmt::Debug,
+    hash::Hash,
+    time::Duration,
+};
 
 use anyhow::Result;
 use priority_queue::PriorityQueue;
@@ -16,6 +22,8 @@ pub struct NetworkCoordinator<TProtocol, TMessage> {
     sinks: HashMap<NodeId, mpsc::UnboundedSender<(NodeId, TMessage)>>,
     connections: HashMap<Link, Connection<TProtocol, TMessage>>,
     events: PriorityQueue<Link, Reverse<Timestamp>>,
+    local_nodes: HashSet<NodeId>,
+    cross_shard_sink: Option<mpsc::UnboundedSender<CrossShardMessage<TProtocol, TMessage>>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -38,13 +46,28 @@ impl<TProtocol: Clone + Eq + Hash, TMessage: Debug> NetworkCoordinator<TProtocol
             sinks: HashMap::new(),
             connections: HashMap::new(),
             events: PriorityQueue::new(),
+            local_nodes: HashSet::new(),
+            cross_shard_sink: None,
         }
+    }
+
+    pub fn set_cross_shard_sink(
+        &mut self,
+        sink: mpsc::UnboundedSender<CrossShardMessage<TProtocol, TMessage>>,
+    ) {
+        self.cross_shard_sink = Some(sink);
     }
 
     pub fn listen(&mut self, to: NodeId) -> mpsc::UnboundedReceiver<(NodeId, TMessage)> {
         let (sink, source) = mpsc::unbounded_channel();
         self.sinks.insert(to, sink);
+        self.local_nodes.insert(to);
         source
+    }
+
+    /// Get a clone of the delivery sink for a node (for cross-shard delivery).
+    pub fn node_sink(&self, id: &NodeId) -> Option<mpsc::UnboundedSender<(NodeId, TMessage)>> {
+        self.sinks.get(id).cloned()
     }
 
     pub fn add_edge(&mut self, config: EdgeConfig) {
@@ -80,7 +103,20 @@ impl<TProtocol: Clone + Eq + Hash, TMessage: Debug> NetworkCoordinator<TProtocol
                     }
                 },
                 Some(message) = self.source.recv() => {
-                    self.schedule_message(message, clock.now());
+                    if self.local_nodes.contains(&message.to) {
+                        // Intra-shard: handle locally
+                        self.schedule_message(message, clock.now());
+                    } else if let Some(cross_shard) = &self.cross_shard_sink {
+                        // Cross-shard: forward to broker with send timestamp
+                        let _ = cross_shard.send(CrossShardMessage {
+                            send_time: clock.now(),
+                            from: message.from,
+                            to: message.to,
+                            protocol: message.protocol,
+                            body: message.body,
+                            bytes: message.bytes,
+                        });
+                    }
                     clock.finish_task();
                 }
             }
@@ -101,6 +137,15 @@ impl<TProtocol: Clone + Eq + Hash, TMessage: Debug> NetworkCoordinator<TProtocol
 }
 
 pub struct Message<TProtocol, TMessage> {
+    pub from: NodeId,
+    pub to: NodeId,
+    pub protocol: TProtocol,
+    pub body: TMessage,
+    pub bytes: u64,
+}
+
+pub struct CrossShardMessage<TProtocol, TMessage> {
+    pub send_time: Timestamp,
     pub from: NodeId,
     pub to: NodeId,
     pub protocol: TProtocol,

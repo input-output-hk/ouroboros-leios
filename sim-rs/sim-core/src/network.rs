@@ -9,8 +9,12 @@ use crate::{
     config::NodeId,
 };
 
-mod connection;
-mod coordinator;
+pub(crate) mod connection;
+pub(crate) mod coordinator;
+pub(crate) mod broker;
+
+pub use broker::{CrossShardBroker, ShardHandle, ShardLookup};
+pub use coordinator::CrossShardMessage;
 
 pub struct Network<TProtocol, TMessage> {
     clock: ClockBarrier,
@@ -48,6 +52,18 @@ impl<TProtocol: Clone + Eq + Hash, TMessage: Debug> Network<TProtocol, TMessage>
             bandwidth_bps,
         });
         Ok(())
+    }
+
+    pub fn set_cross_shard_sink(
+        &mut self,
+        sink: mpsc::UnboundedSender<CrossShardMessage<TProtocol, TMessage>>,
+    ) {
+        self.coordinator.set_cross_shard_sink(sink);
+    }
+
+    /// Get a clone of the delivery sink for a local node (for cross-shard delivery).
+    pub fn node_sink(&self, id: &NodeId) -> Option<mpsc::UnboundedSender<(NodeId, TMessage)>> {
+        self.coordinator.node_sink(id)
     }
 
     pub fn open(

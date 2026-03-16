@@ -16,32 +16,79 @@ use crate::clock::TaskInitiator;
 
 use super::{Clock, Timestamp, timestamp::AtomicTimestamp};
 
+/// Other shards' time references for computing the lookahead ceiling.
+pub struct PeerShard {
+    /// The peer shard's current time.
+    pub time: Arc<AtomicTimestamp>,
+    /// Minimum network latency from that shard to this one.
+    pub min_latency: Duration,
+    /// Notified when the peer advances time.
+    pub time_advanced: Arc<Notify>,
+}
+
 pub struct ClockCoordinator {
     timestamp_resolution: Duration,
     time: Arc<AtomicTimestamp>,
+    time_ceiling: Arc<AtomicTimestamp>,
+    peer_shards: Vec<PeerShard>,
     tx: mpsc::UnboundedSender<ClockEvent>,
     rx: mpsc::UnboundedReceiver<ClockEvent>,
     waiter_count: Arc<AtomicUsize>,
     tasks: Arc<AtomicUsize>,
     task_notify: Arc<Notify>,
+    /// Notified whenever this coordinator advances time, so external
+    /// observers (e.g. the cross-shard broker) can react.
+    time_advanced_notify: Arc<Notify>,
 }
 
 impl ClockCoordinator {
     pub fn new(timestamp_resolution: Duration) -> Self {
         let time = Arc::new(AtomicTimestamp::new(Timestamp::zero()));
+        let time_ceiling = Arc::new(AtomicTimestamp::new(Timestamp::max()));
         let (tx, rx) = mpsc::unbounded_channel();
         let waiter_count = Arc::new(AtomicUsize::new(0));
         let tasks = Arc::new(AtomicUsize::new(0));
         let task_notify = Arc::new(Notify::new());
+        let time_advanced_notify = Arc::new(Notify::new());
         Self {
             timestamp_resolution,
             time,
+            time_ceiling,
+            peer_shards: Vec::new(),
             tx,
             rx,
             waiter_count,
             tasks,
             task_notify,
+            time_advanced_notify,
         }
+    }
+
+    /// Returns a shared reference to this coordinator's time, readable from other shards.
+    pub fn shared_time(&self) -> Arc<AtomicTimestamp> {
+        self.time.clone()
+    }
+
+    /// Returns the time ceiling, which external code can update to prevent
+    /// this coordinator from advancing past a certain timestamp.
+    pub fn time_ceiling(&self) -> Arc<AtomicTimestamp> {
+        self.time_ceiling.clone()
+    }
+
+    /// Returns a Notify that can be used to wake this coordinator
+    /// when the time ceiling changes.
+    pub fn ceiling_notify(&self) -> Arc<Notify> {
+        self.task_notify.clone()
+    }
+
+    /// Returns a Notify that fires whenever this coordinator advances time.
+    pub fn time_advanced_notify(&self) -> Arc<Notify> {
+        self.time_advanced_notify.clone()
+    }
+
+    /// Set peer shards for lookahead ceiling computation.
+    pub fn set_peer_shards(&mut self, peers: Vec<PeerShard>) {
+        self.peer_shards = peers;
     }
 
     pub fn clock(&self) -> Clock {
@@ -66,36 +113,67 @@ impl ClockCoordinator {
         loop {
             // If all actors are waiting, wait for either a new event or a task completion
             if running == 0 {
-                // Try to advance time immediately if tasks are already done
-                while running == 0 && self.tasks.load(Ordering::Acquire) == 0 {
-                    let (timestamp, waiter_ids) = queue.pop_first().unwrap();
-                    self.time.store(timestamp, Ordering::Release);
+                loop {
+                    // Register interest in notifications BEFORE checking,
+                    // to avoid missing a notify between the check and the await.
+                    let task_notified = self.task_notify.notified();
+                    tokio::pin!(task_notified);
+                    let peer_notified: Vec<_> = self.peer_shards
+                        .iter()
+                        .map(|p| Box::pin(p.time_advanced.notified()))
+                        .collect();
+                    let has_peers = !peer_notified.is_empty();
 
-                    for id in waiter_ids {
-                        if waiters[id]
-                            .as_ref()
-                            .and_then(|w: &Waiter| w.until)
-                            .is_some_and(|ts| ts == timestamp)
-                        {
-                            running += 1;
-                            let waiter = waiters[id].take().unwrap();
-                            let _ = waiter.done.send(());
+                    // Try to advance time if tasks are done
+                    while running == 0 && self.tasks.load(Ordering::Acquire) == 0 {
+                        let Some((timestamp, _)) = queue.first_key_value() else {
+                            break;
+                        };
+                        let timestamp = *timestamp;
+                        // Compute ceiling: min of external ceiling and peer shard lookaheads
+                        let mut ceiling = self.time_ceiling.load(Ordering::Acquire);
+                        for peer in &self.peer_shards {
+                            let peer_time = peer.time.load(Ordering::Acquire);
+                            let lookahead = peer_time + peer.min_latency;
+                            if lookahead < ceiling {
+                                ceiling = lookahead;
+                            }
+                        }
+                        if timestamp > ceiling {
+                            break;
+                        }
+                        let (_, waiter_ids) = queue.pop_first().unwrap();
+                        self.time.store(timestamp, Ordering::Release);
+                        self.time_advanced_notify.notify_waiters();
+
+                        for id in waiter_ids {
+                            if waiters[id]
+                                .as_ref()
+                                .and_then(|w: &Waiter| w.until)
+                                .is_some_and(|ts| ts == timestamp)
+                            {
+                                running += 1;
+                                let waiter = waiters[id].take().unwrap();
+                                let _ = waiter.done.send(());
+                            }
                         }
                     }
-                }
-                if running == 0 {
-                    // Tasks still in flight — wait for either a channel event or task completion
+                    if running != 0 {
+                        break;
+                    }
+                    // Blocked — wait for a channel event, task completion, or peer advancement
                     select! {
                         event = self.rx.recv() => {
                             let Some(event) = event else { return };
                             Self::handle_event(event, &mut waiters, &mut running, &mut queue, &self.time);
                         }
-                        () = self.task_notify.notified() => {
-                            // Tasks counter changed — loop back to re-check
+                        () = &mut task_notified => {
+                            continue;
+                        }
+                        _ = futures::future::select_all(peer_notified), if has_peers => {
                             continue;
                         }
                     }
-                    continue;
                 }
             }
 
@@ -116,12 +194,16 @@ impl ClockCoordinator {
     ) {
         match event {
             ClockEvent::Wait { actor, until, done } => {
-                if until.is_some_and(|t| t <= time.load(Ordering::Acquire)) {
-                    // Time already reached or passed this point — complete immediately
-                    // without entering wait state (actor stays "running")
-                    let _ = done.send(());
-                    return;
-                }
+                // If time has advanced past the requested wait (due to the
+                // finish_task atomic+notify race), treat as a normal wait at
+                // the current time — it will be immediately woken by the
+                // time advancement loop.
+                let now = time.load(Ordering::Acquire);
+                let until = if until.is_some_and(|t| t < now) {
+                    Some(now)
+                } else {
+                    until
+                };
                 if waiters[actor].replace(Waiter { until, done }).is_some() {
                     panic!("An actor has somehow managed to wait twice");
                 }
