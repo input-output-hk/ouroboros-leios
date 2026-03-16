@@ -7,7 +7,10 @@ use std::{
     time::Duration,
 };
 
-use tokio::sync::{mpsc, oneshot};
+use tokio::{
+    select,
+    sync::{Notify, mpsc, oneshot},
+};
 
 use crate::clock::TaskInitiator;
 
@@ -20,6 +23,7 @@ pub struct ClockCoordinator {
     rx: mpsc::UnboundedReceiver<ClockEvent>,
     waiter_count: Arc<AtomicUsize>,
     tasks: Arc<AtomicUsize>,
+    task_notify: Arc<Notify>,
 }
 
 impl ClockCoordinator {
@@ -28,6 +32,7 @@ impl ClockCoordinator {
         let (tx, rx) = mpsc::unbounded_channel();
         let waiter_count = Arc::new(AtomicUsize::new(0));
         let tasks = Arc::new(AtomicUsize::new(0));
+        let task_notify = Arc::new(Notify::new());
         Self {
             timestamp_resolution,
             time,
@@ -35,6 +40,7 @@ impl ClockCoordinator {
             rx,
             waiter_count,
             tasks,
+            task_notify,
         }
     }
 
@@ -45,6 +51,7 @@ impl ClockCoordinator {
             self.waiter_count.clone(),
             TaskInitiator::new(self.tasks.clone()),
             self.tx.clone(),
+            self.task_notify.clone(),
         )
     }
 
@@ -56,47 +63,76 @@ impl ClockCoordinator {
 
         let mut queue: BTreeMap<Timestamp, Vec<usize>> = BTreeMap::new();
         let mut running = waiters.len();
-        while let Some(event) = self.rx.recv().await {
-            match event {
-                ClockEvent::Wait { actor, until, done } => {
-                    assert!(until.is_none_or(|t| t >= self.time.load(Ordering::Acquire)));
-                    if waiters[actor].replace(Waiter { until, done }).is_some() {
-                        panic!("An actor has somehow managed to wait twice");
-                    }
-                    running = running.checked_sub(1).unwrap();
-                    if let Some(timestamp) = until {
-                        queue.entry(timestamp).or_default().push(actor);
-                    }
-                    while running == 0 && self.tasks.load(Ordering::Acquire) == 0 {
-                        // advance time
-                        let (timestamp, waiter_ids) = queue.pop_first().unwrap();
-                        self.time.store(timestamp, Ordering::Release);
+        loop {
+            // If all actors are waiting, wait for either a new event or a task completion
+            if running == 0 {
+                // Try to advance time immediately if tasks are already done
+                while running == 0 && self.tasks.load(Ordering::Acquire) == 0 {
+                    let (timestamp, waiter_ids) = queue.pop_first().unwrap();
+                    self.time.store(timestamp, Ordering::Release);
 
-                        for id in waiter_ids {
-                            if waiters[id]
-                                .as_ref()
-                                .and_then(|w| w.until)
-                                .is_some_and(|ts| ts == timestamp)
-                            {
-                                running += 1;
-                                let waiter = waiters[id].take().unwrap();
-                                let _ = waiter.done.send(());
-                            }
+                    for id in waiter_ids {
+                        if waiters[id]
+                            .as_ref()
+                            .and_then(|w: &Waiter| w.until)
+                            .is_some_and(|ts| ts == timestamp)
+                        {
+                            running += 1;
+                            let waiter = waiters[id].take().unwrap();
+                            let _ = waiter.done.send(());
                         }
                     }
                 }
-                ClockEvent::CancelWait { actor } => {
-                    if waiters[actor].take().is_some() {
-                        running += 1;
+                if running == 0 {
+                    // Tasks still in flight — wait for either a channel event or task completion
+                    select! {
+                        event = self.rx.recv() => {
+                            let Some(event) = event else { return };
+                            Self::handle_event(event, &mut waiters, &mut running, &mut queue, &self.time);
+                        }
+                        () = self.task_notify.notified() => {
+                            // Tasks counter changed — loop back to re-check
+                            continue;
+                        }
                     }
+                    continue;
                 }
-                ClockEvent::FinishTask => {
-                    let prev_tasks = self.tasks.fetch_sub(1, Ordering::AcqRel);
-                    assert!(prev_tasks != 0, "Finished a task that was never started");
-                    assert!(
-                        running != 0,
-                        "All tasks were completed while there were no actors to complete them"
-                    );
+            }
+
+            // Actors are running — just process channel events
+            let Some(event) = self.rx.recv().await else {
+                return;
+            };
+            Self::handle_event(event, &mut waiters, &mut running, &mut queue, &self.time);
+        }
+    }
+
+    fn handle_event(
+        event: ClockEvent,
+        waiters: &mut [Option<Waiter>],
+        running: &mut usize,
+        queue: &mut BTreeMap<Timestamp, Vec<usize>>,
+        time: &AtomicTimestamp,
+    ) {
+        match event {
+            ClockEvent::Wait { actor, until, done } => {
+                if until.is_some_and(|t| t <= time.load(Ordering::Acquire)) {
+                    // Time already reached or passed this point — complete immediately
+                    // without entering wait state (actor stays "running")
+                    let _ = done.send(());
+                    return;
+                }
+                if waiters[actor].replace(Waiter { until, done }).is_some() {
+                    panic!("An actor has somehow managed to wait twice");
+                }
+                *running = running.checked_sub(1).unwrap();
+                if let Some(timestamp) = until {
+                    queue.entry(timestamp).or_default().push(actor);
+                }
+            }
+            ClockEvent::CancelWait { actor } => {
+                if waiters[actor].take().is_some() {
+                    *running += 1;
                 }
             }
         }
@@ -118,7 +154,6 @@ pub enum ClockEvent {
     CancelWait {
         actor: usize,
     },
-    FinishTask,
 }
 
 #[cfg(test)]
