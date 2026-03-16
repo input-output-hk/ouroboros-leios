@@ -1,17 +1,17 @@
 import Link from "@docusaurus/Link";
 
 import useDocusaurusContext from "@docusaurus/useDocusaurusContext";
-import HomepageFeatures from "@site/src/components/HomepageFeatures";
 import Layout from "@theme/Layout";
 import clsx from "clsx";
 import React, { useEffect, useState } from "react";
 
+import LiveTrackerPreview from "@site/static/img/live-tracker-preview.png";
+import VideoCamUrl from "@site/static/img/video-cam.png";
+import { ArrowRightIcon } from "../components/icons";
 import { LinkButton } from "../components/LinkButton/LinkButton";
 import HowLeiosWorksGraphic from "./HowLeiosWorksGraphic";
 import styles from "./index.module.css";
 import ResearchGraphic from "./ResearchGraphic";
-import VideoCamUrl from "@site/static/img/video-cam.png";
-import LiveTrackerPreview from "@site/static/img/live-tracker-preview.png";
 
 function HomepageHeader() {
   const { siteConfig } = useDocusaurusContext();
@@ -19,10 +19,43 @@ function HomepageHeader() {
   return (
     <>
       <header className={clsx("hero hero--primary")}>
-        <div className="container">
-          <div className={clsx("container-padding", styles.heroBanner)}>
-            <h1 className={styles.heroTitle}>{siteConfig.title}</h1>
-            <p className={styles.heroStandfirst}>{siteConfig.tagline}</p>
+        <video className="hero-video-desktop" autoPlay muted loop playsInline>
+          <source
+            src="/homepage/hero-background-desktop.mp4"
+            type="video/mp4"
+          />
+        </video>
+        <video className="hero-video-mobile" autoPlay muted loop playsInline>
+          <source src="/homepage/hero-background-mobile.mp4" type="video/mp4" />
+        </video>
+        <div className="hero-overlay" />
+
+        <div className={clsx("container hero-content")}>
+          <div className={clsx("container-padding")}>
+            <div className={styles.heroBanner}>
+              <h1 className={styles.heroTitle}>{siteConfig.title}</h1>
+              <p className={styles.heroStandfirst}>{siteConfig.tagline}</p>
+              <div className={styles.heroButtonsContainer}>
+                <a
+                  className={clsx("primary-button homepage-button")}
+                  href="#dev-dashboard"
+                >
+                  View live development{" "}
+                  <ArrowRightIcon
+                    style={{ rotate: "90deg" }}
+                    height={12}
+                    width={12}
+                  />
+                </a>
+                <a
+                  className={clsx("secondary-button homepage-button")}
+                  href="/formal-spec/"
+                >
+                  {" "}
+                  Explore how it works <ArrowRightIcon height={12} width={12} />
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       </header>
@@ -438,6 +471,18 @@ function MempoolSimulationSection() {
 
 export default function Home(): React.ReactElement {
   const { siteConfig } = useDocusaurusContext();
+  const iframeRef = React.useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (event.data?.type === "dashboard-height" && iframeRef.current) {
+        iframeRef.current.style.height = event.data.height + "px";
+      }
+    };
+
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
   return (
     <Layout
       title={siteConfig.title}
@@ -445,17 +490,20 @@ export default function Home(): React.ReactElement {
     >
       <HomepageHeader />
       <main>
-        <HomepageFeatures />
+        {/* <HomepageFeatures /> */}
+
         <iframe
-          src="https://engineering.iog.io/leios"
+          ref={iframeRef}
+          src="https://engineering.iog.io/documentation-dashboard"
           title="Leios"
           className={styles.devTracker}
+          id="dev-dashboard"
         />
-        <LeiosSpecificationSection />
+        {/* <LeiosSpecificationSection />
         <HowLeiosWorksSection />
         <MonthlyReviewsSection />
         <LiveTrackerSection />
-        <MempoolSimulationSection />
+        <MempoolSimulationSection /> */}
       </main>
     </Layout>
   );

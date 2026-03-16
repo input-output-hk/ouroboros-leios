@@ -4,7 +4,8 @@ import { themes as prismThemes } from "prism-react-renderer";
 
 const config: Config = {
   title: "Ouroboros Leios",
-  tagline: "A high-throughput protocol for Cardano",
+  tagline:
+    "A high throughput protocol for Cardano. Designed to increase transaction capacity while preserving security and ecosystem compatibility.",
   favicon: "img/favicon.ico",
 
   // Set the production url of your site here
@@ -166,7 +167,7 @@ const config: Config = {
       },
       links: [
         {
-          title: "Docs",
+          title: "Documentation",
           items: [
             {
               label: "Formal Specification",
@@ -187,20 +188,41 @@ const config: Config = {
           ],
         },
         {
-          title: "Community",
+          title: "Development",
           items: [
             {
-              label: "Monthly review meetings",
-              to: "/docs/development/monthly-reviews",
+              label: "Roadmap",
+              to: "/development/roadmap",
             },
             {
-              label: "GitHub Discussions",
-              href: "https://github.com/input-output-hk/ouroboros-leios/discussions",
+              label: "Strategy",
+              to: "/docs/strategy",
+            },
+            {
+              label: "Research Variants",
+              to: "/docs/development/overview",
+            },
+            {
+              label: "Simulation Results",
+              to: "/docs/development/simulation-demonstration",
             },
           ],
         },
         {
-          title: "Legal",
+          title: "Updates",
+          items: [
+            {
+              label: "Mempool Visualizer",
+              to: "https://leios.cardano-scaling.org/mempool-viz/",
+            },
+            {
+              label: "Throughput Simulator",
+              to: "https://www.insightmaker.com/insight/4DU4kmFVCFDaq30ux29PCe/Cardano-Throughput-v0-3",
+            },
+          ],
+        },
+        {
+          title: "Community",
           items: [
             {
               label: "Terms & Conditions",
@@ -212,23 +234,6 @@ const config: Config = {
             },
             {
               label: "Contributors",
-              to: "https://github.com/input-output-hk/ouroboros-leios/graphs/contributors",
-            },
-          ],
-        },
-        {
-          title: "More resources",
-          items: [
-            {
-              label: "IOHK research library",
-              to: "https://iohk.io/en/research/library/",
-            },
-            {
-              label: "Essential Cardano",
-              to: "https://www.essentialcardano.io/",
-            },
-            {
-              label: "Cardano Docs",
               to: "https://docs.cardano.org/",
             },
           ],
@@ -241,9 +246,35 @@ const config: Config = {
       darkTheme: prismThemes.dracula,
     },
     socials: {
-      github: "https://github.com/input-output-hk/ouroboros-leios",
-      discord: "https://discord.gg/83aXYxy9",
+      tagline: "Join the conversation",
+      items: [
+        { platform: "twitter", url: "https://x.com/inputoutputHK" },
+        {
+          platform: "github",
+          url: "https://github.com/input-output-hk/ouroboros-leios",
+        },
+        {
+          platform: "linkedIn",
+          url: "https://www.linkedin.com/company/input-output-group/posts/?feedView=all",
+        },
+        { platform: "facebook", url: "https://www.facebook.com/iohk.io" },
+        { platform: "discord", url: "https://discord.gg/83aXYxy9" },
+      ],
     },
+    legal: [
+      {
+        label: "Terms & Conditions",
+        to: "https://static.iohk.io/terms/iohktermsandconditions.pdf",
+      },
+      {
+        label: "Privacy Policy",
+        to: "https://static.iohk.io/terms/iog-privacy-policy.pdf",
+      },
+      {
+        label: "Contributors",
+        to: "https://github.com/input-output-hk/ouroboros-leios/graphs/contributors",
+      },
+    ],
   } satisfies Preset.ThemeConfig,
 };
 
