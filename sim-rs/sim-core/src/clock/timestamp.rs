@@ -17,6 +17,10 @@ impl Timestamp {
         Self(0)
     }
 
+    pub fn max() -> Self {
+        Self(u64::MAX)
+    }
+
     pub fn from_secs(secs: u64) -> Self {
         Self(secs * NANOS_PER_SEC)
     }

@@ -8,9 +8,7 @@ use figment::{
     providers::{Format as _, Yaml},
 };
 use sim_core::{
-    clock::ClockCoordinator,
     config::{NodeId, RawParameters, RawTopology, SimConfiguration, Topology},
-    events::EventTracker,
     sim::Simulation,
 };
 use tokio::{
@@ -142,10 +140,7 @@ async fn main() -> Result<()> {
     let monitor = tokio::spawn(EventMonitor::new(&config, events_source, args.output).run());
     pin!(monitor);
 
-    let clock_coordinator = ClockCoordinator::new(config.timestamp_resolution);
-    let clock = clock_coordinator.clock();
-    let tracker = EventTracker::new(events_sink, clock.clone(), &config.nodes);
-    let mut simulation = Simulation::new(config, tracker, clock_coordinator).await?;
+    let mut simulation = Simulation::new(config, events_sink).await?;
 
     select! {
         result = simulation.run(token) => { result? }
