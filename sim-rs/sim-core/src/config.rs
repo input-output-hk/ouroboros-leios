@@ -179,6 +179,15 @@ pub enum LeiosVariant {
     LinearWithTxReferences,
 }
 
+impl LeiosVariant {
+    pub fn has_ibs(&self) -> bool {
+        !matches!(
+            self,
+            Self::FullWithoutIbs | Self::Linear | Self::LinearWithTxReferences
+        )
+    }
+}
+
 #[derive(Debug, Copy, Clone, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum RelayStrategy {
