@@ -13,7 +13,7 @@ use futures::FutureExt;
 pub use mock::MockClockCoordinator;
 use timestamp::AtomicTimestamp;
 pub use timestamp::Timestamp;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{Notify, mpsc, oneshot};
 
 mod coordinator;
 mod mock;
@@ -56,6 +56,7 @@ pub struct Clock {
     waiters: Arc<AtomicUsize>,
     tasks: TaskInitiator,
     tx: mpsc::UnboundedSender<ClockEvent>,
+    task_notify: Arc<Notify>,
 }
 
 impl Clock {
@@ -65,6 +66,7 @@ impl Clock {
         waiters: Arc<AtomicUsize>,
         tasks: TaskInitiator,
         tx: mpsc::UnboundedSender<ClockEvent>,
+        task_notify: Arc<Notify>,
     ) -> Self {
         Self {
             timestamp_resolution,
@@ -72,6 +74,7 @@ impl Clock {
             waiters,
             tasks,
             tx,
+            task_notify,
         }
     }
 
@@ -89,6 +92,7 @@ impl Clock {
             time: self.time.clone(),
             tasks: self.tasks.clone(),
             tx: self.tx.clone(),
+            task_notify: self.task_notify.clone(),
         }
     }
 }
@@ -99,6 +103,7 @@ pub struct ClockBarrier {
     time: Arc<AtomicTimestamp>,
     tasks: TaskInitiator,
     tx: mpsc::UnboundedSender<ClockEvent>,
+    task_notify: Arc<Notify>,
 }
 
 impl ClockBarrier {
@@ -111,7 +116,8 @@ impl ClockBarrier {
     }
 
     pub fn finish_task(&self) {
-        let _ = self.tx.send(ClockEvent::FinishTask);
+        self.tasks.finish_task();
+        self.task_notify.notify_one();
     }
 
     pub fn task_initiator(&self) -> TaskInitiator {
@@ -128,7 +134,7 @@ impl ClockBarrier {
 
     fn wait(&mut self, until: Option<Timestamp>) -> Waiter<'_> {
         let (tx, rx) = oneshot::channel();
-        let done = until.is_some_and(|ts| ts == self.now())
+        let done = until.is_some_and(|ts| ts <= self.now())
             || self
                 .tx
                 .send(ClockEvent::Wait {
@@ -158,6 +164,10 @@ impl TaskInitiator {
     }
     pub fn start_task(&self) {
         self.tasks.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+    }
+    fn finish_task(&self) {
+        let prev = self.tasks.fetch_sub(1, std::sync::atomic::Ordering::AcqRel);
+        assert!(prev != 0, "Finished a task that was never started");
     }
 }
 
