@@ -479,6 +479,12 @@
       "description": "Only supported by Haskell simulation.",
       "type": "boolean"
     },
+    "shard-count": {
+      "description": "Number of clock shards for parallel simulation. Each shard advances time independently.\nOnly supported by Rust simulation.",
+      "type": "integer",
+      "minimum": 1,
+      "default": 1
+    },
     "timestamp-resolution-ms": {
       "description": "The smallest unit of time to simulate, in fractions of a millisecond.\nOnly supported by Rust simulation.",
       "type": "number"

@@ -34,8 +34,8 @@ impl TransactionProducer {
         let nodes = config
             .nodes
             .iter()
-            .map(|node| {
-                let sink = node_tx_sinks.remove(&node.id).unwrap();
+            .filter_map(|node| {
+                let sink = node_tx_sinks.remove(&node.id)?;
                 let state =
                     NodeState {
                         sink,
@@ -44,7 +44,7 @@ impl TransactionProducer {
                             .tx_generation_weight
                             .unwrap_or(if node.stake > 0 { 0 } else { 1 }),
                     };
-                (node.id, state)
+                Some((node.id, state))
             })
             .collect();
         Self {
