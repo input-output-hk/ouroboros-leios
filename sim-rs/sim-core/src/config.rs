@@ -67,6 +67,8 @@ pub enum ShardStrategy {
     ZeroLatencyClusters,
     /// K-means clustering by geographic coordinates to maximize cross-shard latency
     Geographic,
+    /// Agglomerative clustering: merge lowest-latency pairs first (Kruskal-style)
+    MinLatencyClusters,
 }
 
 #[derive(Deserialize)]
@@ -81,6 +83,9 @@ pub struct RawParameters {
     pub shard_count: usize,
     #[serde(default)]
     pub shard_strategy: ShardStrategy,
+    /// Max shard size as percentage of average (for min-latency-clusters). Default 200.
+    #[serde(default = "default_shard_max_size_pct")]
+    pub shard_max_size_pct: u64,
 
     // Leios protocol configuration
     pub leios_stage_length_slots: u64,
@@ -758,6 +763,7 @@ pub struct SimConfiguration {
     pub timestamp_resolution: Duration,
     pub shard_count: usize,
     pub shard_strategy: ShardStrategy,
+    pub shard_max_size_pct: u64,
     pub slots: Option<u64>,
     pub emit_conformance_events: bool,
     pub aggregate_events: bool,
@@ -831,6 +837,7 @@ impl SimConfiguration {
             timestamp_resolution: duration_ms(params.timestamp_resolution_ms),
             shard_count: params.shard_count.max(1),
             shard_strategy: params.shard_strategy.clone(),
+            shard_max_size_pct: params.shard_max_size_pct,
             slots: None,
             emit_conformance_events: false,
             aggregate_events: false,
@@ -884,6 +891,10 @@ fn duration_ms(ms: f64) -> Duration {
 
 fn default_shard_count() -> usize {
     1
+}
+
+fn default_shard_max_size_pct() -> u64 {
+    200
 }
 
 #[derive(Debug, Clone)]
