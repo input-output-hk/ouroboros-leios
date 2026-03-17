@@ -1,0 +1,3 @@
+timestamp-resolution-ms: 1.0
+shard-count: 4
+shard-strategy: zero-latency-clusters
