@@ -90,7 +90,7 @@ impl Simulation {
         config: SimConfiguration,
         event_sender: mpsc::UnboundedSender<(crate::events::Event, Timestamp)>,
     ) -> Result<Self> {
-        let use_sequential = config.sequential_engine && config.shard_count <= 1;
+        let use_sequential = config.sequential_engine;
         let config = Arc::new(config);
         let shard_count = config.shard_count;
 
