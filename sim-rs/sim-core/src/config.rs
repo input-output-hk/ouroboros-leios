@@ -88,6 +88,9 @@ pub struct RawParameters {
     /// Max shard size as percentage of average (for min-latency-clusters). Default 200.
     #[serde(default = "default_shard_max_size_pct")]
     pub shard_max_size_pct: u64,
+    /// Use sequential DES engine instead of actor-based engine (single-shard only).
+    #[serde(default = "default_true")]
+    pub sequential_engine: bool,
 
     // Leios protocol configuration
     pub leios_stage_length_slots: u64,
@@ -766,6 +769,7 @@ pub struct SimConfiguration {
     pub shard_count: usize,
     pub shard_strategy: ShardStrategy,
     pub shard_max_size_pct: u64,
+    pub sequential_engine: bool,
     pub slots: Option<u64>,
     pub emit_conformance_events: bool,
     pub aggregate_events: bool,
@@ -840,6 +844,7 @@ impl SimConfiguration {
             shard_count: params.shard_count.max(1),
             shard_strategy: params.shard_strategy.clone(),
             shard_max_size_pct: params.shard_max_size_pct,
+            sequential_engine: params.sequential_engine,
             slots: None,
             emit_conformance_events: false,
             aggregate_events: false,
@@ -897,6 +902,10 @@ fn default_shard_count() -> usize {
 
 fn default_shard_max_size_pct() -> u64 {
     200
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Debug, Clone)]
