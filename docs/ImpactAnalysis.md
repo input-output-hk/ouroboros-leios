@@ -267,6 +267,18 @@ The Network layer implements the mini-protocols that enable the Consensus layer 
 
 Similar resource contention risks apply to the Network layer, including network bandwidth contention between Praos and Leios, networking overhead latency, and contention between fresh and stale Leios traffic.
 
+## Message latencies
+
+Due to extra volume that Leios imposes on the protocol, it is imperative that the uderlying TCP bearer is managed such that arbitrary amount of data does not accrue in the host OS kernel buffers. Such a design is necessary to mitigate head-of-line blocking effects which would adversely affect network latencies, and in particular apparent ranking (Praos) block propagation times. For eg. Linux and macOS support TCP socket option TCP_NOTSENT_LOWAT which allows to limit the volume of data written to the socket and that which cannot be yet sent out. This is very useful when we know what we want to diffuse, but also change our mind in terms of message ordering at the last moment, and do in the a way which doesn't artificially limit our thruput. Crucially, this option allow us to satisfy ranking block delivery timeliness guarantees which simultaneously gives us the means to manage the memory footprint of a running node. Sadly, this option is not universally supported and alternatives themselves are not portable, and manual transmission pacing is onerous so we postpone its investigation.
+
+## Traffic priority
+
+The interleaving of protocol messages is the primary function of the muxer component, which in the current design is fair by design in the sense that each protocol is serviced in round robin fashion. A bias can be introduced here which would prioritize some protocols over others. Some standard approaches which can be considered are token bucket filters, which allow a protocol to briefly monopolize egress, which can be practical for blockfetch which is active occasionally. A complimentary approach could leverage a weighted queuing scheme, which would dedicate more effort to some protocols over others while also providing (relaxed) bounds on servicing guarantees.
+
+## Transaction submission
+
+Current cardano-node (10.7, at the time of this writing) is by default using the legacy transaction submission protocol which fetches all transactions from every peer that offers them, even if some of those transactions are repeated. This scheme is found to be effective and robust in the current protocol implementation, but it necessarily leads to higher bandwidth consumption. A new protocol version v2 is being rolled out and tested, which is expected to bring cpu, memory and bandwidth use down, which in turn frees those resources for other tasks, and Leios in particular.
+
 ## New mini-protocols
 
 The node must include new mini-protocols (**NEW-LeiosMiniProtocols**) to diffuse EB announcements, EBs themselves, EBs' transactions, and votes for EBs. These protocols enable the Consensus layer to satisfy **REQ-DiffuseLeiosBlocks** and **REQ-DiffuseLeiosVotes**. The Leios mini-protocols will require new fetch decision logic (**NEW-LeiosFetchDecisionLogic**), since the node should not necessarily simply download every such object from every peer that offers it. Such fetch decision logic is also required for TxSubmission and for Peras votes; the Leios logic will likely be similar but not equivalent.
