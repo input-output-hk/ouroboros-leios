@@ -114,13 +114,7 @@ impl Simulation {
         let shard_count = config.shard_count;
 
         // Build shard lookup: node_id -> shard_index
-        let shard_lookup: ShardLookup = Arc::new(
-            config
-                .nodes
-                .iter()
-                .map(|n| (n.id, n.id.to_inner() % shard_count))
-                .collect(),
-        );
+        let shard_lookup: ShardLookup = crate::sharding::compute_shard_lookup(&config);
 
         // Create per-shard clock coordinators
         let mut clock_coordinators: Vec<ClockCoordinator> = (0..shard_count)
@@ -368,46 +362,59 @@ impl Simulation {
             set.spawn(actor.run());
         }
 
-        // Spawn slot witness — cancels token when all slots are done
-        let mut slot_witness = self.slot_witness;
-        let slot_token = token.clone();
-        set.spawn(async move {
+        if self.shards.len() == 1 {
+            // Single shard: run everything in one task via select! for minimal overhead
+            let mut shard = self.shards.pop().unwrap();
             select! {
-                _ = slot_token.cancelled() => {}
-                _ = slot_witness.run() => { slot_token.cancel(); }
-            }
-            Ok(())
-        });
-
-        // Spawn each shard as its own tokio task (independent LP)
-        for mut shard in self.shards {
-            let shard_token = token.clone();
+                biased;
+                _ = token.cancelled() => {}
+                _ = self.slot_witness.run() => {}
+                _ = shard.clock_coordinator.run() => {}
+                result = shard.network.run() => { result? }
+                result = shard.tx_producer.run() => { result?; }
+                result = set.join_next() => { result.unwrap()??; }
+            };
+        } else {
+            // Multi-shard: spawn each shard as its own tokio task (independent LP)
+            let mut slot_witness = self.slot_witness;
+            let slot_token = token.clone();
             set.spawn(async move {
                 select! {
-                    _ = shard_token.cancelled() => {}
-                    _ = shard.clock_coordinator.run() => {}
-                    result = shard.network.run() => { result? }
-                    result = shard.tx_producer.run() => { result?; }
+                    _ = slot_token.cancelled() => {}
+                    _ = slot_witness.run() => { slot_token.cancel(); }
                 }
                 Ok(())
             });
-        }
 
-        // Wait for tasks — errors during normal operation propagate,
-        // but errors after cancellation (e.g. closed channels) are expected.
-        while let Some(result) = set.join_next().await {
-            match result {
-                Ok(Ok(())) => {}
-                Ok(Err(e)) => {
-                    if !token.is_cancelled() {
-                        token.cancel();
-                        return Err(e);
+            for mut shard in self.shards {
+                let shard_token = token.clone();
+                set.spawn(async move {
+                    select! {
+                        _ = shard_token.cancelled() => {}
+                        _ = shard.clock_coordinator.run() => {}
+                        result = shard.network.run() => { result? }
+                        result = shard.tx_producer.run() => { result?; }
                     }
-                }
-                Err(e) => {
-                    if !token.is_cancelled() {
-                        token.cancel();
-                        return Err(e.into());
+                    Ok(())
+                });
+            }
+
+            // Wait for tasks — errors during normal operation propagate,
+            // but errors after cancellation (e.g. closed channels) are expected.
+            while let Some(result) = set.join_next().await {
+                match result {
+                    Ok(Ok(())) => {}
+                    Ok(Err(e)) => {
+                        if !token.is_cancelled() {
+                            token.cancel();
+                            return Err(e);
+                        }
+                    }
+                    Err(e) => {
+                        if !token.is_cancelled() {
+                            token.cancel();
+                            return Err(e.into());
+                        }
                     }
                 }
             }

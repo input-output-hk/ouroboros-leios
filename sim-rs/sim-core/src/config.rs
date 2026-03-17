@@ -57,6 +57,16 @@ impl From<DistributionConfig> for FloatDistribution {
     }
 }
 
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ShardStrategy {
+    /// Simple round-robin by node ID
+    #[default]
+    RoundRobin,
+    /// Round-robin but keeps 0-latency-connected nodes on the same shard
+    ZeroLatencyClusters,
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct RawParameters {
@@ -67,6 +77,8 @@ pub struct RawParameters {
     pub timestamp_resolution_ms: f64,
     #[serde(default = "default_shard_count")]
     pub shard_count: usize,
+    #[serde(default)]
+    pub shard_strategy: ShardStrategy,
 
     // Leios protocol configuration
     pub leios_stage_length_slots: u64,
@@ -739,6 +751,7 @@ pub struct SimConfiguration {
     pub seed: u64,
     pub timestamp_resolution: Duration,
     pub shard_count: usize,
+    pub shard_strategy: ShardStrategy,
     pub slots: Option<u64>,
     pub emit_conformance_events: bool,
     pub aggregate_events: bool,
@@ -811,6 +824,7 @@ impl SimConfiguration {
             seed: 0,
             timestamp_resolution: duration_ms(params.timestamp_resolution_ms),
             shard_count: params.shard_count.max(1),
+            shard_strategy: params.shard_strategy.clone(),
             slots: None,
             emit_conformance_events: false,
             aggregate_events: false,
