@@ -1,5 +1,7 @@
+mod geographic;
 mod round_robin;
 pub(crate) mod shard;
+mod union_find;
 mod zero_latency_clusters;
 
 use std::sync::Arc;
@@ -17,6 +19,7 @@ pub fn compute_shard_lookup(config: &SimConfiguration) -> ShardLookup {
     let lookup = match config.shard_strategy {
         ShardStrategy::RoundRobin => round_robin::assign(config),
         ShardStrategy::ZeroLatencyClusters => zero_latency_clusters::assign(config),
+        ShardStrategy::Geographic => geographic::assign(config),
     };
 
     // Log shard sizes for balance diagnostics

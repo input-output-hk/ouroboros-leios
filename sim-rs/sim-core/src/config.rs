@@ -65,6 +65,8 @@ pub enum ShardStrategy {
     RoundRobin,
     /// Round-robin but keeps 0-latency-connected nodes on the same shard
     ZeroLatencyClusters,
+    /// K-means clustering by geographic coordinates to maximize cross-shard latency
+    Geographic,
 }
 
 #[derive(Deserialize)]
@@ -381,6 +383,10 @@ impl From<RawTopology> for Topology {
                     id,
                     name: name.clone(),
                     stake: node.stake.unwrap_or_default(),
+                    location: match &node.location {
+                        RawNodeLocation::Coords(coords) => Some(*coords),
+                        RawNodeLocation::Cluster { .. } => None,
+                    },
                     cpu_multiplier: 1.0,
                     cores: node.cpu_core_count,
                     tx_conflict_fraction: node.tx_conflict_fraction,
@@ -885,6 +891,7 @@ pub struct NodeConfiguration {
     pub id: NodeId,
     pub name: String,
     pub stake: u64,
+    pub location: Option<(f64, f64)>,
     pub cpu_multiplier: f64,
     pub cores: Option<u64>,
     pub tx_conflict_fraction: Option<f64>,
