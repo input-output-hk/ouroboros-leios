@@ -14,7 +14,7 @@ use crate::{
     config::{CpuTimeConfig, LeiosVariant, NodeConfiguration, NodeId, SimConfiguration},
     events::EventTracker,
     model::Transaction,
-    network::{CrossShardBroker, Network, ShardHandle, ShardLookup},
+    network::{Network, ShardLookup},
 };
 
 use self::{
@@ -47,29 +47,8 @@ impl NetworkWrapper {
         }
     }
 
-    fn shutdown(self) -> Result<()> {
-        match self {
-            Self::Leios(network) => network.shutdown(),
-            Self::Stracciatella(network) => network.shutdown(),
-            Self::LinearLeios(network) => network.shutdown(),
-        }
-    }
 }
 
-enum BrokerWrapper {
-    Leios(CrossShardBroker<MiniProtocol, <LeiosNode as NodeImpl>::Message>),
-    Stracciatella(CrossShardBroker<MiniProtocol, <StracciatellaLeiosNode as NodeImpl>::Message>),
-    LinearLeios(CrossShardBroker<MiniProtocol, <LinearLeiosNode as NodeImpl>::Message>),
-}
-impl BrokerWrapper {
-    async fn run(&mut self) -> Result<()> {
-        match self {
-            Self::Leios(broker) => broker.run().await,
-            Self::Stracciatella(broker) => broker.run().await,
-            Self::LinearLeios(broker) => broker.run().await,
-        }
-    }
-}
 
 enum NodeListWrapper {
     Leios(Vec<NodeDriver<LeiosNode>>),
@@ -121,7 +100,6 @@ struct Shard {
 
 pub struct Simulation {
     shards: Vec<Shard>,
-    broker: Option<BrokerWrapper>,
     slot_witness: SlotWitness,
     nodes: NodeListWrapper,
     actors: Vec<Box<dyn Actor>>,
@@ -157,41 +135,66 @@ impl Simulation {
             .map(|clock| EventTracker::new(event_sender.clone(), clock.clone(), &config.nodes))
             .collect();
 
-        let (networks, nodes, actors, tx_producers, broker) = match config.variant {
+        let (networks, nodes, actors, tx_producers) = match config.variant {
             LeiosVariant::Linear | LeiosVariant::LinearWithTxReferences => Self::init_sharded(
                 &config,
                 &trackers,
                 &clocks,
-                &mut clock_coordinators,
                 &shard_lookup,
                 |nets| nets.into_iter().map(NetworkWrapper::LinearLeios).collect(),
                 NodeListWrapper::LinearLeios,
-                BrokerWrapper::LinearLeios,
                 linear_leios::register_actors,
             )?,
             LeiosVariant::FullWithoutIbs => Self::init_sharded(
                 &config,
                 &trackers,
                 &clocks,
-                &mut clock_coordinators,
                 &shard_lookup,
                 |nets| nets.into_iter().map(NetworkWrapper::Stracciatella).collect(),
                 NodeListWrapper::Stracciatella,
-                BrokerWrapper::Stracciatella,
                 no_additional_actors,
             )?,
             _ => Self::init_sharded(
                 &config,
                 &trackers,
                 &clocks,
-                &mut clock_coordinators,
                 &shard_lookup,
                 |nets| nets.into_iter().map(NetworkWrapper::Leios).collect(),
                 NodeListWrapper::Leios,
-                BrokerWrapper::Leios,
                 no_additional_actors,
             )?,
         };
+
+        // CMB lookahead: each shard's ceiling = min(peer.time + min_latency[peer→this]).
+        // Compute min_latencies from cross-shard edges, clamped to timestamp_resolution.
+        if shard_count > 1 {
+            let mut min_latencies = vec![vec![Duration::MAX; shard_count]; shard_count];
+            for link in &config.links {
+                let fs = shard_lookup[&link.nodes.0];
+                let ts = shard_lookup[&link.nodes.1];
+                if fs != ts {
+                    if link.latency < min_latencies[fs][ts] {
+                        min_latencies[fs][ts] = link.latency;
+                    }
+                    if link.latency < min_latencies[ts][fs] {
+                        min_latencies[ts][fs] = link.latency;
+                    }
+                }
+            }
+            let min_lookahead = config.timestamp_resolution;
+            for i in 0..shard_count {
+                let peers: Vec<crate::clock::PeerShard> = (0..shard_count)
+                    .filter(|&j| j != i)
+                    .filter(|&j| min_latencies[j][i] != Duration::MAX)
+                    .map(|j| crate::clock::PeerShard {
+                        time: clock_coordinators[j].shared_time(),
+                        min_latency: min_latencies[j][i].max(min_lookahead),
+                        time_advanced: clock_coordinators[j].time_advanced_notify(),
+                    })
+                    .collect();
+                clock_coordinators[i].set_peer_shards(peers);
+            }
+        }
 
         // SlotWitness uses shard 0's clock
         let slot_witness = SlotWitness::new(clocks[0].barrier(), trackers[0].clone(), &config);
@@ -209,7 +212,6 @@ impl Simulation {
 
         Ok(Self {
             shards,
-            broker: if shard_count > 1 { Some(broker) } else { None },
             slot_witness,
             nodes,
             actors,
@@ -217,36 +219,29 @@ impl Simulation {
     }
 
     #[allow(clippy::type_complexity, clippy::too_many_arguments)]
-    fn init_sharded<N, NF, NLF, BF, AAF>(
+    fn init_sharded<N, NF, NLF, AAF>(
         config: &Arc<SimConfiguration>,
         trackers: &[EventTracker],
         clocks: &[Clock],
-        clock_coordinators: &mut [ClockCoordinator],
         shard_lookup: &ShardLookup,
         network_wrapper_fn: NF,
         node_list_wrapper_fn: NLF,
-        broker_wrapper_fn: BF,
         additional_actors_fn: AAF,
     ) -> Result<(
         Vec<NetworkWrapper>,
         NodeListWrapper,
         Vec<Box<dyn Actor>>,
         Vec<TransactionProducer>,
-        BrokerWrapper,
     )>
     where
         N: NodeImpl,
         N::Message: Send + 'static,
         NF: FnOnce(Vec<Network<MiniProtocol, N::Message>>) -> Vec<NetworkWrapper>,
         NLF: FnOnce(Vec<NodeDriver<N>>) -> NodeListWrapper,
-        BF: FnOnce(CrossShardBroker<MiniProtocol, N::Message>) -> BrokerWrapper,
         AAF: FnOnce(ActorInitArgs<N>) -> Vec<Box<dyn Actor>>,
     {
         let shard_count = clocks.len();
         let mut rng = ChaChaRng::seed_from_u64(config.seed);
-
-        // Create cross-shard message channel
-        let (cross_shard_sink, cross_shard_source) = mpsc::unbounded_channel();
 
         // Create per-shard networks
         let mut networks: Vec<Network<MiniProtocol, N::Message>> = clocks
@@ -254,15 +249,23 @@ impl Simulation {
             .map(|clock| Network::new(clock.clone()))
             .collect();
 
-        // Set cross-shard sink on all networks
+        // Set up direct NC-to-NC cross-shard routing (bypasses broker for delivery)
         if shard_count > 1 {
+            let mut delivery_sinks = Vec::new();
             for network in &mut networks {
-                network.set_cross_shard_sink(cross_shard_sink.clone());
+                let (tx, rx) = mpsc::unbounded_channel();
+                delivery_sinks.push(tx);
+                network.set_cross_shard_delivery(rx);
+            }
+            for network in &mut networks {
+                network.set_cross_shard_routing(
+                    delivery_sinks.clone(),
+                    shard_lookup.clone(),
+                );
             }
         }
 
-        // Add intra-shard edges to per-shard networks, cross-shard edges to broker
-        let mut broker_edges: Vec<(NodeId, NodeId, Duration, Option<u64>)> = Vec::new();
+        // Add edges to per-shard networks
         for link_config in config.links.iter() {
             let from = link_config.nodes.0;
             let to = link_config.nodes.1;
@@ -270,7 +273,7 @@ impl Simulation {
             let to_shard = shard_lookup[&to];
 
             if from_shard == to_shard {
-                // Both directions go to the same shard's network
+                // Intra-shard: both directions go to the same shard's network
                 networks[from_shard].set_edge_policy(
                     from,
                     to,
@@ -278,12 +281,14 @@ impl Simulation {
                     link_config.bandwidth_bps,
                 )?;
             } else {
-                // Cross-shard: add to each shard's network (for outbound routing)
-                // and to the broker (for timing/delivery).
-                // Each shard's network needs the edge so it can recognize the target as non-local
-                // and forward to the broker. But it doesn't need a Connection for it —
-                // the broker handles timing. So we don't add edges to the networks.
-                broker_edges.push((from, to, link_config.latency, link_config.bandwidth_bps));
+                // Cross-shard: add incoming connections to each target shard's NC
+                // so it can handle timing locally when messages are routed.
+                networks[to_shard].add_incoming_edge(
+                    from, to, link_config.latency, link_config.bandwidth_bps,
+                );
+                networks[from_shard].add_incoming_edge(
+                    to, from, link_config.latency, link_config.bandwidth_bps,
+                );
             }
         }
 
@@ -330,59 +335,6 @@ impl Simulation {
             all_nodes.push(driver);
         }
 
-        // Create broker with direct node sinks for cross-shard delivery
-        let shard_handles: Vec<ShardHandle<N::Message>> = (0..shard_count)
-            .map(|i| {
-                let mut node_sinks = HashMap::new();
-                for node_config in &config.nodes {
-                    if shard_lookup[&node_config.id] == i
-                        && let Some(sink) = networks[i].node_sink(&node_config.id)
-                    {
-                        node_sinks.insert(node_config.id, sink);
-                    }
-                }
-                ShardHandle {
-                    node_sinks,
-                    shard_time: clock_coordinators[i].shared_time(),
-                    time_advanced: clock_coordinators[i].time_advanced_notify(),
-                    tasks: clocks[i].task_initiator(),
-                }
-            })
-            .collect();
-
-        let mut broker =
-            CrossShardBroker::new(cross_shard_source, shard_handles, shard_lookup.clone());
-        // Compute min latencies between shards and set up peer shard references
-        let mut min_latencies = vec![vec![Duration::MAX; shard_count]; shard_count];
-        for (from, to, latency, bandwidth_bps) in &broker_edges {
-            broker.add_edge(*from, *to, *latency, *bandwidth_bps);
-            broker.add_edge(*to, *from, *latency, *bandwidth_bps);
-            let fs = shard_lookup[from];
-            let ts = shard_lookup[to];
-            if *latency < min_latencies[fs][ts] {
-                min_latencies[fs][ts] = *latency;
-            }
-            if *latency < min_latencies[ts][fs] {
-                min_latencies[ts][fs] = *latency;
-            }
-        }
-
-        // Give each coordinator references to peer shard times + min latencies
-        if shard_count > 1 {
-            for i in 0..shard_count {
-                let peers: Vec<crate::clock::PeerShard> = (0..shard_count)
-                    .filter(|&j| j != i)
-                    .filter(|&j| min_latencies[j][i] != Duration::MAX)
-                    .map(|j| crate::clock::PeerShard {
-                        time: clock_coordinators[j].shared_time(),
-                        min_latency: min_latencies[j][i],
-                        time_advanced: clock_coordinators[j].time_advanced_notify(),
-                    })
-                    .collect();
-                clock_coordinators[i].set_peer_shards(peers);
-            }
-        }
-
         // Create per-shard transaction producers
         let tx_producers: Vec<TransactionProducer> = per_shard_tx_sinks
             .into_iter()
@@ -398,87 +350,69 @@ impl Simulation {
             .collect();
 
         let networks = network_wrapper_fn(networks);
-        let broker = broker_wrapper_fn(broker);
 
         Ok((
             networks,
             node_list_wrapper_fn(all_nodes),
             actors,
             tx_producers,
-            broker,
         ))
     }
 
-    // Run the simulation indefinitely.
-    pub async fn run(&mut self, token: CancellationToken) -> Result<()> {
+    /// Run the simulation. Consumes self so shards can be spawned as independent tasks.
+    pub async fn run(mut self, token: CancellationToken) -> Result<()> {
         let mut set = JoinSet::new();
 
         self.nodes.run_all(&mut set);
-        for actor in self.actors.drain(..) {
+        for actor in self.actors {
             set.spawn(actor.run());
         }
 
-        // Spawn per-shard tasks
-        // We need to run clock coordinators and networks for each shard concurrently.
-        // Since we can't move self into multiple futures, we'll use a JoinSet approach.
-
-        // Unfortunately, the clock coordinators and networks borrow &mut self,
-        // so we need to restructure. Let's run them all in the select.
-
-        // For now, handle the common single-shard case and multi-shard case separately.
-        if self.shards.len() == 1 {
-            let shard = &mut self.shards[0];
+        // Spawn slot witness — cancels token when all slots are done
+        let mut slot_witness = self.slot_witness;
+        let slot_token = token.clone();
+        set.spawn(async move {
             select! {
-                biased;
-                _ = token.cancelled() => {}
-                _ = self.slot_witness.run() => {}
-                _ = shard.clock_coordinator.run() => {}
-                result = shard.network.run() => { result? }
-                result = shard.tx_producer.run() => { result?; }
-                result = set.join_next() => { result.unwrap()??; }
-            };
-        } else {
-            // Multi-shard: run each shard's coordinator + network + tx_producer concurrently
-            let mut shard_futures: Vec<BoxFuture<'_, Result<()>>> = Vec::new();
-            for shard in &mut self.shards {
-                shard_futures.push(Box::pin(async {
-                    select! {
-                        _ = shard.clock_coordinator.run() => {}
-                        result = shard.network.run() => { result? }
-                        result = shard.tx_producer.run() => { result?; }
-                    }
-                    Ok(())
-                }));
+                _ = slot_token.cancelled() => {}
+                _ = slot_witness.run() => { slot_token.cancel(); }
             }
+            Ok(())
+        });
 
-            let broker = self.broker.as_mut();
-
-            select! {
-                biased;
-                _ = token.cancelled() => {}
-                _ = self.slot_witness.run() => {}
-                result = futures::future::select_all(&mut shard_futures) => {
-                    result.0?;
+        // Spawn each shard as its own tokio task (independent LP)
+        for mut shard in self.shards {
+            let shard_token = token.clone();
+            set.spawn(async move {
+                select! {
+                    _ = shard_token.cancelled() => {}
+                    _ = shard.clock_coordinator.run() => {}
+                    result = shard.network.run() => { result? }
+                    result = shard.tx_producer.run() => { result?; }
                 }
-                result = async {
-                    if let Some(broker) = broker {
-                        broker.run().await?;
-                    } else {
-                        std::future::pending::<()>().await;
+                Ok(())
+            });
+        }
+
+        // Wait for tasks — errors during normal operation propagate,
+        // but errors after cancellation (e.g. closed channels) are expected.
+        while let Some(result) = set.join_next().await {
+            match result {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => {
+                    if !token.is_cancelled() {
+                        token.cancel();
+                        return Err(e);
                     }
-                    Ok::<(), anyhow::Error>(())
-                } => { result? }
-                result = set.join_next() => { result.unwrap()??; }
-            };
+                }
+                Err(e) => {
+                    if !token.is_cancelled() {
+                        token.cancel();
+                        return Err(e.into());
+                    }
+                }
+            }
         }
 
-        Ok(())
-    }
-
-    pub fn shutdown(self) -> Result<()> {
-        for shard in self.shards {
-            shard.network.shutdown()?;
-        }
         Ok(())
     }
 }
