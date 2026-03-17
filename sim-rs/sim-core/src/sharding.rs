@@ -1,4 +1,5 @@
 mod round_robin;
+pub(crate) mod shard;
 mod zero_latency_clusters;
 
 use std::sync::Arc;
