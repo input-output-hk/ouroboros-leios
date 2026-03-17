@@ -16,11 +16,11 @@ use crate::clock::TaskInitiator;
 
 use super::{Clock, Timestamp, timestamp::AtomicTimestamp};
 
-/// Other shards' time references for computing the lookahead ceiling.
+/// Peer shard reference for CMB lookahead ceiling.
 pub struct PeerShard {
-    /// The peer shard's current time.
+    /// The peer shard's current published time.
     pub time: Arc<AtomicTimestamp>,
-    /// Minimum network latency from that shard to this one.
+    /// Minimum link latency from that shard to this one (the CMB lookahead).
     pub min_latency: Duration,
     /// Notified when the peer advances time.
     pub time_advanced: Arc<Notify>,
@@ -29,22 +29,19 @@ pub struct PeerShard {
 pub struct ClockCoordinator {
     timestamp_resolution: Duration,
     time: Arc<AtomicTimestamp>,
-    time_ceiling: Arc<AtomicTimestamp>,
     peer_shards: Vec<PeerShard>,
     tx: mpsc::UnboundedSender<ClockEvent>,
     rx: mpsc::UnboundedReceiver<ClockEvent>,
     waiter_count: Arc<AtomicUsize>,
     tasks: Arc<AtomicUsize>,
     task_notify: Arc<Notify>,
-    /// Notified whenever this coordinator advances time, so external
-    /// observers (e.g. the cross-shard broker) can react.
+    /// Notified whenever this coordinator advances time, so peer shards can react.
     time_advanced_notify: Arc<Notify>,
 }
 
 impl ClockCoordinator {
     pub fn new(timestamp_resolution: Duration) -> Self {
         let time = Arc::new(AtomicTimestamp::new(Timestamp::zero()));
-        let time_ceiling = Arc::new(AtomicTimestamp::new(Timestamp::max()));
         let (tx, rx) = mpsc::unbounded_channel();
         let waiter_count = Arc::new(AtomicUsize::new(0));
         let tasks = Arc::new(AtomicUsize::new(0));
@@ -53,7 +50,6 @@ impl ClockCoordinator {
         Self {
             timestamp_resolution,
             time,
-            time_ceiling,
             peer_shards: Vec::new(),
             tx,
             rx,
@@ -64,21 +60,9 @@ impl ClockCoordinator {
         }
     }
 
-    /// Returns a shared reference to this coordinator's time, readable from other shards.
+    /// Returns a shared reference to this coordinator's time.
     pub fn shared_time(&self) -> Arc<AtomicTimestamp> {
         self.time.clone()
-    }
-
-    /// Returns the time ceiling, which external code can update to prevent
-    /// this coordinator from advancing past a certain timestamp.
-    pub fn time_ceiling(&self) -> Arc<AtomicTimestamp> {
-        self.time_ceiling.clone()
-    }
-
-    /// Returns a Notify that can be used to wake this coordinator
-    /// when the time ceiling changes.
-    pub fn ceiling_notify(&self) -> Arc<Notify> {
-        self.task_notify.clone()
     }
 
     /// Returns a Notify that fires whenever this coordinator advances time.
@@ -86,7 +70,7 @@ impl ClockCoordinator {
         self.time_advanced_notify.clone()
     }
 
-    /// Set peer shards for lookahead ceiling computation.
+    /// Set peer shards for CMB lookahead ceiling.
     pub fn set_peer_shards(&mut self, peers: Vec<PeerShard>) {
         self.peer_shards = peers;
     }
@@ -111,35 +95,44 @@ impl ClockCoordinator {
         let mut queue: BTreeMap<Timestamp, Vec<usize>> = BTreeMap::new();
         let mut running = waiters.len();
         loop {
-            // If all actors are waiting, wait for either a new event or a task completion
+            // If all actors are waiting, try to advance time
             if running == 0 {
                 loop {
-                    // Register interest in notifications BEFORE checking,
+                    // Register interest in notifications BEFORE checking state,
                     // to avoid missing a notify between the check and the await.
                     let task_notified = self.task_notify.notified();
                     tokio::pin!(task_notified);
-                    let peer_notified: Vec<_> = self.peer_shards
+                    task_notified.as_mut().enable();
+                    let mut peer_notified: Vec<_> = self.peer_shards
                         .iter()
                         .map(|p| Box::pin(p.time_advanced.notified()))
                         .collect();
+                    // Eagerly register as waiters so we don't miss notifications
+                    // from peers running in parallel tasks.
+                    for notified in &mut peer_notified {
+                        notified.as_mut().enable();
+                    }
                     let has_peers = !peer_notified.is_empty();
 
-                    // Try to advance time if tasks are done
+                    // Advance time through queued events while no tasks are pending
                     while running == 0 && self.tasks.load(Ordering::Acquire) == 0 {
                         let Some((timestamp, _)) = queue.first_key_value() else {
                             break;
                         };
                         let timestamp = *timestamp;
-                        // Compute ceiling: min of external ceiling and peer shard lookaheads
-                        let mut ceiling = self.time_ceiling.load(Ordering::Acquire);
+                        // CMB ceiling: can't advance past min(peer.time + peer.min_latency)
+                        let mut ceiling = Timestamp::max();
                         for peer in &self.peer_shards {
-                            let peer_time = peer.time.load(Ordering::Acquire);
-                            let lookahead = peer_time + peer.min_latency;
-                            if lookahead < ceiling {
-                                ceiling = lookahead;
-                            }
+                            let c = peer.time.load(Ordering::Acquire) + peer.min_latency;
+                            if c < ceiling { ceiling = c; }
                         }
                         if timestamp > ceiling {
+                            // CMB null message: advance published time to ceiling
+                            // so peers can update their own ceilings.
+                            if ceiling > self.time.load(Ordering::Acquire) {
+                                self.time.store(ceiling, Ordering::Release);
+                                self.time_advanced_notify.notify_waiters();
+                            }
                             break;
                         }
                         let (_, waiter_ids) = queue.pop_first().unwrap();
@@ -170,7 +163,7 @@ impl ClockCoordinator {
                         () = &mut task_notified => {
                             continue;
                         }
-                        _ = futures::future::select_all(peer_notified), if has_peers => {
+                        _ = async { futures::future::select_all(peer_notified).await }, if has_peers => {
                             continue;
                         }
                     }

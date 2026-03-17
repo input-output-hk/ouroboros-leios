@@ -1,7 +1,7 @@
-use std::{fmt::Debug, hash::Hash, time::Duration};
+use std::{collections::HashMap, fmt::Debug, hash::Hash, sync::Arc, time::Duration};
 
 use anyhow::{Result, bail};
-use coordinator::{EdgeConfig, Message, NetworkCoordinator};
+use coordinator::{CrossShardDelivery, EdgeConfig, Message, NetworkCoordinator};
 use tokio::sync::mpsc;
 
 use crate::{
@@ -11,10 +11,9 @@ use crate::{
 
 pub(crate) mod connection;
 pub(crate) mod coordinator;
-pub(crate) mod broker;
 
-pub use broker::{CrossShardBroker, ShardHandle, ShardLookup};
-pub use coordinator::CrossShardMessage;
+/// Maps a node ID to its shard index.
+pub type ShardLookup = Arc<HashMap<NodeId, usize>>;
 
 pub struct Network<TProtocol, TMessage> {
     clock: ClockBarrier,
@@ -54,16 +53,31 @@ impl<TProtocol: Clone + Eq + Hash, TMessage: Debug> Network<TProtocol, TMessage>
         Ok(())
     }
 
-    pub fn set_cross_shard_sink(
+    /// Add an incoming cross-shard edge (Connection only, no listen/local_nodes).
+    pub fn add_incoming_edge(
         &mut self,
-        sink: mpsc::UnboundedSender<CrossShardMessage<TProtocol, TMessage>>,
+        from: NodeId,
+        to: NodeId,
+        latency: Duration,
+        bandwidth_bps: Option<u64>,
     ) {
-        self.coordinator.set_cross_shard_sink(sink);
+        self.coordinator.add_edge(EdgeConfig { from, to, latency, bandwidth_bps });
     }
 
-    /// Get a clone of the delivery sink for a local node (for cross-shard delivery).
-    pub fn node_sink(&self, id: &NodeId) -> Option<mpsc::UnboundedSender<(NodeId, TMessage)>> {
-        self.coordinator.node_sink(id)
+    /// Set up direct cross-shard routing: this NC sends directly to target NCs.
+    pub fn set_cross_shard_routing(
+        &mut self,
+        targets: Vec<mpsc::UnboundedSender<CrossShardDelivery<TProtocol, TMessage>>>,
+        shard_lookup: Arc<HashMap<NodeId, usize>>,
+    ) {
+        self.coordinator.set_cross_shard_routing(targets, shard_lookup);
+    }
+
+    pub fn set_cross_shard_delivery(
+        &mut self,
+        receiver: mpsc::UnboundedReceiver<CrossShardDelivery<TProtocol, TMessage>>,
+    ) {
+        self.coordinator.set_cross_shard_delivery(receiver);
     }
 
     pub fn open(
@@ -84,9 +98,6 @@ impl<TProtocol: Clone + Eq + Hash, TMessage: Debug> Network<TProtocol, TMessage>
         self.coordinator.run(&mut self.clock).await
     }
 
-    pub fn shutdown(self) -> Result<()> {
-        Ok(())
-    }
 }
 
 pub struct NetworkSource<T> {
