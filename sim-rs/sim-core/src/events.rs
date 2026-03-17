@@ -317,6 +317,10 @@ impl EventTracker {
         }
     }
 
+    pub fn sender(&self) -> mpsc::UnboundedSender<(Event, Timestamp)> {
+        self.sender.clone()
+    }
+
     pub fn track_global_slot(&self, slot: u64) {
         self.send(Event::GlobalSlot { slot });
     }
