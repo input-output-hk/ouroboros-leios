@@ -27,6 +27,7 @@ mod driver;
 mod leios;
 mod linear_leios;
 mod lottery;
+pub(crate) mod sequential;
 mod slot;
 mod stracciatella;
 #[cfg(test)]
@@ -80,6 +81,8 @@ pub struct Simulation {
     slot_witness: SlotWitness,
     nodes: NodeListWrapper,
     actors: Vec<Box<dyn Actor>>,
+    /// If set, the sequential DES engine handles execution instead of the actor model.
+    sequential: Option<Box<dyn sequential::SequentialRunner>>,
 }
 
 impl Simulation {
@@ -87,6 +90,7 @@ impl Simulation {
         config: SimConfiguration,
         event_sender: mpsc::UnboundedSender<(crate::events::Event, Timestamp)>,
     ) -> Result<Self> {
+        let use_sequential = config.sequential_engine && config.shard_count <= 1;
         let config = Arc::new(config);
         let shard_count = config.shard_count;
 
@@ -105,6 +109,25 @@ impl Simulation {
             .iter()
             .map(|clock| EventTracker::new(event_sender.clone(), clock.clone(), &config.nodes))
             .collect();
+
+        if use_sequential {
+            tracing::info!("using sequential DES engine");
+            let seq = sequential::build(
+                config.clone(),
+                trackers[0].clone(),
+                clocks[0].clone(),
+                clock_coordinators[0].shared_time(),
+            );
+            let slot_witness =
+                SlotWitness::new(clocks[0].barrier(), trackers[0].clone(), &config);
+            return Ok(Self {
+                shards: vec![],
+                slot_witness,
+                nodes: NodeListWrapper::Leios(vec![]),
+                actors: vec![],
+                sequential: Some(seq),
+            });
+        }
 
         let (nodes, actors, shards) = match config.variant {
             LeiosVariant::Linear | LeiosVariant::LinearWithTxReferences => {
@@ -153,6 +176,7 @@ impl Simulation {
             slot_witness,
             nodes,
             actors,
+            sequential: None,
         })
     }
 
@@ -238,6 +262,12 @@ impl Simulation {
 
     /// Run the simulation. Consumes self so shards can be spawned as independent tasks.
     pub async fn run(mut self, token: CancellationToken) -> Result<()> {
+        // Sequential engine path
+        if let Some(seq) = self.sequential.take() {
+            let result = tokio::task::spawn_blocking(move || seq.run(token)).await?;
+            return result;
+        }
+
         let mut set = JoinSet::new();
 
         self.nodes.run_all(&mut set);

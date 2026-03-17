@@ -12,6 +12,7 @@ futures = "0.3"
 netsim-async = { git = "https://github.com/input-output-hk/ce-netsim.git", rev = "9d1e26c" }
 num-traits = "0.2"
 priority-queue = "2"
+rayon = "1"
 rand = "0.9"
 rand_chacha = "0.9"
 rand_distr = "0.5"
