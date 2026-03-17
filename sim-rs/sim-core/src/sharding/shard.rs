@@ -122,6 +122,11 @@ where
             }
         }
         let min_lookahead = config.timestamp_resolution;
+        let cmb_lookahead = min_latencies.iter().flatten()
+            .filter(|&&d| d != Duration::MAX)
+            .min().copied().unwrap_or(Duration::MAX)
+            .max(min_lookahead);
+        tracing::info!(?cmb_lookahead, "CMB lookahead (min cross-shard latency)");
         for i in 0..shard_count {
             let peers: Vec<PeerShard> = (0..shard_count)
                 .filter(|&j| j != i)
