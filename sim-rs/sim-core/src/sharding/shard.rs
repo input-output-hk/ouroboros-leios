@@ -106,6 +106,20 @@ where
         }
     }
 
+    // Log cross-shard edge statistics
+    if shard_count > 1 {
+        let cross_shard_edges = config.links.iter()
+            .filter(|l| shard_lookup[&l.nodes.0] != shard_lookup[&l.nodes.1])
+            .count();
+        let total_edges = config.links.len();
+        tracing::info!(
+            cross_shard_edges,
+            total_edges,
+            pct = format!("{:.1}%", 100.0 * cross_shard_edges as f64 / total_edges as f64),
+            "cross-shard edge count"
+        );
+    }
+
     // CMB peer wiring: compute min cross-shard latencies
     if shard_count > 1 {
         let mut min_latencies = vec![vec![Duration::MAX; shard_count]; shard_count];

@@ -69,6 +69,8 @@ pub enum ShardStrategy {
     Geographic,
     /// Agglomerative clustering: merge lowest-latency pairs first (Kruskal-style)
     MinLatencyClusters,
+    /// Min-cut partitioning: recursive bisection with Kernighan-Lin refinement
+    MinCut,
 }
 
 #[derive(Deserialize)]

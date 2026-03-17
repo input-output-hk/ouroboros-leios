@@ -1,4 +1,5 @@
 mod geographic;
+mod min_cut;
 mod min_latency_clusters;
 mod round_robin;
 pub(crate) mod shard;
@@ -22,6 +23,7 @@ pub fn compute_shard_lookup(config: &SimConfiguration) -> ShardLookup {
         ShardStrategy::ZeroLatencyClusters => zero_latency_clusters::assign(config),
         ShardStrategy::Geographic => geographic::assign(config),
         ShardStrategy::MinLatencyClusters => min_latency_clusters::assign(config),
+        ShardStrategy::MinCut => min_cut::assign(config),
     };
 
     // Log shard sizes for balance diagnostics
