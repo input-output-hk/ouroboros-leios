@@ -488,7 +488,7 @@
     "shard-strategy": {
       "description": "Strategy for assigning nodes to shards.\n- round-robin: simple node_id % shard_count\n- zero-latency-clusters: keeps 0-latency-connected nodes on the same shard\nOnly supported by Rust simulation.",
       "type": "string",
-      "enum": ["round-robin", "zero-latency-clusters"],
+      "enum": ["round-robin", "zero-latency-clusters", "geographic"],
       "default": "round-robin"
     },
     "timestamp-resolution-ms": {
