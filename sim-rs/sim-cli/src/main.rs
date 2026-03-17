@@ -140,7 +140,7 @@ async fn main() -> Result<()> {
     let monitor = tokio::spawn(EventMonitor::new(&config, events_source, args.output).run());
     pin!(monitor);
 
-    let mut simulation = Simulation::new(config, events_sink).await?;
+    let simulation = Simulation::new(config, events_sink).await?;
 
     select! {
         result = simulation.run(token) => { result? }
@@ -148,7 +148,6 @@ async fn main() -> Result<()> {
         _ = ctrlc_source => {}
     };
 
-    simulation.shutdown()?;
     monitor.await??;
     Ok(())
 }

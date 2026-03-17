@@ -3,6 +3,7 @@ use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
     hash::Hash,
+    sync::Arc,
     time::Duration,
 };
 
@@ -17,13 +18,20 @@ use crate::{
 
 use super::connection::Connection;
 
+/// Tuple sent directly from source NC to target NC for cross-shard messages.
+pub type CrossShardDelivery<TProtocol, TMessage> = (NodeId, NodeId, TProtocol, TMessage, u64, Timestamp);
+
 pub struct NetworkCoordinator<TProtocol, TMessage> {
     source: mpsc::UnboundedReceiver<Message<TProtocol, TMessage>>,
     sinks: HashMap<NodeId, mpsc::UnboundedSender<(NodeId, TMessage)>>,
     connections: HashMap<Link, Connection<TProtocol, TMessage>>,
     events: PriorityQueue<Link, Reverse<Timestamp>>,
     local_nodes: HashSet<NodeId>,
-    cross_shard_sink: Option<mpsc::UnboundedSender<CrossShardMessage<TProtocol, TMessage>>>,
+    /// Per-shard delivery sinks for sending cross-shard messages directly to target NCs.
+    cross_shard_targets: Vec<mpsc::UnboundedSender<CrossShardDelivery<TProtocol, TMessage>>>,
+    shard_lookup: Option<Arc<HashMap<NodeId, usize>>>,
+    /// Receives cross-shard messages from other NCs for local timing/delivery.
+    cross_shard_delivery: Option<mpsc::UnboundedReceiver<CrossShardDelivery<TProtocol, TMessage>>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -47,15 +55,27 @@ impl<TProtocol: Clone + Eq + Hash, TMessage: Debug> NetworkCoordinator<TProtocol
             connections: HashMap::new(),
             events: PriorityQueue::new(),
             local_nodes: HashSet::new(),
-            cross_shard_sink: None,
+            cross_shard_targets: Vec::new(),
+            shard_lookup: None,
+            cross_shard_delivery: None,
         }
     }
 
-    pub fn set_cross_shard_sink(
+    /// Set up direct cross-shard routing: this NC sends directly to target NCs.
+    pub fn set_cross_shard_routing(
         &mut self,
-        sink: mpsc::UnboundedSender<CrossShardMessage<TProtocol, TMessage>>,
+        targets: Vec<mpsc::UnboundedSender<CrossShardDelivery<TProtocol, TMessage>>>,
+        shard_lookup: Arc<HashMap<NodeId, usize>>,
     ) {
-        self.cross_shard_sink = Some(sink);
+        self.cross_shard_targets = targets;
+        self.shard_lookup = Some(shard_lookup);
+    }
+
+    pub fn set_cross_shard_delivery(
+        &mut self,
+        receiver: mpsc::UnboundedReceiver<CrossShardDelivery<TProtocol, TMessage>>,
+    ) {
+        self.cross_shard_delivery = Some(receiver);
     }
 
     pub fn listen(&mut self, to: NodeId) -> mpsc::UnboundedReceiver<(NodeId, TMessage)> {
@@ -63,11 +83,6 @@ impl<TProtocol: Clone + Eq + Hash, TMessage: Debug> NetworkCoordinator<TProtocol
         self.sinks.insert(to, sink);
         self.local_nodes.insert(to);
         source
-    }
-
-    /// Get a clone of the delivery sink for a node (for cross-shard delivery).
-    pub fn node_sink(&self, id: &NodeId) -> Option<mpsc::UnboundedSender<(NodeId, TMessage)>> {
-        self.sinks.get(id).cloned()
     }
 
     pub fn add_edge(&mut self, config: EdgeConfig) {
@@ -85,6 +100,7 @@ impl<TProtocol: Clone + Eq + Hash, TMessage: Debug> NetworkCoordinator<TProtocol
                 Some((_, Reverse(timestamp))) => clock.wait_until(*timestamp),
                 None => clock.wait_forever(),
             };
+            let has_delivery = self.cross_shard_delivery.is_some();
             select! {
                 () = waiter => {
                     let (link, Reverse(timestamp)) = self.events.pop().unwrap();
@@ -106,18 +122,31 @@ impl<TProtocol: Clone + Eq + Hash, TMessage: Debug> NetworkCoordinator<TProtocol
                     if self.local_nodes.contains(&message.to) {
                         // Intra-shard: handle locally
                         self.schedule_message(message, clock.now());
-                    } else if let Some(cross_shard) = &self.cross_shard_sink {
-                        // Cross-shard: forward to broker with send timestamp
-                        let _ = cross_shard.send(CrossShardMessage {
-                            send_time: clock.now(),
-                            from: message.from,
-                            to: message.to,
-                            protocol: message.protocol,
-                            body: message.body,
-                            bytes: message.bytes,
-                        });
+                    } else if let Some(lookup) = &self.shard_lookup {
+                        // Cross-shard: send directly to target NC
+                        let target_shard = lookup[&message.to];
+                        let _ = self.cross_shard_targets[target_shard].send((
+                            message.from, message.to, message.protocol,
+                            message.body, message.bytes, clock.now(),
+                        ));
                     }
                     clock.finish_task();
+                }
+                // Receive cross-shard messages from broker — schedule through
+                // local Connection for proper timing (synchronized with coordinator).
+                Some((from, to, protocol, body, bytes, send_time)) = async {
+                    match &mut self.cross_shard_delivery {
+                        Some(rx) => rx.recv().await,
+                        None => std::future::pending().await,
+                    }
+                }, if has_delivery => {
+                    let link = Link { from, to };
+                    if let Some(connection) = self.connections.get_mut(&link) {
+                        connection.send(body, bytes, protocol, send_time);
+                        if let Some(timestamp) = connection.next_arrival_time() {
+                            self.events.push(link, Reverse(timestamp));
+                        }
+                    }
                 }
             }
         }
@@ -144,11 +173,3 @@ pub struct Message<TProtocol, TMessage> {
     pub bytes: u64,
 }
 
-pub struct CrossShardMessage<TProtocol, TMessage> {
-    pub send_time: Timestamp,
-    pub from: NodeId,
-    pub to: NodeId,
-    pub protocol: TProtocol,
-    pub body: TMessage,
-    pub bytes: u64,
-}

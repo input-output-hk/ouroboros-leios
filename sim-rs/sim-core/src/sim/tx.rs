@@ -22,6 +22,7 @@ pub struct TransactionProducer {
     clock: ClockBarrier,
     nodes: HashMap<NodeId, NodeState>,
     config: Option<RealTransactionConfig>,
+    shard_count: usize,
 }
 
 impl TransactionProducer {
@@ -55,6 +56,7 @@ impl TransactionProducer {
                 TransactionConfig::Real(config) => Some(config.clone()),
                 _ => None,
             },
+            shard_count: config.shard_count,
         }
     }
 
@@ -85,7 +87,8 @@ impl TransactionProducer {
 
             node.sink.send(Arc::new(tx))?;
 
-            let millis_until_tx = config.frequency_ms.sample(&mut rng) as u64;
+            let millis_until_tx = config.frequency_ms.sample(&mut rng) as u64
+                * self.shard_count as u64;
             next_tx_at += Duration::from_millis(millis_until_tx);
 
             if config.stop_time.is_some_and(|t| next_tx_at > t) {
