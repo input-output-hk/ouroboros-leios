@@ -107,6 +107,7 @@ COPY demo/proto-devnet/config/gen.template.json /app/config/gen.template.json
 
 # Copy scripts
 COPY antithesis/scripts/init-pool-node.sh /app/scripts/
+COPY antithesis/scripts/init-dingo-node.sh /app/scripts/
 COPY antithesis/scripts/run-pool-node.sh /app/scripts/
 COPY antithesis/scripts/run-tx-generator.sh /app/scripts/
 COPY antithesis/scripts/run-tx-generator-loop.sh /app/scripts/
