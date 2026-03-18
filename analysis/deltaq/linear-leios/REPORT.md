@@ -14,19 +14,21 @@ The ΔQ model is a complement to the Haskell and Rust simulations to gain confid
 
 ### 2.1 Linear Leios Protocol
 
-Linear Leios (CIP-164) is designed around the key insight: Praos block production only occupies roughly 25% of slot time, leaving significant unused network bandwidth and computational capacity during "calm periods". Linear Leios exploits this headroom to achieve high throughput while preserving Praos security guarantees.
+Linear Leios is designed around the key insight: Praos block production only occupies roughly 25% of slot time, leaving significant unused network bandwidth and computational capacity during "calm periods". Linear Leios exploits this headroom to achieve high throughput while preserving Praos security guarantees.
 
 In Linear Leios there are two block types:
 
 - **EB (Endorser Block):** Contains transaction references only. EBs are subject to a vote-based certification process requiring a quorum of the voting committee.
 - **RB (Ranking Block):** A standard Praos block, which in addition can reference an EB or include a certificate for an endorsed EB.
 
-The security constraint is that each EB must diffuse to all honest nodes within TODO
+The security constraint is that each EB must diffuse to all honest nodes within Δ\_EB slots of its creation.
 
-The DeltaQ analysis of linear Leios validates the following assumptions:
+The DeltaQ analysis of Linear Leios validates the following assumptions:
 
 * Reapplying a certified EB cannot cost more than standard transaction processing
 * Any certified EB referenced by an RB must be transmitted before that RB is processed
+
+The protocol behavior is governed by several timing parameters that control the duration of diffusion and voting intervals. The following sections describe each parameter and the trade-offs it involves.
 
 #### 2.1.1 Parameter $L\_{hdr}$
 
@@ -92,11 +94,27 @@ TODO
 
 ### 4.1 Empirical distributions
 
-TODO
+Several operations in the ΔQ model are grounded in empirical timing measurements taken from a Cardano mainnet node rather than synthetic assumptions. Two operations are of particular interest:
+
+- **`applyTx`:** The cost of validating a transaction against the current ledger state for the first time. This is the work a node performs when it receives a fresh transaction from the mempool. Measurements show a wide spread: roughly 28% of transactions complete in under 5 ms, 65% in under 10 ms, and about 8% take longer than 20 ms.
+
+- **`reapplyTx`:** The cost of re-validating a transaction that has already been validated before — for instance, when an EB is certified and its transactions are applied to the ledger. Because script execution can be skipped, reapply is substantially cheaper than apply: roughly 42% of transactions complete in under 1 ms and fewer than 2% take more than 10 ms.
+
+For batch processing (a full RB or EB worth of transactions), the Central Limit Theorem is applied to the single-transaction distributions to obtain a tractable aggregate distribution for sequential application of many transactions.
 
 ### 4.2 Markov model for TxCache
 
-TODO
+When an EB arrives at a node, its transactions may already be present in the local mempool (a cache hit), or they may need to be fetched from the network (a cache miss). To model this, we use a two-state Markov chain parameterized by $p$, the probability that a given transaction is in the cache.
+
+The transition matrix is:
+
+$M = \begin{pmatrix} 1-p & p \\ 1-p/2 & p/2 \end{pmatrix}$
+
+Solving the stationary condition $\pi M = \pi$ yields the steady-state distribution:
+
+$\pi_1 = \frac{2-p}{2+p}, \quad \pi_2 = \frac{2p}{2+p}$
+
+where $\pi_2$ is the steady-state cache hit rate used in the ΔQ model. Higher values of $p$ (more transactions already cached) reduce the need for network fetches and therefore lower the EB processing latency.
 
 ## 5. Protocol Parameter Sweep
 
