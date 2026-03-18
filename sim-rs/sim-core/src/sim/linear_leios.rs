@@ -23,7 +23,8 @@ use crate::{
     model::{
         BlockId, Endorsement, EndorserBlockId, LinearEndorserBlock as EndorserBlock,
         LinearRankingBlock as RankingBlock, LinearRankingBlockHeader as RankingBlockHeader,
-        NoVoteReason, Transaction, TransactionId, VoteBundle, VoteBundleId,
+        NoVoteReason, Transaction, TransactionId, TransactionLostReason, VoteBundle,
+        VoteBundleId,
     },
     sim::{
         MiniProtocol, NodeImpl, SimCpuTask, SimMessage,
@@ -340,6 +341,7 @@ impl NodeImpl for LinearLeiosNode {
             total_stake: sim_config.total_stake,
         };
         let mempool_max_size_bytes = sim_config.mempool_size_bytes;
+        let tx_backlog_max_size = sim_config.tx_backlog_max_size;
 
         Self {
             id: config.id,
@@ -352,7 +354,7 @@ impl NodeImpl for LinearLeiosNode {
             consumers: config.consumers.clone(),
             current_slot: 0,
             txs: HashMap::new(),
-            mempool: Mempool::new(mempool_max_size_bytes),
+            mempool: Mempool::new(mempool_max_size_bytes, tx_backlog_max_size),
             ledger_states: BTreeMap::new(),
             praos: NodePraosState::default(),
             leios: NodeLeiosState::default(),
@@ -504,6 +506,11 @@ impl LinearLeiosNode {
 
     fn generate_tx(&mut self, tx: Arc<Transaction>) {
         self.tracker.track_transaction_generated(&tx, self.id);
+        if self.mempool.is_backlog_full() {
+            self.tracker
+                .track_transaction_lost(tx.id, TransactionLostReason::BacklogFull);
+            return;
+        }
         self.propagate_tx(self.id, tx);
     }
 
@@ -1439,7 +1446,13 @@ impl LinearLeiosNode {
             return false;
         }
 
-        self.mempool.try_insert(tx.clone())
+        let prev_max = self.mempool.max_backlog_len_seen;
+        let result = self.mempool.try_insert(tx.clone());
+        if self.mempool.max_backlog_len_seen > prev_max {
+            self.tracker
+                .track_backlog_max(self.id, self.mempool.max_backlog_len_seen);
+        }
+        result
     }
 
     fn sample_from_mempool(
@@ -1585,9 +1598,11 @@ struct Mempool {
     queue: BTreeMap<u64, Arc<Transaction>>,
     input_ids: HashSet<u64>,
     tx_ids: HashSet<TransactionId>,
+    tx_backlog_max_size: Option<usize>,
+    max_backlog_len_seen: usize,
 }
 impl Mempool {
-    fn new(max_size_bytes: u64) -> Self {
+    fn new(max_size_bytes: u64, tx_backlog_max_size: Option<usize>) -> Self {
         Self {
             next_id: 0,
             mempool_count: 0,
@@ -1596,7 +1611,18 @@ impl Mempool {
             queue: BTreeMap::new(),
             input_ids: HashSet::new(),
             tx_ids: HashSet::new(),
+            tx_backlog_max_size,
+            max_backlog_len_seen: 0,
         }
+    }
+
+    fn backlog_len(&self) -> usize {
+        self.queue.len() - self.mempool_count
+    }
+
+    fn is_backlog_full(&self) -> bool {
+        self.tx_backlog_max_size
+            .is_some_and(|max| self.backlog_len() >= max)
     }
     fn try_insert(&mut self, tx: Arc<Transaction>) -> bool {
         let new_bytes = self.mempool_size_bytes + tx.bytes;
@@ -1605,6 +1631,10 @@ impl Mempool {
             let id = self.new_id();
             self.tx_ids.insert(tx.id);
             self.queue.insert(id, tx);
+            let backlog_len = self.backlog_len();
+            if backlog_len > self.max_backlog_len_seen {
+                self.max_backlog_len_seen = backlog_len;
+            }
             return false;
         }
         if self.input_ids.contains(&tx.input_id) {
@@ -1767,7 +1797,7 @@ mod mempool_tests {
     fn should_fill_as_space_is_available() {
         let mut txs = TxFactory::new();
         let [tx1, tx2, tx3] = txs.txs([5, 5, 5]);
-        let mut mempool = Mempool::new(10);
+        let mut mempool = Mempool::new(10, None);
         assert!(mempool.try_insert(tx1.clone()));
         assert!(mempool.try_insert(tx2.clone()));
 
@@ -1779,5 +1809,40 @@ mod mempool_tests {
         let added = mempool.remove_txs([tx2.id]);
         assert_eq!(added, vec![tx3.id]);
         assert_eq!(mempool.ids().collect::<Vec<_>>(), vec![tx1.id, tx3.id]);
+    }
+
+    #[test]
+    fn should_track_max_backlog_len() {
+        let mut txs = TxFactory::new();
+        let mut mempool = Mempool::new(5, None);
+        // Fill mempool
+        assert!(mempool.try_insert(txs.tx(5)));
+        assert_eq!(mempool.max_backlog_len_seen, 0);
+
+        // Add to backlog
+        assert!(!mempool.try_insert(txs.tx(5)));
+        assert_eq!(mempool.backlog_len(), 1);
+        assert_eq!(mempool.max_backlog_len_seen, 1);
+
+        assert!(!mempool.try_insert(txs.tx(5)));
+        assert_eq!(mempool.backlog_len(), 2);
+        assert_eq!(mempool.max_backlog_len_seen, 2);
+    }
+
+    #[test]
+    fn should_report_backlog_full() {
+        let mut txs = TxFactory::new();
+        let mut mempool = Mempool::new(5, Some(2));
+        // Fill mempool
+        assert!(mempool.try_insert(txs.tx(5)));
+        assert!(!mempool.is_backlog_full());
+
+        // Add to backlog — not yet full
+        assert!(!mempool.try_insert(txs.tx(5)));
+        assert!(!mempool.is_backlog_full());
+
+        // Add second — now full
+        assert!(!mempool.try_insert(txs.tx(5)));
+        assert!(mempool.is_backlog_full());
     }
 }

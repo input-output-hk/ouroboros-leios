@@ -121,6 +121,10 @@ pub enum Event {
         id: TransactionId,
         reason: TransactionLostReason,
     },
+    TXBacklogMax {
+        node: Node,
+        max_len: usize,
+    },
     RBLotteryWon {
         id: BlockId<Node>,
         slot: u64,
@@ -519,6 +523,17 @@ impl EventTracker {
             id,
             sender: self.to_node(sender),
             recipient: self.to_node(recipient),
+        });
+    }
+
+    pub fn track_transaction_lost(&self, id: TransactionId, reason: TransactionLostReason) {
+        self.send(Event::TXLost { id, reason });
+    }
+
+    pub fn track_backlog_max(&self, node: NodeId, max_len: usize) {
+        self.send(Event::TXBacklogMax {
+            node: self.to_node(node),
+            max_len,
         });
     }
 

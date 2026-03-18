@@ -291,6 +291,7 @@ pub enum NoVoteReason {
 pub enum TransactionLostReason {
     IBExpired,
     EBExpired,
+    BacklogFull,
 }
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
