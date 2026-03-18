@@ -699,6 +699,12 @@ pub(super) fn build(
     config: Arc<SimConfiguration>,
     event_sender: tokio::sync::mpsc::UnboundedSender<(crate::events::Event, Timestamp)>,
 ) -> Box<dyn SequentialRunner> {
+    if config.attacks.late_eb.is_some() {
+        tracing::warn!(
+            "sequential engine does not support attacker scenarios; late_eb_attack config will be ignored"
+        );
+    }
+
     let mut rng = ChaChaRng::seed_from_u64(config.seed);
 
     match config.variant {
