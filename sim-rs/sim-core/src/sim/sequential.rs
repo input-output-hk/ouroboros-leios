@@ -246,38 +246,29 @@ impl<N: NodeImpl> SequentialSimulation<N> {
         let num_nodes = self.nodes.len();
         let mut per_node_work: Vec<Vec<WorkItem<N>>> = (0..num_nodes).map(|_| Vec::new()).collect();
 
+        // How long to sleep when blocked by CMB ceiling or waiting for messages.
+        let blocked_timeout = Duration::from_micros(100);
+
         loop {
             if token.is_cancelled() {
                 break;
             }
 
             // === Drain incoming cross-shard messages ===
-            if let Some(rx) = &self.cross_shard_rx {
-                while let Ok(msg) = rx.try_recv() {
-                    let link = Link {
-                        from: msg.from,
-                        to: msg.to,
-                    };
-                    if let Some(connection) = self.connections.get_mut(&link) {
-                        connection.send(msg.body, msg.bytes, msg.protocol, msg.send_time);
-                        if !self.pending_deliveries.contains(&link) {
-                            if let Some(next_arrival) = connection.next_arrival_time() {
-                                self.pending_deliveries.insert(link.clone());
-                                self.event_queue.push(FutureEvent(
-                                    next_arrival,
-                                    GlobalEvent::NetworkDelivery(link),
-                                ));
-                            }
-                        }
-                    }
-                }
-            }
+            self.drain_cross_shard_messages();
 
             // === Check next event timestamp ===
             let Some(FutureEvent(timestamp, _)) = self.event_queue.peek() else {
-                // No events — if we have peers, yield and retry (they may send us messages)
-                if !self.peer_shards.is_empty() {
-                    std::thread::yield_now();
+                // No events — if we have peers, wait for cross-shard messages
+                if let Some(rx) = &self.cross_shard_rx {
+                    if let Ok(msg) = rx.recv_timeout(blocked_timeout) {
+                        Self::deliver_cross_shard_msg(
+                            &mut self.connections,
+                            &mut self.pending_deliveries,
+                            &mut self.event_queue,
+                            msg,
+                        );
+                    }
                     continue;
                 }
                 break;
@@ -299,7 +290,17 @@ impl<N: NodeImpl> SequentialSimulation<N> {
                     if ceiling > current {
                         self.shared_time.store(ceiling, Ordering::Release);
                     }
-                    std::thread::yield_now();
+                    // Sleep on cross-shard channel instead of spinning
+                    if let Some(rx) = &self.cross_shard_rx {
+                        if let Ok(msg) = rx.recv_timeout(blocked_timeout) {
+                            Self::deliver_cross_shard_msg(
+                                &mut self.connections,
+                                &mut self.pending_deliveries,
+                                &mut self.event_queue,
+                                msg,
+                            );
+                        }
+                    }
                     continue;
                 }
             }
@@ -413,6 +414,48 @@ impl<N: NodeImpl> SequentialSimulation<N> {
         }
 
         Ok(())
+    }
+
+    /// Drain all pending cross-shard messages from the channel.
+    fn drain_cross_shard_messages(&mut self) {
+        let Some(rx) = self.cross_shard_rx.as_ref() else {
+            return;
+        };
+        // Collect into a temp vec to avoid overlapping borrows
+        let msgs: Vec<_> = std::iter::from_fn(|| rx.try_recv().ok()).collect();
+        for msg in msgs {
+            Self::deliver_cross_shard_msg(
+                &mut self.connections,
+                &mut self.pending_deliveries,
+                &mut self.event_queue,
+                msg,
+            );
+        }
+    }
+
+    /// Deliver a single cross-shard message into the local connection.
+    fn deliver_cross_shard_msg(
+        connections: &mut HashMap<Link, Connection<MiniProtocol, N::Message>>,
+        pending_deliveries: &mut HashSet<Link>,
+        event_queue: &mut BinaryHeap<FutureEvent<GlobalEvent<N>>>,
+        msg: CrossShardMsg<N::Message>,
+    ) {
+        let link = Link {
+            from: msg.from,
+            to: msg.to,
+        };
+        if let Some(connection) = connections.get_mut(&link) {
+            connection.send(msg.body, msg.bytes, msg.protocol, msg.send_time);
+            if !pending_deliveries.contains(&link) {
+                if let Some(next_arrival) = connection.next_arrival_time() {
+                    pending_deliveries.insert(link.clone());
+                    event_queue.push(FutureEvent(
+                        next_arrival,
+                        GlobalEvent::NetworkDelivery(link),
+                    ));
+                }
+            }
+        }
     }
 
     /// Apply the side effects from a batch of node processing.
