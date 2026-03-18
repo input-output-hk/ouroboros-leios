@@ -8,13 +8,13 @@ The security of the Linear Leios protocol depends on Δ\_EB, the time within whi
 
 Early simulations suggested Δ\_EB is manageable under happy-path conditions. This report validates that assumption using a ΔQ System Development model.
 
-Using the model, we can rule out infeasible parameters without running simulations. The role of this ΔQ model is therefore to complement the Haskell and Rust simulations and gain confidence in the parameter selection for Linear Leios.
+The ΔQ model is a complement to the Haskell and Rust simulations to gain confidence in the parameter selection for Linear Leios, resp. a precursor to running simulations, as it can rule out infeasible parameter selections.
 
 ## 2. Background
 
 ### 2.1 Linear Leios Protocol
 
-Linear Leios (CIP-164) is a variant of Ouroboros Leios designed around a key insight: Praos block production only occupies roughly 25% of slot time, leaving significant unused network bandwidth and computational capacity during "calm periods". Linear Leios exploits this headroom to achieve high throughput while preserving Praos security guarantees.
+Linear Leios (CIP-164) is designed around the key insight: Praos block production only occupies roughly 25% of slot time, leaving significant unused network bandwidth and computational capacity during "calm periods". Linear Leios exploits this headroom to achieve high throughput while preserving Praos security guarantees.
 
 In Linear Leios there are two block types:
 
@@ -65,7 +65,7 @@ and combinators to build complex abstractions:
 | `a .>>. b` | Sequential composition: `a` then `b` |
 | `a .\/. b` | First to finish: first of `a` and `b` |
 | `a ./\. b` | Last to finish: both, `a` and `b` |
-| `p a b` | Probabilistic choice: `a` with probability `p`, `b` with probabilty `1 - p` |
+| `p a b` | Probabilistic choice: `a` with probability `p`, `b` with probability `1 - p` |
 
 The ΔQ library is built with a backend abstraction for running the computations. The library provides the *piecewise-polynomials* backend. For running complex models we implemented an new backend *sampled*. They compare as follows:
 
@@ -128,7 +128,7 @@ The ΔQ model confirms that the Linear Leios protocol can satisfy its Δ\_EB sec
 
 ## 8. Limitations and Future Work
 
-- This model assumes honest node behavior. Adversarial delay of EBs — for example, an adversary deliberately withholding an EB until just before the voting deadline — is not captured here. Security under such scenarios is treated analytically in the CIP-164 security proof.
+- This model assumes honest node behavior. Adversarial delay of EBs - for example, an adversary deliberately withholding an EB until just before the voting deadline - is not captured here.
 - With the `piecewise-polynomial` ΔQ backend computational complexity is hard to control, where as with the `sampled` backend it is the accuracy of the results. For this analysis to be successful, we built probabilistic models and then combined those using ΔQ in order to get a model with low complexity to be executable with the default backend.
 - Future work should integrate this EB diffusion model with the broader transaction lifecycle ΔQ model (`analysis/deltaq/tx-lifecycle.ipynb`) to produce an end-to-end latency estimate from mempool submission to RB inclusion under Linear Leios.
 
