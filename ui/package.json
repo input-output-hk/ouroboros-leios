@@ -4,9 +4,10 @@
   "version": "0.2.0",
   "type": "module",
   "scripts": {
-    "start": "vite",
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "fetch-geodata": "[ -f public/data/ne_110m_admin_0_countries.geojson ] || bash public/data/fetch-geojson.sh",
+    "start": "npm run fetch-geodata && vite",
+    "dev": "npm run fetch-geodata && vite",
+    "build": "npm run fetch-geodata && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
