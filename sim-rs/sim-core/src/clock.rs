@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-pub use coordinator::ClockCoordinator;
+pub use coordinator::{ClockCoordinator, PeerShard};
 use coordinator::ClockEvent;
 use futures::FutureExt;
 pub use mock::MockClockCoordinator;
@@ -17,7 +17,7 @@ use tokio::sync::{Notify, mpsc, oneshot};
 
 mod coordinator;
 mod mock;
-mod timestamp;
+pub(crate) mod timestamp;
 
 // wrapper struct which holds a SimulationEvent,
 // but is ordered by a timestamp (in reverse)
@@ -82,6 +82,11 @@ impl Clock {
         self.time.load(std::sync::atomic::Ordering::Acquire)
     }
 
+    /// Get a TaskInitiator without registering as a waiter.
+    pub fn task_initiator(&self) -> TaskInitiator {
+        self.tasks.clone()
+    }
+
     pub fn barrier(&self) -> ClockBarrier {
         let id = self
             .waiters
@@ -134,7 +139,7 @@ impl ClockBarrier {
 
     fn wait(&mut self, until: Option<Timestamp>) -> Waiter<'_> {
         let (tx, rx) = oneshot::channel();
-        let done = until.is_some_and(|ts| ts <= self.now())
+        let done = until.is_some_and(|ts| ts == self.now())
             || self
                 .tx
                 .send(ClockEvent::Wait {

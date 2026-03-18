@@ -479,6 +479,36 @@
       "description": "Only supported by Haskell simulation.",
       "type": "boolean"
     },
+    "shard-count": {
+      "description": "Number of clock shards for parallel simulation. Each shard advances time independently.\nOnly supported by Rust simulation.",
+      "type": "integer",
+      "minimum": 1,
+      "default": 1
+    },
+    "shard-strategy": {
+      "description": "Strategy for assigning nodes to shards.\n- round-robin: simple node_id % shard_count\n- zero-latency-clusters: keeps 0-latency-connected nodes on the same shard\n- geographic: k-means clustering by node coordinates\n- min-latency-clusters: agglomerative clustering maximizing cross-shard latency\nOnly supported by Rust simulation.",
+      "type": "string",
+      "enum": ["round-robin", "zero-latency-clusters", "geographic", "min-latency-clusters", "min-cut"],
+      "default": "round-robin"
+    },
+    "shard-max-size-pct": {
+      "description": "Max shard size as percentage of average size. Used by min-latency-clusters to prevent imbalanced shards.\nOnly supported by Rust simulation.",
+      "type": "integer",
+      "minimum": 100,
+      "default": 200
+    },
+    "engine": {
+      "description": "Simulation engine.\n- actor: tokio-based async actor system, non-deterministic, supports attacker scenarios\n- sequential: discrete event simulation, deterministic, does not support attacker scenarios\nOnly supported by Rust simulation.",
+      "type": "string",
+      "enum": ["actor", "sequential"],
+      "default": "actor"
+    },
+    "parallel-threshold": {
+      "description": "Minimum simultaneous events before using rayon parallelism in the sequential engine.\nOnly supported by Rust simulation.",
+      "type": "integer",
+      "minimum": 1,
+      "default": 10
+    },
     "timestamp-resolution-ms": {
       "description": "The smallest unit of time to simulate, in fractions of a millisecond.\nOnly supported by Rust simulation.",
       "type": "number"
