@@ -5,41 +5,27 @@ use std::{
 };
 
 use anyhow::Result;
-use rand::{Rng, RngCore};
+use rand::RngCore;
 use rand_chacha::{ChaChaRng, rand_core::SeedableRng};
-use rand_distr::Distribution;
 use rayon::prelude::*;
 use tokio_util::sync::CancellationToken;
 use tracing::trace;
 
 use crate::{
     clock::{Clock, ClockCoordinator, FutureEvent, Timestamp, timestamp::AtomicTimestamp},
-    config::{LeiosVariant, NodeId, RealTransactionConfig, SimConfiguration, TransactionConfig},
+    config::{LeiosVariant, NodeId, SimConfiguration},
     events::EventTracker,
-    model::{CpuTaskId, Transaction},
+    model::Transaction,
     network::connection::Connection,
     sim::{
-        MiniProtocol, NodeImpl, SimCpuTask, SimMessage as _,
+        MiniProtocol, NodeImpl, SimMessage as _,
+        common::{CpuTaskWrapper, NodeEvent, self},
         cpu::{CpuTaskQueue, Subtask},
         leios::LeiosNode,
         linear_leios::LinearLeiosNode,
         stracciatella::StracciatellaLeiosNode,
     },
 };
-
-// Duplicated from driver.rs (private types)
-
-enum NodeEvent<T> {
-    NewSlot(u64),
-    CpuSubtaskCompleted(Subtask),
-    Other(T),
-}
-
-struct CpuTaskWrapper<Task: SimCpuTask> {
-    task_type: Task,
-    start_time: Timestamp,
-    cpu_time: Duration,
-}
 
 /// Per-node state in the sequential engine.
 struct NodeState<N: NodeImpl> {
@@ -113,98 +99,7 @@ struct PeerShardInfo {
     min_latency: Duration,
 }
 
-/// Transaction generation state.
-struct TxGenerator {
-    rng: ChaChaRng,
-    config: Option<RealTransactionConfig>,
-    node_weights: Vec<(usize, u64)>,
-    total_weight: u64,
-    shard_count: usize,
-    tx_conflict_fractions: Vec<Option<f64>>,
-}
-
-impl TxGenerator {
-    fn new(
-        rng: ChaChaRng,
-        config: &SimConfiguration,
-        node_indices: &HashMap<NodeId, usize>,
-    ) -> Self {
-        let real_config = match &config.transactions {
-            TransactionConfig::Real(c) => Some(c.clone()),
-            _ => None,
-        };
-
-        let mut cumulative = 0u64;
-        let mut node_weights = Vec::new();
-        let mut tx_conflict_fractions = vec![None; node_indices.len()];
-
-        for node_config in &config.nodes {
-            let Some(&idx) = node_indices.get(&node_config.id) else {
-                continue;
-            };
-            if idx < tx_conflict_fractions.len() {
-                tx_conflict_fractions[idx] = node_config.tx_conflict_fraction;
-            }
-            let weight = node_config
-                .tx_generation_weight
-                .unwrap_or(if node_config.stake > 0 { 0 } else { 1 });
-            if weight > 0 {
-                cumulative += weight;
-                node_weights.push((idx, cumulative));
-            }
-        }
-
-        Self {
-            rng,
-            config: real_config,
-            node_weights,
-            total_weight: cumulative,
-            shard_count: config.shard_count,
-            tx_conflict_fractions,
-        }
-    }
-
-    fn first_event_time(&self) -> Option<Timestamp> {
-        let config = self.config.as_ref()?;
-        if self.total_weight == 0 {
-            return None;
-        }
-        Some(config.start_time.unwrap_or(Timestamp::zero()))
-    }
-
-    fn generate(
-        &mut self,
-        now: Timestamp,
-    ) -> Option<(usize, Arc<Transaction>, Option<Timestamp>)> {
-        let config = self.config.as_ref()?;
-        if self.total_weight == 0 {
-            return None;
-        }
-
-        let choice = self.rng.random_range(0..self.total_weight);
-        let idx = match self
-            .node_weights
-            .binary_search_by_key(&choice, |(_, w)| *w)
-        {
-            Ok(i) => self.node_weights[i].0,
-            Err(i) => self.node_weights[i].0,
-        };
-
-        let tx = config.new_tx(&mut self.rng, self.tx_conflict_fractions.get(idx).copied().flatten());
-
-        let millis_until_tx =
-            config.frequency_ms.sample(&mut self.rng) as u64 * self.shard_count as u64;
-        let next_at = now + Duration::from_millis(millis_until_tx);
-
-        let next_time = if config.stop_time.is_some_and(|t| next_at > t) {
-            None
-        } else {
-            Some(next_at)
-        };
-
-        Some((idx, Arc::new(tx), next_time))
-    }
-}
+use crate::sim::tx::TxGeneratorCore;
 
 /// Cross-shard state for multi-shard CMB operation.
 struct CrossShardState<M> {
@@ -223,7 +118,7 @@ pub(super) struct SequentialSimulation<N: NodeImpl> {
     connections: HashMap<Link, Connection<MiniProtocol, N::Message>>,
     event_queue: BinaryHeap<FutureEvent<GlobalEvent<N>>>,
     pending_deliveries: HashSet<Link>,
-    tx_generator: TxGenerator,
+    tx_generator: TxGeneratorCore,
     tracker: EventTracker,
     config: Arc<SimConfiguration>,
     shared_time: Arc<AtomicTimestamp>,
@@ -513,23 +408,10 @@ fn process_node_batch<N: NodeImpl>(
                 node_state.node.handle_new_slot(slot)
             }
             WorkItem::CpuSubtaskCompleted(subtask) => {
-                let task_id = CpuTaskId {
-                    node: node_state.id,
-                    index: subtask.task_id,
-                };
-                let (finished_task, next_subtask) = node_state.cpu.complete_subtask(subtask);
-
-                if let Some((subtask, task)) = next_subtask {
-                    let task_type = task.task_type.name();
-                    node_state.tracker.track_cpu_subtask_started(
-                        CpuTaskId {
-                            node: node_state.id,
-                            index: subtask.task_id,
-                        },
-                        task_type,
-                        subtask.subtask_id,
-                        subtask.duration,
-                    );
+                let result = common::complete_cpu_subtask::<N>(
+                    &mut node_state.cpu, &node_state.tracker, node_state.id, timestamp, subtask,
+                );
+                if let Some(subtask) = result.next_subtask {
                     output.new_events.push(FutureEvent(
                         timestamp + subtask.duration,
                         GlobalEvent::NodeTimed {
@@ -538,19 +420,10 @@ fn process_node_batch<N: NodeImpl>(
                         },
                     ));
                 }
-
-                let Some(task) = finished_task else {
+                let Some(task) = result.finished_task else {
                     continue;
                 };
-                let wall_time = timestamp - task.start_time;
-                node_state.tracker.track_cpu_task_finished(
-                    task_id,
-                    task.task_type.name(),
-                    task.cpu_time,
-                    wall_time,
-                    task.task_type.extra(),
-                );
-                node_state.node.handle_cpu_task(task.task_type)
+                node_state.node.handle_cpu_task(task)
             }
             WorkItem::TimedEvent(event) => node_state.node.handle_timed_event(event),
             WorkItem::Message(from, msg) => node_state.node.handle_message(from, msg),
@@ -571,7 +444,18 @@ fn process_node_batch<N: NodeImpl>(
         }
 
         for task in result.tasks {
-            schedule_cpu_task_batch(node_state, &mut output, node_idx, timestamp, task);
+            let subtasks = common::schedule_cpu_task::<N>(
+                &mut node_state.cpu, &node_state.tracker, node_state.id, timestamp, task, &node_state.config,
+            );
+            for subtask in subtasks {
+                output.new_events.push(FutureEvent(
+                    timestamp + subtask.duration,
+                    GlobalEvent::NodeTimed {
+                        node_idx,
+                        event: NodeEvent::CpuSubtaskCompleted(subtask),
+                    },
+                ));
+            }
         }
 
         for (time, event) in result.timed_events {
@@ -586,51 +470,6 @@ fn process_node_batch<N: NodeImpl>(
     }
 
     output
-}
-
-/// Schedule a CPU task within the batch processing context.
-fn schedule_cpu_task_batch<N: NodeImpl>(
-    node_state: &mut NodeState<N>,
-    output: &mut BatchNodeOutput<N>,
-    node_idx: usize,
-    now: Timestamp,
-    task: N::Task,
-) {
-    let cpu_times = task.times(&node_state.config.cpu_times);
-    let task = CpuTaskWrapper {
-        task_type: task,
-        start_time: now,
-        cpu_time: cpu_times.iter().sum(),
-    };
-    let name = task.task_type.name();
-    let subtask_count = cpu_times.len();
-    let (task_id, subtasks) = node_state.cpu.schedule_task(task, cpu_times);
-    node_state.tracker.track_cpu_task_scheduled(
-        CpuTaskId {
-            node: node_state.id,
-            index: task_id,
-        },
-        name.clone(),
-        subtask_count,
-    );
-    for subtask in subtasks {
-        node_state.tracker.track_cpu_subtask_started(
-            CpuTaskId {
-                node: node_state.id,
-                index: subtask.task_id,
-            },
-            name.clone(),
-            subtask.subtask_id,
-            subtask.duration,
-        );
-        output.new_events.push(FutureEvent(
-            now + subtask.duration,
-            GlobalEvent::NodeTimed {
-                node_idx,
-                event: NodeEvent::CpuSubtaskCompleted(subtask),
-            },
-        ));
-    }
 }
 
 // ─── Builder functions ───────────────────────────────────────────────────────
@@ -841,7 +680,10 @@ where
 
         // TX generator + initial events
         let tx_rng = ChaChaRng::seed_from_u64(rng.next_u64());
-        let tx_generator = TxGenerator::new(tx_rng, &config, &node_indices);
+        let indexed_nodes: Vec<_> = config.nodes.iter()
+            .filter_map(|n| node_indices.get(&n.id).map(|&idx| (idx, n)))
+            .collect();
+        let tx_generator = TxGeneratorCore::new(tx_rng, &config, indexed_nodes);
         let mut event_queue: BinaryHeap<FutureEvent<GlobalEvent<N>>> = BinaryHeap::new();
         for idx in 0..nodes.len() {
             event_queue.push(FutureEvent(
