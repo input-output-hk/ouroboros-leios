@@ -42,18 +42,21 @@ impl Simulation {
     ) -> Result<Self> {
         let config = Arc::new(config);
 
-        if config.sequential_engine {
-            tracing::info!("using sequential DES engine");
-            return Ok(Self(SimulationInner::Sequential(sequential::build(
-                config,
-                event_sender,
-            ))));
+        match config.engine {
+            crate::config::Engine::Sequential => {
+                tracing::info!("using sequential DES engine");
+                Ok(Self(SimulationInner::Sequential(sequential::build(
+                    config,
+                    event_sender,
+                ))))
+            }
+            crate::config::Engine::Actor => {
+                Ok(Self(SimulationInner::Actor(actor::ActorSimulation::new(
+                    config,
+                    event_sender,
+                )?)))
+            }
         }
-
-        Ok(Self(SimulationInner::Actor(actor::ActorSimulation::new(
-            config,
-            event_sender,
-        )?)))
     }
 
     pub async fn run(self, token: CancellationToken) -> Result<()> {
