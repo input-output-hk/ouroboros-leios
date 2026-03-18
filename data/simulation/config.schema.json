@@ -497,6 +497,18 @@
       "minimum": 100,
       "default": 200
     },
+    "engine": {
+      "description": "Simulation engine.\n- actor: tokio-based async actor system, non-deterministic, supports attacker scenarios\n- sequential: discrete event simulation, deterministic, does not support attacker scenarios\nOnly supported by Rust simulation.",
+      "type": "string",
+      "enum": ["actor", "sequential"],
+      "default": "actor"
+    },
+    "parallel-threshold": {
+      "description": "Minimum simultaneous events before using rayon parallelism in the sequential engine.\nOnly supported by Rust simulation.",
+      "type": "integer",
+      "minimum": 1,
+      "default": 10
+    },
     "timestamp-resolution-ms": {
       "description": "The smallest unit of time to simulate, in fractions of a millisecond.\nOnly supported by Rust simulation.",
       "type": "number"

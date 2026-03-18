@@ -100,6 +100,9 @@ pub struct RawParameters {
     pub shard_max_size_pct: u64,
     #[serde(default)]
     pub engine: Engine,
+    /// Minimum simultaneous events before using rayon parallelism in the sequential engine.
+    #[serde(default = "default_parallel_threshold")]
+    pub parallel_threshold: usize,
 
     // Leios protocol configuration
     pub leios_stage_length_slots: u64,
@@ -752,6 +755,7 @@ pub struct SimConfiguration {
     pub shard_strategy: ShardStrategy,
     pub shard_max_size_pct: u64,
     pub engine: Engine,
+    pub parallel_threshold: usize,
     pub slots: Option<u64>,
     pub emit_conformance_events: bool,
     pub aggregate_events: bool,
@@ -827,6 +831,7 @@ impl SimConfiguration {
             shard_strategy: params.shard_strategy.clone(),
             shard_max_size_pct: params.shard_max_size_pct,
             engine: params.engine.clone(),
+            parallel_threshold: params.parallel_threshold,
             slots: None,
             emit_conformance_events: false,
             aggregate_events: false,
@@ -883,6 +888,10 @@ fn default_shard_count() -> usize {
 
 fn default_shard_max_size_pct() -> u64 {
     200
+}
+
+fn default_parallel_threshold() -> usize {
+    10
 }
 #[derive(Debug, Clone)]
 pub struct NodeConfiguration {
