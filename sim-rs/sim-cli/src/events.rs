@@ -12,7 +12,7 @@ use sim_core::{
     clock::Timestamp,
     config::{LeiosVariant, NodeId, SimConfiguration},
     events::{BlockRef, Event, Node},
-    model::{BlockId, NoVoteReason, TransactionId},
+    model::{BlockId, NoVoteReason, TransactionId, TransactionLostReason},
 };
 use tokio::{
     fs::{self, File},
@@ -109,6 +109,8 @@ impl EventMonitor {
         let mut eb_messages = MessageStats::default();
         let mut vote_messages = MessageStats::default();
         let mut no_vote_reasons: BTreeMap<NoVoteReason, u64> = BTreeMap::new();
+        let mut txs_dropped_backlog_full: u64 = 0;
+        let mut max_backlog_len: usize = 0;
 
         // Pretty print options for bytes
         let pbo = Some(PrettyBytesOptions {
@@ -190,7 +192,16 @@ impl EventMonitor {
                 Event::TXReceived { .. } => {
                     tx_messages.received += 1;
                 }
-                Event::TXLost { .. } => {}
+                Event::TXLost { reason, .. } => {
+                    if matches!(reason, TransactionLostReason::BacklogFull) {
+                        txs_dropped_backlog_full += 1;
+                    }
+                }
+                Event::TXBacklogMax { max_len, .. } => {
+                    if max_len > max_backlog_len {
+                        max_backlog_len = max_len;
+                    }
+                }
                 Event::RBLotteryWon { .. } => {}
                 Event::RBGenerated {
                     id: BlockId { slot, producer },
@@ -631,6 +642,15 @@ impl EventMonitor {
             eb_messages.display("EB");
             vote_messages.display("Vote");
         });
+
+        if max_backlog_len > 0 {
+            info!("Maximum tx backlog length: {max_backlog_len}");
+        }
+        if txs_dropped_backlog_full > 0 {
+            info!(
+                "{txs_dropped_backlog_full} generated transaction(s) were dropped because the tx backlog was full."
+            );
+        }
 
         Ok(())
     }
