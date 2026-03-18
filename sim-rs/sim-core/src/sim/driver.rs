@@ -5,28 +5,17 @@ use tokio::{select, sync::mpsc};
 use tracing::trace;
 
 use crate::{
-    clock::{ClockBarrier, FutureEvent, Timestamp},
+    clock::{ClockBarrier, FutureEvent},
     config::{NodeConfiguration, NodeId, SimConfiguration},
     events::EventTracker,
-    model::{CpuTaskId, Transaction},
+    model::Transaction,
     network::{Network, NetworkSink, NetworkSource},
     sim::{
-        EventResult, MiniProtocol, NodeImpl, SimCpuTask, SimMessage as _,
-        cpu::{CpuTaskQueue, Subtask},
+        EventResult, MiniProtocol, NodeImpl, SimMessage as _,
+        common::{CpuTaskWrapper, NodeEvent, self},
+        cpu::CpuTaskQueue,
     },
 };
-
-struct CpuTaskWrapper<Task: SimCpuTask> {
-    task_type: Task,
-    start_time: Timestamp,
-    cpu_time: Duration,
-}
-
-enum NodeEvent<T> {
-    NewSlot(u64),
-    CpuSubtaskCompleted(Subtask),
-    Other(T),
-}
 
 pub struct NodeDriver<N: NodeImpl> {
     node: N,
@@ -151,65 +140,26 @@ impl<N: NodeImpl> NodeDriver<N> {
     }
 
     fn schedule_cpu_task(&mut self, task: N::Task) {
-        let cpu_times = task.times(&self.sim_config.cpu_times);
-        let task = CpuTaskWrapper {
-            task_type: task,
-            start_time: self.clock.now(),
-            cpu_time: cpu_times.iter().sum(),
-        };
-        let name = task.task_type.name();
-        let subtask_count = cpu_times.len();
-        let (task_id, subtasks) = self.cpu.schedule_task(task, cpu_times);
-        self.tracker.track_cpu_task_scheduled(
-            CpuTaskId {
-                node: self.id,
-                index: task_id,
-            },
-            name.clone(),
-            subtask_count,
-        );
+        let now = self.clock.now();
+        let subtasks =
+            common::schedule_cpu_task::<N>(&mut self.cpu, &self.tracker, self.id, now, task, &self.sim_config);
         for subtask in subtasks {
-            self.start_cpu_subtask(subtask, name.clone());
+            let timestamp = now + subtask.duration;
+            self.events
+                .push(FutureEvent(timestamp, NodeEvent::CpuSubtaskCompleted(subtask)));
         }
     }
 
-    fn handle_subtask_completed(&mut self, subtask: Subtask) -> Option<EventResult<N>> {
-        let task_id = CpuTaskId {
-            node: self.id,
-            index: subtask.task_id,
-        };
-        let (finished_task, next_subtask) = self.cpu.complete_subtask(subtask);
-        if let Some((subtask, task)) = next_subtask {
-            let task_type = task.task_type.name();
-            self.start_cpu_subtask(subtask, task_type);
+    fn handle_subtask_completed(&mut self, subtask: crate::sim::cpu::Subtask) -> Option<EventResult<N>> {
+        let now = self.clock.now();
+        let result =
+            common::complete_cpu_subtask::<N>(&mut self.cpu, &self.tracker, self.id, now, subtask);
+        if let Some(subtask) = result.next_subtask {
+            let timestamp = now + subtask.duration;
+            self.events
+                .push(FutureEvent(timestamp, NodeEvent::CpuSubtaskCompleted(subtask)));
         }
-        let task = finished_task?;
-        let wall_time = self.clock.now() - task.start_time;
-        self.tracker.track_cpu_task_finished(
-            task_id,
-            task.task_type.name(),
-            task.cpu_time,
-            wall_time,
-            task.task_type.extra(),
-        );
-        Some(self.node.handle_cpu_task(task.task_type))
-    }
-
-    fn start_cpu_subtask(&mut self, subtask: Subtask, task_type: String) {
-        let task_id = CpuTaskId {
-            node: self.id,
-            index: subtask.task_id,
-        };
-        self.tracker.track_cpu_subtask_started(
-            task_id,
-            task_type,
-            subtask.subtask_id,
-            subtask.duration,
-        );
-        let timestamp = self.clock.now() + subtask.duration;
-        self.events.push(FutureEvent(
-            timestamp,
-            NodeEvent::CpuSubtaskCompleted(subtask),
-        ))
+        let task = result.finished_task?;
+        Some(self.node.handle_cpu_task(task))
     }
 }
