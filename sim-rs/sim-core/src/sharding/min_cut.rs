@@ -95,8 +95,8 @@ fn bisect_kl(
             size_a += comp_sizes[comp];
         } else {
             // Put remaining in B
-            for j in i..n {
-                side[j] = true;
+            for item in side.iter_mut().skip(i) {
+                *item = true;
             }
             break;
         }
@@ -156,12 +156,10 @@ fn bisect_kl(
                             best_a_gain = gains[i];
                         }
                     }
-                } else {
-                    if gains[i] > best_b_gain - 100 {
-                        b_candidates.push(i);
-                        if gains[i] > best_b_gain {
-                            best_b_gain = gains[i];
-                        }
+                } else if gains[i] > best_b_gain - 100 {
+                    b_candidates.push(i);
+                    if gains[i] > best_b_gain {
+                        best_b_gain = gains[i];
                     }
                 }
             }
