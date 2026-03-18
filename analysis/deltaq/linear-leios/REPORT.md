@@ -108,11 +108,11 @@ When an EB arrives at a node, its transactions may already be present in the loc
 
 The transition matrix is:
 
-$M = \begin{pmatrix} 1-p & p \\ 1-p/2 & p/2 \end{pmatrix}$
+$$M = \begin{pmatrix} 1-p & p \\\ 1-p/2 & p/2 \end{pmatrix}$$
 
 Solving the stationary condition $\pi M = \pi$ yields the steady-state distribution:
 
-$\pi_1 = \frac{2-p}{2+p}, \quad \pi_2 = \frac{2p}{2+p}$
+$$\pi_1 = \frac{2-p}{2+p}, \quad \pi_2 = \frac{2p}{2+p}$$
 
 where $\pi_2$ is the steady-state cache hit rate used in the ΔQ model. Higher values of $p$ (more transactions already cached) reduce the need for network fetches and therefore lower the EB processing latency.
 
