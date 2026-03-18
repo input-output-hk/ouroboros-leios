@@ -96,8 +96,6 @@ impl<N: NodeImpl> Default for BatchNodeOutput<N> {
     }
 }
 
-/// Minimum batch size to use rayon parallelism.
-const PARALLEL_THRESHOLD: usize = 32;
 
 /// Cross-shard message sent between sequential shards.
 struct CrossShardMsg<M> {
@@ -389,7 +387,7 @@ impl<N: NodeImpl> SequentialSimulation<N> {
             }
 
             // === Compute — process node work items ===
-            if total_node_work >= PARALLEL_THRESHOLD {
+            if total_node_work >= self.config.parallel_threshold {
                 let outputs: Vec<BatchNodeOutput<N>> = self
                     .nodes
                     .par_iter_mut()
