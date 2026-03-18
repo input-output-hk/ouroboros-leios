@@ -18,6 +18,7 @@ export const Canvas: FC = () => {
         currentNode,
       },
       topography,
+      layoutMode,
     },
     dispatch,
   } = useSimContext();
@@ -26,11 +27,18 @@ export const Canvas: FC = () => {
   const hasMoved = useRef(false);
   const pointerCapture = useRef<number | undefined>(undefined);
 
+  const prevLayoutMode = useRef(layoutMode);
+  const needsRecenter = useRef(true);
+  if (prevLayoutMode.current !== layoutMode) {
+    prevLayoutMode.current = layoutMode;
+    needsRecenter.current = true;
+  }
   useEffect(() => {
+    if (!needsRecenter.current) return;
+    needsRecenter.current = false;
+
     const canvas = canvasRef.current;
-    if (!canvas) {
-      return;
-    }
+    if (!canvas) return;
 
     const width = canvas.parentElement?.getBoundingClientRect().width || 1024;
     const height = canvas.parentElement?.getBoundingClientRect().height || 800;
@@ -48,7 +56,7 @@ export const Canvas: FC = () => {
         canvasOffsetY: offsetY,
       },
     });
-  }, []);
+  }, [topography]);
 
   const handleClick = useCallback(
     (ev: PointerEvent) => {

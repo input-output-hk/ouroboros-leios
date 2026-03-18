@@ -26,3 +26,6 @@ dist-ssr
 # Claude
 .claude
 
+# Fetched data (downloaded at build time by fetch-geojson.sh)
+public/data/ne_110m_admin_0_countries.geojson
+
