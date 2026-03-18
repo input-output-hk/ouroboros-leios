@@ -289,7 +289,7 @@ impl<N: NodeImpl> SequentialSimulation<N> {
                     .zip(per_node_work.par_iter_mut())
                     .filter(|(_, work)| !work.is_empty())
                     .map(|(node_state, work)| {
-                        process_node_batch(node_state, work.drain(..).collect(), timestamp)
+                        process_node_batch(node_state, std::mem::take(work), timestamp)
                     })
                     .collect();
 
@@ -297,11 +297,11 @@ impl<N: NodeImpl> SequentialSimulation<N> {
                     self.apply_batch_output(output, timestamp);
                 }
             } else {
-                for node_idx in 0..num_nodes {
-                    if per_node_work[node_idx].is_empty() {
+                for (node_idx, work) in per_node_work.iter_mut().enumerate().take(num_nodes) {
+                    if work.is_empty() {
                         continue;
                     }
-                    let work: Vec<_> = per_node_work[node_idx].drain(..).collect();
+                    let work = std::mem::take(work);
                     let output =
                         process_node_batch(&mut self.nodes[node_idx], work, timestamp);
                     self.apply_batch_output(output, timestamp);
@@ -329,14 +329,14 @@ impl<N: NodeImpl> SequentialSimulation<N> {
         };
         if let Some(connection) = connections.get_mut(&link) {
             connection.send(msg.body, msg.bytes, msg.protocol, msg.send_time);
-            if !pending_deliveries.contains(&link) {
-                if let Some(next_arrival) = connection.next_arrival_time() {
-                    pending_deliveries.insert(link.clone());
-                    event_queue.push(FutureEvent(
-                        next_arrival,
-                        GlobalEvent::NetworkDelivery(link),
-                    ));
-                }
+            if !pending_deliveries.contains(&link)
+                && let Some(next_arrival) = connection.next_arrival_time()
+            {
+                pending_deliveries.insert(link.clone());
+                event_queue.push(FutureEvent(
+                    next_arrival,
+                    GlobalEvent::NetworkDelivery(link),
+                ));
             }
         }
     }
@@ -364,14 +364,14 @@ impl<N: NodeImpl> SequentialSimulation<N> {
             let link = Link { from: from_id, to };
             if let Some(connection) = self.connections.get_mut(&link) {
                 connection.send(msg, bytes, protocol, timestamp);
-                if !self.pending_deliveries.contains(&link) {
-                    if let Some(next_arrival) = connection.next_arrival_time() {
-                        self.pending_deliveries.insert(link.clone());
-                        self.event_queue.push(FutureEvent(
-                            next_arrival,
-                            GlobalEvent::NetworkDelivery(link),
-                        ));
-                    }
+                if !self.pending_deliveries.contains(&link)
+                    && let Some(next_arrival) = connection.next_arrival_time()
+                {
+                    self.pending_deliveries.insert(link.clone());
+                    self.event_queue.push(FutureEvent(
+                        next_arrival,
+                        GlobalEvent::NetworkDelivery(link),
+                    ));
                 }
             }
         }
@@ -516,10 +516,10 @@ where
 
             let mut first_error = None;
             for handle in handles {
-                if let Err(e) = handle.join().unwrap() {
-                    if first_error.is_none() {
-                        first_error = Some(e);
-                    }
+                if let Err(e) = handle.join().unwrap()
+                    && first_error.is_none()
+                {
+                    first_error = Some(e);
                 }
             }
             match first_error {

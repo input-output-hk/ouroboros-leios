@@ -41,7 +41,7 @@ pub fn assign_components_balanced(
     mut components: Vec<Vec<NodeId>>,
     shard_count: usize,
 ) -> ShardLookup {
-    components.sort_by(|a, b| b.len().cmp(&a.len()));
+    components.sort_by_key(|b| std::cmp::Reverse(b.len()));
 
     let mut shard_sizes = vec![0usize; shard_count];
     let mut lookup = HashMap::new();
