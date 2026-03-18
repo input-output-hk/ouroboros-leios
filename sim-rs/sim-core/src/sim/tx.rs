@@ -7,22 +7,113 @@ use tokio::sync::mpsc;
 
 use crate::{
     clock::{ClockBarrier, Timestamp},
-    config::{NodeId, RealTransactionConfig, SimConfiguration, TransactionConfig},
+    config::{NodeConfiguration, NodeId, RealTransactionConfig, SimConfiguration, TransactionConfig},
     model::Transaction,
 };
 
-struct NodeState {
-    sink: mpsc::UnboundedSender<Arc<Transaction>>,
-    tx_conflict_fraction: Option<f64>,
-    tx_generation_weight: u64,
+/// Core transaction generation logic shared between actor and sequential engines.
+/// Uses usize indices to identify nodes; callers map these to their own node addressing.
+pub(super) struct TxGeneratorCore {
+    rng: ChaChaRng,
+    config: Option<RealTransactionConfig>,
+    node_weights: WeightedLookup<usize>,
+    tx_conflict_fractions: Vec<Option<f64>>,
+    shard_count: usize,
 }
 
+impl TxGeneratorCore {
+    /// Create a new TxGeneratorCore.
+    /// `nodes` is an iterator of (index, node_config) for nodes in this shard.
+    pub(super) fn new<'a>(
+        rng: ChaChaRng,
+        config: &SimConfiguration,
+        nodes: impl IntoIterator<Item = (usize, &'a NodeConfiguration)>,
+    ) -> Self {
+        let mut tx_conflict_fractions = Vec::new();
+        let mut weights = Vec::new();
+
+        for (idx, node) in nodes {
+            // Ensure the vec is large enough
+            if idx >= tx_conflict_fractions.len() {
+                tx_conflict_fractions.resize(idx + 1, None);
+            }
+            tx_conflict_fractions[idx] = node.tx_conflict_fraction;
+
+            let weight = node
+                .tx_generation_weight
+                .unwrap_or(if node.stake > 0 { 0 } else { 1 });
+            if weight > 0 {
+                weights.push((idx, weight));
+            }
+        }
+
+        Self {
+            rng,
+            config: match &config.transactions {
+                TransactionConfig::Real(c) => Some(c.clone()),
+                _ => None,
+            },
+            node_weights: WeightedLookup::new(weights),
+            tx_conflict_fractions,
+            shard_count: config.shard_count,
+        }
+    }
+
+    /// Returns the timestamp of the first transaction event, if tx generation is configured.
+    pub(super) fn first_event_time(&self) -> Option<Timestamp> {
+        self.config.as_ref()?;
+        if self.node_weights.total_weight == 0 {
+            return None;
+        }
+        Some(
+            self.config
+                .as_ref()
+                .unwrap()
+                .start_time
+                .unwrap_or(Timestamp::zero()),
+        )
+    }
+
+    /// Generate one transaction and return the node index, transaction, and next generation time.
+    /// Returns `None` if tx generation is not configured or no eligible nodes exist.
+    pub(super) fn generate(
+        &mut self,
+        now: Timestamp,
+    ) -> Option<(usize, Arc<Transaction>, Option<Timestamp>)> {
+        let config = self.config.as_ref()?;
+        if self.node_weights.total_weight == 0 {
+            return None;
+        }
+
+        let &idx = self.node_weights.sample(&mut self.rng)?;
+        let conflict_fraction = self
+            .tx_conflict_fractions
+            .get(idx)
+            .copied()
+            .flatten();
+
+        let tx = config.new_tx(&mut self.rng, conflict_fraction);
+
+        let millis_until_tx =
+            config.frequency_ms.sample(&mut self.rng) as u64 * self.shard_count as u64;
+        let next_at = now + Duration::from_millis(millis_until_tx);
+
+        let next_time = if config.stop_time.is_some_and(|t| next_at > t) {
+            None
+        } else {
+            Some(next_at)
+        };
+
+        Some((idx, Arc::new(tx), next_time))
+    }
+}
+
+/// Async actor wrapper for tx generation (used by the actor engine).
 pub struct TransactionProducer {
-    rng: ChaChaRng,
+    core: TxGeneratorCore,
     clock: ClockBarrier,
-    nodes: HashMap<NodeId, NodeState>,
-    config: Option<RealTransactionConfig>,
-    shard_count: usize,
+    /// Node sinks indexed by the same usize indices as TxGeneratorCore.
+    sinks: Vec<mpsc::UnboundedSender<Arc<Transaction>>>,
 }
 
 impl TransactionProducer {
@@ -32,52 +123,33 @@ impl TransactionProducer {
         mut node_tx_sinks: HashMap<NodeId, mpsc::UnboundedSender<Arc<Transaction>>>,
         config: &SimConfiguration,
     ) -> Self {
-        let nodes = config
-            .nodes
-            .iter()
-            .filter_map(|node| {
-                let sink = node_tx_sinks.remove(&node.id)?;
-                let state =
-                    NodeState {
-                        sink,
-                        tx_conflict_fraction: node.tx_conflict_fraction,
-                        tx_generation_weight: node
-                            .tx_generation_weight
-                            .unwrap_or(if node.stake > 0 { 0 } else { 1 }),
-                    };
-                Some((node.id, state))
-            })
-            .collect();
+        // Build indexed sinks and node config pairs, filtering to nodes with sinks
+        let mut sinks = Vec::new();
+        let mut indexed_nodes = Vec::new();
+        for node in &config.nodes {
+            if let Some(sink) = node_tx_sinks.remove(&node.id) {
+                let idx = sinks.len();
+                sinks.push(sink);
+                indexed_nodes.push((idx, node));
+            }
+        }
         Self {
-            rng,
+            core: TxGeneratorCore::new(rng, config, indexed_nodes),
             clock,
-            nodes,
-            config: match &config.transactions {
-                TransactionConfig::Real(config) => Some(config.clone()),
-                _ => None,
-            },
-            shard_count: config.shard_count,
+            sinks,
         }
     }
 
     pub async fn run(&mut self) -> Result<()> {
-        let Some(config) = self.config.take() else {
+        let Some(start) = self.core.first_event_time() else {
             self.clock.wait_forever().await;
             return Ok(());
         };
-        let mut next_tx_at = Timestamp::zero();
-        let mut rng = &mut self.rng;
 
-        if let Some(start) = config.start_time {
-            self.clock.wait_until(start).await;
-            next_tx_at = start;
-        };
-
-        let node_weights = self.nodes.iter().filter_map(|(id, node)| {
-            let weight = node.tx_generation_weight;
-            (weight != 0).then_some((*id, weight))
-        });
-        let node_lookup = WeightedLookup::new(node_weights);
+        let mut next_tx_at = start;
+        if next_tx_at > Timestamp::zero() {
+            self.clock.wait_until(next_tx_at).await;
+        }
 
         if node_lookup.is_empty() {
             tracing::warn!(
@@ -91,28 +163,28 @@ impl TransactionProducer {
         }
 
         loop {
-            let node_id = node_lookup.sample(rng).unwrap();
-            let node = self.nodes.get(node_id).unwrap();
-
-            let tx = config.new_tx(rng, node.tx_conflict_fraction);
-
-            node.sink.send(Arc::new(tx))?;
-
-            let millis_until_tx = config.frequency_ms.sample(&mut rng) as u64
-                * self.shard_count as u64;
-            next_tx_at += Duration::from_millis(millis_until_tx);
-
-            if config.stop_time.is_some_and(|t| next_tx_at > t) {
+            let Some((idx, tx, next_time)) = self.core.generate(next_tx_at) else {
                 self.clock.wait_forever().await;
                 return Ok(());
-            } else {
-                self.clock.wait_until(next_tx_at).await;
+            };
+
+            self.sinks[idx].send(tx)?;
+
+            match next_time {
+                Some(t) => {
+                    next_tx_at = t;
+                    self.clock.wait_until(next_tx_at).await;
+                }
+                None => {
+                    self.clock.wait_forever().await;
+                    return Ok(());
+                }
             }
         }
     }
 }
 
-struct WeightedLookup<T> {
+pub(super) struct WeightedLookup<T> {
     elements: Vec<(T, u64)>,
     total_weight: u64,
 }
