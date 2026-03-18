@@ -328,7 +328,15 @@ fn verify_events(events: &[(String, String, String, Timestamp)], config: &SimCon
 // ---------------------------------------------------------------------------
 
 async fn run_sequential(shard_count: usize) -> Vec<(String, String, String, Timestamp)> {
-    let config = test_config(shard_count);
+    run_sequential_with_threshold(shard_count, 10).await
+}
+
+async fn run_sequential_with_threshold(
+    shard_count: usize,
+    parallel_threshold: usize,
+) -> Vec<(String, String, String, Timestamp)> {
+    let mut config = test_config(shard_count);
+    Arc::get_mut(&mut config).unwrap().parallel_threshold = parallel_threshold;
     let (tx, rx) = mpsc::unbounded_channel();
     let mut rng = ChaChaRng::seed_from_u64(config.seed);
     let runner =
@@ -389,8 +397,11 @@ async fn test_actor_multi_shard() {
 
 #[tokio::test]
 async fn test_sequential_deterministic() {
-    let events1 = run_sequential(1).await;
-    let events2 = run_sequential(1).await;
+    // Disable rayon parallelism: with rayon, events from different nodes race
+    // through the mpsc channel, making event *ordering* non-deterministic even
+    // though the simulation state is deterministic.
+    let events1 = run_sequential_with_threshold(1, usize::MAX).await;
+    let events2 = run_sequential_with_threshold(1, usize::MAX).await;
     // Strip timestamps for comparison — just compare (node, event_type, detail) sequences
     let stripped1: Vec<_> = events1.iter().map(|e| (&e.0, &e.1, &e.2)).collect();
     let stripped2: Vec<_> = events2.iter().map(|e| (&e.0, &e.1, &e.2)).collect();
