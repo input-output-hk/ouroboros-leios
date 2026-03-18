@@ -908,3 +908,18 @@ where
         Box::new(MultiShardRunner { shards })
     }
 }
+
+#[cfg(test)]
+pub(crate) fn build_for_test<N: NodeImpl + Send + 'static>(
+    config: Arc<SimConfiguration>,
+    event_sender: tokio::sync::mpsc::UnboundedSender<(crate::events::Event, Timestamp)>,
+    rng: &mut ChaChaRng,
+) -> Box<dyn SequentialRunner>
+where
+    N::Message: Send + Sync,
+    N::Task: Send + Sync,
+    N::TimedEvent: Send + Sync,
+    N::CustomEvent: Send,
+{
+    build_typed::<N>(config, event_sender, rng)
+}

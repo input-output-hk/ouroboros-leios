@@ -36,42 +36,30 @@ pub(crate) struct ActorInitArgs<'a, N: NodeImpl> {
     pub nodes: &'a mut [N],
 }
 
-fn no_additional_actors<N: NodeImpl>(_args: ActorInitArgs<N>) -> Vec<Box<dyn Actor>> {
+pub(crate) fn no_additional_actors<N: NodeImpl>(_args: ActorInitArgs<N>) -> Vec<Box<dyn Actor>> {
     vec![]
 }
 
-enum NodeListWrapper {
-    Leios(Vec<NodeDriver<LeiosNode>>),
-    Stracciatella(Vec<NodeDriver<StracciatellaLeiosNode>>),
-    LinearLeios(Vec<NodeDriver<LinearLeiosNode>>),
+trait RunnableNode: Send {
+    fn run_in(self: Box<Self>, set: &mut JoinSet<Result<()>>);
 }
 
-impl NodeListWrapper {
-    fn run_all(&mut self, set: &mut JoinSet<Result<()>>) {
-        match self {
-            Self::Leios(nodes) => {
-                for node in nodes.drain(..) {
-                    set.spawn(node.run());
-                }
-            }
-            Self::Stracciatella(nodes) => {
-                for node in nodes.drain(..) {
-                    set.spawn(node.run());
-                }
-            }
-            Self::LinearLeios(nodes) => {
-                for node in nodes.drain(..) {
-                    set.spawn(node.run());
-                }
-            }
-        }
+impl<N: NodeImpl + Send + 'static> RunnableNode for NodeDriver<N>
+where
+    N::Message: Send + 'static,
+    N::Task: Send,
+    N::TimedEvent: Send,
+    N::CustomEvent: Send,
+{
+    fn run_in(self: Box<Self>, set: &mut JoinSet<Result<()>>) {
+        set.spawn((*self).run());
     }
 }
 
 pub(super) struct ActorSimulation {
     shards: Vec<Shard>,
     slot_witness: SlotWitness,
-    nodes: NodeListWrapper,
+    nodes: Vec<Box<dyn RunnableNode>>,
     actors: Vec<Box<dyn Actor>>,
 }
 
@@ -80,6 +68,39 @@ impl ActorSimulation {
         config: Arc<SimConfiguration>,
         event_sender: mpsc::UnboundedSender<(crate::events::Event, Timestamp)>,
     ) -> Result<Self> {
+        match config.variant {
+            LeiosVariant::Linear | LeiosVariant::LinearWithTxReferences => {
+                Self::new_generic::<LinearLeiosNode, _>(
+                    config,
+                    event_sender,
+                    super::linear_leios::register_actors,
+                )
+            }
+            LeiosVariant::FullWithoutIbs => {
+                Self::new_generic::<StracciatellaLeiosNode, _>(
+                    config,
+                    event_sender,
+                    no_additional_actors,
+                )
+            }
+            _ => {
+                Self::new_generic::<LeiosNode, _>(config, event_sender, no_additional_actors)
+            }
+        }
+    }
+
+    pub(crate) fn new_generic<N: NodeImpl + Send + 'static, AAF>(
+        config: Arc<SimConfiguration>,
+        event_sender: mpsc::UnboundedSender<(crate::events::Event, Timestamp)>,
+        additional_actors_fn: AAF,
+    ) -> Result<Self>
+    where
+        N::Message: Send + 'static,
+        N::Task: Send,
+        N::TimedEvent: Send,
+        N::CustomEvent: Send,
+        AAF: FnOnce(ActorInitArgs<N>) -> Vec<Box<dyn Actor>>,
+    {
         let shard_count = config.shard_count;
         let shard_lookup: ShardLookup = crate::sharding::compute_shard_lookup(&config);
 
@@ -92,65 +113,21 @@ impl ActorSimulation {
             .map(|clock| EventTracker::new(event_sender.clone(), clock.clone(), &config.nodes))
             .collect();
 
-        let (nodes, actors, shards) = match config.variant {
-            LeiosVariant::Linear | LeiosVariant::LinearWithTxReferences => {
-                let (nodes, actors, tx_sinks, networks) = Self::init_nodes(
-                    &config,
-                    &trackers,
-                    &clocks,
-                    &shard_lookup,
-                    NodeListWrapper::LinearLeios,
-                    super::linear_leios::register_actors,
-                )?;
-                let shards = build_shards(
-                    &config,
-                    &clocks,
-                    &mut clock_coordinators,
-                    &shard_lookup,
-                    tx_sinks,
-                    networks,
-                );
-                (nodes, actors, shards)
-            }
-            LeiosVariant::FullWithoutIbs => {
-                let (nodes, actors, tx_sinks, networks) = Self::init_nodes(
-                    &config,
-                    &trackers,
-                    &clocks,
-                    &shard_lookup,
-                    NodeListWrapper::Stracciatella,
-                    no_additional_actors,
-                )?;
-                let shards = build_shards(
-                    &config,
-                    &clocks,
-                    &mut clock_coordinators,
-                    &shard_lookup,
-                    tx_sinks,
-                    networks,
-                );
-                (nodes, actors, shards)
-            }
-            _ => {
-                let (nodes, actors, tx_sinks, networks) = Self::init_nodes(
-                    &config,
-                    &trackers,
-                    &clocks,
-                    &shard_lookup,
-                    NodeListWrapper::Leios,
-                    no_additional_actors,
-                )?;
-                let shards = build_shards(
-                    &config,
-                    &clocks,
-                    &mut clock_coordinators,
-                    &shard_lookup,
-                    tx_sinks,
-                    networks,
-                );
-                (nodes, actors, shards)
-            }
-        };
+        let (nodes, actors, tx_sinks, networks) = Self::init_nodes(
+            &config,
+            &trackers,
+            &clocks,
+            &shard_lookup,
+            additional_actors_fn,
+        )?;
+        let shards = build_shards(
+            &config,
+            &clocks,
+            &mut clock_coordinators,
+            &shard_lookup,
+            tx_sinks,
+            networks,
+        );
 
         let slot_witness = SlotWitness::new(clocks[0].barrier(), trackers[0].clone(), &config);
 
@@ -162,24 +139,25 @@ impl ActorSimulation {
         })
     }
 
-    #[allow(clippy::type_complexity, clippy::too_many_arguments)]
-    fn init_nodes<N, NLF, AAF>(
+    #[allow(clippy::type_complexity)]
+    fn init_nodes<N, AAF>(
         config: &Arc<SimConfiguration>,
         trackers: &[EventTracker],
         clocks: &[Clock],
         shard_lookup: &ShardLookup,
-        node_list_wrapper_fn: NLF,
         additional_actors_fn: AAF,
     ) -> Result<(
-        NodeListWrapper,
+        Vec<Box<dyn RunnableNode>>,
         Vec<Box<dyn Actor>>,
         Vec<HashMap<NodeId, mpsc::UnboundedSender<Arc<Transaction>>>>,
         Vec<Network<MiniProtocol, N::Message>>,
     )>
     where
-        N: NodeImpl,
+        N: NodeImpl + Send + 'static,
         N::Message: Send + 'static,
-        NLF: FnOnce(Vec<NodeDriver<N>>) -> NodeListWrapper,
+        N::Task: Send,
+        N::TimedEvent: Send,
+        N::CustomEvent: Send,
         AAF: FnOnce(ActorInitArgs<N>) -> Vec<Box<dyn Actor>>,
     {
         let shard_count = clocks.len();
@@ -212,7 +190,7 @@ impl ActorSimulation {
 
         let mut per_shard_tx_sinks: Vec<HashMap<NodeId, mpsc::UnboundedSender<Arc<Transaction>>>> =
             (0..shard_count).map(|_| HashMap::new()).collect();
-        let mut all_nodes = vec![];
+        let mut all_nodes: Vec<Box<dyn RunnableNode>> = vec![];
         for (node_config, node) in config.nodes.iter().zip(node_impls) {
             let id = node_config.id;
             let shard = shard_lookup[&id];
@@ -227,21 +205,18 @@ impl ActorSimulation {
                 trackers[shard].clone(),
                 clocks[shard].barrier(),
             );
-            all_nodes.push(driver);
+            all_nodes.push(Box::new(driver));
         }
 
-        Ok((
-            node_list_wrapper_fn(all_nodes),
-            actors,
-            per_shard_tx_sinks,
-            networks,
-        ))
+        Ok((all_nodes, actors, per_shard_tx_sinks, networks))
     }
 
     pub async fn run(mut self, token: CancellationToken) -> Result<()> {
         let mut set = JoinSet::new();
 
-        self.nodes.run_all(&mut set);
+        for node in self.nodes {
+            node.run_in(&mut set);
+        }
         for actor in self.actors {
             set.spawn(actor.run());
         }
