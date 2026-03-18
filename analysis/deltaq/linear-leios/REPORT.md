@@ -18,8 +18,8 @@ Linear Leios is designed around the key insight: Praos block production only occ
 
 In Linear Leios there are two block types:
 
-- **EB (Endorser Block):** Contains transaction references only. EBs are subject to a vote-based certification process requiring a quorum of the voting committee.
-- **RB (Ranking Block):** A standard Praos block, which in addition can reference an EB or include a certificate for an endorsed EB.
+- **`EB` (Endorser Block):** Contains transaction references only. EBs are subject to a vote-based certification process requiring a quorum of the voting committee.
+- **`RB` (Ranking Block):** A standard Praos block, which in addition can reference an EB or include a certificate for an endorsed EB.
 
 The security constraint is that each EB must diffuse to all honest nodes within Δ\_EB slots of its creation.
 
@@ -100,7 +100,18 @@ Several operations in the ΔQ model are grounded in empirical timing measurement
 
 - **`reapplyTx`:** The cost of re-validating a transaction that has already been validated before — for instance, when an EB is certified and its transactions are applied to the ledger. Because script execution can be skipped, reapply is substantially cheaper than apply: roughly 42% of transactions complete in under 1 ms and fewer than 2% take more than 10 ms.
 
-For batch processing (a full RB or EB worth of transactions), the Central Limit Theorem is applied to the single-transaction distributions to obtain a tractable aggregate distribution for sequential application of many transactions.
+For batch processing (a full RB or EB worth of transactions), the total processing time is the sum of $n$ independent per-transaction durations. By the Central Limit Theorem, this sum converges to a normal distribution $nZ \sim \mathcal{N}(n\mu, n\sigma^2)$ as $n$ grows. The per-transaction mean $\mu$ and standard deviation $\sigma$ are taken directly from the mainnet measurements.
+
+Since the number of transactions $n$ in a block is itself variable, it is modelled as uniform over $n \sim \mathcal{U}(1, N)$. The resulting aggregate is a scale mixture distribution whose CDF is:
+
+$$F(x) = \frac{1}{N} \sum_{n=1}^{N} \Phi\!\left(\frac{x - n\mu}{\sqrt{n}\,\sigma}\right)$$
+
+where $\Phi$ is the standard normal CDF. The two batch distributions use the following parameters derived from the empirical data:
+
+| Operation | $N$ (max transactions) | $\mu$ (mean, s) | $\sigma$ (std dev, s) |
+|---|---|---|---|
+| `applyTxs`   | 100  | 0.01060 | 0.02549 |
+| `reapplyTxs` | 2500 | 0.00271 | 0.02442 |
 
 ### 4.2 Markov model for TxCache
 
