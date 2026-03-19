@@ -121,7 +121,11 @@ pub enum Event {
         id: TransactionId,
         reason: TransactionLostReason,
     },
-    TXBacklogMax {
+    TXLocalBacklogMax {
+        node: Node,
+        max_len: usize,
+    },
+    TXPeerBacklogMax {
         node: Node,
         max_len: usize,
     },
@@ -530,8 +534,15 @@ impl EventTracker {
         self.send(Event::TXLost { id, reason });
     }
 
-    pub fn track_backlog_max(&self, node: NodeId, max_len: usize) {
-        self.send(Event::TXBacklogMax {
+    pub fn track_local_backlog_max(&self, node: NodeId, max_len: usize) {
+        self.send(Event::TXLocalBacklogMax {
+            node: self.to_node(node),
+            max_len,
+        });
+    }
+
+    pub fn track_peer_backlog_max(&self, node: NodeId, max_len: usize) {
+        self.send(Event::TXPeerBacklogMax {
             node: self.to_node(node),
             max_len,
         });
