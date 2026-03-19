@@ -21,12 +21,12 @@ The security constraint is that each EB must diffuse to all honest nodes within 
 
 The protocol behavior is governed by several timing parameters that control the duration of diffusion and voting intervals.
 
-* The parameter $L_\text{hdr}$ needs to be large enough to allow successful RB header diffusion.
+* The parameter $L_\text{hdr}$ needs to be large enough to allow successful RB header diffusion
 * The parameter $L_\text{vote}$ needs to be chosen carefully, because if the length of the interval is
   * too short, then there is probably not enough time to get sufficient votes to reach a quorum
   * too long, then there is probably already a new RB/EB before all votes are delivered
 * The parameter $L_\text{diff}$ is important in order to allow remaining nodes, after a quorum has been reached, receive
-the EB, in order for the security guarantees to hold.
+the EB, in order for the security guarantees to hold
 
 ### 2.2 ΔQ System Development
 
@@ -70,7 +70,16 @@ Stake is distributed across nodes in a pattern derived from mainnet. The stake d
 
 ## 4. ΔQ Model of EB Diffusion
 
+The ΔQ model of EB diffusion captures the steps a node performs upon receiving an RB header:
+
+* Fetch the RB body and the EB concurrently.
+* On receiving the RB body, apply its transactions to the ledger state.
+* On receiving the full EB, determine which transactions are missing and fetch them. Unlike the RB - which carries full transaction data in its body - the EB contains only transaction IDs.
+* Only once both of the above steps complete is the reapply operation applied to the ledger state.
+
 ![](EB-diffusion.png)
+
+With ΔQ, the typical workflow starts from a coarse-grained model describing high-level outcomes and then refines it to improve accuracy. However, finer-grained models generally increase complexity, creating a trade-off between performance and accuracy. For Linear Leios, we chose a low-complexity model and ensure accuracy by grounding it in empirical distributions from measurements or probabilistic modelling - in particular, Markov models.
 
 ### 4.1 Empirical distributions
 
