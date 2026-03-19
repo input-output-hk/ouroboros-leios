@@ -109,7 +109,8 @@ impl EventMonitor {
         let mut eb_messages = MessageStats::default();
         let mut vote_messages = MessageStats::default();
         let mut no_vote_reasons: BTreeMap<NoVoteReason, u64> = BTreeMap::new();
-        let mut txs_dropped_backlog_full: u64 = 0;
+        let mut txs_dropped_generated_backlog_full: u64 = 0;
+        let mut txs_dropped_peer_backlog_full: u64 = 0;
         let mut max_local_backlog_len: usize = 0;
         let mut max_peer_backlog_len: usize = 0;
 
@@ -193,11 +194,15 @@ impl EventMonitor {
                 Event::TXReceived { .. } => {
                     tx_messages.received += 1;
                 }
-                Event::TXLost { reason, .. } => {
-                    if matches!(reason, TransactionLostReason::BacklogFull) {
-                        txs_dropped_backlog_full += 1;
+                Event::TXLost { reason, .. } => match reason {
+                    TransactionLostReason::GeneratedBacklogFull => {
+                        txs_dropped_generated_backlog_full += 1;
                     }
-                }
+                    TransactionLostReason::PeerBacklogFull => {
+                        txs_dropped_peer_backlog_full += 1;
+                    }
+                    _ => {}
+                },
                 Event::TXLocalBacklogMax { max_len, .. } => {
                     if max_len > max_local_backlog_len {
                         max_local_backlog_len = max_len;
@@ -655,9 +660,14 @@ impl EventMonitor {
         if max_peer_backlog_len > 0 {
             info!("Maximum peer tx backlog length: {max_peer_backlog_len}");
         }
-        if txs_dropped_backlog_full > 0 {
+        if txs_dropped_generated_backlog_full > 0 {
             info!(
-                "{txs_dropped_backlog_full} generated transaction(s) were dropped because the tx backlog was full."
+                "{txs_dropped_generated_backlog_full} generated transaction(s) were dropped because the generated tx backlog was full."
+            );
+        }
+        if txs_dropped_peer_backlog_full > 0 {
+            info!(
+                "{txs_dropped_peer_backlog_full} peer transaction(s) were dropped because the peer tx backlog was full."
             );
         }
 
