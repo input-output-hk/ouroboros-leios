@@ -148,7 +148,7 @@ The ΔQ model confirms that the Linear Leios protocol can satisfy its Δ\_EB sec
 
 - This model assumes honest node behavior. Adversarial delay of EBs - for example, an adversary deliberately withholding an EB until just before the voting deadline - is not captured here.
 - With the `piecewise-polynomial` ΔQ backend computational complexity is hard to control, where as with the `sampled` backend it is the accuracy of the results. For this analysis to be successful, we built probabilistic models and then combined those using ΔQ in order to get a model with low complexity to be executable with the default backend.
-- Future work should TODO
+- Future work should improve the `sampled` backend and keep track of the error margin, in order to be able to run the analysis in reasonable time and being able to quantify the inaccuracy introduced by the simulations. 
 
 ## Appendix A: Haskell Source
 
