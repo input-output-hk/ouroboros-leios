@@ -21,22 +21,11 @@ The security constraint is that each EB must diffuse to all honest nodes within 
 
 The protocol behavior is governed by several timing parameters that control the duration of diffusion and voting intervals.
 
-#### 2.1.1 Parameter $L\_{hdr}$
-
-The parameter $L\_{hdr}$ needs to be large enough to allow successful RB header diffusion.
-
-#### 2.1.2 Parameter $L\_{vote}$
-
-The parameter $L\_{vote}$ needs to be chosen carefully, because if the length of the interval is
-
-* too short, then there is probably not enough time to get sufficient votes to reach a quorum
-* too long, then there is probably already a new RB/EB before all votes are delivered
-
-The first item depends on the block/vote diffusion times, whereas second item depends only on the Praos schedule.
-
-#### 2.1.3 Parameter $L\_{diff}$
-
-The parameter $L\_{diff}$ is important in order to allow remaining nodes, after a quorum has been reached, receive
+* The parameter $L_\text{hdr}$ needs to be large enough to allow successful RB header diffusion.
+* The parameter $L_\text{vote}$ needs to be chosen carefully, because if the length of the interval is
+  * too short, then there is probably not enough time to get sufficient votes to reach a quorum
+  * too long, then there is probably already a new RB/EB before all votes are delivered
+* The parameter $L_\text{diff}$ is important in order to allow remaining nodes, after a quorum has been reached, receive
 the EB, in order for the security guarantees to hold.
 
 ### 2.2 ΔQ System Development
