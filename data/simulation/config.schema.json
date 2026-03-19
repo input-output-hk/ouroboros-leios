@@ -389,8 +389,12 @@
       "properties": {},
       "type": "number"
     },
-    "leios-tx-backlog-max-size": {
-      "description": "Maximum number of transactions in the tx backlog (waiting area behind the mempool). null = unbounded.",
+    "leios-tx-generated-backlog-max-size": {
+      "description": "Maximum number of locally-generated transactions in the tx backlog (waiting area behind the mempool). null = unbounded.",
+      "type": ["number", "null"]
+    },
+    "leios-tx-peer-backlog-max-size": {
+      "description": "Maximum number of peer-received transactions in the tx backlog. null = unbounded.",
       "type": ["number", "null"]
     },
     "leios-stage-active-voting-slots": {
