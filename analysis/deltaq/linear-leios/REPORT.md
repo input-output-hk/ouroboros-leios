@@ -8,27 +8,18 @@ The security of the Linear Leios protocol depends on Δ\_EB, the time within whi
 
 Early simulations suggested Δ\_EB is manageable under happy-path conditions. This report validates that assumption using a ΔQ System Development model.
 
-The ΔQ model is a complement to the Haskell and Rust simulations to gain confidence in the parameter selection for Linear Leios, resp. a precursor to running simulations, as it can rule out infeasible parameter selections.
-
 ## 2. Background
 
 ### 2.1 Linear Leios Protocol
 
 Linear Leios is designed around the key insight: Praos block production only occupies roughly 25% of slot time, leaving significant unused network bandwidth and computational capacity during "calm periods". Linear Leios exploits this headroom to achieve high throughput while preserving Praos security guarantees.
 
-In Linear Leios there are two block types:
-
-- **`EB` (Endorser Block):** Contains transaction references only. EBs are subject to a vote-based certification process requiring a quorum of the voting committee.
-- **`RB` (Ranking Block):** A standard Praos block, which in addition can reference an EB or include a certificate for an endorsed EB.
-
-The security constraint is that each EB must diffuse to all honest nodes within Δ\_EB slots of its creation.
-
-The DeltaQ analysis of Linear Leios validates the following assumptions:
+The security constraint is that each EB must diffuse to all honest nodes within Δ\_EB slots of its creation. The DeltaQ analysis of Linear Leios validates the following assumptions:
 
 * Reapplying a certified EB cannot cost more than standard transaction processing
 * Any certified EB referenced by an RB must be transmitted before that RB is processed
 
-The protocol behavior is governed by several timing parameters that control the duration of diffusion and voting intervals. The following sections describe each parameter and the trade-offs it involves.
+The protocol behavior is governed by several timing parameters that control the duration of diffusion and voting intervals.
 
 #### 2.1.1 Parameter $L\_{hdr}$
 
@@ -50,9 +41,7 @@ the EB, in order for the security guarantees to hold.
 
 ### 2.2 ΔQ System Development
 
-∆Q is a modelling tool to analyse the performance characteristics of a distributed system. Outcomes in ΔQ are represented as probability distributions of completion times.
-
-ΔQ is implemented as a domain specific language (DSL) providing the following constructors
+∆Q is a modelling tool to analyse the performance characteristics of a distributed system. Outcomes in ΔQ are represented as probability distributions of completion times. ΔQ is implemented as a domain specific language (DSL) providing the following constructors
 
 | Constructor | Meaning |
 |---|---|
@@ -69,10 +58,12 @@ and combinators to build complex abstractions:
 | `a ./\. b` | Last to finish: both, `a` and `b` |
 | `p a b` | Probabilistic choice: `a` with probability `p`, `b` with probability `1 - p` |
 
-The ΔQ library is built with a backend abstraction for running the computations. The library provides the *piecewise-polynomials* backend. For running complex models we implemented an new backend *sampled*. They compare as follows:
+The ΔQ library is built with a backend abstraction for running the computations. The library provides the [piecewise-polynomials](https://github.com/DeltaQ-SD/deltaq/tree/main/lib/probability-polynomial) backend. For running complex models we implemented an new backend [sampled](https://github.com/yveshauser/deltaq/blob/experimental/lib/deltaq/src/DeltaQ/Sampled.hs). They compare as follows:
 
 - *piecewise-polynomials* is an analytic backend, i.e., exact results, but the computational complexity of the backend does not allow running complex models
 - *sampled* is an approximation backend with efficient computation, but accuracy is hard to control
+
+The ΔQ model is a complement to the Haskell and Rust simulations to gain confidence in the parameter selection for Linear Leios, resp. a precursor to running simulations, as it can rule out infeasible parameter selections.
 
 ## 3. Network Model
 
@@ -89,8 +80,6 @@ TODO
 Stake is distributed across nodes in a pattern derived from mainnet. The stake distribution determines the RB production rate: nodes with more stake win the RB sortition lottery more frequently.
 
 ## 4. ΔQ Model of EB Diffusion
-
-TODO
 
 ### 4.1 Empirical distributions
 
