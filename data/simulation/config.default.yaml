@@ -74,6 +74,7 @@ tx-validation-cpu-time-ms: 1.5
 tx-validation-cpu-time-ms-per-byte: 0
 tx-max-size-bytes: 16384
 tx-conflict-fraction: 0
+tx-batch-window-ms: null
 
 ################################################################################
 # Ranking Block Configuration
