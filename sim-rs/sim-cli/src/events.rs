@@ -110,7 +110,8 @@ impl EventMonitor {
         let mut vote_messages = MessageStats::default();
         let mut no_vote_reasons: BTreeMap<NoVoteReason, u64> = BTreeMap::new();
         let mut txs_dropped_backlog_full: u64 = 0;
-        let mut max_backlog_len: usize = 0;
+        let mut max_local_backlog_len: usize = 0;
+        let mut max_peer_backlog_len: usize = 0;
 
         // Pretty print options for bytes
         let pbo = Some(PrettyBytesOptions {
@@ -197,9 +198,14 @@ impl EventMonitor {
                         txs_dropped_backlog_full += 1;
                     }
                 }
-                Event::TXBacklogMax { max_len, .. } => {
-                    if max_len > max_backlog_len {
-                        max_backlog_len = max_len;
+                Event::TXLocalBacklogMax { max_len, .. } => {
+                    if max_len > max_local_backlog_len {
+                        max_local_backlog_len = max_len;
+                    }
+                }
+                Event::TXPeerBacklogMax { max_len, .. } => {
+                    if max_len > max_peer_backlog_len {
+                        max_peer_backlog_len = max_len;
                     }
                 }
                 Event::RBLotteryWon { .. } => {}
@@ -643,8 +649,11 @@ impl EventMonitor {
             vote_messages.display("Vote");
         });
 
-        if max_backlog_len > 0 {
-            info!("Maximum tx backlog length: {max_backlog_len}");
+        if max_local_backlog_len > 0 {
+            info!("Maximum local tx backlog length: {max_local_backlog_len}");
+        }
+        if max_peer_backlog_len > 0 {
+            info!("Maximum peer tx backlog length: {max_peer_backlog_len}");
         }
         if txs_dropped_backlog_full > 0 {
             info!(
