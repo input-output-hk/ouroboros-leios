@@ -81,6 +81,8 @@ Stake is distributed across nodes in a pattern derived from mainnet. The stake d
 
 ## 4. ΔQ Model of EB Diffusion
 
+![](EB-diffusion.png)
+
 ### 4.1 Empirical distributions
 
 Several operations in the ΔQ model are grounded in empirical timing measurements taken from a Cardano mainnet node rather than synthetic assumptions. Two operations are of particular interest:
@@ -132,7 +134,7 @@ Under the reference parameters (EB size = 12 MB, stage length = 7 slots, bandwid
 - **90th percentile:** < 4 seconds
 - **99th percentile:** < 6 seconds
 
-![](docs/validateEB.svg)
+![](validateEB.svg)
 
 ### 6.2 Protocol Security Validation
 
