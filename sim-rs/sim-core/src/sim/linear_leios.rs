@@ -4,7 +4,7 @@ use rand_distr::Distribution;
 use tokio::sync::mpsc;
 
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet, VecDeque},
     sync::Arc,
     time::Duration,
 };
@@ -533,7 +533,8 @@ impl LinearLeiosNode {
         }
 
         let referenced_by_eb = self.acknowledge_tx(&tx);
-        let added_to_mempool = self.try_add_tx_to_mempool(&tx);
+        let is_local = from == self.id;
+        let added_to_mempool = self.try_add_tx_to_mempool(&tx, is_local);
 
         // If we added the TX to our mempool, we want to propagate it so our peers can as well.
         // If it was referenced by an EB, we want to propagate it so our peers have the full EB.
@@ -1439,18 +1440,23 @@ impl LinearLeiosNode {
 
 // Ledger/mempool operations
 impl LinearLeiosNode {
-    fn try_add_tx_to_mempool(&mut self, tx: &Arc<Transaction>) -> bool {
+    fn try_add_tx_to_mempool(&mut self, tx: &Arc<Transaction>, is_local: bool) -> bool {
         let ledger_state = self.resolve_ledger_state(self.latest_rb_id());
         if ledger_state.spent_inputs.contains(&tx.input_id) {
             // This TX conflicts with something already on-chain
             return false;
         }
 
-        let prev_max = self.mempool.max_backlog_len_seen;
-        let result = self.mempool.try_insert(tx.clone());
-        if self.mempool.max_backlog_len_seen > prev_max {
+        let prev_local_max = self.mempool.max_local_backlog_len_seen;
+        let prev_peer_max = self.mempool.max_peer_backlog_len_seen;
+        let result = self.mempool.try_insert(tx.clone(), is_local);
+        if self.mempool.max_local_backlog_len_seen > prev_local_max {
             self.tracker
-                .track_backlog_max(self.id, self.mempool.max_backlog_len_seen);
+                .track_local_backlog_max(self.id, self.mempool.max_local_backlog_len_seen);
+        }
+        if self.mempool.max_peer_backlog_len_seen > prev_peer_max {
+            self.tracker
+                .track_peer_backlog_max(self.id, self.mempool.max_peer_backlog_len_seen);
         }
         result
     }
@@ -1487,7 +1493,8 @@ impl LinearLeiosNode {
                 removed_ids.push(tx.id);
             }
         }
-        for newly_queued_tx in self.mempool.remove_txs(removed_ids) {
+        self.mempool.remove_txs(removed_ids);
+        for newly_queued_tx in self.mempool.promote_from_backlogs() {
             for peer in &self.consumers {
                 self.queued
                     .send_to(*peer, Message::AnnounceTx(newly_queued_tx));
@@ -1512,7 +1519,8 @@ impl LinearLeiosNode {
 
     fn remove_txs_from_mempool(&mut self, txs: &[Arc<Transaction>]) {
         let inputs = txs.iter().map(|tx| tx.input_id).collect::<HashSet<_>>();
-        for newly_queued_tx in self.mempool.remove_conflicting_txs(&inputs) {
+        self.mempool.remove_conflicting_txs(&inputs);
+        for newly_queued_tx in self.mempool.promote_from_backlogs() {
             for peer in &self.consumers {
                 self.queued
                     .send_to(*peer, Message::AnnounceTx(newly_queued_tx));
@@ -1592,48 +1600,54 @@ impl LinearLeiosNode {
 
 struct Mempool {
     next_id: u64,
-    mempool_count: usize,
     mempool_size_bytes: u64,
     max_size_bytes: u64,
-    queue: BTreeMap<u64, Arc<Transaction>>,
+    mempool: BTreeMap<u64, Arc<Transaction>>,
     input_ids: HashSet<u64>,
     tx_ids: HashSet<TransactionId>,
+    local_backlog: VecDeque<Arc<Transaction>>,
+    peer_backlog: VecDeque<Arc<Transaction>>,
     tx_backlog_max_size: Option<usize>,
-    max_backlog_len_seen: usize,
+    max_local_backlog_len_seen: usize,
+    max_peer_backlog_len_seen: usize,
 }
 impl Mempool {
     fn new(max_size_bytes: u64, tx_backlog_max_size: Option<usize>) -> Self {
         Self {
             next_id: 0,
-            mempool_count: 0,
             mempool_size_bytes: 0,
             max_size_bytes,
-            queue: BTreeMap::new(),
+            mempool: BTreeMap::new(),
             input_ids: HashSet::new(),
             tx_ids: HashSet::new(),
+            local_backlog: VecDeque::new(),
+            peer_backlog: VecDeque::new(),
             tx_backlog_max_size,
-            max_backlog_len_seen: 0,
+            max_local_backlog_len_seen: 0,
+            max_peer_backlog_len_seen: 0,
         }
-    }
-
-    fn backlog_len(&self) -> usize {
-        self.queue.len() - self.mempool_count
     }
 
     fn is_backlog_full(&self) -> bool {
         self.tx_backlog_max_size
-            .is_some_and(|max| self.backlog_len() >= max)
+            .is_some_and(|max| self.local_backlog.len() >= max)
     }
-    fn try_insert(&mut self, tx: Arc<Transaction>) -> bool {
+
+    fn try_insert(&mut self, tx: Arc<Transaction>, is_local: bool) -> bool {
         let new_bytes = self.mempool_size_bytes + tx.bytes;
-        if self.mempool_count < self.queue.len() || new_bytes > self.max_size_bytes {
-            // mempool is or would be full, just put this at the end and Be Done
-            let id = self.new_id();
+        if !self.mempool.is_empty() && new_bytes > self.max_size_bytes {
+            // mempool would be full, add to backlog
             self.tx_ids.insert(tx.id);
-            self.queue.insert(id, tx);
-            let backlog_len = self.backlog_len();
-            if backlog_len > self.max_backlog_len_seen {
-                self.max_backlog_len_seen = backlog_len;
+            if is_local {
+                self.local_backlog.push_back(tx);
+                if self.local_backlog.len() > self.max_local_backlog_len_seen {
+                    self.max_local_backlog_len_seen = self.local_backlog.len();
+                }
+            } else {
+                self.peer_backlog.push_back(tx);
+                if self.peer_backlog.len() > self.max_peer_backlog_len_seen {
+                    self.max_peer_backlog_len_seen = self.peer_backlog.len();
+                }
             }
             return false;
         }
@@ -1642,117 +1656,118 @@ impl Mempool {
             return false;
         }
 
-        self.mempool_count += 1;
         self.mempool_size_bytes = new_bytes;
         self.input_ids.insert(tx.input_id);
         let id = self.new_id();
         self.tx_ids.insert(tx.id);
-        self.queue.insert(id, tx);
+        self.mempool.insert(id, tx);
         true
     }
 
     fn ids(&self) -> impl Iterator<Item = TransactionId> {
-        self.queue.values().take(self.mempool_count).map(|tx| tx.id)
+        self.mempool.values().map(|tx| tx.id)
     }
 
     fn contains(&self, id: &TransactionId) -> bool {
         self.tx_ids.contains(id)
     }
 
-    // Removes a set of TXs from the mempool.
-    // Returns any previously-queued TXs now added to the mempool.
-    fn remove_txs(&mut self, ids: impl IntoIterator<Item = TransactionId>) -> Vec<TransactionId> {
+    // Removes a set of TXs from the mempool by transaction ID.
+    fn remove_txs(&mut self, ids: impl IntoIterator<Item = TransactionId>) {
         let id_set: HashSet<TransactionId> = ids.into_iter().collect();
         if id_set.is_empty() {
-            return vec![];
+            return;
         }
-        let mut new_mempool_count = self.mempool_count;
-        let mut full = false;
-        let mut newly_added = vec![];
-        let mut seen_so_far = 0;
-        self.queue.retain(|_, tx| {
-            let seen = seen_so_far;
-            seen_so_far += 1;
-            if seen < self.mempool_count {
-                // we're iterating through the mempool
-                if !id_set.contains(&tx.id) {
-                    return true;
-                }
-                // this is a transaction in the mempool which we want to remove
-                new_mempool_count -= 1;
-                self.mempool_size_bytes -= tx.bytes;
-                self.input_ids.remove(&tx.input_id);
-                self.tx_ids.remove(&tx.id);
-                false
-            } else {
-                // we're iterating through the queued TXs which aren't yet in the mempool
-                if self.input_ids.contains(&tx.input_id) {
-                    // conflicts with the mempool, remove it at once
-                    self.tx_ids.remove(&tx.id);
-                    return false;
-                }
-                // add TXs until we're full
-                if !full {
-                    let new_size = self.mempool_size_bytes + tx.bytes;
-                    if new_size > self.max_size_bytes {
-                        full = true;
-                    } else {
-                        new_mempool_count += 1;
-                        self.mempool_size_bytes = new_size;
-                        self.input_ids.insert(tx.input_id);
-                        newly_added.push(tx.id);
-                    }
-                }
-                true
+        self.mempool.retain(|_, tx| {
+            if !id_set.contains(&tx.id) {
+                return true;
             }
+            self.mempool_size_bytes -= tx.bytes;
+            self.input_ids.remove(&tx.input_id);
+            self.tx_ids.remove(&tx.id);
+            false
         });
-        self.mempool_count = new_mempool_count;
+    }
+
+    // Removes TXs from the mempool and both backlogs that conflict with the given input IDs.
+    fn remove_conflicting_txs(&mut self, conflicting_inputs: &HashSet<u64>) {
+        self.mempool.retain(|_, tx| {
+            if !conflicting_inputs.contains(&tx.input_id) {
+                return true;
+            }
+            self.mempool_size_bytes -= tx.bytes;
+            self.input_ids.remove(&tx.input_id);
+            self.tx_ids.remove(&tx.id);
+            false
+        });
+        for backlog in [&mut self.local_backlog, &mut self.peer_backlog] {
+            backlog.retain(|tx| {
+                if conflicting_inputs.contains(&tx.input_id) {
+                    self.tx_ids.remove(&tx.id);
+                    false
+                } else {
+                    true
+                }
+            });
+        }
+    }
+
+    // Promotes TXs from both backlogs into the mempool while space permits.
+    // Returns the IDs of newly promoted TXs.
+    fn promote_from_backlogs(&mut self) -> Vec<TransactionId> {
+        let mut newly_added = vec![];
+        Self::promote_backlog(
+            &mut self.local_backlog,
+            &mut self.mempool,
+            &mut self.input_ids,
+            &mut self.tx_ids,
+            &mut self.mempool_size_bytes,
+            self.max_size_bytes,
+            &mut self.next_id,
+            &mut newly_added,
+        );
+        Self::promote_backlog(
+            &mut self.peer_backlog,
+            &mut self.mempool,
+            &mut self.input_ids,
+            &mut self.tx_ids,
+            &mut self.mempool_size_bytes,
+            self.max_size_bytes,
+            &mut self.next_id,
+            &mut newly_added,
+        );
         newly_added
     }
 
-    fn remove_conflicting_txs(&mut self, input_ids: &HashSet<u64>) -> Vec<TransactionId> {
-        let mut new_mempool_count = self.mempool_count;
-        let mut full = false;
-        let mut newly_added = vec![];
-        let mut seen_so_far = 0;
-        self.queue.retain(|_, tx| {
-            let seen = seen_so_far;
-            seen_so_far += 1;
-            if seen < self.mempool_count {
-                // we're iterating through the mempool
-                if !input_ids.contains(&tx.input_id) {
-                    return true;
-                }
-                // this is a transaction in the mempool which we want to remove
-                new_mempool_count -= 1;
-                self.mempool_size_bytes -= tx.bytes;
-                self.input_ids.remove(&tx.input_id);
-                self.tx_ids.remove(&tx.id);
-                false
-            } else {
-                // we're iterating through the queued TXs which aren't yet in the mempool
-                if self.input_ids.contains(&tx.input_id) || input_ids.contains(&tx.input_id) {
-                    // conflicts with the ledger or the new mempool, remove it at once
-                    self.tx_ids.remove(&tx.id);
-                    return false;
-                }
-                // add TXs until we're full
-                if !full {
-                    let new_size = self.mempool_size_bytes + tx.bytes;
-                    if new_size > self.max_size_bytes {
-                        full = true;
-                    } else {
-                        new_mempool_count += 1;
-                        self.mempool_size_bytes = new_size;
-                        self.input_ids.insert(tx.input_id);
-                        newly_added.push(tx.id);
-                    }
-                }
-                true
+    #[allow(clippy::too_many_arguments)]
+    fn promote_backlog(
+        backlog: &mut VecDeque<Arc<Transaction>>,
+        mempool: &mut BTreeMap<u64, Arc<Transaction>>,
+        input_ids: &mut HashSet<u64>,
+        tx_ids: &mut HashSet<TransactionId>,
+        mempool_size_bytes: &mut u64,
+        max_size_bytes: u64,
+        next_id: &mut u64,
+        newly_added: &mut Vec<TransactionId>,
+    ) {
+        while let Some(tx) = backlog.front() {
+            if input_ids.contains(&tx.input_id) {
+                let tx = backlog.pop_front().unwrap();
+                tx_ids.remove(&tx.id);
+                continue;
             }
-        });
-        self.mempool_count = new_mempool_count;
-        newly_added
+            let new_size = *mempool_size_bytes + tx.bytes;
+            if new_size > max_size_bytes {
+                break;
+            }
+            let tx = backlog.pop_front().unwrap();
+            *mempool_size_bytes = new_size;
+            input_ids.insert(tx.input_id);
+            newly_added.push(tx.id);
+            let id = *next_id;
+            *next_id += 1;
+            mempool.insert(id, tx);
+        }
     }
 
     fn new_id(&mut self) -> u64 {
@@ -1798,51 +1813,91 @@ mod mempool_tests {
         let mut txs = TxFactory::new();
         let [tx1, tx2, tx3] = txs.txs([5, 5, 5]);
         let mut mempool = Mempool::new(10, None);
-        assert!(mempool.try_insert(tx1.clone()));
-        assert!(mempool.try_insert(tx2.clone()));
+        assert!(mempool.try_insert(tx1.clone(), true));
+        assert!(mempool.try_insert(tx2.clone(), true));
 
         // new TX doesn't fit
-        assert!(!mempool.try_insert(tx3.clone()));
+        assert!(!mempool.try_insert(tx3.clone(), true));
         assert_eq!(mempool.ids().collect::<Vec<_>>(), vec![tx1.id, tx2.id]);
 
-        // until we remove a TX, and suddenly it does
-        let added = mempool.remove_txs([tx2.id]);
+        // until we remove a TX, and the backlog promotes
+        mempool.remove_txs([tx2.id]);
+        let added = mempool.promote_from_backlogs();
         assert_eq!(added, vec![tx3.id]);
         assert_eq!(mempool.ids().collect::<Vec<_>>(), vec![tx1.id, tx3.id]);
     }
 
     #[test]
-    fn should_track_max_backlog_len() {
+    fn should_track_max_backlog_len_separately() {
         let mut txs = TxFactory::new();
         let mut mempool = Mempool::new(5, None);
         // Fill mempool
-        assert!(mempool.try_insert(txs.tx(5)));
-        assert_eq!(mempool.max_backlog_len_seen, 0);
+        assert!(mempool.try_insert(txs.tx(5), true));
+        assert_eq!(mempool.max_local_backlog_len_seen, 0);
+        assert_eq!(mempool.max_peer_backlog_len_seen, 0);
 
-        // Add to backlog
-        assert!(!mempool.try_insert(txs.tx(5)));
-        assert_eq!(mempool.backlog_len(), 1);
-        assert_eq!(mempool.max_backlog_len_seen, 1);
+        // Add local to backlog
+        assert!(!mempool.try_insert(txs.tx(5), true));
+        assert_eq!(mempool.local_backlog.len(), 1);
+        assert_eq!(mempool.max_local_backlog_len_seen, 1);
 
-        assert!(!mempool.try_insert(txs.tx(5)));
-        assert_eq!(mempool.backlog_len(), 2);
-        assert_eq!(mempool.max_backlog_len_seen, 2);
+        // Add peer to backlog
+        assert!(!mempool.try_insert(txs.tx(5), false));
+        assert_eq!(mempool.peer_backlog.len(), 1);
+        assert_eq!(mempool.max_peer_backlog_len_seen, 1);
+
+        // Add another local
+        assert!(!mempool.try_insert(txs.tx(5), true));
+        assert_eq!(mempool.local_backlog.len(), 2);
+        assert_eq!(mempool.max_local_backlog_len_seen, 2);
+        // Peer max unchanged
+        assert_eq!(mempool.max_peer_backlog_len_seen, 1);
     }
 
     #[test]
-    fn should_report_backlog_full() {
+    fn should_report_backlog_full_only_for_local() {
         let mut txs = TxFactory::new();
         let mut mempool = Mempool::new(5, Some(2));
         // Fill mempool
-        assert!(mempool.try_insert(txs.tx(5)));
+        assert!(mempool.try_insert(txs.tx(5), true));
         assert!(!mempool.is_backlog_full());
 
-        // Add to backlog — not yet full
-        assert!(!mempool.try_insert(txs.tx(5)));
+        // Add peer txs to backlog — should NOT affect is_backlog_full
+        assert!(!mempool.try_insert(txs.tx(5), false));
+        assert!(!mempool.try_insert(txs.tx(5), false));
+        assert!(!mempool.try_insert(txs.tx(5), false));
         assert!(!mempool.is_backlog_full());
 
-        // Add second — now full
-        assert!(!mempool.try_insert(txs.tx(5)));
+        // Add local to backlog — not yet full
+        assert!(!mempool.try_insert(txs.tx(5), true));
+        assert!(!mempool.is_backlog_full());
+
+        // Add second local — now full
+        assert!(!mempool.try_insert(txs.tx(5), true));
         assert!(mempool.is_backlog_full());
+    }
+
+    #[test]
+    fn should_promote_from_both_backlogs() {
+        let mut txs = TxFactory::new();
+        let [tx1, tx2, tx3, tx4] = txs.txs([5, 5, 5, 5]);
+        let mut mempool = Mempool::new(10, None);
+
+        // Fill mempool
+        assert!(mempool.try_insert(tx1.clone(), true));
+        assert!(mempool.try_insert(tx2.clone(), true));
+
+        // Add one local and one peer to backlog
+        assert!(!mempool.try_insert(tx3.clone(), true));
+        assert!(!mempool.try_insert(tx4.clone(), false));
+
+        // Remove both mempool txs to make space for both backlog txs
+        mempool.remove_txs([tx1.id, tx2.id]);
+        let promoted = mempool.promote_from_backlogs();
+
+        // Both should be promoted (local first, then peer)
+        assert_eq!(promoted, vec![tx3.id, tx4.id]);
+        assert_eq!(mempool.local_backlog.len(), 0);
+        assert_eq!(mempool.peer_backlog.len(), 0);
     }
 }
