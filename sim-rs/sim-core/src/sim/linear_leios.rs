@@ -539,7 +539,15 @@ impl LinearLeiosNode {
 
         let referenced_by_eb = self.acknowledge_tx(&tx);
         let is_local = from == self.id;
-        let added_to_mempool = self.try_add_tx_to_mempool(&tx, is_local);
+        let result = self.try_add_tx_to_mempool(&tx, is_local);
+
+        if matches!(result, InsertResult::PeerBacklogFull) {
+            // Peer backlog full — drop the tx entirely to avoid memory growth
+            self.txs.remove(&id);
+            return;
+        }
+
+        let added_to_mempool = matches!(result, InsertResult::AddedToMempool);
 
         // If we added the TX to our mempool, we want to propagate it so our peers can as well.
         // If it was referenced by an EB, we want to propagate it so our peers have the full EB.
@@ -1445,11 +1453,11 @@ impl LinearLeiosNode {
 
 // Ledger/mempool operations
 impl LinearLeiosNode {
-    fn try_add_tx_to_mempool(&mut self, tx: &Arc<Transaction>, is_local: bool) -> bool {
+    fn try_add_tx_to_mempool(&mut self, tx: &Arc<Transaction>, is_local: bool) -> InsertResult {
         let ledger_state = self.resolve_ledger_state(self.latest_rb_id());
         if ledger_state.spent_inputs.contains(&tx.input_id) {
             // This TX conflicts with something already on-chain
-            return false;
+            return InsertResult::Backlogged;
         }
 
         let prev_local_max = self.mempool.max_local_backlog_len_seen;
@@ -1463,15 +1471,11 @@ impl LinearLeiosNode {
             self.tracker
                 .track_peer_backlog_max(self.id, self.mempool.max_peer_backlog_len_seen);
         }
-        match result {
-            InsertResult::AddedToMempool => true,
-            InsertResult::Backlogged => false,
-            InsertResult::PeerBacklogFull => {
-                self.tracker
-                    .track_transaction_lost(tx.id, TransactionLostReason::PeerBacklogFull);
-                false
-            }
+        if matches!(result, InsertResult::PeerBacklogFull) {
+            self.tracker
+                .track_transaction_lost(tx.id, TransactionLostReason::PeerBacklogFull);
         }
+        result
     }
 
     fn sample_from_mempool(
