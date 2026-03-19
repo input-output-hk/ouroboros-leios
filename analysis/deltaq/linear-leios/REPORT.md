@@ -49,7 +49,7 @@ the EB, in order for the security guarantees to hold.
 | `wait t` | Deterministic delay of `t` seconds |
 | `uniform t s` | Uniform distribution between `t` `s` |
 
-and combinators to build complex abstractions:
+and combinators to build more complex abstractions:
 
 | Operator | Meaning |
 |---|---|
@@ -93,7 +93,7 @@ For batch processing (a full RB or EB worth of transactions), the total processi
 
 Since the number of transactions $n$ in a block is itself variable, it is modelled as uniform over $n \sim \mathcal{U}(1, N)$. The resulting aggregate is a scale mixture distribution whose CDF is:
 
-$$F(x) = \frac{1}{N} \sum_{n=1}^{N} \Phi\!\left(\frac{x - n\mu}{\sqrt{n}\,\sigma}\right)$$
+$$F(x) = \frac{1}{N} \sum_{n=1}^{N} \Phi \left(\frac{x - n\mu}{\sqrt{n}\,\sigma}\right)$$
 
 where $\Phi$ is the standard normal CDF. The two batch distributions use the following parameters derived from the empirical data:
 
@@ -148,7 +148,7 @@ The ΔQ model confirms that the Linear Leios protocol can satisfy its Δ\_EB sec
 
 - This model assumes honest node behavior. Adversarial delay of EBs - for example, an adversary deliberately withholding an EB until just before the voting deadline - is not captured here.
 - With the `piecewise-polynomial` ΔQ backend computational complexity is hard to control, where as with the `sampled` backend it is the accuracy of the results. For this analysis to be successful, we built probabilistic models and then combined those using ΔQ in order to get a model with low complexity to be executable with the default backend.
-- Future work should integrate this EB diffusion model with the broader transaction lifecycle ΔQ model (`analysis/deltaq/tx-lifecycle.ipynb`) to produce an end-to-end latency estimate from mempool submission to RB inclusion under Linear Leios.
+- Future work should TODO
 
 ## Appendix A: Haskell Source
 
