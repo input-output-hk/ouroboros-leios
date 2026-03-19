@@ -129,6 +129,11 @@ pub(super) struct SequentialSimulation<N: NodeImpl> {
 }
 
 impl<N: NodeImpl> SequentialSimulation<N> {
+    /// Quantize a timestamp to the configured resolution.
+    fn quantize(&self, t: Timestamp) -> Timestamp {
+        t.with_resolution(self.config.timestamp_resolution)
+    }
+
     /// Run the simulation using BSP batch processing with rayon parallelism.
     pub(super) fn run(mut self, token: CancellationToken) -> Result<()>
     where
@@ -157,6 +162,7 @@ impl<N: NodeImpl> SequentialSimulation<N> {
                         &mut self.pending_deliveries,
                         &mut self.event_queue,
                         msg,
+                        self.config.timestamp_resolution,
                     );
                 }
             }
@@ -171,6 +177,7 @@ impl<N: NodeImpl> SequentialSimulation<N> {
                             &mut self.pending_deliveries,
                             &mut self.event_queue,
                             msg,
+                            self.config.timestamp_resolution,
                         );
                     }
                     continue;
@@ -199,6 +206,7 @@ impl<N: NodeImpl> SequentialSimulation<N> {
                             &mut self.pending_deliveries,
                             &mut self.event_queue,
                             msg,
+                            self.config.timestamp_resolution,
                         );
                     }
                     continue;
@@ -233,7 +241,7 @@ impl<N: NodeImpl> SequentialSimulation<N> {
                         if let Some(next_arrival) = connection.next_arrival_time() {
                             self.pending_deliveries.insert(link.clone());
                             self.event_queue.push(FutureEvent(
-                                next_arrival,
+                                self.quantize(next_arrival),
                                 GlobalEvent::NetworkDelivery(link.clone()),
                             ));
                         }
@@ -244,15 +252,26 @@ impl<N: NodeImpl> SequentialSimulation<N> {
                         }
                     }
                     GlobalEvent::TxGeneration => {
-                        if let Some((node_idx, tx, next_time)) =
+                        // When tx_batch_window is set, generate all TXs within
+                        // that window in one batch. Otherwise generate one at a time.
+                        let batch_end = self.config.tx_batch_window
+                            .map(|w| timestamp + w);
+                        while let Some((node_idx, tx, next_time)) =
                             self.tx_generator.generate(timestamp)
                         {
-                            if let Some(t) = next_time {
-                                self.event_queue
-                                    .push(FutureEvent(t, GlobalEvent::TxGeneration));
-                            }
                             per_node_work[node_idx].push(WorkItem::NewTx(tx));
                             total_node_work += 1;
+                            match next_time {
+                                Some(t) if batch_end.is_some_and(|end| t <= end) => {
+                                    // Next TX falls within the batch window — continue.
+                                }
+                                Some(t) => {
+                                    self.event_queue
+                                        .push(FutureEvent(self.quantize(t), GlobalEvent::TxGeneration));
+                                    break;
+                                }
+                                None => break,
+                            }
                         }
                     }
                     GlobalEvent::SlotBoundary { slot } => {
@@ -322,6 +341,7 @@ impl<N: NodeImpl> SequentialSimulation<N> {
         pending_deliveries: &mut HashSet<Link>,
         event_queue: &mut BinaryHeap<FutureEvent<GlobalEvent<N>>>,
         msg: CrossShardMsg<N::Message>,
+        timestamp_resolution: Duration,
     ) {
         let link = Link {
             from: msg.from,
@@ -334,7 +354,7 @@ impl<N: NodeImpl> SequentialSimulation<N> {
             {
                 pending_deliveries.insert(link.clone());
                 event_queue.push(FutureEvent(
-                    next_arrival,
+                    next_arrival.with_resolution(timestamp_resolution),
                     GlobalEvent::NetworkDelivery(link),
                 ));
             }
@@ -369,14 +389,15 @@ impl<N: NodeImpl> SequentialSimulation<N> {
                 {
                     self.pending_deliveries.insert(link.clone());
                     self.event_queue.push(FutureEvent(
-                        next_arrival,
+                        self.quantize(next_arrival),
                         GlobalEvent::NetworkDelivery(link),
                     ));
                 }
             }
         }
 
-        for event in output.new_events {
+        for mut event in output.new_events {
+            event.0 = self.quantize(event.0);
             self.event_queue.push(event);
         }
     }
