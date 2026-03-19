@@ -132,6 +132,9 @@ pub struct RawParameters {
     pub tx_conflict_fraction: Option<f64>,
     pub tx_start_time: Option<f64>,
     pub tx_stop_time: Option<f64>,
+    /// When set, the sequential engine batches all TX generation events within this window
+    /// into a single timestamp, independent of timestamp-resolution-ms.
+    pub tx_batch_window_ms: Option<f64>,
 
     // Ranking block configuration
     pub rb_generation_probability: f64,
@@ -829,6 +832,8 @@ pub struct SimConfiguration {
     pub(crate) sizes: BlockSizeConfig,
     pub(crate) transactions: TransactionConfig,
     pub(crate) attacks: AttackConfig,
+    /// TX generation batching window for the sequential engine.
+    pub(crate) tx_batch_window: Option<Duration>,
 }
 
 impl SimConfiguration {
@@ -908,6 +913,7 @@ impl SimConfiguration {
             sizes: BlockSizeConfig::new(&params),
             transactions: TransactionConfig::new(&params),
             attacks,
+            tx_batch_window: params.tx_batch_window_ms.map(duration_ms),
         })
     }
 }
