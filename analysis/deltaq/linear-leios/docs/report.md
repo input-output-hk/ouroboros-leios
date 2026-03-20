@@ -8,56 +8,54 @@ The security of the Linear Leios protocol depends on Δ\_EB, the time within whi
 
 Early simulations suggested Δ\_EB is manageable under happy-path conditions. This report validates that assumption using a ΔQ System Development model.
 
+The ΔQ model for Linear Leios is a complement to the Haskell and Rust simulations to gain confidence in the parameter selection for Linear Leios, resp. a precursor to running simulations, as it can rule out infeasible parameter selections.
+
 ## 2. Background
 
 ### 2.1 Linear Leios Protocol
 
 Linear Leios is designed around the key insight: Praos block production only occupies roughly 25% of slot time, leaving significant unused network bandwidth and computational capacity during "calm periods". Linear Leios exploits this headroom to achieve high throughput while preserving Praos security guarantees.
 
-The protocol behavior is governed by several timing parameters that control the duration of diffusion and voting intervals.
+The protocol behavior is governed by several [protocol parameters](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#protocol-parameters), in particular timing parameters that control the duration of diffusion and voting intervals. Their values must be chosen carefully in order for Linear Leios to achieve higher performance and throughput, as the following constraints illustrate:
 
-* The parameter $L_\text{hdr}$ needs to be large enough to allow successful RB header diffusion
-* The parameter $L_\text{vote}$ needs to be chosen carefully, because if the length of the interval is
-  * too short, then there is probably not enough time to get sufficient votes to reach a quorum
-  * too long, then there is probably already a new RB/EB before all votes are delivered
-* The parameter $L_\text{diff}$ is important in order to allow remaining nodes, after a quorum has been reached, receive the EB, in order for the security guarantees to hold
+* $L_\text{hdr}$ must be large enough to allow RB headers to diffuse across the network before the voting phase begins.
+* $L_\text{vote}$ must be calibrated carefully: too short and there is insufficient time to accumulate the votes needed for a quorum; too long and a new RB may arrive before all votes are delivered.
+* $L_\text{diff}$ must be large enough that, after a quorum is reached, all remaining nodes can receive and apply the EB before the next RB is produced - a prerequisite for the Leios security guarantees to hold.
 
-For the security analysis of Linear Leios there are the fallowing assumptions:
+#### 2.1.1 Security Analysis
+
+The security analysis of Linear Leios is based on the following assumptions:
 
 * Certified EBs are delivered to all block producing nodes in the worst case at the end of $L_\text{diff}$
 * Reapplying an EB plus verifying the correctness of the EB certificate is computationally less expensive than applying an RB
 
-This analysis targets a stronger bound than the CIP: we require that each certified EB reaches all honest block-producing nodes by the end of $L_\text{diff}$, i.e., within Δ\_EB slots of its creation.
+This analysis adopts a stronger version of the first assumption than the CIP requires: every certified EB must reach all honest block-producing nodes by the end of $L_\text{diff}$, i.e., within Δ\_EB slots of its creation.
 
 Δ\_EB plays a role in Leios analogous to the Δ parameter in Ouroboros Praos - both bound the time within which a message must reach all honest block producers, and a violation in either case can cause a fork. In Leios, if Δ\_EB is violated, a block producer may receive a new RB carrying a certificate that references an EB the local node has not yet received. That node therefore does not know about the transactions in the EB and has not updated its ledger state accordingly, leading to a divergence in perceived ledger state - a fork. The parameter $L_\text{diff}$ is therefore critical: it reserves enough time after a quorum is reached for the EB to finish diffusing to all remaining nodes, during $L_\text{diff}$ no new RB is being added to the chain giving those nodes the opportunity to receive and apply the EB.
-
-The key question this analysis addresses is whether the first assumption above holds: can certified EBs realistically be delivered to all block-producing nodes by the end of $L_\text{diff}$ under realistic network conditions.
 
 ### 2.2 ΔQ System Development
 
 ∆Q is a modelling tool to analyse the performance characteristics of a distributed system. Outcomes in ΔQ are represented as probability distributions of completion times. ΔQ is implemented as a domain specific language (DSL) providing the following constructors
 
-| Constructor | Meaning |
-|---|---|
-| `never` | Outcome that never finishes |
-| `wait t` | Deterministic delay of `t` seconds |
+| Constructor   | Meaning                              |
+| ------------- | ------------------------------------ |
+| `never`       | Outcome that never finishes          |
+| `wait t`      | Deterministic delay of `t` seconds   |
 | `uniform t s` | Uniform distribution between `t` `s` |
 
 and combinators to build more complex abstractions:
 
-| Operator | Meaning |
-|---|---|
-| `a .>>. b` | Sequential composition: `a` then `b` |
-| `a .\/. b` | First to finish: `a` or `b` |
-| `a ./\. b` | Last to finish: `a` and `b` |
-| `p a b` | Probabilistic choice: `a` with probability `p`, `b` with probability `1 - p` |
+| Operator   | Meaning                                                                      |
+| ---------- | ---------------------------------------------------------------------------- |
+| `a .>>. b` | Sequential composition: `a` then `b`                                         |
+| `a .\/. b` | First to finish: `a` or `b`                                                  |
+| `a ./\. b` | Last to finish: `a` and `b`                                                  |
+| `p a b`    | Probabilistic choice: `a` with probability `p`, `b` with probability `1 - p` |
 
 The ΔQ library uses a backend abstraction for computations such as convolution for sequential composition. It provides the [piecewise-polynomials](https://github.com/DeltaQ-SD/deltaq/tree/main/lib/probability-polynomial) backend as default. For running complex models, we implemented a new backend called [sampled](https://github.com/yveshauser/deltaq/blob/experimental/lib/deltaq/src/DeltaQ/Sampled.hs). They compare as follows:
 
 - *piecewise-polynomials* is an analytic backend, i.e., exact results, but the computational complexity of the backend does not allow running complex models
 - *sampled* is an approximation backend with efficient computation, but accuracy is hard to control
-
-The ΔQ model is a complement to the Haskell and Rust simulations to gain confidence in the parameter selection for Linear Leios, resp. a precursor to running simulations, as it can rule out infeasible parameter selections.
 
 ## 3. Network Model
 
@@ -67,34 +65,34 @@ The block diffusion model used in this library has been taken from the [Praos pe
 
 The network is modelled as a random graph in which nodes have a fixed number of peers. Block diffusion across multiple hops is captured by sequential composition of per-hop ΔQs. A single hop is characterised by the transfer time for a given block size and the geographic distance between the two endpoints. Following the Praos model, three distance categories are distinguished:
 
-| Distance | Description | Round trip time (RTT) |
-|---|---|---|
-| Short | Same data centre | 0.012 s |
-| Medium | Same continent | 0.069 s |
-| Long | Different continents | 0.268 s |
+| Distance | Description          | Round trip time (RTT) |
+| -------- | -------------------- | --------------------- |
+| Short    | Same data centre     | 0.012 s               |
+| Medium   | Same continent       | 0.069 s               |
+| Long     | Different continents | 0.268 s               |
 
 Each category yields a deterministic transfer time for a given block size. The one-hop ΔQ assigns equal probability to each distance category. The end-to-end diffusion ΔQ for $n$ hops is the $n$-fold sequential composition of the one-hop ΔQ. To account for the variable path length in a random graph, the multi-hop ΔQs are combined via probabilistic choice, weighted by the empirical path-length distribution of a random graph with 2500 nodes of degree 10 (Table below, sourced from the Praos model):
 
 | Path length | Probability (%) |
-|---|---|
-| 1 | 0.40 |
-| 2 | 3.91 |
-| 3 | 31.06 |
-| 4 | 61.85 |
-| 5 | 2.78 |
+| ----------- | --------------- |
+| 1           | 0.40            |
+| 2           | 3.91            |
+| 3           | 31.06           |
+| 4           | 61.85           |
+| 5           | 2.78            |
 
 The resulting blended ΔQ captures the distribution of end-to-end transfer times over the expected variety of paths in the network.
 
-An alternative path-length distribution derived from a mainnet-like topology is available via the [topology-checker](https://github.com/input-output-hk/ouroboros-leios/tree/main/topology-checker) tool and is implemented in [`DeltaQ.Praos`](../src/DeltaQ/Praos.hs) (see `hopCount`), but is not currently used in the model:
+An alternative path-length distribution was calculated by the [topology-checker](https://github.com/input-output-hk/ouroboros-leios/tree/main/topology-checker) tool from a mainnet-like topology. It is implemented in [`DeltaQ.Praos`](../src/DeltaQ/Praos.hs) (see `hopCount`), but is not currently used in the model:
 
 | Path length | Count |
-|---|---|
-| 1 | 1909 |
-| 2 | 3867 |
-| 3 | 2826 |
-| 4 | 1068 |
-| 5 | 214 |
-| 6 | 16 |
+| ----------- | ----- |
+| 1           | 1909  |
+| 2           | 3867  |
+| 3           | 2826  |
+| 4           | 1068  |
+| 5           | 214   |
+| 6           | 16    |
 
 This distribution reflects the actual peer-to-peer topology of the Cardano mainnet rather than a synthetic random graph, and could be substituted for the Praos path-length distribution to ground the model more closely in real network conditions.
 
@@ -119,7 +117,7 @@ The ΔQ model of EB diffusion captures the steps a node performs upon receiving 
 
 ![](EB-diffusion.svg)
 
-With ΔQ, the typical workflow starts from a coarse-grained model describing high-level outcomes and then refines it to improve accuracy. However, finer-grained models generally increase complexity, creating a trade-off between performance and accuracy. For Linear Leios, we chose a low-complexity model and ensure accuracy by grounding it in empirical distributions from measurements or probabilistic modelling - in particular, Markov models.
+With ΔQ, the typical workflow starts from a coarse-grained model describing high-level outcomes and then refining it to improve accuracy. However, finer-grained models generally increase complexity, forcing a switch to a backend that calculates approximate solutions, creating a trade-off between performance and accuracy. For Linear Leios, we chose a low-complexity model and ensure accuracy. The low-complexity model is possible by leveraging empirical distributions from measurements and probabilistic modelling.
 
 ### 4.1 Empirical distributions
 
@@ -137,10 +135,10 @@ $$F(x) = \frac{1}{N} \sum_{n=1}^{N} \Phi \left(\frac{x - n\mu}{\sqrt{n}\,\sigma}
 
 where $\Phi$ is the standard normal CDF. The two batch distributions use the following parameters derived from the empirical data:
 
-| Operation | $N$ (max transactions) | $\mu$ (mean, s) | $\sigma$ (std dev, s) |
-|---|---|---|---|
-| `applyTxs`   | 100  | 0.01060 | 0.02549 |
-| `reapplyTxs` | 2500 | 0.00271 | 0.02442 |
+| Operation    | $N$ (max transactions) | $\mu$ (mean, s) | $\sigma$ (std dev, s) |
+| ------------ | ---------------------- | --------------- | --------------------- |
+| `applyTxs`   | 100                    | 0.01060         | 0.02549               |
+| `reapplyTxs` | 2500                   | 0.00271         | 0.02442               |
 
 ### 4.2 Markov model for TxCache
 
@@ -206,12 +204,12 @@ nix develop
 
 The following executables are available:
 
-| Executable | Description |
-|---|---|
+| Executable                         | Description                                                    |
+| ---------------------------------- | -------------------------------------------------------------- |
 | `cabal run leios-deltaq-estimates` | Print estimated values for $L_\text{vote}$ and $L_\text{diff}$ |
-| `cabal run leios-deltaq-plots` | Generate CDF plots as SVG files |
-| `cabal run leios-deltaq-stats` | Compute statistics for all configurations |
-| `cabal run leios-deltaq-diagrams` | Generate the EB-validation outcome diagram |
+| `cabal run leios-deltaq-plots`     | Generate CDF plots as SVG files                                |
+| `cabal run leios-deltaq-stats`     | Compute statistics for all configurations                      |
+| `cabal run leios-deltaq-diagrams`  | Generate the EB-validation outcome diagram                     |
 
 ## Appendix B: References
 
