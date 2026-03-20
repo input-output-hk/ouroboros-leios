@@ -112,7 +112,7 @@ The ΔQ model of EB diffusion captures the steps a node performs upon receiving 
 * On receiving the full EB, determine which transactions are missing and fetch them. Unlike the RB - which carries full transaction data in its body - the EB contains only transaction IDs.
 * Only once both of the above steps complete is the reapply operation applied to the ledger state.
 
-![](EB-diffusion.png)
+![](EB-diffusion.svg)
 
 With ΔQ, the typical workflow starts from a coarse-grained model describing high-level outcomes and then refines it to improve accuracy. However, finer-grained models generally increase complexity, creating a trade-off between performance and accuracy. For Linear Leios, we chose a low-complexity model and ensure accuracy by grounding it in empirical distributions from measurements or probabilistic modelling - in particular, Markov models.
 
