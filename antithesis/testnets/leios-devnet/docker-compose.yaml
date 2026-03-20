@@ -12,16 +12,21 @@ x-common-env: &common-env
   ENABLE_WAN_EMULATION: "false"
   REF_SLOT: ${REF_SLOT:-11}
 
-x-pool-hosts: &pool-hosts
+x-node-hosts: &node-hosts
   IP_POOL1: "pool1"
   IP_POOL2: "pool2"
   IP_POOL3: "pool3"
+  IP_DINGO1: "dingo1"
   PORT_POOL1: "3001"
   PORT_POOL2: "3002"
   PORT_POOL3: "3003"
+  PORT_DINGO: "3001"
 
 x-node-image: &node-image
   image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${IMAGE_TAG:-latest}
+
+x-dingo-image: &dingo-image
+  image: ghcr.io/blinklabs-io/dingo:main-antithesis
 
 services:
   # ==========================================================================
@@ -34,7 +39,7 @@ services:
     init: true
     command: ["/app/scripts/init-pool-node.sh", "1"]
     environment:
-      <<: [*common-env, *pool-hosts]
+      <<: [*common-env, *node-hosts]
     volumes:
       - pool1-data:/data
       - genesis-shared:/shared-genesis
@@ -52,7 +57,7 @@ services:
       init-pool1:
         condition: service_completed_successfully
     environment:
-      <<: [*common-env, *pool-hosts]
+      <<: [*common-env, *node-hosts]
     volumes:
       - pool2-data:/data
       - genesis-shared:/shared-genesis
@@ -70,9 +75,25 @@ services:
       init-pool1:
         condition: service_completed_successfully
     environment:
-      <<: [*common-env, *pool-hosts]
+      <<: [*common-env, *node-hosts]
     volumes:
       - pool3-data:/data
+      - genesis-shared:/shared-genesis
+      - logs:/logs
+    networks:
+      - leios-net
+
+  init-dingo1:
+    # NOTE: we reuse the cardano-node image for convenience when doing the init
+    <<: *node-image
+    command: ["/app/scripts/init-dingo-node.sh", "1"]
+    depends_on:
+      init-pool1:
+        condition: service_completed_successfully
+    environment:
+      <<: [*common-env, *node-hosts]
+    volumes:
+      - dingo1-data:/data
       - genesis-shared:/shared-genesis
       - logs:/logs
     networks:
@@ -160,6 +181,39 @@ services:
       retries: 60
       start_period: 30s
 
+  dingo1:
+    <<: *dingo-image
+    container_name: dingo1
+    hostname: dingo1
+    init: true
+    depends_on:
+      init-dingo1:
+        condition: service_completed_successfully
+      pool1:
+        condition: service_started
+    cap_add:
+      - NET_ADMIN
+    environment:
+      <<: *common-env
+      HOST_ADDR: "0.0.0.0"
+      CARDANO_PORT: "3001"
+      CARDANO_CONFIG: /data/config.yaml
+      CARDANO_TOPOLOGY: /data/topology.json
+      CARDANO_NODE_SOCKET_PATH: /data/dingo.socket
+      CARDANO_NETWORK_MAGIC: '164'
+      DINGO_RUN_MODE: leios
+    volumes:
+      - dingo1-data:/data
+      - logs:/logs
+    networks:
+      - leios-net
+    healthcheck:
+      test: ["CMD", "test", "-S", "/data/dingo.socket"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 30s
+
   # ==========================================================================
   # TX Generator (randomized loop for Antithesis)
   # ==========================================================================
@@ -177,7 +231,7 @@ services:
       pool3:
         condition: service_healthy
     environment:
-      <<: *pool-hosts
+      <<: *node-hosts
     volumes:
       - txgen-data:/data
       - genesis-shared:/shared-genesis:ro
@@ -215,6 +269,7 @@ volumes:
   pool1-data:
   pool2-data:
   pool3-data:
+  dingo1-data:
   txgen-data:
   genesis-shared:
   logs:
