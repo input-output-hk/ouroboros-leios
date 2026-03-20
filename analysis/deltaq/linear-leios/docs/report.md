@@ -25,8 +25,9 @@ The protocol behavior is governed by several timing parameters that control the 
 * The parameter $L_\text{vote}$ needs to be chosen carefully, because if the length of the interval is
   * too short, then there is probably not enough time to get sufficient votes to reach a quorum
   * too long, then there is probably already a new RB/EB before all votes are delivered
-* The parameter $L_\text{diff}$ is important in order to allow remaining nodes, after a quorum has been reached, receive
-the EB, in order for the security guarantees to hold
+* The parameter $L_\text{diff}$ is important in order to allow remaining nodes, after a quorum has been reached, receive the EB, in order for the security guarantees to hold
+
+Δ\_EB plays a role in Leios analogous to the Δ parameter in Ouroboros Praos - both bound the time within which a message must reach all honest block producers, and a violation in either case can cause a fork. In Leios, if Δ\_EB is violated, a block producer may receive a new RB carrying a certificate that references an EB the local node has not yet received. That node therefore does not know about the transactions in the EB and has not updated its ledger state accordingly, leading to a divergence in perceived ledger state - a fork. The parameter $L_\text{diff}$ is therefore critical: it reserves enough time after a quorum is reached for the EB to finish diffusing to all remaining nodes, during $L_\text{diff}$ no new RB is being added to the chain giving those nodes the opportunity to receive and apply the EB.
 
 ### 2.2 ΔQ System Development
 
@@ -193,13 +194,20 @@ The Haskell source implementing the ΔQ model described in this report is locate
 analysis/deltaq/linear-leios/
 ```
 
-To build and run the Haskell source using nix:
+To build and run using nix:
 
 ```bash
 nix develop
-cabal build linear-leios-analysis
-cabal run linear-leios-analysis stats
 ```
+
+The following executables are available:
+
+| Executable | Description |
+|---|---|
+| `cabal run leios-deltaq-estimates` | Print estimated values for $L_\text{vote}$ and $L_\text{diff}$ |
+| `cabal run leios-deltaq-plots` | Generate CDF plots as SVG files |
+| `cabal run leios-deltaq-stats` | Compute statistics for all configurations |
+| `cabal run leios-deltaq-diagrams` | Generate the EB-validation outcome diagram |
 
 ## Appendix B: References
 
