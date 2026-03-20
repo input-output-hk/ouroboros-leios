@@ -217,7 +217,8 @@ jobs:
             -d "antithesis/testnets/leios-devnet" \
             -c "${GITHUB_SHA}" \
             -r "${GITHUB_REPOSITORY}" \
-            -t 30
+            -t 1 \
+            -y 1
         env:
           MOOG_GITHUB_PAT: ${{ secrets.MOOG_GITHUB_PAT }}
           MOOG_WALLET_FILE: wallet.json
