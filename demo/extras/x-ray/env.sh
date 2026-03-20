@@ -12,5 +12,6 @@
 : "${PROMETHEUS_CONFIG:=${XRAY_SOURCE_DIR}/prometheus.yaml}"
 : "${LOKI_CONFIG:=${XRAY_SOURCE_DIR}/loki.yaml}"
 : "${SS_FILTER:=( sport = 3001 and dport = 3002 ) or ( sport = 3002 and dport = 3001 ) or ( sport = 3002 and dport = 3003 ) or ( sport = 3003 and dport = 3002 )}"
+: "${DEMO_DASHBOARDS_DIR:=${WORKING_DIR}/demo-dashboards}"
 
 XRAY_REQUIRED_COMMANDS=(prometheus loki grafana alloy ss_http_exporter process-compose)
