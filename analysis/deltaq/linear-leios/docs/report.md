@@ -146,17 +146,23 @@ where $\Phi$ is the standard normal CDF. The two batch distributions use the fol
 
 When an EB arrives at a node, its transactions may already be present in the local transaction cache (a cache hit), or they may need to be fetched from the network (a cache miss). To model this, we use a two-state Markov chain parameterized by $p$, the probability that a given transaction is in the cache.
 
-The transition matrix is:
+![](TxCache.svg)
+
+With states ordered as (miss, hit), the transition matrix is:
 
 $$M = \begin{pmatrix} 1-p & p \\\ 1-p/2 & p/2 \end{pmatrix}$$
-
-![](TxCache.svg)
 
 Solving the stationary condition $\pi M = \pi$ yields the steady-state distribution:
 
 $$\pi_1 = \frac{2-p}{2+p}, \quad \pi_2 = \frac{2p}{2+p}$$
 
-where $\pi_2$ is the steady-state cache hit rate used in the ΔQ model. Higher values of $p$ (more transactions already cached) reduce the need for network fetches and therefore lower the EB processing latency.
+The steady-state $\pi_2$ is the long-run fraction of transactions that are cache hits. It differs from the raw parameter $p$ because the transition probabilities are asymmetric: from a miss, the probability of transitioning to a hit is $p$, whereas from a hit, the probability of staying in the hit state is only $p/2$. For a batch of transactions drawn from the steady-state distribution, the effective hit rate is:
+
+$$r = \pi_2 \cdot p + \pi_1 \cdot (1 - p)$$
+
+This is used in the ΔQ model to weight the two processing branches — with probability $r$ a transaction can be reapplied cheaply from the cache; with probability $1 - r$ it must first be fetched from the network.
+
+The model uses $p = 0.75$, giving $\pi_1 \approx 0.455$, $\pi_2 \approx 0.545$, and an effective batch hit rate of $r \approx 0.523$. Higher values of $p$ increase $r$ and therefore lower the EB processing latency.
 
 ## 5. Protocol Parameter Sweep
 

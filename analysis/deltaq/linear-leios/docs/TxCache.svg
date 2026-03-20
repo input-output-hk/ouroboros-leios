@@ -1,48 +1,46 @@
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="225pt" height="115pt" viewBox="0.00 0.00 225.00 115.00">
-<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 110.9)">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="181pt" height="100pt" viewBox="0.00 0.00 181.00 100.00">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 96.29)">
 <title>TxCache</title>
-<polygon fill="white" stroke="none" points="-4,4 -4,-110.9 220.74,-110.9 220.74,4 -4,4"/>
-<!-- hit -->
-<g id="node1" class="node">
-<title>hit</title>
-<ellipse fill="none" stroke="black" cx="36.05" cy="-36.05" rx="36.05" ry="36.05"/>
-<text xml:space="preserve" text-anchor="middle" x="36.05" y="-40.25" font-family="Times,serif" font-size="14.00">Cache</text>
-<text xml:space="preserve" text-anchor="middle" x="36.05" y="-23.45" font-family="Times,serif" font-size="14.00">Hit</text>
-</g>
-<!-- hit&#45;&gt;hit -->
-<g id="edge3" class="edge">
-<title>hit-&gt;hit</title>
-<path fill="none" stroke="black" d="M22.49,-69.83C22.49,-81.09 27.01,-90.1 36.05,-90.1 41.84,-90.1 45.78,-86.4 47.86,-80.78"/>
-<polygon fill="black" stroke="black" points="51.25,-81.75 49.37,-71.32 44.33,-80.64 51.25,-81.75"/>
-<text xml:space="preserve" text-anchor="middle" x="36.05" y="-94.3" font-family="Times,serif" font-size="14.00">p/2</text>
-</g>
+<polygon fill="white" stroke="none" points="-4,4 -4,-96.29 176.51,-96.29 176.51,4 -4,4"/>
 <!-- miss -->
-<g id="node2" class="node">
+<g id="node1" class="node">
 <title>miss</title>
-<ellipse fill="none" stroke="black" cx="180.7" cy="-36.05" rx="36.05" ry="36.05"/>
-<text xml:space="preserve" text-anchor="middle" x="180.7" y="-40.25" font-family="Times,serif" font-size="14.00">Cache</text>
-<text xml:space="preserve" text-anchor="middle" x="180.7" y="-23.45" font-family="Times,serif" font-size="14.00">Miss</text>
-</g>
-<!-- hit&#45;&gt;miss -->
-<g id="edge1" class="edge">
-<title>hit-&gt;miss</title>
-<path fill="none" stroke="black" d="M72.31,-36.05C90.65,-36.05 113.32,-36.05 133.09,-36.05"/>
-<polygon fill="black" stroke="black" points="132.83,-39.55 142.83,-36.05 132.83,-32.55 132.83,-39.55"/>
-<text xml:space="preserve" text-anchor="middle" x="108.37" y="-40.25" font-family="Times,serif" font-size="14.00">1 - p/2</text>
-</g>
-<!-- miss&#45;&gt;hit -->
-<g id="edge2" class="edge">
-<title>miss-&gt;hit</title>
-<path fill="none" stroke="black" d="M147.44,-21.2C140.7,-18.73 133.55,-16.55 126.65,-15.25 110.69,-12.23 106.06,-12.23 90.1,-15.25 86.75,-15.88 83.35,-16.72 79.97,-17.69"/>
-<polygon fill="black" stroke="black" points="79.15,-14.28 70.74,-20.73 81.34,-20.93 79.15,-14.28"/>
-<text xml:space="preserve" text-anchor="middle" x="108.37" y="-19.45" font-family="Times,serif" font-size="14.00">p</text>
+<ellipse fill="none" stroke="black" cx="28.75" cy="-28.75" rx="28.75" ry="28.75"/>
+<text xml:space="preserve" text-anchor="middle" x="28.75" y="-24.55" font-family="Times,serif" font-size="14.00">miss</text>
 </g>
 <!-- miss&#45;&gt;miss -->
 <g id="edge4" class="edge">
 <title>miss-&gt;miss</title>
-<path fill="none" stroke="black" d="M167.13,-69.83C167.13,-81.09 171.66,-90.1 180.7,-90.1 186.49,-90.1 190.42,-86.4 192.5,-80.78"/>
-<polygon fill="black" stroke="black" points="195.89,-81.75 194.02,-71.32 188.98,-80.64 195.89,-81.75"/>
-<text xml:space="preserve" text-anchor="middle" x="180.7" y="-94.3" font-family="Times,serif" font-size="14.00">1 - p</text>
+<path fill="none" stroke="black" d="M16.66,-55.18C15.83,-66.17 19.86,-75.49 28.75,-75.49 34.3,-75.49 37.96,-71.85 39.72,-66.44"/>
+<polygon fill="black" stroke="black" points="43.18,-66.98 40.68,-56.68 36.22,-66.29 43.18,-66.98"/>
+<text xml:space="preserve" text-anchor="middle" x="28.75" y="-79.69" font-family="Times,serif" font-size="14.00">1 - p</text>
+</g>
+<!-- hit -->
+<g id="node2" class="node">
+<title>hit</title>
+<ellipse fill="none" stroke="black" cx="151.28" cy="-28.75" rx="21.23" ry="21.23"/>
+<text xml:space="preserve" text-anchor="middle" x="151.28" y="-24.55" font-family="Times,serif" font-size="14.00">hit</text>
+</g>
+<!-- miss&#45;&gt;hit -->
+<g id="edge2" class="edge">
+<title>miss-&gt;hit</title>
+<path fill="none" stroke="black" d="M57.7,-28.75C75.81,-28.75 99.46,-28.75 118.31,-28.75"/>
+<polygon fill="black" stroke="black" points="118.11,-32.25 128.11,-28.75 118.11,-25.25 118.11,-32.25"/>
+<text xml:space="preserve" text-anchor="middle" x="93.77" y="-32.95" font-family="Times,serif" font-size="14.00">p</text>
+</g>
+<!-- hit&#45;&gt;miss -->
+<g id="edge1" class="edge">
+<title>hit-&gt;miss</title>
+<path fill="none" stroke="black" d="M132.63,-17.98C126.36,-14.73 119.11,-11.59 112.05,-9.95 96.22,-6.27 91.43,-6.8 75.49,-9.95 72.15,-10.61 68.74,-11.52 65.37,-12.58"/>
+<polygon fill="black" stroke="black" points="64.48,-9.18 56.27,-15.87 66.86,-15.76 64.48,-9.18"/>
+<text xml:space="preserve" text-anchor="middle" x="93.77" y="-14.15" font-family="Times,serif" font-size="14.00">1 - p/2</text>
+</g>
+<!-- hit&#45;&gt;hit -->
+<g id="edge3" class="edge">
+<title>hit-&gt;hit</title>
+<path fill="none" stroke="black" d="M141.01,-47.72C139.09,-58.27 142.52,-67.98 151.28,-67.98 156.62,-67.98 159.97,-64.37 161.35,-59.17"/>
+<polygon fill="black" stroke="black" points="164.84,-59.29 161.52,-49.23 157.85,-59.17 164.84,-59.29"/>
+<text xml:space="preserve" text-anchor="middle" x="151.28" y="-72.18" font-family="Times,serif" font-size="14.00">p/2</text>
 </g>
 </g>
 </svg>
