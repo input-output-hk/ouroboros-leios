@@ -278,6 +278,7 @@ The analysis container reports assertions to Antithesis SDK:
 - sometimes: Per-pool slot advances between checks (pool1, pool2, pool3)
 - sometimes: Leios votes were created
 - sometimes: Transactions are entering the mempool
+- sometimes: Transactions are landing in blocks (TPS)
 
 - reachable: Analysis parsed ForgedBlock events
 - reachable: Analysis parsed block reception events

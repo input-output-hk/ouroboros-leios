@@ -23,6 +23,7 @@ class BlockEvent:
     block_hash: str
     slot: int
     block_type: str  # 'praos', 'eb', 'vote'
+    tx_count: int = 0
 
 
 @dataclass
@@ -44,6 +45,11 @@ class Metrics:
     max_slot_by_node: dict = None
     mempool_txs_added: int = 0
     chain_tip_by_node: dict = None
+    # TPS tracking
+    praos_txs_landed: int = 0
+    leios_txs_landed: int = 0
+    first_event_time: datetime = None
+    last_event_time: datetime = None
 
     def __post_init__(self):
         if self.praos_latencies_ms is None:
@@ -191,6 +197,20 @@ def parse_log_line(line: str, node_name: str) -> Optional[BlockEvent]:
                 block_type="tx",
             )
 
+        # Mempool tx removals (txs landed in a block)
+        # ns: "Mempool.RemoveTxs", data.txs: [{tx: {txid: ...}}, ...]
+        if "RemoveTxs" in ns:
+            txs = event_data.get("txs", [])
+            if isinstance(txs, list) and len(txs) > 0:
+                return BlockEvent(
+                    timestamp=ts,
+                    node=node_name,
+                    event_type="mempool_remove",
+                    block_hash=str(len(txs)),  # stash count in hash field
+                    slot=0,
+                    block_type="tx",
+                )
+
         # Leios events
         # ns: "Consensus.LeiosKernel" with EB/Vote in data
         if "LeiosKernel" in ns or "LeiosPeer" in ns:
@@ -201,6 +221,9 @@ def parse_log_line(line: str, node_name: str) -> Optional[BlockEvent]:
                     if "created" in kind.lower() or "generate" in kind.lower()
                     else "received"
                 )
+                # Count transactions in EB if present
+                eb_txs = event_data.get("transactions", [])
+                tx_count = len(eb_txs) if isinstance(eb_txs, list) else 0
                 return BlockEvent(
                     timestamp=ts,
                     node=node_name,
@@ -208,6 +231,7 @@ def parse_log_line(line: str, node_name: str) -> Optional[BlockEvent]:
                     block_hash=event_data.get("hash", event_data.get("id", "unknown")),
                     slot=event_data.get("slot", 0),
                     block_type="eb",
+                    tx_count=tx_count,
                 )
             if "Vote" in kind:
                 event_type = (
@@ -277,6 +301,12 @@ def compute_metrics(log_dir: str = "/logs") -> Metrics:
         events = parse_log_file(log_file, node_name)
 
         for event in events:
+            # Track time window
+            if metrics.first_event_time is None or event.timestamp < metrics.first_event_time:
+                metrics.first_event_time = event.timestamp
+            if metrics.last_event_time is None or event.timestamp > metrics.last_event_time:
+                metrics.last_event_time = event.timestamp
+
             # Count events
             if event.block_type == "praos":
                 if event.event_type == "created":
@@ -331,10 +361,13 @@ def compute_metrics(log_dir: str = "/logs") -> Metrics:
             elif event.block_type == "tx":
                 if event.event_type == "mempool_tx":
                     metrics.mempool_txs_added += 1
+                elif event.event_type == "mempool_remove":
+                    metrics.praos_txs_landed += int(event.block_hash)
 
             elif event.block_type == "eb":
                 if event.event_type == "created":
                     metrics.leios_ebs_created += 1
+                    metrics.leios_txs_landed += event.tx_count
 
             elif event.block_type == "vote":
                 if event.event_type == "created":
@@ -352,6 +385,23 @@ def compute_metrics(log_dir: str = "/logs") -> Metrics:
     metrics.orphan_block_hashes = received_hashes - created_hashes
 
     return metrics
+
+
+def get_tps(metrics: Metrics) -> dict:
+    """Compute transactions per second from metrics."""
+    total_txs = metrics.praos_txs_landed + metrics.leios_txs_landed
+    if metrics.first_event_time and metrics.last_event_time:
+        elapsed = (metrics.last_event_time - metrics.first_event_time).total_seconds()
+    else:
+        elapsed = 0.0
+    tps = total_txs / elapsed if elapsed > 0 else 0.0
+    return {
+        "praos_txs_landed": metrics.praos_txs_landed,
+        "leios_txs_landed": metrics.leios_txs_landed,
+        "total_txs_landed": total_txs,
+        "elapsed_seconds": round(elapsed, 1),
+        "tps": round(tps, 2),
+    }
 
 
 def get_latency_stats(latencies: list[float]) -> dict:

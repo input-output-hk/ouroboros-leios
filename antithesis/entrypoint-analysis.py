@@ -20,7 +20,7 @@ except ImportError:
     ANTITHESIS_AVAILABLE = False
     print("Antithesis SDK not available - running in local mode")
 
-from analyse import compute_metrics, get_latency_stats
+from analyse import compute_metrics, get_latency_stats, get_tps
 
 
 def log(msg: str):
@@ -177,6 +177,23 @@ def report_assertions(metrics, praos_threshold_ms: float, prev_max_slot: int, pr
         )
     else:
         log(f"  Mempool txs added: {metrics.mempool_txs_added}")
+
+    # TPS: transactions are landing in blocks
+    tps_stats = get_tps(metrics)
+    if tps_stats["total_txs_landed"] > 0:
+        if ANTITHESIS_AVAILABLE:
+            sometimes(
+                tps_stats["tps"] > 0,
+                "Transactions are landing in blocks",
+                tps_stats,
+            )
+        else:
+            log(
+                f"  TPS: {tps_stats['tps']} "
+                f"(praos={tps_stats['praos_txs_landed']}, "
+                f"leios={tps_stats['leios_txs_landed']}, "
+                f"elapsed={tps_stats['elapsed_seconds']}s)"
+            )
 
     # --- Safety assertions ---
 
@@ -360,6 +377,13 @@ def main():
                 log(
                     f"Praos latency: avg={praos_stats['avg_ms']:.1f}ms, p95={praos_stats['p95_ms']:.1f}ms, max={praos_stats['max_ms']:.1f}ms"
                 )
+
+            tps_stats = get_tps(metrics)
+            log(
+                f"TPS: {tps_stats['tps']} "
+                f"(praos={tps_stats['praos_txs_landed']}, leios={tps_stats['leios_txs_landed']}, "
+                f"elapsed={tps_stats['elapsed_seconds']}s)"
+            )
 
             # Report assertions
             report_assertions(metrics, praos_threshold_ms, prev_max_slot, prev_max_slot_by_node)
