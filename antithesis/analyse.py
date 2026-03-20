@@ -183,9 +183,9 @@ def parse_log_line(line: str, node_name: str) -> Optional[BlockEvent]:
             )
 
         # Mempool tx additions
-        # ns: "Mempool" with AddedToCurrentMempool or TraceMempoolAddedTx
+        # ns: "Mempool.AddedTx", data.kind: "TraceMempoolAddedTx"
         if "Mempool" in ns and (
-            "AddedToCurrentMempool" in ns
+            "AddedTx" in ns
             or "TraceMempoolAddedTx" in str(event_data.get("kind", ""))
         ):
             return BlockEvent(
