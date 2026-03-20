@@ -177,17 +177,22 @@ The ΔQ model yields the following completion-time distribution for EB diffusion
 - **95th percentile:** 12.57 seconds
 - **99th percentile:** 15.41 seconds
 
-Under the proposed parameters ($L_\text{hdr}=1$, $L_\text{vote}=4$, $L_\text{diff}=7$) ... TODO
-
 ### 5.2 Protocol Security Validation
 
-The ΔQ model confirms that Δ\_EB is satisfied with probability exceeding 99.9% per EB. This is consistent with the security requirements of the Leios protocol and supports the parameter choices proposed in the CIP.
+The ΔQ model gives a high probability that under the proposed parameters ($L_\text{hdr}=1$, $L_\text{vote}=4$, $L_\text{diff}=7$) an EB reaches all honest block-producing nodes before the end of $L_\text{diff}$:
+
+```haskell
+successWithin validateEB 14
+0.9753948688574636
+```
+
+This provides strong evidence that the proposed parameters are viable and consistent with the security requirements of the Leios protocol as specified in CIP-164.
 
 ## 6. Conclusions
 
-The ΔQ model confirms that the Linear Leios protocol can satisfy its Δ\_EB security requirement under realistic network conditions:
+This report has presented a ΔQ System Development model for EB diffusion in Linear Leios, grounded in empirical network and transaction-processing data. The model addresses the central security question: can certified EBs realistically reach all honest block-producing nodes within the Δ\_EB deadline under realistic network conditions, without modelling adversarial behaviour?
 
-- TODO
+The analysis shows that under the proposed parameters ($L_\text{hdr}=1$, $L_\text{vote}=4$, $L_\text{diff}=7$), the EB diffusion completes within the deadline with a probability of 97.54%, providing strong evidence that the parameter choices in CIP-164 are sound.
 
 ## 7. Limitations and Future Work
 
