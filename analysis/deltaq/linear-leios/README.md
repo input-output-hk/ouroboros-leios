@@ -1,6 +1,6 @@
 # DeltaQ / Statistics library for Ourobors Praos and Leios
 
-The library provides a [DeltaQ](https://github.com/DeltaQ-SD/deltaq/) model for Linear Leios.
+The library provides a [DeltaQ](https://github.com/DeltaQ-SD/deltaq/) model for Linear Leios. A detailed description of the model and its results is in the [report](docs/report.md).
 
 ### Parameter estimates
 
