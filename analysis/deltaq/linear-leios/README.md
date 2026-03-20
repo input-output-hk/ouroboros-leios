@@ -7,12 +7,12 @@ The library provides a [DeltaQ](https://github.com/DeltaQ-SD/deltaq/) model for 
 Running the parameter estimation is done as follows:
 
 ```
-$ cabal run leios-deltaq-analysis estimates
+$ cabal run leios-deltaq-estimates
 ```
 
 ### Statistics
 
-The statistisics depend on the protocol parameters and other configurations. The following values are calculated
+The statistics depend on the protocol parameters and other configurations. The following values are calculated:
 
 |Statistic|Dependencies|Description|
 |---|---|---|
@@ -26,17 +26,29 @@ The statistisics depend on the protocol parameters and other configurations. The
 Run the statistics as follows:
 
 ```
-$ cabal run leios-deltaq-analysis stats
+$ cabal run leios-deltaq-stats
 ```
+
+Results are written to `output.csv`.
 
 ### Plots
 
-The plot shows the CDF for the EB diffusion times. We see in the diagram, that an EB with convincing probability arrived within 14 (= 3*1 + 4 + 7) slots.
+The plot shows the CDF for the EB diffusion times. We see in the diagram that an EB with convincing probability arrived within 14 (= 3*1 + 4 + 7) slots.
 
 ![](docs/validateEB.svg)
 
-Generate the diagrams as follows:
+Generate the plots as follows:
 
 ```
-$ cabal run leios-deltaq-analysis plots
+$ cabal run leios-deltaq-plots
 ```
+
+### Outcome diagram
+
+Generate the outcome diagram for EB validation as follows:
+
+```
+$ cabal run leios-deltaq-diagrams
+```
+
+The diagram is written to `docs/EB-diffusion.svg`.

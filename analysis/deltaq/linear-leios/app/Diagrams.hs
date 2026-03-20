@@ -31,5 +31,5 @@ validateEBDiagram =
 
 main :: IO ()
 main =
-    renderSVG "docs/EB-diffusion.svg" (mkWidth 700)
+    renderSVG "EB-diffusion.svg" (mkWidth 700)
     $ renderOutcomeDiagram validateEBDiagram

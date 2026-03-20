@@ -38,19 +38,36 @@ executable leios-deltaq-diagrams
     hs-source-dirs:   app
     default-language: Haskell2010
 
-executable leios-deltaq-analysis
+executable leios-deltaq-estimates
     import:           warnings
-    main-is:          Main.hs
+    main-is:          Estimates.hs
+    build-depends:    async
+                    , base
+                    , leios-deltaq
+    hs-source-dirs:   app
+    ghc-options: -O2 -threaded -rtsopts "-with-rtsopts=-N -s"
+    default-language: Haskell2010
+
+executable leios-deltaq-plots
+    import:           warnings
+    main-is:          Plots.hs
+    build-depends:    base
+                    , deltaq
+                    , leios-deltaq
+                    , Chart >= 1.8 && < 2.0
+                    , Chart-cairo
+    hs-source-dirs:   app
+    ghc-options: -O2
+    default-language: Haskell2010
+
+executable leios-deltaq-stats
+    import:           warnings
+    main-is:          Stats.hs
     build-depends:    async
                     , base
                     , bytestring
                     , cassava
-                    , deltaq
                     , leios-deltaq
-                    , random
-                    , vector
-                    , Chart >= 1.8 && < 2.0
-                    , Chart-cairo
     hs-source-dirs:   app
     ghc-options: -O2 -threaded -rtsopts "-with-rtsopts=-N -s"
     default-language: Haskell2010
