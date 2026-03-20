@@ -123,11 +123,13 @@ With ΔQ, the typical workflow starts from a coarse-grained model describing hig
 
 Several operations in the ΔQ model are grounded in empirical timing measurements taken from a Cardano mainnet node rather than synthetic assumptions. Two operations are of particular interest:
 
-- **`applyTx`:** The cost of validating a transaction against the current ledger state for the first time. This is the work a node performs when it receives a fresh transaction from the mempool. Measurements show a wide spread: roughly 28% of transactions complete in under 5 ms, 65% in under 10 ms, and about 8% take longer than 20 ms.
+- **`applyTx`:** The cost of validating a transaction against the current ledger state for the first time. This is the work a node performs when it receives a fresh transaction from the mempool. Measurements show a wide spread: roughly 28% of transactions complete in under 5 ms, 65% in under 10 ms, and about 8% take longer than 10 ms.
 
-- **`reapplyTx`:** The cost of re-validating a transaction that has already been validated before — for instance, when an EB is certified and its transactions are applied to the ledger. Because script execution can be skipped, reapply is substantially cheaper than apply: roughly 42% of transactions complete in under 1 ms and fewer than 2% take more than 10 ms.
+- **`reapplyTx`:** The cost of re-validating a transaction that has already been validated before. Because script execution can be skipped, reapply is substantially cheaper than apply: roughly 42% of transactions complete in under 1 ms and fewer than 2% take more than 10 ms.
 
-For batch processing (a full RB or EB worth of transactions), the total processing time is the sum of $n$ independent per-transaction durations. By the Central Limit Theorem, this sum converges to a normal distribution $nZ \sim \mathcal{N}(n\mu, n\sigma^2)$ as $n$ grows. The per-transaction mean $\mu$ and standard deviation $\sigma$ are taken directly from the mainnet measurements.
+### 4.1.1 Batch processing
+
+For batch processing the total processing time is the sum of $n$ independent per-transaction durations. By the *Central Limit Theorem*, this sum converges to a normal distribution $nZ \sim \mathcal{N}(n\mu, n\sigma^2)$ as $n$ grows. The per-transaction mean $\mu$ and standard deviation $\sigma$ are taken directly from the mainnet measurements in the case of `applyTx` and `reapplyTx`.
 
 Since the number of transactions $n$ in a block is itself variable, it is modelled as uniform over $n \sim \mathcal{U}(1, N)$. The resulting aggregate is a scale mixture distribution whose CDF is:
 
@@ -135,18 +137,20 @@ $$F(x) = \frac{1}{N} \sum_{n=1}^{N} \Phi \left(\frac{x - n\mu}{\sqrt{n}\,\sigma}
 
 where $\Phi$ is the standard normal CDF. The two batch distributions use the following parameters derived from the empirical data:
 
-| Operation    | $N$ (max transactions) | $\mu$ (mean, s) | $\sigma$ (std dev, s) |
-| ------------ | ---------------------- | --------------- | --------------------- |
-| `applyTxs`   | 100                    | 0.01060         | 0.02549               |
-| `reapplyTxs` | 2500                   | 0.00271         | 0.02442               |
+| Operation    | $N$ (max transactions) | $\mu$ (mean, ms) | $\sigma$ (std dev, ms) |
+| ------------ | ---------------------- | ---------------- | ---------------------- |
+| `applyTxs`   | 100                    | 10.60            | 25.49                  |
+| `reapplyTxs` | 2500                   | 2.71             | 24.42                  |
 
 ### 4.2 Markov model for TxCache
 
-When an EB arrives at a node, its transactions may already be present in the local mempool (a cache hit), or they may need to be fetched from the network (a cache miss). To model this, we use a two-state Markov chain parameterized by $p$, the probability that a given transaction is in the cache.
+When an EB arrives at a node, its transactions may already be present in the local transaction cache (a cache hit), or they may need to be fetched from the network (a cache miss). To model this, we use a two-state Markov chain parameterized by $p$, the probability that a given transaction is in the cache.
 
 The transition matrix is:
 
 $$M = \begin{pmatrix} 1-p & p \\\ 1-p/2 & p/2 \end{pmatrix}$$
+
+![](TxCache.svg)
 
 Solving the stationary condition $\pi M = \pi$ yields the steady-state distribution:
 
