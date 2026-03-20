@@ -12,7 +12,7 @@ $ cabal run leios-deltaq-estimates
 
 ### Statistics
 
-The statistics depend on the protocol parameters and other configurations. The following values are calculated:
+The tool `cabal run leios-deltaq-stats` sweeps over a set of configurations and computes the statistics for each. The statistics depend on the protocol parameters and other configurations. The following values are calculated:
 
 |Statistic|Dependencies|Description|
 |---|---|---|

@@ -164,38 +164,36 @@ This is used in the ΔQ model to weight the two processing branches — with pro
 
 The model uses $p = 0.75$, giving $\pi_1 \approx 0.455$, $\pi_2 \approx 0.545$, and an effective batch hit rate of $r \approx 0.523$. Higher values of $p$ increase $r$ and therefore lower the EB processing latency.
 
-## 5. Protocol Parameter Sweep
+## 5. Results
 
-The primary security question is: for each parameter combination, does the EB diffusion complete within the Δ\_EB deadline (equal to the diffusion stage length, i.e., 7 slots = 7 seconds in the reference configuration) with sufficiently high probability?
+### 5.1 Cumulative distribution function for Δ\_EB
 
-The CIP-164 protocol requires that the probability of an EB failing to diffuse within Δ\_EB be negligibly small — concretely, below the security threshold used in the Leios security proof.
-
-## 6. Results
-
-### 6.1 CDF of Δ\_EB
-
-Under the reference parameters (EB size = 12 MB, stage length = 7 slots, bandwidth = 100 Mbps, diameter = 7 hops), the ΔQ model yields the following completion-time distribution for EB diffusion:
-
-- **Median diffusion time:** < 2 seconds
-- **90th percentile:** < 4 seconds
-- **99th percentile:** < 6 seconds
+The ΔQ model yields the following completion-time distribution for EB diffusion:
 
 ![](validateEB.svg)
 
-### 6.2 Protocol Security Validation
+- **Median diffusion time:** 4.91 seconds
+- **75th percentile:** 7.13 seconds
+- **95th percentile:** 12.57 seconds
+- **99th percentile:** 15.41 seconds
+
+Under the proposed parameters ($L_\text{hdr}=1$, $L_\text{vote}=4$, $L_\text{diff}=7$) ... TODO
+
+### 5.2 Protocol Security Validation
 
 The ΔQ model confirms that Δ\_EB is satisfied with probability exceeding 99.9% per EB. This is consistent with the security requirements of the Leios protocol and supports the parameter choices proposed in the CIP.
 
-## 7. Conclusions
+## 6. Conclusions
 
 The ΔQ model confirms that the Linear Leios protocol can satisfy its Δ\_EB security requirement under realistic network conditions:
 
 - TODO
 
-## 8. Limitations and Future Work
+## 7. Limitations and Future Work
 
 - This model assumes honest node behavior. Adversarial delay of EBs - for example, an adversary deliberately withholding an EB until just before the voting deadline - is not captured here.
 - With the `piecewise-polynomial` ΔQ backend computational complexity is hard to control, where as with the `sampled` backend it is the accuracy of the results. For this analysis to be successful, we built probabilistic models and then combined those using ΔQ in order to get a model with low complexity to be executable with the default backend.
+- The model does not account for Freshest First Delivery (FFD) of EBs as specified in CIP-164. FFD prioritises the most recently produced blocks during diffusion, which can delay older EBs and worsen their individual diffusion latency; incorporating it would require modelling the interaction between concurrent EB diffusions.
 - Future work should improve the `sampled` backend to keep track of the error margin, in order to be able to run the analysis in reasonable time and being able to quantify the inaccuracy introduced by the simulations.
 
 ## Appendix A: Haskell Source
