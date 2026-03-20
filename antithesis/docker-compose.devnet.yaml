@@ -13,13 +13,15 @@ x-common-env: &common-env
   ENABLE_WAN_EMULATION: ${ENABLE_WAN_EMULATION:-false}
   REF_SLOT: ${REF_SLOT:-11}
 
-x-pool-ips: &pool-ips
+x-node-ips: &node-ips
   IP_POOL1: "172.28.0.10"
   IP_POOL2: "172.28.0.20"
   IP_POOL3: "172.28.0.30"
+  IP_DINGO1: "172.28.0.40"
   PORT_POOL1: "3001"
   PORT_POOL2: "3002"
   PORT_POOL3: "3003"
+  PORT_DINGO: "3001"
 
 services:
   # ==========================================================================
@@ -32,7 +34,7 @@ services:
       dockerfile: antithesis/Dockerfile.cardano-node-bp
     command: ["/app/scripts/init-pool-node.sh", "1"]
     environment:
-      <<: [*common-env, *pool-ips]
+      <<: [*common-env, *node-ips]
     volumes:
       - pool1-data:/data
       - genesis-shared:/shared-genesis
@@ -50,7 +52,7 @@ services:
       init-pool1:
         condition: service_completed_successfully
     environment:
-      <<: [*common-env, *pool-ips]
+      <<: [*common-env, *node-ips]
     volumes:
       - pool2-data:/data
       - genesis-shared:/shared-genesis
@@ -68,9 +70,28 @@ services:
       init-pool1:
         condition: service_completed_successfully
     environment:
-      <<: [*common-env, *pool-ips]
+      <<: [*common-env, *node-ips]
     volumes:
       - pool3-data:/data
+      - genesis-shared:/shared-genesis
+      - logs:/logs
+    networks:
+      - leios-net
+
+  init-dingo1:
+    # NOTE: we reuse the cardano-node image for convenience when doing the init
+    image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
+    build:
+      context: ..
+      dockerfile: antithesis/Dockerfile.cardano-node-bp
+    command: ["/app/scripts/init-dingo-node.sh", "1"]
+    depends_on:
+      init-pool1:
+        condition: service_completed_successfully
+    environment:
+      <<: [*common-env, *node-ips]
+    volumes:
+      - dingo1-data:/data
       - genesis-shared:/shared-genesis
       - logs:/logs
     networks:
@@ -167,6 +188,37 @@ services:
       retries: 60
       start_period: 30s
 
+  dingo1:
+    image: ghcr.io/blinklabs-io/dingo:main-antithesis
+    depends_on:
+      init-dingo1:
+        condition: service_completed_successfully
+      pool1:
+        condition: service_started
+    cap_add:
+      - NET_ADMIN
+    environment:
+      <<: *common-env
+      HOST_ADDR: "0.0.0.0"
+      CARDANO_PORT: "3001"
+      CARDANO_CONFIG: /data/config.yaml
+      CARDANO_TOPOLOGY: /data/topology.json
+      CARDANO_NODE_SOCKET_PATH: /data/dingo.socket
+      CARDANO_NETWORK_MAGIC: '164'
+      DINGO_RUN_MODE: leios
+    volumes:
+      - dingo1-data:/data
+      - logs:/logs
+    networks:
+      leios-net:
+        ipv4_address: 172.28.0.40
+    healthcheck:
+      test: ["CMD", "test", "-S", "/data/dingo.socket"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 30s
+
   # ==========================================================================
   # TX Generator
   # ==========================================================================
@@ -184,7 +236,7 @@ services:
       pool3:
         condition: service_healthy
     environment:
-      <<: *pool-ips
+      <<: *node-ips
     volumes:
       - txgen-data:/data
       - genesis-shared:/shared-genesis:ro
@@ -222,6 +274,7 @@ volumes:
   pool1-data:
   pool2-data:
   pool3-data:
+  dingo1-data:
   txgen-data:
   genesis-shared:
   logs:
