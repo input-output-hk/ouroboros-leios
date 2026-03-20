@@ -153,6 +153,7 @@ echo "  Traffic control: RATE=${RATE}, DELAY=${DELAY}"
 XRAY_COMPOSE=()
 if [ "$XRAY" = "1" ]; then
 	set -a
+	# shellcheck source=/dev/null
 	source "${XRAY_SOURCE_DIR}/env.sh"
 	set +a
 	XRAY_COMPOSE=(-f "${XRAY_SOURCE_DIR}/process-compose.yaml")
