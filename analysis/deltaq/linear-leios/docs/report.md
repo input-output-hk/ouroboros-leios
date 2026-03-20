@@ -68,11 +68,7 @@ The network is modelled as a random graph in which nodes have a fixed number of 
 | Medium | Same continent | 0.069 s |
 | Long | Different continents | 0.268 s |
 
-Each category yields a deterministic transfer time for a given block size. The one-hop ΔQ assigns equal probability to each distance category:
-
-$$\Delta Q_{\text{hop}} = \frac{1}{3}\,\Delta Q_{\text{short}} + \frac{1}{3}\,\Delta Q_{\text{medium}} + \frac{1}{3}\,\Delta Q_{\text{long}}$$
-
-The end-to-end diffusion ΔQ for $n$ hops is the $n$-fold sequential composition of the one-hop ΔQ. To account for the variable path length in a random graph, the multi-hop ΔQs are combined via probabilistic choice, weighted by the empirical path-length distribution of a random graph with 2500 nodes of degree 10 (Table below, sourced from the Praos model):
+Each category yields a deterministic transfer time for a given block size. The one-hop ΔQ assigns equal probability to each distance category. The end-to-end diffusion ΔQ for $n$ hops is the $n$-fold sequential composition of the one-hop ΔQ. To account for the variable path length in a random graph, the multi-hop ΔQs are combined via probabilistic choice, weighted by the empirical path-length distribution of a random graph with 2500 nodes of degree 10 (Table below, sourced from the Praos model):
 
 | Path length | Probability (%) |
 |---|---|
