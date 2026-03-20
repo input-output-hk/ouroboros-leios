@@ -34,7 +34,7 @@ the EB, in order for the security guarantees to hold
 
 | Constructor | Meaning |
 |---|---|
-| `never` | Deterministic delay of `t` seconds |
+| `never` | Outcome that never finishes |
 | `wait t` | Deterministic delay of `t` seconds |
 | `uniform t s` | Uniform distribution between `t` `s` |
 
@@ -43,11 +43,11 @@ and combinators to build more complex abstractions:
 | Operator | Meaning |
 |---|---|
 | `a .>>. b` | Sequential composition: `a` then `b` |
-| `a .\/. b` | First to finish: first of `a` and `b` |
-| `a ./\. b` | Last to finish: both, `a` and `b` |
+| `a .\/. b` | First to finish: `a` or `b` |
+| `a ./\. b` | Last to finish: `a` and `b` |
 | `p a b` | Probabilistic choice: `a` with probability `p`, `b` with probability `1 - p` |
 
-The ΔQ library is built with a backend abstraction for running the computations. The library provides the [piecewise-polynomials](https://github.com/DeltaQ-SD/deltaq/tree/main/lib/probability-polynomial) backend. For running complex models we implemented an new backend [sampled](https://github.com/yveshauser/deltaq/blob/experimental/lib/deltaq/src/DeltaQ/Sampled.hs). They compare as follows:
+The ΔQ library uses a backend abstraction for computations such as convolution for sequential composition. It provides the [piecewise-polynomials](https://github.com/DeltaQ-SD/deltaq/tree/main/lib/probability-polynomial) backend as default. For running complex models, we implemented a new backend called [sampled](https://github.com/yveshauser/deltaq/blob/experimental/lib/deltaq/src/DeltaQ/Sampled.hs). They compare as follows:
 
 - *piecewise-polynomials* is an analytic backend, i.e., exact results, but the computational complexity of the backend does not allow running complex models
 - *sampled* is an approximation backend with efficient computation, but accuracy is hard to control
@@ -56,17 +56,56 @@ The ΔQ model is a complement to the Haskell and Rust simulations to gain confid
 
 ## 3. Network Model
 
-### 3.1 Network
+### 3.1 Network Topology
 
-The block diffusion model used in this library has been taken from the [Praos performance model](https://github.com/intersectMBO/cardano-formal-specifications/src/performance/app/PraosModel.lhs) and updated with estimates from the Leios topology-checker tools.
+The block diffusion model used in this library has been taken from the [Praos performance model](https://github.com/intersectMBO/cardano-formal-specifications/blob/main/src/performance/app/PraosModel.lhs). 
 
-### 3.1 Topology
+The network is modelled as a random graph in which nodes have a fixed number of peers. Block diffusion across multiple hops is captured by sequential composition of per-hop ΔQs. A single hop is characterised by the transfer time for a given block size and the geographic distance between the two endpoints. Following the Praos model, three distance categories are distinguished:
 
-TODO
+| Distance | Description | Round trip time (RTT) |
+|---|---|---|
+| Short | Same data centre | 0.012 s |
+| Medium | Same continent | 0.069 s |
+| Long | Different continents | 0.268 s |
+
+Each category yields a deterministic transfer time for a given block size. The one-hop ΔQ assigns equal probability to each distance category:
+
+$$\Delta Q_{\text{hop}} = \frac{1}{3}\,\Delta Q_{\text{short}} + \frac{1}{3}\,\Delta Q_{\text{medium}} + \frac{1}{3}\,\Delta Q_{\text{long}}$$
+
+The end-to-end diffusion ΔQ for $n$ hops is the $n$-fold sequential composition of the one-hop ΔQ. To account for the variable path length in a random graph, the multi-hop ΔQs are combined via probabilistic choice, weighted by the empirical path-length distribution of a random graph with 2500 nodes of degree 10 (Table below, sourced from the Praos model):
+
+| Path length | Probability (%) |
+|---|---|
+| 1 | 0.40 |
+| 2 | 3.91 |
+| 3 | 31.06 |
+| 4 | 61.85 |
+| 5 | 2.78 |
+
+The resulting blended ΔQ captures the distribution of end-to-end transfer times over the expected variety of paths in the network.
+
+An alternative path-length distribution derived from a mainnet-like topology is available via the [topology-checker](https://github.com/input-output-hk/ouroboros-leios/tree/main/topology-checker) tool and is implemented in [`DeltaQ.Praos`](../src/DeltaQ/Praos.hs) (see `hopCount`), but is not currently used in the model:
+
+| Path length | Count |
+|---|---|
+| 1 | 1909 |
+| 2 | 3867 |
+| 3 | 2826 |
+| 4 | 1068 |
+| 5 | 214 |
+| 6 | 16 |
+
+This distribution reflects the actual peer-to-peer topology of the Cardano mainnet rather than a synthetic random graph, and could be substituted for the Praos path-length distribution to ground the model more closely in real network conditions.
 
 ### 3.2 Stake Distribution
 
 Stake is distributed across nodes in a pattern derived from mainnet. The stake distribution determines the RB production rate: nodes with more stake win the RB sortition lottery more frequently.
+
+The distribution is modelled as a power law fitted to mainnet data. For $n$ nodes ranked by stake, the relative stake of node $k$ is:
+
+$$s_k = \left(\frac{k+1}{n}\right)^{10} - \left(\frac{k}{n}\right)^{10}$$
+
+This concentrates stake among a small number of large pools, reflecting the actual mainnet dynamics where a minority of stake pools control the majority of stake. The derivation of this model is documented in the [linear-leios-preliminaries](../../linear-leios-preliminaries.md#stake-distribution).
 
 ## 4. ΔQ Model of EB Diffusion
 
