@@ -5,4 +5,4 @@ providers:
     folder: Cardano dashboards
     type: file
     options:
-      path: "${WORKING_DIR}/grafana/dashboards"
+      path: "${GRAFANA_HOMEPATH}/dashboards"

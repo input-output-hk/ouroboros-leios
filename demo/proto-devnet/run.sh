@@ -7,7 +7,7 @@ set -eo pipefail
 # Set defaults for all environment variables
 # These can be overridden by exporting them before running this script
 set -a
-: "${WORKING_DIR:=tmp-devnet}"
+: "${WORKING_DIR:=$(pwd)/tmp-devnet}"
 : "${SOURCE_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 : "${IP_NODE1:=172.28.0.10}"
 : "${PORT_NODE1:=3001}"
@@ -22,6 +22,9 @@ set -a
 # Traffic control settings (symmetric, applied to all edges)
 : "${RATE:=10Mbps}"
 : "${DELAY:=200ms}"
+# X-ray observability (on by default, disable with XRAY=0)
+: "${XRAY:=1}"
+: "${XRAY_SOURCE_DIR:="${SOURCE_DIR}/../extras/x-ray"}"
 set +a
 
 # Check for required commands
@@ -140,9 +143,23 @@ export LOG_PATH="${LOG_PATH:-$(realpath "${WORKING_DIR}")/node*/node.log}"
 # Configure tx-generator
 envsubst <"${CONFIG_DIR}/gen.template.json" >"${WORKING_DIR}/gen.json"
 
-# Configure alloy for x-ray observability
-envsubst <"${CONFIG_DIR}/alloy.template" >"${WORKING_DIR}/alloy"
+# Configure alloy for x-ray observability (named config.alloy to avoid conflict with alloy/ storage dir)
+export ALLOY_CONFIG="${WORKING_DIR}/config.alloy"
+envsubst <"${CONFIG_DIR}/alloy.template" >"${ALLOY_CONFIG}"
 
-echo "Starting proto-devnet with process-compose..."
-echo "  Traffic control: ${RATE} / ${DELAY}"
-process-compose --no-server -f "${SOURCE_DIR}/process-compose.yaml"
+echo "Starting proto-devnet ..."
+echo "  Traffic control: RATE=${RATE}, DELAY=${DELAY}"
+# X-ray observability integration
+XRAY_COMPOSE=()
+if [ "$XRAY" = "1" ]; then
+	set -a
+	source "${XRAY_SOURCE_DIR}/env.sh"
+	set +a
+	XRAY_COMPOSE=(-f "${XRAY_SOURCE_DIR}/process-compose.yaml")
+	echo "  X-ray observability: enabled XRAY=${XRAY} (Grafana at http://localhost:3000)"
+else
+	echo "  X-ray observability: disabled XRAY=${XRAY}"
+fi
+process-compose --no-server \
+	-f "${SOURCE_DIR}/process-compose.yaml" \
+	"${XRAY_COMPOSE[@]}"
