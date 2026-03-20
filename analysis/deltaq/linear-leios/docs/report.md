@@ -14,11 +14,6 @@ Early simulations suggested Δ\_EB is manageable under happy-path conditions. Th
 
 Linear Leios is designed around the key insight: Praos block production only occupies roughly 25% of slot time, leaving significant unused network bandwidth and computational capacity during "calm periods". Linear Leios exploits this headroom to achieve high throughput while preserving Praos security guarantees.
 
-The security constraint is that each EB must diffuse to all honest nodes within Δ\_EB slots of its creation. The DeltaQ analysis of Linear Leios validates the following assumptions:
-
-* Reapplying a certified EB cannot cost more than standard transaction processing
-* Any certified EB referenced by an RB must be transmitted before that RB is processed
-
 The protocol behavior is governed by several timing parameters that control the duration of diffusion and voting intervals.
 
 * The parameter $L_\text{hdr}$ needs to be large enough to allow successful RB header diffusion
@@ -27,7 +22,16 @@ The protocol behavior is governed by several timing parameters that control the 
   * too long, then there is probably already a new RB/EB before all votes are delivered
 * The parameter $L_\text{diff}$ is important in order to allow remaining nodes, after a quorum has been reached, receive the EB, in order for the security guarantees to hold
 
+For the security analysis of Linear Leios there are the fallowing assumptions:
+
+* Certified EBs are delivered to all block producing nodes in the worst case at the end of $L_\text{diff}$
+* Reapplying an EB plus verifying the correctness of the EB certificate is computationally less expensive than applying an RB
+
+This analysis targets a stronger bound than the CIP: we require that each certified EB reaches all honest block-producing nodes by the end of $L_\text{diff}$, i.e., within Δ\_EB slots of its creation.
+
 Δ\_EB plays a role in Leios analogous to the Δ parameter in Ouroboros Praos - both bound the time within which a message must reach all honest block producers, and a violation in either case can cause a fork. In Leios, if Δ\_EB is violated, a block producer may receive a new RB carrying a certificate that references an EB the local node has not yet received. That node therefore does not know about the transactions in the EB and has not updated its ledger state accordingly, leading to a divergence in perceived ledger state - a fork. The parameter $L_\text{diff}$ is therefore critical: it reserves enough time after a quorum is reached for the EB to finish diffusing to all remaining nodes, during $L_\text{diff}$ no new RB is being added to the chain giving those nodes the opportunity to receive and apply the EB.
+
+The key question this analysis addresses is whether the first assumption above holds: can certified EBs realistically be delivered to all block-producing nodes by the end of $L_\text{diff}$ under realistic network conditions.
 
 ### 2.2 ΔQ System Development
 
@@ -59,7 +63,7 @@ The ΔQ model is a complement to the Haskell and Rust simulations to gain confid
 
 ### 3.1 Network Topology
 
-The block diffusion model used in this library has been taken from the [Praos performance model](https://github.com/intersectMBO/cardano-formal-specifications/blob/main/src/performance/app/PraosModel.lhs). 
+The block diffusion model used in this library has been taken from the [Praos performance model](https://github.com/intersectMBO/cardano-formal-specifications/blob/main/src/performance/app/PraosModel.lhs).
 
 The network is modelled as a random graph in which nodes have a fixed number of peers. Block diffusion across multiple hops is captured by sequential composition of per-hop ΔQs. A single hop is characterised by the transfer time for a given block size and the geographic distance between the two endpoints. Following the Praos model, three distance categories are distinguished:
 
@@ -184,7 +188,7 @@ The ΔQ model confirms that the Linear Leios protocol can satisfy its Δ\_EB sec
 
 - This model assumes honest node behavior. Adversarial delay of EBs - for example, an adversary deliberately withholding an EB until just before the voting deadline - is not captured here.
 - With the `piecewise-polynomial` ΔQ backend computational complexity is hard to control, where as with the `sampled` backend it is the accuracy of the results. For this analysis to be successful, we built probabilistic models and then combined those using ΔQ in order to get a model with low complexity to be executable with the default backend.
-- Future work should improve the `sampled` backend and keep track of the error margin, in order to be able to run the analysis in reasonable time and being able to quantify the inaccuracy introduced by the simulations. 
+- Future work should improve the `sampled` backend to keep track of the error margin, in order to be able to run the analysis in reasonable time and being able to quantify the inaccuracy introduced by the simulations.
 
 ## Appendix A: Haskell Source
 
