@@ -133,14 +133,18 @@ pub struct RawParameters {
     pub eb_include_txs_from_previous_stage: bool,
 
     // Vote configuration
-    pub vote_generation_probability: f64,
-    pub vote_generation_cpu_time_ms_constant: f64,
+    pub persistent_vote_generation_probability: f64,
+    pub non_persistent_vote_generation_probability: f64,
+    pub persistent_vote_generation_cpu_time_ms: f64,
+    pub non_persistent_vote_generation_cpu_time_ms: f64,
     pub vote_generation_cpu_time_ms_per_tx: f64,
     pub vote_generation_cpu_time_ms_per_ib: f64,
-    pub vote_validation_cpu_time_ms: f64,
+    pub persistent_vote_validation_cpu_time_ms: f64,
+    pub non_persistent_vote_validation_cpu_time_ms: f64,
     pub vote_threshold: u64,
     pub vote_bundle_size_bytes_constant: u64,
-    pub vote_bundle_size_bytes_per_eb: u64,
+    pub persistent_vote_bundle_size_bytes_per_eb: u64,
+    pub non_persistent_vote_bundle_size_bytes_per_eb: u64,
 
     // Certificate configuration
     pub cert_generation_cpu_time_ms_constant: f64,
@@ -393,6 +397,16 @@ impl From<RawTopology> for Topology {
     }
 }
 
+fn vote_weighted_average(params: &RawParameters, persistent: f64, non_persistent: f64) -> f64 {
+    let total = params.persistent_vote_generation_probability
+        + params.non_persistent_vote_generation_probability;
+    if total == 0.0 {
+        return 0.0;
+    }
+    let frac = params.persistent_vote_generation_probability / total;
+    frac * persistent + (1.0 - frac) * non_persistent
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct CpuTimeConfig {
     pub tx_validation_constant: Duration,
@@ -449,10 +463,18 @@ impl CpuTimeConfig {
             eb_body_validation_per_byte: duration_ms(
                 params.eb_body_validation_cpu_time_ms_per_byte,
             ),
-            vote_generation_constant: duration_ms(params.vote_generation_cpu_time_ms_constant),
+            vote_generation_constant: duration_ms(vote_weighted_average(
+                params,
+                params.persistent_vote_generation_cpu_time_ms,
+                params.non_persistent_vote_generation_cpu_time_ms,
+            )),
             vote_generation_per_tx: duration_ms(params.vote_generation_cpu_time_ms_per_tx),
             vote_generation_per_ib: duration_ms(params.vote_generation_cpu_time_ms_per_ib),
-            vote_validation: duration_ms(params.vote_validation_cpu_time_ms),
+            vote_validation: duration_ms(vote_weighted_average(
+                params,
+                params.persistent_vote_validation_cpu_time_ms,
+                params.non_persistent_vote_validation_cpu_time_ms,
+            )),
             cert_generation_constant: duration_ms(params.cert_generation_cpu_time_ms_constant),
             cert_generation_per_node: duration_ms(params.cert_generation_cpu_time_ms_per_node),
             cert_validation_constant: duration_ms(params.cert_validation_cpu_time_ms_constant),
@@ -485,7 +507,12 @@ impl BlockSizeConfig {
             eb_constant: params.eb_size_bytes_constant,
             eb_per_ib: params.eb_size_bytes_per_ib,
             vote_constant: params.vote_bundle_size_bytes_constant,
-            vote_per_eb: params.vote_bundle_size_bytes_per_eb,
+            vote_per_eb: vote_weighted_average(
+                params,
+                params.persistent_vote_bundle_size_bytes_per_eb as f64,
+                params.non_persistent_vote_bundle_size_bytes_per_eb as f64,
+            )
+            .round() as u64,
         }
     }
 
@@ -791,7 +818,8 @@ impl SimConfiguration {
             block_generation_probability: params.rb_generation_probability,
             ib_generation_probability: params.ib_generation_probability,
             eb_generation_probability: params.eb_generation_probability,
-            vote_probability: params.vote_generation_probability,
+            vote_probability: params.persistent_vote_generation_probability
+                + params.non_persistent_vote_generation_probability,
             vote_threshold: params.vote_threshold,
             vote_slot_length: params.leios_stage_active_voting_slots,
             eb_include_txs_from_previous_stage: params.eb_include_txs_from_previous_stage,
