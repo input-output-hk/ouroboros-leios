@@ -64,6 +64,24 @@ export WORKING_DIR=my-devnet
 ./run.sh
 ```
 
+## Traffic control
+
+Proto-devnet uses Linux network namespaces and `tc` (traffic control) to simulate realistic network conditions between nodes: a configurable rate limit and latency on each link.
+
+This requires elevated privileges (`sudo`). The rate and delay can be tuned:
+
+``` shell
+RATE=1Mbps DELAY=500ms ./run.sh
+```
+
+To disable traffic control entirely for quick iteration without elevated processes:
+
+``` shell
+TC=0 ./run.sh
+```
+
+When disabled, nodes run directly on loopback (`127.0.0.1`) with different ports — no network simulation, no `sudo`.
+
 ## Observability with X-ray
 
 Proto-devnet generates an Alloy configuration for use with the X-ray observability stack.

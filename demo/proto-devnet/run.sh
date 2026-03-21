@@ -9,19 +9,26 @@ set -eo pipefail
 set -a
 : "${WORKING_DIR:=$(pwd)/tmp-devnet}"
 : "${SOURCE_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
-: "${IP_NODE1:=172.28.0.10}"
 : "${PORT_NODE1:=3001}"
-: "${IP_NODE2:=172.28.0.20}"
 : "${PORT_NODE2:=3002}"
-: "${IP_NODE3:=172.28.0.30}"
 : "${PORT_NODE3:=3003}"
 : "${METRICS_PORT_NODE1:=12901}"
 : "${METRICS_PORT_NODE2:=12902}"
 : "${METRICS_PORT_NODE3:=12903}"
-: "${IP_HOST:=172.28.0.1}"
-# Traffic control settings (symmetric, applied to all edges)
-: "${RATE:=10Mbps}"
-: "${DELAY:=200ms}"
+# Traffic control (on by default, disable with TC=0)
+: "${TC:=1}"
+if [ "$TC" = "1" ]; then
+	: "${RATE:=10Mbps}"
+	: "${DELAY:=200ms}"
+	: "${IP_HOST:=172.28.0.1}"
+	: "${IP_NODE1:=172.28.0.10}"
+	: "${IP_NODE2:=172.28.0.20}"
+	: "${IP_NODE3:=172.28.0.30}"
+else
+	IP_NODE1=127.0.0.1
+	IP_NODE2=127.0.0.1
+	IP_NODE3=127.0.0.1
+fi
 # X-ray observability (on by default, disable with XRAY=0)
 : "${XRAY:=1}"
 : "${XRAY_SOURCE_DIR:="${SOURCE_DIR}/../extras/x-ray"}"
@@ -148,7 +155,14 @@ export ALLOY_CONFIG="${WORKING_DIR}/config.alloy"
 envsubst <"${CONFIG_DIR}/alloy.template" >"${ALLOY_CONFIG}"
 
 echo "Starting proto-devnet ..."
-echo "  Traffic control: RATE=${RATE}, DELAY=${DELAY}"
+# Traffic control integration
+TC_COMPOSE=()
+if [ "$TC" = "1" ]; then
+	TC_COMPOSE=(-f "${SOURCE_DIR}/process-compose-tc.yaml")
+	echo "  Traffic control: enabled TC=${TC} (RATE=${RATE}, DELAY=${DELAY})"
+else
+	echo "  Traffic control: disabled TC=${TC} (nodes on loopback)"
+fi
 # X-ray observability integration
 XRAY_COMPOSE=()
 if [ "$XRAY" = "1" ]; then
@@ -164,4 +178,5 @@ else
 fi
 process-compose --no-server \
 	-f "${SOURCE_DIR}/process-compose.yaml" \
+	"${TC_COMPOSE[@]}" \
 	"${XRAY_COMPOSE[@]}"
