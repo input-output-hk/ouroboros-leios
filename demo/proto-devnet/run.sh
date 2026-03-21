@@ -145,10 +145,6 @@ find "$WORKING_DIR/utxo-keys" -name "*.skey" -exec chmod 400 {} \;
 cp -r "$CONFIG_DIR/funds.json" "$WORKING_DIR/funds.json"
 envsubst <"${CONFIG_DIR}/centrifuge.template.json" >"${WORKING_DIR}/centrifuge.json"
 
-# Set LOG_PATH to absolute path for x-ray observability
-# Use realpath to resolve WORKING_DIR to absolute path
-export LOG_PATH="${LOG_PATH:-$(realpath "${WORKING_DIR}")/node*/node.log}"
-
 # Configure alloy for x-ray observability (named config.alloy to avoid conflict with alloy/ storage dir)
 export ALLOY_CONFIG="${WORKING_DIR}/config.alloy"
 envsubst <"${CONFIG_DIR}/alloy.template" >"${ALLOY_CONFIG}"

@@ -45,7 +45,7 @@ loki.write "loki" {
 }
 
 local.file_match "local_files" {
-	path_targets = [{"__path__" = "${LOG_PATH}"}]
+	path_targets = [{"__path__" = "${WORKING_DIR}/**/*.log"}]
 	sync_period  = "5s"
 }
 
@@ -130,6 +130,16 @@ loki.process "extract_cardano_node_logs" {
 		values = {
 			service = "cardano-node",
 			type    = "cardano-node",
+		}
+	}
+
+	stage.match {
+		selector = `{process="TxCentrifuge"}`
+		stage.static_labels {
+			values = {
+				service = "tx-centrifuge",
+				type    = "tx-centrifuge",
+			}
 		}
 	}
 
