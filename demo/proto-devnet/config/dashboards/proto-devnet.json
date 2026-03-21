@@ -84,12 +84,28 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Load"
+              "options": "Load (assumed 204B per tx)"
             },
             "properties": [
               {
                 "id": "custom.axisPlacement",
                 "value": "right"
+              },
+              {
+                "id": "unit",
+                "value": "TxkB/s"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "Mempool bytes"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "deckbytes"
               }
             ]
           }
@@ -123,10 +139,10 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "cardano_node_metrics_mempoolBytes_int",
+          "expr": "cardano_node_metrics_mempoolBytes_int / 1000",
           "legendFormat": "{{process}} mempool",
           "range": true,
-          "refId": "A"
+          "refId": "Mempool bytes"
         },
         {
           "datasource": {
@@ -135,13 +151,13 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "rate({service=\"tx-centrifuge\", ns=\"TxCentrifuge.Builder.NewTx\"}[30s])",
+          "expr": "rate({service=\"tx-centrifuge\", ns=\"TxCentrifuge.Builder.NewTx\"}[30s]) * 204 / 1000",
           "hide": false,
           "instant": false,
-          "legendFormat": "Load",
+          "legendFormat": "Load (assumed 204B per tx)",
           "queryType": "range",
           "range": true,
-          "refId": "B"
+          "refId": "Load"
         }
       ],
       "title": "Mempool",
