@@ -12,7 +12,7 @@
       "inputs_per_tx": 1,
       "outputs_per_tx": 1,
       "fee": 1000000,
-      "optimistic_recycle": true
+      "optimistic_recycle": false
     }
   },
   "rate_limit": {
