@@ -44,6 +44,13 @@ linear-diffuse-stage-length-slots: 5
 # - "txs-received": all TXs in the EB must have been received
 # - "fully-valid": the EB must be fully validated
 linear-eb-propagation-criteria: eb-received
+# Maximum age (in slots) before a transaction can be pruned from node memory.
+# When set, transactions older than this that are no longer in the mempool
+# will be removed to limit memory growth during long simulations.
+# Suggested value: linear-vote-stage-length-slots + linear-diffuse-stage-length-slots
+#   + ceil(leios-header-diffusion-time-ms / 1000) * 3 + buffer
+# With defaults: 5 + 5 + 3 + 10 = 23
+linear-tx-max-age-slots: null
 store-txs-as-references: false
 
 ################################################################################

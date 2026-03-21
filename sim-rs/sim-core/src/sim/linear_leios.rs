@@ -219,8 +219,8 @@ pub enum TimedEvent {
 }
 
 enum TransactionView {
-    Pending,
-    Received(Arc<Transaction>),
+    Pending { seen_slot: u64 },
+    Received { tx: Arc<Transaction>, seen_slot: u64 },
 }
 
 enum RankingBlockView {
@@ -308,6 +308,7 @@ pub struct LinearLeiosNode {
     clock: Clock,
     lottery: LotteryConfig,
     consumers: Vec<NodeId>,
+    current_slot: u64,
     txs: HashMap<TransactionId, TransactionView>,
     mempool: Mempool,
     ledger_states: BTreeMap<BlockId, Arc<LedgerState>>,
@@ -349,6 +350,7 @@ impl NodeImpl for LinearLeiosNode {
             clock,
             lottery,
             consumers: config.consumers.clone(),
+            current_slot: 0,
             txs: HashMap::new(),
             mempool: Mempool::new(mempool_max_size_bytes),
             ledger_states: BTreeMap::new(),
@@ -365,7 +367,9 @@ impl NodeImpl for LinearLeiosNode {
     }
 
     fn handle_new_slot(&mut self, slot: u64) -> EventResult {
+        self.current_slot = slot;
         self.try_generate_rb(slot);
+        self.prune_old_txs(slot);
 
         std::mem::take(&mut self.queued)
     }
@@ -445,20 +449,47 @@ impl NodeImpl for LinearLeiosNode {
     }
 }
 
+// TX pruning
+impl LinearLeiosNode {
+    // Remove old transactions from the txs map to bound memory growth.
+    // A TX must meet both conditions to be pruned:
+    // - Old enough that no new EB could reference it, and any EB that did
+    //   reference it has already been received and validated (age > max_age).
+    // - No longer in the mempool. A TX still in the mempool could be included
+    //   in a future EB if previous EBs failed to get enough votes, so we must
+    //   keep it in the txs map for has_tx() / sample_from_mempool() lookups.
+    fn prune_old_txs(&mut self, current_slot: u64) {
+        let Some(max_age) = self.sim_config.linear_tx_max_age_slots else {
+            return;
+        };
+        let mempool = &self.mempool;
+        self.txs.retain(|id, view| {
+            let seen_slot = match view {
+                TransactionView::Pending { seen_slot } => *seen_slot,
+                TransactionView::Received { seen_slot, .. } => *seen_slot,
+            };
+            if current_slot.saturating_sub(seen_slot) <= max_age {
+                return true;
+            }
+            mempool.contains(id)
+        });
+    }
+}
+
 // Transaction propagation
 impl LinearLeiosNode {
     fn receive_announce_tx(&mut self, from: NodeId, id: TransactionId) {
         if self.txs.get(&id).is_none_or(|t| {
             self.sim_config.relay_strategy == RelayStrategy::RequestFromAll
-                && matches!(t, TransactionView::Pending)
+                && matches!(t, TransactionView::Pending { .. })
         }) {
-            self.txs.insert(id, TransactionView::Pending);
+            self.txs.insert(id, TransactionView::Pending { seen_slot: self.current_slot });
             self.queued.send_to(from, Message::RequestTx(id));
         }
     }
 
     fn receive_request_tx(&mut self, from: NodeId, id: TransactionId) {
-        if let Some(TransactionView::Received(tx)) = self.txs.get(&id) {
+        if let Some(TransactionView::Received { tx, .. }) = self.txs.get(&id) {
             self.tracker.track_transaction_sent(tx, self.id, from);
             self.queued.send_to(from, Message::Tx(tx.clone()));
         }
@@ -478,10 +509,18 @@ impl LinearLeiosNode {
 
     fn propagate_tx(&mut self, from: NodeId, tx: Arc<Transaction>) {
         let id = tx.id;
+        let seen_slot = self
+            .txs
+            .get(&id)
+            .map(|v| match v {
+                TransactionView::Pending { seen_slot } => *seen_slot,
+                TransactionView::Received { seen_slot, .. } => *seen_slot,
+            })
+            .unwrap_or(self.current_slot);
         if self
             .txs
-            .insert(id, TransactionView::Received(tx.clone()))
-            .is_some_and(|tx| matches!(tx, TransactionView::Received(_)))
+            .insert(id, TransactionView::Received { tx: tx.clone(), seen_slot })
+            .is_some_and(|tv| matches!(tv, TransactionView::Received { .. }))
         {
             return;
         }
@@ -503,7 +542,7 @@ impl LinearLeiosNode {
     }
 
     fn has_tx(&self, tx_id: TransactionId) -> bool {
-        matches!(self.txs.get(&tx_id), Some(TransactionView::Received(_)))
+        matches!(self.txs.get(&tx_id), Some(TransactionView::Received { .. }))
     }
 
     fn acknowledge_tx(&mut self, tx: &Transaction) -> bool {
@@ -1163,7 +1202,7 @@ impl LinearLeiosNode {
         for tx in withheld_txs {
             // Add the peer's withheld TXs to the list we know of,
             // but not to our mempools
-            self.txs.insert(tx.id, TransactionView::Received(tx));
+            self.txs.insert(tx.id, TransactionView::Received { tx, seen_slot: self.current_slot });
         }
         // If an attacker receives an EB over a side channel,
         // it will skip validation and will not disseminate it to peers.
@@ -1216,7 +1255,7 @@ impl LinearLeiosNode {
             self.tracker.track_transaction_generated(&tx, self.id);
             let tx = Arc::new(tx);
             self.txs
-                .insert(tx.id, TransactionView::Received(tx.clone()));
+                .insert(tx.id, TransactionView::Received { tx: tx.clone(), seen_slot: self.current_slot });
             txs.push(tx);
         }
         txs
@@ -1423,7 +1462,7 @@ impl LinearLeiosNode {
         // Fill with as many pending transactions as can fit
         let mut removed_ids = vec![];
         while let Some(id) = candidates.pop() {
-            let Some(TransactionView::Received(tx)) = self.txs.get(&id) else {
+            let Some(TransactionView::Received { tx, .. }) = self.txs.get(&id) else {
                 panic!("missing a TX in our mempool");
             };
             if size + tx.bytes > max_size {
@@ -1545,6 +1584,7 @@ struct Mempool {
     max_size_bytes: u64,
     queue: BTreeMap<u64, Arc<Transaction>>,
     input_ids: HashSet<u64>,
+    tx_ids: HashSet<TransactionId>,
 }
 impl Mempool {
     fn new(max_size_bytes: u64) -> Self {
@@ -1555,6 +1595,7 @@ impl Mempool {
             max_size_bytes,
             queue: BTreeMap::new(),
             input_ids: HashSet::new(),
+            tx_ids: HashSet::new(),
         }
     }
     fn try_insert(&mut self, tx: Arc<Transaction>) -> bool {
@@ -1562,6 +1603,7 @@ impl Mempool {
         if self.mempool_count < self.queue.len() || new_bytes > self.max_size_bytes {
             // mempool is or would be full, just put this at the end and Be Done
             let id = self.new_id();
+            self.tx_ids.insert(tx.id);
             self.queue.insert(id, tx);
             return false;
         }
@@ -1574,12 +1616,17 @@ impl Mempool {
         self.mempool_size_bytes = new_bytes;
         self.input_ids.insert(tx.input_id);
         let id = self.new_id();
+        self.tx_ids.insert(tx.id);
         self.queue.insert(id, tx);
         true
     }
 
     fn ids(&self) -> impl Iterator<Item = TransactionId> {
         self.queue.values().take(self.mempool_count).map(|tx| tx.id)
+    }
+
+    fn contains(&self, id: &TransactionId) -> bool {
+        self.tx_ids.contains(id)
     }
 
     // Removes a set of TXs from the mempool.
@@ -1605,11 +1652,13 @@ impl Mempool {
                 new_mempool_count -= 1;
                 self.mempool_size_bytes -= tx.bytes;
                 self.input_ids.remove(&tx.input_id);
+                self.tx_ids.remove(&tx.id);
                 false
             } else {
                 // we're iterating through the queued TXs which aren't yet in the mempool
                 if self.input_ids.contains(&tx.input_id) {
                     // conflicts with the mempool, remove it at once
+                    self.tx_ids.remove(&tx.id);
                     return false;
                 }
                 // add TXs until we're full
@@ -1648,11 +1697,13 @@ impl Mempool {
                 new_mempool_count -= 1;
                 self.mempool_size_bytes -= tx.bytes;
                 self.input_ids.remove(&tx.input_id);
+                self.tx_ids.remove(&tx.id);
                 false
             } else {
                 // we're iterating through the queued TXs which aren't yet in the mempool
                 if self.input_ids.contains(&tx.input_id) || input_ids.contains(&tx.input_id) {
                     // conflicts with the ledger or the new mempool, remove it at once
+                    self.tx_ids.remove(&tx.id);
                     return false;
                 }
                 // add TXs until we're full

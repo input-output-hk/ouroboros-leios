@@ -80,6 +80,7 @@ pub struct RawParameters {
     pub linear_vote_stage_length_slots: u64,
     pub linear_diffuse_stage_length_slots: u64,
     pub linear_eb_propagation_criteria: EBPropagationCriteria,
+    pub linear_tx_max_age_slots: Option<u64>,
 
     // Transaction configuration
     pub tx_generation_distribution: DistributionConfig,
@@ -172,6 +173,15 @@ pub enum LeiosVariant {
     FullWithTxReferences,
     Linear,
     LinearWithTxReferences,
+}
+
+impl LeiosVariant {
+    pub fn has_ibs(&self) -> bool {
+        !matches!(
+            self,
+            Self::FullWithoutIbs | Self::Linear | Self::LinearWithTxReferences
+        )
+    }
 }
 
 #[derive(Debug, Copy, Clone, Deserialize, PartialEq, Eq)]
@@ -728,6 +738,7 @@ pub struct SimConfiguration {
     pub(crate) linear_vote_stage_length: u64,
     pub(crate) linear_diffuse_stage_length: u64,
     pub(crate) linear_eb_propagation_criteria: EBPropagationCriteria,
+    pub(crate) linear_tx_max_age_slots: Option<u64>,
     pub(crate) max_block_size: u64,
     pub(crate) max_ib_size: u64,
     pub(crate) max_eb_size: u64,
@@ -798,6 +809,7 @@ impl SimConfiguration {
             linear_vote_stage_length: params.linear_vote_stage_length_slots,
             linear_diffuse_stage_length: params.linear_diffuse_stage_length_slots,
             linear_eb_propagation_criteria: params.linear_eb_propagation_criteria,
+            linear_tx_max_age_slots: params.linear_tx_max_age_slots,
             max_block_size: params.rb_body_max_size_bytes,
             max_ib_size: params.ib_body_max_size_bytes,
             max_eb_size: params.eb_referenced_txs_max_size_bytes,

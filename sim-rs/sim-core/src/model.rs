@@ -271,7 +271,7 @@ pub struct VoteBundle {
     pub ebs: BTreeMap<EndorserBlockId, usize>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum NoVoteReason {
     InvalidSlot,
     ExtraIB,

@@ -39,8 +39,6 @@ struct Args {
     output: Option<PathBuf>,
     #[clap(short, long)]
     parameters: Vec<PathBuf>,
-    #[clap(short, long)]
-    timescale: Option<f64>,
     #[clap(long)]
     trace_node: Vec<usize>,
     #[clap(short, long)]
@@ -175,7 +173,6 @@ mod tests {
                 topology: Some(topology?.path()),
                 output: None,
                 parameters: vec![],
-                timescale: None,
                 trace_node: vec![],
                 slots: None,
                 conformance_events: false,

@@ -12,7 +12,7 @@ use sim_core::{
     clock::Timestamp,
     config::{LeiosVariant, NodeId, SimConfiguration},
     events::{BlockRef, Event, Node},
-    model::{BlockId, TransactionId},
+    model::{BlockId, NoVoteReason, TransactionId},
 };
 use tokio::{
     fs::{self, File},
@@ -48,6 +48,7 @@ pub struct EventMonitor {
     pool_ids: Vec<NodeId>,
     maximum_ib_age: u64,
     maximum_eb_age: u64,
+    vote_threshold: u64,
     events_source: LivenessMonitor,
     output_path: Option<PathBuf>,
     aggregate: bool,
@@ -73,6 +74,7 @@ impl EventMonitor {
             pool_ids,
             maximum_ib_age,
             maximum_eb_age: config.max_eb_age,
+            vote_threshold: config.vote_threshold,
             events_source: LivenessMonitor::new(config, events_source),
             output_path,
             aggregate: config.aggregate_events,
@@ -106,6 +108,7 @@ impl EventMonitor {
         let mut ib_messages = MessageStats::default();
         let mut eb_messages = MessageStats::default();
         let mut vote_messages = MessageStats::default();
+        let mut no_vote_reasons: BTreeMap<NoVoteReason, u64> = BTreeMap::new();
 
         // Pretty print options for bytes
         let pbo = Some(PrettyBytesOptions {
@@ -388,7 +391,9 @@ impl EventMonitor {
                     }
                 }
                 Event::NoVTBundleGenerated { .. } => {}
-                Event::VTBundleNotGenerated { .. } => {}
+                Event::VTBundleNotGenerated { reason, .. } => {
+                    *no_vote_reasons.entry(reason).or_default() += 1;
+                }
                 Event::VTBundleSent { .. } => {
                     vote_messages.sent += 1;
                 }
@@ -483,34 +488,51 @@ impl EventMonitor {
             let expired_ebs = ebs.values().filter(|eb| eb.included_in_eb.is_none() && eb.included_in_block.is_none() && eb.generated < eb_expiration_cutoff).count();
             let empty_ebs = ebs.values().filter(|eb| eb.is_empty()).count();
             let bundle_count = votes_per_bundle.len();
-            let txs_per_ib = compute_stats(ibs.values().map(|ib| ib.txs.len() as f64));
-            let bytes_per_ib = compute_stats(ibs.values().map(|ib| ib.bytes as f64));
-            let ibs_per_tx = compute_stats(ibs_containing_tx.into_values());
+            let has_ibs = self.variant.has_ibs();
             let txs_per_eb = compute_stats(ebs.values().map(|eb| eb.txs.len() as f64));
-            let ibs_per_eb = compute_stats(ebs.values().map(|eb| eb.ibs.len() as f64));
-            let ebs_per_ib = compute_stats(ebs_containing_ib.into_values());
-            let ib_time_stats = compute_stats(times_to_reach_ib.iter().map(|t| t.as_secs_f64()));
             let eb_time_stats = compute_stats(times_to_reach_eb.iter().map(|t| t.as_secs_f64()));
             let block_time_stats = compute_stats(times_to_reach_block.iter().map(|t| t.as_secs_f64()));
-            let ibs_received = compute_stats(
-                self.node_ids
-                    .iter()
-                    .map(|id| seen_ibs.get(id).copied().unwrap_or_default()),
-            );
             let votes_per_pool = compute_stats(votes_per_pool.into_values());
+            let uncertified_ebs = ebs.keys()
+                .filter(|id| eb_votes.get(id).copied().unwrap_or(0.0) < self.vote_threshold as f64)
+                .count();
             let votes_per_eb = compute_stats(eb_votes.into_values());
             let votes_per_bundle = compute_stats(votes_per_bundle.into_values());
 
-            info!(
-                "{} IB(s) were generated, on average {:.3} IB(s) per slot.",
-                ibs.len(),
-                ibs.len() as f64 / total_slots as f64
-            );
-            info!(
-                "{} out of {} transaction(s) were included in at least one IB.",
-                times_to_reach_ib.len(),
-                txs.len(),
-            );
+            if has_ibs {
+                let txs_per_ib = compute_stats(ibs.values().map(|ib| ib.txs.len() as f64));
+                let bytes_per_ib = compute_stats(ibs.values().map(|ib| ib.bytes as f64));
+                let ibs_per_tx = compute_stats(ibs_containing_tx.into_values());
+                let ibs_received = compute_stats(
+                    self.node_ids
+                        .iter()
+                        .map(|id| seen_ibs.get(id).copied().unwrap_or_default()),
+                );
+                info!(
+                    "{} IB(s) were generated, on average {:.3} IB(s) per slot.",
+                    ibs.len(),
+                    ibs.len() as f64 / total_slots as f64
+                );
+                info!(
+                    "{} out of {} transaction(s) were included in at least one IB.",
+                    times_to_reach_ib.len(),
+                    txs.len(),
+                );
+                info!(
+                    "Each transaction was included in an average of {:.3} IB(s) (stddev {:.3}).",
+                    ibs_per_tx.mean, ibs_per_tx.std_dev,
+                );
+                info!(
+                    "Each IB contained an average of {:.3} transaction(s) (stddev {:.3}) and an average of {} (stddev {:.3}). {} IB(s) were empty.",
+                    txs_per_ib.mean, txs_per_ib.std_dev,
+                    pretty_bytes(bytes_per_ib.mean.trunc() as u64, pbo.clone()), pretty_bytes(bytes_per_ib.std_dev.trunc() as u64, pbo.clone()),
+                    ibs.values().filter(|ib| ib.is_empty()).count(),
+                );
+                info!(
+                    "Each node received an average of {:.3} IB(s) (stddev {:.3}).",
+                    ibs_received.mean, ibs_received.std_dev,
+                );
+            }
             let avg_age = txs.values().filter_map(|tx| {
                 if tx.tx_type.is_none() {
                     Some((last_timestamp - tx.generated).as_secs_f64())
@@ -524,20 +546,6 @@ impl EventMonitor {
                 avg_age_stats.mean, avg_age_stats.std_dev,
             );
             info!(
-                "Each transaction was included in an average of {:.3} IB(s) (stddev {:.3}).",
-                ibs_per_tx.mean, ibs_per_tx.std_dev,
-            );
-            info!(
-                "Each IB contained an average of {:.3} transaction(s) (stddev {:.3}) and an average of {} (stddev {:.3}). {} IB(s) were empty.",
-                txs_per_ib.mean, txs_per_ib.std_dev,
-                pretty_bytes(bytes_per_ib.mean.trunc() as u64, pbo.clone()), pretty_bytes(bytes_per_ib.std_dev.trunc() as u64, pbo.clone()),
-                ibs.values().filter(|ib| ib.is_empty()).count(),
-            );
-            info!(
-                "Each node received an average of {:.3} IB(s) (stddev {:.3}).",
-                ibs_received.mean, ibs_received.std_dev,
-            );
-            info!(
                 "{} EB(s) were generated; on average there were {:.3} EB(s) per slot.",
                 ebs.len(),
                 ebs.len() as f64 / total_slots as f64
@@ -546,22 +554,26 @@ impl EventMonitor {
                 "Each EB contained an average of {:.3} transaction(s) (stddev {:.3}). {} EB(s) were empty.",
                 txs_per_eb.mean, txs_per_eb.std_dev, empty_ebs
             );
-            info!(
-                "Each EB contained an average of {:.3} IB(s) (stddev {:.3}). {} EB(s) were empty.",
-                ibs_per_eb.mean, ibs_per_eb.std_dev, empty_ebs
-            );
-            info!(
-                "Each IB was included in an average of {:.3} EB(s) (stddev {:.3}).",
-                ebs_per_ib.mean, ebs_per_ib.std_dev,
-            );
-            info!(
-                "{} out of {} IBs were included in at least one EB.",
-                ibs.values().filter(|ib| ib.included_in_eb.is_some()).count(), ibs.len(),
-            );
-            info!(
-                "{} out of {} IBs expired before they reached an EB.",
-                expired_ibs, ibs.len(),
-            );
+            if has_ibs {
+                let ibs_per_eb = compute_stats(ebs.values().map(|eb| eb.ibs.len() as f64));
+                let ebs_per_ib = compute_stats(ebs_containing_ib.into_values());
+                info!(
+                    "Each EB contained an average of {:.3} IB(s) (stddev {:.3}). {} EB(s) were empty.",
+                    ibs_per_eb.mean, ibs_per_eb.std_dev, empty_ebs
+                );
+                info!(
+                    "Each IB was included in an average of {:.3} EB(s) (stddev {:.3}).",
+                    ebs_per_ib.mean, ebs_per_ib.std_dev,
+                );
+                info!(
+                    "{} out of {} IBs were included in at least one EB.",
+                    ibs.values().filter(|ib| ib.included_in_eb.is_some()).count(), ibs.len(),
+                );
+                info!(
+                    "{} out of {} IBs expired before they reached an EB.",
+                    expired_ibs, ibs.len(),
+                );
+            }
             info!(
                 "{} out of {} EBs expired before an EB from their stage reached an RB.",
                 expired_ebs, ebs.len(),
@@ -577,16 +589,30 @@ impl EventMonitor {
                 votes_per_eb.mean, votes_per_eb.std_dev);
             info!("There were {bundle_count} bundle(s) of votes. Each bundle contained {:.3} vote(s) (stddev {:.3}).",
                 votes_per_bundle.mean, votes_per_bundle.std_dev);
+            if !no_vote_reasons.is_empty() {
+                let total: u64 = no_vote_reasons.values().sum();
+                info!("{total} vote(s) were not generated due to validation failures:");
+                for (reason, count) in &no_vote_reasons {
+                    info!("  {reason:?}: {count}");
+                }
+            }
+            if uncertified_ebs > 0 {
+                info!("{uncertified_ebs} out of {} EB(s) did not reach the vote threshold ({}).",
+                    ebs.len(), self.vote_threshold);
+            }
             info!("{} L1 block(s) had a Leios endorsement.", leios_blocks_with_endorsements);
             info!("{} tx(s) ({}) were referenced by a Leios endorsement.", leios_txs, pretty_bytes(leios_tx_bytes, pbo.clone()));
             info!("{} tx(s) ({}) were included directly in a Praos block.", praos_txs, pretty_bytes(praos_tx_bytes, pbo.clone()));
             info!("Spatial efficiency: {}/{} ({:.3}%) of Leios bytes were unique transactions.", pretty_bytes(leios_tx_bytes, pbo.clone()), pretty_bytes(total_leios_bytes, pbo.clone()),
                   (leios_tx_bytes as f64 / total_leios_bytes as f64) * 100.);
             info!("{} tx(s) ({:.3}%) referenced by a Leios endorsement were redundant.", total_leios_txs - leios_txs, (total_leios_txs - leios_txs) as f64 / total_leios_txs as f64 * 100.);
-            info!(
-                "Each transaction took an average of {:.3}s (stddev {:.3}) to be included in an IB.",
-                ib_time_stats.mean, ib_time_stats.std_dev,
-            );
+            if has_ibs {
+                let ib_time_stats = compute_stats(times_to_reach_ib.iter().map(|t| t.as_secs_f64()));
+                info!(
+                    "Each transaction took an average of {:.3}s (stddev {:.3}) to be included in an IB.",
+                    ib_time_stats.mean, ib_time_stats.std_dev,
+                );
+            }
             info!(
                 "Each transaction took an average of {:.3}s (stddev {:.3}) to be included in an EB.",
                 eb_time_stats.mean, eb_time_stats.std_dev,
@@ -599,7 +625,9 @@ impl EventMonitor {
 
         info_span!("network").in_scope(|| {
             tx_messages.display("TX");
-            ib_messages.display("IB");
+            if self.variant.has_ibs() {
+                ib_messages.display("IB");
+            }
             eb_messages.display("EB");
             vote_messages.display("Vote");
         });
