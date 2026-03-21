@@ -26,7 +26,7 @@ Install these prerequisites:
 - `cardano-cli` compatible with the cardano-node version
 - `sqlite3` for creating Leios databases
 - `jq` and `envsubst` for config modifications
-- `tx-generator` (optional) for generating transaction workload
+- `tx-centrifuge` for generating transaction workload
 
 Ensure they are on your PATH, override if needed with something like:
 
@@ -46,7 +46,7 @@ This `process-compose` orchestrated demo will:
 
 1. Initialize a three node cardano devnet
 2. Start all three nodes
-3. Generate and submit a transaction workload using `tx-generator`
+3. Generate and submit a transaction workload using `tx-centrifuge`
 4. Observes tip advancing and mempool size (more observability come later):
 
 ``` shell

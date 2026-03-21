@@ -23,7 +23,7 @@
           pkgs.envsubst
           inputs'.cardano-node.packages.cardano-testnet
           inputs'.cardano-node.packages.cardano-cli
-          inputs'.cardano-node.packages.tx-generator
+          inputs'.cardano-node.packages.tx-centrifuge
           # Use the patched cardano-node
           inputs'.cardano-node-leios.packages.cardano-node
         ];

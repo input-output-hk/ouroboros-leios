@@ -1,0 +1,32 @@
+{
+  "initial_inputs": {
+    "type": "genesis_utxo_keys",
+    "params": {
+      "network_magic": 164,
+      "signing_keys_file": "funds.json"
+    }
+  },
+  "builder": {
+    "type": "value",
+    "params": {
+      "inputs_per_tx": 1,
+      "outputs_per_tx": 1,
+      "fee": 1000000,
+      "optimistic_recycle": true
+    }
+  },
+  "rate_limit": {
+    "type": "token_bucket",
+    "scope": "shared",
+    "params": { "tps": 100 }
+  },
+  "workloads": {
+    "synthetic-chain": {
+        "targets": {
+            "node1": {"addr": "${IP_NODE1}", "port": ${PORT_NODE1}}
+        }
+    }
+  },
+  "nodeConfig": "node1/config.yaml",
+  "protocolParametersFile": "pp.json"
+}

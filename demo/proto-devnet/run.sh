@@ -43,7 +43,7 @@ REQUIRED_COMMANDS=(
 	"envsubst"
 	"cardano-node"
 	"cardano-cli"
-	"tx-generator"
+	"tx-centrifuge"
 )
 
 MISSING_COMMANDS=()
@@ -138,17 +138,16 @@ for i in "${nodes[@]}"; do
 	chmod 400 "$NODE_DIR/keys"/*.skey
 done
 
-# Copy utxo-keys for tx-generator and set permissions
-echo "Setting up utxo-keys for tx-generator"
+# Copy utxo-keys for tx-centrifuge and set permissions
+echo "Setting up utxo-keys for tx-centrifuge"
 cp -r "$CONFIG_DIR/utxo-keys" "$WORKING_DIR/utxo-keys"
 find "$WORKING_DIR/utxo-keys" -name "*.skey" -exec chmod 400 {} \;
+cp -r "$CONFIG_DIR/funds.json" "$WORKING_DIR/funds.json"
+envsubst <"${CONFIG_DIR}/centrifuge.template.json" >"${WORKING_DIR}/centrifuge.json"
 
 # Set LOG_PATH to absolute path for x-ray observability
 # Use realpath to resolve WORKING_DIR to absolute path
 export LOG_PATH="${LOG_PATH:-$(realpath "${WORKING_DIR}")/node*/node.log}"
-
-# Configure tx-generator
-envsubst <"${CONFIG_DIR}/gen.template.json" >"${WORKING_DIR}/gen.json"
 
 # Configure alloy for x-ray observability (named config.alloy to avoid conflict with alloy/ storage dir)
 export ALLOY_CONFIG="${WORKING_DIR}/config.alloy"

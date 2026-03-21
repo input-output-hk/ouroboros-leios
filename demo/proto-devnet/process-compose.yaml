@@ -26,8 +26,10 @@ processes:
       bash "${SOURCE_DIR}/run-node.sh"
     log_location: "${WORKING_DIR}/node3/node.log"
 
-  TxGenerator:
-    command: while [ ! -S ${WORKING_DIR}/node1/node.socket ]; do sleep 0.5; done && cd ${WORKING_DIR} && tx-generator json_highlevel gen.json
+  TxCentrifuge:
+    working_dir: ${WORKING_DIR}
+    command: tx-centrifuge centrifuge.json
+    log_location: "${WORKING_DIR}/tx-centrifuge.log"
     depends_on:
       Node1:
         condition: process_started
