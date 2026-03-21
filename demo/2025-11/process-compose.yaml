@@ -20,6 +20,7 @@ processes:
       IP_UPSTREAM_NODE="${IP_UPSTREAM_NODE}" \
       IP_NODE0="${IP_NODE0}" \
       IP_DOWNSTREAM_NODE="${IP_DOWNSTREAM_NODE}" \
+      env PATH=$PATH \
       bash "${SOURCE_DIR}/scripts/init-namespaces.sh"
 
   PrepareUpstreamNode:
@@ -36,12 +37,14 @@ processes:
       UPSTREAM_NODE_DIR="${UPSTREAM_NODE_DIR}" \
       REF_SLOT="${REF_SLOT}" \
       ONSET_OF_REF_SLOT="${ONSET_OF_REF_SLOT}" \
-      PORT_UPSTREAM_NODE="${PORT_UPSTREAM_NODE}" \
-      ip netns exec leios-experiment:upstream bash "${SOURCE_DIR}/scripts/upstream-node.sh"
+      ip netns exec leios-experiment:upstream env PATH=$PATH bash \
+      "${SOURCE_DIR}/scripts/upstream-node.sh"
     log_location: "${WORKING_DIR}/upstream-node.log"
     depends_on:
       PrepareUpstreamNode:
         condition: process_completed_successfully
+      Upstreampcap:
+        condition: process_started
     availability:
       restart: "always"
 
@@ -50,7 +53,6 @@ processes:
     command: |
       NODE0_DIR="${NODE0_DIR}" \
       DATA_DIR="${DATA_DIR}" \
-      PORT_UPSTREAM_NODE="${PORT_UPSTREAM_NODE}" \
       IP_UPSTREAM_NODE="${IP_UPSTREAM_NODE}" \
       bash "${SOURCE_DIR}/scripts/prepare-node0.sh"
     depends_on:
@@ -63,12 +65,14 @@ processes:
     is_elevated: true
     command: |
       NODE0_DIR="${NODE0_DIR}" \
-      PORT_NODE0="${PORT_NODE0}" \
-      ip netns exec leios-experiment:node0 bash "${SOURCE_DIR}/scripts/node0.sh"
+      ip netns exec leios-experiment:node0 env PATH=$PATH bash \
+      "${SOURCE_DIR}/scripts/node0.sh"
     log_location: "${WORKING_DIR}/node0.log"
     depends_on:
       PrepareNode0:
         condition: process_completed_successfully
+      Node0pcap:
+        condition: process_started
     availability:
       restart: "always"
 
@@ -77,7 +81,6 @@ processes:
     command: |
       DOWNSTREAM_NODE_DIR="${DOWNSTREAM_NODE_DIR}" \
       DATA_DIR="${DATA_DIR}" \
-      PORT_NODE0="${PORT_NODE0}" \
       IP_NODE0="${IP_NODE0}" \
       bash "${SOURCE_DIR}/scripts/prepare-downstream-node.sh"
     depends_on:
@@ -91,21 +94,52 @@ processes:
     command: |
       DOWNSTREAM_NODE_DIR="${DOWNSTREAM_NODE_DIR}" \
       PORT_DOWNSTREAM_NODE="${PORT_DOWNSTREAM_NODE}" \
-      ip netns exec leios-experiment:downstream bash "${SOURCE_DIR}/scripts/downstream-node.sh"
+      ip netns exec leios-experiment:downstream env PATH=$PATH bash \
+      "${SOURCE_DIR}/scripts/downstream-node.sh"
     log_location: "${WORKING_DIR}/downstream-node.log"
     depends_on:
       PrepareDownstreamNode:
         condition: process_completed_successfully
+      Downstreampcap:
+        condition: process_started
     availability:
       restart: "always"
+
+  Node0pcap:
+    is_elevated: true
+    command: |
+      ip netns exec leios-experiment:node0 env PATH=$PATH \
+      tcpdump -w "${WORKING_DIR}/node_0.pcap" -s 0
+    depends_on:
+      InitNamespaces:
+        condition: process_completed_successfully
+
+  Upstreampcap:
+    is_elevated: true
+    command: |
+      ip netns exec leios-experiment:upstream env PATH=$PATH \
+      tcpdump -w "${WORKING_DIR}/upstream.pcap" -s 0
+    depends_on:
+      InitNamespaces:
+        condition: process_completed_successfully
+
+  Downstreampcap:
+    is_elevated: true
+    command: |
+      ip netns exec leios-experiment:downstream env PATH=$PATH \
+      tcpdump -w "${WORKING_DIR}/downstream.pcap" -s 0
+    depends_on:
+      InitNamespaces:
+        condition: process_completed_successfully
 
   SSOnUpstreamNode:
     is_elevated: true
     command: |
+      WORKING_DIR=$WORKING_DIR \
+      IP_NODE0="${IP_NODE0}" \
       IP_UPSTREAM_NODE="${IP_UPSTREAM_NODE}" \
-      PORT_UPSTREAM_NODE="${PORT_UPSTREAM_NODE}" \
-      PORT_NODE0="${PORT_NODE0}" \
-      ip netns exec leios-experiment:upstream bash "${SOURCE_DIR}/scripts/ss-on-upstream.sh"
+      ip netns exec leios-experiment:upstream env PATH=$PATH bash \
+      "${SOURCE_DIR}/scripts/ss-on-upstream.sh"
     depends_on:
       UpstreamNode:
         condition: "process_started"
@@ -115,11 +149,12 @@ processes:
   SSOnNode0:
     is_elevated: true
     command: |
+      WORKING_DIR=$WORKING_DIR \
+      IP_UPSTREAM_NODE="${IP_UPSTREAM_NODE}" \
+      IP_DOWNSTREAM_NODE="${IP_DOWNSTREAM_NODE}" \
       IP_NODE0="${IP_NODE0}" \
-      PORT_NODE0="${PORT_NODE0}" \
-      PORT_UPSTREAM_NODE="${PORT_UPSTREAM_NODE}" \
-      PORT_DOWNSTREAM_NODE="${PORT_DOWNSTREAM_NODE}" \
-      ip netns exec leios-experiment:node0 bash "${SOURCE_DIR}/scripts/ss-on-node0.sh"
+      ip netns exec leios-experiment:node0 env PATH=$PATH bash \
+      "${SOURCE_DIR}/scripts/ss-on-node0.sh"
     depends_on:
       Node0:
         condition: "process_started"
@@ -129,10 +164,11 @@ processes:
   SSOnDownstreamNode:
     is_elevated: true
     command: |
+      WORKING_DIR=$WORKING_DIR \
+      IP_NODE0="${IP_NODE0}" \
       IP_DOWNSTREAM_NODE="${IP_DOWNSTREAM_NODE}" \
-      PORT_NODE0="${PORT_NODE0}" \
-      PORT_DOWNSTREAM_NODE="${PORT_DOWNSTREAM_NODE}" \
-      ip netns exec leios-experiment:downstream bash "${SOURCE_DIR}/scripts/ss-on-downstream.sh"
+      ip netns exec leios-experiment:downstream env PATH=$PATH bash \
+      "${SOURCE_DIR}/scripts/ss-on-downstream.sh"
     depends_on:
       DownstreamNode:
         condition: "process_started"
