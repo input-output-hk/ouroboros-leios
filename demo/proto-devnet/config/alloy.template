@@ -116,13 +116,9 @@ loki.process "extract_cardano_node_logs" {
 
 	stage.labels {
 		values = {
-			level    = "sev",
-			alias    = "host",
-			host     = "host",
-			instance = "host",
-			sev      = "sev",
-			thread   = "thread",
-			ns       = "ns",
+			host = "host",
+			sev  = "sev",
+			ns   = "ns",
 		}
 	}
 
