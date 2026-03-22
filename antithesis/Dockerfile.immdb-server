@@ -57,14 +57,14 @@ RUN apt-get update -y && \
 RUN mkdir -p /app/config /app/genesis /app/scripts /data /logs
 
 # Copy genesis files (baked in)
-COPY demo/2025-11/data/2025-10-10-13-29-24641-1050-50-blocks-50-coay-sup/genesis/*.json /app/genesis/
+COPY demo/burst/data/2025-10-10-13-29-24641-1050-50-blocks-50-coay-sup/genesis/*.json /app/genesis/
 
 # Copy immutable chain data (baked in)
-COPY demo/2025-11/data/2025-10-10-13-29-24641-1050-50-blocks-50-coay-sup/immutable.tar.gz /app/config/
+COPY demo/burst/data/2025-10-10-13-29-24641-1050-50-blocks-50-coay-sup/immutable.tar.gz /app/config/
 
 # Copy config files
-COPY demo/2025-11/data/upstream-node/config.json /app/config/upstream-config.json
-COPY demo/2025-11/manifest.json /app/config/manifest.json
+COPY demo/burst/data/upstream-node/config.json /app/config/upstream-config.json
+COPY demo/burst/manifest.json /app/config/manifest.json
 
 # Copy scripts
 COPY antithesis/scripts/init-upstream.sh /app/scripts/

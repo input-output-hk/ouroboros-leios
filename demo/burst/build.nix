@@ -9,8 +9,8 @@
     }:
     {
       devShells = lib.optionalAttrs (system == "x86_64-linux") {
-        dev-demo-2025-11 = pkgs.mkShell {
-          name = "dev-demo-2025-11";
+        dev-demo-burst = pkgs.mkShell {
+          name = "dev-demo-burst";
           src = ./.;
           inputsFrom = [ config.devShells.dev-demo ];
           packages = [
@@ -30,11 +30,11 @@
       };
 
       packages = lib.optionalAttrs (system == "x86_64-linux") rec {
-        demo-2025-11 = pkgs.writeShellApplication {
-          name = "leios_202511_demo";
+        demo-burst = pkgs.writeShellApplication {
+          name = "leios-demo-burst";
           runtimeInputs =
-            config.devShells.dev-demo-2025-11.nativeBuildInputs
-            ++ config.devShells.dev-demo-2025-11.buildInputs
+            config.devShells.dev-demo-burst.nativeBuildInputs
+            ++ config.devShells.dev-demo-burst.buildInputs
             ++ [ pkgs.sqlite ];
           runtimeEnv = {
             # Override paths to point to nix store
@@ -46,7 +46,7 @@
           text = builtins.readFile ./run.sh;
         };
         # TODO: drop this once we are sure no external uses exist anymore
-        leios_202511_demo = demo-2025-11;
+        demo-2025-11 = demo-burst;
       };
     };
 }
