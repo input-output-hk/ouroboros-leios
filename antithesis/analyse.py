@@ -3,7 +3,7 @@
 Leios Antithesis Analysis Module
 
 Parses node logs and computes metrics for Antithesis assertions.
-Adapted from demo/2025-11/analysis scripts.
+Adapted from demo/burst/analysis scripts.
 """
 
 import json
@@ -350,7 +350,10 @@ def compute_metrics(log_dir: str = "/logs") -> Metrics:
                     if event.event_type == "adopted" and event.slot > 0:
                         cur = metrics.chain_tip_by_node.get(event.node)
                         if cur is None or event.slot > cur[0]:
-                            metrics.chain_tip_by_node[event.node] = (event.slot, event.block_hash)
+                            metrics.chain_tip_by_node[event.node] = (
+                                event.slot,
+                                event.block_hash,
+                            )
                 if event.slot > metrics.max_slot_seen:
                     metrics.max_slot_seen = event.slot
                 if event.slot > 0:

@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
 # Simple wrapper script to set defaults, check for requirements, and run the
-# 2025-11 demo using process-compose
+# demo using process-compose
 set -eo pipefail
 
 # Set defaults for all environment variables
 # These can be overridden by exporting them before running this script
 set -a
-: "${WORKING_DIR:=tmp-leios-202511-demo}"
+: "${WORKING_DIR:=tmp-demo-burst}"
 : "${SOURCE_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 
 # Data configuration
@@ -66,7 +66,7 @@ if [ ${#MISSING_COMMANDS[@]} -gt 0 ]; then
   done
   echo ""
   echo "Please install the missing commands or use nix:"
-  echo "  nix run github:input-output-hk/ouroboros-leios#demo-2025-11"
+  echo "  nix run github:input-output-hk/ouroboros-leios#demo-burst"
   exit 1
 fi
 
@@ -82,7 +82,7 @@ if [ -d "$WORKING_DIR" ]; then
     exit 0
   fi
 fi
-echo "Initializing 2025-11 demo in $WORKING_DIR"
+echo "Initializing burst demo in $WORKING_DIR"
 
 # Create working directory
 mkdir -p "$WORKING_DIR"
@@ -100,7 +100,7 @@ export NODE0_DIR="$WORKING_DIR/node0"
 export DOWNSTREAM_NODE_DIR="$WORKING_DIR/downstream-node"
 export ONSET_OF_REF_SLOT=$(($(date +%s) + SECONDS_UNTIL_REF_SLOT))
 
-echo "Starting 2025-11 demo with process-compose..."
+echo "Starting burst demo with process-compose..."
 echo "  WORKING_DIR: $WORKING_DIR"
 echo "  CLUSTER_RUN: $CLUSTER_RUN"
 echo "  REF_SLOT: $REF_SLOT"

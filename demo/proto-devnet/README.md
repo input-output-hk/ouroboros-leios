@@ -1,6 +1,6 @@
 # Demo: Proto-Devnet
 
-A small network of patched cardano nodes that is loaded with synthetically created transactions. The same observability as with [the November demo](../2025-11) is available.
+A small network of patched cardano nodes that is loaded with synthetically created transactions. Includes the x-ray observability as also used on [the protocol burst demo](../burst).
 
 ![Demo diagram](./demo-proto-devnet.excalidraw.svg)
 
