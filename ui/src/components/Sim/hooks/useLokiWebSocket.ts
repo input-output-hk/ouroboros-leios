@@ -20,10 +20,14 @@ const HOST_PORT_TO_NODE: Record<string, string> = {
   "10.0.0.1:3001": "UpstreamNode",
   "10.0.0.2:3002": "Node0",
   "10.0.0.3:3003": "DownstreamNode",
-  // demo-proto-devnet
+  // demo-proto-devnet with TC
   "172.28.0.10:3001": "Node1",
   "172.28.0.20:3002": "Node2",
   "172.28.0.30:3003": "Node3",
+  // demo-proto-devnet without TC
+  "127.0.0.1:3001": "Node1",
+  "127.0.0.1:3002": "Node2",
+  "127.0.0.1:3003": "Node3",
   // docker immdb mock
   "172.28.0.110:3001": "UpstreamNode",
   "172.28.0.120:3002": "Node0",

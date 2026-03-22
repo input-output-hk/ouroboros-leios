@@ -27,7 +27,7 @@
         };
       };
 
-      packages = lib.optionalAttrs (system == "x86_64-linux") rec {
+      packages = lib.optionalAttrs (system == "x86_64-linux") {
         x-ray = pkgs.writeShellApplication {
           name = "x-ray";
           runtimeInputs = config.devShells.dev-demo-extras-x-ray.nativeBuildInputs;

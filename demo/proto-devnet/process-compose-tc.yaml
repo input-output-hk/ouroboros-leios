@@ -1,0 +1,55 @@
+# Traffic control overlay for process-compose.yaml
+#
+# NOTE: Elevated processes (is_elevated: true) run via sudo, which does not
+# preserve environment variables. We must explicitly pass needed variables
+# inline in the command for them to be available in elevated scripts.
+
+version: "0.5"
+
+processes:
+  InitNamespaces:
+    is_elevated: true
+    command: |
+      RATE="${RATE}" \
+      DELAY="${DELAY}" \
+      IP_NODE1="${IP_NODE1}" \
+      IP_NODE2="${IP_NODE2}" \
+      IP_NODE3="${IP_NODE3}" \
+      IP_HOST="${IP_HOST}" \
+      bash "${SOURCE_DIR}/scripts/init-namespaces.sh"
+
+  Node1:
+    is_elevated: true
+    command: |
+      NODE_DIR="${WORKING_DIR}/node1" \
+      IP="${IP_NODE1}" \
+      PORT="${PORT_NODE1}" \
+      ip netns exec proto-devnet:node1 bash "${SOURCE_DIR}/run-node.sh"
+    log_location: "${WORKING_DIR}/node1/node.log"
+    depends_on:
+      InitNamespaces:
+        condition: process_completed_successfully
+
+  Node2:
+    is_elevated: true
+    command: |
+      NODE_DIR="${WORKING_DIR}/node2" \
+      IP="${IP_NODE2}" \
+      PORT="${PORT_NODE2}" \
+      ip netns exec proto-devnet:node2 bash "${SOURCE_DIR}/run-node.sh"
+    log_location: "${WORKING_DIR}/node2/node.log"
+    depends_on:
+      InitNamespaces:
+        condition: process_completed_successfully
+
+  Node3:
+    is_elevated: true
+    command: |
+      NODE_DIR="${WORKING_DIR}/node3" \
+      IP="${IP_NODE3}" \
+      PORT="${PORT_NODE3}" \
+      ip netns exec proto-devnet:node3 bash "${SOURCE_DIR}/run-node.sh"
+    log_location: "${WORKING_DIR}/node3/node.log"
+    depends_on:
+      InitNamespaces:
+        condition: process_completed_successfully

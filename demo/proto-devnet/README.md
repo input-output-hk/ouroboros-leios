@@ -26,7 +26,7 @@ Install these prerequisites:
 - `cardano-cli` compatible with the cardano-node version
 - `sqlite3` for creating Leios databases
 - `jq` and `envsubst` for config modifications
-- `tx-generator` (optional) for generating transaction workload
+- `tx-centrifuge` for generating transaction workload
 
 Ensure they are on your PATH, override if needed with something like:
 
@@ -46,7 +46,7 @@ This `process-compose` orchestrated demo will:
 
 1. Initialize a three node cardano devnet
 2. Start all three nodes
-3. Generate and submit a transaction workload using `tx-generator`
+3. Generate and submit a transaction workload using `tx-centrifuge`
 4. Observes tip advancing and mempool size (more observability come later):
 
 ``` shell
@@ -64,53 +64,31 @@ export WORKING_DIR=my-devnet
 ./run.sh
 ```
 
+## Traffic control
+
+Proto-devnet uses Linux network namespaces and `tc` (traffic control) to simulate realistic network conditions between nodes: a configurable rate limit and latency on each link.
+
+This requires elevated privileges (`sudo`). The rate and delay can be tuned:
+
+``` shell
+RATE=1Mbps DELAY=500ms ./run.sh
+```
+
+To disable traffic control entirely for quick iteration without elevated processes:
+
+``` shell
+TC=0 ./run.sh
+```
+
+When disabled, nodes run directly on loopback (`127.0.0.1`) with different ports — no network simulation, no `sudo`.
+
 ## Observability with X-ray
 
 Proto-devnet generates an Alloy configuration for use with the X-ray observability stack.
 
-To use it:
+The observability stack is started by default and can be turned off using `XRAY=0`.
 
-1. Start proto-devnet (using one of the methods above)
-
-2. In another terminal, start x-ray with the generated config:
-
-    **Using nix:**
-
-    ``` shell
-    ALLOY_CONFIG="$(realpath tmp-devnet/alloy)" nix run github:input-output-hk/ouroboros-leios#x-ray
-    ```
-
-    **Without nix:**
-
-    ``` shell
-    cd ../extras/x-ray
-    ALLOY_CONFIG="$(realpath ../../proto-devnet/tmp-devnet/alloy)" ./run.sh
-    ```
-
-3. Access Grafana at <http://localhost:3000>
-
-The generated alloy config is customized for proto-devnet with correct node IPs and Prometheus ports.
-
-### Debugging Alloy log collection
-
-If logs aren't appearing in Grafana, check:
-
-1. View the generated alloy config to see the LOG_PATH (should be absolute):
-
-   ```shell
-      cat tmp-devnet/alloy | grep -A2 "local.file_match"
-   ```
-
-2. Check Alloy's UI at <http://localhost:12345> to see:
-
-   - What files it's discovering
-   - Any errors in log collection
-
-3. Verify the log files exist and match the pattern:
-
-   ```shell
-   ls -la tmp-devnet/node*/node.log
-   ```
+When the tools are available and observability is not turned off, you can access grafana at <http://localhost:3000>
 
 ## Clean up
 
