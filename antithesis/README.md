@@ -418,7 +418,7 @@ docker compose -f docker-compose.devnet.yaml exec pool1 bash
 ## Related Documentation
 
 - [Proto-Devnet Demo](../demo/proto-devnet/README.md)
-- [2025-11 Demo](../demo/2025-11/README.md)
+- [Protocol burst Demo](../demo/burst/README.md)
 - [Ouroboros Leios Specification](https://leios.cardano-scaling.org)
 - [Antithesis Documentation](https://antithesis.com/docs/)
 - [Cardano Foundation Moog](https://github.com/cardano-foundation/moog)

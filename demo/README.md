@@ -2,7 +2,7 @@
 
 This is a collection of Leios demonstrations created using specially patched versions of `cardano-node` and other components not originating from this repository:
 
-- [2025-11](2025-11/): Improvement of MVD using tc and better observability
+- [burst](burst/): Protocol burst scenario to reproduce Leios interference with Praos
 - [proto-devnet](proto-devnet/): A leios-enabld devnet created from prototype cardano-nodes
 
 There are other, component-specific demos you might be looking for:
@@ -13,14 +13,13 @@ There are other, component-specific demos you might be looking for:
 
 ## Prototypes
 
-Leios prototyping is visibile in the following PRs:
+Leios prototyping is visibile in the following branches:
 
-1. [cardano-node](https://github.com/IntersectMBO/cardano-node/pull/6386)
-2. [ouroboros-consensus](https://github.com/IntersectMBO/ouroboros-consensus/pull/1793)
-3. [ouroboros-network](https://github.com/IntersectMBO/ouroboros-network/tree/nfrisby/leios-202511-demo)
+1. [cardano-node](https://github.com/IntersectMBO/cardano-node/tree/leios-prototype)
+2. [ouroboros-consensus](https://github.com/IntersectMBO/ouroboros-consensus/tree/leios-prototype)
+3. [ouroboros-network](https://github.com/IntersectMBO/ouroboros-network/tree/leios-prototype)
 
 All prototyping artifacts are in their `leios-prototype` branch.
-For each demo a special tag `leios-prototype-demo-YYYYMM` will be attached to denote the components used in the demo for a particular month.
 
 ## Flake inputs
 
@@ -28,8 +27,7 @@ The repository pulls in patched cardano-node and ouroboros-consensus as visible
 in [flake.nix](../flake.nix):
 
 ```nix
-    cardano-node.url = "github:intersectmbo/cardano-node?ref=...";
-
+    cardano-node-leios.url = "github:intersectmbo/cardano-node?ref=...";
     ouroboros-consensus.url = "github:intersectmbo/ouroboros-consensus?ref=...";
 ```
 

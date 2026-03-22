@@ -16,7 +16,7 @@ import { EConnectionState } from "@/contexts/SimContext/types";
 
 // TODO: Replace with topology-based mapping
 const HOST_PORT_TO_NODE: Record<string, string> = {
-  // demo-2025-11
+  // demo-burst
   "10.0.0.1:3001": "UpstreamNode",
   "10.0.0.2:3002": "Node0",
   "10.0.0.3:3003": "DownstreamNode",
