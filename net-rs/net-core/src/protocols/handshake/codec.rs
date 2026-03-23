@@ -15,9 +15,9 @@
 
 use std::collections::BTreeMap;
 
-use minicbor::{Decoder, Encoder};
 use minicbor::decode::Error as DecodeError;
 use minicbor::encode::Error as EncodeError;
+use minicbor::{Decoder, Encoder};
 
 use super::{Message, RefuseReason, VersionTable};
 
@@ -124,9 +124,10 @@ impl<'a> minicbor::Decode<'a, ()> for Message {
                 let start = d.position();
                 d.skip()?; // skip one CBOR value
                 let end = d.position();
-                let raw = d.input().get(start..end).ok_or_else(|| {
-                    DecodeError::message("failed to extract version data bytes")
-                })?;
+                let raw = d
+                    .input()
+                    .get(start..end)
+                    .ok_or_else(|| DecodeError::message("failed to extract version data bytes"))?;
                 Ok(Message::AcceptVersion(version, raw.to_vec()))
             }
             2 => {
@@ -153,9 +154,9 @@ const MAX_VERSION_TABLE_ENTRIES: u64 = 256;
 const MAX_MISMATCH_VERSIONS: u64 = 256;
 
 fn decode_version_table(d: &mut Decoder<'_>) -> Result<VersionTable, DecodeError> {
-    let len = d.map()?.ok_or_else(|| {
-        DecodeError::message("expected definite-length map for version table")
-    })?;
+    let len = d
+        .map()?
+        .ok_or_else(|| DecodeError::message("expected definite-length map for version table"))?;
 
     if len > MAX_VERSION_TABLE_ENTRIES {
         return Err(DecodeError::message(format!(
@@ -170,9 +171,10 @@ fn decode_version_table(d: &mut Decoder<'_>) -> Result<VersionTable, DecodeError
         let start = d.position();
         d.skip()?;
         let end = d.position();
-        let raw = d.input().get(start..end).ok_or_else(|| {
-            DecodeError::message("failed to extract version data bytes")
-        })?;
+        let raw = d
+            .input()
+            .get(start..end)
+            .ok_or_else(|| DecodeError::message("failed to extract version data bytes"))?;
         table.insert(version, raw.to_vec());
     }
 
@@ -310,8 +312,8 @@ mod tests {
 
     /// ProposeVersions payload: [0, {14: [764824073, false, 0, false], 15: [764824073, false, 0, false]}]
     const LIVE_PROPOSE_PAYLOAD: &[u8] = &[
-        0x82, 0x00, 0xa2, 0x0e, 0x84, 0x1a, 0x2d, 0x96, 0x4a, 0x09, 0xf4, 0x00,
-        0xf4, 0x0f, 0x84, 0x1a, 0x2d, 0x96, 0x4a, 0x09, 0xf4, 0x00, 0xf4,
+        0x82, 0x00, 0xa2, 0x0e, 0x84, 0x1a, 0x2d, 0x96, 0x4a, 0x09, 0xf4, 0x00, 0xf4, 0x0f, 0x84,
+        0x1a, 0x2d, 0x96, 0x4a, 0x09, 0xf4, 0x00, 0xf4,
     ];
 
     /// AcceptVersion payload: [1, 15, [764824073, false, 0, false]]
@@ -345,8 +347,7 @@ mod tests {
         match msg {
             Message::AcceptVersion(version, params) => {
                 assert_eq!(version, 15);
-                let data: super::super::n2n::VersionData =
-                    minicbor::decode(&params).unwrap();
+                let data: super::super::n2n::VersionData = minicbor::decode(&params).unwrap();
                 assert_eq!(data.network_magic, 764824073);
                 assert!(!data.initiator_only_diffusion_mode);
                 assert_eq!(data.peer_sharing, 0);
@@ -368,7 +369,10 @@ mod tests {
         let versions = super::super::n2n::version_table(&data);
         let msg = Message::ProposeVersions(versions);
         let encoded = minicbor::to_vec(&msg).unwrap();
-        assert_eq!(encoded, LIVE_PROPOSE_PAYLOAD, "our encoding must match what the live node accepted");
+        assert_eq!(
+            encoded, LIVE_PROPOSE_PAYLOAD,
+            "our encoding must match what the live node accepted"
+        );
     }
 
     #[test]

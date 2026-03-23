@@ -1,4 +1,4 @@
-use tokio::io::{DuplexStream, duplex};
+use tokio::io::{duplex, DuplexStream};
 
 use super::Bearer;
 

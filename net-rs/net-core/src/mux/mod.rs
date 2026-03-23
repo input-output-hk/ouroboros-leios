@@ -1,8 +1,8 @@
-pub mod wire;
 pub mod channel;
-pub mod scheduler;
 pub mod egress;
 pub mod ingress;
+pub mod scheduler;
+pub mod wire;
 
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -116,8 +116,7 @@ impl<S: scheduler::Scheduler> Mux<S> {
         let id = proto_config.id;
 
         // Egress: protocol writes → mux reads and sends to bearer.
-        let (egress_send, egress_recv) =
-            tokio::sync::mpsc::channel(proto_config.egress_queue_size);
+        let (egress_send, egress_recv) = tokio::sync::mpsc::channel(proto_config.egress_queue_size);
         self.egress_protocols.insert(
             id,
             ProtocolEgress {
@@ -382,4 +381,3 @@ mod tests {
         running_b.abort();
     }
 }
-

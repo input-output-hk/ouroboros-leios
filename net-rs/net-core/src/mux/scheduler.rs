@@ -55,16 +55,13 @@ impl Scheduler for StrictPriority {
     }
 
     fn next(&mut self, ready: &[ProtocolId]) -> Option<ProtocolId> {
-        ready
-            .iter()
-            .copied()
-            .min_by_key(|id| {
-                self.priorities
-                    .iter()
-                    .find(|(p, _)| *p == *id)
-                    .map(|(_, prio)| *prio)
-                    .unwrap_or(u8::MAX)
-            })
+        ready.iter().copied().min_by_key(|id| {
+            self.priorities
+                .iter()
+                .find(|(p, _)| *p == *id)
+                .map(|(_, prio)| *prio)
+                .unwrap_or(u8::MAX)
+        })
     }
 }
 

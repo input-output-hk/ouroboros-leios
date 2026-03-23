@@ -44,10 +44,7 @@ pub trait Protocol: Send + 'static {
     type State: Clone + Debug + Send;
 
     /// The message type. All variants in one enum, tagged by CBOR array index.
-    type Message: for<'a> minicbor::Decode<'a, ()>
-        + minicbor::Encode<()>
-        + Debug
-        + Send;
+    type Message: for<'a> minicbor::Decode<'a, ()> + minicbor::Encode<()> + Debug + Send;
 
     /// The initial state when the protocol starts.
     fn initial_state() -> Self::State;
@@ -57,10 +54,7 @@ pub trait Protocol: Send + 'static {
 
     /// Compute the next state after a message. Returns an error if the
     /// message is invalid for the current state.
-    fn transition(
-        state: &Self::State,
-        msg: &Self::Message,
-    ) -> Result<Self::State, ProtocolError>;
+    fn transition(state: &Self::State, msg: &Self::Message) -> Result<Self::State, ProtocolError>;
 
     /// Maximum message size (bytes) allowed in the given state.
     /// 0 means no limit.
@@ -197,12 +191,10 @@ impl<P: Protocol> Runner<P> {
 
         // Receive with optional timeout.
         let msg: P::Message = match P::timeout(&self.state) {
-            Some(duration) => {
-                match tokio::time::timeout(duration, self.codec_recv.recv()).await {
-                    Ok(result) => result?,
-                    Err(_) => return Err(ProtocolError::Timeout(duration)),
-                }
-            }
+            Some(duration) => match tokio::time::timeout(duration, self.codec_recv.recv()).await {
+                Ok(result) => result?,
+                Err(_) => return Err(ProtocolError::Timeout(duration)),
+            },
             None => self.codec_recv.recv().await?,
         };
 

@@ -1,4 +1,6 @@
+mod blockfetch;
 mod capture;
+mod chainsync;
 mod handshake;
 
 use clap::{Parser, Subcommand};
@@ -32,6 +34,30 @@ enum Command {
         #[arg(long, default_value_t = n2n::MAINNET_MAGIC)]
         magic: u64,
     },
+
+    /// Follow the chain tip via ChainSync
+    ChainSync {
+        /// Host and port to connect to
+        host: String,
+
+        /// Network magic number
+        #[arg(long, default_value_t = n2n::MAINNET_MAGIC)]
+        magic: u64,
+
+        /// Number of headers to follow
+        #[arg(long, default_value_t = 20)]
+        count: usize,
+    },
+
+    /// Fetch blocks via BlockFetch (uses ChainSync to find tip first)
+    BlockFetch {
+        /// Host and port to connect to
+        host: String,
+
+        /// Network magic number
+        #[arg(long, default_value_t = n2n::MAINNET_MAGIC)]
+        magic: u64,
+    },
 }
 
 #[tokio::main]
@@ -43,5 +69,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match cli.command {
         Command::Handshake { host, magic } => handshake::run(&host, magic).await,
         Command::Capture { host, magic } => capture::run(&host, magic).await,
+        Command::ChainSync { host, magic, count } => chainsync::run(&host, magic, count).await,
+        Command::BlockFetch { host, magic } => blockfetch::run(&host, magic).await,
     }
 }
