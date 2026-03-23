@@ -1,6 +1,8 @@
 mod blockfetch;
 mod capture;
 mod chainsync;
+mod connect;
+mod follow;
 mod handshake;
 
 use clap::{Parser, Subcommand};
@@ -35,7 +37,7 @@ enum Command {
         magic: u64,
     },
 
-    /// Follow the chain tip via ChainSync
+    /// Follow the chain tip via ChainSync (limited count, for debugging)
     ChainSync {
         /// Host and port to connect to
         host: String,
@@ -58,6 +60,20 @@ enum Command {
         #[arg(long, default_value_t = n2n::MAINNET_MAGIC)]
         magic: u64,
     },
+
+    /// Follow the chain tip continuously with reconnection
+    Follow {
+        /// Host and port to connect to
+        host: String,
+
+        /// Network magic number
+        #[arg(long, default_value_t = n2n::MAINNET_MAGIC)]
+        magic: u64,
+
+        /// Maximum rollback depth (number of points to retain)
+        #[arg(long, default_value_t = 2160)]
+        max_rollback: usize,
+    },
 }
 
 #[tokio::main]
@@ -71,5 +87,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Command::Capture { host, magic } => capture::run(&host, magic).await,
         Command::ChainSync { host, magic, count } => chainsync::run(&host, magic, count).await,
         Command::BlockFetch { host, magic } => blockfetch::run(&host, magic).await,
+        Command::Follow {
+            host,
+            magic,
+            max_rollback,
+        } => follow::run(&host, magic, max_rollback).await,
     }
 }
