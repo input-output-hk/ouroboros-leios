@@ -144,7 +144,9 @@ where $\Phi$ is the standard normal CDF. The two batch distributions use the fol
 
 ### 4.2 Markov model for TxCache
 
-When an EB arrives at a node, its transactions may already be present in the local transaction cache (a cache hit), or they may need to be fetched from the network (a cache miss). To model this, we use a two-state Markov chain parameterized by $p$, the probability that a given transaction is in the cache.
+When an EB arrives at a node, its transactions may already be present in the local transaction cache (a cache hit), or they may need to be fetched from the network (a cache miss). To model this, we use a two-state Markov chain parameterized by $p$, the probability that a given transaction is in the cache[^1].
+
+[^1]: This model was introduced by Nick in the Leios monthly presentation in February 26
 
 ![](TxCache.svg)
 
@@ -179,12 +181,63 @@ The ΔQ model yields the following completion-time distribution for EB diffusion
 
 ### 5.2 Protocol Security Validation
 
+#### 5.2.1 Safety
+
 The ΔQ model gives a high probability that under the proposed parameters ($L_\text{hdr}=1$, $L_\text{vote}=4$, $L_\text{diff}=7$) an EB reaches all honest block-producing nodes before the end of $L_\text{diff}$:
 
 ```haskell
-successWithin validateEB 14
+ghci> successWithin validateEB 14
 0.9753948688574636
 ```
+
+The EB diffusion completes within
+$L := 3 * L_\text{hdr} + L_\text{vote} + L_\text{diff} = 14$ with probability 97.54%.
+
+This means that for $L = 14$ the saftey property holds for Linear Leios.
+
+#### 5.2.2 Liveness
+
+As a liveness metric we look at the probability that there is a certificate in the next RB. An EB becomes certified when two independent conditions both hold:
+
+* a quorum of votes is collected within $L_\text{vote}$
+* no new RB interrupts the process before the full window $L$ elapses
+
+The certification probability is therefore:
+
+$$P_\text{certified} = P_\text{quorum} \times (1 - P_\text{interrupted})$$
+
+$P_\text{interrupted}$ is derived from the Praos block-production distribution, which is modelled as a Poisson process with the active slot coefficient as rate parameter. Therefore the waiting time to the next RB is exponentially distributed and the probability that an RB arrives within $L$ slots is:
+
+$$P_\text{interrupted} = 1 - e^{-f L}$$
+
+For $f = 1/20$ and $L = 14$ this gives $P_\text{interrupted} \approx 50.3\%$.
+
+$P_\text{quorum}$ depends on $P_\text{validating}$ - the probability that an EB is validated before the end of $L_\text{vote}$. This is calculated in Haskell as follows:
+
+```haskell
+ghci> fromRational (successWithin validateEB 7) :: Double
+0.7414282609198065
+```
+
+The calculation for $P_\text{quorum}$ follows the [markov chain simulation](../../../markov/) for Linear Leios: Each of the 2500 stake pool operators (SPOs) is independently elected to the voting committee via a Poisson sortition: SPO $i$ with relative stake $s_i$ is elected with probability $1 - e^{-\tilde{m} s_i}$, where $\tilde{m}$ is calibrated so that the expected committee size equals $m = 600$. If elected, SPO $i$ casts a successful vote with probability $P_\text{validating}$, so its individual success probability is $p_i = P_\text{validating} (1 - e^{-\tilde{m} s_i})$. The total vote count $V = \sum_i X_i$ with $X_i \sim \text{Bernoulli}(p_i)$ is approximated by a normal distribution via the Central Limit Theorem:
+
+$$V \sim \mathcal{N}(\mu,\, \sigma^2), \quad \mu = \sum_i p_i, \quad \sigma^2 = \sum_i p_i(1-p_i)$$
+
+The quorum probability is then:
+
+$$P_\text{quorum} = P(V \geq \tau \cdot m) \approx 1 - \Phi\!\left(\frac{\tau m - \mu}{\sigma}\right)$$
+
+For the proposed parameters ($P_\text{validating} \approx 74.1\%$, $m = 600$, $\tau = 3/4$), the quorum threshold is $450$ votes and $\mu \approx 444.9 < 450$, giving $P_\text{quorum} \approx 35.9\%$.
+
+The probability that an EB will be certified can be calculated in Haskell as follows:
+
+```haskell
+ghci> let config = Config { name = "CIP", lHdr = 1, lVote = 4, lDiff = 7, numberSPOs = 2500, committeeSizeEstimated = 600, τ = 3 % 4, f = 1 % 20 }
+ghci> pCertified config
+0.17805177733045532
+```
+
+TODO: check value
 
 This provides strong evidence that the proposed parameters are viable and consistent with the security requirements of the Leios protocol as specified in CIP-164.
 
@@ -198,6 +251,7 @@ The analysis shows that under the proposed parameters ($L_\text{hdr}=1$, $L_\tex
 
 - This model assumes honest node behavior. Adversarial delay of EBs - for example, an adversary deliberately withholding an EB until just before the voting deadline - is not captured here.
 - With the `piecewise-polynomial` ΔQ backend computational complexity is hard to control, where as with the `sampled` backend it is the accuracy of the results. For this analysis to be successful, we built probabilistic models and then combined those using ΔQ in order to get a model with low complexity to be executable with the default backend.
+- Adjust sortition mechanism to Fait Accompli
 - The model does not account for Freshest First Delivery (FFD) of EBs as specified in CIP-164. FFD prioritises the most recently produced blocks during diffusion, which can delay older EBs and worsen their individual diffusion latency; incorporating it would require modelling the interaction between concurrent EB diffusions.
 - Future work should improve the `sampled` backend to keep track of the error margin, in order to be able to run the analysis in reasonable time and being able to quantify the inaccuracy introduced by the simulations.
 
