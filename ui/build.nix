@@ -34,9 +34,12 @@
         npmDeps = pkgs.importNpmLock { npmRoot = ./.; };
         inherit (pkgs.importNpmLock) npmConfigHook;
 
+        nativeBuildInputs = [ pkgs.curl ];
+
         buildPhase = ''
           npm run build
         '';
+
         installPhase = ''
           mkdir -p $out/visualizer/
           cp -r dist/* $out/visualizer/
