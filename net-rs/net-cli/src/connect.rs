@@ -1,0 +1,90 @@
+//! Shared connection helper: TCP connect → mux setup → handshake.
+
+use std::net::ToSocketAddrs;
+
+use net_core::bearer::tcp::TcpBearer;
+use net_core::codec::{CodecRecv, CodecSend};
+use net_core::mux::scheduler::RoundRobin;
+use net_core::mux::{Mux, MuxConfig, ProtocolConfig, RunningMux, MODE_INITIATOR};
+use net_core::protocols::handshake;
+use net_core::protocols::handshake::n2n;
+
+/// A live mux connection with handshake completed.
+pub struct Connection {
+    pub running: RunningMux,
+    pub channels: Vec<(CodecSend, CodecRecv)>,
+}
+
+/// Connect to a Cardano node, set up the mux with the given protocols,
+/// and perform the version handshake. Returns the running mux and
+/// codec pairs for each protocol (in registration order, excluding handshake).
+pub async fn connect_and_handshake(
+    host: &str,
+    magic: u64,
+    protocols: &[ProtocolConfig],
+) -> Result<Connection, Box<dyn std::error::Error>> {
+    connect_and_handshake_with_config(host, magic, protocols, MuxConfig::default()).await
+}
+
+/// Like `connect_and_handshake` but with a custom mux config.
+pub async fn connect_and_handshake_with_config(
+    host: &str,
+    magic: u64,
+    protocols: &[ProtocolConfig],
+    mux_config: MuxConfig,
+) -> Result<Connection, Box<dyn std::error::Error>> {
+    let addr = host
+        .to_socket_addrs()?
+        .next()
+        .ok_or_else(|| format!("could not resolve {host}"))?;
+
+    let bearer = TcpBearer::connect(addr).await?;
+
+    let hs_proto = ProtocolConfig {
+        id: handshake::PROTOCOL_ID,
+        priority: 0,
+        ingress_limit: handshake::SIZE_LIMIT,
+        egress_queue_size: 4,
+    };
+
+    let mut mux = Mux::new(mux_config, RoundRobin::default(), MODE_INITIATOR);
+    let (hs_send, hs_recv) = mux.register(&hs_proto);
+
+    let mut channels = Vec::new();
+    for proto in protocols {
+        let (send, recv) = mux.register(proto);
+        channels.push((CodecSend::new(send), CodecRecv::new(recv)));
+    }
+
+    let running = mux.run(bearer);
+
+    let versions = n2n::version_table(&n2n::VersionData {
+        network_magic: magic,
+        initiator_only_diffusion_mode: false,
+        peer_sharing: 0,
+        query: false,
+    });
+
+    let hs_result =
+        handshake::run_client(CodecSend::new(hs_send), CodecRecv::new(hs_recv), versions).await;
+
+    match hs_result {
+        Ok(handshake::HandshakeResult::Accepted { version_number, .. }) => {
+            println!("  handshake accepted: version {version_number}");
+        }
+        Ok(handshake::HandshakeResult::Refused(reason)) => {
+            running.abort();
+            return Err(format!("handshake refused: {reason:?}").into());
+        }
+        Ok(handshake::HandshakeResult::QueryReply(_)) => {
+            running.abort();
+            return Err("unexpected query reply".into());
+        }
+        Err(e) => {
+            running.abort();
+            return Err(e.into());
+        }
+    }
+
+    Ok(Connection { running, channels })
+}

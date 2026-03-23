@@ -1,36 +1,15 @@
-use std::net::ToSocketAddrs;
-
-use net_core::bearer::tcp::TcpBearer;
-use net_core::codec::{CodecRecv, CodecSend};
-use net_core::mux::scheduler::RoundRobin;
-use net_core::mux::{Mux, MuxConfig, ProtocolConfig, MODE_INITIATOR};
+use net_core::mux::ProtocolConfig;
 use net_core::protocol::Role;
 use net_core::protocol::Runner;
 use net_core::protocols::blockfetch;
 use net_core::protocols::blockfetch::BlockFetch;
 use net_core::protocols::chainsync;
 use net_core::protocols::chainsync::ChainSync;
-use net_core::protocols::handshake;
-use net_core::protocols::handshake::n2n;
 use net_core::types::Point;
 
+use crate::connect;
+
 pub async fn run(host: &str, magic: u64) -> Result<(), Box<dyn std::error::Error>> {
-    let addr = host
-        .to_socket_addrs()?
-        .next()
-        .ok_or_else(|| format!("could not resolve {host}"))?;
-
-    println!("connecting to {addr}...");
-    let bearer = TcpBearer::connect(addr).await?;
-    println!("connected");
-
-    // Register handshake, chainsync, and blockfetch on the mux.
-    let hs_proto = ProtocolConfig {
-        id: handshake::PROTOCOL_ID,
-        priority: 0,
-        ingress_limit: handshake::SIZE_LIMIT,
-        egress_queue_size: 4,
-    };
     let cs_proto = ProtocolConfig {
         id: chainsync::PROTOCOL_ID,
         priority: 1,
@@ -44,45 +23,16 @@ pub async fn run(host: &str, magic: u64) -> Result<(), Box<dyn std::error::Error
         egress_queue_size: 16,
     };
 
-    let mut mux = Mux::new(MuxConfig::default(), RoundRobin::default(), MODE_INITIATOR);
-    let (hs_send, hs_recv) = mux.register(&hs_proto);
-    let (cs_send, cs_recv) = mux.register(&cs_proto);
-    let (bf_send, bf_recv) = mux.register(&bf_proto);
-    let running = mux.run(bearer);
+    println!("connecting to {host}...");
+    let conn = connect::connect_and_handshake(host, magic, &[cs_proto, bf_proto]).await?;
+    let running = conn.running;
 
-    // Handshake.
-    let versions = n2n::version_table(&n2n::VersionData {
-        network_magic: magic,
-        initiator_only_diffusion_mode: false,
-        peer_sharing: 0,
-        query: false,
-    });
-
-    let hs_result =
-        handshake::run_client(CodecSend::new(hs_send), CodecRecv::new(hs_recv), versions).await?;
-
-    match &hs_result {
-        handshake::HandshakeResult::Accepted { version_number, .. } => {
-            println!("handshake accepted: version {version_number}");
-        }
-        handshake::HandshakeResult::Refused(reason) => {
-            println!("handshake refused: {reason:?}");
-            running.abort();
-            return Ok(());
-        }
-        handshake::HandshakeResult::QueryReply(_) => {
-            println!("unexpected query reply");
-            running.abort();
-            return Ok(());
-        }
-    }
+    let mut channels = conn.channels.into_iter();
+    let (cs_send, cs_recv) = channels.next().expect("chainsync channel");
+    let (bf_send, bf_recv) = channels.next().expect("blockfetch channel");
 
     // ChainSync: find the tip so we have a point for BlockFetch.
-    let mut cs_runner = Runner::<ChainSync>::new(
-        Role::Client,
-        CodecSend::new(cs_send),
-        CodecRecv::new(cs_recv),
-    );
+    let mut cs_runner = Runner::<ChainSync>::new(Role::Client, cs_send, cs_recv);
 
     println!("finding intersection...");
     let result = chainsync::find_intersection(&mut cs_runner, vec![Point::Origin]).await?;
@@ -109,11 +59,7 @@ pub async fn run(host: &str, magic: u64) -> Result<(), Box<dyn std::error::Error
 
     println!("fetching block at {fetch_point}...");
 
-    let mut bf_runner = Runner::<BlockFetch>::new(
-        Role::Client,
-        CodecSend::new(bf_send),
-        CodecRecv::with_max_buffer(bf_recv, blockfetch::SIZE_LIMIT_STREAMING),
-    );
+    let mut bf_runner = Runner::<BlockFetch>::new(Role::Client, bf_send, bf_recv);
 
     let has_blocks =
         blockfetch::request_range(&mut bf_runner, fetch_point.clone(), fetch_point).await?;
@@ -125,7 +71,7 @@ pub async fn run(host: &str, magic: u64) -> Result<(), Box<dyn std::error::Error
             println!(
                 "  block #{block_count}: {} bytes  tip={}",
                 body.0.len(),
-                tip,
+                tip
             );
         }
         println!("batch complete: {block_count} block(s)");
