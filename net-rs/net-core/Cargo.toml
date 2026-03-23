@@ -1,0 +1,14 @@
+[package]
+name = "net-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1", features = ["rt", "net", "io-util", "time", "sync", "macros"] }
+bytes = "1"
+byteorder = "1"
+thiserror = "2"
+tracing = "0.1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "test-util"] }
