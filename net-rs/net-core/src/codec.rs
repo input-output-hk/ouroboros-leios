@@ -174,6 +174,13 @@ mod tests {
         }
     }
 
+    fn test_mux_config() -> MuxConfig {
+        MuxConfig {
+            sdu_timeout: std::time::Duration::from_secs(2),
+            ..MuxConfig::default()
+        }
+    }
+
     fn make_mux_pair(
         proto: &ProtocolConfig,
     ) -> (
@@ -184,11 +191,11 @@ mod tests {
     ) {
         let (bearer_a, bearer_b) = MemBearer::pair();
 
-        let mut mux_a = Mux::new(MuxConfig::default(), RoundRobin::default(), MODE_INITIATOR);
+        let mut mux_a = Mux::new(test_mux_config(), RoundRobin::default(), MODE_INITIATOR);
         let (send_ch, _recv_ch) = mux_a.register(proto);
         let running_a = mux_a.run(bearer_a);
 
-        let mut mux_b = Mux::new(MuxConfig::default(), RoundRobin::default(), MODE_RESPONDER);
+        let mut mux_b = Mux::new(test_mux_config(), RoundRobin::default(), MODE_RESPONDER);
         let (_send_ch, recv_ch) = mux_b.register(proto);
         let running_b = mux_b.run(bearer_b);
 
@@ -288,11 +295,11 @@ mod tests {
         };
         let (bearer_a, bearer_b) = MemBearer::pair();
 
-        let mut mux_a = Mux::new(MuxConfig::default(), RoundRobin::default(), MODE_INITIATOR);
+        let mut mux_a = Mux::new(test_mux_config(), RoundRobin::default(), MODE_INITIATOR);
         let (send_ch, _) = mux_a.register(&proto);
         let ra = mux_a.run(bearer_a);
 
-        let mut mux_b = Mux::new(MuxConfig::default(), RoundRobin::default(), MODE_RESPONDER);
+        let mut mux_b = Mux::new(test_mux_config(), RoundRobin::default(), MODE_RESPONDER);
         let (_, recv_ch) = mux_b.register(&proto);
         let rb = mux_b.run(bearer_b);
 
