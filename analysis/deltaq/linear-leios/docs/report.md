@@ -191,7 +191,7 @@ ghci> fromRational (successWithin validateEB 14) :: Double
 ```
 
 The EB diffusion completes within
-$L := 3 * L_\text{hdr} + L_\text{vote} + L_\text{diff} = 14$ with probability 97.54%.
+$L := 3 L_\text{hdr} + L_\text{vote} + L_\text{diff} = 14$ with probability 97.54%.
 
 This means that for $L = 14$ the saftey property holds for Linear Leios.
 
