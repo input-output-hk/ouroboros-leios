@@ -128,13 +128,16 @@ impl<S: scheduler::Scheduler> Mux<S> {
         );
 
         // Ingress: mux reads from bearer → protocol reads.
+        // The counter is shared between the demuxer (increments) and the
+        // ChannelRecv (decrements) so buffer accounting stays accurate.
+        let ingress_counter = channel::IngressCounter::new();
         let (ingress_send, ingress_recv) =
             tokio::sync::mpsc::channel(proto_config.egress_queue_size);
         self.ingress_protocols.insert(
             id,
             ProtocolIngress {
                 tx: ingress_send,
-                buffered_bytes: 0,
+                counter: ingress_counter.clone(),
                 limit: proto_config.ingress_limit,
             },
         );
@@ -142,12 +145,15 @@ impl<S: scheduler::Scheduler> Mux<S> {
         self.scheduler.register(id, proto_config.priority);
 
         let send = ChannelSend::new(egress_send);
-        let recv = ChannelRecv::new(ingress_recv);
+        let recv = ChannelRecv::new(ingress_recv, ingress_counter);
         (send, recv)
     }
 
     /// Start the muxer and demuxer tasks over the given bearer. Returns a
     /// `RunningMux` with handles to the background tasks.
+    ///
+    /// If either the muxer or demuxer task fails, the other is automatically
+    /// aborted and the error is propagated via the `RunningMux`.
     pub fn run<B: Bearer>(self, bearer: B) -> RunningMux {
         let (reader, writer) = bearer.split();
         let clock = Instant::now();
@@ -168,37 +174,78 @@ impl<S: scheduler::Scheduler> Mux<S> {
             self.mode,
         ));
 
+        // Spawn a supervisor that aborts the surviving task when one fails.
+        let muxer_abort = muxer_handle.abort_handle();
+        let demuxer_abort = demuxer_handle.abort_handle();
+
+        let (error_tx, error_rx) = tokio::sync::watch::channel(None);
+
+        let supervisor = tokio::spawn(async move {
+            let error = tokio::select! {
+                result = muxer_handle => {
+                    demuxer_abort.abort();
+                    match result {
+                        Ok(Ok(())) => None,
+                        Ok(Err(e)) => Some(format!("muxer error: {e}")),
+                        Err(e) if e.is_cancelled() => None,
+                        Err(e) => Some(format!("muxer panic: {e}")),
+                    }
+                }
+                result = demuxer_handle => {
+                    muxer_abort.abort();
+                    match result {
+                        Ok(Ok(())) => None,
+                        Ok(Err(e)) => Some(format!("demuxer error: {e}")),
+                        Err(e) if e.is_cancelled() => None,
+                        Err(e) => Some(format!("demuxer panic: {e}")),
+                    }
+                }
+            };
+
+            if let Some(err) = &error {
+                tracing::error!("mux shutdown: {err}");
+            }
+
+            let _ = error_tx.send(error);
+        });
+
         RunningMux {
-            muxer: muxer_handle,
-            demuxer: demuxer_handle,
+            supervisor,
+            error_rx,
         }
     }
 }
 
-/// Handle to a running multiplexer. Dropping this will not cancel the tasks;
-/// call `shutdown()` explicitly or abort the handles.
+/// Handle to a running multiplexer. When either the muxer or demuxer task
+/// fails, the other is automatically aborted and the error is available
+/// via `wait()` or `error()`.
 pub struct RunningMux {
-    muxer: JoinHandle<Result<(), MuxError>>,
-    demuxer: JoinHandle<Result<(), MuxError>>,
+    supervisor: JoinHandle<()>,
+    error_rx: tokio::sync::watch::Receiver<Option<String>>,
 }
 
 impl RunningMux {
-    /// Wait for both tasks to complete. Returns the first error encountered.
-    pub async fn join(self) -> Result<(), MuxError> {
-        tokio::select! {
-            result = self.muxer => {
-                result.map_err(|_| MuxError::Shutdown)?
-            }
-            result = self.demuxer => {
-                result.map_err(|_| MuxError::Shutdown)?
-            }
+    /// Wait for the mux to shut down. Returns the error if one occurred.
+    pub async fn wait(&mut self) -> Result<(), MuxError> {
+        // Wait for the error channel to be updated.
+        let _ = self.error_rx.changed().await;
+        match self.error_rx.borrow().as_ref() {
+            Some(err) => Err(MuxError::Io(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                err.clone(),
+            ))),
+            None => Ok(()),
         }
     }
 
-    /// Abort both muxer and demuxer tasks.
+    /// Check if the mux has encountered an error (non-blocking).
+    pub fn error(&self) -> Option<String> {
+        self.error_rx.borrow().clone()
+    }
+
+    /// Abort the mux (both tasks).
     pub fn abort(&self) {
-        self.muxer.abort();
-        self.demuxer.abort();
+        self.supervisor.abort();
     }
 }
 
@@ -207,6 +254,13 @@ mod tests {
     use super::*;
     use crate::bearer::mem::MemBearer;
     use scheduler::RoundRobin;
+
+    fn test_config() -> MuxConfig {
+        MuxConfig {
+            sdu_timeout: Duration::from_secs(2),
+            ..MuxConfig::default()
+        }
+    }
 
     #[tokio::test]
     async fn mux_round_trip_single_protocol() {
@@ -220,12 +274,12 @@ mod tests {
             egress_queue_size: 10,
         };
 
-        let mut mux_a = Mux::new(MuxConfig::default(), RoundRobin::default(), MODE_INITIATOR);
+        let mut mux_a = Mux::new(test_config(), RoundRobin::default(), MODE_INITIATOR);
         let (send_a, _recv_a) = mux_a.register(&proto);
         let running_a = mux_a.run(bearer_a);
 
         // Set up mux B (responder) with the same protocol.
-        let mut mux_b = Mux::new(MuxConfig::default(), RoundRobin::default(), MODE_RESPONDER);
+        let mut mux_b = Mux::new(test_config(), RoundRobin::default(), MODE_RESPONDER);
         let (_send_b, mut recv_b) = mux_b.register(&proto);
         let running_b = mux_b.run(bearer_b);
 
@@ -253,11 +307,11 @@ mod tests {
             egress_queue_size: 10,
         };
 
-        let mut mux_a = Mux::new(MuxConfig::default(), RoundRobin::default(), MODE_INITIATOR);
+        let mut mux_a = Mux::new(test_config(), RoundRobin::default(), MODE_INITIATOR);
         let (send_a, mut recv_a) = mux_a.register(&proto);
         let running_a = mux_a.run(bearer_a);
 
-        let mut mux_b = Mux::new(MuxConfig::default(), RoundRobin::default(), MODE_RESPONDER);
+        let mut mux_b = Mux::new(test_config(), RoundRobin::default(), MODE_RESPONDER);
         let (send_b, mut recv_b) = mux_b.register(&proto);
         let running_b = mux_b.run(bearer_b);
 
@@ -298,12 +352,12 @@ mod tests {
             egress_queue_size: 10,
         };
 
-        let mut mux_a = Mux::new(MuxConfig::default(), RoundRobin::default(), MODE_INITIATOR);
+        let mut mux_a = Mux::new(test_config(), RoundRobin::default(), MODE_INITIATOR);
         let (send_a_cs, _) = mux_a.register(&proto_cs);
         let (send_a_bf, _) = mux_a.register(&proto_bf);
         let running_a = mux_a.run(bearer_a);
 
-        let mut mux_b = Mux::new(MuxConfig::default(), RoundRobin::default(), MODE_RESPONDER);
+        let mut mux_b = Mux::new(test_config(), RoundRobin::default(), MODE_RESPONDER);
         let (_, mut recv_b_cs) = mux_b.register(&proto_cs);
         let (_, mut recv_b_bf) = mux_b.register(&proto_bf);
         let running_b = mux_b.run(bearer_b);

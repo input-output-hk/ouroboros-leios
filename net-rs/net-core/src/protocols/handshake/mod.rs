@@ -203,6 +203,13 @@ mod tests {
     use crate::mux::scheduler::RoundRobin;
     use crate::mux::{Mux, MuxConfig, ProtocolConfig, MODE_INITIATOR, MODE_RESPONDER};
 
+    fn test_config() -> MuxConfig {
+        MuxConfig {
+            sdu_timeout: std::time::Duration::from_secs(2),
+            ..MuxConfig::default()
+        }
+    }
+
     fn make_handshake_mux_pair() -> (
         (CodecSend, CodecRecv),
         (CodecSend, CodecRecv),
@@ -218,11 +225,11 @@ mod tests {
             egress_queue_size: 4,
         };
 
-        let mut mux_a = Mux::new(MuxConfig::default(), RoundRobin::default(), MODE_INITIATOR);
+        let mut mux_a = Mux::new(test_config(), RoundRobin::default(), MODE_INITIATOR);
         let (send_a, recv_a) = mux_a.register(&proto);
         let running_a = mux_a.run(bearer_a);
 
-        let mut mux_b = Mux::new(MuxConfig::default(), RoundRobin::default(), MODE_RESPONDER);
+        let mut mux_b = Mux::new(test_config(), RoundRobin::default(), MODE_RESPONDER);
         let (send_b, recv_b) = mux_b.register(&proto);
         let running_b = mux_b.run(bearer_b);
 

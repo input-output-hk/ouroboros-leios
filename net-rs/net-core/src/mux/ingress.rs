@@ -8,15 +8,16 @@ use bytes::Bytes;
 use tokio::io::AsyncRead;
 use tokio::sync::mpsc;
 
+use super::channel::IngressCounter;
 use super::wire;
-use super::{MuxError, ProtocolId};
+use super::{MuxError, ProtocolId, MODE_INITIATOR, MODE_RESPONDER};
 
 /// Per-protocol ingress state tracked by the demuxer.
 pub(crate) struct ProtocolIngress {
     /// Sender to the protocol's ChannelRecv.
     pub tx: mpsc::Sender<Bytes>,
-    /// Current accumulated bytes in the channel (approximate).
-    pub buffered_bytes: usize,
+    /// Shared byte counter — incremented here, decremented by ChannelRecv.
+    pub counter: IngressCounter,
     /// Maximum allowed bytes before declaring a protocol violation.
     pub limit: usize,
 }
@@ -30,11 +31,18 @@ pub(crate) async fn run_demuxer<R>(
     mut protocols: HashMap<ProtocolId, ProtocolIngress>,
     sdu_timeout: Duration,
     max_sdu_payload: usize,
-    _our_mode: u16,
+    our_mode: u16,
 ) -> Result<(), MuxError>
 where
     R: AsyncRead + Unpin,
 {
+    // The expected mode bit on incoming segments: opposite of ours.
+    let expected_remote_mode = if our_mode == MODE_INITIATOR {
+        MODE_RESPONDER
+    } else {
+        MODE_INITIATOR
+    };
+
     loop {
         // Read one segment with a timeout.
         let segment = match tokio::time::timeout(
@@ -52,26 +60,35 @@ where
             Err(_) => return Err(MuxError::SduTimeout(sdu_timeout)),
         };
 
-        // Incoming segments from the remote peer have the *remote* mode bit.
-        // We need to map to the local protocol ID: remote initiator → our
-        // responder channel, remote responder → our initiator channel.
-        // The protocol ID itself is the same; we just need to find the right
-        // channel. Our protocols are registered for our role, so we accept
-        // segments whose mode is the *opposite* of ours.
+        // Validate the mode bit: incoming segments should have the remote mode.
+        if segment.header.mode != expected_remote_mode {
+            tracing::warn!(
+                protocol = segment.header.protocol,
+                expected_mode = expected_remote_mode,
+                actual_mode = segment.header.mode,
+                "received segment with unexpected mode bit, ignoring"
+            );
+            continue;
+        }
+
         let protocol_id = segment.header.protocol;
 
         let state = match protocols.get_mut(&protocol_id) {
             Some(s) => s,
             None => {
                 // Unknown protocol — log and skip (per Haskell behavior).
-                tracing::warn!(protocol = protocol_id, "received segment for unregistered protocol, ignoring");
+                tracing::warn!(
+                    protocol = protocol_id,
+                    "received segment for unregistered protocol, ignoring"
+                );
                 continue;
             }
         };
 
-        // Check ingress buffer limit.
-        let new_size = state.buffered_bytes + segment.payload.len();
-        if new_size > state.limit && state.limit > 0 {
+        // Check ingress buffer limit using the shared counter.
+        let current = state.counter.load();
+        let new_size = current + segment.payload.len();
+        if state.limit > 0 && new_size > state.limit {
             return Err(MuxError::IngressOverflow {
                 protocol: protocol_id,
                 size: new_size,
@@ -79,19 +96,19 @@ where
             });
         }
 
+        // Increment the counter before dispatching.
+        state.counter.add(segment.payload.len());
+
         // Dispatch to the protocol's channel.
         if state.tx.send(segment.payload).await.is_err() {
             // Protocol channel was dropped — the protocol has terminated.
             // Remove it and continue.
-            tracing::debug!(protocol = protocol_id, "protocol channel closed, removing");
+            tracing::debug!(
+                protocol = protocol_id,
+                "protocol channel closed, removing"
+            );
             protocols.remove(&protocol_id);
             continue;
         }
-
-        state.buffered_bytes = new_size;
-        // Note: buffered_bytes is approximate. The protocol consuming data
-        // reduces the actual buffer, but we don't track that here. A more
-        // accurate approach would use an AtomicUsize shared with the channel.
-        // For Phase 1 the limit is generous enough that this is fine.
     }
 }
