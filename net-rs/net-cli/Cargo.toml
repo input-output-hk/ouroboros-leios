@@ -1,0 +1,11 @@
+[package]
+name = "net-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+net-core = { path = "../net-core" }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+clap = { version = "4", features = ["derive"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
