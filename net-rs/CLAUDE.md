@@ -82,10 +82,42 @@ Protocol timeouts must be implemented and enforced, both detection and handling.
 
 The bearer/transport layer must be trait-based and pluggable. Current scope is TCP only (no Unix sockets / N2C), but the design must not block future transports (Unix sockets, QUIC, etc.).
 
+## Workspace Structure
+
+```
+net-rs/
+  Cargo.toml            -- workspace root
+  net-core/             -- library crate
+    src/
+      lib.rs
+      bearer/           -- Bearer trait (mod.rs), TcpBearer (tcp.rs), MemBearer (mem.rs)
+      mux/              -- Multiplexer: wire format, egress/ingress tasks, channels, scheduler
+      codec.rs          -- CBOR framing over mux channels (CodecSend/CodecRecv)
+      protocol.rs       -- Protocol trait, Runner with agency-checked send/recv
+      protocols/
+        handshake/      -- Handshake protocol (state machine, CBOR codec, N2N version data)
+  net-cli/              -- binary crate
+    src/
+      main.rs           -- subcommand dispatch
+      handshake.rs      -- `handshake` command (connect + negotiate)
+      capture.rs        -- `capture` command (raw byte capture for test vectors)
+```
+
+## Key Design Decisions
+
+- **Bearer**: trait-based (not enum) for transport pluggability
+- **Mux**: per-protocol egress queues with pluggable Scheduler trait; demuxer uses `try_send` (never blocks); supervisor auto-aborts peer on task failure
+- **Ingress accounting**: shared `Arc<AtomicUsize>` between demuxer and ChannelRecv for accurate buffer tracking
+- **Codec**: `for<'a> Decode<'a>` (HRTB) so decoded types are owned, avoiding borrow conflicts; `max_buffer` cap prevents unbounded growth
+- **Protocol framework**: `Runner` wraps codec + state, provides agency-checked `send()`/`recv()` — protocols use it directly in async functions (not a generic driver loop)
+- **SDU size**: default 12,288 bytes (Cardano standard), not 65,535
+
 ## Implementation Phases
 
-1. **Phase 1: Basic Handshake** — multiplexer + Handshake protocol + CLI test connecting to an existing node
+1. **Phase 1: Mux + Handshake** — COMPLETE. Bearer, mux, codec, protocol framework, handshake (client+server), CLI, 51 tests, live-tested against mainnet, security-audited.
 2. **Phase 2: ChainSync / BlockFetch** — ChainSync and BlockFetch protocols + CLI test that follows tip and fetches blocks
+3. **Phase 3: Remaining Praos + Multi-Peer** — TxSubmission, KeepAlive, PeerSharing + multi-peer coordination layer
+4. **Phase 4: Leios Protocols** — LeiosNotify, LeiosFetch, priority scheduling
 
 ## Documentation
 

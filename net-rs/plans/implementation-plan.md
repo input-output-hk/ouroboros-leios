@@ -58,13 +58,23 @@ means:
 
 ## Implementation Phases
 
-### Phase 1: Mux + Handshake
+### Phase 1: Mux + Handshake — COMPLETE
 
 Deliverable: `net-cli` that connects to an existing Cardano node, completes handshake,
 prints negotiated version. Also: server-side handshake and MemBearer integration tests.
 
-Builds: bearer trait, mux (wire format, egress/ingress, scheduler, channels), CBOR codec
-framing, protocol framework, handshake protocol (client + server), connection API.
+Built: bearer trait (TCP + mem), mux (wire format, egress with scheduler, ingress with
+`try_send` and shared `IngressCounter`, supervisor for error propagation), CBOR codec
+with `max_buffer` and HRTB decode, protocol framework (`Runner` with agency checks),
+handshake protocol (client + server + N2N negotiation), CLI with subcommands.
+
+51 tests. Live-tested against backbone.cardano.iog.io:3001. Security audit completed:
+segment size validation, CBOR collection caps, buffer limits, non-blocking demuxer,
+mode bit validation, supervisor teardown.
+
+Additions beyond original plan: supervisor task, IngressCounter, try_send in demuxer,
+max_buffer in codec, CBOR collection length caps, capture command, test vectors from
+live node, security audit checklist.
 
 ### Phase 2: ChainSync + BlockFetch
 
