@@ -5,4 +5,13 @@ providers:
     folder: Cardano dashboards
     type: file
     options:
-      path: "${WORKING_DIR}/grafana/dashboards"
+      path: "${GRAFANA_HOMEPATH}/dashboards"
+
+  - name: Demo
+    folder: Demo dashboards
+    type: file
+    disableDeletion: false
+    allowUiUpdates: true
+    options:
+      path: "${DEMO_DASHBOARDS_DIR}"
+      foldersFromFilesStructure: false

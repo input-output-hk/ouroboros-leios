@@ -7,21 +7,31 @@ set -eo pipefail
 # Set defaults for all environment variables
 # These can be overridden by exporting them before running this script
 set -a
-: "${WORKING_DIR:=tmp-devnet}"
+: "${WORKING_DIR:=$(pwd)/tmp-devnet}"
 : "${SOURCE_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
-: "${IP_NODE1:=172.28.0.10}"
 : "${PORT_NODE1:=3001}"
-: "${IP_NODE2:=172.28.0.20}"
 : "${PORT_NODE2:=3002}"
-: "${IP_NODE3:=172.28.0.30}"
 : "${PORT_NODE3:=3003}"
 : "${METRICS_PORT_NODE1:=12901}"
 : "${METRICS_PORT_NODE2:=12902}"
 : "${METRICS_PORT_NODE3:=12903}"
-: "${IP_HOST:=172.28.0.1}"
-# Traffic control settings (symmetric, applied to all edges)
-: "${RATE:=10Mbps}"
-: "${DELAY:=200ms}"
+# Traffic control (on by default, disable with TC=0)
+: "${TC:=1}"
+if [ "$TC" = "1" ]; then
+	: "${RATE:=10Mbps}"
+	: "${DELAY:=200ms}"
+	: "${IP_HOST:=172.28.0.1}"
+	: "${IP_NODE1:=172.28.0.10}"
+	: "${IP_NODE2:=172.28.0.20}"
+	: "${IP_NODE3:=172.28.0.30}"
+else
+	IP_NODE1=127.0.0.1
+	IP_NODE2=127.0.0.1
+	IP_NODE3=127.0.0.1
+fi
+# X-ray observability (on by default, disable with XRAY=0)
+: "${XRAY:=1}"
+: "${XRAY_SOURCE_DIR:="${SOURCE_DIR}/../extras/x-ray"}"
 set +a
 
 # Check for required commands
@@ -33,7 +43,7 @@ REQUIRED_COMMANDS=(
 	"envsubst"
 	"cardano-node"
 	"cardano-cli"
-	"tx-generator"
+	"tx-centrifuge"
 )
 
 MISSING_COMMANDS=()
@@ -128,21 +138,40 @@ for i in "${nodes[@]}"; do
 	chmod 400 "$NODE_DIR/keys"/*.skey
 done
 
-# Copy utxo-keys for tx-generator and set permissions
-echo "Setting up utxo-keys for tx-generator"
+# Copy utxo-keys for tx-centrifuge and set permissions
+echo "Setting up utxo-keys for tx-centrifuge"
 cp -r "$CONFIG_DIR/utxo-keys" "$WORKING_DIR/utxo-keys"
 find "$WORKING_DIR/utxo-keys" -name "*.skey" -exec chmod 400 {} \;
+cp -r "$CONFIG_DIR/funds.json" "$WORKING_DIR/funds.json"
+envsubst <"${CONFIG_DIR}/centrifuge.template.json" >"${WORKING_DIR}/centrifuge.json"
 
-# Set LOG_PATH to absolute path for x-ray observability
-# Use realpath to resolve WORKING_DIR to absolute path
-export LOG_PATH="${LOG_PATH:-$(realpath "${WORKING_DIR}")/node*/node.log}"
+# Configure alloy for x-ray observability (named config.alloy to avoid conflict with alloy/ storage dir)
+export ALLOY_CONFIG="${WORKING_DIR}/config.alloy"
+envsubst <"${CONFIG_DIR}/alloy.template" >"${ALLOY_CONFIG}"
 
-# Configure tx-generator
-envsubst <"${CONFIG_DIR}/gen.template.json" >"${WORKING_DIR}/gen.json"
-
-# Configure alloy for x-ray observability
-envsubst <"${CONFIG_DIR}/alloy.template" >"${WORKING_DIR}/alloy"
-
-echo "Starting proto-devnet with process-compose..."
-echo "  Traffic control: ${RATE} / ${DELAY}"
-process-compose --no-server -f "${SOURCE_DIR}/process-compose.yaml"
+echo "Starting proto-devnet ..."
+# Traffic control integration
+TC_COMPOSE=()
+if [ "$TC" = "1" ]; then
+	TC_COMPOSE=(-f "${SOURCE_DIR}/process-compose-tc.yaml")
+	echo "  Traffic control: enabled TC=${TC} (RATE=${RATE}, DELAY=${DELAY})"
+else
+	echo "  Traffic control: disabled TC=${TC} (nodes on loopback)"
+fi
+# X-ray observability integration
+XRAY_COMPOSE=()
+if [ "$XRAY" = "1" ]; then
+	set -a
+	DEMO_DASHBOARDS_DIR="${SOURCE_DIR}/config/dashboards"
+	# shellcheck source=/dev/null
+	source "${XRAY_SOURCE_DIR}/env.sh"
+	set +a
+	XRAY_COMPOSE=(-f "${XRAY_SOURCE_DIR}/process-compose.yaml")
+	echo "  X-ray observability: enabled XRAY=${XRAY} (Grafana at http://localhost:3000)"
+else
+	echo "  X-ray observability: disabled XRAY=${XRAY}"
+fi
+process-compose --no-server \
+	-f "${SOURCE_DIR}/process-compose.yaml" \
+	"${TC_COMPOSE[@]}" \
+	"${XRAY_COMPOSE[@]}"
