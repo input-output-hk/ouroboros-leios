@@ -29,6 +29,7 @@ pub(crate) async fn run_demuxer<R>(
     mut reader: R,
     mut protocols: HashMap<ProtocolId, ProtocolIngress>,
     sdu_timeout: Duration,
+    max_sdu_payload: usize,
     _our_mode: u16,
 ) -> Result<(), MuxError>
 where
@@ -36,8 +37,11 @@ where
 {
     loop {
         // Read one segment with a timeout.
-        let segment = match tokio::time::timeout(sdu_timeout, wire::read_segment(&mut reader))
-            .await
+        let segment = match tokio::time::timeout(
+            sdu_timeout,
+            wire::read_segment(&mut reader, max_sdu_payload),
+        )
+        .await
         {
             Ok(Ok(seg)) => seg,
             Ok(Err(e)) if e.kind() == std::io::ErrorKind::UnexpectedEof => {

@@ -22,6 +22,25 @@ cargo clippy                   # lint
 cargo fmt --check              # format check
 ```
 
+## Testing
+
+```sh
+cargo test                     # run all unit + integration tests
+cargo run -p net-cli -- handshake backbone.cardano.iog.io:3001  # live test against mainnet
+cargo run -p net-cli -- capture backbone.cardano.iog.io:3001    # capture wire bytes for test vectors
+```
+
+### Test vector workflow
+
+When implementing a new protocol or changing CBOR encoding:
+
+1. Use `net-cli capture` (or write a similar capture command) to record the raw bytes exchanged with a real Cardano node
+2. Add the captured bytes as `const` test vectors in the relevant codec test module
+3. Write tests that: (a) decode the captured bytes, (b) verify our encoding matches the captured bytes, (c) round-trip our types through encode/decode
+4. This ensures wire compatibility with the live network, not just self-consistency
+
+Test data notes are in `net-core/test_data/README.md`.
+
 ## Code Standards
 
 - **No panics** — every `unwrap()`, `expect()`, indexing, etc. must be handled. Use `Result`/`Option` propagation.

@@ -75,12 +75,29 @@ pub struct Segment {
 }
 
 /// Read one complete segment from an async reader.
-pub async fn read_segment<R: AsyncRead + Unpin>(reader: &mut R) -> io::Result<Segment> {
+///
+/// `max_payload` limits the accepted payload size. If the header declares
+/// a payload larger than this, the read is rejected with `InvalidData`
+/// to prevent a malicious peer from causing unbounded allocation.
+pub async fn read_segment<R: AsyncRead + Unpin>(
+    reader: &mut R,
+    max_payload: usize,
+) -> io::Result<Segment> {
     let mut header_buf = [0u8; HEADER_LEN];
     reader.read_exact(&mut header_buf).await?;
     let header = Header::decode(&header_buf);
 
-    let mut payload = BytesMut::zeroed(header.payload_len as usize);
+    let payload_len = header.payload_len as usize;
+    if payload_len > max_payload {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!(
+                "segment payload length {payload_len} exceeds maximum {max_payload}"
+            ),
+        ));
+    }
+
+    let mut payload = BytesMut::zeroed(payload_len);
     reader.read_exact(&mut payload).await?;
 
     Ok(Segment {
@@ -247,8 +264,113 @@ mod tests {
         assert_eq!(buf.len(), HEADER_LEN + 5);
 
         let mut cursor = &buf[..];
-        let read_back = read_segment(&mut cursor).await.unwrap();
+        let read_back = read_segment(&mut cursor, MAX_PAYLOAD_LEN).await.unwrap();
         assert_eq!(read_back.header, segment.header);
         assert_eq!(read_back.payload, segment.payload);
+    }
+
+    // --- Test vectors from live mainnet handshake ---
+
+    /// Full segment: client ProposeVersions (protocol 0, initiator mode).
+    const LIVE_PROPOSE_SEGMENT: &[u8] = &[
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x17, 0x82, 0x00, 0xa2, 0x0e,
+        0x84, 0x1a, 0x2d, 0x96, 0x4a, 0x09, 0xf4, 0x00, 0xf4, 0x0f, 0x84, 0x1a,
+        0x2d, 0x96, 0x4a, 0x09, 0xf4, 0x00, 0xf4,
+    ];
+
+    /// Full segment: server AcceptVersion (protocol 0, responder mode).
+    const LIVE_ACCEPT_SEGMENT: &[u8] = &[
+        0x26, 0x40, 0xd7, 0x8d, 0x80, 0x00, 0x00, 0x0c, 0x83, 0x01, 0x0f, 0x84,
+        0x1a, 0x2d, 0x96, 0x4a, 0x09, 0xf4, 0x00, 0xf4,
+    ];
+
+    #[test]
+    fn decode_live_propose_segment_header() {
+        let header = Header::decode(LIVE_PROPOSE_SEGMENT[..8].try_into().unwrap());
+        assert_eq!(header.timestamp, 0);
+        assert_eq!(header.mode, 0); // initiator
+        assert_eq!(header.protocol, 0); // handshake
+        assert_eq!(header.payload_len, 23); // 0x17
+    }
+
+    #[test]
+    fn decode_live_accept_segment_header() {
+        let header = Header::decode(LIVE_ACCEPT_SEGMENT[..8].try_into().unwrap());
+        assert_eq!(header.mode, 0x8000); // responder
+        assert_eq!(header.protocol, 0); // handshake
+        assert_eq!(header.payload_len, 12); // 0x0c
+    }
+
+    #[tokio::test]
+    async fn read_live_propose_segment() {
+        let mut cursor = &LIVE_PROPOSE_SEGMENT[..];
+        let seg = read_segment(&mut cursor, MAX_PAYLOAD_LEN).await.unwrap();
+        assert_eq!(seg.header.protocol, 0);
+        assert_eq!(seg.header.mode, 0);
+        assert_eq!(seg.payload.len(), 23);
+    }
+
+    #[tokio::test]
+    async fn read_live_accept_segment() {
+        let mut cursor = &LIVE_ACCEPT_SEGMENT[..];
+        let seg = read_segment(&mut cursor, MAX_PAYLOAD_LEN).await.unwrap();
+        assert_eq!(seg.header.protocol, 0);
+        assert_eq!(seg.header.mode, 0x8000);
+        assert_eq!(seg.payload.len(), 12);
+    }
+
+    // --- Edge cases ---
+
+    #[test]
+    fn segment_payload_max_sdu() {
+        let data = vec![0u8; MAX_PAYLOAD_LEN];
+        let segments = segment_payload(2, 0, 0, &data, MAX_PAYLOAD_LEN);
+        assert_eq!(segments.len(), 1);
+        assert_eq!(segments[0].payload.len(), MAX_PAYLOAD_LEN);
+    }
+
+    #[test]
+    fn segment_payload_sdu_larger_than_max_clamps() {
+        // If sdu_size exceeds MAX_PAYLOAD_LEN, it should be clamped.
+        let data = vec![0u8; MAX_PAYLOAD_LEN + 100];
+        let segments = segment_payload(2, 0, 0, &data, MAX_PAYLOAD_LEN + 1000);
+        // Should clamp to MAX_PAYLOAD_LEN and split.
+        assert_eq!(segments.len(), 2);
+        assert_eq!(segments[0].payload.len(), MAX_PAYLOAD_LEN);
+        assert_eq!(segments[1].payload.len(), 100);
+    }
+
+    #[test]
+    fn header_timestamp_wraps() {
+        let header = Header {
+            timestamp: u32::MAX,
+            mode: 0,
+            protocol: 0,
+            payload_len: 0,
+        };
+        let mut buf = [0u8; HEADER_LEN];
+        header.encode(&mut buf);
+        let decoded = Header::decode(&buf);
+        assert_eq!(decoded.timestamp, u32::MAX);
+    }
+
+    #[tokio::test]
+    async fn read_segment_rejects_oversized_payload() {
+        // Craft a header claiming payload_len = 60000, but set max_payload = 12288.
+        let header = Header {
+            timestamp: 0,
+            mode: 0,
+            protocol: 0,
+            payload_len: 60000,
+        };
+        let mut buf = [0u8; HEADER_LEN];
+        header.encode(&mut buf);
+
+        let mut cursor = &buf[..];
+        let result = read_segment(&mut cursor, 12288).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);
+        assert!(err.to_string().contains("exceeds maximum"));
     }
 }

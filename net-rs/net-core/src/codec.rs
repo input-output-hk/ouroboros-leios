@@ -32,19 +32,29 @@ impl CodecSend {
     }
 }
 
+/// Default maximum decode buffer size (2.5 MB, matching the largest per-state
+/// size limit in the spec — BlockFetch StStreaming).
+const DEFAULT_MAX_BUFFER: usize = 2_500_000;
+
 /// Receiving half: reads bytes from the channel and incrementally CBOR-decodes
 /// messages. Handles the case where a message spans multiple segments or
 /// multiple messages arrive in a single segment.
 pub struct CodecRecv {
     channel: ChannelRecv,
     buffer: BytesMut,
+    max_buffer: usize,
 }
 
 impl CodecRecv {
     pub fn new(channel: ChannelRecv) -> Self {
+        Self::with_max_buffer(channel, DEFAULT_MAX_BUFFER)
+    }
+
+    pub fn with_max_buffer(channel: ChannelRecv, max_buffer: usize) -> Self {
         Self {
             channel,
             buffer: BytesMut::new(),
+            max_buffer,
         }
     }
 
@@ -81,6 +91,17 @@ impl CodecRecv {
             // Read more data from the channel.
             match self.channel.recv().await {
                 Some(chunk) => {
+                    if self.buffer.len() + chunk.len() > self.max_buffer {
+                        return Err(MuxError::Io(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            format!(
+                                "codec buffer would exceed maximum ({} + {} > {})",
+                                self.buffer.len(),
+                                chunk.len(),
+                                self.max_buffer,
+                            ),
+                        )));
+                    }
                     self.buffer.extend_from_slice(&chunk);
                 }
                 None => {
@@ -228,5 +249,90 @@ mod tests {
 
         ra.abort();
         rb.abort();
+    }
+
+    #[tokio::test]
+    async fn codec_large_message_spanning_segments() {
+        // Send a message larger than the default SDU size (12288 bytes).
+        // This forces the mux to split it across multiple segments.
+        let proto = ProtocolConfig {
+            id: 0,
+            priority: 0,
+            ingress_limit: 100_000,
+            egress_queue_size: 10,
+        };
+        let (codec_send, mut codec_recv, ra, rb) = make_mux_pair(&proto);
+
+        let msg = TestMsg {
+            tag: 1,
+            payload: vec![0xAB; 30_000], // larger than 12KB SDU
+        };
+        codec_send.send(&msg).await.unwrap();
+
+        let received: TestMsg = codec_recv.recv().await.unwrap();
+        assert_eq!(received.tag, 1);
+        assert_eq!(received.payload.len(), 30_000);
+        assert!(received.payload.iter().all(|&b| b == 0xAB));
+
+        ra.abort();
+        rb.abort();
+    }
+
+    #[tokio::test]
+    async fn codec_recv_rejects_oversized_buffer() {
+        let proto = ProtocolConfig {
+            id: 0,
+            priority: 0,
+            ingress_limit: 100_000,
+            egress_queue_size: 10,
+        };
+        let (bearer_a, bearer_b) = MemBearer::pair();
+
+        let mut mux_a = Mux::new(MuxConfig::default(), RoundRobin::default(), MODE_INITIATOR);
+        let (send_ch, _) = mux_a.register(&proto);
+        let ra = mux_a.run(bearer_a);
+
+        let mut mux_b = Mux::new(MuxConfig::default(), RoundRobin::default(), MODE_RESPONDER);
+        let (_, recv_ch) = mux_b.register(&proto);
+        let rb = mux_b.run(bearer_b);
+
+        let codec_send = CodecSend::new(send_ch);
+        // Set a tiny buffer limit.
+        let mut codec_recv = CodecRecv::with_max_buffer(recv_ch, 100);
+
+        // Send a message that's larger than the buffer limit.
+        let msg = TestMsg {
+            tag: 1,
+            payload: vec![0xAB; 200],
+        };
+        codec_send.send(&msg).await.unwrap();
+
+        let result: Result<TestMsg, _> = codec_recv.recv().await;
+        assert!(result.is_err(), "should reject buffer exceeding max");
+
+        ra.abort();
+        rb.abort();
+    }
+
+    #[tokio::test]
+    async fn codec_recv_returns_error_on_channel_close() {
+        let proto = ProtocolConfig {
+            id: 0,
+            priority: 0,
+            ingress_limit: 65535,
+            egress_queue_size: 10,
+        };
+        let (codec_send, mut codec_recv, ra, rb) = make_mux_pair(&proto);
+
+        // Drop the sender side and abort the mux — the recv should fail.
+        drop(codec_send);
+        ra.abort();
+        rb.abort();
+
+        // Give tasks a moment to shut down.
+        tokio::task::yield_now().await;
+
+        let result: Result<TestMsg, _> = codec_recv.recv().await;
+        assert!(result.is_err());
     }
 }

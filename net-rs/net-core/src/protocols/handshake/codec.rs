@@ -286,4 +286,85 @@ mod tests {
             other => panic!("expected QueryReply, got {other:?}"),
         }
     }
+
+    // --- Test vectors captured from backbone.cardano.iog.io:3001 (2026-03-23) ---
+
+    /// ProposeVersions payload: [0, {14: [764824073, false, 0, false], 15: [764824073, false, 0, false]}]
+    const LIVE_PROPOSE_PAYLOAD: &[u8] = &[
+        0x82, 0x00, 0xa2, 0x0e, 0x84, 0x1a, 0x2d, 0x96, 0x4a, 0x09, 0xf4, 0x00,
+        0xf4, 0x0f, 0x84, 0x1a, 0x2d, 0x96, 0x4a, 0x09, 0xf4, 0x00, 0xf4,
+    ];
+
+    /// AcceptVersion payload: [1, 15, [764824073, false, 0, false]]
+    const LIVE_ACCEPT_PAYLOAD: &[u8] = &[
+        0x83, 0x01, 0x0f, 0x84, 0x1a, 0x2d, 0x96, 0x4a, 0x09, 0xf4, 0x00, 0xf4,
+    ];
+
+    #[test]
+    fn decode_live_propose() {
+        let msg: Message = minicbor::decode(LIVE_PROPOSE_PAYLOAD).unwrap();
+        match msg {
+            Message::ProposeVersions(versions) => {
+                assert_eq!(versions.len(), 2);
+                assert!(versions.contains_key(&14));
+                assert!(versions.contains_key(&15));
+                // Decode the version data for V14.
+                let data: super::super::n2n::VersionData =
+                    minicbor::decode(versions.get(&14).unwrap()).unwrap();
+                assert_eq!(data.network_magic, 764824073);
+                assert!(!data.initiator_only_diffusion_mode);
+                assert_eq!(data.peer_sharing, 0);
+                assert!(!data.query);
+            }
+            other => panic!("expected ProposeVersions, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn decode_live_accept() {
+        let msg: Message = minicbor::decode(LIVE_ACCEPT_PAYLOAD).unwrap();
+        match msg {
+            Message::AcceptVersion(version, params) => {
+                assert_eq!(version, 15);
+                let data: super::super::n2n::VersionData =
+                    minicbor::decode(&params).unwrap();
+                assert_eq!(data.network_magic, 764824073);
+                assert!(!data.initiator_only_diffusion_mode);
+                assert_eq!(data.peer_sharing, 0);
+                assert!(!data.query);
+            }
+            other => panic!("expected AcceptVersion, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn encode_matches_live_propose() {
+        // Build the same ProposeVersions our client sends.
+        let data = super::super::n2n::VersionData {
+            network_magic: 764824073,
+            initiator_only_diffusion_mode: false,
+            peer_sharing: 0,
+            query: false,
+        };
+        let versions = super::super::n2n::version_table(&data);
+        let msg = Message::ProposeVersions(versions);
+        let encoded = minicbor::to_vec(&msg).unwrap();
+        assert_eq!(encoded, LIVE_PROPOSE_PAYLOAD, "our encoding must match what the live node accepted");
+    }
+
+    #[test]
+    fn unknown_message_tag_fails() {
+        // CBOR array [99] — unknown tag.
+        let bad = &[0x82, 0x18, 0x63, 0x00];
+        let result: Result<Message, _> = minicbor::decode(bad);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn truncated_payload_fails() {
+        // Take the first 5 bytes of a valid propose — incomplete.
+        let truncated = &LIVE_PROPOSE_PAYLOAD[..5];
+        let result: Result<Message, _> = minicbor::decode(truncated);
+        assert!(result.is_err());
+    }
 }
