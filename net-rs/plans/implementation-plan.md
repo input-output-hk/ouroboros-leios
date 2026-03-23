@@ -1,15 +1,93 @@
-# net-rs Phase 1 Implementation Plan
+# net-rs Implementation Plan
 
 ## Context
 
 net-rs is a greenfield Rust implementation of the Cardano mini-protocol network stack for
-Praos and Leios. This plan covers the initial crate setup and Phase 1 (multiplexer +
-handshake + CLI test connecting to an existing node), with structural decisions informed by
-Leios requirements so we don't need to refactor later.
+Praos and Leios. Structural decisions are informed by Leios requirements (QoS, priority
+scheduling, new protocols) so we don't need to refactor later.
 
 Key references (all in `docs/`): `praos-network.md` (protocol spec), `leios-changes.md`
 (what Leios needs from the mux), `implementation-haskell.md` and
 `implementation-pallas-v1.md` / `v2.md` (prior art).
+
+## Architectural Layering
+
+The design is layered to support both simple tool use and multi-peer node operation,
+without the lower layers dictating the concurrency model.
+
+### The problem: single-peer vs multi-peer coordination
+
+Pallas v1 gives each connection independent protocol handles driven by `await` calls.
+This works for tools (connect to one node, fetch data, disconnect) but breaks down when
+you need to coordinate across peers — e.g. ChainSync on peer A announces a header, and
+you need to BlockFetch it from peer B based on latency.
+
+Pallas v2 solves this with an event-driven model (Interface/Behavior/Manager) where all
+protocol messages from all peers flow through a single `handle_io()` callback. The
+behavior layer has a unified view of all peer states.
+
+The Haskell node takes a third approach: independent concurrent actors (one per protocol
+instance) coordinating through shared mutable state (STM TVars for chain DB, mempool,
+candidate chains) with a separate Peer Selection Governor making connection decisions.
+
+### Our approach: layered, not opinionated
+
+Rather than choosing one model upfront, we layer the architecture so that the core
+protocol machinery is reusable under any concurrency model:
+
+- **Layer 1 — net-core** (Phase 1-2): Protocol state machines, codecs, mux, bearer.
+  No opinion on single-peer vs multi-peer. State machines are pure
+  (`transition(state, msg) -> Result<State>`) — they can be driven by direct `await`
+  calls or by an event loop.
+
+- **Layer 2 — Connection API** (Phase 1-2): Single-connection facade —
+  `connect()` → handshake → protocol handles. Simple, imperative, v1-style. Good for
+  tools, tests, and the CLI.
+
+- **Layer 3 — Node / Behavior** (Phase 3+): Multi-peer coordination. This is where an
+  event-driven model (like v2's Behavior pattern) or actor model (like Haskell's STM
+  approach) would live. The exact model will be chosen based on Leios requirements
+  (freshest-first cross-protocol delivery, peer promotion, etc.).
+
+The critical design constraint is that Layer 1's types must not preclude Layer 3. This
+means:
+- Protocol state machines must be pure (no embedded I/O or channel ownership)
+- Channels must be splittable (`ChannelSend` + `ChannelRecv`) for pipelining
+- Decoder state must be separate from the channel
+- The `Protocol` trait should not assume request-response pairing
+
+## Implementation Phases
+
+### Phase 1: Mux + Handshake
+
+Deliverable: `net-cli` that connects to an existing Cardano node, completes handshake,
+prints negotiated version. Also: server-side handshake and MemBearer integration tests.
+
+Builds: bearer trait, mux (wire format, egress/ingress, scheduler, channels), CBOR codec
+framing, protocol framework, handshake protocol (client + server), connection API.
+
+### Phase 2: ChainSync + BlockFetch
+
+Deliverable: `net-cli` that follows the chain tip via ChainSync and fetches blocks via
+BlockFetch, logging slot/block/hash.
+
+Builds: ChainSync protocol (client + server), BlockFetch protocol (client + server),
+possibly pipelined driver for BlockFetch.
+
+### Phase 3: Remaining Praos Protocols + Multi-Peer
+
+Deliverable: TxSubmission, KeepAlive, PeerSharing. Multi-peer coordination layer for
+running a simulated test network of nodes talking to each other.
+
+Builds: remaining protocol implementations, multi-peer behavior/coordination layer
+(model TBD — event-driven or actor-based), peer lifecycle management.
+
+### Phase 4: Leios Protocols
+
+Deliverable: LeiosNotify, LeiosFetch protocols. Priority scheduling in mux.
+
+Builds: Leios protocol implementations, StrictPriority/WFQ scheduler, freshest-first
+delivery logic in the behavior layer.
 
 ## Workspace Structure
 
@@ -198,7 +276,9 @@ pub struct Connection {
 }
 ```
 
-## Phase 1 Deliverable: net-cli
+## Phase 1 Deliverable
+
+### net-cli
 
 A CLI binary that:
 1. Takes a `host:port` and network magic as arguments
