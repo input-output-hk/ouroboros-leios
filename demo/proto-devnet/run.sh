@@ -162,6 +162,7 @@ fi
 XRAY_COMPOSE=()
 if [ "$XRAY" = "1" ]; then
 	set -a
+  # shellcheck disable=SC2034
 	DEMO_DASHBOARDS_DIR="${SOURCE_DIR}/config/dashboards"
 	# shellcheck source=/dev/null
 	source "${XRAY_SOURCE_DIR}/env.sh"
