@@ -185,8 +185,7 @@ def parse_log_line(line: str, node_name: str) -> Optional[BlockEvent]:
         # Mempool tx additions
         # ns: "Mempool.AddedTx", data.kind: "TraceMempoolAddedTx"
         if "Mempool" in ns and (
-            "AddedTx" in ns
-            or "TraceMempoolAddedTx" in str(event_data.get("kind", ""))
+            "AddedTx" in ns or "TraceMempoolAddedTx" in str(event_data.get("kind", ""))
         ):
             return BlockEvent(
                 timestamp=ts,
@@ -302,9 +301,15 @@ def compute_metrics(log_dir: str = "/logs") -> Metrics:
 
         for event in events:
             # Track time window
-            if metrics.first_event_time is None or event.timestamp < metrics.first_event_time:
+            if (
+                metrics.first_event_time is None
+                or event.timestamp < metrics.first_event_time
+            ):
                 metrics.first_event_time = event.timestamp
-            if metrics.last_event_time is None or event.timestamp > metrics.last_event_time:
+            if (
+                metrics.last_event_time is None
+                or event.timestamp > metrics.last_event_time
+            ):
                 metrics.last_event_time = event.timestamp
 
             # Count events
