@@ -97,18 +97,33 @@ where
         }
 
         // Increment the counter before dispatching.
-        state.counter.add(segment.payload.len());
+        let payload_len = segment.payload.len();
+        state.counter.add(payload_len);
 
-        // Dispatch to the protocol's channel.
-        if state.tx.send(segment.payload).await.is_err() {
-            // Protocol channel was dropped — the protocol has terminated.
-            // Remove it and continue.
-            tracing::debug!(
-                protocol = protocol_id,
-                "protocol channel closed, removing"
-            );
-            protocols.remove(&protocol_id);
-            continue;
+        // Dispatch to the protocol's channel. Use try_send to avoid blocking
+        // the demuxer (which would stall ALL protocols). If the channel is
+        // full, the protocol is not consuming fast enough — treat as overload.
+        match state.tx.try_send(segment.payload) {
+            Ok(()) => {}
+            Err(mpsc::error::TrySendError::Full(_)) => {
+                // Undo the counter increment since we didn't actually deliver.
+                state.counter.sub(payload_len);
+                return Err(MuxError::IngressOverflow {
+                    protocol: protocol_id,
+                    size: state.counter.load() + payload_len,
+                    limit: state.limit,
+                });
+            }
+            Err(mpsc::error::TrySendError::Closed(_)) => {
+                // Protocol channel was dropped — the protocol has terminated.
+                state.counter.sub(payload_len);
+                tracing::debug!(
+                    protocol = protocol_id,
+                    "protocol channel closed, removing"
+                );
+                protocols.remove(&protocol_id);
+                continue;
+            }
         }
     }
 }
