@@ -7,6 +7,7 @@ set -eo pipefail
 : "${SOURCE_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 : "${XRAY_SOURCE_DIR:=${SOURCE_DIR}}"
 set -a
+# shellcheck disable=SC1091
 source "${SOURCE_DIR}/env.sh"
 set +a
 
