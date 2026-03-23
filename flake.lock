@@ -931,11 +931,11 @@
         "utils": "utils_2"
       },
       "locked": {
-        "lastModified": 1774262492,
-        "narHash": "sha256-I4yAhewOy+tylP+U+yr99JChqWCXsUJjkoSM2sZN1hw=",
+        "lastModified": 1774270996,
+        "narHash": "sha256-OB5ROMv3Hxg9KbkPClhowDPzzG+wiL2td+XTuy3w6O8=",
         "owner": "intersectmbo",
         "repo": "cardano-node",
-        "rev": "01decec8a52b788289eee4eb8c7d34764f6a601a",
+        "rev": "c53f7c0d9509675d0a5eddb5a45cd53dd09b1bff",
         "type": "github"
       },
       "original": {
