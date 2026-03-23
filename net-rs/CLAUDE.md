@@ -41,6 +41,17 @@ When implementing a new protocol or changing CBOR encoding:
 
 Test data notes are in `net-core/test_data/README.md`.
 
+### Security audit at end of each phase
+
+Before marking a phase complete, audit every path where untrusted remote data enters the system:
+
+1. **Allocation bounds**: every length field read from the wire (CBOR map/array lengths, segment payload_len, string lengths) must be checked against a maximum before allocating. A malicious peer must not be able to trigger unbounded allocation.
+2. **Buffer bounds**: every accumulation buffer (codec recv buffer, ingress buffers) must have a hard cap. Exceeding it must return an error, not block or grow.
+3. **No blocking on untrusted input**: the demuxer must never block waiting for a slow protocol consumer (use `try_send`, not `send().await`). A single slow/malicious protocol must not stall others.
+4. **Timeout coverage**: every state where we wait for remote data must have a timeout. Verify no path can wait forever.
+5. **Error propagation**: every error must result in clean connection teardown. Verify no error is silently swallowed leaving the connection in a broken state.
+6. **No panics**: `grep` for `unwrap()`, `expect()`, `panic!`, indexing without bounds checks in non-test code.
+
 ## Code Standards
 
 - **No panics** — every `unwrap()`, `expect()`, indexing, etc. must be handled. Use `Result`/`Option` propagation.
