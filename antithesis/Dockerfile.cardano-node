@@ -56,12 +56,12 @@ RUN apt-get update -y && \
 RUN mkdir -p /app/config /app/genesis /app/scripts /data /logs
 
 # Copy genesis files (baked in)
-COPY demo/2025-11/data/2025-10-10-13-29-24641-1050-50-blocks-50-coay-sup/genesis/*.json /app/genesis/
+COPY demo/burst/data/2025-10-10-13-29-24641-1050-50-blocks-50-coay-sup/genesis/*.json /app/genesis/
 
 # Copy config files
-COPY demo/2025-11/data/node0/config.json /app/config/node0-config.json
-COPY demo/2025-11/data/downstream-node/config.json /app/config/downstream-config.json
-COPY demo/2025-11/data/topology.template.json /app/config/topology.template.json
+COPY demo/burst/data/node0/config.json /app/config/node0-config.json
+COPY demo/burst/data/downstream-node/config.json /app/config/downstream-config.json
+COPY demo/burst/data/topology.template.json /app/config/topology.template.json
 
 # Copy scripts
 COPY antithesis/scripts/init-node0.sh /app/scripts/

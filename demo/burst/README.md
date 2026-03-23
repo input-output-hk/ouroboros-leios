@@ -1,16 +1,45 @@
-# Prototype demo - November 2025
+# Protocol burst demo
 
-Slight improvement of the [October 2025 demonstration](../2025-10) using `tc` and better observability using Grafana et al. In summary the progress made during November 2025 on the Leios networking prototype is:
+Culmination of former `2025-10` and `2025-11` demos into a single protocol burst scenario. See git history prior to `96472a81e48f527277b7cdbffca28f84982970df` for removed and merged demo descriptions.
 
-- The surprisingly-high latency observed in the October demo was explained and reined in.
-- Key structured log events were added to the prototype.
-- Observability/reporting/monitoring was improved.
-- Packaging of the prerequisites for executing the demo was improved.
+The architecture of this demo is as follows and it works by having Praos and Leios traffic prepared, which is released by `Upstream` on a pre-determined schedule at a very unfortunate time such that lots of Leios traffic is pulled from `Node0` and `Downstream`.
 
-![Demo diagram](./demo-2025-11.excalidraw.svg)
+![Demo diagram](./demo-burst.excalidraw.svg)
 
 > [!TIP]
 > This is an excalidraw SVG with embedded scene so it can be loaded and edited in [https://excalidraw.com/].
+
+## Praos and Leios traffic
+
+In this iteration of the demo, the data and traffic is very simple.
+
+- The Praos data is a simple chain provided by the Performance&Tracing team.
+- The mocked upstream peer serves each Praos block when the mocked wall-clock reaches the onset of their slots.
+- The Leios data is ten 12.5 megabyte EBs.
+  They use the minimal number of txs necessary in order to accumulate 12.5 megabytes in order to minimize the CPU&heap overhead of the patched-in Leios logic, since this iteration of the demo is primarily intended to focus on networking.
+- The mocked upstream peer serves those EBs just prior to the onset of one of the Praos block's slot, akin to (relatively minor) ATK-LeiosProtocolBurst attack.
+  Thus, the patched nodes are under significant Leios load when that Praos block begins diffusing.
+
+## Upstream
+
+The mocked upstream peer is a patched variant of `immdb-server`.
+
+- It runs incomplete variants of LeiosNotify and LeiosFetch: just EBs and EB closures, nothing else (no EB announcements, no votes, no range requests).
+- It serves the EBs present in the given `--leios-db`; it sends Leios notificaitons offering the data according to the given `--leios-schedule`.
+  See the demo tool section above for how to generate those files.
+
+## Node0
+
+The patched node is the latest prototype of `cardano-node`. At first, this was a very basic implementation of the Leios fetch protocol only with little persistence. In the meantime, the prototype was expanded to cover to also produce real EBs and relay other information. 
+
+For this demo to work, it is important that:
+- Node0 to not hold stake, otherwise it would produce EBs themselves and interfere measurements
+- Not validate EB transactions as the mocked Leios traffic is just placeholder bytes
+
+## Downstream
+
+For simplicity, this is simply another instance of the patched node.
+In the future, it could be comparatively lightweight and moreover could replay an arbitrary schedule of downstream requests, dual to the mocked upstream peer's arbitrary schedule of upstream notifications.
 
 ## Bufferbloat
 
@@ -48,7 +77,7 @@ Highlights include the following.
 Run the demo with all dependencies automatically provided using nix:
 
 ```shell
-nix run github:input-output-hk/ouroboros-leios#demo-2025-11
+nix run github:input-output-hk/ouroboros-leios#demo-burst
 ```
 
 Or enter the `nix develop` shell (also available via `direnv allow`) and follow [without nix instructions](#without-nix).
@@ -60,7 +89,7 @@ Install these prerequisites:
 - `process-compose` for orchestrating the demo processes
 - `cardano-node` patched with Leios support
 - `immdb-server` for the upstream node (mock server)
-- `leiosdemo202510` for generating Leios schedules
+- `leiosdemo202510` for generating Leios schedules (TODO: cleanup/rename)
 - `ss_http_exporter` for socket statistics monitoring
 - `sqlite3` for creating Leios databases
 - `jq` for config modifications
@@ -116,7 +145,7 @@ export PATH=$(cd ~/code/iog/ouroboros-consensus; dirname $(cabal list-bin immdb-
 Run the Leios X-Ray (Grafana based observability stack) in a separate terminal:
 
 ```shell
-export LOG_PATH="tmp-leios-202511-demo/*.log"
+export LOG_PATH="tmp-demo-burst/*.log"
 nix run github:input-output-hk/ouroboros-leios#x-ray
 ```
 
@@ -127,6 +156,7 @@ Access Grafana at <http://localhost:3000>
 To reset the demo, simply remove the working directories:
 
 ```shell
-rm -rf tmp-leios-202511-demo
+rm -rf tmp-demo-burst
 rm -rf tmp-x-ray
 ```
+    
