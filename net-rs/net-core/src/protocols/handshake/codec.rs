@@ -144,10 +144,24 @@ impl<'a> minicbor::Decode<'a, ()> for Message {
     }
 }
 
+/// Maximum number of versions in a version table. The handshake size limit
+/// is 5760 bytes — even with minimal per-version overhead (~3 bytes key +
+/// 1 byte value) you can't fit more than ~1000 entries.
+const MAX_VERSION_TABLE_ENTRIES: u64 = 256;
+
+/// Maximum number of version numbers in a VersionMismatch refuse reason.
+const MAX_MISMATCH_VERSIONS: u64 = 256;
+
 fn decode_version_table(d: &mut Decoder<'_>) -> Result<VersionTable, DecodeError> {
     let len = d.map()?.ok_or_else(|| {
         DecodeError::message("expected definite-length map for version table")
     })?;
+
+    if len > MAX_VERSION_TABLE_ENTRIES {
+        return Err(DecodeError::message(format!(
+            "version table has {len} entries, maximum is {MAX_VERSION_TABLE_ENTRIES}"
+        )));
+    }
 
     let mut table = BTreeMap::new();
     for _ in 0..len {
@@ -174,6 +188,11 @@ fn decode_refuse_reason(d: &mut Decoder<'_>) -> Result<RefuseReason, DecodeError
             let len = d.array()?.ok_or_else(|| {
                 DecodeError::message("expected definite-length array for version mismatch")
             })?;
+            if len > MAX_MISMATCH_VERSIONS {
+                return Err(DecodeError::message(format!(
+                    "version mismatch list has {len} entries, maximum is {MAX_MISMATCH_VERSIONS}"
+                )));
+            }
             let mut versions = Vec::with_capacity(len as usize);
             for _ in 0..len {
                 versions.push(d.u64()?);
@@ -365,6 +384,19 @@ mod tests {
         // Take the first 5 bytes of a valid propose — incomplete.
         let truncated = &LIVE_PROPOSE_PAYLOAD[..5];
         let result: Result<Message, _> = minicbor::decode(truncated);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn oversized_version_table_rejected() {
+        // Craft a ProposeVersions with a map claiming 1000 entries.
+        // Our limit is 256 — the length check rejects before iteration.
+        let mut buf = Vec::new();
+        let mut e = minicbor::Encoder::new(&mut buf);
+        e.array(2).unwrap();
+        e.u32(0).unwrap();
+        e.map(1000).unwrap();
+        let result: Result<Message, _> = minicbor::decode(&buf);
         assert!(result.is_err());
     }
 }
