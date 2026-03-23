@@ -103,7 +103,7 @@ COPY demo/proto-devnet/config/pools-keys/pool3/ /app/pools-keys/pool3/
 COPY demo/proto-devnet/config/utxo-keys/ /app/utxo-keys/
 
 # Copy tx-generator template
-COPY demo/proto-devnet/config/gen.template.json /app/config/gen.template.json
+COPY antithesis/config/gen.template.json /app/config/gen.template.json
 
 # Copy scripts
 COPY antithesis/scripts/init-pool-node.sh /app/scripts/
