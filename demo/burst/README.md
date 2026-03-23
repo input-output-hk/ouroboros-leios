@@ -30,9 +30,10 @@ The mocked upstream peer is a patched variant of `immdb-server`.
 
 ## Node0
 
-The patched node is the latest prototype of `cardano-node`. At first, this was a very basic implementation of the Leios fetch protocol only with little persistence. In the meantime, the prototype was expanded to cover to also produce real EBs and relay other information. 
+The patched node is the latest prototype of `cardano-node`. At first, this was a very basic implementation of the Leios fetch protocol only with little persistence. In the meantime, the prototype was expanded to cover to also produce real EBs and relay other information.
 
 For this demo to work, it is important that:
+
 - Node0 to not hold stake, otherwise it would produce EBs themselves and interfere measurements
 - Not validate EB transactions as the mocked Leios traffic is just placeholder bytes
 
@@ -159,4 +160,3 @@ To reset the demo, simply remove the working directories:
 rm -rf tmp-demo-burst
 rm -rf tmp-x-ray
 ```
-    
