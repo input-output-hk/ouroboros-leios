@@ -186,7 +186,7 @@ The ΔQ model yields the following completion-time distribution for EB diffusion
 The ΔQ model gives a high probability that under the proposed parameters ($L_\text{hdr}=1$, $L_\text{vote}=4$, $L_\text{diff}=7$) an EB reaches all honest block-producing nodes before the end of $L_\text{diff}$:
 
 ```haskell
-ghci> successWithin validateEB 14
+ghci> fromRational (successWithin validateEB 14) :: Double
 0.9753948688574636
 ```
 
@@ -219,13 +219,13 @@ ghci> fromRational (successWithin validateEB 7) :: Double
 0.7414282609198065
 ```
 
-The calculation for $P_\text{quorum}$ follows the [markov chain simulation](../../../markov/) for Linear Leios: Each of the 2500 stake pool operators (SPOs) is independently elected to the voting committee via a Poisson sortition: SPO $i$ with relative stake $s_i$ is elected with probability $1 - e^{-\tilde{m} s_i}$, where $\tilde{m}$ is calibrated so that the expected committee size equals $m = 600$. If elected, SPO $i$ casts a successful vote with probability $P_\text{validating}$, so its individual success probability is $p_i = P_\text{validating} (1 - e^{-\tilde{m} s_i})$. The total vote count $V = \sum_i X_i$ with $X_i \sim \text{Bernoulli}(p_i)$ is approximated by a normal distribution via the Central Limit Theorem:
+The calculation of $P_\text{quorum}$ is taken from an early version of the [markov chain simulation](../../../markov/) for Linear Leios: Each of the 2500 stake pool operators (SPOs) is independently elected to the voting committee via a Poisson sortition: SPO $i$ with relative stake $s_i$ is elected with probability $1 - e^{-\tilde{m} s_i}$, where $\tilde{m}$ is calibrated so that the expected committee size equals $m = 600$. If elected, SPO $i$ casts a successful vote with probability $P_\text{validating}$, so its individual success probability is $p_i = P_\text{validating} \times (1 - e^{-\tilde{m} s_i})$. The total vote count $V = \sum_i X_i$ with $X_i \sim \text{Bernoulli}(p_i)$ is approximated by a normal distribution via the Central Limit Theorem:
 
 $$V \sim \mathcal{N}(\mu,\, \sigma^2), \quad \mu = \sum_i p_i, \quad \sigma^2 = \sum_i p_i(1-p_i)$$
 
 The quorum probability is then:
 
-$$P_\text{quorum} = P(V \geq \tau \cdot m) \approx 1 - \Phi\!\left(\frac{\tau m - \mu}{\sigma}\right)$$
+$$P_\text{quorum} = P(V \geq \tau m) \approx 1 - \Phi \left(\frac{\tau m - \mu}{\sigma}\right)$$
 
 For the proposed parameters ($P_\text{validating} \approx 74.1\%$, $m = 600$, $\tau = 3/4$), the quorum threshold is $450$ votes and $\mu \approx 444.9 < 450$, giving $P_\text{quorum} \approx 35.9\%$.
 
@@ -237,9 +237,7 @@ ghci> pCertified config
 0.17805177733045532
 ```
 
-TODO: check value
-
-This provides strong evidence that the proposed parameters are viable and consistent with the security requirements of the Leios protocol as specified in CIP-164.
+This provides evidence that the proposed parameters are viable and consistent with the security requirements of the Leios protocol as specified in CIP-164.
 
 ## 6. Conclusions
 
