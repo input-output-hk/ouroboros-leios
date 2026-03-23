@@ -164,6 +164,7 @@ impl<S: scheduler::Scheduler> Mux<S> {
             reader,
             self.ingress_protocols,
             self.config.sdu_timeout,
+            self.config.sdu_size,
             self.mode,
         ));
 

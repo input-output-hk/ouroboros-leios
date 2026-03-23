@@ -211,4 +211,60 @@ mod tests {
             Err(super::super::RefuseReason::VersionMismatch(_))
         ));
     }
+
+    #[test]
+    fn version_data_v7_v10_format_decode() {
+        // v7-v10 used only 2 fields: [magic, diffusionMode].
+        // Our decoder should handle this gracefully.
+        let v10_cbor = minicbor::to_vec(&(MAINNET_MAGIC, false)).unwrap();
+        let decoded = VersionData::decode(&v10_cbor).unwrap();
+        assert_eq!(decoded.network_magic, MAINNET_MAGIC);
+        assert!(!decoded.initiator_only_diffusion_mode);
+        assert_eq!(decoded.peer_sharing, 0); // default
+        assert!(!decoded.query); // default
+    }
+
+    #[test]
+    fn version_data_all_fields_set() {
+        let data = VersionData {
+            network_magic: PREPROD_MAGIC,
+            initiator_only_diffusion_mode: true,
+            peer_sharing: 1,
+            query: true,
+        };
+        let encoded = data.encode();
+        let decoded = VersionData::decode(&encoded).unwrap();
+        assert_eq!(decoded, data);
+    }
+
+    #[test]
+    fn version_data_decode_from_live_bytes() {
+        // The exact bytes the server returned for V15 params:
+        // [764824073, false, 0, false]
+        let live_bytes: &[u8] = &[0x84, 0x1a, 0x2d, 0x96, 0x4a, 0x09, 0xf4, 0x00, 0xf4];
+        let decoded = VersionData::decode(live_bytes).unwrap();
+        assert_eq!(decoded.network_magic, MAINNET_MAGIC);
+        assert!(!decoded.initiator_only_diffusion_mode);
+        assert_eq!(decoded.peer_sharing, 0);
+        assert!(!decoded.query);
+    }
+
+    #[test]
+    fn version_data_invalid_cbor() {
+        let bad = &[0xFF, 0xFF];
+        assert!(VersionData::decode(bad).is_err());
+    }
+
+    #[test]
+    fn version_table_has_ascending_keys() {
+        let data = VersionData {
+            network_magic: MAINNET_MAGIC,
+            initiator_only_diffusion_mode: false,
+            peer_sharing: 0,
+            query: false,
+        };
+        let table = version_table(&data);
+        let keys: Vec<u64> = table.keys().copied().collect();
+        assert_eq!(keys, vec![14, 15]); // ascending order
+    }
 }
