@@ -64,9 +64,7 @@ impl CodecRecv {
     ///
     /// The decoded type must be owned (no borrows from the input buffer).
     /// This is necessary because the buffer is mutated between decode attempts.
-    pub async fn recv<T: for<'a> minicbor::Decode<'a, ()>>(
-        &mut self,
-    ) -> Result<T, MuxError> {
+    pub async fn recv<T: for<'a> minicbor::Decode<'a, ()>>(&mut self) -> Result<T, MuxError> {
         loop {
             // Try to decode a message from the buffer.
             if !self.buffer.is_empty() {

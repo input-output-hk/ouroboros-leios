@@ -12,8 +12,8 @@ use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::time::Duration;
 
+use crate::codec::{CodecRecv, CodecSend};
 use crate::protocol::{Agency, Protocol, ProtocolError, Role, Runner};
-use crate::codec::{CodecSend, CodecRecv};
 
 /// Handshake protocol ID in the multiplexer.
 pub const PROTOCOL_ID: u16 = 0;
@@ -138,12 +138,10 @@ pub async fn run_client(
     let response = runner.recv().await?;
 
     match response {
-        Message::AcceptVersion(version_number, params) => {
-            Ok(HandshakeResult::Accepted {
-                version_number,
-                params,
-            })
-        }
+        Message::AcceptVersion(version_number, params) => Ok(HandshakeResult::Accepted {
+            version_number,
+            params,
+        }),
         Message::Refuse(reason) => Ok(HandshakeResult::Refused(reason)),
         Message::QueryReply(table) => Ok(HandshakeResult::QueryReply(table)),
         other => Err(ProtocolError::InvalidMessage(format!(

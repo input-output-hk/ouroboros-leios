@@ -118,9 +118,8 @@ pub fn negotiate(
 
     // Decode the client's params for the selected version.
     let client_params_bytes = &client_versions[&best_version];
-    let client_data = VersionData::decode(client_params_bytes).map_err(|e| {
-        super::RefuseReason::HandshakeDecodeError(best_version, e)
-    })?;
+    let client_data = VersionData::decode(client_params_bytes)
+        .map_err(|e| super::RefuseReason::HandshakeDecodeError(best_version, e))?;
 
     // Check network magic.
     if client_data.network_magic != server_magic {
@@ -191,7 +190,10 @@ mod tests {
         let client_table = version_table(&client_data);
 
         let result = negotiate(&client_table, TESTNET_MAGIC);
-        assert!(matches!(result, Err(super::super::RefuseReason::Refused(_, _))));
+        assert!(matches!(
+            result,
+            Err(super::super::RefuseReason::Refused(_, _))
+        ));
     }
 
     #[test]

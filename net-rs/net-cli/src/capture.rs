@@ -1,5 +1,4 @@
 /// Capture raw handshake bytes from a live Cardano node for test vectors.
-
 use std::net::ToSocketAddrs;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -31,7 +30,7 @@ pub async fn run(host: &str, magic: u64) -> Result<(), Box<dyn std::error::Error
     // Build the mux segment manually.
     let header = Header {
         timestamp: 0,
-        mode: 0, // initiator
+        mode: 0,     // initiator
         protocol: 0, // handshake
         payload_len: cbor_payload.len() as u16,
     };
@@ -43,7 +42,12 @@ pub async fn run(host: &str, magic: u64) -> Result<(), Box<dyn std::error::Error
     sent.extend_from_slice(&header_bytes);
     sent.extend_from_slice(&cbor_payload);
 
-    println!("sending {} bytes (header {} + payload {})", sent.len(), HEADER_LEN, cbor_payload.len());
+    println!(
+        "sending {} bytes (header {} + payload {})",
+        sent.len(),
+        HEADER_LEN,
+        cbor_payload.len()
+    );
     println!("sent hex: {}", hex(&sent));
 
     stream.write_all(&sent).await?;
@@ -76,17 +80,30 @@ pub async fn run(host: &str, magic: u64) -> Result<(), Box<dyn std::error::Error
     // Print as Rust byte array literals for test vectors.
     println!("\n// Test vector: client -> server (ProposeVersions)");
     println!("const PROPOSE_SEGMENT: &[u8] = &{};", rust_bytes(&sent));
-    println!("const PROPOSE_PAYLOAD: &[u8] = &{};", rust_bytes(&cbor_payload));
+    println!(
+        "const PROPOSE_PAYLOAD: &[u8] = &{};",
+        rust_bytes(&cbor_payload)
+    );
 
     println!("\n// Test vector: server -> client (AcceptVersion or Refuse)");
-    println!("const RESPONSE_SEGMENT: &[u8] = &{};", rust_bytes(&received));
-    println!("const RESPONSE_PAYLOAD: &[u8] = &{};", rust_bytes(&resp_payload));
+    println!(
+        "const RESPONSE_SEGMENT: &[u8] = &{};",
+        rust_bytes(&received)
+    );
+    println!(
+        "const RESPONSE_PAYLOAD: &[u8] = &{};",
+        rust_bytes(&resp_payload)
+    );
 
     Ok(())
 }
 
 fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect::<Vec<_>>().join("")
+    bytes
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect::<Vec<_>>()
+        .join("")
 }
 
 fn rust_bytes(bytes: &[u8]) -> String {

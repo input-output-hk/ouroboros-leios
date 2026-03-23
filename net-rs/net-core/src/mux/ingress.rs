@@ -117,10 +117,7 @@ where
             Err(mpsc::error::TrySendError::Closed(_)) => {
                 // Protocol channel was dropped — the protocol has terminated.
                 state.counter.sub(payload_len);
-                tracing::debug!(
-                    protocol = protocol_id,
-                    "protocol channel closed, removing"
-                );
+                tracing::debug!(protocol = protocol_id, "protocol channel closed, removing");
                 protocols.remove(&protocol_id);
                 continue;
             }

@@ -36,12 +36,8 @@ pub async fn run(host: &str, magic: u64) -> Result<(), Box<dyn std::error::Error
         query: false,
     });
 
-    let result = handshake::run_client(
-        CodecSend::new(send_ch),
-        CodecRecv::new(recv_ch),
-        versions,
-    )
-    .await;
+    let result =
+        handshake::run_client(CodecSend::new(send_ch), CodecRecv::new(recv_ch), versions).await;
 
     match &result {
         Ok(handshake::HandshakeResult::Accepted {
