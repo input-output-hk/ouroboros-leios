@@ -18,9 +18,9 @@ Linear Leios is designed around the key insight: Praos block production only occ
 
 The protocol behavior is governed by several [protocol parameters](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#protocol-parameters), in particular timing parameters that control the duration of diffusion and voting intervals. Their values must be chosen carefully in order for Linear Leios to achieve higher performance and throughput, as the following constraints illustrate:
 
-* $L_\text{hdr}$ must be large enough to allow RB headers to diffuse across the network before the voting phase begins.
-* $L_\text{vote}$ must be calibrated carefully: too short and there is insufficient time to accumulate the votes needed for a quorum; too long and a new RB may arrive before all votes are delivered.
-* $L_\text{diff}$ must be large enough that, after a quorum is reached, all remaining nodes can receive and apply the EB before the next RB is produced - a prerequisite for the Leios security guarantees to hold.
+* $L_\text{hdr}$ must be large enough to allow RB headers to diffuse across the network before the voting phase begins
+* $L_\text{vote}$ must be calibrated carefully: too short and there is insufficient time to accumulate the votes needed for a quorum; too long and a new RB may arrive before all votes are delivered
+* $L_\text{diff}$ must be large enough that, after a quorum is reached, all remaining nodes can receive and apply the EB before the next RB is produced - a prerequisite for the Leios security guarantees to hold
 
 #### 2.1.1 Security Analysis
 
@@ -110,10 +110,10 @@ This concentrates stake among a small number of large pools, reflecting the actu
 
 The ΔQ model of EB diffusion captures the steps a node performs upon receiving an RB header:
 
-* Fetch the RB body and the EB concurrently.
-* On receiving the RB body, apply its transactions to the ledger state.
-* On receiving the full EB, determine which transactions are missing and fetch them. Unlike the RB - which carries full transaction data in its body - the EB contains only transaction IDs.
-* Only once both of the above steps complete is the reapply operation applied to the ledger state.
+* Fetch the RB body and the EB concurrently
+* On receiving the RB body, apply its transactions to the ledger state
+* On receiving the full EB, determine which transactions are missing and fetch them. Unlike the RB - which carries full transaction data in its body - the EB contains only transaction IDs
+* Only once both of the above steps complete is the reapply operation applied to the ledger state
 
 ![](EB-diffusion.svg)
 
@@ -247,11 +247,11 @@ The analysis shows that under the proposed parameters ($L_\text{hdr}=1$, $L_\tex
 
 ## 7. Limitations and Future Work
 
-- This model assumes honest node behavior. Adversarial delay of EBs - for example, an adversary deliberately withholding an EB until just before the voting deadline - is not captured here.
-- With the `piecewise-polynomial` ΔQ backend computational complexity is hard to control, where as with the `sampled` backend it is the accuracy of the results. For this analysis to be successful, we built probabilistic models and then combined those using ΔQ in order to get a model with low complexity to be executable with the default backend.
-- Adjust sortition mechanism to Fait Accompli
-- The model does not account for Freshest First Delivery (FFD) of EBs as specified in CIP-164. FFD prioritises the most recently produced blocks during diffusion, which can delay older EBs and worsen their individual diffusion latency; incorporating it would require modelling the interaction between concurrent EB diffusions.
-- Future work should improve the `sampled` backend to keep track of the error margin, in order to be able to run the analysis in reasonable time and being able to quantify the inaccuracy introduced by the simulations.
+* This model assumes honest node behavior. Adversarial delay of EBs - for example, an adversary deliberately withholding an EB until just before the voting deadline - is not captured here
+* With the `piecewise-polynomial` ΔQ backend computational complexity is hard to control, where as with the `sampled` backend it is the accuracy of the results. For this analysis to be successful, we built probabilistic models and then combined those using ΔQ in order to get a model with low complexity to be executable with the default backend
+* Adjust sortition mechanism to Fait Accompli
+* The model does not account for Freshest First Delivery (FFD) of EBs as specified in CIP-164. FFD prioritises the most recently produced blocks during diffusion, which can delay older EBs and worsen their individual diffusion latency; incorporating it would require modelling the interaction between concurrent EB diffusions
+* Future work should improve the `sampled` backend to keep track of the error margin, in order to be able to run the analysis in reasonable time and being able to quantify the inaccuracy introduced by the simulations
 
 ## Appendix A: Haskell Source
 
@@ -278,7 +278,7 @@ The following executables are available:
 
 ## Appendix B: References
 
-- [CIP-164 – Ouroboros Leios](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md)
-- [Supporting information for modeling Linear Leios](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/)
-- [Praos performance model](https://github.com/IntersectMBO/cardano-formal-specifications/tree/main/src/performance)
-- [deltaq Haskell package](https://hackage.haskell.org/package/deltaq)
+* [CIP-164 – Ouroboros Leios](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md)
+* [Supporting information for modeling Linear Leios](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/)
+* [Praos performance model](https://github.com/IntersectMBO/cardano-formal-specifications/tree/main/src/performance)
+* [deltaq Haskell package](https://hackage.haskell.org/package/deltaq)
