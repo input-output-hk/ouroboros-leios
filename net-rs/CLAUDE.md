@@ -136,8 +136,8 @@ net-rs/
 
 1. **Phase 1: Mux + Handshake** — COMPLETE. Bearer, mux, codec, protocol framework, handshake (client+server), CLI, 51 tests, live-tested against mainnet, security-audited.
 2. **Phase 2: ChainSync / BlockFetch** — COMPLETE. Shared types (Point, Tip, WrappedHeader, BlockBody), ChainSync + BlockFetch + KeepAlive protocols (state machines, CBOR codecs, client + server), persistent chain follower with reconnection, fake server CLI with Poisson block/rollback generation, 109 tests, live-tested against mainnet, security-audited.
-3. **Phase 3: Remaining Praos + Multi-Peer** — PROTOCOLS COMPLETE. TxSubmission (6 states, pull-based with blocking/non-blocking, flow control, client helper + server handler, 20 tests) and PeerSharing (3 states, IPv4/IPv6 peer addresses, client helper + server handler, 18 tests). All 6 N2N mini-protocols implemented. 147 total tests. Live-tested against mainnet (PeerSharing against cardano-main2.everstake.one:3001). Multi-peer coordination layer still TBD.
-4. **Phase 4: Leios Protocols** — LeiosNotify, LeiosFetch, priority scheduling
+3. **Phase 3: Remaining Praos + Multi-Peer** — PROTOCOLS COMPLETE. TxSubmission (6 states, pull-based with blocking/non-blocking, flow control, client helper + server handler, 20 tests) and PeerSharing (3 states, IPv4/IPv6 peer addresses, client helper + server handler, 18 tests). All 6 N2N mini-protocols implemented. 147 total tests. Live-tested against mainnet (PeerSharing against cardano-main2.everstake.one:3001). Multi-peer coordination: thread-per-peer with shared coordinator (events up, commands down via PeerHandle channels). Peer-agnostic interface upward (candidate tips, block requests, bad-peer reports). TBD.
+4. **Phase 4: Leios Protocols** — LeiosNotify, LeiosFetch, extend coordinator with freshest-first delivery
 
 ## Documentation
 

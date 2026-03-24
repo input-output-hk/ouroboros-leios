@@ -44,10 +44,11 @@ protocol machinery is reusable under any concurrency model:
   `connect()` → handshake → protocol handles. Simple, imperative, v1-style. Good for
   tools, tests, and the CLI.
 
-- **Layer 3 — Node / Behavior** (Phase 3+): Multi-peer coordination. This is where an
-  event-driven model (like v2's Behavior pattern) or actor model (like Haskell's STM
-  approach) would live. The exact model will be chosen based on Leios requirements
-  (freshest-first cross-protocol delivery, peer promotion, etc.).
+- **Layer 3 — Coordinator** (Phase 3+): Multi-peer coordination. Thread-per-peer model
+  with a shared coordinator task. Each peer runs an independent task tree; the coordinator
+  aggregates state via `PeerHandle` channels and makes cross-peer decisions (fetch
+  scheduling, promotion/demotion). Exposes a peer-agnostic interface upward (candidate
+  chain tips, block requests, bad-peer reports).
 
 The critical design constraint is that Layer 1's types must not preclude Layer 3. This
 means:
@@ -124,19 +125,79 @@ TxSubmission, PeerSharing, KeepAlive) plus Handshake.
 
 #### Multi-Peer Coordination — TBD
 
-Remaining deliverable for Phase 3. Design not yet chosen.
+Remaining deliverable for Phase 3. Thread-per-peer model with a shared coordinator.
 
-Options:
-- Connection manager: accept/initiate connections, track peer state
-- Peer coordination: ChainSync from multiple peers, BlockFetch from best peer
-- Model TBD — event-driven (v2 Behavior pattern) or actor-based (Haskell STM approach)
+**Design decision (2026-03-24):** After evaluating three approaches — (1) thread-per-peer
+with coordinator, (2) Pallas v2 event-driven single-threaded behavior, (3) Haskell-style
+actor model — we chose option 1. The single-threaded nature of option 2 is undesirable.
+Option 3's full actor constellation is over-engineered for ~20 peers. Option 1 extends the
+existing per-connection task tree naturally, and the coordinator pattern (events up, commands
+down via channels) handles all known coordination scenarios without architectural risk.
+
+**Architecture:**
+
+```
+Consensus / Application (future — for now, adapted `follow` CLI)
+    ↕  narrow interface: candidate chain tips, block requests, bad-peer reports
+Network Coordinator (peer selection, fetch scheduling, promotion/demotion)
+    ↕  PeerHandle (watch channels for state, mpsc for commands/events)
+Per-Peer Task Trees (protocol runners, mux, bearer)
+```
+
+The coordinator aggregates per-peer state into a peer-agnostic view:
+- ChainSync announcements from all peers → deduplicated set of candidate chain tips
+- Block fetch requests routed to best-placed peer (by latency, load, availability)
+- Bad-peer reports traced back to source peer for demotion
+
+The interface between consensus/application and the network is deliberately narrow and
+peer-agnostic. The application sees chains and blocks, not peers.
+
+**PeerHandle sketch:**
+
+```rust
+struct PeerHandle {
+    // State (read by coordinator)
+    status: watch::Receiver<PeerStatus>,     // Cold/Warm/Hot
+    chain_tip: watch::Receiver<Option<Tip>>, // latest ChainSync tip
+    inflight_blocks: Arc<AtomicUsize>,
+    latency: Arc<AtomicU64>,
+
+    // Commands (coordinator → peer)
+    cmd_tx: mpsc::Sender<PeerCommand>,
+    // PeerCommand: Promote(Hot), Demote(Warm), FetchBlocks(range), Disconnect
+
+    // Events (peer → coordinator)
+    event_rx: mpsc::Receiver<PeerEvent>,
+    // PeerEvent: HeaderAnnounced(header), BlockFetched(point), Misbehavior(reason)
+}
+```
+
+**Promotion/demotion:** Starting/stopping protocol tasks within a peer's task tree.
+"Demote from hot to warm" = cancel ChainSync + BlockFetch + TxSubmission, keep KeepAlive.
+Implemented via cancellation tokens per protocol group. Can be deferred to a later
+sub-phase if needed.
+
+**Testing:** Adapt `follow` CLI to use the multi-peer system — connect to N mainnet peers,
+follow chains, exercise fetch scheduling. Real mainnet peers provide realistic conditions
+(variable latency, slow peers, disconnections) that a fake server cannot.
+
+**Ordering rationale:** Multi-peer before Leios protocols because (a) we can test against
+real mainnet nodes today with all 6 existing protocols, (b) the coordinator is the hard
+architectural problem — better to solve it while the protocol set is simpler, (c) once the
+coordinator exists, adding LeiosNotify/LeiosFetch is just adding two more protocol tasks
+and event types to an existing framework.
 
 ### Phase 4: Leios Protocols
 
-Deliverable: LeiosNotify, LeiosFetch protocols. Priority scheduling in mux.
+Deliverable: LeiosNotify, LeiosFetch protocols. Priority scheduling and freshest-first
+delivery in the coordinator.
 
-Builds: Leios protocol implementations, StrictPriority/WFQ scheduler (StrictPriority
-already implemented), freshest-first delivery logic in the behavior layer.
+Builds on the multi-peer coordinator from Phase 3:
+- LeiosNotify/LeiosFetch state machines (same Runner pattern as all other protocols)
+- Add to per-peer task trees as new protocol tasks
+- Extend PeerHandle with Leios-specific events (EB announced, vote received)
+- Freshest-first fetch scheduling in coordinator (priority hint on fetch requests)
+- StrictPriority/WFQ scheduler in mux (StrictPriority already implemented)
 
 ## Workspace Structure
 
