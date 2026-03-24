@@ -167,6 +167,7 @@ async fn block_generator(
     notify: watch::Sender<u64>,
     block_rate: f64,
     rollback_rate: f64,
+    max_rollback_depth: usize,
 ) {
     let mut rng = StdRng::from_entropy();
 
@@ -182,8 +183,7 @@ async fn block_generator(
         if rollback_interval < block_interval && chain.block_count() > 1 {
             tokio::time::sleep(rollback_interval).await;
 
-            // Roll back 1-3 blocks.
-            let max_depth = (chain.block_count() as usize - 1).min(3);
+            let max_depth = (chain.block_count() as usize - 1).min(max_rollback_depth);
             let depth = rng.gen_range(1..=max_depth);
             let new_tip = chain.rollback(depth);
             let count = chain.block_count();
@@ -368,13 +368,21 @@ pub async fn run(
     magic: u64,
     block_rate: f64,
     rollback_rate: f64,
+    max_rollback_depth: usize,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let (chain, notify) = FakeChain::new();
 
     // Start block generator.
     let chain_gen = chain.clone();
     tokio::spawn(async move {
-        block_generator(chain_gen, notify, block_rate, rollback_rate).await;
+        block_generator(
+            chain_gen,
+            notify,
+            block_rate,
+            rollback_rate,
+            max_rollback_depth,
+        )
+        .await;
     });
 
     let rollback_info = if rollback_rate > 0.0 {
