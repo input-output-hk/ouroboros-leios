@@ -111,6 +111,7 @@ net-rs/
       chainsync.rs      -- `chain-sync` command (follow chain tip)
       blockfetch.rs     -- `block-fetch` command (fetch blocks)
       follow.rs         -- `follow` command (persistent chain follower with reconnect)
+      serve.rs          -- `serve` command (fake server with Poisson block/rollback generation)
 ```
 
 ## Key Design Decisions
@@ -123,12 +124,13 @@ net-rs/
 - **SDU size**: default 12,288 bytes (Cardano standard), not 65,535
 - **Opaque headers/blocks**: `WrappedHeader` and `BlockBody` store raw CBOR bytes — era-specific decoding happens at higher layers, not the network stack
 - **Composable client helpers**: protocols expose simple async functions (`find_intersection`, `request_next`, `recv_block`) rather than complex callback frameworks
+- **Server uses Message directly**: server-side code uses `runner.recv()` / `runner.send()` with Message enums — no separate Request/Response types (Runner enforces agency)
 
 ## Implementation Phases
 
 1. **Phase 1: Mux + Handshake** — COMPLETE. Bearer, mux, codec, protocol framework, handshake (client+server), CLI, 51 tests, live-tested against mainnet, security-audited.
-2. **Phase 2: ChainSync / BlockFetch** — COMPLETE. Shared types (Point, Tip, WrappedHeader, BlockBody), ChainSync + BlockFetch + KeepAlive protocols (state machines, CBOR codecs, client + server helpers), persistent chain follower with reconnection, fake server CLI with Poisson block generation, 109 tests, live-tested against mainnet.
-3. **Phase 3: Remaining Praos + Multi-Peer** — TxSubmission, PeerSharing + multi-peer coordination layer (KeepAlive moved to Phase 2)
+2. **Phase 2: ChainSync / BlockFetch** — COMPLETE. Shared types (Point, Tip, WrappedHeader, BlockBody), ChainSync + BlockFetch + KeepAlive protocols (state machines, CBOR codecs, client + server), persistent chain follower with reconnection, fake server CLI with Poisson block/rollback generation, 109 tests, live-tested against mainnet, security-audited.
+3. **Phase 3: Remaining Praos + Multi-Peer** — TxSubmission, PeerSharing protocols + multi-peer coordination layer
 4. **Phase 4: Leios Protocols** — LeiosNotify, LeiosFetch, priority scheduling
 
 ## Documentation
