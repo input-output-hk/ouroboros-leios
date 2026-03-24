@@ -10,7 +10,7 @@ use tokio::sync::mpsc;
 
 use super::channel::IngressCounter;
 use super::wire;
-use super::{MuxError, ProtocolId, MODE_INITIATOR, MODE_RESPONDER};
+use super::{ChannelKey, MuxError};
 
 /// Per-protocol ingress state tracked by the demuxer.
 pub(crate) struct ProtocolIngress {
@@ -25,24 +25,19 @@ pub(crate) struct ProtocolIngress {
 /// Run the demuxer task. Reads segments from the bearer and dispatches
 /// payloads to per-protocol ingress channels.
 ///
+/// Routes by `(protocol_id, mode)` composite key, supporting both
+/// unidirectional and duplex connections.
+///
 /// Returns on I/O error, protocol violation, or when the bearer is closed.
 pub(crate) async fn run_demuxer<R>(
     mut reader: R,
-    mut protocols: HashMap<ProtocolId, ProtocolIngress>,
+    mut protocols: HashMap<ChannelKey, ProtocolIngress>,
     sdu_timeout: Duration,
     max_sdu_payload: usize,
-    our_mode: u16,
 ) -> Result<(), MuxError>
 where
     R: AsyncRead + Unpin,
 {
-    // The expected mode bit on incoming segments: opposite of ours.
-    let expected_remote_mode = if our_mode == MODE_INITIATOR {
-        MODE_RESPONDER
-    } else {
-        MODE_INITIATOR
-    };
-
     loop {
         // Read one segment with a timeout.
         let segment = match tokio::time::timeout(
@@ -60,26 +55,18 @@ where
             Err(_) => return Err(MuxError::SduTimeout(sdu_timeout)),
         };
 
-        // Validate the mode bit: incoming segments should have the remote mode.
-        if segment.header.mode != expected_remote_mode {
-            tracing::warn!(
-                protocol = segment.header.protocol,
-                expected_mode = expected_remote_mode,
-                actual_mode = segment.header.mode,
-                "received segment with unexpected mode bit, ignoring"
-            );
-            continue;
-        }
-
         let protocol_id = segment.header.protocol;
+        let mode = segment.header.mode;
+        let key = (protocol_id, mode);
 
-        let state = match protocols.get_mut(&protocol_id) {
+        let state = match protocols.get_mut(&key) {
             Some(s) => s,
             None => {
-                // Unknown protocol — log and skip (per Haskell behavior).
+                // Unknown protocol/direction — log and skip (per Haskell behavior).
                 tracing::warn!(
                     protocol = protocol_id,
-                    "received segment for unregistered protocol, ignoring"
+                    mode = mode,
+                    "received segment for unregistered protocol/direction, ignoring"
                 );
                 continue;
             }
@@ -117,8 +104,12 @@ where
             Err(mpsc::error::TrySendError::Closed(_)) => {
                 // Protocol channel was dropped — the protocol has terminated.
                 state.counter.sub(payload_len);
-                tracing::debug!(protocol = protocol_id, "protocol channel closed, removing");
-                protocols.remove(&protocol_id);
+                tracing::debug!(
+                    protocol = protocol_id,
+                    mode = mode,
+                    "protocol channel closed, removing"
+                );
+                protocols.remove(&key);
                 continue;
             }
         }

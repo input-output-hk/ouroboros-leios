@@ -11,6 +11,7 @@ pub async fn run(
     magic: u64,
     max_peers: usize,
     listen: Option<String>,
+    duplex: bool,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     if hosts.is_empty() && listen.is_none() {
         return Err("at least one --host or --listen is required".into());
@@ -23,6 +24,7 @@ pub async fn run(
         sdu_timeout: Duration::from_secs(900),
         listen_address: listen.clone(),
         chain_store_capacity: 2160,
+        duplex,
     };
 
     let mut handle = spawn_coordinator(config);

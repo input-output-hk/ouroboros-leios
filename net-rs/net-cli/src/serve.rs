@@ -100,6 +100,7 @@ pub async fn run(
         sdu_timeout: Duration::from_secs(900),
         listen_address: Some(format!("0.0.0.0:{port}")),
         chain_store_capacity: 10_000,
+        duplex: false,
     };
 
     let mut handle = spawn_coordinator(config);

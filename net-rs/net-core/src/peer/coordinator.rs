@@ -20,6 +20,7 @@ use crate::types::{Point, Tip, WrappedHeader};
 
 use super::chain_store::ChainStore;
 use super::connect::{self, Connection};
+use super::duplex_task::{run_duplex_task, DuplexTaskConfig};
 use super::peer_task::{run_peer_task, PeerTaskConfig};
 use super::responder_task::{run_responder_task, server_protocol_configs, ResponderTaskConfig};
 use super::types::{NetworkCommand, NetworkEvent, PeerCommand, PeerEvent};
@@ -101,30 +102,50 @@ impl Coordinator {
         }
     }
 
-    /// Assign a new PeerId and spawn a peer task.
+    /// Assign a new PeerId and spawn an outbound peer task (initiator or duplex).
     fn add_peer_with_backoff(&mut self, address: String, reconnect_backoff: Duration) -> PeerId {
         let peer_id = PeerId(self.next_peer_id);
         self.next_peer_id += 1;
 
         let (cmd_sender, cmd_receiver) = mpsc::channel(16);
 
-        let task_config = PeerTaskConfig {
-            peer_id,
-            address: address.clone(),
-            network_magic: self.config.network_magic,
-            keepalive_interval: self.config.keepalive_interval,
-            sdu_timeout: self.config.sdu_timeout,
-            event_sender: self.peer_event_sender.clone(),
-            command_receiver: cmd_receiver,
+        let (task_handle, mode) = if self.config.duplex {
+            let task_config = DuplexTaskConfig {
+                peer_id,
+                address: address.clone(),
+                network_magic: self.config.network_magic,
+                keepalive_interval: self.config.keepalive_interval,
+                sdu_timeout: self.config.sdu_timeout,
+                chain_store: self.chain_store.clone(),
+                peer_provider: self.peer_provider.clone(),
+                event_sender: self.peer_event_sender.clone(),
+                command_receiver: cmd_receiver,
+            };
+            (
+                tokio::spawn(run_duplex_task(task_config)),
+                ConnectionMode::Duplex,
+            )
+        } else {
+            let task_config = PeerTaskConfig {
+                peer_id,
+                address: address.clone(),
+                network_magic: self.config.network_magic,
+                keepalive_interval: self.config.keepalive_interval,
+                sdu_timeout: self.config.sdu_timeout,
+                event_sender: self.peer_event_sender.clone(),
+                command_receiver: cmd_receiver,
+            };
+            (
+                tokio::spawn(run_peer_task(task_config)),
+                ConnectionMode::InitiatorOnly,
+            )
         };
-
-        let task_handle = tokio::spawn(run_peer_task(task_config));
 
         self.peers.insert(
             peer_id,
             PeerState {
                 address,
-                mode: ConnectionMode::InitiatorOnly,
+                mode,
                 commands: cmd_sender,
                 task_handle,
                 tip: None,

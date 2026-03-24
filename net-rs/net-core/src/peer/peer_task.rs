@@ -34,8 +34,8 @@ pub(crate) struct PeerTaskConfig {
     pub command_receiver: mpsc::Receiver<PeerCommand>,
 }
 
-/// Protocol configs for the 5 client-side protocols (excluding handshake).
-fn client_protocol_configs() -> Vec<ProtocolConfig> {
+/// Protocol configs for the 4 client-side protocols (excluding handshake).
+pub(crate) fn client_protocol_configs() -> Vec<ProtocolConfig> {
     vec![
         ProtocolConfig {
             id: chainsync::PROTOCOL_ID,
@@ -65,7 +65,7 @@ fn client_protocol_configs() -> Vec<ProtocolConfig> {
 }
 
 /// Spawn the ChainSync sub-task. Runs find_intersection then request_next loop.
-fn spawn_chainsync(
+pub(crate) fn spawn_chainsync(
     cs_send: CodecSend,
     cs_recv: CodecRecv,
     peer_id: PeerId,
@@ -138,7 +138,7 @@ fn spawn_chainsync(
 }
 
 /// Spawn the KeepAlive sub-task. Periodic pings on an interval.
-fn spawn_keepalive(
+pub(crate) fn spawn_keepalive(
     ka_send: CodecSend,
     ka_recv: CodecRecv,
     peer_id: PeerId,
@@ -175,7 +175,7 @@ fn spawn_keepalive(
 }
 
 /// Spawn the BlockFetch sub-task. Waits for fetch commands on the internal channel.
-fn spawn_blockfetch(
+pub(crate) fn spawn_blockfetch(
     bf_send: CodecSend,
     bf_recv: CodecRecv,
     peer_id: PeerId,
@@ -241,7 +241,7 @@ fn spawn_blockfetch(
 }
 
 /// Spawn the PeerSharing sub-task. Waits for share requests on the internal channel.
-fn spawn_peersharing(
+pub(crate) fn spawn_peersharing(
     ps_send: CodecSend,
     ps_recv: CodecRecv,
     peer_id: PeerId,
