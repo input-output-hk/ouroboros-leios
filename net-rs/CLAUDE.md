@@ -28,6 +28,8 @@ cargo fmt --check              # format check
 cargo test                     # run all unit + integration tests
 cargo run -p net-cli -- handshake backbone.cardano.iog.io:3001  # live test against mainnet
 cargo run -p net-cli -- capture backbone.cardano.iog.io:3001    # capture wire bytes for test vectors
+cargo run -p net-cli -- serve --port 9999 --block-rate 0.05     # fake server (Poisson blocks)
+cargo run -p net-cli -- follow 127.0.0.1:9999                   # follow fake server
 ```
 
 ### Test vector workflow
@@ -125,7 +127,7 @@ net-rs/
 ## Implementation Phases
 
 1. **Phase 1: Mux + Handshake** — COMPLETE. Bearer, mux, codec, protocol framework, handshake (client+server), CLI, 51 tests, live-tested against mainnet, security-audited.
-2. **Phase 2: ChainSync / BlockFetch** — COMPLETE. Shared types (Point, Tip, WrappedHeader, BlockBody), ChainSync + BlockFetch protocols (state machines, CBOR codecs, client helpers), CLI commands, 98 tests, security-audited. Needs live mainnet testing.
+2. **Phase 2: ChainSync / BlockFetch** — COMPLETE. Shared types (Point, Tip, WrappedHeader, BlockBody), ChainSync + BlockFetch + KeepAlive protocols (state machines, CBOR codecs, client + server helpers), persistent chain follower with reconnection, fake server CLI with Poisson block generation, 109 tests, live-tested against mainnet.
 3. **Phase 3: Remaining Praos + Multi-Peer** — TxSubmission, PeerSharing + multi-peer coordination layer (KeepAlive moved to Phase 2)
 4. **Phase 4: Leios Protocols** — LeiosNotify, LeiosFetch, priority scheduling
 

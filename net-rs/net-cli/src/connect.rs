@@ -5,7 +5,7 @@ use std::net::ToSocketAddrs;
 use net_core::bearer::tcp::TcpBearer;
 use net_core::codec::{CodecRecv, CodecSend};
 use net_core::mux::scheduler::RoundRobin;
-use net_core::mux::{Mux, MuxConfig, ProtocolConfig, RunningMux, MODE_INITIATOR};
+use net_core::mux::{Mux, MuxConfig, ProtocolConfig, RunningMux, MODE_INITIATOR, MODE_RESPONDER};
 use net_core::protocols::handshake;
 use net_core::protocols::handshake::n2n;
 
@@ -79,6 +79,54 @@ pub async fn connect_and_handshake_with_config(
         Ok(handshake::HandshakeResult::QueryReply(_)) => {
             running.abort();
             return Err("unexpected query reply".into());
+        }
+        Err(e) => {
+            running.abort();
+            return Err(e.into());
+        }
+    }
+
+    Ok(Connection { running, channels })
+}
+
+/// Accept a connection and perform the server-side handshake.
+pub async fn accept_and_handshake(
+    listener: &tokio::net::TcpListener,
+    magic: u64,
+    protocols: &[ProtocolConfig],
+    mux_config: MuxConfig,
+) -> Result<Connection, Box<dyn std::error::Error>> {
+    let (bearer, peer_addr) = TcpBearer::accept(listener).await?;
+    println!("  accepted connection from {peer_addr}");
+
+    let hs_proto = ProtocolConfig {
+        id: handshake::PROTOCOL_ID,
+        priority: 0,
+        ingress_limit: handshake::SIZE_LIMIT,
+        egress_queue_size: 4,
+    };
+
+    let mut mux = Mux::new(mux_config, RoundRobin::default(), MODE_RESPONDER);
+    let (hs_send, hs_recv) = mux.register(&hs_proto);
+
+    let mut channels = Vec::new();
+    for proto in protocols {
+        let (send, recv) = mux.register(proto);
+        channels.push((CodecSend::new(send), CodecRecv::new(recv)));
+    }
+
+    let running = mux.run(bearer);
+
+    let hs_result = handshake::run_server(
+        CodecSend::new(hs_send),
+        CodecRecv::new(hs_recv),
+        |client_versions| n2n::negotiate(client_versions, magic),
+    )
+    .await;
+
+    match hs_result {
+        Ok((version, _params)) => {
+            println!("  handshake negotiated: version {version}");
         }
         Err(e) => {
             running.abort();

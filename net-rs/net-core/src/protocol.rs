@@ -124,11 +124,10 @@ impl<P: Protocol> Runner<P> {
 
     /// Whether the local side currently has agency.
     pub fn has_agency(&self) -> bool {
-        match (P::agency(&self.state), self.role) {
-            (Agency::Client, Role::Client) => true,
-            (Agency::Server, Role::Server) => true,
-            _ => false,
-        }
+        matches!(
+            (P::agency(&self.state), self.role),
+            (Agency::Client, Role::Client) | (Agency::Server, Role::Server)
+        )
     }
 
     /// Whether the protocol has terminated.
@@ -145,11 +144,10 @@ impl<P: Protocol> Runner<P> {
         }
 
         // Check that we have agency.
-        let we_have_agency = match (agency, self.role) {
-            (Agency::Client, Role::Client) => true,
-            (Agency::Server, Role::Server) => true,
-            _ => false,
-        };
+        let we_have_agency = matches!(
+            (agency, self.role),
+            (Agency::Client, Role::Client) | (Agency::Server, Role::Server)
+        );
         if !we_have_agency {
             return Err(ProtocolError::AgencyViolation {
                 role: self.role,
@@ -177,11 +175,10 @@ impl<P: Protocol> Runner<P> {
         }
 
         // Check that they have agency.
-        let they_have_agency = match (agency, self.role) {
-            (Agency::Client, Role::Server) => true,
-            (Agency::Server, Role::Client) => true,
-            _ => false,
-        };
+        let they_have_agency = matches!(
+            (agency, self.role),
+            (Agency::Client, Role::Server) | (Agency::Server, Role::Client)
+        );
         if !they_have_agency {
             return Err(ProtocolError::AgencyViolation {
                 role: self.role,

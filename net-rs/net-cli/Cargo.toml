@@ -10,3 +10,4 @@ minicbor = { version = "0.25", features = ["std"] }
 clap = { version = "4", features = ["derive"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
+rand = "0.8"

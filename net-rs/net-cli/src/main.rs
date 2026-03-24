@@ -4,6 +4,7 @@ mod chainsync;
 mod connect;
 mod follow;
 mod handshake;
+mod serve;
 
 use clap::{Parser, Subcommand};
 use net_core::protocols::handshake::n2n;
@@ -61,6 +62,21 @@ enum Command {
         magic: u64,
     },
 
+    /// Run a fake Cardano node serving synthetic blocks
+    Serve {
+        /// Port to listen on
+        #[arg(long, default_value_t = 3001)]
+        port: u16,
+
+        /// Network magic number
+        #[arg(long, default_value_t = n2n::MAINNET_MAGIC)]
+        magic: u64,
+
+        /// Block generation rate (blocks/sec, Poisson λ)
+        #[arg(long, default_value_t = 0.05)]
+        block_rate: f64,
+    },
+
     /// Follow the chain tip continuously with reconnection
     Follow {
         /// Host and port to connect to
@@ -87,6 +103,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Command::Capture { host, magic } => capture::run(&host, magic).await,
         Command::ChainSync { host, magic, count } => chainsync::run(&host, magic, count).await,
         Command::BlockFetch { host, magic } => blockfetch::run(&host, magic).await,
+        Command::Serve {
+            port,
+            magic,
+            block_rate,
+        } => serve::run(port, magic, block_rate).await,
         Command::Follow {
             host,
             magic,
