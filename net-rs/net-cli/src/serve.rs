@@ -14,11 +14,11 @@ use net_core::mux::{MuxConfig, ProtocolConfig};
 use net_core::protocol::Role;
 use net_core::protocol::Runner;
 use net_core::protocols::blockfetch;
-use net_core::protocols::blockfetch::{BlockFetch, BlockFetchRequest, BlockFetchResponse};
+use net_core::protocols::blockfetch::{BlockFetch, Message as BfMsg};
 use net_core::protocols::chainsync;
-use net_core::protocols::chainsync::{ChainSync, ChainSyncRequest, ChainSyncResponse};
+use net_core::protocols::chainsync::{ChainSync, Message as CsMsg};
 use net_core::protocols::keepalive;
-use net_core::protocols::keepalive::{KeepAlive, KeepAliveRequest, KeepAliveResponse};
+use net_core::protocols::keepalive::{KeepAlive, Message as KaMsg};
 use net_core::types::{BlockBody, Point, Tip, WrappedHeader};
 
 use crate::connect;
@@ -184,72 +184,57 @@ async fn serve_chainsync(cs_send: CodecSend, cs_recv: CodecRecv, chain: FakeChai
     let mut subscription = chain.subscribe();
 
     loop {
-        let req = match chainsync::receive_request(&mut runner).await {
-            Ok(req) => req,
+        let msg = match runner.recv().await {
+            Ok(msg) => msg,
             Err(_) => break,
         };
 
-        match req {
-            ChainSyncRequest::FindIntersect(points) => match chain.find_intersection(&points) {
+        match msg {
+            CsMsg::MsgFindIntersect { points } => match chain.find_intersection(&points) {
                 Some((point, tip)) => {
                     read_index = chain.index_of(&point);
-                    let _ = chainsync::send_response(
-                        &mut runner,
-                        ChainSyncResponse::IntersectFound { point, tip },
-                    )
-                    .await;
+                    let _ = runner.send(&CsMsg::MsgIntersectFound { point, tip }).await;
                 }
                 None => {
                     let tip = chain.tip();
-                    let _ = chainsync::send_response(
-                        &mut runner,
-                        ChainSyncResponse::IntersectNotFound { tip },
-                    )
-                    .await;
+                    let _ = runner.send(&CsMsg::MsgIntersectNotFound { tip }).await;
                 }
             },
-            ChainSyncRequest::RequestNext => {
-                // Check if there are blocks after our read pointer.
+            CsMsg::MsgRequestNext => {
                 let pending = chain.blocks_after(read_index);
                 if let Some(block) = pending.first() {
                     read_index = chain.index_of(&block.point);
                     let tip = chain.tip();
-                    let _ = chainsync::send_response(
-                        &mut runner,
-                        ChainSyncResponse::RollForward {
+                    let _ = runner
+                        .send(&CsMsg::MsgRollForward {
                             header: block.header.clone(),
                             tip,
-                        },
-                    )
-                    .await;
+                        })
+                        .await;
                 } else {
-                    // At tip — send AwaitReply and wait for a new block.
-                    let _ =
-                        chainsync::send_response(&mut runner, ChainSyncResponse::AwaitReply).await;
+                    let _ = runner.send(&CsMsg::MsgAwaitReply).await;
 
-                    // Wait until a new block is actually available.
                     loop {
                         if subscription.changed().await.is_err() {
-                            return; // chain shut down
+                            return;
                         }
                         let pending = chain.blocks_after(read_index);
                         if let Some(block) = pending.first() {
                             read_index = chain.index_of(&block.point);
                             let tip = chain.tip();
-                            let _ = chainsync::send_response(
-                                &mut runner,
-                                ChainSyncResponse::RollForward {
+                            let _ = runner
+                                .send(&CsMsg::MsgRollForward {
                                     header: block.header.clone(),
                                     tip,
-                                },
-                            )
-                            .await;
+                                })
+                                .await;
                             break;
                         }
                     }
                 }
             }
-            ChainSyncRequest::Done => break,
+            CsMsg::MsgDone => break,
+            _ => break,
         }
     }
 }
@@ -259,34 +244,30 @@ async fn serve_blockfetch(bf_send: CodecSend, bf_recv: CodecRecv, chain: FakeCha
     let mut runner = Runner::<BlockFetch>::new(Role::Server, bf_send, bf_recv);
 
     loop {
-        let req = match blockfetch::receive_request(&mut runner).await {
-            Ok(req) => req,
+        let msg = match runner.recv().await {
+            Ok(msg) => msg,
             Err(_) => break,
         };
 
-        match req {
-            BlockFetchRequest::RequestRange { from, to } => {
+        match msg {
+            BfMsg::MsgRequestRange { from, to } => {
                 let blocks = chain.get_range(&from, &to);
                 if blocks.is_empty() {
-                    let _ =
-                        blockfetch::send_response(&mut runner, BlockFetchResponse::NoBlocks).await;
+                    let _ = runner.send(&BfMsg::MsgNoBlocks).await;
                 } else {
-                    let _ = blockfetch::send_response(&mut runner, BlockFetchResponse::StartBatch)
-                        .await;
+                    let _ = runner.send(&BfMsg::MsgStartBatch).await;
                     for block in &blocks {
-                        let _ = blockfetch::send_response(
-                            &mut runner,
-                            BlockFetchResponse::Block {
+                        let _ = runner
+                            .send(&BfMsg::MsgBlock {
                                 body: block.body.clone(),
-                            },
-                        )
-                        .await;
+                            })
+                            .await;
                     }
-                    let _ =
-                        blockfetch::send_response(&mut runner, BlockFetchResponse::BatchDone).await;
+                    let _ = runner.send(&BfMsg::MsgBatchDone).await;
                 }
             }
-            BlockFetchRequest::ClientDone => break,
+            BfMsg::MsgClientDone => break,
+            _ => break,
         }
     }
 }
@@ -296,20 +277,17 @@ async fn serve_keepalive(ka_send: CodecSend, ka_recv: CodecRecv) {
     let mut runner = Runner::<KeepAlive>::new(Role::Server, ka_send, ka_recv);
 
     loop {
-        let req = match keepalive::receive_request(&mut runner).await {
-            Ok(req) => req,
+        let msg = match runner.recv().await {
+            Ok(msg) => msg,
             Err(_) => break,
         };
 
-        match req {
-            KeepAliveRequest::KeepAlive { cookie } => {
-                let _ = keepalive::send_response(
-                    &mut runner,
-                    KeepAliveResponse::KeepAliveResponse { cookie },
-                )
-                .await;
+        match msg {
+            KaMsg::MsgKeepAlive { cookie } => {
+                let _ = runner.send(&KaMsg::MsgKeepAliveResponse { cookie }).await;
             }
-            KeepAliveRequest::Done => break,
+            KaMsg::MsgDone => break,
+            _ => break,
         }
     }
 }
