@@ -79,6 +79,10 @@ enum Command {
         /// Rollback rate (rollbacks/sec, Poisson λ; 0 = no rollbacks)
         #[arg(long, default_value_t = 0.0)]
         rollback_rate: f64,
+
+        /// Maximum rollback depth (capped at chain length - 1)
+        #[arg(long, default_value_t = 3)]
+        max_rollback_depth: usize,
     },
 
     /// Follow the chain tip continuously with reconnection
@@ -112,7 +116,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             magic,
             block_rate,
             rollback_rate,
-        } => serve::run(port, magic, block_rate, rollback_rate).await,
+            max_rollback_depth,
+        } => serve::run(port, magic, block_rate, rollback_rate, max_rollback_depth).await,
         Command::Follow {
             host,
             magic,
