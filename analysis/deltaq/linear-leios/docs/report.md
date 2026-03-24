@@ -63,7 +63,7 @@ The $\Delta\text{Q}$ library uses a backend abstraction for computations such as
 
 The block diffusion model used in this library has been taken from the [Praos performance model](https://github.com/intersectMBO/cardano-formal-specifications/blob/main/src/performance/app/PraosModel.lhs).
 
-The network is modelled as a random graph in which nodes have a fixed number of peers. Block diffusion across multiple hops is captured by sequential composition of per-hop $\Delta\text{Q}$s. A single hop is characterised by the transfer time for a given block size and the geographic distance between the two endpoints. Following the Praos model, three distance categories are distinguished:
+The network is modelled as a random graph in which nodes have a fixed number of peers. Block diffusion across multiple hops is captured by sequential composition of per-hop $\Delta\text{Qs}$. A single hop is characterised by the transfer time for a given block size and the geographic distance between the two endpoints. Following the Praos model, three distance categories are distinguished:
 
 | Distance | Description          | Round trip time (RTT) |
 | -------- | -------------------- | --------------------- |
@@ -71,7 +71,7 @@ The network is modelled as a random graph in which nodes have a fixed number of 
 | Medium   | Same continent       | 0.069 s               |
 | Long     | Different continents | 0.268 s               |
 
-Each category yields a deterministic transfer time for a given block size. The one-hop $\Delta\text{Q}$ assigns equal probability to each distance category. The end-to-end diffusion $\Delta\text{Q}$ for $n$ hops is the $n$-fold sequential composition of the one-hop $\Delta\text{Q}$. To account for the variable path length in a random graph, the multi-hop $\Delta\text{Q}$s are combined via probabilistic choice, weighted by the empirical path-length distribution of a random graph with 2500 nodes of degree 10 (Table below, sourced from the Praos model):
+Each category yields a deterministic transfer time for a given block size. The one-hop $\Delta\text{Q}$ assigns equal probability to each distance category. The end-to-end diffusion $\Delta\text{Q}$ for $n$ hops is the $n$-fold sequential composition of the one-hop $\Delta\text{Q}$. To account for the variable path length in a random graph, the multi-hop $\Delta\text{Qs}$ are combined via probabilistic choice, weighted by the empirical path-length distribution of a random graph with 2500 nodes of degree 10 (Table below, sourced from the Praos model):
 
 | Path length | Probability (%) |
 | ----------- | --------------- |
