@@ -19,6 +19,8 @@ use net_core::protocols::chainsync;
 use net_core::protocols::chainsync::{ChainSync, Message as CsMsg};
 use net_core::protocols::keepalive;
 use net_core::protocols::keepalive::{KeepAlive, Message as KaMsg};
+use net_core::protocols::txsubmission;
+use net_core::protocols::txsubmission::{Message as TsMsg, TxSubmission};
 use net_core::types::{BlockBody, Point, Tip, WrappedHeader};
 
 use crate::connect;
@@ -363,6 +365,137 @@ async fn serve_keepalive(ka_send: CodecSend, ka_recv: CodecRecv) {
     }
 }
 
+/// Serve TxSubmission for one connection (transaction consumer).
+async fn serve_txsubmission(ts_send: CodecSend, ts_recv: CodecRecv) {
+    let mut runner = Runner::<TxSubmission>::new(Role::Server, ts_send, ts_recv);
+
+    // Receive MsgInit.
+    let msg = match runner.recv().await {
+        Ok(msg) => msg,
+        Err(_) => return,
+    };
+    if !matches!(msg, TsMsg::MsgInit) {
+        return;
+    }
+
+    let mut outstanding: usize = 0; // number of announced but unacked tx ids
+
+    loop {
+        // Decide whether to send a blocking or non-blocking request.
+        let (ack, req) = if outstanding > 0 {
+            // We have outstanding ids — use non-blocking to check for more,
+            // and ack what we've consumed.
+            let ack = outstanding as u16;
+            outstanding = 0;
+            (ack, txsubmission::MAX_UNACKED as u16)
+        } else {
+            // Nothing outstanding — blocking wait for at least one tx.
+            (0u16, txsubmission::MAX_UNACKED as u16)
+        };
+
+        let blocking = outstanding == 0 && ack == 0;
+        if blocking {
+            runner
+                .send(&TsMsg::MsgRequestTxIdsBlocking { ack, req })
+                .await
+                .ok();
+        } else {
+            runner
+                .send(&TsMsg::MsgRequestTxIdsNonBlocking { ack, req })
+                .await
+                .ok();
+        }
+
+        let msg = match runner.recv().await {
+            Ok(msg) => msg,
+            Err(_) => break,
+        };
+
+        match msg {
+            TsMsg::MsgReplyTxIds { tx_ids } => {
+                if tx_ids.is_empty() {
+                    // Non-blocking empty reply — do a blocking request next.
+                    runner
+                        .send(&TsMsg::MsgRequestTxIdsBlocking {
+                            ack: 0,
+                            req: txsubmission::MAX_UNACKED as u16,
+                        })
+                        .await
+                        .ok();
+
+                    let msg = match runner.recv().await {
+                        Ok(msg) => msg,
+                        Err(_) => break,
+                    };
+
+                    match msg {
+                        TsMsg::MsgDone => {
+                            println!("  txsubmission: client done");
+                            break;
+                        }
+                        TsMsg::MsgReplyTxIds { tx_ids } if !tx_ids.is_empty() => {
+                            // Request the full transactions.
+                            let ids: Vec<_> = tx_ids.iter().map(|t| t.tx_id.clone()).collect();
+                            let count = ids.len();
+                            runner
+                                .send(&TsMsg::MsgRequestTxs { tx_ids: ids })
+                                .await
+                                .ok();
+
+                            let msg = match runner.recv().await {
+                                Ok(msg) => msg,
+                                Err(_) => break,
+                            };
+                            match msg {
+                                TsMsg::MsgReplyTxs { txs } => {
+                                    println!(
+                                        "  txsubmission: received {} tx(s), {} bytes total",
+                                        txs.len(),
+                                        txs.iter().map(|t| t.0.len()).sum::<usize>()
+                                    );
+                                    outstanding = count;
+                                }
+                                _ => break,
+                            }
+                        }
+                        _ => break,
+                    }
+                    continue;
+                }
+
+                // Got some tx ids — request the full transactions.
+                let ids: Vec<_> = tx_ids.iter().map(|t| t.tx_id.clone()).collect();
+                let count = ids.len();
+                runner
+                    .send(&TsMsg::MsgRequestTxs { tx_ids: ids })
+                    .await
+                    .ok();
+
+                let msg = match runner.recv().await {
+                    Ok(msg) => msg,
+                    Err(_) => break,
+                };
+                match msg {
+                    TsMsg::MsgReplyTxs { txs } => {
+                        println!(
+                            "  txsubmission: received {} tx(s), {} bytes total",
+                            txs.len(),
+                            txs.iter().map(|t| t.0.len()).sum::<usize>()
+                        );
+                        outstanding = count;
+                    }
+                    _ => break,
+                }
+            }
+            TsMsg::MsgDone => {
+                println!("  txsubmission: client done");
+                break;
+            }
+            _ => break,
+        }
+    }
+}
+
 pub async fn run(
     port: u16,
     magic: u64,
@@ -409,6 +542,12 @@ pub async fn run(
         ingress_limit: blockfetch::INGRESS_LIMIT,
         egress_queue_size: 16,
     };
+    let ts_proto = ProtocolConfig {
+        id: txsubmission::PROTOCOL_ID,
+        priority: 3,
+        ingress_limit: txsubmission::INGRESS_LIMIT,
+        egress_queue_size: 16,
+    };
     let ka_proto = ProtocolConfig {
         id: keepalive::PROTOCOL_ID,
         priority: 7,
@@ -425,7 +564,12 @@ pub async fn run(
         let conn = match connect::accept_and_handshake(
             &listener,
             magic,
-            &[cs_proto.clone(), bf_proto.clone(), ka_proto.clone()],
+            &[
+                cs_proto.clone(),
+                bf_proto.clone(),
+                ts_proto.clone(),
+                ka_proto.clone(),
+            ],
             mux_config.clone(),
         )
         .await
@@ -443,16 +587,19 @@ pub async fn run(
             let mut channels = conn.channels.into_iter();
             let (cs_send, cs_recv) = channels.next().expect("chainsync channel");
             let (bf_send, bf_recv) = channels.next().expect("blockfetch channel");
+            let (ts_send, ts_recv) = channels.next().expect("txsubmission channel");
             let (ka_send, ka_recv) = channels.next().expect("keepalive channel");
 
             // Run all protocols concurrently. ChainSync is the primary —
             // when it finishes (client Done or error), we clean up.
             let bf_handle = tokio::spawn(serve_blockfetch(bf_send, bf_recv, chain.clone()));
+            let ts_handle = tokio::spawn(serve_txsubmission(ts_send, ts_recv));
             let ka_handle = tokio::spawn(serve_keepalive(ka_send, ka_recv));
 
             serve_chainsync(cs_send, cs_recv, chain).await;
 
             bf_handle.abort();
+            ts_handle.abort();
             ka_handle.abort();
             conn.running.abort();
             println!("  client disconnected");

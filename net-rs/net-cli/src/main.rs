@@ -5,6 +5,7 @@ mod connect;
 mod follow;
 mod handshake;
 mod serve;
+mod submit;
 
 use clap::{Parser, Subcommand};
 use net_core::protocols::handshake::n2n;
@@ -85,6 +86,32 @@ enum Command {
         max_rollback_depth: usize,
     },
 
+    /// Submit random transactions via TxSubmission
+    Submit {
+        /// Host and port to connect to
+        host: String,
+
+        /// Network magic number
+        #[arg(long, default_value_t = n2n::MAINNET_MAGIC)]
+        magic: u64,
+
+        /// Tx generation rate (per second, Poisson). Omit for single tx.
+        #[arg(long)]
+        tx_rate: Option<f64>,
+
+        /// Minimum tx body size in bytes
+        #[arg(long, default_value_t = 1500)]
+        min_size: usize,
+
+        /// Maximum tx body size in bytes
+        #[arg(long, default_value_t = 1500)]
+        max_size: usize,
+
+        /// Number of transactions to submit (default: 1 if no --tx-rate, infinite otherwise)
+        #[arg(long)]
+        count: Option<usize>,
+    },
+
     /// Follow the chain tip continuously with reconnection
     Follow {
         /// Host and port to connect to
@@ -118,6 +145,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             rollback_rate,
             max_rollback_depth,
         } => serve::run(port, magic, block_rate, rollback_rate, max_rollback_depth).await,
+        Command::Submit {
+            host,
+            magic,
+            tx_rate,
+            min_size,
+            max_size,
+            count,
+        } => submit::run(&host, magic, tx_rate, min_size, max_size, count).await,
         Command::Follow {
             host,
             magic,
