@@ -102,17 +102,31 @@ Security-audited (allocation bounds, buffer caps, timeouts, no panics, agency en
 
 ### Phase 3: Remaining Praos Protocols + Multi-Peer
 
-Deliverable: TxSubmission, PeerSharing protocols. Multi-peer coordination layer for
-running a simulated test network of nodes talking to each other.
+#### Protocols — COMPLETE
 
-Protocols to implement:
-- **TxSubmission** (protocol ID 4) — bidirectional tx submission with blocking/non-blocking
-  modes. Most complex Praos protocol: 5 states, request/reply with tx IDs and tx bodies,
-  pipelining support.
-- **PeerSharing** (protocol ID 10) — request/reply for discovering peers. Simple: 3 states,
-  request N peers → receive list.
+All 6 N2N mini-protocols implemented. 147 total tests.
 
-Multi-peer layer:
+- **TxSubmission** (protocol ID 4) — pull-based tx dissemination with blocking/non-blocking
+  modes. 6 states, 7 message types (MsgInit, MsgRequestTxIds blocking/non-blocking,
+  MsgReplyTxIds, MsgRequestTxs, MsgReplyTxs, MsgDone). Flow control with ack/req windowing
+  (max 10 unacked). Module-local types: TxId, TxBody, TxIdAndSize, PendingTx (opaque CBOR
+  wrappers). Client helper `run_client` manages FIFO of announced txs, responds to server
+  pulls via mpsc channel. CBOR codec with indefinite-length inner lists per Haskell codec.
+  CLI `submit` command with single-tx and Poisson stream modes. 20 tests.
+- **PeerSharing** (protocol ID 10) — request/reply for peer discovery. 3 states, 3 message
+  types (MsgShareRequest, MsgSharePeers, MsgDone). PeerAddress type with IPv4/IPv6 support.
+  Client helper `share_request`. CLI `peer-share` command with peer_sharing=1 handshake
+  negotiation and graceful rejection. Live-tested against cardano-main2.everstake.one:3001.
+  18 tests.
+
+Server side: fake `serve` command handles all 6 protocols (ChainSync, BlockFetch,
+TxSubmission, PeerSharing, KeepAlive) plus Handshake.
+
+#### Multi-Peer Coordination — TBD
+
+Remaining deliverable for Phase 3. Design not yet chosen.
+
+Options:
 - Connection manager: accept/initiate connections, track peer state
 - Peer coordination: ChainSync from multiple peers, BlockFetch from best peer
 - Model TBD — event-driven (v2 Behavior pattern) or actor-based (Haskell STM approach)
