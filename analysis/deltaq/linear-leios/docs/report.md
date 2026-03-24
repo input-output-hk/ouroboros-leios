@@ -252,6 +252,7 @@ The analysis shows that under the proposed parameters ($L_\text{hdr}=1$, $L_\tex
 * This model assumes honest node behavior. Adversarial delay of EBs - for example, an adversary deliberately withholding an EB until just before the voting deadline - is not captured here
 * With the `piecewise-polynomial` $\Delta\text{Q}$ backend computational complexity is hard to control, where as with the `sampled` backend it is the accuracy of the results. For this analysis to be successful, we built probabilistic models and then combined those using $\Delta\text{Q}$ in order to get a model with low complexity to be executable with the default backend
 * Adjust sortition mechanism to Fait Accompli
+* When input parameters are means or point estimates rather than full probability distributions (or when the distributions used do not adequately capture tail behaviour) high-percentile outputs such as the 99th percentile should be interpreted with caution, as these extremes can be sensitive to the underlying assumptions
 * The model does not account for Freshest First Delivery (FFD) of EBs as specified in CIP-164. FFD prioritises the most recently produced blocks during diffusion, which can delay older EBs and worsen their individual diffusion latency; incorporating it would require modelling the interaction between concurrent EB diffusions
 * Future work should improve the `sampled` backend to keep track of the error margin, in order to be able to run the analysis in reasonable time and being able to quantify the inaccuracy introduced by the simulations
 
