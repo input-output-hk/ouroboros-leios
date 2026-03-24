@@ -10,7 +10,7 @@ use tokio::sync::mpsc;
 
 use super::scheduler::Scheduler;
 use super::wire;
-use super::{MuxError, ProtocolId};
+use super::{ChannelKey, MuxError, ProtocolId};
 
 /// Per-protocol egress state tracked by the muxer.
 pub(crate) struct ProtocolEgress {
@@ -53,7 +53,7 @@ impl ProtocolEgress {
 /// on I/O error.
 pub(crate) async fn run_muxer<W, S>(
     mut writer: W,
-    mut protocols: HashMap<ProtocolId, ProtocolEgress>,
+    mut protocols: HashMap<ChannelKey, ProtocolEgress>,
     mut scheduler: S,
     sdu_size: usize,
     clock: Instant,
@@ -77,11 +77,12 @@ where
             state.fill_pending();
         }
 
-        // Collect IDs of protocols with data ready.
+        // Collect protocol IDs (not composite keys) that have data ready.
+        // The scheduler works at the protocol level, not per-direction.
         let ready: Vec<ProtocolId> = protocols
             .iter()
             .filter(|(_, state)| state.pending.is_some())
-            .map(|(id, _)| *id)
+            .map(|((id, _), _)| *id)
             .collect();
 
         if ready.is_empty() {
@@ -89,20 +90,29 @@ where
         }
 
         // Ask the scheduler which protocol to service.
-        let chosen = match scheduler.next(&ready) {
+        let chosen_id = match scheduler.next(&ready) {
             Some(id) => id,
             None => continue,
         };
 
-        // Take the data and write it.
-        if let Some(state) = protocols.get_mut(&chosen) {
-            if let Some(data) = state.take_pending() {
-                let mode = state.mode;
-                let timestamp = clock.elapsed().as_micros() as u32;
-                let segments = wire::segment_payload(chosen, mode, timestamp, &data, sdu_size);
+        // Find the first composite key for this protocol ID that has data.
+        let chosen_key = protocols
+            .iter()
+            .find(|((id, _), state)| *id == chosen_id && state.pending.is_some())
+            .map(|(key, _)| *key);
 
-                for segment in &segments {
-                    wire::write_segment(&mut writer, segment).await?;
+        if let Some(key) = chosen_key {
+            if let Some(state) = protocols.get_mut(&key) {
+                if let Some(data) = state.take_pending() {
+                    let mode = state.mode;
+                    let protocol_id = key.0;
+                    let timestamp = clock.elapsed().as_micros() as u32;
+                    let segments =
+                        wire::segment_payload(protocol_id, mode, timestamp, &data, sdu_size);
+
+                    for segment in &segments {
+                        wire::write_segment(&mut writer, segment).await?;
+                    }
                 }
             }
         }
@@ -111,7 +121,7 @@ where
 
 /// Block until at least one protocol has data available, either in its
 /// pending buffer or in its receiver channel.
-async fn wait_for_any_data(protocols: &mut HashMap<ProtocolId, ProtocolEgress>) {
+async fn wait_for_any_data(protocols: &mut HashMap<ChannelKey, ProtocolEgress>) {
     // Check pending buffers first.
     if protocols.values().any(|s| s.pending.is_some()) {
         return;

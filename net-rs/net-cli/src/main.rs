@@ -159,6 +159,10 @@ enum Command {
         /// Listen address for inbound peers (e.g. 0.0.0.0:3001)
         #[arg(long)]
         listen: Option<String>,
+
+        /// Use duplex mode (both client and server protocols per connection)
+        #[arg(long)]
+        duplex: bool,
     },
 }
 
@@ -203,6 +207,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             magic,
             max_peers,
             listen,
-        } => multi_follow::run(&hosts, magic, max_peers, listen).await,
+            duplex,
+        } => multi_follow::run(&hosts, magic, max_peers, listen, duplex).await,
     }
 }

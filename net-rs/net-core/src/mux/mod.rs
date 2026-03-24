@@ -85,16 +85,23 @@ pub enum MuxError {
     SduTimeout(Duration),
 }
 
-/// A configured but not yet running multiplexer. Call `channel()` to register
+/// Key for routing mux channels: (protocol_id, mode_bit).
+/// In unidirectional mode, each protocol ID has one entry.
+/// In duplex mode, a protocol ID may have two entries (one per direction).
+pub type ChannelKey = (ProtocolId, u16);
+
+/// A configured but not yet running multiplexer. Call `register()` to register
 /// protocols, then `run()` to start the muxer/demuxer tasks.
 pub struct Mux<S: scheduler::Scheduler> {
     config: MuxConfig,
     scheduler: S,
     mode: u16,
-    /// Egress state: protocol → (receiver, mode, pending buffer).
-    egress_protocols: HashMap<ProtocolId, ProtocolEgress>,
-    /// Ingress state: protocol → (sender, byte count, limit).
-    ingress_protocols: HashMap<ProtocolId, ProtocolIngress>,
+    /// Egress state: (protocol, mode) → (receiver, mode, pending buffer).
+    egress_protocols: HashMap<ChannelKey, ProtocolEgress>,
+    /// Ingress state: (protocol, mode) → (sender, byte count, limit).
+    /// For ingress, the mode in the key is the *remote* mode (what we expect
+    /// to see on incoming segments for this channel).
+    ingress_protocols: HashMap<ChannelKey, ProtocolIngress>,
 }
 
 impl<S: scheduler::Scheduler> Mux<S> {
@@ -110,30 +117,46 @@ impl<S: scheduler::Scheduler> Mux<S> {
         }
     }
 
-    /// Register a protocol and return its channel halves. The protocol will
-    /// participate in multiplexing once `run()` is called.
+    /// Register a protocol using the mux's default mode and return its channel
+    /// halves. This is the standard method for unidirectional connections.
     pub fn register(&mut self, proto_config: &ProtocolConfig) -> (ChannelSend, ChannelRecv) {
+        self.register_with_mode(proto_config, self.mode)
+    }
+
+    /// Register a protocol with an explicit mode (direction) and return its
+    /// channel halves. Use this for duplex connections where the same protocol
+    /// ID needs channels in both directions.
+    pub fn register_with_mode(
+        &mut self,
+        proto_config: &ProtocolConfig,
+        mode: u16,
+    ) -> (ChannelSend, ChannelRecv) {
         let id = proto_config.id;
 
         // Egress: protocol writes → mux reads and sends to bearer.
+        // The egress key uses *our* mode (what we stamp on outgoing segments).
         let (egress_send, egress_recv) = tokio::sync::mpsc::channel(proto_config.egress_queue_size);
         self.egress_protocols.insert(
-            id,
+            (id, mode),
             ProtocolEgress {
                 rx: egress_recv,
-                mode: self.mode,
+                mode,
                 pending: None,
             },
         );
 
         // Ingress: mux reads from bearer → protocol reads.
-        // The counter is shared between the demuxer (increments) and the
-        // ChannelRecv (decrements) so buffer accounting stays accurate.
+        // The ingress key uses the *remote* mode (what we expect on incoming segments).
+        let remote_mode = if mode == MODE_INITIATOR {
+            MODE_RESPONDER
+        } else {
+            MODE_INITIATOR
+        };
         let ingress_counter = channel::IngressCounter::new();
         let (ingress_send, ingress_recv) =
             tokio::sync::mpsc::channel(proto_config.egress_queue_size);
         self.ingress_protocols.insert(
-            id,
+            (id, remote_mode),
             ProtocolIngress {
                 tx: ingress_send,
                 counter: ingress_counter.clone(),
@@ -170,7 +193,6 @@ impl<S: scheduler::Scheduler> Mux<S> {
             self.ingress_protocols,
             self.config.sdu_timeout,
             self.config.sdu_size,
-            self.mode,
         ));
 
         // Spawn a supervisor that aborts the surviving task when one fails.
@@ -373,6 +395,74 @@ mod tests {
         let bf_msg = recv_b_bf.recv().await.unwrap();
         assert_eq!(cs_msg, &b"chainsync"[..]);
         assert_eq!(bf_msg, &b"blockfetch"[..]);
+
+        running_a.abort();
+        running_b.abort();
+    }
+
+    /// Duplex test: register the same protocol in both directions on one
+    /// connection. Both sides run protocol 2 as both initiator and responder.
+    ///
+    /// Wire semantics: register_with_mode(MODE_INITIATOR) creates a channel
+    /// that *sends* with mode=0 and *receives* from mode=0x8000 (the remote's
+    /// responder). So A's initiator send is received by B's responder recv,
+    /// and B's responder send is received by A's initiator recv.
+    #[tokio::test]
+    async fn mux_duplex_same_protocol_both_directions() {
+        let (bearer_a, bearer_b) = MemBearer::pair();
+
+        let proto = ProtocolConfig {
+            id: 2,
+            priority: 0,
+            ingress_limit: 65535,
+            egress_queue_size: 10,
+        };
+
+        // Side A: register protocol 2 in both directions.
+        // init channel: sends mode=0, receives mode=0x8000
+        // resp channel: sends mode=0x8000, receives mode=0
+        let mut mux_a = Mux::new(test_config(), RoundRobin::default(), MODE_INITIATOR);
+        let (send_a_init, mut recv_a_init) = mux_a.register_with_mode(&proto, MODE_INITIATOR);
+        let (send_a_resp, mut recv_a_resp) = mux_a.register_with_mode(&proto, MODE_RESPONDER);
+        let running_a = mux_a.run(bearer_a);
+
+        // Side B: register protocol 2 in both directions.
+        let mut mux_b = Mux::new(test_config(), RoundRobin::default(), MODE_RESPONDER);
+        let (send_b_init, mut recv_b_init) = mux_b.register_with_mode(&proto, MODE_INITIATOR);
+        let (send_b_resp, mut recv_b_resp) = mux_b.register_with_mode(&proto, MODE_RESPONDER);
+        let running_b = mux_b.run(bearer_b);
+
+        // A sends as initiator (mode=0) → B receives on resp channel (ingress key (2, 0)).
+        send_a_init
+            .send(bytes::Bytes::from_static(b"A init"))
+            .await
+            .unwrap();
+        let msg = recv_b_resp.recv().await.unwrap();
+        assert_eq!(msg, &b"A init"[..]);
+
+        // B sends as responder (mode=0x8000) → A receives on init channel (ingress key (2, 0x8000)).
+        send_b_resp
+            .send(bytes::Bytes::from_static(b"B resp"))
+            .await
+            .unwrap();
+        let msg = recv_a_init.recv().await.unwrap();
+        assert_eq!(msg, &b"B resp"[..]);
+
+        // B sends as initiator (mode=0) → A receives on resp channel (ingress key (2, 0)).
+        send_b_init
+            .send(bytes::Bytes::from_static(b"B init"))
+            .await
+            .unwrap();
+        let msg = recv_a_resp.recv().await.unwrap();
+        assert_eq!(msg, &b"B init"[..]);
+
+        // A sends as responder (mode=0x8000) → B receives on init channel (ingress key (2, 0x8000)).
+        send_a_resp
+            .send(bytes::Bytes::from_static(b"A resp"))
+            .await
+            .unwrap();
+        let msg = recv_b_init.recv().await.unwrap();
+        assert_eq!(msg, &b"A resp"[..]);
 
         running_a.abort();
         running_b.abort();

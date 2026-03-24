@@ -164,7 +164,13 @@ ResponderOnly Peer Tasks (inbound connections, server protocols)
 - Coordinator deduplicates tips by block number (only forwards if ahead of best known)
 - Fetch routing: picks peer with matching tip and lowest RTT
 - Reconnection: exponential backoff (1s → 2s → 4s → ... → 30s cap) for initiator peers only
-- `ConnectionMode` enum: `InitiatorOnly` and `ResponderOnly` implemented; `Duplex` deferred
+- `ConnectionMode` enum: all three modes implemented (InitiatorOnly, ResponderOnly, Duplex)
+- Mux uses `(ProtocolId, u16)` composite keys for channel routing; scheduler stays keyed by
+  `ProtocolId` (both directions share priority). `register_with_mode()` for explicit direction.
+  Demuxer routes by `(protocol_id, mode)` — accepts segments in both directions.
+- Duplex task (`duplex_task.rs`): combines client + server sub-tasks on one mux via
+  `connect_duplex()` / `accept_duplex()`. Coordinator spawns duplex tasks when `config.duplex`
+  is set. `multi-follow --duplex` flag.
 - `ChainStore`: shared in-memory chain state (VecDeque with capacity eviction, watch::channel
   notification). Coordinator populates from `BlockFetched` events (with header from
   `pending_headers` map) and `InjectBlock` commands. Responder tasks read via `Arc<ChainStore>`.
@@ -177,11 +183,11 @@ ResponderOnly Peer Tasks (inbound connections, server protocols)
 
 **Deferred for future phases:**
 - Promotion/demotion (warm/hot lifecycle, cancellation tokens per protocol group)
-- Duplex mode (both initiator + responder protocols on one connection, Cardano V10+)
 - Backoff reset on sustained connection success
 
-**Live-tested:** Mainnet initiator peers with tip deduplication. Local relay chain:
-serve → multi-follow (with --listen) → follow. Exponential backoff reconnection.
+**Live-tested:** Duplex against mainnet (backbone.cardano.iog.io:3001, version 15).
+Local relay chain: serve → multi-follow --listen → follow. Exponential backoff reconnection.
+172 total tests.
 
 ### Phase 4: Leios Protocols
 
