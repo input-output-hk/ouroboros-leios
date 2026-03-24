@@ -128,46 +128,6 @@ pub async fn done(runner: &mut Runner<KeepAlive>) -> Result<(), ProtocolError> {
     runner.send(&Message::MsgDone).await
 }
 
-// --- Server helpers ---
-
-/// A request received by the server from the client.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum KeepAliveRequest {
-    KeepAlive { cookie: u16 },
-    Done,
-}
-
-/// A response the server sends to the client.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum KeepAliveResponse {
-    KeepAliveResponse { cookie: u16 },
-}
-
-/// Receive the next request from the client.
-pub async fn receive_request(
-    runner: &mut Runner<KeepAlive>,
-) -> Result<KeepAliveRequest, ProtocolError> {
-    let msg = runner.recv().await?;
-    match msg {
-        Message::MsgKeepAlive { cookie } => Ok(KeepAliveRequest::KeepAlive { cookie }),
-        Message::MsgDone => Ok(KeepAliveRequest::Done),
-        other => Err(ProtocolError::InvalidMessage(format!(
-            "expected client request, got {other:?}"
-        ))),
-    }
-}
-
-/// Send a response to the client.
-pub async fn send_response(
-    runner: &mut Runner<KeepAlive>,
-    response: KeepAliveResponse,
-) -> Result<(), ProtocolError> {
-    let msg = match response {
-        KeepAliveResponse::KeepAliveResponse { cookie } => Message::MsgKeepAliveResponse { cookie },
-    };
-    runner.send(&msg).await
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -270,10 +230,11 @@ mod tests {
             let mut runner = Runner::<KeepAlive>::new(Role::Server, ss, sr);
 
             for _ in 0..2 {
-                let req = receive_request(&mut runner).await.unwrap();
-                match req {
-                    KeepAliveRequest::KeepAlive { cookie } => {
-                        send_response(&mut runner, KeepAliveResponse::KeepAliveResponse { cookie })
+                let msg = runner.recv().await.unwrap();
+                match msg {
+                    Message::MsgKeepAlive { cookie } => {
+                        runner
+                            .send(&Message::MsgKeepAliveResponse { cookie })
                             .await
                             .unwrap();
                     }
@@ -281,8 +242,8 @@ mod tests {
                 }
             }
 
-            let req = receive_request(&mut runner).await.unwrap();
-            assert!(matches!(req, KeepAliveRequest::Done));
+            let msg = runner.recv().await.unwrap();
+            assert!(matches!(msg, Message::MsgDone));
         });
 
         let client = tokio::spawn(async move {
@@ -310,16 +271,14 @@ mod tests {
         let server = tokio::spawn(async move {
             let mut runner = Runner::<KeepAlive>::new(Role::Server, ss, sr);
 
-            let req = receive_request(&mut runner).await.unwrap();
-            assert!(matches!(req, KeepAliveRequest::KeepAlive { .. }));
+            let msg = runner.recv().await.unwrap();
+            assert!(matches!(msg, Message::MsgKeepAlive { .. }));
 
             // Respond with wrong cookie intentionally.
-            send_response(
-                &mut runner,
-                KeepAliveResponse::KeepAliveResponse { cookie: 9999 },
-            )
-            .await
-            .unwrap();
+            runner
+                .send(&Message::MsgKeepAliveResponse { cookie: 9999 })
+                .await
+                .unwrap();
         });
 
         let client = tokio::spawn(async move {
