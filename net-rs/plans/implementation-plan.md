@@ -125,7 +125,8 @@ TxSubmission, PeerSharing, KeepAlive) plus Handshake.
 
 #### Multi-Peer Coordination — COMPLETE
 
-Thread-per-peer model with a shared coordinator. 6 new tests (153 total).
+Thread-per-peer model with a shared coordinator. InitiatorOnly + ResponderOnly peers.
+171 total tests.
 
 **Design decision (2026-03-24):** After evaluating three approaches — (1) thread-per-peer
 with coordinator, (2) Pallas v2 event-driven single-threaded behavior, (3) Haskell-style
@@ -137,36 +138,50 @@ down via channels) handles all known coordination scenarios without architectura
 **Architecture (implemented):**
 
 ```
-Application (multi-follow CLI)
-    ↑ NetworkEvent (peer-agnostic: TipAdvanced, BlockReceived, ...)
-    ↓ NetworkCommand (AddPeer, FetchBlock, DiscoverPeers, Shutdown)
+Application (multi-follow CLI, serve CLI)
+    ↑ NetworkEvent (peer-agnostic: TipAdvanced, BlockReceived, TransactionReceived, ...)
+    ↓ NetworkCommand (AddPeer, FetchBlock, InjectBlock, InjectRollback, Shutdown, ...)
 Coordinator task (single tokio task)
+    ├── ChainStore (Arc, shared with responder tasks)
+    ├── Accept loop (if listen_address configured)
     ↑ (PeerId, PeerEvent) via shared mpsc fan-in from all peers
     ↓ PeerCommand via per-peer mpsc (FetchBlocks, RequestPeers, Disconnect)
-Per-Peer Tasks (one tokio task per outbound connection)
-    ├── ChainSync sub-task (request_next loop → HeaderAnnounced/RolledBack events)
-    ├── BlockFetch sub-task (idle, receives FetchBlocks commands)
-    ├── KeepAlive sub-task (periodic pings → LatencyMeasured events)
-    └── PeerSharing sub-task (on-demand → PeersDiscovered events)
+InitiatorOnly Peer Tasks (outbound connections, client protocols)
+    ├── ChainSync client (request_next loop → HeaderAnnounced/RolledBack)
+    ├── BlockFetch client (idle, receives FetchBlocks → BlockFetched)
+    ├── KeepAlive client (periodic pings → LatencyMeasured)
+    └── PeerSharing client (on-demand → PeersDiscovered)
+ResponderOnly Peer Tasks (inbound connections, server protocols)
+    ├── ChainSync server (reads from ChainStore, serves headers)
+    ├── BlockFetch server (reads from ChainStore, streams blocks)
+    ├── KeepAlive server (echo)
+    ├── TxSubmission server (pulls txs → TransactionReceived)
+    └── PeerSharing server (serves peer addresses via callback)
 ```
 
 **Key implementation details:**
 - `PeerEvent` abstracts over raw protocol messages — peer task is the translation layer
 - Coordinator deduplicates tips by block number (only forwards if ahead of best known)
 - Fetch routing: picks peer with matching tip and lowest RTT
-- Reconnection: exponential backoff (1s → 2s → 4s → ... → 30s cap) via reconnect queue
-- `ConnectionMode` enum: `InitiatorOnly` (implemented), `ResponderOnly`, `Duplex` (deferred)
-- Connection helpers moved from net-cli to `net-core::peer::connect` (library code)
-- `multi-follow` CLI command for testing against mainnet
+- Reconnection: exponential backoff (1s → 2s → 4s → ... → 30s cap) for initiator peers only
+- `ConnectionMode` enum: `InitiatorOnly` and `ResponderOnly` implemented; `Duplex` deferred
+- `ChainStore`: shared in-memory chain state (VecDeque with capacity eviction, watch::channel
+  notification). Coordinator populates from `BlockFetched` events (with header from
+  `pending_headers` map) and `InjectBlock` commands. Responder tasks read via `Arc<ChainStore>`.
+- Server protocol handlers in `net-core::peer::server_handlers` — extracted from serve.rs,
+  parameterized on `Arc<ChainStore>` and event senders
+- Accept loop: spawned as background task if `listen_address` configured; feeds completed
+  connections to coordinator via internal mpsc channel
+- `serve` CLI refactored to use coordinator with `InjectBlock`/`InjectRollback` commands
+- `multi-follow --listen` enables relay mode (initiator upstream + responder downstream)
 
 **Deferred for future phases:**
 - Promotion/demotion (warm/hot lifecycle, cancellation tokens per protocol group)
-- ResponderOnly mode (server-side peer tasks serving our chain to inbound connections)
 - Duplex mode (both initiator + responder protocols on one connection, Cardano V10+)
 - Backoff reset on sustained connection success
 
-**Live-tested:** 2 concurrent connections to backbone.cardano.iog.io:3001, tip
-deduplication verified, exponential backoff reconnection verified against unreachable host.
+**Live-tested:** Mainnet initiator peers with tip deduplication. Local relay chain:
+serve → multi-follow (with --listen) → follow. Exponential backoff reconnection.
 
 ### Phase 4: Leios Protocols
 
