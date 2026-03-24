@@ -4,6 +4,7 @@ mod chainsync;
 mod connect;
 mod follow;
 mod handshake;
+mod peershare;
 mod serve;
 mod submit;
 
@@ -112,6 +113,20 @@ enum Command {
         count: Option<usize>,
     },
 
+    /// Request peers from a node via PeerSharing
+    PeerShare {
+        /// Host and port to connect to
+        host: String,
+
+        /// Network magic number
+        #[arg(long, default_value_t = n2n::MAINNET_MAGIC)]
+        magic: u64,
+
+        /// Number of peers to request
+        #[arg(long, default_value_t = 10)]
+        amount: u8,
+    },
+
     /// Follow the chain tip continuously with reconnection
     Follow {
         /// Host and port to connect to
@@ -153,6 +168,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             max_size,
             count,
         } => submit::run(&host, magic, tx_rate, min_size, max_size, count).await,
+        Command::PeerShare {
+            host,
+            magic,
+            amount,
+        } => peershare::run(&host, magic, amount).await,
         Command::Follow {
             host,
             magic,

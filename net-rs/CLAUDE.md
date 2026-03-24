@@ -30,6 +30,8 @@ cargo run -p net-cli -- handshake backbone.cardano.iog.io:3001  # live test agai
 cargo run -p net-cli -- capture backbone.cardano.iog.io:3001    # capture wire bytes for test vectors
 cargo run -p net-cli -- serve --port 9999 --block-rate 0.05     # fake server (Poisson blocks)
 cargo run -p net-cli -- follow 127.0.0.1:9999                   # follow fake server
+cargo run -p net-cli -- submit 127.0.0.1:9999                   # submit tx to fake server
+cargo run -p net-cli -- peer-share cardano-main2.everstake.one:3001  # peer sharing (live, supports peer_sharing=1)
 ```
 
 ### Test vector workflow
