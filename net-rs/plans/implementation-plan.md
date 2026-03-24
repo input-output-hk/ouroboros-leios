@@ -216,15 +216,103 @@ Local relay chain: serve → multi-follow --listen → follow. Exponential backo
 
 ### Phase 4: Leios Protocols
 
-Deliverable: LeiosNotify, LeiosFetch protocols. Priority scheduling and freshest-first
-delivery in the coordinator.
+Deliverable: LeiosNotify and LeiosFetch protocols integrated into the multi-peer
+coordinator, with Praos header/body extensions and priority scheduling.
 
-Builds on the multi-peer coordinator from Phase 3:
-- LeiosNotify/LeiosFetch state machines (same Runner pattern as all other protocols)
-- Add to per-peer task trees as new protocol tasks
-- Extend PeerHandle with Leios-specific events (EB announced, vote received)
-- Freshest-first fetch scheduling in coordinator (priority hint on fetch requests)
-- StrictPriority/WFQ scheduler in mux (StrictPriority already implemented)
+**Working assumptions:**
+- Protocol IDs: LeiosNotify = 18, LeiosFetch = 19 (not yet assigned in CIP)
+- Two protocols only; no third protocol for range requests initially
+- All Leios data types (EBs, votes, certificates, BLS keys/sigs) are opaque byte blobs,
+  same pattern as `WrappedHeader`/`BlockBody`
+- BLS crypto verification is out of scope (consensus layer, not networking)
+
+#### Phase 4a: LeiosNotify Protocol
+
+State machine, Message enum, CBOR codec, client + server async helpers, unit tests.
+
+```
+StIdle (Client)  → MsgLeiosNotificationRequestNext → StBusy (Server)
+StBusy           → MsgLeiosBlockAnnouncement        → StIdle
+StBusy           → MsgLeiosBlockOffer               → StIdle
+StBusy           → MsgLeiosBlockTxsOffer            → StIdle
+StBusy           → MsgLeiosVotesOffer               → StIdle
+StIdle           → MsgDone                          → StDone
+```
+
+Files: `net-core/src/protocols/leios_notify/mod.rs`, `codec.rs`
+
+#### Phase 4b: LeiosFetch Protocol
+
+State machine, Message enum, CBOR codec (including bitmap TX addressing),
+client + server async helpers, unit tests.
+
+```
+StIdle       (Client)  → MsgLeiosBlockRequest          → StBlock      (Server)
+StBlock      (Server)  → MsgLeiosBlock                 → StIdle
+
+StIdle       (Client)  → MsgLeiosBlockTxsRequest       → StBlockTxs   (Server)
+StBlockTxs   (Server)  → MsgLeiosBlockTxs              → StIdle
+
+StIdle       (Client)  → MsgLeiosVotesRequest          → StVotes      (Server)
+StVotes      (Server)  → MsgLeiosVoteDelivery          → StIdle
+
+StIdle       (Client)  → MsgLeiosBlockRangeRequest     → StBlockRange (Server)
+StBlockRange (Server)  → MsgLeiosNextBlockAndTxsInRange → StBlockRange
+StBlockRange (Server)  → MsgLeiosLastBlockAndTxsInRange → StIdle
+
+StIdle       (Client)  → MsgDone                       → StDone
+```
+
+Bitmap TX addressing: `MsgLeiosBlockTxsRequest` carries `map<u16, u64>` where each bit
+selects one of 64 contiguous transactions at offset `64 × index`.
+
+Files: `net-core/src/protocols/leios_fetch/mod.rs`, `codec.rs`
+
+#### Phase 4c: Praos Header/Body Extensions
+
+Extend existing CBOR codecs for backward-compatible optional fields:
+- `WrappedHeader`: optional trailing `(announced_eb: hash32, announced_eb_size: u32)`
+  and `certified_eb: bool`
+- `BlockBody`: optional trailing `eb_certificate` (opaque blob)
+
+Tests with extended test vectors. Old data still decodes; new fields are optional.
+
+Files: `net-core/src/types.rs`, existing codec tests
+
+#### Phase 4d: Per-Peer Task Integration
+
+Add LeiosNotify + LeiosFetch to per-peer task trees:
+- Client tasks in initiator/duplex peers (subscribe to announcements, fetch on demand)
+- Server tasks in responder/duplex peers (serve from ChainStore)
+
+Files: `net-core/src/peer/peer_task.rs`, `responder_task.rs`, `duplex_task.rs`,
+`server_handlers.rs`
+
+#### Phase 4e: Coordinator + ChainStore Extensions
+
+- Extend `PeerEvent`/`PeerCommand` with Leios variants (EB announced, votes offered,
+  fetch EB, fetch votes)
+- Extend `ChainStore` with EB/vote storage (opaque blobs)
+- Coordinator routes Leios announcements and fetch requests
+- Integration tests with MemBearer
+
+Files: `net-core/src/peer/types.rs`, `chain_store.rs`, `coordinator.rs`
+
+#### Phase 4f: Priority Scheduling Verification
+
+- Assign Leios protocol priorities: High = Praos, Medium = LeiosFetch (19),
+  Low = LeiosNotify (18) + PeerSharing (10)
+- Test that Praos traffic preempts Leios under load
+
+Files: `net-core/src/peer/mod.rs` (protocol ID constants), mux config
+
+#### Deferred
+
+- Freshest-first scheduling (pending upstream discussion)
+- Third protocol for range requests (if needed after testing)
+- Structured Leios types (replace opaque blobs when spec stabilizes)
+- Head-of-line blocking mitigation (dual-LeiosFetch per peer)
+- Live Leios testnet testing (when testnet available)
 
 ## Workspace Structure
 
