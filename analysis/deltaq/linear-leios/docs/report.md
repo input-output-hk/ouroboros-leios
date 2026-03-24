@@ -49,7 +49,7 @@ and combinators to build more complex abstractions:
 | ---------- | ---------------------------------------------------------------------------- |
 | `a .>>. b` | Sequential composition: `a` then `b`                                         |
 | `a .\/. b` | First to finish: `a` or `b`                                                  |
-| `a ./\. b` | Last to finish: `a` and `b`                                                  |
+| `a ./\. b` | All to finish: `a` and `b`                                                  |
 | `p a b`    | Probabilistic choice: `a` with probability `p`, `b` with probability `1 - p` |
 
 The $\Delta\text{Q}$ library uses a backend abstraction for computations such as convolution for sequential composition. It provides the [piecewise-polynomials](https://github.com/DeltaQ-SD/deltaq/tree/main/lib/probability-polynomial) backend as default. For running complex models, we implemented a new backend called [sampled](https://github.com/yveshauser/deltaq/blob/experimental/lib/deltaq/src/DeltaQ/Sampled.hs). They compare as follows:
@@ -71,7 +71,7 @@ The network is modelled as a random graph in which nodes have a fixed number of 
 | Medium   | Same continent       | 0.069 s               |
 | Long     | Different continents | 0.268 s               |
 
-Each category yields a deterministic transfer time for a given block size. The one-hop $\Delta\text{Q}$ assigns equal probability to each distance category. The end-to-end diffusion $\Delta\text{Q}$ for $n$ hops is the $n$-fold sequential composition of the one-hop $\Delta\text{Q}$. To account for the variable path length in a random graph, the multi-hop $\Delta\text{Qs}$ are combined via probabilistic choice, weighted by the empirical path-length distribution of a random graph with 2500 nodes of degree 10 (Table below, sourced from the Praos model):
+Each category yields a deterministic transfer time for a given block size. The one-hop $\Delta\text{Q}$ assigns equal probability to each distance category. The end-to-end diffusion $\Delta\text{Q}$ for $n$ hops is the $n$-fold sequential composition of the one-hop $\Delta\text{Q}$. To account for the variable path length in a random graph, the multi-hop $\Delta\text{Qs}$ are combined via probabilistic choice, weighted by the empirical path-length distribution of a regular random graph with 2500 nodes of degree 10 (Table below, sourced from the Praos model):
 
 | Path length | Probability (%) |
 | ----------- | --------------- |
