@@ -223,7 +223,7 @@ ghci> fromRational (successWithin validateEB 7) :: Double
 
 The calculation of $P_\text{quorum}$ is taken from an early version of the [markov chain simulation](../../../markov/) for Linear Leios: Each of the 2500 stake pool operators (SPOs) is independently elected to the voting committee via a Poisson sortition: SPO $i$ with relative stake $s_i$ is elected with probability $1 - e^{-\tilde{m} s_i}$, where $\tilde{m}$ is calibrated so that the expected committee size equals $m = 600$. If elected, SPO $i$ casts a successful vote with probability $P_\text{validating}$, so its individual success probability is $p_i = P_\text{validating} \times (1 - e^{-\tilde{m} s_i})$. The total vote count $V = \sum_i X_i$ with $X_i \sim \text{Bernoulli}(p_i)$ is approximated by a normal distribution via the Central Limit Theorem:
 
-$$V \sim \mathcal{N}(\mu,\, \sigma^2), \quad \mu = \sum_i p_i, \quad \sigma^2 = \sum_i p_i(1-p_i)$$
+$$V \sim \mathcal{N}(\mu, \sigma^2), \quad \mu = \sum_i p_i, \quad \sigma^2 = \sum_i p_i(1-p_i)$$
 
 The quorum probability is then:
 
