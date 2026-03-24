@@ -117,6 +117,9 @@ The $\Delta\text{Q}$ model of EB diffusion captures the steps a node performs up
 * On receiving the full EB, determine which transactions are missing and fetch them. Unlike the RB - which carries full transaction data in its body - the EB contains only transaction IDs
 * Only once both of the above steps complete is the reapply operation applied to the ledger state
 
+The outcome diagram then looks as follows[^3]:
+[^3]: Refer to "Mind Your Outcomes" for an explanation of outcome diagrams
+
 ![Outcome diagram of EB diffusion](EB-diffusion.svg)
 
 With $\Delta\text{Q}$, the typical workflow starts from a coarse-grained model describing high-level outcomes and then refining it to improve accuracy. However, finer-grained models generally increase complexity, forcing a switch to a backend that calculates approximate solutions, creating a trade-off between performance and accuracy. For Linear Leios, we chose a low-complexity model and ensure accuracy. The low-complexity model is possible by leveraging empirical distributions from measurements and probabilistic modelling.
