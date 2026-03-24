@@ -115,7 +115,7 @@ The $\Delta\text{Q}$ model of EB diffusion captures the steps a node performs up
 * On receiving the full EB, determine which transactions are missing and fetch them. Unlike the RB - which carries full transaction data in its body - the EB contains only transaction IDs
 * Only once both of the above steps complete is the reapply operation applied to the ledger state
 
-![](EB-diffusion.svg)
+![Outcome diagram of EB diffusion](EB-diffusion.svg)
 
 With $\Delta\text{Q}$, the typical workflow starts from a coarse-grained model describing high-level outcomes and then refining it to improve accuracy. However, finer-grained models generally increase complexity, forcing a switch to a backend that calculates approximate solutions, creating a trade-off between performance and accuracy. For Linear Leios, we chose a low-complexity model and ensure accuracy. The low-complexity model is possible by leveraging empirical distributions from measurements and probabilistic modelling.
 
@@ -148,7 +148,7 @@ When an EB arrives at a node, its transactions may already be present in the loc
 
 [^1]: This model was introduced by Nick in the Leios monthly presentation in February 26
 
-![](TxCache.svg)
+![Markov model for TxCache](TxCache.svg)
 
 With states ordered as (miss, hit), the transition matrix is:
 
@@ -172,7 +172,7 @@ The model uses $p = 0.75$, giving $\pi_1 \approx 0.455$, $\pi_2 \approx 0.545$, 
 
 The $\Delta\text{Q}$ model yields the following completion-time distribution for EB diffusion:
 
-![](validateEB.svg)
+![CDF of validateEB](validateEB.svg)
 
 - **Median diffusion time:** 4.91 seconds
 - **75th percentile:** 7.13 seconds
