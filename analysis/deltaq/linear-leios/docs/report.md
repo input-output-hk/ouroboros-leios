@@ -73,15 +73,14 @@ The network is modelled as a random graph in which nodes have a fixed number of 
 | Medium   | Same continent       | 0.069 s               |
 | Long     | Different continents | 0.268 s               |
 
-Each category yields a deterministic transfer time for a given block size. The one-hop $\Delta\text{Q}$ assigns equal probability to each distance category. The end-to-end diffusion $\Delta\text{Q}$ for $n$ hops is the $n$-fold sequential composition of the one-hop $\Delta\text{Q}$. To account for the variable path length in a random graph, the multi-hop $\Delta\text{Qs}$ are combined via probabilistic choice, weighted by the empirical path-length distribution of a regular random graph with 2500 nodes of degree 10 (Table below, sourced from the Praos model):
+Each category yields a deterministic transfer time for a given block size. The one-hop $\Delta\text{Q}$ assigns equal probability to each distance category. The end-to-end diffusion $\Delta\text{Q}$ for $n$ hops is the $n$-fold sequential composition of the one-hop $\Delta\text{Q}$. To account for the variable path length in a random graph, the multi-hop $\Delta\text{Qs}$ are combined via probabilistic choice, weighted by the empirical path-length distribution of a regular random graph with 2500 nodes of degree 20 (Table below, sourced from the Praos model):
 
 | Path length | Probability (%) |
 | ----------- | --------------- |
-| 1           | 0.40            |
-| 2           | 3.91            |
-| 3           | 31.06           |
-| 4           | 61.85           |
-| 5           | 2.78            |
+| 1           | 0.80            |
+| 2           | 14.72           |
+| 3           | 80.08           |
+| 4           | 4.40            |
 
 The resulting blended $\Delta\text{Q}$ captures the distribution of end-to-end transfer times over the expected variety of paths in the network.
 
@@ -176,10 +175,10 @@ The $\Delta\text{Q}$ model yields the following completion-time distribution for
 
 ![CDF of validateEB](validateEB.svg)
 
-- **Median diffusion time:** 4.91 seconds
-- **75th percentile:** 7.13 seconds
-- **95th percentile:** 12.57 seconds
-- **99th percentile:** 15.41 seconds
+- **Median diffusion time:** 4.08 seconds
+- **75th percentile:** 6.01 seconds
+- **95th percentile:** 11.71 seconds
+- **99th percentile:** 14.28 seconds
 
 ### 5.2 Protocol Security Validation
 
@@ -189,11 +188,11 @@ The $\Delta\text{Q}$ model gives a high probability that under the proposed para
 
 ```haskell
 ghci> fromRational (successWithin validateEB 14) :: Double
-0.9753948688574636
+0.9874287669980376
 ```
 
 The EB diffusion completes within
-$L := 3 L_\text{hdr} + L_\text{vote} + L_\text{diff} = 14$ with probability 97.54%.
+$L := 3 L_\text{hdr} + L_\text{vote} + L_\text{diff} = 14$ with probability 98.74%.
 
 This means that for $L = 14$ the saftey property holds for Linear Leios.
 
@@ -218,7 +217,7 @@ $P_\text{quorum}$ depends on $P_\text{validating}$ - the probability that an EB 
 
 ```haskell
 ghci> fromRational (successWithin validateEB 7) :: Double
-0.7414282609198065
+0.8104894614479866
 ```
 
 The calculation of $P_\text{quorum}$ is taken from an early version of the [markov chain simulation](../../../markov/) for Linear Leios: Each of the 2500 stake pool operators (SPOs) is independently elected to the voting committee via a Poisson sortition: SPO $i$ with relative stake $s_i$ is elected with probability $1 - e^{-\tilde{m} s_i}$, where $\tilde{m}$ is calibrated so that the expected committee size equals $m = 600$. If elected, SPO $i$ casts a successful vote with probability $P_\text{validating}$, so its individual success probability is $p_i = P_\text{validating} \times (1 - e^{-\tilde{m} s_i})$. The total vote count $V = \sum_i X_i$ with $X_i \sim \text{Bernoulli}(p_i)$ is approximated by a normal distribution via the Central Limit Theorem:
@@ -229,23 +228,24 @@ The quorum probability is then:
 
 $$P_\text{quorum} = P(V \geq \tau m) \approx 1 - \Phi \left(\frac{\tau m - \mu}{\sigma}\right)$$
 
-For the proposed parameters ($P_\text{validating} \approx 74.1\%$, $m = 600$, $\tau = 3/4$), the quorum threshold is $450$ votes and $\mu \approx 444.9 < 450$, giving $P_\text{quorum} \approx 35.9\%$.
-
 The probability that an EB will be certified can be calculated in Haskell as follows:
 
 ```haskell
 ghci> let config = Config { name = "CIP", lHdr = 1, lVote = 4, lDiff = 7, numberSPOs = 2500, committeeSizeEstimated = 600, τ = 3 % 4, f = 1 % 20 }
 ghci> pCertified config
-0.17805177733045532
+0.49475559304267985
 ```
 
-This provides evidence that the proposed parameters are viable and consistent with the security requirements of the Leios protocol as specified in CIP-164.
+This provides strong evidence that the proposed parameters are viable and consistent with the security requirements of the Leios protocol as specified in CIP-164.
 
 ## 6. Conclusions
 
 This report has presented a $\Delta\text{Q}$ System Development model for EB diffusion in Linear Leios, grounded in empirical network and transaction-processing data. The model addresses the central security question: can certified EBs realistically reach all honest block-producing nodes within the $\Delta_\text{EB}$ deadline under realistic network conditions, without modelling adversarial behaviour?
 
-The analysis shows that under the proposed parameters ($L_\text{hdr}=1$, $L_\text{vote}=4$, $L_\text{diff}=7$), the EB diffusion completes within the deadline with a probability of 97.54%, providing strong evidence that the parameter choices in CIP-164 are sound.
+The analysis shows that under the proposed parameters ($L_\text{hdr}=1$, $L_\text{vote}=4$, $L_\text{diff}=7$):
+
+* **Safety**: EB diffusion completes within the deadline ($L=14$ slots) with a probability of 98.74%
+* **Liveness**: The probability that an EB is certified and included in the next RB is approximately 49.5%
 
 ## 7. Limitations and Future Work
 

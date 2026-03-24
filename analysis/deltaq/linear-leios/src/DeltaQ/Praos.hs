@@ -63,9 +63,15 @@ hopCount = [(1, 1909), (2, 3867), (3, 2826), (4, 1068), (5, 214), (6, 16)]
 lengthProbsNode10 :: [(Int, Rational)]
 lengthProbsNode10 = [(1, 0.40), (2, 3.91), (3, 31.06), (4, 61.85), (5, 2.78)]
 
+lengthProbsNode15 :: [(Int, Rational)]
+lengthProbsNode15 = [(1, 0.60), (2, 8.58), (3, 65.86), (4, 24.95)]
+
+lengthProbsNode20 :: [(Int, Rational)]
+lengthProbsNode20 = [(1, 0.80), (2, 14.72), (3, 80.08), (4, 4.40)]
+
 -- | blendedDelay
 blendedDelay :: BlockSize -> DQ
-blendedDelay b = choices $ map (\(n, p) -> (p, hops n b)) lengthProbsNode10
+blendedDelay b = choices $ map (\(n, p) -> (p, hops n b)) lengthProbsNode20
 
 sendRBHeader :: DQ
 sendRBHeader = blendedDelay B64
