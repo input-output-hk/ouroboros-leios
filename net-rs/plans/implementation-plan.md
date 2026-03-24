@@ -76,28 +76,53 @@ Additions beyond original plan: supervisor task, IngressCounter, try_send in dem
 max_buffer in codec, CBOR collection length caps, capture command, test vectors from
 live node, security audit checklist.
 
-### Phase 2: ChainSync + BlockFetch
+### Phase 2: ChainSync + BlockFetch — COMPLETE
 
-Deliverable: `net-cli` that follows the chain tip via ChainSync and fetches blocks via
-BlockFetch, logging slot/block/hash.
+Deliverable: persistent chain follower CLI that connects to mainnet, follows the tip,
+handles rollbacks and reconnections. Fake server CLI for local testing.
 
-Builds: ChainSync protocol (client + server), BlockFetch protocol (client + server),
-possibly pipelined driver for BlockFetch.
+Built: shared Cardano types (Point, Tip, WrappedHeader, BlockBody with CBOR encode/decode
+and allocation bounds), ChainSync protocol (client helpers: find_intersection, request_next,
+done; state machine with 5 states, 8 messages), BlockFetch protocol (client helpers:
+request_range, recv_block, done; 4 states, 6 messages), KeepAlive protocol (keep_alive
+client helper with cookie validation, ping/pong; 3 states, 3 messages).
+
+Server: Runner-based with Message directly (no separate Request/Response types — Runner
+enforces agency). Fake server (`serve` CLI) generates blocks on Poisson schedule with
+configurable rollback rate/depth. Connection helper (`connect.rs`) with both client
+(`connect_and_handshake`) and server (`accept_and_handshake`) variants.
+
+CLI: `chain-sync` (debug, limited count), `block-fetch` (fetch tip block), `follow`
+(persistent chain follower with reconnection, KeepAlive background task, intersection-based
+resume, drain of initial re-delivery), `serve` (fake server with `--block-rate`,
+`--rollback-rate`, `--max-rollback-depth`).
+
+109 tests. Live-tested against backbone.cardano.iog.io:3001 and local fake server.
+Security-audited (allocation bounds, buffer caps, timeouts, no panics, agency enforcement).
 
 ### Phase 3: Remaining Praos Protocols + Multi-Peer
 
-Deliverable: TxSubmission, KeepAlive, PeerSharing. Multi-peer coordination layer for
+Deliverable: TxSubmission, PeerSharing protocols. Multi-peer coordination layer for
 running a simulated test network of nodes talking to each other.
 
-Builds: remaining protocol implementations, multi-peer behavior/coordination layer
-(model TBD — event-driven or actor-based), peer lifecycle management.
+Protocols to implement:
+- **TxSubmission** (protocol ID 4) — bidirectional tx submission with blocking/non-blocking
+  modes. Most complex Praos protocol: 5 states, request/reply with tx IDs and tx bodies,
+  pipelining support.
+- **PeerSharing** (protocol ID 10) — request/reply for discovering peers. Simple: 3 states,
+  request N peers → receive list.
+
+Multi-peer layer:
+- Connection manager: accept/initiate connections, track peer state
+- Peer coordination: ChainSync from multiple peers, BlockFetch from best peer
+- Model TBD — event-driven (v2 Behavior pattern) or actor-based (Haskell STM approach)
 
 ### Phase 4: Leios Protocols
 
 Deliverable: LeiosNotify, LeiosFetch protocols. Priority scheduling in mux.
 
-Builds: Leios protocol implementations, StrictPriority/WFQ scheduler, freshest-first
-delivery logic in the behavior layer.
+Builds: Leios protocol implementations, StrictPriority/WFQ scheduler (StrictPriority
+already implemented), freshest-first delivery logic in the behavior layer.
 
 ## Workspace Structure
 
