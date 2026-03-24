@@ -19,6 +19,8 @@ use net_core::protocols::chainsync;
 use net_core::protocols::chainsync::{ChainSync, Message as CsMsg};
 use net_core::protocols::keepalive;
 use net_core::protocols::keepalive::{KeepAlive, Message as KaMsg};
+use net_core::protocols::peersharing;
+use net_core::protocols::peersharing::{Message as PsMsg, PeerAddress, PeerSharing};
 use net_core::protocols::txsubmission;
 use net_core::protocols::txsubmission::{Message as TsMsg, TxSubmission};
 use net_core::types::{BlockBody, Point, Tip, WrappedHeader};
@@ -365,6 +367,46 @@ async fn serve_keepalive(ka_send: CodecSend, ka_recv: CodecRecv) {
     }
 }
 
+/// Serve PeerSharing for one connection (returns fake peers).
+async fn serve_peersharing(ps_send: CodecSend, ps_recv: CodecRecv) {
+    use std::net::Ipv4Addr;
+
+    let mut runner = Runner::<PeerSharing>::new(Role::Server, ps_send, ps_recv);
+
+    let fake_peers = [
+        PeerAddress::IPv4 {
+            addr: Ipv4Addr::new(192, 0, 2, 1),
+            port: 3001,
+        },
+        PeerAddress::IPv4 {
+            addr: Ipv4Addr::new(192, 0, 2, 2),
+            port: 3001,
+        },
+        PeerAddress::IPv4 {
+            addr: Ipv4Addr::new(192, 0, 2, 3),
+            port: 3001,
+        },
+    ];
+
+    loop {
+        let msg = match runner.recv().await {
+            Ok(msg) => msg,
+            Err(_) => break,
+        };
+
+        match msg {
+            PsMsg::MsgShareRequest { amount } => {
+                let count = (amount as usize).min(fake_peers.len());
+                let peers = fake_peers[..count].to_vec();
+                println!("  peersharing: sharing {count} peer(s)");
+                let _ = runner.send(&PsMsg::MsgSharePeers { peers }).await;
+            }
+            PsMsg::MsgDone => break,
+            _ => break,
+        }
+    }
+}
+
 /// Serve TxSubmission for one connection (transaction consumer).
 async fn serve_txsubmission(ts_send: CodecSend, ts_recv: CodecRecv) {
     let mut runner = Runner::<TxSubmission>::new(Role::Server, ts_send, ts_recv);
@@ -548,6 +590,12 @@ pub async fn run(
         ingress_limit: txsubmission::INGRESS_LIMIT,
         egress_queue_size: 16,
     };
+    let ps_proto = ProtocolConfig {
+        id: peersharing::PROTOCOL_ID,
+        priority: 5,
+        ingress_limit: peersharing::INGRESS_LIMIT,
+        egress_queue_size: 4,
+    };
     let ka_proto = ProtocolConfig {
         id: keepalive::PROTOCOL_ID,
         priority: 7,
@@ -568,6 +616,7 @@ pub async fn run(
                 cs_proto.clone(),
                 bf_proto.clone(),
                 ts_proto.clone(),
+                ps_proto.clone(),
                 ka_proto.clone(),
             ],
             mux_config.clone(),
@@ -588,18 +637,21 @@ pub async fn run(
             let (cs_send, cs_recv) = channels.next().expect("chainsync channel");
             let (bf_send, bf_recv) = channels.next().expect("blockfetch channel");
             let (ts_send, ts_recv) = channels.next().expect("txsubmission channel");
+            let (ps_send, ps_recv) = channels.next().expect("peersharing channel");
             let (ka_send, ka_recv) = channels.next().expect("keepalive channel");
 
             // Run all protocols concurrently. ChainSync is the primary —
             // when it finishes (client Done or error), we clean up.
             let bf_handle = tokio::spawn(serve_blockfetch(bf_send, bf_recv, chain.clone()));
             let ts_handle = tokio::spawn(serve_txsubmission(ts_send, ts_recv));
+            let ps_handle = tokio::spawn(serve_peersharing(ps_send, ps_recv));
             let ka_handle = tokio::spawn(serve_keepalive(ka_send, ka_recv));
 
             serve_chainsync(cs_send, cs_recv, chain).await;
 
             bf_handle.abort();
             ts_handle.abort();
+            ps_handle.abort();
             ka_handle.abort();
             conn.running.abort();
             println!("  client disconnected");
