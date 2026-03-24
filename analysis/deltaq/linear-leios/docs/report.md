@@ -61,7 +61,7 @@ The $\Delta\text{Q}$ library uses a backend abstraction for computations such as
 
 ### 3.1 Network Topology
 
-The block diffusion model used in this library has been taken from the [Praos performance model](https://github.com/intersectMBO/cardano-formal-specifications/blob/main/src/performance/app/PraosModel.lhs).
+The block diffusion model used in this library has been taken from the [Praos performance model](https://github.com/IntersectMBO/cardano-formal-specifications/blob/909f0cc981d5e38a6de1791860ccd7249ade3aa4/src/performance/app/PraosModel.lhs).
 
 The network is modelled as a random graph in which nodes have a fixed number of peers. Block diffusion across multiple hops is captured by sequential composition of per-hop $\Delta\text{Qs}$. A single hop is characterised by the transfer time for a given block size and the geographic distance between the two endpoints. Following the Praos model, three distance categories are distinguished:
 
