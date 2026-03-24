@@ -55,7 +55,7 @@ pub async fn run(host: &str, magic: u64) -> Result<(), Box<dyn std::error::Error
         }
         Ok(handshake::HandshakeResult::QueryReply(table)) => {
             println!("query reply: {} versions", table.len());
-            for (v, _) in table {
+            for v in table.keys() {
                 println!("  version {v}");
             }
         }

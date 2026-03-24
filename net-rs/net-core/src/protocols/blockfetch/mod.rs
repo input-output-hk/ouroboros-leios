@@ -157,6 +157,52 @@ pub async fn done(runner: &mut Runner<BlockFetch>) -> Result<(), ProtocolError> 
     runner.send(&Message::MsgClientDone).await
 }
 
+// --- Server helpers ---
+
+/// A request received by the server from the client.
+#[derive(Debug, Clone)]
+pub enum BlockFetchRequest {
+    RequestRange { from: Point, to: Point },
+    ClientDone,
+}
+
+/// A response the server sends to the client.
+#[derive(Debug, Clone)]
+pub enum BlockFetchResponse {
+    StartBatch,
+    NoBlocks,
+    Block { body: BlockBody },
+    BatchDone,
+}
+
+/// Receive the next request from the client (server must not have agency).
+pub async fn receive_request(
+    runner: &mut Runner<BlockFetch>,
+) -> Result<BlockFetchRequest, ProtocolError> {
+    let msg = runner.recv().await?;
+    match msg {
+        Message::MsgRequestRange { from, to } => Ok(BlockFetchRequest::RequestRange { from, to }),
+        Message::MsgClientDone => Ok(BlockFetchRequest::ClientDone),
+        other => Err(ProtocolError::InvalidMessage(format!(
+            "expected client request, got {other:?}"
+        ))),
+    }
+}
+
+/// Send a response to the client.
+pub async fn send_response(
+    runner: &mut Runner<BlockFetch>,
+    response: BlockFetchResponse,
+) -> Result<(), ProtocolError> {
+    let msg = match response {
+        BlockFetchResponse::StartBatch => Message::MsgStartBatch,
+        BlockFetchResponse::NoBlocks => Message::MsgNoBlocks,
+        BlockFetchResponse::Block { body } => Message::MsgBlock { body },
+        BlockFetchResponse::BatchDone => Message::MsgBatchDone,
+    };
+    runner.send(&msg).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -303,22 +349,24 @@ mod tests {
         let server = tokio::spawn(async move {
             let mut runner = Runner::<BlockFetch>::new(Role::Server, ss, sr);
 
-            let msg = runner.recv().await.unwrap();
-            assert!(matches!(msg, Message::MsgRequestRange { .. }));
+            let req = receive_request(&mut runner).await.unwrap();
+            assert!(matches!(req, BlockFetchRequest::RequestRange { .. }));
 
-            runner.send(&Message::MsgStartBatch).await.unwrap();
-            runner
-                .send(&Message::MsgBlock { body: block1c })
+            send_response(&mut runner, BlockFetchResponse::StartBatch)
                 .await
                 .unwrap();
-            runner
-                .send(&Message::MsgBlock { body: block2c })
+            send_response(&mut runner, BlockFetchResponse::Block { body: block1c })
                 .await
                 .unwrap();
-            runner.send(&Message::MsgBatchDone).await.unwrap();
+            send_response(&mut runner, BlockFetchResponse::Block { body: block2c })
+                .await
+                .unwrap();
+            send_response(&mut runner, BlockFetchResponse::BatchDone)
+                .await
+                .unwrap();
 
-            let msg = runner.recv().await.unwrap();
-            assert!(matches!(msg, Message::MsgClientDone));
+            let req = receive_request(&mut runner).await.unwrap();
+            assert!(matches!(req, BlockFetchRequest::ClientDone));
         });
 
         // Client: request range, receive blocks.
@@ -364,9 +412,16 @@ mod tests {
 
         let server = tokio::spawn(async move {
             let mut runner = Runner::<BlockFetch>::new(Role::Server, ss, sr);
-            let _ = runner.recv().await.unwrap();
-            runner.send(&Message::MsgNoBlocks).await.unwrap();
-            let _ = runner.recv().await.unwrap();
+
+            let req = receive_request(&mut runner).await.unwrap();
+            assert!(matches!(req, BlockFetchRequest::RequestRange { .. }));
+
+            send_response(&mut runner, BlockFetchResponse::NoBlocks)
+                .await
+                .unwrap();
+
+            let req = receive_request(&mut runner).await.unwrap();
+            assert!(matches!(req, BlockFetchRequest::ClientDone));
         });
 
         let client = tokio::spawn(async move {

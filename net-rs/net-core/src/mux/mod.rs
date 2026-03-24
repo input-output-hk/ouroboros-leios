@@ -229,10 +229,7 @@ impl RunningMux {
         // Wait for the error channel to be updated.
         let _ = self.error_rx.changed().await;
         match self.error_rx.borrow().as_ref() {
-            Some(err) => Err(MuxError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                err.clone(),
-            ))),
+            Some(err) => Err(MuxError::Io(std::io::Error::other(err.clone()))),
             None => Ok(()),
         }
     }

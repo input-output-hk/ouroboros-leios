@@ -190,6 +190,58 @@ pub async fn done(runner: &mut Runner<ChainSync>) -> Result<(), ProtocolError> {
     runner.send(&Message::MsgDone).await
 }
 
+// --- Server helpers ---
+
+/// A request received by the server from the client.
+#[derive(Debug, Clone)]
+pub enum ChainSyncRequest {
+    FindIntersect(Vec<Point>),
+    RequestNext,
+    Done,
+}
+
+/// A response the server sends to the client.
+#[derive(Debug, Clone)]
+pub enum ChainSyncResponse {
+    IntersectFound { point: Point, tip: Tip },
+    IntersectNotFound { tip: Tip },
+    RollForward { header: WrappedHeader, tip: Tip },
+    RollBackward { point: Point, tip: Tip },
+    AwaitReply,
+}
+
+/// Receive the next request from the client (server must not have agency).
+pub async fn receive_request(
+    runner: &mut Runner<ChainSync>,
+) -> Result<ChainSyncRequest, ProtocolError> {
+    let msg = runner.recv().await?;
+    match msg {
+        Message::MsgFindIntersect { points } => Ok(ChainSyncRequest::FindIntersect(points)),
+        Message::MsgRequestNext => Ok(ChainSyncRequest::RequestNext),
+        Message::MsgDone => Ok(ChainSyncRequest::Done),
+        other => Err(ProtocolError::InvalidMessage(format!(
+            "expected client request, got {other:?}"
+        ))),
+    }
+}
+
+/// Send a response to the client.
+pub async fn send_response(
+    runner: &mut Runner<ChainSync>,
+    response: ChainSyncResponse,
+) -> Result<(), ProtocolError> {
+    let msg = match response {
+        ChainSyncResponse::IntersectFound { point, tip } => {
+            Message::MsgIntersectFound { point, tip }
+        }
+        ChainSyncResponse::IntersectNotFound { tip } => Message::MsgIntersectNotFound { tip },
+        ChainSyncResponse::RollForward { header, tip } => Message::MsgRollForward { header, tip },
+        ChainSyncResponse::RollBackward { point, tip } => Message::MsgRollBackward { point, tip },
+        ChainSyncResponse::AwaitReply => Message::MsgAwaitReply,
+    };
+    runner.send(&msg).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -395,35 +447,34 @@ mod tests {
         let server = tokio::spawn(async move {
             let mut runner = Runner::<ChainSync>::new(Role::Server, ss, sr);
 
-            // Receive FindIntersect.
-            let msg = runner.recv().await.unwrap();
-            assert!(matches!(msg, Message::MsgFindIntersect { .. }));
+            let req = receive_request(&mut runner).await.unwrap();
+            assert!(matches!(req, ChainSyncRequest::FindIntersect(_)));
 
-            // Respond with IntersectFound.
-            runner
-                .send(&Message::MsgIntersectFound {
+            send_response(
+                &mut runner,
+                ChainSyncResponse::IntersectFound {
                     point: Point::Origin,
                     tip: tip_clone.clone(),
-                })
-                .await
-                .unwrap();
+                },
+            )
+            .await
+            .unwrap();
 
-            // Receive RequestNext.
-            let msg = runner.recv().await.unwrap();
-            assert!(matches!(msg, Message::MsgRequestNext));
+            let req = receive_request(&mut runner).await.unwrap();
+            assert!(matches!(req, ChainSyncRequest::RequestNext));
 
-            // Respond with RollForward.
-            runner
-                .send(&Message::MsgRollForward {
+            send_response(
+                &mut runner,
+                ChainSyncResponse::RollForward {
                     header: WrappedHeader(header_clone),
                     tip: tip_clone,
-                })
-                .await
-                .unwrap();
+                },
+            )
+            .await
+            .unwrap();
 
-            // Receive Done.
-            let msg = runner.recv().await.unwrap();
-            assert!(matches!(msg, Message::MsgDone));
+            let req = receive_request(&mut runner).await.unwrap();
+            assert!(matches!(req, ChainSyncRequest::Done));
         });
 
         // Client: find intersection, request one header, done.
@@ -469,17 +520,24 @@ mod tests {
         let server = tokio::spawn(async move {
             let mut runner = Runner::<ChainSync>::new(Role::Server, ss, sr);
 
-            let _ = runner.recv().await.unwrap(); // RequestNext
-            runner.send(&Message::MsgAwaitReply).await.unwrap();
-            runner
-                .send(&Message::MsgRollForward {
-                    header: WrappedHeader(vec![0x80]),
-                    tip: tip_clone,
-                })
+            let req = receive_request(&mut runner).await.unwrap();
+            assert!(matches!(req, ChainSyncRequest::RequestNext));
+
+            send_response(&mut runner, ChainSyncResponse::AwaitReply)
                 .await
                 .unwrap();
+            send_response(
+                &mut runner,
+                ChainSyncResponse::RollForward {
+                    header: WrappedHeader(vec![0x80]),
+                    tip: tip_clone,
+                },
+            )
+            .await
+            .unwrap();
 
-            let _ = runner.recv().await.unwrap(); // Done
+            let req = receive_request(&mut runner).await.unwrap();
+            assert!(matches!(req, ChainSyncRequest::Done));
         });
 
         // Client: request_next should handle AwaitReply transparently.
