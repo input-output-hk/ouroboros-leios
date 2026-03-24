@@ -1,14 +1,14 @@
-# ΔQ Model for Δ\_EB in Linear Leios
+# $\Delta\text{Q}$ Model for $\Delta_\text{EB}$ in Linear Leios
 
-*Related issue:* [#543 – Create ΔQ model to investigate Δ\_EB and protocol parameters](https://github.com/input-output-hk/ouroboros-leios/issues/543)
+*Related issue:* [#543 – Create $\Delta\text{Q}$ model to investigate $\Delta_\text{EB}$ and protocol parameters](https://github.com/input-output-hk/ouroboros-leios/issues/543)
 
 ## 1. Motivation
 
-The security of the Linear Leios protocol depends on Δ\_EB, the time within which an Endorser Block (EB) must diffuse across the network as outlined in [CIP-164](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md).
+The security of the Linear Leios protocol depends on $\Delta_\text{EB}$, the time within which an Endorser Block (EB) must diffuse across the network as outlined in [CIP-164](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md).
 
-Early simulations suggested Δ\_EB is manageable under happy-path conditions. This report validates that assumption using a ΔQ System Development model.
+Early simulations suggested $\Delta_\text{EB}$ is manageable under happy-path conditions. This report validates that assumption using a $\Delta\text{Q}$ System Development model.
 
-The ΔQ model for Linear Leios is a complement to the Haskell and Rust simulations to gain confidence in the parameter selection for Linear Leios, resp. a precursor to running simulations, as it can rule out infeasible parameter selections.
+The $\Delta\text{Q}$ model for Linear Leios is a complement to the Haskell and Rust simulations to gain confidence in the parameter selection for Linear Leios, resp. a precursor to running simulations, as it can rule out infeasible parameter selections.
 
 ## 2. Background
 
@@ -29,13 +29,13 @@ The security analysis of Linear Leios is based on the following assumptions:
 * Certified EBs are delivered to all block producing nodes in the worst case at the end of $L_\text{diff}$
 * Reapplying an EB plus verifying the correctness of the EB certificate is computationally less expensive than applying an RB
 
-This analysis adopts a stronger version of the first assumption than the CIP requires: every certified EB must reach all honest block-producing nodes by the end of $L_\text{diff}$, i.e., within Δ\_EB slots of its creation.
+This analysis adopts a stronger version of the first assumption than the CIP requires: every certified EB must reach all honest block-producing nodes by the end of $L_\text{diff}$, i.e., within $\Delta_\text{EB}$ slots of its creation.
 
-Δ\_EB plays a role in Leios analogous to the Δ parameter in Ouroboros Praos - both bound the time within which a message must reach all honest block producers, and a violation in either case can cause a fork. In Leios, if Δ\_EB is violated, a block producer may receive a new RB carrying a certificate that references an EB the local node has not yet received. That node therefore does not know about the transactions in the EB and has not updated its ledger state accordingly, leading to a divergence in perceived ledger state - a fork. The parameter $L_\text{diff}$ is therefore critical: it reserves enough time after a quorum is reached for the EB to finish diffusing to all remaining nodes, during $L_\text{diff}$ no new RB is being added to the chain giving those nodes the opportunity to receive and apply the EB.
+$\Delta_\text{EB}$ plays a role in Leios analogous to the $\Delta$ parameter in Ouroboros Praos - both bound the time within which a message must reach all honest block producers, and a violation in either case can cause a fork. In Leios, if $\Delta_\text{EB}$ is violated, a block producer may receive a new RB carrying a certificate that references an EB the local node has not yet received. That node therefore does not know about the transactions in the EB and has not updated its ledger state accordingly, leading to a divergence in perceived ledger state - a fork. The parameter $L_\text{diff}$ is therefore critical: it reserves enough time after a quorum is reached for the EB to finish diffusing to all remaining nodes, during $L_\text{diff}$ no new RB is being added to the chain giving those nodes the opportunity to receive and apply the EB.
 
-### 2.2 ΔQ System Development
+### 2.2 $\Delta\text{Q}$ System Development
 
-∆Q is a modelling tool to analyse the performance characteristics of a distributed system. Outcomes in ΔQ are represented as probability distributions of completion times. ΔQ is implemented as a domain specific language (DSL) providing the following constructors
+∆Q is a modelling tool to analyse the performance characteristics of a distributed system. Outcomes in $\Delta\text{Q}$ are represented as probability distributions of completion times. $\Delta\text{Q}$ is implemented as a domain specific language (DSL) providing the following constructors
 
 | Constructor   | Meaning                              |
 | ------------- | ------------------------------------ |
@@ -52,7 +52,7 @@ and combinators to build more complex abstractions:
 | `a ./\. b` | Last to finish: `a` and `b`                                                  |
 | `p a b`    | Probabilistic choice: `a` with probability `p`, `b` with probability `1 - p` |
 
-The ΔQ library uses a backend abstraction for computations such as convolution for sequential composition. It provides the [piecewise-polynomials](https://github.com/DeltaQ-SD/deltaq/tree/main/lib/probability-polynomial) backend as default. For running complex models, we implemented a new backend called [sampled](https://github.com/yveshauser/deltaq/blob/experimental/lib/deltaq/src/DeltaQ/Sampled.hs). They compare as follows:
+The $\Delta\text{Q}$ library uses a backend abstraction for computations such as convolution for sequential composition. It provides the [piecewise-polynomials](https://github.com/DeltaQ-SD/deltaq/tree/main/lib/probability-polynomial) backend as default. For running complex models, we implemented a new backend called [sampled](https://github.com/yveshauser/deltaq/blob/experimental/lib/deltaq/src/DeltaQ/Sampled.hs). They compare as follows:
 
 - *piecewise-polynomials* is an analytic backend, i.e., exact results, but the computational complexity of the backend does not allow running complex models
 - *sampled* is an approximation backend with efficient computation, but accuracy is hard to control
@@ -63,7 +63,7 @@ The ΔQ library uses a backend abstraction for computations such as convolution 
 
 The block diffusion model used in this library has been taken from the [Praos performance model](https://github.com/intersectMBO/cardano-formal-specifications/blob/main/src/performance/app/PraosModel.lhs).
 
-The network is modelled as a random graph in which nodes have a fixed number of peers. Block diffusion across multiple hops is captured by sequential composition of per-hop ΔQs. A single hop is characterised by the transfer time for a given block size and the geographic distance between the two endpoints. Following the Praos model, three distance categories are distinguished:
+The network is modelled as a random graph in which nodes have a fixed number of peers. Block diffusion across multiple hops is captured by sequential composition of per-hop $\Delta\text{Q}$s. A single hop is characterised by the transfer time for a given block size and the geographic distance between the two endpoints. Following the Praos model, three distance categories are distinguished:
 
 | Distance | Description          | Round trip time (RTT) |
 | -------- | -------------------- | --------------------- |
@@ -71,7 +71,7 @@ The network is modelled as a random graph in which nodes have a fixed number of 
 | Medium   | Same continent       | 0.069 s               |
 | Long     | Different continents | 0.268 s               |
 
-Each category yields a deterministic transfer time for a given block size. The one-hop ΔQ assigns equal probability to each distance category. The end-to-end diffusion ΔQ for $n$ hops is the $n$-fold sequential composition of the one-hop ΔQ. To account for the variable path length in a random graph, the multi-hop ΔQs are combined via probabilistic choice, weighted by the empirical path-length distribution of a random graph with 2500 nodes of degree 10 (Table below, sourced from the Praos model):
+Each category yields a deterministic transfer time for a given block size. The one-hop $\Delta\text{Q}$ assigns equal probability to each distance category. The end-to-end diffusion $\Delta\text{Q}$ for $n$ hops is the $n$-fold sequential composition of the one-hop $\Delta\text{Q}$. To account for the variable path length in a random graph, the multi-hop $\Delta\text{Q}$s are combined via probabilistic choice, weighted by the empirical path-length distribution of a random graph with 2500 nodes of degree 10 (Table below, sourced from the Praos model):
 
 | Path length | Probability (%) |
 | ----------- | --------------- |
@@ -81,7 +81,7 @@ Each category yields a deterministic transfer time for a given block size. The o
 | 4           | 61.85           |
 | 5           | 2.78            |
 
-The resulting blended ΔQ captures the distribution of end-to-end transfer times over the expected variety of paths in the network.
+The resulting blended $\Delta\text{Q}$ captures the distribution of end-to-end transfer times over the expected variety of paths in the network.
 
 An alternative path-length distribution was calculated by the [topology-checker](https://github.com/input-output-hk/ouroboros-leios/tree/main/topology-checker) tool from a mainnet-like topology. It is implemented in [`DeltaQ.Praos`](../src/DeltaQ/Praos.hs) (see `hopCount`), but is not currently used in the model:
 
@@ -106,9 +106,9 @@ $$s_k = \left(\frac{k+1}{n}\right)^{10} - \left(\frac{k}{n}\right)^{10}$$
 
 This concentrates stake among a small number of large pools, reflecting the actual mainnet dynamics where a minority of stake pools control the majority of stake. The derivation of this model is documented in the [linear-leios-preliminaries](../../linear-leios-preliminaries.md#stake-distribution).
 
-## 4. ΔQ Model of EB Diffusion
+## 4. $\Delta\text{Q}$ Model of EB Diffusion
 
-The ΔQ model of EB diffusion captures the steps a node performs upon receiving an RB header:
+The $\Delta\text{Q}$ model of EB diffusion captures the steps a node performs upon receiving an RB header:
 
 * Fetch the RB body and the EB concurrently
 * On receiving the RB body, apply its transactions to the ledger state
@@ -117,11 +117,11 @@ The ΔQ model of EB diffusion captures the steps a node performs upon receiving 
 
 ![](EB-diffusion.svg)
 
-With ΔQ, the typical workflow starts from a coarse-grained model describing high-level outcomes and then refining it to improve accuracy. However, finer-grained models generally increase complexity, forcing a switch to a backend that calculates approximate solutions, creating a trade-off between performance and accuracy. For Linear Leios, we chose a low-complexity model and ensure accuracy. The low-complexity model is possible by leveraging empirical distributions from measurements and probabilistic modelling.
+With $\Delta\text{Q}$, the typical workflow starts from a coarse-grained model describing high-level outcomes and then refining it to improve accuracy. However, finer-grained models generally increase complexity, forcing a switch to a backend that calculates approximate solutions, creating a trade-off between performance and accuracy. For Linear Leios, we chose a low-complexity model and ensure accuracy. The low-complexity model is possible by leveraging empirical distributions from measurements and probabilistic modelling.
 
 ### 4.1 Empirical distributions
 
-Several operations in the ΔQ model are grounded in empirical timing measurements taken from a Cardano mainnet node rather than synthetic assumptions. Two operations are of particular interest:
+Several operations in the $\Delta\text{Q}$ model are grounded in empirical timing measurements taken from a Cardano mainnet node rather than synthetic assumptions. Two operations are of particular interest:
 
 - **`applyTx`:** The cost of validating a transaction against the current ledger state for the first time. This is the work a node performs when it receives a fresh transaction from the mempool. Measurements show a wide spread: roughly 28% of transactions complete in under 5 ms, 65% in under 10 ms, and about 8% take longer than 10 ms.
 
@@ -162,15 +162,15 @@ The steady-state $\pi_2$ is the long-run fraction of transactions that are cache
 
 $$r = \pi_2 \cdot p + \pi_1 \cdot (1 - p)$$
 
-This is used in the ΔQ model to weight the two processing branches — with probability $r$ a transaction can be reapplied cheaply from the cache; with probability $1 - r$ it must first be fetched from the network.
+This is used in the $\Delta\text{Q}$ model to weight the two processing branches — with probability $r$ a transaction can be reapplied cheaply from the cache; with probability $1 - r$ it must first be fetched from the network.
 
 The model uses $p = 0.75$, giving $\pi_1 \approx 0.455$, $\pi_2 \approx 0.545$, and an effective batch hit rate of $r \approx 0.523$. Higher values of $p$ increase $r$ and therefore lower the EB processing latency.
 
 ## 5. Results
 
-### 5.1 Cumulative distribution function for Δ\_EB
+### 5.1 Cumulative distribution function for $\Delta_\text{EB}$
 
-The ΔQ model yields the following completion-time distribution for EB diffusion:
+The $\Delta\text{Q}$ model yields the following completion-time distribution for EB diffusion:
 
 ![](validateEB.svg)
 
@@ -183,7 +183,7 @@ The ΔQ model yields the following completion-time distribution for EB diffusion
 
 #### 5.2.1 Safety
 
-The ΔQ model gives a high probability that under the proposed parameters ($L_\text{hdr}=1$, $L_\text{vote}=4$, $L_\text{diff}=7$) an EB reaches all honest block-producing nodes before the end of $L_\text{diff}$:
+The $\Delta\text{Q}$ model gives a high probability that under the proposed parameters ($L_\text{hdr}=1$, $L_\text{vote}=4$, $L_\text{diff}=7$) an EB reaches all honest block-producing nodes before the end of $L_\text{diff}$:
 
 ```haskell
 ghci> fromRational (successWithin validateEB 14) :: Double
@@ -241,21 +241,21 @@ This provides evidence that the proposed parameters are viable and consistent wi
 
 ## 6. Conclusions
 
-This report has presented a ΔQ System Development model for EB diffusion in Linear Leios, grounded in empirical network and transaction-processing data. The model addresses the central security question: can certified EBs realistically reach all honest block-producing nodes within the Δ\_EB deadline under realistic network conditions, without modelling adversarial behaviour?
+This report has presented a $\Delta\text{Q}$ System Development model for EB diffusion in Linear Leios, grounded in empirical network and transaction-processing data. The model addresses the central security question: can certified EBs realistically reach all honest block-producing nodes within the $\Delta_\text{EB}$ deadline under realistic network conditions, without modelling adversarial behaviour?
 
 The analysis shows that under the proposed parameters ($L_\text{hdr}=1$, $L_\text{vote}=4$, $L_\text{diff}=7$), the EB diffusion completes within the deadline with a probability of 97.54%, providing strong evidence that the parameter choices in CIP-164 are sound.
 
 ## 7. Limitations and Future Work
 
 * This model assumes honest node behavior. Adversarial delay of EBs - for example, an adversary deliberately withholding an EB until just before the voting deadline - is not captured here
-* With the `piecewise-polynomial` ΔQ backend computational complexity is hard to control, where as with the `sampled` backend it is the accuracy of the results. For this analysis to be successful, we built probabilistic models and then combined those using ΔQ in order to get a model with low complexity to be executable with the default backend
+* With the `piecewise-polynomial` $\Delta\text{Q}$ backend computational complexity is hard to control, where as with the `sampled` backend it is the accuracy of the results. For this analysis to be successful, we built probabilistic models and then combined those using $\Delta\text{Q}$ in order to get a model with low complexity to be executable with the default backend
 * Adjust sortition mechanism to Fait Accompli
 * The model does not account for Freshest First Delivery (FFD) of EBs as specified in CIP-164. FFD prioritises the most recently produced blocks during diffusion, which can delay older EBs and worsen their individual diffusion latency; incorporating it would require modelling the interaction between concurrent EB diffusions
 * Future work should improve the `sampled` backend to keep track of the error margin, in order to be able to run the analysis in reasonable time and being able to quantify the inaccuracy introduced by the simulations
 
 ## Appendix A: Haskell Source
 
-The Haskell source implementing the ΔQ model described in this report is located at:
+The Haskell source implementing the $\Delta\text{Q}$ model described in this report is located at:
 
 ```
 analysis/deltaq/linear-leios/
