@@ -1,5 +1,6 @@
 //! Persistent chain follower: connects to a node and follows the tip
-//! indefinitely, reconnecting on failure.
+//! indefinitely, reconnecting on failure. Runs KeepAlive in the background
+//! to prevent the peer from dropping the connection.
 
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
@@ -9,9 +10,14 @@ use net_core::protocol::Role;
 use net_core::protocol::Runner;
 use net_core::protocols::chainsync;
 use net_core::protocols::chainsync::{ChainSync, ChainSyncEvent};
+use net_core::protocols::keepalive;
+use net_core::protocols::keepalive::KeepAlive;
 use net_core::types::Point;
 
 use crate::connect;
+
+/// KeepAlive ping interval.
+const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(20);
 
 /// Rolling window of known chain points for intersection on reconnect.
 struct ChainState {
@@ -41,7 +47,6 @@ impl ChainState {
     }
 
     fn roll_backward(&mut self, to: &Point) -> usize {
-        // Pop points until we find the rollback target.
         let mut depth = 0;
         while let Some(back) = self.points.back() {
             if back == to {
@@ -78,6 +83,26 @@ impl ChainState {
     }
 }
 
+/// Spawn a background task that sends KeepAlive pings every KEEPALIVE_INTERVAL.
+fn spawn_keepalive(
+    ka_send: net_core::codec::CodecSend,
+    ka_recv: net_core::codec::CodecRecv,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut runner = Runner::<KeepAlive>::new(Role::Client, ka_send, ka_recv);
+        let mut cookie: u16 = 0;
+
+        loop {
+            tokio::time::sleep(KEEPALIVE_INTERVAL).await;
+            cookie = cookie.wrapping_add(1);
+            match keepalive::keep_alive(&mut runner, cookie).await {
+                Ok(_rtt) => {}
+                Err(_) => break, // connection lost, let the main loop handle reconnect
+            }
+        }
+    })
+}
+
 pub async fn run(
     host: &str,
     magic: u64,
@@ -89,6 +114,12 @@ pub async fn run(
         ingress_limit: chainsync::INGRESS_LIMIT,
         egress_queue_size: 16,
     };
+    let ka_proto = ProtocolConfig {
+        id: keepalive::PROTOCOL_ID,
+        priority: 7,
+        ingress_limit: keepalive::INGRESS_LIMIT,
+        egress_queue_size: 4,
+    };
 
     let mut state = ChainState::new(max_rollback);
     let mut backoff = Duration::from_secs(1);
@@ -97,7 +128,8 @@ pub async fn run(
     loop {
         println!("connecting to {host}...");
 
-        // Use a long SDU timeout — at tip we may wait minutes between blocks.
+        // Use a long SDU timeout — at tip we may wait minutes between blocks,
+        // but KeepAlive pings keep the connection alive.
         let mux_config = MuxConfig {
             sdu_timeout: Duration::from_secs(900),
             ..MuxConfig::default()
@@ -106,13 +138,13 @@ pub async fn run(
         let conn = match connect::connect_and_handshake_with_config(
             host,
             magic,
-            &[cs_proto.clone()],
+            &[cs_proto.clone(), ka_proto.clone()],
             mux_config,
         )
         .await
         {
             Ok(conn) => {
-                backoff = Duration::from_secs(1); // reset on success
+                backoff = Duration::from_secs(1);
                 conn
             }
             Err(e) => {
@@ -124,18 +156,20 @@ pub async fn run(
             }
         };
 
-        // Extract chainsync channel (index 0 in our protocol list).
-        let (cs_send, cs_recv) = conn.channels.into_iter().next().expect("chainsync channel");
+        let mut channels = conn.channels.into_iter();
+        let (cs_send, cs_recv) = channels.next().expect("chainsync channel");
+        let (ka_send, ka_recv) = channels.next().expect("keepalive channel");
+
+        // Start KeepAlive background pings.
+        let ka_handle = spawn_keepalive(ka_send, ka_recv);
 
         let mut runner = Runner::<ChainSync>::new(Role::Client, cs_send, cs_recv);
 
         // Find intersection. On first connect (no known points), jump straight
         // to the current tip rather than syncing from genesis.
         let result = if state.is_empty() {
-            // First: ask for origin to learn the tip.
             match chainsync::find_intersection(&mut runner, vec![Point::Origin]).await {
                 Ok(Some((_point, tip))) if tip.point != Point::Origin => {
-                    // Second: intersect at the tip to position the read pointer there.
                     println!("  tip is {tip}, jumping to it...");
                     chainsync::find_intersection(&mut runner, vec![tip.point]).await
                 }
@@ -160,6 +194,7 @@ pub async fn run(
             }
             Err(e) => {
                 println!("  intersection error: {e}");
+                ka_handle.abort();
                 conn.running.abort();
                 println!("  reconnecting in {backoff:?}...");
                 tokio::time::sleep(backoff).await;
@@ -168,8 +203,7 @@ pub async fn run(
             }
         }
 
-        // Drain the initial rollback + re-delivery of the intersection point
-        // that the server sends after FindIntersect. These aren't new blocks.
+        // Drain the initial rollback + re-delivery of the intersection point.
         let intersection_point = state.points.back().cloned();
         let mut drained = false;
 
@@ -179,7 +213,6 @@ pub async fn run(
         let err = loop {
             match chainsync::request_next(&mut runner).await {
                 Ok(ChainSyncEvent::RollForward { header: _, tip }) => {
-                    // Skip the re-delivery of the intersection point.
                     if !drained {
                         if intersection_point.as_ref() == Some(&tip.point) {
                             drained = true;
@@ -202,7 +235,6 @@ pub async fn run(
                     );
                 }
                 Ok(ChainSyncEvent::RollBackward { point, tip }) => {
-                    // Suppress the initial no-op rollback (depth 0).
                     let depth = state.roll_backward(&point);
                     state.block_no = tip.block_no;
 
@@ -214,6 +246,7 @@ pub async fn run(
             }
         };
 
+        ka_handle.abort();
         conn.running.abort();
         println!("  connection lost: {err}");
         println!("  reconnecting in {backoff:?}...");

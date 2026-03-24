@@ -99,13 +99,16 @@ net-rs/
         handshake/      -- Handshake protocol (state machine, CBOR codec, N2N version data)
         chainsync/      -- ChainSync protocol (follow chain tip, intersection finding)
         blockfetch/     -- BlockFetch protocol (request and stream block ranges)
+        keepalive/      -- KeepAlive protocol (ping/pong to keep connections alive)
   net-cli/              -- binary crate
     src/
       main.rs           -- subcommand dispatch
+      connect.rs        -- shared connection helper (TCP + mux + handshake)
       handshake.rs      -- `handshake` command (connect + negotiate)
       capture.rs        -- `capture` command (raw byte capture for test vectors)
       chainsync.rs      -- `chain-sync` command (follow chain tip)
       blockfetch.rs     -- `block-fetch` command (fetch blocks)
+      follow.rs         -- `follow` command (persistent chain follower with reconnect)
 ```
 
 ## Key Design Decisions
@@ -123,7 +126,7 @@ net-rs/
 
 1. **Phase 1: Mux + Handshake** — COMPLETE. Bearer, mux, codec, protocol framework, handshake (client+server), CLI, 51 tests, live-tested against mainnet, security-audited.
 2. **Phase 2: ChainSync / BlockFetch** — COMPLETE. Shared types (Point, Tip, WrappedHeader, BlockBody), ChainSync + BlockFetch protocols (state machines, CBOR codecs, client helpers), CLI commands, 98 tests, security-audited. Needs live mainnet testing.
-3. **Phase 3: Remaining Praos + Multi-Peer** — TxSubmission, KeepAlive, PeerSharing + multi-peer coordination layer
+3. **Phase 3: Remaining Praos + Multi-Peer** — TxSubmission, PeerSharing + multi-peer coordination layer (KeepAlive moved to Phase 2)
 4. **Phase 4: Leios Protocols** — LeiosNotify, LeiosFetch, priority scheduling
 
 ## Documentation
