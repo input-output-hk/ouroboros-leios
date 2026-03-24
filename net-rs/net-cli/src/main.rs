@@ -75,6 +75,10 @@ enum Command {
         /// Block generation rate (blocks/sec, Poisson λ)
         #[arg(long, default_value_t = 0.05)]
         block_rate: f64,
+
+        /// Rollback rate (rollbacks/sec, Poisson λ; 0 = no rollbacks)
+        #[arg(long, default_value_t = 0.0)]
+        rollback_rate: f64,
     },
 
     /// Follow the chain tip continuously with reconnection
@@ -107,7 +111,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             port,
             magic,
             block_rate,
-        } => serve::run(port, magic, block_rate).await,
+            rollback_rate,
+        } => serve::run(port, magic, block_rate, rollback_rate).await,
         Command::Follow {
             host,
             magic,

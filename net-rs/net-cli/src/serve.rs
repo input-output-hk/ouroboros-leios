@@ -133,47 +133,94 @@ impl FakeChain {
     fn block_count(&self) -> u64 {
         self.inner.lock().unwrap().blocks.len() as u64
     }
+
+    /// Roll back the chain by `depth` blocks. Returns the new tip point.
+    fn rollback(&self, depth: usize) -> Point {
+        let mut inner = self.inner.lock().unwrap();
+        let new_len = inner.blocks.len().saturating_sub(depth);
+        inner.blocks.truncate(new_len);
+        match inner.blocks.last() {
+            Some(block) => block.point.clone(),
+            None => Point::Origin,
+        }
+    }
+
+    /// Check if the given read_index is still valid (within the chain).
+    fn is_valid_index(&self, index: Option<usize>) -> bool {
+        let inner = self.inner.lock().unwrap();
+        match index {
+            None => true, // Origin is always valid
+            Some(i) => i < inner.blocks.len(),
+        }
+    }
 }
 
-/// Background task that generates blocks on a Poisson schedule.
-async fn block_generator(chain: FakeChain, notify: watch::Sender<u64>, rate: f64) {
+/// Sample an exponential inter-arrival time: -ln(U) / λ
+fn exp_sample(rng: &mut StdRng, rate: f64) -> Duration {
+    let u: f64 = rng.gen_range(0.001..1.0);
+    Duration::from_secs_f64(-u.ln() / rate)
+}
+
+/// Background task that generates blocks and occasional rollbacks on Poisson schedules.
+async fn block_generator(
+    chain: FakeChain,
+    notify: watch::Sender<u64>,
+    block_rate: f64,
+    rollback_rate: f64,
+) {
     let mut rng = StdRng::from_entropy();
 
     loop {
-        // Exponential inter-arrival time: -ln(U) / λ
-        let u: f64 = rng.gen_range(0.001..1.0);
-        let interval = Duration::from_secs_f64(-u.ln() / rate);
-        tokio::time::sleep(interval).await;
-
-        let block = {
-            let mut inner = chain.inner.lock().unwrap();
-            let slot = inner.next_slot;
-            inner.next_slot += 1;
-
-            let mut hash = [0u8; 32];
-            rng.fill(&mut hash);
-
-            let point = Point::Specific { slot, hash };
-
-            // Opaque dummy header and body — must be valid CBOR.
-            let mut cbor_buf = Vec::new();
-            let mut enc = minicbor::Encoder::new(&mut cbor_buf);
-            enc.bytes(&hash).expect("CBOR encode");
-            let header = WrappedHeader(cbor_buf.clone());
-            let body = BlockBody(cbor_buf);
-
-            let block = FakeBlock {
-                point,
-                header,
-                body,
-            };
-            inner.blocks.push(block.clone());
-            block
+        // Sample next event: block or rollback, whichever comes first.
+        let block_interval = exp_sample(&mut rng, block_rate);
+        let rollback_interval = if rollback_rate > 0.0 {
+            exp_sample(&mut rng, rollback_rate)
+        } else {
+            Duration::from_secs(u64::MAX) // effectively never
         };
 
-        let count = chain.block_count();
-        println!("  generated block #{count} at slot {}", block.point);
-        let _ = notify.send(count);
+        if rollback_interval < block_interval && chain.block_count() > 1 {
+            tokio::time::sleep(rollback_interval).await;
+
+            // Roll back 1-3 blocks.
+            let max_depth = (chain.block_count() as usize - 1).min(3);
+            let depth = rng.gen_range(1..=max_depth);
+            let new_tip = chain.rollback(depth);
+            let count = chain.block_count();
+            println!("  rollback depth={depth}, new tip: {new_tip} (#{count})");
+            let _ = notify.send(count);
+        } else {
+            tokio::time::sleep(block_interval).await;
+
+            let block = {
+                let mut inner = chain.inner.lock().unwrap();
+                let slot = inner.next_slot;
+                inner.next_slot += 1;
+
+                let mut hash = [0u8; 32];
+                rng.fill(&mut hash);
+
+                let point = Point::Specific { slot, hash };
+
+                let mut cbor_buf = Vec::new();
+                let mut enc = minicbor::Encoder::new(&mut cbor_buf);
+                enc.bytes(&hash).expect("CBOR encode");
+                let header = WrappedHeader(cbor_buf.clone());
+                let body = BlockBody(cbor_buf);
+
+                let block = FakeBlock {
+                    point,
+                    header,
+                    body,
+                };
+                inner.blocks.push(block.clone());
+                block
+            };
+
+            let count = chain.block_count();
+            println!("  generated block #{count} at slot {}", block.point);
+            let _ = notify.send(count);
+        }
     }
 }
 
@@ -201,34 +248,58 @@ async fn serve_chainsync(cs_send: CodecSend, cs_recv: CodecRecv, chain: FakeChai
                 }
             },
             CsMsg::MsgRequestNext => {
-                let pending = chain.blocks_after(read_index);
-                if let Some(block) = pending.first() {
-                    read_index = chain.index_of(&block.point);
+                // Check if our read pointer was invalidated by a rollback.
+                if !chain.is_valid_index(read_index) {
                     let tip = chain.tip();
+                    read_index = chain.index_of(&tip.point);
                     let _ = runner
-                        .send(&CsMsg::MsgRollForward {
-                            header: block.header.clone(),
+                        .send(&CsMsg::MsgRollBackward {
+                            point: tip.point.clone(),
                             tip,
                         })
                         .await;
                 } else {
-                    let _ = runner.send(&CsMsg::MsgAwaitReply).await;
+                    let pending = chain.blocks_after(read_index);
+                    if let Some(block) = pending.first() {
+                        read_index = chain.index_of(&block.point);
+                        let tip = chain.tip();
+                        let _ = runner
+                            .send(&CsMsg::MsgRollForward {
+                                header: block.header.clone(),
+                                tip,
+                            })
+                            .await;
+                    } else {
+                        let _ = runner.send(&CsMsg::MsgAwaitReply).await;
 
-                    loop {
-                        if subscription.changed().await.is_err() {
-                            return;
-                        }
-                        let pending = chain.blocks_after(read_index);
-                        if let Some(block) = pending.first() {
-                            read_index = chain.index_of(&block.point);
-                            let tip = chain.tip();
-                            let _ = runner
-                                .send(&CsMsg::MsgRollForward {
-                                    header: block.header.clone(),
-                                    tip,
-                                })
-                                .await;
-                            break;
+                        loop {
+                            if subscription.changed().await.is_err() {
+                                return;
+                            }
+                            // After waking, check for rollback first.
+                            if !chain.is_valid_index(read_index) {
+                                let tip = chain.tip();
+                                read_index = chain.index_of(&tip.point);
+                                let _ = runner
+                                    .send(&CsMsg::MsgRollBackward {
+                                        point: tip.point.clone(),
+                                        tip,
+                                    })
+                                    .await;
+                                break;
+                            }
+                            let pending = chain.blocks_after(read_index);
+                            if let Some(block) = pending.first() {
+                                read_index = chain.index_of(&block.point);
+                                let tip = chain.tip();
+                                let _ = runner
+                                    .send(&CsMsg::MsgRollForward {
+                                        header: block.header.clone(),
+                                        tip,
+                                    })
+                                    .await;
+                                break;
+                            }
                         }
                     }
                 }
@@ -292,17 +363,27 @@ async fn serve_keepalive(ka_send: CodecSend, ka_recv: CodecRecv) {
     }
 }
 
-pub async fn run(port: u16, magic: u64, block_rate: f64) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(
+    port: u16,
+    magic: u64,
+    block_rate: f64,
+    rollback_rate: f64,
+) -> Result<(), Box<dyn std::error::Error>> {
     let (chain, notify) = FakeChain::new();
 
     // Start block generator.
     let chain_gen = chain.clone();
     tokio::spawn(async move {
-        block_generator(chain_gen, notify, block_rate).await;
+        block_generator(chain_gen, notify, block_rate, rollback_rate).await;
     });
 
+    let rollback_info = if rollback_rate > 0.0 {
+        format!(", rollback rate={rollback_rate}/sec")
+    } else {
+        String::new()
+    };
     println!(
-        "fake server listening on port {port} (magic={magic}, rate={block_rate} blocks/sec, ~{:.0}s mean interval)",
+        "fake server listening on port {port} (magic={magic}, block rate={block_rate}/sec (~{:.0}s mean){rollback_info})",
         1.0 / block_rate
     );
 
