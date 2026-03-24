@@ -63,7 +63,7 @@ pub async fn run(
     min_size: usize,
     max_size: usize,
     count: Option<usize>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     println!("connecting to {host}...");
 
     let ts_proto = ProtocolConfig {

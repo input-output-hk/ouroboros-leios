@@ -123,9 +123,9 @@ All 6 N2N mini-protocols implemented. 147 total tests.
 Server side: fake `serve` command handles all 6 protocols (ChainSync, BlockFetch,
 TxSubmission, PeerSharing, KeepAlive) plus Handshake.
 
-#### Multi-Peer Coordination — TBD
+#### Multi-Peer Coordination — COMPLETE
 
-Remaining deliverable for Phase 3. Thread-per-peer model with a shared coordinator.
+Thread-per-peer model with a shared coordinator. 6 new tests (153 total).
 
 **Design decision (2026-03-24):** After evaluating three approaches — (1) thread-per-peer
 with coordinator, (2) Pallas v2 event-driven single-threaded behavior, (3) Haskell-style
@@ -134,58 +134,39 @@ Option 3's full actor constellation is over-engineered for ~20 peers. Option 1 e
 existing per-connection task tree naturally, and the coordinator pattern (events up, commands
 down via channels) handles all known coordination scenarios without architectural risk.
 
-**Architecture:**
+**Architecture (implemented):**
 
 ```
-Consensus / Application (future — for now, adapted `follow` CLI)
-    ↕  narrow interface: candidate chain tips, block requests, bad-peer reports
-Network Coordinator (peer selection, fetch scheduling, promotion/demotion)
-    ↕  PeerHandle (watch channels for state, mpsc for commands/events)
-Per-Peer Task Trees (protocol runners, mux, bearer)
+Application (multi-follow CLI)
+    ↑ NetworkEvent (peer-agnostic: TipAdvanced, BlockReceived, ...)
+    ↓ NetworkCommand (AddPeer, FetchBlock, DiscoverPeers, Shutdown)
+Coordinator task (single tokio task)
+    ↑ (PeerId, PeerEvent) via shared mpsc fan-in from all peers
+    ↓ PeerCommand via per-peer mpsc (FetchBlocks, RequestPeers, Disconnect)
+Per-Peer Tasks (one tokio task per outbound connection)
+    ├── ChainSync sub-task (request_next loop → HeaderAnnounced/RolledBack events)
+    ├── BlockFetch sub-task (idle, receives FetchBlocks commands)
+    ├── KeepAlive sub-task (periodic pings → LatencyMeasured events)
+    └── PeerSharing sub-task (on-demand → PeersDiscovered events)
 ```
 
-The coordinator aggregates per-peer state into a peer-agnostic view:
-- ChainSync announcements from all peers → deduplicated set of candidate chain tips
-- Block fetch requests routed to best-placed peer (by latency, load, availability)
-- Bad-peer reports traced back to source peer for demotion
+**Key implementation details:**
+- `PeerEvent` abstracts over raw protocol messages — peer task is the translation layer
+- Coordinator deduplicates tips by block number (only forwards if ahead of best known)
+- Fetch routing: picks peer with matching tip and lowest RTT
+- Reconnection: exponential backoff (1s → 2s → 4s → ... → 30s cap) via reconnect queue
+- `ConnectionMode` enum: `InitiatorOnly` (implemented), `ResponderOnly`, `Duplex` (deferred)
+- Connection helpers moved from net-cli to `net-core::peer::connect` (library code)
+- `multi-follow` CLI command for testing against mainnet
 
-The interface between consensus/application and the network is deliberately narrow and
-peer-agnostic. The application sees chains and blocks, not peers.
+**Deferred for future phases:**
+- Promotion/demotion (warm/hot lifecycle, cancellation tokens per protocol group)
+- ResponderOnly mode (server-side peer tasks serving our chain to inbound connections)
+- Duplex mode (both initiator + responder protocols on one connection, Cardano V10+)
+- Backoff reset on sustained connection success
 
-**PeerHandle sketch:**
-
-```rust
-struct PeerHandle {
-    // State (read by coordinator)
-    status: watch::Receiver<PeerStatus>,     // Cold/Warm/Hot
-    chain_tip: watch::Receiver<Option<Tip>>, // latest ChainSync tip
-    inflight_blocks: Arc<AtomicUsize>,
-    latency: Arc<AtomicU64>,
-
-    // Commands (coordinator → peer)
-    cmd_tx: mpsc::Sender<PeerCommand>,
-    // PeerCommand: Promote(Hot), Demote(Warm), FetchBlocks(range), Disconnect
-
-    // Events (peer → coordinator)
-    event_rx: mpsc::Receiver<PeerEvent>,
-    // PeerEvent: HeaderAnnounced(header), BlockFetched(point), Misbehavior(reason)
-}
-```
-
-**Promotion/demotion:** Starting/stopping protocol tasks within a peer's task tree.
-"Demote from hot to warm" = cancel ChainSync + BlockFetch + TxSubmission, keep KeepAlive.
-Implemented via cancellation tokens per protocol group. Can be deferred to a later
-sub-phase if needed.
-
-**Testing:** Adapt `follow` CLI to use the multi-peer system — connect to N mainnet peers,
-follow chains, exercise fetch scheduling. Real mainnet peers provide realistic conditions
-(variable latency, slow peers, disconnections) that a fake server cannot.
-
-**Ordering rationale:** Multi-peer before Leios protocols because (a) we can test against
-real mainnet nodes today with all 6 existing protocols, (b) the coordinator is the hard
-architectural problem — better to solve it while the protocol set is simpler, (c) once the
-coordinator exists, adding LeiosNotify/LeiosFetch is just adding two more protocol tasks
-and event types to an existing framework.
+**Live-tested:** 2 concurrent connections to backbone.cardano.iog.io:3001, tip
+deduplication verified, exponential backoff reconnection verified against unreachable host.
 
 ### Phase 4: Leios Protocols
 

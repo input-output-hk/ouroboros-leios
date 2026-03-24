@@ -26,7 +26,7 @@ pub const MAX_BLOCK_SIZE: usize = 2_500_000;
 /// Wire format:
 ///   origin   = []                    (empty array)
 ///   specific = [slotNo, headerHash]  (2-element array)
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Point {
     Origin,
     Specific { slot: u64, hash: [u8; 32] },

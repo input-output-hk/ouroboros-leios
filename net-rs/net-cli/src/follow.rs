@@ -107,7 +107,7 @@ pub async fn run(
     host: &str,
     magic: u64,
     max_rollback: usize,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let cs_proto = ProtocolConfig {
         id: chainsync::PROTOCOL_ID,
         priority: 1,

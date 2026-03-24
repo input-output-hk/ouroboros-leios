@@ -9,7 +9,7 @@ use net_core::types::Point;
 
 use crate::connect;
 
-pub async fn run(host: &str, magic: u64) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(host: &str, magic: u64) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let cs_proto = ProtocolConfig {
         id: chainsync::PROTOCOL_ID,
         priority: 1,
