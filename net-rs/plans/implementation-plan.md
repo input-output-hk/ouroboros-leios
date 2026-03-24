@@ -181,8 +181,33 @@ ResponderOnly Peer Tasks (inbound connections, server protocols)
 - `serve` CLI refactored to use coordinator with `InjectBlock`/`InjectRollback` commands
 - `multi-follow --listen` enables relay mode (initiator upstream + responder downstream)
 
-**Deferred for future phases:**
-- Promotion/demotion (warm/hot lifecycle, cancellation tokens per protocol group)
+**Deferred (Phase 3b: Promotion/Demotion/Churn):**
+
+Can be done before or after Phase 4 — neither blocks Leios protocols. Moderate
+scope (1-2 sessions). No new information required from consensus/application.
+
+*Promotion/demotion:*
+- `PeerTemperature` enum: Cold (address only), Warm (connected, KeepAlive + PeerSharing),
+  Hot (fully active: + ChainSync, BlockFetch, TxSubmission)
+- Currently all peers go straight to Hot on connection; need two-phase startup
+- Per-peer cancellation tokens (one per protocol group) for dynamic sub-task lifecycle
+- New `PeerCommand::Promote(Hot)` / `Demote(Warm)` — peer task spawns/aborts protocol
+  sub-tasks accordingly
+- Connection setup becomes: connect → handshake → KeepAlive only → promote adds protocols
+
+*Churn (policy layer on top of promotion/demotion):*
+- Background timer in coordinator that periodically reshuffles peers
+- Configurable target counts: `target_warm_peers`, `target_hot_peers`
+- Round-robin reshuffling: demote one hot → warm, promote one warm → hot
+- Drop warm → cold (disconnect), connect cold → warm (from PeerSharing discovery)
+- Peer quality scoring from existing state (RTT, tip freshness, time connected)
+- Cooldown tracking to avoid thrashing
+
+*Already have:* per-peer tip/RTT, PeerSharing discovery, ConnectionMode tracking,
+Disconnect command. *Need:* temperature tracking, dynamic sub-task lifecycle,
+churn policy config, target peer counts.
+
+**Also deferred:**
 - Backoff reset on sustained connection success
 
 **Live-tested:** Duplex against mainnet (backbone.cardano.iog.io:3001, version 15).
