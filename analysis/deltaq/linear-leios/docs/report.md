@@ -1,6 +1,6 @@
 # $\Delta\text{Q}$ Model for $\Delta_\text{EB}$ in Linear Leios
 
-*Related issue:* [#543 – Create $\Delta\text{Q}$ model to investigate $\Delta_\text{EB}$ and protocol parameters](https://github.com/input-output-hk/ouroboros-leios/issues/543)
+*Related issue:* [#543 – Create ΔQ model to investigate ΔEB and protocol parameters](https://github.com/input-output-hk/ouroboros-leios/issues/543)
 
 ## 1. Motivation
 
