@@ -6,15 +6,22 @@
 //! individual peers via per-peer channels.
 
 use std::collections::HashMap;
+use std::net::ToSocketAddrs;
+use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 
-use crate::types::{Point, Tip};
+use crate::mux::MuxConfig;
+use crate::protocols::peersharing::PeerAddress;
+use crate::types::{Point, Tip, WrappedHeader};
 
+use super::chain_store::ChainStore;
+use super::connect::{self, Connection};
 use super::peer_task::{run_peer_task, PeerTaskConfig};
+use super::responder_task::{run_responder_task, server_protocol_configs, ResponderTaskConfig};
 use super::types::{NetworkCommand, NetworkEvent, PeerCommand, PeerEvent};
 use super::{ConnectionMode, CoordinatorConfig, CoordinatorHandle, PeerId};
 
@@ -53,6 +60,17 @@ struct Coordinator {
     pending_fetches: HashMap<Point, PeerId>,
     /// Peers waiting to be reconnected (address, next attempt time, current backoff).
     reconnect_queue: Vec<(String, Instant, Duration)>,
+
+    /// Shared chain state for responder peers.
+    chain_store: Arc<ChainStore>,
+    /// Headers from HeaderAnnounced, keyed by point, for populating ChainStore on BlockFetched.
+    pending_headers: HashMap<Point, WrappedHeader>,
+    /// Completed inbound connections from the accept loop.
+    inbound_connections: Option<mpsc::Receiver<Connection>>,
+    /// Handle for the accept loop task (if listening).
+    accept_task: Option<JoinHandle<()>>,
+    /// Peer provider callback for PeerSharing server.
+    peer_provider: Arc<dyn Fn(u8) -> Vec<PeerAddress> + Send + Sync>,
 }
 
 impl Coordinator {
@@ -62,6 +80,7 @@ impl Coordinator {
         peer_events: mpsc::Receiver<(PeerId, PeerEvent)>,
         network_events: mpsc::Sender<NetworkEvent>,
         network_commands: mpsc::Receiver<NetworkCommand>,
+        chain_store: Arc<ChainStore>,
     ) -> Self {
         Self {
             config,
@@ -74,6 +93,11 @@ impl Coordinator {
             best_tip: None,
             pending_fetches: HashMap::new(),
             reconnect_queue: Vec::new(),
+            chain_store,
+            pending_headers: HashMap::new(),
+            inbound_connections: None,
+            accept_task: None,
+            peer_provider: Arc::new(|_| Vec::new()),
         }
     }
 
@@ -138,6 +162,10 @@ impl Coordinator {
                     peer.tip = Some(tip.clone());
                 }
 
+                // Store header for later use when BlockFetched arrives.
+                self.pending_headers
+                    .insert(tip.point.clone(), header.clone());
+
                 // Deduplicate: only forward if this tip is ahead of our best.
                 let is_new = match &self.best_tip {
                     None => true,
@@ -163,6 +191,7 @@ impl Coordinator {
                 if let Some(best) = &self.best_tip {
                     if tip.block_no < best.block_no {
                         self.best_tip = Some(tip.clone());
+                        self.chain_store.rollback_to(&point);
                         let _ = self
                             .network_events
                             .send(NetworkEvent::RolledBack { point, tip })
@@ -173,6 +202,15 @@ impl Coordinator {
 
             PeerEvent::BlockFetched { point, body } => {
                 self.pending_fetches.remove(&point);
+
+                // Populate chain store for responder peers.
+                let header = self
+                    .pending_headers
+                    .remove(&point)
+                    .unwrap_or(WrappedHeader(vec![0xA0])); // fallback: empty CBOR map
+                self.chain_store
+                    .append_block(point.clone(), header, body.clone());
+
                 let _ = self
                     .network_events
                     .send(NetworkEvent::BlockReceived { point, body })
@@ -189,6 +227,13 @@ impl Coordinator {
                 let _ = self
                     .network_events
                     .send(NetworkEvent::PeersDiscovered { peers })
+                    .await;
+            }
+
+            PeerEvent::TransactionReceived { body } => {
+                let _ = self
+                    .network_events
+                    .send(NetworkEvent::TransactionReceived { peer_id, body })
                     .await;
             }
 
@@ -256,6 +301,18 @@ impl Coordinator {
                 }
             }
 
+            NetworkCommand::InjectBlock {
+                point,
+                header,
+                body,
+            } => {
+                self.chain_store.append_block(point, header, body);
+            }
+
+            NetworkCommand::InjectRollback { point } => {
+                self.chain_store.rollback_to(&point);
+            }
+
             NetworkCommand::Shutdown => {
                 // Disconnect all peers.
                 let peer_ids: Vec<PeerId> = self.peers.keys().copied().collect();
@@ -277,14 +334,16 @@ impl Coordinator {
         if let Some(peer) = self.peers.remove(&peer_id) {
             peer.task_handle.abort();
 
-            // Schedule reconnection with escalating backoff.
-            let backoff = peer.reconnect_backoff;
-            let next_backoff = (backoff * 2).min(MAX_BACKOFF);
-            self.reconnect_queue.push((
-                peer.address.clone(),
-                Instant::now() + backoff,
-                next_backoff,
-            ));
+            // Only schedule reconnection for initiator peers (not inbound responders).
+            if peer.mode == ConnectionMode::InitiatorOnly {
+                let backoff = peer.reconnect_backoff;
+                let next_backoff = (backoff * 2).min(MAX_BACKOFF);
+                self.reconnect_queue.push((
+                    peer.address.clone(),
+                    Instant::now() + backoff,
+                    next_backoff,
+                ));
+            }
 
             let _ = self
                 .network_events
@@ -332,6 +391,107 @@ impl Coordinator {
         }
     }
 
+    /// Add a responder peer for an accepted inbound connection.
+    fn add_responder_peer(&mut self, connection: Connection, address: String) -> PeerId {
+        let peer_id = PeerId(self.next_peer_id);
+        self.next_peer_id += 1;
+
+        let (cmd_sender, cmd_receiver) = mpsc::channel(16);
+
+        let task_config = ResponderTaskConfig {
+            peer_id,
+            connection,
+            chain_store: self.chain_store.clone(),
+            peer_provider: self.peer_provider.clone(),
+            event_sender: self.peer_event_sender.clone(),
+            command_receiver: cmd_receiver,
+        };
+
+        let task_handle = tokio::spawn(run_responder_task(task_config));
+
+        self.peers.insert(
+            peer_id,
+            PeerState {
+                address,
+                mode: ConnectionMode::ResponderOnly,
+                commands: cmd_sender,
+                task_handle,
+                tip: None,
+                rtt: None,
+                reconnect_backoff: Duration::from_secs(0), // unused for responders
+            },
+        );
+
+        peer_id
+    }
+
+    /// Start the accept loop if a listen address is configured.
+    fn start_accept_loop(&mut self) {
+        let listen_address = match &self.config.listen_address {
+            Some(addr) => addr.clone(),
+            None => return,
+        };
+
+        let addr = match listen_address.to_socket_addrs() {
+            Ok(mut addrs) => match addrs.next() {
+                Some(addr) => addr,
+                None => {
+                    tracing::error!("could not resolve listen address: {listen_address}");
+                    return;
+                }
+            },
+            Err(e) => {
+                tracing::error!("invalid listen address {listen_address}: {e}");
+                return;
+            }
+        };
+
+        let magic = self.config.network_magic;
+        let mux_config = MuxConfig {
+            sdu_timeout: self.config.sdu_timeout,
+            ..MuxConfig::default()
+        };
+        let protocols = server_protocol_configs();
+
+        let (conn_sender, conn_receiver) = mpsc::channel::<Connection>(16);
+        self.inbound_connections = Some(conn_receiver);
+
+        let task = tokio::spawn(async move {
+            let listener = match tokio::net::TcpListener::bind(addr).await {
+                Ok(l) => {
+                    tracing::info!("listening for inbound peers on {addr}");
+                    l
+                }
+                Err(e) => {
+                    tracing::error!("failed to bind {addr}: {e}");
+                    return;
+                }
+            };
+
+            loop {
+                match connect::accept_and_handshake(
+                    &listener,
+                    magic,
+                    &protocols,
+                    mux_config.clone(),
+                )
+                .await
+                {
+                    Ok(conn) => {
+                        if conn_sender.send(conn).await.is_err() {
+                            break; // coordinator shut down
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!("inbound handshake failed: {e}");
+                    }
+                }
+            }
+        });
+
+        self.accept_task = Some(task);
+    }
+
     /// Time until next reconnection is due, or a large default.
     fn next_reconnect_delay(&self) -> Duration {
         self.reconnect_queue
@@ -343,6 +503,9 @@ impl Coordinator {
 
     /// Main coordinator loop.
     async fn run(mut self) {
+        // Start accept loop if configured.
+        self.start_accept_loop();
+
         loop {
             let reconnect_delay = self.next_reconnect_delay();
 
@@ -352,23 +515,44 @@ impl Coordinator {
                         Some((peer_id, peer_event)) => {
                             self.handle_peer_event(peer_id, peer_event).await;
                         }
-                        None => break, // all peer event senders dropped
+                        None => break,
                     }
                 }
                 command = self.network_commands.recv() => {
                     match command {
                         Some(cmd) => {
                             if !self.handle_network_command(cmd).await {
-                                break; // Shutdown
+                                break;
                             }
                         }
-                        None => break, // application dropped the command sender
+                        None => break,
+                    }
+                }
+                conn = async {
+                    match &mut self.inbound_connections {
+                        Some(rx) => rx.recv().await,
+                        None => std::future::pending().await,
+                    }
+                } => {
+                    if let Some(conn) = conn {
+                        if self.peers.len() < self.config.max_peers {
+                            let peer_id = self.add_responder_peer(conn, "inbound".to_string());
+                            tracing::info!("accepted inbound peer as {peer_id}");
+                        } else {
+                            tracing::warn!("max peers reached, dropping inbound connection");
+                            conn.running.abort();
+                        }
                     }
                 }
                 _ = tokio::time::sleep(reconnect_delay) => {
                     self.process_reconnections();
                 }
             }
+        }
+
+        // Abort accept loop if running.
+        if let Some(task) = self.accept_task.take() {
+            task.abort();
         }
 
         // Abort all remaining peer tasks.
@@ -383,6 +567,7 @@ pub fn spawn_coordinator(config: CoordinatorConfig) -> CoordinatorHandle {
     let (net_event_sender, net_event_receiver) = mpsc::channel(64);
     let (net_cmd_sender, net_cmd_receiver) = mpsc::channel(64);
     let (peer_event_sender, peer_event_receiver) = mpsc::channel(256);
+    let (chain_store, _chain_rx) = ChainStore::new(config.chain_store_capacity);
 
     let coordinator = Coordinator::new(
         config,
@@ -390,6 +575,7 @@ pub fn spawn_coordinator(config: CoordinatorConfig) -> CoordinatorHandle {
         peer_event_receiver,
         net_event_sender,
         net_cmd_receiver,
+        chain_store,
     );
 
     tokio::spawn(coordinator.run());
@@ -419,12 +605,14 @@ mod tests {
         let (_net_cmd_sender, net_cmd_receiver) = mpsc::channel(64);
 
         let config = CoordinatorConfig::default();
+        let (chain_store, _chain_rx) = crate::peer::chain_store::ChainStore::new(100);
         let mut coordinator = Coordinator::new(
             config,
             peer_event_sender.clone(),
             peer_event_receiver,
             net_event_sender,
             net_cmd_receiver,
+            chain_store,
         );
 
         // Manually insert a peer (simulate it being connected).
@@ -499,12 +687,14 @@ mod tests {
         let (_net_cmd_sender, net_cmd_receiver) = mpsc::channel(64);
 
         let config = CoordinatorConfig::default();
+        let (chain_store, _chain_rx) = crate::peer::chain_store::ChainStore::new(100);
         let mut coordinator = Coordinator::new(
             config,
             peer_event_sender,
             peer_event_receiver,
             net_event_sender,
             net_cmd_receiver,
+            chain_store,
         );
 
         // Two peers.
@@ -597,12 +787,14 @@ mod tests {
         let (_net_cmd_sender, net_cmd_receiver) = mpsc::channel(64);
 
         let config = CoordinatorConfig::default();
+        let (chain_store, _chain_rx) = crate::peer::chain_store::ChainStore::new(100);
         let mut coordinator = Coordinator::new(
             config,
             peer_event_sender,
             peer_event_receiver,
             net_event_sender,
             net_cmd_receiver,
+            chain_store,
         );
 
         let peer_id = PeerId(0);
@@ -658,12 +850,14 @@ mod tests {
         let (_net_cmd_sender, net_cmd_receiver) = mpsc::channel(64);
 
         let config = CoordinatorConfig::default();
+        let (chain_store, _chain_rx) = crate::peer::chain_store::ChainStore::new(100);
         let mut coordinator = Coordinator::new(
             config,
             peer_event_sender,
             peer_event_receiver,
             net_event_sender,
             net_cmd_receiver,
+            chain_store,
         );
 
         // Add a peer and simulate failure.

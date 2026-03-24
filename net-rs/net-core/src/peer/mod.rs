@@ -17,9 +17,12 @@
 //! Per-Peer Tasks
 //! ```
 
+pub mod chain_store;
 pub mod connect;
 mod coordinator;
 pub(crate) mod peer_task;
+pub(crate) mod responder_task;
+pub mod server_handlers;
 pub mod types;
 
 pub use coordinator::spawn_coordinator;
@@ -69,6 +72,10 @@ pub struct CoordinatorConfig {
     pub keepalive_interval: Duration,
     /// SDU timeout for mux (long at tip — blocks are infrequent).
     pub sdu_timeout: Duration,
+    /// Address to listen on for inbound (responder) connections. None = don't listen.
+    pub listen_address: Option<String>,
+    /// Maximum blocks to retain in the chain store (for serving to responder peers).
+    pub chain_store_capacity: usize,
 }
 
 impl Default for CoordinatorConfig {
@@ -78,6 +85,8 @@ impl Default for CoordinatorConfig {
             max_peers: 20,
             keepalive_interval: Duration::from_secs(20),
             sdu_timeout: Duration::from_secs(900),
+            listen_address: None,
+            chain_store_capacity: 2160,
         }
     }
 }

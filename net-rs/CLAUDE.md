@@ -33,6 +33,7 @@ cargo run -p net-cli -- follow 127.0.0.1:9999                   # follow fake se
 cargo run -p net-cli -- submit 127.0.0.1:9999                   # submit tx to fake server
 cargo run -p net-cli -- peer-share cardano-main2.everstake.one:3001  # peer sharing (live, supports peer_sharing=1)
 cargo run -p net-cli -- multi-follow --host backbone.cardano.iog.io:3001 --host backbone.cardano.iog.io:3001  # multi-peer follow (live)
+cargo run -p net-cli -- multi-follow --host backbone.cardano.iog.io:3001 --listen 0.0.0.0:8888  # relay mode (live upstream, local downstream)
 ```
 
 ### Test vector workflow
@@ -108,11 +109,14 @@ net-rs/
         txsubmission/   -- TxSubmission protocol (pull-based tx dissemination, blocking/non-blocking)
         peersharing/    -- PeerSharing protocol (peer discovery, IPv4/IPv6 addresses)
       peer/
-        mod.rs          -- PeerId, ConnectionMode, CoordinatorConfig, CoordinatorHandle, PeerError
-        types.rs        -- PeerEvent, PeerCommand, NetworkEvent, NetworkCommand
-        connect.rs      -- connection helpers (TCP + mux + handshake, moved from net-cli)
-        peer_task.rs    -- per-peer task: protocol sub-tasks, event translation, command dispatch
-        coordinator.rs  -- coordinator: peer aggregation, tip dedup, fetch routing, reconnection
+        mod.rs            -- PeerId, ConnectionMode, CoordinatorConfig, CoordinatorHandle, PeerError
+        types.rs          -- PeerEvent, PeerCommand, NetworkEvent, NetworkCommand
+        chain_store.rs    -- ChainStore: shared in-memory chain state for responder peers
+        connect.rs        -- connection helpers (TCP + mux + handshake, moved from net-cli)
+        peer_task.rs      -- per-peer initiator task: client protocol sub-tasks
+        responder_task.rs -- per-peer responder task: server protocol sub-tasks
+        server_handlers.rs -- server-side protocol handlers (ChainSync/BlockFetch/KeepAlive/TxSubmission/PeerSharing)
+        coordinator.rs    -- coordinator: peer aggregation, tip dedup, fetch routing, accept loop, reconnection
   net-cli/              -- binary crate
     src/
       main.rs           -- subcommand dispatch
@@ -122,8 +126,8 @@ net-rs/
       chainsync.rs      -- `chain-sync` command (follow chain tip)
       blockfetch.rs     -- `block-fetch` command (fetch blocks)
       follow.rs         -- `follow` command (persistent single-peer chain follower)
-      multi_follow.rs   -- `multi-follow` command (multi-peer chain follower via coordinator)
-      serve.rs          -- `serve` command (fake server with all 6 N2N protocols)
+      multi_follow.rs   -- `multi-follow` command (multi-peer chain follower via coordinator, optional --listen)
+      serve.rs          -- `serve` command (fake server via coordinator with Poisson block generation)
       submit.rs         -- `submit` command (tx submission with Poisson generation)
       peershare.rs      -- `peer-share` command (request peers from a node)
 ```
@@ -139,13 +143,13 @@ net-rs/
 - **Opaque headers/blocks**: `WrappedHeader` and `BlockBody` store raw CBOR bytes — era-specific decoding happens at higher layers, not the network stack
 - **Composable client helpers**: protocols expose simple async functions (`find_intersection`, `request_next`, `recv_block`) rather than complex callback frameworks
 - **Server uses Message directly**: server-side code uses `runner.recv()` / `runner.send()` with Message enums — no separate Request/Response types (Runner enforces agency)
-- **Multi-peer coordinator**: thread-per-peer with shared coordinator task. Each peer runs an independent tokio task tree; coordinator aggregates state via channels. Per-peer tasks fan-in `(PeerId, PeerEvent)` to coordinator; coordinator sends `PeerCommand` per-peer. Application interface is peer-agnostic (`NetworkEvent`/`NetworkCommand`). Exponential backoff reconnection (1s→30s cap). Designed for `ConnectionMode::{InitiatorOnly, ResponderOnly, Duplex}` — only InitiatorOnly implemented initially.
+- **Multi-peer coordinator**: thread-per-peer with shared coordinator task. Each peer runs an independent tokio task tree; coordinator aggregates state via channels. Per-peer tasks fan-in `(PeerId, PeerEvent)` to coordinator; coordinator sends `PeerCommand` per-peer. Application interface is peer-agnostic (`NetworkEvent`/`NetworkCommand`). InitiatorOnly peers (outbound, client protocols) and ResponderOnly peers (inbound, server protocols) both supported. ChainStore shared between coordinator and responder peers; populated via `InjectBlock`/`InjectRollback` commands or from initiator peer `BlockFetched` events. Accept loop for inbound connections via `listen_address` config. Exponential backoff reconnection for initiator peers (1s→30s cap); no reconnection for responder peers. `serve` CLI uses the coordinator with `InjectBlock` commands from a Poisson block generator.
 
 ## Implementation Phases
 
 1. **Phase 1: Mux + Handshake** — COMPLETE. Bearer, mux, codec, protocol framework, handshake (client+server), CLI, 51 tests, live-tested against mainnet, security-audited.
 2. **Phase 2: ChainSync / BlockFetch** — COMPLETE. Shared types (Point, Tip, WrappedHeader, BlockBody), ChainSync + BlockFetch + KeepAlive protocols (state machines, CBOR codecs, client + server), persistent chain follower with reconnection, fake server CLI with Poisson block/rollback generation, 109 tests, live-tested against mainnet, security-audited.
-3. **Phase 3: Remaining Praos + Multi-Peer** — COMPLETE. TxSubmission + PeerSharing protocols (38 tests). Multi-peer coordinator: thread-per-peer with shared coordinator task, per-peer task trees (ChainSync + BlockFetch + KeepAlive + PeerSharing sub-tasks), tip deduplication, fetch routing, exponential backoff reconnection, peer-agnostic application interface (NetworkEvent/NetworkCommand). ConnectionMode enum supports InitiatorOnly/ResponderOnly/Duplex (only InitiatorOnly implemented). `multi-follow` CLI command. 153 total tests. Live-tested against mainnet (2 concurrent peer connections, tip dedup verified).
+3. **Phase 3: Remaining Praos + Multi-Peer** — COMPLETE. TxSubmission + PeerSharing protocols (38 tests). Multi-peer coordinator with InitiatorOnly + ResponderOnly peer support. ChainStore for shared chain state, server protocol handlers in net-core, responder task for inbound connections, accept loop with listen_address config, InjectBlock/InjectRollback commands. `serve` CLI refactored to use coordinator. `multi-follow --listen` for relay mode. 171 total tests. Live-tested: mainnet initiator peers, local relay chain (serve → multi-follow → follow).
 4. **Phase 4: Leios Protocols** — LeiosNotify, LeiosFetch, extend coordinator with freshest-first delivery
 
 ## Documentation

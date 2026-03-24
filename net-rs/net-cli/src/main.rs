@@ -145,7 +145,7 @@ enum Command {
     /// Follow the chain tip from multiple peers via the coordinator
     MultiFollow {
         /// Hosts to connect to (repeatable)
-        #[arg(long = "host", required = true)]
+        #[arg(long = "host")]
         hosts: Vec<String>,
 
         /// Network magic number
@@ -155,6 +155,10 @@ enum Command {
         /// Maximum number of peers
         #[arg(long, default_value_t = 20)]
         max_peers: usize,
+
+        /// Listen address for inbound peers (e.g. 0.0.0.0:3001)
+        #[arg(long)]
+        listen: Option<String>,
     },
 }
 
@@ -198,6 +202,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             hosts,
             magic,
             max_peers,
-        } => multi_follow::run(&hosts, magic, max_peers).await,
+            listen,
+        } => multi_follow::run(&hosts, magic, max_peers, listen).await,
     }
 }

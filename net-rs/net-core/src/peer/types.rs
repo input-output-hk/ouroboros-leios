@@ -40,6 +40,9 @@ pub enum PeerEvent {
     /// PeerSharing: received peer addresses.
     PeersDiscovered { peers: Vec<PeerAddress> },
 
+    /// TxSubmission server: received a transaction from a client.
+    TransactionReceived { body: Vec<u8> },
+
     /// Peer misbehaved or connection broke.
     Failed { reason: String },
 }
@@ -85,6 +88,9 @@ pub enum NetworkEvent {
 
     /// New peers discovered via PeerSharing.
     PeersDiscovered { peers: Vec<PeerAddress> },
+
+    /// A transaction was received from an inbound peer (via TxSubmission server).
+    TransactionReceived { peer_id: PeerId, body: Vec<u8> },
 }
 
 /// Commands sent from the application to the coordinator.
@@ -98,6 +104,17 @@ pub enum NetworkCommand {
 
     /// Request peers from connected nodes (triggers PeerSharing).
     DiscoverPeers,
+
+    /// Inject a block into the chain store (for responder peers to serve).
+    /// Used by block generators or other local producers.
+    InjectBlock {
+        point: Point,
+        header: WrappedHeader,
+        body: BlockBody,
+    },
+
+    /// Roll back the chain store to a point (for responder peers).
+    InjectRollback { point: Point },
 
     /// Shut down all peers and stop the coordinator.
     Shutdown,
