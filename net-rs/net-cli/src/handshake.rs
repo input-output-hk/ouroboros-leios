@@ -7,7 +7,7 @@ use net_core::mux::{Mux, MuxConfig, ProtocolConfig, MODE_INITIATOR};
 use net_core::protocols::handshake;
 use net_core::protocols::handshake::n2n;
 
-pub async fn run(host: &str, magic: u64) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(host: &str, magic: u64) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let addr = host
         .to_socket_addrs()?
         .next()

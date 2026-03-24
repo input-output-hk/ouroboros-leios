@@ -32,6 +32,7 @@ cargo run -p net-cli -- serve --port 9999 --block-rate 0.05     # fake server (P
 cargo run -p net-cli -- follow 127.0.0.1:9999                   # follow fake server
 cargo run -p net-cli -- submit 127.0.0.1:9999                   # submit tx to fake server
 cargo run -p net-cli -- peer-share cardano-main2.everstake.one:3001  # peer sharing (live, supports peer_sharing=1)
+cargo run -p net-cli -- multi-follow --host backbone.cardano.iog.io:3001 --host backbone.cardano.iog.io:3001  # multi-peer follow (live)
 ```
 
 ### Test vector workflow
@@ -106,15 +107,22 @@ net-rs/
         keepalive/      -- KeepAlive protocol (ping/pong to keep connections alive)
         txsubmission/   -- TxSubmission protocol (pull-based tx dissemination, blocking/non-blocking)
         peersharing/    -- PeerSharing protocol (peer discovery, IPv4/IPv6 addresses)
+      peer/
+        mod.rs          -- PeerId, ConnectionMode, CoordinatorConfig, CoordinatorHandle, PeerError
+        types.rs        -- PeerEvent, PeerCommand, NetworkEvent, NetworkCommand
+        connect.rs      -- connection helpers (TCP + mux + handshake, moved from net-cli)
+        peer_task.rs    -- per-peer task: protocol sub-tasks, event translation, command dispatch
+        coordinator.rs  -- coordinator: peer aggregation, tip dedup, fetch routing, reconnection
   net-cli/              -- binary crate
     src/
       main.rs           -- subcommand dispatch
-      connect.rs        -- shared connection helper (TCP + mux + handshake)
+      connect.rs        -- re-exports net_core::peer::connect
       handshake.rs      -- `handshake` command (connect + negotiate)
       capture.rs        -- `capture` command (raw byte capture for test vectors)
       chainsync.rs      -- `chain-sync` command (follow chain tip)
       blockfetch.rs     -- `block-fetch` command (fetch blocks)
-      follow.rs         -- `follow` command (persistent chain follower with reconnect)
+      follow.rs         -- `follow` command (persistent single-peer chain follower)
+      multi_follow.rs   -- `multi-follow` command (multi-peer chain follower via coordinator)
       serve.rs          -- `serve` command (fake server with all 6 N2N protocols)
       submit.rs         -- `submit` command (tx submission with Poisson generation)
       peershare.rs      -- `peer-share` command (request peers from a node)
@@ -131,12 +139,13 @@ net-rs/
 - **Opaque headers/blocks**: `WrappedHeader` and `BlockBody` store raw CBOR bytes — era-specific decoding happens at higher layers, not the network stack
 - **Composable client helpers**: protocols expose simple async functions (`find_intersection`, `request_next`, `recv_block`) rather than complex callback frameworks
 - **Server uses Message directly**: server-side code uses `runner.recv()` / `runner.send()` with Message enums — no separate Request/Response types (Runner enforces agency)
+- **Multi-peer coordinator**: thread-per-peer with shared coordinator task. Each peer runs an independent tokio task tree; coordinator aggregates state via channels. Per-peer tasks fan-in `(PeerId, PeerEvent)` to coordinator; coordinator sends `PeerCommand` per-peer. Application interface is peer-agnostic (`NetworkEvent`/`NetworkCommand`). Exponential backoff reconnection (1s→30s cap). Designed for `ConnectionMode::{InitiatorOnly, ResponderOnly, Duplex}` — only InitiatorOnly implemented initially.
 
 ## Implementation Phases
 
 1. **Phase 1: Mux + Handshake** — COMPLETE. Bearer, mux, codec, protocol framework, handshake (client+server), CLI, 51 tests, live-tested against mainnet, security-audited.
 2. **Phase 2: ChainSync / BlockFetch** — COMPLETE. Shared types (Point, Tip, WrappedHeader, BlockBody), ChainSync + BlockFetch + KeepAlive protocols (state machines, CBOR codecs, client + server), persistent chain follower with reconnection, fake server CLI with Poisson block/rollback generation, 109 tests, live-tested against mainnet, security-audited.
-3. **Phase 3: Remaining Praos + Multi-Peer** — PROTOCOLS COMPLETE. TxSubmission (6 states, pull-based with blocking/non-blocking, flow control, client helper + server handler, 20 tests) and PeerSharing (3 states, IPv4/IPv6 peer addresses, client helper + server handler, 18 tests). All 6 N2N mini-protocols implemented. 147 total tests. Live-tested against mainnet (PeerSharing against cardano-main2.everstake.one:3001). Multi-peer coordination: thread-per-peer with shared coordinator (events up, commands down via PeerHandle channels). Peer-agnostic interface upward (candidate tips, block requests, bad-peer reports). TBD.
+3. **Phase 3: Remaining Praos + Multi-Peer** — COMPLETE. TxSubmission + PeerSharing protocols (38 tests). Multi-peer coordinator: thread-per-peer with shared coordinator task, per-peer task trees (ChainSync + BlockFetch + KeepAlive + PeerSharing sub-tasks), tip deduplication, fetch routing, exponential backoff reconnection, peer-agnostic application interface (NetworkEvent/NetworkCommand). ConnectionMode enum supports InitiatorOnly/ResponderOnly/Duplex (only InitiatorOnly implemented). `multi-follow` CLI command. 153 total tests. Live-tested against mainnet (2 concurrent peer connections, tip dedup verified).
 4. **Phase 4: Leios Protocols** — LeiosNotify, LeiosFetch, extend coordinator with freshest-first delivery
 
 ## Documentation

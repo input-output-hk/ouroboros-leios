@@ -15,7 +15,11 @@ use net_core::protocols::handshake::n2n;
 use net_core::protocols::peersharing;
 use net_core::protocols::peersharing::PeerSharing;
 
-pub async fn run(host: &str, magic: u64, amount: u8) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(
+    host: &str,
+    magic: u64,
+    amount: u8,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     println!("connecting to {host}...");
 
     let addr = host

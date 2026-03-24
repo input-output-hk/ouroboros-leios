@@ -544,7 +544,7 @@ pub async fn run(
     block_rate: f64,
     rollback_rate: f64,
     max_rollback_depth: usize,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let (chain, notify) = FakeChain::new();
 
     // Start block generator.

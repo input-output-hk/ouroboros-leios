@@ -4,6 +4,7 @@ mod chainsync;
 mod connect;
 mod follow;
 mod handshake;
+mod multi_follow;
 mod peershare;
 mod serve;
 mod submit;
@@ -140,10 +141,25 @@ enum Command {
         #[arg(long, default_value_t = 2160)]
         max_rollback: usize,
     },
+
+    /// Follow the chain tip from multiple peers via the coordinator
+    MultiFollow {
+        /// Hosts to connect to (repeatable)
+        #[arg(long = "host", required = true)]
+        hosts: Vec<String>,
+
+        /// Network magic number
+        #[arg(long, default_value_t = n2n::MAINNET_MAGIC)]
+        magic: u64,
+
+        /// Maximum number of peers
+        #[arg(long, default_value_t = 20)]
+        max_peers: usize,
+    },
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tracing_subscriber::fmt::init();
 
     let cli = Cli::parse();
@@ -178,5 +194,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             magic,
             max_rollback,
         } => follow::run(&host, magic, max_rollback).await,
+        Command::MultiFollow {
+            hosts,
+            magic,
+            max_peers,
+        } => multi_follow::run(&hosts, magic, max_peers).await,
     }
 }
