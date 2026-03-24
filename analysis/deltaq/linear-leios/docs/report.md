@@ -280,5 +280,6 @@ The following executables are available:
 
 * [CIP-164 – Ouroboros Leios](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md)
 * [Supporting information for modeling Linear Leios](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/)
-* [Praos performance model](https://github.com/IntersectMBO/cardano-formal-specifications/tree/main/src/performance)
+* [Mind Your Outcomes: The ∆QSD Paradigm for Quality-Centric Systems Development and Its Application to a Blockchain Case Study](https://doi.org/10.3390/computers11030045)
 * [deltaq Haskell package](https://hackage.haskell.org/package/deltaq)
+* [Praos performance model](https://github.com/IntersectMBO/cardano-formal-specifications/tree/main/src/performance)
