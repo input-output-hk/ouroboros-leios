@@ -6,7 +6,9 @@
 
 The security of the Linear Leios protocol depends on $\Delta_\text{EB}$, the time within which an Endorser Block (EB) must diffuse across the network as outlined in [CIP-164](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md).
 
-Early simulations suggested $\Delta_\text{EB}$ is manageable under happy-path conditions. This report validates that assumption using a $\Delta\text{Q}$ System Development model.
+Early simulations suggested $\Delta_\text{EB}$ is manageable under happy-path conditions[^1]. This report validates that assumption using a $\Delta\text{Q}$ System Development model.
+
+[^1]: No adversarial nodes, no significant congestion, blocks/messages propagate without unusual delays
 
 The $\Delta\text{Q}$ model for Linear Leios is a complement to the Haskell and Rust simulations to gain confidence in the parameter selection for Linear Leios, resp. a precursor to running simulations, as it can rule out infeasible parameter selections.
 
@@ -150,9 +152,9 @@ where $\Phi$ is the standard normal CDF. The two batch distributions use the fol
 
 ### 4.2 Markov model for TxCache
 
-When an EB arrives at a node, its transactions may already be present in the local transaction cache (a cache hit), or they may need to be fetched from the network (a cache miss). To model this, we use a two-state Markov chain parameterized by $p$, the probability that a given transaction is in the cache[^1].
+When an EB arrives at a node, its transactions may already be present in the local transaction cache (a cache hit), or they may need to be fetched from the network (a cache miss). To model this, we use a two-state Markov chain parameterized by $p$, the probability that a given transaction is in the cache[^4].
 
-[^1]: This model was introduced by Nick in the Leios monthly presentation in February 26
+[^4]: This model was introduced by Nick in the Leios monthly presentation in February 26
 
 ![Markov model for TxCache](TxCache.svg)
 
