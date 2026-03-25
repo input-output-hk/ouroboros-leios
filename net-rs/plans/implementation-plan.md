@@ -226,7 +226,7 @@ coordinator, with Praos header/body extensions and priority scheduling.
   same pattern as `WrappedHeader`/`BlockBody`
 - BLS crypto verification is out of scope (consensus layer, not networking)
 
-#### Phase 4a: LeiosNotify Protocol
+#### Phase 4a: LeiosNotify Protocol — COMPLETE
 
 State machine, Message enum, CBOR codec, client + server async helpers, unit tests.
 
@@ -241,10 +241,10 @@ StIdle           → MsgDone                          → StDone
 
 Files: `net-core/src/protocols/leios_notify/mod.rs`, `codec.rs`
 
-#### Phase 4b: LeiosFetch Protocol
+#### Phase 4b: LeiosFetch Protocol — COMPLETE
 
 State machine, Message enum, CBOR codec (including bitmap TX addressing),
-client + server async helpers, unit tests.
+client + server async helpers, unit tests. 16 MB max EB size.
 
 ```
 StIdle       (Client)  → MsgLeiosBlockRequest          → StBlock      (Server)
@@ -273,12 +273,17 @@ Files: `net-core/src/protocols/leios_fetch/mod.rs`, `codec.rs`
 Full Shelley+ header parsing: `WrappedHeader` converted from opaque tuple struct to
 named-field struct with `raw: Vec<u8>` and `parsed: Option<HeaderInfo>`. `HeaderInfo`
 extracts era, block_number, slot, prev_hash, issuer_vkey, body_size, block_body_hash,
-plus CIP-0164 Leios extensions (announced_eb, certified_eb). Byron headers gracefully
-return None. `BlockBody` converted similarly with `LeiosBlockInfo` sidecar (parser
-deferred). 232 total tests. 11 new parser tests.
+plus CIP-0164 Leios extensions (announced_eb, certified_eb). Array length alone
+disambiguates optional fields (10=base, 11=certified_eb, 12=announced_eb, 13=both).
+`BlockBody` converted similarly with parsed `LeiosBlockInfo` (extracts EB certificate
+from 5th element of Shelley+ block array). Byron headers/blocks return None gracefully.
+types.rs split into types/ module (mod.rs, header.rs, block.rs). codec.rs moved to
+mux/codec.rs, protocol.rs moved to protocols/protocol.rs. 238 total tests, 17 new
+parser tests.
 
-Files: `net-core/src/types.rs`, `net-core/src/peer/types.rs`, all protocol codecs and
-peer modules updated for struct field access.
+Files: `net-core/src/types/{mod,header,block}.rs`, `net-core/src/mux/codec.rs`,
+`net-core/src/protocols/protocol.rs`, `net-core/src/peer/types.rs`, all protocol
+codecs and peer modules updated for struct field access and import paths.
 
 #### Phase 4d: Per-Peer Task Integration
 

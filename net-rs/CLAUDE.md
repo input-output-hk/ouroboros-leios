@@ -97,17 +97,22 @@ net-rs/
     src/
       lib.rs
       bearer/           -- Bearer trait (mod.rs), TcpBearer (tcp.rs), MemBearer (mem.rs)
-      mux/              -- Multiplexer: wire format, egress/ingress tasks, channels, scheduler
-      codec.rs          -- CBOR framing over mux channels (CodecSend/CodecRecv)
-      protocol.rs       -- Protocol trait, Runner with agency-checked send/recv
-      types.rs          -- Shared Cardano types: Point, Tip, WrappedHeader, BlockBody
+      mux/              -- Multiplexer: wire format, egress/ingress tasks, channels, scheduler, CBOR codec
+        codec.rs        -- CBOR framing over mux channels (CodecSend/CodecRecv)
+      types/            -- Shared Cardano types
+        mod.rs          -- Point, Tip, encode/decode_points
+        header.rs       -- WrappedHeader, HeaderInfo (Shelley+ header parser with Leios extensions)
+        block.rs        -- BlockBody, LeiosBlockInfo (block body parser)
       protocols/
+        protocol.rs     -- Protocol trait, Runner with agency-checked send/recv
         handshake/      -- Handshake protocol (state machine, CBOR codec, N2N version data)
         chainsync/      -- ChainSync protocol (follow chain tip, intersection finding)
         blockfetch/     -- BlockFetch protocol (request and stream block ranges)
         keepalive/      -- KeepAlive protocol (ping/pong to keep connections alive)
         txsubmission/   -- TxSubmission protocol (pull-based tx dissemination, blocking/non-blocking)
         peersharing/    -- PeerSharing protocol (peer discovery, IPv4/IPv6 addresses)
+        leios_notify/   -- LeiosNotify protocol (Leios announcement, protocol ID 18)
+        leios_fetch/    -- LeiosFetch protocol (Leios data fetch with bitmap TX addressing, protocol ID 19)
       peer/
         mod.rs            -- PeerId, ConnectionMode, CoordinatorConfig, CoordinatorHandle, PeerError
         types.rs          -- PeerEvent, PeerCommand, NetworkEvent, NetworkCommand
@@ -141,7 +146,7 @@ net-rs/
 - **Codec**: `for<'a> Decode<'a>` (HRTB) so decoded types are owned, avoiding borrow conflicts; `max_buffer` cap prevents unbounded growth
 - **Protocol framework**: `Runner` wraps codec + state, provides agency-checked `send()`/`recv()` — protocols use it directly in async functions (not a generic driver loop)
 - **SDU size**: default 12,288 bytes (Cardano standard), not 65,535
-- **Opaque headers/blocks**: `WrappedHeader` and `BlockBody` store raw CBOR bytes — era-specific decoding happens at higher layers, not the network stack
+- **Parsed headers, opaque blocks**: `WrappedHeader` stores raw CBOR bytes plus parsed `HeaderInfo` (Shelley+ era, slot, block_number, prev_hash, issuer_vkey, body_size, block_body_hash, CIP-0164 Leios extensions). `BlockBody` stores raw bytes plus parsed `LeiosBlockInfo` (EB certificate if present). Byron headers/blocks return `None` gracefully. Parsing uses array-length disambiguation for optional Leios fields (10=base, 11=certified_eb, 12=announced_eb, 13=both)
 - **Composable client helpers**: protocols expose simple async functions (`find_intersection`, `request_next`, `recv_block`) rather than complex callback frameworks
 - **Server uses Message directly**: server-side code uses `runner.recv()` / `runner.send()` with Message enums — no separate Request/Response types (Runner enforces agency)
 - **Multi-peer coordinator**: thread-per-peer with shared coordinator task. Each peer runs an independent tokio task tree; coordinator aggregates state via channels. Per-peer tasks fan-in `(PeerId, PeerEvent)` to coordinator; coordinator sends `PeerCommand` per-peer. Application interface is peer-agnostic (`NetworkEvent`/`NetworkCommand`). Three connection modes: InitiatorOnly (outbound, client protocols), ResponderOnly (inbound, server protocols), Duplex (both on one connection). Mux uses `(ProtocolId, u16)` composite keys to support both directions per protocol ID. ChainStore shared between coordinator and responder/duplex peers; populated via `InjectBlock`/`InjectRollback` commands or from initiator peer `BlockFetched` events. Accept loop for inbound connections via `listen_address` config. Exponential backoff reconnection for initiator/duplex peers; no reconnection for responder peers.
@@ -151,7 +156,7 @@ net-rs/
 1. **Phase 1: Mux + Handshake** — COMPLETE. Bearer, mux, codec, protocol framework, handshake (client+server), CLI, 51 tests, live-tested against mainnet, security-audited.
 2. **Phase 2: ChainSync / BlockFetch** — COMPLETE. Shared types (Point, Tip, WrappedHeader, BlockBody), ChainSync + BlockFetch + KeepAlive protocols (state machines, CBOR codecs, client + server), persistent chain follower with reconnection, fake server CLI with Poisson block/rollback generation, 109 tests, live-tested against mainnet, security-audited.
 3. **Phase 3: Remaining Praos + Multi-Peer** — COMPLETE. TxSubmission + PeerSharing protocols (38 tests). Multi-peer coordinator with all three connection modes (InitiatorOnly, ResponderOnly, Duplex). Mux composite keys `(ProtocolId, u16)` for bidirectional protocol support. ChainStore, server handlers, responder/duplex tasks, accept loop, InjectBlock/InjectRollback commands. `serve` CLI uses coordinator. `multi-follow --listen --duplex`. 172 total tests. Live-tested: duplex against mainnet, local relay chain (serve → multi-follow → follow).
-4. **Phase 4: Leios Protocols** — LeiosNotify, LeiosFetch, extend coordinator with freshest-first delivery
+4. **Phase 4: Leios Protocols** — IN PROGRESS. Phase 4a (LeiosNotify, protocol ID 18) complete. Phase 4b (LeiosFetch, protocol ID 19, bitmap TX addressing) complete. Phase 4c (Shelley+ header parser with Leios extensions, block body parser) complete. 238 total tests. Phases 4d-4f (per-peer task integration, coordinator extensions, priority scheduling) pending.
 
 ## Documentation
 
