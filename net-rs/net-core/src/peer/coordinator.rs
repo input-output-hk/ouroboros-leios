@@ -5,7 +5,7 @@
 //! all peer tasks via a shared fan-in channel and sends commands to
 //! individual peers via per-peer channels.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::net::ToSocketAddrs;
 use std::sync::Arc;
 use std::time::Duration;
@@ -69,6 +69,28 @@ struct Coordinator {
     leios_store: Option<Arc<LeiosStore>>,
     /// Headers from HeaderAnnounced, keyed by point, for populating ChainStore on BlockFetched.
     pending_headers: HashMap<Point, WrappedHeader>,
+
+    // --- Leios dedup and routing state ---
+    /// Seen Leios EB offers: (slot, hash). Deduplicated before forwarding.
+    seen_leios_blocks: HashSet<(u64, [u8; 32])>,
+    /// Seen Leios TX offers: (slot, hash).
+    seen_leios_txs: HashSet<(u64, [u8; 32])>,
+    /// Seen individual vote offers: (slot, voter_id).
+    seen_leios_votes: HashSet<(u64, Vec<u8>)>,
+    /// Highest slot seen across all Leios offers (for pruning).
+    max_leios_slot: u64,
+    /// Which peers offered which Leios blocks: (slot, hash) -> offering peers.
+    leios_block_offers: HashMap<(u64, [u8; 32]), Vec<PeerId>>,
+    /// Which peers offered which Leios TXs.
+    leios_txs_offers: HashMap<(u64, [u8; 32]), Vec<PeerId>>,
+    /// Which peers offered which votes: (slot, voter_id) -> offering peers.
+    leios_vote_offers: HashMap<(u64, Vec<u8>), Vec<PeerId>>,
+    /// Pending Leios block fetches: (slot, hash) -> peer fetching it.
+    pending_leios_block_fetches: HashMap<(u64, [u8; 32]), PeerId>,
+    /// Pending Leios TX fetches: (slot, hash) -> peer fetching it.
+    pending_leios_txs_fetches: HashMap<(u64, [u8; 32]), PeerId>,
+    /// Pending Leios vote fetches: (slot, voter_id) -> peer fetching them.
+    pending_leios_vote_fetches: HashMap<(u64, Vec<u8>), PeerId>,
     /// Completed inbound connections from the accept loop.
     inbound_connections: Option<mpsc::Receiver<Connection>>,
     /// Handle for the accept loop task (if listening).
@@ -101,6 +123,16 @@ impl Coordinator {
             chain_store,
             leios_store,
             pending_headers: HashMap::new(),
+            seen_leios_blocks: HashSet::new(),
+            seen_leios_txs: HashSet::new(),
+            seen_leios_votes: HashSet::new(),
+            max_leios_slot: 0,
+            leios_block_offers: HashMap::new(),
+            leios_txs_offers: HashMap::new(),
+            leios_vote_offers: HashMap::new(),
+            pending_leios_block_fetches: HashMap::new(),
+            pending_leios_txs_fetches: HashMap::new(),
+            pending_leios_vote_fetches: HashMap::new(),
             inbound_connections: None,
             accept_task: None,
             peer_provider: Arc::new(|_| Vec::new()),
@@ -168,6 +200,29 @@ impl Coordinator {
     /// Assign a new PeerId and spawn a peer task with default backoff.
     fn add_peer(&mut self, address: String) -> PeerId {
         self.add_peer_with_backoff(address, Duration::from_secs(1))
+    }
+
+    /// Update the max Leios slot and prune old entries from dedup sets and offer maps.
+    fn update_leios_slot(&mut self, slot: u64) {
+        if slot > self.max_leios_slot {
+            self.max_leios_slot = slot;
+            let cutoff = slot.saturating_sub(self.config.leios_dedup_window);
+            self.seen_leios_blocks.retain(|(s, _)| *s >= cutoff);
+            self.seen_leios_txs.retain(|(s, _)| *s >= cutoff);
+            self.seen_leios_votes.retain(|(s, _)| *s >= cutoff);
+            self.leios_block_offers.retain(|(s, _), _| *s >= cutoff);
+            self.leios_txs_offers.retain(|(s, _), _| *s >= cutoff);
+            self.leios_vote_offers.retain(|(s, _), _| *s >= cutoff);
+        }
+    }
+
+    /// Find the lowest-RTT peer from a list of candidates.
+    fn best_peer_by_rtt(&self, candidates: &[PeerId]) -> Option<PeerId> {
+        candidates
+            .iter()
+            .filter_map(|id| self.peers.get(id).map(|p| (*id, p)))
+            .min_by_key(|(_, p)| p.rtt.unwrap_or(Duration::from_secs(999)))
+            .map(|(id, _)| id)
     }
 
     /// Handle an event from a peer task.
@@ -266,7 +321,7 @@ impl Coordinator {
                     .await;
             }
 
-            // Leios events — stub-forwarded for now (Phase 4e will add aggregation).
+            // Leios events — deduplicated with offer tracking for smart routing.
             PeerEvent::LeiosBlockAnnounced { header } => {
                 let _ = self
                     .network_events
@@ -275,28 +330,71 @@ impl Coordinator {
             }
 
             PeerEvent::LeiosBlockOffered { slot, hash } => {
-                let _ = self
-                    .network_events
-                    .send(NetworkEvent::LeiosBlockOffered { slot, hash })
-                    .await;
+                self.update_leios_slot(slot);
+                // Track which peer offered this block.
+                self.leios_block_offers
+                    .entry((slot, hash))
+                    .or_default()
+                    .push(peer_id);
+                // Deduplicate: only forward first occurrence.
+                if self.seen_leios_blocks.insert((slot, hash)) {
+                    tracing::debug!("leios: new EB offer at slot {slot} from {peer_id}");
+                    let _ = self
+                        .network_events
+                        .send(NetworkEvent::LeiosBlockOffered { slot, hash })
+                        .await;
+                } else {
+                    tracing::debug!(
+                        "leios: deduplicated EB offer at slot {slot} from {peer_id} (already seen)"
+                    );
+                }
             }
 
             PeerEvent::LeiosBlockTxsOffered { slot, hash } => {
-                // Forward as a block offer — application decides whether to fetch txs.
-                let _ = self
-                    .network_events
-                    .send(NetworkEvent::LeiosBlockOffered { slot, hash })
-                    .await;
+                self.update_leios_slot(slot);
+                self.leios_txs_offers
+                    .entry((slot, hash))
+                    .or_default()
+                    .push(peer_id);
+                if self.seen_leios_txs.insert((slot, hash)) {
+                    tracing::debug!("leios: new TXs offer at slot {slot} from {peer_id}");
+                    let _ = self
+                        .network_events
+                        .send(NetworkEvent::LeiosBlockTxsOffered { slot, hash })
+                        .await;
+                } else {
+                    tracing::debug!(
+                        "leios: deduplicated TXs offer at slot {slot} from {peer_id} (already seen)"
+                    );
+                }
             }
 
             PeerEvent::LeiosVotesOffered { votes } => {
-                let _ = self
-                    .network_events
-                    .send(NetworkEvent::LeiosVotesOffered { votes })
-                    .await;
+                // Per-vote dedup: only forward unseen votes.
+                let mut unseen = Vec::new();
+                for (slot, voter_id) in votes {
+                    self.update_leios_slot(slot);
+                    self.leios_vote_offers
+                        .entry((slot, voter_id.clone()))
+                        .or_default()
+                        .push(peer_id);
+                    if self.seen_leios_votes.insert((slot, voter_id.clone())) {
+                        unseen.push((slot, voter_id));
+                    }
+                }
+                if !unseen.is_empty() {
+                    tracing::debug!("leios: {} new vote(s) from {peer_id}", unseen.len());
+                    let _ = self
+                        .network_events
+                        .send(NetworkEvent::LeiosVotesOffered { votes: unseen })
+                        .await;
+                } else {
+                    tracing::debug!("leios: all votes from {peer_id} deduplicated");
+                }
             }
 
             PeerEvent::LeiosBlockFetched { slot, hash, block } => {
+                self.pending_leios_block_fetches.remove(&(slot, hash));
                 // Populate leios store for responder peers.
                 if let Some(ref store) = self.leios_store {
                     store.inject_block(slot, hash, block.clone());
@@ -307,7 +405,27 @@ impl Coordinator {
                     .await;
             }
 
+            PeerEvent::LeiosBlockTxsFetched {
+                slot,
+                hash,
+                transactions,
+            } => {
+                self.pending_leios_txs_fetches.remove(&(slot, hash));
+                let _ = self
+                    .network_events
+                    .send(NetworkEvent::LeiosBlockTxsReceived {
+                        slot,
+                        hash,
+                        transactions,
+                    })
+                    .await;
+            }
+
             PeerEvent::LeiosVotesFetched { votes } => {
+                // Clear pending entries for this peer (coarse: we don't know
+                // which specific votes came back, so clear all from this peer).
+                self.pending_leios_vote_fetches
+                    .retain(|_, id| *id != peer_id);
                 let _ = self
                     .network_events
                     .send(NetworkEvent::LeiosVotesReceived { votes })
@@ -391,12 +509,80 @@ impl Coordinator {
             }
 
             NetworkCommand::FetchLeiosBlock { slot, hash } => {
-                // Send to first connected peer. Phase 4e will add smart routing.
-                if let Some((&peer_id, _)) = self.peers.iter().next() {
-                    if let Some(peer) = self.peers.get(&peer_id) {
+                let key = (slot, hash);
+                if self.pending_leios_block_fetches.contains_key(&key) {
+                    tracing::debug!("leios: fetch EB slot {slot} already pending, skipping");
+                    return true;
+                }
+                // Pick lowest-RTT peer that offered this block.
+                let candidates = self
+                    .leios_block_offers
+                    .get(&key)
+                    .cloned()
+                    .unwrap_or_default();
+                if let Some(best_id) = self.best_peer_by_rtt(&candidates) {
+                    let rtt = self.peers.get(&best_id).and_then(|p| p.rtt);
+                    tracing::debug!(
+                        "leios: routing EB fetch slot {slot} to {best_id} (rtt={rtt:?}, {} candidate(s))",
+                        candidates.len()
+                    );
+                    if let Some(peer) = self.peers.get(&best_id) {
                         let _ = peer
                             .commands
                             .send(PeerCommand::FetchLeiosBlock { slot, hash })
+                            .await;
+                        self.pending_leios_block_fetches.insert(key, best_id);
+                    }
+                } else {
+                    tracing::debug!("leios: no peer available for EB fetch at slot {slot}");
+                }
+            }
+
+            NetworkCommand::FetchLeiosBlockTxs { slot, hash, bitmap } => {
+                let key = (slot, hash);
+                if self.pending_leios_txs_fetches.contains_key(&key) {
+                    tracing::debug!("leios: fetch TXs slot {slot} already pending, skipping");
+                    return true;
+                }
+                let candidates = self.leios_txs_offers.get(&key).cloned().unwrap_or_default();
+                if let Some(best_id) = self.best_peer_by_rtt(&candidates) {
+                    let rtt = self.peers.get(&best_id).and_then(|p| p.rtt);
+                    tracing::debug!(
+                        "leios: routing TXs fetch slot {slot} to {best_id} (rtt={rtt:?})"
+                    );
+                    if let Some(peer) = self.peers.get(&best_id) {
+                        let _ = peer
+                            .commands
+                            .send(PeerCommand::FetchLeiosBlockTxs { slot, hash, bitmap })
+                            .await;
+                        self.pending_leios_txs_fetches.insert(key, best_id);
+                    }
+                }
+            }
+
+            NetworkCommand::FetchLeiosVotes { votes } => {
+                // Group vote IDs by best offering peer, skipping already-pending.
+                let mut by_peer: HashMap<PeerId, Vec<(u64, Vec<u8>)>> = HashMap::new();
+                for (slot, voter_id) in votes {
+                    let key = (slot, voter_id.clone());
+                    if self.pending_leios_vote_fetches.contains_key(&key) {
+                        continue;
+                    }
+                    let candidates = self
+                        .leios_vote_offers
+                        .get(&key)
+                        .cloned()
+                        .unwrap_or_default();
+                    if let Some(best_id) = self.best_peer_by_rtt(&candidates) {
+                        self.pending_leios_vote_fetches.insert(key, best_id);
+                        by_peer.entry(best_id).or_default().push((slot, voter_id));
+                    }
+                }
+                for (target_peer, vote_ids) in by_peer {
+                    if let Some(peer) = self.peers.get(&target_peer) {
+                        let _ = peer
+                            .commands
+                            .send(PeerCommand::FetchLeiosVotes { votes: vote_ids })
                             .await;
                     }
                 }
@@ -453,6 +639,24 @@ impl Coordinator {
 
             // Clean up any pending fetches assigned to this peer.
             self.pending_fetches.retain(|_, id| *id != peer_id);
+
+            // Clean up Leios offer tracking for this peer.
+            for offers in self.leios_block_offers.values_mut() {
+                offers.retain(|id| *id != peer_id);
+            }
+            for offers in self.leios_txs_offers.values_mut() {
+                offers.retain(|id| *id != peer_id);
+            }
+            for offers in self.leios_vote_offers.values_mut() {
+                offers.retain(|id| *id != peer_id);
+            }
+            // Clean up pending Leios fetches assigned to this peer.
+            self.pending_leios_block_fetches
+                .retain(|_, id| *id != peer_id);
+            self.pending_leios_txs_fetches
+                .retain(|_, id| *id != peer_id);
+            self.pending_leios_vote_fetches
+                .retain(|_, id| *id != peer_id);
         }
     }
 
@@ -1017,6 +1221,361 @@ mod tests {
         assert_eq!(coordinator.peers.len(), 1);
         // Reconnect queue should be empty now.
         assert!(coordinator.reconnect_queue.is_empty());
+    }
+
+    /// Helper: create a coordinator with leios enabled and given dedup window.
+    fn make_leios_coordinator(
+        dedup_window: u64,
+    ) -> (
+        Coordinator,
+        mpsc::Sender<(PeerId, PeerEvent)>,
+        mpsc::Receiver<NetworkEvent>,
+    ) {
+        let (peer_event_sender, peer_event_receiver) = mpsc::channel(256);
+        let (net_event_sender, net_event_receiver) = mpsc::channel(64);
+        let (_net_cmd_sender, net_cmd_receiver) = mpsc::channel(64);
+
+        let config = CoordinatorConfig {
+            leios_enabled: true,
+            leios_dedup_window: dedup_window,
+            ..CoordinatorConfig::default()
+        };
+        let (chain_store, _chain_rx) = crate::peer::chain_store::ChainStore::new(100);
+        let (leios_store, _leios_rx) = crate::peer::leios_store::LeiosStore::new(100);
+
+        let coordinator = Coordinator::new(
+            config,
+            peer_event_sender.clone(),
+            peer_event_receiver,
+            net_event_sender,
+            net_cmd_receiver,
+            chain_store,
+            Some(leios_store),
+        );
+
+        (coordinator, peer_event_sender, net_event_receiver)
+    }
+
+    /// Helper: insert a fake peer into the coordinator with a given RTT.
+    fn insert_peer(
+        coordinator: &mut Coordinator,
+        peer_id: PeerId,
+        rtt: Option<Duration>,
+    ) -> mpsc::Receiver<PeerCommand> {
+        let (cmd_sender, cmd_receiver) = mpsc::channel(16);
+        coordinator.peers.insert(
+            peer_id,
+            PeerState {
+                address: format!("test-{}:3001", peer_id.0),
+                mode: ConnectionMode::InitiatorOnly,
+                commands: cmd_sender,
+                task_handle: tokio::spawn(async {}),
+                tip: None,
+                rtt,
+                reconnect_backoff: Duration::from_secs(1),
+            },
+        );
+        cmd_receiver
+    }
+
+    fn test_hash() -> [u8; 32] {
+        let mut h = [0u8; 32];
+        h[0] = 0xAB;
+        h
+    }
+
+    fn test_hash2() -> [u8; 32] {
+        let mut h = [0u8; 32];
+        h[0] = 0xCD;
+        h
+    }
+
+    #[tokio::test]
+    async fn leios_block_offer_dedup() {
+        let (mut coordinator, _, mut net_rx) = make_leios_coordinator(1000);
+        let peer_a = PeerId(0);
+        let peer_b = PeerId(1);
+        insert_peer(&mut coordinator, peer_a, None);
+        insert_peer(&mut coordinator, peer_b, None);
+
+        let hash = test_hash();
+
+        // Peer A offers an EB.
+        coordinator
+            .handle_peer_event(peer_a, PeerEvent::LeiosBlockOffered { slot: 100, hash })
+            .await;
+
+        // Should produce LeiosBlockOffered.
+        let event = net_rx.try_recv().unwrap();
+        assert!(matches!(
+            event,
+            NetworkEvent::LeiosBlockOffered { slot: 100, .. }
+        ));
+
+        // Peer B offers the same EB.
+        coordinator
+            .handle_peer_event(peer_b, PeerEvent::LeiosBlockOffered { slot: 100, hash })
+            .await;
+
+        // Should NOT produce another event (deduplicated).
+        assert!(net_rx.try_recv().is_err());
+
+        // Both peers should be tracked as offerers.
+        let offerers = coordinator.leios_block_offers.get(&(100, hash)).unwrap();
+        assert_eq!(offerers.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn leios_txs_offer_separate_event() {
+        let (mut coordinator, _, mut net_rx) = make_leios_coordinator(1000);
+        let peer_a = PeerId(0);
+        insert_peer(&mut coordinator, peer_a, None);
+
+        let hash = test_hash();
+
+        // Peer offers TXs for an EB.
+        coordinator
+            .handle_peer_event(peer_a, PeerEvent::LeiosBlockTxsOffered { slot: 50, hash })
+            .await;
+
+        // Should produce LeiosBlockTxsOffered (not LeiosBlockOffered).
+        let event = net_rx.try_recv().unwrap();
+        match event {
+            NetworkEvent::LeiosBlockTxsOffered { slot, .. } => {
+                assert_eq!(slot, 50);
+            }
+            other => panic!("expected LeiosBlockTxsOffered, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn leios_vote_dedup_partial() {
+        let (mut coordinator, _, mut net_rx) = make_leios_coordinator(1000);
+        let peer_a = PeerId(0);
+        let peer_b = PeerId(1);
+        insert_peer(&mut coordinator, peer_a, None);
+        insert_peer(&mut coordinator, peer_b, None);
+
+        // Peer A offers votes (1, "aa") and (2, "bb").
+        coordinator
+            .handle_peer_event(
+                peer_a,
+                PeerEvent::LeiosVotesOffered {
+                    votes: vec![(1, vec![0xAA]), (2, vec![0xBB])],
+                },
+            )
+            .await;
+
+        let event = net_rx.try_recv().unwrap();
+        match event {
+            NetworkEvent::LeiosVotesOffered { votes } => {
+                assert_eq!(votes.len(), 2);
+            }
+            other => panic!("expected LeiosVotesOffered, got {other:?}"),
+        }
+
+        // Peer B offers votes (2, "bb") and (3, "cc") — overlap on (2, "bb").
+        coordinator
+            .handle_peer_event(
+                peer_b,
+                PeerEvent::LeiosVotesOffered {
+                    votes: vec![(2, vec![0xBB]), (3, vec![0xCC])],
+                },
+            )
+            .await;
+
+        // Should only forward the unseen vote (3, "cc").
+        let event = net_rx.try_recv().unwrap();
+        match event {
+            NetworkEvent::LeiosVotesOffered { votes } => {
+                assert_eq!(votes.len(), 1);
+                assert_eq!(votes[0], (3, vec![0xCC]));
+            }
+            other => panic!("expected LeiosVotesOffered with 1 vote, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn leios_fetch_routing_by_rtt() {
+        let (mut coordinator, _, _net_rx) = make_leios_coordinator(1000);
+        let peer_a = PeerId(0);
+        let peer_b = PeerId(1);
+        let mut cmd_rx_a = insert_peer(&mut coordinator, peer_a, Some(Duration::from_millis(200)));
+        let _cmd_rx_b = insert_peer(&mut coordinator, peer_b, Some(Duration::from_millis(50)));
+
+        let hash = test_hash();
+
+        // Both peers offer the same block.
+        coordinator
+            .handle_peer_event(peer_a, PeerEvent::LeiosBlockOffered { slot: 10, hash })
+            .await;
+        coordinator
+            .handle_peer_event(peer_b, PeerEvent::LeiosBlockOffered { slot: 10, hash })
+            .await;
+
+        // Request fetch — should route to peer_b (lower RTT).
+        coordinator
+            .handle_network_command(NetworkCommand::FetchLeiosBlock { slot: 10, hash })
+            .await;
+
+        // Peer A should NOT receive the command.
+        assert!(cmd_rx_a.try_recv().is_err());
+
+        // Peer B should have received it — verified via pending_leios_block_fetches.
+        let pending_peer = coordinator
+            .pending_leios_block_fetches
+            .get(&(10, hash))
+            .unwrap();
+        assert_eq!(*pending_peer, peer_b);
+    }
+
+    #[tokio::test]
+    async fn leios_pending_fetch_dedup() {
+        let (mut coordinator, _, _net_rx) = make_leios_coordinator(1000);
+        let peer_a = PeerId(0);
+        let mut cmd_rx_a = insert_peer(&mut coordinator, peer_a, Some(Duration::from_millis(10)));
+
+        let hash = test_hash();
+
+        // Peer offers the block.
+        coordinator
+            .handle_peer_event(peer_a, PeerEvent::LeiosBlockOffered { slot: 10, hash })
+            .await;
+
+        // First fetch request.
+        coordinator
+            .handle_network_command(NetworkCommand::FetchLeiosBlock { slot: 10, hash })
+            .await;
+
+        // Should have sent command.
+        assert!(cmd_rx_a.try_recv().is_ok());
+
+        // Second fetch request for same block — should be suppressed.
+        coordinator
+            .handle_network_command(NetworkCommand::FetchLeiosBlock { slot: 10, hash })
+            .await;
+
+        // No second command sent.
+        assert!(cmd_rx_a.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn leios_pending_fetch_cleanup_on_failure() {
+        let (mut coordinator, _, mut net_rx) = make_leios_coordinator(1000);
+        let peer_a = PeerId(0);
+        insert_peer(&mut coordinator, peer_a, Some(Duration::from_millis(10)));
+
+        let hash = test_hash();
+
+        // Peer offers and we start fetching.
+        coordinator
+            .handle_peer_event(peer_a, PeerEvent::LeiosBlockOffered { slot: 10, hash })
+            .await;
+        let _ = net_rx.try_recv(); // drain offer event
+        coordinator
+            .handle_network_command(NetworkCommand::FetchLeiosBlock { slot: 10, hash })
+            .await;
+        assert!(coordinator
+            .pending_leios_block_fetches
+            .contains_key(&(10, hash)));
+
+        // Peer fails.
+        coordinator
+            .handle_peer_event(
+                peer_a,
+                PeerEvent::Failed {
+                    reason: "boom".to_string(),
+                },
+            )
+            .await;
+
+        // Pending fetch should be cleaned up.
+        assert!(coordinator.pending_leios_block_fetches.is_empty());
+        // Offer tracking should also be cleaned.
+        let offerers = coordinator
+            .leios_block_offers
+            .get(&(10, hash))
+            .map(|v| v.len())
+            .unwrap_or(0);
+        assert_eq!(offerers, 0);
+    }
+
+    #[tokio::test]
+    async fn leios_seen_set_pruning() {
+        let (mut coordinator, _, mut net_rx) = make_leios_coordinator(10);
+        let peer_a = PeerId(0);
+        insert_peer(&mut coordinator, peer_a, None);
+
+        let hash = test_hash();
+
+        // Offer at slot 1.
+        coordinator
+            .handle_peer_event(peer_a, PeerEvent::LeiosBlockOffered { slot: 1, hash })
+            .await;
+        assert!(net_rx.try_recv().is_ok()); // forwarded
+
+        // Offer at slot 20 — triggers pruning (window=10, so cutoff=10).
+        let hash2 = test_hash2();
+        coordinator
+            .handle_peer_event(
+                peer_a,
+                PeerEvent::LeiosBlockOffered {
+                    slot: 20,
+                    hash: hash2,
+                },
+            )
+            .await;
+        assert!(net_rx.try_recv().is_ok()); // forwarded
+
+        // Slot 1 should have been pruned from seen set.
+        assert!(!coordinator.seen_leios_blocks.contains(&(1, hash)));
+
+        // Re-offer (1, hash) — should be treated as new since it was pruned.
+        coordinator
+            .handle_peer_event(peer_a, PeerEvent::LeiosBlockOffered { slot: 1, hash })
+            .await;
+        assert!(net_rx.try_recv().is_ok()); // forwarded again
+    }
+
+    #[tokio::test]
+    async fn leios_fetch_block_txs_routing() {
+        let (mut coordinator, _, _net_rx) = make_leios_coordinator(1000);
+        let peer_a = PeerId(0);
+        let peer_b = PeerId(1);
+        insert_peer(&mut coordinator, peer_a, Some(Duration::from_millis(200)));
+        let mut cmd_rx_b = insert_peer(&mut coordinator, peer_b, Some(Duration::from_millis(30)));
+
+        let hash = test_hash();
+
+        // Both peers offer TXs.
+        coordinator
+            .handle_peer_event(peer_a, PeerEvent::LeiosBlockTxsOffered { slot: 5, hash })
+            .await;
+        coordinator
+            .handle_peer_event(peer_b, PeerEvent::LeiosBlockTxsOffered { slot: 5, hash })
+            .await;
+
+        // Fetch TXs — should route to peer_b (lower RTT).
+        let bitmap = std::collections::BTreeMap::from([(0u16, 0xFFu64)]);
+        coordinator
+            .handle_network_command(NetworkCommand::FetchLeiosBlockTxs {
+                slot: 5,
+                hash,
+                bitmap,
+            })
+            .await;
+
+        // Peer B should have received the command.
+        let cmd = cmd_rx_b.try_recv().unwrap();
+        match cmd {
+            PeerCommand::FetchLeiosBlockTxs { slot, .. } => assert_eq!(slot, 5),
+            other => panic!("expected FetchLeiosBlockTxs, got {other:?}"),
+        }
+
+        // Should be tracked as pending.
+        assert!(coordinator
+            .pending_leios_txs_fetches
+            .contains_key(&(5, hash)));
     }
 
     #[tokio::test]

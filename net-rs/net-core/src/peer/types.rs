@@ -6,6 +6,8 @@
 
 use std::time::Duration;
 
+use std::collections::BTreeMap;
+
 use crate::protocols::peersharing::PeerAddress;
 use crate::types::{BlockBody, Point, Tip, WrappedHeader};
 
@@ -65,6 +67,13 @@ pub enum PeerEvent {
     /// LeiosFetch: requested votes arrived.
     LeiosVotesFetched { votes: Vec<Vec<u8>> },
 
+    /// LeiosFetch: requested transactions for an EB arrived.
+    LeiosBlockTxsFetched {
+        slot: u64,
+        hash: [u8; 32],
+        transactions: Vec<Vec<u8>>,
+    },
+
     /// Peer misbehaved or connection broke.
     Failed { reason: String },
 }
@@ -80,6 +89,13 @@ pub enum PeerCommand {
 
     /// Fetch an endorser block via LeiosFetch.
     FetchLeiosBlock { slot: u64, hash: [u8; 32] },
+
+    /// Fetch selective transactions from an EB via LeiosFetch (bitmap addressing).
+    FetchLeiosBlockTxs {
+        slot: u64,
+        hash: [u8; 32],
+        bitmap: BTreeMap<u16, u64>,
+    },
 
     /// Fetch votes via LeiosFetch.
     FetchLeiosVotes { votes: Vec<(u64, Vec<u8>)> },
@@ -126,6 +142,9 @@ pub enum NetworkEvent {
     /// Leios: an endorser block is available for download from a peer.
     LeiosBlockOffered { slot: u64, hash: [u8; 32] },
 
+    /// Leios: an EB's transactions are available for download from a peer.
+    LeiosBlockTxsOffered { slot: u64, hash: [u8; 32] },
+
     /// Leios: votes are available for download.
     LeiosVotesOffered { votes: Vec<(u64, Vec<u8>)> },
 
@@ -138,6 +157,13 @@ pub enum NetworkEvent {
 
     /// Leios: fetched votes arrived.
     LeiosVotesReceived { votes: Vec<Vec<u8>> },
+
+    /// Leios: fetched transactions for an EB arrived.
+    LeiosBlockTxsReceived {
+        slot: u64,
+        hash: [u8; 32],
+        transactions: Vec<Vec<u8>>,
+    },
 }
 
 /// Commands sent from the application to the coordinator.
@@ -165,6 +191,16 @@ pub enum NetworkCommand {
 
     /// Fetch a specific Leios block. Coordinator picks the best peer.
     FetchLeiosBlock { slot: u64, hash: [u8; 32] },
+
+    /// Fetch selective transactions from an EB. Coordinator picks the best peer.
+    FetchLeiosBlockTxs {
+        slot: u64,
+        hash: [u8; 32],
+        bitmap: BTreeMap<u16, u64>,
+    },
+
+    /// Fetch specific votes. Coordinator picks the best peer(s).
+    FetchLeiosVotes { votes: Vec<(u64, Vec<u8>)> },
 
     /// Inject a Leios block into the Leios store (for responder peers to serve).
     InjectLeiosBlock {

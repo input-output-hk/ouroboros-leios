@@ -295,8 +295,18 @@ pub(crate) fn spawn_peersharing(
 /// Command sent to the LeiosFetch sub-task via an internal channel.
 #[derive(Debug)]
 pub(crate) enum LeiosFetchCommand {
-    FetchBlock { slot: u64, hash: [u8; 32] },
-    FetchVotes { votes: Vec<(u64, Vec<u8>)> },
+    Block {
+        slot: u64,
+        hash: [u8; 32],
+    },
+    BlockTxs {
+        slot: u64,
+        hash: [u8; 32],
+        bitmap: std::collections::BTreeMap<u16, u64>,
+    },
+    Votes {
+        votes: Vec<(u64, Vec<u8>)>,
+    },
 }
 
 /// Spawn the LeiosNotify sub-task. Continuous request_next loop.
@@ -359,7 +369,7 @@ pub(crate) fn spawn_leios_fetch(
 
         while let Some(cmd) = command_receiver.recv().await {
             match cmd {
-                LeiosFetchCommand::FetchBlock { slot, hash } => {
+                LeiosFetchCommand::Block { slot, hash } => {
                     match leios_fetch::fetch_block(&mut runner, slot, hash).await {
                         Ok(block) => {
                             let _ = event_sender
@@ -379,7 +389,34 @@ pub(crate) fn spawn_leios_fetch(
                         }
                     }
                 }
-                LeiosFetchCommand::FetchVotes { votes } => {
+                LeiosFetchCommand::BlockTxs { slot, hash, bitmap } => {
+                    match leios_fetch::fetch_block_txs(&mut runner, slot, hash, bitmap).await {
+                        Ok(transactions) => {
+                            let _ = event_sender
+                                .send((
+                                    peer_id,
+                                    PeerEvent::LeiosBlockTxsFetched {
+                                        slot,
+                                        hash,
+                                        transactions,
+                                    },
+                                ))
+                                .await;
+                        }
+                        Err(e) => {
+                            let _ = event_sender
+                                .send((
+                                    peer_id,
+                                    PeerEvent::Failed {
+                                        reason: format!("leios_fetch block_txs: {e}"),
+                                    },
+                                ))
+                                .await;
+                            return;
+                        }
+                    }
+                }
+                LeiosFetchCommand::Votes { votes } => {
                     match leios_fetch::fetch_votes(&mut runner, votes).await {
                         Ok(vote_data) => {
                             let _ = event_sender
@@ -514,12 +551,17 @@ pub(crate) async fn run_peer_task(mut config: PeerTaskConfig) {
                     }
                     Some(PeerCommand::FetchLeiosBlock { slot, hash }) => {
                         if let Some((_, _, ref lf_sender)) = leios_handles {
-                            let _ = lf_sender.send(LeiosFetchCommand::FetchBlock { slot, hash }).await;
+                            let _ = lf_sender.send(LeiosFetchCommand::Block { slot, hash }).await;
+                        }
+                    }
+                    Some(PeerCommand::FetchLeiosBlockTxs { slot, hash, bitmap }) => {
+                        if let Some((_, _, ref lf_sender)) = leios_handles {
+                            let _ = lf_sender.send(LeiosFetchCommand::BlockTxs { slot, hash, bitmap }).await;
                         }
                     }
                     Some(PeerCommand::FetchLeiosVotes { votes }) => {
                         if let Some((_, _, ref lf_sender)) = leios_handles {
-                            let _ = lf_sender.send(LeiosFetchCommand::FetchVotes { votes }).await;
+                            let _ = lf_sender.send(LeiosFetchCommand::Votes { votes }).await;
                         }
                     }
                     Some(PeerCommand::Disconnect) | None => {
@@ -985,7 +1027,7 @@ mod tests {
 
         // Send a fetch command.
         command_sender
-            .send(LeiosFetchCommand::FetchBlock {
+            .send(LeiosFetchCommand::Block {
                 slot: 42,
                 hash: [0xAB; 32],
             })

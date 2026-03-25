@@ -27,6 +27,7 @@ pub async fn run(
         chain_store_capacity: 2160,
         duplex,
         leios_enabled: leios,
+        leios_dedup_window: 1000,
     };
 
     let mut handle = spawn_coordinator(config);
@@ -90,6 +91,9 @@ pub async fn run(
             NetworkEvent::LeiosBlockOffered { slot, .. } => {
                 println!("  leios: EB offered at slot {slot}");
             }
+            NetworkEvent::LeiosBlockTxsOffered { slot, .. } => {
+                println!("  leios: EB transactions offered at slot {slot}");
+            }
             NetworkEvent::LeiosVotesOffered { votes } => {
                 println!("  leios: {} vote(s) offered", votes.len());
             }
@@ -101,6 +105,14 @@ pub async fn run(
             }
             NetworkEvent::LeiosVotesReceived { votes } => {
                 println!("  leios: {} vote(s) received", votes.len());
+            }
+            NetworkEvent::LeiosBlockTxsReceived {
+                slot, transactions, ..
+            } => {
+                println!(
+                    "  leios: EB txs received at slot {slot} ({} txs)",
+                    transactions.len()
+                );
             }
         }
     }
