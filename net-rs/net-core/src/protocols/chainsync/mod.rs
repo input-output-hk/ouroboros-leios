@@ -241,7 +241,7 @@ mod tests {
             ChainSync::transition(
                 &State::StCanAwait,
                 &Message::MsgRollForward {
-                    header: WrappedHeader(vec![]),
+                    header: WrappedHeader::opaque(vec![]),
                     tip: tip.clone(),
                 }
             )
@@ -265,7 +265,7 @@ mod tests {
             ChainSync::transition(
                 &State::StMustReply,
                 &Message::MsgRollForward {
-                    header: WrappedHeader(vec![]),
+                    header: WrappedHeader::opaque(vec![]),
                     tip: tip.clone(),
                 }
             )
@@ -411,7 +411,7 @@ mod tests {
 
             runner
                 .send(&Message::MsgRollForward {
-                    header: WrappedHeader(header_clone),
+                    header: WrappedHeader::opaque(header_clone),
                     tip: tip_clone,
                 })
                 .await
@@ -435,7 +435,7 @@ mod tests {
             let event = request_next(&mut runner).await.unwrap();
             match event {
                 ChainSyncEvent::RollForward { header, tip: t } => {
-                    assert_eq!(header, WrappedHeader(header_bytes));
+                    assert_eq!(header, WrappedHeader::opaque(header_bytes));
                     assert_eq!(t, tip);
                 }
                 other => panic!("expected RollForward, got {other:?}"),
@@ -470,7 +470,7 @@ mod tests {
             runner.send(&Message::MsgAwaitReply).await.unwrap();
             runner
                 .send(&Message::MsgRollForward {
-                    header: WrappedHeader(vec![0x80]),
+                    header: WrappedHeader::opaque(vec![0x80]),
                     tip: tip_clone,
                 })
                 .await

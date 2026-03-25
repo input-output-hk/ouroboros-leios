@@ -208,7 +208,7 @@ mod tests {
             BlockFetch::transition(
                 &State::StStreaming,
                 &Message::MsgBlock {
-                    body: BlockBody(vec![]),
+                    body: BlockBody::opaque(vec![]),
                 }
             )
             .unwrap(),
@@ -294,8 +294,8 @@ mod tests {
     async fn blockfetch_request_and_stream() {
         let ((cs, cr), (ss, sr), ra, rb) = make_blockfetch_mux_pair();
 
-        let block1 = BlockBody(vec![0xd8, 0x18, 0x43, 0x01, 0x02, 0x03]);
-        let block2 = BlockBody(vec![0xd8, 0x18, 0x43, 0x04, 0x05, 0x06]);
+        let block1 = BlockBody::opaque(vec![0xd8, 0x18, 0x43, 0x01, 0x02, 0x03]);
+        let block2 = BlockBody::opaque(vec![0xd8, 0x18, 0x43, 0x04, 0x05, 0x06]);
         let block1c = block1.clone();
         let block2c = block2.clone();
 

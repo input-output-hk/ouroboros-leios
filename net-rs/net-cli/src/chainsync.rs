@@ -50,7 +50,7 @@ pub async fn run(
                 println!(
                     "  [{:>4}] roll forward  header={} bytes  tip={}",
                     i + 1,
-                    header.0.len(),
+                    header.raw.len(),
                     tip,
                 );
             }

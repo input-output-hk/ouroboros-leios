@@ -143,7 +143,8 @@ mod tests {
 
     #[test]
     fn roll_forward_round_trip() {
-        let header = WrappedHeader(vec![0x82, 0x06, 0xd8, 0x18, 0x44, 0xde, 0xad, 0xbe, 0xef]);
+        let header =
+            WrappedHeader::opaque(vec![0x82, 0x06, 0xd8, 0x18, 0x44, 0xde, 0xad, 0xbe, 0xef]);
         let msg = Message::MsgRollForward {
             header: header.clone(),
             tip: sample_tip(),
@@ -263,7 +264,7 @@ mod tests {
     fn truncated_roll_forward_fails() {
         // Encode a valid RollForward then truncate.
         let msg = Message::MsgRollForward {
-            header: WrappedHeader(vec![0x80]),
+            header: WrappedHeader::opaque(vec![0x80]),
             tip: sample_tip(),
         };
         let encoded = minicbor::to_vec(&msg).unwrap();

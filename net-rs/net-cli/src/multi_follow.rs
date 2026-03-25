@@ -71,7 +71,7 @@ pub async fn run(
                 println!("  rollback to {point}  tip: {tip}");
             }
             NetworkEvent::BlockReceived { point, body } => {
-                println!("  block received: {} ({} bytes)", point, body.0.len());
+                println!("  block received: {} ({} bytes)", point, body.raw.len());
             }
             NetworkEvent::PeersDiscovered { peers } => {
                 println!("  discovered {} peer(s):", peers.len());

@@ -109,7 +109,7 @@ pub enum NetworkCommand {
     /// Used by block generators or other local producers.
     InjectBlock {
         point: Point,
-        header: WrappedHeader,
+        header: Box<WrappedHeader>,
         body: BlockBody,
     },
 

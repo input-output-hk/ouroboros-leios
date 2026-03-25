@@ -184,12 +184,12 @@ mod tests {
     #[test]
     fn block_announcement_round_trip() {
         let msg = Message::MsgLeiosBlockAnnouncement {
-            header: WrappedHeader(vec![0x82, 0x05, 0x00]),
+            header: WrappedHeader::opaque(vec![0x82, 0x05, 0x00]),
         };
         let decoded = round_trip(&msg);
         match decoded {
             Message::MsgLeiosBlockAnnouncement { header } => {
-                assert_eq!(header.0, vec![0x82, 0x05, 0x00]);
+                assert_eq!(header.raw, vec![0x82, 0x05, 0x00]);
             }
             other => panic!("expected MsgLeiosBlockAnnouncement, got {other:?}"),
         }

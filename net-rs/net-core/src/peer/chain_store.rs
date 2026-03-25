@@ -229,8 +229,8 @@ mod tests {
 
     fn make_block(slot: u64) -> (Point, WrappedHeader, BlockBody) {
         let point = make_point(slot);
-        let header = WrappedHeader(vec![0xA0]);
-        let body = BlockBody(vec![0xBF, 0xFF]);
+        let header = WrappedHeader::opaque(vec![0xA0]);
+        let body = BlockBody::opaque(vec![0xBF, 0xFF]);
         (point, header, body)
     }
 

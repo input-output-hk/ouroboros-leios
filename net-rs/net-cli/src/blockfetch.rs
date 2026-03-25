@@ -70,7 +70,7 @@ pub async fn run(host: &str, magic: u64) -> Result<(), Box<dyn std::error::Error
             block_count += 1;
             println!(
                 "  block #{block_count}: {} bytes  tip={}",
-                body.0.len(),
+                body.raw.len(),
                 tip
             );
         }

@@ -143,3 +143,35 @@ bounds) since those depend on message-specific decode logic.
 - `decode_indefinite_outer_array` — verifies indefinite array support
 
 **Verdict:** No DOS vectors identified.
+
+---
+
+## HeaderInfo parser (types.rs) — Phase 4c
+
+**Design:** `HeaderInfo::parse()` navigates the Shelley+ header CBOR structure to
+extract common fields (slot, block_number, issuer, etc.) plus optional Leios
+extensions. Returns `None` (not error) for Byron headers or any parse failure.
+
+**Allocation bounds:**
+
+| Decode path | Field | Max | Check location |
+|---|---|---|---|
+| Outer array | era tag | u8 (from u32) | `try_parse` |
+| `#6.24` tag | inner bytes | bounded by `MAX_HEADER_SIZE` (65,535) at mux level | `WrappedHeader::decode` |
+| `prev_hash` | hash | exactly 32 or null | `parse_optional_hash` |
+| `issuer_vkey` | hash | exactly 32 | `parse_hash32` |
+| `block_body_hash` | hash | exactly 32 | `parse_hash32` |
+| `announced_eb` | hash | exactly 32 | `parse_hash32` |
+| `announced_eb_size` | uint | u32 | minicbor `u32()` |
+| `certified_eb` | bool | 1 byte | minicbor `bool()` |
+| Skipped fields | VRF, cert, version | — | `decoder.skip()` (no allocation) |
+
+**Key safety properties:**
+- No allocations from untrusted length fields — all decoded values are fixed-size
+- `decoder.skip()` for fields we don't need — zero allocation, just advances position
+- Any decode error → returns `None`, no panic
+- Byron headers (era 0/1) → returns `None` immediately
+- Inner bytes bounded by `MAX_HEADER_SIZE` at the mux/codec layer
+
+**Verdict:** No DOS vectors. Parser reads fixed-size fields and skips
+variable-size ones without allocating.
