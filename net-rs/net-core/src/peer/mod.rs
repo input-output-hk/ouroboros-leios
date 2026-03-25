@@ -82,6 +82,9 @@ pub struct CoordinatorConfig {
     pub duplex: bool,
     /// Enable Leios protocols (LeiosNotify, LeiosFetch). Default: false.
     pub leios_enabled: bool,
+    /// Slot window for Leios announcement deduplication. Offers older than
+    /// `max_seen_slot - leios_dedup_window` are pruned. Default: 1000.
+    pub leios_dedup_window: u64,
 }
 
 impl Default for CoordinatorConfig {
@@ -95,6 +98,7 @@ impl Default for CoordinatorConfig {
             chain_store_capacity: 2160,
             duplex: false,
             leios_enabled: false,
+            leios_dedup_window: 1000,
         }
     }
 }

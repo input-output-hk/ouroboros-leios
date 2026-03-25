@@ -148,6 +148,7 @@ pub async fn run(
         chain_store_capacity: 10_000,
         duplex: false,
         leios_enabled: leios,
+        leios_dedup_window: 1000,
     };
 
     let mut handle = spawn_coordinator(config);
