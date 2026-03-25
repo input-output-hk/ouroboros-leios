@@ -175,3 +175,50 @@ extensions. Returns `None` (not error) for Byron headers or any parse failure.
 
 **Verdict:** No DOS vectors. Parser reads fixed-size fields and skips
 variable-size ones without allocating.
+
+---
+
+## Coordinator Leios extensions — Phase 4e
+
+Phase 4e adds dedup, offer tracking, and smart fetch routing to the coordinator
+for Leios events. All new state is coordinator-internal (not wire data), but is
+driven by untrusted peer events.
+
+**Data structures and bounds:**
+
+| Structure | Type | Bound | Behavior at cap |
+|---|---|---|---|
+| `seen_leios_blocks` | `HashSet<(u64, [u8;32])>` | `MAX_LEIOS_SEEN` (100,000) | Fail-open: forward without dedup |
+| `seen_leios_txs` | `HashSet<(u64, [u8;32])>` | `MAX_LEIOS_SEEN` (100,000) | Fail-open: forward without dedup |
+| `seen_leios_votes` | `HashSet<(u64, Vec<u8>)>` | `MAX_LEIOS_SEEN` (100,000) | Fail-open: forward without dedup |
+| `leios_block_offers` | `HashMap<..., Vec<PeerId>>` | `MAX_LEIOS_OFFERS` (100,000) | Stop tracking new offers |
+| `leios_txs_offers` | `HashMap<..., Vec<PeerId>>` | `MAX_LEIOS_OFFERS` (100,000) | Stop tracking new offers |
+| `leios_vote_offers` | `HashMap<..., Vec<PeerId>>` | `MAX_LEIOS_OFFERS` (100,000) | Stop tracking new offers |
+| `pending_leios_block_fetches` | `HashMap<..., PeerId>` | Bounded by app commands | Cleaned on fetch or peer failure |
+| `pending_leios_txs_fetches` | `HashMap<..., PeerId>` | Bounded by app commands | Cleaned on fetch or peer failure |
+| `pending_leios_vote_fetches` | `HashMap<..., PeerId>` | Bounded by app commands | Cleaned on fetch or peer failure |
+
+**Allocation bounds:**
+- Capacity caps (`MAX_LEIOS_SEEN`, `MAX_LEIOS_OFFERS`) prevent unbounded growth
+  regardless of peer behavior (malicious slots, unique hash flooding)
+- Slot-based pruning (`update_leios_slot`) handles normal-case eviction; capacity
+  caps are the adversarial safety net
+- `Vec<PeerId>` in offer maps: deduped before push (bounded by `max_peers`)
+- `voter_id` in vote keys: bounded to 256 bytes at codec layer (`MAX_VOTER_ID_SIZE`)
+
+**Blocking:**
+- Event handlers use `.send().await` on `network_events` channel (capacity 64).
+  This is a pre-existing pattern shared with all Praos event handlers. If the
+  application consumer stalls, the coordinator loop blocks. Not addressed here —
+  separate concern affecting the entire coordinator, not specific to Phase 4e.
+
+**No panics:**
+- No `unwrap()`, `expect()`, or unchecked indexing in production code
+- All fallbacks use `unwrap_or()`, `unwrap_or_default()`, or safe patterns
+
+**Error propagation:**
+- Channel send failures are silently dropped (`let _ = ...`). This is intentional:
+  a closed app channel should not crash the coordinator.
+
+**Verdict:** All coordinator state is capacity-bounded. Dedup degrades gracefully
+under adversarial load (fail-open). No new DOS vectors identified.

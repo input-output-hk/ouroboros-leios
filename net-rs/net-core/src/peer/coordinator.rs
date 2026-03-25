@@ -5,6 +5,11 @@
 //! all peer tasks via a shared fan-in channel and sends commands to
 //! individual peers via per-peer channels.
 
+/// Max entries in Leios seen sets before dedup degrades (fail-open).
+const MAX_LEIOS_SEEN: usize = 100_000;
+/// Max entries in Leios offer maps before tracking degrades.
+const MAX_LEIOS_OFFERS: usize = 100_000;
+
 use std::collections::{HashMap, HashSet};
 use std::net::ToSocketAddrs;
 use std::sync::Arc;
@@ -331,56 +336,92 @@ impl Coordinator {
 
             PeerEvent::LeiosBlockOffered { slot, hash } => {
                 self.update_leios_slot(slot);
-                // Track which peer offered this block.
-                self.leios_block_offers
-                    .entry((slot, hash))
-                    .or_default()
-                    .push(peer_id);
-                // Deduplicate: only forward first occurrence.
-                if self.seen_leios_blocks.insert((slot, hash)) {
-                    tracing::debug!("leios: new EB offer at slot {slot} from {peer_id}");
+                // Track which peer offered this block (bounded).
+                if self.leios_block_offers.len() < MAX_LEIOS_OFFERS {
+                    let offers = self.leios_block_offers.entry((slot, hash)).or_default();
+                    if !offers.contains(&peer_id) {
+                        offers.push(peer_id);
+                    }
+                }
+                // Deduplicate: only forward first occurrence (bounded).
+                if self.seen_leios_blocks.len() < MAX_LEIOS_SEEN {
+                    if self.seen_leios_blocks.insert((slot, hash)) {
+                        tracing::debug!("leios: new EB offer at slot {slot} from {peer_id}");
+                        let _ = self
+                            .network_events
+                            .send(NetworkEvent::LeiosBlockOffered { slot, hash })
+                            .await;
+                    } else {
+                        tracing::debug!(
+                            "leios: deduplicated EB offer at slot {slot} from {peer_id} (already seen)"
+                        );
+                    }
+                } else {
+                    // Fail-open: forward without tracking.
+                    tracing::warn!(
+                        "leios: seen_leios_blocks at capacity, forwarding without dedup"
+                    );
                     let _ = self
                         .network_events
                         .send(NetworkEvent::LeiosBlockOffered { slot, hash })
                         .await;
-                } else {
-                    tracing::debug!(
-                        "leios: deduplicated EB offer at slot {slot} from {peer_id} (already seen)"
-                    );
                 }
             }
 
             PeerEvent::LeiosBlockTxsOffered { slot, hash } => {
                 self.update_leios_slot(slot);
-                self.leios_txs_offers
-                    .entry((slot, hash))
-                    .or_default()
-                    .push(peer_id);
-                if self.seen_leios_txs.insert((slot, hash)) {
-                    tracing::debug!("leios: new TXs offer at slot {slot} from {peer_id}");
+                if self.leios_txs_offers.len() < MAX_LEIOS_OFFERS {
+                    let offers = self.leios_txs_offers.entry((slot, hash)).or_default();
+                    if !offers.contains(&peer_id) {
+                        offers.push(peer_id);
+                    }
+                }
+                if self.seen_leios_txs.len() < MAX_LEIOS_SEEN {
+                    if self.seen_leios_txs.insert((slot, hash)) {
+                        tracing::debug!("leios: new TXs offer at slot {slot} from {peer_id}");
+                        let _ = self
+                            .network_events
+                            .send(NetworkEvent::LeiosBlockTxsOffered { slot, hash })
+                            .await;
+                    } else {
+                        tracing::debug!(
+                            "leios: deduplicated TXs offer at slot {slot} from {peer_id} (already seen)"
+                        );
+                    }
+                } else {
+                    tracing::warn!("leios: seen_leios_txs at capacity, forwarding without dedup");
                     let _ = self
                         .network_events
                         .send(NetworkEvent::LeiosBlockTxsOffered { slot, hash })
                         .await;
-                } else {
-                    tracing::debug!(
-                        "leios: deduplicated TXs offer at slot {slot} from {peer_id} (already seen)"
-                    );
                 }
             }
 
             PeerEvent::LeiosVotesOffered { votes } => {
-                // Per-vote dedup: only forward unseen votes.
+                // Per-vote dedup: only forward unseen votes (bounded).
+                let seen_at_capacity = self.seen_leios_votes.len() >= MAX_LEIOS_SEEN;
+                let offers_at_capacity = self.leios_vote_offers.len() >= MAX_LEIOS_OFFERS;
                 let mut unseen = Vec::new();
                 for (slot, voter_id) in votes {
                     self.update_leios_slot(slot);
-                    self.leios_vote_offers
-                        .entry((slot, voter_id.clone()))
-                        .or_default()
-                        .push(peer_id);
-                    if self.seen_leios_votes.insert((slot, voter_id.clone())) {
+                    if !offers_at_capacity {
+                        let offers = self
+                            .leios_vote_offers
+                            .entry((slot, voter_id.clone()))
+                            .or_default();
+                        if !offers.contains(&peer_id) {
+                            offers.push(peer_id);
+                        }
+                    }
+                    if seen_at_capacity {
+                        // Fail-open: treat everything as unseen.
+                        unseen.push((slot, voter_id));
+                    } else if self.seen_leios_votes.insert((slot, voter_id.clone())) {
                         unseen.push((slot, voter_id));
                     }
+                }
+                if seen_at_capacity {
+                    tracing::warn!("leios: seen_leios_votes at capacity, forwarding without dedup");
                 }
                 if !unseen.is_empty() {
                     tracing::debug!("leios: {} new vote(s) from {peer_id}", unseen.len());
