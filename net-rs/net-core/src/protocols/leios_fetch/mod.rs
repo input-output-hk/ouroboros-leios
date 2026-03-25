@@ -9,7 +9,7 @@ pub mod codec;
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use crate::protocol::{Agency, Protocol, ProtocolError, Runner};
+use crate::protocols::{Agency, Protocol, ProtocolError, Runner};
 
 /// LeiosFetch protocol ID in the multiplexer.
 pub const PROTOCOL_ID: u16 = 19;
@@ -281,10 +281,11 @@ pub async fn done(runner: &mut Runner<LeiosFetch>) -> Result<(), ProtocolError> 
 mod tests {
     use super::*;
     use crate::bearer::mem::MemBearer;
-    use crate::codec::{CodecRecv, CodecSend};
     use crate::mux::scheduler::RoundRobin;
-    use crate::mux::{Mux, MuxConfig, ProtocolConfig, MODE_INITIATOR, MODE_RESPONDER};
-    use crate::protocol::Role;
+    use crate::mux::{
+        CodecRecv, CodecSend, Mux, MuxConfig, ProtocolConfig, MODE_INITIATOR, MODE_RESPONDER,
+    };
+    use crate::protocols::Role;
 
     fn test_hash() -> [u8; 32] {
         let mut h = [0u8; 32];

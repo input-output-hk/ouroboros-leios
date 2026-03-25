@@ -7,8 +7,8 @@
 
 use bytes::{Bytes, BytesMut};
 
-use crate::mux::channel::{ChannelRecv, ChannelSend};
-use crate::mux::MuxError;
+use super::channel::{ChannelRecv, ChannelSend};
+use super::MuxError;
 
 /// Sending half: CBOR-encodes messages and writes them to the channel.
 pub struct CodecSend {

@@ -8,13 +8,13 @@ use std::sync::Arc;
 
 use tokio::sync::mpsc;
 
-use crate::codec::{CodecRecv, CodecSend};
-use crate::protocol::{Role, Runner};
+use crate::mux::{CodecRecv, CodecSend};
 use crate::protocols::blockfetch::{BlockFetch, Message as BfMsg};
 use crate::protocols::chainsync::{ChainSync, Message as CsMsg};
 use crate::protocols::keepalive::{KeepAlive, Message as KaMsg};
 use crate::protocols::peersharing::{Message as PsMsg, PeerAddress, PeerSharing};
 use crate::protocols::txsubmission::{self, Message as TsMsg, TxSubmission};
+use crate::protocols::{Role, Runner};
 
 use super::chain_store::ChainStore;
 use super::types::PeerEvent;

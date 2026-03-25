@@ -12,8 +12,8 @@ use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::time::Duration;
 
-use crate::codec::{CodecRecv, CodecSend};
-use crate::protocol::{Agency, Protocol, ProtocolError, Role, Runner};
+use crate::mux::{CodecRecv, CodecSend};
+use crate::protocols::{Agency, Protocol, ProtocolError, Role, Runner};
 
 /// Handshake protocol ID in the multiplexer.
 pub const PROTOCOL_ID: u16 = 0;

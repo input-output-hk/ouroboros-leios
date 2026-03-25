@@ -1,9 +1,8 @@
 use std::net::ToSocketAddrs;
 
 use net_core::bearer::tcp::TcpBearer;
-use net_core::codec::{CodecRecv, CodecSend};
 use net_core::mux::scheduler::RoundRobin;
-use net_core::mux::{Mux, MuxConfig, ProtocolConfig, MODE_INITIATOR};
+use net_core::mux::{CodecRecv, CodecSend, Mux, MuxConfig, ProtocolConfig, MODE_INITIATOR};
 use net_core::protocols::handshake;
 use net_core::protocols::handshake::n2n;
 

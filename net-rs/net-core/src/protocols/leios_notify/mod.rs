@@ -8,7 +8,7 @@ pub mod codec;
 
 use std::time::Duration;
 
-use crate::protocol::{Agency, Protocol, ProtocolError, Runner};
+use crate::protocols::{Agency, Protocol, ProtocolError, Runner};
 use crate::types::WrappedHeader;
 
 /// LeiosNotify protocol ID in the multiplexer.
@@ -156,10 +156,11 @@ pub async fn done(runner: &mut Runner<LeiosNotify>) -> Result<(), ProtocolError>
 mod tests {
     use super::*;
     use crate::bearer::mem::MemBearer;
-    use crate::codec::{CodecRecv, CodecSend};
     use crate::mux::scheduler::RoundRobin;
-    use crate::mux::{Mux, MuxConfig, ProtocolConfig, MODE_INITIATOR, MODE_RESPONDER};
-    use crate::protocol::Role;
+    use crate::mux::{
+        CodecRecv, CodecSend, Mux, MuxConfig, ProtocolConfig, MODE_INITIATOR, MODE_RESPONDER,
+    };
+    use crate::protocols::Role;
 
     #[test]
     fn agency_correct() {

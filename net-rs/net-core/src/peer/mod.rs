@@ -110,7 +110,7 @@ pub struct CoordinatorHandle {
 #[derive(Debug, thiserror::Error)]
 pub enum PeerError {
     #[error("protocol error: {0}")]
-    Protocol(#[from] crate::protocol::ProtocolError),
+    Protocol(#[from] crate::protocols::ProtocolError),
 
     #[error("mux error: {0}")]
     Mux(#[from] crate::mux::MuxError),

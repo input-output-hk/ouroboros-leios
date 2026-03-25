@@ -10,13 +10,12 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 
-use crate::codec::{CodecRecv, CodecSend};
-use crate::mux::{MuxConfig, ProtocolConfig};
-use crate::protocol::{Role, Runner};
+use crate::mux::{CodecRecv, CodecSend, MuxConfig, ProtocolConfig};
 use crate::protocols::blockfetch::{self, BlockFetch};
 use crate::protocols::chainsync::{self, ChainSync, ChainSyncEvent};
 use crate::protocols::keepalive::{self, KeepAlive};
 use crate::protocols::peersharing::{self, PeerSharing};
+use crate::protocols::{Role, Runner};
 use crate::types::Point;
 
 use super::connect::{self, Connection};
@@ -389,16 +388,15 @@ mod tests {
     use crate::bearer::mem::MemBearer;
     use crate::mux::scheduler::RoundRobin;
     use crate::mux::{Mux, MODE_INITIATOR, MODE_RESPONDER};
-    use crate::protocol::Runner as ProtocolRunner;
     use crate::protocols::chainsync::{ChainSync, Message as CsMsg};
     use crate::protocols::keepalive::{KeepAlive, Message as KaMsg};
+    use crate::protocols::Runner as ProtocolRunner;
     use crate::types::{BlockBody, Point, Tip, WrappedHeader};
 
     /// Minimal fake server: serves ChainSync and KeepAlive over MemBearer.
     /// Generates `block_count` blocks then holds at tip.
     async fn run_fake_server(bearer_b: MemBearer, magic: u64, block_count: usize) {
-        use crate::codec::{CodecRecv, CodecSend};
-        use crate::mux::{MuxConfig, ProtocolConfig};
+        use crate::mux::{CodecRecv, CodecSend, MuxConfig, ProtocolConfig};
         use crate::protocols::handshake;
 
         let hs_proto = ProtocolConfig {
@@ -595,8 +593,8 @@ mod tests {
         for proto in &protos {
             let (send, recv) = mux.register(proto);
             channels.push((
-                crate::codec::CodecSend::new(send),
-                crate::codec::CodecRecv::new(recv),
+                crate::mux::CodecSend::new(send),
+                crate::mux::CodecRecv::new(recv),
             ));
         }
         let running = mux.run(bearer_a);
@@ -611,8 +609,8 @@ mod tests {
             query: false,
         });
         let hs_result = handshake::run_client(
-            crate::codec::CodecSend::new(hs_send),
-            crate::codec::CodecRecv::new(hs_recv),
+            crate::mux::CodecSend::new(hs_send),
+            crate::mux::CodecRecv::new(hs_recv),
             versions,
         )
         .await;

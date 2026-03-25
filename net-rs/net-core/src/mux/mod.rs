@@ -1,8 +1,11 @@
 pub mod channel;
+pub mod codec;
 pub mod egress;
 pub mod ingress;
 pub mod scheduler;
 pub mod wire;
+
+pub use codec::{CodecRecv, CodecSend};
 
 use std::collections::HashMap;
 use std::time::{Duration, Instant};

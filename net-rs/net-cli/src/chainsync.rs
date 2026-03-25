@@ -1,8 +1,8 @@
 use net_core::mux::ProtocolConfig;
-use net_core::protocol::Role;
-use net_core::protocol::Runner;
 use net_core::protocols::chainsync;
 use net_core::protocols::chainsync::{ChainSync, ChainSyncEvent};
+use net_core::protocols::Role;
+use net_core::protocols::Runner;
 use net_core::types::Point;
 
 use crate::connect;
