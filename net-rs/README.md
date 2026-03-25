@@ -29,7 +29,7 @@ Rust implementation of the Cardano node-to-node (N2N) network stack, covering bo
 - Accept loop for inbound connections
 - Exponential-backoff reconnection for outbound peers
 
-**Security hardened** — allocation bounds on all wire-read lengths, buffer caps, timeouts on all remote waits, clean error propagation, no panics in library code.
+**[Security hardened](docs/security-audit.md)** — allocation bounds on all wire-read lengths, buffer caps, timeouts on all remote waits, clean error propagation, no panics in library code.
 
 **258 tests** — unit tests, codec round-trips, protocol state machines, integration tests with in-memory bearers, and test vectors captured from the live Cardano mainnet.
 

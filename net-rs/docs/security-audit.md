@@ -31,7 +31,231 @@ bounds) since those depend on message-specific decode logic.
 
 ---
 
-## LeiosNotify (protocol ID 18) — Phase 4a
+## Handshake (protocol ID 0)
+
+**Constants:**
+- `SIZE_LIMIT = 5_760`
+- `TIMEOUT = 10s`
+
+**Allocation bounds:**
+
+| Decode path | Field | Max | Check location |
+|---|---|---|---|
+| `decode_version_table` | map length | 256 | `MAX_VERSION_TABLE_ENTRIES` check before `Vec::with_capacity` |
+| `decode_version_table` | per-entry raw bytes | bounded by `SIZE_LIMIT` | `d.input().get(start..end)` safe slice |
+| `decode_refuse_reason` (VersionMismatch) | version list length | 256 | `MAX_MISMATCH_VERSIONS` check before `Vec::with_capacity` |
+
+**Timeout coverage:**
+
+| State | Agency | Timeout |
+|---|---|---|
+| `StPropose` | Server | 10s |
+| `StConfirm` | Server | 10s |
+| `StDone` | Nobody | None (terminal) |
+
+**Other checks:**
+- Unknown message tags → `DecodeError`
+- Truncated messages → minicbor `DecodeError`
+- No `unwrap()`/`expect()`/indexing in non-test code
+
+**Test coverage:**
+- `oversized_version_table_rejected` — verifies `MAX_VERSION_TABLE_ENTRIES` rejection
+
+**Verdict:** No DOS vectors identified.
+
+---
+
+## ChainSync (protocol ID 2)
+
+**Constants:**
+- `INGRESS_LIMIT = 462_000`
+- `SIZE_LIMIT = 65_535`
+- `TIMEOUT_IDLE = 3673s`
+- `TIMEOUT_CAN_AWAIT = 10s`
+- `TIMEOUT_MUST_REPLY = 756s`
+- `TIMEOUT_INTERSECT = 10s`
+
+**Allocation bounds:**
+
+| Decode path | Field | Max | Check location |
+|---|---|---|---|
+| `MsgFindIntersect` | points array length | 2,048 | `decode_points` checks `MAX_POINTS` (definite + indefinite) |
+| `MsgRollForward` | header bytes | 65,535 | `WrappedHeader::decode` checks `MAX_HEADER_SIZE` |
+| `MsgRollForward` / `MsgRollBackward` | tip point hash | exactly 32 | `decode_hash32` rejects != 32 |
+| `MsgIntersectFound` | point hash | exactly 32 | `decode_hash32` rejects != 32 |
+
+**Timeout coverage:**
+
+| State | Agency | Timeout |
+|---|---|---|
+| `StIdle` | Client | None (we have agency) |
+| `StCanAwait` | Server | 10s |
+| `StMustReply` | Server | 756s |
+| `StIntersect` | Server | 10s |
+| `StDone` | Nobody | None (terminal) |
+
+**Other checks:**
+- Unknown message tags → `DecodeError`
+- Truncated messages → minicbor `DecodeError`
+- Indefinite CBOR arrays → bounded iteration with max count checks (`decode_points`)
+- No `unwrap()`/`expect()`/indexing in non-test code
+
+**Test coverage:**
+- `decode_points_oversized_rejected` — verifies `MAX_POINTS` rejection (in types module)
+
+**Verdict:** No DOS vectors identified.
+
+---
+
+## BlockFetch (protocol ID 3)
+
+**Constants:**
+- `INGRESS_LIMIT = 230_686_940` (~220 MB)
+- `SIZE_LIMIT_SMALL = 65_535` (idle/busy states)
+- `SIZE_LIMIT_STREAMING = 2_500_000` (streaming state)
+- `TIMEOUT_BUSY = 60s`
+- `TIMEOUT_STREAMING = 60s`
+
+**Allocation bounds:**
+
+| Decode path | Field | Max | Check location |
+|---|---|---|---|
+| `MsgBlock` | block body bytes | 2,500,000 | `BlockBody::decode` checks `MAX_BLOCK_SIZE` |
+| `MsgRequestRange` | from/to point hash | exactly 32 | `decode_hash32` rejects != 32 |
+
+**Timeout coverage:**
+
+| State | Agency | Timeout |
+|---|---|---|
+| `StIdle` | Client | None (we have agency) |
+| `StBusy` | Server | 60s |
+| `StStreaming` | Server | 60s |
+| `StDone` | Nobody | None (terminal) |
+
+**State-dependent size limits:**
+- `StIdle`, `StBusy` → 65,535 (requests/status are small)
+- `StStreaming` → 2,500,000 (block bodies can be large)
+
+**Other checks:**
+- Unknown message tags → `DecodeError`
+- Truncated messages → minicbor `DecodeError`
+- No `unwrap()`/`expect()`/indexing in non-test code
+
+**Verdict:** No DOS vectors identified.
+
+---
+
+## TxSubmission (protocol ID 4)
+
+**Constants:**
+- `INGRESS_LIMIT = 721_424`
+- `SIZE_LIMIT_SMALL = 5_760` (control messages)
+- `SIZE_LIMIT_LARGE = 2_500_000` (tx delivery)
+- `TIMEOUT_NON_BLOCKING = 10s`
+- `TIMEOUT_TXS = 10s`
+- `MAX_UNACKED = 10`
+- `MAX_TX_ID_SIZE = 128`
+- `MAX_TX_SIZE = 2_500_000`
+
+**Allocation bounds:**
+
+| Decode path | Field | Max | Check location |
+|---|---|---|---|
+| `TxId::decode` | tx id bytes | 128 | `MAX_TX_ID_SIZE` check before `.to_vec()` |
+| `TxBody::decode` | tx body bytes | 2,500,000 | `MAX_TX_SIZE` check before `.to_vec()` |
+| `MsgReplyTxIds` | list length | 10 | `decode_bounded_list` checks `MAX_UNACKED` (definite + indefinite) |
+| `MsgRequestTxs` | list length | 10 | `decode_bounded_list` checks `MAX_UNACKED` (definite + indefinite) |
+| `MsgReplyTxs` | list length | 10 | `decode_bounded_list` checks `MAX_UNACKED` (definite + indefinite) |
+
+**Timeout coverage:**
+
+| State | Agency | Timeout |
+|---|---|---|
+| `StInit` | Client | None (we send immediately) |
+| `StIdle` | Server | None (server decides pacing) |
+| `StTxIdsBlocking` | Client | None (intentional — client blocks waiting for txs) |
+| `StTxIdsNonBlocking` | Client | 10s |
+| `StTxs` | Client | 10s |
+| `StDone` | Nobody | None (terminal) |
+
+**Other checks:**
+- Unknown message tags → `DecodeError`
+- Truncated messages → minicbor `DecodeError`
+- Indefinite CBOR arrays → bounded iteration with max count checks (`decode_bounded_list`)
+- `TxId`/`TxBody` use `d.skip()` to measure raw CBOR size before allocating
+- No `unwrap()`/`expect()`/indexing in non-test code
+
+**Verdict:** No DOS vectors identified.
+
+---
+
+## KeepAlive (protocol ID 8)
+
+**Constants:**
+- `INGRESS_LIMIT = 1_408`
+- `SIZE_LIMIT = 65_535`
+- `TIMEOUT_CLIENT = 97s`
+- `TIMEOUT_SERVER = 60s`
+
+**Allocation bounds:**
+
+No variable-length allocations — messages contain only fixed-size fields (u32 tag, u16 cookie).
+
+**Timeout coverage:**
+
+| State | Agency | Timeout |
+|---|---|---|
+| `StClient` | Client | 97s |
+| `StServer` | Server | 60s |
+| `StDone` | Nobody | None (terminal) |
+
+**Other checks:**
+- Unknown message tags → `DecodeError`
+- Truncated messages → minicbor `DecodeError`
+- No `unwrap()`/`expect()`/indexing in non-test code
+
+**Verdict:** No DOS vectors identified.
+
+---
+
+## PeerSharing (protocol ID 10)
+
+**Constants:**
+- `INGRESS_LIMIT = 5_760`
+- `SIZE_LIMIT = 5_760`
+- `MAX_PEERS = 255`
+- `TIMEOUT_BUSY = 60s`
+
+**Allocation bounds:**
+
+| Decode path | Field | Max | Check location |
+|---|---|---|---|
+| `MsgSharePeers` | peer list length | 255 | `MAX_PEERS` check before `Vec::with_capacity` (definite + indefinite) |
+| `PeerAddress::decode` | IPv4 / IPv6 | fixed-size | 4 bytes / 16 bytes, no variable allocation |
+
+**Timeout coverage:**
+
+| State | Agency | Timeout |
+|---|---|---|
+| `StIdle` | Client | None (we have agency) |
+| `StBusy` | Server | 60s |
+| `StDone` | Nobody | None (terminal) |
+
+**Other checks:**
+- Unknown message tags → `DecodeError`
+- Unknown peer address tags → `DecodeError`
+- Truncated messages → minicbor `DecodeError`
+- No `unwrap()`/`expect()`/indexing in non-test code
+
+**Test coverage:**
+- `truncated_request_fails` — verifies truncation handling
+- `unknown_peer_address_tag_fails` — verifies unknown address type rejection
+
+**Verdict:** No DOS vectors identified.
+
+---
+
+## LeiosNotify (protocol ID 18)
 
 **Constants:**
 - `INGRESS_LIMIT = 65_536`
@@ -75,7 +299,7 @@ bounds) since those depend on message-specific decode logic.
 
 ---
 
-## LeiosFetch (protocol ID 19) — Phase 4b
+## LeiosFetch (protocol ID 19)
 
 **Constants:**
 - `INGRESS_LIMIT = 16_777_216` (16 MB)
@@ -146,7 +370,7 @@ bounds) since those depend on message-specific decode logic.
 
 ---
 
-## HeaderInfo parser (types.rs) — Phase 4c
+## HeaderInfo parser (types.rs)
 
 **Design:** `HeaderInfo::parse()` navigates the Shelley+ header CBOR structure to
 extract common fields (slot, block_number, issuer, etc.) plus optional Leios
@@ -178,7 +402,7 @@ variable-size ones without allocating.
 
 ---
 
-## Coordinator Leios extensions — Phase 4e
+## Coordinator Leios extensions
 
 Phase 4e adds dedup, offer tracking, and smart fetch routing to the coordinator
 for Leios events. All new state is coordinator-internal (not wire data), but is
