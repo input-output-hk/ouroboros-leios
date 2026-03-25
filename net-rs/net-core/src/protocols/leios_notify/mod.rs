@@ -9,7 +9,7 @@ pub mod codec;
 use std::time::Duration;
 
 use crate::protocols::{Agency, Protocol, ProtocolError, Runner};
-use crate::types::WrappedHeader;
+use crate::types::{Point, WrappedHeader};
 
 /// LeiosNotify protocol ID in the multiplexer.
 pub const PROTOCOL_ID: u16 = 18;
@@ -49,10 +49,10 @@ pub enum Message {
     MsgLeiosNotificationRequestNext,
     /// Server announces an RB header containing an EB announcement. [1, header]
     MsgLeiosBlockAnnouncement { header: WrappedHeader },
-    /// Server offers an endorser block for download. [2, slot, hash]
-    MsgLeiosBlockOffer { slot: u64, hash: [u8; 32] },
-    /// Server offers an EB's transactions for download. [3, slot, hash]
-    MsgLeiosBlockTxsOffer { slot: u64, hash: [u8; 32] },
+    /// Server offers an endorser block for download. [2, point]
+    MsgLeiosBlockOffer { point: Point },
+    /// Server offers an EB's transactions for download. [3, point]
+    MsgLeiosBlockTxsOffer { point: Point },
     /// Server offers votes for download. [4, [(slot, voter_id), ...]]
     MsgLeiosVotesOffer { votes: Vec<(u64, Vec<u8>)> },
     /// Client terminates. [5]
@@ -115,9 +115,9 @@ pub enum LeiosNotifyEvent {
     /// An RB header announcing an EB.
     BlockAnnouncement { header: WrappedHeader },
     /// An endorser block is available for download.
-    BlockOffer { slot: u64, hash: [u8; 32] },
+    BlockOffer { point: Point },
     /// An EB's transactions are available for download.
-    BlockTxsOffer { slot: u64, hash: [u8; 32] },
+    BlockTxsOffer { point: Point },
     /// Votes are available for download.
     VotesOffer { votes: Vec<(u64, Vec<u8>)> },
 }
@@ -134,11 +134,11 @@ pub async fn request_next(
         Message::MsgLeiosBlockAnnouncement { header } => {
             Ok(LeiosNotifyEvent::BlockAnnouncement { header })
         }
-        Message::MsgLeiosBlockOffer { slot, hash } => {
-            Ok(LeiosNotifyEvent::BlockOffer { slot, hash })
+        Message::MsgLeiosBlockOffer { point } => {
+            Ok(LeiosNotifyEvent::BlockOffer { point })
         }
-        Message::MsgLeiosBlockTxsOffer { slot, hash } => {
-            Ok(LeiosNotifyEvent::BlockTxsOffer { slot, hash })
+        Message::MsgLeiosBlockTxsOffer { point } => {
+            Ok(LeiosNotifyEvent::BlockTxsOffer { point })
         }
         Message::MsgLeiosVotesOffer { votes } => Ok(LeiosNotifyEvent::VotesOffer { votes }),
         other => Err(ProtocolError::InvalidMessage(format!(
@@ -194,8 +194,10 @@ mod tests {
             LeiosNotify::transition(
                 &State::StBusy,
                 &Message::MsgLeiosBlockOffer {
-                    slot: 1,
-                    hash: [0; 32],
+                    point: Point::Specific {
+                        slot: 1,
+                        hash: [0; 32],
+                    },
                 }
             )
             .unwrap(),
@@ -205,8 +207,10 @@ mod tests {
             LeiosNotify::transition(
                 &State::StBusy,
                 &Message::MsgLeiosBlockTxsOffer {
-                    slot: 1,
-                    hash: [0; 32],
+                    point: Point::Specific {
+                        slot: 1,
+                        hash: [0; 32],
+                    },
                 }
             )
             .unwrap(),
@@ -228,8 +232,7 @@ mod tests {
         assert!(LeiosNotify::transition(
             &State::StIdle,
             &Message::MsgLeiosBlockOffer {
-                slot: 1,
-                hash: [0; 32],
+                point: Point::Specific { slot: 1, hash: [0; 32] },
             }
         )
         .is_err());
@@ -322,8 +325,10 @@ mod tests {
             assert!(matches!(msg, Message::MsgLeiosNotificationRequestNext));
             runner
                 .send(&Message::MsgLeiosBlockOffer {
-                    slot: 42,
-                    hash: test_hash_clone,
+                    point: Point::Specific {
+                        slot: 42,
+                        hash: test_hash_clone,
+                    },
                 })
                 .await
                 .unwrap();
@@ -333,8 +338,10 @@ mod tests {
             assert!(matches!(msg, Message::MsgLeiosNotificationRequestNext));
             runner
                 .send(&Message::MsgLeiosBlockTxsOffer {
-                    slot: 43,
-                    hash: test_hash_clone,
+                    point: Point::Specific {
+                        slot: 43,
+                        hash: test_hash_clone,
+                    },
                 })
                 .await
                 .unwrap();
@@ -369,9 +376,14 @@ mod tests {
             // 2. Block offer
             let event = request_next(&mut runner).await.unwrap();
             match event {
-                LeiosNotifyEvent::BlockOffer { slot, hash } => {
-                    assert_eq!(slot, 42);
-                    assert_eq!(hash, test_hash);
+                LeiosNotifyEvent::BlockOffer { point } => {
+                    assert_eq!(
+                        point,
+                        Point::Specific {
+                            slot: 42,
+                            hash: test_hash,
+                        }
+                    );
                 }
                 other => panic!("expected BlockOffer, got {other:?}"),
             }
@@ -379,9 +391,14 @@ mod tests {
             // 3. Block txs offer
             let event = request_next(&mut runner).await.unwrap();
             match event {
-                LeiosNotifyEvent::BlockTxsOffer { slot, hash } => {
-                    assert_eq!(slot, 43);
-                    assert_eq!(hash, test_hash);
+                LeiosNotifyEvent::BlockTxsOffer { point } => {
+                    assert_eq!(
+                        point,
+                        Point::Specific {
+                            slot: 43,
+                            hash: test_hash,
+                        }
+                    );
                 }
                 other => panic!("expected BlockTxsOffer, got {other:?}"),
             }

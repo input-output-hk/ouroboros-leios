@@ -196,14 +196,14 @@ pub(crate) async fn run_duplex_task(mut config: DuplexTaskConfig) {
                     Some(PeerCommand::RequestPeers { amount }) => {
                         let _ = peer_share_sender.send(amount).await;
                     }
-                    Some(PeerCommand::FetchLeiosBlock { slot, hash }) => {
+                    Some(PeerCommand::FetchLeiosBlock { point }) => {
                         if let Some((_, _, ref lf_sender)) = leios_client_handles {
-                            let _ = lf_sender.send(LeiosFetchCommand::Block { slot, hash }).await;
+                            let _ = lf_sender.send(LeiosFetchCommand::Block { point }).await;
                         }
                     }
-                    Some(PeerCommand::FetchLeiosBlockTxs { slot, hash, bitmap }) => {
+                    Some(PeerCommand::FetchLeiosBlockTxs { point, bitmap }) => {
                         if let Some((_, _, ref lf_sender)) = leios_client_handles {
-                            let _ = lf_sender.send(LeiosFetchCommand::BlockTxs { slot, hash, bitmap }).await;
+                            let _ = lf_sender.send(LeiosFetchCommand::BlockTxs { point, bitmap }).await;
                         }
                     }
                     Some(PeerCommand::FetchLeiosVotes { votes }) => {

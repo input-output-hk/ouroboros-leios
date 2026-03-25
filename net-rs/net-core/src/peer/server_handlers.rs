@@ -8,6 +8,8 @@ use std::sync::Arc;
 
 use tokio::sync::mpsc;
 
+use crate::types::Point;
+
 use crate::mux::{CodecRecv, CodecSend};
 use crate::protocols::blockfetch::{BlockFetch, Message as BfMsg};
 use crate::protocols::chainsync::{ChainSync, Message as CsMsg};
@@ -352,14 +354,12 @@ pub async fn serve_leios_notify(ln_send: CodecSend, ln_recv: CodecRecv, store: A
                 if let Some(notification) = pending.first() {
                     read_index += 1;
                     let response = match notification {
-                        LeiosNotification::BlockOffer { slot, hash } => LnMsg::MsgLeiosBlockOffer {
-                            slot: *slot,
-                            hash: *hash,
+                        LeiosNotification::BlockOffer { point } => LnMsg::MsgLeiosBlockOffer {
+                            point: point.clone(),
                         },
-                        LeiosNotification::BlockTxsOffer { slot, hash } => {
+                        LeiosNotification::BlockTxsOffer { point } => {
                             LnMsg::MsgLeiosBlockTxsOffer {
-                                slot: *slot,
-                                hash: *hash,
+                                point: point.clone(),
                             }
                         }
                         LeiosNotification::VotesOffer { votes } => LnMsg::MsgLeiosVotesOffer {
@@ -379,16 +379,14 @@ pub async fn serve_leios_notify(ln_send: CodecSend, ln_recv: CodecRecv, store: A
                         if let Some(notification) = pending.first() {
                             read_index += 1;
                             let response = match notification {
-                                LeiosNotification::BlockOffer { slot, hash } => {
+                                LeiosNotification::BlockOffer { point } => {
                                     LnMsg::MsgLeiosBlockOffer {
-                                        slot: *slot,
-                                        hash: *hash,
+                                        point: point.clone(),
                                     }
                                 }
-                                LeiosNotification::BlockTxsOffer { slot, hash } => {
+                                LeiosNotification::BlockTxsOffer { point } => {
                                     LnMsg::MsgLeiosBlockTxsOffer {
-                                        slot: *slot,
-                                        hash: *hash,
+                                        point: point.clone(),
                                     }
                                 }
                                 LeiosNotification::VotesOffer { votes } => {
@@ -424,18 +422,27 @@ pub async fn serve_leios_fetch(lf_send: CodecSend, lf_recv: CodecRecv, store: Ar
         };
 
         match msg {
-            LfMsg::MsgLeiosBlockRequest { slot, hash } => {
-                let block = store.get_block(slot, &hash).unwrap_or_default();
+            LfMsg::MsgLeiosBlockRequest { point } => {
+                let block = match &point {
+                    Point::Specific { slot, hash } => {
+                        store.get_block(*slot, hash).unwrap_or_default()
+                    }
+                    Point::Origin => Vec::new(),
+                };
                 if runner.send(&LfMsg::MsgLeiosBlock { block }).await.is_err() {
                     break;
                 }
             }
             LfMsg::MsgLeiosBlockTxsRequest {
-                slot,
-                hash,
+                point,
                 bitmap: _,
             } => {
-                let transactions = store.get_block_txs(slot, &hash).unwrap_or_default();
+                let transactions = match &point {
+                    Point::Specific { slot, hash } => {
+                        store.get_block_txs(*slot, hash).unwrap_or_default()
+                    }
+                    Point::Origin => Vec::new(),
+                };
                 if runner
                     .send(&LfMsg::MsgLeiosBlockTxs { transactions })
                     .await
@@ -650,7 +657,13 @@ mod tests {
 
         // Create and populate LeiosStore.
         let (store, _rx) = LeiosStore::new(100);
-        store.inject_block(42, [0xAB; 32], vec![1, 2, 3]);
+        store.inject_block(
+            Point::Specific {
+                slot: 42,
+                hash: [0xAB; 32],
+            },
+            vec![1, 2, 3],
+        );
 
         // Start server.
         let server_handle = tokio::spawn(serve_leios_notify(server_send, server_recv, store));
@@ -659,9 +672,14 @@ mod tests {
         let mut client = Runner::<LeiosNotify>::new(Role::Client, client_send, client_recv);
         let event = leios_notify::request_next(&mut client).await.unwrap();
         match event {
-            leios_notify::LeiosNotifyEvent::BlockOffer { slot, hash } => {
-                assert_eq!(slot, 42);
-                assert_eq!(hash, [0xAB; 32]);
+            leios_notify::LeiosNotifyEvent::BlockOffer { point } => {
+                assert_eq!(
+                    point,
+                    Point::Specific {
+                        slot: 42,
+                        hash: [0xAB; 32]
+                    }
+                );
             }
             other => panic!("expected BlockOffer, got {other:?}"),
         }
@@ -687,14 +705,20 @@ mod tests {
 
         // Create and populate LeiosStore.
         let (store, _rx) = LeiosStore::new(100);
-        store.inject_block(42, [0xAB; 32], vec![1, 2, 3, 4]);
+        store.inject_block(
+            Point::Specific {
+                slot: 42,
+                hash: [0xAB; 32],
+            },
+            vec![1, 2, 3, 4],
+        );
 
         // Start server.
         let server_handle = tokio::spawn(serve_leios_fetch(server_send, server_recv, store));
 
         // Client: fetch block.
         let mut client = Runner::<LeiosFetch>::new(Role::Client, client_send, client_recv);
-        let block = leios_fetch::fetch_block(&mut client, 42, [0xAB; 32])
+        let block = leios_fetch::fetch_block(&mut client, Point::Specific { slot: 42, hash: [0xAB; 32] })
             .await
             .unwrap();
         assert_eq!(block, vec![1, 2, 3, 4]);

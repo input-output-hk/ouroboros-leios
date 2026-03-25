@@ -13,13 +13,15 @@ use std::sync::{Arc, Mutex};
 
 use tokio::sync::watch;
 
+use crate::types::Point;
+
 /// A notification about available Leios data, served by LeiosNotify.
 #[derive(Debug, Clone)]
 pub enum LeiosNotification {
     /// An endorser block is available for download.
-    BlockOffer { slot: u64, hash: [u8; 32] },
+    BlockOffer { point: Point },
     /// An EB's transactions are available for download.
-    BlockTxsOffer { slot: u64, hash: [u8; 32] },
+    BlockTxsOffer { point: Point },
     /// Votes are available for download.
     VotesOffer { votes: Vec<(u64, Vec<u8>)> },
 }
@@ -76,24 +78,38 @@ impl LeiosStore {
     }
 
     /// Inject an endorser block. Generates a BlockOffer notification.
-    pub fn inject_block(&self, slot: u64, hash: [u8; 32], block: Vec<u8>) {
+    ///
+    /// The `point` must be `Point::Specific { slot, hash }`. If `Point::Origin`
+    /// is passed, the block is silently dropped.
+    pub fn inject_block(&self, point: Point, block: Vec<u8>) {
+        let (slot, hash) = match &point {
+            Point::Specific { slot, hash } => (*slot, *hash),
+            Point::Origin => return,
+        };
         let mut inner = self.inner.lock().unwrap();
         let key = BlockKey { slot, hash };
         inner.blocks.insert(key, block);
         inner
             .notifications
-            .push(LeiosNotification::BlockOffer { slot, hash });
+            .push(LeiosNotification::BlockOffer { point });
         self.bump_version(&mut inner);
     }
 
     /// Inject transactions for an endorser block. Generates a BlockTxsOffer notification.
-    pub fn inject_block_txs(&self, slot: u64, hash: [u8; 32], transactions: Vec<Vec<u8>>) {
+    ///
+    /// The `point` must be `Point::Specific { slot, hash }`. If `Point::Origin`
+    /// is passed, the transactions are silently dropped.
+    pub fn inject_block_txs(&self, point: Point, transactions: Vec<Vec<u8>>) {
+        let (slot, hash) = match &point {
+            Point::Specific { slot, hash } => (*slot, *hash),
+            Point::Origin => return,
+        };
         let mut inner = self.inner.lock().unwrap();
         let key = BlockKey { slot, hash };
         inner.block_txs.insert(key, transactions);
         inner
             .notifications
-            .push(LeiosNotification::BlockTxsOffer { slot, hash });
+            .push(LeiosNotification::BlockTxsOffer { point });
         self.bump_version(&mut inner);
     }
 
@@ -191,8 +207,9 @@ mod tests {
         let (store, _rx) = LeiosStore::new(100);
         let hash = [0xABu8; 32];
         let block = vec![1, 2, 3, 4];
+        let point = Point::Specific { slot: 42, hash };
 
-        store.inject_block(42, hash, block.clone());
+        store.inject_block(point, block.clone());
 
         assert_eq!(store.get_block(42, &hash), Some(block));
         assert_eq!(store.get_block(99, &hash), None);
@@ -203,8 +220,9 @@ mod tests {
         let (store, _rx) = LeiosStore::new(100);
         let hash = [0xCDu8; 32];
         let txs = vec![vec![10, 20], vec![30, 40]];
+        let point = Point::Specific { slot: 42, hash };
 
-        store.inject_block_txs(42, hash, txs.clone());
+        store.inject_block_txs(point, txs.clone());
 
         assert_eq!(store.get_block_txs(42, &hash), Some(txs));
         assert_eq!(store.get_block_txs(99, &hash), None);
@@ -230,15 +248,16 @@ mod tests {
     fn notifications_accumulate() {
         let (store, _rx) = LeiosStore::new(100);
         let hash = [0u8; 32];
+        let point = Point::Specific { slot: 1, hash };
 
-        store.inject_block(1, hash, vec![0x01]);
+        store.inject_block(point, vec![0x01]);
         store.inject_votes(vec![(10, vec![0x02])], vec![vec![0x03]]);
 
         let all = store.notifications_after(0);
         assert_eq!(all.len(), 2);
         assert!(matches!(
             all[0],
-            LeiosNotification::BlockOffer { slot: 1, .. }
+            LeiosNotification::BlockOffer { point: Point::Specific { slot: 1, .. } }
         ));
         assert!(matches!(all[1], LeiosNotification::VotesOffer { .. }));
 
@@ -254,7 +273,7 @@ mod tests {
         let (store, _rx) = LeiosStore::new(100);
         let mut sub = store.subscribe();
 
-        store.inject_block(1, [0u8; 32], vec![0x01]);
+        store.inject_block(Point::Specific { slot: 1, hash: [0u8; 32] }, vec![0x01]);
 
         let result = tokio::time::timeout(std::time::Duration::from_secs(1), sub.changed()).await;
         assert!(result.is_ok());

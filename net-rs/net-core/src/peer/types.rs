@@ -49,18 +49,17 @@ pub enum PeerEvent {
     LeiosBlockAnnounced { header: WrappedHeader },
 
     /// LeiosNotify: an endorser block is available for download.
-    LeiosBlockOffered { slot: u64, hash: [u8; 32] },
+    LeiosBlockOffered { point: Point },
 
     /// LeiosNotify: an EB's transactions are available.
-    LeiosBlockTxsOffered { slot: u64, hash: [u8; 32] },
+    LeiosBlockTxsOffered { point: Point },
 
     /// LeiosNotify: votes are available for download.
     LeiosVotesOffered { votes: Vec<(u64, Vec<u8>)> },
 
     /// LeiosFetch: a requested endorser block arrived.
     LeiosBlockFetched {
-        slot: u64,
-        hash: [u8; 32],
+        point: Point,
         block: Vec<u8>,
     },
 
@@ -69,8 +68,7 @@ pub enum PeerEvent {
 
     /// LeiosFetch: requested transactions for an EB arrived.
     LeiosBlockTxsFetched {
-        slot: u64,
-        hash: [u8; 32],
+        point: Point,
         transactions: Vec<Vec<u8>>,
     },
 
@@ -88,12 +86,11 @@ pub enum PeerCommand {
     RequestPeers { amount: u8 },
 
     /// Fetch an endorser block via LeiosFetch.
-    FetchLeiosBlock { slot: u64, hash: [u8; 32] },
+    FetchLeiosBlock { point: Point },
 
     /// Fetch selective transactions from an EB via LeiosFetch (bitmap addressing).
     FetchLeiosBlockTxs {
-        slot: u64,
-        hash: [u8; 32],
+        point: Point,
         bitmap: BTreeMap<u16, u64>,
     },
 
@@ -140,18 +137,17 @@ pub enum NetworkEvent {
     LeiosBlockAnnounced { header: WrappedHeader },
 
     /// Leios: an endorser block is available for download from a peer.
-    LeiosBlockOffered { slot: u64, hash: [u8; 32] },
+    LeiosBlockOffered { point: Point },
 
     /// Leios: an EB's transactions are available for download from a peer.
-    LeiosBlockTxsOffered { slot: u64, hash: [u8; 32] },
+    LeiosBlockTxsOffered { point: Point },
 
     /// Leios: votes are available for download.
     LeiosVotesOffered { votes: Vec<(u64, Vec<u8>)> },
 
     /// Leios: a fetched endorser block arrived.
     LeiosBlockReceived {
-        slot: u64,
-        hash: [u8; 32],
+        point: Point,
         block: Vec<u8>,
     },
 
@@ -160,8 +156,7 @@ pub enum NetworkEvent {
 
     /// Leios: fetched transactions for an EB arrived.
     LeiosBlockTxsReceived {
-        slot: u64,
-        hash: [u8; 32],
+        point: Point,
         transactions: Vec<Vec<u8>>,
     },
 }
@@ -190,12 +185,11 @@ pub enum NetworkCommand {
     InjectRollback { point: Point },
 
     /// Fetch a specific Leios block. Coordinator picks the best peer.
-    FetchLeiosBlock { slot: u64, hash: [u8; 32] },
+    FetchLeiosBlock { point: Point },
 
     /// Fetch selective transactions from an EB. Coordinator picks the best peer.
     FetchLeiosBlockTxs {
-        slot: u64,
-        hash: [u8; 32],
+        point: Point,
         bitmap: BTreeMap<u16, u64>,
     },
 
@@ -204,8 +198,7 @@ pub enum NetworkCommand {
 
     /// Inject a Leios block into the Leios store (for responder peers to serve).
     InjectLeiosBlock {
-        slot: u64,
-        hash: [u8; 32],
+        point: Point,
         block: Vec<u8>,
     },
 
