@@ -6,7 +6,7 @@
 use std::net::ToSocketAddrs;
 
 use crate::bearer::tcp::TcpBearer;
-use crate::mux::scheduler::RoundRobin;
+use crate::mux::scheduler::StrictPriority;
 use crate::mux::{
     CodecRecv, CodecSend, Mux, MuxConfig, ProtocolConfig, RunningMux, MODE_INITIATOR,
     MODE_RESPONDER,
@@ -61,7 +61,7 @@ pub async fn connect_and_handshake_with_config(
         egress_queue_size: 4,
     };
 
-    let mut mux = Mux::new(mux_config, RoundRobin::default(), MODE_INITIATOR);
+    let mut mux = Mux::new(mux_config, StrictPriority::default(), MODE_INITIATOR);
     let (hs_send, hs_recv) = mux.register(&hs_proto);
 
     let mut channels = Vec::new();
@@ -120,7 +120,7 @@ pub async fn accept_and_handshake(
         egress_queue_size: 4,
     };
 
-    let mut mux = Mux::new(mux_config, RoundRobin::default(), MODE_RESPONDER);
+    let mut mux = Mux::new(mux_config, StrictPriority::default(), MODE_RESPONDER);
     let (hs_send, hs_recv) = mux.register(&hs_proto);
 
     let mut channels = Vec::new();
@@ -174,7 +174,7 @@ pub async fn connect_duplex(
         egress_queue_size: 4,
     };
 
-    let mut mux = Mux::new(mux_config, RoundRobin::default(), MODE_INITIATOR);
+    let mut mux = Mux::new(mux_config, StrictPriority::default(), MODE_INITIATOR);
     let (hs_send, hs_recv) = mux.register(&hs_proto);
 
     let mut initiator_channels = Vec::new();
@@ -244,7 +244,7 @@ pub async fn accept_duplex(
         egress_queue_size: 4,
     };
 
-    let mut mux = Mux::new(mux_config, RoundRobin::default(), MODE_RESPONDER);
+    let mut mux = Mux::new(mux_config, StrictPriority::default(), MODE_RESPONDER);
     let (hs_send, hs_recv) = mux.register(&hs_proto);
 
     let mut initiator_channels = Vec::new();

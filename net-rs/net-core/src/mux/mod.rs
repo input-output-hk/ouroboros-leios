@@ -470,4 +470,71 @@ mod tests {
         running_a.abort();
         running_b.abort();
     }
+
+    /// Verify that StrictPriority scheduling delivers all messages correctly
+    /// when multiple protocols compete for bandwidth. The scheduler unit tests
+    /// (in scheduler.rs) prove the ordering logic; this test verifies the
+    /// end-to-end mux integration with StrictPriority.
+    #[tokio::test]
+    async fn mux_strict_priority_delivers_all() {
+        use scheduler::StrictPriority;
+
+        let (bearer_a, bearer_b) = MemBearer::pair();
+
+        let high_proto = ProtocolConfig {
+            id: 2,
+            priority: 1, // high
+            ingress_limit: 65535,
+            egress_queue_size: 10,
+        };
+        let low_proto = ProtocolConfig {
+            id: 10,
+            priority: 7, // low
+            ingress_limit: 65535,
+            egress_queue_size: 10,
+        };
+
+        // Sender side: StrictPriority scheduler.
+        let mut mux_a = Mux::new(test_config(), StrictPriority::default(), MODE_INITIATOR);
+        let (send_high, _) = mux_a.register(&high_proto);
+        let (send_low, _) = mux_a.register(&low_proto);
+
+        // Queue messages on both protocols BEFORE starting the mux so both
+        // are pending when the egress loop first runs.
+        for i in 0..5u8 {
+            send_low
+                .send(bytes::Bytes::from(vec![b'L', i]))
+                .await
+                .unwrap();
+        }
+        for i in 0..5u8 {
+            send_high
+                .send(bytes::Bytes::from(vec![b'H', i]))
+                .await
+                .unwrap();
+        }
+
+        let running_a = mux_a.run(bearer_a);
+
+        // Receiver side.
+        let mut mux_b = Mux::new(test_config(), RoundRobin::default(), MODE_RESPONDER);
+        let (_, mut receive_high) = mux_b.register(&high_proto);
+        let (_, mut receive_low) = mux_b.register(&low_proto);
+        let running_b = mux_b.run(bearer_b);
+
+        // All high-priority messages arrive intact and in order.
+        for i in 0..5u8 {
+            let msg = receive_high.recv().await.unwrap();
+            assert_eq!(msg.as_ref(), &[b'H', i]);
+        }
+
+        // All low-priority messages arrive intact and in order.
+        for i in 0..5u8 {
+            let msg = receive_low.recv().await.unwrap();
+            assert_eq!(msg.as_ref(), &[b'L', i]);
+        }
+
+        running_a.abort();
+        running_b.abort();
+    }
 }

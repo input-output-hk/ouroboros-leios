@@ -181,34 +181,8 @@ ResponderOnly Peer Tasks (inbound connections, server protocols)
 - `serve` CLI refactored to use coordinator with `InjectBlock`/`InjectRollback` commands
 - `multi-follow --listen` enables relay mode (initiator upstream + responder downstream)
 
-**Deferred (Phase 3b: Promotion/Demotion/Churn):**
-
-Can be done before or after Phase 4 — neither blocks Leios protocols. Moderate
-scope (1-2 sessions). No new information required from consensus/application.
-
-*Promotion/demotion:*
-- `PeerTemperature` enum: Cold (address only), Warm (connected, KeepAlive + PeerSharing),
-  Hot (fully active: + ChainSync, BlockFetch, TxSubmission)
-- Currently all peers go straight to Hot on connection; need two-phase startup
-- Per-peer cancellation tokens (one per protocol group) for dynamic sub-task lifecycle
-- New `PeerCommand::Promote(Hot)` / `Demote(Warm)` — peer task spawns/aborts protocol
-  sub-tasks accordingly
-- Connection setup becomes: connect → handshake → KeepAlive only → promote adds protocols
-
-*Churn (policy layer on top of promotion/demotion):*
-- Background timer in coordinator that periodically reshuffles peers
-- Configurable target counts: `target_warm_peers`, `target_hot_peers`
-- Round-robin reshuffling: demote one hot → warm, promote one warm → hot
-- Drop warm → cold (disconnect), connect cold → warm (from PeerSharing discovery)
-- Peer quality scoring from existing state (RTT, tip freshness, time connected)
-- Cooldown tracking to avoid thrashing
-
-*Already have:* per-peer tip/RTT, PeerSharing discovery, ConnectionMode tracking,
-Disconnect command. *Need:* temperature tracking, dynamic sub-task lifecycle,
-churn policy config, target peer counts.
-
-**Also deferred:**
-- Backoff reset on sustained connection success
+**Deferred:** Promotion/demotion/churn (Phase 3b) and backoff reset. See
+**Future Work** section below.
 
 **Live-tested:** Duplex against mainnet (backbone.cardano.iog.io:3001, version 15).
 Local relay chain: serve → multi-follow --listen → follow. Exponential backoff reconnection.
@@ -325,29 +299,93 @@ events and `InjectLeios*` commands. Routes `FetchLeiosBlock` to first connected 
 Files: `net-core/src/peer/{types,mod,leios_store,peer_task,responder_task,duplex_task,server_handlers,coordinator}.rs`,
 `net-cli/src/{main,serve,multi_follow}.rs`
 
-#### Phase 4e: Coordinator Extensions
+#### Phase 4e: Coordinator Extensions — COMPLETE
 
-- Smart Leios fetch routing across peers (dedup, pick best peer by RTT)
-- Coordinator-level aggregation of Leios announcements
-- Integration tests with MemBearer
+Smart Leios fetch routing: slot-bounded dedup for EB/TX/vote offers (configurable
+`leios_dedup_window`, default 1000 slots), per-offer peer tracking, RTT-based
+smart fetch routing for `FetchLeiosBlock`/`FetchLeiosBlockTxs`/`FetchLeiosVotes`,
+pending fetch dedup and cleanup, separate `LeiosBlockTxsOffered`/`LeiosBlockTxsReceived`
+events. Vote batches deduped per-vote with partial forwarding. App-driven fetching
+(coordinator does not auto-fetch). CLI `--leios` flag on `serve` and `multi-follow`.
+Locally tested: serve --leios → multi-follow --leios (two connections, dedup observed).
+255 total tests.
 
-Files: `net-core/src/peer/coordinator.rs`
+Files: `net-core/src/peer/coordinator.rs`, `net-core/src/peer/types.rs`,
+`net-cli/src/{serve,multi_follow}.rs`
 
-#### Phase 4f: Priority Scheduling Verification
+#### Phase 4f: Priority Scheduling — COMPLETE
 
-- Assign Leios protocol priorities: High = Praos, Medium = LeiosFetch (19),
-  Low = LeiosNotify (18) + PeerSharing (10)
-- Test that Praos traffic preempts Leios under load
+Switched mux from `RoundRobin` to `StrictPriority` scheduler for all production
+connections. Added `mux::scheduler::priorities` named constants module to prevent
+drift between client/server configs.
 
-Files: `net-core/src/peer/mod.rs` (protocol ID constants), mux config
+Priority tiers (lower = higher priority):
+- 0: Handshake (connection setup)
+- 1: ChainSync (chain tip, most time-critical)
+- 2: BlockFetch (block bodies)
+- 3: TxSubmission (tx dissemination)
+- 4: KeepAlive (Praos housekeeping)
+- 5: LeiosFetch (Leios data retrieval)
+- 6: LeiosNotify (Leios announcements)
+- 7: PeerSharing (peer discovery)
 
-#### Deferred
+Fixed KeepAlive from priority 7 → 4 (was below Leios, now correctly Praos-tier).
+Fixed PeerSharing inconsistency (was 5 server / 7 client, now consistently 7).
+Separated LeiosFetch (5) from LeiosNotify (6). 258 total tests.
 
-- Freshest-first scheduling (pending upstream discussion)
-- Third protocol for range requests (if needed after testing)
-- Structured Leios types (replace opaque blobs when spec stabilizes)
-- Head-of-line blocking mitigation (dual-LeiosFetch per peer)
-- Live Leios testnet testing (when testnet available)
+Files: `net-core/src/mux/scheduler.rs`, `net-core/src/peer/connect.rs`,
+`net-core/src/peer/peer_task.rs`, `net-core/src/peer/responder_task.rs`,
+`net-core/src/mux/mod.rs`
+
+## Future Work
+
+All four implementation phases are complete. The items below were deferred during
+implementation and remain open for future work.
+
+### Peer management (Phase 3b: Promotion/Demotion/Churn)
+
+Currently all peers go straight to Hot (all protocols active) on connection. A
+production node needs warm/cold peer states and a churn policy.
+
+- **Promotion/demotion**: `PeerTemperature` enum (Cold/Warm/Hot), per-peer
+  cancellation tokens for dynamic sub-task lifecycle, `Promote`/`Demote` commands.
+  Connection setup becomes: connect → handshake → KeepAlive only → promote adds
+  ChainSync/BlockFetch/TxSubmission.
+- **Churn policy**: background timer in coordinator, configurable target counts
+  (`target_warm_peers`, `target_hot_peers`), peer quality scoring (RTT, tip
+  freshness), cooldown tracking.
+- **Backoff reset**: reset reconnection backoff after sustained connection success.
+
+Already have: per-peer tip/RTT, PeerSharing discovery, ConnectionMode tracking,
+Disconnect command. Need: temperature tracking, dynamic sub-task lifecycle, churn
+config.
+
+### Coordinator blocking fix
+
+The coordinator event loop uses `.send().await` on the `network_events` channel
+(capacity 64) and per-peer `commands` channels (capacity 16). If the application
+consumer or a peer task stalls, the coordinator blocks, stalling all peers. Fix:
+switch to `try_send()` with overflow handling, or increase channel capacity.
+
+### Leios protocol refinements
+
+- **Third protocol for range requests**: CIP-0164 suggests `MsgLeiosBlockRangeRequest`
+  + responses (carrying certified EBs) deserve Praos-level priority via a separate
+  protocol. Currently all LeiosFetch messages share priority 5.
+- **Freshest-first scheduling**: within a protocol, prioritize newest messages over
+  oldest. May never be needed — pending upstream discussion.
+- **Head-of-line blocking mitigation**: run dual LeiosFetch instances per peer so
+  a large EB fetch doesn't block a small vote fetch.
+- **Structured Leios types**: replace opaque byte blobs with parsed types (EBs,
+  votes, certificates, BLS keys/sigs) when the CIP-0164 spec stabilizes.
+
+### Testing and validation
+
+- **Live Leios testnet testing**: end-to-end validation against a real Leios testnet
+  (when available).
+- **Weighted fair queuing**: alternative to StrictPriority that prevents starvation
+  of low-priority protocols under sustained high-priority load. The `Scheduler` trait
+  is already pluggable.
 
 ## Workspace Structure
 
