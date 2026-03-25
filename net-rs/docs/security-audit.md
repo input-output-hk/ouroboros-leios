@@ -72,3 +72,74 @@ bounds) since those depend on message-specific decode logic.
 - `decode_indefinite_outer_array` — verifies indefinite array support
 
 **Verdict:** No DOS vectors identified.
+
+---
+
+## LeiosFetch (protocol ID 19) — Phase 4b
+
+**Constants:**
+- `INGRESS_LIMIT = 16_777_216` (16 MB)
+- `SIZE_LIMIT_SMALL = 65_535` (request states)
+- `SIZE_LIMIT_LARGE = 16_777_216` (delivery states)
+- `MAX_BLOCK_SIZE = 16_777_216`
+- `MAX_BITMAP_ENTRIES = 1_024`
+- `MAX_TRANSACTIONS = 65_536`
+- `MAX_TRANSACTION_SIZE = 65_536`
+- `MAX_VOTES = 1_024`
+- `MAX_VOTER_ID_SIZE = 256`
+- `MAX_VOTE_SIZE = 1_024`
+- `TIMEOUT_SERVER = 120s`
+
+**Allocation bounds:**
+
+| Decode path | Field | Max | Check location |
+|---|---|---|---|
+| `MsgLeiosBlockRequest` | hash | exactly 32 | `decode_hash32` rejects != 32 |
+| `MsgLeiosBlock` | block bytes | 16 MB | `decode_block` checks before `.to_vec()` |
+| `MsgLeiosBlockTxsRequest` | hash | exactly 32 | `decode_hash32` |
+| `MsgLeiosBlockTxsRequest` | bitmap entries | 1,024 | `decode_bitmap` checks before insert (definite + indefinite) |
+| `MsgLeiosBlockTxs` | tx list length | 65,536 | `decode_blob_list` checks before alloc |
+| `MsgLeiosBlockTxs` | per-tx size | 65,536 | `decode_bounded_bytes` checks before `.to_vec()` |
+| `MsgLeiosVotesRequest` | vote ID list length | 1,024 | `decode_vote_id_list` checks before alloc |
+| `MsgLeiosVotesRequest` | voter ID size | 256 | `decode_vote_id_pair` checks before `.to_vec()` |
+| `MsgLeiosVoteDelivery` | vote list length | 1,024 | `decode_blob_list` checks before alloc |
+| `MsgLeiosVoteDelivery` | per-vote size | 1,024 | `decode_bounded_bytes` checks before `.to_vec()` |
+| `MsgLeiosBlockRangeRequest` | start/end hash | exactly 32 | `decode_hash32` |
+| `MsgLeiosNextBlockAndTxsInRange` | block bytes | 16 MB | `decode_block` |
+| `MsgLeiosNextBlockAndTxsInRange` | tx list | 65,536 count, 65,536/item | `decode_blob_list` + `decode_bounded_bytes` |
+| `MsgLeiosLastBlockAndTxsInRange` | block bytes | 16 MB | `decode_block` |
+| `MsgLeiosLastBlockAndTxsInRange` | tx list | 65,536 count, 65,536/item | `decode_blob_list` + `decode_bounded_bytes` |
+
+**Timeout coverage:**
+
+| State | Agency | Timeout |
+|---|---|---|
+| `StIdle` | Client | None (we have agency) |
+| `StBlock` | Server | 120s |
+| `StBlockTxs` | Server | 120s |
+| `StVotes` | Server | 120s |
+| `StBlockRange` | Server | 120s |
+| `StDone` | Nobody | None (terminal) |
+
+**State-dependent size limits:**
+- `StIdle` → 65,535 (requests are small)
+- `StBlock`, `StBlockTxs`, `StVotes`, `StBlockRange` → 16 MB (deliveries can be large)
+
+**Other checks:**
+- Unknown message tags → `DecodeError`
+- Truncated messages → minicbor `DecodeError`
+- Indefinite CBOR arrays and maps → bounded iteration with max count checks
+- Bitmap uses `BTreeMap` — duplicate keys overwrite (no amplification)
+- No `unwrap()`/`expect()`/indexing in non-test code
+
+**Test coverage:**
+- `bitmap_exceeds_max_fails` — verifies `MAX_BITMAP_ENTRIES` rejection
+- `transaction_list_exceeds_max_fails` — verifies `MAX_TRANSACTIONS` rejection
+- `vote_delivery_exceeds_max_fails` — verifies `MAX_VOTES` rejection
+- `vote_request_exceeds_max_fails` — verifies vote request list rejection
+- `wrong_hash_length_fails` — verifies hash length enforcement
+- `unknown_tag_fails` — verifies unknown tag rejection
+- `truncated_message_fails` — verifies truncation handling
+- `decode_indefinite_outer_array` — verifies indefinite array support
+
+**Verdict:** No DOS vectors identified.
