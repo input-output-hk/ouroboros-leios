@@ -86,14 +86,14 @@ The resulting blended $\Delta\text{Q}$ captures the distribution of end-to-end t
 
 An alternative path-length distribution was calculated by the [topology-checker](https://github.com/input-output-hk/ouroboros-leios/tree/main/topology-checker) tool from a mainnet-like topology. It is implemented in [`DeltaQ.Praos`](../src/DeltaQ/Praos.hs) (see `hopCount`), but is not currently used in the model:
 
-| Path length | Count |
-| ----------- | ----- |
-| 1           | 1909  |
-| 2           | 3867  |
-| 3           | 2826  |
-| 4           | 1068  |
-| 5           | 214   |
-| 6           | 16    |
+| Path length | Probability (%) |
+| ----------- | --------------- |
+| 1           | 19.28           |
+| 2           | 39.06           |
+| 3           | 28.55           |
+| 4           | 10.79           |
+| 5           | 2.16            |
+| 6           | 0.16            |
 
 This distribution reflects the actual peer-to-peer topology of the Cardano mainnet rather than a synthetic random graph, and could be substituted for the Praos path-length distribution to ground the model more closely in real network conditions.
 
