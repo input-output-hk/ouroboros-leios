@@ -143,7 +143,7 @@ mod tests {
 
     #[test]
     fn block_round_trip() {
-        let body = BlockBody(vec![0xd8, 0x18, 0x43, 0x01, 0x02, 0x03]);
+        let body = BlockBody::opaque(vec![0xd8, 0x18, 0x43, 0x01, 0x02, 0x03]);
         let msg = Message::MsgBlock { body: body.clone() };
         let decoded = round_trip(&msg);
         match decoded {

@@ -228,7 +228,7 @@ impl Coordinator {
                 let header = self
                     .pending_headers
                     .remove(&point)
-                    .unwrap_or(WrappedHeader(vec![0xA0])); // fallback: empty CBOR map
+                    .unwrap_or(WrappedHeader::opaque(vec![0xA0])); // fallback: empty CBOR map
                 self.chain_store
                     .append_block(point.clone(), header, body.clone());
 
@@ -327,7 +327,7 @@ impl Coordinator {
                 header,
                 body,
             } => {
-                self.chain_store.append_block(point, header, body);
+                self.chain_store.append_block(point, *header, body);
             }
 
             NetworkCommand::InjectRollback { point } => {
@@ -659,7 +659,7 @@ mod tests {
             },
             block_no: 100,
         };
-        let header = WrappedHeader(vec![0xA0]);
+        let header = WrappedHeader::opaque(vec![0xA0]);
 
         // Send a HeaderAnnounced event.
         coordinator
@@ -680,7 +680,7 @@ mod tests {
                 header: recv_header,
             } => {
                 assert_eq!(recv_tip.block_no, 100);
-                assert_eq!(recv_header.0, header.0);
+                assert_eq!(recv_header.raw, header.raw);
             }
             other => panic!("expected TipAdvanced, got {other:?}"),
         }
@@ -744,7 +744,7 @@ mod tests {
             },
             block_no: 100,
         };
-        let header = WrappedHeader(vec![0xA0]);
+        let header = WrappedHeader::opaque(vec![0xA0]);
 
         // Peer A announces tip 100.
         coordinator

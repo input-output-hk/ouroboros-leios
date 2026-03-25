@@ -69,13 +69,13 @@ async fn block_generator(
             let mut cbor_buf = Vec::new();
             let mut enc = minicbor::Encoder::new(&mut cbor_buf);
             enc.bytes(&hash).expect("CBOR encode");
-            let header = WrappedHeader(cbor_buf.clone());
-            let body = BlockBody(cbor_buf);
+            let header = WrappedHeader::opaque(cbor_buf.clone());
+            let body = BlockBody::opaque(cbor_buf);
 
             let _ = commands
                 .send(NetworkCommand::InjectBlock {
                     point: point.clone(),
-                    header,
+                    header: Box::new(header),
                     body,
                 })
                 .await;

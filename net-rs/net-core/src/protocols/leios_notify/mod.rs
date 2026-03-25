@@ -183,7 +183,7 @@ mod tests {
             LeiosNotify::transition(
                 &State::StBusy,
                 &Message::MsgLeiosBlockAnnouncement {
-                    header: WrappedHeader(vec![0x80]),
+                    header: WrappedHeader::opaque(vec![0x80]),
                 }
             )
             .unwrap(),
@@ -311,7 +311,7 @@ mod tests {
             assert!(matches!(msg, Message::MsgLeiosNotificationRequestNext));
             runner
                 .send(&Message::MsgLeiosBlockAnnouncement {
-                    header: WrappedHeader(vec![0x82, 0x05, 0x00]),
+                    header: WrappedHeader::opaque(vec![0x82, 0x05, 0x00]),
                 })
                 .await
                 .unwrap();
@@ -360,7 +360,7 @@ mod tests {
             let event = request_next(&mut runner).await.unwrap();
             match event {
                 LeiosNotifyEvent::BlockAnnouncement { header } => {
-                    assert_eq!(header.0, vec![0x82, 0x05, 0x00]);
+                    assert_eq!(header.raw, vec![0x82, 0x05, 0x00]);
                 }
                 other => panic!("expected BlockAnnouncement, got {other:?}"),
             }

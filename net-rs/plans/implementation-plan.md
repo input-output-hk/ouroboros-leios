@@ -268,16 +268,17 @@ selects one of 64 contiguous transactions at offset `64 × index`.
 
 Files: `net-core/src/protocols/leios_fetch/mod.rs`, `codec.rs`
 
-#### Phase 4c: Praos Header/Body Extensions
+#### Phase 4c: Parsed Headers + Leios Extensions — COMPLETE
 
-Extend existing CBOR codecs for backward-compatible optional fields:
-- `WrappedHeader`: optional trailing `(announced_eb: hash32, announced_eb_size: u32)`
-  and `certified_eb: bool`
-- `BlockBody`: optional trailing `eb_certificate` (opaque blob)
+Full Shelley+ header parsing: `WrappedHeader` converted from opaque tuple struct to
+named-field struct with `raw: Vec<u8>` and `parsed: Option<HeaderInfo>`. `HeaderInfo`
+extracts era, block_number, slot, prev_hash, issuer_vkey, body_size, block_body_hash,
+plus CIP-0164 Leios extensions (announced_eb, certified_eb). Byron headers gracefully
+return None. `BlockBody` converted similarly with `LeiosBlockInfo` sidecar (parser
+deferred). 232 total tests. 11 new parser tests.
 
-Tests with extended test vectors. Old data still decodes; new fields are optional.
-
-Files: `net-core/src/types.rs`, existing codec tests
+Files: `net-core/src/types.rs`, `net-core/src/peer/types.rs`, all protocol codecs and
+peer modules updated for struct field access.
 
 #### Phase 4d: Per-Peer Task Integration
 

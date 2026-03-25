@@ -88,7 +88,7 @@ pub(crate) fn spawn_chainsync(
                     .send((
                         peer_id,
                         PeerEvent::HeaderAnnounced {
-                            header: crate::types::WrappedHeader(Vec::new()),
+                            header: crate::types::WrappedHeader::opaque(Vec::new()),
                             tip,
                         },
                     ))
@@ -549,7 +549,7 @@ mod tests {
                     // then await. A real server would track the client's position.
                     let _ = runner
                         .send(&CsMsg::MsgRollForward {
-                            header: WrappedHeader(vec![0xA0]), // minimal valid CBOR: empty map
+                            header: WrappedHeader::opaque(vec![0xA0]), // minimal valid CBOR: empty map
                             tip: final_tip.clone(),
                         })
                         .await;

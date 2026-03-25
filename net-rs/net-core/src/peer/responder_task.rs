@@ -168,13 +168,13 @@ mod tests {
     fn make_header(slot: u64) -> WrappedHeader {
         let mut buf = Vec::new();
         minicbor::encode(&[slot], &mut buf).unwrap();
-        WrappedHeader(buf)
+        WrappedHeader::opaque(buf)
     }
 
     fn make_body(slot: u64) -> BlockBody {
         let mut buf = Vec::new();
         minicbor::encode(&[slot], &mut buf).unwrap();
-        BlockBody(buf)
+        BlockBody::opaque(buf)
     }
 
     #[tokio::test]

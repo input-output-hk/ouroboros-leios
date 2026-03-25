@@ -349,7 +349,7 @@ mod tests {
     fn make_header(slot: u64) -> WrappedHeader {
         let mut buf = Vec::new();
         minicbor::encode(&[slot], &mut buf).unwrap();
-        WrappedHeader(buf)
+        WrappedHeader::opaque(buf)
     }
 
     /// Create a valid CBOR-encoded BlockBody for testing.
@@ -358,7 +358,7 @@ mod tests {
     fn make_body(slot: u64, _size: usize) -> BlockBody {
         let mut buf = Vec::new();
         minicbor::encode(&[slot], &mut buf).unwrap();
-        BlockBody(buf)
+        BlockBody::opaque(buf)
     }
 
     /// Helper: set up a mux pair for a single protocol.
@@ -421,7 +421,7 @@ mod tests {
         let event = chainsync::request_next(&mut client).await.unwrap();
         match event {
             chainsync::ChainSyncEvent::RollForward { header, tip } => {
-                assert_eq!(header.0, header_1.0);
+                assert_eq!(header.raw, header_1.raw);
                 assert_eq!(tip.block_no, 3);
             }
             other => panic!("expected RollForward, got {other:?}"),
@@ -467,8 +467,8 @@ mod tests {
             received.push(body);
         }
         assert_eq!(received.len(), 3);
-        assert_eq!(received[0].0, body_1.0);
-        assert_eq!(received[2].0, body_3.0);
+        assert_eq!(received[0].raw, body_1.raw);
+        assert_eq!(received[2].raw, body_3.raw);
 
         let _ = blockfetch::done(&mut client).await;
         server_handle.await.ok();
