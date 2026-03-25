@@ -86,12 +86,58 @@ async fn block_generator(
     }
 }
 
+/// Background task that generates Leios endorser blocks and votes on a Poisson schedule.
+/// Generates one EB per Praos block (roughly), plus votes for each EB.
+async fn leios_generator(commands: mpsc::Sender<NetworkCommand>, rate: f64) {
+    let mut rng = StdRng::from_entropy();
+    let mut next_eb_slot: u64 = 1;
+
+    loop {
+        let interval = exp_sample(&mut rng, rate);
+        tokio::time::sleep(interval).await;
+
+        let slot = next_eb_slot;
+        next_eb_slot += 1;
+
+        let mut hash = [0u8; 32];
+        rng.fill(&mut hash);
+
+        // Inject a fake endorser block.
+        let block_data = vec![0x82, slot as u8, 0x00]; // minimal CBOR
+        let _ = commands
+            .send(NetworkCommand::InjectLeiosBlock {
+                slot,
+                hash,
+                block: block_data,
+            })
+            .await;
+
+        // Inject some votes for this EB.
+        let num_votes = rng.gen_range(1..=3u8);
+        let mut vote_ids = Vec::new();
+        let mut vote_data = Vec::new();
+        for v in 0..num_votes {
+            vote_ids.push((slot, vec![v]));
+            vote_data.push(vec![0xA0, v]); // minimal CBOR
+        }
+        let _ = commands
+            .send(NetworkCommand::InjectLeiosVotes {
+                votes: vote_ids,
+                data: vote_data,
+            })
+            .await;
+
+        println!("  leios: generated EB at slot {slot} ({num_votes} votes)");
+    }
+}
+
 pub async fn run(
     port: u16,
     magic: u64,
     block_rate: f64,
     rollback_rate: f64,
     max_rollback_depth: usize,
+    leios: bool,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let config = CoordinatorConfig {
         network_magic: magic,
@@ -101,6 +147,7 @@ pub async fn run(
         listen_address: Some(format!("0.0.0.0:{port}")),
         chain_store_capacity: 10_000,
         duplex: false,
+        leios_enabled: leios,
     };
 
     let mut handle = spawn_coordinator(config);
@@ -111,13 +158,22 @@ pub async fn run(
         block_generator(commands, block_rate, rollback_rate, max_rollback_depth).await;
     });
 
+    // Start Leios generator if enabled.
+    if leios {
+        let commands = handle.commands.clone();
+        tokio::spawn(async move {
+            leios_generator(commands, block_rate * 2.0).await;
+        });
+    }
+
     let rollback_info = if rollback_rate > 0.0 {
         format!(", rollback rate={rollback_rate}/sec")
     } else {
         String::new()
     };
+    let leios_info = if leios { ", leios=on" } else { "" };
     println!(
-        "fake server listening on port {port} (magic={magic}, block rate={block_rate}/sec (~{:.0}s mean){rollback_info})",
+        "fake server listening on port {port} (magic={magic}, block rate={block_rate}/sec (~{:.0}s mean){rollback_info}{leios_info})",
         1.0 / block_rate
     );
 

@@ -43,6 +43,28 @@ pub enum PeerEvent {
     /// TxSubmission server: received a transaction from a client.
     TransactionReceived { body: Vec<u8> },
 
+    /// LeiosNotify: server announced an RB header with EB announcement.
+    LeiosBlockAnnounced { header: WrappedHeader },
+
+    /// LeiosNotify: an endorser block is available for download.
+    LeiosBlockOffered { slot: u64, hash: [u8; 32] },
+
+    /// LeiosNotify: an EB's transactions are available.
+    LeiosBlockTxsOffered { slot: u64, hash: [u8; 32] },
+
+    /// LeiosNotify: votes are available for download.
+    LeiosVotesOffered { votes: Vec<(u64, Vec<u8>)> },
+
+    /// LeiosFetch: a requested endorser block arrived.
+    LeiosBlockFetched {
+        slot: u64,
+        hash: [u8; 32],
+        block: Vec<u8>,
+    },
+
+    /// LeiosFetch: requested votes arrived.
+    LeiosVotesFetched { votes: Vec<Vec<u8>> },
+
     /// Peer misbehaved or connection broke.
     Failed { reason: String },
 }
@@ -55,6 +77,12 @@ pub enum PeerCommand {
 
     /// Request peer addresses via PeerSharing.
     RequestPeers { amount: u8 },
+
+    /// Fetch an endorser block via LeiosFetch.
+    FetchLeiosBlock { slot: u64, hash: [u8; 32] },
+
+    /// Fetch votes via LeiosFetch.
+    FetchLeiosVotes { votes: Vec<(u64, Vec<u8>)> },
 
     /// Gracefully disconnect this peer.
     Disconnect,
@@ -91,6 +119,25 @@ pub enum NetworkEvent {
 
     /// A transaction was received from an inbound peer (via TxSubmission server).
     TransactionReceived { peer_id: PeerId, body: Vec<u8> },
+
+    /// Leios: an EB was announced via an RB header.
+    LeiosBlockAnnounced { header: WrappedHeader },
+
+    /// Leios: an endorser block is available for download from a peer.
+    LeiosBlockOffered { slot: u64, hash: [u8; 32] },
+
+    /// Leios: votes are available for download.
+    LeiosVotesOffered { votes: Vec<(u64, Vec<u8>)> },
+
+    /// Leios: a fetched endorser block arrived.
+    LeiosBlockReceived {
+        slot: u64,
+        hash: [u8; 32],
+        block: Vec<u8>,
+    },
+
+    /// Leios: fetched votes arrived.
+    LeiosVotesReceived { votes: Vec<Vec<u8>> },
 }
 
 /// Commands sent from the application to the coordinator.
@@ -115,6 +162,22 @@ pub enum NetworkCommand {
 
     /// Roll back the chain store to a point (for responder peers).
     InjectRollback { point: Point },
+
+    /// Fetch a specific Leios block. Coordinator picks the best peer.
+    FetchLeiosBlock { slot: u64, hash: [u8; 32] },
+
+    /// Inject a Leios block into the Leios store (for responder peers to serve).
+    InjectLeiosBlock {
+        slot: u64,
+        hash: [u8; 32],
+        block: Vec<u8>,
+    },
+
+    /// Inject votes into the Leios store (for responder peers to serve).
+    InjectLeiosVotes {
+        votes: Vec<(u64, Vec<u8>)>,
+        data: Vec<Vec<u8>>,
+    },
 
     /// Shut down all peers and stop the coordinator.
     Shutdown,

@@ -34,6 +34,8 @@ cargo run -p net-cli -- submit 127.0.0.1:9999                   # submit tx to f
 cargo run -p net-cli -- peer-share cardano-main2.everstake.one:3001  # peer sharing (live, supports peer_sharing=1)
 cargo run -p net-cli -- multi-follow --host backbone.cardano.iog.io:3001 --host backbone.cardano.iog.io:3001  # multi-peer follow (live)
 cargo run -p net-cli -- multi-follow --host backbone.cardano.iog.io:3001 --listen 0.0.0.0:8888  # relay mode (live upstream, local downstream)
+cargo run -p net-cli -- serve --port 9999 --block-rate 0.5 --leios  # fake server with Leios EB/vote generation
+cargo run -p net-cli -- multi-follow --host 127.0.0.1:9999 --leios  # follow with Leios notifications
 ```
 
 ### Test vector workflow
@@ -121,7 +123,8 @@ net-rs/
         peer_task.rs      -- per-peer initiator task: client protocol sub-tasks
         responder_task.rs -- per-peer responder task: server protocol sub-tasks
         duplex_task.rs    -- per-peer duplex task: both client + server on one connection
-        server_handlers.rs -- server-side protocol handlers (ChainSync/BlockFetch/KeepAlive/TxSubmission/PeerSharing)
+        leios_store.rs    -- LeiosStore: content-addressed store for Leios data (EBs, votes)
+        server_handlers.rs -- server-side protocol handlers (ChainSync/BlockFetch/KeepAlive/TxSubmission/PeerSharing/LeiosNotify/LeiosFetch)
         coordinator.rs    -- coordinator: peer aggregation, tip dedup, fetch routing, accept loop, reconnection
   net-cli/              -- binary crate
     src/
@@ -150,13 +153,14 @@ net-rs/
 - **Composable client helpers**: protocols expose simple async functions (`find_intersection`, `request_next`, `recv_block`) rather than complex callback frameworks
 - **Server uses Message directly**: server-side code uses `runner.recv()` / `runner.send()` with Message enums — no separate Request/Response types (Runner enforces agency)
 - **Multi-peer coordinator**: thread-per-peer with shared coordinator task. Each peer runs an independent tokio task tree; coordinator aggregates state via channels. Per-peer tasks fan-in `(PeerId, PeerEvent)` to coordinator; coordinator sends `PeerCommand` per-peer. Application interface is peer-agnostic (`NetworkEvent`/`NetworkCommand`). Three connection modes: InitiatorOnly (outbound, client protocols), ResponderOnly (inbound, server protocols), Duplex (both on one connection). Mux uses `(ProtocolId, u16)` composite keys to support both directions per protocol ID. ChainStore shared between coordinator and responder/duplex peers; populated via `InjectBlock`/`InjectRollback` commands or from initiator peer `BlockFetched` events. Accept loop for inbound connections via `listen_address` config. Exponential backoff reconnection for initiator/duplex peers; no reconnection for responder peers.
+- **Leios per-peer integration**: `leios_enabled: bool` config flag (default false). When true, per-peer tasks register LeiosNotify (ID 18) and LeiosFetch (ID 19) alongside Praos protocols. `spawn_leios_notify` runs continuous request_next loop; `spawn_leios_fetch` is command-driven (like BlockFetch). Server handlers `serve_leios_notify`/`serve_leios_fetch` read from `LeiosStore`. `LeiosStore` is a content-addressed blob store separate from `ChainStore` (Leios data keyed by `(slot, hash)`, not part of a linear chain). Coordinator stub-forwards Leios events/commands (smart aggregation deferred to Phase 4e).
 
 ## Implementation Phases
 
 1. **Phase 1: Mux + Handshake** — COMPLETE. Bearer, mux, codec, protocol framework, handshake (client+server), CLI, 51 tests, live-tested against mainnet, security-audited.
 2. **Phase 2: ChainSync / BlockFetch** — COMPLETE. Shared types (Point, Tip, WrappedHeader, BlockBody), ChainSync + BlockFetch + KeepAlive protocols (state machines, CBOR codecs, client + server), persistent chain follower with reconnection, fake server CLI with Poisson block/rollback generation, 109 tests, live-tested against mainnet, security-audited.
 3. **Phase 3: Remaining Praos + Multi-Peer** — COMPLETE. TxSubmission + PeerSharing protocols (38 tests). Multi-peer coordinator with all three connection modes (InitiatorOnly, ResponderOnly, Duplex). Mux composite keys `(ProtocolId, u16)` for bidirectional protocol support. ChainStore, server handlers, responder/duplex tasks, accept loop, InjectBlock/InjectRollback commands. `serve` CLI uses coordinator. `multi-follow --listen --duplex`. 172 total tests. Live-tested: duplex against mainnet, local relay chain (serve → multi-follow → follow).
-4. **Phase 4: Leios Protocols** — IN PROGRESS. Phase 4a (LeiosNotify, protocol ID 18) complete. Phase 4b (LeiosFetch, protocol ID 19, bitmap TX addressing) complete. Phase 4c (Shelley+ header parser with Leios extensions, block body parser) complete. 238 total tests. Phases 4d-4f (per-peer task integration, coordinator extensions, priority scheduling) pending.
+4. **Phase 4: Leios Protocols** — IN PROGRESS. Phase 4a (LeiosNotify, protocol ID 18) complete. Phase 4b (LeiosFetch, protocol ID 19, bitmap TX addressing) complete. Phase 4c (Shelley+ header parser with Leios extensions, block body parser) complete. Phase 4d (per-peer task integration) complete: `leios_enabled` config flag, `spawn_leios_notify`/`spawn_leios_fetch` client tasks, `serve_leios_notify`/`serve_leios_fetch` server handlers, `LeiosStore` content-addressed store, Leios PeerEvent/PeerCommand/NetworkEvent/NetworkCommand variants, coordinator stub forwarding, wiring in peer_task/responder_task/duplex_task. CLI `--leios` flag on `serve` and `multi-follow` for local end-to-end testing. 247 total tests. Locally tested: serve --leios → multi-follow --leios. Phases 4e-4f (coordinator extensions, priority scheduling) pending.
 
 ## Documentation
 

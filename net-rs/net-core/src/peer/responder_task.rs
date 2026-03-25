@@ -14,11 +14,14 @@ use crate::mux::ProtocolConfig;
 use crate::protocols::blockfetch;
 use crate::protocols::chainsync;
 use crate::protocols::keepalive;
+use crate::protocols::leios_fetch;
+use crate::protocols::leios_notify;
 use crate::protocols::peersharing::{self, PeerAddress};
 use crate::protocols::txsubmission;
 
 use super::chain_store::ChainStore;
 use super::connect::Connection;
+use super::leios_store::LeiosStore;
 use super::server_handlers;
 use super::types::{PeerCommand, PeerEvent};
 use super::PeerId;
@@ -31,11 +34,14 @@ pub(crate) struct ResponderTaskConfig {
     pub peer_provider: Arc<dyn Fn(u8) -> Vec<PeerAddress> + Send + Sync>,
     pub event_sender: mpsc::Sender<(PeerId, PeerEvent)>,
     pub command_receiver: mpsc::Receiver<PeerCommand>,
+    pub leios_enabled: bool,
+    pub leios_store: Option<Arc<LeiosStore>>,
 }
 
-/// Protocol configs for the 5 server-side protocols (excluding handshake).
-pub(crate) fn server_protocol_configs() -> Vec<ProtocolConfig> {
-    vec![
+/// Protocol configs for server-side protocols (excluding handshake).
+/// When `leios_enabled`, also registers LeiosNotify and LeiosFetch.
+pub(crate) fn server_protocol_configs(leios_enabled: bool) -> Vec<ProtocolConfig> {
+    let mut configs = vec![
         ProtocolConfig {
             id: chainsync::PROTOCOL_ID,
             priority: 1,
@@ -66,7 +72,22 @@ pub(crate) fn server_protocol_configs() -> Vec<ProtocolConfig> {
             ingress_limit: keepalive::INGRESS_LIMIT,
             egress_queue_size: 4,
         },
-    ]
+    ];
+    if leios_enabled {
+        configs.push(ProtocolConfig {
+            id: leios_notify::PROTOCOL_ID,
+            priority: 4,
+            ingress_limit: leios_notify::INGRESS_LIMIT,
+            egress_queue_size: 16,
+        });
+        configs.push(ProtocolConfig {
+            id: leios_fetch::PROTOCOL_ID,
+            priority: 4,
+            ingress_limit: leios_fetch::INGRESS_LIMIT,
+            egress_queue_size: 16,
+        });
+    }
+    configs
 }
 
 /// Run the responder peer task. Takes an already-accepted connection,
@@ -91,6 +112,28 @@ pub(crate) async fn run_responder_task(mut config: ResponderTaskConfig) {
         .next()
         .expect("peersharing channel registered fourth");
     let (ka_send, ka_recv) = channels.next().expect("keepalive channel registered fifth");
+
+    // Conditionally extract Leios channels.
+    let leios_handles = if config.leios_enabled {
+        let (ln_send, ln_recv) = channels
+            .next()
+            .expect("leios_notify channel registered sixth");
+        let (lf_send, lf_recv) = channels
+            .next()
+            .expect("leios_fetch channel registered seventh");
+        let store = config
+            .leios_store
+            .expect("leios_store required when leios_enabled");
+        let ln_handle = tokio::spawn(server_handlers::serve_leios_notify(
+            ln_send,
+            ln_recv,
+            store.clone(),
+        ));
+        let lf_handle = tokio::spawn(server_handlers::serve_leios_fetch(lf_send, lf_recv, store));
+        Some((ln_handle, lf_handle))
+    } else {
+        None
+    };
 
     // Spawn server-side protocol sub-tasks.
     let mut cs_handle = tokio::spawn(server_handlers::serve_chainsync(
@@ -141,6 +184,10 @@ pub(crate) async fn run_responder_task(mut config: ResponderTaskConfig) {
     ts_handle.abort();
     ps_handle.abort();
     ka_handle.abort();
+    if let Some((ln_handle, lf_handle)) = leios_handles {
+        ln_handle.abort();
+        lf_handle.abort();
+    }
     config.connection.running.abort();
 }
 
@@ -188,7 +235,7 @@ mod tests {
         }
 
         // Server side: set up mux + handshake, then run responder task.
-        let server_protos = server_protocol_configs();
+        let server_protos = server_protocol_configs(false);
 
         let hs_proto = ProtocolConfig {
             id: handshake::PROTOCOL_ID,
@@ -259,6 +306,8 @@ mod tests {
             peer_provider,
             event_sender,
             command_receiver: cmd_receiver,
+            leios_enabled: false,
+            leios_store: None,
         }));
 
         // Client: run ChainSync against the responder.

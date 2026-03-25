@@ -21,6 +21,7 @@ pub mod chain_store;
 pub mod connect;
 mod coordinator;
 pub(crate) mod duplex_task;
+pub mod leios_store;
 pub(crate) mod peer_task;
 pub(crate) mod responder_task;
 pub mod server_handlers;
@@ -79,6 +80,8 @@ pub struct CoordinatorConfig {
     pub chain_store_capacity: usize,
     /// If true, outbound connections use duplex mode (both client and server protocols).
     pub duplex: bool,
+    /// Enable Leios protocols (LeiosNotify, LeiosFetch). Default: false.
+    pub leios_enabled: bool,
 }
 
 impl Default for CoordinatorConfig {
@@ -91,6 +94,7 @@ impl Default for CoordinatorConfig {
             listen_address: None,
             chain_store_capacity: 2160,
             duplex: false,
+            leios_enabled: false,
         }
     }
 }

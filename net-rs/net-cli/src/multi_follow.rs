@@ -12,6 +12,7 @@ pub async fn run(
     max_peers: usize,
     listen: Option<String>,
     duplex: bool,
+    leios: bool,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     if hosts.is_empty() && listen.is_none() {
         return Err("at least one --host or --listen is required".into());
@@ -25,6 +26,7 @@ pub async fn run(
         listen_address: listen.clone(),
         chain_store_capacity: 2160,
         duplex,
+        leios_enabled: leios,
     };
 
     let mut handle = spawn_coordinator(config);
@@ -81,6 +83,24 @@ pub async fn run(
             }
             NetworkEvent::TransactionReceived { peer_id, body } => {
                 println!("  tx received from {peer_id} ({} bytes)", body.len());
+            }
+            NetworkEvent::LeiosBlockAnnounced { .. } => {
+                println!("  leios: EB announced via RB header");
+            }
+            NetworkEvent::LeiosBlockOffered { slot, .. } => {
+                println!("  leios: EB offered at slot {slot}");
+            }
+            NetworkEvent::LeiosVotesOffered { votes } => {
+                println!("  leios: {} vote(s) offered", votes.len());
+            }
+            NetworkEvent::LeiosBlockReceived { slot, block, .. } => {
+                println!(
+                    "  leios: EB received at slot {slot} ({} bytes)",
+                    block.len()
+                );
+            }
+            NetworkEvent::LeiosVotesReceived { votes } => {
+                println!("  leios: {} vote(s) received", votes.len());
             }
         }
     }

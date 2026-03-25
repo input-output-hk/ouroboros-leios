@@ -16,8 +16,10 @@ use crate::types::Point;
 
 use super::chain_store::ChainStore;
 use super::connect::{self, DuplexConnection};
+use super::leios_store::LeiosStore;
 use super::peer_task::{
-    client_protocol_configs, spawn_blockfetch, spawn_chainsync, spawn_keepalive, spawn_peersharing,
+    client_protocol_configs, spawn_blockfetch, spawn_chainsync, spawn_keepalive, spawn_leios_fetch,
+    spawn_leios_notify, spawn_peersharing, LeiosFetchCommand,
 };
 use super::responder_task::server_protocol_configs;
 use super::server_handlers;
@@ -35,6 +37,8 @@ pub(crate) struct DuplexTaskConfig {
     pub peer_provider: Arc<dyn Fn(u8) -> Vec<PeerAddress> + Send + Sync>,
     pub event_sender: mpsc::Sender<(PeerId, PeerEvent)>,
     pub command_receiver: mpsc::Receiver<PeerCommand>,
+    pub leios_enabled: bool,
+    pub leios_store: Option<Arc<LeiosStore>>,
 }
 
 /// Run a duplex peer task. Connects outbound, then runs both client and
@@ -52,8 +56,8 @@ pub(crate) async fn run_duplex_task(mut config: DuplexTaskConfig) {
     let conn: DuplexConnection = match connect::connect_duplex(
         &config.address,
         config.network_magic,
-        &client_protocol_configs(),
-        &server_protocol_configs(),
+        &client_protocol_configs(config.leios_enabled),
+        &server_protocol_configs(config.leios_enabled),
         mux_config,
     )
     .await
@@ -103,6 +107,26 @@ pub(crate) async fn run_duplex_task(mut config: DuplexTaskConfig) {
         event_sender.clone(),
     );
 
+    // Conditionally spawn Leios client sub-tasks.
+    let leios_client_handles = if config.leios_enabled {
+        let (ln_send, ln_recv) = init_channels
+            .next()
+            .expect("leios_notify initiator channel");
+        let (lf_send, lf_recv) = init_channels.next().expect("leios_fetch initiator channel");
+        let (lf_cmd_sender, lf_cmd_receiver) = mpsc::channel::<LeiosFetchCommand>(16);
+        let ln_handle = spawn_leios_notify(ln_send, ln_recv, peer_id, event_sender.clone());
+        let lf_handle = spawn_leios_fetch(
+            lf_send,
+            lf_recv,
+            peer_id,
+            lf_cmd_receiver,
+            event_sender.clone(),
+        );
+        Some((ln_handle, lf_handle, lf_cmd_sender))
+    } else {
+        None
+    };
+
     // --- Responder (server) sub-tasks ---
     let mut resp_channels = conn.responder_channels.into_iter();
     let (cs_srv_send, cs_srv_recv) = resp_channels.next().expect("chainsync responder channel");
@@ -136,6 +160,31 @@ pub(crate) async fn run_duplex_task(mut config: DuplexTaskConfig) {
     ));
     let ka_server = tokio::spawn(server_handlers::serve_keepalive(ka_srv_send, ka_srv_recv));
 
+    // Conditionally spawn Leios server sub-tasks.
+    let leios_server_handles = if config.leios_enabled {
+        let (ln_srv_send, ln_srv_recv) = resp_channels
+            .next()
+            .expect("leios_notify responder channel");
+        let (lf_srv_send, lf_srv_recv) =
+            resp_channels.next().expect("leios_fetch responder channel");
+        let store = config
+            .leios_store
+            .expect("leios_store required when leios_enabled");
+        let ln_server = tokio::spawn(server_handlers::serve_leios_notify(
+            ln_srv_send,
+            ln_srv_recv,
+            store.clone(),
+        ));
+        let lf_server = tokio::spawn(server_handlers::serve_leios_fetch(
+            lf_srv_send,
+            lf_srv_recv,
+            store,
+        ));
+        Some((ln_server, lf_server))
+    } else {
+        None
+    };
+
     // Main select loop: dispatch commands and detect ChainSync client exit.
     loop {
         tokio::select! {
@@ -146,6 +195,16 @@ pub(crate) async fn run_duplex_task(mut config: DuplexTaskConfig) {
                     }
                     Some(PeerCommand::RequestPeers { amount }) => {
                         let _ = peer_share_sender.send(amount).await;
+                    }
+                    Some(PeerCommand::FetchLeiosBlock { slot, hash }) => {
+                        if let Some((_, _, ref lf_sender)) = leios_client_handles {
+                            let _ = lf_sender.send(LeiosFetchCommand::FetchBlock { slot, hash }).await;
+                        }
+                    }
+                    Some(PeerCommand::FetchLeiosVotes { votes }) => {
+                        if let Some((_, _, ref lf_sender)) = leios_client_handles {
+                            let _ = lf_sender.send(LeiosFetchCommand::FetchVotes { votes }).await;
+                        }
                     }
                     Some(PeerCommand::Disconnect) | None => break,
                 }
@@ -164,10 +223,18 @@ pub(crate) async fn run_duplex_task(mut config: DuplexTaskConfig) {
     ka_client.abort();
     bf_client.abort();
     ps_client.abort();
+    if let Some((ln_handle, lf_handle, _)) = leios_client_handles {
+        ln_handle.abort();
+        lf_handle.abort();
+    }
     cs_server.abort();
     bf_server.abort();
     ts_server.abort();
     ps_server.abort();
     ka_server.abort();
+    if let Some((ln_handle, lf_handle)) = leios_server_handles {
+        ln_handle.abort();
+        lf_handle.abort();
+    }
     conn.running.abort();
 }

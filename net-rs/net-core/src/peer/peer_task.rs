@@ -14,6 +14,8 @@ use crate::mux::{CodecRecv, CodecSend, MuxConfig, ProtocolConfig};
 use crate::protocols::blockfetch::{self, BlockFetch};
 use crate::protocols::chainsync::{self, ChainSync, ChainSyncEvent};
 use crate::protocols::keepalive::{self, KeepAlive};
+use crate::protocols::leios_fetch::{self, LeiosFetch};
+use crate::protocols::leios_notify::{self, LeiosNotify, LeiosNotifyEvent};
 use crate::protocols::peersharing::{self, PeerSharing};
 use crate::protocols::{Role, Runner};
 use crate::types::Point;
@@ -31,11 +33,13 @@ pub(crate) struct PeerTaskConfig {
     pub sdu_timeout: Duration,
     pub event_sender: mpsc::Sender<(PeerId, PeerEvent)>,
     pub command_receiver: mpsc::Receiver<PeerCommand>,
+    pub leios_enabled: bool,
 }
 
-/// Protocol configs for the 4 client-side protocols (excluding handshake).
-pub(crate) fn client_protocol_configs() -> Vec<ProtocolConfig> {
-    vec![
+/// Protocol configs for client-side protocols (excluding handshake).
+/// When `leios_enabled`, also registers LeiosNotify and LeiosFetch.
+pub(crate) fn client_protocol_configs(leios_enabled: bool) -> Vec<ProtocolConfig> {
+    let mut configs = vec![
         ProtocolConfig {
             id: chainsync::PROTOCOL_ID,
             priority: 1,
@@ -60,7 +64,22 @@ pub(crate) fn client_protocol_configs() -> Vec<ProtocolConfig> {
             ingress_limit: peersharing::INGRESS_LIMIT,
             egress_queue_size: 4,
         },
-    ]
+    ];
+    if leios_enabled {
+        configs.push(ProtocolConfig {
+            id: leios_notify::PROTOCOL_ID,
+            priority: 4,
+            ingress_limit: leios_notify::INGRESS_LIMIT,
+            egress_queue_size: 16,
+        });
+        configs.push(ProtocolConfig {
+            id: leios_fetch::PROTOCOL_ID,
+            priority: 4,
+            ingress_limit: leios_fetch::INGRESS_LIMIT,
+            egress_queue_size: 16,
+        });
+    }
+    configs
 }
 
 /// Spawn the ChainSync sub-task. Runs find_intersection then request_next loop.
@@ -273,6 +292,118 @@ pub(crate) fn spawn_peersharing(
     })
 }
 
+/// Command sent to the LeiosFetch sub-task via an internal channel.
+#[derive(Debug)]
+pub(crate) enum LeiosFetchCommand {
+    FetchBlock { slot: u64, hash: [u8; 32] },
+    FetchVotes { votes: Vec<(u64, Vec<u8>)> },
+}
+
+/// Spawn the LeiosNotify sub-task. Continuous request_next loop.
+pub(crate) fn spawn_leios_notify(
+    ln_send: CodecSend,
+    ln_recv: CodecRecv,
+    peer_id: PeerId,
+    event_sender: mpsc::Sender<(PeerId, PeerEvent)>,
+) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut runner = Runner::<LeiosNotify>::new(Role::Client, ln_send, ln_recv);
+        loop {
+            match leios_notify::request_next(&mut runner).await {
+                Ok(LeiosNotifyEvent::BlockAnnouncement { header }) => {
+                    let _ = event_sender
+                        .send((peer_id, PeerEvent::LeiosBlockAnnounced { header }))
+                        .await;
+                }
+                Ok(LeiosNotifyEvent::BlockOffer { slot, hash }) => {
+                    let _ = event_sender
+                        .send((peer_id, PeerEvent::LeiosBlockOffered { slot, hash }))
+                        .await;
+                }
+                Ok(LeiosNotifyEvent::BlockTxsOffer { slot, hash }) => {
+                    let _ = event_sender
+                        .send((peer_id, PeerEvent::LeiosBlockTxsOffered { slot, hash }))
+                        .await;
+                }
+                Ok(LeiosNotifyEvent::VotesOffer { votes }) => {
+                    let _ = event_sender
+                        .send((peer_id, PeerEvent::LeiosVotesOffered { votes }))
+                        .await;
+                }
+                Err(e) => {
+                    let _ = event_sender
+                        .send((
+                            peer_id,
+                            PeerEvent::Failed {
+                                reason: format!("leios_notify: {e}"),
+                            },
+                        ))
+                        .await;
+                    return;
+                }
+            }
+        }
+    })
+}
+
+/// Spawn the LeiosFetch sub-task. Waits for fetch commands on the internal channel.
+pub(crate) fn spawn_leios_fetch(
+    lf_send: CodecSend,
+    lf_recv: CodecRecv,
+    peer_id: PeerId,
+    mut command_receiver: mpsc::Receiver<LeiosFetchCommand>,
+    event_sender: mpsc::Sender<(PeerId, PeerEvent)>,
+) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut runner = Runner::<LeiosFetch>::new(Role::Client, lf_send, lf_recv);
+
+        while let Some(cmd) = command_receiver.recv().await {
+            match cmd {
+                LeiosFetchCommand::FetchBlock { slot, hash } => {
+                    match leios_fetch::fetch_block(&mut runner, slot, hash).await {
+                        Ok(block) => {
+                            let _ = event_sender
+                                .send((peer_id, PeerEvent::LeiosBlockFetched { slot, hash, block }))
+                                .await;
+                        }
+                        Err(e) => {
+                            let _ = event_sender
+                                .send((
+                                    peer_id,
+                                    PeerEvent::Failed {
+                                        reason: format!("leios_fetch block: {e}"),
+                                    },
+                                ))
+                                .await;
+                            return;
+                        }
+                    }
+                }
+                LeiosFetchCommand::FetchVotes { votes } => {
+                    match leios_fetch::fetch_votes(&mut runner, votes).await {
+                        Ok(vote_data) => {
+                            let _ = event_sender
+                                .send((peer_id, PeerEvent::LeiosVotesFetched { votes: vote_data }))
+                                .await;
+                        }
+                        Err(e) => {
+                            let _ = event_sender
+                                .send((
+                                    peer_id,
+                                    PeerEvent::Failed {
+                                        reason: format!("leios_fetch votes: {e}"),
+                                    },
+                                ))
+                                .await;
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+    })
+}
+
 /// Run the per-peer task. Connects, spawns protocol sub-tasks, and
 /// dispatches commands from the coordinator.
 pub(crate) async fn run_peer_task(mut config: PeerTaskConfig) {
@@ -288,7 +419,7 @@ pub(crate) async fn run_peer_task(mut config: PeerTaskConfig) {
     let conn: Connection = match connect::connect_and_handshake_with_config(
         &config.address,
         config.network_magic,
-        &client_protocol_configs(),
+        &client_protocol_configs(config.leios_enabled),
         mux_config,
     )
     .await
@@ -347,6 +478,28 @@ pub(crate) async fn run_peer_task(mut config: PeerTaskConfig) {
         event_sender.clone(),
     );
 
+    // Conditionally spawn Leios sub-tasks.
+    let leios_handles = if config.leios_enabled {
+        let (ln_send, ln_recv) = channels
+            .next()
+            .expect("leios_notify channel registered fifth");
+        let (lf_send, lf_recv) = channels
+            .next()
+            .expect("leios_fetch channel registered sixth");
+        let (lf_cmd_sender, lf_cmd_receiver) = mpsc::channel::<LeiosFetchCommand>(16);
+        let ln_handle = spawn_leios_notify(ln_send, ln_recv, peer_id, event_sender.clone());
+        let lf_handle = spawn_leios_fetch(
+            lf_send,
+            lf_recv,
+            peer_id,
+            lf_cmd_receiver,
+            event_sender.clone(),
+        );
+        Some((ln_handle, lf_handle, lf_cmd_sender))
+    } else {
+        None
+    };
+
     // Main select loop: dispatch commands and detect sub-task failure.
     // ChainSync is the primary protocol — if it exits, the peer is done.
     loop {
@@ -358,6 +511,16 @@ pub(crate) async fn run_peer_task(mut config: PeerTaskConfig) {
                     }
                     Some(PeerCommand::RequestPeers { amount }) => {
                         let _ = peer_share_sender.send(amount).await;
+                    }
+                    Some(PeerCommand::FetchLeiosBlock { slot, hash }) => {
+                        if let Some((_, _, ref lf_sender)) = leios_handles {
+                            let _ = lf_sender.send(LeiosFetchCommand::FetchBlock { slot, hash }).await;
+                        }
+                    }
+                    Some(PeerCommand::FetchLeiosVotes { votes }) => {
+                        if let Some((_, _, ref lf_sender)) = leios_handles {
+                            let _ = lf_sender.send(LeiosFetchCommand::FetchVotes { votes }).await;
+                        }
                     }
                     Some(PeerCommand::Disconnect) | None => {
                         break;
@@ -379,6 +542,10 @@ pub(crate) async fn run_peer_task(mut config: PeerTaskConfig) {
     ka_handle.abort();
     bf_handle.abort();
     ps_handle.abort();
+    if let Some((ln_handle, lf_handle, _)) = leios_handles {
+        ln_handle.abort();
+        lf_handle.abort();
+    }
     conn.running.abort();
 }
 
@@ -387,9 +554,12 @@ mod tests {
     use super::*;
     use crate::bearer::mem::MemBearer;
     use crate::mux::scheduler::RoundRobin;
+    use crate::mux::{CodecRecv, CodecSend, MuxConfig, ProtocolConfig};
     use crate::mux::{Mux, MODE_INITIATOR, MODE_RESPONDER};
     use crate::protocols::chainsync::{ChainSync, Message as CsMsg};
     use crate::protocols::keepalive::{KeepAlive, Message as KaMsg};
+    use crate::protocols::leios_fetch::{self, LeiosFetch, Message as LfMsg};
+    use crate::protocols::leios_notify::{self, LeiosNotify, Message as LnMsg};
     use crate::protocols::Runner as ProtocolRunner;
     use crate::types::{BlockBody, Point, Tip, WrappedHeader};
 
@@ -585,7 +755,7 @@ mod tests {
             ingress_limit: crate::protocols::handshake::SIZE_LIMIT,
             egress_queue_size: 4,
         };
-        let protos = client_protocol_configs();
+        let protos = client_protocol_configs(false);
 
         let mut mux = Mux::new(MuxConfig::default(), RoundRobin::default(), MODE_INITIATOR);
         let (hs_send, hs_recv) = mux.register(&hs_proto);
@@ -660,5 +830,189 @@ mod tests {
         running.abort();
         drop(command_sender);
         server_handle.abort();
+    }
+
+    /// Helper: set up a mux pair for a single protocol.
+    fn mux_pair_for_protocol(
+        proto: &ProtocolConfig,
+    ) -> (
+        (CodecSend, CodecRecv),
+        (CodecSend, CodecRecv),
+        crate::mux::RunningMux,
+        crate::mux::RunningMux,
+    ) {
+        let (bearer_a, bearer_b) = MemBearer::pair();
+        let mut mux_a = Mux::new(MuxConfig::default(), RoundRobin::default(), MODE_INITIATOR);
+        let (send_a, recv_a) = mux_a.register(proto);
+        let running_a = mux_a.run(bearer_a);
+
+        let mut mux_b = Mux::new(MuxConfig::default(), RoundRobin::default(), MODE_RESPONDER);
+        let (send_b, recv_b) = mux_b.register(proto);
+        let running_b = mux_b.run(bearer_b);
+
+        (
+            (CodecSend::new(send_a), CodecRecv::new(recv_a)),
+            (CodecSend::new(send_b), CodecRecv::new(recv_b)),
+            running_a,
+            running_b,
+        )
+    }
+
+    #[tokio::test]
+    async fn spawn_leios_notify_receives_offers() {
+        let ln_proto = ProtocolConfig {
+            id: leios_notify::PROTOCOL_ID,
+            priority: 0,
+            ingress_limit: leios_notify::INGRESS_LIMIT,
+            egress_queue_size: 16,
+        };
+
+        let ((client_send, client_recv), (server_send, server_recv), mux_a, mux_b) =
+            mux_pair_for_protocol(&ln_proto);
+
+        // Fake server: respond to two request_next calls, then expect MsgDone.
+        let server_handle = tokio::spawn(async move {
+            let mut runner =
+                ProtocolRunner::<LeiosNotify>::new(Role::Server, server_send, server_recv);
+
+            // First: receive request, reply with block offer.
+            let msg = runner.recv().await.unwrap();
+            assert!(matches!(msg, LnMsg::MsgLeiosNotificationRequestNext));
+            runner
+                .send(&LnMsg::MsgLeiosBlockOffer {
+                    slot: 42,
+                    hash: [0xAB; 32],
+                })
+                .await
+                .unwrap();
+
+            // Second: receive request, reply with votes offer.
+            let msg = runner.recv().await.unwrap();
+            assert!(matches!(msg, LnMsg::MsgLeiosNotificationRequestNext));
+            runner
+                .send(&LnMsg::MsgLeiosVotesOffer {
+                    votes: vec![(100, vec![0x01])],
+                })
+                .await
+                .unwrap();
+
+            // Client will be aborted, so the next recv will fail — that's fine.
+            let _ = runner.recv().await;
+        });
+
+        let (event_sender, mut event_receiver) = mpsc::channel(64);
+        let peer_id = PeerId(1);
+
+        let ln_handle = spawn_leios_notify(client_send, client_recv, peer_id, event_sender);
+
+        // Collect two events with timeout.
+        let result = tokio::time::timeout(Duration::from_secs(5), async {
+            let (_id, event1) = event_receiver.recv().await.unwrap();
+            match event1 {
+                PeerEvent::LeiosBlockOffered { slot, hash } => {
+                    assert_eq!(slot, 42);
+                    assert_eq!(hash, [0xAB; 32]);
+                }
+                other => panic!("expected LeiosBlockOffered, got {other:?}"),
+            }
+
+            let (_id, event2) = event_receiver.recv().await.unwrap();
+            match event2 {
+                PeerEvent::LeiosVotesOffered { votes } => {
+                    assert_eq!(votes, vec![(100, vec![0x01])]);
+                }
+                other => panic!("expected LeiosVotesOffered, got {other:?}"),
+            }
+        })
+        .await;
+
+        assert!(result.is_ok(), "timed out waiting for Leios notify events");
+
+        // Clean up.
+        ln_handle.abort();
+        server_handle.abort();
+        mux_a.abort();
+        mux_b.abort();
+    }
+
+    #[tokio::test]
+    async fn spawn_leios_fetch_fetches_block() {
+        let lf_proto = ProtocolConfig {
+            id: leios_fetch::PROTOCOL_ID,
+            priority: 0,
+            ingress_limit: leios_fetch::INGRESS_LIMIT,
+            egress_queue_size: 16,
+        };
+
+        let ((client_send, client_recv), (server_send, server_recv), mux_a, mux_b) =
+            mux_pair_for_protocol(&lf_proto);
+
+        // Fake server: receive block request, reply with block, then expect MsgDone.
+        let server_handle = tokio::spawn(async move {
+            let mut runner =
+                ProtocolRunner::<LeiosFetch>::new(Role::Server, server_send, server_recv);
+
+            let msg = runner.recv().await.unwrap();
+            match msg {
+                LfMsg::MsgLeiosBlockRequest { slot, hash } => {
+                    assert_eq!(slot, 42);
+                    assert_eq!(hash, [0xAB; 32]);
+                }
+                other => panic!("expected MsgLeiosBlockRequest, got {other:?}"),
+            }
+            runner
+                .send(&LfMsg::MsgLeiosBlock {
+                    block: vec![1, 2, 3, 4],
+                })
+                .await
+                .unwrap();
+
+            // Expect MsgDone (client channel closes after command_sender is dropped).
+            let _ = runner.recv().await;
+        });
+
+        let (event_sender, mut event_receiver) = mpsc::channel(64);
+        let (command_sender, command_receiver) = mpsc::channel::<LeiosFetchCommand>(16);
+        let peer_id = PeerId(1);
+
+        let lf_handle = spawn_leios_fetch(
+            client_send,
+            client_recv,
+            peer_id,
+            command_receiver,
+            event_sender,
+        );
+
+        // Send a fetch command.
+        command_sender
+            .send(LeiosFetchCommand::FetchBlock {
+                slot: 42,
+                hash: [0xAB; 32],
+            })
+            .await
+            .unwrap();
+
+        // Collect the event.
+        let result = tokio::time::timeout(Duration::from_secs(5), async {
+            let (_id, event) = event_receiver.recv().await.unwrap();
+            match event {
+                PeerEvent::LeiosBlockFetched { slot, hash, block } => {
+                    assert_eq!(slot, 42);
+                    assert_eq!(hash, [0xAB; 32]);
+                    assert_eq!(block, vec![1, 2, 3, 4]);
+                }
+                other => panic!("expected LeiosBlockFetched, got {other:?}"),
+            }
+        })
+        .await;
+
+        assert!(result.is_ok(), "timed out waiting for LeiosBlockFetched");
+
+        // Clean up.
+        drop(command_sender);
+        lf_handle.abort();
+        server_handle.abort();
+        mux_a.abort();
+        mux_b.abort();
     }
 }
