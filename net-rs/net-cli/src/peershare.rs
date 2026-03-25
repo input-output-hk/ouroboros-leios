@@ -5,15 +5,14 @@
 use std::net::ToSocketAddrs;
 
 use net_core::bearer::tcp::TcpBearer;
-use net_core::codec::{CodecRecv, CodecSend};
 use net_core::mux::scheduler::RoundRobin;
-use net_core::mux::{Mux, MuxConfig, ProtocolConfig, MODE_INITIATOR};
-use net_core::protocol::Role;
-use net_core::protocol::Runner;
+use net_core::mux::{CodecRecv, CodecSend, Mux, MuxConfig, ProtocolConfig, MODE_INITIATOR};
 use net_core::protocols::handshake;
 use net_core::protocols::handshake::n2n;
 use net_core::protocols::peersharing;
 use net_core::protocols::peersharing::PeerSharing;
+use net_core::protocols::Role;
+use net_core::protocols::Runner;
 
 pub async fn run(
     host: &str,

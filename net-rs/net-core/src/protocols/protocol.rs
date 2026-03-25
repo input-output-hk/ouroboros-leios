@@ -16,8 +16,8 @@
 use std::fmt::Debug;
 use std::time::Duration;
 
-use crate::codec::{CodecRecv, CodecSend};
 use crate::mux::MuxError;
+use crate::mux::{CodecRecv, CodecSend};
 
 /// Which side has the right to send in a given state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

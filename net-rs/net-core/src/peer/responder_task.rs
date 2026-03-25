@@ -148,13 +148,12 @@ pub(crate) async fn run_responder_task(mut config: ResponderTaskConfig) {
 mod tests {
     use super::*;
     use crate::bearer::mem::MemBearer;
-    use crate::codec::{CodecRecv, CodecSend};
     use crate::mux::scheduler::RoundRobin;
-    use crate::mux::{Mux, MuxConfig, MODE_INITIATOR, MODE_RESPONDER};
-    use crate::protocol::{Role, Runner};
+    use crate::mux::{CodecRecv, CodecSend, Mux, MuxConfig, MODE_INITIATOR, MODE_RESPONDER};
     use crate::protocols::chainsync::{self, ChainSync};
     use crate::protocols::handshake;
     use crate::protocols::handshake::n2n;
+    use crate::protocols::{Role, Runner};
     use crate::types::{BlockBody, Point, WrappedHeader};
     use std::time::Duration;
 

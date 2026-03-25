@@ -6,9 +6,11 @@
 use std::net::ToSocketAddrs;
 
 use crate::bearer::tcp::TcpBearer;
-use crate::codec::{CodecRecv, CodecSend};
 use crate::mux::scheduler::RoundRobin;
-use crate::mux::{Mux, MuxConfig, ProtocolConfig, RunningMux, MODE_INITIATOR, MODE_RESPONDER};
+use crate::mux::{
+    CodecRecv, CodecSend, Mux, MuxConfig, ProtocolConfig, RunningMux, MODE_INITIATOR,
+    MODE_RESPONDER,
+};
 use crate::protocols::handshake;
 use crate::protocols::handshake::n2n;
 

@@ -9,7 +9,7 @@ use std::fmt;
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::time::Duration;
 
-use crate::protocol::{Agency, Protocol, ProtocolError, Runner};
+use crate::protocols::{Agency, Protocol, ProtocolError, Runner};
 
 /// PeerSharing protocol ID in the multiplexer.
 pub const PROTOCOL_ID: u16 = 10;
@@ -139,10 +139,11 @@ pub async fn done(runner: &mut Runner<PeerSharing>) -> Result<(), ProtocolError>
 mod tests {
     use super::*;
     use crate::bearer::mem::MemBearer;
-    use crate::codec::{CodecRecv, CodecSend};
     use crate::mux::scheduler::RoundRobin;
-    use crate::mux::{Mux, MuxConfig, ProtocolConfig, MODE_INITIATOR, MODE_RESPONDER};
-    use crate::protocol::Role;
+    use crate::mux::{
+        CodecRecv, CodecSend, Mux, MuxConfig, ProtocolConfig, MODE_INITIATOR, MODE_RESPONDER,
+    };
+    use crate::protocols::Role;
 
     #[test]
     fn agency_correct() {

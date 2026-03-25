@@ -6,12 +6,12 @@ use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
 use net_core::mux::{MuxConfig, ProtocolConfig};
-use net_core::protocol::Role;
-use net_core::protocol::Runner;
 use net_core::protocols::chainsync;
 use net_core::protocols::chainsync::{ChainSync, ChainSyncEvent};
 use net_core::protocols::keepalive;
 use net_core::protocols::keepalive::KeepAlive;
+use net_core::protocols::Role;
+use net_core::protocols::Runner;
 use net_core::types::Point;
 
 use crate::connect;
@@ -85,8 +85,8 @@ impl ChainState {
 
 /// Spawn a background task that sends KeepAlive pings every KEEPALIVE_INTERVAL.
 fn spawn_keepalive(
-    ka_send: net_core::codec::CodecSend,
-    ka_recv: net_core::codec::CodecRecv,
+    ka_send: net_core::mux::CodecSend,
+    ka_recv: net_core::mux::CodecRecv,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         let mut runner = Runner::<KeepAlive>::new(Role::Client, ka_send, ka_recv);
