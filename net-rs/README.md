@@ -103,6 +103,10 @@ net-rs/
 └── plans/             # Design documents
 ```
 
+See individual crate READMEs for detailed documentation:
+- **[net-core](net-core/)** — library API, module structure, protocol state machines with Mermaid diagrams and agency tables
+- **[net-cli](net-cli/)** — CLI commands and usage examples
+
 ## Building
 
 Requires stable Rust (no nightly features).
