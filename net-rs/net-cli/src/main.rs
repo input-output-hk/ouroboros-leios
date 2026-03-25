@@ -86,6 +86,10 @@ enum Command {
         /// Maximum rollback depth (capped at chain length - 1)
         #[arg(long, default_value_t = 3)]
         max_rollback_depth: usize,
+
+        /// Enable Leios protocols (LeiosNotify + LeiosFetch with synthetic EB/vote generation)
+        #[arg(long)]
+        leios: bool,
     },
 
     /// Submit random transactions via TxSubmission
@@ -163,6 +167,10 @@ enum Command {
         /// Use duplex mode (both client and server protocols per connection)
         #[arg(long)]
         duplex: bool,
+
+        /// Enable Leios protocols (LeiosNotify + LeiosFetch)
+        #[arg(long)]
+        leios: bool,
     },
 }
 
@@ -183,7 +191,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             block_rate,
             rollback_rate,
             max_rollback_depth,
-        } => serve::run(port, magic, block_rate, rollback_rate, max_rollback_depth).await,
+            leios,
+        } => {
+            serve::run(
+                port,
+                magic,
+                block_rate,
+                rollback_rate,
+                max_rollback_depth,
+                leios,
+            )
+            .await
+        }
         Command::Submit {
             host,
             magic,
@@ -208,6 +227,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             max_peers,
             listen,
             duplex,
-        } => multi_follow::run(&hosts, magic, max_peers, listen, duplex).await,
+            leios,
+        } => multi_follow::run(&hosts, magic, max_peers, listen, duplex, leios).await,
     }
 }

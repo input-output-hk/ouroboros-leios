@@ -12,11 +12,14 @@ use crate::mux::{CodecRecv, CodecSend};
 use crate::protocols::blockfetch::{BlockFetch, Message as BfMsg};
 use crate::protocols::chainsync::{ChainSync, Message as CsMsg};
 use crate::protocols::keepalive::{KeepAlive, Message as KaMsg};
+use crate::protocols::leios_fetch::{LeiosFetch, Message as LfMsg};
+use crate::protocols::leios_notify::{LeiosNotify, Message as LnMsg};
 use crate::protocols::peersharing::{Message as PsMsg, PeerAddress, PeerSharing};
 use crate::protocols::txsubmission::{self, Message as TsMsg, TxSubmission};
 use crate::protocols::{Role, Runner};
 
 use super::chain_store::ChainStore;
+use super::leios_store::LeiosStore;
 use super::types::PeerEvent;
 use super::PeerId;
 
@@ -326,6 +329,137 @@ pub async fn serve_peersharing(
     }
 }
 
+/// Serve LeiosNotify for one connection.
+///
+/// Sends notifications about available Leios data as the store is populated.
+/// Uses `LeiosStore::subscribe()` to wake when new items are injected.
+pub async fn serve_leios_notify(ln_send: CodecSend, ln_recv: CodecRecv, store: Arc<LeiosStore>) {
+    use super::leios_store::LeiosNotification;
+
+    let mut runner = Runner::<LeiosNotify>::new(Role::Server, ln_send, ln_recv);
+    let mut read_index: usize = 0;
+    let mut subscription = store.subscribe();
+
+    loop {
+        let msg = match runner.recv().await {
+            Ok(msg) => msg,
+            Err(_) => break,
+        };
+
+        match msg {
+            LnMsg::MsgLeiosNotificationRequestNext => {
+                let pending = store.notifications_after(read_index);
+                if let Some(notification) = pending.first() {
+                    read_index += 1;
+                    let response = match notification {
+                        LeiosNotification::BlockOffer { slot, hash } => LnMsg::MsgLeiosBlockOffer {
+                            slot: *slot,
+                            hash: *hash,
+                        },
+                        LeiosNotification::BlockTxsOffer { slot, hash } => {
+                            LnMsg::MsgLeiosBlockTxsOffer {
+                                slot: *slot,
+                                hash: *hash,
+                            }
+                        }
+                        LeiosNotification::VotesOffer { votes } => LnMsg::MsgLeiosVotesOffer {
+                            votes: votes.clone(),
+                        },
+                    };
+                    if runner.send(&response).await.is_err() {
+                        break;
+                    }
+                } else {
+                    // No pending notifications — wait for new items.
+                    loop {
+                        if subscription.changed().await.is_err() {
+                            return;
+                        }
+                        let pending = store.notifications_after(read_index);
+                        if let Some(notification) = pending.first() {
+                            read_index += 1;
+                            let response = match notification {
+                                LeiosNotification::BlockOffer { slot, hash } => {
+                                    LnMsg::MsgLeiosBlockOffer {
+                                        slot: *slot,
+                                        hash: *hash,
+                                    }
+                                }
+                                LeiosNotification::BlockTxsOffer { slot, hash } => {
+                                    LnMsg::MsgLeiosBlockTxsOffer {
+                                        slot: *slot,
+                                        hash: *hash,
+                                    }
+                                }
+                                LeiosNotification::VotesOffer { votes } => {
+                                    LnMsg::MsgLeiosVotesOffer {
+                                        votes: votes.clone(),
+                                    }
+                                }
+                            };
+                            if runner.send(&response).await.is_err() {
+                                return;
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+            LnMsg::MsgDone => break,
+            _ => break,
+        }
+    }
+}
+
+/// Serve LeiosFetch for one connection.
+///
+/// Responds to block and vote fetch requests from the Leios store.
+pub async fn serve_leios_fetch(lf_send: CodecSend, lf_recv: CodecRecv, store: Arc<LeiosStore>) {
+    let mut runner = Runner::<LeiosFetch>::new(Role::Server, lf_send, lf_recv);
+
+    loop {
+        let msg = match runner.recv().await {
+            Ok(msg) => msg,
+            Err(_) => break,
+        };
+
+        match msg {
+            LfMsg::MsgLeiosBlockRequest { slot, hash } => {
+                let block = store.get_block(slot, &hash).unwrap_or_default();
+                if runner.send(&LfMsg::MsgLeiosBlock { block }).await.is_err() {
+                    break;
+                }
+            }
+            LfMsg::MsgLeiosBlockTxsRequest {
+                slot,
+                hash,
+                bitmap: _,
+            } => {
+                let transactions = store.get_block_txs(slot, &hash).unwrap_or_default();
+                if runner
+                    .send(&LfMsg::MsgLeiosBlockTxs { transactions })
+                    .await
+                    .is_err()
+                {
+                    break;
+                }
+            }
+            LfMsg::MsgLeiosVotesRequest { votes: ids } => {
+                let votes = store.get_votes(&ids);
+                if runner
+                    .send(&LfMsg::MsgLeiosVoteDelivery { votes })
+                    .await
+                    .is_err()
+                {
+                    break;
+                }
+            }
+            LfMsg::MsgDone => break,
+            _ => break,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -335,6 +469,8 @@ mod tests {
     use crate::protocols::blockfetch;
     use crate::protocols::chainsync;
     use crate::protocols::keepalive;
+    use crate::protocols::leios_fetch::{self, LeiosFetch};
+    use crate::protocols::leios_notify::{self, LeiosNotify};
     use crate::types::{BlockBody, Point, WrappedHeader};
 
     fn make_point(slot: u64) -> Point {
@@ -495,6 +631,76 @@ mod tests {
         assert!(rtt.as_millis() < 1000); // MemBearer should be fast
 
         let _ = keepalive::done(&mut client).await;
+        server_handle.await.ok();
+        mux_a.abort();
+        mux_b.abort();
+    }
+
+    #[tokio::test]
+    async fn leios_notify_server_sends_notifications() {
+        let ln_proto = ProtocolConfig {
+            id: leios_notify::PROTOCOL_ID,
+            priority: 0,
+            ingress_limit: leios_notify::INGRESS_LIMIT,
+            egress_queue_size: 16,
+        };
+
+        let ((client_send, client_recv), (server_send, server_recv), mux_a, mux_b) =
+            mux_pair_for_protocol(&ln_proto);
+
+        // Create and populate LeiosStore.
+        let (store, _rx) = LeiosStore::new(100);
+        store.inject_block(42, [0xAB; 32], vec![1, 2, 3]);
+
+        // Start server.
+        let server_handle = tokio::spawn(serve_leios_notify(server_send, server_recv, store));
+
+        // Client: request next notification.
+        let mut client = Runner::<LeiosNotify>::new(Role::Client, client_send, client_recv);
+        let event = leios_notify::request_next(&mut client).await.unwrap();
+        match event {
+            leios_notify::LeiosNotifyEvent::BlockOffer { slot, hash } => {
+                assert_eq!(slot, 42);
+                assert_eq!(hash, [0xAB; 32]);
+            }
+            other => panic!("expected BlockOffer, got {other:?}"),
+        }
+
+        // Clean up.
+        let _ = leios_notify::done(&mut client).await;
+        server_handle.await.ok();
+        mux_a.abort();
+        mux_b.abort();
+    }
+
+    #[tokio::test]
+    async fn leios_fetch_server_delivers_block() {
+        let lf_proto = ProtocolConfig {
+            id: leios_fetch::PROTOCOL_ID,
+            priority: 0,
+            ingress_limit: leios_fetch::INGRESS_LIMIT,
+            egress_queue_size: 16,
+        };
+
+        let ((client_send, client_recv), (server_send, server_recv), mux_a, mux_b) =
+            mux_pair_for_protocol(&lf_proto);
+
+        // Create and populate LeiosStore.
+        let (store, _rx) = LeiosStore::new(100);
+        store.inject_block(42, [0xAB; 32], vec![1, 2, 3, 4]);
+
+        // Start server.
+        let server_handle = tokio::spawn(serve_leios_fetch(server_send, server_recv, store));
+
+        // Client: fetch block.
+        let mut client = Runner::<LeiosFetch>::new(Role::Client, client_send, client_recv);
+        let block = leios_fetch::fetch_block(&mut client, 42, [0xAB; 32])
+            .await
+            .unwrap();
+        assert_eq!(block, vec![1, 2, 3, 4]);
+
+        // Clean up.
+        let _ = leios_fetch::done(&mut client).await;
         server_handle.await.ok();
         mux_a.abort();
         mux_b.abort();

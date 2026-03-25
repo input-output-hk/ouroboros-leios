@@ -285,24 +285,53 @@ Files: `net-core/src/types/{mod,header,block}.rs`, `net-core/src/mux/codec.rs`,
 `net-core/src/protocols/protocol.rs`, `net-core/src/peer/types.rs`, all protocol
 codecs and peer modules updated for struct field access and import paths.
 
-#### Phase 4d: Per-Peer Task Integration
+#### Phase 4d: Per-Peer Task Integration — COMPLETE
 
-Add LeiosNotify + LeiosFetch to per-peer task trees:
-- Client tasks in initiator/duplex peers (subscribe to announcements, fetch on demand)
-- Server tasks in responder/duplex peers (serve from ChainStore)
+Added LeiosNotify + LeiosFetch to per-peer task trees, plus all supporting types and
+plumbing. `leios_enabled: bool` config flag (default false) gates registration.
 
-Files: `net-core/src/peer/peer_task.rs`, `responder_task.rs`, `duplex_task.rs`,
-`server_handlers.rs`
+**Client tasks** (initiator/duplex peers):
+- `spawn_leios_notify` — continuous `request_next` loop, translates server notifications
+  into `PeerEvent::LeiosBlock{Announced,Offered,TxsOffered}` / `LeiosVotesOffered`
+- `spawn_leios_fetch` — command-driven (like `spawn_blockfetch`), receives
+  `LeiosFetchCommand::{FetchBlock,FetchVotes}` via internal mpsc channel, reports
+  `PeerEvent::LeiosBlockFetched` / `LeiosVotesFetched`
 
-#### Phase 4e: Coordinator + ChainStore Extensions
+**Server tasks** (responder/duplex peers):
+- `serve_leios_notify` — reads from `LeiosStore` notification queue, uses
+  `subscribe()` to await new items (same pattern as `serve_chainsync`)
+- `serve_leios_fetch` — serves blocks/txs/votes by `(slot, hash)` from `LeiosStore`
 
-- Extend `PeerEvent`/`PeerCommand` with Leios variants (EB announced, votes offered,
-  fetch EB, fetch votes)
-- Extend `ChainStore` with EB/vote storage (opaque blobs)
-- Coordinator routes Leios announcements and fetch requests
+**LeiosStore** (`leios_store.rs`): content-addressed blob store, separate from ChainStore
+(Leios data keyed by `(slot, hash)`, not part of a linear chain). Methods: `inject_block`,
+`inject_block_txs`, `inject_votes`, `get_block`, `get_block_txs`, `get_votes`,
+`notifications_after`, `subscribe`. Follows ChainStore's Mutex + watch::channel pattern.
+
+**Types** (`types.rs`): 6 new `PeerEvent` variants (LeiosBlockAnnounced, LeiosBlockOffered,
+LeiosBlockTxsOffered, LeiosVotesOffered, LeiosBlockFetched, LeiosVotesFetched), 2 new
+`PeerCommand` variants (FetchLeiosBlock, FetchLeiosVotes), 5 new `NetworkEvent` variants,
+3 new `NetworkCommand` variants (FetchLeiosBlock, InjectLeiosBlock, InjectLeiosVotes).
+
+**Coordinator** (`coordinator.rs`): stub-forwards all Leios PeerEvents to NetworkEvents.
+Creates LeiosStore when `leios_enabled`. Populates LeiosStore from `LeiosBlockFetched`
+events and `InjectLeios*` commands. Routes `FetchLeiosBlock` to first connected peer
+(smart routing deferred to Phase 4e).
+
+**CLI**: `--leios` flag on `serve` (generates synthetic EBs/votes) and `multi-follow`
+(logs Leios notifications). End-to-end tested: `serve --leios → multi-follow --leios`.
+
+247 total tests (9 new: 5 LeiosStore, 2 spawn functions, 2 server handlers).
+
+Files: `net-core/src/peer/{types,mod,leios_store,peer_task,responder_task,duplex_task,server_handlers,coordinator}.rs`,
+`net-cli/src/{main,serve,multi_follow}.rs`
+
+#### Phase 4e: Coordinator Extensions
+
+- Smart Leios fetch routing across peers (dedup, pick best peer by RTT)
+- Coordinator-level aggregation of Leios announcements
 - Integration tests with MemBearer
 
-Files: `net-core/src/peer/types.rs`, `chain_store.rs`, `coordinator.rs`
+Files: `net-core/src/peer/coordinator.rs`
 
 #### Phase 4f: Priority Scheduling Verification
 
@@ -322,39 +351,7 @@ Files: `net-core/src/peer/mod.rs` (protocol ID constants), mux config
 
 ## Workspace Structure
 
-```
-net-rs/
-  Cargo.toml          -- workspace root
-  net-core/
-    Cargo.toml
-    src/
-      lib.rs
-      bearer/
-        mod.rs         -- Bearer trait
-        tcp.rs         -- TcpBearer
-        mem.rs         -- MemBearer (in-memory for tests)
-      mux/
-        mod.rs         -- Mux, RunningMux
-        wire.rs        -- 8-byte header encode/decode, Segment type
-        egress.rs      -- per-protocol egress queues + scheduler
-        ingress.rs     -- demuxer + per-protocol ingress buffers
-        channel.rs     -- ChannelSend / ChannelRecv (split halves)
-        scheduler.rs   -- Scheduler trait + RoundRobin + StrictPriority
-      codec.rs         -- IncrementalDecoder, CBOR framing over channel
-      protocol.rs      -- Protocol trait, State, Agency, Message framework
-      protocols/
-        mod.rs
-        handshake/
-          mod.rs       -- state machine, messages
-          codec.rs     -- CBOR encode/decode
-          client.rs    -- client peer
-          server.rs    -- server peer
-          n2n.rs       -- N2N version data types
-  net-cli/
-    Cargo.toml
-    src/
-      main.rs          -- Phase 1 test CLI
-```
+See CLAUDE.md for the up-to-date workspace structure (updated each phase).
 
 ## Layer Design
 

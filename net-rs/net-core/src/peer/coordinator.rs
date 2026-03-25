@@ -21,6 +21,7 @@ use crate::types::{Point, Tip, WrappedHeader};
 use super::chain_store::ChainStore;
 use super::connect::{self, Connection};
 use super::duplex_task::{run_duplex_task, DuplexTaskConfig};
+use super::leios_store::LeiosStore;
 use super::peer_task::{run_peer_task, PeerTaskConfig};
 use super::responder_task::{run_responder_task, server_protocol_configs, ResponderTaskConfig};
 use super::types::{NetworkCommand, NetworkEvent, PeerCommand, PeerEvent};
@@ -64,6 +65,8 @@ struct Coordinator {
 
     /// Shared chain state for responder peers.
     chain_store: Arc<ChainStore>,
+    /// Shared Leios data store for responder peers (when leios_enabled).
+    leios_store: Option<Arc<LeiosStore>>,
     /// Headers from HeaderAnnounced, keyed by point, for populating ChainStore on BlockFetched.
     pending_headers: HashMap<Point, WrappedHeader>,
     /// Completed inbound connections from the accept loop.
@@ -82,6 +85,7 @@ impl Coordinator {
         network_events: mpsc::Sender<NetworkEvent>,
         network_commands: mpsc::Receiver<NetworkCommand>,
         chain_store: Arc<ChainStore>,
+        leios_store: Option<Arc<LeiosStore>>,
     ) -> Self {
         Self {
             config,
@@ -95,6 +99,7 @@ impl Coordinator {
             pending_fetches: HashMap::new(),
             reconnect_queue: Vec::new(),
             chain_store,
+            leios_store,
             pending_headers: HashMap::new(),
             inbound_connections: None,
             accept_task: None,
@@ -120,6 +125,8 @@ impl Coordinator {
                 peer_provider: self.peer_provider.clone(),
                 event_sender: self.peer_event_sender.clone(),
                 command_receiver: cmd_receiver,
+                leios_enabled: self.config.leios_enabled,
+                leios_store: self.leios_store.clone(),
             };
             (
                 tokio::spawn(run_duplex_task(task_config)),
@@ -134,6 +141,7 @@ impl Coordinator {
                 sdu_timeout: self.config.sdu_timeout,
                 event_sender: self.peer_event_sender.clone(),
                 command_receiver: cmd_receiver,
+                leios_enabled: self.config.leios_enabled,
             };
             (
                 tokio::spawn(run_peer_task(task_config)),
@@ -258,6 +266,54 @@ impl Coordinator {
                     .await;
             }
 
+            // Leios events — stub-forwarded for now (Phase 4e will add aggregation).
+            PeerEvent::LeiosBlockAnnounced { header } => {
+                let _ = self
+                    .network_events
+                    .send(NetworkEvent::LeiosBlockAnnounced { header })
+                    .await;
+            }
+
+            PeerEvent::LeiosBlockOffered { slot, hash } => {
+                let _ = self
+                    .network_events
+                    .send(NetworkEvent::LeiosBlockOffered { slot, hash })
+                    .await;
+            }
+
+            PeerEvent::LeiosBlockTxsOffered { slot, hash } => {
+                // Forward as a block offer — application decides whether to fetch txs.
+                let _ = self
+                    .network_events
+                    .send(NetworkEvent::LeiosBlockOffered { slot, hash })
+                    .await;
+            }
+
+            PeerEvent::LeiosVotesOffered { votes } => {
+                let _ = self
+                    .network_events
+                    .send(NetworkEvent::LeiosVotesOffered { votes })
+                    .await;
+            }
+
+            PeerEvent::LeiosBlockFetched { slot, hash, block } => {
+                // Populate leios store for responder peers.
+                if let Some(ref store) = self.leios_store {
+                    store.inject_block(slot, hash, block.clone());
+                }
+                let _ = self
+                    .network_events
+                    .send(NetworkEvent::LeiosBlockReceived { slot, hash, block })
+                    .await;
+            }
+
+            PeerEvent::LeiosVotesFetched { votes } => {
+                let _ = self
+                    .network_events
+                    .send(NetworkEvent::LeiosVotesReceived { votes })
+                    .await;
+            }
+
             PeerEvent::Failed { reason } => {
                 self.remove_peer(peer_id, reason).await;
             }
@@ -332,6 +388,30 @@ impl Coordinator {
 
             NetworkCommand::InjectRollback { point } => {
                 self.chain_store.rollback_to(&point);
+            }
+
+            NetworkCommand::FetchLeiosBlock { slot, hash } => {
+                // Send to first connected peer. Phase 4e will add smart routing.
+                if let Some((&peer_id, _)) = self.peers.iter().next() {
+                    if let Some(peer) = self.peers.get(&peer_id) {
+                        let _ = peer
+                            .commands
+                            .send(PeerCommand::FetchLeiosBlock { slot, hash })
+                            .await;
+                    }
+                }
+            }
+
+            NetworkCommand::InjectLeiosBlock { slot, hash, block } => {
+                if let Some(ref store) = self.leios_store {
+                    store.inject_block(slot, hash, block);
+                }
+            }
+
+            NetworkCommand::InjectLeiosVotes { votes, data } => {
+                if let Some(ref store) = self.leios_store {
+                    store.inject_votes(votes, data);
+                }
             }
 
             NetworkCommand::Shutdown => {
@@ -426,6 +506,8 @@ impl Coordinator {
             peer_provider: self.peer_provider.clone(),
             event_sender: self.peer_event_sender.clone(),
             command_receiver: cmd_receiver,
+            leios_enabled: self.config.leios_enabled,
+            leios_store: self.leios_store.clone(),
         };
 
         let task_handle = tokio::spawn(run_responder_task(task_config));
@@ -472,7 +554,7 @@ impl Coordinator {
             sdu_timeout: self.config.sdu_timeout,
             ..MuxConfig::default()
         };
-        let protocols = server_protocol_configs();
+        let protocols = server_protocol_configs(self.config.leios_enabled);
 
         let (conn_sender, conn_receiver) = mpsc::channel::<Connection>(16);
         self.inbound_connections = Some(conn_receiver);
@@ -590,6 +672,13 @@ pub fn spawn_coordinator(config: CoordinatorConfig) -> CoordinatorHandle {
     let (peer_event_sender, peer_event_receiver) = mpsc::channel(256);
     let (chain_store, _chain_rx) = ChainStore::new(config.chain_store_capacity);
 
+    let leios_store = if config.leios_enabled {
+        let (store, _leios_rx) = LeiosStore::new(config.chain_store_capacity);
+        Some(store)
+    } else {
+        None
+    };
+
     let coordinator = Coordinator::new(
         config,
         peer_event_sender,
@@ -597,6 +686,7 @@ pub fn spawn_coordinator(config: CoordinatorConfig) -> CoordinatorHandle {
         net_event_sender,
         net_cmd_receiver,
         chain_store,
+        leios_store,
     );
 
     tokio::spawn(coordinator.run());
@@ -634,6 +724,7 @@ mod tests {
             net_event_sender,
             net_cmd_receiver,
             chain_store,
+            None,
         );
 
         // Manually insert a peer (simulate it being connected).
@@ -716,6 +807,7 @@ mod tests {
             net_event_sender,
             net_cmd_receiver,
             chain_store,
+            None,
         );
 
         // Two peers.
@@ -816,6 +908,7 @@ mod tests {
             net_event_sender,
             net_cmd_receiver,
             chain_store,
+            None,
         );
 
         let peer_id = PeerId(0);
@@ -879,6 +972,7 @@ mod tests {
             net_event_sender,
             net_cmd_receiver,
             chain_store,
+            None,
         );
 
         // Add a peer and simulate failure.
