@@ -106,8 +106,7 @@ async fn leios_generator(commands: mpsc::Sender<NetworkCommand>, rate: f64) {
         let block_data = vec![0x82, slot as u8, 0x00]; // minimal CBOR
         let _ = commands
             .send(NetworkCommand::InjectLeiosBlock {
-                slot,
-                hash,
+                point: net_core::types::Point::Specific { slot, hash },
                 block: block_data,
             })
             .await;

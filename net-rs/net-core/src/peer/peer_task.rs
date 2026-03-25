@@ -297,12 +297,10 @@ pub(crate) fn spawn_peersharing(
 #[derive(Debug)]
 pub(crate) enum LeiosFetchCommand {
     Block {
-        slot: u64,
-        hash: [u8; 32],
+        point: Point,
     },
     BlockTxs {
-        slot: u64,
-        hash: [u8; 32],
+        point: Point,
         bitmap: std::collections::BTreeMap<u16, u64>,
     },
     Votes {
@@ -326,14 +324,14 @@ pub(crate) fn spawn_leios_notify(
                         .send((peer_id, PeerEvent::LeiosBlockAnnounced { header }))
                         .await;
                 }
-                Ok(LeiosNotifyEvent::BlockOffer { slot, hash }) => {
+                Ok(LeiosNotifyEvent::BlockOffer { point }) => {
                     let _ = event_sender
-                        .send((peer_id, PeerEvent::LeiosBlockOffered { slot, hash }))
+                        .send((peer_id, PeerEvent::LeiosBlockOffered { point }))
                         .await;
                 }
-                Ok(LeiosNotifyEvent::BlockTxsOffer { slot, hash }) => {
+                Ok(LeiosNotifyEvent::BlockTxsOffer { point }) => {
                     let _ = event_sender
-                        .send((peer_id, PeerEvent::LeiosBlockTxsOffered { slot, hash }))
+                        .send((peer_id, PeerEvent::LeiosBlockTxsOffered { point }))
                         .await;
                 }
                 Ok(LeiosNotifyEvent::VotesOffer { votes }) => {
@@ -370,11 +368,11 @@ pub(crate) fn spawn_leios_fetch(
 
         while let Some(cmd) = command_receiver.recv().await {
             match cmd {
-                LeiosFetchCommand::Block { slot, hash } => {
-                    match leios_fetch::fetch_block(&mut runner, slot, hash).await {
+                LeiosFetchCommand::Block { point } => {
+                    match leios_fetch::fetch_block(&mut runner, point.clone()).await {
                         Ok(block) => {
                             let _ = event_sender
-                                .send((peer_id, PeerEvent::LeiosBlockFetched { slot, hash, block }))
+                                .send((peer_id, PeerEvent::LeiosBlockFetched { point, block }))
                                 .await;
                         }
                         Err(e) => {
@@ -390,15 +388,14 @@ pub(crate) fn spawn_leios_fetch(
                         }
                     }
                 }
-                LeiosFetchCommand::BlockTxs { slot, hash, bitmap } => {
-                    match leios_fetch::fetch_block_txs(&mut runner, slot, hash, bitmap).await {
+                LeiosFetchCommand::BlockTxs { point, bitmap } => {
+                    match leios_fetch::fetch_block_txs(&mut runner, point.clone(), bitmap).await {
                         Ok(transactions) => {
                             let _ = event_sender
                                 .send((
                                     peer_id,
                                     PeerEvent::LeiosBlockTxsFetched {
-                                        slot,
-                                        hash,
+                                        point,
                                         transactions,
                                     },
                                 ))
@@ -550,14 +547,14 @@ pub(crate) async fn run_peer_task(mut config: PeerTaskConfig) {
                     Some(PeerCommand::RequestPeers { amount }) => {
                         let _ = peer_share_sender.send(amount).await;
                     }
-                    Some(PeerCommand::FetchLeiosBlock { slot, hash }) => {
+                    Some(PeerCommand::FetchLeiosBlock { point }) => {
                         if let Some((_, _, ref lf_sender)) = leios_handles {
-                            let _ = lf_sender.send(LeiosFetchCommand::Block { slot, hash }).await;
+                            let _ = lf_sender.send(LeiosFetchCommand::Block { point }).await;
                         }
                     }
-                    Some(PeerCommand::FetchLeiosBlockTxs { slot, hash, bitmap }) => {
+                    Some(PeerCommand::FetchLeiosBlockTxs { point, bitmap }) => {
                         if let Some((_, _, ref lf_sender)) = leios_handles {
-                            let _ = lf_sender.send(LeiosFetchCommand::BlockTxs { slot, hash, bitmap }).await;
+                            let _ = lf_sender.send(LeiosFetchCommand::BlockTxs { point, bitmap }).await;
                         }
                     }
                     Some(PeerCommand::FetchLeiosVotes { votes }) => {
@@ -923,8 +920,10 @@ mod tests {
             assert!(matches!(msg, LnMsg::MsgLeiosNotificationRequestNext));
             runner
                 .send(&LnMsg::MsgLeiosBlockOffer {
-                    slot: 42,
-                    hash: [0xAB; 32],
+                    point: Point::Specific {
+                        slot: 42,
+                        hash: [0xAB; 32],
+                    },
                 })
                 .await
                 .unwrap();
@@ -952,9 +951,14 @@ mod tests {
         let result = tokio::time::timeout(Duration::from_secs(5), async {
             let (_id, event1) = event_receiver.recv().await.unwrap();
             match event1 {
-                PeerEvent::LeiosBlockOffered { slot, hash } => {
-                    assert_eq!(slot, 42);
-                    assert_eq!(hash, [0xAB; 32]);
+                PeerEvent::LeiosBlockOffered { point } => {
+                    assert_eq!(
+                        point,
+                        Point::Specific {
+                            slot: 42,
+                            hash: [0xAB; 32]
+                        }
+                    );
                 }
                 other => panic!("expected LeiosBlockOffered, got {other:?}"),
             }
@@ -997,9 +1001,8 @@ mod tests {
 
             let msg = runner.recv().await.unwrap();
             match msg {
-                LfMsg::MsgLeiosBlockRequest { slot, hash } => {
-                    assert_eq!(slot, 42);
-                    assert_eq!(hash, [0xAB; 32]);
+                LfMsg::MsgLeiosBlockRequest { point } => {
+                    assert_eq!(point, Point::Specific { slot: 42, hash: [0xAB; 32] });
                 }
                 other => panic!("expected MsgLeiosBlockRequest, got {other:?}"),
             }
@@ -1029,8 +1032,10 @@ mod tests {
         // Send a fetch command.
         command_sender
             .send(LeiosFetchCommand::Block {
-                slot: 42,
-                hash: [0xAB; 32],
+                point: Point::Specific {
+                    slot: 42,
+                    hash: [0xAB; 32],
+                },
             })
             .await
             .unwrap();
@@ -1039,9 +1044,14 @@ mod tests {
         let result = tokio::time::timeout(Duration::from_secs(5), async {
             let (_id, event) = event_receiver.recv().await.unwrap();
             match event {
-                PeerEvent::LeiosBlockFetched { slot, hash, block } => {
-                    assert_eq!(slot, 42);
-                    assert_eq!(hash, [0xAB; 32]);
+                PeerEvent::LeiosBlockFetched { point, block } => {
+                    assert_eq!(
+                        point,
+                        Point::Specific {
+                            slot: 42,
+                            hash: [0xAB; 32]
+                        }
+                    );
                     assert_eq!(block, vec![1, 2, 3, 4]);
                 }
                 other => panic!("expected LeiosBlockFetched, got {other:?}"),

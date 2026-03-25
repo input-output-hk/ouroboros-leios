@@ -1,9 +1,9 @@
 //! CBOR encoding for LeiosFetch messages.
 //!
 //! Wire format:
-//!   msgLeiosBlockRequest           = [0, slot, hash32]
+//!   msgLeiosBlockRequest           = [0, point]          where point = [slot, hash32]
 //!   msgLeiosBlock                  = [1, block]
-//!   msgLeiosBlockTxsRequest        = [2, slot, hash32, { u16 => u64, ... }]
+//!   msgLeiosBlockTxsRequest        = [2, point, { u16 => u64, ... }]
 //!   msgLeiosBlockTxs               = [3, [tx, ...]]
 //!   msgLeiosVotesRequest           = [4, [(slot, voterId), ...]]
 //!   msgLeiosVoteDelivery           = [5, [vote, ...]]
@@ -22,6 +22,7 @@ use super::{
     Message, MAX_BITMAP_ENTRIES, MAX_BLOCK_SIZE, MAX_TRANSACTIONS, MAX_TRANSACTION_SIZE,
     MAX_VOTER_ID_SIZE, MAX_VOTES, MAX_VOTE_SIZE,
 };
+use crate::types::Point;
 
 impl minicbor::Encode<()> for Message {
     fn encode<W: minicbor::encode::Write>(
@@ -30,22 +31,20 @@ impl minicbor::Encode<()> for Message {
         _ctx: &mut (),
     ) -> Result<(), EncodeError<W::Error>> {
         match self {
-            Message::MsgLeiosBlockRequest { slot, hash } => {
-                e.array(3)?;
+            Message::MsgLeiosBlockRequest { point } => {
+                e.array(2)?;
                 e.u32(0)?;
-                e.u64(*slot)?;
-                e.bytes(hash)?;
+                minicbor::Encode::encode(point, e, &mut ())?;
             }
             Message::MsgLeiosBlock { block } => {
                 e.array(2)?;
                 e.u32(1)?;
                 e.bytes(block)?;
             }
-            Message::MsgLeiosBlockTxsRequest { slot, hash, bitmap } => {
-                e.array(4)?;
+            Message::MsgLeiosBlockTxsRequest { point, bitmap } => {
+                e.array(3)?;
                 e.u32(2)?;
-                e.u64(*slot)?;
-                e.bytes(hash)?;
+                minicbor::Encode::encode(point, e, &mut ())?;
                 encode_bitmap(e, bitmap)?;
             }
             Message::MsgLeiosBlockTxs { transactions } => {
@@ -115,19 +114,17 @@ impl<'a> minicbor::Decode<'a, ()> for Message {
 
         match tag {
             0 => {
-                let slot = d.u64()?;
-                let hash = decode_hash32(d)?;
-                Ok(Message::MsgLeiosBlockRequest { slot, hash })
+                let point = Point::decode(d, &mut ())?;
+                Ok(Message::MsgLeiosBlockRequest { point })
             }
             1 => {
                 let block = decode_block(d)?;
                 Ok(Message::MsgLeiosBlock { block })
             }
             2 => {
-                let slot = d.u64()?;
-                let hash = decode_hash32(d)?;
+                let point = Point::decode(d, &mut ())?;
                 let bitmap = decode_bitmap(d)?;
-                Ok(Message::MsgLeiosBlockTxsRequest { slot, hash, bitmap })
+                Ok(Message::MsgLeiosBlockTxsRequest { point, bitmap })
             }
             3 => {
                 let transactions =
@@ -383,6 +380,7 @@ fn decode_vote_id_pair(d: &mut Decoder<'_>) -> Result<(u64, Vec<u8>), DecodeErro
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::Point;
 
     fn round_trip(msg: &Message) -> Message {
         let encoded = minicbor::to_vec(msg).unwrap();
@@ -401,14 +399,21 @@ mod tests {
     #[test]
     fn block_request_round_trip() {
         let msg = Message::MsgLeiosBlockRequest {
-            slot: 42,
-            hash: test_hash(),
+            point: Point::Specific {
+                slot: 42,
+                hash: test_hash(),
+            },
         };
         let decoded = round_trip(&msg);
         match decoded {
-            Message::MsgLeiosBlockRequest { slot, hash } => {
-                assert_eq!(slot, 42);
-                assert_eq!(hash, test_hash());
+            Message::MsgLeiosBlockRequest { point } => {
+                assert_eq!(
+                    point,
+                    Point::Specific {
+                        slot: 42,
+                        hash: test_hash(),
+                    }
+                );
             }
             other => panic!("expected MsgLeiosBlockRequest, got {other:?}"),
         }
@@ -433,15 +438,22 @@ mod tests {
         bitmap.insert(5u16, 0x8000_0000_0000_0001u64);
 
         let msg = Message::MsgLeiosBlockTxsRequest {
-            slot: 100,
-            hash: test_hash(),
+            point: Point::Specific {
+                slot: 100,
+                hash: test_hash(),
+            },
             bitmap,
         };
         let decoded = round_trip(&msg);
         match decoded {
-            Message::MsgLeiosBlockTxsRequest { slot, hash, bitmap } => {
-                assert_eq!(slot, 100);
-                assert_eq!(hash, test_hash());
+            Message::MsgLeiosBlockTxsRequest { point, bitmap } => {
+                assert_eq!(
+                    point,
+                    Point::Specific {
+                        slot: 100,
+                        hash: test_hash(),
+                    }
+                );
                 assert_eq!(bitmap.len(), 2);
                 assert_eq!(bitmap[&0], 0xFF);
                 assert_eq!(bitmap[&5], 0x8000_0000_0000_0001);
@@ -453,8 +465,10 @@ mod tests {
     #[test]
     fn block_txs_request_empty_bitmap_round_trip() {
         let msg = Message::MsgLeiosBlockTxsRequest {
-            slot: 0,
-            hash: [0; 32],
+            point: Point::Specific {
+                slot: 0,
+                hash: [0; 32],
+            },
             bitmap: BTreeMap::new(),
         };
         let decoded = round_trip(&msg);
@@ -613,10 +627,12 @@ mod tests {
 
     #[test]
     fn wrong_hash_length_fails() {
+        // MsgLeiosBlockRequest [0, [0, bytes(16)]] — point with hash too short
         let mut buf = Vec::new();
         let mut e = minicbor::Encoder::new(&mut buf);
-        e.array(3).unwrap();
+        e.array(2).unwrap();
         e.u32(0).unwrap();
+        e.array(2).unwrap();
         e.u64(0).unwrap();
         e.bytes(&[0u8; 16]).unwrap(); // 16 bytes, not 32
 
@@ -628,8 +644,10 @@ mod tests {
     fn bitmap_exceeds_max_fails() {
         let mut buf = Vec::new();
         let mut e = minicbor::Encoder::new(&mut buf);
-        e.array(4).unwrap();
+        e.array(3).unwrap();
         e.u32(2).unwrap();
+        // encode point sub-array
+        e.array(2).unwrap();
         e.u64(0).unwrap();
         e.bytes(&[0u8; 32]).unwrap();
         let n = MAX_BITMAP_ENTRIES + 1;
@@ -696,8 +714,10 @@ mod tests {
     #[test]
     fn truncated_message_fails() {
         let msg = Message::MsgLeiosBlockRequest {
-            slot: 1,
-            hash: test_hash(),
+            point: Point::Specific {
+                slot: 1,
+                hash: test_hash(),
+            },
         };
         let encoded = minicbor::to_vec(&msg).unwrap();
         let truncated = &encoded[..3];

@@ -10,6 +10,7 @@ use std::collections::BTreeMap;
 use std::time::Duration;
 
 use crate::protocols::{Agency, Protocol, ProtocolError, Runner};
+use crate::types::Point;
 
 /// LeiosFetch protocol ID in the multiplexer.
 pub const PROTOCOL_ID: u16 = 19;
@@ -69,14 +70,13 @@ pub enum State {
 /// LeiosFetch protocol messages.
 #[derive(Debug, Clone)]
 pub enum Message {
-    /// Client requests an EB. [0, slot, hash]
-    MsgLeiosBlockRequest { slot: u64, hash: [u8; 32] },
+    /// Client requests an EB. [0, point]
+    MsgLeiosBlockRequest { point: Point },
     /// Server delivers an EB. [1, block]
     MsgLeiosBlock { block: Vec<u8> },
-    /// Client requests selective transactions via bitmap. [2, slot, hash, bitmap]
+    /// Client requests selective transactions via bitmap. [2, point, bitmap]
     MsgLeiosBlockTxsRequest {
-        slot: u64,
-        hash: [u8; 32],
+        point: Point,
         bitmap: BTreeMap<u16, u64>,
     },
     /// Server delivers transactions. [3, [tx, ...]]
@@ -178,11 +178,10 @@ impl Protocol for LeiosFetch {
 /// Fetch a single EB from the server.
 pub async fn fetch_block(
     runner: &mut Runner<LeiosFetch>,
-    slot: u64,
-    hash: [u8; 32],
+    point: Point,
 ) -> Result<Vec<u8>, ProtocolError> {
     runner
-        .send(&Message::MsgLeiosBlockRequest { slot, hash })
+        .send(&Message::MsgLeiosBlockRequest { point })
         .await?;
     let msg = runner.recv().await?;
     match msg {
@@ -196,12 +195,11 @@ pub async fn fetch_block(
 /// Fetch selective transactions from an EB using bitmap addressing.
 pub async fn fetch_block_txs(
     runner: &mut Runner<LeiosFetch>,
-    slot: u64,
-    hash: [u8; 32],
+    point: Point,
     bitmap: BTreeMap<u16, u64>,
 ) -> Result<Vec<Vec<u8>>, ProtocolError> {
     runner
-        .send(&Message::MsgLeiosBlockTxsRequest { slot, hash, bitmap })
+        .send(&Message::MsgLeiosBlockTxsRequest { point, bitmap })
         .await?;
     let msg = runner.recv().await?;
     match msg {
@@ -286,6 +284,7 @@ mod tests {
         CodecRecv, CodecSend, Mux, MuxConfig, ProtocolConfig, MODE_INITIATOR, MODE_RESPONDER,
     };
     use crate::protocols::Role;
+    use crate::types::Point;
 
     fn test_hash() -> [u8; 32] {
         let mut h = [0u8; 32];
@@ -318,8 +317,10 @@ mod tests {
             LeiosFetch::transition(
                 &State::StIdle,
                 &Message::MsgLeiosBlockRequest {
-                    slot: 1,
-                    hash: [0; 32],
+                    point: Point::Specific {
+                        slot: 1,
+                        hash: [0; 32],
+                    },
                 }
             )
             .unwrap(),
@@ -338,8 +339,10 @@ mod tests {
             LeiosFetch::transition(
                 &State::StIdle,
                 &Message::MsgLeiosBlockTxsRequest {
-                    slot: 1,
-                    hash: [0; 32],
+                    point: Point::Specific {
+                        slot: 1,
+                        hash: [0; 32],
+                    },
                     bitmap: BTreeMap::new(),
                 }
             )
@@ -428,8 +431,7 @@ mod tests {
         assert!(LeiosFetch::transition(
             &State::StBlock,
             &Message::MsgLeiosBlockRequest {
-                slot: 1,
-                hash: [0; 32],
+                point: Point::Specific { slot: 1, hash: [0; 32] },
             }
         )
         .is_err());
@@ -530,12 +532,14 @@ mod tests {
 
             let msg = runner.recv().await.unwrap();
             match msg {
-                Message::MsgLeiosBlockRequest {
-                    slot,
-                    hash: recv_hash,
-                } => {
-                    assert_eq!(slot, 42);
-                    assert_eq!(recv_hash, hash);
+                Message::MsgLeiosBlockRequest { point } => {
+                    assert_eq!(
+                        point,
+                        Point::Specific {
+                            slot: 42,
+                            hash,
+                        }
+                    );
                 }
                 other => panic!("expected MsgLeiosBlockRequest, got {other:?}"),
             }
@@ -554,7 +558,7 @@ mod tests {
         let client = tokio::spawn(async move {
             let mut runner = Runner::<LeiosFetch>::new(Role::Client, cs, cr);
 
-            let block = fetch_block(&mut runner, 42, hash).await.unwrap();
+            let block = fetch_block(&mut runner, Point::Specific { slot: 42, hash }).await.unwrap();
             assert_eq!(block, vec![0xEB, 0x01, 0x02]);
 
             done(&mut runner).await.unwrap();
@@ -576,8 +580,14 @@ mod tests {
 
             let msg = runner.recv().await.unwrap();
             match msg {
-                Message::MsgLeiosBlockTxsRequest { slot, bitmap, .. } => {
-                    assert_eq!(slot, 100);
+                Message::MsgLeiosBlockTxsRequest { point, bitmap } => {
+                    assert_eq!(
+                        point,
+                        Point::Specific {
+                            slot: 100,
+                            hash,
+                        }
+                    );
                     assert_eq!(bitmap.len(), 2);
                     assert_eq!(bitmap[&0], 0xFF); // first 8 txs
                     assert_eq!(bitmap[&1], 0x01); // tx 64
@@ -603,7 +613,7 @@ mod tests {
             bitmap.insert(0u16, 0xFFu64);
             bitmap.insert(1u16, 0x01u64);
 
-            let txs = fetch_block_txs(&mut runner, 100, hash, bitmap)
+            let txs = fetch_block_txs(&mut runner, Point::Specific { slot: 100, hash }, bitmap)
                 .await
                 .unwrap();
             assert_eq!(txs.len(), 3);

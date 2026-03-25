@@ -88,18 +88,18 @@ pub async fn run(
             NetworkEvent::LeiosBlockAnnounced { .. } => {
                 println!("  leios: EB announced via RB header");
             }
-            NetworkEvent::LeiosBlockOffered { slot, .. } => {
-                println!("  leios: EB offered at slot {slot}");
+            NetworkEvent::LeiosBlockOffered { point } => {
+                println!("  leios: EB offered at {point}");
             }
-            NetworkEvent::LeiosBlockTxsOffered { slot, .. } => {
-                println!("  leios: EB transactions offered at slot {slot}");
+            NetworkEvent::LeiosBlockTxsOffered { point } => {
+                println!("  leios: EB transactions offered at {point}");
             }
             NetworkEvent::LeiosVotesOffered { votes } => {
                 println!("  leios: {} vote(s) offered", votes.len());
             }
-            NetworkEvent::LeiosBlockReceived { slot, block, .. } => {
+            NetworkEvent::LeiosBlockReceived { point, block } => {
                 println!(
-                    "  leios: EB received at slot {slot} ({} bytes)",
+                    "  leios: EB received at {point} ({} bytes)",
                     block.len()
                 );
             }
@@ -107,10 +107,10 @@ pub async fn run(
                 println!("  leios: {} vote(s) received", votes.len());
             }
             NetworkEvent::LeiosBlockTxsReceived {
-                slot, transactions, ..
+                point, transactions,
             } => {
                 println!(
-                    "  leios: EB txs received at slot {slot} ({} txs)",
+                    "  leios: EB txs received at {point} ({} txs)",
                     transactions.len()
                 );
             }

@@ -3,8 +3,8 @@
 //! Wire format:
 //!   msgLeiosNotificationRequestNext = [0]
 //!   msgLeiosBlockAnnouncement       = [1, wrappedHeader]
-//!   msgLeiosBlockOffer              = [2, slot, hash32]
-//!   msgLeiosBlockTxsOffer           = [3, slot, hash32]
+//!   msgLeiosBlockOffer              = [2, point]        where point = [slot, hash32]
+//!   msgLeiosBlockTxsOffer           = [3, point]        where point = [slot, hash32]
 //!   msgLeiosVotesOffer              = [4, [(slot, voterId), ...]]
 //!   msgDone                         = [5]
 
@@ -13,7 +13,7 @@ use minicbor::encode::Error as EncodeError;
 use minicbor::{Decoder, Encoder};
 
 use super::{Message, MAX_VOTER_ID_SIZE, MAX_VOTES_OFFERED};
-use crate::types::WrappedHeader;
+use crate::types::{Point, WrappedHeader};
 
 impl minicbor::Encode<()> for Message {
     fn encode<W: minicbor::encode::Write>(
@@ -31,17 +31,15 @@ impl minicbor::Encode<()> for Message {
                 e.u32(1)?;
                 minicbor::Encode::encode(header, e, &mut ())?;
             }
-            Message::MsgLeiosBlockOffer { slot, hash } => {
-                e.array(3)?;
+            Message::MsgLeiosBlockOffer { point } => {
+                e.array(2)?;
                 e.u32(2)?;
-                e.u64(*slot)?;
-                e.bytes(hash)?;
+                minicbor::Encode::encode(point, e, &mut ())?;
             }
-            Message::MsgLeiosBlockTxsOffer { slot, hash } => {
-                e.array(3)?;
+            Message::MsgLeiosBlockTxsOffer { point } => {
+                e.array(2)?;
                 e.u32(3)?;
-                e.u64(*slot)?;
-                e.bytes(hash)?;
+                minicbor::Encode::encode(point, e, &mut ())?;
             }
             Message::MsgLeiosVotesOffer { votes } => {
                 e.array(2)?;
@@ -74,14 +72,12 @@ impl<'a> minicbor::Decode<'a, ()> for Message {
                 Ok(Message::MsgLeiosBlockAnnouncement { header })
             }
             2 => {
-                let slot = d.u64()?;
-                let hash = decode_hash32(d)?;
-                Ok(Message::MsgLeiosBlockOffer { slot, hash })
+                let point = Point::decode(d, &mut ())?;
+                Ok(Message::MsgLeiosBlockOffer { point })
             }
             3 => {
-                let slot = d.u64()?;
-                let hash = decode_hash32(d)?;
-                Ok(Message::MsgLeiosBlockTxsOffer { slot, hash })
+                let point = Point::decode(d, &mut ())?;
+                Ok(Message::MsgLeiosBlockTxsOffer { point })
             }
             4 => {
                 let votes = decode_vote_offers(d)?;
@@ -93,20 +89,6 @@ impl<'a> minicbor::Decode<'a, ()> for Message {
             ))),
         }
     }
-}
-
-/// Decode a 32-byte hash from CBOR bytes.
-fn decode_hash32(d: &mut Decoder<'_>) -> Result<[u8; 32], DecodeError> {
-    let bytes = d.bytes()?;
-    if bytes.len() != 32 {
-        return Err(DecodeError::message(format!(
-            "expected 32-byte hash, got {} bytes",
-            bytes.len()
-        )));
-    }
-    let mut hash = [0u8; 32];
-    hash.copy_from_slice(bytes);
-    Ok(hash)
 }
 
 /// Decode a list of (slot, voter_id) pairs with bounds checking.
@@ -162,6 +144,7 @@ fn decode_vote_offer_pair(d: &mut Decoder<'_>) -> Result<(u64, Vec<u8>), DecodeE
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::Point;
 
     fn round_trip(msg: &Message) -> Message {
         let encoded = minicbor::to_vec(msg).unwrap();
@@ -198,14 +181,21 @@ mod tests {
     #[test]
     fn block_offer_round_trip() {
         let msg = Message::MsgLeiosBlockOffer {
-            slot: 42,
-            hash: test_hash(),
+            point: Point::Specific {
+                slot: 42,
+                hash: test_hash(),
+            },
         };
         let decoded = round_trip(&msg);
         match decoded {
-            Message::MsgLeiosBlockOffer { slot, hash } => {
-                assert_eq!(slot, 42);
-                assert_eq!(hash, test_hash());
+            Message::MsgLeiosBlockOffer { point } => {
+                assert_eq!(
+                    point,
+                    Point::Specific {
+                        slot: 42,
+                        hash: test_hash(),
+                    }
+                );
             }
             other => panic!("expected MsgLeiosBlockOffer, got {other:?}"),
         }
@@ -214,14 +204,21 @@ mod tests {
     #[test]
     fn block_txs_offer_round_trip() {
         let msg = Message::MsgLeiosBlockTxsOffer {
-            slot: 99,
-            hash: test_hash(),
+            point: Point::Specific {
+                slot: 99,
+                hash: test_hash(),
+            },
         };
         let decoded = round_trip(&msg);
         match decoded {
-            Message::MsgLeiosBlockTxsOffer { slot, hash } => {
-                assert_eq!(slot, 99);
-                assert_eq!(hash, test_hash());
+            Message::MsgLeiosBlockTxsOffer { point } => {
+                assert_eq!(
+                    point,
+                    Point::Specific {
+                        slot: 99,
+                        hash: test_hash(),
+                    }
+                );
             }
             other => panic!("expected MsgLeiosBlockTxsOffer, got {other:?}"),
         }
@@ -276,11 +273,12 @@ mod tests {
 
     #[test]
     fn wrong_hash_length_fails() {
-        // MsgLeiosBlockOffer [2, slot=0, bytes(16)] — hash too short
+        // MsgLeiosBlockOffer [2, [0, bytes(16)]] — point with hash too short
         let mut buf = Vec::new();
         let mut e = minicbor::Encoder::new(&mut buf);
-        e.array(3).unwrap();
+        e.array(2).unwrap();
         e.u32(2).unwrap();
+        e.array(2).unwrap();
         e.u64(0).unwrap();
         e.bytes(&[0u8; 16]).unwrap(); // 16 bytes, not 32
 
@@ -310,8 +308,10 @@ mod tests {
     #[test]
     fn truncated_block_offer_fails() {
         let msg = Message::MsgLeiosBlockOffer {
-            slot: 1,
-            hash: test_hash(),
+            point: Point::Specific {
+                slot: 1,
+                hash: test_hash(),
+            },
         };
         let encoded = minicbor::to_vec(&msg).unwrap();
         let truncated = &encoded[..3];
