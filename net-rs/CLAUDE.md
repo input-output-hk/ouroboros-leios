@@ -157,6 +157,10 @@ net-rs/
 - **Leios per-peer integration**: `leios_enabled: bool` config flag (default false). When true, per-peer tasks register LeiosNotify (ID 18) and LeiosFetch (ID 19) alongside Praos protocols. `spawn_leios_notify` runs continuous request_next loop; `spawn_leios_fetch` is command-driven (like BlockFetch). Server handlers `serve_leios_notify`/`serve_leios_fetch` read from `LeiosStore`. `LeiosStore` is a content-addressed blob store separate from `ChainStore` (Leios data keyed by `(slot, hash)`, not part of a linear chain).
 - **Leios coordinator intelligence**: Coordinator deduplicates EB, TX, and vote offers across peers using slot-bounded seen sets (configurable `leios_dedup_window`, default 1000 slots). Tracks which peers offered which data for RTT-based smart fetch routing (mirrors Praos `FetchBlock` pattern). Pending fetch maps prevent duplicate in-flight requests. Vote batches are deduped per-vote (partial forwarding). App-driven fetching: coordinator does not auto-fetch, app issues `FetchLeiosBlock`/`FetchLeiosBlockTxs`/`FetchLeiosVotes` commands. `LeiosBlockTxsOffered` is a separate event from `LeiosBlockOffered` (not collapsed). `FetchLeiosBlockTxs` carries bitmap for selective TX addressing.
 
+### Known issue: coordinator `.send().await` blocking
+
+The coordinator event loop uses `.send().await` on the `network_events` channel (capacity 64) and per-peer `commands` channels (capacity 16). If the application consumer or a peer task stalls, the coordinator loop blocks, stalling all peers. This affects both Praos and Leios handlers equally. Fix would be switching to `try_send()` or increasing channel capacity. Tracked for a future commit.
+
 ## Implementation Phases
 
 1. **Phase 1: Mux + Handshake** — COMPLETE. Bearer, mux, codec, protocol framework, handshake (client+server), CLI, 51 tests, live-tested against mainnet, security-audited.
