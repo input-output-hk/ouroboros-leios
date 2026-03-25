@@ -108,6 +108,8 @@ $$s_k = \left(\frac{k+1}{n}\right)^{10} - \left(\frac{k}{n}\right)^{10}$$
 
 This concentrates stake among a small number of large pools, reflecting the actual mainnet dynamics where a minority of stake pools control the majority of stake. The derivation of this model is documented in the [linear-leios-preliminaries](../../linear-leios-preliminaries.md#stake-distribution).
 
+The stake distribution is used in Section 5.2.2 to calculate the probability of a quorum.
+
 ## 4. $\Delta\text{Q}$ Model of EB Diffusion
 
 The $\Delta\text{Q}$ model of EB diffusion captures the steps a node performs upon receiving an RB header:
