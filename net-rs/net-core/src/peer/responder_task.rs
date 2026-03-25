@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 use tokio::sync::mpsc;
 
+use crate::mux::scheduler::priorities;
 use crate::mux::ProtocolConfig;
 use crate::protocols::blockfetch;
 use crate::protocols::chainsync;
@@ -44,31 +45,31 @@ pub(crate) fn server_protocol_configs(leios_enabled: bool) -> Vec<ProtocolConfig
     let mut configs = vec![
         ProtocolConfig {
             id: chainsync::PROTOCOL_ID,
-            priority: 1,
+            priority: priorities::CHAINSYNC,
             ingress_limit: chainsync::INGRESS_LIMIT,
             egress_queue_size: 16,
         },
         ProtocolConfig {
             id: blockfetch::PROTOCOL_ID,
-            priority: 2,
+            priority: priorities::BLOCKFETCH,
             ingress_limit: blockfetch::INGRESS_LIMIT,
             egress_queue_size: 16,
         },
         ProtocolConfig {
             id: txsubmission::PROTOCOL_ID,
-            priority: 3,
+            priority: priorities::TXSUBMISSION,
             ingress_limit: txsubmission::INGRESS_LIMIT,
             egress_queue_size: 16,
         },
         ProtocolConfig {
             id: peersharing::PROTOCOL_ID,
-            priority: 5,
+            priority: priorities::PEERSHARING,
             ingress_limit: peersharing::INGRESS_LIMIT,
             egress_queue_size: 4,
         },
         ProtocolConfig {
             id: keepalive::PROTOCOL_ID,
-            priority: 7,
+            priority: priorities::KEEPALIVE,
             ingress_limit: keepalive::INGRESS_LIMIT,
             egress_queue_size: 4,
         },
@@ -76,13 +77,13 @@ pub(crate) fn server_protocol_configs(leios_enabled: bool) -> Vec<ProtocolConfig
     if leios_enabled {
         configs.push(ProtocolConfig {
             id: leios_notify::PROTOCOL_ID,
-            priority: 4,
+            priority: priorities::LEIOS_NOTIFY,
             ingress_limit: leios_notify::INGRESS_LIMIT,
             egress_queue_size: 16,
         });
         configs.push(ProtocolConfig {
             id: leios_fetch::PROTOCOL_ID,
-            priority: 4,
+            priority: priorities::LEIOS_FETCH,
             ingress_limit: leios_fetch::INGRESS_LIMIT,
             egress_queue_size: 16,
         });
