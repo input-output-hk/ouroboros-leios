@@ -87,14 +87,14 @@ Fetched blocks are not associated with their correct chain points.
   - Malicious peer can reorder or inject ambiguous blocks
 
 ### Resolution
-Removed `point` from `PeerEvent::BlockFetched` — the block body contains the header, so point derivation is the coordinator's responsibility. Added `BlockBody::point()` which extracts the header from the block, parses it for slot (via `HeaderInfo`), and computes Blake2b-256 of the header CBOR for the block hash. Added `blake2b_simd` dependency (pure Rust). Coordinator now calls `body.point()` to derive correct points for each streamed block. Commit: PENDING
+Removed `point` from `PeerEvent::BlockFetched` — the block body contains the header, so point derivation is the coordinator's responsibility. Added `BlockBody::point()` which extracts the header from the block, parses it for slot (via `HeaderInfo`), and computes Blake2b-256 of the header CBOR for the block hash. Added `blake2b_simd` dependency (pure Rust). Coordinator now calls `body.point()` to derive correct points for each streamed block. Commit: 8ddb06048
 
 ---
 
 ## 4. Weak Peer Selection for BlockFetch
 
 **Severity:** High
-**Status:** Open
+**Status:** Deferred
 
 ### Description
 Peers are selected for block fetch without strong evidence they contain the requested data.
@@ -114,6 +114,9 @@ Peers are selected for block fetch without strong evidence they contain the requ
 - Adversarial peers can:
   - Stall requests
   - Feed partial or irrelevant data
+
+### Resolution
+Deferred — to be addressed as part of the multi-peer coordinator refactor. Requires tracking per-peer chain coverage (intersection point, tip range) to properly filter fetch candidates.
 
 ---
 
