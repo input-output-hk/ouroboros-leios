@@ -5,6 +5,7 @@
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
+use net_core::mux::scheduler::TrafficClass;
 use net_core::mux::{MuxConfig, ProtocolConfig};
 use net_core::protocols::chainsync;
 use net_core::protocols::chainsync::{ChainSync, ChainSyncEvent};
@@ -107,16 +108,18 @@ pub async fn run(
     host: &str,
     magic: u64,
     max_rollback: usize,
+    scheduler_args: &crate::scheduler_args::SchedulerArgs,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let scheduler_type = scheduler_args.scheduler;
     let cs_proto = ProtocolConfig {
         id: chainsync::PROTOCOL_ID,
-        priority: 1,
+        traffic_class: TrafficClass::Priority,
         ingress_limit: chainsync::INGRESS_LIMIT,
         egress_queue_size: 16,
     };
     let ka_proto = ProtocolConfig {
         id: keepalive::PROTOCOL_ID,
-        priority: 7,
+        traffic_class: TrafficClass::Priority,
         ingress_limit: keepalive::INGRESS_LIMIT,
         egress_queue_size: 4,
     };
@@ -140,6 +143,7 @@ pub async fn run(
             magic,
             &[cs_proto.clone(), ka_proto.clone()],
             mux_config,
+            scheduler_type,
         )
         .await
         {

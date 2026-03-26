@@ -156,7 +156,7 @@ pub async fn done(runner: &mut Runner<LeiosNotify>) -> Result<(), ProtocolError>
 mod tests {
     use super::*;
     use crate::bearer::mem::MemBearer;
-    use crate::mux::scheduler::RoundRobin;
+    use crate::mux::scheduler::{RoundRobin, TrafficClass};
     use crate::mux::{
         CodecRecv, CodecSend, Mux, MuxConfig, ProtocolConfig, MODE_INITIATOR, MODE_RESPONDER,
     };
@@ -274,7 +274,7 @@ mod tests {
 
         let proto = ProtocolConfig {
             id: PROTOCOL_ID,
-            priority: 0,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: INGRESS_LIMIT,
             egress_queue_size: 16,
         };

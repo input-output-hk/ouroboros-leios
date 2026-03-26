@@ -22,9 +22,6 @@ use ingress::ProtocolIngress;
 /// Mini-protocol identifier (15-bit, 0..32767).
 pub type ProtocolId = u16;
 
-/// Priority level for mux scheduling.
-pub type Priority = u8;
-
 /// Direction bit for the wire protocol. The high bit of the protocol field
 /// distinguishes initiator (0) from responder (0x8000).
 pub const MODE_INITIATOR: u16 = 0x0000;
@@ -37,7 +34,9 @@ pub const DEFAULT_SDU_SIZE: usize = 12_288;
 #[derive(Debug, Clone)]
 pub struct ProtocolConfig {
     pub id: ProtocolId,
-    pub priority: Priority,
+    /// Traffic class for scheduling. `Priority` protocols are always serviced
+    /// first; `Default(weight)` protocols share remaining bandwidth via WFQ.
+    pub traffic_class: scheduler::TrafficClass,
     /// Maximum bytes that can accumulate in the ingress buffer before the
     /// connection is torn down (protocol violation per spec).
     pub ingress_limit: usize,
@@ -172,7 +171,7 @@ impl<S: scheduler::Scheduler> Mux<S> {
             },
         );
 
-        self.scheduler.register(id, proto_config.priority);
+        self.scheduler.register(id, proto_config.traffic_class);
 
         let send = ChannelSend::new(egress_send, self.egress_notify.clone());
         let recv = ChannelRecv::new(ingress_recv, ingress_counter, ingress_limit);
@@ -280,7 +279,7 @@ impl RunningMux {
 mod tests {
     use super::*;
     use crate::bearer::mem::MemBearer;
-    use scheduler::RoundRobin;
+    use scheduler::{RoundRobin, TrafficClass};
 
     fn test_config() -> MuxConfig {
         MuxConfig {
@@ -296,7 +295,7 @@ mod tests {
         // Set up mux A (initiator) with one protocol.
         let proto = ProtocolConfig {
             id: 0,
-            priority: 0,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: 65535,
             egress_queue_size: 10,
         };
@@ -329,7 +328,7 @@ mod tests {
 
         let proto = ProtocolConfig {
             id: 2,
-            priority: 0,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: 65535,
             egress_queue_size: 10,
         };
@@ -368,13 +367,13 @@ mod tests {
 
         let proto_cs = ProtocolConfig {
             id: 2,
-            priority: 0,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: 65535,
             egress_queue_size: 10,
         };
         let proto_bf = ProtocolConfig {
             id: 3,
-            priority: 0,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: 65535,
             egress_queue_size: 10,
         };
@@ -422,7 +421,7 @@ mod tests {
 
         let proto = ProtocolConfig {
             id: 2,
-            priority: 0,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: 65535,
             egress_queue_size: 10,
         };
@@ -488,14 +487,14 @@ mod tests {
         let (bearer_a, bearer_b) = MemBearer::pair();
 
         let high_proto = ProtocolConfig {
-            id: 2,
-            priority: 1, // high
+            id: 2, // ChainSync — hardwired priority 1
+            traffic_class: TrafficClass::Priority,
             ingress_limit: 65535,
             egress_queue_size: 10,
         };
         let low_proto = ProtocolConfig {
-            id: 10,
-            priority: 7, // low
+            id: 10, // PeerSharing — hardwired priority 7
+            traffic_class: TrafficClass::Default(1),
             ingress_limit: 65535,
             egress_queue_size: 10,
         };

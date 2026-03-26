@@ -179,7 +179,7 @@ Replaced `yield_now()` polling loop with a shared `tokio::sync::Notify` per Mux 
 ## 7. Strict Priority Scheduling Starvation
 
 **Severity:** Medium
-**Status:** Open
+**Status:** Fixed
 
 ### Description
 Scheduler allows indefinite starvation of lower-priority protocols.
@@ -195,6 +195,9 @@ Scheduler allows indefinite starvation of lower-priority protocols.
 - Effective denial-of-service on lower-priority protocols
 - Reduced system utility under load
 - Trade-off currently biased too far toward priority
+
+### Resolution
+Added `PriorityWfq` two-class scheduler as the new default. Protocols are assigned to either Priority class (absolute priority, round-robin among peers) or Default class (message-based weighted fair queuing). Praos protocols (Handshake, ChainSync, BlockFetch, TxSubmission, KeepAlive) are Priority class; Leios protocols and PeerSharing are Default class with configurable weights. Default class is only serviced when no Priority protocol has data, but within Default class, each protocol gets turns proportional to its weight — preventing starvation among Leios protocols. `StrictPriority` and `RoundRobin` schedulers retained as simpler alternatives. Per-protocol traffic class overrides available via `--protocol-priority` CLI flag. `ProtocolConfig.priority` replaced by `ProtocolConfig.traffic_class: TrafficClass` enum (`Priority | Default(weight)`). Commit: TBD
 
 ---
 

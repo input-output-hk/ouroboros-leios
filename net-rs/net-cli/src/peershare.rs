@@ -6,6 +6,7 @@ use std::net::ToSocketAddrs;
 
 use net_core::bearer::tcp::TcpBearer;
 use net_core::mux::scheduler::RoundRobin;
+use net_core::mux::scheduler::TrafficClass;
 use net_core::mux::{CodecRecv, CodecSend, Mux, MuxConfig, ProtocolConfig, MODE_INITIATOR};
 use net_core::protocols::handshake;
 use net_core::protocols::handshake::n2n;
@@ -30,13 +31,13 @@ pub async fn run(
 
     let hs_proto = ProtocolConfig {
         id: handshake::PROTOCOL_ID,
-        priority: 0,
+        traffic_class: TrafficClass::Priority,
         ingress_limit: handshake::SIZE_LIMIT,
         egress_queue_size: 4,
     };
     let ps_proto = ProtocolConfig {
         id: peersharing::PROTOCOL_ID,
-        priority: 5,
+        traffic_class: TrafficClass::Priority,
         ingress_limit: peersharing::INGRESS_LIMIT,
         egress_queue_size: 4,
     };

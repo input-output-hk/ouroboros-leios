@@ -185,6 +185,26 @@ RUST_LOG=debug cargo run -p net-cli -- multi-follow \
   --leios
 ```
 
+### Scheduler selection
+
+The `serve`, `follow`, and `multi-follow` commands accept `--scheduler` and `--protocol-priority`:
+
+```sh
+# Use strict-priority scheduler (hardwired tiers, can starve Leios)
+cargo run -p net-cli -- serve --port 9999 --scheduler strict-priority
+
+# Use PriorityWfq (default) with custom Leios weights
+cargo run -p net-cli -- multi-follow --host 127.0.0.1:9999 --leios \
+  --protocol-priority 18,3 --protocol-priority 19,1
+
+# Move PeerSharing to Priority class
+cargo run -p net-cli -- follow 127.0.0.1:9999 --protocol-priority 10,P
+```
+
+Schedulers: `priority-wfq` (default), `strict-priority`, `round-robin`. Case-insensitive.
+
+Traffic class overrides: `<protocol-id>,P` for Priority class, `<protocol-id>,<weight>` for Default class with the given WFQ weight.
+
 ## Dependencies
 
 Minimal and C-free:
@@ -203,7 +223,6 @@ Minimal and C-free:
 
 ## Future Work
 
-- **Weighted fair queuing** — alternative mux scheduler for more nuanced QoS
 - **QUIC / Unix socket transports** — bearer trait is ready, implementations deferred
 - **Coordinator `try_send`** — event loop currently uses `.send().await` which can block if a consumer stalls
 - **Freshest-first fetch** — prefer newest blocks when multiple are available
