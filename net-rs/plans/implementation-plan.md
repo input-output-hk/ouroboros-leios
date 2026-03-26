@@ -65,17 +65,18 @@ Deliverable: `net-cli` that connects to an existing Cardano node, completes hand
 prints negotiated version. Also: server-side handshake and MemBearer integration tests.
 
 Built: bearer trait (TCP + mem), mux (wire format, egress with scheduler, ingress with
-`try_send` and shared `IngressCounter`, supervisor for error propagation), CBOR codec
-with `max_buffer` and HRTB decode, protocol framework (`Runner` with agency checks),
-handshake protocol (client + server + N2N negotiation), CLI with subcommands.
+`try_send` and shared `IngressCounter`/`IngressLimit`, supervisor for error propagation),
+CBOR codec with HRTB decode, protocol framework (`Runner` with agency checks and
+per-state ingress limit enforcement), handshake protocol (client + server + N2N
+negotiation), CLI with subcommands.
 
 51 tests. Live-tested against backbone.cardano.iog.io:3001. Security audit completed:
 segment size validation, CBOR collection caps, buffer limits, non-blocking demuxer,
 mode bit validation, supervisor teardown.
 
-Additions beyond original plan: supervisor task, IngressCounter, try_send in demuxer,
-max_buffer in codec, CBOR collection length caps, capture command, test vectors from
-live node, security audit checklist.
+Additions beyond original plan: supervisor task, IngressCounter, IngressLimit (dynamic
+per-state size limits at demuxer), try_send in demuxer, CBOR collection length caps,
+capture command, test vectors from live node, security audit checklist.
 
 ### Phase 2: ChainSync + BlockFetch — COMPLETE
 
@@ -172,8 +173,9 @@ ResponderOnly Peer Tasks (inbound connections, server protocols)
   `connect_duplex()` / `accept_duplex()`. Coordinator spawns duplex tasks when `config.duplex`
   is set. `multi-follow --duplex` flag.
 - `ChainStore`: shared in-memory chain state (VecDeque with capacity eviction, watch::channel
-  notification). Coordinator populates from `BlockFetched` events (with header from
-  `pending_headers` map) and `InjectBlock` commands. Responder tasks read via `Arc<ChainStore>`.
+  notification). Coordinator populates from `BlockFetched` events (derives point via
+  `body.point()`, matches header from `pending_headers` map) and `InjectBlock` commands.
+  Responder tasks read via `Arc<ChainStore>`.
 - Server protocol handlers in `net-core::peer::server_handlers` — extracted from serve.rs,
   parameterized on `Arc<ChainStore>` and event senders
 - Accept loop: spawned as background task if `listen_address` configured; feeds completed
@@ -250,7 +252,9 @@ extracts era, block_number, slot, prev_hash, issuer_vkey, body_size, block_body_
 plus CIP-0164 Leios extensions (announced_eb, certified_eb). Array length alone
 disambiguates optional fields (10=base, 11=certified_eb, 12=announced_eb, 13=both).
 `BlockBody` converted similarly with parsed `LeiosBlockInfo` (extracts EB certificate
-from 5th element of Shelley+ block array). Byron headers/blocks return None gracefully.
+from 5th element of Shelley+ block array); `BlockBody::point()` derives the chain Point
+(slot + Blake2b-256 header hash) from the block body. Byron headers/blocks return None
+gracefully.
 types.rs split into types/ module (mod.rs, header.rs, block.rs). codec.rs moved to
 mux/codec.rs, protocol.rs moved to protocols/protocol.rs. 238 total tests, 17 new
 parser tests.
@@ -560,6 +564,7 @@ Also: a test binary / integration test that runs two nodes (client + server) con
 
 - `tokio` (rt, net, io-util, time, sync, macros)
 - `minicbor` (CBOR encode/decode)
+- `blake2b_simd` (Blake2b-256 block header hashing)
 - `bytes` (BytesMut for buffer management)
 - `byteorder` (wire format)
 - `thiserror` (error types)
