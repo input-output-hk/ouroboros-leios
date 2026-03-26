@@ -32,6 +32,10 @@ pub enum NetworkEvent {
     /// A requested block was fetched.
     BlockReceived { point: Point, body: BlockBody },
 
+    /// A requested block fetch failed (peer responded with NoBlocks).
+    /// Carries the full range from the underlying BlockFetch protocol.
+    BlockFetchFailed { from: Point, to: Point },
+
     /// New peers discovered via PeerSharing.
     PeersDiscovered { peers: Vec<PeerAddress> },
 

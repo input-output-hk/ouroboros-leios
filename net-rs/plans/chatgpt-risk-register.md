@@ -94,7 +94,7 @@ Removed `point` from `PeerEvent::BlockFetched` — the block body contains the h
 ## 4. Weak Peer Selection for BlockFetch
 
 **Severity:** High
-**Status:** Deferred
+**Status:** Fixed
 
 ### Description
 Peers are selected for block fetch without strong evidence they contain the requested data.
@@ -116,7 +116,7 @@ Peers are selected for block fetch without strong evidence they contain the requ
   - Feed partial or irrelevant data
 
 ### Resolution
-Deferred — to be addressed as part of the multi-peer coordinator refactor. Requires tracking per-peer chain coverage (intersection point, tip range) to properly filter fetch candidates.
+Per-peer `ChainFragment` now tracks the exact set of points announced via ChainSync. Each fragment is built from the intersection point (surfaced via new `PeerEvent::IntersectionFound`), extended on each `HeaderAnnounced`, truncated on `RolledBack`, and pruned per-point on `BlockFetched`. Fetch routing now requires `fragment.contains(&point)` — only peers who provably announced the requested block are eligible. Added `WrappedHeader::point()` (shared `header_hash` helper with `BlockBody::point()`) to correctly derive header points, fixing a pre-existing `pending_headers` keying bug that used `tip.point` instead of the announced header's point. `PeerEvent::BlockFetchFailed` and `NetworkEvent::BlockFetchFailed` surface NoBlocks responses to the application for retry. Commit: TBD
 
 ---
 

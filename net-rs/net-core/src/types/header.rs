@@ -4,7 +4,7 @@ use minicbor::decode::Error as DecodeError;
 use minicbor::encode::Error as EncodeError;
 use minicbor::{Decoder, Encoder};
 
-use super::MAX_HEADER_SIZE;
+use super::{Point, MAX_HEADER_SIZE};
 
 /// Number of base fields in a Shelley+ header_body array (before Leios extensions).
 const HEADER_BODY_BASE_FIELDS: u64 = 10;
@@ -171,6 +171,19 @@ fn parse_optional_hash(d: &mut Decoder<'_>) -> Result<Option<[u8; 32]>, DecodeEr
     parse_hash32(d).map(Some)
 }
 
+// --- Header hash ---
+
+/// Compute Blake2b-256 hash of header CBOR bytes.
+/// Used by both `WrappedHeader::point()` and `BlockBody::point()`.
+pub(crate) fn header_hash(header_bytes: &[u8]) -> [u8; 32] {
+    let result = blake2b_simd::Params::new()
+        .hash_length(32)
+        .hash(header_bytes);
+    let mut hash = [0u8; 32];
+    hash.copy_from_slice(result.as_bytes());
+    hash
+}
+
 // --- WrappedHeader ---
 
 /// An era-tagged block header stored as raw CBOR bytes, with optional parsed fields.
@@ -200,6 +213,20 @@ impl WrappedHeader {
     /// Use for test fixtures with trivial CBOR that isn't a real header.
     pub fn opaque(raw: Vec<u8>) -> Self {
         Self { raw, parsed: None }
+    }
+
+    /// Derive the chain Point (slot + header hash) from this header.
+    ///
+    /// Computes Blake2b-256 of the raw header CBOR for the block hash
+    /// and combines with the parsed slot number.
+    /// Returns None for Byron headers or unparseable data.
+    pub fn point(&self) -> Option<Point> {
+        let info = self.parsed.as_ref()?;
+        let hash = header_hash(&self.raw);
+        Some(Point::Specific {
+            slot: info.slot,
+            hash,
+        })
     }
 }
 
@@ -501,6 +528,38 @@ mod tests {
         );
         let header = WrappedHeader::opaque(raw);
         assert!(header.parsed.is_none());
+    }
+
+    #[test]
+    fn wrapped_header_point_returns_slot_and_hash() {
+        let raw = build_test_header(
+            7,
+            999,
+            5000,
+            Some([0xAA; 32]),
+            [0xBB; 32],
+            512,
+            [0xCC; 32],
+            None,
+            None,
+        );
+        let header = WrappedHeader::new(raw.clone());
+        let point = header.point().expect("should derive point");
+        match point {
+            super::super::Point::Specific { slot, hash } => {
+                assert_eq!(slot, 5000);
+                // Hash should be blake2b-256 of the raw header bytes.
+                let expected = header_hash(&raw);
+                assert_eq!(hash, expected);
+            }
+            _ => panic!("expected Point::Specific"),
+        }
+    }
+
+    #[test]
+    fn wrapped_header_point_returns_none_for_opaque() {
+        let header = WrappedHeader::opaque(vec![0xA0]);
+        assert!(header.point().is_none());
     }
 
     #[test]

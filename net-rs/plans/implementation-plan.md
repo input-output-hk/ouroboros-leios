@@ -383,6 +383,37 @@ switch to `try_send()` with overflow handling, or increase channel capacity.
 - **Structured Leios types**: replace opaque byte blobs with parsed types (EBs,
   votes, certificates, BLS keys/sigs) when the CIP-0164 spec stabilizes.
 
+### BlockFetch pipelining
+
+The BlockFetch protocol allows the client to send multiple `MsgRequestRange`
+messages without waiting for each batch to complete. The Haskell node recently
+added support for this. Currently our client sends one range, waits for
+`MsgBatchDone`/`MsgNoBlocks`, then sends the next. Our server similarly
+processes one range at a time.
+
+To implement: the client side (`spawn_blockfetch`) would queue multiple
+`FetchBlocks` commands and pipeline the `MsgRequestRange` sends, then match
+streamed blocks to their originating requests. The server side
+(`serve_blockfetch`) would need to read ahead for the next `MsgRequestRange`
+while still streaming the current batch. The `Runner` already supports
+sequential send/recv — pipelining would need concurrent send and recv on the
+same protocol, which may require splitting the runner or using a separate
+write task.
+
+### Multi-block range fetching
+
+`NetworkCommand::FetchBlock` currently requests a single block (`from == to`),
+even though the underlying BlockFetch protocol supports multi-block ranges and
+the Haskell node batches contiguous headers from a single peer's chain fragment
+into range requests for efficiency. During catch-up this matters: N individual
+round-trips vs fewer batched ones.
+
+To implement: the coordinator would scan a peer's `ChainFragment` for
+contiguous runs of unfetched points and issue `PeerCommand::FetchBlocks` with
+`from` and `to` spanning the run. `pending_fetches` would need to track all
+points in the range (not just one), and `BlockFetchFailed` cleanup would need
+to cover the full range. The per-peer command channel already accepts ranges.
+
 ### Testing and validation
 
 - **Live Leios testnet testing**: end-to-end validation against a real Leios testnet
