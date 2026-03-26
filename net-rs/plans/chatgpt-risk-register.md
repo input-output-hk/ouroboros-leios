@@ -197,14 +197,14 @@ Scheduler allows indefinite starvation of lower-priority protocols.
 - Trade-off currently biased too far toward priority
 
 ### Resolution
-Added `PriorityWfq` two-class scheduler as the new default. Protocols are assigned to either Priority class (absolute priority, round-robin among peers) or Default class (message-based weighted fair queuing). Praos protocols (Handshake, ChainSync, BlockFetch, TxSubmission, KeepAlive) are Priority class; Leios protocols and PeerSharing are Default class with configurable weights. Default class is only serviced when no Priority protocol has data, but within Default class, each protocol gets turns proportional to its weight — preventing starvation among Leios protocols. `StrictPriority` and `RoundRobin` schedulers retained as simpler alternatives. Per-protocol traffic class overrides available via `--protocol-priority` CLI flag. `ProtocolConfig.priority` replaced by `ProtocolConfig.traffic_class: TrafficClass` enum (`Priority | Default(weight)`). Commit: TBD
+Added `PriorityWfq` two-class scheduler as the new default. Protocols are assigned to either Priority class (absolute priority, round-robin among peers) or Default class (message-based weighted fair queuing). Praos protocols (Handshake, ChainSync, BlockFetch, TxSubmission, KeepAlive) are Priority class; Leios protocols and PeerSharing are Default class with configurable weights. Default class is only serviced when no Priority protocol has data, but within Default class, each protocol gets turns proportional to its weight — preventing starvation among Leios protocols. `StrictPriority` and `RoundRobin` schedulers retained as simpler alternatives. Per-protocol traffic class overrides available via `--protocol-priority` CLI flag. `ProtocolConfig.priority` replaced by `ProtocolConfig.traffic_class: TrafficClass` enum (`Priority | Default(weight)`). Commit: b154d6447
 
 ---
 
 ## 8. Missing TCP Keepalive Configuration
 
 **Severity:** Medium
-**Status:** Open
+**Status:** Resolved
 
 ### Description
 TCP connections are not configured with keepalive despite documentation implying it.
@@ -221,6 +221,9 @@ TCP connections are not configured with keepalive despite documentation implying
 - Slow detection of half-open connections
 - Resource leakage (sockets, peer slots)
 - Increased exposure to connection exhaustion
+
+### Resolution
+Added TCP keepalive via `socket2` crate in `configure_stream()`: idle=60s, interval=15s. OS-level dead peer detection now complements the protocol-level KeepAlive (97s cycle). Commit: TBD
 
 ---
 

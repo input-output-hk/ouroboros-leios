@@ -337,7 +337,7 @@ mod tests {
         }
 
         // Should have received Connected event.
-        let timeout = tokio::time::timeout(Duration::from_secs(1), async {
+        let _timeout = tokio::time::timeout(Duration::from_secs(1), async {
             while let Some((_id, event)) = event_receiver.recv().await {
                 if matches!(event, PeerEvent::Connected) {
                     return true;
