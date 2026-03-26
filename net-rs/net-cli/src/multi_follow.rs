@@ -13,6 +13,7 @@ pub async fn run(
     listen: Option<String>,
     duplex: bool,
     leios: bool,
+    scheduler_args: &crate::scheduler_args::SchedulerArgs,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     if hosts.is_empty() && listen.is_none() {
         return Err("at least one --host or --listen is required".into());
@@ -28,6 +29,8 @@ pub async fn run(
         duplex,
         leios_enabled: leios,
         leios_dedup_window: 1000,
+        traffic_class_overrides: scheduler_args.traffic_class_overrides()?,
+        scheduler_type: scheduler_args.scheduler,
     };
 
     let mut handle = spawn_coordinator(config);

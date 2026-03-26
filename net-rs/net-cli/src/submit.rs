@@ -8,6 +8,7 @@ use std::time::Duration;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 
+use net_core::mux::scheduler::TrafficClass;
 use net_core::mux::{MuxConfig, ProtocolConfig};
 use net_core::protocols::keepalive;
 use net_core::protocols::keepalive::KeepAlive;
@@ -68,13 +69,13 @@ pub async fn run(
 
     let ts_proto = ProtocolConfig {
         id: txsubmission::PROTOCOL_ID,
-        priority: 3,
+        traffic_class: TrafficClass::Priority,
         ingress_limit: txsubmission::INGRESS_LIMIT,
         egress_queue_size: 16,
     };
     let ka_proto = ProtocolConfig {
         id: keepalive::PROTOCOL_ID,
-        priority: 7,
+        traffic_class: TrafficClass::Priority,
         ingress_limit: keepalive::INGRESS_LIMIT,
         egress_queue_size: 4,
     };
@@ -84,9 +85,14 @@ pub async fn run(
         ..MuxConfig::default()
     };
 
-    let conn =
-        connect::connect_and_handshake_with_config(host, magic, &[ts_proto, ka_proto], mux_config)
-            .await?;
+    let conn = connect::connect_and_handshake_with_config(
+        host,
+        magic,
+        &[ts_proto, ka_proto],
+        mux_config,
+        net_core::mux::scheduler::SchedulerType::default(),
+    )
+    .await?;
 
     let mut channels = conn.channels.into_iter();
     let (ts_send, ts_recv) = channels.next().expect("txsubmission channel");

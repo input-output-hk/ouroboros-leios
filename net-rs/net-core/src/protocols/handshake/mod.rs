@@ -198,7 +198,7 @@ where
 mod tests {
     use super::*;
     use crate::bearer::mem::MemBearer;
-    use crate::mux::scheduler::RoundRobin;
+    use crate::mux::scheduler::{RoundRobin, TrafficClass};
     use crate::mux::{Mux, MuxConfig, ProtocolConfig, MODE_INITIATOR, MODE_RESPONDER};
 
     fn test_config() -> MuxConfig {
@@ -218,7 +218,7 @@ mod tests {
 
         let proto = ProtocolConfig {
             id: PROTOCOL_ID,
-            priority: 0,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: SIZE_LIMIT,
             egress_queue_size: 4,
         };

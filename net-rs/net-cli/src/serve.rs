@@ -137,6 +137,7 @@ pub async fn run(
     rollback_rate: f64,
     max_rollback_depth: usize,
     leios: bool,
+    scheduler_args: &crate::scheduler_args::SchedulerArgs,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let config = CoordinatorConfig {
         network_magic: magic,
@@ -148,6 +149,8 @@ pub async fn run(
         duplex: false,
         leios_enabled: leios,
         leios_dedup_window: 1000,
+        traffic_class_overrides: scheduler_args.traffic_class_overrides()?,
+        scheduler_type: scheduler_args.scheduler,
     };
 
     let mut handle = spawn_coordinator(config);

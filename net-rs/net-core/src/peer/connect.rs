@@ -6,7 +6,7 @@
 use std::net::ToSocketAddrs;
 
 use crate::bearer::tcp::TcpBearer;
-use crate::mux::scheduler::StrictPriority;
+use crate::mux::scheduler::{AnyScheduler, SchedulerType, TrafficClass};
 use crate::mux::{
     CodecRecv, CodecSend, Mux, MuxConfig, ProtocolConfig, RunningMux, MODE_INITIATOR,
     MODE_RESPONDER,
@@ -37,15 +37,23 @@ pub async fn connect_and_handshake(
     magic: u64,
     protocols: &[ProtocolConfig],
 ) -> Result<Connection, Box<dyn std::error::Error + Send + Sync>> {
-    connect_and_handshake_with_config(host, magic, protocols, MuxConfig::default()).await
+    connect_and_handshake_with_config(
+        host,
+        magic,
+        protocols,
+        MuxConfig::default(),
+        SchedulerType::default(),
+    )
+    .await
 }
 
-/// Like `connect_and_handshake` but with a custom mux config.
+/// Like `connect_and_handshake` but with a custom mux config and scheduler.
 pub async fn connect_and_handshake_with_config(
     host: &str,
     magic: u64,
     protocols: &[ProtocolConfig],
     mux_config: MuxConfig,
+    scheduler_type: SchedulerType,
 ) -> Result<Connection, Box<dyn std::error::Error + Send + Sync>> {
     let addr = host
         .to_socket_addrs()?
@@ -56,12 +64,12 @@ pub async fn connect_and_handshake_with_config(
 
     let hs_proto = ProtocolConfig {
         id: handshake::PROTOCOL_ID,
-        priority: 0,
+        traffic_class: TrafficClass::Priority,
         ingress_limit: handshake::SIZE_LIMIT,
         egress_queue_size: 4,
     };
 
-    let mut mux = Mux::new(mux_config, StrictPriority::default(), MODE_INITIATOR);
+    let mut mux = Mux::new(mux_config, AnyScheduler::from_type(scheduler_type), MODE_INITIATOR);
     let (hs_send, hs_recv) = mux.register(&hs_proto);
 
     let mut channels = Vec::new();
@@ -109,18 +117,19 @@ pub async fn accept_and_handshake(
     magic: u64,
     protocols: &[ProtocolConfig],
     mux_config: MuxConfig,
+    scheduler_type: SchedulerType,
 ) -> Result<Connection, Box<dyn std::error::Error + Send + Sync>> {
     let (bearer, peer_addr) = TcpBearer::accept(listener).await?;
     tracing::info!("accepted connection from {peer_addr}");
 
     let hs_proto = ProtocolConfig {
         id: handshake::PROTOCOL_ID,
-        priority: 0,
+        traffic_class: TrafficClass::Priority,
         ingress_limit: handshake::SIZE_LIMIT,
         egress_queue_size: 4,
     };
 
-    let mut mux = Mux::new(mux_config, StrictPriority::default(), MODE_RESPONDER);
+    let mut mux = Mux::new(mux_config, AnyScheduler::from_type(scheduler_type), MODE_RESPONDER);
     let (hs_send, hs_recv) = mux.register(&hs_proto);
 
     let mut channels = Vec::new();
@@ -165,6 +174,7 @@ pub async fn connect_duplex(
     initiator_protocols: &[ProtocolConfig],
     responder_protocols: &[ProtocolConfig],
     mux_config: MuxConfig,
+    scheduler_type: SchedulerType,
 ) -> Result<DuplexConnection, Box<dyn std::error::Error + Send + Sync>> {
     let addr = host
         .to_socket_addrs()?
@@ -175,12 +185,12 @@ pub async fn connect_duplex(
 
     let hs_proto = ProtocolConfig {
         id: handshake::PROTOCOL_ID,
-        priority: 0,
+        traffic_class: TrafficClass::Priority,
         ingress_limit: handshake::SIZE_LIMIT,
         egress_queue_size: 4,
     };
 
-    let mut mux = Mux::new(mux_config, StrictPriority::default(), MODE_INITIATOR);
+    let mut mux = Mux::new(mux_config, AnyScheduler::from_type(scheduler_type), MODE_INITIATOR);
     let (hs_send, hs_recv) = mux.register(&hs_proto);
 
     let mut initiator_channels = Vec::new();
@@ -239,18 +249,19 @@ pub async fn accept_duplex(
     initiator_protocols: &[ProtocolConfig],
     responder_protocols: &[ProtocolConfig],
     mux_config: MuxConfig,
+    scheduler_type: SchedulerType,
 ) -> Result<DuplexConnection, Box<dyn std::error::Error + Send + Sync>> {
     let (bearer, peer_addr) = TcpBearer::accept(listener).await?;
     tracing::info!("accepted duplex connection from {peer_addr}");
 
     let hs_proto = ProtocolConfig {
         id: handshake::PROTOCOL_ID,
-        priority: 0,
+        traffic_class: TrafficClass::Priority,
         ingress_limit: handshake::SIZE_LIMIT,
         egress_queue_size: 4,
     };
 
-    let mut mux = Mux::new(mux_config, StrictPriority::default(), MODE_RESPONDER);
+    let mut mux = Mux::new(mux_config, AnyScheduler::from_type(scheduler_type), MODE_RESPONDER);
     let (hs_send, hs_recv) = mux.register(&hs_proto);
 
     let mut initiator_channels = Vec::new();

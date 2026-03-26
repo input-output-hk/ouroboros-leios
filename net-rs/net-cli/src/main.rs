@@ -6,11 +6,13 @@ mod follow;
 mod handshake;
 mod multi_follow;
 mod peershare;
+mod scheduler_args;
 mod serve;
 mod submit;
 
 use clap::{Parser, Subcommand};
 use net_core::protocols::handshake::n2n;
+use scheduler_args::SchedulerArgs;
 
 #[derive(Parser)]
 #[command(name = "net-cli", about = "Cardano network protocol test tool")]
@@ -90,6 +92,9 @@ enum Command {
         /// Enable Leios protocols (LeiosNotify + LeiosFetch with synthetic EB/vote generation)
         #[arg(long)]
         leios: bool,
+
+        #[command(flatten)]
+        scheduler_args: SchedulerArgs,
     },
 
     /// Submit random transactions via TxSubmission
@@ -144,6 +149,9 @@ enum Command {
         /// Maximum rollback depth (number of points to retain)
         #[arg(long, default_value_t = 2160)]
         max_rollback: usize,
+
+        #[command(flatten)]
+        scheduler_args: SchedulerArgs,
     },
 
     /// Follow the chain tip from multiple peers via the coordinator
@@ -171,6 +179,9 @@ enum Command {
         /// Enable Leios protocols (LeiosNotify + LeiosFetch)
         #[arg(long)]
         leios: bool,
+
+        #[command(flatten)]
+        scheduler_args: SchedulerArgs,
     },
 }
 
@@ -192,6 +203,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             rollback_rate,
             max_rollback_depth,
             leios,
+            scheduler_args,
         } => {
             serve::run(
                 port,
@@ -200,6 +212,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 rollback_rate,
                 max_rollback_depth,
                 leios,
+                &scheduler_args,
             )
             .await
         }
@@ -220,7 +233,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             host,
             magic,
             max_rollback,
-        } => follow::run(&host, magic, max_rollback).await,
+            scheduler_args,
+        } => follow::run(&host, magic, max_rollback, &scheduler_args).await,
         Command::MultiFollow {
             hosts,
             magic,
@@ -228,6 +242,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             listen,
             duplex,
             leios,
-        } => multi_follow::run(&hosts, magic, max_peers, listen, duplex, leios).await,
+            scheduler_args,
+        } => {
+            multi_follow::run(&hosts, magic, max_peers, listen, duplex, leios, &scheduler_args)
+                .await
+        }
     }
 }

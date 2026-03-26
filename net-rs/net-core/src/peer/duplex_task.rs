@@ -10,6 +10,7 @@ use std::time::Duration;
 
 use tokio::sync::mpsc;
 
+use crate::mux::scheduler::TrafficClass;
 use crate::mux::MuxConfig;
 use crate::protocols::peersharing::PeerAddress;
 use crate::types::Point;
@@ -39,6 +40,8 @@ pub(crate) struct DuplexTaskConfig {
     pub command_receiver: mpsc::Receiver<PeerCommand>,
     pub leios_enabled: bool,
     pub leios_store: Option<Arc<LeiosStore>>,
+    pub traffic_class_overrides: std::collections::HashMap<u16, TrafficClass>,
+    pub scheduler_type: crate::mux::scheduler::SchedulerType,
 }
 
 /// Run a duplex peer task. Connects outbound, then runs both client and
@@ -53,12 +56,21 @@ pub(crate) async fn run_duplex_task(mut config: DuplexTaskConfig) {
         ..MuxConfig::default()
     };
 
+    let mut client_protos = client_protocol_configs(config.leios_enabled);
+    let mut server_protos = server_protocol_configs(config.leios_enabled);
+    for p in client_protos.iter_mut().chain(server_protos.iter_mut()) {
+        if let Some(tc) = config.traffic_class_overrides.get(&p.id) {
+            p.traffic_class = *tc;
+        }
+    }
+
     let conn: DuplexConnection = match connect::connect_duplex(
         &config.address,
         config.network_magic,
-        &client_protocol_configs(config.leios_enabled),
-        &server_protocol_configs(config.leios_enabled),
+        &client_protos,
+        &server_protos,
         mux_config,
+        config.scheduler_type,
     )
     .await
     {

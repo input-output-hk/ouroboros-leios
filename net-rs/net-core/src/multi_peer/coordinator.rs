@@ -169,6 +169,8 @@ impl Coordinator {
                 command_receiver: cmd_receiver,
                 leios_enabled: self.config.leios_enabled,
                 leios_store: self.leios_store.clone(),
+                traffic_class_overrides: self.config.traffic_class_overrides.clone(),
+                scheduler_type: self.config.scheduler_type,
             };
             (
                 tokio::spawn(run_duplex_task(task_config)),
@@ -184,6 +186,8 @@ impl Coordinator {
                 event_sender: self.peer_event_sender.clone(),
                 command_receiver: cmd_receiver,
                 leios_enabled: self.config.leios_enabled,
+                traffic_class_overrides: self.config.traffic_class_overrides.clone(),
+                scheduler_type: self.config.scheduler_type,
             };
             (
                 tokio::spawn(run_peer_task(task_config)),
@@ -859,11 +863,17 @@ impl Coordinator {
         };
 
         let magic = self.config.network_magic;
+        let scheduler_type = self.config.scheduler_type;
         let mux_config = MuxConfig {
             sdu_timeout: self.config.sdu_timeout,
             ..MuxConfig::default()
         };
-        let protocols = server_protocol_configs(self.config.leios_enabled);
+        let mut protocols = server_protocol_configs(self.config.leios_enabled);
+        for p in &mut protocols {
+            if let Some(tc) = self.config.traffic_class_overrides.get(&p.id) {
+                p.traffic_class = *tc;
+            }
+        }
 
         let (conn_sender, conn_receiver) = mpsc::channel::<Connection>(16);
         self.inbound_connections = Some(conn_receiver);
@@ -886,6 +896,7 @@ impl Coordinator {
                     magic,
                     &protocols,
                     mux_config.clone(),
+                    scheduler_type,
                 )
                 .await
                 {

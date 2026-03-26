@@ -10,7 +10,7 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 
-use crate::mux::scheduler::priorities;
+use crate::mux::scheduler::TrafficClass;
 use crate::mux::{CodecRecv, CodecSend, MuxConfig, ProtocolConfig};
 use crate::protocols::blockfetch::{self, BlockFetch};
 use crate::protocols::chainsync::{self, ChainSync, ChainSyncEvent};
@@ -35,6 +35,8 @@ pub(crate) struct PeerTaskConfig {
     pub event_sender: mpsc::Sender<(PeerId, PeerEvent)>,
     pub command_receiver: mpsc::Receiver<PeerCommand>,
     pub leios_enabled: bool,
+    pub traffic_class_overrides: std::collections::HashMap<u16, TrafficClass>,
+    pub scheduler_type: crate::mux::scheduler::SchedulerType,
 }
 
 /// Protocol configs for client-side protocols (excluding handshake).
@@ -43,25 +45,25 @@ pub(crate) fn client_protocol_configs(leios_enabled: bool) -> Vec<ProtocolConfig
     let mut configs = vec![
         ProtocolConfig {
             id: chainsync::PROTOCOL_ID,
-            priority: priorities::CHAINSYNC,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: chainsync::INGRESS_LIMIT,
             egress_queue_size: 16,
         },
         ProtocolConfig {
             id: keepalive::PROTOCOL_ID,
-            priority: priorities::KEEPALIVE,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: keepalive::INGRESS_LIMIT,
             egress_queue_size: 4,
         },
         ProtocolConfig {
             id: blockfetch::PROTOCOL_ID,
-            priority: priorities::BLOCKFETCH,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: blockfetch::INGRESS_LIMIT,
             egress_queue_size: 16,
         },
         ProtocolConfig {
             id: peersharing::PROTOCOL_ID,
-            priority: priorities::PEERSHARING,
+            traffic_class: TrafficClass::Default(1),
             ingress_limit: peersharing::INGRESS_LIMIT,
             egress_queue_size: 4,
         },
@@ -69,13 +71,13 @@ pub(crate) fn client_protocol_configs(leios_enabled: bool) -> Vec<ProtocolConfig
     if leios_enabled {
         configs.push(ProtocolConfig {
             id: leios_notify::PROTOCOL_ID,
-            priority: priorities::LEIOS_NOTIFY,
+            traffic_class: TrafficClass::Default(1),
             ingress_limit: leios_notify::INGRESS_LIMIT,
             egress_queue_size: 16,
         });
         configs.push(ProtocolConfig {
             id: leios_fetch::PROTOCOL_ID,
-            priority: priorities::LEIOS_FETCH,
+            traffic_class: TrafficClass::Default(1),
             ingress_limit: leios_fetch::INGRESS_LIMIT,
             egress_queue_size: 16,
         });
@@ -457,11 +459,18 @@ pub(crate) async fn run_peer_task(mut config: PeerTaskConfig) {
         ..MuxConfig::default()
     };
 
+    let mut protos = client_protocol_configs(config.leios_enabled);
+    for p in &mut protos {
+        if let Some(tc) = config.traffic_class_overrides.get(&p.id) {
+            p.traffic_class = *tc;
+        }
+    }
     let conn: Connection = match connect::connect_and_handshake_with_config(
         &config.address,
         config.network_magic,
-        &client_protocol_configs(config.leios_enabled),
+        &protos,
         mux_config,
+        config.scheduler_type,
     )
     .await
     {
@@ -617,31 +626,31 @@ mod tests {
 
         let hs_proto = ProtocolConfig {
             id: handshake::PROTOCOL_ID,
-            priority: 0,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: handshake::SIZE_LIMIT,
             egress_queue_size: 4,
         };
         let cs_proto = ProtocolConfig {
             id: chainsync::PROTOCOL_ID,
-            priority: 1,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: chainsync::INGRESS_LIMIT,
             egress_queue_size: 16,
         };
         let ka_proto = ProtocolConfig {
             id: keepalive::PROTOCOL_ID,
-            priority: 7,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: keepalive::INGRESS_LIMIT,
             egress_queue_size: 4,
         };
         let bf_proto = ProtocolConfig {
             id: blockfetch::PROTOCOL_ID,
-            priority: 2,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: blockfetch::INGRESS_LIMIT,
             egress_queue_size: 16,
         };
         let ps_proto = ProtocolConfig {
             id: peersharing::PROTOCOL_ID,
-            priority: 7,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: peersharing::INGRESS_LIMIT,
             egress_queue_size: 4,
         };
@@ -805,7 +814,7 @@ mod tests {
         // Set up client-side mux.
         let hs_proto = ProtocolConfig {
             id: crate::protocols::handshake::PROTOCOL_ID,
-            priority: 0,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: crate::protocols::handshake::SIZE_LIMIT,
             egress_queue_size: 4,
         };
@@ -916,7 +925,7 @@ mod tests {
     async fn spawn_leios_notify_receives_offers() {
         let ln_proto = ProtocolConfig {
             id: leios_notify::PROTOCOL_ID,
-            priority: 0,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: leios_notify::INGRESS_LIMIT,
             egress_queue_size: 16,
         };
@@ -1000,7 +1009,7 @@ mod tests {
     async fn spawn_leios_fetch_fetches_block() {
         let lf_proto = ProtocolConfig {
             id: leios_fetch::PROTOCOL_ID,
-            priority: 0,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: leios_fetch::INGRESS_LIMIT,
             egress_queue_size: 16,
         };

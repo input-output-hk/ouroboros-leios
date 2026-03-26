@@ -1,3 +1,4 @@
+use net_core::mux::scheduler::TrafficClass;
 use net_core::mux::ProtocolConfig;
 use net_core::protocols::blockfetch;
 use net_core::protocols::blockfetch::BlockFetch;
@@ -12,13 +13,13 @@ use crate::connect;
 pub async fn run(host: &str, magic: u64) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let cs_proto = ProtocolConfig {
         id: chainsync::PROTOCOL_ID,
-        priority: 1,
+        traffic_class: TrafficClass::Priority,
         ingress_limit: chainsync::INGRESS_LIMIT,
         egress_queue_size: 16,
     };
     let bf_proto = ProtocolConfig {
         id: blockfetch::PROTOCOL_ID,
-        priority: 2,
+        traffic_class: TrafficClass::Priority,
         ingress_limit: blockfetch::INGRESS_LIMIT,
         egress_queue_size: 16,
     };

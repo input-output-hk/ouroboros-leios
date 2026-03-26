@@ -127,7 +127,7 @@ fn try_decode<'a, T: minicbor::Decode<'a, ()>>(data: &'a [u8]) -> DecodeResult<T
 mod tests {
     use super::*;
     use crate::bearer::mem::MemBearer;
-    use crate::mux::scheduler::RoundRobin;
+    use crate::mux::scheduler::{RoundRobin, TrafficClass};
     use crate::mux::{Mux, MuxConfig, ProtocolConfig, MODE_INITIATOR, MODE_RESPONDER};
 
     /// Simple test type: a CBOR array [tag, payload].
@@ -199,7 +199,7 @@ mod tests {
     async fn codec_round_trip() {
         let proto = ProtocolConfig {
             id: 0,
-            priority: 0,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: 65535,
             egress_queue_size: 10,
         };
@@ -222,7 +222,7 @@ mod tests {
     async fn codec_multiple_messages() {
         let proto = ProtocolConfig {
             id: 0,
-            priority: 0,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: 65535,
             egress_queue_size: 10,
         };
@@ -252,7 +252,7 @@ mod tests {
         // This forces the mux to split it across multiple segments.
         let proto = ProtocolConfig {
             id: 0,
-            priority: 0,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: 100_000,
             egress_queue_size: 10,
         };
@@ -279,7 +279,7 @@ mod tests {
         // at the segment level before it reaches the codec buffer.
         let proto = ProtocolConfig {
             id: 0,
-            priority: 0,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: 100,
             egress_queue_size: 10,
         };
@@ -315,7 +315,7 @@ mod tests {
     async fn codec_recv_returns_error_on_channel_close() {
         let proto = ProtocolConfig {
             id: 0,
-            priority: 0,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: 65535,
             egress_queue_size: 10,
         };

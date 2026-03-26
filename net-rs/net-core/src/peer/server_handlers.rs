@@ -471,7 +471,7 @@ pub async fn serve_leios_fetch(lf_send: CodecSend, lf_recv: CodecRecv, store: Ar
 mod tests {
     use super::*;
     use crate::bearer::mem::MemBearer;
-    use crate::mux::scheduler::RoundRobin;
+    use crate::mux::scheduler::{RoundRobin, TrafficClass};
     use crate::mux::{Mux, MuxConfig, ProtocolConfig, MODE_INITIATOR, MODE_RESPONDER};
     use crate::protocols::blockfetch;
     use crate::protocols::chainsync;
@@ -534,7 +534,7 @@ mod tests {
     async fn chainsync_server_responds_to_intersection_and_roll_forward() {
         let cs_proto = ProtocolConfig {
             id: chainsync::PROTOCOL_ID,
-            priority: 1,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: chainsync::INGRESS_LIMIT,
             egress_queue_size: 16,
         };
@@ -581,7 +581,7 @@ mod tests {
     async fn blockfetch_server_streams_blocks() {
         let bf_proto = ProtocolConfig {
             id: blockfetch::PROTOCOL_ID,
-            priority: 2,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: blockfetch::INGRESS_LIMIT,
             egress_queue_size: 16,
         };
@@ -623,7 +623,7 @@ mod tests {
     async fn keepalive_server_echoes_cookie() {
         let ka_proto = ProtocolConfig {
             id: keepalive::PROTOCOL_ID,
-            priority: 7,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: keepalive::INGRESS_LIMIT,
             egress_queue_size: 4,
         };
@@ -647,7 +647,7 @@ mod tests {
     async fn leios_notify_server_sends_notifications() {
         let ln_proto = ProtocolConfig {
             id: leios_notify::PROTOCOL_ID,
-            priority: 0,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: leios_notify::INGRESS_LIMIT,
             egress_queue_size: 16,
         };
@@ -695,7 +695,7 @@ mod tests {
     async fn leios_fetch_server_delivers_block() {
         let lf_proto = ProtocolConfig {
             id: leios_fetch::PROTOCOL_ID,
-            priority: 0,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: leios_fetch::INGRESS_LIMIT,
             egress_queue_size: 16,
         };

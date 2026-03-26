@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use tokio::sync::mpsc;
 
-use crate::mux::scheduler::priorities;
+use crate::mux::scheduler::TrafficClass;
 use crate::mux::ProtocolConfig;
 use crate::protocols::blockfetch;
 use crate::protocols::chainsync;
@@ -45,31 +45,31 @@ pub(crate) fn server_protocol_configs(leios_enabled: bool) -> Vec<ProtocolConfig
     let mut configs = vec![
         ProtocolConfig {
             id: chainsync::PROTOCOL_ID,
-            priority: priorities::CHAINSYNC,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: chainsync::INGRESS_LIMIT,
             egress_queue_size: 16,
         },
         ProtocolConfig {
             id: blockfetch::PROTOCOL_ID,
-            priority: priorities::BLOCKFETCH,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: blockfetch::INGRESS_LIMIT,
             egress_queue_size: 16,
         },
         ProtocolConfig {
             id: txsubmission::PROTOCOL_ID,
-            priority: priorities::TXSUBMISSION,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: txsubmission::INGRESS_LIMIT,
             egress_queue_size: 16,
         },
         ProtocolConfig {
             id: peersharing::PROTOCOL_ID,
-            priority: priorities::PEERSHARING,
+            traffic_class: TrafficClass::Default(1),
             ingress_limit: peersharing::INGRESS_LIMIT,
             egress_queue_size: 4,
         },
         ProtocolConfig {
             id: keepalive::PROTOCOL_ID,
-            priority: priorities::KEEPALIVE,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: keepalive::INGRESS_LIMIT,
             egress_queue_size: 4,
         },
@@ -77,13 +77,13 @@ pub(crate) fn server_protocol_configs(leios_enabled: bool) -> Vec<ProtocolConfig
     if leios_enabled {
         configs.push(ProtocolConfig {
             id: leios_notify::PROTOCOL_ID,
-            priority: priorities::LEIOS_NOTIFY,
+            traffic_class: TrafficClass::Default(1),
             ingress_limit: leios_notify::INGRESS_LIMIT,
             egress_queue_size: 16,
         });
         configs.push(ProtocolConfig {
             id: leios_fetch::PROTOCOL_ID,
-            priority: priorities::LEIOS_FETCH,
+            traffic_class: TrafficClass::Default(1),
             ingress_limit: leios_fetch::INGRESS_LIMIT,
             egress_queue_size: 16,
         });
@@ -240,7 +240,7 @@ mod tests {
 
         let hs_proto = ProtocolConfig {
             id: handshake::PROTOCOL_ID,
-            priority: 0,
+            traffic_class: TrafficClass::Priority,
             ingress_limit: handshake::SIZE_LIMIT,
             egress_queue_size: 4,
         };

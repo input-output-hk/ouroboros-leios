@@ -23,10 +23,14 @@ pub mod types;
 
 pub use coordinator::spawn_coordinator;
 
+use std::collections::HashMap;
 use std::time::Duration;
 
 use tokio::sync::mpsc;
 pub use types::{NetworkCommand, NetworkEvent};
+
+use crate::mux::scheduler::{SchedulerType, TrafficClass};
+use crate::mux::ProtocolId;
 
 /// Configuration for the coordinator.
 #[derive(Debug, Clone)]
@@ -50,6 +54,11 @@ pub struct CoordinatorConfig {
     /// Slot window for Leios announcement deduplication. Offers older than
     /// `max_seen_slot - leios_dedup_window` are pruned. Default: 1000.
     pub leios_dedup_window: u64,
+    /// Per-protocol traffic class overrides. Applied on top of defaults
+    /// from `client_protocol_configs` / `server_protocol_configs`.
+    pub traffic_class_overrides: HashMap<ProtocolId, TrafficClass>,
+    /// Which scheduler to use for mux connections.
+    pub scheduler_type: SchedulerType,
 }
 
 impl Default for CoordinatorConfig {
@@ -64,6 +73,8 @@ impl Default for CoordinatorConfig {
             duplex: false,
             leios_enabled: false,
             leios_dedup_window: 1000,
+            traffic_class_overrides: HashMap::new(),
+            scheduler_type: SchedulerType::default(),
         }
     }
 }
