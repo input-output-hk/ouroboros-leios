@@ -211,16 +211,10 @@ pub(crate) fn spawn_blockfetch(
                     loop {
                         match blockfetch::recv_block(&mut runner).await {
                             Ok(Some(body)) => {
-                                // We don't know the exact point for each block in
-                                // the stream — use `to` for the last one. For now
-                                // send each block as it arrives with the range end.
                                 let _ = event_sender
                                     .send((
                                         peer_id,
-                                        PeerEvent::BlockFetched {
-                                            point: to.clone(),
-                                            body,
-                                        },
+                                        PeerEvent::BlockFetched { body },
                                     ))
                                     .await;
                             }

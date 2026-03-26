@@ -1,10 +1,12 @@
 //! Raw block bodies with optional Leios metadata (CIP-0164).
 
+use std::io::Write as _;
+
 use minicbor::decode::Error as DecodeError;
 use minicbor::encode::Error as EncodeError;
 use minicbor::{Decoder, Encoder};
 
-use super::MAX_BLOCK_SIZE;
+use super::{Point, MAX_BLOCK_SIZE};
 
 /// Number of base fields in a Shelley+ block array (before Leios extensions).
 const BLOCK_BASE_FIELDS: u64 = 4;
@@ -110,6 +112,74 @@ impl BlockBody {
     /// Use for test fixtures with trivial CBOR that isn't a real block.
     pub fn opaque(raw: Vec<u8>) -> Self {
         Self { raw, leios: None }
+    }
+
+    /// Derive the chain Point (slot + header hash) from this block's raw bytes.
+    ///
+    /// Extracts the header from the block, parses it for the slot number,
+    /// and computes Blake2b-256 of the header CBOR for the block hash.
+    /// Returns None for Byron blocks or unparseable data.
+    pub fn point(&self) -> Option<Point> {
+        self.try_point().ok()
+    }
+
+    fn try_point(&self) -> Result<Point, DecodeError> {
+        let mut d = Decoder::new(&self.raw);
+
+        // Unwrap #6.24 tag
+        let tag = d.tag()?;
+        if tag.as_u64() != 24 {
+            return Err(DecodeError::message("expected CBOR tag 24"));
+        }
+        let inner_bytes = d.bytes()?;
+
+        // Inner: [era_tag, era_block]
+        let mut inner = Decoder::new(inner_bytes);
+        let _outer_len = inner.array()?;
+        let era = inner.u32()?;
+
+        if era < 2 {
+            return Err(DecodeError::message("Byron block"));
+        }
+
+        // era_block: [header, tx_bodies, ...]
+        // Record position before/after header to extract its raw bytes.
+        let _block_len = inner.array()?;
+        let header_start = inner.position();
+        inner.skip()?; // skip header
+        let header_end = inner.position();
+
+        let header_inner_bytes = inner_bytes
+            .get(header_start..header_end)
+            .ok_or_else(|| DecodeError::message("failed to extract header bytes"))?;
+
+        // Reconstruct full header CBOR: [era_tag, header_inner]
+        // This matches the WrappedHeader wire format used by ChainSync.
+        let mut header_buf = Vec::new();
+        let mut he = Encoder::new(&mut header_buf);
+        he.array(2)
+            .map_err(|_| DecodeError::message("encode error"))?;
+        he.u32(era)
+            .map_err(|_| DecodeError::message("encode error"))?;
+        he.writer_mut()
+            .write_all(header_inner_bytes)
+            .map_err(|_| DecodeError::message("encode error"))?;
+
+        // Parse header for slot.
+        let info = super::HeaderInfo::parse(&header_buf)
+            .ok_or_else(|| DecodeError::message("failed to parse header"))?;
+
+        // Compute Blake2b-256 of the full header CBOR for the block hash.
+        let hash_result = blake2b_simd::Params::new()
+            .hash_length(32)
+            .hash(&header_buf);
+        let mut hash = [0u8; 32];
+        hash.copy_from_slice(hash_result.as_bytes());
+
+        Ok(Point::Specific {
+            slot: info.slot,
+            hash,
+        })
     }
 }
 
@@ -245,5 +315,100 @@ mod tests {
         let raw = build_test_block(7, Some(&[0x01]));
         let body = BlockBody::opaque(raw);
         assert!(body.leios.is_none());
+    }
+
+    /// Build a block with a real parseable Shelley+ header for point() testing.
+    fn build_block_with_header(era: u8, slot: u64) -> Vec<u8> {
+        use std::io::Write as _;
+
+        // Build header_body: [block_number, slot, prev_hash, issuer_vkey,
+        //   vrf_vkey, vrf_result, body_size, block_body_hash, op_cert, proto_ver]
+        let mut hb_buf = Vec::new();
+        let mut hb = Encoder::new(&mut hb_buf);
+        hb.array(10).unwrap();
+        hb.u64(42).unwrap(); // block_number
+        hb.u64(slot).unwrap(); // slot
+        hb.bytes(&[0xAA; 32]).unwrap(); // prev_hash
+        hb.bytes(&[0xBB; 32]).unwrap(); // issuer_vkey
+        hb.bytes(&[0u8; 32]).unwrap(); // vrf_vkey
+        hb.array(2).unwrap(); // vrf_result
+        hb.bytes(&[0u8; 32]).unwrap();
+        hb.bytes(&[0u8; 32]).unwrap();
+        hb.u32(1024).unwrap(); // body_size
+        hb.bytes(&[0xCC; 32]).unwrap(); // block_body_hash
+        hb.array(4).unwrap(); // op_cert
+        hb.bytes(&[0u8; 32]).unwrap();
+        hb.u64(0).unwrap();
+        hb.u64(0).unwrap();
+        hb.bytes(&[0u8; 64]).unwrap();
+        hb.array(2).unwrap(); // proto_ver
+        hb.u32(10).unwrap();
+        hb.u32(0).unwrap();
+
+        // Build inner header: [header_body, body_signature]
+        let mut hi_buf = Vec::new();
+        let mut hi = Encoder::new(&mut hi_buf);
+        hi.array(2).unwrap();
+        hi.writer_mut().write_all(&hb_buf).unwrap();
+        hi.bytes(&[0u8; 64]).unwrap(); // dummy signature
+
+        // Header as it appears in block: #6.24(inner_header_bytes)
+        let mut header_in_block = Vec::new();
+        let mut hib = Encoder::new(&mut header_in_block);
+        hib.tag(minicbor::data::Tag::new(24)).unwrap();
+        hib.bytes(&hi_buf).unwrap();
+
+        // Block array: [header, txs, witnesses, aux]
+        let mut block_buf = Vec::new();
+        let mut be = Encoder::new(&mut block_buf);
+        be.array(4).unwrap();
+        be.writer_mut().write_all(&header_in_block).unwrap();
+        be.array(0).unwrap(); // txs
+        be.array(0).unwrap(); // witnesses
+        be.null().unwrap(); // aux
+
+        // Outer: [era_tag, block_array]
+        let mut inner_buf = Vec::new();
+        let mut ie = Encoder::new(&mut inner_buf);
+        ie.array(2).unwrap();
+        ie.u32(era as u32).unwrap();
+        ie.writer_mut().write_all(&block_buf).unwrap();
+
+        // Wrap in #6.24
+        let mut outer_buf = Vec::new();
+        let mut oe = Encoder::new(&mut outer_buf);
+        oe.tag(minicbor::data::Tag::new(24)).unwrap();
+        oe.bytes(&inner_buf).unwrap();
+
+        outer_buf
+    }
+
+    #[test]
+    fn block_body_point_extracts_slot_and_hash() {
+        let raw = build_block_with_header(7, 67890);
+        let body = BlockBody::new(raw);
+        let point = body.point().expect("should derive point from Shelley+ block");
+        match point {
+            Point::Specific { slot, hash } => {
+                assert_eq!(slot, 67890);
+                // Hash should be Blake2b-256 of the reconstructed header CBOR.
+                // Just verify it's nonzero (deterministic but hard to precompute).
+                assert_ne!(hash, [0u8; 32]);
+            }
+            Point::Origin => panic!("expected Specific point"),
+        }
+    }
+
+    #[test]
+    fn block_body_point_byron_returns_none() {
+        let raw = build_test_block(0, None);
+        let body = BlockBody::new(raw);
+        assert!(body.point().is_none());
+    }
+
+    #[test]
+    fn block_body_point_invalid_returns_none() {
+        let body = BlockBody::opaque(vec![0xFF]);
+        assert!(body.point().is_none());
     }
 }

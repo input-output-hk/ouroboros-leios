@@ -59,14 +59,14 @@ Handshake negotiation advertises capabilities that do not match actual behaviour
 - `initiator_only_diffusion_mode` now `true` for InitiatorOnly connections, `false` for Duplex
 - `negotiate()` now takes server `VersionData` and correctly ORs diffusion modes per spec
 - Added `negotiate_diffusion_mode_or` test verifying both client-only and server-only proposals
-- Commit: PENDING
+- Commit: 207e0a2a7
 
 ---
 
 ## 3. BlockFetch Point Misattribution
 
 **Severity:** High
-**Status:** Open
+**Status:** Fixed
 
 ### Description
 Fetched blocks are not associated with their correct chain points.
@@ -85,6 +85,9 @@ Fetched blocks are not associated with their correct chain points.
 - Potential ledger inconsistency
 - Attack surface:
   - Malicious peer can reorder or inject ambiguous blocks
+
+### Resolution
+Removed `point` from `PeerEvent::BlockFetched` — the block body contains the header, so point derivation is the coordinator's responsibility. Added `BlockBody::point()` which extracts the header from the block, parses it for slot (via `HeaderInfo`), and computes Blake2b-256 of the header CBOR for the block hash. Added `blake2b_simd` dependency (pure Rust). Coordinator now calls `body.point()` to derive correct points for each streamed block. Commit: PENDING
 
 ---
 

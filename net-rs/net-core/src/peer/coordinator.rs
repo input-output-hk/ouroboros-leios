@@ -289,7 +289,12 @@ impl Coordinator {
                 }
             }
 
-            PeerEvent::BlockFetched { point, body } => {
+            PeerEvent::BlockFetched { body } => {
+                // Derive the point from the block body (header hash + slot).
+                let point = body
+                    .point()
+                    .unwrap_or(Point::Origin); // Byron blocks have no parseable point
+
                 self.pending_fetches.remove(&point);
 
                 // Populate chain store for responder peers.

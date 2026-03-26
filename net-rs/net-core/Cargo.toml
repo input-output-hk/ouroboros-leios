@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 tokio = { version = "1", features = ["rt", "net", "io-util", "time", "sync", "macros"] }
 minicbor = { version = "0.25", features = ["std"] }
+blake2b_simd = "1"
 bytes = "1"
 byteorder = "1"
 thiserror = "2"

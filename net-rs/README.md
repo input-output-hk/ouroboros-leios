@@ -186,6 +186,7 @@ Minimal and C-free:
 | `byteorder` | Wire format integer encoding |
 | `thiserror` | Error type derivation |
 | `tracing` | Structured logging |
+| `blake2b_simd` | Blake2b-256 block header hashing |
 | `clap` | CLI argument parsing (net-cli only) |
 | `rand` | Synthetic data generation (net-cli only) |
 
