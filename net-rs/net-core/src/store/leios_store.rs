@@ -257,7 +257,9 @@ mod tests {
         assert_eq!(all.len(), 2);
         assert!(matches!(
             all[0],
-            LeiosNotification::BlockOffer { point: Point::Specific { slot: 1, .. } }
+            LeiosNotification::BlockOffer {
+                point: Point::Specific { slot: 1, .. }
+            }
         ));
         assert!(matches!(all[1], LeiosNotification::VotesOffer { .. }));
 
@@ -273,7 +275,13 @@ mod tests {
         let (store, _rx) = LeiosStore::new(100);
         let mut sub = store.subscribe();
 
-        store.inject_block(Point::Specific { slot: 1, hash: [0u8; 32] }, vec![0x01]);
+        store.inject_block(
+            Point::Specific {
+                slot: 1,
+                hash: [0u8; 32],
+            },
+            vec![0x01],
+        );
 
         let result = tokio::time::timeout(std::time::Duration::from_secs(1), sub.changed()).await;
         assert!(result.is_ok());

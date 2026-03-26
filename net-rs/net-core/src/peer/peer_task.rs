@@ -217,10 +217,7 @@ pub(crate) fn spawn_blockfetch(
                         match blockfetch::recv_block(&mut runner).await {
                             Ok(Some(body)) => {
                                 let _ = event_sender
-                                    .send((
-                                        peer_id,
-                                        PeerEvent::BlockFetched { body },
-                                    ))
+                                    .send((peer_id, PeerEvent::BlockFetched { body }))
                                     .await;
                             }
                             Ok(None) => break, // batch complete
@@ -242,13 +239,7 @@ pub(crate) fn spawn_blockfetch(
                     // NoBlocks — peer doesn't have this range.
                     tracing::warn!("peer {peer_id}: no blocks for range {from}..{to}");
                     let _ = event_sender
-                        .send((
-                            peer_id,
-                            PeerEvent::BlockFetchFailed {
-                                from,
-                                to,
-                            },
-                        ))
+                        .send((peer_id, PeerEvent::BlockFetchFailed { from, to }))
                         .await;
                 }
                 Err(e) => {
@@ -1025,7 +1016,13 @@ mod tests {
             let msg = runner.recv().await.unwrap();
             match msg {
                 LfMsg::MsgLeiosBlockRequest { point } => {
-                    assert_eq!(point, Point::Specific { slot: 42, hash: [0xAB; 32] });
+                    assert_eq!(
+                        point,
+                        Point::Specific {
+                            slot: 42,
+                            hash: [0xAB; 32]
+                        }
+                    );
                 }
                 other => panic!("expected MsgLeiosBlockRequest, got {other:?}"),
             }

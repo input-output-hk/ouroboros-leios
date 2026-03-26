@@ -93,6 +93,14 @@ enum Command {
         #[arg(long)]
         leios: bool,
 
+        /// Maximum concurrent inbound handshakes
+        #[arg(long, default_value_t = 64)]
+        max_handshaking: usize,
+
+        /// Maximum connections (handshaking + established) per IP
+        #[arg(long, default_value_t = 3)]
+        max_connections_per_ip: usize,
+
         #[command(flatten)]
         scheduler_args: SchedulerArgs,
     },
@@ -180,6 +188,14 @@ enum Command {
         #[arg(long)]
         leios: bool,
 
+        /// Maximum concurrent inbound handshakes
+        #[arg(long, default_value_t = 64)]
+        max_handshaking: usize,
+
+        /// Maximum connections (handshaking + established) per IP
+        #[arg(long, default_value_t = 3)]
+        max_connections_per_ip: usize,
+
         #[command(flatten)]
         scheduler_args: SchedulerArgs,
     },
@@ -203,6 +219,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             rollback_rate,
             max_rollback_depth,
             leios,
+            max_handshaking,
+            max_connections_per_ip,
             scheduler_args,
         } => {
             serve::run(
@@ -212,6 +230,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 rollback_rate,
                 max_rollback_depth,
                 leios,
+                max_handshaking,
+                max_connections_per_ip,
                 &scheduler_args,
             )
             .await
@@ -242,10 +262,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             listen,
             duplex,
             leios,
+            max_handshaking,
+            max_connections_per_ip,
             scheduler_args,
         } => {
-            multi_follow::run(&hosts, magic, max_peers, listen, duplex, leios, &scheduler_args)
-                .await
+            multi_follow::run(
+                &hosts,
+                magic,
+                max_peers,
+                listen,
+                duplex,
+                leios,
+                max_handshaking,
+                max_connections_per_ip,
+                &scheduler_args,
+            )
+            .await
         }
     }
 }

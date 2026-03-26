@@ -383,7 +383,9 @@ mod tests {
     fn block_body_point_extracts_slot_and_hash() {
         let raw = build_block_with_header(7, 67890);
         let body = BlockBody::new(raw);
-        let point = body.point().expect("should derive point from Shelley+ block");
+        let point = body
+            .point()
+            .expect("should derive point from Shelley+ block");
         match point {
             Point::Specific { slot, hash } => {
                 assert_eq!(slot, 67890);

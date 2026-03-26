@@ -61,9 +61,7 @@ impl AnyScheduler {
             SchedulerType::StrictPriority => {
                 Self::StrictPriority(strict_priority::StrictPriority::default())
             }
-            SchedulerType::PriorityWfq => {
-                Self::PriorityWfq(priority_wfq::PriorityWfq::default())
-            }
+            SchedulerType::PriorityWfq => Self::PriorityWfq(priority_wfq::PriorityWfq::default()),
         }
     }
 }

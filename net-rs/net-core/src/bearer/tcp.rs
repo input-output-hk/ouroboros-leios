@@ -36,6 +36,12 @@ impl TcpBearer {
         configure_stream(&stream)?;
         Ok((Self { stream }, addr))
     }
+
+    /// Wrap an already-accepted TCP stream (configures socket options).
+    pub fn from_accepted(stream: TcpStream) -> io::Result<Self> {
+        configure_stream(&stream)?;
+        Ok(Self { stream })
+    }
 }
 
 impl Bearer for TcpBearer {

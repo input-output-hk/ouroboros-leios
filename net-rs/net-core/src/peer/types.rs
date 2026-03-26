@@ -59,10 +59,7 @@ pub enum PeerEvent {
     LeiosVotesOffered { votes: Vec<(u64, Vec<u8>)> },
 
     /// LeiosFetch: a requested endorser block arrived.
-    LeiosBlockFetched {
-        point: Point,
-        block: Vec<u8>,
-    },
+    LeiosBlockFetched { point: Point, block: Vec<u8> },
 
     /// LeiosFetch: requested votes arrived.
     LeiosVotesFetched { votes: Vec<Vec<u8>> },

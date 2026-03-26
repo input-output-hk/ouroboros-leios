@@ -431,7 +431,10 @@ mod tests {
         assert!(LeiosFetch::transition(
             &State::StBlock,
             &Message::MsgLeiosBlockRequest {
-                point: Point::Specific { slot: 1, hash: [0; 32] },
+                point: Point::Specific {
+                    slot: 1,
+                    hash: [0; 32]
+                },
             }
         )
         .is_err());
@@ -533,13 +536,7 @@ mod tests {
             let msg = runner.recv().await.unwrap();
             match msg {
                 Message::MsgLeiosBlockRequest { point } => {
-                    assert_eq!(
-                        point,
-                        Point::Specific {
-                            slot: 42,
-                            hash,
-                        }
-                    );
+                    assert_eq!(point, Point::Specific { slot: 42, hash });
                 }
                 other => panic!("expected MsgLeiosBlockRequest, got {other:?}"),
             }
@@ -558,7 +555,9 @@ mod tests {
         let client = tokio::spawn(async move {
             let mut runner = Runner::<LeiosFetch>::new(Role::Client, cs, cr);
 
-            let block = fetch_block(&mut runner, Point::Specific { slot: 42, hash }).await.unwrap();
+            let block = fetch_block(&mut runner, Point::Specific { slot: 42, hash })
+                .await
+                .unwrap();
             assert_eq!(block, vec![0xEB, 0x01, 0x02]);
 
             done(&mut runner).await.unwrap();
@@ -581,13 +580,7 @@ mod tests {
             let msg = runner.recv().await.unwrap();
             match msg {
                 Message::MsgLeiosBlockTxsRequest { point, bitmap } => {
-                    assert_eq!(
-                        point,
-                        Point::Specific {
-                            slot: 100,
-                            hash,
-                        }
-                    );
+                    assert_eq!(point, Point::Specific { slot: 100, hash });
                     assert_eq!(bitmap.len(), 2);
                     assert_eq!(bitmap[&0], 0xFF); // first 8 txs
                     assert_eq!(bitmap[&1], 0x01); // tx 64

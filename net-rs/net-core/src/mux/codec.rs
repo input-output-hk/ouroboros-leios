@@ -305,7 +305,10 @@ mod tests {
 
         // The recv should fail because the demuxer rejects the oversized data.
         let result: Result<TestMsg, _> = codec_recv.recv().await;
-        assert!(result.is_err(), "should reject message exceeding ingress limit");
+        assert!(
+            result.is_err(),
+            "should reject message exceeding ingress limit"
+        );
 
         ra.abort();
         rb.abort();

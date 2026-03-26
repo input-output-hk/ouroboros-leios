@@ -3,7 +3,7 @@
 //! These functions establish a multiplexed, handshaked connection to a
 //! Cardano node. They are used by both the CLI tools and the coordinator.
 
-use std::net::ToSocketAddrs;
+use std::net::{SocketAddr, ToSocketAddrs};
 
 use crate::bearer::tcp::TcpBearer;
 use crate::mux::scheduler::{AnyScheduler, SchedulerType, TrafficClass};
@@ -69,7 +69,11 @@ pub async fn connect_and_handshake_with_config(
         egress_queue_size: 4,
     };
 
-    let mut mux = Mux::new(mux_config, AnyScheduler::from_type(scheduler_type), MODE_INITIATOR);
+    let mut mux = Mux::new(
+        mux_config,
+        AnyScheduler::from_type(scheduler_type),
+        MODE_INITIATOR,
+    );
     let (hs_send, hs_recv) = mux.register(&hs_proto);
 
     let mut channels = Vec::new();
@@ -120,6 +124,26 @@ pub async fn accept_and_handshake(
     scheduler_type: SchedulerType,
 ) -> Result<Connection, Box<dyn std::error::Error + Send + Sync>> {
     let (bearer, peer_addr) = TcpBearer::accept(listener).await?;
+    handshake_accepted(
+        bearer,
+        peer_addr,
+        magic,
+        protocols,
+        mux_config,
+        scheduler_type,
+    )
+    .await
+}
+
+/// Perform the server-side handshake on an already-accepted bearer.
+pub async fn handshake_accepted(
+    bearer: TcpBearer,
+    peer_addr: SocketAddr,
+    magic: u64,
+    protocols: &[ProtocolConfig],
+    mux_config: MuxConfig,
+    scheduler_type: SchedulerType,
+) -> Result<Connection, Box<dyn std::error::Error + Send + Sync>> {
     tracing::info!("accepted connection from {peer_addr}");
 
     let hs_proto = ProtocolConfig {
@@ -129,7 +153,11 @@ pub async fn accept_and_handshake(
         egress_queue_size: 4,
     };
 
-    let mut mux = Mux::new(mux_config, AnyScheduler::from_type(scheduler_type), MODE_RESPONDER);
+    let mut mux = Mux::new(
+        mux_config,
+        AnyScheduler::from_type(scheduler_type),
+        MODE_RESPONDER,
+    );
     let (hs_send, hs_recv) = mux.register(&hs_proto);
 
     let mut channels = Vec::new();
@@ -190,7 +218,11 @@ pub async fn connect_duplex(
         egress_queue_size: 4,
     };
 
-    let mut mux = Mux::new(mux_config, AnyScheduler::from_type(scheduler_type), MODE_INITIATOR);
+    let mut mux = Mux::new(
+        mux_config,
+        AnyScheduler::from_type(scheduler_type),
+        MODE_INITIATOR,
+    );
     let (hs_send, hs_recv) = mux.register(&hs_proto);
 
     let mut initiator_channels = Vec::new();
@@ -261,7 +293,11 @@ pub async fn accept_duplex(
         egress_queue_size: 4,
     };
 
-    let mut mux = Mux::new(mux_config, AnyScheduler::from_type(scheduler_type), MODE_RESPONDER);
+    let mut mux = Mux::new(
+        mux_config,
+        AnyScheduler::from_type(scheduler_type),
+        MODE_RESPONDER,
+    );
     let (hs_send, hs_recv) = mux.register(&hs_proto);
 
     let mut initiator_channels = Vec::new();

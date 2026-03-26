@@ -115,7 +115,10 @@ impl<P: Protocol> Runner<P> {
     pub fn new(role: Role, codec_send: CodecSend, codec_recv: CodecRecv) -> Self {
         let initial_state = P::initial_state();
         let limit = P::size_limit(&initial_state);
-        assert!(limit > 0, "protocol size_limit must be nonzero for all states");
+        assert!(
+            limit > 0,
+            "protocol size_limit must be nonzero for all states"
+        );
         codec_recv.set_ingress_limit(limit);
 
         Self {

@@ -55,10 +55,7 @@ pub enum NetworkEvent {
     LeiosVotesOffered { votes: Vec<(u64, Vec<u8>)> },
 
     /// Leios: a fetched endorser block arrived.
-    LeiosBlockReceived {
-        point: Point,
-        block: Vec<u8>,
-    },
+    LeiosBlockReceived { point: Point, block: Vec<u8> },
 
     /// Leios: fetched votes arrived.
     LeiosVotesReceived { votes: Vec<Vec<u8>> },
@@ -106,10 +103,7 @@ pub enum NetworkCommand {
     FetchLeiosVotes { votes: Vec<(u64, Vec<u8>)> },
 
     /// Inject a Leios block into the Leios store (for responder peers to serve).
-    InjectLeiosBlock {
-        point: Point,
-        block: Vec<u8>,
-    },
+    InjectLeiosBlock { point: Point, block: Vec<u8> },
 
     /// Inject votes into the Leios store (for responder peers to serve).
     InjectLeiosVotes {

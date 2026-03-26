@@ -15,8 +15,6 @@ use crate::mux::MuxConfig;
 use crate::protocols::peersharing::PeerAddress;
 use crate::types::Point;
 
-use crate::store::chain_store::ChainStore;
-use crate::store::leios_store::LeiosStore;
 use super::connect::{self, DuplexConnection};
 use super::peer_task::{
     client_protocol_configs, spawn_blockfetch, spawn_chainsync, spawn_keepalive, spawn_leios_fetch,
@@ -26,6 +24,8 @@ use super::responder_task::server_protocol_configs;
 use super::server_handlers;
 use super::types::{PeerCommand, PeerEvent};
 use super::PeerId;
+use crate::store::chain_store::ChainStore;
+use crate::store::leios_store::LeiosStore;
 
 /// Configuration for a duplex peer task that connects outbound.
 pub(crate) struct DuplexTaskConfig {
