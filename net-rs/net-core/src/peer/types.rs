@@ -8,6 +8,7 @@ use std::time::Duration;
 use std::collections::BTreeMap;
 
 use crate::protocols::peersharing::PeerAddress;
+use crate::protocols::txsubmission::PendingTx;
 use crate::types::{BlockBody, Point, Tip, WrappedHeader};
 
 // ---------------------------------------------------------------------------
@@ -97,6 +98,9 @@ pub enum PeerCommand {
 
     /// Fetch votes via LeiosFetch.
     FetchLeiosVotes { votes: Vec<(u64, Vec<u8>)> },
+
+    /// Submit a transaction to this peer via TxSubmission.
+    SubmitTransaction { tx: PendingTx },
 
     /// Gracefully disconnect this peer.
     Disconnect,

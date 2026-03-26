@@ -18,6 +18,7 @@ use crate::protocols::keepalive::{self, KeepAlive};
 use crate::protocols::leios_fetch::{self, LeiosFetch};
 use crate::protocols::leios_notify::{self, LeiosNotify, LeiosNotifyEvent};
 use crate::protocols::peersharing::{self, PeerSharing};
+use crate::protocols::txsubmission::{self, PendingTx, TxSubmission};
 use crate::protocols::{Role, Runner};
 use crate::types::Point;
 
@@ -66,6 +67,12 @@ pub(crate) fn client_protocol_configs(leios_enabled: bool) -> Vec<ProtocolConfig
             traffic_class: TrafficClass::Default(1),
             ingress_limit: peersharing::INGRESS_LIMIT,
             egress_queue_size: 4,
+        },
+        ProtocolConfig {
+            id: txsubmission::PROTOCOL_ID,
+            traffic_class: TrafficClass::Priority,
+            ingress_limit: txsubmission::INGRESS_LIMIT,
+            egress_queue_size: 16,
         },
     ];
     if leios_enabled {
@@ -292,6 +299,31 @@ pub(crate) fn spawn_peersharing(
     })
 }
 
+/// Spawn the TxSubmission sub-task. Feeds transactions from the internal
+/// channel to the peer via the TxSubmission protocol.
+pub(crate) fn spawn_txsubmission(
+    ts_send: CodecSend,
+    ts_recv: CodecRecv,
+    peer_id: PeerId,
+    mut tx_receiver: mpsc::Receiver<PendingTx>,
+    event_sender: mpsc::Sender<(PeerId, PeerEvent)>,
+) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut runner = Runner::<TxSubmission>::new(Role::Client, ts_send, ts_recv);
+
+        if let Err(e) = txsubmission::run_client(&mut runner, &mut tx_receiver).await {
+            let _ = event_sender
+                .send((
+                    peer_id,
+                    PeerEvent::Failed {
+                        reason: format!("txsubmission: {e}"),
+                    },
+                ))
+                .await;
+        }
+    })
+}
+
 /// Command sent to the LeiosFetch sub-task via an internal channel.
 #[derive(Debug)]
 pub(crate) enum LeiosFetchCommand {
@@ -490,10 +522,14 @@ pub(crate) async fn run_peer_task(mut config: PeerTaskConfig) {
     let (ps_send, ps_recv) = channels
         .next()
         .expect("peersharing channel registered fourth");
+    let (ts_send, ts_recv) = channels
+        .next()
+        .expect("txsubmission channel registered fifth");
 
     // Internal channels for dispatching commands to sub-tasks.
     let (fetch_sender, fetch_receiver) = mpsc::channel::<(Point, Point)>(16);
     let (peer_share_sender, peer_share_receiver) = mpsc::channel::<u8>(4);
+    let (tx_submit_sender, tx_submit_receiver) = mpsc::channel::<PendingTx>(16);
 
     // Spawn protocol sub-tasks.
     let mut cs_handle = spawn_chainsync(cs_send, cs_recv, peer_id, event_sender.clone());
@@ -516,6 +552,13 @@ pub(crate) async fn run_peer_task(mut config: PeerTaskConfig) {
         ps_recv,
         peer_id,
         peer_share_receiver,
+        event_sender.clone(),
+    );
+    let ts_handle = spawn_txsubmission(
+        ts_send,
+        ts_recv,
+        peer_id,
+        tx_submit_receiver,
         event_sender.clone(),
     );
 
@@ -553,6 +596,9 @@ pub(crate) async fn run_peer_task(mut config: PeerTaskConfig) {
                     Some(PeerCommand::RequestPeers { amount }) => {
                         let _ = peer_share_sender.send(amount).await;
                     }
+                    Some(PeerCommand::SubmitTransaction { tx }) => {
+                        let _ = tx_submit_sender.send(tx).await;
+                    }
                     Some(PeerCommand::FetchLeiosBlock { point }) => {
                         if let Some((_, _, ref lf_sender)) = leios_handles {
                             let _ = lf_sender.send(LeiosFetchCommand::Block { point }).await;
@@ -588,6 +634,7 @@ pub(crate) async fn run_peer_task(mut config: PeerTaskConfig) {
     ka_handle.abort();
     bf_handle.abort();
     ps_handle.abort();
+    ts_handle.abort();
     if let Some((ln_handle, lf_handle, _)) = leios_handles {
         ln_handle.abort();
         lf_handle.abort();
@@ -606,6 +653,7 @@ mod tests {
     use crate::protocols::keepalive::{KeepAlive, Message as KaMsg};
     use crate::protocols::leios_fetch::{self, LeiosFetch, Message as LfMsg};
     use crate::protocols::leios_notify::{self, LeiosNotify, Message as LnMsg};
+    use crate::protocols::txsubmission::{self as ts, PendingTx, TxBody, TxId};
     use crate::protocols::Runner as ProtocolRunner;
     use crate::types::{Point, Tip, WrappedHeader};
 
@@ -1084,6 +1132,66 @@ mod tests {
         // Clean up.
         drop(command_sender);
         lf_handle.abort();
+        server_handle.abort();
+        mux_a.abort();
+        mux_b.abort();
+    }
+
+    #[tokio::test]
+    async fn spawn_txsubmission_submits_tx() {
+        let ts_proto = ProtocolConfig {
+            id: ts::PROTOCOL_ID,
+            traffic_class: TrafficClass::Priority,
+            ingress_limit: ts::INGRESS_LIMIT,
+            egress_queue_size: 16,
+        };
+
+        let ((client_send, client_recv), (server_send, server_recv), mux_a, mux_b) =
+            mux_pair_for_protocol(&ts_proto);
+
+        // Server side: use serve_txsubmission which sends TransactionReceived events.
+        let (server_event_tx, mut server_event_rx) = mpsc::channel(64);
+        let server_peer_id = PeerId(99);
+        let server_handle = tokio::spawn(super::super::server_handlers::serve_txsubmission(
+            server_send,
+            server_recv,
+            server_peer_id,
+            server_event_tx,
+        ));
+
+        // Client side: spawn_txsubmission with a tx channel.
+        let (event_sender, _event_receiver) = mpsc::channel(64);
+        let (tx_sender, tx_receiver) = mpsc::channel::<PendingTx>(16);
+        let peer_id = PeerId(1);
+
+        let ts_handle =
+            spawn_txsubmission(client_send, client_recv, peer_id, tx_receiver, event_sender);
+
+        // Send a transaction.
+        let tx = PendingTx {
+            tx_id: TxId(vec![0x44, 0x01, 0x02, 0x03, 0x04]), // CBOR bytes(4)
+            body: TxBody(vec![0x45, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E]), // CBOR bytes(5)
+            size: 5,
+        };
+        tx_sender.send(tx).await.unwrap();
+
+        // Server should receive TransactionReceived event.
+        let result = tokio::time::timeout(Duration::from_secs(5), async {
+            let (_id, event) = server_event_rx.recv().await.unwrap();
+            match event {
+                PeerEvent::TransactionReceived { body } => {
+                    assert_eq!(body, vec![0x45, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E]);
+                }
+                other => panic!("expected TransactionReceived, got {other:?}"),
+            }
+        })
+        .await;
+
+        assert!(result.is_ok(), "timed out waiting for TransactionReceived");
+
+        // Clean up.
+        drop(tx_sender);
+        ts_handle.abort();
         server_handle.abort();
         mux_a.abort();
         mux_b.abort();
