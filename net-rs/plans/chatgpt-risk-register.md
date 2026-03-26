@@ -7,7 +7,7 @@ This document outlines identified risks in the `net-rs` networking library, focu
 ## 1. Missing Enforcement of Per-State Message Size Limits
 
 **Severity:** High
-**Status:** Open
+**Status:** Fixed
 
 ### Description
 Protocol-defined message size limits are not enforced at the protocol runner level, leaving only coarse mux-level limits.
@@ -26,6 +26,9 @@ Protocol-defined message size limits are not enforced at the protocol runner lev
 ### Risk
 - Memory pressure / DoS
 - Spec deviation (state-machine constraints bypassed)
+
+### Resolution
+Per-state size limits now enforced at demuxer level (one hop from TCP socket), before data enters protocol buffers. Shared `IngressLimit` atomic updated by `Runner` on every state transition; demuxer reads it on every segment dispatch. TCP backpressure naturally constrains sender when limits are hit. Redundant codec `max_buffer` (hardcoded 2.5MB) removed — it was both redundant and harmful for LeiosFetch 16MB messages. `Protocol::size_limit()` is now a required trait method (must return nonzero); Runner panics at construction if violated. Commit: TBD
 
 ---
 

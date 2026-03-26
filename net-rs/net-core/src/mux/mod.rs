@@ -156,6 +156,7 @@ impl<S: scheduler::Scheduler> Mux<S> {
             MODE_INITIATOR
         };
         let ingress_counter = channel::IngressCounter::new();
+        let ingress_limit = channel::IngressLimit::new(proto_config.ingress_limit);
         let (ingress_send, ingress_recv) =
             tokio::sync::mpsc::channel(proto_config.egress_queue_size);
         self.ingress_protocols.insert(
@@ -163,14 +164,14 @@ impl<S: scheduler::Scheduler> Mux<S> {
             ProtocolIngress {
                 tx: ingress_send,
                 counter: ingress_counter.clone(),
-                limit: proto_config.ingress_limit,
+                limit: ingress_limit.clone(),
             },
         );
 
         self.scheduler.register(id, proto_config.priority);
 
         let send = ChannelSend::new(egress_send);
-        let recv = ChannelRecv::new(ingress_recv, ingress_counter);
+        let recv = ChannelRecv::new(ingress_recv, ingress_counter, ingress_limit);
         (send, recv)
     }
 
