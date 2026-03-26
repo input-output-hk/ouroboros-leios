@@ -204,7 +204,7 @@ Added `PriorityWfq` two-class scheduler as the new default. Protocols are assign
 ## 8. Missing TCP Keepalive Configuration
 
 **Severity:** Medium
-**Status:** Resolved
+**Status:** Fixed
 
 ### Description
 TCP connections are not configured with keepalive despite documentation implying it.
@@ -230,7 +230,7 @@ Added TCP keepalive via `socket2` crate in `configure_stream()`: idle=60s, inter
 ## 9. Weak Inbound Admission Control
 
 **Severity:** Medium–High
-**Status:** Mitigated
+**Status:** Fixed
 
 ### Description
 Inbound connection handling lacks early-stage defensive controls.
@@ -301,7 +301,7 @@ Not all implemented protocols are wired into the client orchestration layer.
 - Reduced test coverage of full protocol set
 
 ### Resolution
-Wired TxSubmission client into `client_protocol_configs()`, added `spawn_txsubmission()` in `peer_task.rs` (delegates to existing `txsubmission::run_client()`), and connected it in both `peer_task` and `duplex_task`. Added `PeerCommand::SubmitTransaction` and `NetworkCommand::SubmitTransaction` (broadcasts to all peers). Unit test verifies end-to-end tx flow via `serve_txsubmission` server handler.
+Wired TxSubmission client into `client_protocol_configs()`, added `spawn_txsubmission()` in `peer_task.rs` (delegates to existing `txsubmission::run_client()`), and connected it in both `peer_task` and `duplex_task`. Added `PeerCommand::SubmitTransaction` and `NetworkCommand::SubmitTransaction` (broadcasts to all peers). Unit test verifies end-to-end tx flow via `serve_txsubmission` server handler. Commit: 067cbb2df
 
 ---
 

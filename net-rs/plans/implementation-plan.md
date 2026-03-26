@@ -335,7 +335,7 @@ Priority tiers (lower = higher priority):
 
 Fixed KeepAlive from priority 7 → 4 (was below Leios, now correctly Praos-tier).
 Fixed PeerSharing inconsistency (was 5 server / 7 client, now consistently 7).
-Separated LeiosFetch (5) from LeiosNotify (6). 258 total tests.
+Separated LeiosFetch (5) from LeiosNotify (6). 291 total tests.
 
 Files: `net-core/src/mux/scheduler.rs`, `net-core/src/peer/connect.rs`,
 `net-core/src/peer/peer_task.rs`, `net-core/src/peer/responder_task.rs`,

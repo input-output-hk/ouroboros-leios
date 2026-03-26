@@ -17,7 +17,7 @@ Rust implementation of the Cardano node-to-node (N2N) network stack, covering bo
 - LeiosFetch (protocol ID 19) — data retrieval with bitmap-based selective TX addressing
 
 **Multiplexer with QoS** — all protocols share a single TCP connection via a multiplexer with:
-- Strict-priority scheduling (Praos always outprioritizes Leios)
+- Two-class PriorityWfq scheduling (Praos priority class, Leios weighted fair queuing)
 - Per-protocol egress queues with backpressure
 - Non-blocking demuxer (`try_send`) to prevent cross-protocol stalling
 - Configurable SDU size (default 12,288 bytes per Cardano spec)
@@ -31,7 +31,7 @@ Rust implementation of the Cardano node-to-node (N2N) network stack, covering bo
 
 **[Security hardened](docs/security-audit.md)** — allocation bounds on all wire-read lengths, buffer caps, timeouts on all remote waits, clean error propagation, no panics in library code.
 
-**258 tests** — unit tests, codec round-trips, protocol state machines, integration tests with in-memory bearers, and test vectors captured from the live Cardano mainnet.
+**291 tests** — unit tests, codec round-trips, protocol state machines, integration tests with in-memory bearers, and test vectors captured from the live Cardano mainnet.
 
 ## Architecture
 
@@ -70,7 +70,7 @@ graph TD
         end
 
         subgraph "Mux Layer"
-            SCHED[Scheduler<br/>strict priority]
+            SCHED[Scheduler<br/>PriorityWfq]
             EG[Egress queues]
             IG[Ingress routing]
             CODEC[CBOR Codec]
@@ -124,7 +124,7 @@ Requires stable Rust (no nightly features).
 
 ```sh
 cargo build            # build all crates
-cargo test             # run all 258 tests
+cargo test             # run all 291 tests
 cargo clippy           # lint
 cargo fmt --check      # format check
 ```
