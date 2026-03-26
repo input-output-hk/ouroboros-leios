@@ -330,12 +330,17 @@ impl Coordinator {
                 }
 
                 // Populate chain store for responder peers.
+                // Prefer the ChainSync-announced header; fall back to extracting
+                // the header directly from the block body (covers races where
+                // BlockFetch completes before the header is tracked).
                 let header = self
                     .pending_headers
                     .remove(&point)
-                    .unwrap_or(WrappedHeader::opaque(vec![0xA0])); // fallback: empty CBOR map
-                self.chain_store
-                    .append_block(point.clone(), header, body.clone());
+                    .or_else(|| body.header());
+                if let Some(header) = header {
+                    self.chain_store
+                        .append_block(point.clone(), header, body.clone());
+                }
 
                 let _ = self
                     .network_events

@@ -325,3 +325,230 @@ Wired TxSubmission client into `client_protocol_configs()`, added `spawn_txsubmi
 - Protocol wiring completeness
 
 ---
+
+
+# Cardano `net-rs` Post-Remediation Review
+**Branch:** `prc/net-rs`
+**Scope:** Re-survey of original ChatGPT risk register after fixes
+**Method:** Static code review of provided tarball (authoritative source)
+
+---
+
+# Executive Summary
+
+The previously identified risks have been **substantially addressed**.
+
+- All critical correctness and spec-adherence issues are now **resolved**
+- One item (**Leios deduplication**) is **explicitly accepted by design**
+- One item (**scheduler fairness**) is **resolved with a scoped guarantee**, not absolute fairness
+
+> Overall: **The networking layer is now structurally sound and aligned with Cardano design expectations**, with only minor residual considerations.
+
+---
+
+# Status by Item
+
+## 1. Per-State Message Size Limits
+**Status:** ✅ Resolved
+
+- Dynamic ingress limits now enforced via:
+  - `Runner`
+  - `ChannelRecv`
+  - mux demuxer
+- Limits updated on every state transition
+
+**Assessment:**
+Matches Haskell node model (driver-level, state-dependent enforcement)
+
+---
+
+## 2. Handshake Capability Advertisement
+**Status:** ✅ Resolved
+
+- `peer_sharing` correctly advertised
+- Diffusion mode negotiated correctly (OR semantics)
+- Full `VersionData` used in negotiation
+
+**Assessment:**
+Aligned with node-to-node spec
+
+---
+
+## 3. BlockFetch Point Attribution
+**Status:** ✅ Resolved
+
+- `BlockFetched` now carries only `BlockBody`
+- Point reconstructed via `BlockBody::point()`
+- No longer relies on range endpoints
+
+**Assessment:**
+Correct architectural fix (aligns with Haskell separation of concerns)
+
+---
+
+## 4. BlockFetch Peer Selection
+**Status:** ✅ Resolved
+
+- Per-peer `ChainFragment` introduced
+- Routing now requires `fragment.contains(point)`
+- Maintained via:
+  - `IntersectionFound`
+  - `HeaderAnnounced`
+  - `RolledBack`
+
+**Assessment:**
+Removes previous adversarial weakness and aligns with coverage-based routing
+
+---
+
+## 5. Leios Deduplication Fail-Open
+**Status:** ⚠️ Accepted (by design)
+
+- Bounded sets retained
+- On exhaustion → dedup disabled (fail-open)
+
+**Assessment:**
+- Trade-off: memory safety over strict deduplication
+- Still vulnerable to amplification under targeted attack
+
+**Recommendation (optional):**
+- Consider rate limiting or soft backpressure as a future enhancement
+
+---
+
+## 6. Egress Busy-Wait Scheduling
+**Status:** ✅ Resolved
+
+- Replaced polling with `Notify`-based wakeups
+- No more `yield_now()` loops
+
+**Assessment:**
+Correct and efficient async design
+
+---
+
+## 7. Scheduler Fairness
+**Status:** ✅ Resolved (with scope)
+
+- Introduced `PriorityWfq` scheduler
+- Uses `TrafficClass`:
+  - `Priority`
+  - `Default(weight)`
+
+**Important Nuance:**
+- Fairness applies **within Default class**
+- `Priority` class still has strict precedence
+
+**Assessment:**
+- Correct for Cardano use-case (control vs data separation)
+- Not full cross-class fairness
+
+**Recommendation:**
+- Document explicitly to avoid misunderstanding
+
+---
+
+## 8. TCP Keepalive
+**Status:** ✅ Resolved
+
+- Implemented via `socket2`
+- Applied in `TcpBearer`
+
+**Assessment:**
+Improves detection of half-open connections
+
+---
+
+## 9. Inbound Admission Control
+**Status:** ✅ Resolved
+
+- Accept loop decoupled from handshake
+- Handshakes:
+  - bounded by semaphore
+  - tracked per-IP
+- Proper cleanup on:
+  - failure
+  - disconnect
+
+**Assessment:**
+Strong application-layer admission control (comparable intent to Haskell governor layer)
+
+---
+
+## 10. Leios Fetch “Not Found” Semantics
+**Status:** ✅ Resolved
+
+- Missing data now triggers disconnect
+- No silent defaulting
+
+**Assessment:**
+Correct protocol semantics, avoids ambiguity
+
+---
+
+## 11. TxSubmission Client Coverage
+**Status:** ✅ Resolved
+
+- Client-side wiring implemented
+- `SubmitTransaction` integrated into peer/task layers
+
+**Assessment:**
+Completes protocol symmetry
+
+---
+
+# Residual Observations
+
+## 1. Scheduler Design Clarification
+- `PriorityWfq` is **not fully fair across all traffic**
+- Priority traffic can still starve Default under sustained load
+
+👉 This appears **intentional and appropriate**, but should be clearly documented.
+
+### Resolution
+Intentional and appropriate for Cardano: Praos consensus messages (ChainSync, BlockFetch, TxSubmission, KeepAlive) are time-critical and must not be delayed by bulk Leios data transfer. Default class (Leios, PeerSharing) uses weighted fair queuing among itself, preventing starvation within that class. Per-protocol traffic class is configurable via `--protocol-priority` CLI flag if deployment needs differ.
+
+---
+
+## 2. Header Fallback Path in BlockFetch
+- Coordinator still includes fallback:
+  - missing header → `opaque` placeholder
+
+👉 Not a correctness bug anymore, but:
+- may indicate incomplete invariants in edge cases
+- worth monitoring or tightening later
+
+### Resolution
+Fixed. The `WrappedHeader::opaque(vec![0xA0])` magic fallback has been removed. The coordinator now tries `pending_headers` (normal ChainSync path) first, then falls back to `body.header()` which extracts and parses the header directly from the block body CBOR. If neither succeeds (only possible for Byron blocks with a missing ChainSync header — a broken state), the chain store insertion is skipped entirely; the block is still forwarded to the application via `NetworkEvent::BlockReceived`.
+
+---
+
+## 3. Deduplication Strategy (Leios)
+- Fail-open behaviour is coherent but:
+  - still exploitable for amplification
+
+👉 Acceptable for now, but a future hardening candidate
+
+### Resolution
+Accepted — see Risk #5 for full rationale. Slot-based pruning keeps sets well under capacity during normal operation. The proper defense against a flooding adversary is per-peer rate limiting / admission control, which belongs in future peer management work. Fail-closed would be worse: an adversary could fill the seen set with fabricated offers and suppress legitimate ones.
+
+---
+
+# Final Verdict
+
+| Category | Status |
+|----------|------|
+| Spec adherence | ✅ Strong |
+| Adversarial resilience | ✅ Good (with known trade-offs) |
+| Internal consistency | ✅ Coherent |
+| Architecture alignment (vs Haskell) | ✅ Close |
+
+---
+
+# Conclusion
+
+> The `net-rs` networking stack has moved from **prototype-level risk** to a **credible, production-aligned architecture**, with clear and intentional trade-offs.
+
+No remaining issues rise to the level of the original risk register.
+
+---

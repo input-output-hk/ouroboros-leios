@@ -123,7 +123,16 @@ impl BlockBody {
         self.try_point().ok()
     }
 
-    fn try_point(&self) -> Result<Point, DecodeError> {
+    /// Extract the header from this block body as a WrappedHeader.
+    ///
+    /// Returns None for Byron blocks or unparseable data.
+    pub fn header(&self) -> Option<super::WrappedHeader> {
+        let buf = self.try_extract_header().ok()?;
+        Some(super::WrappedHeader::new(buf))
+    }
+
+    /// Extract the raw header CBOR bytes `[era_tag, header_inner]` from this block.
+    fn try_extract_header(&self) -> Result<Vec<u8>, DecodeError> {
         let mut d = Decoder::new(&self.raw);
 
         // Unwrap #6.24 tag
@@ -164,6 +173,12 @@ impl BlockBody {
         he.writer_mut()
             .write_all(header_inner_bytes)
             .map_err(|_| DecodeError::message("encode error"))?;
+
+        Ok(header_buf)
+    }
+
+    fn try_point(&self) -> Result<Point, DecodeError> {
+        let header_buf = self.try_extract_header()?;
 
         // Parse header for slot.
         let info = super::HeaderInfo::parse(&header_buf)
@@ -395,6 +410,23 @@ mod tests {
             }
             Point::Origin => panic!("expected Specific point"),
         }
+    }
+
+    #[test]
+    fn block_body_header_extracts_matching_point() {
+        let raw = build_block_with_header(7, 99999);
+        let body = BlockBody::new(raw);
+        let header = body.header().expect("should extract header");
+        let body_point = body.point().expect("should derive point");
+        let header_point = header.point().expect("header should have point");
+        assert_eq!(body_point, header_point);
+    }
+
+    #[test]
+    fn block_body_header_byron_returns_none() {
+        let raw = build_test_block(0, None);
+        let body = BlockBody::new(raw);
+        assert!(body.header().is_none());
     }
 
     #[test]
