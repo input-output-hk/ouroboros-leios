@@ -151,7 +151,7 @@ net-rs/
 ## Key Design Decisions
 
 - **Bearer**: trait-based (not enum) for transport pluggability
-- **Mux**: per-protocol egress queues with pluggable Scheduler trait; demuxer uses `try_send` (never blocks); supervisor auto-aborts peer on task failure
+- **Mux**: per-protocol egress queues with pluggable Scheduler trait; egress uses shared `tokio::sync::Notify` for event-driven wakeup (signalled by `ChannelSend` on write); demuxer uses `try_send` (never blocks); supervisor auto-aborts peer on task failure
 - **Ingress accounting**: shared `Arc<AtomicUsize>` between demuxer and ChannelRecv for accurate buffer tracking; shared `IngressLimit` atomic allows Runner to update per-state size limits at the demuxer (closest to TCP socket)
 - **Codec**: `for<'a> Decode<'a>` (HRTB) so decoded types are owned, avoiding borrow conflicts
 - **Protocol framework**: `Runner` wraps codec + state, provides agency-checked `send()`/`recv()` — protocols use it directly in async functions (not a generic driver loop). Runner updates demuxer ingress limit on every state transition. `Protocol::size_limit()` is a required trait method (must return nonzero)

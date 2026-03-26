@@ -172,7 +172,7 @@ Mux egress uses a polling loop with `yield_now()` instead of event-driven wakeup
 - Potential performance degradation under attack
 
 ### Resolution
-Replaced `yield_now()` polling loop with a shared `tokio::sync::Notify` per Mux instance. `ChannelSend::send()` signals `notify_one()` after queuing data; the egress loop registers `notified()` before checking receivers (avoiding the race between check and wait), then blocks on the notify or a 100ms timeout for closed-channel cleanup. One Notify per Mux (not per protocol) — only one egress task consumes, so no thundering herd. Commit: TBD
+Replaced `yield_now()` polling loop with a shared `tokio::sync::Notify` per Mux instance. `ChannelSend::send()` signals `notify_one()` after queuing data; the egress loop registers `notified()` before checking receivers (avoiding the race between check and wait), then blocks on the notify or a 100ms timeout for closed-channel cleanup. One Notify per Mux (not per protocol) — only one egress task consumes, so no thundering herd. Commit: 7072a573d
 
 ---
 
