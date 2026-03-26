@@ -20,8 +20,8 @@ use crate::protocols::peersharing::{Message as PsMsg, PeerAddress, PeerSharing};
 use crate::protocols::txsubmission::{self, Message as TsMsg, TxSubmission};
 use crate::protocols::{Role, Runner};
 
-use super::chain_store::ChainStore;
-use super::leios_store::LeiosStore;
+use crate::store::chain_store::ChainStore;
+use crate::store::leios_store::LeiosStore;
 use super::types::PeerEvent;
 use super::PeerId;
 
@@ -336,7 +336,7 @@ pub async fn serve_peersharing(
 /// Sends notifications about available Leios data as the store is populated.
 /// Uses `LeiosStore::subscribe()` to wake when new items are injected.
 pub async fn serve_leios_notify(ln_send: CodecSend, ln_recv: CodecRecv, store: Arc<LeiosStore>) {
-    use super::leios_store::LeiosNotification;
+    use crate::store::leios_store::LeiosNotification;
 
     let mut runner = Runner::<LeiosNotify>::new(Role::Server, ln_send, ln_recv);
     let mut read_index: usize = 0;

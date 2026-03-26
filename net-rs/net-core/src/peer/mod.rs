@@ -1,39 +1,19 @@
-//! Multi-peer coordination layer.
+//! Per-peer protocol handling.
 //!
-//! Manages N peer connections simultaneously, aggregates their protocol
-//! events, and exposes a peer-agnostic interface to the application.
-//!
-//! Architecture: thread-per-peer with a shared coordinator task.
-//! Each peer runs an independent tokio task tree; the coordinator
-//! aggregates state via channels and makes cross-peer decisions.
-//!
-//! ```text
-//! Application
-//!     ↑ NetworkEvent (peer-agnostic)
-//!     ↓ NetworkCommand
-//! Coordinator task
-//!     ↑ (PeerId, PeerEvent) via shared fan-in channel
-//!     ↓ PeerCommand via per-peer channel
-//! Per-Peer Tasks
-//! ```
+//! Manages individual peer connections: connection setup, protocol
+//! sub-tasks (initiator, responder, duplex), and server-side handlers.
+//! The multi-peer coordination layer lives in the `multi_peer` module.
 
-pub mod chain_store;
 pub mod connect;
-mod coordinator;
 pub(crate) mod duplex_task;
-pub mod leios_store;
 pub(crate) mod peer_task;
 pub(crate) mod responder_task;
 pub mod server_handlers;
 pub mod types;
 
-pub use coordinator::spawn_coordinator;
-
 use std::fmt;
-use std::time::Duration;
 
-use tokio::sync::mpsc;
-pub use types::{NetworkCommand, NetworkEvent, PeerCommand, PeerEvent};
+pub use types::{PeerCommand, PeerEvent};
 
 /// Unique identifier for a connected peer within a coordinator session.
 ///
@@ -63,58 +43,7 @@ pub enum ConnectionMode {
     Duplex,
 }
 
-/// Configuration for the coordinator.
-#[derive(Debug, Clone)]
-pub struct CoordinatorConfig {
-    /// Network magic for handshake (e.g. 764824073 for mainnet).
-    pub network_magic: u64,
-    /// Maximum number of managed peers.
-    pub max_peers: usize,
-    /// Interval between KeepAlive pings per peer.
-    pub keepalive_interval: Duration,
-    /// SDU timeout for mux (long at tip — blocks are infrequent).
-    pub sdu_timeout: Duration,
-    /// Address to listen on for inbound (responder) connections. None = don't listen.
-    pub listen_address: Option<String>,
-    /// Maximum blocks to retain in the chain store (for serving to responder peers).
-    pub chain_store_capacity: usize,
-    /// If true, outbound connections use duplex mode (both client and server protocols).
-    pub duplex: bool,
-    /// Enable Leios protocols (LeiosNotify, LeiosFetch). Default: false.
-    pub leios_enabled: bool,
-    /// Slot window for Leios announcement deduplication. Offers older than
-    /// `max_seen_slot - leios_dedup_window` are pruned. Default: 1000.
-    pub leios_dedup_window: u64,
-}
-
-impl Default for CoordinatorConfig {
-    fn default() -> Self {
-        Self {
-            network_magic: 764824073, // mainnet
-            max_peers: 20,
-            keepalive_interval: Duration::from_secs(20),
-            sdu_timeout: Duration::from_secs(900),
-            listen_address: None,
-            chain_store_capacity: 2160,
-            duplex: false,
-            leios_enabled: false,
-            leios_dedup_window: 1000,
-        }
-    }
-}
-
-/// Handle for interacting with a running coordinator.
-///
-/// The application sends `NetworkCommand`s and receives `NetworkEvent`s.
-/// Dropping the handle will cause the coordinator to shut down.
-pub struct CoordinatorHandle {
-    /// Receive peer-agnostic network events.
-    pub events: mpsc::Receiver<NetworkEvent>,
-    /// Send commands to the coordinator.
-    pub commands: mpsc::Sender<NetworkCommand>,
-}
-
-/// Errors from the peer/coordinator layer.
+/// Errors from the peer layer.
 #[derive(Debug, thiserror::Error)]
 pub enum PeerError {
     #[error("protocol error: {0}")]

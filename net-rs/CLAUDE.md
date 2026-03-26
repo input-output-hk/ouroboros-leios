@@ -117,16 +117,21 @@ net-rs/
         leios_notify/   -- LeiosNotify protocol (Leios announcement, protocol ID 18)
         leios_fetch/    -- LeiosFetch protocol (Leios data fetch with bitmap TX addressing, protocol ID 19)
       peer/
-        mod.rs            -- PeerId, ConnectionMode, CoordinatorConfig, CoordinatorHandle, PeerError
-        types.rs          -- PeerEvent, PeerCommand, NetworkEvent, NetworkCommand
-        chain_store.rs    -- ChainStore: shared in-memory chain state for responder peers
+        mod.rs            -- PeerId, ConnectionMode, PeerError
+        types.rs          -- PeerEvent, PeerCommand
         connect.rs        -- connection helpers (TCP + mux + handshake, moved from net-cli)
         peer_task.rs      -- per-peer initiator task: client protocol sub-tasks
         responder_task.rs -- per-peer responder task: server protocol sub-tasks
         duplex_task.rs    -- per-peer duplex task: both client + server on one connection
-        leios_store.rs    -- LeiosStore: content-addressed store for Leios data (EBs, votes)
         server_handlers.rs -- server-side protocol handlers (ChainSync/BlockFetch/KeepAlive/TxSubmission/PeerSharing/LeiosNotify/LeiosFetch)
+      multi_peer/
+        mod.rs            -- CoordinatorConfig, CoordinatorHandle, spawn_coordinator
+        types.rs          -- NetworkEvent, NetworkCommand
         coordinator.rs    -- coordinator: peer aggregation, tip dedup, fetch routing, accept loop, reconnection
+      store/
+        mod.rs            -- module root
+        chain_store.rs    -- ChainStore: shared in-memory chain state for responder peers
+        leios_store.rs    -- LeiosStore: content-addressed store for Leios data (EBs, votes)
   net-cli/              -- binary crate
     src/
       main.rs           -- subcommand dispatch

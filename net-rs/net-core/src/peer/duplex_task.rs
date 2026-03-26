@@ -14,9 +14,9 @@ use crate::mux::MuxConfig;
 use crate::protocols::peersharing::PeerAddress;
 use crate::types::Point;
 
-use super::chain_store::ChainStore;
+use crate::store::chain_store::ChainStore;
+use crate::store::leios_store::LeiosStore;
 use super::connect::{self, DuplexConnection};
-use super::leios_store::LeiosStore;
 use super::peer_task::{
     client_protocol_configs, spawn_blockfetch, spawn_chainsync, spawn_keepalive, spawn_leios_fetch,
     spawn_leios_notify, spawn_peersharing, LeiosFetchCommand,
