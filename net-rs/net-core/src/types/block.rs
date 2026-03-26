@@ -170,11 +170,7 @@ impl BlockBody {
             .ok_or_else(|| DecodeError::message("failed to parse header"))?;
 
         // Compute Blake2b-256 of the full header CBOR for the block hash.
-        let hash_result = blake2b_simd::Params::new()
-            .hash_length(32)
-            .hash(&header_buf);
-        let mut hash = [0u8; 32];
-        hash.copy_from_slice(hash_result.as_bytes());
+        let hash = super::header::header_hash(&header_buf);
 
         Ok(Point::Specific {
             slot: info.slot,

@@ -24,6 +24,9 @@ pub enum PeerEvent {
     /// Connection established and handshake completed.
     Connected,
 
+    /// ChainSync: intersection found during `find_intersection`.
+    IntersectionFound { point: Point },
+
     /// ChainSync: peer announced a new header (from `MsgRollForward`).
     HeaderAnnounced { header: WrappedHeader, tip: Tip },
 
@@ -69,6 +72,9 @@ pub enum PeerEvent {
         point: Point,
         transactions: Vec<Vec<u8>>,
     },
+
+    /// BlockFetch: peer responded with NoBlocks for a requested range.
+    BlockFetchFailed { from: Point, to: Point },
 
     /// Peer misbehaved or connection broke.
     Failed { reason: String },

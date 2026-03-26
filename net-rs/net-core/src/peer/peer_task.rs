@@ -102,7 +102,10 @@ pub(crate) fn spawn_chainsync(
         };
 
         match result {
-            Ok(Some((_point, tip))) => {
+            Ok(Some((point, tip))) => {
+                let _ = event_sender
+                    .send((peer_id, PeerEvent::IntersectionFound { point }))
+                    .await;
                 let _ = event_sender
                     .send((
                         peer_id,
@@ -236,6 +239,15 @@ pub(crate) fn spawn_blockfetch(
                 Ok(false) => {
                     // NoBlocks — peer doesn't have this range.
                     tracing::warn!("peer {peer_id}: no blocks for range {from}..{to}");
+                    let _ = event_sender
+                        .send((
+                            peer_id,
+                            PeerEvent::BlockFetchFailed {
+                                from,
+                                to,
+                            },
+                        ))
+                        .await;
                 }
                 Err(e) => {
                     let _ = event_sender

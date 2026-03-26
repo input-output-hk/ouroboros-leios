@@ -17,6 +17,7 @@
 //! Per-Peer Tasks (in `peer` module)
 //! ```
 
+pub(crate) mod chain_fragment;
 mod coordinator;
 pub mod types;
 
