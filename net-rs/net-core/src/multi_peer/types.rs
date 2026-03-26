@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 use crate::peer::PeerId;
 use crate::protocols::peersharing::PeerAddress;
+use crate::protocols::txsubmission::PendingTx;
 use crate::types::{BlockBody, Point, Tip, WrappedHeader};
 
 // ---------------------------------------------------------------------------
@@ -110,6 +111,9 @@ pub enum NetworkCommand {
         votes: Vec<(u64, Vec<u8>)>,
         data: Vec<Vec<u8>>,
     },
+
+    /// Submit a transaction to all connected peers via TxSubmission.
+    SubmitTransaction { tx: PendingTx },
 
     /// Shut down all peers and stop the coordinator.
     Shutdown,

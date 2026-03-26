@@ -230,7 +230,7 @@ Added TCP keepalive via `socket2` crate in `configure_stream()`: idle=60s, inter
 ## 9. Weak Inbound Admission Control
 
 **Severity:** Medium–High
-**Status:** Mitigated (commit TBD)
+**Status:** Mitigated
 
 ### Description
 Inbound connection handling lacks early-stage defensive controls.
@@ -284,7 +284,7 @@ CIP-0164 specifies: “A server should disconnect if the client requests an EB (
 ## 11. Incomplete Client-Side Protocol Coverage
 
 **Severity:** Low–Medium
-**Status:** Open
+**Status:** Fixed
 
 ### Description
 Not all implemented protocols are wired into the client orchestration layer.
@@ -299,6 +299,9 @@ Not all implemented protocols are wired into the client orchestration layer.
 - Functional incompleteness
 - Misleading documentation claims
 - Reduced test coverage of full protocol set
+
+### Resolution
+Wired TxSubmission client into `client_protocol_configs()`, added `spawn_txsubmission()` in `peer_task.rs` (delegates to existing `txsubmission::run_client()`), and connected it in both `peer_task` and `duplex_task`. Added `PeerCommand::SubmitTransaction` and `NetworkCommand::SubmitTransaction` (broadcasts to all peers). Unit test verifies end-to-end tx flow via `serve_txsubmission` server handler.
 
 ---
 

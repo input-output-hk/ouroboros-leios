@@ -13,12 +13,13 @@ use tokio::sync::mpsc;
 use crate::mux::scheduler::TrafficClass;
 use crate::mux::MuxConfig;
 use crate::protocols::peersharing::PeerAddress;
+use crate::protocols::txsubmission::PendingTx;
 use crate::types::Point;
 
 use super::connect::{self, DuplexConnection};
 use super::peer_task::{
     client_protocol_configs, spawn_blockfetch, spawn_chainsync, spawn_keepalive, spawn_leios_fetch,
-    spawn_leios_notify, spawn_peersharing, LeiosFetchCommand,
+    spawn_leios_notify, spawn_peersharing, spawn_txsubmission, LeiosFetchCommand,
 };
 use super::responder_task::server_protocol_configs;
 use super::server_handlers;
@@ -92,9 +93,13 @@ pub(crate) async fn run_duplex_task(mut config: DuplexTaskConfig) {
     let (ka_send, ka_recv) = init_channels.next().expect("keepalive initiator channel");
     let (bf_send, bf_recv) = init_channels.next().expect("blockfetch initiator channel");
     let (ps_send, ps_recv) = init_channels.next().expect("peersharing initiator channel");
+    let (ts_send, ts_recv) = init_channels
+        .next()
+        .expect("txsubmission initiator channel");
 
     let (fetch_sender, fetch_receiver) = mpsc::channel::<(Point, Point)>(16);
     let (peer_share_sender, peer_share_receiver) = mpsc::channel::<u8>(4);
+    let (tx_submit_sender, tx_submit_receiver) = mpsc::channel::<PendingTx>(16);
 
     let mut cs_client = spawn_chainsync(cs_send, cs_recv, peer_id, event_sender.clone());
     let ka_client = spawn_keepalive(
@@ -116,6 +121,13 @@ pub(crate) async fn run_duplex_task(mut config: DuplexTaskConfig) {
         ps_recv,
         peer_id,
         peer_share_receiver,
+        event_sender.clone(),
+    );
+    let ts_client = spawn_txsubmission(
+        ts_send,
+        ts_recv,
+        peer_id,
+        tx_submit_receiver,
         event_sender.clone(),
     );
 
@@ -208,6 +220,9 @@ pub(crate) async fn run_duplex_task(mut config: DuplexTaskConfig) {
                     Some(PeerCommand::RequestPeers { amount }) => {
                         let _ = peer_share_sender.send(amount).await;
                     }
+                    Some(PeerCommand::SubmitTransaction { tx }) => {
+                        let _ = tx_submit_sender.send(tx).await;
+                    }
                     Some(PeerCommand::FetchLeiosBlock { point }) => {
                         if let Some((_, _, ref lf_sender)) = leios_client_handles {
                             let _ = lf_sender.send(LeiosFetchCommand::Block { point }).await;
@@ -240,6 +255,7 @@ pub(crate) async fn run_duplex_task(mut config: DuplexTaskConfig) {
     ka_client.abort();
     bf_client.abort();
     ps_client.abort();
+    ts_client.abort();
     if let Some((ln_handle, lf_handle, _)) = leios_client_handles {
         ln_handle.abort();
         lf_handle.abort();

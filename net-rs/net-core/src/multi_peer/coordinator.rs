@@ -713,6 +713,15 @@ impl Coordinator {
                 }
             }
 
+            NetworkCommand::SubmitTransaction { tx } => {
+                for peer in self.peers.values() {
+                    let _ = peer
+                        .commands
+                        .send(PeerCommand::SubmitTransaction { tx: tx.clone() })
+                        .await;
+                }
+            }
+
             NetworkCommand::Shutdown => {
                 // Disconnect all peers.
                 let peer_ids: Vec<PeerId> = self.peers.keys().copied().collect();
