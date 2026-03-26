@@ -150,7 +150,7 @@ Accepted as intentional design. Fail-open is the correct safety valve — fail-c
 ## 6. Egress Busy-Wait Scheduling
 
 **Severity:** Medium
-**Status:** Open
+**Status:** Fixed
 
 ### Description
 Mux egress uses a polling loop with `yield_now()` instead of event-driven wakeups.
@@ -170,6 +170,9 @@ Mux egress uses a polling loop with `yield_now()` instead of event-driven wakeup
 - CPU waste
 - Reduced scalability
 - Potential performance degradation under attack
+
+### Resolution
+Replaced `yield_now()` polling loop with a shared `tokio::sync::Notify` per Mux instance. `ChannelSend::send()` signals `notify_one()` after queuing data; the egress loop registers `notified()` before checking receivers (avoiding the race between check and wait), then blocks on the notify or a 100ms timeout for closed-channel cleanup. One Notify per Mux (not per protocol) — only one egress task consumes, so no thundering herd. Commit: TBD
 
 ---
 
