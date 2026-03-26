@@ -8,6 +8,7 @@ pub mod wire;
 pub use codec::{CodecRecv, CodecSend};
 
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use thiserror::Error;
@@ -105,6 +106,8 @@ pub struct Mux<S: scheduler::Scheduler> {
     /// For ingress, the mode in the key is the *remote* mode (what we expect
     /// to see on incoming segments for this channel).
     ingress_protocols: HashMap<ChannelKey, ProtocolIngress>,
+    /// Shared notify: signalled by ChannelSend on write to wake the egress loop.
+    egress_notify: Arc<tokio::sync::Notify>,
 }
 
 impl<S: scheduler::Scheduler> Mux<S> {
@@ -117,6 +120,7 @@ impl<S: scheduler::Scheduler> Mux<S> {
             mode,
             egress_protocols: HashMap::new(),
             ingress_protocols: HashMap::new(),
+            egress_notify: Arc::new(tokio::sync::Notify::new()),
         }
     }
 
@@ -170,7 +174,7 @@ impl<S: scheduler::Scheduler> Mux<S> {
 
         self.scheduler.register(id, proto_config.priority);
 
-        let send = ChannelSend::new(egress_send);
+        let send = ChannelSend::new(egress_send, self.egress_notify.clone());
         let recv = ChannelRecv::new(ingress_recv, ingress_counter, ingress_limit);
         (send, recv)
     }
@@ -190,6 +194,7 @@ impl<S: scheduler::Scheduler> Mux<S> {
             self.scheduler,
             self.config.sdu_size,
             clock,
+            self.egress_notify,
         ));
 
         let demuxer_handle = tokio::spawn(ingress::run_demuxer(

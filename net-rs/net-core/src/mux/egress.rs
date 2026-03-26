@@ -2,11 +2,12 @@
 //! and writes to the bearer.
 
 use std::collections::HashMap;
-use std::time::Instant;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use bytes::Bytes;
 use tokio::io::AsyncWrite;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Notify};
 
 use super::scheduler::Scheduler;
 use super::wire;
@@ -57,6 +58,7 @@ pub(crate) async fn run_muxer<W, S>(
     mut scheduler: S,
     sdu_size: usize,
     clock: Instant,
+    notify: Arc<Notify>,
 ) -> Result<(), MuxError>
 where
     W: AsyncWrite + Unpin,
@@ -64,7 +66,7 @@ where
 {
     loop {
         // Wait until at least one protocol has data.
-        wait_for_any_data(&mut protocols).await;
+        wait_for_any_data(&mut protocols, &notify).await;
 
         // Remove dead protocols (sender dropped, no pending data).
         protocols.retain(|_, state| !state.rx.is_closed() || state.pending.is_some());
@@ -121,20 +123,23 @@ where
 
 /// Block until at least one protocol has data available, either in its
 /// pending buffer or in its receiver channel.
-async fn wait_for_any_data(protocols: &mut HashMap<ChannelKey, ProtocolEgress>) {
-    // Check pending buffers first.
+///
+/// Uses a shared `Notify` signalled by `ChannelSend::send()` to avoid
+/// busy-waiting. A periodic timeout (100ms) handles closed-channel cleanup.
+async fn wait_for_any_data(
+    protocols: &mut HashMap<ChannelKey, ProtocolEgress>,
+    notify: &Notify,
+) {
+    // Check pending buffers first (fast path).
     if protocols.values().any(|s| s.pending.is_some()) {
         return;
     }
 
-    // No pending data — we need to block until a receiver has data.
-    // Since we can't do select! over a dynamic set of receivers easily,
-    // we use a notify-based approach: poll in a loop with yield_now().
-    //
-    // For a more efficient implementation, we could use a shared
-    // tokio::sync::Notify that each ChannelSend signals on write.
-    // That's a Phase 2 optimization.
     loop {
+        // Register listener *before* checking receivers to avoid a race
+        // where data arrives between the check and the wait.
+        let notified = notify.notified();
+
         for state in protocols.values_mut() {
             if state.fill_pending() {
                 return;
@@ -147,6 +152,10 @@ async fn wait_for_any_data(protocols: &mut HashMap<ChannelKey, ProtocolEgress>) 
             return;
         }
 
-        tokio::task::yield_now().await;
+        // Wait for a ChannelSend to signal, or periodic closed-channel check.
+        tokio::select! {
+            _ = notified => {}
+            _ = tokio::time::sleep(Duration::from_millis(100)) => {}
+        }
     }
 }

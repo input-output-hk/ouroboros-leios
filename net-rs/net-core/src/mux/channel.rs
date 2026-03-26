@@ -12,7 +12,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use bytes::Bytes;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Notify};
 
 use super::MuxError;
 
@@ -21,16 +21,20 @@ use super::MuxError;
 #[derive(Debug)]
 pub struct ChannelSend {
     tx: mpsc::Sender<Bytes>,
+    /// Shared waker: signals the egress loop that data is available.
+    egress_notify: Arc<Notify>,
 }
 
 impl ChannelSend {
-    pub(crate) fn new(tx: mpsc::Sender<Bytes>) -> Self {
-        Self { tx }
+    pub(crate) fn new(tx: mpsc::Sender<Bytes>, egress_notify: Arc<Notify>) -> Self {
+        Self { tx, egress_notify }
     }
 
     /// Queue a payload chunk for transmission. Blocks if the egress queue is full.
     pub async fn send(&self, payload: Bytes) -> Result<(), MuxError> {
-        self.tx.send(payload).await.map_err(|_| MuxError::Shutdown)
+        self.tx.send(payload).await.map_err(|_| MuxError::Shutdown)?;
+        self.egress_notify.notify_one();
+        Ok(())
     }
 }
 
