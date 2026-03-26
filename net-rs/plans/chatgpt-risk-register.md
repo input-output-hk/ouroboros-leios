@@ -530,7 +530,7 @@ Fixed. The `WrappedHeader::opaque(vec![0xA0])` magic fallback has been removed. 
 👉 Acceptable for now, but a future hardening candidate
 
 ### Resolution
-Accepted — see Risk #5 for full rationale. Slot-based pruning keeps sets well under capacity during normal operation. The proper defense against a flooding adversary is per-peer rate limiting / admission control, which belongs in future peer management work. Fail-closed would be worse: an adversary could fill the seen set with fabricated offers and suppress legitimate ones.
+Accepted — see Risk #5 for full rationale. Slot-based pruning keeps sets well under capacity during normal operation. The proper defense against a flooding adversary is per-peer rate limiting / admission control, which belongs in future peer management work. Fail-closed would be worse: an adversary could fill the seen set with fabricated offers and suppress legitimate ones.  Commit 06615aca10e
 
 ---
 
@@ -552,3 +552,10 @@ Accepted — see Risk #5 for full rationale. Slot-based pruning keeps sets well 
 No remaining issues rise to the level of the original risk register.
 
 ---
+
+# Final signoff from ChatGPT
+
+> This is now in good shape.
+> The architecture is coherent, the risky shortcuts have been removed, and the remaining trade-offs are explicit rather than accidental.
+
+> Reviewed: the previously identified networking risks are now either resolved in code or explicitly documented as accepted trade-offs; no remaining issues appear material for this branch.
