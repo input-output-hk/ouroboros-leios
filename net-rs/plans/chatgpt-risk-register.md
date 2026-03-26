@@ -251,14 +251,14 @@ Inbound connection handling lacks early-stage defensive controls.
 - Vulnerability to simple DoS attacks
 
 ### Resolution
-Decoupled accept loop from handshake: TCP accept is now immediate, each handshake spawned as an independent tokio task. Concurrent handshakes bounded by `tokio::sync::Semaphore` (`max_handshaking`, default 64). Per-IP connection cap (`max_connections_per_ip`, default 3) enforced via shared `Arc<Mutex<HashMap<IpAddr, usize>>>` between accept loop and coordinator — count incremented before handshake spawn, decremented on handshake failure, coordinator rejection, or peer disconnect. Existing 10s handshake timeout still enforced per-connection. Rate limiting deferred as firewall territory. Commit: TBD
+Decoupled accept loop from handshake: TCP accept is now immediate, each handshake spawned as an independent tokio task. Concurrent handshakes bounded by `tokio::sync::Semaphore` (`max_handshaking`, default 64). Per-IP connection cap (`max_connections_per_ip`, default 3) enforced via shared `Arc<Mutex<HashMap<IpAddr, usize>>>` between accept loop and coordinator — count incremented before handshake spawn, decremented on handshake failure, coordinator rejection, or peer disconnect. Existing 10s handshake timeout still enforced per-connection. Rate limiting deferred as firewall territory. Commit: 3825f5284
 
 ---
 
 ## 10. Ambiguous “Not Found” Semantics in Leios Fetch
 
 **Severity:** Medium
-**Status:** Open
+**Status:** Fixed
 
 ### Description
 Missing data is represented as empty payload instead of explicit absence.
@@ -275,6 +275,9 @@ Missing data is represented as empty payload instead of explicit absence.
 - Ambiguous protocol behaviour
 - Future incompatibility with spec
 - Harder debugging and validation
+
+### Resolution
+CIP-0164 specifies: “A server should disconnect if the client requests an EB (or its transactions) the server does not have.” Replaced `unwrap_or_default()` in `serve_leios_fetch()` with explicit `Option` matching — store lookup `None` now breaks the server loop, triggering disconnect. The client side already handles disconnects via `PeerEvent::Failed`. Votes unchanged (batch `filter_map` with partial delivery is correct for multi-key lookups). Commit: ef81b3939
 
 ---
 
