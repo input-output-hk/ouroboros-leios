@@ -28,14 +28,14 @@ Protocol-defined message size limits are not enforced at the protocol runner lev
 - Spec deviation (state-machine constraints bypassed)
 
 ### Resolution
-Per-state size limits now enforced at demuxer level (one hop from TCP socket), before data enters protocol buffers. Shared `IngressLimit` atomic updated by `Runner` on every state transition; demuxer reads it on every segment dispatch. TCP backpressure naturally constrains sender when limits are hit. Redundant codec `max_buffer` (hardcoded 2.5MB) removed — it was both redundant and harmful for LeiosFetch 16MB messages. `Protocol::size_limit()` is now a required trait method (must return nonzero); Runner panics at construction if violated. Commit: TBD
+Per-state size limits now enforced at demuxer level (one hop from TCP socket), before data enters protocol buffers. Shared `IngressLimit` atomic updated by `Runner` on every state transition; demuxer reads it on every segment dispatch. TCP backpressure naturally constrains sender when limits are hit. Redundant codec `max_buffer` (hardcoded 2.5MB) removed — it was both redundant and harmful for LeiosFetch 16MB messages. `Protocol::size_limit()` is now a required trait method (must return nonzero); Runner panics at construction if violated. Commit: 32c2ea936
 
 ---
 
 ## 2. Incorrect Handshake Capability Advertisement
 
 **Severity:** High
-**Status:** Open
+**Status:** Fixed
 
 ### Description
 Handshake negotiation advertises capabilities that do not match actual behaviour.
@@ -53,6 +53,13 @@ Handshake negotiation advertises capabilities that do not match actual behaviour
 - Network topology degradation
 - Interoperability inconsistencies
 - Hard-to-debug peer behaviour
+
+### Resolution
+- `peer_sharing` now set to `1` in all paths (PeerSharing protocol is always registered)
+- `initiator_only_diffusion_mode` now `true` for InitiatorOnly connections, `false` for Duplex
+- `negotiate()` now takes server `VersionData` and correctly ORs diffusion modes per spec
+- Added `negotiate_diffusion_mode_or` test verifying both client-only and server-only proposals
+- Commit: PENDING
 
 ---
 

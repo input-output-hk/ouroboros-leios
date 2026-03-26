@@ -49,7 +49,7 @@ pub async fn run(
     // Handshake with peer_sharing = 1 to enable PeerSharing protocol.
     let versions = n2n::version_table(&n2n::VersionData {
         network_magic: magic,
-        initiator_only_diffusion_mode: false,
+        initiator_only_diffusion_mode: true,
         peer_sharing: 1,
         query: false,
     });

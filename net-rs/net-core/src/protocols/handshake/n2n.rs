@@ -96,9 +96,14 @@ pub fn version_table(data: &VersionData) -> VersionTable {
 /// Standard N2N negotiation: find the highest common version, decode params,
 /// check network magic matches. Returns the accepted version and negotiated
 /// params, or a refuse reason.
+///
+/// `server_data` provides the server's own capabilities. Per the spec:
+/// - diffusion mode = initiator-only if EITHER side proposes it (logical OR)
+/// - peer sharing = inherited from remote (client)
+/// - query = inherited from client
 pub fn negotiate(
     client_versions: &VersionTable,
-    server_magic: u64,
+    server_data: &VersionData,
 ) -> Result<(u64, Vec<u8>), super::RefuseReason> {
     // Our supported versions.
     let our_versions: Vec<u64> = vec![VERSION_V14, VERSION_V15];
@@ -122,23 +127,24 @@ pub fn negotiate(
         .map_err(|e| super::RefuseReason::HandshakeDecodeError(best_version, e))?;
 
     // Check network magic.
-    if client_data.network_magic != server_magic {
+    if client_data.network_magic != server_data.network_magic {
         return Err(super::RefuseReason::Refused(
             best_version,
             format!(
                 "network magic mismatch: client={}, server={}",
-                client_data.network_magic, server_magic
+                client_data.network_magic, server_data.network_magic
             ),
         ));
     }
 
     // Build negotiated version data per spec:
     // - diffusion mode = initiator-only if EITHER side proposes it (OR)
-    // - peer sharing = inherited from remote
+    // - peer sharing = inherited from remote (client)
     // - query = inherited from client
     let negotiated = VersionData {
-        network_magic: server_magic,
-        initiator_only_diffusion_mode: client_data.initiator_only_diffusion_mode,
+        network_magic: server_data.network_magic,
+        initiator_only_diffusion_mode: client_data.initiator_only_diffusion_mode
+            || server_data.initiator_only_diffusion_mode,
         peer_sharing: client_data.peer_sharing,
         query: client_data.query,
     };
@@ -163,20 +169,64 @@ mod tests {
         assert_eq!(data, decoded);
     }
 
+    fn server_data(magic: u64) -> VersionData {
+        VersionData {
+            network_magic: magic,
+            initiator_only_diffusion_mode: false,
+            peer_sharing: 1,
+            query: false,
+        }
+    }
+
     #[test]
     fn negotiate_success() {
         let client_data = VersionData {
             network_magic: MAINNET_MAGIC,
             initiator_only_diffusion_mode: false,
-            peer_sharing: 0,
+            peer_sharing: 1,
             query: false,
         };
         let client_table = version_table(&client_data);
 
-        let (version, params) = negotiate(&client_table, MAINNET_MAGIC).unwrap();
+        let (version, params) = negotiate(&client_table, &server_data(MAINNET_MAGIC)).unwrap();
         assert_eq!(version, VERSION_V15); // highest common
         let negotiated = VersionData::decode(&params).unwrap();
         assert_eq!(negotiated.network_magic, MAINNET_MAGIC);
+    }
+
+    #[test]
+    fn negotiate_diffusion_mode_or() {
+        // If client proposes initiator-only, negotiated should be true
+        // even if server says false (logical OR per spec).
+        let client_data = VersionData {
+            network_magic: MAINNET_MAGIC,
+            initiator_only_diffusion_mode: true,
+            peer_sharing: 1,
+            query: false,
+        };
+        let client_table = version_table(&client_data);
+
+        let (_, params) = negotiate(&client_table, &server_data(MAINNET_MAGIC)).unwrap();
+        let negotiated = VersionData::decode(&params).unwrap();
+        assert!(negotiated.initiator_only_diffusion_mode);
+
+        // If server proposes initiator-only but client doesn't, still true.
+        let client_data2 = VersionData {
+            network_magic: MAINNET_MAGIC,
+            initiator_only_diffusion_mode: false,
+            peer_sharing: 1,
+            query: false,
+        };
+        let client_table2 = version_table(&client_data2);
+        let server_initiator_only = VersionData {
+            network_magic: MAINNET_MAGIC,
+            initiator_only_diffusion_mode: true,
+            peer_sharing: 1,
+            query: false,
+        };
+        let (_, params2) = negotiate(&client_table2, &server_initiator_only).unwrap();
+        let negotiated2 = VersionData::decode(&params2).unwrap();
+        assert!(negotiated2.initiator_only_diffusion_mode);
     }
 
     #[test]
@@ -184,12 +234,12 @@ mod tests {
         let client_data = VersionData {
             network_magic: MAINNET_MAGIC,
             initiator_only_diffusion_mode: false,
-            peer_sharing: 0,
+            peer_sharing: 1,
             query: false,
         };
         let client_table = version_table(&client_data);
 
-        let result = negotiate(&client_table, TESTNET_MAGIC);
+        let result = negotiate(&client_table, &server_data(TESTNET_MAGIC));
         assert!(matches!(
             result,
             Err(super::super::RefuseReason::Refused(_, _))
@@ -202,12 +252,12 @@ mod tests {
         let data = VersionData {
             network_magic: MAINNET_MAGIC,
             initiator_only_diffusion_mode: false,
-            peer_sharing: 0,
+            peer_sharing: 1,
             query: false,
         };
         client_table.insert(99, data.encode()); // unsupported version
 
-        let result = negotiate(&client_table, MAINNET_MAGIC);
+        let result = negotiate(&client_table, &server_data(MAINNET_MAGIC));
         assert!(matches!(
             result,
             Err(super::super::RefuseReason::VersionMismatch(_))
