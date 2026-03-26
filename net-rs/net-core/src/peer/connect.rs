@@ -74,8 +74,8 @@ pub async fn connect_and_handshake_with_config(
 
     let versions = n2n::version_table(&n2n::VersionData {
         network_magic: magic,
-        initiator_only_diffusion_mode: false,
-        peer_sharing: 0,
+        initiator_only_diffusion_mode: true,
+        peer_sharing: 1,
         query: false,
     });
 
@@ -131,10 +131,16 @@ pub async fn accept_and_handshake(
 
     let running = mux.run(bearer);
 
+    let server_data = n2n::VersionData {
+        network_magic: magic,
+        initiator_only_diffusion_mode: false,
+        peer_sharing: 1,
+        query: false,
+    };
     let hs_result = handshake::run_server(
         CodecSend::new(hs_send),
         CodecRecv::new(hs_recv),
-        |client_versions| n2n::negotiate(client_versions, magic),
+        |client_versions| n2n::negotiate(client_versions, &server_data),
     )
     .await;
 
@@ -194,7 +200,7 @@ pub async fn connect_duplex(
     let versions = n2n::version_table(&n2n::VersionData {
         network_magic: magic,
         initiator_only_diffusion_mode: false,
-        peer_sharing: 0,
+        peer_sharing: 1,
         query: false,
     });
 
@@ -261,10 +267,16 @@ pub async fn accept_duplex(
 
     let running = mux.run(bearer);
 
+    let server_data = n2n::VersionData {
+        network_magic: magic,
+        initiator_only_diffusion_mode: false,
+        peer_sharing: 1,
+        query: false,
+    };
     let hs_result = handshake::run_server(
         CodecSend::new(hs_send),
         CodecRecv::new(hs_recv),
-        |client_versions| n2n::negotiate(client_versions, magic),
+        |client_versions| n2n::negotiate(client_versions, &server_data),
     )
     .await;
 

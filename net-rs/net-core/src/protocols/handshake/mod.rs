@@ -248,16 +248,22 @@ mod tests {
         let client_handle = tokio::spawn(async move {
             let versions = n2n::version_table(&n2n::VersionData {
                 network_magic: magic,
-                initiator_only_diffusion_mode: false,
-                peer_sharing: 0,
+                initiator_only_diffusion_mode: true,
+                peer_sharing: 1,
                 query: false,
             });
             run_client(cs, cr, versions).await
         });
 
         let server_handle = tokio::spawn(async move {
+            let server_data = n2n::VersionData {
+                network_magic: magic,
+                initiator_only_diffusion_mode: false,
+                peer_sharing: 1,
+                query: false,
+            };
             run_server(ss, sr, |client_versions| {
-                n2n::negotiate(client_versions, magic)
+                n2n::negotiate(client_versions, &server_data)
             })
             .await
         });
@@ -293,16 +299,22 @@ mod tests {
             let versions = n2n::version_table(&n2n::VersionData {
                 network_magic: n2n::MAINNET_MAGIC,
                 initiator_only_diffusion_mode: false,
-                peer_sharing: 0,
+                peer_sharing: 1,
                 query: false,
             });
             run_client(cs, cr, versions).await
         });
 
         let server_handle = tokio::spawn(async move {
+            let server_data = n2n::VersionData {
+                network_magic: n2n::TESTNET_MAGIC,
+                initiator_only_diffusion_mode: false,
+                peer_sharing: 1,
+                query: false,
+            };
             run_server(ss, sr, |client_versions| {
                 // Server expects testnet magic — mismatch!
-                n2n::negotiate(client_versions, n2n::TESTNET_MAGIC)
+                n2n::negotiate(client_versions, &server_data)
             })
             .await
         });

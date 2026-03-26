@@ -359,7 +359,8 @@ mod tests {
 
     #[test]
     fn encode_matches_live_propose() {
-        // Build the same ProposeVersions our client sends.
+        // Verify our encoder produces the same bytes as the captured
+        // wire format (captured with peer_sharing=0, diffusion_mode=false).
         let data = super::super::n2n::VersionData {
             network_magic: 764824073,
             initiator_only_diffusion_mode: false,
@@ -371,7 +372,7 @@ mod tests {
         let encoded = minicbor::to_vec(&msg).unwrap();
         assert_eq!(
             encoded, LIVE_PROPOSE_PAYLOAD,
-            "our encoding must match what the live node accepted"
+            "our encoding must match the captured wire format"
         );
     }
 

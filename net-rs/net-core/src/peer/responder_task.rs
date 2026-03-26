@@ -268,8 +268,8 @@ mod tests {
         // Client handshake.
         let versions = n2n::version_table(&n2n::VersionData {
             network_magic: magic,
-            initiator_only_diffusion_mode: false,
-            peer_sharing: 0,
+            initiator_only_diffusion_mode: true,
+            peer_sharing: 1,
             query: false,
         });
         let client_hs = tokio::spawn(handshake::run_client(
@@ -279,10 +279,16 @@ mod tests {
         ));
 
         // Server handshake.
+        let server_data = n2n::VersionData {
+            network_magic: magic,
+            initiator_only_diffusion_mode: false,
+            peer_sharing: 1,
+            query: false,
+        };
         let server_hs = handshake::run_server(
             CodecSend::new(hs_send_b),
             CodecRecv::new(hs_recv_b),
-            |client_versions| n2n::negotiate(client_versions, magic),
+            |client_versions| n2n::negotiate(client_versions, &server_data),
         )
         .await;
         assert!(server_hs.is_ok());

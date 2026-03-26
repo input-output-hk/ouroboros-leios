@@ -653,7 +653,15 @@ mod tests {
         let hs_result = handshake::run_server(
             CodecSend::new(hs_send),
             CodecRecv::new(hs_recv),
-            |client_versions| crate::protocols::handshake::n2n::negotiate(client_versions, magic),
+            |client_versions| {
+                let server_data = crate::protocols::handshake::n2n::VersionData {
+                    network_magic: magic,
+                    initiator_only_diffusion_mode: false,
+                    peer_sharing: 1,
+                    query: false,
+                };
+                crate::protocols::handshake::n2n::negotiate(client_versions, &server_data)
+            },
         )
         .await;
 
@@ -814,8 +822,8 @@ mod tests {
         use crate::protocols::handshake::n2n;
         let versions = n2n::version_table(&n2n::VersionData {
             network_magic: magic,
-            initiator_only_diffusion_mode: false,
-            peer_sharing: 0,
+            initiator_only_diffusion_mode: true,
+            peer_sharing: 1,
             query: false,
         });
         let hs_result = handshake::run_client(

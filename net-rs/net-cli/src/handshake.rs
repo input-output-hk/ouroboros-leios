@@ -30,8 +30,8 @@ pub async fn run(host: &str, magic: u64) -> Result<(), Box<dyn std::error::Error
 
     let versions = n2n::version_table(&n2n::VersionData {
         network_magic: magic,
-        initiator_only_diffusion_mode: false,
-        peer_sharing: 0,
+        initiator_only_diffusion_mode: true,
+        peer_sharing: 1,
         query: false,
     });
 
