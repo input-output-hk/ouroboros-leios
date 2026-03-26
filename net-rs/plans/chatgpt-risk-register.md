@@ -116,14 +116,14 @@ Peers are selected for block fetch without strong evidence they contain the requ
   - Feed partial or irrelevant data
 
 ### Resolution
-Per-peer `ChainFragment` now tracks the exact set of points announced via ChainSync. Each fragment is built from the intersection point (surfaced via new `PeerEvent::IntersectionFound`), extended on each `HeaderAnnounced`, truncated on `RolledBack`, and pruned per-point on `BlockFetched`. Fetch routing now requires `fragment.contains(&point)` — only peers who provably announced the requested block are eligible. Added `WrappedHeader::point()` (shared `header_hash` helper with `BlockBody::point()`) to correctly derive header points, fixing a pre-existing `pending_headers` keying bug that used `tip.point` instead of the announced header's point. `PeerEvent::BlockFetchFailed` and `NetworkEvent::BlockFetchFailed` surface NoBlocks responses to the application for retry. Commit: TBD
+Per-peer `ChainFragment` now tracks the exact set of points announced via ChainSync. Each fragment is built from the intersection point (surfaced via new `PeerEvent::IntersectionFound`), extended on each `HeaderAnnounced`, truncated on `RolledBack`, and pruned per-point on `BlockFetched`. Fetch routing now requires `fragment.contains(&point)` — only peers who provably announced the requested block are eligible. Added `WrappedHeader::point()` (shared `header_hash` helper with `BlockBody::point()`) to correctly derive header points, fixing a pre-existing `pending_headers` keying bug that used `tip.point` instead of the announced header's point. `PeerEvent::BlockFetchFailed` and `NetworkEvent::BlockFetchFailed` surface NoBlocks responses to the application for retry. Commit: 3683da78e
 
 ---
 
 ## 5. Fail-Open Deduplication in Leios
 
 **Severity:** Medium–High
-**Status:** Open
+**Status:** Accepted
 
 ### Description
 Deduplication mechanisms degrade under load, allowing duplicate traffic.
@@ -141,6 +141,9 @@ Deduplication mechanisms degrade under load, allowing duplicate traffic.
 - Amplified network traffic
 - Reduced effectiveness of anti-duplication
 - Potential cascading load issues
+
+### Resolution
+Accepted as intentional design. Fail-open is the correct safety valve — fail-closed would allow an adversary to fill the seen set with fabricated offers and thereby suppress legitimate ones. Slot-based pruning (`update_leios_slot`, window default 1000 slots) is the primary bound and keeps sets well under 100K during normal operation. To reach the hard cap an adversary would need 100+ unique offers per slot sustained across the window; the consequence is only duplicate forwarding to the application, which must still decide whether to fetch (and fake offers fail at fetch time). The targeted defence against a flooding adversary is per-peer rate limiting / admission control, which belongs in future peer management work (Phase 3b promotion/demotion/churn).
 
 ---
 
