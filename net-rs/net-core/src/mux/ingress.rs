@@ -8,7 +8,7 @@ use bytes::Bytes;
 use tokio::io::AsyncRead;
 use tokio::sync::mpsc;
 
-use super::channel::IngressCounter;
+use super::channel::{IngressCounter, IngressLimit};
 use super::wire;
 use super::{ChannelKey, MuxError};
 
@@ -18,8 +18,10 @@ pub(crate) struct ProtocolIngress {
     pub tx: mpsc::Sender<Bytes>,
     /// Shared byte counter — incremented here, decremented by ChannelRecv.
     pub counter: IngressCounter,
-    /// Maximum allowed bytes before declaring a protocol violation.
-    pub limit: usize,
+    /// Shared limit — updated by protocol runner as state changes, read by
+    /// demuxer on each segment dispatch. Enforces per-state size limits at
+    /// the nearest point to the TCP socket.
+    pub limit: IngressLimit,
 }
 
 /// Run the demuxer task. Reads segments from the bearer and dispatches
@@ -72,14 +74,16 @@ where
             }
         };
 
-        // Check ingress buffer limit using the shared counter.
+        // Check ingress buffer limit using the shared counter and
+        // dynamic limit (updated by protocol runner on state changes).
+        let limit = state.limit.load();
         let current = state.counter.load();
         let new_size = current + segment.payload.len();
-        if state.limit > 0 && new_size > state.limit {
+        if new_size > limit {
             return Err(MuxError::IngressOverflow {
                 protocol: protocol_id,
                 size: new_size,
-                limit: state.limit,
+                limit,
             });
         }
 
@@ -98,7 +102,7 @@ where
                 return Err(MuxError::IngressOverflow {
                     protocol: protocol_id,
                     size: state.counter.load() + payload_len,
-                    limit: state.limit,
+                    limit: state.limit.load(),
                 });
             }
             Err(mpsc::error::TrySendError::Closed(_)) => {

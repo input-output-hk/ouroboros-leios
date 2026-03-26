@@ -58,20 +58,53 @@ impl IngressCounter {
     }
 }
 
+/// Shared ingress limit that the protocol runner can update and the demuxer
+/// reads on each segment dispatch. Allows per-state size limits to be
+/// enforced at the demuxer level (closest to the TCP socket).
+#[derive(Debug, Clone)]
+pub struct IngressLimit(pub Arc<AtomicUsize>);
+
+impl IngressLimit {
+    pub fn new(initial: usize) -> Self {
+        Self(Arc::new(AtomicUsize::new(initial)))
+    }
+
+    pub fn store(&self, limit: usize) {
+        self.0.store(limit, Ordering::Relaxed);
+    }
+
+    pub fn load(&self) -> usize {
+        self.0.load(Ordering::Relaxed)
+    }
+}
+
 /// Receiving half of a protocol channel. Yields reassembled payload chunks
 /// from the demuxer.
 #[derive(Debug)]
 pub struct ChannelRecv {
     rx: mpsc::Receiver<Bytes>,
     ingress_counter: IngressCounter,
+    ingress_limit: IngressLimit,
 }
 
 impl ChannelRecv {
-    pub(crate) fn new(rx: mpsc::Receiver<Bytes>, ingress_counter: IngressCounter) -> Self {
+    pub(crate) fn new(
+        rx: mpsc::Receiver<Bytes>,
+        ingress_counter: IngressCounter,
+        ingress_limit: IngressLimit,
+    ) -> Self {
         Self {
             rx,
             ingress_counter,
+            ingress_limit,
         }
+    }
+
+    /// Update the demuxer's ingress limit for this protocol. Called by the
+    /// protocol runner when the state changes, so the demuxer enforces
+    /// per-state size limits at the segment level (before data is buffered).
+    pub fn set_ingress_limit(&self, limit: usize) {
+        self.ingress_limit.store(limit);
     }
 
     /// Receive the next payload chunk. Returns `None` if the mux has shut down.

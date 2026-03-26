@@ -57,10 +57,9 @@ pub trait Protocol: Send + 'static {
     fn transition(state: &Self::State, msg: &Self::Message) -> Result<Self::State, ProtocolError>;
 
     /// Maximum message size (bytes) allowed in the given state.
-    /// 0 means no limit.
-    fn size_limit(_state: &Self::State) -> usize {
-        0
-    }
+    /// Must be nonzero — Runner will panic if this returns 0, and
+    /// the demuxer will reject all data for a protocol with limit 0.
+    fn size_limit(state: &Self::State) -> usize;
 
     /// Timeout for receiving a message in the given state.
     /// `None` means no timeout (wait forever).
@@ -108,10 +107,20 @@ pub struct Runner<P: Protocol> {
 
 impl<P: Protocol> Runner<P> {
     /// Create a new runner starting in the protocol's initial state.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `P::size_limit()` returns 0 for the initial state. Every
+    /// protocol must define a nonzero size limit for all states.
     pub fn new(role: Role, codec_send: CodecSend, codec_recv: CodecRecv) -> Self {
+        let initial_state = P::initial_state();
+        let limit = P::size_limit(&initial_state);
+        assert!(limit > 0, "protocol size_limit must be nonzero for all states");
+        codec_recv.set_ingress_limit(limit);
+
         Self {
             role,
-            state: P::initial_state(),
+            state: initial_state,
             codec_send,
             codec_recv,
         }
@@ -162,6 +171,13 @@ impl<P: Protocol> Runner<P> {
         self.codec_send.send(msg).await?;
 
         self.state = next_state;
+
+        // Update the demuxer's ingress limit for the new state. After
+        // sending, the remote side typically has agency and will respond,
+        // so set the limit before data arrives.
+        self.codec_recv
+            .set_ingress_limit(P::size_limit(&self.state));
+
         Ok(())
     }
 
@@ -185,6 +201,11 @@ impl<P: Protocol> Runner<P> {
                 agency,
             });
         }
+
+        // Set the demuxer's ingress limit for the current state, so
+        // oversized data is rejected at the segment level (closest to TCP).
+        self.codec_recv
+            .set_ingress_limit(P::size_limit(&self.state));
 
         // Receive with optional timeout.
         let msg: P::Message = match P::timeout(&self.state) {

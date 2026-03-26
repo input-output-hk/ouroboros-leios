@@ -146,9 +146,9 @@ net-rs/
 
 - **Bearer**: trait-based (not enum) for transport pluggability
 - **Mux**: per-protocol egress queues with pluggable Scheduler trait; demuxer uses `try_send` (never blocks); supervisor auto-aborts peer on task failure
-- **Ingress accounting**: shared `Arc<AtomicUsize>` between demuxer and ChannelRecv for accurate buffer tracking
-- **Codec**: `for<'a> Decode<'a>` (HRTB) so decoded types are owned, avoiding borrow conflicts; `max_buffer` cap prevents unbounded growth
-- **Protocol framework**: `Runner` wraps codec + state, provides agency-checked `send()`/`recv()` — protocols use it directly in async functions (not a generic driver loop)
+- **Ingress accounting**: shared `Arc<AtomicUsize>` between demuxer and ChannelRecv for accurate buffer tracking; shared `IngressLimit` atomic allows Runner to update per-state size limits at the demuxer (closest to TCP socket)
+- **Codec**: `for<'a> Decode<'a>` (HRTB) so decoded types are owned, avoiding borrow conflicts
+- **Protocol framework**: `Runner` wraps codec + state, provides agency-checked `send()`/`recv()` — protocols use it directly in async functions (not a generic driver loop). Runner updates demuxer ingress limit on every state transition. `Protocol::size_limit()` is a required trait method (must return nonzero)
 - **SDU size**: default 12,288 bytes (Cardano standard), not 65,535
 - **Parsed headers, opaque blocks**: `WrappedHeader` stores raw CBOR bytes plus parsed `HeaderInfo` (Shelley+ era, slot, block_number, prev_hash, issuer_vkey, body_size, block_body_hash, CIP-0164 Leios extensions). `BlockBody` stores raw bytes plus parsed `LeiosBlockInfo` (EB certificate if present). Byron headers/blocks return `None` gracefully. Parsing uses array-length disambiguation for optional Leios fields (10=base, 11=certified_eb, 12=announced_eb, 13=both)
 - **Composable client helpers**: protocols expose simple async functions (`find_intersection`, `request_next`, `recv_block`) rather than complex callback frameworks
