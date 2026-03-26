@@ -11,6 +11,7 @@ bytes = "1"
 byteorder = "1"
 thiserror = "2"
 tracing = "0.1"
+socket2 = { version = "0.5", features = ["all"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "test-util"] }

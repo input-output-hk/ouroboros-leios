@@ -616,7 +616,7 @@ mod tests {
     use crate::protocols::leios_fetch::{self, LeiosFetch, Message as LfMsg};
     use crate::protocols::leios_notify::{self, LeiosNotify, Message as LnMsg};
     use crate::protocols::Runner as ProtocolRunner;
-    use crate::types::{BlockBody, Point, Tip, WrappedHeader};
+    use crate::types::{Point, Tip, WrappedHeader};
 
     /// Minimal fake server: serves ChainSync and KeepAlive over MemBearer.
     /// Generates `block_count` blocks then holds at tip.
@@ -804,7 +804,7 @@ mod tests {
 
         // Set up peer task channels.
         let (event_sender, mut event_receiver) = mpsc::channel(64);
-        let (command_sender, command_receiver) = mpsc::channel::<PeerCommand>(16);
+        let (command_sender, _command_receiver) = mpsc::channel::<PeerCommand>(16);
         let peer_id = PeerId(1);
 
         // We can't use connect_and_handshake (it does TCP), so we need to

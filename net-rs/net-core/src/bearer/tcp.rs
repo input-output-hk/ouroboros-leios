@@ -2,6 +2,7 @@ use std::io;
 use std::net::SocketAddr;
 use std::time::Duration;
 
+use socket2::{SockRef, TcpKeepalive};
 use tokio::io::{ReadHalf, WriteHalf};
 use tokio::net::{TcpListener, TcpStream};
 
@@ -48,7 +49,10 @@ impl Bearer for TcpBearer {
 
 fn configure_stream(stream: &TcpStream) -> io::Result<()> {
     stream.set_nodelay(true)?;
-    // Keepalive is platform-specific; use the socket2 crate if we need
-    // fine-grained control. For now, TCP_NODELAY is the critical setting.
+    let sock = SockRef::from(stream);
+    let keepalive = TcpKeepalive::new()
+        .with_time(Duration::from_secs(60))
+        .with_interval(Duration::from_secs(15));
+    sock.set_tcp_keepalive(&keepalive)?;
     Ok(())
 }
