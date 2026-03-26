@@ -130,6 +130,7 @@ async fn leios_generator(commands: mpsc::Sender<NetworkCommand>, rate: f64) {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn run(
     port: u16,
     magic: u64,
@@ -137,6 +138,8 @@ pub async fn run(
     rollback_rate: f64,
     max_rollback_depth: usize,
     leios: bool,
+    max_handshaking: usize,
+    max_connections_per_ip: usize,
     scheduler_args: &crate::scheduler_args::SchedulerArgs,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let config = CoordinatorConfig {
@@ -151,6 +154,8 @@ pub async fn run(
         leios_dedup_window: 1000,
         traffic_class_overrides: scheduler_args.traffic_class_overrides()?,
         scheduler_type: scheduler_args.scheduler,
+        max_handshaking,
+        max_connections_per_ip,
     };
 
     let mut handle = spawn_coordinator(config);

@@ -32,7 +32,10 @@ impl ChannelSend {
 
     /// Queue a payload chunk for transmission. Blocks if the egress queue is full.
     pub async fn send(&self, payload: Bytes) -> Result<(), MuxError> {
-        self.tx.send(payload).await.map_err(|_| MuxError::Shutdown)?;
+        self.tx
+            .send(payload)
+            .await
+            .map_err(|_| MuxError::Shutdown)?;
         self.egress_notify.notify_one();
         Ok(())
     }

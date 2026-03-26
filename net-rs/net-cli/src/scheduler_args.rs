@@ -21,9 +21,7 @@ pub struct SchedulerArgs {
 
 impl SchedulerArgs {
     /// Parse the `--protocol-priority` values into a map.
-    pub fn traffic_class_overrides(
-        &self,
-    ) -> Result<HashMap<ProtocolId, TrafficClass>, String> {
+    pub fn traffic_class_overrides(&self) -> Result<HashMap<ProtocolId, TrafficClass>, String> {
         let mut map = HashMap::new();
         for arg in &self.protocol_priority {
             let (id_str, class_str) = arg

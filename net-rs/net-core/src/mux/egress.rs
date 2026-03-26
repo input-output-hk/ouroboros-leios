@@ -126,10 +126,7 @@ where
 ///
 /// Uses a shared `Notify` signalled by `ChannelSend::send()` to avoid
 /// busy-waiting. A periodic timeout (100ms) handles closed-channel cleanup.
-async fn wait_for_any_data(
-    protocols: &mut HashMap<ChannelKey, ProtocolEgress>,
-    notify: &Notify,
-) {
+async fn wait_for_any_data(protocols: &mut HashMap<ChannelKey, ProtocolEgress>, notify: &Notify) {
     // Check pending buffers first (fast path).
     if protocols.values().any(|s| s.pending.is_some()) {
         return;

@@ -20,10 +20,10 @@ use crate::protocols::peersharing::{Message as PsMsg, PeerAddress, PeerSharing};
 use crate::protocols::txsubmission::{self, Message as TsMsg, TxSubmission};
 use crate::protocols::{Role, Runner};
 
-use crate::store::chain_store::ChainStore;
-use crate::store::leios_store::LeiosStore;
 use super::types::PeerEvent;
 use super::PeerId;
+use crate::store::chain_store::ChainStore;
+use crate::store::leios_store::LeiosStore;
 
 /// Serve ChainSync for one connection.
 ///
@@ -433,10 +433,7 @@ pub async fn serve_leios_fetch(lf_send: CodecSend, lf_recv: CodecRecv, store: Ar
                     break;
                 }
             }
-            LfMsg::MsgLeiosBlockTxsRequest {
-                point,
-                bitmap: _,
-            } => {
+            LfMsg::MsgLeiosBlockTxsRequest { point, bitmap: _ } => {
                 let transactions = match &point {
                     Point::Specific { slot, hash } => {
                         store.get_block_txs(*slot, hash).unwrap_or_default()
@@ -718,9 +715,15 @@ mod tests {
 
         // Client: fetch block.
         let mut client = Runner::<LeiosFetch>::new(Role::Client, client_send, client_recv);
-        let block = leios_fetch::fetch_block(&mut client, Point::Specific { slot: 42, hash: [0xAB; 32] })
-            .await
-            .unwrap();
+        let block = leios_fetch::fetch_block(
+            &mut client,
+            Point::Specific {
+                slot: 42,
+                hash: [0xAB; 32],
+            },
+        )
+        .await
+        .unwrap();
         assert_eq!(block, vec![1, 2, 3, 4]);
 
         // Clean up.

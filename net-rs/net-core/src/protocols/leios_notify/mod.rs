@@ -134,12 +134,8 @@ pub async fn request_next(
         Message::MsgLeiosBlockAnnouncement { header } => {
             Ok(LeiosNotifyEvent::BlockAnnouncement { header })
         }
-        Message::MsgLeiosBlockOffer { point } => {
-            Ok(LeiosNotifyEvent::BlockOffer { point })
-        }
-        Message::MsgLeiosBlockTxsOffer { point } => {
-            Ok(LeiosNotifyEvent::BlockTxsOffer { point })
-        }
+        Message::MsgLeiosBlockOffer { point } => Ok(LeiosNotifyEvent::BlockOffer { point }),
+        Message::MsgLeiosBlockTxsOffer { point } => Ok(LeiosNotifyEvent::BlockTxsOffer { point }),
         Message::MsgLeiosVotesOffer { votes } => Ok(LeiosNotifyEvent::VotesOffer { votes }),
         other => Err(ProtocolError::InvalidMessage(format!(
             "expected notification, got {other:?}"
@@ -232,7 +228,10 @@ mod tests {
         assert!(LeiosNotify::transition(
             &State::StIdle,
             &Message::MsgLeiosBlockOffer {
-                point: Point::Specific { slot: 1, hash: [0; 32] },
+                point: Point::Specific {
+                    slot: 1,
+                    hash: [0; 32]
+                },
             }
         )
         .is_err());

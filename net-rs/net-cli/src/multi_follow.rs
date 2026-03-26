@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
 use net_core::multi_peer::{spawn_coordinator, CoordinatorConfig};
 
+#[allow(clippy::too_many_arguments)]
 pub async fn run(
     hosts: &[String],
     magic: u64,
@@ -13,6 +14,8 @@ pub async fn run(
     listen: Option<String>,
     duplex: bool,
     leios: bool,
+    max_handshaking: usize,
+    max_connections_per_ip: usize,
     scheduler_args: &crate::scheduler_args::SchedulerArgs,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     if hosts.is_empty() && listen.is_none() {
@@ -31,6 +34,8 @@ pub async fn run(
         leios_dedup_window: 1000,
         traffic_class_overrides: scheduler_args.traffic_class_overrides()?,
         scheduler_type: scheduler_args.scheduler,
+        max_handshaking,
+        max_connections_per_ip,
     };
 
     let mut handle = spawn_coordinator(config);
@@ -101,16 +106,14 @@ pub async fn run(
                 println!("  leios: {} vote(s) offered", votes.len());
             }
             NetworkEvent::LeiosBlockReceived { point, block } => {
-                println!(
-                    "  leios: EB received at {point} ({} bytes)",
-                    block.len()
-                );
+                println!("  leios: EB received at {point} ({} bytes)", block.len());
             }
             NetworkEvent::LeiosVotesReceived { votes } => {
                 println!("  leios: {} vote(s) received", votes.len());
             }
             NetworkEvent::LeiosBlockTxsReceived {
-                point, transactions,
+                point,
+                transactions,
             } => {
                 println!(
                     "  leios: EB txs received at {point} ({} txs)",

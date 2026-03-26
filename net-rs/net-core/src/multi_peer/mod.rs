@@ -59,6 +59,10 @@ pub struct CoordinatorConfig {
     pub traffic_class_overrides: HashMap<ProtocolId, TrafficClass>,
     /// Which scheduler to use for mux connections.
     pub scheduler_type: SchedulerType,
+    /// Maximum concurrent in-flight inbound handshakes.
+    pub max_handshaking: usize,
+    /// Maximum connections (handshaking + established) from a single IP.
+    pub max_connections_per_ip: usize,
 }
 
 impl Default for CoordinatorConfig {
@@ -75,6 +79,8 @@ impl Default for CoordinatorConfig {
             leios_dedup_window: 1000,
             traffic_class_overrides: HashMap::new(),
             scheduler_type: SchedulerType::default(),
+            max_handshaking: 64,
+            max_connections_per_ip: 3,
         }
     }
 }

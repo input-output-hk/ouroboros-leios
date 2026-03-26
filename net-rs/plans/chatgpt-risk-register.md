@@ -223,14 +223,14 @@ TCP connections are not configured with keepalive despite documentation implying
 - Increased exposure to connection exhaustion
 
 ### Resolution
-Added TCP keepalive via `socket2` crate in `configure_stream()`: idle=60s, interval=15s. OS-level dead peer detection now complements the protocol-level KeepAlive (97s cycle). Commit: TBD
+Added TCP keepalive via `socket2` crate in `configure_stream()`: idle=60s, interval=15s. OS-level dead peer detection now complements the protocol-level KeepAlive (97s cycle). Commit: cd2a8399d
 
 ---
 
 ## 9. Weak Inbound Admission Control
 
 **Severity:** Medium–High
-**Status:** Open
+**Status:** Mitigated (commit TBD)
 
 ### Description
 Inbound connection handling lacks early-stage defensive controls.
@@ -249,6 +249,9 @@ Inbound connection handling lacks early-stage defensive controls.
 - Connection exhaustion
 - Resource starvation
 - Vulnerability to simple DoS attacks
+
+### Resolution
+Decoupled accept loop from handshake: TCP accept is now immediate, each handshake spawned as an independent tokio task. Concurrent handshakes bounded by `tokio::sync::Semaphore` (`max_handshaking`, default 64). Per-IP connection cap (`max_connections_per_ip`, default 3) enforced via shared `Arc<Mutex<HashMap<IpAddr, usize>>>` between accept loop and coordinator — count incremented before handshake spawn, decremented on handshake failure, coordinator rejection, or peer disconnect. Existing 10s handshake timeout still enforced per-connection. Rate limiting deferred as firewall territory. Commit: TBD
 
 ---
 

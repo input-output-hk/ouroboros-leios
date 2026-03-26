@@ -20,12 +20,12 @@ use crate::protocols::leios_notify;
 use crate::protocols::peersharing::{self, PeerAddress};
 use crate::protocols::txsubmission;
 
-use crate::store::chain_store::ChainStore;
-use crate::store::leios_store::LeiosStore;
 use super::connect::Connection;
 use super::server_handlers;
 use super::types::{PeerCommand, PeerEvent};
 use super::PeerId;
+use crate::store::chain_store::ChainStore;
+use crate::store::leios_store::LeiosStore;
 
 /// Configuration for a responder peer task.
 pub(crate) struct ResponderTaskConfig {

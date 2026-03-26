@@ -11,8 +11,8 @@ const MAX_LEIOS_SEEN: usize = 100_000;
 const MAX_LEIOS_OFFERS: usize = 100_000;
 
 use std::collections::{HashMap, HashSet};
-use std::net::ToSocketAddrs;
-use std::sync::Arc;
+use std::net::{IpAddr, ToSocketAddrs};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use tokio::sync::mpsc;
@@ -20,26 +20,31 @@ use tokio::task::JoinHandle;
 use tokio::time::Instant;
 
 use super::chain_fragment::ChainFragment;
+use crate::bearer::tcp::TcpBearer;
 use crate::mux::MuxConfig;
 use crate::protocols::peersharing::PeerAddress;
 use crate::types::{Point, Tip, WrappedHeader};
 
-use crate::store::chain_store::ChainStore;
-use crate::store::leios_store::LeiosStore;
 use super::types::{NetworkCommand, NetworkEvent};
 use super::{CoordinatorConfig, CoordinatorHandle};
 use crate::peer::connect::{self, Connection};
 use crate::peer::duplex_task::{run_duplex_task, DuplexTaskConfig};
 use crate::peer::peer_task::{run_peer_task, PeerTaskConfig};
-use crate::peer::responder_task::{run_responder_task, server_protocol_configs, ResponderTaskConfig};
+use crate::peer::responder_task::{
+    run_responder_task, server_protocol_configs, ResponderTaskConfig,
+};
 use crate::peer::types::{PeerCommand, PeerEvent};
 use crate::peer::{ConnectionMode, PeerId};
+use crate::store::chain_store::ChainStore;
+use crate::store::leios_store::LeiosStore;
 
 /// Per-peer state tracked by the coordinator.
 struct PeerState {
     address: String,
     #[allow(dead_code)]
     mode: ConnectionMode,
+    /// IP address for inbound peers (used for per-IP connection counting).
+    ip: Option<IpAddr>,
     commands: mpsc::Sender<PeerCommand>,
     task_handle: JoinHandle<()>,
     tip: Option<Tip>,
@@ -101,10 +106,12 @@ struct Coordinator {
     pending_leios_txs_fetches: HashMap<(u64, [u8; 32]), PeerId>,
     /// Pending Leios vote fetches: (slot, voter_id) -> peer fetching them.
     pending_leios_vote_fetches: HashMap<(u64, Vec<u8>), PeerId>,
-    /// Completed inbound connections from the accept loop.
-    inbound_connections: Option<mpsc::Receiver<Connection>>,
+    /// Completed inbound connections from the accept loop: (connection, peer IP).
+    inbound_connections: Option<mpsc::Receiver<(Connection, IpAddr)>>,
     /// Handle for the accept loop task (if listening).
     accept_task: Option<JoinHandle<()>>,
+    /// Per-IP connection count (handshaking + established). Shared with accept loop.
+    ip_counts: Arc<Mutex<HashMap<IpAddr, usize>>>,
     /// Peer provider callback for PeerSharing server.
     peer_provider: Arc<dyn Fn(u8) -> Vec<PeerAddress> + Send + Sync>,
 }
@@ -145,6 +152,7 @@ impl Coordinator {
             pending_leios_vote_fetches: HashMap::new(),
             inbound_connections: None,
             accept_task: None,
+            ip_counts: Arc::new(Mutex::new(HashMap::new())),
             peer_provider: Arc::new(|_| Vec::new()),
         }
     }
@@ -200,6 +208,7 @@ impl Coordinator {
             PeerState {
                 address,
                 mode,
+                ip: None,
                 commands: cmd_sender,
                 task_handle,
                 tip: None,
@@ -272,8 +281,7 @@ impl Coordinator {
                 }
 
                 // Store header for later use when BlockFetched arrives.
-                self.pending_headers
-                    .insert(header_point, header.clone());
+                self.pending_headers.insert(header_point, header.clone());
 
                 // Deduplicate: only forward if this tip is ahead of our best.
                 let is_new = match &self.best_tip {
@@ -312,9 +320,7 @@ impl Coordinator {
 
             PeerEvent::BlockFetched { body } => {
                 // Derive the point from the block body (header hash + slot).
-                let point = body
-                    .point()
-                    .unwrap_or(Point::Origin); // Byron blocks have no parseable point
+                let point = body.point().unwrap_or(Point::Origin); // Byron blocks have no parseable point
 
                 self.pending_fetches.remove(&point);
 
@@ -427,7 +433,9 @@ impl Coordinator {
                             );
                         }
                     } else {
-                        tracing::warn!("leios: seen_leios_txs at capacity, forwarding without dedup");
+                        tracing::warn!(
+                            "leios: seen_leios_txs at capacity, forwarding without dedup"
+                        );
                         let _ = self
                             .network_events
                             .send(NetworkEvent::LeiosBlockTxsOffered { point })
@@ -533,10 +541,7 @@ impl Coordinator {
                 // Notify application with the full range so it can retry.
                 let _ = self
                     .network_events
-                    .send(NetworkEvent::BlockFetchFailed {
-                        from,
-                        to,
-                    })
+                    .send(NetworkEvent::BlockFetchFailed { from, to })
                     .await;
             }
 
@@ -729,6 +734,11 @@ impl Coordinator {
         if let Some(peer) = self.peers.remove(&peer_id) {
             peer.task_handle.abort();
 
+            // Decrement per-IP connection count for inbound peers.
+            if let Some(ip) = peer.ip {
+                decrement_ip_count(&self.ip_counts, ip);
+            }
+
             // Only schedule reconnection for initiator peers (not inbound responders).
             if peer.mode == ConnectionMode::InitiatorOnly {
                 let backoff = peer.reconnect_backoff;
@@ -805,7 +815,7 @@ impl Coordinator {
     }
 
     /// Add a responder peer for an accepted inbound connection.
-    fn add_responder_peer(&mut self, connection: Connection, address: String) -> PeerId {
+    fn add_responder_peer(&mut self, connection: Connection, ip: IpAddr) -> PeerId {
         let peer_id = PeerId(self.next_peer_id);
         self.next_peer_id += 1;
 
@@ -827,8 +837,9 @@ impl Coordinator {
         self.peers.insert(
             peer_id,
             PeerState {
-                address,
+                address: ip.to_string(),
                 mode: ConnectionMode::ResponderOnly,
+                ip: Some(ip),
                 commands: cmd_sender,
                 task_handle,
                 tip: None,
@@ -875,8 +886,13 @@ impl Coordinator {
             }
         }
 
-        let (conn_sender, conn_receiver) = mpsc::channel::<Connection>(16);
+        let (conn_sender, conn_receiver) = mpsc::channel::<(Connection, IpAddr)>(16);
         self.inbound_connections = Some(conn_receiver);
+
+        let ip_counts = self.ip_counts.clone();
+        let max_connections_per_ip = self.config.max_connections_per_ip;
+        let semaphore = Arc::new(tokio::sync::Semaphore::new(self.config.max_handshaking));
+        let protocols = Arc::new(protocols);
 
         let task = tokio::spawn(async move {
             let listener = match tokio::net::TcpListener::bind(addr).await {
@@ -891,24 +907,84 @@ impl Coordinator {
             };
 
             loop {
-                match connect::accept_and_handshake(
-                    &listener,
-                    magic,
-                    &protocols,
-                    mux_config.clone(),
-                    scheduler_type,
-                )
-                .await
-                {
-                    Ok(conn) => {
-                        if conn_sender.send(conn).await.is_err() {
-                            break; // coordinator shut down
-                        }
-                    }
+                // Accept TCP connection immediately (don't block on handshake).
+                let (stream, peer_addr) = match listener.accept().await {
+                    Ok(accepted) => accepted,
                     Err(e) => {
-                        tracing::warn!("inbound handshake failed: {e}");
+                        tracing::warn!("TCP accept failed: {e}");
+                        continue;
+                    }
+                };
+
+                let ip = peer_addr.ip();
+
+                // Check per-IP connection limit.
+                {
+                    let counts = ip_counts.lock().expect("ip_counts lock poisoned");
+                    if counts.get(&ip).copied().unwrap_or(0) >= max_connections_per_ip {
+                        tracing::warn!("per-IP limit reached for {ip}, dropping connection");
+                        drop(stream);
+                        continue;
                     }
                 }
+
+                // Check concurrent handshake limit.
+                let permit = match semaphore.clone().try_acquire_owned() {
+                    Ok(permit) => permit,
+                    Err(_) => {
+                        tracing::warn!(
+                            "max handshaking limit reached, dropping connection from {ip}"
+                        );
+                        drop(stream);
+                        continue;
+                    }
+                };
+
+                // Reserve the per-IP slot before spawning.
+                {
+                    let mut counts = ip_counts.lock().expect("ip_counts lock poisoned");
+                    *counts.entry(ip).or_insert(0) += 1;
+                }
+
+                let conn_sender = conn_sender.clone();
+                let ip_counts = ip_counts.clone();
+                let protocols = protocols.clone();
+                let mux_config = mux_config.clone();
+
+                tokio::spawn(async move {
+                    let _permit = permit; // held until task completes
+
+                    let bearer = match TcpBearer::from_accepted(stream) {
+                        Ok(b) => b,
+                        Err(e) => {
+                            tracing::warn!("socket configuration failed for {peer_addr}: {e}");
+                            decrement_ip_count(&ip_counts, ip);
+                            return;
+                        }
+                    };
+
+                    match connect::handshake_accepted(
+                        bearer,
+                        peer_addr,
+                        magic,
+                        &protocols,
+                        mux_config,
+                        scheduler_type,
+                    )
+                    .await
+                    {
+                        Ok(conn) => {
+                            if conn_sender.send((conn, ip)).await.is_err() {
+                                // Coordinator shut down — clean up.
+                                decrement_ip_count(&ip_counts, ip);
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!("inbound handshake failed from {peer_addr}: {e}");
+                            decrement_ip_count(&ip_counts, ip);
+                        }
+                    }
+                });
             }
         });
 
@@ -951,19 +1027,20 @@ impl Coordinator {
                         None => break,
                     }
                 }
-                conn = async {
+                result = async {
                     match &mut self.inbound_connections {
                         Some(rx) => rx.recv().await,
                         None => std::future::pending().await,
                     }
                 } => {
-                    if let Some(conn) = conn {
+                    if let Some((conn, ip)) = result {
                         if self.peers.len() < self.config.max_peers {
-                            let peer_id = self.add_responder_peer(conn, "inbound".to_string());
+                            let peer_id = self.add_responder_peer(conn, ip);
                             tracing::info!("accepted inbound peer as {peer_id}");
                         } else {
                             tracing::warn!("max peers reached, dropping inbound connection");
                             conn.running.abort();
+                            decrement_ip_count(&self.ip_counts, ip);
                         }
                     }
                 }
@@ -981,6 +1058,17 @@ impl Coordinator {
         // Abort all remaining peer tasks.
         for (_, peer) in self.peers.drain() {
             peer.task_handle.abort();
+        }
+    }
+}
+
+/// Decrement the per-IP connection count, removing the entry if it reaches zero.
+fn decrement_ip_count(ip_counts: &Mutex<HashMap<IpAddr, usize>>, ip: IpAddr) {
+    let mut counts = ip_counts.lock().expect("ip_counts lock poisoned");
+    if let Some(count) = counts.get_mut(&ip) {
+        *count -= 1;
+        if *count == 0 {
+            counts.remove(&ip);
         }
     }
 }
@@ -1055,6 +1143,7 @@ mod tests {
             PeerState {
                 address: "test:3001".to_string(),
                 mode: ConnectionMode::InitiatorOnly,
+                ip: None,
                 commands: cmd_sender,
                 task_handle: tokio::spawn(async {}),
                 tip: None,
@@ -1141,6 +1230,7 @@ mod tests {
                 PeerState {
                     address: format!("test-{:?}:3001", peer_id),
                     mode: ConnectionMode::InitiatorOnly,
+                    ip: None,
                     commands: cmd_sender,
                     task_handle: tokio::spawn(async {}),
                     tip: None,
@@ -1240,6 +1330,7 @@ mod tests {
             PeerState {
                 address: "test:3001".to_string(),
                 mode: ConnectionMode::InitiatorOnly,
+                ip: None,
                 commands: cmd_sender,
                 task_handle: tokio::spawn(async {}),
                 tip: None,
@@ -1306,6 +1397,7 @@ mod tests {
             PeerState {
                 address: "test:3001".to_string(),
                 mode: ConnectionMode::InitiatorOnly,
+                ip: None,
                 commands: cmd_sender,
                 task_handle: tokio::spawn(async {}),
                 tip: None,
@@ -1388,6 +1480,7 @@ mod tests {
             PeerState {
                 address: format!("test-{}:3001", peer_id.0),
                 mode: ConnectionMode::InitiatorOnly,
+                ip: None,
                 commands: cmd_sender,
                 task_handle: tokio::spawn(async {}),
                 tip: None,
@@ -1423,19 +1516,32 @@ mod tests {
 
         // Peer A offers an EB.
         coordinator
-            .handle_peer_event(peer_a, PeerEvent::LeiosBlockOffered { point: Point::Specific { slot: 100, hash } })
+            .handle_peer_event(
+                peer_a,
+                PeerEvent::LeiosBlockOffered {
+                    point: Point::Specific { slot: 100, hash },
+                },
+            )
             .await;
 
         // Should produce LeiosBlockOffered.
         let event = net_rx.try_recv().unwrap();
         assert!(matches!(
             event,
-            NetworkEvent::LeiosBlockOffered { point: Point::Specific { slot: 100, .. }, .. }
+            NetworkEvent::LeiosBlockOffered {
+                point: Point::Specific { slot: 100, .. },
+                ..
+            }
         ));
 
         // Peer B offers the same EB.
         coordinator
-            .handle_peer_event(peer_b, PeerEvent::LeiosBlockOffered { point: Point::Specific { slot: 100, hash } })
+            .handle_peer_event(
+                peer_b,
+                PeerEvent::LeiosBlockOffered {
+                    point: Point::Specific { slot: 100, hash },
+                },
+            )
             .await;
 
         // Should NOT produce another event (deduplicated).
@@ -1456,13 +1562,21 @@ mod tests {
 
         // Peer offers TXs for an EB.
         coordinator
-            .handle_peer_event(peer_a, PeerEvent::LeiosBlockTxsOffered { point: Point::Specific { slot: 50, hash } })
+            .handle_peer_event(
+                peer_a,
+                PeerEvent::LeiosBlockTxsOffered {
+                    point: Point::Specific { slot: 50, hash },
+                },
+            )
             .await;
 
         // Should produce LeiosBlockTxsOffered (not LeiosBlockOffered).
         let event = net_rx.try_recv().unwrap();
         match event {
-            NetworkEvent::LeiosBlockTxsOffered { point: Point::Specific { slot, .. }, .. } => {
+            NetworkEvent::LeiosBlockTxsOffered {
+                point: Point::Specific { slot, .. },
+                ..
+            } => {
                 assert_eq!(slot, 50);
             }
             other => panic!("expected LeiosBlockTxsOffered, got {other:?}"),
@@ -1528,15 +1642,27 @@ mod tests {
 
         // Both peers offer the same block.
         coordinator
-            .handle_peer_event(peer_a, PeerEvent::LeiosBlockOffered { point: Point::Specific { slot: 10, hash } })
+            .handle_peer_event(
+                peer_a,
+                PeerEvent::LeiosBlockOffered {
+                    point: Point::Specific { slot: 10, hash },
+                },
+            )
             .await;
         coordinator
-            .handle_peer_event(peer_b, PeerEvent::LeiosBlockOffered { point: Point::Specific { slot: 10, hash } })
+            .handle_peer_event(
+                peer_b,
+                PeerEvent::LeiosBlockOffered {
+                    point: Point::Specific { slot: 10, hash },
+                },
+            )
             .await;
 
         // Request fetch — should route to peer_b (lower RTT).
         coordinator
-            .handle_network_command(NetworkCommand::FetchLeiosBlock { point: Point::Specific { slot: 10, hash } })
+            .handle_network_command(NetworkCommand::FetchLeiosBlock {
+                point: Point::Specific { slot: 10, hash },
+            })
             .await;
 
         // Peer A should NOT receive the command.
@@ -1560,12 +1686,19 @@ mod tests {
 
         // Peer offers the block.
         coordinator
-            .handle_peer_event(peer_a, PeerEvent::LeiosBlockOffered { point: Point::Specific { slot: 10, hash } })
+            .handle_peer_event(
+                peer_a,
+                PeerEvent::LeiosBlockOffered {
+                    point: Point::Specific { slot: 10, hash },
+                },
+            )
             .await;
 
         // First fetch request.
         coordinator
-            .handle_network_command(NetworkCommand::FetchLeiosBlock { point: Point::Specific { slot: 10, hash } })
+            .handle_network_command(NetworkCommand::FetchLeiosBlock {
+                point: Point::Specific { slot: 10, hash },
+            })
             .await;
 
         // Should have sent command.
@@ -1573,7 +1706,9 @@ mod tests {
 
         // Second fetch request for same block — should be suppressed.
         coordinator
-            .handle_network_command(NetworkCommand::FetchLeiosBlock { point: Point::Specific { slot: 10, hash } })
+            .handle_network_command(NetworkCommand::FetchLeiosBlock {
+                point: Point::Specific { slot: 10, hash },
+            })
             .await;
 
         // No second command sent.
@@ -1590,11 +1725,18 @@ mod tests {
 
         // Peer offers and we start fetching.
         coordinator
-            .handle_peer_event(peer_a, PeerEvent::LeiosBlockOffered { point: Point::Specific { slot: 10, hash } })
+            .handle_peer_event(
+                peer_a,
+                PeerEvent::LeiosBlockOffered {
+                    point: Point::Specific { slot: 10, hash },
+                },
+            )
             .await;
         let _ = net_rx.try_recv(); // drain offer event
         coordinator
-            .handle_network_command(NetworkCommand::FetchLeiosBlock { point: Point::Specific { slot: 10, hash } })
+            .handle_network_command(NetworkCommand::FetchLeiosBlock {
+                point: Point::Specific { slot: 10, hash },
+            })
             .await;
         assert!(coordinator
             .pending_leios_block_fetches
@@ -1631,7 +1773,12 @@ mod tests {
 
         // Offer at slot 1.
         coordinator
-            .handle_peer_event(peer_a, PeerEvent::LeiosBlockOffered { point: Point::Specific { slot: 1, hash } })
+            .handle_peer_event(
+                peer_a,
+                PeerEvent::LeiosBlockOffered {
+                    point: Point::Specific { slot: 1, hash },
+                },
+            )
             .await;
         assert!(net_rx.try_recv().is_ok()); // forwarded
 
@@ -1655,7 +1802,12 @@ mod tests {
 
         // Re-offer (1, hash) — should be treated as new since it was pruned.
         coordinator
-            .handle_peer_event(peer_a, PeerEvent::LeiosBlockOffered { point: Point::Specific { slot: 1, hash } })
+            .handle_peer_event(
+                peer_a,
+                PeerEvent::LeiosBlockOffered {
+                    point: Point::Specific { slot: 1, hash },
+                },
+            )
             .await;
         assert!(net_rx.try_recv().is_ok()); // forwarded again
     }
@@ -1672,10 +1824,20 @@ mod tests {
 
         // Both peers offer TXs.
         coordinator
-            .handle_peer_event(peer_a, PeerEvent::LeiosBlockTxsOffered { point: Point::Specific { slot: 5, hash } })
+            .handle_peer_event(
+                peer_a,
+                PeerEvent::LeiosBlockTxsOffered {
+                    point: Point::Specific { slot: 5, hash },
+                },
+            )
             .await;
         coordinator
-            .handle_peer_event(peer_b, PeerEvent::LeiosBlockTxsOffered { point: Point::Specific { slot: 5, hash } })
+            .handle_peer_event(
+                peer_b,
+                PeerEvent::LeiosBlockTxsOffered {
+                    point: Point::Specific { slot: 5, hash },
+                },
+            )
             .await;
 
         // Fetch TXs — should route to peer_b (lower RTT).
@@ -1690,7 +1852,10 @@ mod tests {
         // Peer B should have received the command.
         let cmd = cmd_rx_b.try_recv().unwrap();
         match cmd {
-            PeerCommand::FetchLeiosBlockTxs { point: Point::Specific { slot, .. }, .. } => assert_eq!(slot, 5),
+            PeerCommand::FetchLeiosBlockTxs {
+                point: Point::Specific { slot, .. },
+                ..
+            } => assert_eq!(slot, 5),
             other => panic!("expected FetchLeiosBlockTxs, got {other:?}"),
         }
 
@@ -1729,10 +1894,7 @@ mod tests {
     // --- ChainFragment integration tests ---
 
     /// Helper: create a coordinator for fragment tests.
-    fn make_fragment_coordinator() -> (
-        Coordinator,
-        mpsc::Receiver<NetworkEvent>,
-    ) {
+    fn make_fragment_coordinator() -> (Coordinator, mpsc::Receiver<NetworkEvent>) {
         let (peer_event_sender, peer_event_receiver) = mpsc::channel(256);
         let (net_event_sender, net_event_receiver) = mpsc::channel(64);
         let (_net_cmd_sender, net_cmd_receiver) = mpsc::channel(64);
@@ -1758,25 +1920,41 @@ mod tests {
         let mut cmd_a = insert_peer(&mut coordinator, peer_a, Some(Duration::from_millis(50)));
         let mut cmd_b = insert_peer(&mut coordinator, peer_b, Some(Duration::from_millis(10)));
 
-        let point_100 = Point::Specific { slot: 100, hash: [1u8; 32] };
-        let point_101 = Point::Specific { slot: 101, hash: [2u8; 32] };
+        let point_100 = Point::Specific {
+            slot: 100,
+            hash: [1u8; 32],
+        };
+        let point_101 = Point::Specific {
+            slot: 101,
+            hash: [2u8; 32],
+        };
 
         // Only peer A has point_100 in its fragment.
-        coordinator.handle_peer_event(
-            peer_a,
-            PeerEvent::IntersectionFound { point: point_100.clone() },
-        ).await;
+        coordinator
+            .handle_peer_event(
+                peer_a,
+                PeerEvent::IntersectionFound {
+                    point: point_100.clone(),
+                },
+            )
+            .await;
 
         // Peer B has a different point.
-        coordinator.handle_peer_event(
-            peer_b,
-            PeerEvent::IntersectionFound { point: point_101.clone() },
-        ).await;
+        coordinator
+            .handle_peer_event(
+                peer_b,
+                PeerEvent::IntersectionFound {
+                    point: point_101.clone(),
+                },
+            )
+            .await;
 
         // Fetch point_100 — should route to peer A (only one with it).
-        coordinator.handle_network_command(
-            NetworkCommand::FetchBlock { point: point_100.clone() },
-        ).await;
+        coordinator
+            .handle_network_command(NetworkCommand::FetchBlock {
+                point: point_100.clone(),
+            })
+            .await;
 
         // Peer A should receive the fetch command.
         let cmd = cmd_a.try_recv().unwrap();
@@ -1794,20 +1972,29 @@ mod tests {
         let mut cmd_a = insert_peer(&mut coordinator, peer_a, Some(Duration::from_millis(100)));
         let mut cmd_b = insert_peer(&mut coordinator, peer_b, Some(Duration::from_millis(10)));
 
-        let point = Point::Specific { slot: 200, hash: [3u8; 32] };
+        let point = Point::Specific {
+            slot: 200,
+            hash: [3u8; 32],
+        };
 
         // Both peers have the point in their fragments.
         for id in [peer_a, peer_b] {
-            coordinator.handle_peer_event(
-                id,
-                PeerEvent::IntersectionFound { point: point.clone() },
-            ).await;
+            coordinator
+                .handle_peer_event(
+                    id,
+                    PeerEvent::IntersectionFound {
+                        point: point.clone(),
+                    },
+                )
+                .await;
         }
 
         // Fetch — should route to peer B (lower RTT).
-        coordinator.handle_network_command(
-            NetworkCommand::FetchBlock { point: point.clone() },
-        ).await;
+        coordinator
+            .handle_network_command(NetworkCommand::FetchBlock {
+                point: point.clone(),
+            })
+            .await;
 
         assert!(cmd_a.try_recv().is_err());
         let cmd = cmd_b.try_recv().unwrap();
@@ -1820,12 +2007,17 @@ mod tests {
         let peer_a = PeerId(0);
         let _cmd_a = insert_peer(&mut coordinator, peer_a, Some(Duration::from_millis(10)));
 
-        let point = Point::Specific { slot: 300, hash: [4u8; 32] };
+        let point = Point::Specific {
+            slot: 300,
+            hash: [4u8; 32],
+        };
 
         // Peer A's fragment is empty — no intersection set.
-        coordinator.handle_network_command(
-            NetworkCommand::FetchBlock { point: point.clone() },
-        ).await;
+        coordinator
+            .handle_network_command(NetworkCommand::FetchBlock {
+                point: point.clone(),
+            })
+            .await;
 
         // No fetch command sent, no pending fetch recorded.
         assert!(!coordinator.pending_fetches.contains_key(&point));
@@ -1842,18 +2034,35 @@ mod tests {
         insert_peer(&mut coordinator, peer_a, None);
         insert_peer(&mut coordinator, peer_b, None);
 
-        let point = Point::Specific { slot: 400, hash: [5u8; 32] };
+        let point = Point::Specific {
+            slot: 400,
+            hash: [5u8; 32],
+        };
 
         // Both peers have the point.
         for id in [peer_a, peer_b] {
-            coordinator.handle_peer_event(
-                id,
-                PeerEvent::IntersectionFound { point: point.clone() },
-            ).await;
+            coordinator
+                .handle_peer_event(
+                    id,
+                    PeerEvent::IntersectionFound {
+                        point: point.clone(),
+                    },
+                )
+                .await;
         }
 
-        assert!(coordinator.peers.get(&peer_a).unwrap().fragment.contains(&point));
-        assert!(coordinator.peers.get(&peer_b).unwrap().fragment.contains(&point));
+        assert!(coordinator
+            .peers
+            .get(&peer_a)
+            .unwrap()
+            .fragment
+            .contains(&point));
+        assert!(coordinator
+            .peers
+            .get(&peer_b)
+            .unwrap()
+            .fragment
+            .contains(&point));
 
         // Simulate BlockFetched with a body whose point() returns None (opaque).
         // We need to use pending_fetches to verify cleanup.
@@ -1862,12 +2071,14 @@ mod tests {
         // Use a real-ish block body that returns a known point.
         // Since opaque bodies return None, use pending_fetches + Point::Origin path.
         // Instead, let's directly test by simulating with Origin.
-        coordinator.handle_peer_event(
-            peer_a,
-            PeerEvent::BlockFetched {
-                body: crate::types::BlockBody::opaque(vec![0xD8, 0x18, 0x40]),
-            },
-        ).await;
+        coordinator
+            .handle_peer_event(
+                peer_a,
+                PeerEvent::BlockFetched {
+                    body: crate::types::BlockBody::opaque(vec![0xD8, 0x18, 0x40]),
+                },
+            )
+            .await;
 
         // The fetched block resolves to Point::Origin (opaque body).
         // Both peers' fragments should have Origin removed (no-op if not present).
@@ -1882,33 +2093,56 @@ mod tests {
         let peer_a = PeerId(0);
         insert_peer(&mut coordinator, peer_a, None);
 
-        let p100 = Point::Specific { slot: 100, hash: [1u8; 32] };
-        let p101 = Point::Specific { slot: 101, hash: [2u8; 32] };
-        let p102 = Point::Specific { slot: 102, hash: [3u8; 32] };
+        let p100 = Point::Specific {
+            slot: 100,
+            hash: [1u8; 32],
+        };
+        let p101 = Point::Specific {
+            slot: 101,
+            hash: [2u8; 32],
+        };
+        let p102 = Point::Specific {
+            slot: 102,
+            hash: [3u8; 32],
+        };
 
         // Build fragment: intersection at p100, then p101, p102.
-        coordinator.handle_peer_event(
-            peer_a,
-            PeerEvent::IntersectionFound { point: p100.clone() },
-        ).await;
+        coordinator
+            .handle_peer_event(
+                peer_a,
+                PeerEvent::IntersectionFound {
+                    point: p100.clone(),
+                },
+            )
+            .await;
 
-        let tip = Tip { point: p101.clone(), block_no: 101 };
-        coordinator.handle_peer_event(
-            peer_a,
-            PeerEvent::HeaderAnnounced {
-                header: WrappedHeader::opaque(vec![0xA0]),
-                tip,
-            },
-        ).await;
+        let tip = Tip {
+            point: p101.clone(),
+            block_no: 101,
+        };
+        coordinator
+            .handle_peer_event(
+                peer_a,
+                PeerEvent::HeaderAnnounced {
+                    header: WrappedHeader::opaque(vec![0xA0]),
+                    tip,
+                },
+            )
+            .await;
 
-        let tip2 = Tip { point: p102.clone(), block_no: 102 };
-        coordinator.handle_peer_event(
-            peer_a,
-            PeerEvent::HeaderAnnounced {
-                header: WrappedHeader::opaque(vec![0xA1]),
-                tip: tip2,
-            },
-        ).await;
+        let tip2 = Tip {
+            point: p102.clone(),
+            block_no: 102,
+        };
+        coordinator
+            .handle_peer_event(
+                peer_a,
+                PeerEvent::HeaderAnnounced {
+                    header: WrappedHeader::opaque(vec![0xA1]),
+                    tip: tip2,
+                },
+            )
+            .await;
 
         let frag = &coordinator.peers.get(&peer_a).unwrap().fragment;
         assert!(frag.contains(&p100));
@@ -1916,11 +2150,19 @@ mod tests {
         assert!(frag.contains(&p102));
 
         // Rollback to p100.
-        let rollback_tip = Tip { point: p100.clone(), block_no: 100 };
-        coordinator.handle_peer_event(
-            peer_a,
-            PeerEvent::RolledBack { point: p100.clone(), tip: rollback_tip },
-        ).await;
+        let rollback_tip = Tip {
+            point: p100.clone(),
+            block_no: 100,
+        };
+        coordinator
+            .handle_peer_event(
+                peer_a,
+                PeerEvent::RolledBack {
+                    point: p100.clone(),
+                    tip: rollback_tip,
+                },
+            )
+            .await;
 
         let frag = &coordinator.peers.get(&peer_a).unwrap().fragment;
         assert!(frag.contains(&p100));
@@ -1934,27 +2176,49 @@ mod tests {
         let peer_a = PeerId(0);
         insert_peer(&mut coordinator, peer_a, None);
 
-        let point = Point::Specific { slot: 500, hash: [6u8; 32] };
+        let point = Point::Specific {
+            slot: 500,
+            hash: [6u8; 32],
+        };
 
         // Peer A has the point.
-        coordinator.handle_peer_event(
-            peer_a,
-            PeerEvent::IntersectionFound { point: point.clone() },
-        ).await;
+        coordinator
+            .handle_peer_event(
+                peer_a,
+                PeerEvent::IntersectionFound {
+                    point: point.clone(),
+                },
+            )
+            .await;
 
-        assert!(coordinator.peers.get(&peer_a).unwrap().fragment.contains(&point));
+        assert!(coordinator
+            .peers
+            .get(&peer_a)
+            .unwrap()
+            .fragment
+            .contains(&point));
 
         // Mark as pending fetch.
         coordinator.pending_fetches.insert(point.clone(), peer_a);
 
         // BlockFetch fails.
-        coordinator.handle_peer_event(
-            peer_a,
-            PeerEvent::BlockFetchFailed { from: point.clone(), to: point.clone() },
-        ).await;
+        coordinator
+            .handle_peer_event(
+                peer_a,
+                PeerEvent::BlockFetchFailed {
+                    from: point.clone(),
+                    to: point.clone(),
+                },
+            )
+            .await;
 
         // Point should be removed from peer A's fragment.
-        assert!(!coordinator.peers.get(&peer_a).unwrap().fragment.contains(&point));
+        assert!(!coordinator
+            .peers
+            .get(&peer_a)
+            .unwrap()
+            .fragment
+            .contains(&point));
 
         // Pending fetch should be cleared.
         assert!(!coordinator.pending_fetches.contains_key(&point));
@@ -1970,23 +2234,38 @@ mod tests {
         let peer_a = PeerId(0);
         insert_peer(&mut coordinator, peer_a, None);
 
-        let intersection = Point::Specific { slot: 50, hash: [0xAA; 32] };
-        coordinator.handle_peer_event(
-            peer_a,
-            PeerEvent::IntersectionFound { point: intersection.clone() },
-        ).await;
+        let intersection = Point::Specific {
+            slot: 50,
+            hash: [0xAA; 32],
+        };
+        coordinator
+            .handle_peer_event(
+                peer_a,
+                PeerEvent::IntersectionFound {
+                    point: intersection.clone(),
+                },
+            )
+            .await;
 
         // Opaque header has no parsed info, so point() returns None.
         // Coordinator should fall back to tip.point for the fragment.
-        let tip_point = Point::Specific { slot: 51, hash: [0xBB; 32] };
-        let tip = Tip { point: tip_point.clone(), block_no: 51 };
-        coordinator.handle_peer_event(
-            peer_a,
-            PeerEvent::HeaderAnnounced {
-                header: WrappedHeader::opaque(vec![0xA0]),
-                tip,
-            },
-        ).await;
+        let tip_point = Point::Specific {
+            slot: 51,
+            hash: [0xBB; 32],
+        };
+        let tip = Tip {
+            point: tip_point.clone(),
+            block_no: 51,
+        };
+        coordinator
+            .handle_peer_event(
+                peer_a,
+                PeerEvent::HeaderAnnounced {
+                    header: WrappedHeader::opaque(vec![0xA0]),
+                    tip,
+                },
+            )
+            .await;
 
         let frag = &coordinator.peers.get(&peer_a).unwrap().fragment;
         assert!(frag.contains(&intersection));
