@@ -424,10 +424,12 @@ pub async fn serve_leios_fetch(lf_send: CodecSend, lf_recv: CodecRecv, store: Ar
         match msg {
             LfMsg::MsgLeiosBlockRequest { point } => {
                 let block = match &point {
-                    Point::Specific { slot, hash } => {
-                        store.get_block(*slot, hash).unwrap_or_default()
-                    }
-                    Point::Origin => Vec::new(),
+                    Point::Specific { slot, hash } => store.get_block(*slot, hash),
+                    Point::Origin => None,
+                };
+                let Some(block) = block else {
+                    // CIP-0164: server should disconnect if it doesn't have the requested EB.
+                    break;
                 };
                 if runner.send(&LfMsg::MsgLeiosBlock { block }).await.is_err() {
                     break;
@@ -435,10 +437,12 @@ pub async fn serve_leios_fetch(lf_send: CodecSend, lf_recv: CodecRecv, store: Ar
             }
             LfMsg::MsgLeiosBlockTxsRequest { point, bitmap: _ } => {
                 let transactions = match &point {
-                    Point::Specific { slot, hash } => {
-                        store.get_block_txs(*slot, hash).unwrap_or_default()
-                    }
-                    Point::Origin => Vec::new(),
+                    Point::Specific { slot, hash } => store.get_block_txs(*slot, hash),
+                    Point::Origin => None,
+                };
+                let Some(transactions) = transactions else {
+                    // CIP-0164: server should disconnect if it doesn't have the requested EB txs.
+                    break;
                 };
                 if runner
                     .send(&LfMsg::MsgLeiosBlockTxs { transactions })
@@ -728,6 +732,85 @@ mod tests {
 
         // Clean up.
         let _ = leios_fetch::done(&mut client).await;
+        server_handle.await.ok();
+        mux_a.abort();
+        mux_b.abort();
+    }
+
+    #[tokio::test]
+    async fn leios_fetch_disconnects_on_missing_block() {
+        let lf_proto = ProtocolConfig {
+            id: leios_fetch::PROTOCOL_ID,
+            traffic_class: TrafficClass::Priority,
+            ingress_limit: leios_fetch::INGRESS_LIMIT,
+            egress_queue_size: 16,
+        };
+
+        let ((client_send, client_recv), (server_send, server_recv), mux_a, mux_b) =
+            mux_pair_for_protocol(&lf_proto);
+
+        // Empty store — no blocks injected.
+        let (store, _rx) = LeiosStore::new(100);
+
+        let server_handle = tokio::spawn(serve_leios_fetch(server_send, server_recv, store));
+
+        // Client: request a block that doesn't exist.
+        let mut client = Runner::<LeiosFetch>::new(Role::Client, client_send, client_recv);
+        let result = leios_fetch::fetch_block(
+            &mut client,
+            Point::Specific {
+                slot: 99,
+                hash: [0xFF; 32],
+            },
+        )
+        .await;
+
+        // Server should have disconnected — client sees an error.
+        assert!(
+            result.is_err(),
+            "expected error from disconnect, got {result:?}"
+        );
+
+        server_handle.await.ok();
+        mux_a.abort();
+        mux_b.abort();
+    }
+
+    #[tokio::test]
+    async fn leios_fetch_disconnects_on_missing_block_txs() {
+        let lf_proto = ProtocolConfig {
+            id: leios_fetch::PROTOCOL_ID,
+            traffic_class: TrafficClass::Priority,
+            ingress_limit: leios_fetch::INGRESS_LIMIT,
+            egress_queue_size: 16,
+        };
+
+        let ((client_send, client_recv), (server_send, server_recv), mux_a, mux_b) =
+            mux_pair_for_protocol(&lf_proto);
+
+        // Empty store — no block txs injected.
+        let (store, _rx) = LeiosStore::new(100);
+
+        let server_handle = tokio::spawn(serve_leios_fetch(server_send, server_recv, store));
+
+        // Client: request txs for a block that doesn't exist.
+        let mut client = Runner::<LeiosFetch>::new(Role::Client, client_send, client_recv);
+        let result = leios_fetch::fetch_block_txs(
+            &mut client,
+            Point::Specific {
+                slot: 99,
+                hash: [0xFF; 32],
+            },
+            std::collections::BTreeMap::new(),
+        )
+        .await;
+
+        // Server should have disconnected — client sees an error.
+        assert!(
+            result.is_err(),
+            "expected error from disconnect, got {result:?}"
+        );
+
         server_handle.await.ok();
         mux_a.abort();
         mux_b.abort();
