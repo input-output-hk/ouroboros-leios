@@ -157,7 +157,7 @@ where $\Phi$ is the standard normal CDF. The two batch distributions use the fol
 
 When an EB arrives at a node, its transactions may already be present in the local transaction cache (a cache hit), or they may need to be fetched from the network (a cache miss). To model this, we use a two-state Markov chain parameterized by $p$, the cache hit probability after a miss[^5].
 
-[^5]: A similar model was introduced by Nick in the Leios monthly presentation in February 26
+[^5]: A similar model has been shown by Nick in the Leios monthly presentation in February 26
 
 ![Markov model for TxCache](TxCache.svg)
 
@@ -171,11 +171,25 @@ $$\pi_1 = \frac{1-q}{p+1-q}, \quad \pi_2 = \frac{p}{p+1-q}$$
 
 The steady-state values $\pi_1$ and $\pi_2$ are the long-run fractions of transactions that are cache misses and hits respectively, with $\pi_1 + \pi_2 = 1$. 
 
-With $q = p/2$ and $p = 0.75$ we get $\pi_1 = \frac{0.625}{1.375} \approx 0.455$ and $\pi_2 = \frac{0.75}{1.375} \approx 0.545$. For a batch of transactions drawn from the steady-state distribution, the effective hit rate is:
+With $q = p/2$ and $p = 0.75$ we get $\pi_1 = \frac{0.625}{1.375} \approx 0.455$ and $\pi_2 = \frac{0.75}{1.375} \approx 0.545$.
 
-$$r = \pi_1 \cdot (1 - p) + \pi_2 \cdot q = \pi_1 \cdot (1 - p) + \pi_2 \cdot \frac{p}{2}$$
+The steady-state hit rate $\pi_2$ is used in the model to weight the two processing branches for a single transaction: with probability $\pi_2$ a transaction is looked up from the cache; with probability $\pi_1$ it must be fetched from the network.
 
-This is used in the $\Delta\text{Q}$ model to weight the two processing branches: With probability $r$ a batch of transaction can be looked-up from the cache; with probability $1 - r$ they must first be fetched from the network.
+When an EB carries $n$ transactions, the node fetches all missing ones in parallel over the network. The batch completes when the last transaction resolves, so the batch completion time is the maximum of $n$ independent single-transaction outcomes.
+
+Each transaction is a hit or a miss, drawn from the stationary distribution. The single-transaction CDF is:
+
+$$F_{\text{single}}(t) = \pi_2 \cdot F_{\text{hit}}(t) + \pi_1 \cdot F_{\text{miss}}(t)$$
+
+Where for the cumulative distribution for the cache lookup $F_{\text{hit}}(t)$ we assume a small, constant number and fetching a transaction $F_{\text{miss}}(t)$ is based on the Praos diffusion model.
+
+When an EB carries $n$ transactions fetched in parallel, the batch completes when the last one finishes. Since all $n$ transactions must complete by time $t$, the batch CDF is:
+
+$$F_{\text{batch}}(t) = F_{\text{single}}(t)^n$$
+
+Since $n$ varies across EBs, it is modelled as uniform over $\mathcal{U}(1, N)$, giving the aggregate:
+
+$$F(t) = \frac{1}{N} \sum_{n=1}^{N} F_{\text{single}}(t)^n$$
 
 ## 5. Results
 
@@ -185,10 +199,10 @@ The $\Delta\text{Q}$ model yields the following completion-time distribution for
 
 ![CDF of validateEB](validateEB.svg)
 
-- **Median diffusion time:** 4.91 seconds
-- **75th percentile:** 7.13 seconds
-- **95th percentile:** 12.57 seconds
-- **99th percentile:** 15.41 seconds
+- **Median diffusion time:** 4.87 seconds
+- **75th percentile:** 7.05 seconds
+- **95th percentile:** 12.53 seconds
+- **99th percentile:** 15.35 seconds
 
 ### 5.2 Protocol Security Validation
 
@@ -198,7 +212,7 @@ The $\Delta\text{Q}$ model gives a high probability that under the proposed para
 
 ```haskell
 ghci> fromRational (successWithin validateEB 14) :: Double
-0.9753948688574636
+0.9759755867045543
 ```
 
 The EB diffusion completes within
@@ -227,7 +241,7 @@ $P_\text{quorum}$ depends on $P_\text{validating}$ - the probability that an EB 
 
 ```haskell
 ghci> fromRational (successWithin validateEB 7) :: Double
-0.7414282609198065
+0.7454210857594001
 ```
 
 The calculation of $P_\text{quorum}$ is taken from an early version of the [markov chain simulation](../../../markov/) for Linear Leios: Each of the 2500 stake pool operators (SPOs) is independently elected to the voting committee via a Poisson sortition: SPO $i$ with relative stake $s_i$ is elected with probability $1 - e^{-\tilde{m} s_i}$, where $\tilde{m}$ is calibrated so that the expected committee size equals $m = 600$. If elected, SPO $i$ casts a successful vote with probability $P_\text{validating}$, so its individual success probability is $p_i = P_\text{validating} \times (1 - e^{-\tilde{m} s_i})$. The total vote count $V = \sum_i X_i$ with $X_i \sim \text{Bernoulli}(p_i)$ is approximated by a normal distribution via the Central Limit Theorem:
@@ -238,14 +252,12 @@ The quorum probability is then:
 
 $$P_\text{quorum} = P(V \geq \tau m) \approx 1 - \Phi \left(\frac{\tau m - \mu}{\sigma}\right)$$
 
-For the proposed parameters ($P_\text{validating} \approx 74.1\%$, $m = 600$, $\tau = 3/4$), the quorum threshold is $450$ votes and $\mu \approx 444.9 < 450$, giving $P_\text{quorum} \approx 35.9\%$.
-
 The probability that an EB will be certified can be calculated in Haskell as follows:
 
 ```haskell
 ghci> let config = Config { name = "CIP", lHdr = 1, lVote = 4, lDiff = 7, numberSPOs = 2500, committeeSizeEstimated = 600, τ = 3 % 4, f = 1 % 20 }
 ghci> pCertified config
-0.17805177733045532
+0.21092012465683743
 ```
 
 This provides evidence that the proposed parameters are viable and consistent with the security requirements of the Leios protocol as specified in CIP-164.
