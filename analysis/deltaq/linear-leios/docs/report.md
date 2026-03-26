@@ -16,7 +16,9 @@ The $\Delta\text{Q}$ model for Linear Leios is a complement to the Haskell and R
 
 ### 2.1 Linear Leios Protocol
 
-Linear Leios is designed around the key insight: Praos block production only occupies roughly 25% of slot time, leaving significant unused network bandwidth and computational capacity during "calm periods". Linear Leios exploits this headroom to achieve high throughput while preserving Praos security guarantees.
+Linear Leios is designed around the key insight: Praos block production only occupies roughly 25% of slot time[^2], leaving significant unused network bandwidth and computational capacity during "calm periods". Linear Leios exploits this headroom to achieve high throughput while preserving Praos security guarantees.
+
+[^2]: Praos blocks diffuse in at most 5 seconds on average all 20 slots
 
 The protocol behavior is governed by several [protocol parameters](https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#protocol-parameters), in particular timing parameters that control the duration of diffusion and voting intervals. Their values must be chosen carefully in order for Linear Leios to achieve higher performance and throughput, as the following constraints illustrate:
 
@@ -33,9 +35,9 @@ The security analysis of Linear Leios is based on the following assumptions:
 
 This analysis adopts a stronger version of the first assumption than the CIP requires: every certified EB must reach all honest block-producing nodes by the end of $L_\text{diff}$, i.e., within $\Delta_\text{EB}$ slots of its creation.
 
-$\Delta_\text{EB}$ plays a role in Leios analogous to the $\Delta$ parameter in Ouroboros Praos[^2] - both bound the time within which a message must reach all honest block producers, and a violation in either case can cause a fork. In Leios, if $\Delta_\text{EB}$ is violated, a block producer may receive a new RB carrying a certificate that references an EB the local node has not yet received. That node therefore does not know about the transactions in the EB and has not updated its ledger state accordingly, leading to a divergence in perceived ledger state. The parameter $L_\text{diff}$ is therefore critical: it reserves enough time after a quorum is reached for the EB to finish diffusing to all remaining nodes, during $L_\text{diff}$ no new RB is being added to the chain giving those nodes the opportunity to receive and apply the EB.
+$\Delta_\text{EB}$ plays a role in Leios analogous to the $\Delta$ parameter in Ouroboros Praos[^3] - both bound the time within which a message must reach all honest block producers, and a violation in either case can cause a fork. In Leios, if $\Delta_\text{EB}$ is violated, a block producer may receive a new RB carrying a certificate that references an EB the local node has not yet received. That node therefore does not know about the transactions in the EB and has not updated its ledger state accordingly, leading to a divergence in perceived ledger state. The parameter $L_\text{diff}$ is therefore critical: it reserves enough time after a quorum is reached for the EB to finish diffusing to all remaining nodes, during $L_\text{diff}$ no new RB is being added to the chain giving those nodes the opportunity to receive and apply the EB.
 
-[^2]: The Praos requirement is that 95% of blocks arrive and are validated within 5 seconds
+[^3]: The Praos requirement is that 95% of blocks arrive and are validated within 5 seconds
 
 ### 2.2 $\Delta\text{Q}$ System Development
 
@@ -120,8 +122,8 @@ The $\Delta\text{Q}$ model of EB diffusion captures the steps a node performs up
 * On receiving the full EB, determine which transactions are missing and fetch them. Unlike the RB - which carries full transaction data in its body - the EB contains only transaction IDs
 * Only once both of the above steps complete is the reapply operation applied to the ledger state
 
-The outcome diagram then looks as follows[^3]:
-[^3]: Refer to "Mind Your Outcomes" for an explanation of outcome diagrams
+The outcome diagram then looks as follows[^4]:
+[^4]: Refer to "Mind Your Outcomes" for an explanation of outcome diagrams
 
 ![Outcome diagram of EB diffusion](EB-diffusion.svg)
 
@@ -152,9 +154,9 @@ where $\Phi$ is the standard normal CDF. The two batch distributions use the fol
 
 ### 4.2 Markov model for TxCache
 
-When an EB arrives at a node, its transactions may already be present in the local transaction cache (a cache hit), or they may need to be fetched from the network (a cache miss). To model this, we use a two-state Markov chain parameterized by $p$, the probability that a given transaction is in the cache[^4].
+When an EB arrives at a node, its transactions may already be present in the local transaction cache (a cache hit), or they may need to be fetched from the network (a cache miss). To model this, we use a two-state Markov chain parameterized by $p$, the probability that a given transaction is in the cache[^5].
 
-[^4]: This model was introduced by Nick in the Leios monthly presentation in February 26
+[^5]: This model was introduced by Nick in the Leios monthly presentation in February 26
 
 ![Markov model for TxCache](TxCache.svg)
 
@@ -258,7 +260,7 @@ The analysis shows that under the proposed parameters ($L_\text{hdr}=1$, $L_\tex
 
 * This model assumes honest node behavior. Adversarial delay of EBs - for example, an adversary deliberately withholding an EB until just before the voting deadline - is not captured here
 * With the `piecewise-polynomial` $\Delta\text{Q}$ backend computational complexity is hard to control, where as with the `sampled` backend it is the accuracy of the results. For this analysis to be successful, we built probabilistic models and then combined those using $\Delta\text{Q}$ in order to get a model with low complexity to be executable with the default backend
-* Adjust sortition mechanism to Fait Accompli
+* Adjust sortition mechanism to [Fait Accompli](https://github.com/input-output-hk/ouroboros-leios/blob/d5f1a9bc940e69f406c3e25c0d7d9aa58cf701f8/crypto-benchmarks.rs/Specification.md#sortition)
 * When input parameters are means or point estimates rather than full probability distributions (or when the distributions used do not adequately capture tail behaviour) high-percentile outputs such as the 99th percentile should be interpreted with caution, as these extremes can be sensitive to the underlying assumptions
 * The model does not account for Freshest First Delivery (FFD) of EBs as specified in CIP-164. FFD prioritises the most recently produced blocks during diffusion, which can delay older EBs and worsen their individual diffusion latency; incorporating it would require modelling the interaction between concurrent EB diffusions
 * Future work should improve the `sampled` backend to keep track of the error margin, in order to be able to run the analysis in reasonable time and being able to quantify the inaccuracy introduced by the simulations
