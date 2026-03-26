@@ -10,8 +10,8 @@ use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use tokio::sync::mpsc;
 
-use net_core::peer::types::{NetworkCommand, NetworkEvent};
-use net_core::peer::{spawn_coordinator, CoordinatorConfig};
+use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
+use net_core::multi_peer::{spawn_coordinator, CoordinatorConfig};
 use net_core::types::{BlockBody, Point, WrappedHeader};
 
 /// Sample an exponential inter-arrival time: -ln(U) / λ

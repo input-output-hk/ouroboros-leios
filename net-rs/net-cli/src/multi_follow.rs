@@ -3,8 +3,8 @@
 
 use std::time::{Duration, Instant};
 
-use net_core::peer::types::{NetworkCommand, NetworkEvent};
-use net_core::peer::{spawn_coordinator, CoordinatorConfig};
+use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
+use net_core::multi_peer::{spawn_coordinator, CoordinatorConfig};
 
 pub async fn run(
     hosts: &[String],

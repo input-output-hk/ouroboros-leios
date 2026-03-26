@@ -42,13 +42,20 @@ graph TD
     end
 
     subgraph "net-core (library)"
-        subgraph "Peer Layer"
+        subgraph "Multi-Peer Layer (multi_peer)"
             COORD[Coordinator]
+        end
+
+        subgraph "Store Layer (store)"
+            CS[ChainStore]
+            LS[LeiosStore]
+        end
+
+        subgraph "Peer Layer (peer)"
             PT[Peer Task<br/>initiator]
             RT[Responder Task]
             DT[Duplex Task]
-            CS[ChainStore]
-            LS[LeiosStore]
+            SH[Server Handlers]
         end
 
         subgraph "Protocol Layer"
@@ -78,12 +85,14 @@ graph TD
 
     CLI --> COORD
     COORD --> PT & RT & DT
+    COORD --> CS & LS
+    SH --> CS & LS
+    PT & RT & DT --> SH
     PT & RT & DT --> HS & CSYNC & BF & TX & KA & PS & LN & LF
     HS & CSYNC & BF & TX & KA & PS & LN & LF --> CODEC
     CODEC --> EG --> SCHED --> WIRE
     WIRE --> TCP & MEM
     TCP & MEM --> WIRE --> IG --> CODEC
-    COORD --> CS & LS
 ```
 
 ## Workspace Structure
@@ -92,11 +101,13 @@ graph TD
 net-rs/
 ├── net-core/          # Library crate — all protocol logic
 │   └── src/
-│       ├── bearer/    # Transport trait + TCP/memory implementations
-│       ├── mux/       # Multiplexer: wire format, egress, ingress, scheduler, codec
-│       ├── types/     # Shared Cardano types (Point, Tip, Header, Block)
-│       ├── protocols/ # All 8 mini-protocols (state machines + CBOR)
-│       └── peer/      # Multi-peer coordinator, per-peer tasks, stores
+│       ├── bearer/      # Transport trait + TCP/memory implementations
+│       ├── mux/         # Multiplexer: wire format, egress, ingress, scheduler, codec
+│       ├── types/       # Shared Cardano types (Point, Tip, Header, Block)
+│       ├── protocols/   # All 8 mini-protocols (state machines + CBOR)
+│       ├── store/       # Shared data stores (ChainStore, LeiosStore)
+│       ├── peer/        # Per-peer tasks (initiator, responder, duplex), server handlers
+│       └── multi_peer/  # Multi-peer coordinator, application interface
 ├── net-cli/           # Binary crate — CLI tool for testing and demos
 │   └── src/           # Subcommands: handshake, follow, serve, submit, ...
 ├── docs/              # Protocol references and implementation notes

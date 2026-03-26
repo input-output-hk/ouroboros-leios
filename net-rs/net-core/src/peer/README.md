@@ -1,21 +1,18 @@
-# peer — Multi-Peer Coordination
+# peer — Per-Peer Protocol Handling
 
-Manages multiple concurrent peer connections with aggregation, deduplication, and smart routing. Provides a peer-agnostic application interface via `NetworkEvent`/`NetworkCommand` channels.
+Manages individual peer connections: connection setup, protocol sub-tasks (initiator, responder, duplex), and server-side handlers. Multi-peer coordination lives in the `multi_peer` module.
 
 ## Files
 
 | File | Description |
 |------|-------------|
-| `mod.rs` | `PeerId`, `ConnectionMode`, `CoordinatorConfig`, `CoordinatorHandle`, `PeerError` |
-| `types.rs` | `PeerEvent`, `PeerCommand`, `NetworkEvent`, `NetworkCommand` |
+| `mod.rs` | `PeerId`, `ConnectionMode`, `PeerError` |
+| `types.rs` | `PeerEvent`, `PeerCommand` (peer ↔ coordinator boundary) |
 | `connect.rs` | Connection setup helpers: TCP + mux + handshake wiring |
-| `chain_store.rs` | `ChainStore`: thread-safe in-memory chain state with change notifications |
-| `leios_store.rs` | `LeiosStore`: content-addressed Leios data store (EBs, TXs, votes) |
 | `peer_task.rs` | Per-peer initiator task: spawns client protocol sub-tasks |
 | `responder_task.rs` | Per-peer responder task: spawns server protocol handlers |
 | `duplex_task.rs` | Per-peer duplex task: both client + server on one connection |
 | `server_handlers.rs` | Server-side protocol implementations (ChainSync, BlockFetch, KeepAlive, TxSubmission, PeerSharing, LeiosNotify, LeiosFetch) |
-| `coordinator.rs` | Multi-peer aggregation, tip dedup, fetch routing, accept loop, reconnection |
 
 ## Connection Modes
 
@@ -24,55 +21,6 @@ Manages multiple concurrent peer connections with aggregation, deduplication, an
 | `InitiatorOnly` | Outbound connection — runs client protocol sub-tasks (ChainSync, BlockFetch, KeepAlive, etc.) |
 | `ResponderOnly` | Inbound connection via accept loop — runs server protocol handlers |
 | `Duplex` | Both client and server protocols on one connection, using composite mux keys for bidirectional routing |
-
-## Coordinator
-
-Single tokio task that aggregates all peer events:
-
-- **Tip deduplication**: only forwards `TipAdvanced` when tip actually changes
-- **Smart block fetch routing**: picks peer with best RTT for `FetchBlock` commands
-- **Accept loop**: listens for inbound connections when `listen_address` is configured
-- **Reconnection**: exponential backoff for failed outbound/duplex peers; no reconnection for responders
-- **Leios intelligence** (when `leios_enabled`):
-  - Slot-bounded seen sets for EB/TX/vote offer deduplication (`leios_dedup_window`, default 1000 slots)
-  - Per-offer peer tracking for RTT-based smart fetch routing
-  - Pending fetch maps prevent duplicate in-flight requests
-  - Vote batches deduped per-vote (partial forwarding)
-
-## Stores
-
-### ChainStore
-
-Thread-safe (`Mutex`) linear chain storage:
-- `VecDeque<StoredBlock>` with capacity limit (auto-evicts oldest)
-- Change notifications via `watch::channel` for server handlers
-- `find_intersection(points)` for ChainSync server
-- `append_block`, `rollback_to`, `tip`, `block_at`, `blocks_after`
-
-### LeiosStore
-
-Content-addressed (`Mutex`) storage keyed by `(slot, hash)`:
-- Separate maps for blocks, block_txs, votes (opaque bytes)
-- Notification queue for LeiosNotify server (`pop_notifications`)
-- Change notifications via `watch::channel`
-- `inject_block`, `inject_block_txs`, `inject_votes`, `get_block`, `get_votes`
-
-## Application Interface
-
-```
-NetworkCommand (app -> coordinator)     NetworkEvent (coordinator -> app)
-├── AddPeer { address }                 ├── PeerConnected { peer_id }
-├── FetchBlock { point }                ├── PeerDisconnected { peer_id }
-├── DiscoverPeers                       ├── TipAdvanced { tip, header }
-├── InjectBlock { point, header, body } ├── RolledBack { point, tip }
-├── InjectRollback { point }            ├── BlockReceived { point, body }
-├── FetchLeiosBlock { slot, hash }      ├── LeiosBlockOffered { slot, hash }
-├── FetchLeiosBlockTxs { .. }           ├── LeiosBlockReceived { .. }
-├── FetchLeiosVotes { votes }           ├── LeiosVotesReceived { .. }
-└── Shutdown                            └── ...
-```
-
-`CoordinatorHandle` bundles the two channel endpoints for application use.
 
 ## Per-Peer Task Architecture
 

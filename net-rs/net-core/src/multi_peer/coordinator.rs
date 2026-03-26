@@ -23,14 +23,16 @@ use crate::mux::MuxConfig;
 use crate::protocols::peersharing::PeerAddress;
 use crate::types::{Point, Tip, WrappedHeader};
 
-use super::chain_store::ChainStore;
-use super::connect::{self, Connection};
-use super::duplex_task::{run_duplex_task, DuplexTaskConfig};
-use super::leios_store::LeiosStore;
-use super::peer_task::{run_peer_task, PeerTaskConfig};
-use super::responder_task::{run_responder_task, server_protocol_configs, ResponderTaskConfig};
-use super::types::{NetworkCommand, NetworkEvent, PeerCommand, PeerEvent};
-use super::{ConnectionMode, CoordinatorConfig, CoordinatorHandle, PeerId};
+use crate::store::chain_store::ChainStore;
+use crate::store::leios_store::LeiosStore;
+use super::types::{NetworkCommand, NetworkEvent};
+use super::{CoordinatorConfig, CoordinatorHandle};
+use crate::peer::connect::{self, Connection};
+use crate::peer::duplex_task::{run_duplex_task, DuplexTaskConfig};
+use crate::peer::peer_task::{run_peer_task, PeerTaskConfig};
+use crate::peer::responder_task::{run_responder_task, server_protocol_configs, ResponderTaskConfig};
+use crate::peer::types::{PeerCommand, PeerEvent};
+use crate::peer::{ConnectionMode, PeerId};
 
 /// Per-peer state tracked by the coordinator.
 struct PeerState {
@@ -980,7 +982,7 @@ mod tests {
         let (_net_cmd_sender, net_cmd_receiver) = mpsc::channel(64);
 
         let config = CoordinatorConfig::default();
-        let (chain_store, _chain_rx) = crate::peer::chain_store::ChainStore::new(100);
+        let (chain_store, _chain_rx) = ChainStore::new(100);
         let mut coordinator = Coordinator::new(
             config,
             peer_event_sender.clone(),
@@ -1063,7 +1065,7 @@ mod tests {
         let (_net_cmd_sender, net_cmd_receiver) = mpsc::channel(64);
 
         let config = CoordinatorConfig::default();
-        let (chain_store, _chain_rx) = crate::peer::chain_store::ChainStore::new(100);
+        let (chain_store, _chain_rx) = ChainStore::new(100);
         let mut coordinator = Coordinator::new(
             config,
             peer_event_sender,
@@ -1164,7 +1166,7 @@ mod tests {
         let (_net_cmd_sender, net_cmd_receiver) = mpsc::channel(64);
 
         let config = CoordinatorConfig::default();
-        let (chain_store, _chain_rx) = crate::peer::chain_store::ChainStore::new(100);
+        let (chain_store, _chain_rx) = ChainStore::new(100);
         let mut coordinator = Coordinator::new(
             config,
             peer_event_sender,
@@ -1228,7 +1230,7 @@ mod tests {
         let (_net_cmd_sender, net_cmd_receiver) = mpsc::channel(64);
 
         let config = CoordinatorConfig::default();
-        let (chain_store, _chain_rx) = crate::peer::chain_store::ChainStore::new(100);
+        let (chain_store, _chain_rx) = ChainStore::new(100);
         let mut coordinator = Coordinator::new(
             config,
             peer_event_sender,
@@ -1300,8 +1302,8 @@ mod tests {
             leios_dedup_window: dedup_window,
             ..CoordinatorConfig::default()
         };
-        let (chain_store, _chain_rx) = crate::peer::chain_store::ChainStore::new(100);
-        let (leios_store, _leios_rx) = crate::peer::leios_store::LeiosStore::new(100);
+        let (chain_store, _chain_rx) = ChainStore::new(100);
+        let (leios_store, _leios_rx) = LeiosStore::new(100);
 
         let coordinator = Coordinator::new(
             config,
