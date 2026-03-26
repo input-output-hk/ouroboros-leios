@@ -155,27 +155,27 @@ where $\Phi$ is the standard normal CDF. The two batch distributions use the fol
 
 ### 4.2 Markov model for TxCache
 
-When an EB arrives at a node, its transactions may already be present in the local transaction cache (a cache hit), or they may need to be fetched from the network (a cache miss). To model this, we use a two-state Markov chain parameterized by $p$, the probability that a given transaction is in the cache[^5].
+When an EB arrives at a node, its transactions may already be present in the local transaction cache (a cache hit), or they may need to be fetched from the network (a cache miss). To model this, we use a two-state Markov chain parameterized by $p$, the cache hit probability after a miss[^5].
 
-[^5]: This model was introduced by Nick in the Leios monthly presentation in February 26
+[^5]: A similar model was introduced by Nick in the Leios monthly presentation in February 26
 
 ![Markov model for TxCache](TxCache.svg)
 
 With states ordered as (miss, hit), the transition matrix is:
 
-$$M = \begin{pmatrix} 1-p & p \\\ 1-p/2 & p/2 \end{pmatrix}$$
+$$M = \begin{pmatrix} 1-p & p \\\ 1-q & q \end{pmatrix}$$
 
 Solving the stationary condition $\pi M = \pi$ yields the steady-state distribution:
 
-$$\pi_1 = \frac{2-p}{2+p}, \quad \pi_2 = \frac{2p}{2+p}$$
+$$\pi_1 = \frac{1-q}{p+1-q}, \quad \pi_2 = \frac{p}{p+1-q}$$
 
-The steady-state $\pi_2$ is the long-run fraction of transactions that are cache hits. It differs from the raw parameter $p$ because the transition probabilities are asymmetric: from a miss, the probability of transitioning to a hit is $p$, whereas from a hit, the probability of staying in the hit state is only $p/2$. For a batch of transactions drawn from the steady-state distribution, the effective hit rate is:
+The steady-state values $\pi_1$ and $\pi_2$ are the long-run fractions of transactions that are cache misses and hits respectively, with $\pi_1 + \pi_2 = 1$. 
 
-$$r = \pi_2 \cdot p + \pi_1 \cdot (1 - p)$$
+With $q = p/2$ and $p = 0.75$ we get $\pi_1 = \frac{0.625}{1.375} \approx 0.455$ and $\pi_2 = \frac{0.75}{1.375} \approx 0.545$. For a batch of transactions drawn from the steady-state distribution, the effective hit rate is:
 
-This is used in the $\Delta\text{Q}$ model to weight the two processing branches — with probability $r$ a transaction can be reapplied cheaply from the cache; with probability $1 - r$ it must first be fetched from the network.
+$$r = \pi_1 \cdot (1 - p) + \pi_2 \cdot q = \pi_1 \cdot (1 - p) + \pi_2 \cdot \frac{p}{2}$$
 
-The model uses $p = 0.75$, giving $\pi_1 \approx 0.455$, $\pi_2 \approx 0.545$, and an effective batch hit rate of $r \approx 0.523$. Higher values of $p$ increase $r$ and therefore lower the EB processing latency.
+This is used in the $\Delta\text{Q}$ model to weight the two processing branches: With probability $r$ a batch of transaction can be looked-up from the cache; with probability $1 - r$ they must first be fetched from the network.
 
 ## 5. Results
 
