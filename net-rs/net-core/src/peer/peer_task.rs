@@ -22,6 +22,7 @@ use crate::protocols::txsubmission::{self, PendingTx, TxSubmission};
 use crate::protocols::{Role, Runner};
 use crate::types::Point;
 
+use super::command_dispatch::{dispatch_command, ClientProtocolSenders};
 use super::connect::{self, Connection};
 use super::types::{PeerCommand, PeerEvent};
 use super::PeerId;
@@ -584,39 +585,21 @@ pub(crate) async fn run_peer_task(mut config: PeerTaskConfig) {
         None
     };
 
+    // Build shared command senders for dispatch.
+    let senders = ClientProtocolSenders {
+        fetch: fetch_sender,
+        peer_share: peer_share_sender,
+        tx_submit: tx_submit_sender,
+        leios_fetch: leios_handles.as_ref().map(|(_, _, lf)| lf.clone()),
+    };
+
     // Main select loop: dispatch commands and detect sub-task failure.
     // ChainSync is the primary protocol — if it exits, the peer is done.
     loop {
         tokio::select! {
             cmd = config.command_receiver.recv() => {
-                match cmd {
-                    Some(PeerCommand::FetchBlocks { from, to }) => {
-                        let _ = fetch_sender.send((from, to)).await;
-                    }
-                    Some(PeerCommand::RequestPeers { amount }) => {
-                        let _ = peer_share_sender.send(amount).await;
-                    }
-                    Some(PeerCommand::SubmitTransaction { tx }) => {
-                        let _ = tx_submit_sender.send(tx).await;
-                    }
-                    Some(PeerCommand::FetchLeiosBlock { point }) => {
-                        if let Some((_, _, ref lf_sender)) = leios_handles {
-                            let _ = lf_sender.send(LeiosFetchCommand::Block { point }).await;
-                        }
-                    }
-                    Some(PeerCommand::FetchLeiosBlockTxs { point, bitmap }) => {
-                        if let Some((_, _, ref lf_sender)) = leios_handles {
-                            let _ = lf_sender.send(LeiosFetchCommand::BlockTxs { point, bitmap }).await;
-                        }
-                    }
-                    Some(PeerCommand::FetchLeiosVotes { votes }) => {
-                        if let Some((_, _, ref lf_sender)) = leios_handles {
-                            let _ = lf_sender.send(LeiosFetchCommand::Votes { votes }).await;
-                        }
-                    }
-                    Some(PeerCommand::Disconnect) | None => {
-                        break;
-                    }
+                if !dispatch_command(cmd, &senders).await {
+                    break;
                 }
             }
             // If ChainSync exits, the peer is done.
