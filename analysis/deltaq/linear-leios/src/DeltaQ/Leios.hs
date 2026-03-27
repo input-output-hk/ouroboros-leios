@@ -17,6 +17,7 @@ module DeltaQ.Leios (
 ) where
 
 import Data.Maybe (fromJust)
+import Data.Ratio ((%))
 import DeltaQ (
   DQ,
   DeltaQ (quantile, successWithin),
@@ -26,6 +27,7 @@ import DeltaQ (
   maybeFromEventually,
   wait,
  )
+import DeltaQ.Distributions
 import DeltaQ.Leios.EmpiricalDistributions (
   applyTxs,
   reapplyTxs,
@@ -86,15 +88,33 @@ fetchingTx p =
 --
 -- We consider batches of transactions to be looked up in the cache simultaniously.
 -- Using the mixture distribution, currently only implemented for a single transaction.
--- TODO: Distribution of worst of all transactions in batch
 fetchingTxs :: DQ
-fetchingTxs = unsafeFromPositiveMeasure $ M.add (M.scale π_1 blendedDelay') (M.scale π_2 (M.dirac 0.001))
+fetchingTxs =
+  choices
+    [ (5 % 6, wait 0.001)
+    , (1 % 6, txCache')
+    ]
+
+-- | Single cache lookup
+txCache :: M.Measure Rational
+txCache = M.add (M.scale π_1 blendedDelay') (M.scale π_2 (M.dirac 0.001))
  where
   blendedDelay' :: M.Measure Rational
   blendedDelay' = fromJust $ M.fromDistribution (PW.distribution (blendedDelay B1024))
   π_1 = (2 - p) / (2 + p)
   π_2 = 2 * p / (2 + p)
   p = 0.75
+
+-- | Parellel cache lookups
+txCache' :: DQ
+txCache' = measuredDQ pairs
+ where
+  dq = PW.unsafeFromPositiveMeasure txCache
+  n = 256
+  pairs =
+    pairList
+      [0.0, 1.0, 2.0, 5.0, 7.0]
+      (\i -> let fi = successWithin dq i in fi * (1 % n) * (1 - fi ^ n) / (1 - fi))
 
 processRBandEB :: DQ
 processRBandEB = processRB ./\. processEB

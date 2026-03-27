@@ -153,15 +153,19 @@ where $\Phi$ is the standard normal CDF. The two batch distributions use the fol
 | `applyTxs`   | 100                    | 10.60            | 25.49                  |
 | `reapplyTxs` | 2500                   | 2.71             | 24.42                  |
 
-### 4.2 Markov model for TxCache
+### 4.2 Mempool and TxCache
 
-When an EB arrives at a node, its transactions may already be present in the local transaction cache (a cache hit), or they may need to be fetched from the network (a cache miss). To model this, we use a two-state Markov chain parameterized by $p$, the cache hit probability after a miss[^5].
+Transactions are diffused across the network and put into the mempools of block-producing nodes. [Mempool measurements](https://github.com/input-output-hk/ouroboros-leios/tree/main/post-cip/mempool-measurements) show that mempools are well synchronized and fragmentation is the exception rather than the rule.
 
-[^5]: A similar model has been shown by Nick in the Leios monthly presentation in February 26
+When an EB arrives at a node, the transactions it references are expected to already be present in the local mempool. If that is not the case, the mempools across the nodes have become fragmented, that means there are mempools that only share a small subset of transactions with each other.
 
-![Markov model for TxCache](TxCache.svg)
+To deal with mempool fragmentation, Linear Leios introduces an additional transaction cache that stores transactions explicitly fetched from the network. Fetching may prevent timely certification of the EB, but any subsequent EB referencing the same transactions can serve them directly from the cache.
 
-With states ordered as (miss, hit), the transition matrix is:
+To incorporate the mempool and transaction cache into the model, we use a two-state Markov chain where each transaction is either present in the mempool or must be handeld by the transaction cache.
+
+![Markov model for Mempool and TxCache](MemPoolAndTxCache.svg)
+
+With states ordered as (MemPool, TxCache), the transition matrix is:
 
 $$M = \begin{pmatrix} 1-p & p \\\ 1-q & q \end{pmatrix}$$
 
@@ -171,17 +175,19 @@ $$\pi_1 = \frac{1-q}{p+1-q}, \quad \pi_2 = \frac{p}{p+1-q}$$
 
 The steady-state values $\pi_1$ and $\pi_2$ are the long-run fractions of transactions that are cache misses and hits respectively, with $\pi_1 + \pi_2 = 1$. 
 
-With $q = p/2$ and $p = 0.75$ we get $\pi_1 = \frac{0.625}{1.375} \approx 0.455$ and $\pi_2 = \frac{0.75}{1.375} \approx 0.545$.
+With $p = 0.5$ and $q = 0.9$ we get $\pi_1 = \frac{1}{6} \approx 0.17$ and $\pi_2 = \frac{5}{6} \approx 0.83$.
 
-The steady-state hit rate $\pi_2$ is used in the model to weight the two processing branches for a single transaction: with probability $\pi_2$ a transaction is looked up from the cache; with probability $\pi_1$ it must be fetched from the network.
+The steady-state rate is used in the model for determining if we are in a normal situation where mempools are highly synchronized or in a situation where fragmentation of the mempool is taking place.
 
-When an EB carries $n$ transactions, the node fetches all missing ones in parallel over the network. The batch completes when the last transaction resolves, so the batch completion time is the maximum of $n$ independent single-transaction outcomes.
+#### 4.2.1 TxCache
 
-Each transaction is a hit or a miss, drawn from the stationary distribution. The single-transaction CDF is:
+For an EB with $n$ transaction refereneces, the node fetches all missing transactions in parallel over the network. The batch completion time is the maximum of $n$ independent single-transaction outcomes.
 
-$$F_{\text{single}}(t) = \pi_2 \cdot F_{\text{hit}}(t) + \pi_1 \cdot F_{\text{miss}}(t)$$
+Each transaction is a cache hit with rate $p$, or a miss in the TxCache with probability $1 - p$. Again using a mixture model, the CDF for a single transaction is:
 
-Where for the cumulative distribution for the cache lookup $F_{\text{hit}}(t)$ we assume a small, constant number and fetching a transaction $F_{\text{miss}}(t)$ is based on the Praos diffusion model.
+$$F_{\text{single}}(t) = \omega_1 \cdot F_{\text{hit}}(t) + \omega_2 \cdot F_{\text{miss}}(t)$$
+
+Here $F_{\text{hit}}(t)$ models a cache lookup as a small constant delay, and $F_{\text{miss}}(t)$ models a network fetch using the Praos diffusion model. The weights $\omega_1$ and $\omega_2$ are steady-state hit and miss rates from a Markov chain, so that the mixture reflects the long-run fraction of transactions handled by each path.
 
 When an EB carries $n$ transactions fetched in parallel, the batch completes when the last one finishes. Since all $n$ transactions must complete by time $t$, the batch CDF is:
 
@@ -189,7 +195,7 @@ $$F_{\text{batch}}(t) = F_{\text{single}}(t)^n$$
 
 Since $n$ varies across EBs, it is modelled as uniform over $\mathcal{U}(1, N)$, giving the aggregate:
 
-$$F(t) = \frac{1}{N} \sum_{n=1}^{N} F_{\text{single}}(t)^n$$
+$$F(t) = \frac{1}{N} \sum_{n=1}^{N} F_{\text{single}}(t)^n = \frac{F_{\text{single}}(t)}{N} \cdot \frac{1 - F_{\text{single}}(t)^N}{1 - F_{\text{single}}(t)}$$
 
 ## 5. Results
 
@@ -199,10 +205,10 @@ The $\Delta\text{Q}$ model yields the following completion-time distribution for
 
 ![CDF of validateEB](validateEB.svg)
 
-- **Median diffusion time:** 4.87 seconds
-- **75th percentile:** 7.05 seconds
-- **95th percentile:** 12.53 seconds
-- **99th percentile:** 15.35 seconds
+- **Median diffusion time:** 4.52 seconds
+- **75th percentile:** 6.81 seconds
+- **95th percentile:** 12.23 seconds
+- **99th percentile:** 15.11 seconds
 
 ### 5.2 Protocol Security Validation
 
@@ -212,11 +218,11 @@ The $\Delta\text{Q}$ model gives a high probability that under the proposed para
 
 ```haskell
 ghci> fromRational (successWithin validateEB 14) :: Double
-0.9759755867045543
+0.9740003675134772
 ```
 
 The EB diffusion completes within
-$L := 3 L_\text{hdr} + L_\text{vote} + L_\text{diff} = 14$ with probability 97.54%.
+$L := 3 L_\text{hdr} + L_\text{vote} + L_\text{diff} = 14$ with probability 97.40%.
 
 This means that for $L = 14$ the saftey property holds for Linear Leios.
 
@@ -241,7 +247,7 @@ $P_\text{quorum}$ depends on $P_\text{validating}$ - the probability that an EB 
 
 ```haskell
 ghci> fromRational (successWithin validateEB 7) :: Double
-0.7454210857594001
+0.7200684098158037
 ```
 
 The calculation of $P_\text{quorum}$ is taken from an early version of the [markov chain simulation](../../../markov/) for Linear Leios: Each of the 2500 stake pool operators (SPOs) is independently elected to the voting committee via a Poisson sortition: SPO $i$ with relative stake $s_i$ is elected with probability $1 - e^{-\tilde{m} s_i}$, where $\tilde{m}$ is calibrated so that the expected committee size equals $m = 600$. If elected, SPO $i$ casts a successful vote with probability $P_\text{validating}$, so its individual success probability is $p_i = P_\text{validating} \times (1 - e^{-\tilde{m} s_i})$. The total vote count $V = \sum_i X_i$ with $X_i \sim \text{Bernoulli}(p_i)$ is approximated by a normal distribution via the Central Limit Theorem:
@@ -257,7 +263,7 @@ The probability that an EB will be certified can be calculated in Haskell as fol
 ```haskell
 ghci> let config = Config { name = "CIP", lHdr = 1, lVote = 4, lDiff = 7, numberSPOs = 2500, committeeSizeEstimated = 600, τ = 3 % 4, f = 1 % 20 }
 ghci> pCertified config
-0.21092012465683743
+0.356114310950717
 ```
 
 This provides evidence that the proposed parameters are viable and consistent with the security requirements of the Leios protocol as specified in CIP-164.

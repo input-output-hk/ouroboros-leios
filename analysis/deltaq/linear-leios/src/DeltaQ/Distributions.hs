@@ -5,6 +5,7 @@ module DeltaQ.Distributions (
   normalDQ,
   logNormalDQ,
   scaleMixtureDQ,
+  pairList
 ) where
 
 import DeltaQ
