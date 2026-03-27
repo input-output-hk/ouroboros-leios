@@ -4,6 +4,7 @@
 //! sub-tasks (initiator, responder, duplex), and server-side handlers.
 //! The multi-peer coordination layer lives in the `multi_peer` module.
 
+pub(crate) mod command_dispatch;
 pub mod connect;
 pub(crate) mod duplex_task;
 pub(crate) mod peer_task;
