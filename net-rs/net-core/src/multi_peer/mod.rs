@@ -19,6 +19,7 @@
 
 pub(crate) mod chain_fragment;
 mod coordinator;
+pub(crate) mod leios_tracker;
 pub mod types;
 
 pub use coordinator::spawn_coordinator;
