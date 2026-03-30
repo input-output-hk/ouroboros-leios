@@ -1,0 +1,15 @@
+[package]
+name = "net-node"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+net-core = { path = "../net-core" }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "signal"] }
+clap = { version = "4", features = ["derive"] }
+figment = { version = "0.10", features = ["toml"] }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+rand = "0.8"
