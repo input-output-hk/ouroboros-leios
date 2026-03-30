@@ -64,6 +64,10 @@ pub struct CoordinatorConfig {
     pub max_handshaking: usize,
     /// Maximum connections (handshaking + established) from a single IP.
     pub max_connections_per_ip: usize,
+    /// Simulated inbound delay per peer address. Events from matching peers
+    /// are delayed by the specified duration before processing. Default: empty
+    /// (no delay). Used for local network simulation.
+    pub peer_delays: HashMap<String, Duration>,
 }
 
 impl Default for CoordinatorConfig {
@@ -82,6 +86,7 @@ impl Default for CoordinatorConfig {
             scheduler_type: SchedulerType::default(),
             max_handshaking: 64,
             max_connections_per_ip: 3,
+            peer_delays: HashMap::new(),
         }
     }
 }

@@ -109,6 +109,22 @@ pub struct ProductionConfig {
     /// Per-slot probability of producing a ranking block.
     #[serde(default = "default_rb_probability")]
     pub rb_generation_probability: f64,
+
+    /// Per-slot probability of producing an input block (Leios).
+    #[serde(default)]
+    pub ib_generation_probability: f64,
+
+    /// Per-stage probability of producing an endorser block (Leios).
+    #[serde(default)]
+    pub eb_generation_probability: f64,
+
+    /// Per-stage probability of producing a vote (Leios).
+    #[serde(default)]
+    pub vote_generation_probability: f64,
+
+    /// Leios stage length in slots.
+    #[serde(default = "default_stage_length")]
+    pub stage_length_slots: u64,
 }
 
 fn default_total_stake() -> u64 {
@@ -119,12 +135,20 @@ fn default_rb_probability() -> f64 {
     0.05
 }
 
+fn default_stage_length() -> u64 {
+    20
+}
+
 impl Default for ProductionConfig {
     fn default() -> Self {
         Self {
             stake: 0,
             total_stake: default_total_stake(),
             rb_generation_probability: default_rb_probability(),
+            ib_generation_probability: 0.0,
+            eb_generation_probability: 0.0,
+            vote_generation_probability: 0.0,
+            stage_length_slots: default_stage_length(),
         }
     }
 }
@@ -187,6 +211,14 @@ pub struct ValidationConfig {
     /// Per-byte component of TX validation (ms/byte).
     #[serde(default)]
     pub tx_validation_ms_per_byte: f64,
+
+    /// Endorser block validation (ms).
+    #[serde(default = "default_eb_validation_ms")]
+    pub eb_validation_ms: f64,
+
+    /// Vote validation (ms).
+    #[serde(default = "default_vote_validation_ms")]
+    pub vote_validation_ms: f64,
 }
 
 fn default_rb_head_ms() -> f64 {
@@ -198,6 +230,12 @@ fn default_rb_body_ms_constant() -> f64 {
 fn default_tx_validation_ms() -> f64 {
     0.5
 }
+fn default_eb_validation_ms() -> f64 {
+    2.0
+}
+fn default_vote_validation_ms() -> f64 {
+    1.0
+}
 
 impl Default for ValidationConfig {
     fn default() -> Self {
@@ -207,6 +245,8 @@ impl Default for ValidationConfig {
             rb_body_validation_ms_per_byte: 0.0,
             tx_validation_ms: default_tx_validation_ms(),
             tx_validation_ms_per_byte: 0.0,
+            eb_validation_ms: default_eb_validation_ms(),
+            vote_validation_ms: default_vote_validation_ms(),
         }
     }
 }

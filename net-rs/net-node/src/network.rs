@@ -27,6 +27,17 @@ fn parse_scheduler(name: &str) -> Result<SchedulerType, Box<dyn std::error::Erro
 pub async fn start(
     config: &NodeConfig,
 ) -> Result<CoordinatorHandle, Box<dyn std::error::Error + Send + Sync>> {
+    // Build per-peer delay map from config.
+    let peer_delays: HashMap<String, Duration> = config
+        .peers
+        .iter()
+        .filter_map(|p| {
+            p.inbound_delay_ms
+                .filter(|&ms| ms > 0)
+                .map(|ms| (p.address.clone(), Duration::from_millis(ms)))
+        })
+        .collect();
+
     let coordinator_config = CoordinatorConfig {
         network_magic: config.network_magic,
         max_peers: config.max_peers,
@@ -41,6 +52,7 @@ pub async fn start(
         scheduler_type: parse_scheduler(&config.scheduler)?,
         max_handshaking: config.max_handshaking,
         max_connections_per_ip: config.max_connections_per_ip,
+        peer_delays,
     };
 
     let handle = spawn_coordinator(coordinator_config);
