@@ -39,6 +39,24 @@ cargo run -p net-cli -- multi-follow --host 127.0.0.1:9999 --leios  # follow wit
 RUST_LOG=debug cargo run -p net-cli -- multi-follow --host 127.0.0.1:9999 --host 127.0.0.1:9999 --leios  # multi-peer Leios dedup (two connections, observe dedup/routing logs)
 ```
 
+### Test node (net-node)
+
+The test node is a configurable Leios node for local network simulation. It uses TOML config files layered left-to-right, with `--set key=value` for individual overrides.
+
+```sh
+# Two-node local test network (two terminals):
+RUST_LOG=info cargo run -p net-node -- --config net-node/configs/mainnet.toml --config net-node/configs/node0.toml
+RUST_LOG=info cargo run -p net-node -- --config net-node/configs/mainnet.toml --config net-node/configs/node1.toml
+
+# Fast slots for quick testing:
+cargo run -p net-node -- --config net-node/configs/mainnet.toml --config net-node/configs/node0.toml --set slot_duration_ms=200
+
+# Check JSONL telemetry output:
+cat node0-events.jsonl | python3 -m json.tool
+```
+
+Config layering: base config (shared genesis, magic, protocol params) + per-node overlay (node_id, listen_address, peers, stake, telemetry). See `net-node/configs/` for examples.
+
 ### Test vector workflow
 
 When implementing a new protocol or changing CBOR encoding:
@@ -134,7 +152,7 @@ net-rs/
         mod.rs            -- module root
         chain_store.rs    -- ChainStore: shared in-memory chain state for responder peers
         leios_store.rs    -- LeiosStore: content-addressed store for Leios data (EBs, votes)
-  net-cli/              -- binary crate
+  net-cli/              -- binary crate (CLI tools for testing and demos)
     src/
       main.rs           -- subcommand dispatch
       connect.rs        -- re-exports net_core::peer::connect
@@ -147,6 +165,18 @@ net-rs/
       serve.rs          -- `serve` command (fake server via coordinator with Poisson block generation)
       submit.rs         -- `submit` command (tx submission with Poisson generation)
       peershare.rs      -- `peer-share` command (request peers from a node)
+  net-node/             -- binary crate (configurable test node for network simulation)
+    configs/            -- sample TOML configs (mainnet.toml base + per-node overlays)
+    src/
+      main.rs           -- CLI (clap), config loading, main event loop
+      config.rs         -- TOML config structs (serde), figment layering, CLI overrides
+      clock.rs          -- slot clock: wall-clock -> slot mapping, aligned tick stream
+      network.rs        -- coordinator wrapper: config translation, peer setup, delay injection
+      production.rs     -- VRF lottery (from sim-rs), fake Shelley+ block/EB/vote building
+      consensus.rs      -- longest-chain selection, Leios EB/vote fetch decisions
+      validation.rs     -- fake validation with configurable timed delays
+      mempool.rs        -- tx pool + fake Poisson tx generation
+      telemetry.rs      -- EventSink/StatsSink traits, JSONL file sink, HTTP sinks, peer stats
 ```
 
 ## Key Design Decisions

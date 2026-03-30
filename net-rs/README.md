@@ -29,9 +29,17 @@ Rust implementation of the Cardano node-to-node (N2N) network stack, covering bo
 - Accept loop for inbound connections
 - Exponential-backoff reconnection for outbound peers
 
+**Test node** — configurable Leios-capable node for local network simulation:
+- VRF-based block production (stake-weighted lottery ported from sim-rs)
+- Longest-chain consensus with configurable fake validation delays
+- Leios IB/EB/vote production at stage boundaries
+- Per-peer network delay injection for topology simulation
+- Telemetry: sim-rs-compatible JSONL events, per-peer bandwidth tracking, HTTP + file sinks
+- TOML config with layering (base + per-node overlays + CLI overrides)
+
 **[Security hardened](docs/security-audit.md)** — allocation bounds on all wire-read lengths, buffer caps, timeouts on all remote waits, clean error propagation, no panics in library code.
 
-**291 tests** — unit tests, codec round-trips, protocol state machines, integration tests with in-memory bearers, and test vectors captured from the live Cardano mainnet.
+**324 tests** — unit tests, codec round-trips, protocol state machines, integration tests with in-memory bearers, and test vectors captured from the live Cardano mainnet.
 
 ## Architecture
 
@@ -110,6 +118,9 @@ net-rs/
 │       └── multi_peer/  # Multi-peer coordinator, application interface
 ├── net-cli/           # Binary crate — CLI tool for testing and demos
 │   └── src/           # Subcommands: handshake, follow, serve, submit, ...
+├── net-node/          # Binary crate — configurable test node
+│   ├── configs/       # Sample TOML configs (mainnet base + node overlays)
+│   └── src/           # Node logic: config, clock, production, consensus, telemetry
 ├── docs/              # Protocol references and implementation notes
 └── plans/             # Design documents
 ```
@@ -184,6 +195,45 @@ RUST_LOG=debug cargo run -p net-cli -- multi-follow \
   --host 127.0.0.1:9999 \
   --leios
 ```
+
+### Test node
+
+The `net-node` binary is a configurable test node for local network simulation. It uses TOML config files layered left-to-right.
+
+```sh
+# Two-node test network (run in separate terminals):
+RUST_LOG=info cargo run -p net-node -- \
+  --config net-node/configs/mainnet.toml \
+  --config net-node/configs/node0.toml
+
+RUST_LOG=info cargo run -p net-node -- \
+  --config net-node/configs/mainnet.toml \
+  --config net-node/configs/node1.toml
+
+# Override individual values:
+cargo run -p net-node -- \
+  --config net-node/configs/mainnet.toml \
+  --config net-node/configs/node0.toml \
+  --set slot_duration_ms=200
+```
+
+Both nodes produce blocks (500 stake each out of 1000 total), exchange them via ChainSync, and generate Leios EBs/votes at stage boundaries. Node 1 has a 50ms simulated delay on events from node 0.
+
+Telemetry output (`node0-events.jsonl`) uses sim-rs-compatible JSONL format:
+
+```json
+{"time_s":62969194.0,"message":{"type":"RBGenerated","node":"node-0","slot":125938388,"size_bytes":401}}
+{"time_s":62969194.5,"message":{"type":"EBGenerated","node":"node-0","slot":125938390}}
+```
+
+Periodic stats (logged and/or POSTed to HTTP endpoint) include per-peer bandwidth:
+
+```
+periodic stats node=node-0 slot=100 tip=Some(50) produced=5 received=45 peers=1
+  peer stats peer=peer-0 address=127.0.0.1:30001 mode=Duplex rtt_ms=None delay_ms=0 sent=1024 received=2048
+```
+
+See `net-node/configs/` for the full config schema with comments.
 
 ### Scheduler selection
 
