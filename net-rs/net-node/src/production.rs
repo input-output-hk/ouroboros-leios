@@ -134,22 +134,94 @@ impl BlockProducer {
         roll < target
     }
 
-    /// Build a fake block with minimal opaque CBOR.
+    /// Build a fake block with valid Shelley+ CBOR structure.
+    ///
+    /// The header and block body use proper era-tagged encoding so that
+    /// `body.point()` and `WrappedHeader::parse()` both work correctly.
+    /// The point hash is `blake2b_256(header_cbor)`, matching the real
+    /// Cardano derivation.
     fn make_fake_block(&mut self, slot: u64) -> (Point, WrappedHeader, BlockBody) {
-        let mut hash = [0u8; 32];
-        self.rng.fill(&mut hash);
+        let mut issuer_vkey = [0u8; 32];
+        self.rng.fill(&mut issuer_vkey);
+        let mut body_hash = [0u8; 32];
+        self.rng.fill(&mut body_hash);
 
-        let point = Point::Specific { slot, hash };
+        // Build header_body: 10-field array (Shelley+ minimum).
+        // [block_number, slot, prev_hash, issuer_vkey, vrf_vkey, vrf_result,
+        //  body_size, block_body_hash, operational_cert, protocol_version]
+        let mut header_body = Vec::new();
+        let mut hb = minicbor::Encoder::new(&mut header_body);
+        let _ = hb
+            .array(10)
+            .and_then(|e| e.u64(self.block_count)) // block_number
+            .and_then(|e| e.u64(slot)) // slot
+            .and_then(|e| e.null()) // prev_hash (null for simplicity)
+            .and_then(|e| e.bytes(&issuer_vkey)) // issuer_vkey
+            .and_then(|e| e.bytes(&[0u8; 32])) // vrf_vkey (placeholder)
+            .and_then(|e| e.array(2)) // vrf_result: [output, proof]
+            .and_then(|e| e.bytes(&[0u8; 32]))
+            .and_then(|e| e.bytes(&[0u8; 64]))
+            .and_then(|e| e.u32(0)) // body_size
+            .and_then(|e| e.bytes(&body_hash)) // block_body_hash
+            .and_then(|e| e.array(4)) // operational_cert: [vkey, counter, kes_period, sig]
+            .and_then(|e| e.bytes(&[0u8; 32]))
+            .and_then(|e| e.u64(0))
+            .and_then(|e| e.u64(0))
+            .and_then(|e| e.bytes(&[0u8; 64]))
+            .and_then(|e| e.array(2)) // protocol_version: [major, minor]
+            .and_then(|e| e.u32(10))
+            .and_then(|e| e.u32(0));
 
-        let mut cbor_buf = Vec::new();
-        let mut enc = minicbor::Encoder::new(&mut cbor_buf);
-        // Encode as a 2-element array [slot, hash] for minimal structure.
-        let _ = enc
+        // Inner header: [header_body, body_signature]
+        let mut header_inner = Vec::new();
+        let mut hi = minicbor::Encoder::new(&mut header_inner);
+        let _ = hi.array(2);
+        header_inner.extend_from_slice(&header_body);
+        let _ = minicbor::Encoder::new(&mut header_inner).bytes(&[0u8; 64]); // signature placeholder
+
+        // Header CBOR: [era_tag, #6.24(header_inner)]
+        let era: u32 = 7; // Conway
+        let mut header_cbor = Vec::new();
+        let mut he = minicbor::Encoder::new(&mut header_cbor);
+        let _ = he
             .array(2)
-            .and_then(|e| e.u64(slot))
-            .and_then(|e| e.bytes(&hash));
-        let header = WrappedHeader::opaque(cbor_buf.clone());
-        let body = BlockBody::opaque(cbor_buf);
+            .and_then(|e| e.u32(era))
+            .and_then(|e| e.tag(minicbor::data::Tag::new(24)))
+            .and_then(|e| e.bytes(&header_inner));
+
+        // Point: (slot, blake2b_256(header_cbor))
+        let hash_result = blake2b_simd::Params::new()
+            .hash_length(32)
+            .hash(&header_cbor);
+        let mut hash = [0u8; 32];
+        hash.copy_from_slice(hash_result.as_bytes());
+        let point = Point::Specific { slot, hash };
+        let header = WrappedHeader::new(header_cbor.clone());
+
+        // Block body: #6.24([era_tag, [header, tx_bodies, tx_witnesses, metadata]])
+        // The header inside the block must be the same bytes so body.point()
+        // extracts the same hash.
+        let mut block_inner = Vec::new();
+        let mut bi = minicbor::Encoder::new(&mut block_inner);
+        let _ = bi.array(2).and_then(|e| e.u32(era));
+        // era_block: [header, tx_bodies, ...]
+        let _ = minicbor::Encoder::new(&mut block_inner).array(4);
+        // header (same inner bytes wrapped in #6.24)
+        let _ = minicbor::Encoder::new(&mut block_inner)
+            .tag(minicbor::data::Tag::new(24))
+            .and_then(|e| e.bytes(&header_inner));
+        // tx_bodies (empty map)
+        let _ = minicbor::Encoder::new(&mut block_inner).map(0);
+        // tx_witnesses (empty map)
+        let _ = minicbor::Encoder::new(&mut block_inner).map(0);
+        // metadata (null)
+        let _ = minicbor::Encoder::new(&mut block_inner).null();
+
+        let mut body_cbor = Vec::new();
+        let _ = minicbor::Encoder::new(&mut body_cbor)
+            .tag(minicbor::data::Tag::new(24))
+            .and_then(|e| e.bytes(&block_inner));
+        let body = BlockBody::new(body_cbor);
 
         (point, header, body)
     }
@@ -290,5 +362,39 @@ mod tests {
         let v = votes.unwrap();
         assert!(!v.vote_ids.is_empty());
         assert_eq!(v.vote_ids.len(), v.vote_data.len());
+    }
+
+    #[test]
+    fn fake_block_has_parseable_cbor() {
+        let config = ProductionConfig {
+            stake: 1000,
+            rb_generation_probability: 1.0,
+            ..base_config()
+        };
+        let mut producer = BlockProducer::new(&config, Some(42));
+        let (point, header, body) = producer.try_produce_block(12345).unwrap();
+
+        // Header should be parseable.
+        assert!(header.parsed.is_some(), "header should parse");
+        let info = header.parsed.as_ref().unwrap();
+        assert_eq!(info.slot, 12345);
+        assert_eq!(info.era, 7); // Conway
+
+        // Header point should match the produced point.
+        let header_point = header.point();
+        assert!(header_point.is_some(), "header.point() should work");
+        assert_eq!(header_point.unwrap(), point);
+
+        // Block body should derive the same point.
+        let body_point = body.point();
+        assert!(body_point.is_some(), "body.point() should work");
+        assert_eq!(body_point.unwrap(), point);
+
+        // Body should also extract a parseable header.
+        let extracted = body.header();
+        assert!(extracted.is_some(), "body.header() should work");
+        let ex = extracted.unwrap();
+        assert!(ex.parsed.is_some());
+        assert_eq!(ex.parsed.as_ref().unwrap().slot, 12345);
     }
 }

@@ -677,6 +677,7 @@ dependencies = [
 name = "net-node"
 version = "0.1.0"
 dependencies = [
+ "blake2b_simd",
  "clap",
  "figment",
  "minicbor",
