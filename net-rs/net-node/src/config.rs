@@ -86,6 +86,10 @@ pub struct NodeConfig {
     #[serde(default)]
     pub transactions: TxConfig,
 
+    /// Validation timing settings.
+    #[serde(default)]
+    pub validation: ValidationConfig,
+
     /// Outbound peer list.
     #[serde(default)]
     pub peers: Vec<PeerConfig>,
@@ -159,6 +163,54 @@ impl Default for TxConfig {
     }
 }
 
+/// Validation timing configuration.
+///
+/// Fake validation simulates CPU cost as `sleep(constant + per_byte * body_len)`.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ValidationConfig {
+    /// Constant component of RB header validation (ms).
+    #[serde(default = "default_rb_head_ms")]
+    pub rb_head_validation_ms: f64,
+
+    /// Constant component of RB body validation (ms).
+    #[serde(default = "default_rb_body_ms_constant")]
+    pub rb_body_validation_ms_constant: f64,
+
+    /// Per-byte component of RB body validation (ms/byte).
+    #[serde(default)]
+    pub rb_body_validation_ms_per_byte: f64,
+
+    /// Constant component of TX validation (ms).
+    #[serde(default = "default_tx_validation_ms")]
+    pub tx_validation_ms: f64,
+
+    /// Per-byte component of TX validation (ms/byte).
+    #[serde(default)]
+    pub tx_validation_ms_per_byte: f64,
+}
+
+fn default_rb_head_ms() -> f64 {
+    1.0
+}
+fn default_rb_body_ms_constant() -> f64 {
+    5.0
+}
+fn default_tx_validation_ms() -> f64 {
+    0.5
+}
+
+impl Default for ValidationConfig {
+    fn default() -> Self {
+        Self {
+            rb_head_validation_ms: default_rb_head_ms(),
+            rb_body_validation_ms_constant: default_rb_body_ms_constant(),
+            rb_body_validation_ms_per_byte: 0.0,
+            tx_validation_ms: default_tx_validation_ms(),
+            tx_validation_ms_per_byte: 0.0,
+        }
+    }
+}
+
 // --- defaults ---
 
 fn default_node_id() -> String {
@@ -220,6 +272,7 @@ impl Default for NodeConfig {
             max_connections_per_ip: default_max_connections_per_ip(),
             production: ProductionConfig::default(),
             transactions: TxConfig::default(),
+            validation: ValidationConfig::default(),
             peers: Vec::new(),
         }
     }

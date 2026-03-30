@@ -1,8 +1,10 @@
 mod clock;
 mod config;
+mod consensus;
 mod mempool;
 mod network;
 mod production;
+mod validation;
 
 use clap::Parser;
 use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
@@ -55,6 +57,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         );
     }
 
+    // Validator and consensus.
+    let (validator, mut validation_rx) = validation::Validator::new(config.validation.clone());
+    let mut consensus =
+        consensus::Consensus::new(config.node_id.clone(), handle.commands.clone(), validator);
+
     // Transaction generator (background task).
     let _tx_handle = mempool::spawn_tx_generator(
         &config.transactions,
@@ -78,6 +85,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         block_count = producer.block_count(),
                         "produced block"
                     );
+                    consensus.register_self_produced(&point);
                     let _ = handle.commands.send(NetworkCommand::InjectBlock {
                         point,
                         header: Box::new(header),
@@ -87,12 +95,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             }
             event = handle.events.recv() => {
                 match event {
-                    Some(event) => log_event(&config.node_id, &event),
+                    Some(event) => {
+                        if !consensus.handle_event(&event).await {
+                            log_event(&config.node_id, &event);
+                        }
+                    }
                     None => {
                         warn!("coordinator channel closed");
                         break;
                     }
                 }
+            }
+            Some(result) = validation_rx.recv() => {
+                consensus.on_validation_complete(result).await;
             }
             _ = &mut shutdown => {
                 info!("shutting down");
@@ -113,15 +128,6 @@ fn log_event(node_id: &str, event: &NetworkEvent) {
         NetworkEvent::PeerDisconnected { peer_id, reason } => {
             info!(node_id, %peer_id, %reason, "peer disconnected");
         }
-        NetworkEvent::TipAdvanced { tip, .. } => {
-            info!(node_id, %tip, "tip advanced");
-        }
-        NetworkEvent::RolledBack { point, tip } => {
-            info!(node_id, to = %point, %tip, "rolled back");
-        }
-        NetworkEvent::BlockReceived { point, .. } => {
-            info!(node_id, %point, "block received");
-        }
         NetworkEvent::TransactionReceived { peer_id, body } => {
             info!(node_id, %peer_id, bytes = body.len(), "transaction received");
         }
@@ -129,7 +135,6 @@ fn log_event(node_id: &str, event: &NetworkEvent) {
             info!(node_id, count = peers.len(), "peers discovered");
         }
         _ => {
-            // Leios events and others -- log generically for now.
             info!(node_id, event = ?event, "network event");
         }
     }

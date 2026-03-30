@@ -268,9 +268,16 @@ impl Coordinator {
                 }
             }
 
-            PeerEvent::BlockFetched { body } => {
-                // Derive the point from the block body (header hash + slot).
-                let point = body.point().unwrap_or(Point::Origin); // Byron blocks have no parseable point
+            PeerEvent::BlockFetched { from, to, body } => {
+                // Use the original fetch range to identify the block.
+                // For single-block fetches (from == to), this is the
+                // authoritative point. Falls back to body parsing for
+                // multi-block ranges.
+                let point = if from == to {
+                    from
+                } else {
+                    body.point().unwrap_or(from)
+                };
 
                 self.pending_fetches.remove(&point);
 
@@ -1578,27 +1585,27 @@ mod tests {
             .fragment
             .contains(&point));
 
-        // Simulate BlockFetched with a body whose point() returns None (opaque).
-        // We need to use pending_fetches to verify cleanup.
+        // Simulate BlockFetched with an opaque body whose point() returns None.
+        // The fetch range (from == to == point) provides the authoritative point.
         coordinator.pending_fetches.insert(point.clone(), peer_a);
 
-        // Use a real-ish block body that returns a known point.
-        // Since opaque bodies return None, use pending_fetches + Point::Origin path.
-        // Instead, let's directly test by simulating with Origin.
         coordinator
             .handle_peer_event(
                 peer_a,
                 PeerEvent::BlockFetched {
+                    from: point.clone(),
+                    to: point.clone(),
                     body: crate::types::BlockBody::opaque(vec![0xD8, 0x18, 0x40]),
                 },
             )
             .await;
 
-        // The fetched block resolves to Point::Origin (opaque body).
-        // Both peers' fragments should have Origin removed (no-op if not present).
-        // To properly test, let's verify pending_fetches was cleaned for the point.
-        // The opaque body returns Point::Origin, so pending_fetches for our point remains.
-        // This test verifies the mechanism works; real integration uses real block bodies.
+        // The fetch range carries the original point, so pending_fetches is
+        // correctly cleaned up even for opaque block bodies.
+        assert!(
+            !coordinator.pending_fetches.contains_key(&point),
+            "pending fetch should be removed"
+        );
     }
 
     #[tokio::test]

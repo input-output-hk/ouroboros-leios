@@ -133,7 +133,7 @@ tx_size_max = 16384
 
 **Verify:** Single node with `stake = total_stake` produces every slot. Second node following sees blocks via ChainSync. Deterministic seed gives reproducible sequence.
 
-### Stage 3: Consensus + Validation
+### Stage 3: Consensus + Validation — COMPLETE
 
 **Goal:** Follow longest chain from peers, fetch blocks, validate with configurable delays, re-serve validated blocks.
 
