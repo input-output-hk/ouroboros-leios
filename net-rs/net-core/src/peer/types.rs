@@ -34,9 +34,14 @@ pub enum PeerEvent {
     /// ChainSync: peer rolled back (from `MsgRollBackward`).
     RolledBack { point: Point, tip: Tip },
 
-    /// BlockFetch: a requested block arrived. The block body contains the
-    /// header, from which the Point can be derived via `body.point()`.
-    BlockFetched { body: BlockBody },
+    /// BlockFetch: a requested block arrived. Carries the original fetch
+    /// range so the coordinator can identify which request this fulfils
+    /// without relying on body parsing (which fails for opaque/fake blocks).
+    BlockFetched {
+        from: Point,
+        to: Point,
+        body: BlockBody,
+    },
 
     /// KeepAlive: measured round-trip time.
     LatencyMeasured { rtt: Duration },
