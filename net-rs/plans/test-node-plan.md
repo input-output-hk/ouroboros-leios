@@ -70,7 +70,7 @@ net-node/src/
 - **Event format:** Match sim-rs JSONL field names/structure for direct tooling reuse.
 - **CLI:** `net-node --config base.toml --config node0.toml --set slot_duration_ms=100`. `--config` is repeatable, files layered left-to-right. `--set` for individual key=value overrides.
 
-### Stage 1: Skeleton + Config + Slot Clock
+### Stage 1: Skeleton + Config + Slot Clock — COMPLETE
 
 **Goal:** Running binary that loads layered TOML config, starts coordinator in duplex mode, connects to peers, accepts inbound, ticks slots.
 
@@ -108,7 +108,7 @@ loop { tokio::select! {
 
 **Verify:** Two nodes on different ports, each peering with the other. Confirm `PeerConnected` events and slot ticks at correct rate.
 
-### Stage 2: Block Production + Transaction Injection
+### Stage 2: Block Production + Transaction Injection — COMPLETE
 
 **Goal:** Node produces fake Praos blocks via VRF lottery per slot. Generates and disseminates fake transactions.
 

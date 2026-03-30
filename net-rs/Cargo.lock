@@ -316,6 +316,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "figment",
+ "minicbor",
  "net-core",
  "rand",
  "serde",

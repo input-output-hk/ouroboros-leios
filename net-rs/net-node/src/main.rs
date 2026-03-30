@@ -1,9 +1,11 @@
 mod clock;
 mod config;
+mod mempool;
 mod network;
+mod production;
 
 use clap::Parser;
-use net_core::multi_peer::types::NetworkEvent;
+use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
 use tracing::{info, warn};
 
 #[derive(Parser)]
@@ -32,11 +34,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         slot_ms = config.slot_duration_ms,
         leios = config.leios_enabled,
         peers = config.peers.len(),
+        stake = config.production.stake,
+        total_stake = config.production.total_stake,
+        tx_rate = config.transactions.tx_rate,
         "starting node"
     );
 
     let mut slot_clock = clock::SlotClock::new(config.genesis_time_unix, config.slot_duration_ms);
     let mut handle = network::start(&config).await?;
+
+    // Block producer.
+    let mut producer = production::BlockProducer::new(&config.production, config.seed);
+    if producer.is_active() {
+        info!(
+            node_id = %config.node_id,
+            stake = config.production.stake,
+            total_stake = config.production.total_stake,
+            rb_prob = config.production.rb_generation_probability,
+            "block production enabled"
+        );
+    }
+
+    // Transaction generator (background task).
+    let _tx_handle = mempool::spawn_tx_generator(
+        &config.transactions,
+        config.seed,
+        handle.commands.clone(),
+        config.node_id.clone(),
+    );
 
     // Graceful shutdown on Ctrl-C.
     let shutdown = tokio::signal::ctrl_c();
@@ -45,7 +70,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     loop {
         tokio::select! {
             slot = slot_clock.tick() => {
-                info!(slot, node_id = %config.node_id, "slot tick");
+                // Try to produce a block this slot.
+                if let Some((point, header, body)) = producer.try_produce_block(slot) {
+                    info!(
+                        node_id = %config.node_id,
+                        %point,
+                        block_count = producer.block_count(),
+                        "produced block"
+                    );
+                    let _ = handle.commands.send(NetworkCommand::InjectBlock {
+                        point,
+                        header: Box::new(header),
+                        body,
+                    }).await;
+                }
             }
             event = handle.events.recv() => {
                 match event {
@@ -58,9 +96,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             }
             _ = &mut shutdown => {
                 info!("shutting down");
-                let _ = handle.commands.send(
-                    net_core::multi_peer::types::NetworkCommand::Shutdown
-                ).await;
+                let _ = handle.commands.send(NetworkCommand::Shutdown).await;
                 break;
             }
         }
