@@ -138,7 +138,7 @@ impl BlockProducer {
     ///
     /// The header and block body use proper era-tagged encoding so that
     /// `body.point()` and `WrappedHeader::parse()` both work correctly.
-    /// The point hash is `blake2b_256(header_cbor)`, matching the real
+    /// The point hash uses `header_hash()`, matching the real
     /// Cardano derivation.
     fn make_fake_block(&mut self, slot: u64) -> (Point, WrappedHeader, BlockBody) {
         let mut issuer_vkey = [0u8; 32];
@@ -189,14 +189,11 @@ impl BlockProducer {
             .and_then(|e| e.tag(minicbor::data::Tag::new(24)))
             .and_then(|e| e.bytes(&header_inner));
 
-        // Point: (slot, blake2b_256(header_cbor))
-        let hash_result = blake2b_simd::Params::new()
-            .hash_length(32)
-            .hash(&header_cbor);
-        let mut hash = [0u8; 32];
-        hash.copy_from_slice(hash_result.as_bytes());
-        let point = Point::Specific { slot, hash };
+        // Point: (slot, header_hash(header_cbor))
         let header = WrappedHeader::new(header_cbor.clone());
+        let point = header
+            .point()
+            .expect("freshly-built Shelley+ header must parse");
 
         // Block body: #6.24([era_tag, [header, tx_bodies, tx_witnesses, metadata]])
         // The header inside the block must be the same bytes so body.point()
@@ -206,10 +203,8 @@ impl BlockProducer {
         let _ = bi.array(2).and_then(|e| e.u32(era));
         // era_block: [header, tx_bodies, ...]
         let _ = minicbor::Encoder::new(&mut block_inner).array(4);
-        // header (same inner bytes wrapped in #6.24)
-        let _ = minicbor::Encoder::new(&mut block_inner)
-            .tag(minicbor::data::Tag::new(24))
-            .and_then(|e| e.bytes(&header_inner));
+        // header: [header_body, sig] (raw, no #6.24 wrapping — matches real Cardano blocks)
+        block_inner.extend_from_slice(&header_inner);
         // tx_bodies (empty map)
         let _ = minicbor::Encoder::new(&mut block_inner).map(0);
         // tx_witnesses (empty map)

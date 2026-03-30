@@ -1,7 +1,5 @@
 //! Raw block bodies with optional Leios metadata (CIP-0164).
 
-use std::io::Write as _;
-
 use minicbor::decode::Error as DecodeError;
 use minicbor::encode::Error as EncodeError;
 use minicbor::{Decoder, Encoder};
@@ -131,7 +129,12 @@ impl BlockBody {
         Some(super::WrappedHeader::new(buf))
     }
 
-    /// Extract the raw header CBOR bytes `[era_tag, header_inner]` from this block.
+    /// Extract the header from this block in ChainSync wire format:
+    /// `[era_tag, #6.24(header_cbor)]`.
+    ///
+    /// Inside the block, the header is stored as raw CBOR `[header_body, sig]`.
+    /// This method wraps it in `#6.24` to match the ChainSync wire format,
+    /// ensuring consistent hashing and downstream compatibility.
     fn try_extract_header(&self) -> Result<Vec<u8>, DecodeError> {
         let mut d = Decoder::new(&self.raw);
 
@@ -162,16 +165,16 @@ impl BlockBody {
             .get(header_start..header_end)
             .ok_or_else(|| DecodeError::message("failed to extract header bytes"))?;
 
-        // Reconstruct full header CBOR: [era_tag, header_inner]
-        // This matches the WrappedHeader wire format used by ChainSync.
+        // Reconstruct in ChainSync wire format: [era_tag, #6.24(header_cbor)]
         let mut header_buf = Vec::new();
         let mut he = Encoder::new(&mut header_buf);
         he.array(2)
             .map_err(|_| DecodeError::message("encode error"))?;
         he.u32(era)
             .map_err(|_| DecodeError::message("encode error"))?;
-        he.writer_mut()
-            .write_all(header_inner_bytes)
+        he.tag(minicbor::data::Tag::new(24))
+            .map_err(|_| DecodeError::message("encode error"))?;
+        he.bytes(header_inner_bytes)
             .map_err(|_| DecodeError::message("encode error"))?;
 
         Ok(header_buf)
@@ -356,24 +359,19 @@ mod tests {
         hb.u32(10).unwrap();
         hb.u32(0).unwrap();
 
-        // Build inner header: [header_body, body_signature]
-        let mut hi_buf = Vec::new();
-        let mut hi = Encoder::new(&mut hi_buf);
+        // Build header: [header_body, body_signature]
+        let mut header_buf = Vec::new();
+        let mut hi = Encoder::new(&mut header_buf);
         hi.array(2).unwrap();
         hi.writer_mut().write_all(&hb_buf).unwrap();
         hi.bytes(&[0u8; 64]).unwrap(); // dummy signature
 
-        // Header as it appears in block: #6.24(inner_header_bytes)
-        let mut header_in_block = Vec::new();
-        let mut hib = Encoder::new(&mut header_in_block);
-        hib.tag(minicbor::data::Tag::new(24)).unwrap();
-        hib.bytes(&hi_buf).unwrap();
-
         // Block array: [header, txs, witnesses, aux]
+        // Note: real Cardano blocks store the header directly (no #6.24 wrapping).
         let mut block_buf = Vec::new();
         let mut be = Encoder::new(&mut block_buf);
         be.array(4).unwrap();
-        be.writer_mut().write_all(&header_in_block).unwrap();
+        be.writer_mut().write_all(&header_buf).unwrap();
         be.array(0).unwrap(); // txs
         be.array(0).unwrap(); // witnesses
         be.null().unwrap(); // aux

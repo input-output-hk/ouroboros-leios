@@ -75,11 +75,11 @@ impl HeaderInfo {
         let inner_bytes = d.bytes()?;
 
         // Inner: [header_body, body_signature]
-        let mut inner = Decoder::new(inner_bytes);
-        let _inner_len = inner.array()?;
+        let mut d = Decoder::new(inner_bytes);
+        let _inner_len = d.array()?;
 
         // header_body is itself an array
-        let body_len = match inner.array()? {
+        let body_len = match d.array()? {
             Some(n) => n,
             None => return Err(DecodeError::message("indefinite header_body")),
         };
@@ -91,25 +91,25 @@ impl HeaderInfo {
         }
 
         // Field 0: block_number
-        let block_number = inner.u64()?;
+        let block_number = d.u64()?;
         // Field 1: slot
-        let slot = inner.u64()?;
+        let slot = d.u64()?;
         // Field 2: prev_hash (hash32 or null)
-        let prev_hash = parse_optional_hash(&mut inner)?;
+        let prev_hash = parse_optional_hash(&mut d)?;
         // Field 3: issuer_vkey (bytes 32)
-        let issuer_vkey = parse_hash32(&mut inner)?;
+        let issuer_vkey = parse_hash32(&mut d)?;
         // Field 4: vrf_vkey — skip
-        inner.skip()?;
+        d.skip()?;
         // Field 5: vrf_result — skip
-        inner.skip()?;
+        d.skip()?;
         // Field 6: body_size
-        let body_size = inner.u32()?;
+        let body_size = d.u32()?;
         // Field 7: block_body_hash
-        let block_body_hash = parse_hash32(&mut inner)?;
+        let block_body_hash = parse_hash32(&mut d)?;
         // Field 8: operational_cert — skip
-        inner.skip()?;
+        d.skip()?;
         // Field 9: protocol_version — skip
-        inner.skip()?;
+        d.skip()?;
 
         // CIP-0164 Leios extensions — optional trailing fields.
         // The array length alone determines which are present:
@@ -120,15 +120,15 @@ impl HeaderInfo {
         let extra = body_len - HEADER_BODY_BASE_FIELDS;
 
         let announced_eb = if extra >= 2 {
-            let eb_hash = parse_hash32(&mut inner)?;
-            let eb_size = inner.u32()?;
+            let eb_hash = parse_hash32(&mut d)?;
+            let eb_size = d.u32()?;
             Some((eb_hash, eb_size))
         } else {
             None
         };
 
         let certified_eb = if extra == 1 || extra == 3 {
-            Some(inner.bool()?)
+            Some(d.bool()?)
         } else {
             None
         };
@@ -174,14 +174,30 @@ fn parse_optional_hash(d: &mut Decoder<'_>) -> Result<Option<[u8; 32]>, DecodeEr
 // --- Header hash ---
 
 /// Compute Blake2b-256 hash of header CBOR bytes.
-/// Used by both `WrappedHeader::point()` and `BlockBody::point()`.
+/// Compute the block header hash (Blake2b-256).
+///
+/// The input is an era-tagged header in ChainSync wire format:
+/// `[era_tag, #6.24(header_cbor)]`. The hash is `Blake2b-256(header_cbor)` —
+/// over the bytes inside the `#6.24` bstr, which is the CBOR encoding of
+/// `[header_body, body_signature]`. This matches the Cardano convention
+/// where neither the era tag nor the `#6.24` wrapping are part of the
+/// header identity.
 pub(crate) fn header_hash(header_bytes: &[u8]) -> [u8; 32] {
-    let result = blake2b_simd::Params::new()
-        .hash_length(32)
-        .hash(header_bytes);
+    let hash_input = extract_header_cbor(header_bytes).unwrap_or(header_bytes);
+    let result = blake2b_simd::Params::new().hash_length(32).hash(hash_input);
     let mut hash = [0u8; 32];
     hash.copy_from_slice(result.as_bytes());
     hash
+}
+
+/// Extract the inner header CBOR bytes from `[era_tag, #6.24(header_cbor)]`.
+/// Returns `header_cbor` — the bytes inside the `#6.24` bstr.
+fn extract_header_cbor(header_bytes: &[u8]) -> Option<&[u8]> {
+    let mut d = minicbor::Decoder::new(header_bytes);
+    d.array().ok()?;
+    d.skip().ok()?; // skip era_tag
+    d.tag().ok()?; // skip #6.24 tag
+    d.bytes().ok() // extract the inner bstr content
 }
 
 // --- WrappedHeader ---
