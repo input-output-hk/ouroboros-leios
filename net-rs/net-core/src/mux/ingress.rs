@@ -2,6 +2,8 @@
 //! payloads to per-protocol ingress channels.
 
 use std::collections::HashMap;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use std::time::Duration;
 
 use bytes::Bytes;
@@ -36,6 +38,7 @@ pub(crate) async fn run_demuxer<R>(
     mut protocols: HashMap<ChannelKey, ProtocolIngress>,
     sdu_timeout: Duration,
     max_sdu_payload: usize,
+    stats: Arc<super::MuxStats>,
 ) -> Result<(), MuxError>
 where
     R: AsyncRead + Unpin,
@@ -56,6 +59,11 @@ where
             Ok(Err(e)) => return Err(MuxError::Io(e)),
             Err(_) => return Err(MuxError::SduTimeout(sdu_timeout)),
         };
+
+        stats.bytes_received.fetch_add(
+            (wire::HEADER_LEN + segment.payload.len()) as u64,
+            Ordering::Relaxed,
+        );
 
         let protocol_id = segment.header.protocol;
         let mode = segment.header.mode;

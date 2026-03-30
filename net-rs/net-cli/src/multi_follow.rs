@@ -128,6 +128,7 @@ pub async fn run(
                     println!("  block fetch failed: {from}..{to}");
                 }
             }
+            NetworkEvent::PeerSnapshot { .. } => {}
         }
     }
 

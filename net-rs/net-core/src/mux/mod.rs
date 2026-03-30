@@ -8,6 +8,7 @@ pub mod wire;
 pub use codec::{CodecRecv, CodecSend};
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -29,6 +30,37 @@ pub const MODE_RESPONDER: u16 = 0x8000;
 
 /// Default SDU (segment) payload size, matching Cardano node's 12KB choice.
 pub const DEFAULT_SDU_SIZE: usize = 12_288;
+
+/// Per-connection byte counters, shared between mux tasks and the owner.
+/// Used for telemetry — zero overhead (single relaxed atomic add per segment).
+#[derive(Debug)]
+pub struct MuxStats {
+    pub bytes_sent: AtomicU64,
+    pub bytes_received: AtomicU64,
+}
+
+impl MuxStats {
+    pub fn new() -> Self {
+        Self {
+            bytes_sent: AtomicU64::new(0),
+            bytes_received: AtomicU64::new(0),
+        }
+    }
+
+    /// Read current counters (relaxed ordering, suitable for telemetry).
+    pub fn snapshot(&self) -> (u64, u64) {
+        (
+            self.bytes_sent.load(Ordering::Relaxed),
+            self.bytes_received.load(Ordering::Relaxed),
+        )
+    }
+}
+
+impl Default for MuxStats {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 /// Configuration for a single protocol channel within the mux.
 #[derive(Debug, Clone)]
@@ -186,6 +218,7 @@ impl<S: scheduler::Scheduler> Mux<S> {
     pub fn run<B: Bearer>(self, bearer: B) -> RunningMux {
         let (reader, writer) = bearer.split();
         let clock = Instant::now();
+        let stats = Arc::new(MuxStats::new());
 
         let muxer_handle = tokio::spawn(egress::run_muxer(
             writer,
@@ -194,6 +227,7 @@ impl<S: scheduler::Scheduler> Mux<S> {
             self.config.sdu_size,
             clock,
             self.egress_notify,
+            stats.clone(),
         ));
 
         let demuxer_handle = tokio::spawn(ingress::run_demuxer(
@@ -201,6 +235,7 @@ impl<S: scheduler::Scheduler> Mux<S> {
             self.ingress_protocols,
             self.config.sdu_timeout,
             self.config.sdu_size,
+            stats.clone(),
         ));
 
         // Spawn a supervisor that aborts the surviving task when one fails.
@@ -241,6 +276,7 @@ impl<S: scheduler::Scheduler> Mux<S> {
         RunningMux {
             supervisor,
             error_rx,
+            stats,
         }
     }
 }
@@ -251,6 +287,8 @@ impl<S: scheduler::Scheduler> Mux<S> {
 pub struct RunningMux {
     supervisor: JoinHandle<()>,
     error_rx: tokio::sync::watch::Receiver<Option<String>>,
+    /// Per-connection byte counters (shared with muxer/demuxer tasks).
+    pub stats: Arc<MuxStats>,
 }
 
 impl RunningMux {

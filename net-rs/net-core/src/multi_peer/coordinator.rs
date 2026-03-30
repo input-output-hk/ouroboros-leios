@@ -52,6 +52,8 @@ struct PeerState {
     /// Simulated inbound delay. Events from this peer are delayed by this
     /// duration before processing. Zero = no delay.
     inbound_delay: Duration,
+    /// Shared byte counters from this peer's mux connection.
+    mux_stats: Option<Arc<crate::mux::MuxStats>>,
 }
 
 /// The coordinator's internal state.
@@ -199,6 +201,7 @@ impl Coordinator {
                 fragment: ChainFragment::new(),
                 reconnect_backoff,
                 inbound_delay,
+                mux_stats: None,
             },
         );
 
@@ -213,7 +216,10 @@ impl Coordinator {
     /// Handle an event from a peer task.
     async fn handle_peer_event(&mut self, peer_id: PeerId, event: PeerEvent) {
         match event {
-            PeerEvent::Connected => {
+            PeerEvent::Connected { mux_stats } => {
+                if let Some(peer) = self.peers.get_mut(&peer_id) {
+                    peer.mux_stats = Some(mux_stats);
+                }
                 let address = self
                     .peers
                     .get(&peer_id)
@@ -650,6 +656,31 @@ impl Coordinator {
                 }
             }
 
+            NetworkCommand::QueryPeers => {
+                let peers: Vec<super::types::PeerInfo> = self
+                    .peers
+                    .iter()
+                    .map(|(id, p)| {
+                        let (bytes_sent, bytes_received) =
+                            p.mux_stats.as_ref().map(|s| s.snapshot()).unwrap_or((0, 0));
+                        super::types::PeerInfo {
+                            peer_id: *id,
+                            address: p.address.clone(),
+                            mode: p.mode,
+                            rtt: p.rtt,
+                            tip_block_no: p.tip.as_ref().map(|t| t.block_no),
+                            inbound_delay: p.inbound_delay,
+                            bytes_sent,
+                            bytes_received,
+                        }
+                    })
+                    .collect();
+                let _ = self
+                    .network_events
+                    .send(NetworkEvent::PeerSnapshot { peers })
+                    .await;
+            }
+
             NetworkCommand::Shutdown => {
                 // Disconnect all peers.
                 let peer_ids: Vec<PeerId> = self.peers.keys().copied().collect();
@@ -779,6 +810,7 @@ impl Coordinator {
                 fragment: ChainFragment::new(),
                 reconnect_backoff: Duration::from_secs(0), // unused for responders
                 inbound_delay,
+                mux_stats: None,
             },
         );
 
@@ -1130,6 +1162,7 @@ mod tests {
                 fragment: ChainFragment::new(),
                 reconnect_backoff: Duration::from_secs(1),
                 inbound_delay: Duration::ZERO,
+                mux_stats: None,
             },
         );
 
@@ -1218,6 +1251,7 @@ mod tests {
                     fragment: ChainFragment::new(),
                     reconnect_backoff: Duration::from_secs(1),
                     inbound_delay: Duration::ZERO,
+                    mux_stats: None,
                 },
             );
         }
@@ -1319,6 +1353,7 @@ mod tests {
                 fragment: ChainFragment::new(),
                 reconnect_backoff: Duration::from_secs(1),
                 inbound_delay: Duration::ZERO,
+                mux_stats: None,
             },
         );
 
@@ -1387,6 +1422,7 @@ mod tests {
                 fragment: ChainFragment::new(),
                 reconnect_backoff: Duration::from_secs(1),
                 inbound_delay: Duration::ZERO,
+                mux_stats: None,
             },
         );
 
@@ -1438,6 +1474,7 @@ mod tests {
                 fragment: ChainFragment::new(),
                 reconnect_backoff: Duration::from_secs(1),
                 inbound_delay: Duration::ZERO,
+                mux_stats: None,
             },
         );
         cmd_receiver

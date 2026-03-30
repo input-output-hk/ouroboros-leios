@@ -516,7 +516,14 @@ pub(crate) async fn run_peer_task(mut config: PeerTaskConfig) {
     };
 
     // Report successful connection.
-    let _ = event_sender.send((peer_id, PeerEvent::Connected)).await;
+    let _ = event_sender
+        .send((
+            peer_id,
+            PeerEvent::Connected {
+                mux_stats: conn.running.stats.clone(),
+            },
+        ))
+        .await;
 
     // Extract codec pairs (in registration order).
     let mut channels = conn.channels.into_iter();

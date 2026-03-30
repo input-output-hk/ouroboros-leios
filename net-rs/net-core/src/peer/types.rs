@@ -7,6 +7,9 @@ use std::time::Duration;
 
 use std::collections::BTreeMap;
 
+use std::sync::Arc;
+
+use crate::mux::MuxStats;
 use crate::protocols::peersharing::PeerAddress;
 use crate::protocols::txsubmission::PendingTx;
 use crate::types::{BlockBody, Point, Tip, WrappedHeader};
@@ -23,7 +26,7 @@ use crate::types::{BlockBody, Point, Tip, WrappedHeader};
 #[derive(Debug)]
 pub enum PeerEvent {
     /// Connection established and handshake completed.
-    Connected,
+    Connected { mux_stats: Arc<MuxStats> },
 
     /// ChainSync: intersection found during `find_intersection`.
     IntersectionFound { point: Point },

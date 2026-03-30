@@ -2,7 +2,9 @@
 
 use std::collections::BTreeMap;
 
-use crate::peer::PeerId;
+use std::time::Duration;
+
+use crate::peer::{ConnectionMode, PeerId};
 use crate::protocols::peersharing::PeerAddress;
 use crate::protocols::txsubmission::PendingTx;
 use crate::types::{BlockBody, Point, Tip, WrappedHeader};
@@ -66,6 +68,22 @@ pub enum NetworkEvent {
         point: Point,
         transactions: Vec<Vec<u8>>,
     },
+
+    /// Response to `QueryPeers`: snapshot of all connected peers.
+    PeerSnapshot { peers: Vec<PeerInfo> },
+}
+
+/// Snapshot of a single peer's state, for telemetry reporting.
+#[derive(Debug, Clone)]
+pub struct PeerInfo {
+    pub peer_id: PeerId,
+    pub address: String,
+    pub mode: ConnectionMode,
+    pub rtt: Option<Duration>,
+    pub tip_block_no: Option<u64>,
+    pub inbound_delay: Duration,
+    pub bytes_sent: u64,
+    pub bytes_received: u64,
 }
 
 /// Commands sent from the application to the coordinator.
@@ -114,6 +132,9 @@ pub enum NetworkCommand {
 
     /// Submit a transaction to all connected peers via TxSubmission.
     SubmitTransaction { tx: PendingTx },
+
+    /// Request a snapshot of all connected peers (for telemetry).
+    QueryPeers,
 
     /// Shut down all peers and stop the coordinator.
     Shutdown,
