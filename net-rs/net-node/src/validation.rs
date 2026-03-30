@@ -63,8 +63,7 @@ mod tests {
             rb_head_validation_ms: 1.0,
             rb_body_validation_ms_constant: 5.0,
             rb_body_validation_ms_per_byte: 0.001,
-            tx_validation_ms: 0.5,
-            tx_validation_ms_per_byte: 0.0,
+            ..Default::default()
         };
         let (validator, _rx) = Validator::new(config);
 
@@ -84,9 +83,7 @@ mod tests {
         let config = ValidationConfig {
             rb_head_validation_ms: 0.0,
             rb_body_validation_ms_constant: 0.0,
-            rb_body_validation_ms_per_byte: 0.0,
-            tx_validation_ms: 0.0,
-            tx_validation_ms_per_byte: 0.0,
+            ..Default::default()
         };
         let (validator, mut rx) = Validator::new(config);
 

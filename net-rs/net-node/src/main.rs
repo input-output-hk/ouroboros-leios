@@ -44,6 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let mut slot_clock = clock::SlotClock::new(config.genesis_time_unix, config.slot_duration_ms);
     let mut handle = network::start(&config).await?;
+    let commands = handle.commands.clone();
 
     // Block producer.
     let mut producer = production::BlockProducer::new(&config.production, config.seed);
@@ -53,6 +54,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             stake = config.production.stake,
             total_stake = config.production.total_stake,
             rb_prob = config.production.rb_generation_probability,
+            eb_prob = config.production.eb_generation_probability,
+            vote_prob = config.production.vote_generation_probability,
             "block production enabled"
         );
     }
@@ -60,13 +63,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Validator and consensus.
     let (validator, mut validation_rx) = validation::Validator::new(config.validation.clone());
     let mut consensus =
-        consensus::Consensus::new(config.node_id.clone(), handle.commands.clone(), validator);
+        consensus::Consensus::new(config.node_id.clone(), commands.clone(), validator);
 
     // Transaction generator (background task).
     let _tx_handle = mempool::spawn_tx_generator(
         &config.transactions,
         config.seed,
-        handle.commands.clone(),
+        commands.clone(),
         config.node_id.clone(),
     );
 
@@ -74,10 +77,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let shutdown = tokio::signal::ctrl_c();
     tokio::pin!(shutdown);
 
+    let leios = config.leios_enabled;
+
     loop {
         tokio::select! {
             slot = slot_clock.tick() => {
-                // Try to produce a block this slot.
+                // Praos: try to produce a ranking block.
                 if let Some((point, header, body)) = producer.try_produce_block(slot) {
                     info!(
                         node_id = %config.node_id,
@@ -86,11 +91,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         "produced block"
                     );
                     consensus.register_self_produced(&point);
-                    let _ = handle.commands.send(NetworkCommand::InjectBlock {
+                    let _ = commands.send(NetworkCommand::InjectBlock {
                         point,
                         header: Box::new(header),
                         body,
                     }).await;
+                }
+
+                // Leios: produce EBs and votes at stage boundaries.
+                if leios && producer.is_stage_boundary(slot) {
+                    if let Some(eb) = producer.try_produce_eb(slot) {
+                        info!(
+                            node_id = %config.node_id,
+                            %eb.point,
+                            "produced endorser block"
+                        );
+                        let _ = commands.send(NetworkCommand::InjectLeiosBlock {
+                            point: eb.point,
+                            block: eb.data,
+                        }).await;
+                    }
+                    if let Some(votes) = producer.try_produce_votes(slot) {
+                        info!(
+                            node_id = %config.node_id,
+                            count = votes.vote_ids.len(),
+                            "produced votes"
+                        );
+                        let _ = commands.send(NetworkCommand::InjectLeiosVotes {
+                            votes: votes.vote_ids,
+                            data: votes.vote_data,
+                        }).await;
+                    }
                 }
             }
             event = handle.events.recv() => {
@@ -111,7 +142,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             }
             _ = &mut shutdown => {
                 info!("shutting down");
-                let _ = handle.commands.send(NetworkCommand::Shutdown).await;
+                let _ = commands.send(NetworkCommand::Shutdown).await;
                 break;
             }
         }

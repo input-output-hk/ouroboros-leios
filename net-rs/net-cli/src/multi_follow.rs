@@ -36,6 +36,7 @@ pub async fn run(
         scheduler_type: scheduler_args.scheduler,
         max_handshaking,
         max_connections_per_ip,
+        peer_delays: std::collections::HashMap::new(),
     };
 
     let mut handle = spawn_coordinator(config);

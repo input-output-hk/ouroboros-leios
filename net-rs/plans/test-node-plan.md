@@ -154,9 +154,9 @@ tx_validation_ms = 0.5
 
 **Verify:** Node A produces, Node B follows with 500ms validation delay. Measure lag. Two producers with 50/50 stake, follower tracks longest chain across forks.
 
-### Stage 4: Leios Production + Network Delay Injection
+### Stage 4: Leios Production + Network Delay Injection — COMPLETE
 
-**Goal:** Extend production/consensus to Leios (IBs, EBs, votes). Add per-peer delay injection for simulation.
+**Goal:** Extend production/consensus to Leios (IBs, EBs, votes). Add delay injection for simulation.
 
 **Modules:** extend `production.rs`, `consensus.rs`, `validation.rs`, `network.rs`, `config.rs`
 
@@ -181,7 +181,7 @@ inbound_delay_ms = 200
 
 **Leios consensus:** On `LeiosBlockOffered` -> `FetchLeiosBlock`. On `LeiosVotesOffered` -> `FetchLeiosVotes`. Track EB/vote state for production decisions.
 
-**Delay injection:** `DelayedEventStream` wraps coordinator's event receiver. Events from peers matching delay rules are held in `tokio_util::time::DelayQueue` before delivery. Inbound-only (outbound delay would require coordinator changes).
+**Delay injection:** Implemented inside the coordinator via `peer_delays: HashMap<String, Duration>` config. Events from peers with configured delays are buffered and delivered after the specified duration. Per-peer granularity, zero overhead when unconfigured. Configured via `inbound_delay_ms` on `[[peers]]` entries.
 
 **Verify:** Three-node triangle with Leios enabled. Verify EB/vote propagation. Measure delay injection effect on block reception timing.
 

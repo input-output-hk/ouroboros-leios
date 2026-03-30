@@ -63,7 +63,6 @@ impl Consensus {
                 true
             }
             NetworkEvent::BlockFetchFailed { from, to } => {
-                // Remove from in-flight so it can be retried.
                 self.in_flight.remove(from);
                 self.in_flight.remove(to);
                 info!(
@@ -74,6 +73,84 @@ impl Consensus {
                 );
                 true
             }
+
+            // Leios: fetch offered EBs, votes, and txs.
+            NetworkEvent::LeiosBlockOffered { point } => {
+                if !self.in_flight.contains(point) {
+                    self.in_flight.insert(point.clone());
+                    info!(node_id = %self.node_id, %point, "fetching leios block");
+                    let _ = self
+                        .commands
+                        .send(NetworkCommand::FetchLeiosBlock {
+                            point: point.clone(),
+                        })
+                        .await;
+                }
+                true
+            }
+            NetworkEvent::LeiosBlockTxsOffered { point } => {
+                let key = Point::Specific {
+                    slot: match point {
+                        Point::Specific { slot, .. } => *slot,
+                        _ => 0,
+                    },
+                    hash: [0xFE; 32], // distinct key to avoid collision with block fetch
+                };
+                if !self.in_flight.contains(&key) {
+                    self.in_flight.insert(key);
+                    info!(node_id = %self.node_id, %point, "fetching leios block txs");
+                    let _ = self
+                        .commands
+                        .send(NetworkCommand::FetchLeiosBlockTxs {
+                            point: point.clone(),
+                            bitmap: std::collections::BTreeMap::new(),
+                        })
+                        .await;
+                }
+                true
+            }
+            NetworkEvent::LeiosVotesOffered { votes } => {
+                if !votes.is_empty() {
+                    info!(
+                        node_id = %self.node_id,
+                        count = votes.len(),
+                        "fetching leios votes"
+                    );
+                    let _ = self
+                        .commands
+                        .send(NetworkCommand::FetchLeiosVotes {
+                            votes: votes.clone(),
+                        })
+                        .await;
+                }
+                true
+            }
+            NetworkEvent::LeiosBlockReceived { point, .. } => {
+                self.in_flight.remove(point);
+                info!(node_id = %self.node_id, %point, "leios block received");
+                true
+            }
+            NetworkEvent::LeiosVotesReceived { votes } => {
+                info!(
+                    node_id = %self.node_id,
+                    count = votes.len(),
+                    "leios votes received"
+                );
+                true
+            }
+            NetworkEvent::LeiosBlockTxsReceived {
+                point,
+                transactions,
+            } => {
+                info!(
+                    node_id = %self.node_id,
+                    %point,
+                    count = transactions.len(),
+                    "leios block txs received"
+                );
+                true
+            }
+
             _ => false,
         }
     }

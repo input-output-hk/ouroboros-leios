@@ -49,6 +49,9 @@ struct PeerState {
     fragment: ChainFragment,
     /// Backoff for next reconnection attempt if this peer fails.
     reconnect_backoff: Duration,
+    /// Simulated inbound delay. Events from this peer are delayed by this
+    /// duration before processing. Zero = no delay.
+    inbound_delay: Duration,
 }
 
 /// The coordinator's internal state.
@@ -176,6 +179,13 @@ impl Coordinator {
             )
         };
 
+        let inbound_delay = self
+            .config
+            .peer_delays
+            .get(&address)
+            .copied()
+            .unwrap_or(Duration::ZERO);
+
         self.peers.insert(
             peer_id,
             PeerState {
@@ -188,6 +198,7 @@ impl Coordinator {
                 rtt: None,
                 fragment: ChainFragment::new(),
                 reconnect_backoff,
+                inbound_delay,
             },
         );
 
@@ -747,10 +758,18 @@ impl Coordinator {
 
         let task_handle = tokio::spawn(run_responder_task(task_config));
 
+        let address = ip.to_string();
+        let inbound_delay = self
+            .config
+            .peer_delays
+            .get(&address)
+            .copied()
+            .unwrap_or(Duration::ZERO);
+
         self.peers.insert(
             peer_id,
             PeerState {
-                address: ip.to_string(),
+                address,
                 mode: ConnectionMode::ResponderOnly,
                 ip: Some(ip),
                 commands: cmd_sender,
@@ -759,6 +778,7 @@ impl Coordinator {
                 rtt: None,
                 fragment: ChainFragment::new(),
                 reconnect_backoff: Duration::from_secs(0), // unused for responders
+                inbound_delay,
             },
         );
 
@@ -918,13 +938,32 @@ impl Coordinator {
         // Start accept loop if configured.
         self.start_accept_loop();
 
+        // Delayed events buffer: (delivery_time, peer_id, event).
+        // Only used when peer_delays is configured; zero overhead otherwise.
+        let mut delayed: Vec<(Instant, PeerId, PeerEvent)> = Vec::new();
+        let has_any_delays = !self.config.peer_delays.is_empty();
+
         loop {
             let reconnect_delay = self.next_reconnect_delay();
+
+            // Earliest delayed event deadline (only computed when buffer is non-empty).
+            let next_delayed = delayed.iter().map(|(t, _, _)| *t).min();
 
             tokio::select! {
                 event = self.peer_events.recv() => {
                     match event {
                         Some((peer_id, peer_event)) => {
+                            // If delay simulation is active and this peer has
+                            // a configured delay, buffer instead of processing.
+                            if has_any_delays {
+                                let delay = self.peers.get(&peer_id)
+                                    .map(|p| p.inbound_delay)
+                                    .unwrap_or(Duration::ZERO);
+                                if !delay.is_zero() {
+                                    delayed.push((Instant::now() + delay, peer_id, peer_event));
+                                    continue;
+                                }
+                            }
                             self.handle_peer_event(peer_id, peer_event).await;
                         }
                         None => break,
@@ -959,6 +998,19 @@ impl Coordinator {
                 }
                 _ = tokio::time::sleep(reconnect_delay) => {
                     self.process_reconnections();
+                }
+                _ = tokio::time::sleep_until(next_delayed.unwrap_or_else(|| Instant::now() + Duration::from_secs(86400))), if !delayed.is_empty() => {
+                    // Deliver all delayed events whose deadline has passed.
+                    let now = Instant::now();
+                    let mut i = 0;
+                    while i < delayed.len() {
+                        if delayed[i].0 <= now {
+                            let (_, peer_id, event) = delayed.swap_remove(i);
+                            self.handle_peer_event(peer_id, event).await;
+                        } else {
+                            i += 1;
+                        }
+                    }
                 }
             }
         }
@@ -1077,6 +1129,7 @@ mod tests {
                 rtt: None,
                 fragment: ChainFragment::new(),
                 reconnect_backoff: Duration::from_secs(1),
+                inbound_delay: Duration::ZERO,
             },
         );
 
@@ -1164,6 +1217,7 @@ mod tests {
                     rtt: None,
                     fragment: ChainFragment::new(),
                     reconnect_backoff: Duration::from_secs(1),
+                    inbound_delay: Duration::ZERO,
                 },
             );
         }
@@ -1264,6 +1318,7 @@ mod tests {
                 rtt: None,
                 fragment: ChainFragment::new(),
                 reconnect_backoff: Duration::from_secs(1),
+                inbound_delay: Duration::ZERO,
             },
         );
 
@@ -1331,6 +1386,7 @@ mod tests {
                 rtt: None,
                 fragment: ChainFragment::new(),
                 reconnect_backoff: Duration::from_secs(1),
+                inbound_delay: Duration::ZERO,
             },
         );
 
@@ -1381,6 +1437,7 @@ mod tests {
                 rtt,
                 fragment: ChainFragment::new(),
                 reconnect_backoff: Duration::from_secs(1),
+                inbound_delay: Duration::ZERO,
             },
         );
         cmd_receiver
