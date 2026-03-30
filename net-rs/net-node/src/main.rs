@@ -4,11 +4,14 @@ mod consensus;
 mod mempool;
 mod network;
 mod production;
+mod telemetry;
 mod validation;
 
 use clap::Parser;
 use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
 use tracing::{info, warn};
+
+use telemetry::NodeEvent;
 
 #[derive(Parser)]
 #[command(name = "net-node", about = "Cardano Leios test node")]
@@ -73,23 +76,52 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         config.node_id.clone(),
     );
 
+    // Telemetry.
+    let mut telem = telemetry::TelemetryHandle::new(
+        &config.telemetry,
+        config.node_id.clone(),
+        config.genesis_time_unix,
+    )?;
+
+    // Stats timer.
+    let stats_interval = if telem.has_stats_sinks() && config.telemetry.stats_interval_secs > 0 {
+        config.telemetry.stats_interval_secs
+    } else {
+        0
+    };
+    let mut stats_tick = tokio::time::interval(if stats_interval > 0 {
+        std::time::Duration::from_secs(stats_interval)
+    } else {
+        std::time::Duration::from_secs(86400) // effectively disabled
+    });
+    stats_tick.tick().await; // consume initial immediate tick
+
     // Graceful shutdown on Ctrl-C.
     let shutdown = tokio::signal::ctrl_c();
     tokio::pin!(shutdown);
 
     let leios = config.leios_enabled;
+    let node_id = config.node_id.clone();
 
     loop {
         tokio::select! {
             slot = slot_clock.tick() => {
+                telem.current_slot = slot;
+
                 // Praos: try to produce a ranking block.
                 if let Some((point, header, body)) = producer.try_produce_block(slot) {
                     info!(
-                        node_id = %config.node_id,
+                        node_id = %node_id,
                         %point,
                         block_count = producer.block_count(),
                         "produced block"
                     );
+                    telem.blocks_produced += 1;
+                    telem.record(NodeEvent::RBGenerated {
+                        node: node_id.clone(),
+                        slot,
+                        size_bytes: body.raw.len(),
+                    });
                     consensus.register_self_produced(&point);
                     let _ = commands.send(NetworkCommand::InjectBlock {
                         point,
@@ -101,22 +133,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 // Leios: produce EBs and votes at stage boundaries.
                 if leios && producer.is_stage_boundary(slot) {
                     if let Some(eb) = producer.try_produce_eb(slot) {
-                        info!(
-                            node_id = %config.node_id,
-                            %eb.point,
-                            "produced endorser block"
-                        );
+                        info!(node_id = %node_id, %eb.point, "produced endorser block");
+                        telem.record(NodeEvent::EBGenerated {
+                            node: node_id.clone(),
+                            slot,
+                        });
                         let _ = commands.send(NetworkCommand::InjectLeiosBlock {
                             point: eb.point,
                             block: eb.data,
                         }).await;
                     }
                     if let Some(votes) = producer.try_produce_votes(slot) {
-                        info!(
-                            node_id = %config.node_id,
-                            count = votes.vote_ids.len(),
-                            "produced votes"
-                        );
+                        info!(node_id = %node_id, count = votes.vote_ids.len(), "produced votes");
+                        telem.record(NodeEvent::VTBundleGenerated {
+                            node: node_id.clone(),
+                            slot,
+                            count: votes.vote_ids.len(),
+                        });
                         let _ = commands.send(NetworkCommand::InjectLeiosVotes {
                             votes: votes.vote_ids,
                             data: votes.vote_data,
@@ -127,8 +160,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             event = handle.events.recv() => {
                 match event {
                     Some(event) => {
+                        record_network_event(&mut telem, &node_id, &event);
                         if !consensus.handle_event(&event).await {
-                            log_event(&config.node_id, &event);
+                            log_event(&node_id, &event);
                         }
                     }
                     None => {
@@ -138,10 +172,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 }
             }
             Some(result) = validation_rx.recv() => {
+                telem.blocks_validated += 1;
+                telem.record(NodeEvent::BlockValidated {
+                    node: node_id.clone(),
+                    block_no: telem.blocks_validated,
+                });
                 consensus.on_validation_complete(result).await;
+            }
+            _ = stats_tick.tick(), if stats_interval > 0 => {
+                telem.flush();
+                let _ = commands.send(NetworkCommand::QueryPeers).await;
             }
             _ = &mut shutdown => {
                 info!("shutting down");
+                telem.flush();
                 let _ = commands.send(NetworkCommand::Shutdown).await;
                 break;
             }
@@ -149,6 +193,67 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     }
 
     Ok(())
+}
+
+/// Record network events into telemetry.
+fn record_network_event(
+    telem: &mut telemetry::TelemetryHandle,
+    node_id: &str,
+    event: &NetworkEvent,
+) {
+    match event {
+        NetworkEvent::PeerConnected { peer_id, address } => {
+            telem.record(NodeEvent::PeerConnected {
+                node: node_id.into(),
+                peer_id: peer_id.to_string(),
+                address: address.clone(),
+            });
+        }
+        NetworkEvent::PeerDisconnected { peer_id, reason } => {
+            telem.record(NodeEvent::PeerDisconnected {
+                node: node_id.into(),
+                peer_id: peer_id.to_string(),
+                reason: reason.clone(),
+            });
+        }
+        NetworkEvent::TipAdvanced { tip, .. } => {
+            telem.tip_block_no = Some(tip.block_no);
+            telem.record(NodeEvent::TipAdvanced {
+                node: node_id.into(),
+                block_no: tip.block_no,
+                slot: match &tip.point {
+                    net_core::types::Point::Specific { slot, .. } => *slot,
+                    _ => 0,
+                },
+            });
+        }
+        NetworkEvent::BlockReceived { .. } => {
+            telem.blocks_received += 1;
+            telem.record(NodeEvent::RBReceived {
+                node: node_id.into(),
+                slot: telem.current_slot,
+            });
+        }
+        NetworkEvent::TransactionReceived { .. } => {
+            telem.txs_generated += 1;
+        }
+        NetworkEvent::PeerSnapshot { peers } => {
+            telem.emit_stats(peers);
+        }
+        NetworkEvent::LeiosBlockReceived { .. } => {
+            telem.record(NodeEvent::EBReceived {
+                node: node_id.into(),
+                slot: telem.current_slot,
+            });
+        }
+        NetworkEvent::LeiosVotesReceived { votes } => {
+            telem.record(NodeEvent::VotesReceived {
+                node: node_id.into(),
+                count: votes.len(),
+            });
+        }
+        _ => {}
+    }
 }
 
 fn log_event(node_id: &str, event: &NetworkEvent) {
@@ -165,6 +270,7 @@ fn log_event(node_id: &str, event: &NetworkEvent) {
         NetworkEvent::PeersDiscovered { peers, .. } => {
             info!(node_id, count = peers.len(), "peers discovered");
         }
+        NetworkEvent::PeerSnapshot { .. } => {} // handled by telemetry
         _ => {
             info!(node_id, event = ?event, "network event");
         }

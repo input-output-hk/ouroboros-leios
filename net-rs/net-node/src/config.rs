@@ -90,6 +90,10 @@ pub struct NodeConfig {
     #[serde(default)]
     pub validation: ValidationConfig,
 
+    /// Telemetry configuration.
+    #[serde(default)]
+    pub telemetry: TelemetryConfig,
+
     /// Outbound peer list.
     #[serde(default)]
     pub peers: Vec<PeerConfig>,
@@ -251,6 +255,56 @@ impl Default for ValidationConfig {
     }
 }
 
+/// Telemetry configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct TelemetryConfig {
+    /// Stats emission interval in seconds. 0 = disabled.
+    #[serde(default = "default_stats_interval")]
+    pub stats_interval_secs: u64,
+
+    /// Event sinks.
+    #[serde(default)]
+    pub event_sinks: Vec<EventSinkConfig>,
+
+    /// Stats sinks.
+    #[serde(default)]
+    pub stats_sinks: Vec<StatsSinkConfig>,
+}
+
+fn default_stats_interval() -> u64 {
+    10
+}
+
+impl Default for TelemetryConfig {
+    fn default() -> Self {
+        Self {
+            stats_interval_secs: default_stats_interval(),
+            event_sinks: Vec::new(),
+            stats_sinks: Vec::new(),
+        }
+    }
+}
+
+/// Event sink configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub enum EventSinkConfig {
+    #[serde(rename = "file")]
+    File { path: String },
+    #[serde(rename = "http")]
+    Http { url: String },
+}
+
+/// Stats sink configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub enum StatsSinkConfig {
+    #[serde(rename = "log")]
+    Log,
+    #[serde(rename = "http")]
+    Http { url: String },
+}
+
 // --- defaults ---
 
 fn default_node_id() -> String {
@@ -313,6 +367,7 @@ impl Default for NodeConfig {
             production: ProductionConfig::default(),
             transactions: TxConfig::default(),
             validation: ValidationConfig::default(),
+            telemetry: TelemetryConfig::default(),
             peers: Vec::new(),
         }
     }

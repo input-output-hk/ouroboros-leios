@@ -2,6 +2,7 @@
 //! and writes to the bearer.
 
 use std::collections::HashMap;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -59,6 +60,7 @@ pub(crate) async fn run_muxer<W, S>(
     sdu_size: usize,
     clock: Instant,
     notify: Arc<Notify>,
+    stats: Arc<super::MuxStats>,
 ) -> Result<(), MuxError>
 where
     W: AsyncWrite + Unpin,
@@ -114,6 +116,10 @@ where
 
                     for segment in &segments {
                         wire::write_segment(&mut writer, segment).await?;
+                        stats.bytes_sent.fetch_add(
+                            (wire::HEADER_LEN + segment.payload.len()) as u64,
+                            Ordering::Relaxed,
+                        );
                     }
                 }
             }

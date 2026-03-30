@@ -185,7 +185,7 @@ inbound_delay_ms = 200
 
 **Verify:** Three-node triangle with Leios enabled. Verify EB/vote propagation. Measure delay injection effect on block reception timing.
 
-### Stage 5: Telemetry
+### Stage 5: Telemetry — COMPLETE
 
 **Goal:** Event and stats sinks for observability. File format compatible with sim-rs tooling.
 

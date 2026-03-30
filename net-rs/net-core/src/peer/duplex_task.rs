@@ -86,7 +86,14 @@ pub(crate) async fn run_duplex_task(mut config: DuplexTaskConfig) {
         }
     };
 
-    let _ = event_sender.send((peer_id, PeerEvent::Connected)).await;
+    let _ = event_sender
+        .send((
+            peer_id,
+            PeerEvent::Connected {
+                mux_stats: conn.running.stats.clone(),
+            },
+        ))
+        .await;
 
     // --- Initiator (client) sub-tasks ---
     let mut init_channels = conn.initiator_channels.into_iter();

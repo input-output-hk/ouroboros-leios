@@ -97,8 +97,15 @@ pub(crate) async fn run_responder_task(mut config: ResponderTaskConfig) {
     let peer_id = config.peer_id;
     let event_sender = config.event_sender.clone();
 
-    // Report successful connection.
-    let _ = event_sender.send((peer_id, PeerEvent::Connected)).await;
+    // Report successful connection with stats handle.
+    let _ = event_sender
+        .send((
+            peer_id,
+            PeerEvent::Connected {
+                mux_stats: config.connection.running.stats.clone(),
+            },
+        ))
+        .await;
 
     // Extract codec pairs (in registration order).
     let mut channels = config.connection.channels.into_iter();
@@ -339,7 +346,7 @@ mod tests {
         // Should have received Connected event.
         let _timeout = tokio::time::timeout(Duration::from_secs(1), async {
             while let Some((_id, event)) = event_receiver.recv().await {
-                if matches!(event, PeerEvent::Connected) {
+                if matches!(event, PeerEvent::Connected { .. }) {
                     return true;
                 }
             }
