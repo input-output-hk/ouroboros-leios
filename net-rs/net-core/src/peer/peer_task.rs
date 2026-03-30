@@ -225,14 +225,7 @@ pub(crate) fn spawn_blockfetch(
                         match blockfetch::recv_block(&mut runner).await {
                             Ok(Some(body)) => {
                                 let _ = event_sender
-                                    .send((
-                                        peer_id,
-                                        PeerEvent::BlockFetched {
-                                            from: from.clone(),
-                                            to: to.clone(),
-                                            body,
-                                        },
-                                    ))
+                                    .send((peer_id, PeerEvent::BlockFetched { body }))
                                     .await;
                             }
                             Ok(None) => break, // batch complete

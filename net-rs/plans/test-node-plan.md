@@ -216,13 +216,13 @@ type = "log"
 
 **Verify:** Run node with file sink, verify JSONL output. Feed into sim-rs analysis tooling.
 
-### Risks
+### Risks — status
 
-- **Coordinator `.send().await` blocking:** Main loop must drain events promptly. Validation is non-blocking (spawned tasks). Telemetry sinks must buffer/drop, never block.
-- **Clock drift:** Mitigated by recomputing slot from wall clock each tick, not incrementing a counter.
-- **Leios stage alignment:** Deterministic from `slot / stage_length_slots` -- all nodes with same config agree.
-- **Self-produced block re-fetch:** When the node produces and injects a block, the coordinator announces it to peers who may announce it back. Consensus module must track "I produced this point" to avoid re-fetching own blocks.
-- **Fake block CBOR parsability:** Downstream nodes may try to parse headers via `WrappedHeader::parse()`. Fake CBOR needs correct Shelley+ array structure with valid slot values, not just random bytes.
+- **Coordinator `.send().await` blocking:** Mitigated for test node use (main loop drains promptly, validation is non-blocking, telemetry sinks buffer/drop). Fundamental coordinator fix (switch to `try_send()`) deferred.
+- **Clock drift:** Resolved. Slot recomputed from wall clock each tick, no counter drift.
+- **Leios stage alignment:** Resolved. Deterministic `slot / stage_length_slots`.
+- **Self-produced block re-fetch:** Resolved. `consensus.register_self_produced()` skips fetch for own blocks.
+- **Fake block CBOR parsability:** FIXED — fake blocks now use valid Shelley+ CBOR structure so `body.point()` and `WrappedHeader::parse()` work. Reverted the `PeerEvent::BlockFetched` from/to workaround; coordinator correctly derives points from block bodies again.
 
 ### Future: net-cluster Orchestrator
 
