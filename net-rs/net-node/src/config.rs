@@ -78,9 +78,85 @@ pub struct NodeConfig {
     #[serde(default = "default_max_connections_per_ip")]
     pub max_connections_per_ip: usize,
 
+    /// Block production settings.
+    #[serde(default)]
+    pub production: ProductionConfig,
+
+    /// Transaction generation settings.
+    #[serde(default)]
+    pub transactions: TxConfig,
+
     /// Outbound peer list.
     #[serde(default)]
     pub peers: Vec<PeerConfig>,
+}
+
+/// Block production configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProductionConfig {
+    /// This node's stake.
+    #[serde(default)]
+    pub stake: u64,
+
+    /// Total network stake. Must be consistent across all nodes.
+    #[serde(default = "default_total_stake")]
+    pub total_stake: u64,
+
+    /// Per-slot probability of producing a ranking block.
+    #[serde(default = "default_rb_probability")]
+    pub rb_generation_probability: f64,
+}
+
+fn default_total_stake() -> u64 {
+    1000
+}
+
+fn default_rb_probability() -> f64 {
+    0.05
+}
+
+impl Default for ProductionConfig {
+    fn default() -> Self {
+        Self {
+            stake: 0,
+            total_stake: default_total_stake(),
+            rb_generation_probability: default_rb_probability(),
+        }
+    }
+}
+
+/// Transaction generation configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct TxConfig {
+    /// Transaction generation rate (txs/sec, Poisson lambda). 0 = disabled.
+    #[serde(default)]
+    pub tx_rate: f64,
+
+    /// Minimum transaction body size in bytes.
+    #[serde(default = "default_tx_size_min")]
+    pub tx_size_min: usize,
+
+    /// Maximum transaction body size in bytes.
+    #[serde(default = "default_tx_size_max")]
+    pub tx_size_max: usize,
+}
+
+fn default_tx_size_min() -> usize {
+    250
+}
+
+fn default_tx_size_max() -> usize {
+    16384
+}
+
+impl Default for TxConfig {
+    fn default() -> Self {
+        Self {
+            tx_rate: 0.0,
+            tx_size_min: default_tx_size_min(),
+            tx_size_max: default_tx_size_max(),
+        }
+    }
 }
 
 // --- defaults ---
@@ -142,6 +218,8 @@ impl Default for NodeConfig {
             leios_dedup_window: default_leios_dedup_window(),
             max_handshaking: default_max_handshaking(),
             max_connections_per_ip: default_max_connections_per_ip(),
+            production: ProductionConfig::default(),
+            transactions: TxConfig::default(),
             peers: Vec::new(),
         }
     }

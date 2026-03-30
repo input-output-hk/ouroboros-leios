@@ -135,16 +135,17 @@ mod tests {
 
     #[tokio::test]
     async fn tick_returns_current_slot() {
-        // Genesis 2 seconds ago, 100ms slots.
+        // Genesis very recently, 100ms slots. The tick fires at the next
+        // slot boundary, so the returned slot should be small but positive.
         let genesis_unix = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
-            .as_secs()
-            .saturating_sub(2);
+            .as_secs();
 
         let mut clock = SlotClock::new(genesis_unix, 100);
         let slot = clock.tick().await;
-        // Should be approximately 20 (±2 for timing).
-        assert!(slot >= 18 && slot <= 25, "slot was {slot}");
+        // First tick should be slot 1 (next boundary after genesis).
+        // Allow up to 5 for CI/scheduling jitter.
+        assert!(slot >= 1 && slot <= 5, "slot was {slot}");
     }
 }
