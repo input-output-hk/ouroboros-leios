@@ -161,8 +161,11 @@ impl Consensus {
         let ValidationComplete { point, body } = result;
         self.in_flight.remove(&point);
 
-        // Build a header from the body for injection.
-        let header = WrappedHeader::opaque(body.raw.clone());
+        // Extract the header from the block body for injection.
+        // This produces the canonical ChainSync wire format [era, #6.24(header_cbor)].
+        let header = body
+            .header()
+            .unwrap_or_else(|| WrappedHeader::opaque(Vec::new()));
 
         // Update local tip (increment block_no).
         let block_no = self.local_tip.as_ref().map_or(1, |t| t.block_no + 1);
