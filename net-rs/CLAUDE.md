@@ -57,6 +57,28 @@ cat node0-events.jsonl | python3 -m json.tool
 
 Config layering: base config (shared genesis, magic, protocol params) + per-node overlay (node_id, listen_address, peers, stake, telemetry). See `net-node/configs/` for examples.
 
+### Test cluster (net-cluster)
+
+The cluster orchestrator spawns multiple net-node instances with auto-generated random topology, receives their telemetry via HTTP, and produces a merged time-ordered JSONL event log.
+
+```sh
+# Build the net-node binary first (net-cluster spawns it as child processes):
+cargo build -p net-node
+
+# Run a 5-node cluster with sample config:
+RUST_LOG=info cargo run -p net-cluster -- --config net-cluster/configs/sample-cluster.toml --net-node-bin target/debug/net-node
+
+# Override settings:
+cargo run -p net-cluster -- --config net-cluster/configs/sample-cluster.toml --net-node-bin target/debug/net-node --set num_nodes=10 --set degree=3
+
+# Ctrl-C to stop. Check merged event output:
+cat cluster-events.jsonl | python3 -m json.tool --no-ensure-ascii | head
+
+# Node logs are in logs/node-{i}.log
+```
+
+Cluster config fields: `num_nodes`, `degree` (peers per node), `min_latency_ms`/`max_latency_ms` (random edge delays), `base_config` (shared net-node config), `base_port`, `seed`, `output_events`, `ordering_window_secs`, `aggregator_port`, `stake_distribution`, `stats_interval_secs`, `external_peers`. See `net-cluster/configs/sample-cluster.toml`.
+
 ### Test vector workflow
 
 When implementing a new protocol or changing CBOR encoding:
@@ -177,6 +199,17 @@ net-rs/
       validation.rs     -- fake validation with configurable timed delays
       mempool.rs        -- tx pool + fake Poisson tx generation
       telemetry.rs      -- EventSink/StatsSink traits, JSONL file sink, HTTP sinks, peer stats
+  net-cluster/          -- binary crate (cluster orchestrator for multi-node test networks)
+    configs/            -- sample cluster TOML configs
+    src/
+      main.rs           -- CLI (clap), orchestration flow, signal handling
+      config.rs         -- ClusterConfig, figment loading
+      topology.rs       -- random graph generation, port allocation, edge delays, stake
+      overlay.rs        -- per-node TOML overlay generation, temp file management
+      process.rs        -- child process spawning, shutdown, log piping
+      server.rs         -- axum HTTP server: POST /events, POST /stats (telemetry receiver)
+      aggregator.rs     -- time-ordered event merge, watermark flushing, JSONL output
+      types.rs          -- StatsSnapshot (Deserialize), IngestedEvent, event parsing
 ```
 
 ## Key Design Decisions
