@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Box, Typography, Divider, Chip } from "@mui/material";
 import {
   LineChart,
@@ -15,15 +16,27 @@ function formatBytes(b: number): string {
   return `${(b / 1024 / 1024).toFixed(1)} MB`;
 }
 
+const EMPTY_SERIES: never[] = [];
+
 function NodeInspector({ nodeId }: { nodeId: string }) {
   const stats = useStore((s) => s.latestStats[nodeId]);
-  const series = useStore((s) => s.nodeTimeSeries[nodeId] ?? []);
+  const series = useStore((s) => s.nodeTimeSeries[nodeId]) ?? EMPTY_SERIES;
 
-  const chartData = series.map((p, i) => ({
-    t: i,
-    bandwidth: p.bandwidth,
-    messages: p.messages,
-  }));
+  const WINDOW = 60;
+  const chartData = useMemo(() => {
+    const raw = series.map((p, i) => ({
+      t: i,
+      bandwidth: p.bandwidth as number | null,
+      messages: p.messages as number | null,
+    }));
+    if (raw.length >= WINDOW) return raw;
+    const pad = Array.from({ length: WINDOW - raw.length }, (_, i) => ({
+      t: i,
+      bandwidth: null as number | null,
+      messages: null as number | null,
+    }));
+    return [...pad, ...raw.map((p, i) => ({ ...p, t: WINDOW - raw.length + i }))];
+  }, [series]);
 
   return (
     <Box>
@@ -71,7 +84,7 @@ function NodeInspector({ nodeId }: { nodeId: string }) {
         </Typography>
       )}
 
-      {chartData.length > 1 && (
+      {series.length > 0 && (
         <>
           <Divider sx={{ my: 1 }} />
           <Typography variant="caption" color="text.secondary">
@@ -89,6 +102,7 @@ function NodeInspector({ nodeId }: { nodeId: string }) {
                 dot={false}
                 strokeWidth={1.5}
                 isAnimationActive={false}
+                connectNulls={false}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -108,6 +122,7 @@ function NodeInspector({ nodeId }: { nodeId: string }) {
                 dot={false}
                 strokeWidth={1.5}
                 isAnimationActive={false}
+                connectNulls={false}
               />
             </LineChart>
           </ResponsiveContainer>

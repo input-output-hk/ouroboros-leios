@@ -59,7 +59,7 @@ export function AggregateCharts() {
   }
 
   return (
-    <Box sx={{ display: "flex", gap: 1, height: "100%", p: 1 }}>
+    <Box sx={{ display: "flex", height: "100%", "& > :not(:last-child)": { borderRight: 1, borderColor: "grey.800" } }}>
       <ChartCard
         title="Bandwidth/s"
         data={bwData}
@@ -94,8 +94,8 @@ function ChartCard({
   formatValue: (v: number) => string;
 }) {
   return (
-    <Box sx={{ flex: 1, minWidth: 0 }}>
-      <Typography variant="caption" color="text.secondary" sx={{ pl: 1 }}>
+    <Box sx={{ flex: 1, minWidth: 0, p: 1 }}>
+      <Typography variant="body2" color="text.secondary">
         {title}
       </Typography>
       <ResponsiveContainer width="100%" height="85%">

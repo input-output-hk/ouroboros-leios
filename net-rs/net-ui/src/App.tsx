@@ -34,55 +34,45 @@ export default function App() {
       }}
     >
       {/* Header */}
-      <Box sx={{ px: 2, py: 0.5, borderBottom: 1, borderColor: "divider" }}>
-        <Typography variant="subtitle2" color="text.secondary">
-          net-cluster dashboard
+      <Box sx={{ px: 2, py: 0.5, borderBottom: 1, borderColor: "grey.800" }}>
+        <Typography variant="h6" color="text.secondary">
+          Leios net-cluster dashboard
           {topology && ` — ${topology.nodes.length} nodes, ${topology.edges.length} edges`}
         </Typography>
       </Box>
 
-      {/* Top: Graph + Inspector */}
+      {/* Main: left (graph + charts) | right (inspector + events) */}
       <Box sx={{ flex: 1, display: "flex", minHeight: 0 }}>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <ReactFlowProvider>
-            <TopologyGraph />
-          </ReactFlowProvider>
+        {/* Left column */}
+        <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+          <Box sx={{ flex: 1, minHeight: 0 }}>
+            <ReactFlowProvider>
+              <TopologyGraph />
+            </ReactFlowProvider>
+          </Box>
+          <Box sx={{ height: 220, borderTop: 1, borderColor: "grey.800" }}>
+            <AggregateCharts />
+          </Box>
         </Box>
+
+        {/* Right column */}
         <Paper
           elevation={2}
           sx={{
             width: 350,
+            flexShrink: 0,
+            display: "flex",
+            flexDirection: "column",
             borderLeft: 1,
-            borderColor: "divider",
-            overflowY: "auto",
+            borderColor: "grey.800",
           }}
         >
-          <InspectorPanel />
-        </Paper>
-      </Box>
-
-      {/* Bottom: Charts + Events */}
-      <Box
-        sx={{
-          height: 220,
-          display: "flex",
-          borderTop: 1,
-          borderColor: "divider",
-        }}
-      >
-        <Box sx={{ flex: 2, minWidth: 0 }}>
-          <AggregateCharts />
-        </Box>
-        <Paper
-          elevation={2}
-          sx={{
-            flex: 1,
-            minWidth: 0,
-            borderLeft: 1,
-            borderColor: "divider",
-          }}
-        >
-          <EventLog />
+          <Box sx={{ flex: 3, overflowY: "auto", minHeight: 0 }}>
+            <InspectorPanel />
+          </Box>
+          <Box sx={{ flex: 2, borderTop: 1, borderColor: "grey.800", minHeight: 0 }}>
+            <EventLog />
+          </Box>
         </Paper>
       </Box>
     </Box>
