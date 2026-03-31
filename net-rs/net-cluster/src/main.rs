@@ -13,8 +13,10 @@ mod topology;
 mod types;
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use clap::Parser;
+use tokio::sync::RwLock;
 
 #[derive(Parser)]
 #[command(
@@ -77,17 +79,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         );
     }
 
-    // Step 4: Start the telemetry HTTP server.
+    // Step 4: Create shared event window and start the HTTP server.
+    let event_window = Arc::new(RwLock::new(types::EventWindow::new(
+        config.event_window_size,
+    )));
     let (event_tx, event_rx) = tokio::sync::mpsc::channel(256);
-    let (_server_state, _server_handle) =
-        server::start(config.aggregator_port, event_tx, topo.clone()).await?;
+    let (_server_state, _server_handle) = server::start(
+        config.aggregator_port,
+        event_tx,
+        topo.clone(),
+        event_window.clone(),
+    )
+    .await?;
 
     // Step 5: Spawn the aggregator task.
     let output_path = PathBuf::from(&config.output_events);
     let num_nodes = config.num_nodes;
     let ordering_window = config.ordering_window_secs;
+    let agg_window = event_window.clone();
     let aggregator_handle = tokio::spawn(async move {
-        if let Err(e) = aggregator::run(event_rx, &output_path, num_nodes, ordering_window).await {
+        if let Err(e) = aggregator::run(
+            event_rx,
+            &output_path,
+            num_nodes,
+            ordering_window,
+            agg_window,
+        )
+        .await
+        {
             tracing::error!("aggregator error: {e}");
         }
     });

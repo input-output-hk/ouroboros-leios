@@ -6,7 +6,7 @@
 //! individual peers via per-peer channels.
 
 use std::collections::HashMap;
-use std::net::{IpAddr, ToSocketAddrs};
+use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -19,15 +19,16 @@ use super::leios_tracker::{LeiosTracker, OfferResult, PeerRttLookup};
 use crate::bearer::tcp::TcpBearer;
 use crate::mux::MuxConfig;
 use crate::protocols::peersharing::PeerAddress;
-use crate::types::{Point, Tip, WrappedHeader};
+use crate::types::{Point, Tip};
 
 use super::types::{NetworkCommand, NetworkEvent};
 use super::{CoordinatorConfig, CoordinatorHandle};
-use crate::peer::connect::{self, Connection};
-use crate::peer::duplex_task::{run_duplex_task, DuplexTaskConfig};
-use crate::peer::peer_task::{run_peer_task, PeerTaskConfig};
-use crate::peer::responder_task::{
-    run_responder_task, server_protocol_configs, ResponderTaskConfig,
+use crate::peer::connect::{self, DuplexConnection};
+use crate::peer::duplex_task::{
+    run_accepted_duplex_task, run_duplex_task, AcceptedDuplexTaskConfig, DuplexTaskConfig,
+};
+use crate::peer::peer_task::{
+    client_protocol_configs, run_peer_task, server_protocol_configs, PeerTaskConfig,
 };
 use crate::peer::types::{PeerCommand, PeerEvent};
 use crate::peer::{ConnectionMode, PeerId};
@@ -83,13 +84,10 @@ struct Coordinator {
     chain_store: Arc<ChainStore>,
     /// Shared Leios data store for responder peers (when leios_enabled).
     leios_store: Option<Arc<LeiosStore>>,
-    /// Headers from HeaderAnnounced, keyed by point, for populating ChainStore on BlockFetched.
-    pending_headers: HashMap<Point, WrappedHeader>,
-
     /// Leios dedup, offer tracking, and fetch routing (None when leios_enabled=false).
     leios: Option<LeiosTracker>,
-    /// Completed inbound connections from the accept loop: (connection, peer IP).
-    inbound_connections: Option<mpsc::Receiver<(Connection, IpAddr)>>,
+    /// Completed inbound duplex connections from the accept loop.
+    inbound_connections: Option<mpsc::Receiver<(DuplexConnection, SocketAddr)>>,
     /// Handle for the accept loop task (if listening).
     accept_task: Option<JoinHandle<()>>,
     /// Per-IP connection count (handshaking + established). Shared with accept loop.
@@ -126,7 +124,6 @@ impl Coordinator {
             reconnect_queue: Vec::new(),
             chain_store,
             leios_store,
-            pending_headers: HashMap::new(),
             leios,
             inbound_connections: None,
             accept_task: None,
@@ -247,9 +244,6 @@ impl Coordinator {
                     peer.fragment.append(header_point.clone());
                 }
 
-                // Store header for later use when BlockFetched arrives.
-                self.pending_headers.insert(header_point, header.clone());
-
                 // Deduplicate: only forward if this tip is ahead of our best.
                 let is_new = match &self.best_tip {
                     None => true,
@@ -297,19 +291,8 @@ impl Coordinator {
                     peer.fragment.remove(&point);
                 }
 
-                // Populate chain store for responder peers.
-                // Prefer the ChainSync-announced header; fall back to extracting
-                // the header directly from the block body (covers races where
-                // BlockFetch completes before the header is tracked).
-                let header = self
-                    .pending_headers
-                    .remove(&point)
-                    .or_else(|| body.header());
-                if let Some(header) = header {
-                    self.chain_store
-                        .append_block(point.clone(), header, body.clone());
-                }
-
+                // Forward to app for validation. The app will InjectBlock after
+                // validation to make the block available to downstream peers.
                 let _ = self
                     .network_events
                     .send(NetworkEvent::BlockReceived { point, body })
@@ -701,8 +684,10 @@ impl Coordinator {
                 decrement_ip_count(&self.ip_counts, ip);
             }
 
-            // Only schedule reconnection for initiator peers (not inbound responders).
-            if peer.mode == ConnectionMode::InitiatorOnly {
+            // Schedule reconnection for outbound peers only. Accepted (inbound)
+            // peers have `ip` set and should not reconnect — the remote side
+            // re-initiates those.
+            if peer.ip.is_none() {
                 let backoff = peer.reconnect_backoff;
                 let next_backoff = (backoff * 2).min(MAX_BACKOFF);
                 self.reconnect_queue.push((
@@ -763,16 +748,17 @@ impl Coordinator {
         }
     }
 
-    /// Add a responder peer for an accepted inbound connection.
-    fn add_responder_peer(&mut self, connection: Connection, ip: IpAddr) -> PeerId {
+    /// Add a duplex peer for an accepted inbound connection.
+    fn add_accepted_peer(&mut self, connection: DuplexConnection, peer_addr: SocketAddr) -> PeerId {
         let peer_id = PeerId(self.next_peer_id);
         self.next_peer_id += 1;
 
         let (cmd_sender, cmd_receiver) = mpsc::channel(16);
 
-        let task_config = ResponderTaskConfig {
+        let task_config = AcceptedDuplexTaskConfig {
             peer_id,
             connection,
+            keepalive_interval: self.config.keepalive_interval,
             chain_store: self.chain_store.clone(),
             peer_provider: self.peer_provider.clone(),
             event_sender: self.peer_event_sender.clone(),
@@ -781,9 +767,10 @@ impl Coordinator {
             leios_store: self.leios_store.clone(),
         };
 
-        let task_handle = tokio::spawn(run_responder_task(task_config));
+        let task_handle = tokio::spawn(run_accepted_duplex_task(task_config));
 
-        let address = ip.to_string();
+        let ip = peer_addr.ip();
+        let address = peer_addr.to_string();
         let inbound_delay = self
             .config
             .peer_delays
@@ -795,14 +782,14 @@ impl Coordinator {
             peer_id,
             PeerState {
                 address,
-                mode: ConnectionMode::ResponderOnly,
+                mode: ConnectionMode::Duplex,
                 ip: Some(ip),
                 commands: cmd_sender,
                 task_handle,
                 tip: None,
                 rtt: None,
                 fragment: ChainFragment::new(),
-                reconnect_backoff: Duration::from_secs(0), // unused for responders
+                reconnect_backoff: Duration::from_secs(0), // accepted peers don't reconnect
                 inbound_delay,
                 mux_stats: None,
             },
@@ -838,20 +825,23 @@ impl Coordinator {
             sdu_timeout: self.config.sdu_timeout,
             ..MuxConfig::default()
         };
-        let mut protocols = server_protocol_configs(self.config.leios_enabled);
-        for p in &mut protocols {
+        let leios_enabled = self.config.leios_enabled;
+        let mut client_protos = client_protocol_configs(leios_enabled);
+        let mut server_protos = server_protocol_configs(leios_enabled);
+        for p in client_protos.iter_mut().chain(server_protos.iter_mut()) {
             if let Some(tc) = self.config.traffic_class_overrides.get(&p.id) {
                 p.traffic_class = *tc;
             }
         }
 
-        let (conn_sender, conn_receiver) = mpsc::channel::<(Connection, IpAddr)>(16);
+        let (conn_sender, conn_receiver) = mpsc::channel::<(DuplexConnection, SocketAddr)>(16);
         self.inbound_connections = Some(conn_receiver);
 
         let ip_counts = self.ip_counts.clone();
         let max_connections_per_ip = self.config.max_connections_per_ip;
         let semaphore = Arc::new(tokio::sync::Semaphore::new(self.config.max_handshaking));
-        let protocols = Arc::new(protocols);
+        let client_protos = Arc::new(client_protos);
+        let server_protos = Arc::new(server_protos);
 
         let task = tokio::spawn(async move {
             let listener = match tokio::net::TcpListener::bind(addr).await {
@@ -907,7 +897,8 @@ impl Coordinator {
 
                 let conn_sender = conn_sender.clone();
                 let ip_counts = ip_counts.clone();
-                let protocols = protocols.clone();
+                let client_protos = client_protos.clone();
+                let server_protos = server_protos.clone();
                 let mux_config = mux_config.clone();
 
                 tokio::spawn(async move {
@@ -922,18 +913,19 @@ impl Coordinator {
                         }
                     };
 
-                    match connect::handshake_accepted(
+                    match connect::handshake_accepted_duplex(
                         bearer,
                         peer_addr,
                         magic,
-                        &protocols,
+                        &client_protos,
+                        &server_protos,
                         mux_config,
                         scheduler_type,
                     )
                     .await
                     {
                         Ok(conn) => {
-                            if conn_sender.send((conn, ip)).await.is_err() {
+                            if conn_sender.send((conn, peer_addr)).await.is_err() {
                                 // Coordinator shut down — clean up.
                                 decrement_ip_count(&ip_counts, ip);
                             }
@@ -1011,14 +1003,14 @@ impl Coordinator {
                         None => std::future::pending().await,
                     }
                 } => {
-                    if let Some((conn, ip)) = result {
+                    if let Some((conn, peer_addr)) = result {
                         if self.peers.len() < self.config.max_peers {
-                            let peer_id = self.add_responder_peer(conn, ip);
+                            let peer_id = self.add_accepted_peer(conn, peer_addr);
                             tracing::info!("accepted inbound peer as {peer_id}");
                         } else {
                             tracing::warn!("max peers reached, dropping inbound connection");
                             conn.running.abort();
-                            decrement_ip_count(&self.ip_counts, ip);
+                            decrement_ip_count(&self.ip_counts, peer_addr.ip());
                         }
                     }
                 }
@@ -1113,6 +1105,7 @@ pub fn spawn_coordinator(config: CoordinatorConfig) -> CoordinatorHandle {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::WrappedHeader;
 
     /// Helper: set up a coordinator with a MemBearer-connected peer.
     /// Returns (CoordinatorHandle, server_handle, MemBearer pair).
@@ -1881,5 +1874,67 @@ mod tests {
         let frag = &coordinator.peers.get(&peer_a).unwrap().fragment;
         assert!(frag.contains(&intersection));
         assert!(frag.contains(&tip_point));
+    }
+
+    // --- Reconnection tests ---
+
+    /// Helper: create a coordinator and insert a peer, then remove it and
+    /// return the reconnect queue state. `inbound_ip` simulates an accepted
+    /// (inbound) peer when Some; outbound peers have None.
+    async fn reconnection_after_removal(inbound_ip: Option<IpAddr>) -> Vec<String> {
+        let (peer_event_sender, peer_event_receiver) = mpsc::channel(256);
+        let (net_event_sender, mut net_event_receiver) = mpsc::channel(64);
+        let (_net_cmd_sender, net_cmd_receiver) = mpsc::channel(64);
+        let config = CoordinatorConfig::default();
+        let (chain_store, _chain_rx) = ChainStore::new(100);
+        let mut coordinator = Coordinator::new(
+            config,
+            peer_event_sender,
+            peer_event_receiver,
+            net_event_sender,
+            net_cmd_receiver,
+            chain_store,
+            None,
+        );
+
+        let peer_id = PeerId(0);
+        let (cmd_sender, _cmd_receiver) = mpsc::channel(16);
+        coordinator.peers.insert(
+            peer_id,
+            PeerState {
+                address: "test:3001".to_string(),
+                mode: ConnectionMode::Duplex,
+                ip: inbound_ip,
+                commands: cmd_sender,
+                task_handle: tokio::spawn(async {}),
+                tip: None,
+                rtt: None,
+                fragment: ChainFragment::new(),
+                reconnect_backoff: Duration::from_secs(1),
+                inbound_delay: Duration::ZERO,
+                mux_stats: None,
+            },
+        );
+
+        coordinator.remove_peer(peer_id, "test".to_string()).await;
+        let _ = net_event_receiver.try_recv();
+
+        coordinator
+            .reconnect_queue
+            .iter()
+            .map(|(addr, _, _)| addr.clone())
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn outbound_peer_schedules_reconnection() {
+        let queue = reconnection_after_removal(None).await;
+        assert_eq!(queue, vec!["test:3001"]);
+    }
+
+    #[tokio::test]
+    async fn accepted_peer_does_not_schedule_reconnection() {
+        let queue = reconnection_after_removal(Some("127.0.0.1".parse().unwrap())).await;
+        assert!(queue.is_empty());
     }
 }

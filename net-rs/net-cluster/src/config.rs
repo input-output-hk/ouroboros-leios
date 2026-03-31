@@ -67,6 +67,10 @@ pub struct ClusterConfig {
     #[serde(default = "default_stats_interval")]
     pub stats_interval_secs: u64,
 
+    /// Maximum number of recent events kept in memory for the UI API.
+    #[serde(default = "default_event_window_size")]
+    pub event_window_size: usize,
+
     /// External peers injected into random nodes.
     #[serde(default)]
     pub external_peers: Vec<ExternalPeerConfig>,
@@ -96,6 +100,9 @@ fn default_aggregator_port() -> u16 {
 fn default_stake_distribution() -> String {
     "equal".to_string()
 }
+fn default_event_window_size() -> usize {
+    10000
+}
 fn default_stats_interval() -> u64 {
     5
 }
@@ -115,6 +122,7 @@ impl Default for ClusterConfig {
             aggregator_port: default_aggregator_port(),
             stake_distribution: default_stake_distribution(),
             stats_interval_secs: default_stats_interval(),
+            event_window_size: default_event_window_size(),
             external_peers: Vec::new(),
         }
     }

@@ -18,11 +18,11 @@ use crate::types::Point;
 
 use super::command_dispatch::{dispatch_command, ClientProtocolSenders};
 use super::connect::{self, DuplexConnection};
+use super::peer_task::server_protocol_configs;
 use super::peer_task::{
     client_protocol_configs, spawn_blockfetch, spawn_chainsync, spawn_keepalive, spawn_leios_fetch,
     spawn_leios_notify, spawn_peersharing, spawn_txsubmission, LeiosFetchCommand,
 };
-use super::responder_task::server_protocol_configs;
 use super::server_handlers;
 use super::types::{PeerCommand, PeerEvent};
 use super::PeerId;
@@ -46,9 +46,22 @@ pub(crate) struct DuplexTaskConfig {
     pub scheduler_type: crate::mux::scheduler::SchedulerType,
 }
 
+/// Configuration for a duplex peer task from an already-accepted connection.
+pub(crate) struct AcceptedDuplexTaskConfig {
+    pub peer_id: PeerId,
+    pub connection: DuplexConnection,
+    pub keepalive_interval: Duration,
+    pub chain_store: Arc<ChainStore>,
+    pub peer_provider: Arc<dyn Fn(u8) -> Vec<PeerAddress> + Send + Sync>,
+    pub event_sender: mpsc::Sender<(PeerId, PeerEvent)>,
+    pub command_receiver: mpsc::Receiver<PeerCommand>,
+    pub leios_enabled: bool,
+    pub leios_store: Option<Arc<LeiosStore>>,
+}
+
 /// Run a duplex peer task. Connects outbound, then runs both client and
 /// server protocol sub-tasks on the same mux.
-pub(crate) async fn run_duplex_task(mut config: DuplexTaskConfig) {
+pub(crate) async fn run_duplex_task(config: DuplexTaskConfig) {
     let peer_id = config.peer_id;
     let event_sender = config.event_sender.clone();
 
@@ -95,6 +108,77 @@ pub(crate) async fn run_duplex_task(mut config: DuplexTaskConfig) {
         ))
         .await;
 
+    run_duplex_protocols(
+        conn,
+        DuplexProtocolParams {
+            peer_id: config.peer_id,
+            keepalive_interval: config.keepalive_interval,
+            leios_enabled: config.leios_enabled,
+            chain_store: config.chain_store,
+            peer_provider: config.peer_provider,
+            leios_store: config.leios_store,
+            event_sender: config.event_sender,
+            command_receiver: config.command_receiver,
+        },
+    )
+    .await;
+}
+
+/// Run a duplex peer task from an already-accepted connection.
+pub(crate) async fn run_accepted_duplex_task(config: AcceptedDuplexTaskConfig) {
+    let peer_id = config.peer_id;
+    let event_sender = config.event_sender.clone();
+    let conn = config.connection;
+
+    let _ = event_sender
+        .send((
+            peer_id,
+            PeerEvent::Connected {
+                mux_stats: conn.running.stats.clone(),
+            },
+        ))
+        .await;
+
+    run_duplex_protocols(
+        conn,
+        DuplexProtocolParams {
+            peer_id: config.peer_id,
+            keepalive_interval: config.keepalive_interval,
+            leios_enabled: config.leios_enabled,
+            chain_store: config.chain_store,
+            peer_provider: config.peer_provider,
+            leios_store: config.leios_store,
+            event_sender: config.event_sender,
+            command_receiver: config.command_receiver,
+        },
+    )
+    .await;
+}
+
+/// Shared parameters for duplex protocol wiring.
+struct DuplexProtocolParams {
+    peer_id: PeerId,
+    keepalive_interval: Duration,
+    leios_enabled: bool,
+    chain_store: Arc<ChainStore>,
+    peer_provider: Arc<dyn Fn(u8) -> Vec<PeerAddress> + Send + Sync>,
+    leios_store: Option<Arc<LeiosStore>>,
+    event_sender: mpsc::Sender<(PeerId, PeerEvent)>,
+    command_receiver: mpsc::Receiver<PeerCommand>,
+}
+
+/// Shared protocol wiring for duplex connections (both outbound and accepted).
+async fn run_duplex_protocols(conn: DuplexConnection, params: DuplexProtocolParams) {
+    let DuplexProtocolParams {
+        peer_id,
+        keepalive_interval,
+        leios_enabled,
+        chain_store,
+        peer_provider,
+        leios_store,
+        event_sender,
+        mut command_receiver,
+    } = params;
     // --- Initiator (client) sub-tasks ---
     let mut init_channels = conn.initiator_channels.into_iter();
     let (cs_send, cs_recv) = init_channels.next().expect("chainsync initiator channel");
@@ -114,7 +198,7 @@ pub(crate) async fn run_duplex_task(mut config: DuplexTaskConfig) {
         ka_send,
         ka_recv,
         peer_id,
-        config.keepalive_interval,
+        keepalive_interval,
         event_sender.clone(),
     );
     let bf_client = spawn_blockfetch(
@@ -140,7 +224,7 @@ pub(crate) async fn run_duplex_task(mut config: DuplexTaskConfig) {
     );
 
     // Conditionally spawn Leios client sub-tasks.
-    let leios_client_handles = if config.leios_enabled {
+    let leios_client_handles = if leios_enabled {
         let (ln_send, ln_recv) = init_channels
             .next()
             .expect("leios_notify initiator channel");
@@ -172,12 +256,12 @@ pub(crate) async fn run_duplex_task(mut config: DuplexTaskConfig) {
     let cs_server = tokio::spawn(server_handlers::serve_chainsync(
         cs_srv_send,
         cs_srv_recv,
-        config.chain_store.clone(),
+        chain_store.clone(),
     ));
     let bf_server = tokio::spawn(server_handlers::serve_blockfetch(
         bf_srv_send,
         bf_srv_recv,
-        config.chain_store.clone(),
+        chain_store.clone(),
     ));
     let ts_server = tokio::spawn(server_handlers::serve_txsubmission(
         ts_srv_send,
@@ -188,20 +272,18 @@ pub(crate) async fn run_duplex_task(mut config: DuplexTaskConfig) {
     let ps_server = tokio::spawn(server_handlers::serve_peersharing(
         ps_srv_send,
         ps_srv_recv,
-        config.peer_provider,
+        peer_provider,
     ));
     let ka_server = tokio::spawn(server_handlers::serve_keepalive(ka_srv_send, ka_srv_recv));
 
     // Conditionally spawn Leios server sub-tasks.
-    let leios_server_handles = if config.leios_enabled {
+    let leios_server_handles = if leios_enabled {
         let (ln_srv_send, ln_srv_recv) = resp_channels
             .next()
             .expect("leios_notify responder channel");
         let (lf_srv_send, lf_srv_recv) =
             resp_channels.next().expect("leios_fetch responder channel");
-        let store = config
-            .leios_store
-            .expect("leios_store required when leios_enabled");
+        let store = leios_store.expect("leios_store required when leios_enabled");
         let ln_server = tokio::spawn(server_handlers::serve_leios_notify(
             ln_srv_send,
             ln_srv_recv,
@@ -228,7 +310,7 @@ pub(crate) async fn run_duplex_task(mut config: DuplexTaskConfig) {
     // Main select loop: dispatch commands and detect ChainSync client exit.
     loop {
         tokio::select! {
-            cmd = config.command_receiver.recv() => {
+            cmd = command_receiver.recv() => {
                 if !dispatch_command(cmd, &senders).await {
                     break;
                 }

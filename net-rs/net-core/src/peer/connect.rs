@@ -194,6 +194,77 @@ pub async fn handshake_accepted(
     Ok(Connection { running, channels })
 }
 
+/// Complete a duplex handshake on an already-accepted TCP connection.
+/// Like `handshake_accepted` but registers protocols in both directions.
+pub async fn handshake_accepted_duplex(
+    bearer: TcpBearer,
+    peer_addr: SocketAddr,
+    magic: u64,
+    initiator_protocols: &[ProtocolConfig],
+    responder_protocols: &[ProtocolConfig],
+    mux_config: MuxConfig,
+    scheduler_type: SchedulerType,
+) -> Result<DuplexConnection, Box<dyn std::error::Error + Send + Sync>> {
+    tracing::info!("accepted duplex connection from {peer_addr}");
+
+    let hs_proto = ProtocolConfig {
+        id: handshake::PROTOCOL_ID,
+        traffic_class: TrafficClass::Priority,
+        ingress_limit: handshake::SIZE_LIMIT,
+        egress_queue_size: 4,
+    };
+
+    let mut mux = Mux::new(
+        mux_config,
+        AnyScheduler::from_type(scheduler_type),
+        MODE_RESPONDER,
+    );
+    let (hs_send, hs_recv) = mux.register(&hs_proto);
+
+    let mut initiator_channels = Vec::new();
+    for proto in initiator_protocols {
+        let (send, recv) = mux.register_with_mode(proto, MODE_INITIATOR);
+        initiator_channels.push((CodecSend::new(send), CodecRecv::new(recv)));
+    }
+
+    let mut responder_channels = Vec::new();
+    for proto in responder_protocols {
+        let (send, recv) = mux.register_with_mode(proto, MODE_RESPONDER);
+        responder_channels.push((CodecSend::new(send), CodecRecv::new(recv)));
+    }
+
+    let running = mux.run(bearer);
+
+    let server_data = n2n::VersionData {
+        network_magic: magic,
+        initiator_only_diffusion_mode: false,
+        peer_sharing: 1,
+        query: false,
+    };
+    let hs_result = handshake::run_server(
+        CodecSend::new(hs_send),
+        CodecRecv::new(hs_recv),
+        |client_versions| n2n::negotiate(client_versions, &server_data),
+    )
+    .await;
+
+    match hs_result {
+        Ok((version, _params)) => {
+            tracing::info!("handshake negotiated (accepted duplex): version {version}");
+        }
+        Err(e) => {
+            running.abort();
+            return Err(e.into());
+        }
+    }
+
+    Ok(DuplexConnection {
+        running,
+        initiator_channels,
+        responder_channels,
+    })
+}
+
 /// Connect to a Cardano node in duplex mode: registers each protocol in both
 /// directions (initiator and responder). Returns separate channel sets.
 pub async fn connect_duplex(

@@ -93,6 +93,58 @@ pub(crate) fn client_protocol_configs(leios_enabled: bool) -> Vec<ProtocolConfig
     configs
 }
 
+/// Protocol configs for server-side protocols (excluding handshake).
+/// When `leios_enabled`, also registers LeiosNotify and LeiosFetch.
+pub(crate) fn server_protocol_configs(leios_enabled: bool) -> Vec<ProtocolConfig> {
+    let mut configs = vec![
+        ProtocolConfig {
+            id: chainsync::PROTOCOL_ID,
+            traffic_class: TrafficClass::Priority,
+            ingress_limit: chainsync::INGRESS_LIMIT,
+            egress_queue_size: 16,
+        },
+        ProtocolConfig {
+            id: blockfetch::PROTOCOL_ID,
+            traffic_class: TrafficClass::Priority,
+            ingress_limit: blockfetch::INGRESS_LIMIT,
+            egress_queue_size: 16,
+        },
+        ProtocolConfig {
+            id: txsubmission::PROTOCOL_ID,
+            traffic_class: TrafficClass::Priority,
+            ingress_limit: txsubmission::INGRESS_LIMIT,
+            egress_queue_size: 16,
+        },
+        ProtocolConfig {
+            id: peersharing::PROTOCOL_ID,
+            traffic_class: TrafficClass::Default(1),
+            ingress_limit: peersharing::INGRESS_LIMIT,
+            egress_queue_size: 4,
+        },
+        ProtocolConfig {
+            id: keepalive::PROTOCOL_ID,
+            traffic_class: TrafficClass::Priority,
+            ingress_limit: keepalive::INGRESS_LIMIT,
+            egress_queue_size: 4,
+        },
+    ];
+    if leios_enabled {
+        configs.push(ProtocolConfig {
+            id: leios_notify::PROTOCOL_ID,
+            traffic_class: TrafficClass::Default(1),
+            ingress_limit: leios_notify::INGRESS_LIMIT,
+            egress_queue_size: 16,
+        });
+        configs.push(ProtocolConfig {
+            id: leios_fetch::PROTOCOL_ID,
+            traffic_class: TrafficClass::Default(1),
+            ingress_limit: leios_fetch::INGRESS_LIMIT,
+            egress_queue_size: 16,
+        });
+    }
+    configs
+}
+
 /// Spawn the ChainSync sub-task. Runs find_intersection then request_next loop.
 pub(crate) fn spawn_chainsync(
     cs_send: CodecSend,
