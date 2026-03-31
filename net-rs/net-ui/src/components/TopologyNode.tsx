@@ -7,7 +7,6 @@ interface TopologyNodeData {
   label: string;
   stake: number;
   selected: boolean;
-  flash: "produced" | "received" | "rolledback" | null;
 }
 
 type Props = NodeProps & { data: TopologyNodeData };
@@ -36,8 +35,9 @@ function bgColor(_selected: boolean, flash: "produced" | "received" | "rolledbac
 }
 
 function TopologyNodeInner({ data }: Props) {
-  const { label, selected, flash } = data;
+  const { label, selected } = data;
   const stats = useStore((s) => s.latestStats[label]);
+  const flash = useStore((s) => s.nodeFlash[label] ?? null);
   const tip = stats?.tip_block_no;
   const tipHash = stats?.tip_hash;
 
