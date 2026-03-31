@@ -22,6 +22,8 @@ pub struct ProcessManager {
     net_node_bin: PathBuf,
     base_config: String,
     log_dir: PathBuf,
+    /// Extra --set overrides forwarded to each net-node process.
+    node_overrides: Vec<String>,
 }
 
 impl ProcessManager {
@@ -30,12 +32,19 @@ impl ProcessManager {
     /// `net_node_bin` is the path to the net-node binary.
     /// `base_config` is the path to the shared base config file.
     /// `log_dir` is where child stdout/stderr logs are written.
-    pub fn new(net_node_bin: PathBuf, base_config: String, log_dir: PathBuf) -> Self {
+    /// `node_overrides` are forwarded as `--set key=value` to each net-node.
+    pub fn new(
+        net_node_bin: PathBuf,
+        base_config: String,
+        log_dir: PathBuf,
+        node_overrides: Vec<String>,
+    ) -> Self {
         Self {
             children: Vec::new(),
             net_node_bin,
             base_config,
             log_dir,
+            node_overrides,
         }
     }
 
@@ -52,11 +61,15 @@ impl ProcessManager {
         let log_file = std::fs::File::create(&log_path)?;
         let stderr_file = log_file.try_clone()?;
 
-        let child = Command::new(&self.net_node_bin)
-            .arg("--config")
+        let mut cmd = Command::new(&self.net_node_bin);
+        cmd.arg("--config")
             .arg(&self.base_config)
             .arg("--config")
-            .arg(overlay_path)
+            .arg(overlay_path);
+        for ov in &self.node_overrides {
+            cmd.arg("--set").arg(ov);
+        }
+        let child = cmd
             .stdout(Stdio::from(log_file))
             .stderr(Stdio::from(stderr_file))
             .env(

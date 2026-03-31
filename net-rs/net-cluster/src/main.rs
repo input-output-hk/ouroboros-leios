@@ -36,6 +36,11 @@ struct Cli {
     #[arg(long = "net-node-bin")]
     net_node_bin: Option<String>,
 
+    /// Override individual net-node config values (repeatable, key=value).
+    /// These are forwarded as --set to each spawned net-node process.
+    #[arg(long = "node-set", value_name = "KEY=VALUE")]
+    node_set: Vec<String>,
+
     /// Forward child stdout/stderr to this process's stdout.
     #[arg(long = "verbose", short = 'v')]
     verbose: bool,
@@ -124,7 +129,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tracing::info!("using net-node binary: {}", net_node_bin.display());
 
     let log_dir = PathBuf::from("logs");
-    let mut pm = process::ProcessManager::new(net_node_bin, config.base_config.clone(), log_dir);
+    let mut pm = process::ProcessManager::new(
+        net_node_bin,
+        config.base_config.clone(),
+        log_dir,
+        cli.node_set,
+    );
 
     for (i, node) in topo.nodes.iter().enumerate() {
         pm.spawn(i, &node.node_id, &overlays.paths[i])?;
