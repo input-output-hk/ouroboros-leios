@@ -8,7 +8,7 @@ import type {
 } from "./types";
 import { fetchTopology, fetchAllStats, fetchEvents } from "./api";
 
-const MAX_SERIES = 300;
+const MAX_SERIES = 60; // ~5 min at 5s stats interval
 const MAX_EVENTS = 500;
 
 export interface DashboardState {
@@ -22,6 +22,8 @@ export interface DashboardState {
 
   // Stats (polled 1s)
   latestStats: Record<string, StatsSnapshot>;
+  prevSnapshot: { time: number; bandwidth: number; messages: number; blocks: number } | null;
+  prevNodeSnapshot: Record<string, { time: number; bandwidth: number; messages: number }>;
   aggregateSeries: AggregatePoint[];
   nodeTimeSeries: Record<string, NodeSeriesPoint[]>;
   pollStats: () => Promise<void>;
@@ -63,6 +65,8 @@ export const useStore = create<DashboardState>()((set, get) => ({
 
   // --- Stats ---
   latestStats: {},
+  prevSnapshot: null,
+  prevNodeSnapshot: {},
   aggregateSeries: [],
   nodeTimeSeries: {},
 
@@ -70,13 +74,13 @@ export const useStore = create<DashboardState>()((set, get) => ({
     try {
       const stats = await fetchAllStats();
       const now = Date.now();
+      const { prevSnapshot, prevNodeSnapshot } = get();
 
+      // Compute current cumulative totals
       let totalBandwidth = 0;
       let totalMessages = 0;
       let totalBlocks = 0;
-      const newNodeSeries: Record<string, NodeSeriesPoint[]> = {
-        ...get().nodeTimeSeries,
-      };
+      const curNodeCum: Record<string, { bandwidth: number; messages: number }> = {};
 
       for (const snap of Object.values(stats)) {
         let nodeBw = 0;
@@ -88,31 +92,79 @@ export const useStore = create<DashboardState>()((set, get) => ({
           snap.blocks_produced + snap.blocks_received + snap.txs_generated;
         totalBlocks += snap.blocks_produced;
 
-        const prev = newNodeSeries[snap.node_id] ?? [];
-        const updated = [
-          ...prev,
-          {
-            time: now,
-            bandwidth: nodeBw,
-            messages:
-              snap.blocks_produced + snap.blocks_received + snap.txs_generated,
-          },
-        ].slice(-MAX_SERIES);
-        newNodeSeries[snap.node_id] = updated;
+        curNodeCum[snap.node_id] = {
+          bandwidth: nodeBw,
+          messages:
+            snap.blocks_produced + snap.blocks_received + snap.txs_generated,
+        };
       }
 
-      const point: AggregatePoint = {
-        time: now,
-        bandwidth: totalBandwidth,
-        messages: totalMessages,
-        blocks: totalBlocks,
-      };
+      const curSnap = { time: now, bandwidth: totalBandwidth, messages: totalMessages, blocks: totalBlocks };
 
-      set((s) => ({
-        latestStats: stats,
-        aggregateSeries: [...s.aggregateSeries, point].slice(-MAX_SERIES),
-        nodeTimeSeries: newNodeSeries,
-      }));
+      if (prevSnapshot) {
+        const changed =
+          curSnap.bandwidth !== prevSnapshot.bandwidth ||
+          curSnap.messages !== prevSnapshot.messages ||
+          curSnap.blocks !== prevSnapshot.blocks;
+
+        const newNodeSeries: Record<string, NodeSeriesPoint[]> = {
+          ...get().nodeTimeSeries,
+        };
+        const newNodeSnap: Record<string, { time: number; bandwidth: number; messages: number }> = {
+          ...prevNodeSnapshot,
+        };
+
+        if (changed) {
+          const dtSec = Math.max(0.1, (now - prevSnapshot.time) / 1000);
+          const point: AggregatePoint = {
+            time: now,
+            bandwidth: Math.max(0, curSnap.bandwidth - prevSnapshot.bandwidth) / dtSec,
+            messages: Math.max(0, curSnap.messages - prevSnapshot.messages),
+            blocks: Math.max(0, curSnap.blocks - prevSnapshot.blocks),
+          };
+
+          for (const [nodeId, cur] of Object.entries(curNodeCum)) {
+            const prev = prevNodeSnapshot[nodeId];
+            if (!prev) continue;
+            const nodeChanged = cur.bandwidth !== prev.bandwidth || cur.messages !== prev.messages;
+            if (nodeChanged) {
+              const nodeDt = Math.max(0.1, (now - prev.time) / 1000);
+              const series = newNodeSeries[nodeId] ?? [];
+              newNodeSeries[nodeId] = [
+                ...series,
+                {
+                  time: now,
+                  bandwidth: Math.max(0, cur.bandwidth - prev.bandwidth) / nodeDt,
+                  messages: Math.max(0, cur.messages - prev.messages),
+                },
+              ].slice(-MAX_SERIES);
+              newNodeSnap[nodeId] = { time: now, ...cur };
+            }
+          }
+
+          set((s) => ({
+            latestStats: stats,
+            prevSnapshot: curSnap,
+            prevNodeSnapshot: newNodeSnap,
+            aggregateSeries: [...s.aggregateSeries, point].slice(-MAX_SERIES),
+            nodeTimeSeries: newNodeSeries,
+          }));
+        } else {
+          // No change — just update latestStats, don't emit a data point
+          set({ latestStats: stats });
+        }
+      } else {
+        // First poll — store baseline
+        const curNodeSnap: Record<string, { time: number; bandwidth: number; messages: number }> = {};
+        for (const [id, cum] of Object.entries(curNodeCum)) {
+          curNodeSnap[id] = { time: now, ...cum };
+        }
+        set({
+          latestStats: stats,
+          prevSnapshot: curSnap,
+          prevNodeSnapshot: curNodeSnap,
+        });
+      }
     } catch (e) {
       console.error("Failed to poll stats:", e);
     }

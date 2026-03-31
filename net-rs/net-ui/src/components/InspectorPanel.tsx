@@ -10,7 +10,7 @@ import {
 import { useStore } from "@/store";
 
 function formatBytes(b: number): string {
-  if (b < 1024) return `${b} B`;
+  if (b < 1024) return `${Math.round(b)} B`;
   if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
   return `${(b / 1024 / 1024).toFixed(1)} MB`;
 }
@@ -81,13 +81,14 @@ function NodeInspector({ nodeId }: { nodeId: string }) {
             <LineChart data={chartData}>
               <XAxis dataKey="t" hide />
               <YAxis hide />
-              <Tooltip />
+              <Tooltip formatter={(v: number) => formatBytes(v) + "/s"} />
               <Line
                 type="monotone"
                 dataKey="bandwidth"
                 stroke="#90caf9"
                 dot={false}
                 strokeWidth={1.5}
+                isAnimationActive={false}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -106,6 +107,7 @@ function NodeInspector({ nodeId }: { nodeId: string }) {
                 stroke="#f48fb1"
                 dot={false}
                 strokeWidth={1.5}
+                isAnimationActive={false}
               />
             </LineChart>
           </ResponsiveContainer>
