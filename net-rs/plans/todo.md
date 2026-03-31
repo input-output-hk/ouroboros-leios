@@ -1,9 +1,5 @@
 ## Quick TODO list
 
-## Add a block graph in the inspector
-
-Match the aggregate one
-
 ## Console <div> in <p> error
 
 ￼installHook.js:1 In HTML, <div> cannot be a descendant of <p>.

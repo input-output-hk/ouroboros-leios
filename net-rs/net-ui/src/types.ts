@@ -66,4 +66,5 @@ export interface NodeSeriesPoint {
   time: number;
   bandwidth: number;
   messages: number;
+  blocks: number;
 }
