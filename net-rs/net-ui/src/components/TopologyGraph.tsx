@@ -63,7 +63,7 @@ export function TopologyGraph() {
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
       for (const change of changes) {
-        if (change.type === "position" && change.position && change.id) {
+        if (change.type === "position" && change.dragging && change.position && change.id) {
           setNodePosition(change.id, change.position);
         }
       }
@@ -73,7 +73,7 @@ export function TopologyGraph() {
 
   const onNodeClick: NodeMouseHandler = useCallback(
     (_event, node) => {
-      selectNode(selectedNodeId === node.id ? null : node.id);
+      selectNode(node.id);
     },
     [selectNode, selectedNodeId],
   );
@@ -83,11 +83,7 @@ export function TopologyGraph() {
       const parts = edge.id.split("-");
       const from = Number(parts[0]);
       const to = Number(parts[1]);
-      if (selectedEdge?.from === from && selectedEdge?.to === to) {
-        selectEdge(null);
-      } else {
-        selectEdge({ from, to });
-      }
+      selectEdge({ from, to });
     },
     [selectEdge, selectedEdge],
   );

@@ -12,40 +12,47 @@ interface TopologyNodeData {
 
 type Props = NodeProps & { data: TopologyNodeData };
 
+const handleStyle = {
+  opacity: 0,
+  top: "50%",
+  left: "50%",
+  transform: "translate(-50%, -50%)",
+  pointerEvents: "none" as const,
+};
+
 function TopologyNodeInner({ data }: Props) {
   const { label, stats, selected } = data;
   const blocksProduced = stats?.blocks_produced ?? 0;
 
   return (
-    <>
-      <Handle type="target" position={Position.Top} style={{ visibility: "hidden" }} />
-      <Box
-        sx={{
-          width: 56,
-          height: 56,
-          borderRadius: "50%",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          bgcolor: selected ? "primary.dark" : "background.paper",
-          border: 2,
-          borderColor: selected ? "primary.main" : "grey.700",
-          cursor: "pointer",
-          "&:hover": { borderColor: "primary.light" },
-        }}
-      >
-        <Typography variant="caption" fontWeight="bold" lineHeight={1}>
-          {label.replace("node-", "N")}
+    <Box
+      sx={{
+        width: 56,
+        height: 56,
+        borderRadius: "50%",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        bgcolor: selected ? "primary.dark" : "background.paper",
+        border: 2,
+        borderColor: selected ? "primary.main" : "grey.700",
+        cursor: "pointer",
+        "&:hover": { borderColor: "primary.light" },
+        position: "relative",
+      }}
+    >
+      <Typography variant="caption" fontWeight="bold" lineHeight={1}>
+        {label.replace("node-", "N")}
+      </Typography>
+      {stats && (
+        <Typography variant="caption" fontSize={9} color="text.secondary" lineHeight={1}>
+          {blocksProduced}b
         </Typography>
-        {stats && (
-          <Typography variant="caption" fontSize={9} color="text.secondary" lineHeight={1}>
-            {blocksProduced}b
-          </Typography>
-        )}
-      </Box>
-      <Handle type="source" position={Position.Bottom} style={{ visibility: "hidden" }} />
-    </>
+      )}
+      <Handle type="target" position={Position.Top} style={handleStyle} />
+      <Handle type="source" position={Position.Bottom} style={handleStyle} />
+    </Box>
   );
 }
 

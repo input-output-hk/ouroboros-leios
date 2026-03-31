@@ -27,7 +27,7 @@ export function EventLog() {
         overflowY: "auto",
         p: 1,
         fontFamily: "monospace",
-        fontSize: 11,
+        fontSize: 16,
       }}
     >
       {events.length === 0 && (
