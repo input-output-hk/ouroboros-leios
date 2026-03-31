@@ -8,7 +8,7 @@ interface TopologyNodeData {
   stake: number;
   stats?: StatsSnapshot;
   selected: boolean;
-  flash: "produced" | "received" | null;
+  flash: "produced" | "received" | "rolledback" | null;
 }
 
 type Props = NodeProps & { data: TopologyNodeData };
@@ -21,14 +21,16 @@ const handleStyle = {
   pointerEvents: "none" as const,
 };
 
-function borderColor(selected: boolean, flash: "produced" | "received" | null): string {
+function borderColor(selected: boolean, flash: "produced" | "received" | "rolledback" | null): string {
+  if (flash === "rolledback") return "#9c27b0";
   if (flash === "produced") return "#4caf50";
   if (flash === "received") return "#ffb74d";
   if (selected) return "#90caf9";
   return "#616161";
 }
 
-function bgColor(_selected: boolean, flash: "produced" | "received" | null): string {
+function bgColor(_selected: boolean, flash: "produced" | "received" | "rolledback" | null): string {
+  if (flash === "rolledback") return "#4a148c";
   if (flash === "produced") return "#1b5e20";
   if (flash === "received") return "#4e342e";
   return "#263238";

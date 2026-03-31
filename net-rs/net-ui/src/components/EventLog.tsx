@@ -11,6 +11,7 @@ const typeColors: Record<string, string> = {
   EBReceived: "#64b5f6",
   VTBundleGenerated: "#ce93d8",
   VTBundleReceived: "#ba68c8",
+  RolledBack: "#e040fb",
   Slot: "#fff59d",
 };
 

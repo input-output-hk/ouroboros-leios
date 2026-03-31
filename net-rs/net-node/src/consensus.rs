@@ -317,7 +317,8 @@ impl Consensus {
     /// Handle a completed validation: inject the block so downstream peers
     /// can fetch it, and update the chain tree. If this causes a fork switch,
     /// issue a rollback to the common ancestor first.
-    pub async fn on_validation_complete(&mut self, result: ValidationComplete) {
+    /// Returns `true` if a fork switch rollback was issued.
+    pub async fn on_validation_complete(&mut self, result: ValidationComplete) -> bool {
         let ValidationComplete { point, body } = result;
         self.in_flight.remove(&point);
 
@@ -350,6 +351,7 @@ impl Consensus {
         // Detect fork switch: compare against the last adopted tip.
         // If the new block's chain doesn't descend from the adopted tip,
         // we need to rollback to the common ancestor.
+        let mut rolled_back = false;
         if let Some(adopted_hash) = self.adopted_tip_hash {
             if adopted_hash != new_hash {
                 // Check if adopted tip is an ancestor of the new block
@@ -376,6 +378,7 @@ impl Consensus {
                                     point: ancestor_point,
                                 })
                                 .await;
+                            rolled_back = true;
                         }
                     }
                 }
@@ -408,6 +411,8 @@ impl Consensus {
                 block_no,
             })
             .await;
+
+        rolled_back
     }
 
     /// A peer announced a new tip.
