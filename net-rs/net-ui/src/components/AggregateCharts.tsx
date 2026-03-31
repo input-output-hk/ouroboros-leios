@@ -86,6 +86,7 @@ export function AggregateCharts() {
         title="Forks"
         data={forkData}
         color="#ffb74d"
+        yMin={1}
         formatValue={(v) => String(Math.round(v))}
       />
     </Box>
@@ -97,11 +98,13 @@ function ChartCard({
   data,
   color,
   formatValue,
+  yMin = 0,
 }: {
   title: string;
   data: { t: number; value: number | null }[];
   color: string;
   formatValue: (v: number) => string;
+  yMin?: number;
 }) {
   return (
     <Box sx={{ flex: 1, minWidth: 0, p: 1 }}>
@@ -115,6 +118,7 @@ function ChartCard({
             width={55}
             tick={{ fontSize: 10 }}
             tickFormatter={(v: number) => formatValue(v)}
+            domain={[yMin, "auto"]}
           />
           <Tooltip
             formatter={(v: number) => formatValue(v)}
