@@ -1,3 +1,4 @@
+mod chain_tree;
 mod clock;
 mod config;
 mod consensus;
