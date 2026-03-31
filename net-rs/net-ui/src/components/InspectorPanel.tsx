@@ -84,7 +84,7 @@ function NodeInspector({ nodeId }: { nodeId: string }) {
             const peerNode = addrToNode[p.address] ?? null;
             return (
             <Box key={p.peer_id} sx={{ ml: 1, mb: 0.5 }}>
-              <Typography variant="body2" fontSize={11}>
+              <Typography variant="body2" component="div" fontSize={11}>
                 <Chip label={p.mode} size="small" sx={{ mr: 0.5, height: 16, fontSize: 10 }} />
                 {peerNode ? <><b>{peerNode}</b> ({p.address})</> : p.address}
                 {p.rtt_ms != null && ` (${p.rtt_ms.toFixed(0)}ms RTT)`}

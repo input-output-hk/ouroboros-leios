@@ -1,55 +1,5 @@
 ## Quick TODO list
 
-## Console <div> in <p> error
-
-￼installHook.js:1 In HTML, <div> cannot be a descendant of <p>.
-This will cause a hydration error.
-
-  ...
-    <Styled(div) as="div" ref={null} className="MuiBox-root" theme={{...}} sx={{p:2, ...}}>
-      <Insertion6>
-      <div className="MuiBox-roo...">
-        <NodeInspector nodeId="node-4">
-          <Box3>
-            <Styled(div) as="div" ref={null} className="MuiBox-root" theme={{...}} sx={{}}>
-              <Insertion6>
-              <div className="MuiBox-roo...">
-                <Typography2>
-                <Box3 sx={{mb:1}}>
-                  <Styled(div) as="div" ref={null} className="MuiBox-root" theme={{...}} sx={{mb:1}}>
-                    <Insertion6>
-                    <div className="MuiBox-roo...">
-                      <Typography2>
-                      <Typography2>
-                      <Typography2>
-                      <Typography2>
-                      <Typography2>
-                      <Divider2>
-                      <Typography2>
-                      <Box3 sx={{ml:1,mb:0.5}}>
-                        <Styled(div) as="div" ref={null} className="MuiBox-root" theme={{...}} sx={{ml:1,mb:0.5}}>
-                          <Insertion6>
-                          <div className="MuiBox-roo...">
-                            <Typography2 variant="body2" fontSize={11}>
-                              <MuiTypography-root as="p" ref={null} className="MuiTypogra..." sx={{fontSize:11, ...}} ...>
-                                <Insertion6>
->                               <p
->                                 className="MuiTypography-root MuiTypography-body2 css-1u8ahwx-MuiTypography-root"
->                                 style={{}}
->                               >
-                                  <Chip2 label="Duplex" size="small" sx={{mr:0.5,height:16, ...}}>
-                                    <MuiChip-root as="div" className="MuiChip-ro..." disabled={undefined} ...>
-                                      <Insertion6>
->                                     <div
->                                       className="MuiChip-root MuiChip-filled MuiChip-sizeSmall MuiChip-colorDefault ..."
->                                       disabled={undefined}
->                                       onClick={undefined}
->                                       onKeyDown={function handleKeyDown}
->                                       onKeyUp={function handleKeyUp}
->                                       tabIndex={undefined}
->                                       ref={function}
->                                     >
-
 ## Consensus
 
 We need to implement true Praos consensus (longest chain).  I suspect
