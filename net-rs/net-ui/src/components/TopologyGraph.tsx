@@ -22,6 +22,7 @@ export function TopologyGraph() {
   const latestStats = useStore((s) => s.latestStats);
   const selectedNodeId = useStore((s) => s.selectedNodeId);
   const selectedEdge = useStore((s) => s.selectedEdge);
+  const nodeFlash = useStore((s) => s.nodeFlash);
   const selectNode = useStore((s) => s.selectNode);
   const selectEdge = useStore((s) => s.selectEdge);
   const setNodePosition = useStore((s) => s.setNodePosition);
@@ -37,9 +38,10 @@ export function TopologyGraph() {
         stake: n.stake,
         stats: latestStats[n.node_id],
         selected: selectedNodeId === n.node_id,
+        flash: nodeFlash[n.node_id] ?? null,
       },
     }));
-  }, [topology, nodePositions, latestStats, selectedNodeId]);
+  }, [topology, nodePositions, latestStats, selectedNodeId, nodeFlash]);
 
   const edges: Edge[] = useMemo(() => {
     if (!topology) return [];

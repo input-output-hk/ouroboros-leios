@@ -8,6 +8,7 @@ interface TopologyNodeData {
   stake: number;
   stats?: StatsSnapshot;
   selected: boolean;
+  flash: "produced" | "received" | null;
 }
 
 type Props = NodeProps & { data: TopologyNodeData };
@@ -20,34 +21,48 @@ const handleStyle = {
   pointerEvents: "none" as const,
 };
 
+function borderColor(selected: boolean, flash: "produced" | "received" | null): string {
+  if (flash === "produced") return "#4caf50";
+  if (flash === "received") return "#ffb74d";
+  if (selected) return "#90caf9";
+  return "#616161";
+}
+
+function bgColor(_selected: boolean, flash: "produced" | "received" | null): string {
+  if (flash === "produced") return "#1b5e20";
+  if (flash === "received") return "#4e342e";
+  return "#263238";
+}
+
 function TopologyNodeInner({ data }: Props) {
-  const { label, stats, selected } = data;
-  const blocksProduced = stats?.blocks_produced ?? 0;
+  const { label, stats, selected, flash } = data;
+  const tip = stats?.tip_block_no;
 
   return (
     <Box
       sx={{
-        width: 56,
-        height: 56,
+        width: 72,
+        height: 72,
         borderRadius: "50%",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        bgcolor: selected ? "primary.dark" : "background.paper",
-        border: 2,
-        borderColor: selected ? "primary.main" : "grey.700",
+        bgcolor: bgColor(selected, flash),
+        border: selected ? 4 : 2,
+        borderColor: borderColor(selected, flash),
         cursor: "pointer",
         "&:hover": { borderColor: "primary.light" },
         position: "relative",
+        transition: "background-color 0.3s, border-color 0.3s",
       }}
     >
-      <Typography variant="caption" fontWeight="bold" lineHeight={1}>
-        {label.replace("node-", "N")}
+      <Typography variant="caption" fontWeight="bold" lineHeight={1.2}>
+        {label}
       </Typography>
-      {stats && (
-        <Typography variant="caption" fontSize={9} color="text.secondary" lineHeight={1}>
-          {blocksProduced}b
+      {tip != null && (
+        <Typography variant="caption" fontSize={9} color="text.secondary" lineHeight={1.2}>
+          Tip: {tip}
         </Typography>
       )}
       <Handle type="target" position={Position.Top} style={handleStyle} />

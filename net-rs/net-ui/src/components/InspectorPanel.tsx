@@ -20,7 +20,20 @@ const EMPTY_SERIES: never[] = [];
 
 function NodeInspector({ nodeId }: { nodeId: string }) {
   const stats = useStore((s) => s.latestStats[nodeId]);
+  const topology = useStore((s) => s.topology);
   const series = useStore((s) => s.nodeTimeSeries[nodeId]) ?? EMPTY_SERIES;
+
+  const addrToNode = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (topology) {
+      for (const n of topology.nodes) {
+        // Map both full address and just the port
+        map[n.listen_address] = n.node_id;
+        map[`127.0.0.1:${n.listen_port}`] = n.node_id;
+      }
+    }
+    return map;
+  }, [topology]);
 
   const WINDOW = 60;
   const chartData = useMemo(() => {
@@ -65,18 +78,21 @@ function NodeInspector({ nodeId }: { nodeId: string }) {
           <Typography variant="caption" color="text.secondary">
             Peers ({stats.peer_count})
           </Typography>
-          {stats.peers.map((p) => (
+          {stats.peers.map((p) => {
+            const peerNode = addrToNode[p.address] ?? null;
+            return (
             <Box key={p.peer_id} sx={{ ml: 1, mb: 0.5 }}>
               <Typography variant="body2" fontSize={11}>
                 <Chip label={p.mode} size="small" sx={{ mr: 0.5, height: 16, fontSize: 10 }} />
-                {p.address}
+                {peerNode ? <><b>{peerNode}</b> ({p.address})</> : p.address}
                 {p.rtt_ms != null && ` (${p.rtt_ms.toFixed(0)}ms RTT)`}
               </Typography>
               <Typography variant="body2" fontSize={10} color="text.secondary" sx={{ ml: 1 }}>
                 {formatBytes(p.bytes_sent)} sent / {formatBytes(p.bytes_received)} received
               </Typography>
             </Box>
-          ))}
+            );
+          })}
         </Box>
       ) : (
         <Typography variant="body2" color="text.secondary">
