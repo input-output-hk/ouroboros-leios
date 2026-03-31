@@ -547,7 +547,12 @@ mod tests {
         let (store, _rx) = ChainStore::new(100);
         let header_1 = make_header(1);
         for slot in 1..=3 {
-            store.append_block(make_point(slot), make_header(slot), make_body(slot, 50));
+            store.append_block(
+                make_point(slot),
+                make_header(slot),
+                make_body(slot, 50),
+                slot,
+            );
         }
 
         // Start server.
@@ -594,7 +599,12 @@ mod tests {
         let body_1 = make_body(1, 100);
         let body_3 = make_body(3, 100);
         for slot in 1..=3 {
-            store.append_block(make_point(slot), make_header(slot), make_body(slot, 100));
+            store.append_block(
+                make_point(slot),
+                make_header(slot),
+                make_body(slot, 100),
+                slot,
+            );
         }
 
         let server_handle = tokio::spawn(serve_blockfetch(server_send, server_recv, store));

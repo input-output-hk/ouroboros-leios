@@ -56,13 +56,20 @@ impl ChainStore {
     }
 
     /// Append a block to the chain. Evicts the oldest block if over capacity.
+    /// `block_no` is the caller-provided chain height (not an internal counter).
     /// Returns `false` if the point is already stored (no-op).
-    pub fn append_block(&self, point: Point, header: WrappedHeader, body: BlockBody) -> bool {
+    pub fn append_block(
+        &self,
+        point: Point,
+        header: WrappedHeader,
+        body: BlockBody,
+        block_no: u64,
+    ) -> bool {
         let mut inner = self.inner.lock().unwrap();
         if inner.blocks.iter().any(|b| b.point == point) {
             return false;
         }
-        inner.block_no += 1;
+        inner.block_no = block_no;
         inner.blocks.push_back(StoredBlock {
             point,
             header,
@@ -251,14 +258,14 @@ mod tests {
     fn append_advances_tip() {
         let (store, _rx) = ChainStore::new(100);
         let (p1, h1, b1) = make_block(1);
-        store.append_block(p1.clone(), h1, b1);
+        store.append_block(p1.clone(), h1, b1, 1);
 
         let tip = store.tip();
         assert_eq!(tip.point, p1);
         assert_eq!(tip.block_no, 1);
 
         let (p2, h2, b2) = make_block(2);
-        store.append_block(p2.clone(), h2, b2);
+        store.append_block(p2.clone(), h2, b2, 2);
         let tip = store.tip();
         assert_eq!(tip.point, p2);
         assert_eq!(tip.block_no, 2);
@@ -268,10 +275,10 @@ mod tests {
     fn append_deduplicates_by_point() {
         let (store, _rx) = ChainStore::new(100);
         let (p1, h1, b1) = make_block(1);
-        assert!(store.append_block(p1.clone(), h1.clone(), b1.clone()));
+        assert!(store.append_block(p1.clone(), h1.clone(), b1.clone(), 1));
 
         // Same point again — should be a no-op.
-        assert!(!store.append_block(p1, h1, b1));
+        assert!(!store.append_block(p1, h1, b1, 1));
 
         let tip = store.tip();
         assert_eq!(tip.block_no, 1);
@@ -283,7 +290,7 @@ mod tests {
         let (store, _rx) = ChainStore::new(3);
         for slot in 1..=5 {
             let (p, h, b) = make_block(slot);
-            store.append_block(p, h, b);
+            store.append_block(p, h, b, slot);
         }
         // Should have blocks 3, 4, 5 (evicted 1 and 2).
         assert_eq!(store.stored_count(), 3);
@@ -300,7 +307,7 @@ mod tests {
         let (store, _rx) = ChainStore::new(100);
         for slot in 1..=5 {
             let (p, h, b) = make_block(slot);
-            store.append_block(p, h, b);
+            store.append_block(p, h, b, slot);
         }
 
         let new_tip = store.rollback_to(&make_point(3));
@@ -317,7 +324,7 @@ mod tests {
         let (store, _rx) = ChainStore::new(100);
         for slot in 1..=3 {
             let (p, h, b) = make_block(slot);
-            store.append_block(p, h, b);
+            store.append_block(p, h, b, slot);
         }
 
         let new_tip = store.rollback_to(&Point::Origin);
@@ -330,7 +337,7 @@ mod tests {
         let (store, _rx) = ChainStore::new(100);
         for slot in 1..=5 {
             let (p, h, b) = make_block(slot);
-            store.append_block(p, h, b);
+            store.append_block(p, h, b, slot);
         }
 
         let new_tip = store.rollback(2);
@@ -343,7 +350,7 @@ mod tests {
         let (store, _rx) = ChainStore::new(100);
         for slot in 1..=5 {
             let (p, h, b) = make_block(slot);
-            store.append_block(p, h, b);
+            store.append_block(p, h, b, slot);
         }
 
         // Should find point 4 first (it's listed before point 2).
@@ -359,7 +366,7 @@ mod tests {
         let (store, _rx) = ChainStore::new(100);
         for slot in 1..=3 {
             let (p, h, b) = make_block(slot);
-            store.append_block(p, h, b);
+            store.append_block(p, h, b, slot);
         }
 
         let result = store.find_intersection(&[make_point(99), Point::Origin]);
@@ -373,7 +380,7 @@ mod tests {
         let (store, _rx) = ChainStore::new(100);
         for slot in 1..=3 {
             let (p, h, b) = make_block(slot);
-            store.append_block(p, h, b);
+            store.append_block(p, h, b, slot);
         }
 
         let result = store.find_intersection(&[make_point(99), make_point(100)]);
@@ -385,7 +392,7 @@ mod tests {
         let (store, _rx) = ChainStore::new(100);
         for slot in 1..=5 {
             let (p, h, b) = make_block(slot);
-            store.append_block(p, h, b);
+            store.append_block(p, h, b, slot);
         }
 
         // After index 2 (block at slot 3) → blocks at slots 4, 5.
@@ -404,7 +411,7 @@ mod tests {
         let (store, _rx) = ChainStore::new(100);
         for slot in 1..=5 {
             let (p, h, b) = make_block(slot);
-            store.append_block(p, h, b);
+            store.append_block(p, h, b, slot);
         }
 
         let range = store.get_range(&make_point(2), &make_point(4));
@@ -418,7 +425,7 @@ mod tests {
         let (store, _rx) = ChainStore::new(100);
         for slot in 1..=3 {
             let (p, h, b) = make_block(slot);
-            store.append_block(p, h, b);
+            store.append_block(p, h, b, slot);
         }
 
         let range = store.get_range(&make_point(99), &make_point(100));
@@ -430,7 +437,7 @@ mod tests {
         let (store, _rx) = ChainStore::new(100);
         for slot in 1..=5 {
             let (p, h, b) = make_block(slot);
-            store.append_block(p, h, b);
+            store.append_block(p, h, b, slot);
         }
 
         assert!(store.is_valid_index(Some(4))); // index 4 = block 5
@@ -446,7 +453,7 @@ mod tests {
         let mut sub = store.subscribe();
 
         let (p, h, b) = make_block(1);
-        store.append_block(p, h, b);
+        store.append_block(p, h, b, 1);
 
         // Should wake up.
         let result = tokio::time::timeout(std::time::Duration::from_secs(1), sub.changed()).await;
