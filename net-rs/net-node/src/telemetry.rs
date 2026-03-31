@@ -192,8 +192,6 @@ impl EventSink for FileEventSink {
 pub struct HttpEventSink {
     url: String,
     client: reqwest::Client,
-    batch: Vec<serde_json::Value>,
-    batch_limit: usize,
 }
 
 impl HttpEventSink {
@@ -201,37 +199,22 @@ impl HttpEventSink {
         Self {
             url: url.to_string(),
             client: reqwest::Client::new(),
-            batch: Vec::new(),
-            batch_limit: 100,
         }
-    }
-
-    fn send_batch(&mut self) {
-        if self.batch.is_empty() {
-            return;
-        }
-        let events = std::mem::take(&mut self.batch);
-        let client = self.client.clone();
-        let url = self.url.clone();
-        tokio::spawn(async move {
-            let _ = client.post(&url).json(&events).send().await;
-        });
     }
 }
 
 impl EventSink for HttpEventSink {
     fn emit(&mut self, event: &OutputEvent) {
         if let Ok(value) = serde_json::to_value(event) {
-            self.batch.push(value);
-        }
-        if self.batch.len() >= self.batch_limit {
-            self.send_batch();
+            let client = self.client.clone();
+            let url = self.url.clone();
+            tokio::spawn(async move {
+                let _ = client.post(&url).json(&[value]).send().await;
+            });
         }
     }
 
-    fn flush(&mut self) {
-        self.send_batch();
-    }
+    fn flush(&mut self) {}
 }
 
 // ---------------------------------------------------------------------------

@@ -88,7 +88,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let event_window = Arc::new(RwLock::new(types::EventWindow::new(
         config.event_window_size,
     )));
-    let (event_tx, event_rx) = tokio::sync::mpsc::channel(256);
+    let (event_tx, event_rx) = tokio::sync::mpsc::channel(4096);
     let (_server_state, _server_handle) = server::start(
         config.aggregator_port,
         event_tx,

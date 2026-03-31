@@ -8,7 +8,7 @@ import type {
 } from "./types";
 import { fetchTopology, fetchAllStats, fetchEvents } from "./api";
 
-const MAX_SERIES = 60; // ~5 min at 5s stats interval
+const MAX_SERIES = 300; // ~5 min at 1s stats interval
 const MAX_EVENTS = 500;
 
 export interface DashboardState {

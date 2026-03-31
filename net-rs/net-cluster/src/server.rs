@@ -117,6 +117,13 @@ async fn receive_events(
         log_interesting_event(event);
     }
 
+    // Push to EventWindow immediately so the UI gets real-time events
+    // (the aggregator still writes time-ordered JSONL separately).
+    {
+        let raw_events: Vec<serde_json::Value> = events.iter().map(|e| e.raw.clone()).collect();
+        state.event_window.write().await.push(raw_events);
+    }
+
     match state.event_tx.try_send(events) {
         Ok(()) => StatusCode::OK,
         Err(mpsc::error::TrySendError::Full(_)) => {
