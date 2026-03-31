@@ -42,6 +42,10 @@ export function AggregateCharts() {
     () => padSeries(series.map((p, i) => ({ t: i, value: p.blocks }))),
     [series],
   );
+  const forkData = useMemo(
+    () => padSeries(series.map((p, i) => ({ t: i, value: p.forks }))),
+    [series],
+  );
 
   if (series.length < 2) {
     return (
@@ -76,6 +80,12 @@ export function AggregateCharts() {
         title="Blocks"
         data={blkData}
         color="#a5d6a7"
+        formatValue={(v) => String(Math.round(v))}
+      />
+      <ChartCard
+        title="Forks"
+        data={forkData}
+        color="#ffb74d"
         formatValue={(v) => String(Math.round(v))}
       />
     </Box>

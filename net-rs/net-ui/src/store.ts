@@ -22,7 +22,7 @@ export interface DashboardState {
 
   // Stats (polled 1s)
   latestStats: Record<string, StatsSnapshot>;
-  prevSnapshot: { time: number; bandwidth: number; messages: number; blocks: number } | null;
+  prevSnapshot: { time: number; bandwidth: number; messages: number; blocks: number; forks: number } | null;
   prevNodeSnapshot: Record<string, { time: number; bandwidth: number; messages: number; blocks: number }>;
   aggregateSeries: AggregatePoint[];
   nodeTimeSeries: Record<string, NodeSeriesPoint[]>;
@@ -106,13 +106,21 @@ export const useStore = create<DashboardState>()((set, get) => ({
         };
       }
 
-      const curSnap = { time: now, bandwidth: totalBandwidth, messages: totalMessages, blocks: totalBlocks };
+      // Count distinct chain tips (forks)
+      const tipSet = new Set<string>();
+      for (const snap of Object.values(stats)) {
+        if (snap.tip_hash) tipSet.add(snap.tip_hash);
+      }
+      const curForks = tipSet.size;
+
+      const curSnap = { time: now, bandwidth: totalBandwidth, messages: totalMessages, blocks: totalBlocks, forks: curForks };
 
       if (prevSnapshot) {
         const changed =
           curSnap.bandwidth !== prevSnapshot.bandwidth ||
           curSnap.messages !== prevSnapshot.messages ||
-          curSnap.blocks !== prevSnapshot.blocks;
+          curSnap.blocks !== prevSnapshot.blocks ||
+          curSnap.forks !== prevSnapshot.forks;
 
         const newNodeSeries: Record<string, NodeSeriesPoint[]> = {
           ...get().nodeTimeSeries,
@@ -128,6 +136,7 @@ export const useStore = create<DashboardState>()((set, get) => ({
             bandwidth: Math.max(0, curSnap.bandwidth - prevSnapshot.bandwidth) / dtSec,
             messages: Math.max(0, curSnap.messages - prevSnapshot.messages),
             blocks: Math.max(0, curSnap.blocks - prevSnapshot.blocks),
+            forks: curForks,
           };
 
           for (const [nodeId, cur] of Object.entries(curNodeCum)) {

@@ -60,6 +60,7 @@ export interface AggregatePoint {
   bandwidth: number;
   messages: number;
   blocks: number;
+  forks: number;
 }
 
 export interface NodeSeriesPoint {
