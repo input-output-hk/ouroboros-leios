@@ -78,6 +78,11 @@ pub struct NodeConfig {
     #[serde(default = "default_max_connections_per_ip")]
     pub max_connections_per_ip: usize,
 
+    /// Chain security parameter k — blocks deeper than this below the best
+    /// tip are considered immutable and pruned from the chain tree.
+    #[serde(default = "default_security_param_k")]
+    pub security_param_k: u64,
+
     /// Block production settings.
     #[serde(default)]
     pub production: ProductionConfig,
@@ -334,6 +339,10 @@ fn default_leios_dedup_window() -> u64 {
     1000
 }
 
+fn default_security_param_k() -> u64 {
+    2160
+}
+
 fn default_max_handshaking() -> usize {
     64
 }
@@ -357,6 +366,7 @@ impl Default for NodeConfig {
             keepalive_interval_secs: default_keepalive_interval_secs(),
             chain_store_capacity: default_chain_store_capacity(),
             leios_dedup_window: default_leios_dedup_window(),
+            security_param_k: default_security_param_k(),
             max_handshaking: default_max_handshaking(),
             max_connections_per_ip: default_max_connections_per_ip(),
             production: ProductionConfig::default(),

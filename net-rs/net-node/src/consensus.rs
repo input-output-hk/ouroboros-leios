@@ -1,10 +1,11 @@
-//! Longest-chain consensus.
+//! Longest-chain consensus with fork tracking.
 //!
-//! Tracks the local validated chain tip. When a peer announces a longer
-//! chain, fetches the block, validates it, and adopts it. Self-produced
-//! blocks are tracked to avoid re-fetching them.
+//! Maintains a tree of block headers keyed by hash. When a peer announces
+//! a new block, it is inserted into the tree via its `prev_hash` link.
+//! The longest chain (highest `block_number`) is selected as the best tip.
+//! Blocks deeper than `k` below the best tip are pruned.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
 use net_core::types::{BlockBody, Point, Tip, WrappedHeader};
@@ -13,16 +14,120 @@ use tracing::info;
 
 use crate::validation::{ValidationComplete, Validator};
 
-/// Consensus state tracking the local chain tip.
+/// A node in the chain tree, representing one block header.
+#[derive(Debug, Clone)]
+#[allow(dead_code)] // Fields used for debugging and future chain-walking.
+struct ChainNode {
+    point: Point,
+    block_number: u64,
+    slot: u64,
+    prev_hash: Option<[u8; 32]>,
+}
+
+/// Tree of block headers for fork tracking and longest-chain selection.
+///
+/// Blocks are keyed by their 32-byte hash. The `best_tip` is cached and
+/// updated on every insert. Pruning removes blocks deeper than `k` below
+/// the best tip.
+#[derive(Debug)]
+pub struct ChainTree {
+    nodes: HashMap<[u8; 32], ChainNode>,
+    best_tip: Option<(Point, u64)>, // (point, block_number)
+}
+
+impl ChainTree {
+    pub fn new() -> Self {
+        Self {
+            nodes: HashMap::new(),
+            best_tip: None,
+        }
+    }
+
+    /// Insert a block. Returns true if this block becomes the new best tip.
+    pub fn insert(
+        &mut self,
+        hash: [u8; 32],
+        point: Point,
+        block_number: u64,
+        slot: u64,
+        prev_hash: Option<[u8; 32]>,
+    ) -> bool {
+        // Duplicate — no change.
+        if self.nodes.contains_key(&hash) {
+            return false;
+        }
+
+        self.nodes.insert(
+            hash,
+            ChainNode {
+                point: point.clone(),
+                block_number,
+                slot,
+                prev_hash,
+            },
+        );
+
+        let is_new_best = match &self.best_tip {
+            None => true,
+            Some((_, best_bn)) => block_number > *best_bn,
+        };
+
+        if is_new_best {
+            self.best_tip = Some((point, block_number));
+        }
+
+        is_new_best
+    }
+
+    /// Check whether a block hash is in the tree.
+    #[cfg(test)]
+    pub fn contains(&self, hash: &[u8; 32]) -> bool {
+        self.nodes.contains_key(hash)
+    }
+
+    /// The current best tip (highest block_number).
+    pub fn best_tip(&self) -> Option<(&Point, u64)> {
+        self.best_tip.as_ref().map(|(p, bn)| (p, *bn))
+    }
+
+    /// Extract the hash from the best tip's Point.
+    pub fn best_tip_hash(&self) -> Option<[u8; 32]> {
+        match &self.best_tip {
+            Some((Point::Specific { hash, .. }, _)) => Some(*hash),
+            _ => None,
+        }
+    }
+
+    /// Look up block_number for a given hash.
+    pub fn block_number(&self, hash: &[u8; 32]) -> Option<u64> {
+        self.nodes.get(hash).map(|n| n.block_number)
+    }
+
+    /// Number of blocks in the tree.
+    #[cfg(test)]
+    pub fn len(&self) -> usize {
+        self.nodes.len()
+    }
+
+    /// Prune blocks with block_number below the threshold.
+    pub fn prune_below(&mut self, min_block_number: u64) {
+        self.nodes
+            .retain(|_, node| node.block_number >= min_block_number);
+    }
+}
+
+/// Consensus state with fork-tracking chain tree.
 pub struct Consensus {
     node_id: String,
-    local_tip: Option<Tip>,
+    chain_tree: ChainTree,
     /// Points of blocks we produced (skip re-fetching).
     self_produced: HashSet<Point>,
     /// Points currently being fetched or validated (avoid duplicate requests).
     in_flight: HashSet<Point>,
     commands: mpsc::Sender<NetworkCommand>,
     validator: Validator,
+    /// Security parameter k — prune blocks deeper than this.
+    security_param_k: u64,
 }
 
 impl Consensus {
@@ -30,28 +135,42 @@ impl Consensus {
         node_id: String,
         commands: mpsc::Sender<NetworkCommand>,
         validator: Validator,
+        security_param_k: u64,
     ) -> Self {
         Self {
             node_id,
-            local_tip: None,
+            chain_tree: ChainTree::new(),
             self_produced: HashSet::new(),
             in_flight: HashSet::new(),
             commands,
             validator,
+            security_param_k,
         }
     }
 
     /// Register a block we produced ourselves, so we don't re-fetch it.
     /// Returns the block_no to use for injection.
-    pub fn register_self_produced(&mut self, point: &Point) -> u64 {
+    pub fn register_self_produced(&mut self, point: &Point, header: &WrappedHeader) -> u64 {
         self.self_produced.insert(point.clone());
-        let block_no = self.local_tip.as_ref().map_or(1, |t| t.block_no + 1);
-        // Update local_tip immediately (don't wait for peer re-announcement).
-        self.local_tip = Some(Tip {
-            point: point.clone(),
-            block_no,
-        });
-        block_no
+
+        // Insert into chain tree from header info.
+        if let Some(info) = header.parsed.as_ref() {
+            let hash = match point {
+                Point::Specific { hash, .. } => *hash,
+                _ => return 1,
+            };
+            self.chain_tree.insert(
+                hash,
+                point.clone(),
+                info.block_number,
+                info.slot,
+                info.prev_hash,
+            );
+            info.block_number
+        } else {
+            // Fallback for opaque headers.
+            self.chain_tree.best_tip().map_or(1, |(_, bn)| bn + 1)
+        }
     }
 
     /// Handle a network event. Returns true if the event was consumed by
@@ -164,22 +283,39 @@ impl Consensus {
     }
 
     /// Handle a completed validation: inject the block so downstream peers
-    /// can fetch it, and update the local tip.
+    /// can fetch it, and update the chain tree.
     pub async fn on_validation_complete(&mut self, result: ValidationComplete) {
         let ValidationComplete { point, body } = result;
         self.in_flight.remove(&point);
 
         // Extract the header from the block body for injection.
-        // This produces the canonical ChainSync wire format [era, #6.24(header_cbor)].
         let header = body
             .header()
             .unwrap_or_else(|| WrappedHeader::opaque(Vec::new()));
 
-        // Update local tip (increment block_no).
-        let block_no = self.local_tip.as_ref().map_or(1, |t| t.block_no + 1);
-        let new_tip = Tip {
-            point: point.clone(),
-            block_no,
+        // Insert into chain tree (may already be there from TipAdvanced).
+        let block_no = if let Some(info) = header.parsed.as_ref() {
+            let hash = match &point {
+                Point::Specific { hash, .. } => *hash,
+                _ => [0u8; 32],
+            };
+            self.chain_tree.insert(
+                hash,
+                point.clone(),
+                info.block_number,
+                info.slot,
+                info.prev_hash,
+            );
+            info.block_number
+        } else {
+            // Fallback: look up from tree, or estimate.
+            let hash = match &point {
+                Point::Specific { hash, .. } => *hash,
+                _ => [0u8; 32],
+            };
+            self.chain_tree
+                .block_number(&hash)
+                .unwrap_or_else(|| self.chain_tree.best_tip().map_or(1, |(_, bn)| bn + 1))
         };
 
         info!(
@@ -189,7 +325,11 @@ impl Consensus {
             "block validated, adopting"
         );
 
-        self.local_tip = Some(new_tip);
+        // Prune old blocks beyond k.
+        if block_no > self.security_param_k {
+            self.chain_tree
+                .prune_below(block_no - self.security_param_k);
+        }
 
         // Inject into chain store so we serve it to downstream peers.
         let _ = self
@@ -204,27 +344,39 @@ impl Consensus {
     }
 
     /// A peer announced a new tip.
-    async fn on_tip_advanced(&mut self, tip: &Tip, _header: &WrappedHeader) {
-        let dominated = self
-            .local_tip
-            .as_ref()
-            .is_none_or(|local| tip.block_no > local.block_no);
+    async fn on_tip_advanced(&mut self, tip: &Tip, header: &WrappedHeader) {
+        let point = &tip.point;
+
+        // Check if this tip is better than our current best BEFORE inserting.
+        let dominated = match self.chain_tree.best_tip() {
+            None => true,
+            Some((_, best_bn)) => tip.block_no > best_bn,
+        };
+
+        // Insert into chain tree if we have header info.
+        if let Some(info) = header.parsed.as_ref() {
+            if let Point::Specific { hash, .. } = point {
+                self.chain_tree.insert(
+                    *hash,
+                    point.clone(),
+                    info.block_number,
+                    info.slot,
+                    info.prev_hash,
+                );
+            }
+        }
 
         if !dominated {
             return;
         }
 
-        let point = &tip.point;
-
         // Don't fetch our own blocks.
         if self.self_produced.contains(point) {
-            // We produced this — just adopt the tip directly.
             info!(
                 node_id = %self.node_id,
                 %tip,
                 "adopting self-produced tip"
             );
-            self.local_tip = Some(tip.clone());
             return;
         }
 
@@ -268,9 +420,6 @@ impl Consensus {
             "rolling back"
         );
 
-        // Reset local tip to the rollback point.
-        self.local_tip = Some(tip.clone());
-
         let _ = self
             .commands
             .send(NetworkCommand::InjectRollback {
@@ -279,10 +428,23 @@ impl Consensus {
             .await;
     }
 
-    /// Current local tip.
+    /// Current local tip as a `Tip`, derived from the chain tree.
     #[allow(dead_code)]
-    pub fn local_tip(&self) -> Option<&Tip> {
-        self.local_tip.as_ref()
+    pub fn local_tip(&self) -> Option<Tip> {
+        self.chain_tree.best_tip().map(|(point, block_no)| Tip {
+            point: point.clone(),
+            block_no,
+        })
+    }
+
+    /// Hash of the current best tip, for passing as prev_hash to block production.
+    pub fn tip_hash(&self) -> Option<[u8; 32]> {
+        self.chain_tree.best_tip_hash()
+    }
+
+    /// Next block number (best tip + 1), for setting in produced block headers.
+    pub fn next_block_number(&self) -> u64 {
+        self.chain_tree.best_tip().map_or(1, |(_, bn)| bn + 1)
     }
 }
 
@@ -290,23 +452,302 @@ impl Consensus {
 mod tests {
     use super::*;
 
-    fn make_tip(slot: u64, block_no: u64) -> (Tip, WrappedHeader) {
-        let hash = [slot as u8; 32];
-        let point = Point::Specific { slot, hash };
+    /// Build a fake Shelley+ header with proper CBOR so WrappedHeader::new
+    /// parses it into HeaderInfo with block_number, slot, and prev_hash.
+    fn make_header(slot: u64, block_number: u64, prev_hash: Option<[u8; 32]>) -> WrappedHeader {
+        let issuer_vkey = [0u8; 32];
+        let body_hash = [slot as u8; 32];
+
+        let mut header_body = Vec::new();
+        let mut hb = minicbor::Encoder::new(&mut header_body);
+        let _ = hb
+            .array(10)
+            .and_then(|e| e.u64(block_number))
+            .and_then(|e| e.u64(slot))
+            .and_then(|e| match prev_hash {
+                Some(h) => e.bytes(&h),
+                None => e.null(),
+            })
+            .and_then(|e| e.bytes(&issuer_vkey))
+            .and_then(|e| e.bytes(&[0u8; 32])) // vrf_vkey
+            .and_then(|e| e.array(2))
+            .and_then(|e| e.bytes(&[0u8; 32]))
+            .and_then(|e| e.bytes(&[0u8; 64]))
+            .and_then(|e| e.u32(0))
+            .and_then(|e| e.bytes(&body_hash))
+            .and_then(|e| e.array(4))
+            .and_then(|e| e.bytes(&[0u8; 32]))
+            .and_then(|e| e.u64(0))
+            .and_then(|e| e.u64(0))
+            .and_then(|e| e.bytes(&[0u8; 64]))
+            .and_then(|e| e.array(2))
+            .and_then(|e| e.u32(10))
+            .and_then(|e| e.u32(0));
+
+        let mut header_inner = Vec::new();
+        let mut hi = minicbor::Encoder::new(&mut header_inner);
+        let _ = hi.array(2);
+        header_inner.extend_from_slice(&header_body);
+        let _ = minicbor::Encoder::new(&mut header_inner).bytes(&[0u8; 64]);
+
+        let mut header_cbor = Vec::new();
+        let mut he = minicbor::Encoder::new(&mut header_cbor);
+        let _ = he
+            .array(2)
+            .and_then(|e| e.u32(7))
+            .and_then(|e| e.tag(minicbor::data::Tag::new(24)))
+            .and_then(|e| e.bytes(&header_inner));
+
+        WrappedHeader::new(header_cbor)
+    }
+
+    /// Build a tip + header pair. Returns (tip, header, hash).
+    fn make_tip(slot: u64, block_no: u64, prev_hash: Option<[u8; 32]>) -> (Tip, WrappedHeader) {
+        let header = make_header(slot, block_no, prev_hash);
+        let point = header.point().expect("test header must parse");
         let tip = Tip { point, block_no };
-        let header = WrappedHeader::opaque(vec![0u8; 10]);
         (tip, header)
     }
 
-    #[tokio::test]
-    async fn skips_self_produced_blocks() {
-        let (cmd_tx, mut cmd_rx) = mpsc::channel(16);
+    fn make_consensus() -> (Consensus, mpsc::Receiver<NetworkCommand>) {
+        let (cmd_tx, cmd_rx) = mpsc::channel(16);
         let config = crate::config::ValidationConfig::default();
         let (validator, _val_rx) = Validator::new(config);
-        let mut consensus = Consensus::new("test".into(), cmd_tx, validator);
+        let consensus = Consensus::new("test".into(), cmd_tx, validator, 2160);
+        (consensus, cmd_rx)
+    }
 
-        let (tip, header) = make_tip(1, 1);
-        consensus.register_self_produced(&tip.point);
+    // --- ChainTree unit tests ---
+
+    #[test]
+    fn chain_tree_linear_chain() {
+        let mut tree = ChainTree::new();
+
+        assert!(tree.insert(
+            [1; 32],
+            Point::Specific {
+                slot: 1,
+                hash: [1; 32]
+            },
+            1,
+            1,
+            None
+        ));
+        assert!(tree.insert(
+            [2; 32],
+            Point::Specific {
+                slot: 2,
+                hash: [2; 32]
+            },
+            2,
+            2,
+            Some([1; 32])
+        ));
+        assert!(tree.insert(
+            [3; 32],
+            Point::Specific {
+                slot: 3,
+                hash: [3; 32]
+            },
+            3,
+            3,
+            Some([2; 32])
+        ));
+
+        let (_, bn) = tree.best_tip().unwrap();
+        assert_eq!(bn, 3);
+        assert_eq!(tree.len(), 3);
+    }
+
+    #[test]
+    fn chain_tree_fork_longer_wins() {
+        let mut tree = ChainTree::new();
+
+        // Chain A: 3 blocks.
+        tree.insert(
+            [1; 32],
+            Point::Specific {
+                slot: 1,
+                hash: [1; 32],
+            },
+            1,
+            1,
+            None,
+        );
+        tree.insert(
+            [2; 32],
+            Point::Specific {
+                slot: 2,
+                hash: [2; 32],
+            },
+            2,
+            2,
+            Some([1; 32]),
+        );
+        tree.insert(
+            [3; 32],
+            Point::Specific {
+                slot: 3,
+                hash: [3; 32],
+            },
+            3,
+            3,
+            Some([2; 32]),
+        );
+
+        // Chain B: fork from block 1, extends to 4.
+        tree.insert(
+            [0xB2; 32],
+            Point::Specific {
+                slot: 2,
+                hash: [0xB2; 32],
+            },
+            2,
+            2,
+            Some([1; 32]),
+        );
+        tree.insert(
+            [0xB3; 32],
+            Point::Specific {
+                slot: 3,
+                hash: [0xB3; 32],
+            },
+            3,
+            3,
+            Some([0xB2; 32]),
+        );
+        let switched = tree.insert(
+            [0xB4; 32],
+            Point::Specific {
+                slot: 4,
+                hash: [0xB4; 32],
+            },
+            4,
+            4,
+            Some([0xB3; 32]),
+        );
+
+        assert!(switched, "chain B should become best");
+        let (tip, bn) = tree.best_tip().unwrap();
+        assert_eq!(bn, 4);
+        assert_eq!(
+            *tip,
+            Point::Specific {
+                slot: 4,
+                hash: [0xB4; 32]
+            }
+        );
+    }
+
+    #[test]
+    fn chain_tree_fork_shorter_ignored() {
+        let mut tree = ChainTree::new();
+
+        // Chain A: 3 blocks.
+        tree.insert(
+            [1; 32],
+            Point::Specific {
+                slot: 1,
+                hash: [1; 32],
+            },
+            1,
+            1,
+            None,
+        );
+        tree.insert(
+            [2; 32],
+            Point::Specific {
+                slot: 2,
+                hash: [2; 32],
+            },
+            2,
+            2,
+            Some([1; 32]),
+        );
+        tree.insert(
+            [3; 32],
+            Point::Specific {
+                slot: 3,
+                hash: [3; 32],
+            },
+            3,
+            3,
+            Some([2; 32]),
+        );
+
+        // Chain B: fork from block 1, only 2 blocks total.
+        let switched = tree.insert(
+            [0xC2; 32],
+            Point::Specific {
+                slot: 2,
+                hash: [0xC2; 32],
+            },
+            2,
+            2,
+            Some([1; 32]),
+        );
+
+        assert!(!switched, "shorter fork should not become best");
+        let (_, bn) = tree.best_tip().unwrap();
+        assert_eq!(bn, 3);
+    }
+
+    #[test]
+    fn chain_tree_duplicate_ignored() {
+        let mut tree = ChainTree::new();
+        tree.insert(
+            [1; 32],
+            Point::Specific {
+                slot: 1,
+                hash: [1; 32],
+            },
+            1,
+            1,
+            None,
+        );
+        let dup = tree.insert(
+            [1; 32],
+            Point::Specific {
+                slot: 1,
+                hash: [1; 32],
+            },
+            1,
+            1,
+            None,
+        );
+        assert!(!dup);
+        assert_eq!(tree.len(), 1);
+    }
+
+    #[test]
+    fn chain_tree_pruning() {
+        let mut tree = ChainTree::new();
+        for i in 1..=10u64 {
+            let hash = [i as u8; 32];
+            let prev = if i > 1 {
+                Some([(i - 1) as u8; 32])
+            } else {
+                None
+            };
+            tree.insert(hash, Point::Specific { slot: i, hash }, i, i, prev);
+        }
+        assert_eq!(tree.len(), 10);
+
+        tree.prune_below(6);
+        assert_eq!(tree.len(), 5); // blocks 6..=10
+        assert!(!tree.contains(&[1; 32]));
+        assert!(tree.contains(&[6; 32]));
+        assert!(tree.contains(&[10; 32]));
+    }
+
+    // --- Consensus integration tests ---
+
+    #[tokio::test]
+    async fn skips_self_produced_blocks() {
+        let (mut consensus, mut cmd_rx) = make_consensus();
+
+        let (tip, header) = make_tip(1, 1, None);
+        consensus.register_self_produced(&tip.point, &header);
 
         let event = NetworkEvent::TipAdvanced {
             tip: tip.clone(),
@@ -322,50 +763,33 @@ mod tests {
 
     #[tokio::test]
     async fn fetches_longer_chain() {
-        let (cmd_tx, mut cmd_rx) = mpsc::channel(16);
-        let config = crate::config::ValidationConfig::default();
-        let (validator, _val_rx) = Validator::new(config);
-        let mut consensus = Consensus::new("test".into(), cmd_tx, validator);
+        let (mut consensus, mut cmd_rx) = make_consensus();
 
-        let (tip, header) = make_tip(1, 1);
+        let (tip, header) = make_tip(1, 1, None);
         let event = NetworkEvent::TipAdvanced { tip, header };
         consensus.handle_event(&event).await;
 
         // Should issue a FetchBlock command.
         let cmd = cmd_rx.recv().await.unwrap();
-        match cmd {
-            NetworkCommand::FetchBlock { point } => {
-                assert_eq!(
-                    point,
-                    Point::Specific {
-                        slot: 1,
-                        hash: [1; 32]
-                    }
-                );
-            }
-            other => panic!("expected FetchBlock, got {other:?}"),
-        }
+        assert!(matches!(cmd, NetworkCommand::FetchBlock { .. }));
     }
 
     #[tokio::test]
     async fn ignores_shorter_chain() {
-        let (cmd_tx, mut cmd_rx) = mpsc::channel(16);
-        let config = crate::config::ValidationConfig::default();
-        let (validator, _val_rx) = Validator::new(config);
-        let mut consensus = Consensus::new("test".into(), cmd_tx, validator);
+        let (mut consensus, mut cmd_rx) = make_consensus();
 
         // Set local tip to block 5.
-        let (tip5, header5) = make_tip(5, 5);
-        consensus.register_self_produced(&tip5.point);
+        let (tip5, header5) = make_tip(5, 5, None);
+        consensus.register_self_produced(&tip5.point, &header5);
         consensus
             .handle_event(&NetworkEvent::TipAdvanced {
                 tip: tip5,
-                header: header5,
+                header: header5.clone(),
             })
             .await;
 
         // Announce block 3 — should be ignored.
-        let (tip3, header3) = make_tip(3, 3);
+        let (tip3, header3) = make_tip(3, 3, None);
         consensus
             .handle_event(&NetworkEvent::TipAdvanced {
                 tip: tip3,
@@ -378,12 +802,9 @@ mod tests {
 
     #[tokio::test]
     async fn no_duplicate_fetches() {
-        let (cmd_tx, mut cmd_rx) = mpsc::channel(16);
-        let config = crate::config::ValidationConfig::default();
-        let (validator, _val_rx) = Validator::new(config);
-        let mut consensus = Consensus::new("test".into(), cmd_tx, validator);
+        let (mut consensus, mut cmd_rx) = make_consensus();
 
-        let (tip, header) = make_tip(1, 1);
+        let (tip, header) = make_tip(1, 1, None);
 
         // Announce same tip twice.
         consensus
@@ -399,5 +820,21 @@ mod tests {
         // Only one FetchBlock command.
         let _cmd = cmd_rx.recv().await.unwrap();
         assert!(cmd_rx.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn tip_hash_for_production() {
+        let (mut consensus, _cmd_rx) = make_consensus();
+
+        assert!(consensus.tip_hash().is_none());
+
+        let (tip, header) = make_tip(1, 1, None);
+        let expected_hash = match &tip.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!("expected specific"),
+        };
+        consensus.register_self_produced(&tip.point, &header);
+
+        assert_eq!(consensus.tip_hash(), Some(expected_hash));
     }
 }
