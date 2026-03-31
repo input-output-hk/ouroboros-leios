@@ -33,6 +33,9 @@ export interface DashboardState {
   lastEventTime: number;
   pollEvents: () => Promise<void>;
 
+  // Node flash (block produced/received)
+  nodeFlash: Record<string, "produced" | "received" | null>;
+
   // Selection
   selectedNodeId: string | null;
   selectedEdge: { from: number; to: number } | null;
@@ -185,14 +188,41 @@ export const useStore = create<DashboardState>()((set, get) => ({
         lastEventTime,
       );
 
+      // Compute flashes from new events
+      const flashes: Record<string, "produced" | "received"> = {};
+      for (const e of newEvents) {
+        const node = e.message?.node;
+        const type = e.message?.type;
+        if (!node) continue;
+        if (type === "RBGenerated") flashes[node] = "produced";
+        else if (type === "RBReceived" || type === "TipAdvanced") flashes[node] = "received";
+      }
+
       set((s) => ({
         events: [...s.events, ...newEvents].slice(-MAX_EVENTS),
         lastEventTime: maxTime,
+        nodeFlash: { ...s.nodeFlash, ...flashes },
       }));
+
+      // Clear flashes after 600ms
+      if (Object.keys(flashes).length > 0) {
+        setTimeout(() => {
+          set((s) => {
+            const cleared = { ...s.nodeFlash };
+            for (const id of Object.keys(flashes)) {
+              if (cleared[id] === flashes[id]) cleared[id] = null;
+            }
+            return { nodeFlash: cleared };
+          });
+        }, 600);
+      }
     } catch (e) {
       console.error("Failed to poll events:", e);
     }
   },
+
+  // --- Flash ---
+  nodeFlash: {},
 
   // --- Selection ---
   selectedNodeId: null,
