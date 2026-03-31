@@ -1,9 +1,5 @@
 ## Quick TODO list
 
-## Wider latency spread
-
-Increase max latency in the cluster generation to match real geography
-
 ## RTT measurement
 
 Doesn't look like latencies are being counted - measured in the wrong place?
@@ -28,3 +24,8 @@ Consensus will need to build a tree of chains / forks and when a new block
 is offered, attach it to the relevant fork (this requires the previous block
 hash from the header).  Then it should choose which of the chains is now
 the longest, and fetch blocks it does not already have.
+
+## Reordering of events
+
+It looks like events are getting re-ordered in the log - for example you
+see a VTVoteGenerated before EBGenerated or EBReceived.

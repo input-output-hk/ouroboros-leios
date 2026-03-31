@@ -3,13 +3,13 @@
 # Run with:
 #   cargo run -p net-cluster -- --config net-cluster/configs/sample-cluster.toml
 #
-# This spawns 5 nodes with degree-2 random topology, 10–100ms latency,
-# and equal stake distribution.
+# This spawns 5 nodes with degree-2 random topology, 5–250ms latency
+# (matching real intercontinental geography), and equal stake distribution.
 
 num_nodes = 5
 degree = 2
-min_latency_ms = 10
-max_latency_ms = 100
+min_latency_ms = 5
+max_latency_ms = 250
 
 # Base config shared by all nodes (genesis, protocol params, etc.)
 base_config = "net-node/configs/mainnet.toml"

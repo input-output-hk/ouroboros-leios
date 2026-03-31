@@ -80,10 +80,10 @@ fn default_degree() -> usize {
     3
 }
 fn default_min_latency() -> u64 {
-    10
+    5
 }
 fn default_max_latency() -> u64 {
-    200
+    300
 }
 fn default_base_port() -> u16 {
     30000
@@ -180,8 +180,8 @@ mod tests {
         let config = ClusterConfig::default();
         assert_eq!(config.num_nodes, 5);
         assert_eq!(config.degree, 3);
-        assert_eq!(config.min_latency_ms, 10);
-        assert_eq!(config.max_latency_ms, 200);
+        assert_eq!(config.min_latency_ms, 5);
+        assert_eq!(config.max_latency_ms, 300);
     }
 
     #[test]
