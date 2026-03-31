@@ -58,7 +58,14 @@ impl BlockProducer {
     }
 
     /// Run the VRF lottery for a Praos ranking block at the given slot.
-    pub fn try_produce_block(&mut self, slot: u64) -> Option<(Point, WrappedHeader, BlockBody)> {
+    /// `prev_hash` is the hash of the parent block (from consensus tip).
+    /// `block_number` is the chain height (parent block_number + 1).
+    pub fn try_produce_block(
+        &mut self,
+        slot: u64,
+        prev_hash: Option<[u8; 32]>,
+        block_number: u64,
+    ) -> Option<(Point, WrappedHeader, BlockBody)> {
         if !self.is_active() {
             return None;
         }
@@ -68,7 +75,7 @@ impl BlockProducer {
         }
 
         self.block_count += 1;
-        Some(self.make_fake_block(slot))
+        Some(self.make_fake_block(slot, prev_hash, block_number))
     }
 
     /// Try to produce a Leios endorser block. Called at stage boundaries.
@@ -140,7 +147,12 @@ impl BlockProducer {
     /// `body.point()` and `WrappedHeader::parse()` both work correctly.
     /// The point hash uses `header_hash()`, matching the real
     /// Cardano derivation.
-    fn make_fake_block(&mut self, slot: u64) -> (Point, WrappedHeader, BlockBody) {
+    fn make_fake_block(
+        &mut self,
+        slot: u64,
+        prev_hash: Option<[u8; 32]>,
+        block_number: u64,
+    ) -> (Point, WrappedHeader, BlockBody) {
         let mut issuer_vkey = [0u8; 32];
         self.rng.fill(&mut issuer_vkey);
         let mut body_hash = [0u8; 32];
@@ -153,9 +165,12 @@ impl BlockProducer {
         let mut hb = minicbor::Encoder::new(&mut header_body);
         let _ = hb
             .array(10)
-            .and_then(|e| e.u64(self.block_count)) // block_number
+            .and_then(|e| e.u64(block_number)) // block_number
             .and_then(|e| e.u64(slot)) // slot
-            .and_then(|e| e.null()) // prev_hash (null for simplicity)
+            .and_then(|e| match prev_hash {
+                Some(h) => e.bytes(&h),
+                None => e.null(),
+            }) // prev_hash
             .and_then(|e| e.bytes(&issuer_vkey)) // issuer_vkey
             .and_then(|e| e.bytes(&[0u8; 32])) // vrf_vkey (placeholder)
             .and_then(|e| e.array(2)) // vrf_result: [output, proof]
@@ -246,7 +261,7 @@ mod tests {
         let mut producer = BlockProducer::new(&config, Some(42));
         assert!(!producer.is_active());
         for slot in 0..100 {
-            assert!(producer.try_produce_block(slot).is_none());
+            assert!(producer.try_produce_block(slot, None, slot + 1).is_none());
         }
     }
 
@@ -260,7 +275,7 @@ mod tests {
         let mut producer = BlockProducer::new(&config, Some(42));
         assert!(producer.is_active());
         for slot in 0..100 {
-            let result = producer.try_produce_block(slot);
+            let result = producer.try_produce_block(slot, None, slot + 1);
             assert!(result.is_some(), "should produce at slot {slot}");
             let (point, _, _) = result.unwrap();
             match point {
@@ -282,7 +297,11 @@ mod tests {
         let run = |seed| {
             let mut producer = BlockProducer::new(&config, Some(seed));
             (0..1000)
-                .filter_map(|slot| producer.try_produce_block(slot).map(|_| slot))
+                .filter_map(|slot| {
+                    producer
+                        .try_produce_block(slot, None, slot + 1)
+                        .map(|_| slot)
+                })
                 .collect::<Vec<_>>()
         };
 
@@ -301,7 +320,7 @@ mod tests {
         };
         let mut producer = BlockProducer::new(&config, Some(99));
         let wins: usize = (0..10_000)
-            .filter(|slot| producer.try_produce_block(*slot).is_some())
+            .filter(|slot| producer.try_produce_block(*slot, None, 1).is_some())
             .count();
         // Expected: 10000 * (100/1000) * 0.5 = 500, allow ±20%.
         assert!(
@@ -367,7 +386,7 @@ mod tests {
             ..base_config()
         };
         let mut producer = BlockProducer::new(&config, Some(42));
-        let (point, header, body) = producer.try_produce_block(12345).unwrap();
+        let (point, header, body) = producer.try_produce_block(12345, None, 1).unwrap();
 
         // Header should be parseable.
         assert!(header.parsed.is_some(), "header should parse");

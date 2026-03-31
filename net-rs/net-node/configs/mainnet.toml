@@ -11,6 +11,7 @@ slot_duration_ms = 1000
 genesis_time_unix = 1654041600   # Vasil-era genesis (2022-06-01T00:00:00Z)
 leios_enabled = true
 scheduler = "priority-wfq"
+security_param_k = 2160
 
 [production]
 total_stake = 1000

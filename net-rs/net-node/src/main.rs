@@ -65,8 +65,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     // Validator and consensus.
     let (validator, mut validation_rx) = validation::Validator::new(config.validation.clone());
-    let mut consensus =
-        consensus::Consensus::new(config.node_id.clone(), commands.clone(), validator);
+    let mut consensus = consensus::Consensus::new(
+        config.node_id.clone(),
+        commands.clone(),
+        validator,
+        config.security_param_k,
+    );
 
     // Transaction generator (background task).
     let _tx_handle = mempool::spawn_tx_generator(
@@ -109,7 +113,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 telem.current_slot = slot;
 
                 // Praos: try to produce a ranking block.
-                if let Some((point, header, body)) = producer.try_produce_block(slot) {
+                let prev_hash = consensus.tip_hash();
+                let next_block_no = consensus.next_block_number();
+                if let Some((point, header, body)) = producer.try_produce_block(slot, prev_hash, next_block_no) {
                     info!(
                         node_id = %node_id,
                         %point,
@@ -122,7 +128,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         slot,
                         size_bytes: body.raw.len(),
                     });
-                    let block_no = consensus.register_self_produced(&point);
+                    let block_no = consensus.register_self_produced(&point, &header);
                     let _ = commands.send(NetworkCommand::InjectBlock {
                         point,
                         header: Box::new(header),
