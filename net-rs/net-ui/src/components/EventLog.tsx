@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
-import { Box, Typography, Chip } from "@mui/material";
+import { Box, Typography, Chip, IconButton } from "@mui/material";
+import PauseIcon from "@mui/icons-material/Pause";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import { useStore } from "@/store";
 
 const typeColors: Record<string, string> = {
@@ -14,22 +16,36 @@ const typeColors: Record<string, string> = {
 
 export function EventLog() {
   const events = useStore((s) => s.events);
+  const paused = useStore((s) => s.eventsPaused);
+  const togglePause = useStore((s) => s.toggleEventsPause);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [events.length]);
+    if (!paused) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [events.length, paused]);
 
   return (
-    <Box
-      sx={{
-        height: "100%",
-        overflowY: "auto",
-        p: 1,
-        fontFamily: "monospace",
-        fontSize: 16,
-      }}
-    >
+    <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      <Box sx={{ display: "flex", alignItems: "center", px: 1, py: 0.25, borderBottom: 1, borderColor: "grey.800" }}>
+        <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
+          Events {paused && "(paused)"}
+        </Typography>
+        <IconButton size="small" onClick={togglePause} sx={{ p: 0.25 }}>
+          {paused ? <PlayArrowIcon sx={{ fontSize: 16 }} /> : <PauseIcon sx={{ fontSize: 16 }} />}
+        </IconButton>
+      </Box>
+      <Box
+        sx={{
+          flex: 1,
+          overflowY: "auto",
+          p: 1,
+          fontFamily: "monospace",
+          fontSize: 16,
+          minHeight: 0,
+        }}
+      >
       {events.length === 0 && (
         <Typography color="text.secondary" variant="body2">
           Waiting for events...
@@ -62,6 +78,7 @@ export function EventLog() {
         );
       })}
       <div ref={bottomRef} />
+      </Box>
     </Box>
   );
 }

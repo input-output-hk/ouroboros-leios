@@ -31,7 +31,9 @@ export interface DashboardState {
   // Events (polled 1s)
   events: OutputEvent[];
   lastEventTime: number;
+  eventsPaused: boolean;
   pollEvents: () => Promise<void>;
+  toggleEventsPause: () => void;
 
   // Node flash (block produced/received)
   nodeFlash: Record<string, "produced" | "received" | null>;
@@ -176,9 +178,13 @@ export const useStore = create<DashboardState>()((set, get) => ({
   // --- Events ---
   events: [],
   lastEventTime: 0,
+  eventsPaused: false,
+
+  toggleEventsPause: () => set((s) => ({ eventsPaused: !s.eventsPaused })),
 
   pollEvents: async () => {
     try {
+      if (get().eventsPaused) return;
       const { lastEventTime } = get();
       const newEvents = await fetchEvents(lastEventTime);
       if (newEvents.length === 0) return;

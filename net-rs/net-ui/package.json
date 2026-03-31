@@ -12,6 +12,7 @@
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
+    "@mui/icons-material": "^6.5.0",
     "@mui/material": "^6.4.0",
     "@xyflow/react": "^12.6.0",
     "d3-force": "^3.0.0",
