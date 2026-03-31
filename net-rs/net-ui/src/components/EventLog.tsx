@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
-import { Box, Typography, Chip, IconButton } from "@mui/material";
+import { Box, Typography, IconButton } from "@mui/material";
 import PauseIcon from "@mui/icons-material/Pause";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
-import { useStore } from "@/store";
+import { useStore, getEvents } from "@/store";
 
 const typeColors: Record<string, string> = {
   RBGenerated: "#a5d6a7",
@@ -16,16 +16,17 @@ const typeColors: Record<string, string> = {
 };
 
 export function EventLog() {
-  const events = useStore((s) => s.events);
+  const eventVersion = useStore((s) => s.eventVersion);
   const paused = useStore((s) => s.eventsPaused);
   const togglePause = useStore((s) => s.toggleEventsPause);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const events = getEvents();
 
   useEffect(() => {
     if (!paused) {
       bottomRef.current?.scrollIntoView();
     }
-  }, [events.length, paused]);
+  }, [eventVersion, paused]);
 
   return (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -37,13 +38,13 @@ export function EventLog() {
           {paused ? <PlayArrowIcon sx={{ fontSize: 16 }} /> : <PauseIcon sx={{ fontSize: 16 }} />}
         </IconButton>
       </Box>
-      <Box
-        sx={{
+      <div
+        style={{
           flex: 1,
           overflowY: "auto",
-          p: 1,
+          padding: 8,
           fontFamily: "monospace",
-          fontSize: 16,
+          fontSize: 11,
           minHeight: 0,
         }}
       >
@@ -56,30 +57,30 @@ export function EventLog() {
         const msgType = e.message?.type ?? "unknown";
         const color = typeColors[msgType] ?? "#999";
         return (
-          <Box key={i} sx={{ display: "flex", gap: 0.5, mb: 0.25, alignItems: "center" }}>
-            <Typography variant="caption" color="text.secondary" sx={{ minWidth: 55 }}>
+          <div key={i} style={{ display: "flex", gap: 4, marginBottom: 2, alignItems: "center" }}>
+            <span style={{ minWidth: 55, color: "#999" }}>
               {e.time_s.toFixed(1)}s
-            </Typography>
-            <Typography variant="caption" sx={{ minWidth: 45 }}>
+            </span>
+            <span style={{ minWidth: 45 }}>
               {e.message?.node ?? "?"}
-            </Typography>
-            <Chip
-              label={msgType}
-              size="small"
-              sx={{
-                height: 16,
+            </span>
+            <span
+              style={{
                 fontSize: 9,
-                bgcolor: `${color}22`,
+                padding: "1px 5px",
+                borderRadius: 8,
+                backgroundColor: `${color}22`,
                 color,
-                borderColor: color,
-                border: "1px solid",
+                border: `1px solid ${color}`,
               }}
-            />
-          </Box>
+            >
+              {msgType}
+            </span>
+          </div>
         );
       })}
       <div ref={bottomRef} />
-      </Box>
+      </div>
     </Box>
   );
 }

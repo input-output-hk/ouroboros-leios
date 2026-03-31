@@ -50,9 +50,7 @@ export default function App() {
         {/* Left column */}
         <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
           <Box sx={{ flex: 1, minHeight: 0 }}>
-            <ReactFlowProvider>
-              <TopologyGraph />
-            </ReactFlowProvider>
+            <ReactFlowProvider><TopologyGraph /></ReactFlowProvider>
           </Box>
           <Box sx={{ height: 220, borderTop: 1, borderColor: "grey.800" }}>
             <AggregateCharts />

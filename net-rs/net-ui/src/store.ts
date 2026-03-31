@@ -11,6 +11,13 @@ import { fetchTopology, fetchAllStats, fetchEvents } from "./api";
 const MAX_SERIES = 300; // ~5 min at 1s stats interval
 const MAX_EVENTS = 500;
 
+// Mutable event ring buffer — kept outside Zustand to avoid
+// retaining old immutable array copies in React state snapshots.
+const eventRing: OutputEvent[] = [];
+export function getEvents(): readonly OutputEvent[] {
+  return eventRing;
+}
+
 export interface DashboardState {
   // Topology (loaded once)
   topology: Topology | null;
@@ -28,8 +35,8 @@ export interface DashboardState {
   nodeTimeSeries: Record<string, NodeSeriesPoint[]>;
   pollStats: () => Promise<void>;
 
-  // Events
-  events: OutputEvent[];
+  // Events (actual events in eventRing, outside store)
+  eventVersion: number;
   lastEventTime: number;
   eventsPaused: boolean;
   handleEventBatch: (events: OutputEvent[]) => void;
@@ -188,7 +195,7 @@ export const useStore = create<DashboardState>()((set, get) => ({
   },
 
   // --- Events ---
-  events: [],
+  eventVersion: 0,
   lastEventTime: 0,
   eventsPaused: false,
 
@@ -214,8 +221,14 @@ export const useStore = create<DashboardState>()((set, get) => ({
       else if (type === "RBReceived" && flashes[node] !== "produced") flashes[node] = "received";
     }
 
+    // Mutate ring buffer in place — no immutable copy in store state.
+    for (const e of newEvents) {
+      if (eventRing.length >= MAX_EVENTS) eventRing.shift();
+      eventRing.push(e);
+    }
+
     set((s) => ({
-      events: [...s.events, ...newEvents].slice(-MAX_EVENTS),
+      eventVersion: s.eventVersion + 1,
       lastEventTime: maxTime,
       nodeFlash: { ...s.nodeFlash, ...flashes },
     }));
