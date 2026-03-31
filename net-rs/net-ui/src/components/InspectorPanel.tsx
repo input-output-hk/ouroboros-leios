@@ -41,12 +41,14 @@ function NodeInspector({ nodeId }: { nodeId: string }) {
       t: i,
       bandwidth: p.bandwidth as number | null,
       messages: p.messages as number | null,
+      blocks: p.blocks as number | null,
     }));
     if (raw.length >= WINDOW) return raw;
     const pad = Array.from({ length: WINDOW - raw.length }, (_, i) => ({
       t: i,
       bandwidth: null as number | null,
       messages: null as number | null,
+      blocks: null as number | null,
     }));
     return [...pad, ...raw.map((p, i) => ({ ...p, t: WINDOW - raw.length + i }))];
   }, [series]);
@@ -142,6 +144,30 @@ function NodeInspector({ nodeId }: { nodeId: string }) {
                 type="monotone"
                 dataKey="messages"
                 stroke="#f48fb1"
+                dot={false}
+                strokeWidth={1.5}
+                isAnimationActive={false}
+                connectNulls={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+
+          <Typography variant="caption" color="text.secondary">
+            Blocks
+          </Typography>
+          <ResponsiveContainer width="100%" height={80}>
+            <LineChart data={chartData}>
+              <XAxis dataKey="t" hide />
+              <YAxis hide />
+              <Tooltip
+                formatter={(v: number) => String(Math.round(v))}
+                contentStyle={{ backgroundColor: "rgba(30,30,30,0.9)", border: "1px solid #555", borderRadius: 4, color: "#fff" }}
+                labelStyle={{ display: "none" }}
+              />
+              <Line
+                type="monotone"
+                dataKey="blocks"
+                stroke="#a5d6a7"
                 dot={false}
                 strokeWidth={1.5}
                 isAnimationActive={false}

@@ -23,7 +23,7 @@ export interface DashboardState {
   // Stats (polled 1s)
   latestStats: Record<string, StatsSnapshot>;
   prevSnapshot: { time: number; bandwidth: number; messages: number; blocks: number } | null;
-  prevNodeSnapshot: Record<string, { time: number; bandwidth: number; messages: number }>;
+  prevNodeSnapshot: Record<string, { time: number; bandwidth: number; messages: number; blocks: number }>;
   aggregateSeries: AggregatePoint[];
   nodeTimeSeries: Record<string, NodeSeriesPoint[]>;
   pollStats: () => Promise<void>;
@@ -86,7 +86,7 @@ export const useStore = create<DashboardState>()((set, get) => ({
       let totalBandwidth = 0;
       let totalMessages = 0;
       let totalBlocks = 0;
-      const curNodeCum: Record<string, { bandwidth: number; messages: number }> = {};
+      const curNodeCum: Record<string, { bandwidth: number; messages: number; blocks: number }> = {};
 
       for (const snap of Object.values(stats)) {
         let nodeBw = 0;
@@ -102,6 +102,7 @@ export const useStore = create<DashboardState>()((set, get) => ({
           bandwidth: nodeBw,
           messages:
             snap.blocks_produced + snap.blocks_received + snap.txs_generated,
+          blocks: snap.blocks_produced,
         };
       }
 
@@ -116,7 +117,7 @@ export const useStore = create<DashboardState>()((set, get) => ({
         const newNodeSeries: Record<string, NodeSeriesPoint[]> = {
           ...get().nodeTimeSeries,
         };
-        const newNodeSnap: Record<string, { time: number; bandwidth: number; messages: number }> = {
+        const newNodeSnap: Record<string, { time: number; bandwidth: number; messages: number; blocks: number }> = {
           ...prevNodeSnapshot,
         };
 
@@ -132,7 +133,7 @@ export const useStore = create<DashboardState>()((set, get) => ({
           for (const [nodeId, cur] of Object.entries(curNodeCum)) {
             const prev = prevNodeSnapshot[nodeId];
             if (!prev) continue;
-            const nodeChanged = cur.bandwidth !== prev.bandwidth || cur.messages !== prev.messages;
+            const nodeChanged = cur.bandwidth !== prev.bandwidth || cur.messages !== prev.messages || cur.blocks !== prev.blocks;
             if (nodeChanged) {
               const nodeDt = Math.max(0.1, (now - prev.time) / 1000);
               const series = newNodeSeries[nodeId] ?? [];
@@ -142,6 +143,7 @@ export const useStore = create<DashboardState>()((set, get) => ({
                   time: now,
                   bandwidth: Math.max(0, cur.bandwidth - prev.bandwidth) / nodeDt,
                   messages: Math.max(0, cur.messages - prev.messages),
+                  blocks: Math.max(0, cur.blocks - prev.blocks),
                 },
               ].slice(-MAX_SERIES);
               newNodeSnap[nodeId] = { time: now, ...cur };
@@ -161,7 +163,7 @@ export const useStore = create<DashboardState>()((set, get) => ({
         }
       } else {
         // First poll — store baseline
-        const curNodeSnap: Record<string, { time: number; bandwidth: number; messages: number }> = {};
+        const curNodeSnap: Record<string, { time: number; bandwidth: number; messages: number; blocks: number }> = {};
         for (const [id, cum] of Object.entries(curNodeCum)) {
           curNodeSnap[id] = { time: now, ...cum };
         }
