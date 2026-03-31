@@ -301,7 +301,14 @@ impl Coordinator {
 
             PeerEvent::LatencyMeasured { rtt } => {
                 if let Some(peer) = self.peers.get_mut(&peer_id) {
-                    peer.rtt = Some(rtt);
+                    // Accepted peers (ip.is_some()) don't have configured
+                    // inbound_delay — skip their RTT to avoid showing 0ms.
+                    // The outbound side of each connection tracks RTT.
+                    if peer.ip.is_none() {
+                        // Add the simulated inbound delay so RTT reflects
+                        // configured link latency (real TCP on localhost is ~0).
+                        peer.rtt = Some(rtt + peer.inbound_delay);
+                    }
                 }
             }
 
@@ -975,7 +982,9 @@ impl Coordinator {
                         Some((peer_id, peer_event)) => {
                             // If delay simulation is active and this peer has
                             // a configured delay, buffer instead of processing.
-                            if has_any_delays {
+                            // LatencyMeasured is exempt: it's a measurement, not
+                            // data, and its RTT is adjusted below instead.
+                            if has_any_delays && !matches!(peer_event, PeerEvent::LatencyMeasured { .. }) {
                                 let delay = self.peers.get(&peer_id)
                                     .map(|p| p.inbound_delay)
                                     .unwrap_or(Duration::ZERO);
