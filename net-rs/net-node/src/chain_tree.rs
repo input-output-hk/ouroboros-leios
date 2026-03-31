@@ -64,7 +64,15 @@ impl ChainTree {
 
         let is_new_best = match &self.best_tip {
             None => true,
-            Some((_, best_bn)) => block_number > *best_bn,
+            Some((_, best_bn)) => {
+                if block_number != *best_bn {
+                    block_number > *best_bn
+                } else {
+                    // Deterministic tie-breaker: lower hash wins.
+                    let best_hash = self.best_tip_hash().unwrap_or([0xFF; 32]);
+                    hash < best_hash
+                }
+            }
         };
 
         if is_new_best {
@@ -344,6 +352,52 @@ mod tests {
         );
         assert!(!dup);
         assert_eq!(tree.len(), 1);
+    }
+
+    #[test]
+    fn tie_break_lower_hash_wins() {
+        let mut tree = ChainTree::new();
+
+        // Insert block with higher hash first.
+        tree.insert(
+            [0xBB; 32],
+            Point::Specific {
+                slot: 1,
+                hash: [0xBB; 32],
+            },
+            1,
+            1,
+            None,
+        );
+        assert_eq!(tree.best_tip_hash(), Some([0xBB; 32]));
+
+        // Insert block with same block_number but lower hash — should become best.
+        let switched = tree.insert(
+            [0xAA; 32],
+            Point::Specific {
+                slot: 1,
+                hash: [0xAA; 32],
+            },
+            1,
+            1,
+            None,
+        );
+        assert!(switched, "lower hash should win tie");
+        assert_eq!(tree.best_tip_hash(), Some([0xAA; 32]));
+
+        // Insert block with same block_number but higher hash — should NOT switch.
+        let not_switched = tree.insert(
+            [0xCC; 32],
+            Point::Specific {
+                slot: 1,
+                hash: [0xCC; 32],
+            },
+            1,
+            1,
+            None,
+        );
+        assert!(!not_switched, "higher hash should not win tie");
+        assert_eq!(tree.best_tip_hash(), Some([0xAA; 32]));
     }
 
     #[test]
