@@ -34,11 +34,15 @@ export default function App() {
       }}
     >
       {/* Header */}
-      <Box sx={{ px: 2, py: 0.5, borderBottom: 1, borderColor: "grey.800" }}>
-        <Typography variant="h6" color="text.secondary">
-          Leios net-cluster dashboard
-          {topology && ` — ${topology.nodes.length} nodes, ${topology.edges.length} edges`}
+      <Box sx={{ px: 2, py: 0.75, bgcolor: "#1a0a2e", borderBottom: 1, borderColor: "#3d1f6d", display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+        <Typography variant="h5" sx={{ color: "#ffffff", fontWeight: 700 }}>
+          Leios Network
         </Typography>
+        {topology && (
+          <Typography variant="body2" sx={{ color: "#ffffff" }}>
+            {topology.nodes.length} nodes, {topology.edges.length} edges
+          </Typography>
+        )}
       </Box>
 
       {/* Main: left (graph + charts) | right (inspector + events) */}
