@@ -7,11 +7,12 @@
 use std::collections::{BTreeMap, HashMap};
 use std::io::{BufWriter, Write};
 use std::path::Path;
+use std::sync::Arc;
 use std::time::Instant;
 
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, RwLock};
 
-use crate::types::IngestedEvent;
+use crate::types::{EventWindow, IngestedEvent};
 
 /// Run the aggregator as a tokio task.
 ///
@@ -22,6 +23,7 @@ pub async fn run(
     output_path: &Path,
     num_nodes: usize,
     ordering_window_secs: f64,
+    event_window: Arc<RwLock<EventWindow>>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let file = std::fs::File::create(output_path)?;
     let mut writer = BufWriter::new(file);
@@ -36,17 +38,17 @@ pub async fn run(
                 match batch {
                     Some(events) => {
                         state.ingest(events);
-                        state.flush_to_watermark(&mut writer)?;
+                        state.flush_to_watermark(&mut writer, &event_window).await?;
                     }
                     None => {
                         // Channel closed — final flush of all remaining events.
-                        state.flush_all(&mut writer)?;
+                        state.flush_all(&mut writer, &event_window).await?;
                         break;
                     }
                 }
             }
             _ = flush_interval.tick() => {
-                state.flush_to_watermark(&mut writer)?;
+                state.flush_to_watermark(&mut writer, &event_window).await?;
             }
         }
     }
@@ -168,7 +170,11 @@ impl AggregatorState {
     }
 
     /// Flush all events with timestamp <= watermark.
-    fn flush_to_watermark<W: Write>(&mut self, writer: &mut W) -> Result<(), std::io::Error> {
+    async fn flush_to_watermark<W: Write>(
+        &mut self,
+        writer: &mut W,
+        event_window: &Arc<RwLock<EventWindow>>,
+    ) -> Result<(), std::io::Error> {
         let watermark = match self.watermark() {
             Some(w) => w,
             None => return Ok(()),
@@ -181,14 +187,20 @@ impl AggregatorState {
         let kept = self.buffer.split_off(&OrderedF64(cutoff));
         let flushing = std::mem::replace(&mut self.buffer, kept);
 
+        let mut window_batch = Vec::new();
         for (_ts, events) in flushing {
             for event in events {
                 serde_json::to_writer(&mut *writer, &event)?;
                 writer.write_all(b"\n")?;
                 self.events_written += 1;
+                window_batch.push(event);
             }
         }
         writer.flush()?;
+
+        if !window_batch.is_empty() {
+            event_window.write().await.push(window_batch);
+        }
 
         if self.events_written > 0 && self.events_written.is_multiple_of(1000) {
             tracing::info!("aggregator: {} events written", self.events_written);
@@ -198,16 +210,27 @@ impl AggregatorState {
     }
 
     /// Flush all remaining buffered events (used at shutdown).
-    fn flush_all<W: Write>(&mut self, writer: &mut W) -> Result<(), std::io::Error> {
+    async fn flush_all<W: Write>(
+        &mut self,
+        writer: &mut W,
+        event_window: &Arc<RwLock<EventWindow>>,
+    ) -> Result<(), std::io::Error> {
         let flushing = std::mem::take(&mut self.buffer);
+        let mut window_batch = Vec::new();
         for (_ts, events) in flushing {
             for event in events {
                 serde_json::to_writer(&mut *writer, &event)?;
                 writer.write_all(b"\n")?;
                 self.events_written += 1;
+                window_batch.push(event);
             }
         }
         writer.flush()?;
+
+        if !window_batch.is_empty() {
+            event_window.write().await.push(window_batch);
+        }
+
         tracing::info!(
             "aggregator: final flush complete, {} total events written",
             self.events_written
@@ -268,8 +291,12 @@ mod tests {
         assert!((w - 1.0).abs() < f64::EPSILON);
     }
 
-    #[test]
-    fn test_flush_ordering() {
+    fn test_window() -> Arc<RwLock<EventWindow>> {
+        Arc::new(RwLock::new(EventWindow::new(1000)))
+    }
+
+    #[tokio::test]
+    async fn test_flush_ordering() {
         let mut state = AggregatorState::new(2, 5.0);
         state.ingest(vec![
             make_event(3.0, "node-0"),
@@ -278,8 +305,12 @@ mod tests {
             make_event(4.0, "node-1"),
         ]);
 
+        let window = test_window();
         let mut output = Vec::new();
-        state.flush_to_watermark(&mut output).unwrap();
+        state
+            .flush_to_watermark(&mut output, &window)
+            .await
+            .unwrap();
 
         let lines: Vec<&str> = std::str::from_utf8(&output)
             .unwrap()
@@ -299,15 +330,19 @@ mod tests {
             })
             .collect();
         assert_eq!(times, vec![1.0, 2.0, 3.0]);
+
+        // Verify event window also received the events.
+        assert_eq!(window.read().await.all_events().len(), 3);
     }
 
-    #[test]
-    fn test_flush_all() {
+    #[tokio::test]
+    async fn test_flush_all() {
         let mut state = AggregatorState::new(2, 5.0);
         state.ingest(vec![make_event(1.0, "node-0"), make_event(5.0, "node-1")]);
 
+        let window = test_window();
         let mut output = Vec::new();
-        state.flush_all(&mut output).unwrap();
+        state.flush_all(&mut output, &window).await.unwrap();
 
         let lines: Vec<&str> = std::str::from_utf8(&output)
             .unwrap()
@@ -315,5 +350,6 @@ mod tests {
             .split('\n')
             .collect();
         assert_eq!(lines.len(), 2);
+        assert_eq!(window.read().await.all_events().len(), 2);
     }
 }

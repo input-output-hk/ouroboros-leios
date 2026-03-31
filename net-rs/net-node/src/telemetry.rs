@@ -304,6 +304,7 @@ impl StatsSink for HttpStatsSink {
 pub struct TelemetryHandle {
     node_id: String,
     genesis_time_unix: u64,
+    start_time: std::time::Instant,
     event_sinks: Vec<Box<dyn EventSink>>,
     stats_sinks: Vec<Box<dyn StatsSink>>,
     // Counters
@@ -346,6 +347,7 @@ impl TelemetryHandle {
         }
 
         Ok(Self {
+            start_time: std::time::Instant::now(),
             node_id,
             genesis_time_unix,
             event_sinks,
@@ -399,7 +401,7 @@ impl TelemetryHandle {
         }
         let snapshot = StatsSnapshot {
             node_id: self.node_id.clone(),
-            uptime_secs: self.time_s(),
+            uptime_secs: self.start_time.elapsed().as_secs_f64(),
             slot: self.current_slot,
             tip_block_no: self.tip_block_no,
             blocks_produced: self.blocks_produced,

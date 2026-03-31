@@ -56,8 +56,12 @@ impl ChainStore {
     }
 
     /// Append a block to the chain. Evicts the oldest block if over capacity.
-    pub fn append_block(&self, point: Point, header: WrappedHeader, body: BlockBody) {
+    /// Returns `false` if the point is already stored (no-op).
+    pub fn append_block(&self, point: Point, header: WrappedHeader, body: BlockBody) -> bool {
         let mut inner = self.inner.lock().unwrap();
+        if inner.blocks.iter().any(|b| b.point == point) {
+            return false;
+        }
         inner.block_no += 1;
         inner.blocks.push_back(StoredBlock {
             point,
@@ -70,6 +74,7 @@ impl ChainStore {
         let count = inner.block_no;
         drop(inner);
         let _ = self.notify.send(count);
+        true
     }
 
     /// Roll back the chain to the given point. Removes all blocks after it.
@@ -257,6 +262,20 @@ mod tests {
         let tip = store.tip();
         assert_eq!(tip.point, p2);
         assert_eq!(tip.block_no, 2);
+    }
+
+    #[test]
+    fn append_deduplicates_by_point() {
+        let (store, _rx) = ChainStore::new(100);
+        let (p1, h1, b1) = make_block(1);
+        assert!(store.append_block(p1.clone(), h1.clone(), b1.clone()));
+
+        // Same point again — should be a no-op.
+        assert!(!store.append_block(p1, h1, b1));
+
+        let tip = store.tip();
+        assert_eq!(tip.block_no, 1);
+        assert_eq!(store.stored_count(), 1);
     }
 
     #[test]

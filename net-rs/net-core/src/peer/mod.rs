@@ -8,7 +8,6 @@ pub(crate) mod command_dispatch;
 pub mod connect;
 pub(crate) mod duplex_task;
 pub(crate) mod peer_task;
-pub(crate) mod responder_task;
 pub mod server_handlers;
 pub mod types;
 

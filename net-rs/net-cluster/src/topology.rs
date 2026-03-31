@@ -4,11 +4,12 @@
 //! allocation, latency assignment, and stake distribution.
 
 use rand::prelude::*;
+use serde::Serialize;
 
 use crate::config::ClusterConfig;
 
 /// A peer link from one node to another.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct PeerLink {
     /// Address of the peer (e.g. "127.0.0.1:30001").
     pub address: String,
@@ -17,7 +18,7 @@ pub struct PeerLink {
 }
 
 /// Per-node topology information.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct NodeTopology {
     /// Index in the cluster (0..num_nodes).
     pub index: usize,
@@ -25,19 +26,19 @@ pub struct NodeTopology {
     pub node_id: String,
     /// Listen address ("127.0.0.1:{port}").
     pub listen_address: String,
-    /// Listen port (used for port allocation tracking).
-    #[allow(dead_code)]
+    /// Listen port.
     pub listen_port: u16,
     /// Stake share for this node.
     pub stake: u64,
     /// Deterministic PRNG seed for this node.
     pub seed: u64,
-    /// Outbound peer connections.
+    /// Outbound peer connections (not serialized — use `edges` instead).
+    #[serde(skip)]
     pub peers: Vec<PeerLink>,
 }
 
 /// An undirected edge in the topology.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Edge {
     pub from: usize,
     pub to: usize,
@@ -45,7 +46,7 @@ pub struct Edge {
 }
 
 /// Complete cluster topology.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Topology {
     pub nodes: Vec<NodeTopology>,
     pub edges: Vec<Edge>,
@@ -84,17 +85,13 @@ pub fn generate(config: &ClusterConfig, total_stake: u64) -> Topology {
         })
         .collect();
 
-    // Step 4: Convert edges to peer links.
+    // Step 4: Convert edges to peer links (directional: from → to only).
+    // Accepted connections run duplex (both client + server protocols),
+    // so only one direction per edge is needed.
     for edge in &edges {
         let to_addr = nodes[edge.to].listen_address.clone();
         nodes[edge.from].peers.push(PeerLink {
             address: to_addr,
-            inbound_delay_ms: edge.latency_ms,
-        });
-
-        let from_addr = nodes[edge.from].listen_address.clone();
-        nodes[edge.to].peers.push(PeerLink {
-            address: from_addr,
             inbound_delay_ms: edge.latency_ms,
         });
     }
@@ -255,9 +252,9 @@ mod tests {
         let topo = generate(&config, 1000);
         assert_eq!(topo.nodes.len(), 2);
         assert!(!topo.edges.is_empty());
-        // Both nodes should have each other as peers.
-        assert!(!topo.nodes[0].peers.is_empty());
-        assert!(!topo.nodes[1].peers.is_empty());
+        // Directional: only the `from` node has a peer link.
+        let total_peers: usize = topo.nodes.iter().map(|n| n.peers.len()).sum();
+        assert_eq!(total_peers, topo.edges.len());
     }
 
     #[test]

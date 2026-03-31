@@ -1,30 +1,32 @@
-//! HTTP telemetry receiver.
+//! HTTP telemetry receiver and REST API.
 //!
-//! Axum server with POST endpoints for receiving event batches and stats
-//! snapshots from net-node instances.
+//! Axum server with POST endpoints for receiving telemetry from net-node
+//! instances, and GET endpoints for the UI to query topology, stats, and events.
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use axum::extract::State;
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use axum::routing::post;
+use axum::routing::{get, post};
 use axum::Json;
 use tokio::sync::{mpsc, RwLock};
+use tower_http::cors::CorsLayer;
 
 use crate::topology::Topology;
-use crate::types::{self, IngestedEvent, StatsSnapshot};
+use crate::types::{self, EventWindow, IngestedEvent, StatsSnapshot};
 
 /// Shared state for the HTTP server.
 pub struct ServerState {
     /// Channel to send ingested events to the aggregator task.
     pub event_tx: mpsc::Sender<Vec<IngestedEvent>>,
-    /// Latest stats per node (write here, read in future Stage 2 GET endpoints).
+    /// Latest stats per node.
     pub latest_stats: RwLock<HashMap<String, StatsSnapshot>>,
-    /// Topology (for future Stage 2 GET endpoint).
-    #[allow(dead_code)]
+    /// Cluster topology.
     pub topology: Topology,
+    /// Recent events window for the UI API.
+    pub event_window: Arc<RwLock<EventWindow>>,
 }
 
 /// Start the telemetry HTTP server.
@@ -36,17 +38,26 @@ pub async fn start(
     port: u16,
     event_tx: mpsc::Sender<Vec<IngestedEvent>>,
     topology: Topology,
+    event_window: Arc<RwLock<EventWindow>>,
 ) -> Result<(Arc<ServerState>, tokio::task::JoinHandle<()>), Box<dyn std::error::Error + Send + Sync>>
 {
     let state = Arc::new(ServerState {
         event_tx,
         latest_stats: RwLock::new(HashMap::new()),
         topology,
+        event_window,
     });
 
     let app = axum::Router::new()
+        // Telemetry ingestion (POST).
         .route("/events", post(receive_events))
         .route("/stats", post(receive_stats))
+        // UI API (GET).
+        .route("/api/topology", get(get_topology))
+        .route("/api/stats", get(get_all_stats))
+        .route("/api/stats/:node_id", get(get_node_stats))
+        .route("/api/events", get(get_events))
+        .layer(CorsLayer::permissive())
         .with_state(state.clone());
 
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
@@ -61,6 +72,10 @@ pub async fn start(
 
     Ok((state, handle))
 }
+
+// ---------------------------------------------------------------------------
+// POST handlers (telemetry ingestion from net-node)
+// ---------------------------------------------------------------------------
 
 /// Log notable events (block production, reception, etc.) at info level.
 fn log_interesting_event(event: &IngestedEvent) {
@@ -131,6 +146,52 @@ async fn receive_stats(
     StatusCode::OK
 }
 
+// ---------------------------------------------------------------------------
+// GET handlers (UI API)
+// ---------------------------------------------------------------------------
+
+/// GET /api/topology — return the cluster node/edge graph.
+async fn get_topology(State(state): State<Arc<ServerState>>) -> Json<Topology> {
+    Json(state.topology.clone())
+}
+
+/// GET /api/stats — return latest stats for all nodes.
+async fn get_all_stats(
+    State(state): State<Arc<ServerState>>,
+) -> Json<HashMap<String, StatsSnapshot>> {
+    let stats = state.latest_stats.read().await;
+    Json(stats.clone())
+}
+
+/// GET /api/stats/:node_id — return latest stats for a single node.
+async fn get_node_stats(
+    State(state): State<Arc<ServerState>>,
+    Path(node_id): Path<String>,
+) -> Result<Json<StatsSnapshot>, StatusCode> {
+    let stats = state.latest_stats.read().await;
+    match stats.get(&node_id) {
+        Some(s) => Ok(Json(s.clone())),
+        None => Err(StatusCode::NOT_FOUND),
+    }
+}
+
+/// Query parameters for the events endpoint.
+#[derive(serde::Deserialize)]
+struct EventsQuery {
+    /// Return events with time_s > after. Default: 0.
+    after: Option<f64>,
+}
+
+/// GET /api/events?after=T — return recent events after the given timestamp.
+async fn get_events(
+    State(state): State<Arc<ServerState>>,
+    Query(query): Query<EventsQuery>,
+) -> Json<Vec<serde_json::Value>> {
+    let window = state.event_window.read().await;
+    let after = query.after.unwrap_or(0.0);
+    Json(window.events_after(after))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -140,6 +201,7 @@ mod tests {
 
     fn test_state() -> (Arc<ServerState>, mpsc::Receiver<Vec<IngestedEvent>>) {
         let (tx, rx) = mpsc::channel(100);
+        let event_window = Arc::new(RwLock::new(EventWindow::new(100)));
         let state = Arc::new(ServerState {
             event_tx: tx,
             latest_stats: RwLock::new(HashMap::new()),
@@ -147,6 +209,7 @@ mod tests {
                 nodes: Vec::new(),
                 edges: Vec::new(),
             },
+            event_window,
         });
         (state, rx)
     }
@@ -155,6 +218,10 @@ mod tests {
         axum::Router::new()
             .route("/events", post(receive_events))
             .route("/stats", post(receive_stats))
+            .route("/api/topology", get(get_topology))
+            .route("/api/stats", get(get_all_stats))
+            .route("/api/stats/:node_id", get(get_node_stats))
+            .route("/api/events", get(get_events))
             .with_state(state)
     }
 
@@ -240,5 +307,166 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_get_topology() {
+        let (state, _rx) = test_state();
+        let app = test_app(state);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/topology")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        let topo: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(topo["nodes"].is_array());
+        assert!(topo["edges"].is_array());
+    }
+
+    #[tokio::test]
+    async fn test_get_all_stats() {
+        let (state, _rx) = test_state();
+        // Insert some stats.
+        state.latest_stats.write().await.insert(
+            "node-0".to_string(),
+            StatsSnapshot {
+                node_id: "node-0".to_string(),
+                uptime_secs: 10.0,
+                slot: 100,
+                tip_block_no: Some(5),
+                blocks_produced: 1,
+                blocks_received: 3,
+                blocks_validated: 2,
+                txs_generated: 10,
+                peer_count: 0,
+                peers: Vec::new(),
+            },
+        );
+        let app = test_app(state);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/stats")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        let stats: HashMap<String, serde_json::Value> = serde_json::from_slice(&body).unwrap();
+        assert!(stats.contains_key("node-0"));
+    }
+
+    #[tokio::test]
+    async fn test_get_node_stats_found() {
+        let (state, _rx) = test_state();
+        state.latest_stats.write().await.insert(
+            "node-0".to_string(),
+            StatsSnapshot {
+                node_id: "node-0".to_string(),
+                uptime_secs: 10.0,
+                slot: 100,
+                tip_block_no: Some(5),
+                blocks_produced: 1,
+                blocks_received: 3,
+                blocks_validated: 2,
+                txs_generated: 10,
+                peer_count: 0,
+                peers: Vec::new(),
+            },
+        );
+        let app = test_app(state);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/stats/node-0")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_get_node_stats_not_found() {
+        let (state, _rx) = test_state();
+        let app = test_app(state);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/stats/nonexistent")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn test_get_events() {
+        let (state, _rx) = test_state();
+        // Insert events into the window.
+        state.event_window.write().await.push(vec![
+            serde_json::json!({"time_s": 1.0, "message": {"type": "Slot"}}),
+            serde_json::json!({"time_s": 2.0, "message": {"type": "Slot"}}),
+            serde_json::json!({"time_s": 3.0, "message": {"type": "Slot"}}),
+        ]);
+        let app = test_app(state);
+
+        // Query all events.
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/events?after=0")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        let events: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(events.len(), 3);
+
+        // Query events after t=1.5.
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/events?after=1.5")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        let events: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(events.len(), 2);
     }
 }

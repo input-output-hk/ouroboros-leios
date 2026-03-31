@@ -4,6 +4,8 @@
 //! Events are kept as opaque `serde_json::Value` to avoid coupling to the
 //! full NodeEvent enum.
 
+use std::collections::VecDeque;
+
 use serde::{Deserialize, Serialize};
 
 /// Stats snapshot received from a net-node instance.
@@ -64,6 +66,53 @@ pub fn parse_event(value: serde_json::Value) -> Option<IngestedEvent> {
     })
 }
 
+/// Ring buffer of recent events for the UI API.
+///
+/// Keeps up to `capacity` events ordered by insertion time. Events are
+/// stored as opaque JSON values with their `time_s` for efficient filtering.
+pub struct EventWindow {
+    events: VecDeque<serde_json::Value>,
+    capacity: usize,
+}
+
+impl EventWindow {
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            events: VecDeque::with_capacity(capacity.min(1024)),
+            capacity,
+        }
+    }
+
+    /// Push events into the window, evicting oldest if over capacity.
+    pub fn push(&mut self, events: impl IntoIterator<Item = serde_json::Value>) {
+        for event in events {
+            if self.events.len() >= self.capacity {
+                self.events.pop_front();
+            }
+            self.events.push_back(event);
+        }
+    }
+
+    /// Return all events with `time_s > after`.
+    pub fn events_after(&self, after: f64) -> Vec<serde_json::Value> {
+        self.events
+            .iter()
+            .filter(|e| {
+                e.get("time_s")
+                    .and_then(|t| t.as_f64())
+                    .is_some_and(|t| t > after)
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// Return all events in the window.
+    #[cfg(test)]
+    pub fn all_events(&self) -> Vec<serde_json::Value> {
+        self.events.iter().cloned().collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -122,5 +171,37 @@ mod tests {
         assert_eq!(stats.node_id, "node-0");
         assert_eq!(stats.peers.len(), 1);
         assert_eq!(stats.peers[0].bytes_sent, 1024);
+    }
+
+    #[test]
+    fn test_event_window_push_and_query() {
+        let mut w = EventWindow::new(5);
+        w.push(vec![
+            serde_json::json!({"time_s": 1.0, "message": {"type": "A"}}),
+            serde_json::json!({"time_s": 2.0, "message": {"type": "B"}}),
+            serde_json::json!({"time_s": 3.0, "message": {"type": "C"}}),
+        ]);
+        assert_eq!(w.all_events().len(), 3);
+        assert_eq!(w.events_after(1.5).len(), 2);
+        assert_eq!(w.events_after(3.0).len(), 0);
+    }
+
+    #[test]
+    fn test_event_window_capacity() {
+        let mut w = EventWindow::new(3);
+        w.push(vec![
+            serde_json::json!({"time_s": 1.0}),
+            serde_json::json!({"time_s": 2.0}),
+            serde_json::json!({"time_s": 3.0}),
+            serde_json::json!({"time_s": 4.0}),
+        ]);
+        // Oldest event (time_s=1.0) should have been evicted.
+        assert_eq!(w.all_events().len(), 3);
+        let times: Vec<f64> = w
+            .all_events()
+            .iter()
+            .filter_map(|e| e["time_s"].as_f64())
+            .collect();
+        assert_eq!(times, vec![2.0, 3.0, 4.0]);
     }
 }
