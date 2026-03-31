@@ -3,6 +3,7 @@ import { ReactFlowProvider } from "@xyflow/react";
 import { Box, Paper, Typography } from "@mui/material";
 import { useStore } from "@/store";
 import { usePolling } from "@/hooks/usePolling";
+import { useEventStream } from "@/hooks/useEventStream";
 import { useForceLayout } from "@/hooks/useForceLayout";
 import { TopologyGraph } from "@/components/TopologyGraph";
 import { InspectorPanel } from "@/components/InspectorPanel";
@@ -12,7 +13,6 @@ import { EventLog } from "@/components/EventLog";
 export default function App() {
   const loadTopology = useStore((s) => s.loadTopology);
   const pollStats = useStore((s) => s.pollStats);
-  const pollEvents = useStore((s) => s.pollEvents);
   const topology = useStore((s) => s.topology);
 
   useEffect(() => {
@@ -21,7 +21,7 @@ export default function App() {
 
   useForceLayout();
   usePolling(pollStats, 1000);
-  usePolling(pollEvents, 1000);
+  useEventStream();
 
   return (
     <Box

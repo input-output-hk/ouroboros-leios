@@ -28,10 +28,11 @@ export interface DashboardState {
   nodeTimeSeries: Record<string, NodeSeriesPoint[]>;
   pollStats: () => Promise<void>;
 
-  // Events (polled 1s)
+  // Events
   events: OutputEvent[];
   lastEventTime: number;
   eventsPaused: boolean;
+  handleEventBatch: (events: OutputEvent[]) => void;
   pollEvents: () => Promise<void>;
   toggleEventsPause: () => void;
 
@@ -182,46 +183,51 @@ export const useStore = create<DashboardState>()((set, get) => ({
 
   toggleEventsPause: () => set((s) => ({ eventsPaused: !s.eventsPaused })),
 
+  handleEventBatch: (newEvents: OutputEvent[]) => {
+    if (newEvents.length === 0) return;
+
+    const maxTime = newEvents.reduce(
+      (max, e) => Math.max(max, e.time_s),
+      get().lastEventTime,
+    );
+
+    // Compute flashes from new events.
+    // "produced" takes priority — don't let RBReceived overwrite it.
+    const flashes: Record<string, "produced" | "received"> = {};
+    for (const e of newEvents) {
+      const node = e.message?.node;
+      const type = e.message?.type;
+      if (!node) continue;
+      if (type === "RBGenerated") flashes[node] = "produced";
+      else if (type === "RBReceived" && flashes[node] !== "produced") flashes[node] = "received";
+    }
+
+    set((s) => ({
+      events: [...s.events, ...newEvents].slice(-MAX_EVENTS),
+      lastEventTime: maxTime,
+      nodeFlash: { ...s.nodeFlash, ...flashes },
+    }));
+
+    // Clear flashes after 600ms
+    if (Object.keys(flashes).length > 0) {
+      setTimeout(() => {
+        set((s) => {
+          const cleared = { ...s.nodeFlash };
+          for (const id of Object.keys(flashes)) {
+            if (cleared[id] === flashes[id]) cleared[id] = null;
+          }
+          return { nodeFlash: cleared };
+        });
+      }, 600);
+    }
+  },
+
   pollEvents: async () => {
     try {
       if (get().eventsPaused) return;
       const { lastEventTime } = get();
       const newEvents = await fetchEvents(lastEventTime);
-      if (newEvents.length === 0) return;
-
-      const maxTime = newEvents.reduce(
-        (max, e) => Math.max(max, e.time_s),
-        lastEventTime,
-      );
-
-      // Compute flashes from new events
-      const flashes: Record<string, "produced" | "received"> = {};
-      for (const e of newEvents) {
-        const node = e.message?.node;
-        const type = e.message?.type;
-        if (!node) continue;
-        if (type === "RBGenerated") flashes[node] = "produced";
-        else if (type === "RBReceived" || type === "TipAdvanced") flashes[node] = "received";
-      }
-
-      set((s) => ({
-        events: [...s.events, ...newEvents].slice(-MAX_EVENTS),
-        lastEventTime: maxTime,
-        nodeFlash: { ...s.nodeFlash, ...flashes },
-      }));
-
-      // Clear flashes after 600ms
-      if (Object.keys(flashes).length > 0) {
-        setTimeout(() => {
-          set((s) => {
-            const cleared = { ...s.nodeFlash };
-            for (const id of Object.keys(flashes)) {
-              if (cleared[id] === flashes[id]) cleared[id] = null;
-            }
-            return { nodeFlash: cleared };
-          });
-        }, 600);
-      }
+      get().handleEventBatch(newEvents);
     } catch (e) {
       console.error("Failed to poll events:", e);
     }

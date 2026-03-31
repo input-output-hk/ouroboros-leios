@@ -1,11 +1,9 @@
 ## Quick TODO list
 
-## Event spread
+## Improve header
 
-With longer latencies I'd expect to see a flow across the graph as blocks
-propagate.  If this is happening (check log event timings) you can't see it
-in the UI because of the delay in fetching.  How can we make this more
-real time?
+Make the header more interesting - colour the background with a dark purple
+(IO colours), increase heading size but move the node/edge count smaller on the right hand side
 
 ## Console <div> in <p> error
 

@@ -9,9 +9,11 @@ use std::sync::Arc;
 
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
+use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::routing::{get, post};
 use axum::Json;
-use tokio::sync::{mpsc, RwLock};
+use futures_util::stream::Stream;
+use tokio::sync::{broadcast, mpsc, RwLock};
 use tower_http::cors::CorsLayer;
 
 use crate::topology::Topology;
@@ -27,6 +29,8 @@ pub struct ServerState {
     pub topology: Topology,
     /// Recent events window for the UI API.
     pub event_window: Arc<RwLock<EventWindow>>,
+    /// Broadcast channel for real-time SSE event streaming.
+    pub event_broadcast: broadcast::Sender<Vec<serde_json::Value>>,
 }
 
 /// Start the telemetry HTTP server.
@@ -41,11 +45,13 @@ pub async fn start(
     event_window: Arc<RwLock<EventWindow>>,
 ) -> Result<(Arc<ServerState>, tokio::task::JoinHandle<()>), Box<dyn std::error::Error + Send + Sync>>
 {
+    let (event_broadcast, _) = broadcast::channel(256);
     let state = Arc::new(ServerState {
         event_tx,
         latest_stats: RwLock::new(HashMap::new()),
         topology,
         event_window,
+        event_broadcast,
     });
 
     let app = axum::Router::new()
@@ -57,6 +63,7 @@ pub async fn start(
         .route("/api/stats", get(get_all_stats))
         .route("/api/stats/:node_id", get(get_node_stats))
         .route("/api/events", get(get_events))
+        .route("/api/events/stream", get(event_stream))
         .layer(CorsLayer::permissive())
         .with_state(state.clone());
 
@@ -119,10 +126,13 @@ async fn receive_events(
 
     // Push to EventWindow immediately so the UI gets real-time events
     // (the aggregator still writes time-ordered JSONL separately).
+    let raw_events: Vec<serde_json::Value> = events.iter().map(|e| e.raw.clone()).collect();
     {
-        let raw_events: Vec<serde_json::Value> = events.iter().map(|e| e.raw.clone()).collect();
-        state.event_window.write().await.push(raw_events);
+        state.event_window.write().await.push(raw_events.clone());
     }
+
+    // Broadcast to SSE subscribers (ignore if no subscribers).
+    let _ = state.event_broadcast.send(raw_events);
 
     match state.event_tx.try_send(events) {
         Ok(()) => StatusCode::OK,
@@ -189,6 +199,31 @@ struct EventsQuery {
     after: Option<f64>,
 }
 
+/// GET /api/events/stream — SSE stream of events as they arrive.
+async fn event_stream(
+    State(state): State<Arc<ServerState>>,
+) -> Sse<impl Stream<Item = Result<Event, std::convert::Infallible>>> {
+    let mut rx = state.event_broadcast.subscribe();
+    let stream = async_stream::stream! {
+        loop {
+            match rx.recv().await {
+                Ok(batch) => {
+                    for event in batch {
+                        if let Ok(json) = serde_json::to_string(&event) {
+                            yield Ok(Event::default().data(json));
+                        }
+                    }
+                }
+                Err(broadcast::error::RecvError::Lagged(n)) => {
+                    tracing::warn!("SSE client lagged, dropped {n} batches");
+                }
+                Err(broadcast::error::RecvError::Closed) => break,
+            }
+        }
+    };
+    Sse::new(stream).keep_alive(KeepAlive::default())
+}
+
 /// GET /api/events?after=T — return recent events after the given timestamp.
 async fn get_events(
     State(state): State<Arc<ServerState>>,
@@ -209,6 +244,7 @@ mod tests {
     fn test_state() -> (Arc<ServerState>, mpsc::Receiver<Vec<IngestedEvent>>) {
         let (tx, rx) = mpsc::channel(100);
         let event_window = Arc::new(RwLock::new(EventWindow::new(100)));
+        let (event_broadcast, _) = broadcast::channel(256);
         let state = Arc::new(ServerState {
             event_tx: tx,
             latest_stats: RwLock::new(HashMap::new()),
@@ -217,6 +253,7 @@ mod tests {
                 edges: Vec::new(),
             },
             event_window,
+            event_broadcast,
         });
         (state, rx)
     }
