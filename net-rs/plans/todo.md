@@ -1,10 +1,5 @@
 ## Quick TODO list
 
-## Improve header
-
-Make the header more interesting - colour the background with a dark purple
-(IO colours), increase heading size but move the node/edge count smaller on the right hand side
-
 ## Console <div> in <p> error
 
 ￼installHook.js:1 In HTML, <div> cannot be a descendant of <p>.
