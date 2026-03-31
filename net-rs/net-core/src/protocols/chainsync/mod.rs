@@ -24,8 +24,8 @@ pub const SIZE_LIMIT: usize = 65_535;
 /// Timeout for StIdle (long — consumer may be downloading a large range).
 pub const TIMEOUT_IDLE: Duration = Duration::from_secs(3673);
 
-/// Timeout for StCanAwait (server should respond quickly).
-pub const TIMEOUT_CAN_AWAIT: Duration = Duration::from_secs(10);
+/// Timeout for StCanAwait (server waits until a new block arrives).
+pub const TIMEOUT_CAN_AWAIT: Duration = Duration::from_secs(3673);
 
 /// Timeout for StMustReply (midpoint of spec's 601-911s range).
 pub const TIMEOUT_MUST_REPLY: Duration = Duration::from_secs(756);
