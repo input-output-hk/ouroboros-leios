@@ -110,7 +110,11 @@ function NodeInspector({ nodeId }: { nodeId: string }) {
             <LineChart data={chartData}>
               <XAxis dataKey="t" hide />
               <YAxis hide />
-              <Tooltip formatter={(v: number) => formatBytes(v) + "/s"} />
+              <Tooltip
+                formatter={(v: number) => formatBytes(v) + "/s"}
+                contentStyle={{ backgroundColor: "rgba(30,30,30,0.9)", border: "1px solid #555", borderRadius: 4, color: "#fff" }}
+                labelStyle={{ display: "none" }}
+              />
               <Line
                 type="monotone"
                 dataKey="bandwidth"
@@ -130,7 +134,10 @@ function NodeInspector({ nodeId }: { nodeId: string }) {
             <LineChart data={chartData}>
               <XAxis dataKey="t" hide />
               <YAxis hide />
-              <Tooltip />
+              <Tooltip
+                contentStyle={{ backgroundColor: "rgba(30,30,30,0.9)", border: "1px solid #555", borderRadius: 4, color: "#fff" }}
+                labelStyle={{ display: "none" }}
+              />
               <Line
                 type="monotone"
                 dataKey="messages"
