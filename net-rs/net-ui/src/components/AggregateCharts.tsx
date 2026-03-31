@@ -106,7 +106,11 @@ function ChartCard({
             tick={{ fontSize: 10 }}
             tickFormatter={(v: number) => formatValue(v)}
           />
-          <Tooltip formatter={(v: number) => formatValue(v)} />
+          <Tooltip
+            formatter={(v: number) => formatValue(v)}
+            contentStyle={{ backgroundColor: "rgba(30,30,30,0.9)", border: "1px solid #555", borderRadius: 4, color: "#fff" }}
+            labelStyle={{ display: "none" }}
+          />
           <Line
             type="monotone"
             dataKey="value"

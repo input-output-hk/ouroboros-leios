@@ -1,5 +1,9 @@
 ## Quick TODO list
 
+## Add a block graph in the inspector
+
+Match the aggregate one
+
 ## Console <div> in <p> error
 
 ￼installHook.js:1 In HTML, <div> cannot be a descendant of <p>.
@@ -61,11 +65,7 @@ is offered, attach it to the relevant fork (this requires the previous block
 hash from the header).  Then it should choose which of the chains is now
 the longest, and fetch blocks it does not already have.
 
-## Reordering of events
+## Cluster control
 
-It looks like events are getting re-ordered in the log, or lost - for example 
-you see a VTBundleGenerated before EBGenerated or EBReceived.
-
-Actually there are cases of VTBundleGenerated with no EB traffic before it at
-all.  This must be a case of lost events I think.
-
+Control of the cluster from the UI - ability to set size, degree
+and latency parameters and restart the cluster
