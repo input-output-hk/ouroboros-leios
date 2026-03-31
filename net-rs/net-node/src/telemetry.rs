@@ -100,6 +100,7 @@ pub struct StatsSnapshot {
     pub uptime_secs: f64,
     pub slot: u64,
     pub tip_block_no: Option<u64>,
+    pub tip_hash: Option<String>,
     pub blocks_produced: u64,
     pub blocks_received: u64,
     pub blocks_validated: u64,
@@ -297,6 +298,7 @@ pub struct TelemetryHandle {
     pub txs_generated: u64,
     pub current_slot: u64,
     pub tip_block_no: Option<u64>,
+    pub tip_hash: Option<String>,
 }
 
 impl TelemetryHandle {
@@ -341,6 +343,7 @@ impl TelemetryHandle {
             txs_generated: 0,
             current_slot: 0,
             tip_block_no: None,
+            tip_hash: None,
         })
     }
 
@@ -387,6 +390,7 @@ impl TelemetryHandle {
             uptime_secs: self.start_time.elapsed().as_secs_f64(),
             slot: self.current_slot,
             tip_block_no: self.tip_block_no,
+            tip_hash: self.tip_hash.clone(),
             blocks_produced: self.blocks_produced,
             blocks_received: self.blocks_received,
             blocks_validated: self.blocks_validated,
@@ -433,6 +437,7 @@ mod tests {
             uptime_secs: 10.0,
             slot: 100,
             tip_block_no: Some(50),
+            tip_hash: Some("ab12".into()),
             blocks_produced: 5,
             blocks_received: 45,
             blocks_validated: 44,

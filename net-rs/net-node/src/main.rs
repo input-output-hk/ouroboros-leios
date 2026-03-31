@@ -219,6 +219,12 @@ fn record_network_event(
         }
         NetworkEvent::TipAdvanced { tip, .. } => {
             telem.tip_block_no = Some(tip.block_no);
+            telem.tip_hash = match &tip.point {
+                net_core::types::Point::Specific { hash, .. } => {
+                    Some(format!("{:02x}{:02x}", hash[30], hash[31]))
+                }
+                _ => None,
+            };
             telem.record(NodeEvent::TipAdvanced {
                 node: node_id.into(),
                 block_no: tip.block_no,

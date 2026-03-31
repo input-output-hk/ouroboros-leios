@@ -1,9 +1,11 @@
 ## Quick TODO list
 
-## Node tip display
+## Event spread
 
-Show the last 2 hex digits of the node hash to ensure they are all one
-the *same* block at that number.
+With longer latencies I'd expect to see a flow across the graph as blocks
+propagate.  If this is happening (check log event timings) you can't see it
+in the UI because of the delay in fetching.  How can we make this more
+real time?
 
 ## Console <div> in <p> error
 

@@ -17,6 +17,8 @@ pub struct StatsSnapshot {
     pub uptime_secs: f64,
     pub slot: u64,
     pub tip_block_no: Option<u64>,
+    #[serde(default)]
+    pub tip_hash: Option<String>,
     pub blocks_produced: u64,
     pub blocks_received: u64,
     pub blocks_validated: u64,
