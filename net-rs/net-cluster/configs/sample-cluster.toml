@@ -24,13 +24,13 @@ seed = 42
 output_events = "cluster-events.jsonl"
 
 # Time window for cross-node event ordering
-ordering_window_secs = 5.0
+ordering_window_secs = 1.0
 
 # Telemetry aggregator port
 aggregator_port = 9100
 
 # Stats reporting interval (seconds)
-stats_interval_secs = 5
+stats_interval_secs = 1
 
 # Stake distribution
 stake_distribution = "equal"
