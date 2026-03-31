@@ -37,6 +37,7 @@ function bgColor(_selected: boolean, flash: "produced" | "received" | null): str
 function TopologyNodeInner({ data }: Props) {
   const { label, stats, selected, flash } = data;
   const tip = stats?.tip_block_no;
+  const tipHash = stats?.tip_hash;
 
   return (
     <Box
@@ -62,7 +63,7 @@ function TopologyNodeInner({ data }: Props) {
       </Typography>
       {tip != null && (
         <Typography variant="caption" fontSize={9} color="text.secondary" lineHeight={1.2}>
-          Tip: {tip}
+          {tip}{tipHash ? ` #${tipHash}` : ""}
         </Typography>
       )}
       <Handle type="target" position={Position.Top} style={handleStyle} />

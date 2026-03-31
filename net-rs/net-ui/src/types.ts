@@ -37,6 +37,7 @@ export interface StatsSnapshot {
   uptime_secs: number;
   slot: number;
   tip_block_no: number | null;
+  tip_hash: string | null;
   blocks_produced: number;
   blocks_received: number;
   blocks_validated: number;
