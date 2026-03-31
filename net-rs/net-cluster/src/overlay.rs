@@ -26,13 +26,19 @@ pub fn generate_overlays(
     temp_dir: &Path,
     aggregator_port: u16,
     stats_interval_secs: u64,
+    rb_generation_probability: Option<f64>,
 ) -> Result<OverlayFiles, Box<dyn std::error::Error + Send + Sync>> {
     std::fs::create_dir_all(temp_dir)?;
 
     let mut paths = Vec::with_capacity(topology.nodes.len());
 
     for node in &topology.nodes {
-        let toml_content = render_overlay(node, aggregator_port, stats_interval_secs);
+        let toml_content = render_overlay(
+            node,
+            aggregator_port,
+            stats_interval_secs,
+            rb_generation_probability,
+        );
         let path = temp_dir.join(format!("node-{}.toml", node.index));
         std::fs::write(&path, &toml_content)?;
         paths.push(path);
@@ -45,7 +51,12 @@ pub fn generate_overlays(
 }
 
 /// Render a single node's overlay TOML content.
-fn render_overlay(node: &NodeTopology, aggregator_port: u16, stats_interval_secs: u64) -> String {
+fn render_overlay(
+    node: &NodeTopology,
+    aggregator_port: u16,
+    stats_interval_secs: u64,
+    rb_generation_probability: Option<f64>,
+) -> String {
     let mut s = String::new();
 
     writeln!(s, "node_id = \"{}\"", node.node_id).ok();
@@ -54,6 +65,9 @@ fn render_overlay(node: &NodeTopology, aggregator_port: u16, stats_interval_secs
     writeln!(s).ok();
     writeln!(s, "[production]").ok();
     writeln!(s, "stake = {}", node.stake).ok();
+    if let Some(p) = rb_generation_probability {
+        writeln!(s, "rb_generation_probability = {p}").ok();
+    }
     writeln!(s).ok();
     writeln!(s, "[telemetry]").ok();
     writeln!(s, "stats_interval_secs = {stats_interval_secs}").ok();
@@ -116,7 +130,7 @@ mod tests {
     #[test]
     fn test_render_overlay() {
         let node = sample_node();
-        let toml = render_overlay(&node, 9100, 5);
+        let toml = render_overlay(&node, 9100, 5, None);
 
         assert!(toml.contains("node_id = \"node-0\""));
         assert!(toml.contains("listen_address = \"127.0.0.1:30000\""));
@@ -135,7 +149,7 @@ mod tests {
     #[test]
     fn test_render_parses_as_toml() {
         let node = sample_node();
-        let toml_str = render_overlay(&node, 9100, 5);
+        let toml_str = render_overlay(&node, 9100, 5, None);
         let parsed: toml::Value = toml::from_str(&toml_str).expect("generated TOML should parse");
         assert_eq!(parsed["node_id"].as_str(), Some("node-0"));
     }
@@ -147,7 +161,7 @@ mod tests {
             edges: Vec::new(),
         };
         let dir = tempfile::tempdir().unwrap();
-        let overlays = generate_overlays(&topo, dir.path(), 9100, 5).unwrap();
+        let overlays = generate_overlays(&topo, dir.path(), 9100, 5, None).unwrap();
         assert_eq!(overlays.paths.len(), 1);
         assert!(overlays.paths[0].exists());
 

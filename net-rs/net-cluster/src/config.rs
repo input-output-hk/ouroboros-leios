@@ -71,6 +71,9 @@ pub struct ClusterConfig {
     #[serde(default = "default_event_window_size")]
     pub event_window_size: usize,
 
+    /// Override rb_generation_probability for all nodes.
+    pub rb_generation_probability: Option<f64>,
+
     /// External peers injected into random nodes.
     #[serde(default)]
     pub external_peers: Vec<ExternalPeerConfig>,
@@ -123,6 +126,7 @@ impl Default for ClusterConfig {
             stake_distribution: default_stake_distribution(),
             stats_interval_secs: default_stats_interval(),
             event_window_size: default_event_window_size(),
+            rb_generation_probability: None,
             external_peers: Vec::new(),
         }
     }
