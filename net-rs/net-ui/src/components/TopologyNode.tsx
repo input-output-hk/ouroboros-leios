@@ -1,12 +1,11 @@
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { Box, Typography } from "@mui/material";
-import type { StatsSnapshot } from "@/types";
+import { useStore } from "@/store";
 
 interface TopologyNodeData {
   label: string;
   stake: number;
-  stats?: StatsSnapshot;
   selected: boolean;
   flash: "produced" | "received" | "rolledback" | null;
 }
@@ -37,7 +36,8 @@ function bgColor(_selected: boolean, flash: "produced" | "received" | "rolledbac
 }
 
 function TopologyNodeInner({ data }: Props) {
-  const { label, stats, selected, flash } = data;
+  const { label, selected, flash } = data;
+  const stats = useStore((s) => s.latestStats[label]);
   const tip = stats?.tip_block_no;
   const tipHash = stats?.tip_hash;
 
