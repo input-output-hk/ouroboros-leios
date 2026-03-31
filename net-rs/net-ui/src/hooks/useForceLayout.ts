@@ -56,7 +56,7 @@ export function useForceLayout() {
           })
           .strength(0.4),
       )
-      .force("charge", forceManyBody().strength(-300))
+      .force("charge", forceManyBody().strength(-800))
       .force("center", forceCenter(0, 0))
       .alpha(1)
       .alphaDecay(0.05);

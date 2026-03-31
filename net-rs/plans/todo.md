@@ -1,9 +1,5 @@
 ## Quick TODO list
 
-## Graph display
-
-Increase repel force to spread the graph more
-
 ## Node tip display
 
 Show the last 2 hex digits of the node hash to ensure they are all one
