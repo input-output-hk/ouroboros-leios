@@ -26,7 +26,8 @@ pub const MAX_VOTES_OFFERED: usize = 1024;
 /// Maximum voter ID size in bytes.
 pub const MAX_VOTER_ID_SIZE: usize = 256;
 
-/// Timeout for StBusy (server must reply within 60s).
+/// Timeout for StBusy — unused (long-poll: no timeout, see `timeout()`).
+#[allow(dead_code)]
 pub const TIMEOUT_BUSY: Duration = Duration::from_secs(60);
 
 // --- State machine ---
@@ -100,9 +101,10 @@ impl Protocol for LeiosNotify {
 
     fn timeout(state: &State) -> Option<Duration> {
         match state {
-            State::StIdle => None,
-            State::StBusy => Some(TIMEOUT_BUSY),
-            State::StDone => None,
+            // StBusy has no timeout: the server may legitimately wait for new
+            // Leios data before responding (long-poll pattern, same as
+            // ChainSync MsgAwaitReply).
+            State::StIdle | State::StBusy | State::StDone => None,
         }
     }
 }
@@ -252,7 +254,7 @@ mod tests {
     #[test]
     fn timeouts() {
         assert_eq!(LeiosNotify::timeout(&State::StIdle), None);
-        assert_eq!(LeiosNotify::timeout(&State::StBusy), Some(TIMEOUT_BUSY));
+        assert_eq!(LeiosNotify::timeout(&State::StBusy), None);
         assert_eq!(LeiosNotify::timeout(&State::StDone), None);
     }
 
