@@ -229,7 +229,7 @@ fn default_rb_head_ms() -> f64 {
     1.0
 }
 fn default_rb_body_ms_constant() -> f64 {
-    5.0
+    1000.0
 }
 fn default_tx_validation_ms() -> f64 {
     0.5

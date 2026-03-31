@@ -34,3 +34,6 @@ stats_interval_secs = 1
 
 # Stake distribution
 stake_distribution = "equal"
+
+# Override block production rate (default from base config is 0.05)
+rb_generation_probability = 0.2

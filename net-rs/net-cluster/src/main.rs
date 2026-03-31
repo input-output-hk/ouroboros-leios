@@ -123,6 +123,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         &temp_dir,
         config.aggregator_port,
         config.stats_interval_secs,
+        config.rb_generation_probability,
     )?;
 
     let net_node_bin = process::resolve_net_node_bin(cli.net_node_bin.as_deref())?;
