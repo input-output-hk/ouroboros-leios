@@ -16,10 +16,10 @@ use crate::validation::{ValidationComplete, Validator};
 
 /// A node in the chain tree, representing one block header.
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields used for debugging and future chain-walking.
 struct ChainNode {
     point: Point,
     block_number: u64,
+    #[allow(dead_code)] // stored for future use (e.g., slot-based tiebreaking)
     slot: u64,
     prev_hash: Option<[u8; 32]>,
 }
@@ -114,12 +114,41 @@ impl ChainTree {
         self.nodes
             .retain(|_, node| node.block_number >= min_block_number);
     }
+
+    /// Walk the prev_hash chain from `hash` back to genesis (or a gap),
+    /// collecting hashes in reverse order (tip first).
+    fn ancestors(&self, mut hash: [u8; 32]) -> Vec<[u8; 32]> {
+        let mut chain = vec![hash];
+        while let Some(node) = self.nodes.get(&hash) {
+            match node.prev_hash {
+                Some(parent) if self.nodes.contains_key(&parent) => {
+                    chain.push(parent);
+                    hash = parent;
+                }
+                _ => break,
+            }
+        }
+        chain
+    }
+
+    /// Find the common ancestor of two block hashes by walking both chains
+    /// back until they meet. Returns the common ancestor hash, or None if
+    /// the chains are disconnected (gap in the tree).
+    pub fn find_common_ancestor(&self, hash_a: [u8; 32], hash_b: [u8; 32]) -> Option<[u8; 32]> {
+        let ancestors_a: HashSet<[u8; 32]> = self.ancestors(hash_a).into_iter().collect();
+        self.ancestors(hash_b)
+            .into_iter()
+            .find(|ancestor| ancestors_a.contains(ancestor))
+    }
 }
 
 /// Consensus state with fork-tracking chain tree.
 pub struct Consensus {
     node_id: String,
     chain_tree: ChainTree,
+    /// Hash of the last block we actually injected into the chain store.
+    /// Distinct from chain_tree.best_tip() which is speculative.
+    adopted_tip_hash: Option<[u8; 32]>,
     /// Points of blocks we produced (skip re-fetching).
     self_produced: HashSet<Point>,
     /// Points currently being fetched or validated (avoid duplicate requests).
@@ -140,6 +169,7 @@ impl Consensus {
         Self {
             node_id,
             chain_tree: ChainTree::new(),
+            adopted_tip_hash: None,
             self_produced: HashSet::new(),
             in_flight: HashSet::new(),
             commands,
@@ -166,6 +196,8 @@ impl Consensus {
                 info.slot,
                 info.prev_hash,
             );
+            // Self-produced blocks are immediately injected.
+            self.adopted_tip_hash = Some(hash);
             info.block_number
         } else {
             // Fallback for opaque headers.
@@ -283,7 +315,8 @@ impl Consensus {
     }
 
     /// Handle a completed validation: inject the block so downstream peers
-    /// can fetch it, and update the chain tree.
+    /// can fetch it, and update the chain tree. If this causes a fork switch,
+    /// issue a rollback to the common ancestor first.
     pub async fn on_validation_complete(&mut self, result: ValidationComplete) {
         let ValidationComplete { point, body } = result;
         self.in_flight.remove(&point);
@@ -293,14 +326,15 @@ impl Consensus {
             .header()
             .unwrap_or_else(|| WrappedHeader::opaque(Vec::new()));
 
+        let new_hash = match &point {
+            Point::Specific { hash, .. } => *hash,
+            _ => [0u8; 32],
+        };
+
         // Insert into chain tree (may already be there from TipAdvanced).
         let block_no = if let Some(info) = header.parsed.as_ref() {
-            let hash = match &point {
-                Point::Specific { hash, .. } => *hash,
-                _ => [0u8; 32],
-            };
             self.chain_tree.insert(
-                hash,
+                new_hash,
                 point.clone(),
                 info.block_number,
                 info.slot,
@@ -308,15 +342,45 @@ impl Consensus {
             );
             info.block_number
         } else {
-            // Fallback: look up from tree, or estimate.
-            let hash = match &point {
-                Point::Specific { hash, .. } => *hash,
-                _ => [0u8; 32],
-            };
             self.chain_tree
-                .block_number(&hash)
+                .block_number(&new_hash)
                 .unwrap_or_else(|| self.chain_tree.best_tip().map_or(1, |(_, bn)| bn + 1))
         };
+
+        // Detect fork switch: compare against the last adopted tip.
+        // If the new block's chain doesn't descend from the adopted tip,
+        // we need to rollback to the common ancestor.
+        if let Some(adopted_hash) = self.adopted_tip_hash {
+            if adopted_hash != new_hash {
+                // Check if adopted tip is an ancestor of the new block
+                // (simple chain extension) or on a different fork.
+                let is_ancestor = self.chain_tree.ancestors(new_hash).contains(&adopted_hash);
+
+                if !is_ancestor {
+                    // Fork switch! Find common ancestor and rollback.
+                    if let Some(ancestor) =
+                        self.chain_tree.find_common_ancestor(adopted_hash, new_hash)
+                    {
+                        if let Some(ancestor_node) = self.chain_tree.nodes.get(&ancestor) {
+                            let ancestor_point = ancestor_node.point.clone();
+                            info!(
+                                node_id = %self.node_id,
+                                new_tip = %point,
+                                ancestor = %ancestor_point,
+                                "fork switch: rolling back to common ancestor"
+                            );
+
+                            let _ = self
+                                .commands
+                                .send(NetworkCommand::InjectRollback {
+                                    point: ancestor_point,
+                                })
+                                .await;
+                        }
+                    }
+                }
+            }
+        }
 
         info!(
             node_id = %self.node_id,
@@ -324,6 +388,9 @@ impl Consensus {
             block_no,
             "block validated, adopting"
         );
+
+        // Update adopted tip.
+        self.adopted_tip_hash = Some(new_hash);
 
         // Prune old blocks beyond k.
         if block_no > self.security_param_k {
@@ -836,5 +903,205 @@ mod tests {
         consensus.register_self_produced(&tip.point, &header);
 
         assert_eq!(consensus.tip_hash(), Some(expected_hash));
+    }
+
+    // --- ChainTree ancestor/fork tests ---
+
+    #[test]
+    fn common_ancestor_linear() {
+        let mut tree = ChainTree::new();
+        tree.insert(
+            [1; 32],
+            Point::Specific {
+                slot: 1,
+                hash: [1; 32],
+            },
+            1,
+            1,
+            None,
+        );
+        tree.insert(
+            [2; 32],
+            Point::Specific {
+                slot: 2,
+                hash: [2; 32],
+            },
+            2,
+            2,
+            Some([1; 32]),
+        );
+        tree.insert(
+            [3; 32],
+            Point::Specific {
+                slot: 3,
+                hash: [3; 32],
+            },
+            3,
+            3,
+            Some([2; 32]),
+        );
+
+        // Common ancestor of block 2 and block 3 is block 2.
+        assert_eq!(tree.find_common_ancestor([2; 32], [3; 32]), Some([2; 32]));
+        // Common ancestor of block 1 and block 3 is block 1.
+        assert_eq!(tree.find_common_ancestor([1; 32], [3; 32]), Some([1; 32]));
+    }
+
+    #[test]
+    fn common_ancestor_fork() {
+        let mut tree = ChainTree::new();
+        // Shared prefix: 1 -> 2
+        tree.insert(
+            [1; 32],
+            Point::Specific {
+                slot: 1,
+                hash: [1; 32],
+            },
+            1,
+            1,
+            None,
+        );
+        tree.insert(
+            [2; 32],
+            Point::Specific {
+                slot: 2,
+                hash: [2; 32],
+            },
+            2,
+            2,
+            Some([1; 32]),
+        );
+        // Fork A: 2 -> A3
+        tree.insert(
+            [0xA3; 32],
+            Point::Specific {
+                slot: 3,
+                hash: [0xA3; 32],
+            },
+            3,
+            3,
+            Some([2; 32]),
+        );
+        // Fork B: 2 -> B3 -> B4
+        tree.insert(
+            [0xB3; 32],
+            Point::Specific {
+                slot: 3,
+                hash: [0xB3; 32],
+            },
+            3,
+            3,
+            Some([2; 32]),
+        );
+        tree.insert(
+            [0xB4; 32],
+            Point::Specific {
+                slot: 4,
+                hash: [0xB4; 32],
+            },
+            4,
+            4,
+            Some([0xB3; 32]),
+        );
+
+        // Common ancestor of A3 and B4 should be block 2.
+        assert_eq!(
+            tree.find_common_ancestor([0xA3; 32], [0xB4; 32]),
+            Some([2; 32])
+        );
+    }
+
+    #[tokio::test]
+    async fn fork_switch_issues_rollback() {
+        let (cmd_tx, mut cmd_rx) = mpsc::channel(32);
+        let config = crate::config::ValidationConfig::default();
+        let (validator, _val_rx) = Validator::new(config);
+        let mut consensus = Consensus::new("test".into(), cmd_tx, validator, 2160);
+
+        // Build chain A: blocks 1, 2, 3 (self-produced, so they're in the tree).
+        let (tip1, hdr1) = make_tip(10, 1, None);
+        let hash1 = match &tip1.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus.register_self_produced(&tip1.point, &hdr1);
+
+        let (tip2, hdr2) = make_tip(20, 2, Some(hash1));
+        let hash2 = match &tip2.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus.register_self_produced(&tip2.point, &hdr2);
+
+        let (tip3, hdr3) = make_tip(30, 3, Some(hash2));
+        consensus.register_self_produced(&tip3.point, &hdr3);
+
+        assert_eq!(consensus.local_tip().unwrap().block_no, 3);
+
+        // Now announce a competing fork B: fork from block 1.
+        // B2 at slot 21, B3 at slot 31, B4 at slot 41 (longer than A).
+        let (tipb2, hdrb2) = make_tip(21, 2, Some(hash1));
+        let hashb2 = match &tipb2.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+
+        let (tipb3, hdrb3) = make_tip(31, 3, Some(hashb2));
+        let hashb3 = match &tipb3.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+
+        let (tipb4, hdrb4) = make_tip(41, 4, Some(hashb3));
+
+        // Insert B2 and B3 into tree (as if we received headers via TipAdvanced).
+        consensus
+            .handle_event(&NetworkEvent::TipAdvanced {
+                tip: tipb2,
+                header: hdrb2,
+            })
+            .await;
+        consensus
+            .handle_event(&NetworkEvent::TipAdvanced {
+                tip: tipb3,
+                header: hdrb3,
+            })
+            .await;
+        // B4 is the one that overtakes — announce and fetch it.
+        consensus
+            .handle_event(&NetworkEvent::TipAdvanced {
+                tip: tipb4.clone(),
+                header: hdrb4.clone(),
+            })
+            .await;
+
+        // Drain fetch command.
+        let cmd = cmd_rx.recv().await.unwrap();
+        assert!(matches!(cmd, NetworkCommand::FetchBlock { .. }));
+
+        // Simulate: block B4 was fetched and validated.
+        // Build a minimal block body that produces the same header.
+        // We need to go through the validator to get on_validation_complete called.
+        // Instead, call on_validation_complete directly with a fake body.
+        let fake_body = BlockBody::new(hdrb4.raw.clone()); // won't parse as block, but that's OK
+        let result = ValidationComplete {
+            point: tipb4.point.clone(),
+            body: fake_body,
+        };
+        consensus.on_validation_complete(result).await;
+
+        // Drain commands: we expect InjectRollback then InjectBlock.
+        let mut got_rollback = false;
+        let mut got_inject = false;
+        while let Ok(cmd) = cmd_rx.try_recv() {
+            match cmd {
+                NetworkCommand::InjectRollback { .. } => got_rollback = true,
+                NetworkCommand::InjectBlock { .. } => got_inject = true,
+                _ => {}
+            }
+        }
+
+        assert!(got_rollback, "fork switch should issue InjectRollback");
+        assert!(got_inject, "fork switch should inject the new block");
     }
 }
