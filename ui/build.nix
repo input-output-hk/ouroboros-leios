@@ -12,6 +12,8 @@
         buildCommand = ''
           mkdir -p $out
           cp -rL $src/ui/* $out/
+          chmod -R u+w $out
+          cp ${config.packages.geojson} $out/public/data/ne_110m_admin_0_countries.geojson
         '';
       };
     in
@@ -27,6 +29,11 @@
         ];
       };
 
+      packages.geojson = pkgs.fetchurl {
+        url = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson";
+        hash = "sha256-aGbId9Ocupw1diCHiDmzNtVp+MZi08+rTLHb4tOcl38=";
+      };
+
       packages.ui = pkgs.buildNpmPackage {
         name = "leios-ui";
         src = resolvedSrc;
@@ -34,9 +41,12 @@
         npmDeps = pkgs.importNpmLock { npmRoot = ./.; };
         inherit (pkgs.importNpmLock) npmConfigHook;
 
+        nativeBuildInputs = [ pkgs.curl ];
+
         buildPhase = ''
           npm run build
         '';
+
         installPhase = ''
           mkdir -p $out/visualizer/
           cp -r dist/* $out/visualizer/

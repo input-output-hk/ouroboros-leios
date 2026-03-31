@@ -1,5 +1,4 @@
 -- | Leios EB diffusion
---
 module DeltaQ.Leios (
   -- * DeltaQ
   validateEB,
@@ -15,7 +14,6 @@ module DeltaQ.Leios (
   pValidating,
   pHeaderOnTime,
   pEBOnTime,
-
 ) where
 
 import DeltaQ (

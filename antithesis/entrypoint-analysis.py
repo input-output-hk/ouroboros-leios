@@ -13,7 +13,12 @@ from datetime import datetime
 # Import Antithesis SDK - handles gracefully if not available
 try:
     from antithesis.lifecycle import setup_complete
-    from antithesis.assertions import always, always_or_unreachable, reachable, sometimes
+    from antithesis.assertions import (
+        always,
+        always_or_unreachable,
+        reachable,
+        sometimes,
+    )
 
     ANTITHESIS_AVAILABLE = True
 except ImportError:
@@ -29,7 +34,12 @@ def log(msg: str):
     print(f"[{ts}] {msg}", flush=True)
 
 
-def report_assertions(metrics, praos_threshold_ms: float, prev_max_slot: int, prev_max_slot_by_node: dict = None):
+def report_assertions(
+    metrics,
+    praos_threshold_ms: float,
+    prev_max_slot: int,
+    prev_max_slot_by_node: dict = None,
+):
     """Report assertions to Antithesis SDK or stdout."""
     praos_stats = get_latency_stats(metrics.praos_latencies_ms)
 
@@ -284,7 +294,9 @@ def report_assertions(metrics, praos_threshold_ms: float, prev_max_slot: int, pr
             )
         else:
             status = "PASS" if within_k else "FAIL"
-            log(f"[{status}] Max chain divergence: {max_divergence} slots (k={max_fork_depth})")
+            log(
+                f"[{status}] Max chain divergence: {max_divergence} slots (k={max_fork_depth})"
+            )
 
     # --- Reachable guards: ensure key code paths are exercised ---
     if ANTITHESIS_AVAILABLE:
@@ -362,9 +374,7 @@ def main():
             log(
                 f"Leios: EBs={metrics.leios_ebs_created}, votes={metrics.leios_votes_created}"
             )
-            log(
-                f"Per-pool: {dict(metrics.blocks_created_by_node)}"
-            )
+            log(f"Per-pool: {dict(metrics.blocks_created_by_node)}")
             log(
                 f"Safety: equivocations={len(metrics.equivocations)}, "
                 f"dup_creators={len(metrics.duplicate_creators)}, "
@@ -386,7 +396,9 @@ def main():
             )
 
             # Report assertions
-            report_assertions(metrics, praos_threshold_ms, prev_max_slot, prev_max_slot_by_node)
+            report_assertions(
+                metrics, praos_threshold_ms, prev_max_slot, prev_max_slot_by_node
+            )
             prev_max_slot = metrics.max_slot_seen
             prev_max_slot_by_node = dict(metrics.max_slot_by_node)
 

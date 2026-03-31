@@ -2,6 +2,7 @@
   pkgs,
   inputs,
   system,
+  lib,
   ...
 }:
 
@@ -65,9 +66,11 @@ in
 {
   inherit
     leiosSpec
-    leiosDocs
     agdaWithDeps
     agdaTraceParser
     hsTraceParser
     ;
+}
+// lib.optionalAttrs (system != "aarch64-linux") {
+  inherit leiosDocs;
 }
