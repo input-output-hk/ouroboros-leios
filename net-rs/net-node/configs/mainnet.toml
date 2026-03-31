@@ -14,8 +14,7 @@ scheduler = "priority-wfq"
 
 [production]
 total_stake = 1000
-rb_generation_probability = 0.05
-ib_generation_probability = 0.5
+rb_generation_probability = 0.5
 eb_generation_probability = 0.5
 vote_generation_probability = 0.8
 stage_length_slots = 20

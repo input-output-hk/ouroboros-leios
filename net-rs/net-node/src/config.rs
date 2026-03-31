@@ -114,10 +114,6 @@ pub struct ProductionConfig {
     #[serde(default = "default_rb_probability")]
     pub rb_generation_probability: f64,
 
-    /// Per-slot probability of producing an input block (Leios).
-    #[serde(default)]
-    pub ib_generation_probability: f64,
-
     /// Per-stage probability of producing an endorser block (Leios).
     #[serde(default)]
     pub eb_generation_probability: f64,
@@ -149,7 +145,6 @@ impl Default for ProductionConfig {
             stake: 0,
             total_stake: default_total_stake(),
             rb_generation_probability: default_rb_probability(),
-            ib_generation_probability: 0.0,
             eb_generation_probability: 0.0,
             vote_generation_probability: 0.0,
             stage_length_slots: default_stage_length(),
