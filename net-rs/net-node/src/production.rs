@@ -1,7 +1,7 @@
 //! Block production via fake VRF lottery.
 //!
 //! Each slot, the producer runs a stake-weighted lottery to decide whether
-//! to produce ranking blocks (Praos), input blocks, endorser blocks, and
+//! to produce ranking blocks (Praos), endorser blocks, and
 //! votes (Leios). The lottery is ported from sim-rs.
 
 use rand::rngs::StdRng;
