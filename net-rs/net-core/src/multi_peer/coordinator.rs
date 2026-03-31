@@ -543,8 +543,10 @@ impl Coordinator {
                 point,
                 header,
                 body,
+                block_no,
             } => {
-                self.chain_store.append_block(point, *header, body);
+                self.chain_store
+                    .append_block(point, *header, body, block_no);
             }
 
             NetworkCommand::InjectRollback { point } => {

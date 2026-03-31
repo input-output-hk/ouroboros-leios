@@ -72,15 +72,15 @@ async fn block_generator(
             let header = WrappedHeader::opaque(cbor_buf.clone());
             let body = BlockBody::opaque(cbor_buf);
 
+            block_count += 1;
             let _ = commands
                 .send(NetworkCommand::InjectBlock {
                     point: point.clone(),
                     header: Box::new(header),
                     body,
+                    block_no: block_count,
                 })
                 .await;
-
-            block_count += 1;
             println!("  generated block #{block_count} at slot {point}");
         }
     }

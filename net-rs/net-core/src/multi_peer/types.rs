@@ -104,6 +104,7 @@ pub enum NetworkCommand {
         point: Point,
         header: Box<WrappedHeader>,
         body: BlockBody,
+        block_no: u64,
     },
 
     /// Roll back the chain store to a point (for responder peers).

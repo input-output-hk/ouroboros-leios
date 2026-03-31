@@ -122,11 +122,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         slot,
                         size_bytes: body.raw.len(),
                     });
-                    consensus.register_self_produced(&point);
+                    let block_no = consensus.register_self_produced(&point);
                     let _ = commands.send(NetworkCommand::InjectBlock {
                         point,
                         header: Box::new(header),
                         body,
+                        block_no,
                     }).await;
                 }
 

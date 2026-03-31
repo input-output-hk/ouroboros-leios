@@ -42,8 +42,16 @@ impl Consensus {
     }
 
     /// Register a block we produced ourselves, so we don't re-fetch it.
-    pub fn register_self_produced(&mut self, point: &Point) {
+    /// Returns the block_no to use for injection.
+    pub fn register_self_produced(&mut self, point: &Point) -> u64 {
         self.self_produced.insert(point.clone());
+        let block_no = self.local_tip.as_ref().map_or(1, |t| t.block_no + 1);
+        // Update local_tip immediately (don't wait for peer re-announcement).
+        self.local_tip = Some(Tip {
+            point: point.clone(),
+            block_no,
+        });
+        block_no
     }
 
     /// Handle a network event. Returns true if the event was consumed by
@@ -190,6 +198,7 @@ impl Consensus {
                 point,
                 header: Box::new(header),
                 body,
+                block_no,
             })
             .await;
     }
