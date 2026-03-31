@@ -184,7 +184,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     node: node_id.clone(),
                     block_no: telem.blocks_validated,
                 });
-                consensus.on_validation_complete(result).await;
+                let rolled_back = consensus.on_validation_complete(result).await;
+                if rolled_back {
+                    telem.record(NodeEvent::RolledBack {
+                        node: node_id.clone(),
+                        slot: telem.current_slot,
+                    });
+                }
             }
             _ = stats_tick.tick(), if stats_interval > 0 => {
                 telem.flush();
@@ -263,6 +269,15 @@ fn record_network_event(
             telem.record(NodeEvent::VotesReceived {
                 node: node_id.into(),
                 count: votes.len(),
+            });
+        }
+        NetworkEvent::RolledBack { point, .. } => {
+            telem.record(NodeEvent::RolledBack {
+                node: node_id.into(),
+                slot: match point {
+                    net_core::types::Point::Specific { slot, .. } => *slot,
+                    _ => 0,
+                },
             });
         }
         _ => {}

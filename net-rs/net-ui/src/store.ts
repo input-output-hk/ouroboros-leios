@@ -36,8 +36,8 @@ export interface DashboardState {
   pollEvents: () => Promise<void>;
   toggleEventsPause: () => void;
 
-  // Node flash (block produced/received)
-  nodeFlash: Record<string, "produced" | "received" | null>;
+  // Node flash (block produced/received/rolled back)
+  nodeFlash: Record<string, "produced" | "received" | "rolledback" | null>;
 
   // Selection
   selectedNodeId: string | null;
@@ -195,12 +195,13 @@ export const useStore = create<DashboardState>()((set, get) => ({
 
     // Compute flashes from new events.
     // "produced" takes priority — don't let RBReceived overwrite it.
-    const flashes: Record<string, "produced" | "received"> = {};
+    const flashes: Record<string, "produced" | "received" | "rolledback"> = {};
     for (const e of newEvents) {
       const node = e.message?.node;
       const type = e.message?.type;
       if (!node) continue;
-      if (type === "RBGenerated") flashes[node] = "produced";
+      if (type === "RolledBack") flashes[node] = "rolledback";
+      else if (type === "RBGenerated") flashes[node] = "produced";
       else if (type === "RBReceived" && flashes[node] !== "produced") flashes[node] = "received";
     }
 
