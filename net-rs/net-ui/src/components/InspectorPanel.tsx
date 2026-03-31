@@ -63,7 +63,7 @@ function NodeInspector({ nodeId }: { nodeId: string }) {
         <Box sx={{ mb: 1 }}>
           <Typography variant="body2">Slot: {stats.slot}</Typography>
           <Typography variant="body2">
-            Tip: {stats.tip_block_no ?? "—"}
+            Tip: {stats.tip_block_no ?? "—"}{stats.tip_hash ? ` #${stats.tip_hash}` : ""}
           </Typography>
           <Typography variant="body2">
             Blocks: {stats.blocks_produced} produced, {stats.blocks_received}{" "}
