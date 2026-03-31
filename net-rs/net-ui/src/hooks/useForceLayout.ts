@@ -61,15 +61,32 @@ export function useForceLayout() {
       .alpha(1)
       .alphaDecay(0.05);
 
-    sim.on("tick", () => {
+    // Throttle position updates: at most once per animation frame
+    let dirty = false;
+    let rafId: number | null = null;
+
+    function publishPositions() {
+      rafId = null;
+      if (!dirty) return;
+      dirty = false;
       const positions: Record<string, { x: number; y: number }> = {};
       for (const n of nodeArray) {
         positions[n.nodeId] = { x: n.x ?? 0, y: n.y ?? 0 };
       }
       setNodePositions(positions);
+    }
+
+    sim.on("tick", () => {
+      dirty = true;
+      if (rafId == null) {
+        rafId = requestAnimationFrame(publishPositions);
+      }
     });
 
     sim.on("end", () => {
+      // Final publish to ensure we capture the settled positions
+      dirty = true;
+      publishPositions();
       simRef.current = null;
     });
 
@@ -77,6 +94,7 @@ export function useForceLayout() {
 
     return () => {
       sim.stop();
+      if (rafId != null) cancelAnimationFrame(rafId);
     };
   }, [topology, setNodePositions]);
 }

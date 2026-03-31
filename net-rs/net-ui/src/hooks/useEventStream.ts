@@ -3,7 +3,7 @@ import { useStore } from "@/store";
 import type { OutputEvent } from "@/types";
 
 const BASE = import.meta.env.VITE_API_URL ?? "";
-const FLUSH_INTERVAL_MS = 50;
+const FLUSH_INTERVAL_MS = 250;
 
 export function useEventStream() {
   const handleEvent = useStore((s) => s.handleEventBatch);

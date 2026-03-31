@@ -23,7 +23,7 @@ export function EventLog() {
 
   useEffect(() => {
     if (!paused) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      bottomRef.current?.scrollIntoView();
     }
   }, [events.length, paused]);
 
