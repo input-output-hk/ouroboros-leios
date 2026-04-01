@@ -36,10 +36,25 @@ Rust implementation of the Cardano node-to-node (N2N) network stack, covering bo
 - Per-peer network delay injection for topology simulation
 - Telemetry: sim-rs-compatible JSONL events, per-peer bandwidth tracking, HTTP + file sinks
 - TOML config with layering (base + per-node overlays + CLI overrides)
+- Fork-aware chain tree for tracking and visualizing competing branches
+
+**Cluster orchestrator** — spawn and manage multi-node test networks:
+- Auto-generated random topology with configurable degree and edge delays
+- Stake distribution (equal, weighted, or zipf)
+- HTTP telemetry aggregation from all nodes
+- Time-ordered event merge with watermark flushing to JSONL
+- Per-node log capture
+
+**Web UI** — real-time cluster visualization (React + Vite):
+- Force-directed topology graph with per-node status
+- Chain tree view showing forks and block propagation
+- Aggregate charts (block rates, bandwidth, latency)
+- Event log with collapsible overlay
+- Inspector panel for node/edge details
 
 **[Security hardened](docs/security-audit.md)** — allocation bounds on all wire-read lengths, buffer caps, timeouts on all remote waits, clean error propagation, no panics in library code.
 
-**324 tests** — unit tests, codec round-trips, protocol state machines, integration tests with in-memory bearers, and test vectors captured from the live Cardano mainnet.
+**376 tests** — unit tests, codec round-trips, protocol state machines, integration tests with in-memory bearers, and test vectors captured from the live Cardano mainnet.
 
 ## Architecture
 
@@ -121,6 +136,11 @@ net-rs/
 ├── net-node/          # Binary crate — configurable test node
 │   ├── configs/       # Sample TOML configs (mainnet base + node overlays)
 │   └── src/           # Node logic: config, clock, production, consensus, telemetry
+├── net-cluster/       # Binary crate — cluster orchestrator
+│   ├── configs/       # Sample cluster TOML configs
+│   └── src/           # Topology generation, process management, event aggregation
+├── net-ui/            # Web UI — real-time cluster visualization (React + Vite)
+│   └── src/           # Topology graph, chain tree, charts, event log
 ├── docs/              # Protocol references and implementation notes
 └── plans/             # Design documents
 ```
@@ -128,6 +148,9 @@ net-rs/
 See individual crate READMEs for detailed documentation:
 - **[net-core](net-core/)** — library API, module structure, protocol state machines with Mermaid diagrams and agency tables
 - **[net-cli](net-cli/)** — CLI commands and usage examples
+- **[net-node](net-node/)** — configurable test node for local network simulation
+- **[net-cluster](net-cluster/)** — cluster orchestrator for multi-node test networks
+- **[net-ui](net-ui/)** — real-time web UI for cluster visualization
 
 ## Building
 
@@ -135,7 +158,7 @@ Requires stable Rust (no nightly features).
 
 ```sh
 cargo build            # build all crates
-cargo test             # run all 291 tests
+cargo test             # run all 376 tests
 cargo clippy           # lint
 cargo fmt --check      # format check
 ```
@@ -268,8 +291,12 @@ Minimal and C-free:
 | `thiserror` | Error type derivation |
 | `tracing` | Structured logging |
 | `blake2b_simd` | Blake2b-256 block header hashing |
-| `clap` | CLI argument parsing (net-cli only) |
-| `rand` | Synthetic data generation (net-cli only) |
+| `clap` | CLI argument parsing (net-cli, net-node, net-cluster) |
+| `rand` | Synthetic data generation, topology generation |
+| `figment` | Config layering with TOML (net-node, net-cluster) |
+| `serde` / `serde_json` | Serialization for config and telemetry |
+| `reqwest` | HTTP client for telemetry posting (net-node) |
+| `axum` | HTTP server for telemetry collection (net-cluster) |
 
 ## Future Work
 

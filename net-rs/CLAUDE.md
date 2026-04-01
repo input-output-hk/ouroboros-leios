@@ -196,6 +196,7 @@ net-rs/
       network.rs        -- coordinator wrapper: config translation, peer setup, delay injection
       production.rs     -- VRF lottery (from sim-rs), fake Shelley+ block/EB/vote building
       consensus.rs      -- longest-chain selection, Leios EB/vote fetch decisions
+      chain_tree.rs     -- fork-tracking tree structure for block headers, UI snapshots
       validation.rs     -- fake validation with configurable timed delays
       mempool.rs        -- tx pool + fake Poisson tx generation
       telemetry.rs      -- EventSink/StatsSink traits, JSONL file sink, HTTP sinks, peer stats
@@ -210,6 +211,16 @@ net-rs/
       server.rs         -- axum HTTP server: POST /events, POST /stats (telemetry receiver)
       aggregator.rs     -- time-ordered event merge, watermark flushing, JSONL output
       types.rs          -- StatsSnapshot (Deserialize), IngestedEvent, event parsing
+  net-ui/               -- web UI (React + Vite, real-time cluster visualization)
+    src/
+      main.tsx          -- React entry point, MUI theme setup
+      App.tsx           -- main app layout, polling orchestration
+      api.ts            -- HTTP client for cluster API
+      store.ts          -- Zustand state management
+      types.ts          -- TypeScript type definitions
+      theme.ts          -- Material-UI theme configuration
+      components/       -- TopologyGraph, ChainTreeView, AggregateCharts, EventLog, InspectorPanel
+      hooks/            -- usePolling, useForceLayout, useEventStream
 ```
 
 ## Key Design Decisions
@@ -237,7 +248,7 @@ The coordinator event loop uses `.send().await` on the `network_events` channel 
 1. **Phase 1: Mux + Handshake** — COMPLETE. Bearer, mux, codec, protocol framework, handshake (client+server), CLI, 51 tests, live-tested against mainnet, security-audited.
 2. **Phase 2: ChainSync / BlockFetch** — COMPLETE. Shared types (Point, Tip, WrappedHeader, BlockBody), ChainSync + BlockFetch + KeepAlive protocols (state machines, CBOR codecs, client + server), persistent chain follower with reconnection, fake server CLI with Poisson block/rollback generation, 109 tests, live-tested against mainnet, security-audited.
 3. **Phase 3: Remaining Praos + Multi-Peer** — COMPLETE. TxSubmission + PeerSharing protocols (38 tests). Multi-peer coordinator with all three connection modes (InitiatorOnly, ResponderOnly, Duplex). Mux composite keys `(ProtocolId, u16)` for bidirectional protocol support. ChainStore, server handlers, responder/duplex tasks, accept loop, InjectBlock/InjectRollback commands. `serve` CLI uses coordinator. `multi-follow --listen --duplex`. 172 total tests. Live-tested: duplex against mainnet, local relay chain (serve → multi-follow → follow).
-4. **Phase 4: Leios Protocols** — COMPLETE. Phase 4a (LeiosNotify, protocol ID 18) complete. Phase 4b (LeiosFetch, protocol ID 19, bitmap TX addressing) complete. Phase 4c (Shelley+ header parser with Leios extensions, block body parser) complete. Phase 4d (per-peer task integration) complete: `leios_enabled` config flag, `spawn_leios_notify`/`spawn_leios_fetch` client tasks, `serve_leios_notify`/`serve_leios_fetch` server handlers, `LeiosStore` content-addressed store, Leios PeerEvent/PeerCommand/NetworkEvent/NetworkCommand variants, coordinator stub forwarding, wiring in peer_task/responder_task/duplex_task. Phase 4e (coordinator extensions) complete: slot-bounded dedup for EB/TX/vote offers, per-offer peer tracking, RTT-based smart fetch routing for `FetchLeiosBlock`/`FetchLeiosBlockTxs`/`FetchLeiosVotes`, pending fetch dedup and cleanup, separate `LeiosBlockTxsOffered`/`LeiosBlockTxsReceived` events, `leios_dedup_window` config. CLI `--leios` flag on `serve` and `multi-follow` for local end-to-end testing. Phase 4f (priority scheduling) complete: switched mux from `RoundRobin` to `StrictPriority` scheduler, fixed priority assignments (KeepAlive above Leios, LeiosFetch above LeiosNotify, PeerSharing consistently lowest), added `mux::scheduler::priorities` named constants. 291 total tests.
+4. **Phase 4: Leios Protocols** — COMPLETE. Phase 4a (LeiosNotify, protocol ID 18) complete. Phase 4b (LeiosFetch, protocol ID 19, bitmap TX addressing) complete. Phase 4c (Shelley+ header parser with Leios extensions, block body parser) complete. Phase 4d (per-peer task integration) complete: `leios_enabled` config flag, `spawn_leios_notify`/`spawn_leios_fetch` client tasks, `serve_leios_notify`/`serve_leios_fetch` server handlers, `LeiosStore` content-addressed store, Leios PeerEvent/PeerCommand/NetworkEvent/NetworkCommand variants, coordinator stub forwarding, wiring in peer_task/responder_task/duplex_task. Phase 4e (coordinator extensions) complete: slot-bounded dedup for EB/TX/vote offers, per-offer peer tracking, RTT-based smart fetch routing for `FetchLeiosBlock`/`FetchLeiosBlockTxs`/`FetchLeiosVotes`, pending fetch dedup and cleanup, separate `LeiosBlockTxsOffered`/`LeiosBlockTxsReceived` events, `leios_dedup_window` config. CLI `--leios` flag on `serve` and `multi-follow` for local end-to-end testing. Phase 4f (priority scheduling) complete: switched mux from `RoundRobin` to `StrictPriority` scheduler, fixed priority assignments (KeepAlive above Leios, LeiosFetch above LeiosNotify, PeerSharing consistently lowest), added `mux::scheduler::priorities` named constants. 376 total tests.
 
 ## Documentation
 

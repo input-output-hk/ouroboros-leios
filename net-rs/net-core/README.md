@@ -21,7 +21,7 @@ src/
 | Module | Description | README |
 |--------|-------------|--------|
 | **bearer** | `Bearer` trait + `TcpBearer` / `MemBearer` implementations | [bearer/](src/bearer/) |
-| **mux** | Multiplexer with pluggable schedulers (`StrictPriority`, `RoundRobin`), wire format, CBOR codec, non-blocking demuxer | [mux/](src/mux/) |
+| **mux** | Multiplexer with pluggable schedulers (`PriorityWfq` default, `StrictPriority`, `RoundRobin`), wire format, CBOR codec, non-blocking demuxer | [mux/](src/mux/) |
 | **types** | `Point`, `Tip`, `WrappedHeader`, `HeaderInfo`, `BlockBody`, `LeiosBlockInfo` | [types/](src/types/) |
 | **protocols** | Protocol framework (`Protocol` trait, `Runner`) + all 8 mini-protocols with state machines and agency tables | [protocols/](src/protocols/) |
 | **store** | `ChainStore` (linear chain state), `LeiosStore` (content-addressed Leios data) — shared between coordinator and server handlers | [store/](src/store/) |
