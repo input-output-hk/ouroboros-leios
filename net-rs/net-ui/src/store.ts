@@ -5,6 +5,7 @@ import type {
   OutputEvent,
   AggregatePoint,
   NodeSeriesPoint,
+  ChainTreeEntry,
 } from "./types";
 import { fetchTopology, fetchAllStats, fetchEvents } from "./api";
 
@@ -33,6 +34,8 @@ export interface DashboardState {
   prevNodeSnapshot: Record<string, { time: number; bandwidth: number; messages: number; blocks: number }>;
   aggregateSeries: AggregatePoint[];
   nodeTimeSeries: Record<string, NodeSeriesPoint[]>;
+  networkChainTree: ChainTreeEntry[];
+  networkTipCounts: Record<string, number>;
   pollStats: () => Promise<void>;
 
   // Events (actual events in eventRing, outside store)
@@ -82,6 +85,8 @@ export const useStore = create<DashboardState>()((set, get) => ({
   prevNodeSnapshot: {},
   aggregateSeries: [],
   nodeTimeSeries: {},
+  networkChainTree: [],
+  networkTipCounts: {},
 
   pollStats: async () => {
     try {
@@ -119,6 +124,23 @@ export const useStore = create<DashboardState>()((set, get) => ({
         if (snap.tip_hash) tipSet.add(snap.tip_hash);
       }
       const curForks = tipSet.size;
+
+      // Aggregate network-wide chain tree
+      const mergedEntries = new Map<string, ChainTreeEntry>();
+      const tipCounts: Record<string, number> = {};
+      for (const snap of Object.values(stats)) {
+        if (snap.chain_tree) {
+          for (const e of snap.chain_tree) {
+            mergedEntries.set(e.hash, e);
+          }
+        }
+        if (snap.tip_hash) {
+          tipCounts[snap.tip_hash] = (tipCounts[snap.tip_hash] ?? 0) + 1;
+        }
+      }
+      const networkChainTree = [...mergedEntries.values()].sort(
+        (a, b) => a.block_number - b.block_number,
+      );
 
       const curSnap = { time: now, bandwidth: totalBandwidth, messages: totalMessages, blocks: totalBlocks, forks: curForks };
 
@@ -172,10 +194,12 @@ export const useStore = create<DashboardState>()((set, get) => ({
             prevNodeSnapshot: newNodeSnap,
             aggregateSeries: [...s.aggregateSeries, point].slice(-MAX_SERIES),
             nodeTimeSeries: newNodeSeries,
+            networkChainTree,
+            networkTipCounts: tipCounts,
           }));
         } else {
           // No change — just update latestStats, don't emit a data point
-          set({ latestStats: stats });
+          set({ latestStats: stats, networkChainTree, networkTipCounts: tipCounts });
         }
       } else {
         // First poll — store baseline
@@ -187,6 +211,8 @@ export const useStore = create<DashboardState>()((set, get) => ({
           latestStats: stats,
           prevSnapshot: curSnap,
           prevNodeSnapshot: curNodeSnap,
+          networkChainTree,
+          networkTipCounts: tipCounts,
         });
       }
     } catch (e) {

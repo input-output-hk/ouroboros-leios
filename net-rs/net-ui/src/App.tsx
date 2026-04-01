@@ -8,12 +8,15 @@ import { useForceLayout } from "@/hooks/useForceLayout";
 import { TopologyGraph } from "@/components/TopologyGraph";
 import { InspectorPanel } from "@/components/InspectorPanel";
 import { AggregateCharts } from "@/components/AggregateCharts";
+import { ChainTreeView } from "@/components/ChainTreeView";
 import { EventLog } from "@/components/EventLog";
 
 export default function App() {
   const loadTopology = useStore((s) => s.loadTopology);
   const pollStats = useStore((s) => s.pollStats);
   const topology = useStore((s) => s.topology);
+  const networkChainTree = useStore((s) => s.networkChainTree);
+  const networkTipCounts = useStore((s) => s.networkTipCounts);
 
   useEffect(() => {
     loadTopology();
@@ -49,8 +52,22 @@ export default function App() {
       <Box sx={{ flex: 1, display: "flex", minHeight: 0 }}>
         {/* Left column */}
         <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-          <Box sx={{ flex: 1, minHeight: 0 }}>
+          <Box sx={{ flex: 1, minHeight: 0, position: "relative" }}>
             <ReactFlowProvider><TopologyGraph /></ReactFlowProvider>
+            {networkChainTree.length > 0 && (
+              <Box sx={{
+                position: "absolute",
+                bottom: 12,
+                right: 12,
+                borderRadius: 1,
+                px: 1,
+                py: 0.5,
+                pointerEvents: "auto",
+                backdropFilter: "blur(6px)",
+              }}>
+                <ChainTreeView entries={networkChainTree} tipCounts={networkTipCounts} />
+              </Box>
+            )}
           </Box>
           <Box sx={{ height: 220, borderTop: 1, borderColor: "grey.800" }}>
             <AggregateCharts />

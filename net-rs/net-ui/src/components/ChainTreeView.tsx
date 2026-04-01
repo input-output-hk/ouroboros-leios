@@ -24,9 +24,11 @@ interface LayoutBlock {
 export function ChainTreeView({
   entries,
   tipHash,
+  tipCounts,
 }: {
   entries: ChainTreeEntry[];
   tipHash?: string | null;
+  tipCounts?: Record<string, number>;
 }) {
   const layout = useMemo(() => {
     if (entries.length === 0) return { blocks: [] as LayoutBlock[], cols: 0, rows: 0 };
@@ -35,9 +37,21 @@ export function ChainTreeView({
     for (const e of entries) byHash.set(e.hash, e);
 
     // Find main chain: walk from tip backward.
+    // In tipCounts mode, pick the tip with the highest count.
     const mainSet = new Set<string>();
-    let cur = tipHash ?? null;
-    // If tipHash isn't in entries, find the highest block_number entry.
+    let cur: string | null = null;
+    if (tipCounts) {
+      let bestCount = 0;
+      for (const [hash, count] of Object.entries(tipCounts)) {
+        if (byHash.has(hash) && count > bestCount) {
+          bestCount = count;
+          cur = hash;
+        }
+      }
+    } else {
+      cur = tipHash ?? null;
+    }
+    // If tip isn't in entries, find the highest block_number entry.
     if (!cur || !byHash.has(cur)) {
       let best: ChainTreeEntry | null = null;
       for (const e of entries) {
@@ -74,7 +88,7 @@ export function ChainTreeView({
         entry: e,
         col,
         row: 0,
-        color: e.hash === tipHash ? TIP_COLOR : MAIN_COLOR,
+        color: (tipCounts ? tipCounts[e.hash] !== undefined : e.hash === tipHash) ? TIP_COLOR : MAIN_COLOR,
       });
       hashRow.set(e.hash, 0);
       if (!colOccupied.has(col)) colOccupied.set(col, new Set());
@@ -123,7 +137,7 @@ export function ChainTreeView({
     const cols = blockNums.length;
     const rows = maxRow + 1;
     return { blocks, cols, rows };
-  }, [entries, tipHash]);
+  }, [entries, tipHash, tipCounts]);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -135,15 +149,16 @@ export function ChainTreeView({
 
   if (layout.blocks.length === 0) return null;
 
+  const PAD_TOP = tipCounts ? 10 : 0;
   const svgW = layout.cols * COL_W;
-  const svgH = layout.rows * ROW_H;
+  const svgH = layout.rows * ROW_H + PAD_TOP;
 
   // Build hash→position map for connectors.
   const posMap = new Map<string, { x: number; y: number }>();
   for (const b of layout.blocks) {
     posMap.set(b.entry.hash, {
       x: b.col * COL_W + BLOCK_W / 2,
-      y: b.row * ROW_H + BLOCK_H / 2,
+      y: b.row * ROW_H + BLOCK_H / 2 + PAD_TOP,
     });
   }
 
@@ -171,7 +186,7 @@ export function ChainTreeView({
         {/* Blocks */}
         {layout.blocks.map((b) => {
           const x = b.col * COL_W;
-          const y = b.row * ROW_H;
+          const y = b.row * ROW_H + PAD_TOP;
           return (
             <g key={`block-${b.entry.hash}`}>
               <rect
@@ -208,6 +223,44 @@ export function ChainTreeView({
             </g>
           );
         })}
+        {/* Tip count badges — overlaid on top-right of block */}
+        {tipCounts && layout.blocks
+          .filter((b) => tipCounts[b.entry.hash] !== undefined)
+          .map((b) => {
+            const bx = b.col * COL_W;
+            const by = b.row * ROW_H + PAD_TOP;
+            const label = String(tipCounts[b.entry.hash]);
+            const padX = 4;
+            const padY = 2;
+            const badgeW = label.length * 7 + padX * 2;
+            const badgeH = 14 + padY * 2;
+            const rx = bx + BLOCK_W - badgeW + 4;
+            const ry = by - badgeH / 2 + 2;
+            return (
+              <g key={`count-${b.entry.hash}`}>
+                <rect
+                  x={rx}
+                  y={ry}
+                  width={badgeW}
+                  height={badgeH}
+                  rx={3}
+                  ry={3}
+                  fill="rgba(0,0,0,0.7)"
+                />
+                <text
+                  x={rx + badgeW / 2}
+                  y={ry + badgeH / 2 + 4}
+                  textAnchor="middle"
+                  fill="#fff"
+                  fontSize={12}
+                  fontWeight="bold"
+                  fontFamily="monospace"
+                >
+                  {label}
+                </text>
+              </g>
+            );
+          })}
       </svg>
     </Box>
   );
