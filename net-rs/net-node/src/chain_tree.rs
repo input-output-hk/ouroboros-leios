@@ -8,6 +8,19 @@
 use std::collections::{HashMap, HashSet};
 
 use net_core::types::Point;
+use serde::Serialize;
+
+/// A block entry in a chain tree snapshot, for UI display.
+#[derive(Debug, Clone, Serialize)]
+pub struct ChainTreeEntry {
+    pub block_number: u64,
+    pub hash: String,
+    pub prev_hash: Option<String>,
+}
+
+fn short_hash(h: &[u8; 32]) -> String {
+    format!("{:02x}{:02x}", h[30], h[31])
+}
 
 /// A node in the chain tree, representing one block header.
 #[derive(Debug, Clone)]
@@ -147,6 +160,97 @@ impl ChainTree {
         self.ancestors(hash_b)
             .into_iter()
             .find(|ancestor| ancestors_a.contains(ancestor))
+    }
+
+    /// Snapshot the recent chain tree for UI display.
+    ///
+    /// Walks backward from `tip_hash` for up to `depth` blocks on the main
+    /// chain, plus any fork blocks within that window. If a fork diverges from
+    /// a block below the window, the window is extended down to include that
+    /// fork point. Pass the adopted tip hash (not the speculative best tip) to
+    /// avoid showing disconnected blocks from unvalidated peer announcements.
+    pub fn snapshot(
+        &self,
+        tip_hash: [u8; 32],
+        depth: usize,
+        max_block_number: Option<u64>,
+    ) -> Vec<ChainTreeEntry> {
+        if !self.nodes.contains_key(&tip_hash) {
+            return Vec::new();
+        }
+
+        // Walk main chain from tip backward for `depth` blocks.
+        let main_chain = self.ancestors(tip_hash);
+        let main_set: HashSet<[u8; 32]> = main_chain.iter().copied().collect();
+        let main_window: HashSet<[u8; 32]> = main_chain.iter().take(depth).copied().collect();
+
+        let min_block_no = main_chain
+            .iter()
+            .take(depth)
+            .filter_map(|h| self.nodes.get(h))
+            .map(|n| n.block_number)
+            .min()
+            .unwrap_or(0);
+
+        let max_bn = max_block_number.unwrap_or(u64::MAX);
+
+        // Collect fork blocks within the window.
+        let mut included: HashSet<[u8; 32]> = main_window.clone();
+        let mut fork_blocks: Vec<[u8; 32]> = Vec::new();
+        for (hash, node) in &self.nodes {
+            if !main_set.contains(hash)
+                && node.block_number >= min_block_no
+                && node.block_number <= max_bn
+            {
+                fork_blocks.push(*hash);
+                included.insert(*hash);
+            }
+        }
+
+        // Extend window down to include fork points (parent of fork that's on main chain).
+        for hash in &fork_blocks {
+            let mut cur = *hash;
+            while let Some(node) = self.nodes.get(&cur) {
+                match node.prev_hash {
+                    Some(parent) if !included.contains(&parent) => {
+                        if let Some(parent_node) = self.nodes.get(&parent) {
+                            included.insert(parent);
+                            // If parent is on main chain, we found the fork point -- stop.
+                            if main_set.contains(&parent) {
+                                break;
+                            }
+                            cur = parent;
+                            // Also include ancestor fork blocks.
+                            if parent_node.block_number < min_block_no {
+                                continue;
+                            }
+                        } else {
+                            break;
+                        }
+                    }
+                    _ => break,
+                }
+            }
+        }
+
+        // Convert to entries sorted by (block_number, hash).
+        let mut entries: Vec<ChainTreeEntry> = included
+            .iter()
+            .filter_map(|h| {
+                let node = self.nodes.get(h)?;
+                Some(ChainTreeEntry {
+                    block_number: node.block_number,
+                    hash: short_hash(h),
+                    prev_hash: node.prev_hash.as_ref().map(short_hash),
+                })
+            })
+            .collect();
+        entries.sort_by(|a, b| {
+            a.block_number
+                .cmp(&b.block_number)
+                .then(a.hash.cmp(&b.hash))
+        });
+        entries
     }
 }
 
@@ -523,5 +627,98 @@ mod tests {
             tree.find_common_ancestor([0xA3; 32], [0xB4; 32]),
             Some([2; 32])
         );
+    }
+
+    #[test]
+    fn snapshot_empty_tree() {
+        let tree = ChainTree::new();
+        assert!(tree.snapshot([1; 32], 10, None).is_empty());
+    }
+
+    #[test]
+    fn snapshot_linear_chain() {
+        let mut tree = ChainTree::new();
+        for i in 1..=15u64 {
+            let hash = [i as u8; 32];
+            let prev = if i > 1 {
+                Some([(i - 1) as u8; 32])
+            } else {
+                None
+            };
+            tree.insert(hash, Point::Specific { slot: i, hash }, i, i, prev);
+        }
+
+        let entries = tree.snapshot([15; 32], 10, None);
+        assert_eq!(entries.len(), 10);
+        assert_eq!(entries[0].block_number, 6);
+        assert_eq!(entries[9].block_number, 15);
+    }
+
+    #[test]
+    fn snapshot_includes_fork() {
+        let mut tree = ChainTree::new();
+        // Main chain: 1 -> 2 -> 3 -> 4 -> 5
+        for i in 1..=5u64 {
+            let hash = [i as u8; 32];
+            let prev = if i > 1 {
+                Some([(i - 1) as u8; 32])
+            } else {
+                None
+            };
+            tree.insert(hash, Point::Specific { slot: i, hash }, i, i, prev);
+        }
+        // Fork at block 3: 3 -> F4
+        tree.insert(
+            [0xF4; 32],
+            Point::Specific {
+                slot: 4,
+                hash: [0xF4; 32],
+            },
+            4,
+            4,
+            Some([3; 32]),
+        );
+
+        let entries = tree.snapshot([5; 32], 10, None);
+        // Should include all 5 main + 1 fork = 6
+        assert_eq!(entries.len(), 6);
+        // Fork block should be present
+        let fork = entries.iter().find(|e| e.hash == "f4f4").unwrap();
+        assert_eq!(fork.block_number, 4);
+        assert_eq!(fork.prev_hash.as_deref(), Some("0303"));
+    }
+
+    #[test]
+    fn snapshot_extends_to_fork_point() {
+        let mut tree = ChainTree::new();
+        // Main chain: 1 -> 2 -> ... -> 15
+        for i in 1..=15u64 {
+            let hash = [i as u8; 32];
+            let prev = if i > 1 {
+                Some([(i - 1) as u8; 32])
+            } else {
+                None
+            };
+            tree.insert(hash, Point::Specific { slot: i, hash }, i, i, prev);
+        }
+        // Fork from block 4: 4 -> F7 (block_number 7, within the 10-block window 6..15)
+        tree.insert(
+            [0xF7; 32],
+            Point::Specific {
+                slot: 7,
+                hash: [0xF7; 32],
+            },
+            7,
+            7,
+            Some([4; 32]),
+        );
+
+        let entries = tree.snapshot([15; 32], 10, None);
+        // Window is 6..15 (10 main blocks), but fork parent is block 4.
+        // Should extend down to include block 4 as fork point.
+        let has_block_4 = entries.iter().any(|e| e.block_number == 4);
+        assert!(has_block_4, "fork point block 4 should be included");
+        let has_fork = entries.iter().any(|e| e.hash == "f7f7");
+        assert!(has_fork, "fork block should be included");
     }
 }

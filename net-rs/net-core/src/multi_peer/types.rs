@@ -95,6 +95,10 @@ pub enum NetworkCommand {
     /// Fetch a specific block. The coordinator picks the best peer.
     FetchBlock { point: Point },
 
+    /// Fetch a range of blocks (from..=to inclusive). The coordinator picks
+    /// the best peer whose chain fragment covers the range.
+    FetchBlockRange { from: Point, to: Point },
+
     /// Request peers from connected nodes (triggers PeerSharing).
     DiscoverPeers,
 

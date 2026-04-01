@@ -7,7 +7,7 @@ use net_core::types::{BlockBody, Point, Tip, WrappedHeader};
 use tokio::sync::mpsc;
 use tracing::info;
 
-use crate::chain_tree::ChainTree;
+use crate::chain_tree::{ChainTree, ChainTreeEntry};
 use crate::validation::{ValidationComplete, Validator};
 
 /// Consensus state with fork-tracking chain tree.
@@ -19,6 +19,8 @@ pub struct Consensus {
     adopted_tip_hash: Option<[u8; 32]>,
     /// Points of blocks we produced (skip re-fetching).
     self_produced: HashSet<Point>,
+    /// Hashes of blocks we have validated or produced (for range-fetch decisions).
+    validated: HashSet<[u8; 32]>,
     /// Points currently being fetched or validated (avoid duplicate requests).
     in_flight: HashSet<Point>,
     commands: mpsc::Sender<NetworkCommand>,
@@ -39,6 +41,7 @@ impl Consensus {
             chain_tree: ChainTree::new(),
             adopted_tip_hash: None,
             self_produced: HashSet::new(),
+            validated: HashSet::new(),
             in_flight: HashSet::new(),
             commands,
             validator,
@@ -66,6 +69,7 @@ impl Consensus {
             );
             // Self-produced blocks are immediately injected.
             self.adopted_tip_hash = Some(hash);
+            self.validated.insert(hash);
             info.block_number
         } else {
             // Fallback for opaque headers.
@@ -217,36 +221,47 @@ impl Consensus {
         };
 
         // Detect fork switch: compare against the last adopted tip.
-        // If the new block's chain doesn't descend from the adopted tip,
-        // we need to rollback to the common ancestor.
         let mut rolled_back = false;
+        let mut update_tip = true;
         if let Some(adopted_hash) = self.adopted_tip_hash {
             if adopted_hash != new_hash {
-                // Check if adopted tip is an ancestor of the new block
-                // (simple chain extension) or on a different fork.
-                let is_ancestor = self.chain_tree.ancestors(new_hash).contains(&adopted_hash);
+                let new_ancestors = self.chain_tree.ancestors(new_hash);
+                let extends_adopted = new_ancestors.contains(&adopted_hash);
 
-                if !is_ancestor {
-                    // Fork switch! Find common ancestor and rollback.
-                    if let Some(ancestor) =
-                        self.chain_tree.find_common_ancestor(adopted_hash, new_hash)
-                    {
-                        if let Some(ancestor_point) = self.chain_tree.point(&ancestor) {
-                            let ancestor_point = ancestor_point.clone();
-                            info!(
-                                node_id = %self.node_id,
-                                new_tip = %point,
-                                ancestor = %ancestor_point,
-                                "fork switch: rolling back to common ancestor"
-                            );
+                if !extends_adopted {
+                    // Check if the new block is an ancestor of the adopted tip
+                    // (i.e., we already have a longer chain — just inject, don't
+                    // update tip). This happens when range-fetched blocks arrive
+                    // out of order.
+                    let adopted_ancestors = self.chain_tree.ancestors(adopted_hash);
+                    let already_on_chain = adopted_ancestors.contains(&new_hash);
 
-                            let _ = self
-                                .commands
-                                .send(NetworkCommand::InjectRollback {
-                                    point: ancestor_point,
-                                })
-                                .await;
-                            rolled_back = true;
+                    if already_on_chain {
+                        // Block is behind our adopted tip on the same chain.
+                        // Inject it but don't change the tip.
+                        update_tip = false;
+                    } else {
+                        // Genuine fork switch — rollback to common ancestor.
+                        if let Some(ancestor) =
+                            self.chain_tree.find_common_ancestor(adopted_hash, new_hash)
+                        {
+                            if let Some(ancestor_point) = self.chain_tree.point(&ancestor) {
+                                let ancestor_point = ancestor_point.clone();
+                                info!(
+                                    node_id = %self.node_id,
+                                    new_tip = %point,
+                                    ancestor = %ancestor_point,
+                                    "fork switch: rolling back to common ancestor"
+                                );
+
+                                let _ = self
+                                    .commands
+                                    .send(NetworkCommand::InjectRollback {
+                                        point: ancestor_point,
+                                    })
+                                    .await;
+                                rolled_back = true;
+                            }
                         }
                     }
                 }
@@ -260,8 +275,11 @@ impl Consensus {
             "block validated, adopting"
         );
 
-        // Update adopted tip.
-        self.adopted_tip_hash = Some(new_hash);
+        // Update adopted tip only if this block extends or replaces it.
+        if update_tip {
+            self.adopted_tip_hash = Some(new_hash);
+        }
+        self.validated.insert(new_hash);
 
         // Prune old blocks beyond k.
         if block_no > self.security_param_k {
@@ -280,6 +298,10 @@ impl Consensus {
             })
             .await;
 
+        // Check for unvalidated ancestors (headers may have arrived after the
+        // initial range fetch). If there's a gap, fetch it.
+        self.fetch_unvalidated_ancestors().await;
+
         rolled_back
     }
 
@@ -293,20 +315,41 @@ impl Consensus {
             Some((_, best_bn)) => tip.block_no > best_bn,
         };
 
-        // Insert into chain tree if we have header info.
+        // Insert the announced header into the chain tree.
+        // When catching up, the header may be an intermediate block (different
+        // from tip), so use the header's own point. When current, use tip's
+        // point to avoid rehashing.
         if let Some(info) = header.parsed.as_ref() {
-            if let Point::Specific { hash, .. } = point {
-                self.chain_tree.insert(
-                    *hash,
-                    point.clone(),
-                    info.block_number,
-                    info.slot,
-                    info.prev_hash,
-                );
-            }
+            let (insert_hash, insert_point) = if info.block_number == tip.block_no {
+                // Header IS the tip — use tip's pre-computed hash.
+                match point {
+                    Point::Specific { hash, .. } => (*hash, point.clone()),
+                    _ => return,
+                }
+            } else {
+                // Header is an intermediate block — compute its own hash.
+                match header.point() {
+                    Some(hp) => match &hp {
+                        Point::Specific { hash, .. } => (*hash, hp),
+                        _ => return,
+                    },
+                    None => return,
+                }
+            };
+            self.chain_tree.insert(
+                insert_hash,
+                insert_point,
+                info.block_number,
+                info.slot,
+                info.prev_hash,
+            );
         }
 
         if !dominated {
+            // Even though we're not fetching this tip, the newly inserted
+            // header may have filled a gap in the adopted tip's ancestry.
+            // Check and fetch any unvalidated ancestors that are now reachable.
+            self.fetch_unvalidated_ancestors().await;
             return;
         }
 
@@ -325,17 +368,40 @@ impl Consensus {
             return;
         }
 
+        // Walk chain_tree ancestors from tip to find the earliest unvalidated
+        // block — issue a range fetch from there to the tip so we get all
+        // intermediate blocks on a fork in one request.
+        let tip_hash = match point {
+            Point::Specific { hash, .. } => *hash,
+            _ => return,
+        };
+        let ancestors = self.chain_tree.ancestors(tip_hash);
+        let mut fetch_from = point.clone();
+        for &hash in &ancestors {
+            if self.validated.contains(&hash) {
+                break; // reached validated chain
+            }
+            if let Some(p) = self.chain_tree.point(&hash) {
+                if self.self_produced.contains(p) {
+                    break;
+                }
+                fetch_from = p.clone();
+            }
+        }
+
         info!(
             node_id = %self.node_id,
             %tip,
-            "fetching block for longer chain"
+            from = %fetch_from,
+            "fetching blocks for longer chain"
         );
 
         self.in_flight.insert(point.clone());
         let _ = self
             .commands
-            .send(NetworkCommand::FetchBlock {
-                point: point.clone(),
+            .send(NetworkCommand::FetchBlockRange {
+                from: fetch_from,
+                to: point.clone(),
             })
             .await;
     }
@@ -349,6 +415,45 @@ impl Consensus {
             "block received, validating"
         );
         self.validator.validate_block(point.clone(), body.clone());
+    }
+
+    /// Check if the adopted tip has unvalidated ancestors in the chain tree
+    /// and fetch them if so. Called after inserting new headers or validating
+    /// blocks, since either can reveal a gap that needs filling.
+    async fn fetch_unvalidated_ancestors(&mut self) {
+        let adopted_hash = match self.adopted_tip_hash {
+            Some(h) => h,
+            None => return,
+        };
+        let ancestors = self.chain_tree.ancestors(adopted_hash);
+        let mut gap_start: Option<Point> = None;
+        let mut gap_end: Option<Point> = None;
+        for &hash in ancestors.iter().skip(1) {
+            if self.validated.contains(&hash) {
+                break;
+            }
+            if let Some(p) = self.chain_tree.point(&hash) {
+                if self.self_produced.contains(p) || self.in_flight.contains(p) {
+                    break;
+                }
+                gap_start = Some(p.clone());
+                if gap_end.is_none() {
+                    gap_end = Some(p.clone());
+                }
+            }
+        }
+        if let (Some(from), Some(to)) = (gap_start, gap_end) {
+            info!(
+                node_id = %self.node_id,
+                %from,
+                %to,
+                "fetching unvalidated ancestors"
+            );
+            let _ = self
+                .commands
+                .send(NetworkCommand::FetchBlockRange { from, to })
+                .await;
+        }
     }
 
     /// Chain rolled back.
@@ -375,6 +480,22 @@ impl Consensus {
             point: point.clone(),
             block_no,
         })
+    }
+
+    /// Snapshot the recent chain tree for UI display.
+    /// Uses the adopted tip (last validated block) rather than the speculative
+    /// best tip, so the prev_hash chain is always connected.
+    /// Returns (chain_tree_entries, tip_block_no, tip_hash_suffix).
+    pub fn chain_tree_snapshot(&self) -> (Vec<ChainTreeEntry>, Option<u64>, Option<String>) {
+        match self.adopted_tip_hash {
+            Some(hash) => {
+                let block_no = self.chain_tree.block_number(&hash);
+                let entries = self.chain_tree.snapshot(hash, 10, block_no);
+                let tip_hash = Some(format!("{:02x}{:02x}", hash[30], hash[31]));
+                (entries, block_no, tip_hash)
+            }
+            None => (Vec::new(), None, None),
+        }
     }
 
     /// Hash of the current best tip, for passing as prev_hash to block production.
@@ -484,9 +605,9 @@ mod tests {
         let event = NetworkEvent::TipAdvanced { tip, header };
         consensus.handle_event(&event).await;
 
-        // Should issue a FetchBlock command.
+        // Should issue a FetchBlockRange command.
         let cmd = cmd_rx.recv().await.unwrap();
-        assert!(matches!(cmd, NetworkCommand::FetchBlock { .. }));
+        assert!(matches!(cmd, NetworkCommand::FetchBlockRange { .. }));
     }
 
     #[tokio::test]
@@ -532,7 +653,7 @@ mod tests {
             .handle_event(&NetworkEvent::TipAdvanced { tip, header })
             .await;
 
-        // Only one FetchBlock command.
+        // Only one FetchBlockRange command.
         let _cmd = cmd_rx.recv().await.unwrap();
         assert!(cmd_rx.try_recv().is_err());
     }
@@ -619,7 +740,7 @@ mod tests {
 
         // Drain fetch command.
         let cmd = cmd_rx.recv().await.unwrap();
-        assert!(matches!(cmd, NetworkCommand::FetchBlock { .. }));
+        assert!(matches!(cmd, NetworkCommand::FetchBlockRange { .. }));
 
         // Simulate: block B4 was fetched and validated.
         // Build a minimal block body that produces the same header.
