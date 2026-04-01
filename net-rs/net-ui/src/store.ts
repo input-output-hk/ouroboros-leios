@@ -35,7 +35,7 @@ export interface DashboardState {
   aggregateSeries: AggregatePoint[];
   nodeTimeSeries: Record<string, NodeSeriesPoint[]>;
   networkChainTree: ChainTreeEntry[];
-  networkTipCounts: Record<string, number>;
+  networkTipCounts: Record<string, string[]>;
   pollStats: () => Promise<void>;
 
   // Events (actual events in eventRing, outside store)
@@ -131,7 +131,7 @@ export const useStore = create<DashboardState>()((set, get) => ({
       for (const e of get().networkChainTree) {
         mergedEntries.set(e.hash, e);
       }
-      const tipCounts: Record<string, number> = {};
+      const tipCounts: Record<string, string[]> = {};
       for (const snap of Object.values(stats)) {
         if (snap.chain_tree) {
           for (const e of snap.chain_tree) {
@@ -139,7 +139,7 @@ export const useStore = create<DashboardState>()((set, get) => ({
           }
         }
         if (snap.tip_hash) {
-          tipCounts[snap.tip_hash] = (tipCounts[snap.tip_hash] ?? 0) + 1;
+          (tipCounts[snap.tip_hash] ??= []).push(snap.node_id);
         }
       }
       // Prune blocks too far behind the tip.

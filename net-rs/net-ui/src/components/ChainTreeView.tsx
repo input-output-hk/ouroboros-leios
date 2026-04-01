@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Box } from "@mui/material";
 import type { ChainTreeEntry } from "@/types";
 
@@ -25,11 +26,15 @@ export function ChainTreeView({
   entries,
   tipHash,
   tipCounts,
+  onSelectNode,
 }: {
   entries: ChainTreeEntry[];
   tipHash?: string | null;
-  tipCounts?: Record<string, number>;
+  tipCounts?: Record<string, string[]>;
+  onSelectNode?: (nodeId: string) => void;
 }) {
+  const [popup, setPopup] = useState<{ x: number; y: number; hash: string } | null>(null);
+
   const layout = useMemo(() => {
     if (entries.length === 0) return { blocks: [] as LayoutBlock[], cols: 0, rows: 0 };
 
@@ -37,14 +42,14 @@ export function ChainTreeView({
     for (const e of entries) byHash.set(e.hash, e);
 
     // Find main chain: walk from tip backward.
-    // In tipCounts mode, pick the tip with the highest count.
+    // In tipCounts mode, pick the tip with the most nodes.
     const mainSet = new Set<string>();
     let cur: string | null = null;
     if (tipCounts) {
       let bestCount = 0;
-      for (const [hash, count] of Object.entries(tipCounts)) {
-        if (byHash.has(hash) && count > bestCount) {
-          bestCount = count;
+      for (const [hash, nodes] of Object.entries(tipCounts)) {
+        if (byHash.has(hash) && nodes.length > bestCount) {
+          bestCount = nodes.length;
           cur = hash;
         }
       }
@@ -76,8 +81,8 @@ export function ChainTreeView({
     // lane. Once a fork block is bumped, all its descendants stay in that
     // lane.
     const blocks: LayoutBlock[] = [];
-    const colOccupied = new Map<number, Set<number>>(); // col → set of occupied rows
-    const hashRow = new Map<string, number>(); // hash → assigned row
+    const colOccupied = new Map<number, Set<number>>(); // col -> set of occupied rows
+    const hashRow = new Map<string, number>(); // hash -> assigned row
     let maxRow = 0;
 
     // Place main chain on row 0.
@@ -147,13 +152,32 @@ export function ChainTreeView({
     if (el) el.scrollLeft = el.scrollWidth;
   }, [entries]);
 
+  // Close popup on outside click.
+  useEffect(() => {
+    if (!popup) return;
+    const handler = () => setPopup(null);
+    window.addEventListener("click", handler);
+    return () => window.removeEventListener("click", handler);
+  }, [popup]);
+
+  const handleBadgeClick = useCallback((e: React.MouseEvent, hash: string) => {
+    e.stopPropagation();
+    const target = (e.target as SVGElement).closest("g");
+    if (!target) return;
+    const rect = target.getBoundingClientRect();
+    const popupW = 190;
+    const x = Math.min(rect.left, window.innerWidth - popupW - 8);
+    // Position so popup bottom is just above the badge top.
+    setPopup({ x, y: rect.top, hash });
+  }, []);
+
   if (layout.blocks.length === 0) return null;
 
   const PAD_TOP = tipCounts ? 10 : 0;
   const svgW = layout.cols * COL_W;
   const svgH = layout.rows * ROW_H + PAD_TOP;
 
-  // Build hash→position map for connectors.
+  // Build hash->position map for connectors.
   const posMap = new Map<string, { x: number; y: number }>();
   for (const b of layout.blocks) {
     posMap.set(b.entry.hash, {
@@ -163,7 +187,7 @@ export function ChainTreeView({
   }
 
   return (
-    <Box ref={containerRef} sx={{ overflowX: "auto", mt: 0.5 }}>
+    <Box ref={containerRef} sx={{ overflowX: "auto", mt: 0.5, position: "relative" }}>
       <svg width={svgW} height={svgH} style={{ display: "block" }}>
         {/* Connectors */}
         {layout.blocks.map((b) => {
@@ -223,13 +247,14 @@ export function ChainTreeView({
             </g>
           );
         })}
-        {/* Tip count badges — overlaid on top-right of block */}
+        {/* Tip count badges — clickable */}
         {tipCounts && layout.blocks
           .filter((b) => tipCounts[b.entry.hash] !== undefined)
           .map((b) => {
             const bx = b.col * COL_W;
             const by = b.row * ROW_H + PAD_TOP;
-            const label = String(tipCounts[b.entry.hash]);
+            const nodes = tipCounts[b.entry.hash];
+            const label = String(nodes.length);
             const padX = 4;
             const padY = 2;
             const badgeW = label.length * 7 + padX * 2;
@@ -237,7 +262,11 @@ export function ChainTreeView({
             const rx = bx + BLOCK_W - badgeW + 4;
             const ry = by - badgeH / 2 + 2;
             return (
-              <g key={`count-${b.entry.hash}`}>
+              <g
+                key={`count-${b.entry.hash}`}
+                style={{ cursor: "pointer" }}
+                onClick={(e) => handleBadgeClick(e as unknown as React.MouseEvent, b.entry.hash)}
+              >
                 <rect
                   x={rx}
                   y={ry}
@@ -262,6 +291,68 @@ export function ChainTreeView({
             );
           })}
       </svg>
+      {/* Node list popup — rendered via portal to escape scroll container */}
+      {popup && (() => {
+        const liveNodes = tipCounts?.[popup.hash];
+        if (!liveNodes || liveNodes.length === 0) return null;
+        const sorted = [...liveNodes].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+        return createPortal(
+          <Box
+            onClick={(e) => e.stopPropagation()}
+            sx={{
+              position: "fixed",
+              left: popup.x,
+              bottom: window.innerHeight - popup.y + 4,
+              bgcolor: "rgba(20, 20, 30, 0.95)",
+              backdropFilter: "blur(6px)",
+              border: "1px solid #666",
+              borderRadius: 1.5,
+              zIndex: 9999,
+              maxHeight: 240,
+              display: "flex",
+              flexDirection: "column",
+              minWidth: 180,
+              minHeight: 120,
+              boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
+            }}
+          >
+            <Box sx={{
+              px: 1.5,
+              py: 0.7,
+              borderBottom: "1px solid #444",
+              fontFamily: "monospace",
+              fontSize: 11,
+              color: "#999",
+              flexShrink: 0,
+            }}>
+              {sorted.length} nodes on tip #{popup.hash}
+            </Box>
+            <Box sx={{ overflowY: "auto", flexGrow: 1 }}>
+              {sorted.map((nodeId) => (
+                <Box
+                  key={nodeId}
+                  onClick={() => {
+                    onSelectNode?.(nodeId);
+                    setPopup(null);
+                  }}
+                  sx={{
+                    px: 1.5,
+                    py: 0.4,
+                    cursor: "pointer",
+                    fontFamily: "monospace",
+                    fontSize: 12,
+                    color: "#ccc",
+                    "&:hover": { bgcolor: "rgba(255,255,255,0.1)", color: "#fff" },
+                  }}
+                >
+                  {nodeId}
+                </Box>
+              ))}
+            </Box>
+          </Box>,
+          document.body,
+        );
+      })()}
     </Box>
   );
 }
