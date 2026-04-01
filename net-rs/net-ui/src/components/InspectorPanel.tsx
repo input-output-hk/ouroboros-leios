@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useStore } from "@/store";
+import { ChainTreeView } from "./ChainTreeView";
 
 function formatBytes(b: number): string {
   if (b < 1024) return `${Math.round(b)} B`;
@@ -75,6 +76,16 @@ function NodeInspector({ nodeId }: { nodeId: string }) {
           <Typography variant="body2">
             Uptime: {stats.uptime_secs.toFixed(0)}s
           </Typography>
+
+          {stats.chain_tree && stats.chain_tree.length > 0 && (
+            <>
+              <Divider sx={{ my: 1 }} />
+              <Typography variant="caption" color="text.secondary">
+                Chain
+              </Typography>
+              <ChainTreeView entries={stats.chain_tree} tipHash={stats.tip_hash} />
+            </>
+          )}
 
           <Divider sx={{ my: 1 }} />
           <Typography variant="caption" color="text.secondary">

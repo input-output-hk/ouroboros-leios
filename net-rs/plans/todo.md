@@ -8,9 +8,12 @@ line of linked squares with additional 'tracks' for forks, each block
 shown with number and hash suffix as in the node tip.  Scale it to either
 the last 10 blocks or the earliest fork point, whichever is earlier.
 
-## UI memory leak
+## Make the inspector an overlay
 
-The UI has a serious memory leak.  11G after an hour.
+The inspector is getting limited by width with the chain display.
+Make it a semi-transparent overlay, on the right-hand 50% of the graph
+which only appears when a node is selected.  The side bar can be all
+event log.
 
 ## Cluster control
 

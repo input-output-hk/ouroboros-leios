@@ -32,6 +32,12 @@ export interface PeerStatsEntry {
   bytes_received: number;
 }
 
+export interface ChainTreeEntry {
+  block_number: number;
+  hash: string;
+  prev_hash: string | null;
+}
+
 export interface StatsSnapshot {
   node_id: string;
   uptime_secs: number;
@@ -44,6 +50,7 @@ export interface StatsSnapshot {
   txs_generated: number;
   peer_count: number;
   peers: PeerStatsEntry[];
+  chain_tree?: ChainTreeEntry[];
 }
 
 export interface OutputEvent {

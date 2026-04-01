@@ -395,6 +395,7 @@ mod tests {
                 txs_generated: 10,
                 peer_count: 0,
                 peers: Vec::new(),
+                chain_tree: Vec::new(),
             },
         );
         let app = test_app(state);
@@ -434,6 +435,7 @@ mod tests {
                 txs_generated: 10,
                 peer_count: 0,
                 peers: Vec::new(),
+                chain_tree: Vec::new(),
             },
         );
         let app = test_app(state);

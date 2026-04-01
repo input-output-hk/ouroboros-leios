@@ -14,4 +14,28 @@ export const theme = createTheme({
     fontFamily: '"Roboto Mono", "Roboto", monospace',
     fontSize: 13,
   },
+  components: {
+    MuiCssBaseline: {
+      styleOverrides: {
+        "*": {
+          scrollbarWidth: "thin",
+          scrollbarColor: "#555 transparent",
+        },
+        "*::-webkit-scrollbar": {
+          width: 6,
+          height: 6,
+        },
+        "*::-webkit-scrollbar-track": {
+          background: "transparent",
+        },
+        "*::-webkit-scrollbar-thumb": {
+          background: "#555",
+          borderRadius: 3,
+        },
+        "*::-webkit-scrollbar-thumb:hover": {
+          background: "#777",
+        },
+      },
+    },
+  },
 });
