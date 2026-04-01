@@ -125,8 +125,12 @@ export const useStore = create<DashboardState>()((set, get) => ({
       }
       const curForks = tipSet.size;
 
-      // Aggregate network-wide chain tree
+      // Aggregate network-wide chain tree, accumulating across polls so
+      // gaps don't appear when nodes are at different chain heights.
       const mergedEntries = new Map<string, ChainTreeEntry>();
+      for (const e of get().networkChainTree) {
+        mergedEntries.set(e.hash, e);
+      }
       const tipCounts: Record<string, number> = {};
       for (const snap of Object.values(stats)) {
         if (snap.chain_tree) {
@@ -137,6 +141,15 @@ export const useStore = create<DashboardState>()((set, get) => ({
         if (snap.tip_hash) {
           tipCounts[snap.tip_hash] = (tipCounts[snap.tip_hash] ?? 0) + 1;
         }
+      }
+      // Prune blocks too far behind the tip.
+      let maxBn = 0;
+      for (const e of mergedEntries.values()) {
+        if (e.block_number > maxBn) maxBn = e.block_number;
+      }
+      const pruneBelow = maxBn - 30;
+      for (const [hash, e] of mergedEntries) {
+        if (e.block_number < pruneBelow) mergedEntries.delete(hash);
       }
       const networkChainTree = [...mergedEntries.values()].sort(
         (a, b) => a.block_number - b.block_number,
