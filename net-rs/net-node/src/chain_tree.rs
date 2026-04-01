@@ -18,6 +18,21 @@ pub struct ChainTreeEntry {
     pub prev_hash: Option<String>,
 }
 
+/// Returns true if tip A is better than tip B.
+/// Higher block_number wins; ties broken by lower hash (deterministic, prevents flapping).
+pub fn is_better_tip(
+    a_block_no: u64,
+    a_hash: &[u8; 32],
+    b_block_no: u64,
+    b_hash: &[u8; 32],
+) -> bool {
+    if a_block_no != b_block_no {
+        a_block_no > b_block_no
+    } else {
+        a_hash < b_hash
+    }
+}
+
 fn short_hash(h: &[u8; 32]) -> String {
     format!("{:02x}{:02x}", h[30], h[31])
 }
@@ -78,13 +93,8 @@ impl ChainTree {
         let is_new_best = match &self.best_tip {
             None => true,
             Some((_, best_bn)) => {
-                if block_number != *best_bn {
-                    block_number > *best_bn
-                } else {
-                    // Deterministic tie-breaker: lower hash wins.
-                    let best_hash = self.best_tip_hash().unwrap_or([0xFF; 32]);
-                    hash < best_hash
-                }
+                let best_hash = self.best_tip_hash().unwrap_or([0xFF; 32]);
+                is_better_tip(block_number, &hash, *best_bn, &best_hash)
             }
         };
 
