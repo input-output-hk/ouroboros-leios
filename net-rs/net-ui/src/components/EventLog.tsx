@@ -44,7 +44,7 @@ export function EventLog() {
           overflowY: "auto",
           padding: 8,
           fontFamily: "monospace",
-          fontSize: 11,
+          fontSize: 13,
           minHeight: 0,
         }}
       >
@@ -61,12 +61,12 @@ export function EventLog() {
             <span style={{ minWidth: 55, color: "#999" }}>
               {e.time_s.toFixed(1)}s
             </span>
-            <span style={{ minWidth: 45 }}>
+            <span style={{ width: 55, flexShrink: 0 }}>
               {e.message?.node ?? "?"}
             </span>
             <span
               style={{
-                fontSize: 9,
+                fontSize: 11,
                 padding: "1px 5px",
                 borderRadius: 8,
                 backgroundColor: `${color}22`,
