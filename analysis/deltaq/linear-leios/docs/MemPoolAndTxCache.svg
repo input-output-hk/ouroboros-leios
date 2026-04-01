@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="253pt" height="141pt" viewBox="0.00 0.00 253.00 141.00">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 137.06)">
+<title>MemPoolAndTxCache</title>
+<polygon fill="white" stroke="none" points="-4,4 -4,-137.06 248.71,-137.06 248.71,4 -4,4"/>
+<!-- TxCache -->
+<g id="node1" class="node">
+<title>TxCache</title>
+<ellipse fill="none" stroke="black" cx="45.89" cy="-49.13" rx="45.89" ry="45.89"/>
+<text xml:space="preserve" text-anchor="middle" x="45.89" y="-44.93" font-family="Times,serif" font-size="14.00">TxCache</text>
+</g>
+<!-- TxCache&#45;&gt;TxCache -->
+<g id="edge1" class="edge">
+<title>TxCache-&gt;TxCache</title>
+<path fill="none" stroke="black" d="M32.33,-93.33C33.22,-104.58 37.74,-113.02 45.89,-113.02 50.99,-113.02 54.66,-109.72 56.92,-104.5"/>
+<polygon fill="black" stroke="black" points="60.32,-105.33 59.12,-94.8 53.5,-103.78 60.32,-105.33"/>
+<text xml:space="preserve" text-anchor="middle" x="45.89" y="-117.22" font-family="Times,serif" font-size="14.00">1-p</text>
+</g>
+<!-- MemPool -->
+<g id="node2" class="node">
+<title>MemPool</title>
+<ellipse fill="none" stroke="black" cx="195.58" cy="-49.13" rx="49.13" ry="49.13"/>
+<text xml:space="preserve" text-anchor="middle" x="195.58" y="-44.93" font-family="Times,serif" font-size="14.00">MemPool</text>
+</g>
+<!-- TxCache&#45;&gt;MemPool -->
+<g id="edge2" class="edge">
+<title>TxCache-&gt;MemPool</title>
+<path fill="none" stroke="black" d="M92.01,-49.13C105.53,-49.13 120.57,-49.13 134.88,-49.13"/>
+<polygon fill="black" stroke="black" points="134.64,-52.63 144.64,-49.13 134.64,-45.63 134.64,-52.63"/>
+<text xml:space="preserve" text-anchor="middle" x="119.12" y="-53.33" font-family="Times,serif" font-size="14.00">p</text>
+</g>
+<!-- MemPool&#45;&gt;TxCache -->
+<g id="edge4" class="edge">
+<title>MemPool-&gt;TxCache</title>
+<path fill="none" stroke="black" d="M149.53,-31.16C136.77,-27.96 122.8,-26.23 109.78,-28.33 106.64,-28.84 103.45,-29.48 100.25,-30.21"/>
+<polygon fill="black" stroke="black" points="99.65,-26.75 90.87,-32.67 101.43,-33.52 99.65,-26.75"/>
+<text xml:space="preserve" text-anchor="middle" x="119.12" y="-32.53" font-family="Times,serif" font-size="14.00">1-q</text>
+</g>
+<!-- MemPool&#45;&gt;MemPool -->
+<g id="edge3" class="edge">
+<title>MemPool-&gt;MemPool</title>
+<path fill="none" stroke="black" d="M181.49,-96.49C182.59,-107.85 187.29,-116.26 195.58,-116.26 200.89,-116.26 204.72,-112.81 207.08,-107.34"/>
+<polygon fill="black" stroke="black" points="210.4,-108.5 209.31,-97.97 203.59,-106.89 210.4,-108.5"/>
+<text xml:space="preserve" text-anchor="middle" x="195.58" y="-120.46" font-family="Times,serif" font-size="14.00">q</text>
+</g>
+</g>
+</svg>

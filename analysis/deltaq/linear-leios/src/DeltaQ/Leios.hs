@@ -16,6 +16,8 @@ module DeltaQ.Leios (
   pEBOnTime,
 ) where
 
+import Data.Maybe (fromJust)
+import Data.Ratio ((%))
 import DeltaQ (
   DQ,
   DeltaQ (quantile, successWithin),
@@ -25,16 +27,19 @@ import DeltaQ (
   maybeFromEventually,
   wait,
  )
+import DeltaQ.Distributions
 import DeltaQ.Leios.EmpiricalDistributions (
   applyTxs,
   reapplyTxs,
  )
+import qualified DeltaQ.PiecewisePolynomial as PW
 import DeltaQ.Praos (
   BlockSize (..),
   blendedDelay,
   sendRBBody,
   sendRBHeader,
  )
+import qualified Numeric.Measure.Finite.Mixed as M
 
 -- | fetchingEB
 --
@@ -82,20 +87,34 @@ fetchingTx p =
 -- Batch processing of transactions
 --
 -- We consider batches of transactions to be looked up in the cache simultaniously.
--- The hit-rate then becomes: \(r = \pi_1 \times (1-p) + \pi_2 \times p\)
+-- Using the mixture distribution, currently only implemented for a single transaction.
 fetchingTxs :: DQ
 fetchingTxs =
   choices
-    [ (hitRate, wait 0.001)
-    , (1 - hitRate, blendedDelay B1024)
+    [ (5 % 6, wait 0.001)
+    , (1 % 6, txCache')
     ]
+
+-- | Single cache lookup
+txCache :: M.Measure Rational
+txCache = M.add (M.scale π_1 blendedDelay') (M.scale π_2 (M.dirac 0.001))
  where
+  blendedDelay' :: M.Measure Rational
+  blendedDelay' = fromJust $ M.fromDistribution (PW.distribution (blendedDelay B1024))
   π_1 = (2 - p) / (2 + p)
   π_2 = 2 * p / (2 + p)
   p = 0.75
 
-  hitRate :: Rational
-  hitRate = π_2 * p + π_1 * (1 - p)
+-- | Parellel cache lookups
+txCache' :: DQ
+txCache' = measuredDQ pairs
+ where
+  dq = PW.unsafeFromPositiveMeasure txCache
+  n = 256
+  pairs =
+    pairList
+      [0.0, 1.0, 2.0, 5.0, 7.0]
+      (\i -> let fi = successWithin dq i in fi * (1 % n) * (1 - fi ^ n) / (1 - fi))
 
 processRBandEB :: DQ
 processRBandEB = processRB ./\. processEB

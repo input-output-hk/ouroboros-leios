@@ -78,7 +78,7 @@ reapplyTx =
 -- We make use of the central limit theorem and get the following normal distribution
 -- as distribution of sequential application of 'applyTx'
 --
--- \(nZ \sim \mathcal{N}(\mu,\,\sigma^{2})\)
+-- \(nZ \sim \mathcal{N}(\mu,\sigma^{2})\)
 --
 -- where \(n\) is the number of transactions. Mean and standard derivation
 -- from the corresponding numbers in the csv file are:
@@ -91,7 +91,7 @@ reapplyTx =
 -- The resulting distribution function is the scale mixture distribution
 -- and the cumulative distribution function is:
 --
--- \(F(x) = \frac{1}{N} \sum_1^N \Phi\!\left(\frac{x - n\mu}{n\sigma}\right)\)
+-- \(F(x) = \frac{1}{N} \sum_1^N \Phi\left(\frac{x - n\mu}{n\sigma}\right)\)
 applyTxs :: DQ
 applyTxs = scaleMixtureDQ 100 0.01059939845 0.02548883812
 
@@ -100,7 +100,7 @@ applyTxs = scaleMixtureDQ 100 0.01059939845 0.02548883812
 -- We make use of the central limit theorem and get the following normal distribution
 -- as distribution of sequential application of 'reapplyTx'
 --
--- \(nZ \sim \mathcal{N}(\mu,\,\sigma^{2})\)
+-- \(nZ \sim \mathcal{N}(\mu,\sigma^{2})\)
 --
 -- where \(n\) is the number of transactions. Mean and standard derivation
 -- from the corresponding numbers in the csv file are:
@@ -113,6 +113,6 @@ applyTxs = scaleMixtureDQ 100 0.01059939845 0.02548883812
 -- The resulting distribution function is the scale mixture distribution
 -- and the cumulative distribution function is:
 --
--- \(F(x) = \frac{1}{N} \sum_1^N \Phi\!\left(\frac{x - n\mu}{n\sigma}\right)\)
+-- \(F(x) = \frac{1}{N} \sum_1^N \Phi\left(\frac{x - n\mu}{n\sigma}\right)\)
 reapplyTxs :: DQ
 reapplyTxs = scaleMixtureDQ 2500 0.002711165479 0.02441685076
