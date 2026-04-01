@@ -218,16 +218,6 @@ export function InspectorPanel() {
   const selectedNodeId = useStore((s) => s.selectedNodeId);
   const selectedEdge = useStore((s) => s.selectedEdge);
 
-  if (!selectedNodeId && !selectedEdge) {
-    return (
-      <Box sx={{ p: 2 }}>
-        <Typography variant="body2" color="text.secondary">
-          Click a node or edge to inspect
-        </Typography>
-      </Box>
-    );
-  }
-
   return (
     <Box sx={{ p: 2, overflowY: "auto", height: "100%" }}>
       {selectedNodeId && <NodeInspector nodeId={selectedNodeId} />}
