@@ -1,14 +1,22 @@
 //! Longest-chain consensus with fork tracking.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
 use net_core::types::{BlockBody, Point, Tip, WrappedHeader};
 use tokio::sync::mpsc;
 use tracing::info;
 
-use crate::chain_tree::{ChainTree, ChainTreeEntry};
+use crate::chain_tree::{is_better_tip, ChainTree, ChainTreeEntry};
 use crate::validation::{ValidationComplete, Validator};
+
+/// A validated block stashed for later replay during a fork switch.
+struct PendingBlock {
+    point: Point,
+    header: WrappedHeader,
+    body: BlockBody,
+    block_no: u64,
+}
 
 /// Consensus state with fork-tracking chain tree.
 pub struct Consensus {
@@ -27,6 +35,10 @@ pub struct Consensus {
     validator: Validator,
     /// Security parameter k — prune blocks deeper than this.
     security_param_k: u64,
+    /// Validated fork blocks stashed because they weren't yet longer than the
+    /// adopted tip. Keyed by block hash. Replayed in order when a longer block
+    /// on the same fork triggers a switch.
+    pending_fork_blocks: HashMap<[u8; 32], PendingBlock>,
 }
 
 impl Consensus {
@@ -46,6 +58,7 @@ impl Consensus {
             commands,
             validator,
             security_param_k,
+            pending_fork_blocks: HashMap::new(),
         }
     }
 
@@ -223,6 +236,7 @@ impl Consensus {
         // Detect fork switch: compare against the last adopted tip.
         let mut rolled_back = false;
         let mut update_tip = true;
+        let mut stashed = false;
         if let Some(adopted_hash) = self.adopted_tip_hash {
             if adopted_hash != new_hash {
                 let new_ancestors = self.chain_tree.ancestors(new_hash);
@@ -241,31 +255,91 @@ impl Consensus {
                         // Inject it but don't change the tip.
                         update_tip = false;
                     } else {
-                        // Genuine fork switch — rollback to common ancestor.
-                        if let Some(ancestor) =
-                            self.chain_tree.find_common_ancestor(adopted_hash, new_hash)
-                        {
-                            if let Some(ancestor_point) = self.chain_tree.point(&ancestor) {
-                                let ancestor_point = ancestor_point.clone();
-                                info!(
-                                    node_id = %self.node_id,
-                                    new_tip = %point,
-                                    ancestor = %ancestor_point,
-                                    "fork switch: rolling back to common ancestor"
-                                );
+                        // Genuine fork — only switch if the new chain is strictly
+                        // longer. Otherwise stash the block for later replay.
+                        let adopted_bn = self.chain_tree.block_number(&adopted_hash).unwrap_or(0);
+                        if is_better_tip(block_no, &new_hash, adopted_bn, &adopted_hash) {
+                            // Longer chain — do the fork switch.
+                            if let Some(ancestor) =
+                                self.chain_tree.find_common_ancestor(adopted_hash, new_hash)
+                            {
+                                if let Some(ancestor_point) = self.chain_tree.point(&ancestor) {
+                                    let ancestor_point = ancestor_point.clone();
+                                    info!(
+                                        node_id = %self.node_id,
+                                        new_tip = %point,
+                                        ancestor = %ancestor_point,
+                                        "fork switch: rolling back to common ancestor"
+                                    );
 
-                                let _ = self
-                                    .commands
-                                    .send(NetworkCommand::InjectRollback {
-                                        point: ancestor_point,
-                                    })
-                                    .await;
-                                rolled_back = true;
+                                    let _ = self
+                                        .commands
+                                        .send(NetworkCommand::InjectRollback {
+                                            point: ancestor_point,
+                                        })
+                                        .await;
+                                    rolled_back = true;
+
+                                    // Replay stashed fork blocks that are ancestors
+                                    // of the new tip, in ascending block_no order.
+                                    let ancestor_set: HashSet<_> =
+                                        self.chain_tree.ancestors(new_hash).into_iter().collect();
+                                    let mut replay: Vec<PendingBlock> = ancestor_set
+                                        .iter()
+                                        .filter_map(|h| self.pending_fork_blocks.remove(h))
+                                        .collect();
+                                    replay.sort_by_key(|b| b.block_no);
+                                    for pending in replay {
+                                        let pending_hash = match &pending.point {
+                                            Point::Specific { hash, .. } => *hash,
+                                            _ => continue,
+                                        };
+                                        self.validated.insert(pending_hash);
+                                        let _ = self
+                                            .commands
+                                            .send(NetworkCommand::InjectBlock {
+                                                point: pending.point,
+                                                header: Box::new(pending.header),
+                                                body: pending.body,
+                                                block_no: pending.block_no,
+                                            })
+                                            .await;
+                                    }
+                                }
                             }
+                        } else {
+                            // Not yet longer — stash for later replay.
+                            info!(
+                                node_id = %self.node_id,
+                                %point,
+                                block_no,
+                                adopted_bn,
+                                "fork block validated, stashing (not yet longer)"
+                            );
+                            update_tip = false;
+                            stashed = true;
+                            self.pending_fork_blocks.insert(
+                                new_hash,
+                                PendingBlock {
+                                    point: point.clone(),
+                                    header: header.clone(),
+                                    body: body.clone(),
+                                    block_no,
+                                },
+                            );
                         }
                     }
                 }
             }
+        }
+
+        if stashed {
+            // Prune old blocks beyond k (chain tree maintenance).
+            if block_no > self.security_param_k {
+                self.chain_tree
+                    .prune_below(block_no - self.security_param_k);
+            }
+            return false;
         }
 
         info!(
@@ -310,9 +384,16 @@ impl Consensus {
         let point = &tip.point;
 
         // Check if this tip is better than our current best BEFORE inserting.
+        let tip_hash = match point {
+            Point::Specific { hash, .. } => *hash,
+            _ => return,
+        };
         let dominated = match self.chain_tree.best_tip() {
             None => true,
-            Some((_, best_bn)) => tip.block_no > best_bn,
+            Some((_, best_bn)) => {
+                let best_hash = self.chain_tree.best_tip_hash().unwrap_or([0xFF; 32]);
+                is_better_tip(tip.block_no, &tip_hash, best_bn, &best_hash)
+            }
         };
 
         // Insert the announced header into the chain tree.
@@ -456,21 +537,19 @@ impl Consensus {
         }
     }
 
-    /// Chain rolled back.
+    /// Peer chain rolled back (ChainSync MsgRollBackward).
+    ///
+    /// We only log this — actual chain store rollbacks are handled by
+    /// `on_validation_complete` when a fork switch is triggered. Blindly
+    /// rolling back the chain store here would destroy state when a single
+    /// peer diverges while others are still on the longer chain.
     async fn on_rolled_back(&mut self, point: &Point, tip: &Tip) {
         info!(
             node_id = %self.node_id,
             to = %point,
             %tip,
-            "rolling back"
+            "peer chain rolled back (no local rollback)"
         );
-
-        let _ = self
-            .commands
-            .send(NetworkCommand::InjectRollback {
-                point: point.clone(),
-            })
-            .await;
     }
 
     /// Current local tip as a `Tip`, derived from the chain tree.
@@ -766,5 +845,130 @@ mod tests {
 
         assert!(got_rollback, "fork switch should issue InjectRollback");
         assert!(got_inject, "fork switch should inject the new block");
+    }
+
+    #[tokio::test]
+    async fn fork_switch_no_regression() {
+        // Verify that adopted_tip doesn't regress when a lower fork block
+        // validates before a higher one.
+        let (cmd_tx, mut cmd_rx) = mpsc::channel(64);
+        let config = crate::config::ValidationConfig::default();
+        let (validator, _val_rx) = Validator::new(config);
+        let mut consensus = Consensus::new("test".into(), cmd_tx, validator, 2160);
+
+        // Build chain A: blocks 1..5 (self-produced).
+        let mut prev: Option<[u8; 32]> = None;
+        let mut hashes = Vec::new();
+        for i in 1..=5u64 {
+            let (tip, hdr) = make_tip(i * 10, i, prev);
+            let hash = match &tip.point {
+                Point::Specific { hash, .. } => *hash,
+                _ => panic!(),
+            };
+            consensus.register_self_produced(&tip.point, &hdr);
+            hashes.push(hash);
+            prev = Some(hash);
+        }
+        assert_eq!(consensus.local_tip().unwrap().block_no, 5);
+
+        // Fork B diverges after block 2.
+        // B3 at slot 31, B4 at slot 41, ..., B6 at slot 61.
+        let fork_base = hashes[1]; // hash of block 2
+        let (tipb3, hdrb3) = make_tip(31, 3, Some(fork_base));
+        let hashb3 = match &tipb3.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        let (tipb4, hdrb4) = make_tip(41, 4, Some(hashb3));
+        let hashb4 = match &tipb4.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        let (tipb5, hdrb5) = make_tip(51, 5, Some(hashb4));
+        let hashb5 = match &tipb5.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        let (tipb6, hdrb6) = make_tip(61, 6, Some(hashb5));
+
+        // Insert fork headers into chain tree (as if received via TipAdvanced).
+        for (tip, hdr) in [
+            (tipb3.clone(), hdrb3.clone()),
+            (tipb4.clone(), hdrb4.clone()),
+            (tipb5.clone(), hdrb5.clone()),
+            (tipb6.clone(), hdrb6.clone()),
+        ] {
+            consensus
+                .handle_event(&NetworkEvent::TipAdvanced { tip, header: hdr })
+                .await;
+        }
+        // Drain any fetch commands from TipAdvanced.
+        while cmd_rx.try_recv().is_ok() {}
+
+        // Validate B3 (block_no=3, lower than adopted tip=5). Should stash.
+        let result = ValidationComplete {
+            point: tipb3.point.clone(),
+            body: BlockBody::new(hdrb3.raw.clone()),
+        };
+        let rolled_back = consensus.on_validation_complete(result).await;
+        assert!(!rolled_back, "should not rollback for shorter fork");
+        // adopted_tip should still be block 5 on chain A.
+        assert_eq!(
+            consensus
+                .chain_tree
+                .block_number(&consensus.adopted_tip_hash.unwrap()),
+            Some(5),
+            "adopted tip should not regress"
+        );
+        // No InjectBlock or InjectRollback should have been issued.
+        assert!(cmd_rx.try_recv().is_err(), "no commands for stashed block");
+
+        // Validate B4 (block_no=4, strictly lower than adopted=5). Should stash.
+        let result = ValidationComplete {
+            point: tipb4.point.clone(),
+            body: BlockBody::new(hdrb4.raw.clone()),
+        };
+        let rolled_back = consensus.on_validation_complete(result).await;
+        assert!(!rolled_back, "should not rollback for shorter fork block");
+        assert_eq!(
+            consensus
+                .chain_tree
+                .block_number(&consensus.adopted_tip_hash.unwrap()),
+            Some(5),
+            "adopted tip should still be 5 after B4"
+        );
+
+        // Validate B5 (same height as adopted=5). May switch via tie-breaking
+        // (lower hash wins) or stash — either way, process it.
+        let result = ValidationComplete {
+            point: tipb5.point.clone(),
+            body: BlockBody::new(hdrb5.raw.clone()),
+        };
+        consensus.on_validation_complete(result).await;
+        // Drain any commands from B5 (it may or may not have switched).
+        while cmd_rx.try_recv().is_ok() {}
+
+        // Validate B6 (block_no=6). Should advance to block 6 (either via
+        // fork switch or by extending B5 if tie-breaking already switched).
+        let result = ValidationComplete {
+            point: tipb6.point.clone(),
+            body: BlockBody::new(hdrb6.raw.clone()),
+        };
+        consensus.on_validation_complete(result).await;
+
+        // adopted_tip should now be block 6.
+        assert_eq!(
+            consensus
+                .chain_tree
+                .block_number(&consensus.adopted_tip_hash.unwrap()),
+            Some(6),
+            "adopted tip should be 6 after fork switch"
+        );
+
+        // Stashed blocks should be cleared.
+        assert!(
+            consensus.pending_fork_blocks.is_empty(),
+            "pending fork blocks should be cleared after replay"
+        );
     }
 }
