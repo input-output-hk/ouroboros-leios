@@ -115,12 +115,12 @@ export default function App() {
                 alignItems: "center",
                 borderRadius: 1,
                 px: 0.5,
-                height: 24,
+                height: 36,
               }}
             >
               {eventLogOpen
-                ? <ChevronRightIcon sx={{ fontSize: 16 }} />
-                : <><ChevronLeftIcon sx={{ fontSize: 16 }} /><Typography variant="caption" sx={{ fontSize: 10, mr: 0.5 }}>Events</Typography></>
+                ? <ChevronRightIcon sx={{ fontSize: 28 }} />
+                : <><ChevronLeftIcon sx={{ fontSize: 28 }} /><Typography variant="caption" sx={{ fontSize: 18, mr: 0.5 }}>Events</Typography></>
               }
             </Box>
 
@@ -164,12 +164,12 @@ export default function App() {
                   px: 0.5,
                   mr: 1.5,
                   mb: 0.5,
-                  height: 24,
+                  height: 36,
                 }}
               >
                 {chainTreeOpen
-                  ? <ExpandMoreIcon sx={{ fontSize: 16 }} />
-                  : <><ExpandLessIcon sx={{ fontSize: 16 }} /><Typography variant="caption" sx={{ fontSize: 10, mr: 0.5 }}>Chain</Typography></>
+                  ? <ExpandMoreIcon sx={{ fontSize: 28 }} />
+                  : <><ExpandLessIcon sx={{ fontSize: 28 }} /><Typography variant="caption" sx={{ fontSize: 18, mr: 0.5 }}>Chain</Typography></>
                 }
               </Box>
               {chainTreeOpen && (
@@ -206,12 +206,12 @@ export default function App() {
                 px: 0.5,
                 ml: 1,
                 mb: 0.5,
-                height: 24,
+                height: 36,
               }}
             >
               {chartsOpen
-                ? <ExpandMoreIcon sx={{ fontSize: 16 }} />
-                : <><ExpandLessIcon sx={{ fontSize: 16 }} /><Typography variant="caption" sx={{ fontSize: 10, mr: 0.5 }}>Charts</Typography></>
+                ? <ExpandMoreIcon sx={{ fontSize: 28 }} />
+                : <><ExpandLessIcon sx={{ fontSize: 28 }} /><Typography variant="caption" sx={{ fontSize: 18, mr: 0.5 }}>Charts</Typography></>
               }
             </Box>
             <Box sx={{
