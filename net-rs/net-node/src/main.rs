@@ -168,7 +168,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             event = handle.events.recv() => {
                 match event {
                     Some(event) => {
-                        record_network_event(&mut telem, &node_id, &event);
+                        record_network_event(&mut telem, &node_id, &event, &consensus);
                         if !consensus.handle_event(&event).await {
                             log_event(&node_id, &event);
                         }
@@ -214,6 +214,7 @@ fn record_network_event(
     telem: &mut telemetry::TelemetryHandle,
     node_id: &str,
     event: &NetworkEvent,
+    consensus: &consensus::Consensus,
 ) {
     match event {
         NetworkEvent::PeerConnected { peer_id, address } => {
@@ -258,7 +259,8 @@ fn record_network_event(
             telem.txs_generated += 1;
         }
         NetworkEvent::PeerSnapshot { peers } => {
-            telem.emit_stats(peers);
+            let (chain_tree, tip_block_no, tip_hash) = consensus.chain_tree_snapshot();
+            telem.emit_stats(peers, chain_tree, tip_block_no, tip_hash);
         }
         NetworkEvent::LeiosBlockReceived { .. } => {
             telem.record(NodeEvent::EBReceived {

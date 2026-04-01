@@ -10,6 +10,7 @@ use net_core::multi_peer::types::PeerInfo;
 use serde::Serialize;
 use tracing::info;
 
+use crate::chain_tree::ChainTreeEntry;
 use crate::config::{EventSinkConfig, StatsSinkConfig, TelemetryConfig};
 
 // ---------------------------------------------------------------------------
@@ -107,6 +108,7 @@ pub struct StatsSnapshot {
     pub txs_generated: u64,
     pub peer_count: usize,
     pub peers: Vec<PeerStatsEntry>,
+    pub chain_tree: Vec<ChainTreeEntry>,
 }
 
 #[derive(Serialize, Clone)]
@@ -380,8 +382,18 @@ impl TelemetryHandle {
         }
     }
 
-    /// Emit a stats snapshot with peer info.
-    pub fn emit_stats(&mut self, peers: &[PeerInfo]) {
+    /// Emit a stats snapshot with peer info and chain tree.
+    ///
+    /// `tip_block_no` and `tip_hash` are taken from the consensus adopted tip
+    /// (not the speculative peer-announced tip) so they're always consistent
+    /// with the chain_tree snapshot.
+    pub fn emit_stats(
+        &mut self,
+        peers: &[PeerInfo],
+        chain_tree: Vec<ChainTreeEntry>,
+        tip_block_no: Option<u64>,
+        tip_hash: Option<String>,
+    ) {
         if self.stats_sinks.is_empty() {
             return;
         }
@@ -389,14 +401,15 @@ impl TelemetryHandle {
             node_id: self.node_id.clone(),
             uptime_secs: self.start_time.elapsed().as_secs_f64(),
             slot: self.current_slot,
-            tip_block_no: self.tip_block_no,
-            tip_hash: self.tip_hash.clone(),
+            tip_block_no,
+            tip_hash,
             blocks_produced: self.blocks_produced,
             blocks_received: self.blocks_received,
             blocks_validated: self.blocks_validated,
             txs_generated: self.txs_generated,
             peer_count: peers.len(),
             peers: peers.iter().map(PeerStatsEntry::from_peer_info).collect(),
+            chain_tree,
         };
         for sink in &mut self.stats_sinks {
             sink.emit(&snapshot);
@@ -453,11 +466,13 @@ mod tests {
                 bytes_sent: 1024,
                 bytes_received: 2048,
             }],
+            chain_tree: vec![],
         };
         let json = serde_json::to_string(&snapshot).unwrap();
         assert!(json.contains("\"bytes_sent\":1024"));
         assert!(json.contains("\"bytes_received\":2048"));
         assert!(json.contains("\"inbound_delay_ms\":200"));
+        assert!(json.contains("\"chain_tree\":[]"));
     }
 
     #[test]

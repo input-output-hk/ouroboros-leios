@@ -244,19 +244,21 @@ impl Coordinator {
                     peer.fragment.append(header_point.clone());
                 }
 
-                // Deduplicate: only forward if this tip is ahead of our best.
-                let is_new = match &self.best_tip {
-                    None => true,
-                    Some(best) => tip.block_no > best.block_no,
+                // Update best tip tracker.
+                let dominated = match &self.best_tip {
+                    None => false,
+                    Some(best) => tip.block_no <= best.block_no,
                 };
-
-                if is_new {
+                if !dominated {
                     self.best_tip = Some(tip.clone());
-                    let _ = self
-                        .network_events
-                        .send(NetworkEvent::TipAdvanced { tip, header })
-                        .await;
                 }
+
+                // Always forward headers so consensus can build the full
+                // chain tree (needed for fork tracking and UI display).
+                let _ = self
+                    .network_events
+                    .send(NetworkEvent::TipAdvanced { tip, header })
+                    .await;
             }
 
             PeerEvent::RolledBack { point, tip } => {
@@ -530,6 +532,34 @@ impl Coordinator {
                             })
                             .await;
                         self.pending_fetches.insert(point, best_id);
+                    }
+                }
+            }
+
+            NetworkCommand::FetchBlockRange { from, to } => {
+                // Range fetch: find a peer whose fragment contains the `to`
+                // point (it should also have everything from..to).
+                if self.pending_fetches.contains_key(&to) {
+                    return true;
+                }
+
+                let best_peer = self
+                    .peers
+                    .iter()
+                    .filter(|(_, p)| p.fragment.contains(&to))
+                    .min_by_key(|(_, p)| p.rtt.unwrap_or(Duration::from_secs(999)))
+                    .map(|(id, _)| *id);
+
+                if let Some(best_id) = best_peer {
+                    if let Some(peer) = self.peers.get(&best_id) {
+                        let _ = peer
+                            .commands
+                            .send(PeerCommand::FetchBlocks {
+                                from,
+                                to: to.clone(),
+                            })
+                            .await;
+                        self.pending_fetches.insert(to, best_id);
                     }
                 }
             }
@@ -1288,8 +1318,8 @@ mod tests {
             )
             .await;
 
-        // Should NOT produce another TipAdvanced (deduplicated).
-        assert!(net_event_receiver.try_recv().is_err());
+        // Should also produce TipAdvanced (all headers forwarded for chain tree).
+        assert!(net_event_receiver.try_recv().is_ok());
 
         // Peer B announces tip 101 — this IS new.
         let tip_101 = Tip {
