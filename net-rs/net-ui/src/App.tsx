@@ -41,20 +41,19 @@ export default function App() {
         overflow: "hidden",
       }}
     >
-      {/* Header */}
-      <Box sx={{ px: 2, py: 0.75, bgcolor: "#1a0a2e", borderBottom: 1, borderColor: "#3d1f6d", display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-        <Typography variant="h5" sx={{ color: "#ffffff", fontWeight: 700 }}>
-          Leios Network
-        </Typography>
-        {topology && (
-          <Typography variant="body2" sx={{ color: "#ffffff" }}>
-            {topology.nodes.length} nodes, {topology.edges.length} edges
-          </Typography>
-        )}
-      </Box>
-
       {/* Main content */}
-      <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+      <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, position: "relative" }}>
+        {/* Header — overlay on graph */}
+        <Box sx={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 20, px: 2, py: 0.75, bgcolor: "rgba(13, 27, 42, 0.6)", backdropFilter: "blur(8px)", display: "flex", alignItems: "baseline", justifyContent: "space-between", pointerEvents: "auto" }}>
+          <Typography variant="h5" sx={{ color: "#ffffff", fontWeight: 700 }}>
+            Leios Node Cluster
+          </Typography>
+          {topology && (
+            <Typography variant="body2" sx={{ color: "#ffffff" }}>
+              {topology.nodes.length} nodes, {topology.edges.length} edges
+            </Typography>
+          )}
+        </Box>
         {/* Graph area — full width, all panels overlay */}
         <Box sx={{ flex: 1, minHeight: 0, position: "relative" }}>
           <ReactFlowProvider><TopologyGraph /></ReactFlowProvider>
@@ -62,7 +61,7 @@ export default function App() {
           {/* Overlay layer — pointer-events none, children opt in */}
           <Box sx={{
             position: "absolute",
-            top: 0, left: 0, right: 0, bottom: 0,
+            top: 52, left: 0, right: 0, bottom: 0,
             display: "flex",
             pointerEvents: "none",
           }}>
