@@ -10,7 +10,7 @@ FROM ghcr.io/blinklabs-io/cardano-cli:10.14.0.0-1 AS cardano-cli
 FROM ghcr.io/blinklabs-io/haskell:9.6.6-3.12.1.0-3 AS cardano-node-build
 
 # From intersectmbo/cardano-node leios-prototype branch
-ARG CARDANO_NODE_VERSION_LEIOS=75881ef42e9f699039a6cea03222c8a1690bc40f
+ARG CARDANO_NODE_VERSION_LEIOS=c53f7c0d9509675d0a5eddb5a45cd53dd09b1bff
 
 RUN git clone https://github.com/intersectmbo/cardano-node.git \
     && cd cardano-node \
@@ -30,7 +30,7 @@ RUN --mount=type=cache,target=/root/.cabal/store,id=cabal-store-cardano-node \
 FROM ghcr.io/blinklabs-io/haskell:9.6.6-3.12.1.0-3 AS tx-generator-build
 
 # From intersectmbo/cardano-node master branch
-ARG CARDANO_NODE_VERSION_TXGEN=bd3e580eab25afab55085e981d2e3db74498aa2c
+ARG CARDANO_NODE_VERSION_TXGEN=787153e5ba32e1abc9ec44c058a28bd304b805cd
 
 RUN git clone https://github.com/intersectmbo/cardano-node.git \
     && cd cardano-node \
