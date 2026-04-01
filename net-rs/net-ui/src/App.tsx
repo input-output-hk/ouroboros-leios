@@ -3,6 +3,8 @@ import { ReactFlowProvider } from "@xyflow/react";
 import { Box, IconButton, Typography } from "@mui/material";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import { useStore } from "@/store";
 import { usePolling } from "@/hooks/usePolling";
 import { useEventStream } from "@/hooks/useEventStream";
@@ -22,6 +24,8 @@ export default function App() {
   const selectedNodeId = useStore((s) => s.selectedNodeId);
   const selectedEdge = useStore((s) => s.selectedEdge);
   const [eventLogOpen, setEventLogOpen] = useState(true);
+  const [chartsOpen, setChartsOpen] = useState(true);
+  const [chainTreeOpen, setChainTreeOpen] = useState(true);
 
   useEffect(() => {
     loadTopology();
@@ -41,9 +45,11 @@ export default function App() {
         overflow: "hidden",
       }}
     >
-      {/* Main content */}
-      <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, position: "relative" }}>
-        {/* Header — overlay on graph */}
+      {/* Graph fills entire area */}
+      <Box sx={{ flex: 1, minHeight: 0, position: "relative" }}>
+        <ReactFlowProvider><TopologyGraph /></ReactFlowProvider>
+
+        {/* Header — overlay */}
         <Box sx={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 20, px: 2, py: 0.75, bgcolor: "rgba(13, 27, 42, 0.6)", backdropFilter: "blur(8px)", display: "flex", alignItems: "baseline", justifyContent: "space-between", pointerEvents: "auto" }}>
           <Typography variant="h5" sx={{ color: "#ffffff", fontWeight: 700 }}>
             Leios Node Cluster
@@ -54,20 +60,19 @@ export default function App() {
             </Typography>
           )}
         </Box>
-        {/* Graph area — full width, all panels overlay */}
-        <Box sx={{ flex: 1, minHeight: 0, position: "relative" }}>
-          <ReactFlowProvider><TopologyGraph /></ReactFlowProvider>
 
-          {/* Overlay layer — pointer-events none, children opt in */}
-          <Box sx={{
-            position: "absolute",
-            top: 52, left: 0, right: 0, bottom: 0,
-            display: "flex",
-            pointerEvents: "none",
-          }}>
-            {/* Spacer takes remaining width */}
+        {/* Overlay layer — vertical column */}
+        <Box sx={{
+          position: "absolute",
+          top: 52, left: 0, right: 0, bottom: 0,
+          display: "flex",
+          flexDirection: "column",
+          pointerEvents: "none",
+        }}>
+          {/* Upper area: inspector + event log — flex row */}
+          <Box sx={{ flex: 1, minHeight: 0, display: "flex" }}>
+            {/* Spacer with inspector column */}
             <Box sx={{ flex: 1, minWidth: 0, position: "relative" }}>
-              {/* Inspector + chain tree column — right-aligned within spacer */}
               <Box sx={{
                 position: "absolute",
                 top: 0,
@@ -89,21 +94,6 @@ export default function App() {
                     pointerEvents: "auto",
                   }}>
                     <InspectorPanel />
-                  </Box>
-                )}
-                <Box sx={{ flex: 1 }} />
-                {networkChainTree.length > 0 && (
-                  <Box sx={{
-                    flexShrink: 0,
-                    alignSelf: "flex-end",
-                    borderRadius: 1,
-                    px: 1,
-                    py: 0.5,
-                    m: 1.5,
-                    pointerEvents: "auto",
-                    backdropFilter: "blur(6px)",
-                  }}>
-                    <ChainTreeView entries={networkChainTree} tipCounts={networkTipCounts} />
                   </Box>
                 )}
               </Box>
@@ -154,11 +144,88 @@ export default function App() {
               )}
             </Box>
           </Box>
-        </Box>
 
-        {/* Charts */}
-        <Box sx={{ height: 220, borderTop: 1, borderColor: "grey.800" }}>
-          <AggregateCharts />
+          {/* Chain tree toggle + tree — above charts, right-aligned */}
+          {networkChainTree.length > 0 && (
+            <Box sx={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+              <Box
+                onClick={() => setChainTreeOpen((v) => !v)}
+                sx={{
+                  alignSelf: "flex-end",
+                  pointerEvents: "auto",
+                  bgcolor: "rgba(40, 40, 50, 0.7)",
+                  backdropFilter: "blur(4px)",
+                  color: "#fff",
+                  "&:hover": { bgcolor: "rgba(60, 60, 70, 0.8)" },
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  borderRadius: 1,
+                  px: 0.5,
+                  mr: 1.5,
+                  mb: 0.5,
+                  height: 24,
+                }}
+              >
+                {chainTreeOpen
+                  ? <ExpandMoreIcon sx={{ fontSize: 16 }} />
+                  : <><ExpandLessIcon sx={{ fontSize: 16 }} /><Typography variant="caption" sx={{ fontSize: 10, mr: 0.5 }}>Chain</Typography></>
+                }
+              </Box>
+              {chainTreeOpen && (
+                <Box sx={{
+                  borderRadius: 1,
+                  px: 1,
+                  py: 0.5,
+                  mr: 1.5,
+                  mb: 0.5,
+                  pointerEvents: "auto",
+                  backdropFilter: "blur(6px)",
+                }}>
+                  <ChainTreeView entries={networkChainTree} tipCounts={networkTipCounts} />
+                </Box>
+              )}
+            </Box>
+          )}
+
+          {/* Charts toggle + charts — bottom */}
+          <Box sx={{ flexShrink: 0, display: "flex", flexDirection: "column" }}>
+            <Box
+              onClick={() => setChartsOpen((v) => !v)}
+              sx={{
+                alignSelf: "flex-start",
+                pointerEvents: "auto",
+                bgcolor: "rgba(40, 40, 50, 0.7)",
+                backdropFilter: "blur(4px)",
+                color: "#fff",
+                "&:hover": { bgcolor: "rgba(60, 60, 70, 0.8)" },
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                borderRadius: 1,
+                px: 0.5,
+                ml: 1,
+                mb: 0.5,
+                height: 24,
+              }}
+            >
+              {chartsOpen
+                ? <ExpandMoreIcon sx={{ fontSize: 16 }} />
+                : <><ExpandLessIcon sx={{ fontSize: 16 }} /><Typography variant="caption" sx={{ fontSize: 10, mr: 0.5 }}>Charts</Typography></>
+              }
+            </Box>
+            <Box sx={{
+              height: chartsOpen ? 200 : 0,
+              transition: "height 0.2s ease",
+              overflow: "hidden",
+              backdropFilter: "blur(8px)",
+              bgcolor: "rgba(18, 18, 24, 0.3)",
+              borderTop: chartsOpen ? "1px solid rgba(255,255,255,0.08)" : "none",
+              pointerEvents: "auto",
+            }}>
+              {chartsOpen && <AggregateCharts />}
+            </Box>
+          </Box>
         </Box>
       </Box>
     </Box>
