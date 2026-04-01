@@ -8,6 +8,14 @@ use std::collections::VecDeque;
 
 use serde::{Deserialize, Serialize};
 
+/// A block entry in a chain tree snapshot, for UI display.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChainTreeEntry {
+    pub block_number: u64,
+    pub hash: String,
+    pub prev_hash: Option<String>,
+}
+
 /// Stats snapshot received from a net-node instance.
 ///
 /// Mirrors `net_node::telemetry::StatsSnapshot` with Deserialize.
@@ -25,6 +33,8 @@ pub struct StatsSnapshot {
     pub txs_generated: u64,
     pub peer_count: usize,
     pub peers: Vec<PeerStatsEntry>,
+    #[serde(default)]
+    pub chain_tree: Vec<ChainTreeEntry>,
 }
 
 /// Per-peer stats entry within a stats snapshot.
@@ -173,6 +183,32 @@ mod tests {
         assert_eq!(stats.node_id, "node-0");
         assert_eq!(stats.peers.len(), 1);
         assert_eq!(stats.peers[0].bytes_sent, 1024);
+        // chain_tree defaults to empty when absent (backward compat).
+        assert!(stats.chain_tree.is_empty());
+    }
+
+    #[test]
+    fn test_stats_deserialize_with_chain_tree() {
+        let json = serde_json::json!({
+            "node_id": "node-0",
+            "uptime_secs": 10.0,
+            "slot": 100,
+            "tip_block_no": 5,
+            "blocks_produced": 1,
+            "blocks_received": 3,
+            "blocks_validated": 2,
+            "txs_generated": 10,
+            "peer_count": 0,
+            "peers": [],
+            "chain_tree": [
+                {"block_number": 1, "hash": "a1b2", "prev_hash": null},
+                {"block_number": 2, "hash": "c3d4", "prev_hash": "a1b2"}
+            ]
+        });
+        let stats: StatsSnapshot = serde_json::from_value(json).unwrap();
+        assert_eq!(stats.chain_tree.len(), 2);
+        assert_eq!(stats.chain_tree[0].hash, "a1b2");
+        assert_eq!(stats.chain_tree[1].prev_hash.as_deref(), Some("a1b2"));
     }
 
     #[test]
