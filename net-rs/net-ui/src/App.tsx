@@ -182,7 +182,7 @@ export default function App() {
                   pointerEvents: "auto",
                   backdropFilter: "blur(6px)",
                 }}>
-                  <ChainTreeView entries={networkChainTree} tipCounts={networkTipCounts} />
+                  <ChainTreeView entries={networkChainTree} tipCounts={networkTipCounts} onSelectNode={useStore.getState().selectNode} />
                 </Box>
               )}
             </Box>
