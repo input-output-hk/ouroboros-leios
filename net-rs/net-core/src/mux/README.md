@@ -9,7 +9,7 @@ All Cardano mini-protocols share a single TCP connection via this multiplexer. E
 | `mod.rs` | `Mux` orchestration — protocol registration, `run()` to start egress/ingress tasks |
 | `wire.rs` | 8-byte segment wire format (timestamp, mode+protocol, payload length) |
 | `codec.rs` | CBOR framing: `CodecSend` (encode + send) and `CodecRecv` (receive + incremental decode) |
-| `scheduler.rs` | `Scheduler` trait + implementations: `StrictPriority`, `RoundRobin` |
+| `scheduler/` | `Scheduler` trait + implementations: `PriorityWfq` (default), `StrictPriority`, `RoundRobin` |
 | `channel.rs` | Per-protocol channel halves: `ChannelSend`, `ChannelRecv`, `IngressCounter` |
 | `egress.rs` | Muxer task — pulls from protocol queues via scheduler, segments into SDUs, writes to bearer |
 | `ingress.rs` | Demuxer task — reads segments from bearer, routes by composite key, enforces buffer limits |
@@ -41,12 +41,24 @@ trait Scheduler: Send + 'static {
 
 | Scheduler | Description |
 |-----------|-------------|
-| `StrictPriority` | Always services highest-priority (lowest value) ready queue. Default. Praos always outprioritizes Leios |
-| `RoundRobin` | Cycles through ready queues. Available for testing or alternative QoS |
+| `PriorityWfq` | **Default.** Two-class: Priority class (Praos) always serviced first; Default class (Leios/PeerSharing) uses message-based weighted fair queuing |
+| `StrictPriority` | Hardwired tiers by protocol ID. Can starve low-priority protocols |
+| `RoundRobin` | Cycles through ready queues. Ignores traffic class. For testing |
 
-### Priority Assignments
+### Traffic Classes
 
-Named constants in `mux::scheduler::priorities`:
+`PriorityWfq` assigns each protocol to a traffic class via `ProtocolConfig`:
+
+| Class | Protocols | Behavior |
+|-------|-----------|----------|
+| **Priority** | Handshake, ChainSync, BlockFetch, TxSubmission, KeepAlive | Always serviced first, round-robin among ready |
+| **Default** (weight=1) | LeiosFetch, LeiosNotify, PeerSharing | WFQ proportional to weight, only when no Priority protocol has data |
+
+Per-protocol traffic class is configurable via `--protocol-priority <id>,<P|weight>` CLI flag.
+
+### StrictPriority Assignments
+
+Named constants in `mux::scheduler::priorities` (used by `StrictPriority` scheduler):
 
 | Priority | Protocol |
 |----------|----------|
@@ -58,8 +70,6 @@ Named constants in `mux::scheduler::priorities`:
 | 5 | LeiosFetch |
 | 6 | LeiosNotify |
 | 7 | PeerSharing |
-
-`StrictPriority` can starve low-priority protocols under continuous high-priority load; acceptable because real protocol patterns have natural pauses.
 
 ## CBOR Codec
 
