@@ -49,11 +49,15 @@ impl ProcessManager {
     }
 
     /// Spawn a net-node child process for the given overlay config.
+    ///
+    /// An optional `extra_config` path is appended as an additional `--config`
+    /// layer (loaded after the overlay, so it wins on conflicts).
     pub fn spawn(
         &mut self,
         index: usize,
         node_id: &str,
         overlay_path: &Path,
+        extra_config: Option<&Path>,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         std::fs::create_dir_all(&self.log_dir)?;
 
@@ -66,6 +70,9 @@ impl ProcessManager {
             .arg(&self.base_config)
             .arg("--config")
             .arg(overlay_path);
+        if let Some(p) = extra_config {
+            cmd.arg("--config").arg(p);
+        }
         for ov in &self.node_overrides {
             cmd.arg("--set").arg(ov);
         }

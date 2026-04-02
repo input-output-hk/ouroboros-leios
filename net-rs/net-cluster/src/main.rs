@@ -73,7 +73,6 @@ fn spawn_cluster(
         &temp_dir,
         config.aggregator_port,
         config.stats_interval_secs,
-        config.rb_generation_probability,
         node_config,
     )?;
 
@@ -85,8 +84,9 @@ fn spawn_cluster(
         node_overrides.to_vec(),
     );
 
+    let extra_config = overlays.node_config_path.as_deref();
     for (i, node) in topo.nodes.iter().enumerate() {
-        pm.spawn(i, &node.node_id, &overlays.paths[i])?;
+        pm.spawn(i, &node.node_id, &overlays.paths[i], extra_config)?;
     }
 
     Ok(RunningCluster { pm, temp_dir })

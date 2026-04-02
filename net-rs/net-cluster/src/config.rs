@@ -28,7 +28,7 @@ pub struct ClusterControlConfig {
     pub max_latency_ms: Option<u64>,
     pub seed: Option<u64>,
     /// Node-level config overrides written into each node's overlay TOML.
-    /// Keys are dotted TOML paths (e.g. "validation.rb_body_validation_ms_constant").
+    /// Keys are dotted TOML paths (e.g. "production.rb_generation_probability").
     #[serde(default)]
     pub node_config: std::collections::HashMap<String, serde_json::Value>,
 }
@@ -181,7 +181,15 @@ impl ClusterConfig {
     ///
     /// Reads initial node-level config values from the base config file.
     pub fn control_fields(&self) -> ClusterControlConfig {
-        let node_config = read_node_config_defaults(&self.base_config);
+        let mut node_config = read_node_config_defaults(&self.base_config);
+        // If the cluster config has an explicit rb_generation_probability, it
+        // overrides whatever was in the base config file.
+        if let Some(p) = self.rb_generation_probability {
+            node_config.insert(
+                "production.rb_generation_probability".into(),
+                serde_json::json!(p),
+            );
+        }
         ClusterControlConfig {
             num_nodes: Some(self.num_nodes),
             degree: Some(self.degree),
@@ -231,6 +239,17 @@ fn read_node_config_defaults(
     let Ok(table) = content.parse::<toml::Value>() else {
         return map;
     };
+    if let Some(production) = table.get("production") {
+        if let Some(v) = production
+            .get("rb_generation_probability")
+            .and_then(|v| v.as_float())
+        {
+            map.insert(
+                "production.rb_generation_probability".into(),
+                serde_json::json!(v),
+            );
+        }
+    }
     if let Some(validation) = table.get("validation") {
         if let Some(v) = validation
             .get("rb_body_validation_ms_constant")
