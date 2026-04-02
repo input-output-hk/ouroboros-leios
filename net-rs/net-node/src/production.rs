@@ -6,10 +6,11 @@
 
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
+use tokio::sync::watch;
 
 use net_core::types::{BlockBody, Point, WrappedHeader};
 
-use crate::config::ProductionConfig;
+use crate::config::{DynamicConfig, ProductionConfig};
 
 /// A produced Leios endorser block.
 pub struct ProducedEb {
@@ -28,7 +29,8 @@ pub struct BlockProducer {
     rng: StdRng,
     stake: u64,
     total_stake: u64,
-    config: ProductionConfig,
+    stage_length_slots: u64,
+    dyn_config: watch::Receiver<DynamicConfig>,
     block_count: u64,
     eb_count: u64,
     vote_count: u64,
@@ -36,7 +38,11 @@ pub struct BlockProducer {
 
 impl BlockProducer {
     /// Create a new producer. If `seed` is None, uses entropy.
-    pub fn new(config: &ProductionConfig, seed: Option<u64>) -> Self {
+    pub fn new(
+        config: &ProductionConfig,
+        seed: Option<u64>,
+        dyn_config: watch::Receiver<DynamicConfig>,
+    ) -> Self {
         let rng = match seed {
             Some(s) => StdRng::seed_from_u64(s),
             None => StdRng::from_entropy(),
@@ -45,7 +51,8 @@ impl BlockProducer {
             rng,
             stake: config.stake,
             total_stake: config.total_stake,
-            config: config.clone(),
+            stage_length_slots: config.stage_length_slots,
+            dyn_config,
             block_count: 0,
             eb_count: 0,
             vote_count: 0,
@@ -70,7 +77,8 @@ impl BlockProducer {
             return None;
         }
 
-        if !self.run_lottery(self.config.rb_generation_probability) {
+        let rb_prob = self.dyn_config.borrow().rb_generation_probability;
+        if !self.run_lottery(rb_prob) {
             return None;
         }
 
@@ -80,11 +88,12 @@ impl BlockProducer {
 
     /// Try to produce a Leios endorser block. Called at stage boundaries.
     pub fn try_produce_eb(&mut self, slot: u64) -> Option<ProducedEb> {
-        if !self.is_active() || self.config.eb_generation_probability <= 0.0 {
+        let eb_prob = self.dyn_config.borrow().eb_generation_probability;
+        if !self.is_active() || eb_prob <= 0.0 {
             return None;
         }
 
-        if !self.run_lottery(self.config.eb_generation_probability) {
+        if !self.run_lottery(eb_prob) {
             return None;
         }
 
@@ -100,11 +109,12 @@ impl BlockProducer {
 
     /// Try to produce Leios votes. Called at stage boundaries.
     pub fn try_produce_votes(&mut self, slot: u64) -> Option<ProducedVotes> {
-        if !self.is_active() || self.config.vote_generation_probability <= 0.0 {
+        let vote_prob = self.dyn_config.borrow().vote_generation_probability;
+        if !self.is_active() || vote_prob <= 0.0 {
             return None;
         }
 
-        if !self.run_lottery(self.config.vote_generation_probability) {
+        if !self.run_lottery(vote_prob) {
             return None;
         }
 
@@ -126,7 +136,7 @@ impl BlockProducer {
 
     /// Check if this slot is a stage boundary.
     pub fn is_stage_boundary(&self, slot: u64) -> bool {
-        self.config.stage_length_slots > 0 && slot.is_multiple_of(self.config.stage_length_slots)
+        self.stage_length_slots > 0 && slot.is_multiple_of(self.stage_length_slots)
     }
 
     /// Number of Praos blocks produced so far.
@@ -240,6 +250,7 @@ impl BlockProducer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::DynamicConfigUpdate;
 
     fn base_config() -> ProductionConfig {
         ProductionConfig {
@@ -249,10 +260,24 @@ mod tests {
         }
     }
 
+    /// Create a watch receiver with the given production config's dynamic values.
+    fn dyn_rx(config: &ProductionConfig) -> watch::Receiver<DynamicConfig> {
+        let dyn_config = DynamicConfig {
+            rb_generation_probability: config.rb_generation_probability,
+            eb_generation_probability: config.eb_generation_probability,
+            vote_generation_probability: config.vote_generation_probability,
+            rb_head_validation_ms: 1.0,
+            rb_body_validation_ms_constant: 1000.0,
+            rb_body_validation_ms_per_byte: 0.0,
+            tx_rate: 0.0,
+        };
+        watch::channel(dyn_config).1
+    }
+
     #[test]
     fn zero_stake_never_produces() {
         let config = base_config();
-        let mut producer = BlockProducer::new(&config, Some(42));
+        let mut producer = BlockProducer::new(&config, Some(42), dyn_rx(&config));
         assert!(!producer.is_active());
         for slot in 0..100 {
             assert!(producer.try_produce_block(slot, None, slot + 1).is_none());
@@ -266,7 +291,7 @@ mod tests {
             rb_generation_probability: 1.0,
             ..base_config()
         };
-        let mut producer = BlockProducer::new(&config, Some(42));
+        let mut producer = BlockProducer::new(&config, Some(42), dyn_rx(&config));
         assert!(producer.is_active());
         for slot in 0..100 {
             let result = producer.try_produce_block(slot, None, slot + 1);
@@ -289,7 +314,7 @@ mod tests {
         };
 
         let run = |seed| {
-            let mut producer = BlockProducer::new(&config, Some(seed));
+            let mut producer = BlockProducer::new(&config, Some(seed), dyn_rx(&config));
             (0..1000)
                 .filter_map(|slot| {
                     producer
@@ -312,7 +337,7 @@ mod tests {
             rb_generation_probability: 0.5,
             ..base_config()
         };
-        let mut producer = BlockProducer::new(&config, Some(99));
+        let mut producer = BlockProducer::new(&config, Some(99), dyn_rx(&config));
         let wins: usize = (0..10_000)
             .filter(|slot| producer.try_produce_block(*slot, None, 1).is_some())
             .count();
@@ -329,7 +354,7 @@ mod tests {
             stage_length_slots: 20,
             ..base_config()
         };
-        let producer = BlockProducer::new(&config, Some(42));
+        let producer = BlockProducer::new(&config, Some(42), dyn_rx(&config));
         assert!(producer.is_stage_boundary(0));
         assert!(producer.is_stage_boundary(20));
         assert!(producer.is_stage_boundary(40));
@@ -344,7 +369,7 @@ mod tests {
             eb_generation_probability: 1.0,
             ..base_config()
         };
-        let mut producer = BlockProducer::new(&config, Some(42));
+        let mut producer = BlockProducer::new(&config, Some(42), dyn_rx(&config));
         let eb = producer.try_produce_eb(100);
         assert!(eb.is_some());
     }
@@ -356,7 +381,7 @@ mod tests {
             vote_generation_probability: 1.0,
             ..base_config()
         };
-        let mut producer = BlockProducer::new(&config, Some(42));
+        let mut producer = BlockProducer::new(&config, Some(42), dyn_rx(&config));
         let votes = producer.try_produce_votes(100);
         assert!(votes.is_some());
         let v = votes.unwrap();
@@ -371,7 +396,7 @@ mod tests {
             rb_generation_probability: 1.0,
             ..base_config()
         };
-        let mut producer = BlockProducer::new(&config, Some(42));
+        let mut producer = BlockProducer::new(&config, Some(42), dyn_rx(&config));
         let (point, header, body) = producer.try_produce_block(12345, None, 1).unwrap();
 
         // Header should be parseable.
@@ -396,5 +421,42 @@ mod tests {
         let ex = extracted.unwrap();
         assert!(ex.parsed.is_some());
         assert_eq!(ex.parsed.as_ref().unwrap().slot, 12345);
+    }
+
+    #[test]
+    fn dynamic_update_changes_production_rate() {
+        let config = ProductionConfig {
+            stake: 1000,
+            rb_generation_probability: 0.0, // starts at 0 — no production
+            ..base_config()
+        };
+        let dyn_config = DynamicConfig {
+            rb_generation_probability: 0.0,
+            eb_generation_probability: 0.0,
+            vote_generation_probability: 0.0,
+            rb_head_validation_ms: 1.0,
+            rb_body_validation_ms_constant: 1000.0,
+            rb_body_validation_ms_per_byte: 0.0,
+            tx_rate: 0.0,
+        };
+        let (tx, rx) = watch::channel(dyn_config);
+        let mut producer = BlockProducer::new(&config, Some(42), rx);
+
+        // Should not produce with probability 0.
+        let wins_before: usize = (0..100)
+            .filter(|slot| producer.try_produce_block(*slot, None, 1).is_some())
+            .count();
+        assert_eq!(wins_before, 0);
+
+        // Update probability to 1.0.
+        tx.send_modify(|c| {
+            c.rb_generation_probability = 1.0;
+        });
+
+        // Now should always produce.
+        let wins_after: usize = (100..200)
+            .filter(|slot| producer.try_produce_block(*slot, None, 1).is_some())
+            .count();
+        assert_eq!(wins_after, 100);
     }
 }

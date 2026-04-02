@@ -10,6 +10,7 @@ mod validation;
 
 use clap::Parser;
 use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
+use tokio::io::AsyncBufReadExt;
 use tracing::{info, warn};
 
 use telemetry::NodeEvent;
@@ -50,8 +51,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mut handle = network::start(&config).await?;
     let commands = handle.commands.clone();
 
+    // Dynamic config watch channel (hot-reloadable parameters).
+    let (dyn_tx, dyn_rx) = tokio::sync::watch::channel(config.dynamic_config());
+
     // Block producer.
-    let mut producer = production::BlockProducer::new(&config.production, config.seed);
+    let mut producer =
+        production::BlockProducer::new(&config.production, config.seed, dyn_rx.clone());
     if producer.is_active() {
         info!(
             node_id = %config.node_id,
@@ -65,7 +70,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     }
 
     // Validator and consensus.
-    let (validator, mut validation_rx) = validation::Validator::new(config.validation.clone());
+    let (validator, mut validation_rx) = validation::Validator::new(dyn_rx.clone());
     let mut consensus = consensus::Consensus::new(
         config.node_id.clone(),
         commands.clone(),
@@ -79,6 +84,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         config.seed,
         commands.clone(),
         config.node_id.clone(),
+        dyn_rx.clone(),
     );
 
     // Telemetry.
@@ -104,6 +110,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Graceful shutdown on Ctrl-C.
     let shutdown = tokio::signal::ctrl_c();
     tokio::pin!(shutdown);
+
+    // Stdin reader for dynamic config updates from net-cluster.
+    let stdin = tokio::io::stdin();
+    let mut stdin_reader = tokio::io::BufReader::new(stdin);
+    let mut stdin_line = String::new();
 
     let leios = config.leios_enabled;
     let node_id = config.node_id.clone();
@@ -196,6 +207,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             _ = stats_tick.tick(), if stats_interval > 0 => {
                 telem.flush();
                 let _ = commands.send(NetworkCommand::QueryPeers).await;
+            }
+            result = stdin_reader.read_line(&mut stdin_line) => {
+                match result {
+                    Ok(0) => {} // EOF — stdin closed, no more updates
+                    Ok(_) => {
+                        match serde_json::from_str::<config::DynamicConfigUpdate>(&stdin_line) {
+                            Ok(update) => {
+                                let mut current = dyn_tx.borrow().clone();
+                                current.apply_update(&update);
+                                let _ = dyn_tx.send(current);
+                                info!(node_id = %node_id, "dynamic config updated");
+                            }
+                            Err(e) => {
+                                warn!(node_id = %node_id, "invalid config update on stdin: {e}");
+                            }
+                        }
+                        stdin_line.clear();
+                    }
+                    Err(e) => {
+                        warn!(node_id = %node_id, "stdin read error: {e}");
+                    }
+                }
             }
             _ = &mut shutdown => {
                 info!("shutting down");

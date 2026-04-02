@@ -30,3 +30,12 @@ export async function restartCluster(config: ClusterControlConfig): Promise<bool
   });
   return res.ok;
 }
+
+export async function updateNodeConfig(nodeConfig: Record<string, unknown>): Promise<boolean> {
+  const res = await fetch(`${BASE}/api/update-config`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ node_config: nodeConfig }),
+  });
+  return res.ok;
+}

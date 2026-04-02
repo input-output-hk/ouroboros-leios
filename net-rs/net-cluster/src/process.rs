@@ -6,7 +6,8 @@
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
-use tokio::process::{Child, Command};
+use tokio::io::AsyncWriteExt;
+use tokio::process::{Child, ChildStdin, Command};
 
 /// A running net-node child process.
 pub struct ChildNode {
@@ -14,6 +15,7 @@ pub struct ChildNode {
     pub index: usize,
     pub node_id: String,
     pub child: Child,
+    pub stdin: Option<ChildStdin>,
 }
 
 /// Manages the set of child net-node processes.
@@ -76,7 +78,8 @@ impl ProcessManager {
         for ov in &self.node_overrides {
             cmd.arg("--set").arg(ov);
         }
-        let child = cmd
+        let mut child = cmd
+            .stdin(Stdio::piped())
             .stdout(Stdio::from(log_file))
             .stderr(Stdio::from(stderr_file))
             .env(
@@ -86,12 +89,14 @@ impl ProcessManager {
             .kill_on_drop(true)
             .spawn()?;
 
+        let stdin = child.stdin.take();
         tracing::info!("spawned {node_id} (pid {})", child.id().unwrap_or(0));
 
         self.children.push(ChildNode {
             index,
             node_id: node_id.to_string(),
             child,
+            stdin,
         });
 
         Ok(())
@@ -147,6 +152,26 @@ impl ProcessManager {
                 Ok(None) => {} // Still running.
                 Err(e) => {
                     tracing::warn!("{} status check error: {e}", child.node_id);
+                }
+            }
+        }
+    }
+
+    /// Send a JSON config update to all running children via stdin.
+    ///
+    /// Writes a single JSON line (terminated by newline) to each child's
+    /// stdin pipe. Failures on individual children are logged and skipped.
+    pub async fn send_config_update(&mut self, json: &serde_json::Value) {
+        let mut line = serde_json::to_string(json).unwrap_or_default();
+        line.push('\n');
+        let bytes = line.as_bytes();
+
+        for child in &mut self.children {
+            if let Some(stdin) = &mut child.stdin {
+                if let Err(e) = stdin.write_all(bytes).await {
+                    tracing::warn!("failed to send config update to {}: {e}", child.node_id);
+                    // stdin broken — drop it so we don't keep trying
+                    child.stdin = None;
                 }
             }
         }

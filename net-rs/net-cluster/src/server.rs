@@ -34,6 +34,8 @@ pub struct ServerState {
     pub event_broadcast: broadcast::Sender<Vec<serde_json::Value>>,
     /// Channel to send restart commands to the main loop.
     pub restart_tx: mpsc::Sender<ClusterControlConfig>,
+    /// Channel to send node config updates (without restart) to the main loop.
+    pub update_tx: mpsc::Sender<std::collections::HashMap<String, serde_json::Value>>,
     /// Current controllable config (updated on restart).
     pub current_config: RwLock<ClusterControlConfig>,
     /// Guard against concurrent restarts.
@@ -51,6 +53,7 @@ pub async fn start(
     topology: Topology,
     event_window: Arc<RwLock<EventWindow>>,
     restart_tx: mpsc::Sender<ClusterControlConfig>,
+    update_tx: mpsc::Sender<HashMap<String, serde_json::Value>>,
     initial_config: ClusterControlConfig,
 ) -> Result<(Arc<ServerState>, tokio::task::JoinHandle<()>), Box<dyn std::error::Error + Send + Sync>>
 {
@@ -62,6 +65,7 @@ pub async fn start(
         event_window,
         event_broadcast,
         restart_tx,
+        update_tx,
         current_config: RwLock::new(initial_config),
         restarting: RwLock::new(false),
     });
@@ -79,6 +83,7 @@ pub async fn start(
         // Cluster control API.
         .route("/api/config", get(get_config))
         .route("/api/restart", post(restart_cluster))
+        .route("/api/update-config", post(update_config))
         .layer(CorsLayer::permissive())
         .with_state(state.clone());
 
@@ -216,6 +221,38 @@ async fn restart_cluster(
     }
 }
 
+/// Payload for POST /api/update-config.
+#[derive(serde::Deserialize)]
+struct UpdateConfigPayload {
+    node_config: HashMap<String, serde_json::Value>,
+}
+
+/// POST /api/update-config — push node config changes to running nodes without restart.
+async fn update_config(
+    State(state): State<Arc<ServerState>>,
+    Json(payload): Json<UpdateConfigPayload>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    // Update stored config so GET /api/config reflects the change.
+    {
+        let mut config = state.current_config.write().await;
+        for (k, v) in &payload.node_config {
+            config.node_config.insert(k.clone(), v.clone());
+        }
+    }
+    // Send to main loop for delivery to child processes.
+    match state.update_tx.try_send(payload.node_config) {
+        Ok(()) => Ok(StatusCode::OK),
+        Err(mpsc::error::TrySendError::Full(_)) => Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Update channel full".into(),
+        )),
+        Err(mpsc::error::TrySendError::Closed(_)) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Update channel closed".into(),
+        )),
+    }
+}
+
 /// GET /api/stats — return latest stats for all nodes.
 async fn get_all_stats(
     State(state): State<Arc<ServerState>>,
@@ -290,6 +327,7 @@ mod tests {
         let event_window = Arc::new(RwLock::new(EventWindow::new(100)));
         let (event_broadcast, _) = broadcast::channel(256);
         let (restart_tx, _restart_rx) = mpsc::channel(1);
+        let (update_tx, _update_rx) = mpsc::channel(16);
         let state = Arc::new(ServerState {
             event_tx: tx,
             latest_stats: RwLock::new(HashMap::new()),
@@ -300,6 +338,7 @@ mod tests {
             event_window,
             event_broadcast,
             restart_tx,
+            update_tx,
             current_config: RwLock::new(ClusterControlConfig {
                 num_nodes: Some(5),
                 degree: Some(3),
