@@ -25,7 +25,7 @@ pub fn spawn_tx_generator(
     seed: Option<u64>,
     commands: mpsc::Sender<NetworkCommand>,
     node_id: String,
-    dyn_config: watch::Receiver<DynamicConfig>,
+    mut dyn_config: watch::Receiver<DynamicConfig>,
 ) -> tokio::task::JoinHandle<()> {
     let min_size = config.tx_size_min;
     let max_size = config.tx_size_max;
@@ -41,7 +41,7 @@ pub fn spawn_tx_generator(
             let rate = dyn_config.borrow().tx_rate;
             if rate <= 0.0 {
                 // Wait for a config update that might set a positive rate.
-                if dyn_config.clone().changed().await.is_err() {
+                if dyn_config.changed().await.is_err() {
                     break; // sender dropped
                 }
                 continue;
