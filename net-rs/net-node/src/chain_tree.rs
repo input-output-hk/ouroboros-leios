@@ -134,6 +134,11 @@ impl ChainTree {
         self.nodes.get(hash).map(|n| &n.point)
     }
 
+    /// Look up the prev_hash for a given hash.
+    pub(crate) fn prev_hash(&self, hash: &[u8; 32]) -> Option<[u8; 32]> {
+        self.nodes.get(hash).and_then(|n| n.prev_hash)
+    }
+
     /// Number of blocks in the tree.
     #[cfg(test)]
     pub fn len(&self) -> usize {
