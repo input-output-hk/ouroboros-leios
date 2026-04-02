@@ -21,6 +21,7 @@ export function ControlPanel() {
   const [minLatency, setMinLatency] = useState("5");
   const [maxLatency, setMaxLatency] = useState("300");
   const [seed, setSeed] = useState("");
+  const [rbGenProb, setRbGenProb] = useState("0.05");
   const [rbBodyValidationMs, setRbBodyValidationMs] = useState("1000");
 
   useEffect(() => {
@@ -32,6 +33,8 @@ export function ControlPanel() {
       setSeed(clusterConfig.seed != null ? String(clusterConfig.seed) : "");
 
       const nc = clusterConfig.node_config ?? {};
+      const rbGenVal = nc["production.rb_generation_probability"];
+      if (rbGenVal != null) setRbGenProb(String(rbGenVal));
       const rbVal = nc["validation.rb_body_validation_ms_constant"];
       if (rbVal != null) setRbBodyValidationMs(String(rbVal));
     }
@@ -50,6 +53,7 @@ export function ControlPanel() {
       max_latency_ms: maxLatencyN,
       seed: seed !== "" ? Number(seed) : undefined,
       node_config: {
+        "production.rb_generation_probability": Number(rbGenProb) || 0,
         "validation.rb_body_validation_ms_constant": Number(rbBodyValidationMs) || 0,
       },
     });
@@ -122,6 +126,16 @@ export function ControlPanel() {
       <Typography variant="subtitle2" sx={{ color: "#90caf9", fontWeight: 700 }}>
         Node Config
       </Typography>
+      <TextField
+        label="RB gen probability"
+        type="number"
+        size="small"
+        value={rbGenProb}
+        onChange={(e) => setRbGenProb(e.target.value)}
+        disabled={restarting}
+        slotProps={{ htmlInput: { min: 0, max: 1, step: 0.01 } }}
+        sx={numberFieldSx}
+      />
       <TextField
         label="RB body validation (ms)"
         type="number"
