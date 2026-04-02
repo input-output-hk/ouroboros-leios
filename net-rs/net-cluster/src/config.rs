@@ -19,6 +19,20 @@ fn default_inject_count() -> usize {
     1
 }
 
+/// Subset of ClusterConfig controllable via the REST API.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ClusterControlConfig {
+    pub num_nodes: Option<usize>,
+    pub degree: Option<usize>,
+    pub min_latency_ms: Option<u64>,
+    pub max_latency_ms: Option<u64>,
+    pub seed: Option<u64>,
+    /// Node-level config overrides written into each node's overlay TOML.
+    /// Keys are dotted TOML paths (e.g. "validation.rb_body_validation_ms_constant").
+    #[serde(default)]
+    pub node_config: std::collections::HashMap<String, serde_json::Value>,
+}
+
 /// Top-level cluster configuration.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ClusterConfig {
@@ -132,6 +146,53 @@ impl Default for ClusterConfig {
     }
 }
 
+impl ClusterConfig {
+    /// Apply optional overrides from a control config, returning a new config.
+    pub fn with_overrides(
+        &self,
+        overrides: &ClusterControlConfig,
+    ) -> Result<ClusterConfig, String> {
+        let mut config = self.clone();
+        if let Some(n) = overrides.num_nodes {
+            config.num_nodes = n;
+        }
+        if let Some(d) = overrides.degree {
+            config.degree = d;
+        }
+        if let Some(min) = overrides.min_latency_ms {
+            config.min_latency_ms = min;
+        }
+        if let Some(max) = overrides.max_latency_ms {
+            config.max_latency_ms = max;
+        }
+        if let Some(s) = overrides.seed {
+            config.seed = Some(s);
+        }
+        if config.num_nodes == 0 {
+            return Err("num_nodes must be at least 1".into());
+        }
+        if config.min_latency_ms > config.max_latency_ms {
+            return Err("min_latency_ms must be <= max_latency_ms".into());
+        }
+        Ok(config)
+    }
+
+    /// Extract the controllable fields as a `ClusterControlConfig`.
+    ///
+    /// Reads initial node-level config values from the base config file.
+    pub fn control_fields(&self) -> ClusterControlConfig {
+        let node_config = read_node_config_defaults(&self.base_config);
+        ClusterControlConfig {
+            num_nodes: Some(self.num_nodes),
+            degree: Some(self.degree),
+            min_latency_ms: Some(self.min_latency_ms),
+            max_latency_ms: Some(self.max_latency_ms),
+            seed: self.seed,
+            node_config,
+        }
+    }
+}
+
 /// Load cluster configuration from a TOML file with optional --set overrides.
 pub fn load(
     config_file: &str,
@@ -155,6 +216,33 @@ pub fn load(
     }
 
     Ok(config)
+}
+
+/// Read node-level config defaults from the base net-node config file.
+///
+/// Extracts known controllable values so the UI can show current defaults.
+fn read_node_config_defaults(
+    base_config: &str,
+) -> std::collections::HashMap<String, serde_json::Value> {
+    let mut map = std::collections::HashMap::new();
+    let Ok(content) = std::fs::read_to_string(base_config) else {
+        return map;
+    };
+    let Ok(table) = content.parse::<toml::Value>() else {
+        return map;
+    };
+    if let Some(validation) = table.get("validation") {
+        if let Some(v) = validation
+            .get("rb_body_validation_ms_constant")
+            .and_then(|v| v.as_float())
+        {
+            map.insert(
+                "validation.rb_body_validation_ms_constant".into(),
+                serde_json::json!(v),
+            );
+        }
+    }
+    map
 }
 
 /// Convert "key=value" to a TOML fragment string.

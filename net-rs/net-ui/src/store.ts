@@ -6,8 +6,9 @@ import type {
   AggregatePoint,
   NodeSeriesPoint,
   ChainTreeEntry,
+  ClusterControlConfig,
 } from "./types";
-import { fetchTopology, fetchAllStats, fetchEvents } from "./api";
+import { fetchTopology, fetchAllStats, fetchEvents, fetchConfig, restartCluster as apiRestartCluster } from "./api";
 
 const MAX_SERIES = 300; // ~5 min at 1s stats interval
 const MAX_EVENTS = 500;
@@ -54,6 +55,12 @@ export interface DashboardState {
   selectedEdge: { from: number; to: number } | null;
   selectNode: (id: string | null) => void;
   selectEdge: (edge: { from: number; to: number } | null) => void;
+
+  // Cluster control
+  clusterConfig: ClusterControlConfig | null;
+  restarting: boolean;
+  loadConfig: () => Promise<void>;
+  restartCluster: (config: ClusterControlConfig) => Promise<void>;
 }
 
 export const useStore = create<DashboardState>()((set, get) => ({
@@ -306,4 +313,51 @@ export const useStore = create<DashboardState>()((set, get) => ({
 
   selectNode: (id) => set({ selectedNodeId: id, selectedEdge: null }),
   selectEdge: (edge) => set({ selectedEdge: edge, selectedNodeId: null }),
+
+  // --- Cluster control ---
+  clusterConfig: null,
+  restarting: false,
+
+  loadConfig: async () => {
+    try {
+      const config = await fetchConfig();
+      set({ clusterConfig: config });
+    } catch (e) {
+      console.error("Failed to load config:", e);
+    }
+  },
+
+  restartCluster: async (config) => {
+    set({ restarting: true });
+    try {
+      const ok = await apiRestartCluster(config);
+      if (ok) {
+        // Clear local state from the old cluster.
+        eventRing.length = 0;
+        set({
+          latestStats: {},
+          prevSnapshot: null,
+          prevNodeSnapshot: {},
+          aggregateSeries: [],
+          nodeTimeSeries: {},
+          networkChainTree: [],
+          networkTipCounts: {},
+          eventVersion: 0,
+          lastEventTime: 0,
+          nodeFlash: {},
+          topology: null,
+          layoutReady: false,
+          nodePositions: {},
+          selectedNodeId: null,
+          selectedEdge: null,
+        });
+        // Wait for new nodes to start, then reload topology + config.
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        await get().loadTopology();
+        await get().loadConfig();
+      }
+    } finally {
+      set({ restarting: false });
+    }
+  },
 }));

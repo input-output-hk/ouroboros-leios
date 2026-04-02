@@ -6,6 +6,8 @@
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
 
+use std::collections::HashMap;
+
 use crate::topology::{NodeTopology, Topology};
 
 /// Generated overlay files, stored in a temp directory.
@@ -27,6 +29,7 @@ pub fn generate_overlays(
     aggregator_port: u16,
     stats_interval_secs: u64,
     rb_generation_probability: Option<f64>,
+    node_config: &HashMap<String, serde_json::Value>,
 ) -> Result<OverlayFiles, Box<dyn std::error::Error + Send + Sync>> {
     std::fs::create_dir_all(temp_dir)?;
 
@@ -38,6 +41,7 @@ pub fn generate_overlays(
             aggregator_port,
             stats_interval_secs,
             rb_generation_probability,
+            node_config,
         );
         let path = temp_dir.join(format!("node-{}.toml", node.index));
         std::fs::write(&path, &toml_content)?;
@@ -56,6 +60,7 @@ fn render_overlay(
     aggregator_port: u16,
     stats_interval_secs: u64,
     rb_generation_probability: Option<f64>,
+    node_config: &HashMap<String, serde_json::Value>,
 ) -> String {
     let mut s = String::new();
 
@@ -79,6 +84,34 @@ fn render_overlay(
     writeln!(s, "[[telemetry.stats_sinks]]").ok();
     writeln!(s, "type = \"http\"").ok();
     writeln!(s, "url = \"http://127.0.0.1:{aggregator_port}/stats\"").ok();
+
+    // Node config overrides from the UI, grouped by TOML section.
+    if !node_config.is_empty() {
+        let mut sections: HashMap<&str, Vec<(&str, &serde_json::Value)>> = HashMap::new();
+        for (key, value) in node_config {
+            if let Some((section, field)) = key.split_once('.') {
+                sections.entry(section).or_default().push((field, value));
+            }
+        }
+        for (section, fields) in &sections {
+            writeln!(s).ok();
+            writeln!(s, "[{section}]").ok();
+            for (field, value) in fields {
+                match value {
+                    serde_json::Value::Number(n) => {
+                        writeln!(s, "{field} = {n}").ok();
+                    }
+                    serde_json::Value::Bool(b) => {
+                        writeln!(s, "{field} = {b}").ok();
+                    }
+                    serde_json::Value::String(st) => {
+                        writeln!(s, "{field} = \"{st}\"").ok();
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
 
     for peer in &node.peers {
         writeln!(s).ok();
@@ -130,7 +163,7 @@ mod tests {
     #[test]
     fn test_render_overlay() {
         let node = sample_node();
-        let toml = render_overlay(&node, 9100, 5, None);
+        let toml = render_overlay(&node, 9100, 5, None, &HashMap::new());
 
         assert!(toml.contains("node_id = \"node-0\""));
         assert!(toml.contains("listen_address = \"127.0.0.1:30000\""));
@@ -149,7 +182,7 @@ mod tests {
     #[test]
     fn test_render_parses_as_toml() {
         let node = sample_node();
-        let toml_str = render_overlay(&node, 9100, 5, None);
+        let toml_str = render_overlay(&node, 9100, 5, None, &HashMap::new());
         let parsed: toml::Value = toml::from_str(&toml_str).expect("generated TOML should parse");
         assert_eq!(parsed["node_id"].as_str(), Some("node-0"));
     }
@@ -161,7 +194,8 @@ mod tests {
             edges: Vec::new(),
         };
         let dir = tempfile::tempdir().unwrap();
-        let overlays = generate_overlays(&topo, dir.path(), 9100, 5, None).unwrap();
+        let overlays =
+            generate_overlays(&topo, dir.path(), 9100, 5, None, &HashMap::new()).unwrap();
         assert_eq!(overlays.paths.len(), 1);
         assert!(overlays.paths[0].exists());
 

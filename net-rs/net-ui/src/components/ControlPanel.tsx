@@ -1,0 +1,136 @@
+import { useEffect, useState } from "react";
+import { Box, Button, CircularProgress, Divider, TextField, Typography } from "@mui/material";
+import { useStore } from "@/store";
+
+export function ControlPanel() {
+  const clusterConfig = useStore((s) => s.clusterConfig);
+  const restarting = useStore((s) => s.restarting);
+  const restartCluster = useStore((s) => s.restartCluster);
+
+  // Cluster topology fields
+  const [numNodes, setNumNodes] = useState(5);
+  const [degree, setDegree] = useState(3);
+  const [minLatency, setMinLatency] = useState(5);
+  const [maxLatency, setMaxLatency] = useState(300);
+  const [seed, setSeed] = useState("");
+
+  // Node config fields
+  const [rbBodyValidationMs, setRbBodyValidationMs] = useState(1000);
+
+  useEffect(() => {
+    if (clusterConfig) {
+      if (clusterConfig.num_nodes != null) setNumNodes(clusterConfig.num_nodes);
+      if (clusterConfig.degree != null) setDegree(clusterConfig.degree);
+      if (clusterConfig.min_latency_ms != null) setMinLatency(clusterConfig.min_latency_ms);
+      if (clusterConfig.max_latency_ms != null) setMaxLatency(clusterConfig.max_latency_ms);
+      setSeed(clusterConfig.seed != null ? String(clusterConfig.seed) : "");
+
+      const nc = clusterConfig.node_config ?? {};
+      const rbVal = nc["validation.rb_body_validation_ms_constant"];
+      if (rbVal != null) setRbBodyValidationMs(Number(rbVal));
+    }
+  }, [clusterConfig]);
+
+  const handleRestart = () => {
+    restartCluster({
+      num_nodes: numNodes,
+      degree,
+      min_latency_ms: minLatency,
+      max_latency_ms: maxLatency,
+      seed: seed !== "" ? Number(seed) : undefined,
+      node_config: {
+        "validation.rb_body_validation_ms_constant": rbBodyValidationMs,
+      },
+    });
+  };
+
+  return (
+    <Box sx={{
+      p: 2,
+      display: "flex",
+      flexDirection: "column",
+      gap: 1.5,
+      width: 260,
+    }}>
+      <Typography variant="subtitle2" sx={{ color: "#90caf9", fontWeight: 700 }}>
+        Cluster Topology
+      </Typography>
+      <TextField
+        label="Nodes"
+        type="number"
+        size="small"
+        value={numNodes}
+        onChange={(e) => setNumNodes(Math.max(1, Number(e.target.value)))}
+        disabled={restarting}
+        slotProps={{ htmlInput: { min: 1, max: 100 } }}
+      />
+      <TextField
+        label="Degree"
+        type="number"
+        size="small"
+        value={degree}
+        onChange={(e) => setDegree(Math.max(1, Number(e.target.value)))}
+        disabled={restarting}
+        slotProps={{ htmlInput: { min: 1, max: 50 } }}
+      />
+      <TextField
+        label="Min latency (ms)"
+        type="number"
+        size="small"
+        value={minLatency}
+        onChange={(e) => setMinLatency(Math.max(0, Number(e.target.value)))}
+        disabled={restarting}
+        slotProps={{ htmlInput: { min: 0 } }}
+      />
+      <TextField
+        label="Max latency (ms)"
+        type="number"
+        size="small"
+        value={maxLatency}
+        onChange={(e) => setMaxLatency(Math.max(0, Number(e.target.value)))}
+        disabled={restarting}
+        slotProps={{ htmlInput: { min: 0 } }}
+      />
+      <TextField
+        label="Seed (optional)"
+        type="number"
+        size="small"
+        value={seed}
+        onChange={(e) => setSeed(e.target.value)}
+        disabled={restarting}
+        placeholder="random"
+      />
+
+      <Divider sx={{ borderColor: "rgba(255,255,255,0.1)", my: 0.5 }} />
+
+      <Typography variant="subtitle2" sx={{ color: "#90caf9", fontWeight: 700 }}>
+        Node Config
+      </Typography>
+      <TextField
+        label="RB body validation (ms)"
+        type="number"
+        size="small"
+        value={rbBodyValidationMs}
+        onChange={(e) => setRbBodyValidationMs(Math.max(0, Number(e.target.value)))}
+        disabled={restarting}
+        slotProps={{ htmlInput: { min: 0, step: 100 } }}
+      />
+
+      <Button
+        variant="contained"
+        onClick={handleRestart}
+        disabled={restarting || minLatency > maxLatency || numNodes < 1}
+        sx={{ mt: 0.5 }}
+      >
+        {restarting ? (
+          <>
+            <CircularProgress size={18} sx={{ mr: 1 }} />
+            Restarting...
+          </>
+        ) : (
+          "Restart Cluster"
+        )}
+      </Button>
+    </Box>
+  );
+}

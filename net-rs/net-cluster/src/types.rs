@@ -95,6 +95,11 @@ impl EventWindow {
         }
     }
 
+    /// Clear all events from the window.
+    pub fn clear(&mut self) {
+        self.events.clear();
+    }
+
     /// Push events into the window, evicting oldest if over capacity.
     pub fn push(&mut self, events: impl IntoIterator<Item = serde_json::Value>) {
         for event in events {
