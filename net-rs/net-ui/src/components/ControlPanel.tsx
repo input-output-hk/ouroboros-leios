@@ -2,44 +2,55 @@ import { useEffect, useState } from "react";
 import { Box, Button, CircularProgress, Divider, TextField, Typography } from "@mui/material";
 import { useStore } from "@/store";
 
+/** Dark-mode styling for number input spin buttons. */
+const numberFieldSx = {
+  "& input[type=number]::-webkit-inner-spin-button, & input[type=number]::-webkit-outer-spin-button": {
+    appearance: "auto",
+    filter: "invert(1)",
+  },
+};
+
 export function ControlPanel() {
   const clusterConfig = useStore((s) => s.clusterConfig);
   const restarting = useStore((s) => s.restarting);
   const restartCluster = useStore((s) => s.restartCluster);
 
-  // Cluster topology fields
-  const [numNodes, setNumNodes] = useState(5);
-  const [degree, setDegree] = useState(3);
-  const [minLatency, setMinLatency] = useState(5);
-  const [maxLatency, setMaxLatency] = useState(300);
+  // Store as strings so the user can freely delete and retype.
+  const [numNodes, setNumNodes] = useState("5");
+  const [degree, setDegree] = useState("3");
+  const [minLatency, setMinLatency] = useState("5");
+  const [maxLatency, setMaxLatency] = useState("300");
   const [seed, setSeed] = useState("");
-
-  // Node config fields
-  const [rbBodyValidationMs, setRbBodyValidationMs] = useState(1000);
+  const [rbBodyValidationMs, setRbBodyValidationMs] = useState("1000");
 
   useEffect(() => {
     if (clusterConfig) {
-      if (clusterConfig.num_nodes != null) setNumNodes(clusterConfig.num_nodes);
-      if (clusterConfig.degree != null) setDegree(clusterConfig.degree);
-      if (clusterConfig.min_latency_ms != null) setMinLatency(clusterConfig.min_latency_ms);
-      if (clusterConfig.max_latency_ms != null) setMaxLatency(clusterConfig.max_latency_ms);
+      if (clusterConfig.num_nodes != null) setNumNodes(String(clusterConfig.num_nodes));
+      if (clusterConfig.degree != null) setDegree(String(clusterConfig.degree));
+      if (clusterConfig.min_latency_ms != null) setMinLatency(String(clusterConfig.min_latency_ms));
+      if (clusterConfig.max_latency_ms != null) setMaxLatency(String(clusterConfig.max_latency_ms));
       setSeed(clusterConfig.seed != null ? String(clusterConfig.seed) : "");
 
       const nc = clusterConfig.node_config ?? {};
       const rbVal = nc["validation.rb_body_validation_ms_constant"];
-      if (rbVal != null) setRbBodyValidationMs(Number(rbVal));
+      if (rbVal != null) setRbBodyValidationMs(String(rbVal));
     }
   }, [clusterConfig]);
 
+  const numNodesN = Number(numNodes) || 0;
+  const minLatencyN = Number(minLatency) || 0;
+  const maxLatencyN = Number(maxLatency) || 0;
+  const valid = numNodesN >= 1 && minLatencyN <= maxLatencyN;
+
   const handleRestart = () => {
     restartCluster({
-      num_nodes: numNodes,
-      degree,
-      min_latency_ms: minLatency,
-      max_latency_ms: maxLatency,
+      num_nodes: numNodesN,
+      degree: Number(degree) || 1,
+      min_latency_ms: minLatencyN,
+      max_latency_ms: maxLatencyN,
       seed: seed !== "" ? Number(seed) : undefined,
       node_config: {
-        "validation.rb_body_validation_ms_constant": rbBodyValidationMs,
+        "validation.rb_body_validation_ms_constant": Number(rbBodyValidationMs) || 0,
       },
     });
   };
@@ -60,36 +71,40 @@ export function ControlPanel() {
         type="number"
         size="small"
         value={numNodes}
-        onChange={(e) => setNumNodes(Math.max(1, Number(e.target.value)))}
+        onChange={(e) => setNumNodes(e.target.value)}
         disabled={restarting}
         slotProps={{ htmlInput: { min: 1, max: 100 } }}
+        sx={numberFieldSx}
       />
       <TextField
         label="Degree"
         type="number"
         size="small"
         value={degree}
-        onChange={(e) => setDegree(Math.max(1, Number(e.target.value)))}
+        onChange={(e) => setDegree(e.target.value)}
         disabled={restarting}
         slotProps={{ htmlInput: { min: 1, max: 50 } }}
+        sx={numberFieldSx}
       />
       <TextField
         label="Min latency (ms)"
         type="number"
         size="small"
         value={minLatency}
-        onChange={(e) => setMinLatency(Math.max(0, Number(e.target.value)))}
+        onChange={(e) => setMinLatency(e.target.value)}
         disabled={restarting}
         slotProps={{ htmlInput: { min: 0 } }}
+        sx={numberFieldSx}
       />
       <TextField
         label="Max latency (ms)"
         type="number"
         size="small"
         value={maxLatency}
-        onChange={(e) => setMaxLatency(Math.max(0, Number(e.target.value)))}
+        onChange={(e) => setMaxLatency(e.target.value)}
         disabled={restarting}
         slotProps={{ htmlInput: { min: 0 } }}
+        sx={numberFieldSx}
       />
       <TextField
         label="Seed (optional)"
@@ -99,6 +114,7 @@ export function ControlPanel() {
         onChange={(e) => setSeed(e.target.value)}
         disabled={restarting}
         placeholder="random"
+        sx={numberFieldSx}
       />
 
       <Divider sx={{ borderColor: "rgba(255,255,255,0.1)", my: 0.5 }} />
@@ -111,15 +127,16 @@ export function ControlPanel() {
         type="number"
         size="small"
         value={rbBodyValidationMs}
-        onChange={(e) => setRbBodyValidationMs(Math.max(0, Number(e.target.value)))}
+        onChange={(e) => setRbBodyValidationMs(e.target.value)}
         disabled={restarting}
         slotProps={{ htmlInput: { min: 0, step: 100 } }}
+        sx={numberFieldSx}
       />
 
       <Button
         variant="contained"
         onClick={handleRestart}
-        disabled={restarting || minLatency > maxLatency || numNodes < 1}
+        disabled={restarting || !valid}
         sx={{ mt: 0.5 }}
       >
         {restarting ? (

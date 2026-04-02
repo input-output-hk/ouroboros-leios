@@ -78,12 +78,12 @@ export default function App() {
             position: "absolute",
             top: 42,
             left: 48,
-            bottom: 0,
             zIndex: 24,
             backdropFilter: "blur(8px)",
-            bgcolor: "rgba(13, 27, 42, 0.85)",
+            bgcolor: "rgba(13, 27, 42, 0.5)",
             borderRight: "1px solid rgba(255,255,255,0.08)",
-            overflowY: "auto",
+            borderBottom: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: "0 0 8px 0",
             pointerEvents: "auto",
           }}>
             <ControlPanel />
