@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import { Box, IconButton, Typography } from "@mui/material";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
@@ -14,11 +14,15 @@ import { InspectorPanel } from "@/components/InspectorPanel";
 import { AggregateCharts } from "@/components/AggregateCharts";
 import { ChainTreeView } from "@/components/ChainTreeView";
 import { EventLog } from "@/components/EventLog";
+import { IconSidebar } from "@/components/IconSidebar";
+import { ControlPanel } from "@/components/ControlPanel";
 
 export default function App() {
   const loadTopology = useStore((s) => s.loadTopology);
+  const loadConfig = useStore((s) => s.loadConfig);
   const pollStats = useStore((s) => s.pollStats);
   const topology = useStore((s) => s.topology);
+  const restarting = useStore((s) => s.restarting);
   const networkChainTree = useStore((s) => s.networkChainTree);
   const networkTipCounts = useStore((s) => s.networkTipCounts);
   const selectedNodeId = useStore((s) => s.selectedNodeId);
@@ -26,10 +30,21 @@ export default function App() {
   const [eventLogOpen, setEventLogOpen] = useState(true);
   const [chartsOpen, setChartsOpen] = useState(true);
   const [chainTreeOpen, setChainTreeOpen] = useState(true);
+  const [controlPanelOpen, setControlPanelOpen] = useState(false);
 
   useEffect(() => {
     loadTopology();
-  }, [loadTopology]);
+    loadConfig();
+  }, [loadTopology, loadConfig]);
+
+  // Close control panel when restart completes.
+  const wasRestarting = useRef(false);
+  useEffect(() => {
+    if (wasRestarting.current && !restarting) {
+      setControlPanelOpen(false);
+    }
+    wasRestarting.current = restarting;
+  }, [restarting]);
 
   useForceLayout();
   usePolling(pollStats, 1000);
@@ -49,6 +64,48 @@ export default function App() {
       <Box sx={{ flex: 1, minHeight: 0, position: "relative" }}>
         <ReactFlowProvider><TopologyGraph /></ReactFlowProvider>
 
+        {/* Icon sidebar — absolute, left side, below header */}
+        <Box sx={{ position: "absolute", top: 42, left: 0, bottom: 0, zIndex: 25, pointerEvents: "auto" }}>
+          <IconSidebar
+            controlPanelOpen={controlPanelOpen}
+            onToggleControlPanel={() => setControlPanelOpen((v) => !v)}
+          />
+        </Box>
+
+        {/* Control panel slide-out — next to sidebar */}
+        {controlPanelOpen && (
+          <Box sx={{
+            position: "absolute",
+            top: 42,
+            left: 48,
+            bottom: 0,
+            zIndex: 24,
+            backdropFilter: "blur(8px)",
+            bgcolor: "rgba(13, 27, 42, 0.85)",
+            borderRight: "1px solid rgba(255,255,255,0.08)",
+            overflowY: "auto",
+            pointerEvents: "auto",
+          }}>
+            <ControlPanel />
+          </Box>
+        )}
+
+        {/* Restarting overlay */}
+        {restarting && (
+          <Box sx={{
+            position: "absolute",
+            top: 0, left: 0, right: 0, bottom: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            bgcolor: "rgba(0,0,0,0.4)",
+            zIndex: 50,
+            pointerEvents: "auto",
+          }}>
+            <Typography variant="h6" sx={{ color: "#fff" }}>Restarting cluster...</Typography>
+          </Box>
+        )}
+
         {/* Header — overlay */}
         <Box sx={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 20, px: 2, py: 0.75, bgcolor: "rgba(13, 27, 42, 0.6)", backdropFilter: "blur(8px)", display: "flex", alignItems: "baseline", justifyContent: "space-between", pointerEvents: "auto" }}>
           <Typography variant="h5" sx={{ color: "#ffffff", fontWeight: 700 }}>
@@ -64,7 +121,7 @@ export default function App() {
         {/* Overlay layer — horizontal split: main content left, event log right */}
         <Box sx={{
           position: "absolute",
-          top: 52, left: 0, right: 0, bottom: 0,
+          top: 52, left: 48, right: 0, bottom: 0,
           display: "flex",
           pointerEvents: "none",
         }}>

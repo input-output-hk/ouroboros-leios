@@ -76,3 +76,12 @@ export interface NodeSeriesPoint {
   messages: number;
   blocks: number;
 }
+
+export interface ClusterControlConfig {
+  num_nodes?: number;
+  degree?: number;
+  min_latency_ms?: number;
+  max_latency_ms?: number;
+  seed?: number;
+  node_config: Record<string, unknown>;
+}

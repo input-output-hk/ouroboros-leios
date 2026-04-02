@@ -16,6 +16,7 @@ use futures_util::stream::Stream;
 use tokio::sync::{broadcast, mpsc, RwLock};
 use tower_http::cors::CorsLayer;
 
+use crate::config::ClusterControlConfig;
 use crate::topology::Topology;
 use crate::types::{self, EventWindow, IngestedEvent, StatsSnapshot};
 
@@ -25,12 +26,18 @@ pub struct ServerState {
     pub event_tx: mpsc::Sender<Vec<IngestedEvent>>,
     /// Latest stats per node.
     pub latest_stats: RwLock<HashMap<String, StatsSnapshot>>,
-    /// Cluster topology.
-    pub topology: Topology,
+    /// Cluster topology (updated on restart).
+    pub topology: RwLock<Topology>,
     /// Recent events window for the UI API.
     pub event_window: Arc<RwLock<EventWindow>>,
     /// Broadcast channel for real-time SSE event streaming.
     pub event_broadcast: broadcast::Sender<Vec<serde_json::Value>>,
+    /// Channel to send restart commands to the main loop.
+    pub restart_tx: mpsc::Sender<ClusterControlConfig>,
+    /// Current controllable config (updated on restart).
+    pub current_config: RwLock<ClusterControlConfig>,
+    /// Guard against concurrent restarts.
+    pub restarting: RwLock<bool>,
 }
 
 /// Start the telemetry HTTP server.
@@ -43,15 +50,20 @@ pub async fn start(
     event_tx: mpsc::Sender<Vec<IngestedEvent>>,
     topology: Topology,
     event_window: Arc<RwLock<EventWindow>>,
+    restart_tx: mpsc::Sender<ClusterControlConfig>,
+    initial_config: ClusterControlConfig,
 ) -> Result<(Arc<ServerState>, tokio::task::JoinHandle<()>), Box<dyn std::error::Error + Send + Sync>>
 {
     let (event_broadcast, _) = broadcast::channel(256);
     let state = Arc::new(ServerState {
         event_tx,
         latest_stats: RwLock::new(HashMap::new()),
-        topology,
+        topology: RwLock::new(topology),
         event_window,
         event_broadcast,
+        restart_tx,
+        current_config: RwLock::new(initial_config),
+        restarting: RwLock::new(false),
     });
 
     let app = axum::Router::new()
@@ -64,6 +76,9 @@ pub async fn start(
         .route("/api/stats/:node_id", get(get_node_stats))
         .route("/api/events", get(get_events))
         .route("/api/events/stream", get(event_stream))
+        // Cluster control API.
+        .route("/api/config", get(get_config))
+        .route("/api/restart", post(restart_cluster))
         .layer(CorsLayer::permissive())
         .with_state(state.clone());
 
@@ -169,7 +184,36 @@ async fn receive_stats(
 
 /// GET /api/topology — return the cluster node/edge graph.
 async fn get_topology(State(state): State<Arc<ServerState>>) -> Json<Topology> {
-    Json(state.topology.clone())
+    Json(state.topology.read().await.clone())
+}
+
+/// GET /api/config — return current controllable config.
+async fn get_config(State(state): State<Arc<ServerState>>) -> Json<ClusterControlConfig> {
+    Json(state.current_config.read().await.clone())
+}
+
+/// POST /api/restart — restart the cluster with new config overrides.
+async fn restart_cluster(
+    State(state): State<Arc<ServerState>>,
+    Json(overrides): Json<ClusterControlConfig>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    {
+        let mut restarting = state.restarting.write().await;
+        if *restarting {
+            return Err((StatusCode::CONFLICT, "Restart already in progress".into()));
+        }
+        *restarting = true;
+    }
+    match state.restart_tx.send(overrides).await {
+        Ok(()) => Ok(StatusCode::ACCEPTED),
+        Err(_) => {
+            *state.restarting.write().await = false;
+            Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Restart channel closed".into(),
+            ))
+        }
+    }
 }
 
 /// GET /api/stats — return latest stats for all nodes.
@@ -245,15 +289,26 @@ mod tests {
         let (tx, rx) = mpsc::channel(100);
         let event_window = Arc::new(RwLock::new(EventWindow::new(100)));
         let (event_broadcast, _) = broadcast::channel(256);
+        let (restart_tx, _restart_rx) = mpsc::channel(1);
         let state = Arc::new(ServerState {
             event_tx: tx,
             latest_stats: RwLock::new(HashMap::new()),
-            topology: Topology {
+            topology: RwLock::new(Topology {
                 nodes: Vec::new(),
                 edges: Vec::new(),
-            },
+            }),
             event_window,
             event_broadcast,
+            restart_tx,
+            current_config: RwLock::new(ClusterControlConfig {
+                num_nodes: Some(5),
+                degree: Some(3),
+                min_latency_ms: Some(5),
+                max_latency_ms: Some(300),
+                seed: None,
+                node_config: HashMap::new(),
+            }),
+            restarting: RwLock::new(false),
         });
         (state, rx)
     }
