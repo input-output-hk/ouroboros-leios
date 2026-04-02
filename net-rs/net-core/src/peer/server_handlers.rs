@@ -32,6 +32,7 @@ use crate::store::leios_store::LeiosStore;
 pub async fn serve_chainsync(cs_send: CodecSend, cs_recv: CodecRecv, store: Arc<ChainStore>) {
     let mut runner = Runner::<ChainSync>::new(Role::Server, cs_send, cs_recv);
     let mut read_index: Option<usize> = None;
+    let mut read_point: Option<Point> = None;
     let mut subscription = store.subscribe();
 
     loop {
@@ -44,6 +45,7 @@ pub async fn serve_chainsync(cs_send: CodecSend, cs_recv: CodecRecv, store: Arc<
             CsMsg::MsgFindIntersect { points } => match store.find_intersection(&points) {
                 Some((point, tip)) => {
                     read_index = store.index_of(&point);
+                    read_point = Some(point.clone());
                     let _ = runner.send(&CsMsg::MsgIntersectFound { point, tip }).await;
                 }
                 None => {
@@ -53,12 +55,17 @@ pub async fn serve_chainsync(cs_send: CodecSend, cs_recv: CodecRecv, store: Arc<
             },
             CsMsg::MsgRequestNext => {
                 // Check if our read pointer was invalidated by a rollback.
-                if !store.is_valid_index(read_index) {
+                // Point-matching detects the case where a rollback + re-append
+                // leaves the same index occupied by a different block.
+                if !store.is_valid_index(read_index, &read_point) {
+                    // Roll back to the fork point (where the chain was truncated).
+                    let rollback_target = store.last_rollback_target().unwrap_or(Point::Origin);
                     let tip = store.tip();
-                    read_index = store.index_of(&tip.point);
+                    read_index = store.index_of(&rollback_target);
+                    read_point = Some(rollback_target.clone());
                     let _ = runner
                         .send(&CsMsg::MsgRollBackward {
-                            point: tip.point.clone(),
+                            point: rollback_target,
                             tip,
                         })
                         .await;
@@ -66,6 +73,7 @@ pub async fn serve_chainsync(cs_send: CodecSend, cs_recv: CodecRecv, store: Arc<
                     let pending = store.blocks_after(read_index);
                     if let Some(block) = pending.first() {
                         read_index = store.index_of(&block.point);
+                        read_point = Some(block.point.clone());
                         let tip = store.tip();
                         let _ = runner
                             .send(&CsMsg::MsgRollForward {
@@ -81,12 +89,15 @@ pub async fn serve_chainsync(cs_send: CodecSend, cs_recv: CodecRecv, store: Arc<
                                 return;
                             }
                             // After waking, check for rollback first.
-                            if !store.is_valid_index(read_index) {
+                            if !store.is_valid_index(read_index, &read_point) {
+                                let rollback_target =
+                                    store.last_rollback_target().unwrap_or(Point::Origin);
                                 let tip = store.tip();
-                                read_index = store.index_of(&tip.point);
+                                read_index = store.index_of(&rollback_target);
+                                read_point = Some(rollback_target.clone());
                                 let _ = runner
                                     .send(&CsMsg::MsgRollBackward {
-                                        point: tip.point.clone(),
+                                        point: rollback_target,
                                         tip,
                                     })
                                     .await;
@@ -95,6 +106,7 @@ pub async fn serve_chainsync(cs_send: CodecSend, cs_recv: CodecRecv, store: Arc<
                             let pending = store.blocks_after(read_index);
                             if let Some(block) = pending.first() {
                                 read_index = store.index_of(&block.point);
+                                read_point = Some(block.point.clone());
                                 let tip = store.tip();
                                 let _ = runner
                                     .send(&CsMsg::MsgRollForward {
