@@ -15,8 +15,6 @@ use crate::config::ValidationConfig;
 pub struct ValidationComplete {
     /// The block point that was validated.
     pub point: Point,
-    /// The validated block body (passed through for injection).
-    pub body: BlockBody,
 }
 
 /// Manages fake validation tasks.
@@ -40,7 +38,7 @@ impl Validator {
         let sender = self.sender.clone();
         tokio::spawn(async move {
             tokio::time::sleep(delay).await;
-            let _ = sender.send(ValidationComplete { point, body }).await;
+            let _ = sender.send(ValidationComplete { point }).await;
         });
     }
 
@@ -97,6 +95,5 @@ mod tests {
 
         let result = rx.recv().await.expect("should receive completion");
         assert_eq!(result.point, point);
-        assert_eq!(result.body.raw.len(), 100);
     }
 }
