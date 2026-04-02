@@ -61,18 +61,17 @@ export default function App() {
           )}
         </Box>
 
-        {/* Overlay layer — vertical column */}
+        {/* Overlay layer — horizontal split: main content left, event log right */}
         <Box sx={{
           position: "absolute",
           top: 52, left: 0, right: 0, bottom: 0,
           display: "flex",
-          flexDirection: "column",
           pointerEvents: "none",
         }}>
-          {/* Upper area: inspector + event log — flex row */}
-          <Box sx={{ flex: 1, minHeight: 0, display: "flex" }}>
-            {/* Spacer with inspector column */}
-            <Box sx={{ flex: 1, minWidth: 0, position: "relative" }}>
+          {/* Left area: inspector, chain tree, charts */}
+          <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+            {/* Inspector */}
+            <Box sx={{ flex: 1, minHeight: 0, position: "relative" }}>
               <Box sx={{
                 position: "absolute",
                 top: 0,
@@ -99,7 +98,92 @@ export default function App() {
               </Box>
             </Box>
 
-            {/* Event log toggle */}
+            {/* Chain tree toggle + tree — above charts, left-aligned */}
+            {networkChainTree.length > 0 && (
+              <Box sx={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+                <Box
+                  onClick={() => setChainTreeOpen((v) => !v)}
+                  sx={{
+                    alignSelf: "flex-start",
+                    pointerEvents: "auto",
+                    bgcolor: "rgba(40, 40, 50, 0.7)",
+                    backdropFilter: "blur(4px)",
+                    color: "#fff",
+                    "&:hover": { bgcolor: "rgba(60, 60, 70, 0.8)" },
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    borderRadius: 1,
+                    px: 0.5,
+                    ml: 1,
+                    mb: 0.5,
+                    height: 36,
+                  }}
+                >
+                  {chainTreeOpen
+                    ? <ExpandMoreIcon sx={{ fontSize: 28 }} />
+                    : <><ExpandLessIcon sx={{ fontSize: 28 }} /><Typography variant="caption" sx={{ fontSize: 18, mr: 0.5 }}>Chain</Typography></>
+                  }
+                </Box>
+                {chainTreeOpen && (
+                  <Box sx={{
+                    borderRadius: 1,
+                    px: 1,
+                    py: 0.5,
+                    ml: 1,
+                    mb: 0.5,
+                    maxWidth: "100%",
+                    pointerEvents: "auto",
+                    backdropFilter: "blur(6px)",
+                  }}>
+                    <ChainTreeView entries={networkChainTree} tipCounts={networkTipCounts} onSelectNode={useStore.getState().selectNode} />
+                  </Box>
+                )}
+              </Box>
+            )}
+
+            {/* Charts toggle + charts — bottom */}
+            <Box sx={{ flexShrink: 0, display: "flex", flexDirection: "column" }}>
+              <Box
+                onClick={() => setChartsOpen((v) => !v)}
+                sx={{
+                  alignSelf: "flex-start",
+                  pointerEvents: "auto",
+                  bgcolor: "rgba(40, 40, 50, 0.7)",
+                  backdropFilter: "blur(4px)",
+                  color: "#fff",
+                  "&:hover": { bgcolor: "rgba(60, 60, 70, 0.8)" },
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  borderRadius: 1,
+                  px: 0.5,
+                  ml: 1,
+                  mb: 0.5,
+                  height: 36,
+                }}
+              >
+                {chartsOpen
+                  ? <ExpandMoreIcon sx={{ fontSize: 28 }} />
+                  : <><ExpandLessIcon sx={{ fontSize: 28 }} /><Typography variant="caption" sx={{ fontSize: 18, mr: 0.5 }}>Charts</Typography></>
+                }
+              </Box>
+              <Box sx={{
+                height: chartsOpen ? 200 : 0,
+                transition: "height 0.2s ease",
+                overflow: "hidden",
+                backdropFilter: "blur(8px)",
+                bgcolor: "rgba(18, 18, 24, 0.3)",
+                borderTop: chartsOpen ? "1px solid rgba(255,255,255,0.08)" : "none",
+                pointerEvents: "auto",
+              }}>
+                {chartsOpen && <AggregateCharts />}
+              </Box>
+            </Box>
+          </Box>
+
+          {/* Event log toggle + panel — right side, full height */}
+          <Box sx={{ display: "flex", flexShrink: 0, height: "100%" }}>
             <Box
               onClick={() => setEventLogOpen((v) => !v)}
               sx={{
@@ -123,8 +207,6 @@ export default function App() {
                 : <><ChevronLeftIcon sx={{ fontSize: 28 }} /><Typography variant="caption" sx={{ fontSize: 18, mr: 0.5 }}>Events</Typography></>
               }
             </Box>
-
-            {/* Event log */}
             <Box sx={{
               width: eventLogOpen ? 350 : 0,
               flexShrink: 0,
@@ -142,88 +224,6 @@ export default function App() {
                   <EventLog />
                 </Box>
               )}
-            </Box>
-          </Box>
-
-          {/* Chain tree toggle + tree — above charts, right-aligned */}
-          {networkChainTree.length > 0 && (
-            <Box sx={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-              <Box
-                onClick={() => setChainTreeOpen((v) => !v)}
-                sx={{
-                  alignSelf: "flex-end",
-                  pointerEvents: "auto",
-                  bgcolor: "rgba(40, 40, 50, 0.7)",
-                  backdropFilter: "blur(4px)",
-                  color: "#fff",
-                  "&:hover": { bgcolor: "rgba(60, 60, 70, 0.8)" },
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  borderRadius: 1,
-                  px: 0.5,
-                  mr: 1.5,
-                  mb: 0.5,
-                  height: 36,
-                }}
-              >
-                {chainTreeOpen
-                  ? <ExpandMoreIcon sx={{ fontSize: 28 }} />
-                  : <><ExpandLessIcon sx={{ fontSize: 28 }} /><Typography variant="caption" sx={{ fontSize: 18, mr: 0.5 }}>Chain</Typography></>
-                }
-              </Box>
-              {chainTreeOpen && (
-                <Box sx={{
-                  borderRadius: 1,
-                  px: 1,
-                  py: 0.5,
-                  mr: 1.5,
-                  mb: 0.5,
-                  pointerEvents: "auto",
-                  backdropFilter: "blur(6px)",
-                }}>
-                  <ChainTreeView entries={networkChainTree} tipCounts={networkTipCounts} onSelectNode={useStore.getState().selectNode} />
-                </Box>
-              )}
-            </Box>
-          )}
-
-          {/* Charts toggle + charts — bottom */}
-          <Box sx={{ flexShrink: 0, display: "flex", flexDirection: "column" }}>
-            <Box
-              onClick={() => setChartsOpen((v) => !v)}
-              sx={{
-                alignSelf: "flex-start",
-                pointerEvents: "auto",
-                bgcolor: "rgba(40, 40, 50, 0.7)",
-                backdropFilter: "blur(4px)",
-                color: "#fff",
-                "&:hover": { bgcolor: "rgba(60, 60, 70, 0.8)" },
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                borderRadius: 1,
-                px: 0.5,
-                ml: 1,
-                mb: 0.5,
-                height: 36,
-              }}
-            >
-              {chartsOpen
-                ? <ExpandMoreIcon sx={{ fontSize: 28 }} />
-                : <><ExpandLessIcon sx={{ fontSize: 28 }} /><Typography variant="caption" sx={{ fontSize: 18, mr: 0.5 }}>Charts</Typography></>
-              }
-            </Box>
-            <Box sx={{
-              height: chartsOpen ? 200 : 0,
-              transition: "height 0.2s ease",
-              overflow: "hidden",
-              backdropFilter: "blur(8px)",
-              bgcolor: "rgba(18, 18, 24, 0.3)",
-              borderTop: chartsOpen ? "1px solid rgba(255,255,255,0.08)" : "none",
-              pointerEvents: "auto",
-            }}>
-              {chartsOpen && <AggregateCharts />}
             </Box>
           </Box>
         </Box>
