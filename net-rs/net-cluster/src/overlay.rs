@@ -48,7 +48,8 @@ pub fn generate_overlays(
     let mut paths = Vec::with_capacity(topology.nodes.len());
 
     for node in &topology.nodes {
-        let toml_content = render_overlay(node, aggregator_port, stats_interval_secs);
+        let num_nodes = topology.nodes.len();
+        let toml_content = render_overlay(node, aggregator_port, stats_interval_secs, num_nodes);
         let path = temp_dir.join(format!("node-{}.toml", node.index));
         std::fs::write(&path, &toml_content)?;
         paths.push(path);
@@ -62,12 +63,19 @@ pub fn generate_overlays(
 }
 
 /// Render a single node's overlay TOML content.
-fn render_overlay(node: &NodeTopology, aggregator_port: u16, stats_interval_secs: u64) -> String {
+fn render_overlay(
+    node: &NodeTopology,
+    aggregator_port: u16,
+    stats_interval_secs: u64,
+    num_nodes: usize,
+) -> String {
     let mut s = String::new();
 
     writeln!(s, "node_id = \"{}\"", node.node_id).ok();
     writeln!(s, "listen_address = \"{}\"", node.listen_address).ok();
     writeln!(s, "seed = {}", node.seed).ok();
+    // On localhost all nodes share one IP; allow enough inbound connections.
+    writeln!(s, "max_connections_per_ip = {num_nodes}").ok();
     writeln!(s).ok();
     writeln!(s, "[production]").ok();
     writeln!(s, "stake = {}", node.stake).ok();
@@ -160,7 +168,7 @@ mod tests {
     #[test]
     fn test_render_overlay() {
         let node = sample_node();
-        let toml = render_overlay(&node, 9100, 5);
+        let toml = render_overlay(&node, 9100, 5, 5);
 
         assert!(toml.contains("node_id = \"node-0\""));
         assert!(toml.contains("listen_address = \"127.0.0.1:30000\""));
@@ -179,7 +187,7 @@ mod tests {
     #[test]
     fn test_render_parses_as_toml() {
         let node = sample_node();
-        let toml_str = render_overlay(&node, 9100, 5);
+        let toml_str = render_overlay(&node, 9100, 5, 5);
         let parsed: toml::Value = toml::from_str(&toml_str).expect("generated TOML should parse");
         assert_eq!(parsed["node_id"].as_str(), Some("node-0"));
     }
