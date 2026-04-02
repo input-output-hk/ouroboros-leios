@@ -797,10 +797,14 @@ mod tests {
         (tip, header)
     }
 
+    fn test_dyn_rx() -> tokio::sync::watch::Receiver<crate::config::DynamicConfig> {
+        let config = crate::config::NodeConfig::default();
+        tokio::sync::watch::channel(config.dynamic_config()).1
+    }
+
     fn make_consensus() -> (Consensus, mpsc::Receiver<NetworkCommand>) {
         let (cmd_tx, cmd_rx) = mpsc::channel(16);
-        let config = crate::config::ValidationConfig::default();
-        let (validator, _val_rx) = Validator::new(config);
+        let (validator, _val_rx) = Validator::new(test_dyn_rx());
         let consensus = Consensus::new("test".into(), cmd_tx, validator, 2160);
         (consensus, cmd_rx)
     }
@@ -904,8 +908,7 @@ mod tests {
     #[tokio::test]
     async fn fork_switch_issues_rollback() {
         let (cmd_tx, mut cmd_rx) = mpsc::channel(32);
-        let config = crate::config::ValidationConfig::default();
-        let (validator, _val_rx) = Validator::new(config);
+        let (validator, _val_rx) = Validator::new(test_dyn_rx());
         let mut consensus = Consensus::new("test".into(), cmd_tx, validator, 2160);
 
         // Build chain A: blocks 1, 2, 3 (self-produced, so they're in the tree).
@@ -1009,8 +1012,7 @@ mod tests {
         // Verify that adopted_tip doesn't regress when a lower fork block
         // validates before a higher one.
         let (cmd_tx, mut cmd_rx) = mpsc::channel(256);
-        let config = crate::config::ValidationConfig::default();
-        let (validator, _val_rx) = Validator::new(config);
+        let (validator, _val_rx) = Validator::new(test_dyn_rx());
         let mut consensus = Consensus::new("test".into(), cmd_tx, validator, 2160);
 
         // Build chain A: blocks 1..5 (self-produced).
@@ -1124,8 +1126,7 @@ mod tests {
         // walk from the intermediate header's hash, not the tip hash, to
         // compute a range fetch covering all missing ancestors.
         let (cmd_tx, mut cmd_rx) = mpsc::channel(32);
-        let config = crate::config::ValidationConfig::default();
-        let (validator, _val_rx) = Validator::new(config);
+        let (validator, _val_rx) = Validator::new(test_dyn_rx());
         let mut consensus = Consensus::new("test".into(), cmd_tx, validator, 2160);
 
         // Adopt block 1 as our tip.
@@ -1198,8 +1199,7 @@ mod tests {
         // With Fix 1, fetched blocks are in chain_tree, so
         // find_common_ancestor succeeds and fork switch fires.
         let (cmd_tx, mut cmd_rx) = mpsc::channel(256);
-        let config = crate::config::ValidationConfig::default();
-        let (validator, _val_rx) = Validator::new(config);
+        let (validator, _val_rx) = Validator::new(test_dyn_rx());
         let mut consensus = Consensus::new("test".into(), cmd_tx, validator, 2160);
 
         // Chain A: blocks 1, 2 (self-produced).

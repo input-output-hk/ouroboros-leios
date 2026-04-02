@@ -11,5 +11,5 @@ before restarting.  Samples would be:
 
 ## Mempool tracing
 
-Trace mempool fullness for each node independently and min-max surves
+Trace mempool fullness for each node independently and min-max curves
 for the whole network.

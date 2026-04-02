@@ -10,6 +10,62 @@ use figment::providers::{Format, Serialized, Toml};
 use figment::Figment;
 use serde::{Deserialize, Serialize};
 
+/// Dynamic (hot-reloadable) subset of node configuration.
+///
+/// These fields can be updated at runtime without restarting the node,
+/// delivered via a `tokio::sync::watch` channel.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct DynamicConfig {
+    pub rb_generation_probability: f64,
+    pub eb_generation_probability: f64,
+    pub vote_generation_probability: f64,
+    pub rb_head_validation_ms: f64,
+    pub rb_body_validation_ms_constant: f64,
+    pub rb_body_validation_ms_per_byte: f64,
+    pub tx_rate: f64,
+}
+
+/// Partial update for dynamic config fields. All fields are optional;
+/// only present fields are applied. This is what arrives on stdin as JSON.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct DynamicConfigUpdate {
+    pub rb_generation_probability: Option<f64>,
+    pub eb_generation_probability: Option<f64>,
+    pub vote_generation_probability: Option<f64>,
+    pub rb_head_validation_ms: Option<f64>,
+    pub rb_body_validation_ms_constant: Option<f64>,
+    pub rb_body_validation_ms_per_byte: Option<f64>,
+    pub tx_rate: Option<f64>,
+}
+
+impl DynamicConfig {
+    /// Merge a partial update into this config. Only fields that are `Some`
+    /// in the update are overwritten.
+    pub fn apply_update(&mut self, update: &DynamicConfigUpdate) {
+        if let Some(v) = update.rb_generation_probability {
+            self.rb_generation_probability = v;
+        }
+        if let Some(v) = update.eb_generation_probability {
+            self.eb_generation_probability = v;
+        }
+        if let Some(v) = update.vote_generation_probability {
+            self.vote_generation_probability = v;
+        }
+        if let Some(v) = update.rb_head_validation_ms {
+            self.rb_head_validation_ms = v;
+        }
+        if let Some(v) = update.rb_body_validation_ms_constant {
+            self.rb_body_validation_ms_constant = v;
+        }
+        if let Some(v) = update.rb_body_validation_ms_per_byte {
+            self.rb_body_validation_ms_per_byte = v;
+        }
+        if let Some(v) = update.tx_rate {
+            self.tx_rate = v;
+        }
+    }
+}
+
 /// Peer connection configuration.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PeerConfig {
@@ -378,6 +434,21 @@ impl Default for NodeConfig {
     }
 }
 
+impl NodeConfig {
+    /// Extract the dynamic (hot-reloadable) subset of this config.
+    pub fn dynamic_config(&self) -> DynamicConfig {
+        DynamicConfig {
+            rb_generation_probability: self.production.rb_generation_probability,
+            eb_generation_probability: self.production.eb_generation_probability,
+            vote_generation_probability: self.production.vote_generation_probability,
+            rb_head_validation_ms: self.validation.rb_head_validation_ms,
+            rb_body_validation_ms_constant: self.validation.rb_body_validation_ms_constant,
+            rb_body_validation_ms_per_byte: self.validation.rb_body_validation_ms_per_byte,
+            tx_rate: self.transactions.tx_rate,
+        }
+    }
+}
+
 /// Load configuration from layered TOML files with CLI overrides.
 ///
 /// Files are applied left-to-right (later files override earlier). Key=value
@@ -467,5 +538,36 @@ mod tests {
     fn set_overrides_bool() {
         let config = load(&[], &["leios_enabled=true".to_string()]).unwrap();
         assert!(config.leios_enabled);
+    }
+
+    #[test]
+    fn dynamic_config_from_node_config() {
+        let config = NodeConfig::default();
+        let dyn_config = config.dynamic_config();
+        assert_eq!(
+            dyn_config.rb_generation_probability,
+            config.production.rb_generation_probability
+        );
+        assert_eq!(
+            dyn_config.rb_body_validation_ms_constant,
+            config.validation.rb_body_validation_ms_constant
+        );
+        assert_eq!(dyn_config.tx_rate, config.transactions.tx_rate);
+    }
+
+    #[test]
+    fn dynamic_config_partial_update() {
+        let mut dyn_config = NodeConfig::default().dynamic_config();
+        let original_rb_body = dyn_config.rb_body_validation_ms_constant;
+
+        let update = DynamicConfigUpdate {
+            rb_generation_probability: Some(0.99),
+            ..Default::default()
+        };
+        dyn_config.apply_update(&update);
+
+        assert_eq!(dyn_config.rb_generation_probability, 0.99);
+        // Unchanged fields remain the same.
+        assert_eq!(dyn_config.rb_body_validation_ms_constant, original_rb_body);
     }
 }

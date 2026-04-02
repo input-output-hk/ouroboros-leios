@@ -130,12 +130,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let (event_tx, event_rx) = tokio::sync::mpsc::channel(4096);
     let (restart_tx, mut restart_rx) =
         tokio::sync::mpsc::channel::<config::ClusterControlConfig>(1);
+    let (update_tx, mut update_rx) =
+        tokio::sync::mpsc::channel::<std::collections::HashMap<String, serde_json::Value>>(16);
     let (server_state, _server_handle) = server::start(
         current_config.aggregator_port,
         event_tx,
         topo.clone(),
         event_window.clone(),
         restart_tx,
+        update_tx,
         current_config.control_fields(),
     )
     .await?;
@@ -189,6 +192,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 shutdown_cluster(&mut cluster).await;
                 break;
             }
+            Some(node_config_update) = update_rx.recv() => {
+                tracing::info!("config update requested (no restart): {:?}", node_config_update);
+
+                // Convert dotted-key map to DynamicConfigUpdate JSON.
+                let update_json = dotted_keys_to_dynamic_config(&node_config_update);
+                cluster.pm.send_config_update(&update_json).await;
+
+                // Persist for future restarts.
+                node_config = node_config_update;
+
+                // Update server state so GET /api/config reflects the change.
+                let mut control = server_state.current_config.write().await;
+                control.node_config = node_config.clone();
+            }
             Some(overrides) = restart_rx.recv() => {
                 tracing::info!("restart requested: {:?}", overrides);
                 shutdown_cluster(&mut cluster).await;
@@ -236,6 +253,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let _ = tokio::time::timeout(std::time::Duration::from_secs(5), aggregator_handle).await;
     tracing::info!("cluster shut down");
     Ok(())
+}
+
+/// Convert a dotted-key node_config map (e.g. `{"production.rb_generation_probability": 0.1}`)
+/// into a flat `DynamicConfigUpdate` JSON value that net-node can parse on stdin.
+fn dotted_keys_to_dynamic_config(
+    node_config: &std::collections::HashMap<String, serde_json::Value>,
+) -> serde_json::Value {
+    let mut update = serde_json::Map::new();
+    for (key, value) in node_config {
+        // Strip the section prefix (e.g. "production." or "validation.") to get
+        // the flat DynamicConfigUpdate field name.
+        let field = key
+            .strip_prefix("production.")
+            .or_else(|| key.strip_prefix("validation."))
+            .or_else(|| key.strip_prefix("transactions."))
+            .unwrap_or(key);
+        update.insert(field.to_string(), value.clone());
+    }
+    serde_json::Value::Object(update)
 }
 
 fn log_topology(topo: &topology::Topology) {

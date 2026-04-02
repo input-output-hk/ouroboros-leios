@@ -13,7 +13,9 @@ const numberFieldSx = {
 export function ControlPanel() {
   const clusterConfig = useStore((s) => s.clusterConfig);
   const restarting = useStore((s) => s.restarting);
+  const updating = useStore((s) => s.updating);
   const restartCluster = useStore((s) => s.restartCluster);
+  const updateNodeConfig = useStore((s) => s.updateNodeConfig);
 
   // Store as strings so the user can freely delete and retype.
   const [numNodes, setNumNodes] = useState("5");
@@ -45,6 +47,13 @@ export function ControlPanel() {
   const maxLatencyN = Number(maxLatency) || 0;
   const valid = numNodesN >= 1 && minLatencyN <= maxLatencyN;
 
+  const busy = restarting || updating;
+
+  const nodeConfigPayload = () => ({
+    "production.rb_generation_probability": Number(rbGenProb) || 0,
+    "validation.rb_body_validation_ms_constant": Number(rbBodyValidationMs) || 0,
+  });
+
   const handleRestart = () => {
     restartCluster({
       num_nodes: numNodesN,
@@ -52,11 +61,12 @@ export function ControlPanel() {
       min_latency_ms: minLatencyN,
       max_latency_ms: maxLatencyN,
       seed: seed !== "" ? Number(seed) : undefined,
-      node_config: {
-        "production.rb_generation_probability": Number(rbGenProb) || 0,
-        "validation.rb_body_validation_ms_constant": Number(rbBodyValidationMs) || 0,
-      },
+      node_config: nodeConfigPayload(),
     });
+  };
+
+  const handleUpdate = () => {
+    updateNodeConfig(nodeConfigPayload());
   };
 
   return (
@@ -68,62 +78,6 @@ export function ControlPanel() {
       width: 260,
     }}>
       <Typography variant="subtitle2" sx={{ color: "#90caf9", fontWeight: 700 }}>
-        Cluster Topology
-      </Typography>
-      <TextField
-        label="Nodes"
-        type="number"
-        size="small"
-        value={numNodes}
-        onChange={(e) => setNumNodes(e.target.value)}
-        disabled={restarting}
-        slotProps={{ htmlInput: { min: 1, max: 100 } }}
-        sx={numberFieldSx}
-      />
-      <TextField
-        label="Degree"
-        type="number"
-        size="small"
-        value={degree}
-        onChange={(e) => setDegree(e.target.value)}
-        disabled={restarting}
-        slotProps={{ htmlInput: { min: 1, max: 50 } }}
-        sx={numberFieldSx}
-      />
-      <TextField
-        label="Min latency (ms)"
-        type="number"
-        size="small"
-        value={minLatency}
-        onChange={(e) => setMinLatency(e.target.value)}
-        disabled={restarting}
-        slotProps={{ htmlInput: { min: 0 } }}
-        sx={numberFieldSx}
-      />
-      <TextField
-        label="Max latency (ms)"
-        type="number"
-        size="small"
-        value={maxLatency}
-        onChange={(e) => setMaxLatency(e.target.value)}
-        disabled={restarting}
-        slotProps={{ htmlInput: { min: 0 } }}
-        sx={numberFieldSx}
-      />
-      <TextField
-        label="Seed (optional)"
-        type="number"
-        size="small"
-        value={seed}
-        onChange={(e) => setSeed(e.target.value)}
-        disabled={restarting}
-        placeholder="random"
-        sx={numberFieldSx}
-      />
-
-      <Divider sx={{ borderColor: "rgba(255,255,255,0.1)", my: 0.5 }} />
-
-      <Typography variant="subtitle2" sx={{ color: "#90caf9", fontWeight: 700 }}>
         Node Config
       </Typography>
       <TextField
@@ -132,7 +86,7 @@ export function ControlPanel() {
         size="small"
         value={rbGenProb}
         onChange={(e) => setRbGenProb(e.target.value)}
-        disabled={restarting}
+        disabled={busy}
         slotProps={{ htmlInput: { min: 0, max: 1, step: 0.01 } }}
         sx={numberFieldSx}
       />
@@ -142,15 +96,88 @@ export function ControlPanel() {
         size="small"
         value={rbBodyValidationMs}
         onChange={(e) => setRbBodyValidationMs(e.target.value)}
-        disabled={restarting}
+        disabled={busy}
         slotProps={{ htmlInput: { min: 0, step: 100 } }}
         sx={numberFieldSx}
       />
 
       <Button
         variant="contained"
+        onClick={handleUpdate}
+        disabled={busy}
+        sx={{ mt: 0.5 }}
+      >
+        {updating ? (
+          <>
+            <CircularProgress size={18} sx={{ mr: 1 }} />
+            Updating...
+          </>
+        ) : (
+          "Update Nodes"
+        )}
+      </Button>
+
+      <Divider sx={{ borderColor: "rgba(255,255,255,0.1)", my: 0.5 }} />
+
+      <Typography variant="subtitle2" sx={{ color: "#90caf9", fontWeight: 700 }}>
+        Cluster Topology
+      </Typography>
+      <TextField
+        label="Nodes"
+        type="number"
+        size="small"
+        value={numNodes}
+        onChange={(e) => setNumNodes(e.target.value)}
+        disabled={busy}
+        slotProps={{ htmlInput: { min: 1, max: 100 } }}
+        sx={numberFieldSx}
+      />
+      <TextField
+        label="Degree"
+        type="number"
+        size="small"
+        value={degree}
+        onChange={(e) => setDegree(e.target.value)}
+        disabled={busy}
+        slotProps={{ htmlInput: { min: 1, max: 50 } }}
+        sx={numberFieldSx}
+      />
+      <TextField
+        label="Min latency (ms)"
+        type="number"
+        size="small"
+        value={minLatency}
+        onChange={(e) => setMinLatency(e.target.value)}
+        disabled={busy}
+        slotProps={{ htmlInput: { min: 0 } }}
+        sx={numberFieldSx}
+      />
+      <TextField
+        label="Max latency (ms)"
+        type="number"
+        size="small"
+        value={maxLatency}
+        onChange={(e) => setMaxLatency(e.target.value)}
+        disabled={busy}
+        slotProps={{ htmlInput: { min: 0 } }}
+        sx={numberFieldSx}
+      />
+      <TextField
+        label="Seed (optional)"
+        type="number"
+        size="small"
+        value={seed}
+        onChange={(e) => setSeed(e.target.value)}
+        disabled={busy}
+        placeholder="random"
+        sx={numberFieldSx}
+      />
+
+      <Button
+        variant="contained"
+        color="secondary"
         onClick={handleRestart}
-        disabled={restarting || !valid}
+        disabled={busy || !valid}
         sx={{ mt: 0.5 }}
       >
         {restarting ? (

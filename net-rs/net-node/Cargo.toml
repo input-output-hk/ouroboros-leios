@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 net-core = { path = "../net-core" }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "signal"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "signal", "io-std", "io-util"] }
 clap = { version = "4", features = ["derive"] }
 figment = { version = "0.10", features = ["toml"] }
 serde = { version = "1", features = ["derive"] }

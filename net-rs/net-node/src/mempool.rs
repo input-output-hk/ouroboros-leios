@@ -7,33 +7,30 @@ use std::time::Duration;
 
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 use tracing::info;
 
 use net_core::multi_peer::types::NetworkCommand;
 use net_core::protocols::txsubmission::{PendingTx, TxBody, TxId};
 
-use crate::config::TxConfig;
+use crate::config::{DynamicConfig, TxConfig};
 
 /// Spawn the transaction generator as a background task.
 ///
 /// Returns a `JoinHandle` that runs until the `commands` channel is closed.
-/// If `tx_rate` is 0, no task is spawned (returns None).
+/// The generator reads `tx_rate` from the watch channel each iteration,
+/// so rate changes take effect immediately.
 pub fn spawn_tx_generator(
     config: &TxConfig,
     seed: Option<u64>,
     commands: mpsc::Sender<NetworkCommand>,
     node_id: String,
-) -> Option<tokio::task::JoinHandle<()>> {
-    if config.tx_rate <= 0.0 {
-        return None;
-    }
-
-    let rate = config.tx_rate;
+    dyn_config: watch::Receiver<DynamicConfig>,
+) -> tokio::task::JoinHandle<()> {
     let min_size = config.tx_size_min;
     let max_size = config.tx_size_max;
 
-    let handle = tokio::spawn(async move {
+    tokio::spawn(async move {
         let mut rng = match seed {
             Some(s) => StdRng::seed_from_u64(s.wrapping_add(0xBEEF)),
             None => StdRng::from_entropy(),
@@ -41,6 +38,15 @@ pub fn spawn_tx_generator(
         let mut tx_count: u64 = 0;
 
         loop {
+            let rate = dyn_config.borrow().tx_rate;
+            if rate <= 0.0 {
+                // Wait for a config update that might set a positive rate.
+                if dyn_config.clone().changed().await.is_err() {
+                    break; // sender dropped
+                }
+                continue;
+            }
+
             let interval = exp_sample(&mut rng, rate);
             tokio::time::sleep(interval).await;
 
@@ -68,9 +74,7 @@ pub fn spawn_tx_generator(
                 break; // coordinator shut down
             }
         }
-    });
-
-    Some(handle)
+    })
 }
 
 /// Build a fake transaction with random id and body.

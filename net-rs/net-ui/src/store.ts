@@ -8,7 +8,7 @@ import type {
   ChainTreeEntry,
   ClusterControlConfig,
 } from "./types";
-import { fetchTopology, fetchAllStats, fetchEvents, fetchConfig, restartCluster as apiRestartCluster } from "./api";
+import { fetchTopology, fetchAllStats, fetchEvents, fetchConfig, restartCluster as apiRestartCluster, updateNodeConfig as apiUpdateNodeConfig } from "./api";
 
 const MAX_SERIES = 300; // ~5 min at 1s stats interval
 const MAX_EVENTS = 500;
@@ -134,9 +134,12 @@ export const useStore = create<DashboardState>()((set, get) => ({
 
       // Aggregate network-wide chain tree, accumulating across polls so
       // gaps don't appear when nodes are at different chain heights.
+      // Skip carry-forward while restarting so stale entries don't persist.
       const mergedEntries = new Map<string, ChainTreeEntry>();
-      for (const e of get().networkChainTree) {
-        mergedEntries.set(e.hash, e);
+      if (!get().restarting) {
+        for (const e of get().networkChainTree) {
+          mergedEntries.set(e.hash, e);
+        }
       }
       const tipCounts: Record<string, string[]> = {};
       for (const snap of Object.values(stats)) {
@@ -317,6 +320,7 @@ export const useStore = create<DashboardState>()((set, get) => ({
   // --- Cluster control ---
   clusterConfig: null,
   restarting: false,
+  updating: false,
 
   loadConfig: async () => {
     try {
@@ -358,6 +362,16 @@ export const useStore = create<DashboardState>()((set, get) => ({
       }
     } finally {
       set({ restarting: false });
+    }
+  },
+
+  updateNodeConfig: async (nodeConfig: Record<string, unknown>) => {
+    set({ updating: true });
+    try {
+      await apiUpdateNodeConfig(nodeConfig);
+      await get().loadConfig();
+    } finally {
+      set({ updating: false });
     }
   },
 }));

@@ -6,9 +6,9 @@
 use std::time::Duration;
 
 use net_core::types::{BlockBody, Point};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 
-use crate::config::ValidationConfig;
+use crate::config::DynamicConfig;
 
 /// Result of a completed validation.
 #[derive(Debug)]
@@ -19,16 +19,18 @@ pub struct ValidationComplete {
 
 /// Manages fake validation tasks.
 pub struct Validator {
-    config: ValidationConfig,
+    dyn_config: watch::Receiver<DynamicConfig>,
     sender: mpsc::Sender<ValidationComplete>,
 }
 
 impl Validator {
     /// Create a new validator. Returns the validator and a receiver for
     /// completed validations.
-    pub fn new(config: ValidationConfig) -> (Self, mpsc::Receiver<ValidationComplete>) {
+    pub fn new(
+        dyn_config: watch::Receiver<DynamicConfig>,
+    ) -> (Self, mpsc::Receiver<ValidationComplete>) {
         let (sender, receiver) = mpsc::channel(64);
-        (Self { config, sender }, receiver)
+        (Self { dyn_config, sender }, receiver)
     }
 
     /// Submit a block for validation. Spawns a background task that sleeps
@@ -44,9 +46,10 @@ impl Validator {
 
     /// Compute the total validation delay for a block of the given size.
     fn block_validation_delay(&self, body_len: usize) -> Duration {
-        let ms = self.config.rb_head_validation_ms
-            + self.config.rb_body_validation_ms_constant
-            + self.config.rb_body_validation_ms_per_byte * body_len as f64;
+        let config = self.dyn_config.borrow();
+        let ms = config.rb_head_validation_ms
+            + config.rb_body_validation_ms_constant
+            + config.rb_body_validation_ms_per_byte * body_len as f64;
         Duration::from_secs_f64(ms / 1000.0)
     }
 }
@@ -55,15 +58,27 @@ impl Validator {
 mod tests {
     use super::*;
 
+    fn test_dyn_config(
+        head_ms: f64,
+        body_const_ms: f64,
+        body_per_byte: f64,
+    ) -> watch::Receiver<DynamicConfig> {
+        let config = DynamicConfig {
+            rb_generation_probability: 0.05,
+            eb_generation_probability: 0.0,
+            vote_generation_probability: 0.0,
+            rb_head_validation_ms: head_ms,
+            rb_body_validation_ms_constant: body_const_ms,
+            rb_body_validation_ms_per_byte: body_per_byte,
+            tx_rate: 0.0,
+        };
+        watch::channel(config).1
+    }
+
     #[test]
     fn delay_computation() {
-        let config = ValidationConfig {
-            rb_head_validation_ms: 1.0,
-            rb_body_validation_ms_constant: 5.0,
-            rb_body_validation_ms_per_byte: 0.001,
-            ..Default::default()
-        };
-        let (validator, _rx) = Validator::new(config);
+        let rx = test_dyn_config(1.0, 5.0, 0.001);
+        let (validator, _rx) = Validator::new(rx);
 
         // 1000-byte body: 1.0 + 5.0 + 0.001*1000 = 7.0ms
         let delay = validator.block_validation_delay(1000);
@@ -78,12 +93,8 @@ mod tests {
 
     #[tokio::test]
     async fn validate_block_completes() {
-        let config = ValidationConfig {
-            rb_head_validation_ms: 0.0,
-            rb_body_validation_ms_constant: 0.0,
-            ..Default::default()
-        };
-        let (validator, mut rx) = Validator::new(config);
+        let rx = test_dyn_config(0.0, 0.0, 0.0);
+        let (validator, mut rx) = Validator::new(rx);
 
         let point = Point::Specific {
             slot: 42,
