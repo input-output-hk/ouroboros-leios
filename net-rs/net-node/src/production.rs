@@ -136,9 +136,9 @@ impl BlockProducer {
 
     /// Run the VRF lottery for a given success rate. Returns true on win.
     fn run_lottery(&mut self, probability: f64) -> bool {
-        let target = compute_target_vrf_stake(self.stake, self.total_stake, probability);
-        let roll: u64 = self.rng.gen_range(0..self.total_stake);
-        roll < target
+        let per_node = probability * self.stake as f64 / self.total_stake as f64;
+        let roll: f64 = self.rng.gen();
+        roll < per_node
     }
 
     /// Build a fake block with valid Shelley+ CBOR structure.
@@ -237,12 +237,6 @@ impl BlockProducer {
     }
 }
 
-/// Compute VRF target stake (ported from sim-rs lottery.rs).
-fn compute_target_vrf_stake(stake: u64, total_stake: u64, success_rate: f64) -> u64 {
-    let ratio = stake as f64 / total_stake as f64;
-    (total_stake as f64 * ratio * success_rate) as u64
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -327,14 +321,6 @@ mod tests {
             (400..=600).contains(&wins),
             "wins={wins}, expected ~500 (5%)"
         );
-    }
-
-    #[test]
-    fn vrf_target_computation() {
-        assert_eq!(compute_target_vrf_stake(100, 1000, 1.0), 100);
-        assert_eq!(compute_target_vrf_stake(500, 1000, 0.5), 250);
-        assert_eq!(compute_target_vrf_stake(1000, 1000, 1.0), 1000);
-        assert_eq!(compute_target_vrf_stake(0, 1000, 1.0), 0);
     }
 
     #[test]
