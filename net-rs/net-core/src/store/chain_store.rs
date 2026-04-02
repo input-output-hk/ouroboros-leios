@@ -217,7 +217,7 @@ impl ChainStore {
         let inner = self.inner.lock().unwrap();
         match (index, cursor_point) {
             (None, _) => true, // Origin is always valid
-            (Some(i), Some(p)) => inner.blocks.get(i).map_or(false, |b| b.point == *p),
+            (Some(i), Some(p)) => inner.blocks.get(i).is_some_and(|b| b.point == *p),
             (Some(i), None) => i < inner.blocks.len(),
         }
     }
