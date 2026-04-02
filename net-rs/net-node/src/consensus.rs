@@ -303,6 +303,9 @@ impl Consensus {
         // When catching up, the header may be an intermediate block (different
         // from tip), so use the header's own point. When current, use tip's
         // point to avoid rehashing.
+        // Track insert_hash so the fetch range walk can use it when tip_hash
+        // isn't in the tree (catch-up mode).
+        let mut insert_hash_opt: Option<[u8; 32]> = None;
         if let Some(info) = header.parsed.as_ref() {
             let (insert_hash, insert_point) = if info.block_number == tip.block_no {
                 // Header IS the tip — use tip's pre-computed hash.
@@ -327,6 +330,7 @@ impl Consensus {
                 info.slot,
                 info.prev_hash,
             );
+            insert_hash_opt = Some(insert_hash);
         }
 
         if !dominated {
@@ -352,14 +356,18 @@ impl Consensus {
             return;
         }
 
-        // Walk chain_tree ancestors from tip to find the earliest unvalidated
-        // block — issue a range fetch from there to the tip so we get all
-        // intermediate blocks on a fork in one request.
-        let tip_hash = match point {
-            Point::Specific { hash, .. } => *hash,
-            _ => return,
+        // Walk chain_tree ancestors to find the earliest unvalidated block —
+        // issue a range fetch from there to the tip. During catch-up the tip
+        // hash isn't in chain_tree (only the intermediate header was inserted),
+        // so walk from insert_hash instead.
+        let walk_hash = if self.chain_tree.block_number(&tip_hash).is_some() {
+            tip_hash
+        } else if let Some(ih) = insert_hash_opt {
+            ih
+        } else {
+            tip_hash
         };
-        let ancestors = self.chain_tree.ancestors(tip_hash);
+        let ancestors = self.chain_tree.ancestors(walk_hash);
         let mut fetch_from = point.clone();
         for &hash in &ancestors {
             if self.block_cache.contains_key(&hash) {
@@ -413,6 +421,17 @@ impl Consensus {
             .as_ref()
             .and_then(|i| i.prev_hash)
             .or_else(|| self.chain_tree.prev_hash(&hash));
+        // Insert into chain_tree so ancestors()/find_common_ancestor() can
+        // walk through fetched blocks — critical for fork switches.
+        if let Some(info) = header.parsed.as_ref() {
+            self.chain_tree.insert(
+                hash,
+                point.clone(),
+                info.block_number,
+                info.slot,
+                info.prev_hash,
+            );
+        }
         self.block_cache.insert(
             hash,
             CachedBlock {
@@ -732,6 +751,44 @@ mod tests {
         WrappedHeader::new(header_cbor)
     }
 
+    /// Build a minimal Shelley+ block body containing the given header.
+    /// Format: `#6.24(cbor([era, [header_inner, [], [], true, []]]))`.
+    fn make_block_body(header: &WrappedHeader) -> BlockBody {
+        // Extract header_inner from ChainSync wire format:
+        // header.raw = [2, era(7), #6.24(header_inner)]
+        let mut d = minicbor::Decoder::new(&header.raw);
+        let _ = d.array(); // outer [2, ...]
+        let era = d.u32().unwrap();
+        let _ = d.tag(); // tag 24
+        let header_inner = d.bytes().unwrap();
+
+        // Build era_block: [header_inner, [], [], true, []]
+        let mut era_block = Vec::new();
+        let mut eb = minicbor::Encoder::new(&mut era_block);
+        let _ = eb.array(5);
+        era_block.extend_from_slice(header_inner);
+        let _ = minicbor::Encoder::new(&mut era_block)
+            .array(0)
+            .and_then(|e| e.array(0))
+            .and_then(|e| e.bool(true))
+            .and_then(|e| e.map(0));
+
+        // Build inner: [era, era_block]
+        let mut inner = Vec::new();
+        let mut ie = minicbor::Encoder::new(&mut inner);
+        let _ = ie.array(2).and_then(|e| e.u32(era));
+        inner.extend_from_slice(&era_block);
+
+        // Wrap in #6.24
+        let mut body = Vec::new();
+        let mut be = minicbor::Encoder::new(&mut body);
+        let _ = be
+            .tag(minicbor::data::Tag::new(24))
+            .and_then(|e| e.bytes(&inner));
+
+        BlockBody::new(body)
+    }
+
     /// Build a tip + header pair. Returns (tip, header, hash).
     fn make_tip(slot: u64, block_no: u64, prev_hash: Option<[u8; 32]>) -> (Tip, WrappedHeader) {
         let header = make_header(slot, block_no, prev_hash);
@@ -1036,5 +1093,171 @@ mod tests {
         // All fork blocks should have been adopted (drained from validated_blocks
         // into the chain store). The bodies remain in validated_blocks for
         // future replay, so we just verify the tip is correct above.
+    }
+
+    #[tokio::test]
+    async fn block_received_inserts_into_chain_tree() {
+        // Fix 1: on_block_received must insert into chain_tree so that
+        // ancestors() and find_common_ancestor() work for fetched blocks.
+        let (mut consensus, _cmd_rx) = make_consensus();
+
+        let (tip, header) = make_tip(10, 1, None);
+        let hash = match &tip.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+
+        // Before receiving, block is not in chain_tree.
+        assert!(consensus.chain_tree.block_number(&hash).is_none());
+
+        // Simulate block fetch arrival with a proper block body.
+        let body = make_block_body(&header);
+        consensus.on_block_received(&tip.point, &body);
+
+        // After receiving, block should be in chain_tree.
+        assert_eq!(consensus.chain_tree.block_number(&hash), Some(1));
+    }
+
+    #[tokio::test]
+    async fn catchup_fetch_uses_range_not_single_block() {
+        // Fix 2: during catch-up (header != tip), on_tip_advanced should
+        // walk from the intermediate header's hash, not the tip hash, to
+        // compute a range fetch covering all missing ancestors.
+        let (cmd_tx, mut cmd_rx) = mpsc::channel(32);
+        let config = crate::config::ValidationConfig::default();
+        let (validator, _val_rx) = Validator::new(config);
+        let mut consensus = Consensus::new("test".into(), cmd_tx, validator, 2160);
+
+        // Adopt block 1 as our tip.
+        let (tip1, hdr1) = make_tip(10, 1, None);
+        let hash1 = match &tip1.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus.register_self_produced(&tip1.point, &hdr1);
+
+        // Insert block 2 header into chain_tree (as if an earlier
+        // TipAdvanced intermediate header).
+        let (tip2, hdr2) = make_tip(20, 2, Some(hash1));
+        let hash2 = match &tip2.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus
+            .chain_tree
+            .insert(hash2, tip2.point.clone(), 2, 20, Some(hash1));
+
+        // Now simulate a catch-up TipAdvanced: tip is block 5, but the
+        // header is for block 3 (intermediate). Block 5 is NOT in chain_tree.
+        let (tip3, hdr3) = make_tip(30, 3, Some(hash2));
+
+        let tip5_header = make_header(50, 5, None);
+        let tip5_point = Point::Specific {
+            slot: 50,
+            hash: [0xAA; 32], // fake hash, won't be in chain_tree
+        };
+        let tip5 = Tip {
+            point: tip5_point.clone(),
+            block_no: 5,
+        };
+
+        // Send TipAdvanced with tip=block5, header=block3.
+        consensus
+            .handle_event(&NetworkEvent::TipAdvanced {
+                tip: tip5,
+                header: hdr3,
+            })
+            .await;
+
+        // Should issue a FetchBlockRange where from != to.
+        let cmd = cmd_rx.recv().await.unwrap();
+        match cmd {
+            NetworkCommand::FetchBlockRange { from, to } => {
+                let from_slot = match &from {
+                    Point::Specific { slot, .. } => *slot,
+                    _ => panic!("expected specific point for from"),
+                };
+                let to_slot = match &to {
+                    Point::Specific { slot, .. } => *slot,
+                    _ => panic!("expected specific point for to"),
+                };
+                // `from` should be block 2 (earliest unfetched ancestor
+                // reachable via the intermediate header), not block 5.
+                assert_eq!(
+                    from_slot, 20,
+                    "from should be block 2 (slot 20), not the tip"
+                );
+                assert_eq!(to_slot, 50, "to should be the tip (slot 50)");
+            }
+            other => panic!("expected FetchBlockRange, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn fork_switch_works_after_fetch_fills_chain_tree() {
+        // With Fix 1, fetched blocks are in chain_tree, so
+        // find_common_ancestor succeeds and fork switch fires.
+        let (cmd_tx, mut cmd_rx) = mpsc::channel(256);
+        let config = crate::config::ValidationConfig::default();
+        let (validator, _val_rx) = Validator::new(config);
+        let mut consensus = Consensus::new("test".into(), cmd_tx, validator, 2160);
+
+        // Chain A: blocks 1, 2 (self-produced).
+        let (tip1, hdr1) = make_tip(10, 1, None);
+        let hash1 = match &tip1.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus.register_self_produced(&tip1.point, &hdr1);
+
+        let (tip2, hdr2) = make_tip(20, 2, Some(hash1));
+        consensus.register_self_produced(&tip2.point, &hdr2);
+
+        assert_eq!(consensus.local_tip().unwrap().block_no, 2);
+
+        // Fork B diverges from block 1: B2 at slot 21, B3 at slot 31.
+        let (tipb2, hdrb2) = make_tip(21, 2, Some(hash1));
+        let hashb2 = match &tipb2.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        let (tipb3, hdrb3) = make_tip(31, 3, Some(hashb2));
+
+        // Simulate fetching B2 and B3 bodies (WITHOUT prior TipAdvanced).
+        // With Fix 1, on_block_received inserts them into chain_tree.
+        consensus.on_block_received(&tipb2.point, &make_block_body(&hdrb2));
+        consensus.on_block_received(&tipb3.point, &make_block_body(&hdrb3));
+
+        // Validate B2 then B3.
+        consensus
+            .on_validation_complete(ValidationComplete {
+                point: tipb2.point.clone(),
+            })
+            .await;
+        consensus
+            .on_validation_complete(ValidationComplete {
+                point: tipb3.point.clone(),
+            })
+            .await;
+
+        // Drain commands — should see rollback + inject for fork switch.
+        let mut got_rollback = false;
+        let mut inject_count = 0;
+        while let Ok(cmd) = cmd_rx.try_recv() {
+            match cmd {
+                NetworkCommand::InjectRollback { .. } => got_rollback = true,
+                NetworkCommand::InjectBlock { .. } => inject_count += 1,
+                _ => {}
+            }
+        }
+
+        assert!(
+            got_rollback,
+            "fork switch should fire now that fetched blocks are in chain_tree"
+        );
+        assert!(
+            inject_count >= 2,
+            "should inject B2, B3: got {inject_count}"
+        );
     }
 }

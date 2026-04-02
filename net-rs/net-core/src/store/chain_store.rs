@@ -25,6 +25,9 @@ struct ChainStoreInner {
     capacity: usize,
     /// Running block number (monotonically increasing, not reset on eviction).
     block_no: u64,
+    /// Tip point after the most recent rollback truncation. Server handlers use
+    /// this as the MsgRollBackward target (the true fork point).
+    last_rollback_target: Option<Point>,
 }
 
 /// Thread-safe in-memory chain state.
@@ -49,6 +52,7 @@ impl ChainStore {
                 blocks: VecDeque::new(),
                 capacity,
                 block_no: 0,
+                last_rollback_target: None,
             }),
             notify: notify_sender,
         });
@@ -91,6 +95,7 @@ impl ChainStore {
         let mut inner = self.inner.lock().unwrap();
         if *point == Point::Origin {
             inner.blocks.clear();
+            inner.last_rollback_target = Some(Point::Origin);
             drop(inner);
             let _ = self.notify.send(0);
             return Point::Origin;
@@ -104,6 +109,7 @@ impl ChainStore {
             .back()
             .map(|b| b.point.clone())
             .unwrap_or(Point::Origin);
+        inner.last_rollback_target = Some(tip_point.clone());
         let count = inner.block_no;
         drop(inner);
         let _ = self.notify.send(count);
@@ -120,6 +126,7 @@ impl ChainStore {
             .back()
             .map(|b| b.point.clone())
             .unwrap_or(Point::Origin);
+        inner.last_rollback_target = Some(tip_point.clone());
         let count = inner.block_no;
         drop(inner);
         let _ = self.notify.send(count);
@@ -203,13 +210,22 @@ impl ChainStore {
         }
     }
 
-    /// Check if the given read_index is still valid (within the chain).
-    pub fn is_valid_index(&self, index: Option<usize>) -> bool {
+    /// Check whether a read cursor is still valid by comparing the Point at
+    /// the stored index. Returns false if the index is out of bounds OR a
+    /// different block now occupies that position (rollback + re-append).
+    pub fn is_valid_index(&self, index: Option<usize>, cursor_point: &Option<Point>) -> bool {
         let inner = self.inner.lock().unwrap();
-        match index {
-            None => true, // Origin is always valid
-            Some(i) => i < inner.blocks.len(),
+        match (index, cursor_point) {
+            (None, _) => true, // Origin is always valid
+            (Some(i), Some(p)) => inner.blocks.get(i).map_or(false, |b| b.point == *p),
+            (Some(i), None) => i < inner.blocks.len(),
         }
+    }
+
+    /// The fork point of the most recent rollback (tip after truncation).
+    /// Server handlers use this as the MsgRollBackward target.
+    pub fn last_rollback_target(&self) -> Option<Point> {
+        self.inner.lock().unwrap().last_rollback_target.clone()
     }
 
     /// Subscribe to chain change notifications.
@@ -440,11 +456,41 @@ mod tests {
             store.append_block(p, h, b, slot);
         }
 
-        assert!(store.is_valid_index(Some(4))); // index 4 = block 5
+        let point5 = Some(make_point(5));
+        let point3 = Some(make_point(3));
+        assert!(store.is_valid_index(Some(4), &point5)); // index 4 = block 5
         store.rollback(2); // remove blocks 4, 5
-        assert!(!store.is_valid_index(Some(4))); // now invalid
-        assert!(store.is_valid_index(Some(2))); // index 2 = block 3, still valid
-        assert!(store.is_valid_index(None)); // Origin always valid
+        assert!(!store.is_valid_index(Some(4), &point5)); // out of bounds
+        assert!(store.is_valid_index(Some(2), &point3)); // block 3 still there
+        assert!(store.is_valid_index(None, &None)); // Origin always valid
+
+        // Verify last_rollback_target is block 3 (tip after truncation).
+        assert_eq!(store.last_rollback_target(), Some(make_point(3)));
+    }
+
+    #[test]
+    fn rollback_reappend_detected_by_point_matching() {
+        // The key bug: rollback + re-append at the same index must be detected.
+        let (store, _rx) = ChainStore::new(100);
+        for slot in 1..=5 {
+            let (p, h, b) = make_block(slot);
+            store.append_block(p, h, b, slot);
+        }
+
+        // Cursor at index 4 = block at slot 5.
+        let old_point = Some(make_point(5));
+        assert!(store.is_valid_index(Some(4), &old_point));
+
+        // Rollback removes block 5, then a different block occupies index 4.
+        store.rollback(1); // remove block 5, now [1,2,3,4]
+        let (p, h, b) = make_block(50); // different block at slot 50
+        store.append_block(p, h, b, 50); // now [1,2,3,4,block_50]
+
+        // Same index 4, but different block — must detect as invalid.
+        assert!(!store.is_valid_index(Some(4), &old_point));
+
+        // Rollback target is block 4 (tip after truncation).
+        assert_eq!(store.last_rollback_target(), Some(make_point(4)));
     }
 
     #[tokio::test]
