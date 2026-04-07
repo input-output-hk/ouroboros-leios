@@ -15,9 +15,10 @@ use crate::types::{BlockBody, Point, Tip, WrappedHeader};
 
 /// Events sent from the coordinator to the application.
 ///
-/// Peer-agnostic: the application sees chains and blocks, not peers.
-/// Peer identity is included only for informational/logging purposes
-/// (connect/disconnect events).
+/// Most events carry `peer_id` so chain-selecting consumers (net-node
+/// consensus) can track per-peer candidate chains. Consumers that don't
+/// care about peer identity (net-cli `multi-follow`) can destructure it
+/// with `peer_id: _`.
 #[derive(Debug)]
 pub enum NetworkEvent {
     /// A peer connected successfully.
@@ -26,11 +27,22 @@ pub enum NetworkEvent {
     /// A peer disconnected (error or graceful).
     PeerDisconnected { peer_id: PeerId, reason: String },
 
-    /// A new chain tip was announced (deduplicated across peers).
-    TipAdvanced { tip: Tip, header: WrappedHeader },
+    /// A peer announced a new chain tip. Emitted per-peer, not deduplicated
+    /// across peers — consensus needs to track each peer's candidate chain
+    /// independently.
+    TipAdvanced {
+        peer_id: PeerId,
+        tip: Tip,
+        header: WrappedHeader,
+    },
 
-    /// Chain rolled back to a point.
-    RolledBack { point: Point, tip: Tip },
+    /// A peer rolled its chain back to a point. Emitted for every peer
+    /// rollback, not just those affecting the local best tip.
+    RolledBack {
+        peer_id: PeerId,
+        point: Point,
+        tip: Tip,
+    },
 
     /// A requested block was fetched.
     BlockReceived { point: Point, body: BlockBody },

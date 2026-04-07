@@ -79,7 +79,7 @@ pub async fn run(
                     elapsed.as_secs_f64(),
                 );
             }
-            NetworkEvent::RolledBack { point, tip } => {
+            NetworkEvent::RolledBack { point, tip, .. } => {
                 println!("  rollback to {point}  tip: {tip}");
             }
             NetworkEvent::BlockReceived { point, body } => {

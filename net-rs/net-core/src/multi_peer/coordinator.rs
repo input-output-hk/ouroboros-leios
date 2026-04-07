@@ -55,6 +55,10 @@ struct PeerState {
     inbound_delay: Duration,
     /// Shared byte counters from this peer's mux connection.
     mux_stats: Option<Arc<crate::mux::MuxStats>>,
+    /// Last rollback point this peer was notified to, for dedup: we
+    /// refuse to forward consecutive `RolledBack` events with the same
+    /// point so a chatty peer can't flood the consensus channel.
+    last_rolled_back_to: Option<Point>,
 }
 
 /// The coordinator's internal state.
@@ -199,6 +203,7 @@ impl Coordinator {
                 reconnect_backoff,
                 inbound_delay,
                 mux_stats: None,
+                last_rolled_back_to: None,
             },
         );
 
@@ -242,6 +247,8 @@ impl Coordinator {
                 if let Some(peer) = self.peers.get_mut(&peer_id) {
                     peer.tip = Some(tip.clone());
                     peer.fragment.append(header_point.clone());
+                    // A fresh forward progression clears the rollback dedup.
+                    peer.last_rolled_back_to = None;
                 }
 
                 // Update best tip tracker.
@@ -253,31 +260,56 @@ impl Coordinator {
                     self.best_tip = Some(tip.clone());
                 }
 
-                // Always forward headers so consensus can build the full
-                // chain tree (needed for fork tracking and UI display).
+                // Forward every per-peer announcement so consensus can
+                // maintain a candidate chain per peer (Haskell-style).
                 let _ = self
                     .network_events
-                    .send(NetworkEvent::TipAdvanced { tip, header })
+                    .send(NetworkEvent::TipAdvanced {
+                        peer_id,
+                        tip,
+                        header,
+                    })
                     .await;
             }
 
             PeerEvent::RolledBack { point, tip } => {
                 // Update peer's tip and truncate chain fragment.
-                if let Some(peer) = self.peers.get_mut(&peer_id) {
+                // Per-peer dedup: if we already forwarded a rollback to
+                // this same point for this peer, don't refire — a chatty
+                // peer could otherwise flood the consensus channel.
+                let duplicate = if let Some(peer) = self.peers.get_mut(&peer_id) {
                     peer.tip = Some(tip.clone());
                     peer.fragment.rollback_to(&point);
-                }
+                    let dup = peer.last_rolled_back_to.as_ref() == Some(&point);
+                    if !dup {
+                        peer.last_rolled_back_to = Some(point.clone());
+                    }
+                    dup
+                } else {
+                    false
+                };
 
-                // Forward rollback if it affects our best chain.
+                // If this peer's rollback lowers our best tip, update the
+                // best tip and the local chain store. This mirrors the
+                // prior behaviour but is no longer gated on forwarding.
                 if let Some(best) = &self.best_tip {
                     if tip.block_no < best.block_no {
                         self.best_tip = Some(tip.clone());
                         self.chain_store.rollback_to(&point);
-                        let _ = self
-                            .network_events
-                            .send(NetworkEvent::RolledBack { point, tip })
-                            .await;
                     }
+                }
+
+                // Always forward (unless deduped) so consensus can retire
+                // headers from the peer's candidate chain.
+                if !duplicate {
+                    let _ = self
+                        .network_events
+                        .send(NetworkEvent::RolledBack {
+                            peer_id,
+                            point,
+                            tip,
+                        })
+                        .await;
                 }
             }
 
@@ -745,13 +777,33 @@ impl Coordinator {
                 ));
             }
 
+            // Surface BlockFetchFailed for every pending fetch that was
+            // assigned to this peer, so the application can re-route the
+            // fetch to another peer (or mark it unfetchable) instead of
+            // waiting for an in_flight TTL to expire.
+            let orphaned: Vec<Point> = self
+                .pending_fetches
+                .iter()
+                .filter(|(_, id)| **id == peer_id)
+                .map(|(pt, _)| pt.clone())
+                .collect();
+            for point in &orphaned {
+                let _ = self
+                    .network_events
+                    .send(NetworkEvent::BlockFetchFailed {
+                        from: point.clone(),
+                        to: point.clone(),
+                    })
+                    .await;
+            }
+            for point in &orphaned {
+                self.pending_fetches.remove(point);
+            }
+
             let _ = self
                 .network_events
                 .send(NetworkEvent::PeerDisconnected { peer_id, reason })
                 .await;
-
-            // Clean up any pending fetches assigned to this peer.
-            self.pending_fetches.retain(|_, id| *id != peer_id);
 
             // Clean up Leios offer and fetch tracking for this peer.
             if let Some(tracker) = self.leios.as_mut() {
@@ -840,6 +892,7 @@ impl Coordinator {
                 reconnect_backoff: Duration::from_secs(0), // accepted peers don't reconnect
                 inbound_delay,
                 mux_stats: None,
+                last_rolled_back_to: None,
             },
         );
 
@@ -1122,7 +1175,11 @@ fn decrement_ip_count(ip_counts: &Mutex<HashMap<IpAddr, usize>>, ip: IpAddr) {
 
 /// Spawn a coordinator task and return a handle for the application.
 pub fn spawn_coordinator(config: CoordinatorConfig) -> CoordinatorHandle {
-    let (net_event_sender, net_event_receiver) = mpsc::channel(64);
+    // Network events channel sized to absorb bursts of per-peer announcements
+    // (header advances, rollbacks). The application loop drains it on every
+    // iteration, but a slow tick can leave many events queued — undersizing
+    // here back-pressures the coordinator and stalls all peers.
+    let (net_event_sender, net_event_receiver) = mpsc::channel(256);
     let (net_cmd_sender, net_cmd_receiver) = mpsc::channel(64);
     let (peer_event_sender, peer_event_receiver) = mpsc::channel(256);
     let (chain_store, _chain_rx) = ChainStore::new(config.chain_store_capacity);
@@ -1200,6 +1257,7 @@ mod tests {
                 reconnect_backoff: Duration::from_secs(1),
                 inbound_delay: Duration::ZERO,
                 mux_stats: None,
+                last_rolled_back_to: None,
             },
         );
 
@@ -1227,9 +1285,11 @@ mod tests {
         let event = net_event_receiver.try_recv().unwrap();
         match event {
             NetworkEvent::TipAdvanced {
+                peer_id: recv_peer,
                 tip: recv_tip,
                 header: recv_header,
             } => {
+                assert_eq!(recv_peer, peer_id);
                 assert_eq!(recv_tip.block_no, 100);
                 assert_eq!(recv_header.raw, header.raw);
             }
@@ -1289,6 +1349,7 @@ mod tests {
                     reconnect_backoff: Duration::from_secs(1),
                     inbound_delay: Duration::ZERO,
                     mux_stats: None,
+                    last_rolled_back_to: None,
                 },
             );
         }
@@ -1391,6 +1452,7 @@ mod tests {
                 reconnect_backoff: Duration::from_secs(1),
                 inbound_delay: Duration::ZERO,
                 mux_stats: None,
+                last_rolled_back_to: None,
             },
         );
 
@@ -1423,6 +1485,99 @@ mod tests {
         // Should be queued for reconnection.
         assert_eq!(coordinator.reconnect_queue.len(), 1);
         assert_eq!(coordinator.reconnect_queue[0].0, "test:3001");
+    }
+
+    #[tokio::test]
+    async fn remove_peer_emits_block_fetch_failed_for_orphaned_fetches() {
+        let (peer_event_sender, peer_event_receiver) = mpsc::channel(256);
+        let (net_event_sender, mut net_event_receiver) = mpsc::channel(64);
+        let (_net_cmd_sender, net_cmd_receiver) = mpsc::channel(64);
+
+        let config = CoordinatorConfig::default();
+        let (chain_store, _chain_rx) = ChainStore::new(100);
+        let mut coordinator = Coordinator::new(
+            config,
+            peer_event_sender,
+            peer_event_receiver,
+            net_event_sender,
+            net_cmd_receiver,
+            chain_store,
+            None,
+        );
+
+        let peer_id = PeerId(0);
+        let (cmd_sender, _cmd_receiver) = mpsc::channel(16);
+        coordinator.peers.insert(
+            peer_id,
+            PeerState {
+                address: "test:3001".to_string(),
+                mode: ConnectionMode::InitiatorOnly,
+                ip: None,
+                commands: cmd_sender,
+                task_handle: tokio::spawn(async {}),
+                tip: None,
+                rtt: None,
+                fragment: ChainFragment::new(),
+                reconnect_backoff: Duration::from_secs(1),
+                inbound_delay: Duration::ZERO,
+                mux_stats: None,
+                last_rolled_back_to: None,
+            },
+        );
+
+        // Simulate two pending fetches assigned to this peer.
+        let point_a = Point::Specific {
+            slot: 10,
+            hash: [0xAA; 32],
+        };
+        let point_b = Point::Specific {
+            slot: 20,
+            hash: [0xBB; 32],
+        };
+        coordinator.pending_fetches.insert(point_a.clone(), peer_id);
+        coordinator.pending_fetches.insert(point_b.clone(), peer_id);
+
+        // Peer fails.
+        coordinator
+            .handle_peer_event(
+                peer_id,
+                PeerEvent::Failed {
+                    reason: "connection reset".to_string(),
+                },
+            )
+            .await;
+
+        // Collect all network events emitted.
+        let mut events = Vec::new();
+        while let Ok(ev) = net_event_receiver.try_recv() {
+            events.push(ev);
+        }
+
+        // Expect: two BlockFetchFailed (one per orphaned fetch) + one PeerDisconnected.
+        let failed_points: Vec<Point> = events
+            .iter()
+            .filter_map(|e| match e {
+                NetworkEvent::BlockFetchFailed { to, .. } => Some(to.clone()),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            failed_points.contains(&point_a),
+            "expected BlockFetchFailed for point_a, got events: {events:?}"
+        );
+        assert!(
+            failed_points.contains(&point_b),
+            "expected BlockFetchFailed for point_b, got events: {events:?}"
+        );
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, NetworkEvent::PeerDisconnected { .. })),
+            "expected PeerDisconnected, got events: {events:?}"
+        );
+
+        // pending_fetches should be empty.
+        assert!(coordinator.pending_fetches.is_empty());
     }
 
     #[tokio::test]
@@ -1460,6 +1615,7 @@ mod tests {
                 reconnect_backoff: Duration::from_secs(1),
                 inbound_delay: Duration::ZERO,
                 mux_stats: None,
+                last_rolled_back_to: None,
             },
         );
 
@@ -1512,6 +1668,7 @@ mod tests {
                 reconnect_backoff: Duration::from_secs(1),
                 inbound_delay: Duration::ZERO,
                 mux_stats: None,
+                last_rolled_back_to: None,
             },
         );
         cmd_receiver
@@ -1963,6 +2120,7 @@ mod tests {
                 reconnect_backoff: Duration::from_secs(1),
                 inbound_delay: Duration::ZERO,
                 mux_stats: None,
+                last_rolled_back_to: None,
             },
         );
 
