@@ -109,6 +109,39 @@ impl PeerChain {
     }
 }
 
+/// Result of a single pass of the Haskell-aligned chain selection.
+///
+/// Phase 2.2 runs this as a shadow check: logs the decision alongside
+/// the existing `try_fork_switch` + `fetch_unvalidated_ancestors` so we
+/// can compare them before cutover in phase 3.
+#[derive(Debug, Clone)]
+#[allow(dead_code)] // fields consumed by logging + phase 3 primary path
+pub(crate) enum ShadowDecision {
+    /// No peer has a chain strictly better than the adopted tip.
+    NoBetterChain,
+    /// A peer has a better tip but its chain doesn't connect to the
+    /// validated tree within the visibility window — the peer has
+    /// forked beyond k or we haven't seen enough of its history yet.
+    OrphanCandidate { peer_id: PeerId, tip_block_no: u64 },
+    /// A peer has a better tip and all blocks from the common ancestor
+    /// to its tip are already in the validated tree — a fork switch
+    /// can happen immediately.
+    Switched {
+        peer_id: PeerId,
+        ancestor: [u8; 32],
+        tip_block_no: u64,
+    },
+    /// A peer has a better tip but some blocks between the common
+    /// ancestor and its tip haven't been fetched + validated yet.
+    /// Phase 3's primary path will issue `FetchBlockRange` for these.
+    WaitingForBlocks {
+        peer_id: PeerId,
+        ancestor: [u8; 32],
+        tip_block_no: u64,
+        missing_len: usize,
+    },
+}
+
 /// Consensus state with fork-tracking chain tree.
 pub struct Consensus {
     node_id: String,
@@ -216,6 +249,165 @@ impl Consensus {
         self.peer_chains.remove(&peer_id);
     }
 
+    /// Shadow chain selection: pick the best peer chain, walk back to
+    /// common ancestor with the validated tree, decide what to do.
+    /// Phase 2.2 logs the decision without driving behavior; phase 3
+    /// promotes it to the primary driver.
+    ///
+    /// Returns the decision so tests can assert on it directly.
+    fn select_chain_shadow(&self) -> ShadowDecision {
+        // Pick best candidate: any peer whose tip is strictly better
+        // (block_no, then hash tiebreak) than our adopted tip.
+        let (adopted_hash, adopted_bn) = match self.adopted_tip_hash {
+            Some(h) => (h, self.chain_tree.block_number(&h).unwrap_or(0)),
+            None => ([0u8; 32], 0),
+        };
+
+        let best = self
+            .peer_chains
+            .iter()
+            .filter_map(|(peer_id, chain)| {
+                let tip = chain.tip()?;
+                // Strictly better than adopted.
+                if self.adopted_tip_hash.is_none()
+                    || is_better_tip(tip.block_no, &tip.hash, adopted_bn, &adopted_hash)
+                {
+                    Some((*peer_id, chain, tip.clone()))
+                } else {
+                    None
+                }
+            })
+            .max_by(|a, b| {
+                // Prefer higher block_no; break ties on lower hash for determinism.
+                a.2.block_no
+                    .cmp(&b.2.block_no)
+                    .then_with(|| b.2.hash.cmp(&a.2.hash))
+            });
+
+        let (peer_id, candidate, candidate_tip) = match best {
+            Some(b) => b,
+            None => return ShadowDecision::NoBetterChain,
+        };
+
+        // Walk back to a block that's in the validated tree. Start at
+        // the peer's tip and walk newest→oldest through the peer chain,
+        // collecting missing hashes along the way. If we consume the
+        // entire peer chain without hitting the validated tree, check
+        // the oldest entry's prev_hash (which points at the intersection
+        // or immediately before it). If that's also unknown, the peer's
+        // fork lies entirely outside our visibility window.
+        let mut missing: Vec<[u8; 32]> = Vec::new();
+        let mut ancestor: Option<[u8; 32]> = None;
+        for entry in candidate.iter().rev() {
+            if self.chain_tree.contains(&entry.hash) {
+                ancestor = Some(entry.hash);
+                break;
+            }
+            missing.push(entry.hash);
+        }
+        if ancestor.is_none() {
+            if let Some(oldest) = candidate.iter().next() {
+                if let Some(parent) = oldest.prev_hash {
+                    if self.chain_tree.contains(&parent) {
+                        ancestor = Some(parent);
+                    }
+                }
+            }
+        }
+        let ancestor = match ancestor {
+            Some(a) => a,
+            None => {
+                return ShadowDecision::OrphanCandidate {
+                    peer_id,
+                    tip_block_no: candidate_tip.block_no,
+                }
+            }
+        };
+        // We walked newest→oldest; flip to oldest→newest for replay order.
+        missing.reverse();
+
+        if missing.is_empty() {
+            ShadowDecision::Switched {
+                peer_id,
+                ancestor,
+                tip_block_no: candidate_tip.block_no,
+            }
+        } else {
+            let missing_len = missing.len();
+            ShadowDecision::WaitingForBlocks {
+                peer_id,
+                ancestor,
+                tip_block_no: candidate_tip.block_no,
+                missing_len,
+            }
+        }
+    }
+
+    /// Log the shadow decision. Called from the same sites that drive
+    /// `try_fork_switch` / `fetch_unvalidated_ancestors`.
+    fn log_shadow_decision(&self, source: &str) {
+        let decision = self.select_chain_shadow();
+        // Walk the old code's logic in parallel so we can compare.
+        let old_best_hash = self.chain_tree.best_tip_hash();
+        let old_best_bn = old_best_hash
+            .and_then(|h| self.chain_tree.block_number(&h))
+            .unwrap_or(0);
+        match decision {
+            ShadowDecision::NoBetterChain => {
+                // Quiet path: only log when we expected a decision to be made.
+                tracing::debug!(
+                    node_id = %self.node_id,
+                    source,
+                    "shadow select_chain: no better candidate"
+                );
+            }
+            ShadowDecision::OrphanCandidate {
+                peer_id,
+                tip_block_no,
+            } => {
+                tracing::info!(
+                    node_id = %self.node_id,
+                    source,
+                    %peer_id,
+                    tip_block_no,
+                    "shadow select_chain: candidate has no common ancestor in validated tree"
+                );
+            }
+            ShadowDecision::Switched {
+                peer_id,
+                ancestor,
+                tip_block_no,
+            } => {
+                tracing::info!(
+                    node_id = %self.node_id,
+                    source,
+                    %peer_id,
+                    tip_block_no,
+                    old_best_bn,
+                    ancestor = format!("{:02x}{:02x}", ancestor[30], ancestor[31]),
+                    "shadow select_chain: would switch"
+                );
+            }
+            ShadowDecision::WaitingForBlocks {
+                peer_id,
+                ancestor,
+                tip_block_no,
+                missing_len,
+            } => {
+                tracing::info!(
+                    node_id = %self.node_id,
+                    source,
+                    %peer_id,
+                    tip_block_no,
+                    old_best_bn,
+                    ancestor = format!("{:02x}{:02x}", ancestor[30], ancestor[31]),
+                    missing_len,
+                    "shadow select_chain: would fetch"
+                );
+            }
+        }
+    }
+
     /// Register a block we produced ourselves, so we don't re-fetch it.
     /// Returns the block_no to use for injection.
     pub fn register_self_produced(&mut self, point: &Point, header: &WrappedHeader) -> u64 {
@@ -304,6 +496,7 @@ impl Consensus {
             } => {
                 self.record_peer_tip(*peer_id, tip, header);
                 self.on_tip_advanced(tip, header).await;
+                self.log_shadow_decision("tip_advanced");
                 true
             }
             NetworkEvent::BlockReceived { point, body } => {
@@ -317,10 +510,12 @@ impl Consensus {
             } => {
                 self.record_peer_rollback(*peer_id, point);
                 self.on_rolled_back(point, tip).await;
+                self.log_shadow_decision("rolled_back");
                 true
             }
             NetworkEvent::PeerDisconnected { peer_id, .. } => {
                 self.record_peer_disconnected(*peer_id);
+                self.log_shadow_decision("peer_disconnected");
                 // Don't consume the event — the upstream log handler
                 // still wants to see it.
                 false
@@ -487,6 +682,7 @@ impl Consensus {
         let rolled_back = self.try_fork_switch().await;
         self.drain_validated_blocks().await;
         self.fetch_unvalidated_ancestors().await;
+        self.log_shadow_decision("validation_complete");
 
         // Prune old blocks beyond k.
         if let Some(adopted) = self.adopted_tip_hash {
@@ -1329,6 +1525,131 @@ mod tests {
         // Same hash announced by both peers — each has an independent entry.
         assert_eq!(consensus.peer_chains.get(&peer_a).unwrap().len(), 1);
         assert_eq!(consensus.peer_chains.get(&peer_b).unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn shadow_no_better_chain_when_peer_matches_adopted() {
+        let (mut consensus, _cmd_rx) = make_consensus();
+        let peer = PeerId(1);
+
+        // Self-produce tip 1; peer announces the same.
+        let (tip1, header1) = make_tip(1, 1, None);
+        consensus.register_self_produced(&tip1.point, &header1);
+        consensus.record_peer_tip(peer, &tip1, &header1);
+
+        let decision = consensus.select_chain_shadow();
+        assert!(
+            matches!(decision, ShadowDecision::NoBetterChain),
+            "expected NoBetterChain, got {decision:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn shadow_waiting_for_blocks_when_peer_has_longer_chain() {
+        let (mut consensus, _cmd_rx) = make_consensus();
+        let peer = PeerId(1);
+
+        // Self-produce block 1.
+        let (tip1, header1) = make_tip(1, 1, None);
+        let hash1 = match &tip1.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus.register_self_produced(&tip1.point, &header1);
+
+        // Peer announces block 2 with prev_hash=hash1.
+        let (tip2, header2) = make_tip(2, 2, Some(hash1));
+        let hash2 = match &tip2.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus.record_peer_tip(peer, &tip2, &header2);
+
+        match consensus.select_chain_shadow() {
+            ShadowDecision::WaitingForBlocks {
+                peer_id,
+                ancestor,
+                tip_block_no,
+                missing_len,
+            } => {
+                assert_eq!(peer_id, peer);
+                assert_eq!(ancestor, hash1);
+                assert_eq!(tip_block_no, 2);
+                assert_eq!(missing_len, 1);
+                let _ = hash2; // asserted via missing_len
+            }
+            other => panic!("expected WaitingForBlocks, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn shadow_orphan_candidate_when_peer_forks_outside_window() {
+        let (mut consensus, _cmd_rx) = make_consensus();
+        let peer = PeerId(1);
+
+        // Self-produce block 1.
+        let (tip1, header1) = make_tip(1, 1, None);
+        consensus.register_self_produced(&tip1.point, &header1);
+
+        // Peer announces block 5 with a random prev_hash that doesn't
+        // connect to anything in our validated tree.
+        let orphan_prev: [u8; 32] = [0xEF; 32];
+        let (tip5, header5) = make_tip(5, 5, Some(orphan_prev));
+        consensus.record_peer_tip(peer, &tip5, &header5);
+
+        match consensus.select_chain_shadow() {
+            ShadowDecision::OrphanCandidate {
+                peer_id,
+                tip_block_no,
+            } => {
+                assert_eq!(peer_id, peer);
+                assert_eq!(tip_block_no, 5);
+            }
+            other => panic!("expected OrphanCandidate, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn shadow_picks_best_of_multiple_candidates() {
+        let (mut consensus, _cmd_rx) = make_consensus();
+        let peer_a = PeerId(1);
+        let peer_b = PeerId(2);
+
+        // Self-produce block 1.
+        let (tip1, header1) = make_tip(1, 1, None);
+        let hash1 = match &tip1.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus.register_self_produced(&tip1.point, &header1);
+
+        // peer_a's chain: block 2 with prev=hash1.
+        let (tip2, header2) = make_tip(2, 2, Some(hash1));
+        let hash2 = match &tip2.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus.record_peer_tip(peer_a, &tip2, &header2);
+
+        // peer_b's chain: block 2 + block 3 (longer, so strictly better).
+        consensus.record_peer_tip(peer_b, &tip2, &header2);
+        let (tip3, header3) = make_tip(3, 3, Some(hash2));
+        consensus.record_peer_tip(peer_b, &tip3, &header3);
+
+        match consensus.select_chain_shadow() {
+            ShadowDecision::WaitingForBlocks {
+                peer_id,
+                tip_block_no,
+                ancestor,
+                missing_len,
+            } => {
+                assert_eq!(peer_id, peer_b, "should pick peer_b (block 3)");
+                assert_eq!(tip_block_no, 3);
+                assert_eq!(ancestor, hash1);
+                assert_eq!(missing_len, 2, "blocks 2 and 3 are missing");
+            }
+            other => panic!("expected WaitingForBlocks for peer_b, got {other:?}"),
+        }
     }
 
     #[tokio::test]
