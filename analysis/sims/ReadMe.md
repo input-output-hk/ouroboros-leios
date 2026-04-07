@@ -14,7 +14,7 @@ Contents
 
 ### Haskell simulator
 
-Instructions for building the Haskell simulator `ols` are availabe in [/simulation/](../../simulator/README.md).
+Instructions for building the Haskell simulator `ols` are available in [/simulation/](../../simulation/README.md).
 
 
 ### Rust simulator

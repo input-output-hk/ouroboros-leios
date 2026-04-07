@@ -3,7 +3,7 @@
 This is a collection of Leios demonstrations created using specially patched versions of `cardano-node` and other components not originating from this repository:
 
 - [burst](burst/): Protocol burst scenario to reproduce Leios interference with Praos
-- [proto-devnet](proto-devnet/): A leios-enabld devnet created from prototype cardano-nodes
+- [proto-devnet](proto-devnet/): A leios-enabled devnet created from prototype cardano-nodes
 
 There are other, component-specific demos you might be looking for:
 
