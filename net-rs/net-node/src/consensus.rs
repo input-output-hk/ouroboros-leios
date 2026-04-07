@@ -1,9 +1,10 @@
 //! Longest-chain consensus with fork tracking.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::{Duration, Instant};
 
 use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
+use net_core::peer::PeerId;
 use net_core::types::{BlockBody, Point, Tip, WrappedHeader};
 use tokio::sync::mpsc;
 use tracing::info;
@@ -25,6 +26,87 @@ struct CachedBlock {
     body: BlockBody,
     block_no: u64,
     prev_hash: Option<[u8; 32]>,
+}
+
+/// One header in a per-peer candidate chain.
+#[derive(Debug, Clone)]
+#[allow(dead_code)] // fields consumed by select_chain in phase 2.2
+pub(crate) struct PeerChainEntry {
+    pub hash: [u8; 32],
+    pub point: Point,
+    pub block_no: u64,
+    pub prev_hash: Option<[u8; 32]>,
+}
+
+/// Ordered list of headers a single peer has announced to us.
+///
+/// Mirrors the Haskell `AnchoredFragment Header`: the queue holds entries
+/// from the oldest known header (anchor) to the peer's current tip, in
+/// announcement order. `append` adds the new tip; `rollback_to` truncates
+/// after a rollback point; the whole structure is dropped on peer disconnect.
+///
+/// Bounded at `cap` to avoid unbounded memory growth — when the queue would
+/// exceed the cap, the oldest entries are dropped (effectively the anchor
+/// slides forward). A proper Haskell-style immutable-point anchor is a
+/// future refinement; for now the cap is a blunt safety rail.
+#[derive(Debug)]
+pub(crate) struct PeerChain {
+    entries: VecDeque<PeerChainEntry>,
+    cap: usize,
+}
+
+impl PeerChain {
+    pub fn new(cap: usize) -> Self {
+        Self {
+            entries: VecDeque::new(),
+            cap,
+        }
+    }
+
+    /// Append a new header. If the queue would exceed `cap`, drop oldest.
+    /// Idempotent on the same hash — a duplicate announcement is a no-op.
+    pub fn append(&mut self, entry: PeerChainEntry) {
+        if self.entries.iter().any(|e| e.hash == entry.hash) {
+            return;
+        }
+        self.entries.push_back(entry);
+        while self.entries.len() > self.cap {
+            self.entries.pop_front();
+        }
+    }
+
+    /// Truncate the chain to the given point (inclusive). If the point
+    /// is not in the chain, leave it unchanged — we can't rewrite history
+    /// we never knew.
+    pub fn rollback_to(&mut self, point: &Point) {
+        if let Some(pos) = self.entries.iter().position(|e| &e.point == point) {
+            self.entries.truncate(pos + 1);
+        }
+    }
+
+    /// Last entry in the chain (the peer's current tip), if any.
+    #[allow(dead_code)] // used by select_chain in phase 2.2
+    pub fn tip(&self) -> Option<&PeerChainEntry> {
+        self.entries.back()
+    }
+
+    /// Number of entries currently held.
+    #[allow(dead_code)] // used by tests + select_chain in phase 2.2
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// True when the chain has no entries.
+    #[allow(dead_code)] // used by select_chain in phase 2.2
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Iterate entries from oldest to newest.
+    #[allow(dead_code)]
+    pub fn iter(&self) -> impl DoubleEndedIterator<Item = &PeerChainEntry> {
+        self.entries.iter()
+    }
 }
 
 /// Consensus state with fork-tracking chain tree.
@@ -51,6 +133,10 @@ pub struct Consensus {
     /// same hash is later re-announced via `TipAdvanced` or its body arrives
     /// via `on_block_received` (e.g. a fresh peer with the block connects).
     unfetchable: HashSet<[u8; 32]>,
+    /// Per-peer candidate chains. Populated on `TipAdvanced`, truncated on
+    /// `RolledBack`, dropped on `PeerDisconnected`. Not yet used for chain
+    /// selection — phase 2 only wires bookkeeping; phase 3 wires selection.
+    pub(crate) peer_chains: HashMap<PeerId, PeerChain>,
     commands: mpsc::Sender<NetworkCommand>,
     validator: Validator,
     /// Security parameter k — prune blocks deeper than this.
@@ -73,10 +159,61 @@ impl Consensus {
             validated: HashSet::new(),
             in_flight: HashMap::new(),
             unfetchable: HashSet::new(),
+            peer_chains: HashMap::new(),
             commands,
             validator,
             security_param_k,
         }
+    }
+
+    /// Cap per-peer chains at 2 * k headers — enough to track forks within
+    /// the security window plus a 1k cushion, without growing unboundedly.
+    fn peer_chain_cap(&self) -> usize {
+        (self.security_param_k as usize).saturating_mul(2).max(64)
+    }
+
+    /// Ingest a peer's new header announcement into its candidate chain.
+    fn record_peer_tip(&mut self, peer_id: PeerId, tip: &Tip, header: &WrappedHeader) {
+        let info = match header.parsed.as_ref() {
+            Some(i) => i,
+            None => return, // opaque header — nothing to select on
+        };
+        // When a peer is still catching up, the announced `header` may be
+        // an ancestor of `tip`. Use whichever hash matches.
+        let (hash, point) = if info.block_number == tip.block_no {
+            match &tip.point {
+                Point::Specific { hash, .. } => (*hash, tip.point.clone()),
+                _ => return,
+            }
+        } else {
+            match header.point() {
+                Some(Point::Specific { hash, slot }) => (hash, Point::Specific { hash, slot }),
+                _ => return,
+            }
+        };
+        let entry = PeerChainEntry {
+            hash,
+            point,
+            block_no: info.block_number,
+            prev_hash: info.prev_hash,
+        };
+        let cap = self.peer_chain_cap();
+        self.peer_chains
+            .entry(peer_id)
+            .or_insert_with(|| PeerChain::new(cap))
+            .append(entry);
+    }
+
+    /// Truncate a peer's candidate chain on a rollback.
+    fn record_peer_rollback(&mut self, peer_id: PeerId, point: &Point) {
+        if let Some(chain) = self.peer_chains.get_mut(&peer_id) {
+            chain.rollback_to(point);
+        }
+    }
+
+    /// Drop a peer's candidate chain on disconnect.
+    fn record_peer_disconnected(&mut self, peer_id: PeerId) {
+        self.peer_chains.remove(&peer_id);
     }
 
     /// Register a block we produced ourselves, so we don't re-fetch it.
@@ -160,7 +297,12 @@ impl Consensus {
     /// consensus (caller should not log it separately).
     pub async fn handle_event(&mut self, event: &NetworkEvent) -> bool {
         match event {
-            NetworkEvent::TipAdvanced { tip, header } => {
+            NetworkEvent::TipAdvanced {
+                peer_id,
+                tip,
+                header,
+            } => {
+                self.record_peer_tip(*peer_id, tip, header);
                 self.on_tip_advanced(tip, header).await;
                 true
             }
@@ -168,9 +310,20 @@ impl Consensus {
                 self.on_block_received(point, body);
                 true
             }
-            NetworkEvent::RolledBack { point, tip } => {
+            NetworkEvent::RolledBack {
+                peer_id,
+                point,
+                tip,
+            } => {
+                self.record_peer_rollback(*peer_id, point);
                 self.on_rolled_back(point, tip).await;
                 true
+            }
+            NetworkEvent::PeerDisconnected { peer_id, .. } => {
+                self.record_peer_disconnected(*peer_id);
+                // Don't consume the event — the upstream log handler
+                // still wants to see it.
+                false
             }
             NetworkEvent::BlockFetchFailed { from, to } => {
                 self.in_flight.remove(from);
@@ -894,6 +1047,11 @@ impl Consensus {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use net_core::peer::PeerId;
+
+    /// Placeholder peer id for tests that don't care which peer announced
+    /// the tip — consensus is expected to ignore the value during phase 2.
+    const TEST_PEER: PeerId = PeerId(0);
 
     /// Build a fake Shelley+ header with proper CBOR so WrappedHeader::new
     /// parses it into HeaderInfo with block_number, slot, and prev_hash.
@@ -1002,6 +1160,209 @@ mod tests {
         (consensus, cmd_rx)
     }
 
+    /// Consensus with a small k so the peer-chain cap is also small —
+    /// lets us exercise the cap without announcing thousands of headers.
+    fn make_consensus_with_k(k: u64) -> (Consensus, mpsc::Receiver<NetworkCommand>) {
+        let (cmd_tx, cmd_rx) = mpsc::channel(16);
+        let (validator, _val_rx) = Validator::new(test_dyn_rx());
+        let consensus = Consensus::new("test".into(), cmd_tx, validator, k);
+        (consensus, cmd_rx)
+    }
+
+    #[tokio::test]
+    async fn peer_chain_records_tip_advances() {
+        let (mut consensus, _cmd_rx) = make_consensus();
+        let peer = PeerId(7);
+
+        let (tip1, header1) = make_tip(1, 1, None);
+        let hash1 = match &tip1.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus
+            .handle_event(&NetworkEvent::TipAdvanced {
+                peer_id: peer,
+                tip: tip1,
+                header: header1,
+            })
+            .await;
+
+        let (tip2, header2) = make_tip(2, 2, Some(hash1));
+        consensus
+            .handle_event(&NetworkEvent::TipAdvanced {
+                peer_id: peer,
+                tip: tip2,
+                header: header2,
+            })
+            .await;
+
+        let chain = consensus.peer_chains.get(&peer).expect("chain exists");
+        assert_eq!(chain.len(), 2);
+        assert_eq!(chain.tip().unwrap().block_no, 2);
+        assert_eq!(chain.tip().unwrap().prev_hash, Some(hash1));
+    }
+
+    #[tokio::test]
+    async fn peer_chain_rollback_truncates() {
+        let (mut consensus, _cmd_rx) = make_consensus();
+        let peer = PeerId(7);
+
+        let (tip1, header1) = make_tip(1, 1, None);
+        let point1 = tip1.point.clone();
+        let hash1 = match &tip1.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus
+            .handle_event(&NetworkEvent::TipAdvanced {
+                peer_id: peer,
+                tip: tip1,
+                header: header1,
+            })
+            .await;
+
+        let (tip2, header2) = make_tip(2, 2, Some(hash1));
+        let hash2 = match &tip2.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus
+            .handle_event(&NetworkEvent::TipAdvanced {
+                peer_id: peer,
+                tip: tip2.clone(),
+                header: header2,
+            })
+            .await;
+
+        let (tip3, header3) = make_tip(3, 3, Some(hash2));
+        consensus
+            .handle_event(&NetworkEvent::TipAdvanced {
+                peer_id: peer,
+                tip: tip3,
+                header: header3,
+            })
+            .await;
+
+        assert_eq!(consensus.peer_chains.get(&peer).unwrap().len(), 3);
+
+        // Roll back to block 1 — only tip1 should remain.
+        consensus
+            .handle_event(&NetworkEvent::RolledBack {
+                peer_id: peer,
+                point: point1.clone(),
+                tip: tip2,
+            })
+            .await;
+
+        let chain = consensus.peer_chains.get(&peer).unwrap();
+        assert_eq!(chain.len(), 1);
+        assert_eq!(chain.tip().unwrap().hash, hash1);
+    }
+
+    #[tokio::test]
+    async fn peer_chain_dropped_on_disconnect() {
+        let (mut consensus, _cmd_rx) = make_consensus();
+        let peer = PeerId(7);
+
+        let (tip1, header1) = make_tip(1, 1, None);
+        consensus
+            .handle_event(&NetworkEvent::TipAdvanced {
+                peer_id: peer,
+                tip: tip1,
+                header: header1,
+            })
+            .await;
+
+        assert!(consensus.peer_chains.contains_key(&peer));
+
+        consensus
+            .handle_event(&NetworkEvent::PeerDisconnected {
+                peer_id: peer,
+                reason: "test".to_string(),
+            })
+            .await;
+
+        assert!(!consensus.peer_chains.contains_key(&peer));
+    }
+
+    #[tokio::test]
+    async fn peer_chain_duplicate_announcement_ignored() {
+        let (mut consensus, _cmd_rx) = make_consensus();
+        let peer = PeerId(7);
+
+        let (tip1, header1) = make_tip(1, 1, None);
+        for _ in 0..3 {
+            consensus
+                .handle_event(&NetworkEvent::TipAdvanced {
+                    peer_id: peer,
+                    tip: tip1.clone(),
+                    header: header1.clone(),
+                })
+                .await;
+        }
+
+        assert_eq!(consensus.peer_chains.get(&peer).unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn peer_chain_tracks_peers_independently() {
+        let (mut consensus, _cmd_rx) = make_consensus();
+        let peer_a = PeerId(1);
+        let peer_b = PeerId(2);
+
+        let (tip, header) = make_tip(1, 1, None);
+        consensus
+            .handle_event(&NetworkEvent::TipAdvanced {
+                peer_id: peer_a,
+                tip: tip.clone(),
+                header: header.clone(),
+            })
+            .await;
+        consensus
+            .handle_event(&NetworkEvent::TipAdvanced {
+                peer_id: peer_b,
+                tip,
+                header,
+            })
+            .await;
+
+        // Same hash announced by both peers — each has an independent entry.
+        assert_eq!(consensus.peer_chains.get(&peer_a).unwrap().len(), 1);
+        assert_eq!(consensus.peer_chains.get(&peer_b).unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn peer_chain_bounded_at_2k() {
+        // k=4 → cap should be max(2*4, 64) = 64. Use 100 headers.
+        let (mut consensus, mut cmd_rx) = make_consensus_with_k(4);
+        let peer = PeerId(7);
+
+        let mut prev: Option<[u8; 32]> = None;
+        for i in 1..=100u64 {
+            let (tip, header) = make_tip(i, i, prev);
+            prev = match &tip.point {
+                Point::Specific { hash, .. } => Some(*hash),
+                _ => None,
+            };
+            consensus
+                .handle_event(&NetworkEvent::TipAdvanced {
+                    peer_id: peer,
+                    tip,
+                    header,
+                })
+                .await;
+            // Drain any fetch commands so the command channel doesn't
+            // back up and stall `on_tip_advanced`'s send.
+            while cmd_rx.try_recv().is_ok() {}
+        }
+
+        // Cap is max(2*k, 64) = 64.
+        let chain = consensus.peer_chains.get(&peer).unwrap();
+        assert_eq!(chain.len(), 64);
+        // Most recent entries retained, oldest dropped.
+        assert_eq!(chain.tip().unwrap().block_no, 100);
+    }
+
     #[tokio::test]
     async fn skips_self_produced_blocks() {
         let (mut consensus, mut cmd_rx) = make_consensus();
@@ -1010,6 +1371,7 @@ mod tests {
         consensus.register_self_produced(&tip.point, &header);
 
         let event = NetworkEvent::TipAdvanced {
+            peer_id: TEST_PEER,
             tip: tip.clone(),
             header,
         };
@@ -1026,7 +1388,11 @@ mod tests {
         let (mut consensus, mut cmd_rx) = make_consensus();
 
         let (tip, header) = make_tip(1, 1, None);
-        let event = NetworkEvent::TipAdvanced { tip, header };
+        let event = NetworkEvent::TipAdvanced {
+            peer_id: TEST_PEER,
+            tip,
+            header,
+        };
         consensus.handle_event(&event).await;
 
         // Should issue a FetchBlockRange command.
@@ -1043,6 +1409,7 @@ mod tests {
         consensus.register_self_produced(&tip5.point, &header5);
         consensus
             .handle_event(&NetworkEvent::TipAdvanced {
+                peer_id: TEST_PEER,
                 tip: tip5,
                 header: header5.clone(),
             })
@@ -1052,6 +1419,7 @@ mod tests {
         let (tip3, header3) = make_tip(3, 3, None);
         consensus
             .handle_event(&NetworkEvent::TipAdvanced {
+                peer_id: TEST_PEER,
                 tip: tip3,
                 header: header3,
             })
@@ -1069,12 +1437,17 @@ mod tests {
         // Announce same tip twice.
         consensus
             .handle_event(&NetworkEvent::TipAdvanced {
+                peer_id: TEST_PEER,
                 tip: tip.clone(),
                 header: header.clone(),
             })
             .await;
         consensus
-            .handle_event(&NetworkEvent::TipAdvanced { tip, header })
+            .handle_event(&NetworkEvent::TipAdvanced {
+                peer_id: TEST_PEER,
+                tip,
+                header,
+            })
             .await;
 
         // Only one FetchBlockRange command.
@@ -1143,12 +1516,14 @@ mod tests {
         // Insert B2 and B3 into tree (as if we received headers via TipAdvanced).
         consensus
             .handle_event(&NetworkEvent::TipAdvanced {
+                peer_id: TEST_PEER,
                 tip: tipb2.clone(),
                 header: hdrb2.clone(),
             })
             .await;
         consensus
             .handle_event(&NetworkEvent::TipAdvanced {
+                peer_id: TEST_PEER,
                 tip: tipb3.clone(),
                 header: hdrb3.clone(),
             })
@@ -1156,6 +1531,7 @@ mod tests {
         // B4 is the one that overtakes — announce and fetch it.
         consensus
             .handle_event(&NetworkEvent::TipAdvanced {
+                peer_id: TEST_PEER,
                 tip: tipb4.clone(),
                 header: hdrb4.clone(),
             })
@@ -1251,7 +1627,11 @@ mod tests {
             (tipb6.clone(), hdrb6.clone()),
         ] {
             consensus
-                .handle_event(&NetworkEvent::TipAdvanced { tip, header: hdr })
+                .handle_event(&NetworkEvent::TipAdvanced {
+                    peer_id: TEST_PEER,
+                    tip,
+                    header: hdr,
+                })
                 .await;
         }
         // Drain any fetch commands from TipAdvanced.
@@ -1358,6 +1738,7 @@ mod tests {
         // Send TipAdvanced with tip=block5, header=block3.
         consensus
             .handle_event(&NetworkEvent::TipAdvanced {
+                peer_id: TEST_PEER,
                 tip: tip5,
                 header: hdr3,
             })
@@ -1483,6 +1864,7 @@ mod tests {
 
         consensus
             .handle_event(&NetworkEvent::TipAdvanced {
+                peer_id: TEST_PEER,
                 tip: tip2.clone(),
                 header: hdr2,
             })
@@ -1555,6 +1937,7 @@ mod tests {
         // (Re-announce our own adopted tip — dominated path still calls it.)
         consensus
             .handle_event(&NetworkEvent::TipAdvanced {
+                peer_id: TEST_PEER,
                 tip: tip2a.clone(),
                 header: hdr2a.clone(),
             })
@@ -1607,6 +1990,7 @@ mod tests {
         };
         consensus
             .handle_event(&NetworkEvent::TipAdvanced {
+                peer_id: TEST_PEER,
                 tip: tip2.clone(),
                 header: hdr2.clone(),
             })
@@ -1678,6 +2062,7 @@ mod tests {
         };
         consensus
             .handle_event(&NetworkEvent::TipAdvanced {
+                peer_id: TEST_PEER,
                 tip: tip2.clone(),
                 header: hdr2,
             })
@@ -1734,7 +2119,11 @@ mod tests {
             (tip4.clone(), hdr4),
         ] {
             consensus
-                .handle_event(&NetworkEvent::TipAdvanced { tip, header: hdr })
+                .handle_event(&NetworkEvent::TipAdvanced {
+                    peer_id: TEST_PEER,
+                    tip,
+                    header: hdr,
+                })
                 .await;
         }
         assert!(consensus.chain_tree.contains(&hash4));
@@ -1778,6 +2167,7 @@ mod tests {
         };
         consensus
             .handle_event(&NetworkEvent::TipAdvanced {
+                peer_id: TEST_PEER,
                 tip: tip2.clone(),
                 header: hdr2.clone(),
             })
@@ -1793,6 +2183,7 @@ mod tests {
         // A fresh peer re-announces block#2.
         consensus
             .handle_event(&NetworkEvent::TipAdvanced {
+                peer_id: TEST_PEER,
                 tip: tip2.clone(),
                 header: hdr2,
             })
@@ -2020,7 +2411,11 @@ mod tests {
             (tip4b.clone(), hdr4b),
         ] {
             consensus
-                .handle_event(&NetworkEvent::TipAdvanced { tip, header: hdr })
+                .handle_event(&NetworkEvent::TipAdvanced {
+                    peer_id: TEST_PEER,
+                    tip,
+                    header: hdr,
+                })
                 .await;
         }
         // Drain commands from the announcement walk.
@@ -2050,6 +2445,7 @@ mod tests {
                            // directly via on_tip_advanced of the existing self-produced tip.)
         consensus
             .handle_event(&NetworkEvent::TipAdvanced {
+                peer_id: TEST_PEER,
                 tip: tip2a.clone(),
                 header: hdr2a,
             })
