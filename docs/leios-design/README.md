@@ -584,13 +584,21 @@ The first version of LeiosEbStore can just be two bog standard key-value stores,
 
 ## Network
 
-> [!WARNING]
->
-> TODO: Mostly content directly taken from [impact analysis](../ImpactAnalysis.md). Expand on motivation and concreteness of changes.
-
 The Network layer implements the mini-protocols that enable the Consensus layer to satisfy its diffusion requirements (**REQ-DiffuseLeiosBlocks**, **REQ-DiffuseLeiosVotes**) and prioritization requirements (**REQ-PrioritizePraosOverLeios**, **REQ-PrioritizeFreshOverStaleLeios**) defined in the [Resource management](#resource-management) section. While Consensus drives the scheduling logic for when to diffuse blocks and votes, Network provides the protocol mechanisms to actually transmit them over the peer-to-peer network.
 
 Similar resource contention risks apply to the Network layer, including network bandwidth contention between Praos and Leios, networking overhead latency, and contention between fresh and stale Leios traffic.
+
+### Message latencies
+
+Due to extra volume that Leios imposes on the protocol, it is imperative that the underlying TCP bearer is managed such that arbitrary amount of data does not accrue in the host OS kernel buffers. Such a design is necessary to mitigate head-of-line blocking effects which would adversely affect network latencies, and in particular apparent ranking (Praos) block propagation times. For example, Linux and macOS support TCP socket option TCP_NOTSENT_LOWAT which allows to limit the volume of data written to the socket and that which cannot be yet sent out. This is very useful when we know what we want to diffuse, but also change our mind in terms of message ordering at the last moment, and do in the a way which doesn't artificially limit our throughput. Crucially, this option allow us to satisfy ranking block delivery timeliness guarantees which simultaneously gives us the means to manage the memory footprint of a running node. Sadly, this option is not universally supported and alternatives themselves are not portable, while manual transmission pacing is onerous so we postpone the investigation of the latter.
+
+> [!WARNING]
+>
+> TODO: investigate possibility to use TCP_NOTSENT_LOWAT on cardano network despite its non-portability.
+
+### Transaction submission
+
+Current cardano-node (10.7, at the time of this writing) is by default using the legacy transaction submission protocol which fetches all transactions from every peer that offers them, even if some of those transactions are repeated. This scheme is found to be effective and robust in the current protocol implementation, but it necessarily leads to higher bandwidth consumption. A new protocol version v2 is being rolled out and tested, which is expected to bring cpu, memory and bandwidth use down, which in turn frees those resources for other tasks, and Leios in particular.
 
 ### New mini-protocols
 
