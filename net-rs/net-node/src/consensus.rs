@@ -630,6 +630,29 @@ impl Consensus {
                     in_cache,
                     "fork switch blocked: block not validated"
                 );
+                // Kick off a single-block fetch for the missing block.
+                // It sits between two validated blocks in the tree — a
+                // position `fetch_unvalidated_ancestors` can miss when its
+                // `best_unadopted` selection lands on a different chain
+                // than `try_fork_switch`'s `best`. The fetch will either
+                // bring the body in (recovery) or fail with
+                // `BlockFetchFailed`, which our handler turns into a
+                // `mark_unfetchable_and_prune` call.
+                self.evict_stale_in_flight();
+                if !in_cache {
+                    if let Some(p) = self.chain_tree.point(&cur).cloned() {
+                        if !self.in_flight.contains_key(&p) {
+                            self.mark_in_flight(p.clone());
+                            let _ = self
+                                .commands
+                                .send(NetworkCommand::FetchBlockRange {
+                                    from: p.clone(),
+                                    to: p,
+                                })
+                                .await;
+                        }
+                    }
+                }
                 return false;
             }
             chain.push(cur);
@@ -1883,6 +1906,76 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// When `try_fork_switch` walks a chain and finds a block whose body
+    /// isn't cached, it should kick off a single-block fetch for that
+    /// block. Otherwise that header sits in `chain_tree` indefinitely,
+    /// because `fetch_unvalidated_ancestors`'s walk may follow a different
+    /// chain (different `best_unadopted`) and never visit it.
+    #[tokio::test]
+    async fn fork_switch_kicks_fetch_for_missing_intermediate() {
+        let (mut consensus, mut cmd_rx) = make_consensus();
+
+        // Adopt block#1.
+        let (tip1, hdr1) = make_tip(10, 1, None);
+        let hash1 = match &tip1.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus.register_self_produced(&tip1.point, &hdr1);
+
+        // Plant a chain block#1 → block#2 (header only) → block#3 (cached
+        // + validated) directly into chain_tree, simulating the case where
+        // the fork-switch walk reaches a header whose body never arrived.
+        let (tip2, hdr2) = make_tip(20, 2, Some(hash1));
+        let hash2 = match &tip2.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        let info2 = hdr2.parsed.as_ref().unwrap();
+        consensus.chain_tree.insert(
+            hash2,
+            tip2.point.clone(),
+            info2.block_number,
+            info2.slot,
+            info2.prev_hash,
+        );
+
+        let (tip3, hdr3) = make_tip(30, 3, Some(hash2));
+        let hash3 = match &tip3.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        // Insert block#3 into chain_tree AND cache + validate it.
+        consensus.on_block_received(&tip3.point, &make_block_body(&hdr3));
+        consensus.validated.insert(hash3);
+        // Drain the validation-time fetch attempts so the test only sees
+        // commands from the fork-switch path.
+        while cmd_rx.try_recv().is_ok() {}
+
+        // Trigger a fork switch attempt. block#3 is "best" (block_no > 1),
+        // walk goes block#3 → block#2 → block#1. block#2 has no body —
+        // walk should log "fork switch blocked" AND issue a single-block
+        // fetch for block#2.
+        let switched = consensus.try_fork_switch().await;
+        assert!(!switched, "fork switch should be blocked by missing body");
+
+        // Expect a FetchBlockRange { from: block#2, to: block#2 }.
+        let mut saw_fetch_for_block2 = false;
+        while let Ok(cmd) = cmd_rx.try_recv() {
+            if let NetworkCommand::FetchBlockRange { from, to } = cmd {
+                if from == tip2.point && to == tip2.point {
+                    saw_fetch_for_block2 = true;
+                }
+            }
+        }
+        assert!(
+            saw_fetch_for_block2,
+            "fork-switch should kick a single-block fetch for the missing intermediate"
+        );
+        // And the in_flight set should reflect that.
+        assert!(consensus.in_flight.contains_key(&tip2.point));
     }
 
     /// The full node-14 jam scenario: node has its own self-produced fork
