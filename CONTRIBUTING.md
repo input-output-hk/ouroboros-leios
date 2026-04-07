@@ -1,7 +1,7 @@
 # Contributing to Leios
 
 Thanks for considering contributing and help us on prototyping and
-specifying the Mithril protocol for the whole benefit of the Cardano
+specifying the Leios protocol for the whole benefit of the Cardano
 community!
 
 There are several ways in which you can contribute to this project:

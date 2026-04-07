@@ -1,5 +1,7 @@
-This repository contains simulation and visualisation code to help with
-the design and validation of Ouroboros Leios.
+This directory contains an early Haskell simulation and visualisation code for Ouroboros Leios.
+
+> [!NOTE]
+> This simulation predates the move away from input blocks and implements Short Leios, which is no longer the current protocol design. For up-to-date simulation work see [sim-rs/](../sim-rs/). The visualisations of Praos and basic network behaviour are still useful, but the Leios-specific parts are outdated.
 
 The simulations are not completely configurable from the command line.
 The code for the simulation configurations needs to be adjusted or
@@ -40,10 +42,6 @@ Available commands:
 ```
 
 The visualisation subcommand exposes a number of visualisations:
-
-> [!CAUTION]
-> The visualisations are under active development, so the following list is almost certainly out of date.
-> If you would like an up-to-date list of visualisations, please build and run the command.
 
 ```
 $ cabal run ols -- viz --help
@@ -102,10 +100,6 @@ Available options:
 ```
 
 The simulation subcommand exposes a number of simulations:
-
-> [!CAUTION]
-> The simulations are under active development, so the following list is almost certainly out of date.
-> If you would like an up-to-date list of simulations, please build and run the command.
 
 ```
 $ cabal run ols -- sim --help
