@@ -10,7 +10,9 @@ The protocol is specified in [CIP-0164](https://github.com/cardano-foundation/CI
 
 ## Research and analysis
 
-Two technical report snapshots capture the R&D trajectory: [report 1](docs/technical-report-1.md) (~February 2025) and [report 2](docs/technical-report-2.md) (~August 2025). A [cost analysis](https://leios.cardano-scaling.org/cost-estimator) is available on the website. Additional research artifacts live in [post-cip/](post-cip/) and [analysis/](analysis/).
+Two technical report snapshots capture the R&D trajectory: [report 1](docs/technical-report-1.md) (~February 2025) and [report 2](docs/technical-report-2.md) (~August 2025). A [cost analysis](https://leios.cardano-scaling.org/cost-estimator) is available on the website.
+
+[post-cip/](post-cip/) collects findings made after the CIP was submitted — a Markovian model of Linear Leios, UTxO set and lifetime analysis, CPU cost measurements of ledger operations, and mempool and constraint modelling. [analysis/](analysis/) contains simulation experiment results, [DeltaQ modelling of Linear Leios](analysis/deltaq/linear-leios/), bandwidth measurements, and network timing analysis.
 
 ## Simulations
 
@@ -30,7 +32,7 @@ The [demo/](demo/) directory collects network-level demonstrations built from pr
 
 ## DeltaQ network analysis
 
-[delta_q/](delta_q/) provides a web-based tool for modelling network performance using Delta-QSD theory, including extensions for load analysis and gossip diffusion. See the [DeltaQ README](delta_q/README.md) for building and usage.
+[delta_q/](delta_q/) provides a general-purpose web-based tool for modelling network performance using Delta-QSD theory, including extensions for load analysis and gossip diffusion — see the [DeltaQ README](delta_q/README.md) for building and usage. The more recent [analysis/deltaq/linear-leios/](analysis/deltaq/linear-leios/) applies DeltaQ specifically to Linear Leios, computing EB diffusion statistics and certification probabilities.
 
 ## Community and governance
 
