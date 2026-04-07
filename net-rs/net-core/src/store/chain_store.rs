@@ -202,12 +202,21 @@ impl ChainStore {
     /// Get blocks in a range (inclusive on both endpoints).
     pub fn get_range(&self, from: &Point, to: &Point) -> Vec<StoredBlock> {
         let inner = self.inner.lock().unwrap();
-        let start = inner.blocks.iter().position(|b| b.point == *from);
-        let end = inner.blocks.iter().position(|b| b.point == *to);
-        match (start, end) {
-            (Some(s), Some(e)) if s <= e => inner.blocks.range(s..=e).cloned().collect(),
-            _ => Vec::new(),
-        }
+        let end = match inner.blocks.iter().position(|b| b.point == *to) {
+            Some(e) => e,
+            None => return Vec::new(),
+        };
+        // If `from` is on this chain, slice from there. Otherwise return the
+        // whole prefix up to `to` — the client may be on a fork whose `from`
+        // we don't know, and giving it the chain prefix lets it walk back
+        // through prev_hash to find a common ancestor.
+        let start = inner
+            .blocks
+            .iter()
+            .position(|b| b.point == *from)
+            .filter(|&s| s <= end)
+            .unwrap_or(0);
+        inner.blocks.range(start..=end).cloned().collect()
     }
 
     /// Check whether a read cursor is still valid by comparing the Point at
@@ -446,6 +455,28 @@ mod tests {
 
         let range = store.get_range(&make_point(99), &make_point(100));
         assert!(range.is_empty());
+    }
+
+    /// When `to` is in the store but `from` is not (because `from` is on a
+    /// fork the server doesn't know about, or was rolled back), the server
+    /// should still return what it has up to `to` so the client can use that
+    /// to walk further back. Otherwise the client gets MsgNoBlocks and stays
+    /// stuck on a fork it can't bridge.
+    #[test]
+    fn get_range_returns_prefix_when_from_unknown() {
+        let (store, _rx) = ChainStore::new(100);
+        for slot in 1..=5 {
+            let (p, h, b) = make_block(slot);
+            store.append_block(p, h, b, slot);
+        }
+
+        // from is not in the store, to is.
+        let range = store.get_range(&make_point(99), &make_point(4));
+        assert!(
+            !range.is_empty(),
+            "should return a prefix of the chain up to `to`"
+        );
+        assert_eq!(range.last().unwrap().point, make_point(4));
     }
 
     #[test]

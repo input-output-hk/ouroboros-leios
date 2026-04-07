@@ -1,6 +1,7 @@
 //! Longest-chain consensus with fork tracking.
 
 use std::collections::{HashMap, HashSet};
+use std::time::{Duration, Instant};
 
 use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
 use net_core::types::{BlockBody, Point, Tip, WrappedHeader};
@@ -9,6 +10,13 @@ use tracing::info;
 
 use crate::chain_tree::{is_better_tip, ChainTree, ChainTreeEntry};
 use crate::validation::{ValidationComplete, Validator};
+
+/// How long an in-flight fetch entry remains "active" before being considered
+/// stale and eligible for retry. The coordinator may silently drop a fetch
+/// (e.g. no connected peer has the requested point in its fragment), so we
+/// need a recovery path: if no body arrives within this window, allow a fresh
+/// attempt.
+const IN_FLIGHT_TTL: Duration = Duration::from_secs(15);
 
 /// A block body cached after fetch or self-production.
 struct CachedBlock {
@@ -32,7 +40,17 @@ pub struct Consensus {
     /// Which cached blocks have passed validation.
     validated: HashSet<[u8; 32]>,
     /// Points currently being fetched or validated (avoid duplicate requests).
-    in_flight: HashSet<Point>,
+    /// Each entry remembers when it was added; entries older than
+    /// `IN_FLIGHT_TTL` are treated as stale and dropped lazily so a retry
+    /// can be issued. The coordinator may silently drop a fetch when no
+    /// connected peer has the requested point — without TTL recovery, the
+    /// node would stay stuck on that fork forever.
+    in_flight: HashMap<Point, Instant>,
+    /// Hashes whose body is known to be unfetchable from any current peer.
+    /// Set on `BlockFetchFailed` for single-block fetches; cleared when the
+    /// same hash is later re-announced via `TipAdvanced` or its body arrives
+    /// via `on_block_received` (e.g. a fresh peer with the block connects).
+    unfetchable: HashSet<[u8; 32]>,
     commands: mpsc::Sender<NetworkCommand>,
     validator: Validator,
     /// Security parameter k — prune blocks deeper than this.
@@ -53,7 +71,8 @@ impl Consensus {
             self_produced: HashSet::new(),
             block_cache: HashMap::new(),
             validated: HashSet::new(),
-            in_flight: HashSet::new(),
+            in_flight: HashMap::new(),
+            unfetchable: HashSet::new(),
             commands,
             validator,
             security_param_k,
@@ -95,6 +114,48 @@ impl Consensus {
         }
     }
 
+    /// Drop stale `in_flight` entries (older than `IN_FLIGHT_TTL`). Called
+    /// at the start of fetch-issuing flows so a silently-dropped fetch can
+    /// be retried.
+    fn evict_stale_in_flight(&mut self) {
+        let now = Instant::now();
+        self.in_flight
+            .retain(|_, started| now.duration_since(*started) < IN_FLIGHT_TTL);
+    }
+
+    fn mark_in_flight(&mut self, point: Point) {
+        self.in_flight.insert(point, Instant::now());
+    }
+
+    /// Mark a block hash as unfetchable from any current peer and prune
+    /// it together with all of its descendants from the chain tree, the
+    /// block cache, the validated set, and the in-flight map. This is the
+    /// recovery path for stale fork headers that no peer is willing to
+    /// serve any more (e.g. they all rolled back to a different chain).
+    /// Without this, `fetch_unvalidated_ancestors` and `try_fork_switch`
+    /// keep walking the dead fork forever.
+    fn mark_unfetchable_and_prune(&mut self, hash: [u8; 32]) {
+        self.unfetchable.insert(hash);
+        let removed = self.chain_tree.remove_subtree(hash);
+        if removed.is_empty() {
+            return;
+        }
+        // Drop matching entries from cache, validated set, and in-flight.
+        for h in &removed {
+            self.block_cache.remove(h);
+            self.validated.remove(h);
+        }
+        self.in_flight.retain(|p, _| match p {
+            Point::Specific { hash, .. } => !removed.contains(hash),
+            _ => true,
+        });
+        info!(
+            node_id = %self.node_id,
+            removed_count = removed.len(),
+            "pruned unfetchable fork from chain tree"
+        );
+    }
+
     /// Handle a network event. Returns true if the event was consumed by
     /// consensus (caller should not log it separately).
     pub async fn handle_event(&mut self, event: &NetworkEvent) -> bool {
@@ -123,7 +184,7 @@ impl Consensus {
                         to = %to,
                         "range fetch failed, retrying tip only"
                     );
-                    self.in_flight.insert(to.clone());
+                    self.mark_in_flight(to.clone());
                     let _ = self
                         .commands
                         .send(NetworkCommand::FetchBlockRange {
@@ -132,20 +193,27 @@ impl Consensus {
                         })
                         .await;
                 } else {
+                    // Single-block fetch failed: no peer has this block in
+                    // its current chain (e.g. they all rolled back). Mark
+                    // it unfetchable and prune the whole subtree so the
+                    // walks stop wasting effort on it.
                     info!(
                         node_id = %self.node_id,
                         from = %from,
                         to = %to,
-                        "block fetch failed"
+                        "block fetch failed; pruning subtree"
                     );
+                    if let Point::Specific { hash, .. } = from {
+                        self.mark_unfetchable_and_prune(*hash);
+                    }
                 }
                 true
             }
 
             // Leios: fetch offered EBs, votes, and txs.
             NetworkEvent::LeiosBlockOffered { point } => {
-                if !self.in_flight.contains(point) {
-                    self.in_flight.insert(point.clone());
+                if !self.in_flight.contains_key(point) {
+                    self.mark_in_flight(point.clone());
                     info!(node_id = %self.node_id, %point, "fetching leios block");
                     let _ = self
                         .commands
@@ -164,8 +232,8 @@ impl Consensus {
                     },
                     hash: [0xFE; 32], // distinct key to avoid collision with block fetch
                 };
-                if !self.in_flight.contains(&key) {
-                    self.in_flight.insert(key);
+                if !self.in_flight.contains_key(&key) {
+                    self.mark_in_flight(key);
                     info!(node_id = %self.node_id, %point, "fetching leios block txs");
                     let _ = self
                         .commands
@@ -275,6 +343,9 @@ impl Consensus {
                     self.chain_tree.prune_below(min);
                     self.block_cache.retain(|_, cb| cb.block_no >= min);
                     self.validated.retain(|h| self.block_cache.contains_key(h));
+                    // Drop unfetchable entries that are no longer in the
+                    // tree (and thus can't possibly be referenced again).
+                    self.unfetchable.retain(|h| self.chain_tree.contains(h));
                 }
             }
         }
@@ -330,6 +401,9 @@ impl Consensus {
                 info.slot,
                 info.prev_hash,
             );
+            // A fresh peer announced this header — clear any prior
+            // unfetchable marker so we'll try fetching the body again.
+            self.unfetchable.remove(&insert_hash);
             insert_hash_opt = Some(insert_hash);
         }
 
@@ -351,8 +425,10 @@ impl Consensus {
             return;
         }
 
-        // Don't issue duplicate fetches.
-        if self.in_flight.contains(point) {
+        // Drop stale fetches before checking, so a silently-dropped previous
+        // attempt doesn't permanently block this tip.
+        self.evict_stale_in_flight();
+        if self.in_flight.contains_key(point) {
             return;
         }
 
@@ -381,6 +457,28 @@ impl Consensus {
             }
         }
 
+        // If no cached ancestor was found (single-block fetch), fall back to
+        // fetching from the adopted tip so the range covers all missing blocks.
+        // Only do so if the adopted tip is strictly older than the announced
+        // tip (otherwise we'd send a backwards range across a fork).
+        if fetch_from == *point {
+            if let Some(adopted_hash) = self.adopted_tip_hash {
+                if let Some(adopted_point) = self.chain_tree.point(&adopted_hash) {
+                    let adopted_slot = match adopted_point {
+                        Point::Specific { slot, .. } => *slot,
+                        _ => 0,
+                    };
+                    let tip_slot = match point {
+                        Point::Specific { slot, .. } => *slot,
+                        _ => 0,
+                    };
+                    if adopted_slot < tip_slot {
+                        fetch_from = adopted_point.clone();
+                    }
+                }
+            }
+        }
+
         info!(
             node_id = %self.node_id,
             %tip,
@@ -388,7 +486,7 @@ impl Consensus {
             "fetching blocks for longer chain"
         );
 
-        self.in_flight.insert(point.clone());
+        self.mark_in_flight(point.clone());
         let _ = self
             .commands
             .send(NetworkCommand::FetchBlockRange {
@@ -432,6 +530,9 @@ impl Consensus {
                 info.prev_hash,
             );
         }
+        // The block actually arrived, so any prior unfetchable marker is
+        // stale.
+        self.unfetchable.remove(&hash);
         self.block_cache.insert(
             hash,
             CachedBlock {
@@ -590,17 +691,26 @@ impl Consensus {
     /// Fetch ancestors we don't have yet for the adopted tip and the best
     /// unadopted validated block (to enable fork switches).
     async fn fetch_unvalidated_ancestors(&mut self) {
+        self.evict_stale_in_flight();
         let mut roots: Vec<[u8; 32]> = Vec::new();
         if let Some(h) = self.adopted_tip_hash {
             roots.push(h);
         }
         // Walk from the best validated block that isn't the adopted tip.
         // This traces the chain the fork switch needs, finding gaps where
-        // intermediate blocks haven't been fetched yet.
+        // intermediate blocks haven't been fetched yet. Only consider forks
+        // that are STRICTLY better than the adopted tip — otherwise stale
+        // forks below the adopted chain churn here forever.
+        let adopted_bn = self
+            .adopted_tip_hash
+            .and_then(|h| self.chain_tree.block_number(&h))
+            .unwrap_or(0);
         let best_unadopted = self
             .block_cache
             .iter()
-            .filter(|(&h, _)| self.validated.contains(&h) && !roots.contains(&h))
+            .filter(|(&h, cb)| {
+                self.validated.contains(&h) && !roots.contains(&h) && cb.block_no > adopted_bn
+            })
             .max_by_key(|(_, cb)| cb.block_no)
             .map(|(h, _)| *h);
         if let Some(h) = best_unadopted {
@@ -609,6 +719,16 @@ impl Consensus {
 
         for root in roots {
             let ancestors = self.chain_tree.ancestors(root);
+            // If the deepest known ancestor's parent is unfetchable, the
+            // whole fork is dead — every fetch we'd issue here would just
+            // bounce off `MsgNoBlocks`. Skip this root entirely.
+            if let Some(deepest) = ancestors.last() {
+                if let Some(parent) = self.chain_tree.prev_hash(deepest) {
+                    if self.unfetchable.contains(&parent) {
+                        continue;
+                    }
+                }
+            }
             let mut gap_start: Option<Point> = None;
             let mut gap_end: Option<Point> = None;
             let adopted_set: HashSet<_> = self
@@ -623,7 +743,7 @@ impl Consensus {
                     continue; // have this block — keep looking deeper
                 }
                 if let Some(p) = self.chain_tree.point(&hash) {
-                    if self.self_produced.contains(p) || self.in_flight.contains(p) {
+                    if self.self_produced.contains(p) || self.in_flight.contains_key(p) {
                         break;
                     }
                     gap_start = Some(p.clone());
@@ -632,6 +752,56 @@ impl Consensus {
                     }
                 }
             }
+            // If the ancestor walk hit a dead end (parent not in tree),
+            // check if the deepest block has a prev_hash pointing to a
+            // missing block. If so, fetch from the adopted tip.
+            if gap_start.is_none() && !ancestors.is_empty() {
+                let deepest = *ancestors.last().unwrap();
+                let prev = self
+                    .block_cache
+                    .get(&deepest)
+                    .and_then(|cb| cb.prev_hash)
+                    .or_else(|| self.chain_tree.prev_hash(&deepest));
+                if let Some(parent_hash) = prev {
+                    // If the missing parent is known to be unfetchable,
+                    // this entire fork is dead — don't waste a fetch on
+                    // it. Without this, the loop spins forever issuing
+                    // single-block fetches that nobody can answer.
+                    if self.unfetchable.contains(&parent_hash) {
+                        continue;
+                    }
+                    if !self.block_cache.contains_key(&parent_hash)
+                        && !adopted_set.contains(&parent_hash)
+                    {
+                        if let Some(adopted_hash) = self.adopted_tip_hash {
+                            if let (Some(adopted_point), Some(deepest_point)) = (
+                                self.chain_tree.point(&adopted_hash).cloned(),
+                                self.chain_tree.point(&deepest).cloned(),
+                            ) {
+                                // Only fire if adopted is strictly older than
+                                // deepest. Otherwise adopted is on a competing
+                                // fork and the range would be backwards (or
+                                // span two unrelated chains).
+                                let adopted_slot = match &adopted_point {
+                                    Point::Specific { slot, .. } => *slot,
+                                    _ => 0,
+                                };
+                                let deepest_slot = match &deepest_point {
+                                    Point::Specific { slot, .. } => *slot,
+                                    _ => 0,
+                                };
+                                if adopted_slot < deepest_slot
+                                    && !self.in_flight.contains_key(&deepest_point)
+                                {
+                                    gap_start = Some(adopted_point);
+                                    gap_end = Some(deepest_point);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             if let (Some(from), Some(to)) = (gap_start, gap_end) {
                 info!(
                     node_id = %self.node_id,
@@ -1259,5 +1429,556 @@ mod tests {
             inject_count >= 2,
             "should inject B2, B3: got {inject_count}"
         );
+    }
+
+    #[tokio::test]
+    async fn fetch_range_when_parent_unknown() {
+        // Scenario: node adopts block#1(A). A peer announces block#2 whose
+        // parent block#1(B) was never inserted into the chain tree.
+        // The fetch should use a range from the adopted tip, not a single block.
+        let (cmd_tx, mut cmd_rx) = mpsc::channel(32);
+        let (validator, _val_rx) = Validator::new(test_dyn_rx());
+        let mut consensus = Consensus::new("test".into(), cmd_tx, validator, 2160);
+
+        // Adopt block 1(A).
+        let (tip1a, hdr1a) = make_tip(10, 1, None);
+        let hash1a = match &tip1a.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus.register_self_produced(&tip1a.point, &hdr1a);
+
+        // A different block#1(B) — we only know its hash, never announced.
+        let hdr1b = make_header(11, 1, None);
+        let hash1b = match hdr1b.point().unwrap() {
+            Point::Specific { hash, .. } => hash,
+            _ => panic!(),
+        };
+
+        // Peer announces block#2 whose parent is block#1(B) (unknown to us).
+        let (tip2, hdr2) = make_tip(20, 2, Some(hash1b));
+
+        consensus
+            .handle_event(&NetworkEvent::TipAdvanced {
+                tip: tip2.clone(),
+                header: hdr2,
+            })
+            .await;
+
+        // Should issue a FetchBlockRange. The `from` should be the adopted
+        // tip (block#1(A)), not the announced tip itself (which would be a
+        // useless single-block fetch).
+        let cmd = cmd_rx.recv().await.unwrap();
+        match cmd {
+            NetworkCommand::FetchBlockRange { from, to } => {
+                assert_eq!(
+                    from, tip1a.point,
+                    "from should be adopted tip, not the announced tip"
+                );
+                assert_eq!(to, tip2.point, "to should be the announced tip");
+            }
+            other => panic!("expected FetchBlockRange, got {other:?}"),
+        }
+    }
+
+    /// Regression: when adopted tip is on a different fork than a validated
+    /// unadopted block, `fetch_unvalidated_ancestors` must NOT emit a range
+    /// fetch with `from`/`to` on different forks (the BlockFetch range would
+    /// be invalid since `from` is not an ancestor of `to`).
+    #[tokio::test]
+    async fn no_cross_fork_range_in_fetch_unvalidated_ancestors() {
+        let (cmd_tx, mut cmd_rx) = mpsc::channel(64);
+        let (validator, _val_rx) = Validator::new(test_dyn_rx());
+        let mut consensus = Consensus::new("test".into(), cmd_tx, validator, 2160);
+
+        // Adopt block#1(A) — common base.
+        let (tip1a, hdr1a) = make_tip(10, 1, None);
+        let hash1a = match &tip1a.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus.register_self_produced(&tip1a.point, &hdr1a);
+
+        // Construct block#2(B) on a hidden fork: parent is some unknown
+        // block#1(B). We never insert block#1(B) into the tree.
+        let hdr1b = make_header(11, 1, None);
+        let hash1b = match hdr1b.point().unwrap() {
+            Point::Specific { hash, .. } => hash,
+            _ => panic!(),
+        };
+        let (tip2b, hdr2b) = make_tip(20, 2, Some(hash1b));
+
+        // Receive + validate block#2(B). It enters the cache + validated set,
+        // but its parent isn't in the tree.
+        consensus.on_block_received(&tip2b.point, &make_block_body(&hdr2b));
+        // Drain anything from the receive (likely nothing).
+        while cmd_rx.try_recv().is_ok() {}
+        consensus
+            .on_validation_complete(ValidationComplete {
+                point: tip2b.point.clone(),
+            })
+            .await;
+        // Drain commands triggered by validation.
+        while cmd_rx.try_recv().is_ok() {}
+
+        // Self-produce block#2(A) at a slot LATER than block#2(B). This makes
+        // adopted tip newer (in slot terms) than the deepest known ancestor of
+        // best_unadopted = block#2(B).
+        let (tip2a, hdr2a) = make_tip(30, 2, Some(hash1a));
+        consensus.register_self_produced(&tip2a.point, &hdr2a);
+        while cmd_rx.try_recv().is_ok() {}
+
+        // Now trigger fetch_unvalidated_ancestors via a no-op TipAdvanced.
+        // (Re-announce our own adopted tip — dominated path still calls it.)
+        consensus
+            .handle_event(&NetworkEvent::TipAdvanced {
+                tip: tip2a.clone(),
+                header: hdr2a.clone(),
+            })
+            .await;
+
+        // Inspect any range fetches: NONE may have from-slot > to-slot.
+        while let Ok(cmd) = cmd_rx.try_recv() {
+            if let NetworkCommand::FetchBlockRange { from, to } = cmd {
+                let from_slot = match &from {
+                    Point::Specific { slot, .. } => *slot,
+                    _ => 0,
+                };
+                let to_slot = match &to {
+                    Point::Specific { slot, .. } => *slot,
+                    _ => 0,
+                };
+                assert!(
+                    from_slot <= to_slot,
+                    "invalid backwards range: from {from} > to {to}"
+                );
+            }
+        }
+    }
+
+    /// Regression: a fetch that the coordinator silently dropped (e.g. no
+    /// peer had the requested point in its fragment) must not permanently
+    /// block re-fetching. The walk in `fetch_unvalidated_ancestors` would
+    /// otherwise `break` on the stale `in_flight` entry, leaving the gap
+    /// unfetched forever. With TTL eviction, a later
+    /// `fetch_unvalidated_ancestors` call sees the stale entry as expired,
+    /// removes it, and emits a retry.
+    #[tokio::test]
+    async fn stale_in_flight_evicted_so_fetch_retries() {
+        let (mut consensus, mut cmd_rx) = make_consensus();
+
+        // Adopt block#1 (self-produced).
+        let (tip1, hdr1) = make_tip(10, 1, None);
+        let hash1 = match &tip1.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus.register_self_produced(&tip1.point, &hdr1);
+
+        // Peer announces block#2: header inserted into tree, fetch issued,
+        // in_flight[block#2] set.
+        let (tip2, hdr2) = make_tip(20, 2, Some(hash1));
+        let hash2 = match &tip2.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus
+            .handle_event(&NetworkEvent::TipAdvanced {
+                tip: tip2.clone(),
+                header: hdr2.clone(),
+            })
+            .await;
+        while cmd_rx.try_recv().is_ok() {}
+        assert!(consensus.in_flight.contains_key(&tip2.point));
+
+        // The fetch is silently dropped — block#2 body never arrives. Now
+        // block#3 arrives directly (e.g. via a different peer's range fetch
+        // that reached us with block#3 but not block#2). Validate it.
+        let (tip3, hdr3) = make_tip(30, 3, Some(hash2));
+        consensus.on_block_received(&tip3.point, &make_block_body(&hdr3));
+        consensus
+            .on_validation_complete(ValidationComplete {
+                point: tip3.point.clone(),
+            })
+            .await;
+        while cmd_rx.try_recv().is_ok() {}
+
+        // Mark block#2's in_flight entry as stale.
+        let stale = Instant::now() - IN_FLIGHT_TTL - Duration::from_secs(1);
+        consensus.in_flight.insert(tip2.point.clone(), stale);
+
+        // Trigger another `fetch_unvalidated_ancestors` pass via a no-op
+        // validation complete. With stale eviction, the walk should now
+        // recognise block#2 as fetchable and emit a range fetch covering
+        // it. Without the fix, the walk hits `in_flight.contains_key` and
+        // breaks, emitting nothing.
+        consensus
+            .on_validation_complete(ValidationComplete {
+                point: tip3.point.clone(),
+            })
+            .await;
+
+        let mut saw_fetch_for_block2 = false;
+        while let Ok(cmd) = cmd_rx.try_recv() {
+            if let NetworkCommand::FetchBlockRange { from, to } = cmd {
+                if from == tip2.point || to == tip2.point {
+                    saw_fetch_for_block2 = true;
+                }
+            }
+        }
+        assert!(
+            saw_fetch_for_block2,
+            "stale in_flight should have been evicted; expected a fetch for block#2"
+        );
+    }
+
+    /// A single-block fetch failure marks the hash unfetchable and prunes
+    /// the entire fork rooted at it. The walks that previously kept tripping
+    /// over the dead fork will now skip it naturally.
+    #[tokio::test]
+    async fn unfetchable_blocks_pruned_on_failed_fetch() {
+        let (mut consensus, _cmd_rx) = make_consensus();
+
+        // Adopt block#1 (self-produced).
+        let (tip1, hdr1) = make_tip(10, 1, None);
+        let hash1 = match &tip1.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus.register_self_produced(&tip1.point, &hdr1);
+
+        // Announce block#2 — header inserted into chain_tree.
+        let (tip2, hdr2) = make_tip(20, 2, Some(hash1));
+        let hash2 = match &tip2.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus
+            .handle_event(&NetworkEvent::TipAdvanced {
+                tip: tip2.clone(),
+                header: hdr2,
+            })
+            .await;
+        assert!(consensus.chain_tree.contains(&hash2));
+
+        // Single-block fetch fails for block#2.
+        consensus
+            .handle_event(&NetworkEvent::BlockFetchFailed {
+                from: tip2.point.clone(),
+                to: tip2.point.clone(),
+            })
+            .await;
+
+        assert!(consensus.unfetchable.contains(&hash2));
+        assert!(!consensus.chain_tree.contains(&hash2));
+        assert!(!consensus.block_cache.contains_key(&hash2));
+        assert!(!consensus.in_flight.contains_key(&tip2.point));
+    }
+
+    /// When the unfetchable block has descendants in the tree, they must
+    /// also be removed — otherwise `best_unadopted` selection or the walk
+    /// could still pick a descendant and rediscover the dead fork.
+    #[tokio::test]
+    async fn unfetchable_subtree_descendants_also_pruned() {
+        let (mut consensus, _cmd_rx) = make_consensus();
+
+        let (tip1, hdr1) = make_tip(10, 1, None);
+        let hash1 = match &tip1.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus.register_self_produced(&tip1.point, &hdr1);
+
+        // Announce a chain block#2 → block#3 → block#4 (headers only).
+        let (tip2, hdr2) = make_tip(20, 2, Some(hash1));
+        let hash2 = match &tip2.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        let (tip3, hdr3) = make_tip(30, 3, Some(hash2));
+        let hash3 = match &tip3.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        let (tip4, hdr4) = make_tip(40, 4, Some(hash3));
+        let hash4 = match &tip4.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        for (tip, hdr) in [
+            (tip2.clone(), hdr2),
+            (tip3.clone(), hdr3),
+            (tip4.clone(), hdr4),
+        ] {
+            consensus
+                .handle_event(&NetworkEvent::TipAdvanced { tip, header: hdr })
+                .await;
+        }
+        assert!(consensus.chain_tree.contains(&hash4));
+
+        // Block#2 single-fetch fails — should prune 2, 3, 4.
+        consensus
+            .handle_event(&NetworkEvent::BlockFetchFailed {
+                from: tip2.point.clone(),
+                to: tip2.point.clone(),
+            })
+            .await;
+
+        for h in [hash2, hash3, hash4] {
+            assert!(
+                !consensus.chain_tree.contains(&h),
+                "all descendants should be pruned"
+            );
+        }
+        // Best tip falls back to block#1 (the adopted/self-produced one).
+        assert_eq!(consensus.chain_tree.best_tip_hash(), Some(hash1));
+    }
+
+    /// A re-announcement of an unfetchable hash clears the marker and lets
+    /// future fetches retry — important so a transient peer outage doesn't
+    /// permanently blacklist a block.
+    #[tokio::test]
+    async fn unfetchable_cleared_on_reinsert() {
+        let (mut consensus, _cmd_rx) = make_consensus();
+
+        let (tip1, hdr1) = make_tip(10, 1, None);
+        let hash1 = match &tip1.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus.register_self_produced(&tip1.point, &hdr1);
+
+        let (tip2, hdr2) = make_tip(20, 2, Some(hash1));
+        let hash2 = match &tip2.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus
+            .handle_event(&NetworkEvent::TipAdvanced {
+                tip: tip2.clone(),
+                header: hdr2.clone(),
+            })
+            .await;
+        consensus
+            .handle_event(&NetworkEvent::BlockFetchFailed {
+                from: tip2.point.clone(),
+                to: tip2.point.clone(),
+            })
+            .await;
+        assert!(consensus.unfetchable.contains(&hash2));
+
+        // A fresh peer re-announces block#2.
+        consensus
+            .handle_event(&NetworkEvent::TipAdvanced {
+                tip: tip2.clone(),
+                header: hdr2,
+            })
+            .await;
+
+        assert!(!consensus.unfetchable.contains(&hash2));
+        assert!(consensus.chain_tree.contains(&hash2));
+    }
+
+    /// After a hash has been pruned and marked unfetchable, the walk in
+    /// `fetch_unvalidated_ancestors` must skip any root whose chain
+    /// dead-ends at that hash. Otherwise it issues a fetch that nobody
+    /// can answer and the loop spins forever.
+    #[tokio::test]
+    async fn fetch_skips_roots_dead_ending_in_unfetchable() {
+        let (mut consensus, mut cmd_rx) = make_consensus();
+
+        // Adopt block#1.
+        let (tip1, hdr1) = make_tip(10, 1, None);
+        let hash1 = match &tip1.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus.register_self_produced(&tip1.point, &hdr1);
+
+        // Manually plant a chain block#1 → 2 → 3 in chain_tree, then mark
+        // block#2 as unfetchable WITHOUT pruning the descendants from the
+        // tree (simulating a re-insert after a prior prune).
+        let (tip2, hdr2) = make_tip(20, 2, Some(hash1));
+        let hash2 = match &tip2.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        let info2 = hdr2.parsed.as_ref().unwrap();
+        consensus.chain_tree.insert(
+            hash2,
+            tip2.point.clone(),
+            info2.block_number,
+            info2.slot,
+            info2.prev_hash,
+        );
+        let (tip3, hdr3) = make_tip(30, 3, Some(hash2));
+        let hash3 = match &tip3.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        let info3 = hdr3.parsed.as_ref().unwrap();
+        consensus.chain_tree.insert(
+            hash3,
+            tip3.point.clone(),
+            info3.block_number,
+            info3.slot,
+            info3.prev_hash,
+        );
+
+        // Now remove block#2 from the tree (so block#3's parent in tree is
+        // gone) and mark it unfetchable.
+        let removed = consensus.chain_tree.remove_subtree(hash2);
+        // Note: removing block#2 also removes block#3 (it's a descendant).
+        assert!(removed.contains(&hash3));
+        // Re-insert block#3 alone (simulating a fresh receive that
+        // resurrects the dead fork).
+        consensus.chain_tree.insert(
+            hash3,
+            tip3.point.clone(),
+            info3.block_number,
+            info3.slot,
+            info3.prev_hash,
+        );
+        consensus.unfetchable.insert(hash2);
+
+        // Place block#3 in cache + validated so it would otherwise be
+        // chosen as best_unadopted.
+        consensus.block_cache.insert(
+            hash3,
+            CachedBlock {
+                point: tip3.point.clone(),
+                header: hdr3,
+                body: make_block_body(&make_header(30, 3, Some(hash2))),
+                block_no: 3,
+                prev_hash: Some(hash2),
+            },
+        );
+        consensus.validated.insert(hash3);
+
+        // Trigger fetch_unvalidated_ancestors via on_validation_complete.
+        consensus
+            .on_validation_complete(ValidationComplete {
+                point: tip3.point.clone(),
+            })
+            .await;
+
+        // Expect NO fetch for block#3's dead chain.
+        while let Ok(cmd) = cmd_rx.try_recv() {
+            if let NetworkCommand::FetchBlockRange { from, to } = cmd {
+                let from_h = match &from {
+                    Point::Specific { hash, .. } => Some(*hash),
+                    _ => None,
+                };
+                let to_h = match &to {
+                    Point::Specific { hash, .. } => Some(*hash),
+                    _ => None,
+                };
+                assert!(
+                    from_h != Some(hash3) && to_h != Some(hash3),
+                    "no fetch should be issued for the dead-ended fork"
+                );
+                assert!(
+                    from_h != Some(hash2) && to_h != Some(hash2),
+                    "no fetch should be issued for the unfetchable parent"
+                );
+            }
+        }
+    }
+
+    /// The full node-14 jam scenario: node has its own self-produced fork
+    /// at block#2 (slot 20). It receives a competing chain via TipAdvanced
+    /// only (headers, no bodies). Single-fetch for the competing block#2
+    /// fails. After pruning, no further fetches should be issued for the
+    /// dead fork's descendants, and `try_fork_switch` should be a no-op.
+    #[tokio::test]
+    async fn node_14_jam_regression() {
+        let (mut consensus, mut cmd_rx) = make_consensus();
+
+        // Self-produce block#1 then block#2A (the node's adopted fork).
+        let (tip1, hdr1) = make_tip(10, 1, None);
+        let hash1 = match &tip1.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus.register_self_produced(&tip1.point, &hdr1);
+        let (tip2a, hdr2a) = make_tip(20, 2, Some(hash1));
+        consensus.register_self_produced(&tip2a.point, &hdr2a);
+
+        // A peer announces a competing chain block#2B → block#3B → block#4B
+        // built on the same hash1 root. Headers only.
+        let (tip2b, hdr2b) = make_tip(21, 2, Some(hash1));
+        let hash2b = match &tip2b.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        let (tip3b, hdr3b) = make_tip(31, 3, Some(hash2b));
+        let hash3b = match &tip3b.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        let (tip4b, hdr4b) = make_tip(41, 4, Some(hash3b));
+        let hash4b = match &tip4b.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        for (tip, hdr) in [
+            (tip2b.clone(), hdr2b),
+            (tip3b.clone(), hdr3b),
+            (tip4b.clone(), hdr4b),
+        ] {
+            consensus
+                .handle_event(&NetworkEvent::TipAdvanced { tip, header: hdr })
+                .await;
+        }
+        // Drain commands from the announcement walk.
+        while cmd_rx.try_recv().is_ok() {}
+
+        // Single-fetch for block#2B fails (no peer has it any more).
+        consensus
+            .handle_event(&NetworkEvent::BlockFetchFailed {
+                from: tip2b.point.clone(),
+                to: tip2b.point.clone(),
+            })
+            .await;
+
+        // The dead fork is gone from the tree.
+        for h in [hash2b, hash3b, hash4b] {
+            assert!(
+                !consensus.chain_tree.contains(&h),
+                "dead fork descendant should be pruned"
+            );
+        }
+
+        // `on_validation_complete` shouldn't crash and shouldn't issue
+        // any fresh fetch for the pruned fork.
+        let (_dummy_tip, dummy_hdr) = make_tip(15, 1, None);
+        let _ = dummy_hdr; // unused
+                           // (No new validation needed; just call fetch_unvalidated_ancestors
+                           // directly via on_tip_advanced of the existing self-produced tip.)
+        consensus
+            .handle_event(&NetworkEvent::TipAdvanced {
+                tip: tip2a.clone(),
+                header: hdr2a,
+            })
+            .await;
+
+        while let Ok(cmd) = cmd_rx.try_recv() {
+            if let NetworkCommand::FetchBlockRange { from, to } = cmd {
+                let from_h = match &from {
+                    Point::Specific { hash, .. } => Some(*hash),
+                    _ => None,
+                };
+                let to_h = match &to {
+                    Point::Specific { hash, .. } => Some(*hash),
+                    _ => None,
+                };
+                for h in [hash2b, hash3b, hash4b] {
+                    assert!(
+                        from_h != Some(h) && to_h != Some(h),
+                        "no fetch should be issued for the pruned fork"
+                    );
+                }
+            }
+        }
     }
 }

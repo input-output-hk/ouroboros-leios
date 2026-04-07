@@ -561,6 +561,15 @@ impl Coordinator {
                             .await;
                         self.pending_fetches.insert(to, best_id);
                     }
+                } else {
+                    // No connected peer claims to have this point in its
+                    // fragment — it's currently unfetchable. Signal the
+                    // app so it can prune the dead fork instead of looping
+                    // forever issuing requests we'll silently drop.
+                    let _ = self
+                        .network_events
+                        .send(NetworkEvent::BlockFetchFailed { from, to })
+                        .await;
                 }
             }
 

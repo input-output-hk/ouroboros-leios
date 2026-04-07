@@ -106,7 +106,6 @@ impl ChainTree {
     }
 
     /// Check whether a block hash is in the tree.
-    #[cfg(test)]
     pub fn contains(&self, hash: &[u8; 32]) -> bool {
         self.nodes.contains_key(hash)
     }
@@ -149,6 +148,57 @@ impl ChainTree {
     pub fn prune_below(&mut self, min_block_number: u64) {
         self.nodes
             .retain(|_, node| node.block_number >= min_block_number);
+    }
+
+    /// Remove a single hash from the tree plus every block whose ancestry
+    /// reaches it (i.e. the entire subtree rooted at `root` if you walk
+    /// children rather than parents). Returns the set of removed hashes so
+    /// the caller can purge matching entries from related state (block
+    /// cache, validated set, etc.). If the removal evicts the current best
+    /// tip, `best_tip` is recomputed by scanning what remains.
+    pub fn remove_subtree(&mut self, root: [u8; 32]) -> HashSet<[u8; 32]> {
+        let mut removed = HashSet::new();
+        if !self.nodes.contains_key(&root) {
+            return removed;
+        }
+        // BFS from root over the implicit children index. We walk the
+        // remaining nodes once per level to find direct children — the tree
+        // is small enough that this is fine.
+        let mut frontier: Vec<[u8; 32]> = vec![root];
+        while let Some(h) = frontier.pop() {
+            if !removed.insert(h) {
+                continue;
+            }
+            for (child, node) in self.nodes.iter() {
+                if node.prev_hash == Some(h) && !removed.contains(child) {
+                    frontier.push(*child);
+                }
+            }
+        }
+        for h in &removed {
+            self.nodes.remove(h);
+        }
+        // If the best tip was evicted, recompute it.
+        let best_evicted = self
+            .best_tip_hash()
+            .map(|h| removed.contains(&h))
+            .unwrap_or(false);
+        if best_evicted {
+            self.best_tip = self
+                .nodes
+                .iter()
+                .max_by(|a, b| {
+                    let (h1, n1) = a;
+                    let (h2, n2) = b;
+                    if is_better_tip(n1.block_number, h1, n2.block_number, h2) {
+                        std::cmp::Ordering::Greater
+                    } else {
+                        std::cmp::Ordering::Less
+                    }
+                })
+                .map(|(_, n)| (n.point.clone(), n.block_number));
+        }
+        removed
     }
 
     /// Walk the prev_hash chain from `hash` back to genesis (or a gap),
@@ -735,5 +785,74 @@ mod tests {
         assert!(has_block_4, "fork point block 4 should be included");
         let has_fork = entries.iter().any(|e| e.hash == "f7f7");
         assert!(has_fork, "fork block should be included");
+    }
+
+    fn pt(h: u8) -> Point {
+        Point::Specific {
+            slot: h as u64,
+            hash: [h; 32],
+        }
+    }
+
+    #[test]
+    fn remove_subtree_unknown_hash_is_noop() {
+        let mut tree = ChainTree::new();
+        tree.insert([1; 32], pt(1), 1, 1, None);
+        let removed = tree.remove_subtree([99; 32]);
+        assert!(removed.is_empty());
+        assert!(tree.contains(&[1; 32]));
+    }
+
+    #[test]
+    fn remove_subtree_removes_root_only_when_no_children() {
+        let mut tree = ChainTree::new();
+        tree.insert([1; 32], pt(1), 1, 1, None);
+        tree.insert([2; 32], pt(2), 2, 2, Some([1; 32]));
+        // Block 2 has no children — only it should be removed.
+        let removed = tree.remove_subtree([2; 32]);
+        assert_eq!(removed.len(), 1);
+        assert!(removed.contains(&[2; 32]));
+        assert!(!tree.contains(&[2; 32]));
+        assert!(tree.contains(&[1; 32]));
+    }
+
+    #[test]
+    fn remove_subtree_removes_descendants_recursively() {
+        let mut tree = ChainTree::new();
+        // Linear: 1 -> 2 -> 3 -> 4
+        tree.insert([1; 32], pt(1), 1, 1, None);
+        tree.insert([2; 32], pt(2), 2, 2, Some([1; 32]));
+        tree.insert([3; 32], pt(3), 3, 3, Some([2; 32]));
+        tree.insert([4; 32], pt(4), 4, 4, Some([3; 32]));
+        // Side fork: 2 -> 0xB3 -> 0xB4
+        tree.insert([0xB3; 32], pt(0xB3), 3, 3, Some([2; 32]));
+        tree.insert([0xB4; 32], pt(0xB4), 4, 4, Some([0xB3; 32]));
+
+        // Remove subtree rooted at block 2 — should remove 2, 3, 4, B3, B4.
+        let removed = tree.remove_subtree([2; 32]);
+        assert_eq!(removed.len(), 5);
+        for h in [[2u8; 32], [3; 32], [4; 32], [0xB3; 32], [0xB4; 32]] {
+            assert!(removed.contains(&h));
+            assert!(!tree.contains(&h));
+        }
+        // Block 1 (the root's parent) is still there.
+        assert!(tree.contains(&[1; 32]));
+    }
+
+    #[test]
+    fn remove_subtree_recomputes_best_tip() {
+        let mut tree = ChainTree::new();
+        tree.insert([1; 32], pt(1), 1, 1, None);
+        tree.insert([2; 32], pt(2), 2, 2, Some([1; 32]));
+        tree.insert([3; 32], pt(3), 3, 3, Some([2; 32]));
+        // Best tip is block 3.
+        assert_eq!(tree.best_tip_hash(), Some([3; 32]));
+
+        // Remove subtree rooted at block 2 — best tip should fall back to 1.
+        let removed = tree.remove_subtree([2; 32]);
+        assert!(removed.contains(&[2; 32]));
+        assert!(removed.contains(&[3; 32]));
+        assert_eq!(tree.best_tip_hash(), Some([1; 32]));
+        assert_eq!(tree.best_tip().map(|(_, bn)| bn), Some(1));
     }
 }
