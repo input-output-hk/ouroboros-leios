@@ -297,9 +297,16 @@ impl Consensus {
         // or immediately before it). If that's also unknown, the peer's
         // fork lies entirely outside our visibility window.
         let mut missing: Vec<[u8; 32]> = Vec::new();
+        // Walk the candidate newest→oldest. The "common ancestor" is
+        // the first entry whose body we have actually validated. We
+        // check `validated`, not `chain_tree.contains`, because under
+        // the current design `chain_tree` also holds unvalidated
+        // peer-announced headers — `validated` is the source of truth
+        // for "have a body and applied it". After phase 3 slims
+        // chain_tree to validated-only this becomes equivalent.
         let mut ancestor: Option<[u8; 32]> = None;
         for entry in candidate.iter().rev() {
-            if self.chain_tree.contains(&entry.hash) {
+            if self.validated.contains(&entry.hash) {
                 ancestor = Some(entry.hash);
                 break;
             }
@@ -307,9 +314,18 @@ impl Consensus {
         }
         if ancestor.is_none() {
             if let Some(oldest) = candidate.iter().next() {
-                if let Some(parent) = oldest.prev_hash {
-                    if self.chain_tree.contains(&parent) {
-                        ancestor = Some(parent);
+                match oldest.prev_hash {
+                    None => {
+                        // Oldest entry is at genesis. Treat the
+                        // synthetic all-zero hash as a shared anchor:
+                        // any chain rooted at genesis can be replayed
+                        // from there.
+                        ancestor = Some([0u8; 32]);
+                    }
+                    Some(parent) => {
+                        if self.validated.contains(&parent) {
+                            ancestor = Some(parent);
+                        }
                     }
                 }
             }
@@ -1606,6 +1622,47 @@ mod tests {
                 assert_eq!(tip_block_no, 5);
             }
             other => panic!("expected OrphanCandidate, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn shadow_genesis_root_chain_treated_as_waiting() {
+        // When the peer's chain is rooted at genesis (oldest entry has
+        // prev_hash=None), treat genesis as a shared anchor instead of
+        // declaring the candidate orphan. This handles the case where
+        // we self-produced our own block 1 with a different hash than
+        // the peer's block 1 — both share the genesis "ancestor".
+        let (mut consensus, _cmd_rx) = make_consensus();
+        let peer = PeerId(1);
+
+        // Self-produce our own block 1 (hash A).
+        let (tip_self, header_self) = make_tip(1, 1, None);
+        consensus.register_self_produced(&tip_self.point, &header_self);
+
+        // Peer announces a different block 1 + block 2.
+        // Use slot 50 so the hash differs from ours.
+        let (tip_peer1, hdr_peer1) = make_tip(50, 1, None);
+        let hash_peer1 = match &tip_peer1.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        let (tip_peer2, hdr_peer2) = make_tip(51, 2, Some(hash_peer1));
+        consensus.record_peer_tip(peer, &tip_peer1, &hdr_peer1);
+        consensus.record_peer_tip(peer, &tip_peer2, &hdr_peer2);
+
+        match consensus.select_chain_shadow() {
+            ShadowDecision::WaitingForBlocks {
+                peer_id,
+                ancestor,
+                tip_block_no,
+                missing_len,
+            } => {
+                assert_eq!(peer_id, peer);
+                assert_eq!(ancestor, [0u8; 32], "synthetic genesis hash");
+                assert_eq!(tip_block_no, 2);
+                assert_eq!(missing_len, 2);
+            }
+            other => panic!("expected WaitingForBlocks, got {other:?}"),
         }
     }
 
