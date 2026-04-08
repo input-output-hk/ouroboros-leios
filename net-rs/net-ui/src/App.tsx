@@ -1,10 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
-import { Box, IconButton, Typography } from "@mui/material";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import { Box, Typography } from "@mui/material";
 import { useStore } from "@/store";
 import { usePolling } from "@/hooks/usePolling";
 import { useEventStream } from "@/hooks/useEventStream";
@@ -69,6 +65,12 @@ export default function App() {
           <IconSidebar
             controlPanelOpen={controlPanelOpen}
             onToggleControlPanel={() => setControlPanelOpen((v) => !v)}
+            chainTreeOpen={chainTreeOpen}
+            onToggleChainTree={() => setChainTreeOpen((v) => !v)}
+            chartsOpen={chartsOpen}
+            onToggleCharts={() => setChartsOpen((v) => !v)}
+            eventLogOpen={eventLogOpen}
+            onToggleEventLog={() => setEventLogOpen((v) => !v)}
           />
         </Box>
 
@@ -155,134 +157,61 @@ export default function App() {
               </Box>
             </Box>
 
-            {/* Chain tree toggle + tree — above charts, left-aligned */}
-            {networkChainTree.length > 0 && (
+            {/* Chain tree — above charts, left-aligned */}
+            {networkChainTree.length > 0 && chainTreeOpen && (
               <Box sx={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
-                <Box
-                  onClick={() => setChainTreeOpen((v) => !v)}
-                  sx={{
-                    alignSelf: "flex-start",
-                    pointerEvents: "auto",
-                    bgcolor: "rgba(40, 40, 50, 0.7)",
-                    backdropFilter: "blur(4px)",
-                    color: "#fff",
-                    "&:hover": { bgcolor: "rgba(60, 60, 70, 0.8)" },
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    borderRadius: 1,
-                    px: 0.5,
-                    ml: 1,
-                    mb: 0.5,
-                    height: 36,
-                  }}
-                >
-                  {chainTreeOpen
-                    ? <ExpandMoreIcon sx={{ fontSize: 28 }} />
-                    : <><ExpandLessIcon sx={{ fontSize: 28 }} /><Typography variant="caption" sx={{ fontSize: 18, mr: 0.5 }}>Chain</Typography></>
-                  }
+                <Box sx={{
+                  borderRadius: 1,
+                  px: 1,
+                  py: 0.5,
+                  ml: 1,
+                  mb: 0.5,
+                  maxWidth: "100%",
+                  pointerEvents: "auto",
+                  backdropFilter: "blur(6px)",
+                }}>
+                  <ChainTreeView entries={networkChainTree} tipCounts={networkTipCounts} onSelectNode={useStore.getState().selectNode} />
                 </Box>
-                {chainTreeOpen && (
-                  <Box sx={{
-                    borderRadius: 1,
-                    px: 1,
-                    py: 0.5,
-                    ml: 1,
-                    mb: 0.5,
-                    maxWidth: "100%",
-                    pointerEvents: "auto",
-                    backdropFilter: "blur(6px)",
-                  }}>
-                    <ChainTreeView entries={networkChainTree} tipCounts={networkTipCounts} onSelectNode={useStore.getState().selectNode} />
-                  </Box>
-                )}
               </Box>
             )}
 
-            {/* Charts toggle + charts — bottom */}
-            <Box sx={{ flexShrink: 0, display: "flex", flexDirection: "column" }}>
-              <Box
-                onClick={() => setChartsOpen((v) => !v)}
-                sx={{
-                  alignSelf: "flex-start",
+            {/* Charts — bottom */}
+            {chartsOpen && (
+              <Box sx={{ flexShrink: 0, display: "flex", flexDirection: "column" }}>
+                <Box sx={{
+                  height: 200,
+                  overflow: "hidden",
+                  backdropFilter: "blur(8px)",
+                  bgcolor: "rgba(18, 18, 24, 0.3)",
+                  borderTop: "1px solid rgba(255,255,255,0.08)",
                   pointerEvents: "auto",
-                  bgcolor: "rgba(40, 40, 50, 0.7)",
-                  backdropFilter: "blur(4px)",
-                  color: "#fff",
-                  "&:hover": { bgcolor: "rgba(60, 60, 70, 0.8)" },
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  borderRadius: 1,
-                  px: 0.5,
-                  ml: 1,
-                  mb: 0.5,
-                  height: 36,
-                }}
-              >
-                {chartsOpen
-                  ? <ExpandMoreIcon sx={{ fontSize: 28 }} />
-                  : <><ExpandLessIcon sx={{ fontSize: 28 }} /><Typography variant="caption" sx={{ fontSize: 18, mr: 0.5 }}>Charts</Typography></>
-                }
+                }}>
+                  <AggregateCharts />
+                </Box>
               </Box>
-              <Box sx={{
-                height: chartsOpen ? 200 : 0,
-                transition: "height 0.2s ease",
-                overflow: "hidden",
-                backdropFilter: "blur(8px)",
-                bgcolor: "rgba(18, 18, 24, 0.3)",
-                borderTop: chartsOpen ? "1px solid rgba(255,255,255,0.08)" : "none",
-                pointerEvents: "auto",
-              }}>
-                {chartsOpen && <AggregateCharts />}
-              </Box>
-            </Box>
+            )}
           </Box>
 
-          {/* Event log toggle + panel — right side, full height */}
-          <Box sx={{ display: "flex", flexShrink: 0, height: "100%" }}>
-            <Box
-              onClick={() => setEventLogOpen((v) => !v)}
-              sx={{
-                alignSelf: "flex-start",
-                mt: 1,
-                pointerEvents: "auto",
-                bgcolor: "rgba(40, 40, 50, 0.7)",
-                backdropFilter: "blur(4px)",
-                color: "#fff",
-                "&:hover": { bgcolor: "rgba(60, 60, 70, 0.8)" },
-                cursor: "pointer",
+          {/* Event log — right side, full height */}
+          {eventLogOpen && (
+            <Box sx={{ display: "flex", flexShrink: 0, height: "100%" }}>
+              <Box sx={{
+                width: 350,
+                flexShrink: 0,
+                backdropFilter: "blur(8px)",
+                bgcolor: "rgba(18, 18, 24, 0.3)",
+                borderLeft: "1px solid rgba(255,255,255,0.08)",
                 display: "flex",
-                alignItems: "center",
-                borderRadius: 1,
-                px: 0.5,
-                height: 36,
-              }}
-            >
-              {eventLogOpen
-                ? <ChevronRightIcon sx={{ fontSize: 28 }} />
-                : <><ChevronLeftIcon sx={{ fontSize: 28 }} /><Typography variant="caption" sx={{ fontSize: 18, mr: 0.5 }}>Events</Typography></>
-              }
-            </Box>
-            <Box sx={{
-              width: eventLogOpen ? 350 : 0,
-              flexShrink: 0,
-              transition: "width 0.2s ease",
-              backdropFilter: "blur(8px)",
-              bgcolor: "rgba(18, 18, 24, 0.3)",
-              borderLeft: eventLogOpen ? "1px solid rgba(255,255,255,0.08)" : "none",
-              display: "flex",
-              flexDirection: "column",
-              overflow: "hidden",
-              pointerEvents: "auto",
-            }}>
-              {eventLogOpen && (
+                flexDirection: "column",
+                overflow: "hidden",
+                pointerEvents: "auto",
+              }}>
                 <Box sx={{ flex: 1, minHeight: 0 }}>
                   <EventLog />
                 </Box>
-              )}
+              </Box>
             </Box>
-          </Box>
+          )}
         </Box>
       </Box>
     </Box>
