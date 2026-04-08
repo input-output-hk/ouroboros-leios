@@ -1,4 +1,4 @@
-//! Longest-chain consensus with fork tracking.
+//! Praos longest-chain consensus with fork tracking.
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::{Duration, Instant};
@@ -132,8 +132,8 @@ pub(crate) enum SelectionDecision {
     },
 }
 
-/// Consensus state with fork-tracking chain tree.
-pub struct Consensus {
+/// PraosConsensus state with fork-tracking chain tree.
+pub struct PraosConsensus {
     node_id: String,
     chain_tree: ChainTree,
     /// Hash of the last block we actually injected into the chain store.
@@ -185,7 +185,7 @@ pub struct Consensus {
     security_param_k: u64,
 }
 
-impl Consensus {
+impl PraosConsensus {
     pub fn new(
         node_id: String,
         commands: mpsc::Sender<NetworkCommand>,
@@ -651,83 +651,6 @@ impl Consensus {
                     "block fetch failed; re-evaluating chain selection"
                 );
                 self.select_chain().await;
-                true
-            }
-
-            // Leios: fetch offered EBs, votes, and txs.
-            NetworkEvent::LeiosBlockOffered { point } => {
-                if !self.in_flight.contains_key(point) {
-                    self.mark_in_flight(point.clone());
-                    info!(node_id = %self.node_id, %point, "fetching leios block");
-                    let _ = self
-                        .commands
-                        .send(NetworkCommand::FetchLeiosBlock {
-                            point: point.clone(),
-                        })
-                        .await;
-                }
-                true
-            }
-            NetworkEvent::LeiosBlockTxsOffered { point } => {
-                let key = Point::Specific {
-                    slot: match point {
-                        Point::Specific { slot, .. } => *slot,
-                        _ => 0,
-                    },
-                    hash: [0xFE; 32], // distinct key to avoid collision with block fetch
-                };
-                if !self.in_flight.contains_key(&key) {
-                    self.mark_in_flight(key);
-                    info!(node_id = %self.node_id, %point, "fetching leios block txs");
-                    let _ = self
-                        .commands
-                        .send(NetworkCommand::FetchLeiosBlockTxs {
-                            point: point.clone(),
-                            bitmap: std::collections::BTreeMap::new(),
-                        })
-                        .await;
-                }
-                true
-            }
-            NetworkEvent::LeiosVotesOffered { votes } => {
-                if !votes.is_empty() {
-                    info!(
-                        node_id = %self.node_id,
-                        count = votes.len(),
-                        "fetching leios votes"
-                    );
-                    let _ = self
-                        .commands
-                        .send(NetworkCommand::FetchLeiosVotes {
-                            votes: votes.clone(),
-                        })
-                        .await;
-                }
-                true
-            }
-            NetworkEvent::LeiosBlockReceived { point, .. } => {
-                self.in_flight.remove(point);
-                info!(node_id = %self.node_id, %point, "leios block received");
-                true
-            }
-            NetworkEvent::LeiosVotesReceived { votes } => {
-                info!(
-                    node_id = %self.node_id,
-                    count = votes.len(),
-                    "leios votes received"
-                );
-                true
-            }
-            NetworkEvent::LeiosBlockTxsReceived {
-                point,
-                transactions,
-            } => {
-                info!(
-                    node_id = %self.node_id,
-                    %point,
-                    count = transactions.len(),
-                    "leios block txs received"
-                );
                 true
             }
 
@@ -1206,7 +1129,7 @@ mod tests {
     /// `validation_rx` recv loop — blocks until the actor has finished
     /// processing all pending commands.
     async fn drain_validator(
-        consensus: &mut Consensus,
+        consensus: &mut PraosConsensus,
         val_rx: &mut mpsc::Receiver<LedgerOutcome>,
     ) {
         let quiet_for = Duration::from_millis(50);
@@ -1221,28 +1144,28 @@ mod tests {
     }
 
     fn make_consensus() -> (
-        Consensus,
+        PraosConsensus,
         mpsc::Receiver<NetworkCommand>,
         mpsc::Receiver<LedgerOutcome>,
     ) {
         let (cmd_tx, cmd_rx) = mpsc::channel(16);
         let (validator, val_rx) = Validator::new(test_dyn_rx());
-        let consensus = Consensus::new("test".into(), cmd_tx, validator, 2160);
+        let consensus = PraosConsensus::new("test".into(), cmd_tx, validator, 2160);
         (consensus, cmd_rx, val_rx)
     }
 
-    /// Consensus with a small k so the peer-chain cap is also small —
+    /// PraosConsensus with a small k so the peer-chain cap is also small —
     /// lets us exercise the cap without announcing thousands of headers.
     fn make_consensus_with_k(
         k: u64,
     ) -> (
-        Consensus,
+        PraosConsensus,
         mpsc::Receiver<NetworkCommand>,
         mpsc::Receiver<LedgerOutcome>,
     ) {
         let (cmd_tx, cmd_rx) = mpsc::channel(16);
         let (validator, val_rx) = Validator::new(test_dyn_rx());
-        let consensus = Consensus::new("test".into(), cmd_tx, validator, k);
+        let consensus = PraosConsensus::new("test".into(), cmd_tx, validator, k);
         (consensus, cmd_rx, val_rx)
     }
 
@@ -1717,7 +1640,7 @@ mod tests {
     async fn fork_switch_issues_rollback() {
         let (cmd_tx, mut cmd_rx) = mpsc::channel(64);
         let (validator, mut val_rx) = Validator::new(test_dyn_rx());
-        let mut consensus = Consensus::new("test".into(), cmd_tx, validator, 2160);
+        let mut consensus = PraosConsensus::new("test".into(), cmd_tx, validator, 2160);
 
         // Build chain A: blocks 1, 2, 3 (self-produced).
         let (tip1, hdr1) = make_tip(10, 1, None);
@@ -1815,7 +1738,7 @@ mod tests {
         // validates before a higher one.
         let (cmd_tx, mut cmd_rx) = mpsc::channel(256);
         let (validator, _val_rx) = Validator::new(test_dyn_rx());
-        let mut consensus = Consensus::new("test".into(), cmd_tx, validator, 2160);
+        let mut consensus = PraosConsensus::new("test".into(), cmd_tx, validator, 2160);
 
         // Build chain A: blocks 1..5 (self-produced).
         let mut prev: Option<[u8; 32]> = None;
