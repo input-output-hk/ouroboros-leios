@@ -504,7 +504,7 @@ mod tests {
     /// Uses CBOR: array(1, unsigned(slot)) = [slot].
     fn make_header(slot: u64) -> WrappedHeader {
         let mut buf = Vec::new();
-        minicbor::encode(&[slot], &mut buf).unwrap();
+        minicbor::encode([slot], &mut buf).unwrap();
         WrappedHeader::opaque(buf)
     }
 
@@ -513,7 +513,7 @@ mod tests {
     /// needed — we just need valid CBOR that's distinguishable per slot.
     fn make_body(slot: u64, _size: usize) -> BlockBody {
         let mut buf = Vec::new();
-        minicbor::encode(&[slot], &mut buf).unwrap();
+        minicbor::encode([slot], &mut buf).unwrap();
         BlockBody::opaque(buf)
     }
 

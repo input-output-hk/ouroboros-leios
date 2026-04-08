@@ -309,10 +309,11 @@ mod tests {
     #[test]
     fn decode_points_indefinite() {
         // Build an indefinite-length array of one origin point.
-        let mut buf = Vec::new();
-        buf.push(0x9f); // begin indefinite array
-        buf.push(0x80); // origin point (empty definite array)
-        buf.push(0xff); // break
+        let buf = vec![
+            0x9f, // begin indefinite array
+            0x80, // origin point (empty definite array)
+            0xff, // break
+        ];
 
         let mut d = minicbor::Decoder::new(&buf);
         let points = decode_points(&mut d).unwrap();

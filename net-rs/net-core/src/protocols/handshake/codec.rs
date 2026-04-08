@@ -230,7 +230,7 @@ mod tests {
     fn propose_versions_round_trip() {
         let mut versions = BTreeMap::new();
         // Version 14 with some dummy params (CBOR-encoded [764824073, false, 0, false])
-        let params_14 = minicbor::to_vec(&(764824073u64, false, 0u8, false)).unwrap();
+        let params_14 = minicbor::to_vec((764824073u64, false, 0u8, false)).unwrap();
         versions.insert(14, params_14.clone());
         versions.insert(15, params_14);
 
@@ -249,7 +249,7 @@ mod tests {
 
     #[test]
     fn accept_version_round_trip() {
-        let params = minicbor::to_vec(&(764824073u64, false, 0u8, false)).unwrap();
+        let params = minicbor::to_vec((764824073u64, false, 0u8, false)).unwrap();
         let msg = Message::AcceptVersion(14, params.clone());
         let decoded = round_trip(&msg);
 
