@@ -829,6 +829,7 @@ dependencies = [
 name = "net-node"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "blake2b_simd",
  "clap",
  "figment",
