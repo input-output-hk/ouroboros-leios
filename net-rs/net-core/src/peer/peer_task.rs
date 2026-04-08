@@ -5,6 +5,7 @@
 //! to the coordinator via a shared fan-in channel) and receives
 //! `PeerCommand`s from the coordinator.
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::sync::mpsc;
@@ -20,6 +21,7 @@ use crate::protocols::leios_notify::{self, LeiosNotify, LeiosNotifyEvent};
 use crate::protocols::peersharing::{self, PeerSharing};
 use crate::protocols::txsubmission::{self, PendingTx, TxSubmission};
 use crate::protocols::{Role, Runner};
+use crate::store::chain_store::ChainStore;
 use crate::types::Point;
 
 use super::command_dispatch::{dispatch_command, ClientProtocolSenders};
@@ -34,6 +36,7 @@ pub(crate) struct PeerTaskConfig {
     pub network_magic: u64,
     pub keepalive_interval: Duration,
     pub sdu_timeout: Duration,
+    pub chain_store: Arc<ChainStore>,
     pub event_sender: mpsc::Sender<(PeerId, PeerEvent)>,
     pub command_receiver: mpsc::Receiver<PeerCommand>,
     pub leios_enabled: bool,
@@ -150,32 +153,23 @@ pub(crate) fn spawn_chainsync(
     cs_send: CodecSend,
     cs_recv: CodecRecv,
     peer_id: PeerId,
+    chain_store: Arc<ChainStore>,
     event_sender: mpsc::Sender<(PeerId, PeerEvent)>,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
         let mut runner = Runner::<ChainSync>::new(Role::Client, cs_send, cs_recv);
 
-        // Jump to current tip rather than syncing from genesis.
-        let result = match chainsync::find_intersection(&mut runner, vec![Point::Origin]).await {
-            Ok(Some((_point, tip))) if tip.point != Point::Origin => {
-                chainsync::find_intersection(&mut runner, vec![tip.point]).await
-            }
-            other => other,
-        };
+        // Ask the peer to intersect with our local chain so RollForward
+        // streams every header between the common ancestor and the peer's
+        // current tip. Exponentially-spaced candidates cover the full chain
+        // with O(log n) probes; Origin is the ultimate fallback.
+        let candidates = chain_store.intersection_candidates(32);
+        let result = chainsync::find_intersection(&mut runner, candidates).await;
 
         match result {
-            Ok(Some((point, tip))) => {
+            Ok(Some((point, _tip))) => {
                 let _ = event_sender
                     .send((peer_id, PeerEvent::IntersectionFound { point }))
-                    .await;
-                let _ = event_sender
-                    .send((
-                        peer_id,
-                        PeerEvent::HeaderAnnounced {
-                            header: crate::types::WrappedHeader::opaque(Vec::new()),
-                            tip,
-                        },
-                    ))
                     .await;
             }
             Ok(None) => { /* no intersection, continue from origin */ }
@@ -592,7 +586,13 @@ pub(crate) async fn run_peer_task(mut config: PeerTaskConfig) {
     let (tx_submit_sender, tx_submit_receiver) = mpsc::channel::<PendingTx>(16);
 
     // Spawn protocol sub-tasks.
-    let mut cs_handle = spawn_chainsync(cs_send, cs_recv, peer_id, event_sender.clone());
+    let mut cs_handle = spawn_chainsync(
+        cs_send,
+        cs_recv,
+        peer_id,
+        config.chain_store.clone(),
+        event_sender.clone(),
+    );
     let ka_handle = spawn_keepalive(
         ka_send,
         ka_recv,
@@ -932,7 +932,9 @@ mod tests {
         let (_ps_send, _ps_recv) = channels.next().unwrap();
 
         // Spawn just ChainSync and KeepAlive sub-tasks.
-        let cs_handle = spawn_chainsync(cs_send, cs_recv, peer_id, event_sender.clone());
+        let (chain_store, _rx) = ChainStore::new(100);
+        let cs_handle =
+            spawn_chainsync(cs_send, cs_recv, peer_id, chain_store, event_sender.clone());
         let ka_handle = spawn_keepalive(
             ka_send,
             ka_recv,

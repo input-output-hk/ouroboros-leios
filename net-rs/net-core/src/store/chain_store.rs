@@ -219,6 +219,34 @@ impl ChainStore {
         inner.blocks.range(start..=end).cloned().collect()
     }
 
+    /// Produce ChainSync intersection candidates from the local chain,
+    /// ordered newest-to-oldest: `[tip, tip-1, tip-2, tip-4, tip-8, ...]`
+    /// with exponential lookback, capped at `max` points, and always ending
+    /// with `Point::Origin` as the ultimate fallback.
+    ///
+    /// `find_intersection` returns the first candidate that matches, so
+    /// newest-first ordering selects the most recent common ancestor — the
+    /// shortest possible re-sync window.
+    pub fn intersection_candidates(&self, max: usize) -> Vec<Point> {
+        let inner = self.inner.lock().unwrap();
+        let len = inner.blocks.len();
+        let mut out: Vec<Point> = Vec::with_capacity(max.min(len) + 1);
+        if len > 0 {
+            // Tip (newest) is at `len - 1`. Walk back by 1, 2, 4, 8, ...
+            // until we run out of chain or hit `max`.
+            let mut offset: usize = 0;
+            let mut step: usize = 1;
+            while offset < len && out.len() + 1 < max {
+                let idx = len - 1 - offset;
+                out.push(inner.blocks[idx].point.clone());
+                offset = offset.saturating_add(step);
+                step = step.saturating_mul(2);
+            }
+        }
+        out.push(Point::Origin);
+        out
+    }
+
     /// Check whether a read cursor is still valid by comparing the Point at
     /// the stored index. Returns false if the index is out of bounds OR a
     /// different block now occupies that position (rollback + re-append).
@@ -294,6 +322,52 @@ mod tests {
         let tip = store.tip();
         assert_eq!(tip.point, p2);
         assert_eq!(tip.block_no, 2);
+    }
+
+    #[test]
+    fn intersection_candidates_empty_chain() {
+        let (store, _rx) = ChainStore::new(100);
+        let candidates = store.intersection_candidates(10);
+        assert_eq!(candidates, vec![Point::Origin]);
+    }
+
+    #[test]
+    fn intersection_candidates_exponential_lookback() {
+        let (store, _rx) = ChainStore::new(100);
+        for slot in 1..=20 {
+            let (p, h, b) = make_block(slot);
+            store.append_block(p, h, b, slot);
+        }
+
+        // max=10 → up to 9 chain points + Origin at the end.
+        // Offsets from tip: 0, 1, 3, 7, 15 (next would be 31 > 19, stop)
+        // → slots: 20, 19, 17, 13, 5, then Origin.
+        let candidates = store.intersection_candidates(10);
+        assert_eq!(
+            candidates,
+            vec![
+                make_point(20),
+                make_point(19),
+                make_point(17),
+                make_point(13),
+                make_point(5),
+                Point::Origin,
+            ]
+        );
+    }
+
+    #[test]
+    fn intersection_candidates_caps_at_max() {
+        let (store, _rx) = ChainStore::new(100);
+        for slot in 1..=50 {
+            let (p, h, b) = make_block(slot);
+            store.append_block(p, h, b, slot);
+        }
+        let candidates = store.intersection_candidates(4);
+        // 3 chain points + Origin = 4 total.
+        assert_eq!(candidates.len(), 4);
+        assert_eq!(candidates[0], make_point(50));
+        assert_eq!(*candidates.last().unwrap(), Point::Origin);
     }
 
     #[test]

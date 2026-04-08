@@ -347,10 +347,40 @@ impl PraosConsensus {
         let ancestor = match ancestor {
             Some(a) => a,
             None => {
+                // Diagnostic: common-ancestor walk failed. Dump enough state
+                // to distinguish (a) peer_chain window too short to reach our
+                // ancestry from (b) stale entries from an abandoned fork.
+                let hex_tail = |h: &[u8; 32]| format!("{:02x}{:02x}", h[30], h[31]);
+                let hex_tail_opt = |h: &Option<[u8; 32]>| {
+                    h.as_ref().map(hex_tail).unwrap_or_else(|| "<none>".into())
+                };
+                let oldest = candidate.iter().next();
+                let newest = candidate.iter().next_back();
+                let oldest_prev_in_ancestors = oldest
+                    .and_then(|e| e.prev_hash)
+                    .map(|p| adopted_ancestors.contains(&p))
+                    .unwrap_or(false);
+                tracing::info!(
+                    node_id = %self.node_id,
+                    %peer_id,
+                    peer_tip_block_no = candidate_tip.block_no,
+                    adopted_block_no = adopted_bn,
+                    adopted_hash = hex_tail(&adopted_hash),
+                    peer_chain_len = candidate.len(),
+                    adopted_ancestors_len = adopted_ancestors.len(),
+                    oldest_block_no = oldest.map(|e| e.block_no),
+                    oldest_hash = oldest.map(|e| hex_tail(&e.hash)),
+                    oldest_prev_hash = hex_tail_opt(&oldest.and_then(|e| e.prev_hash)),
+                    oldest_prev_in_ancestors,
+                    newest_block_no = newest.map(|e| e.block_no),
+                    newest_hash = newest.map(|e| hex_tail(&e.hash)),
+                    newest_prev_hash = hex_tail_opt(&newest.and_then(|e| e.prev_hash)),
+                    "select_chain: orphan — no common ancestor found"
+                );
                 return SelectionDecision::OrphanCandidate {
                     peer_id,
                     tip_block_no: candidate_tip.block_no,
-                }
+                };
             }
         };
 
@@ -1412,6 +1442,102 @@ mod tests {
                 assert_eq!(tip_block_no, 5);
             }
             other => panic!("expected OrphanCandidate, got {other:?}"),
+        }
+    }
+
+    /// Regression for the "jump to tip" ChainSync bug: if the peer_chain
+    /// contains only the tip header (because ChainSync skipped ahead instead
+    /// of streaming every rollforward from the common ancestor), the walk
+    /// in `select_chain_once` can never find a common ancestor and every
+    /// peer gets classified as `OrphanCandidate`. The fix is to populate
+    /// peer_chain contiguously from the intersection point — this test
+    /// exercises both halves.
+    #[tokio::test]
+    async fn select_chain_contiguous_stream_finds_ancestor_tip_only_is_orphan() {
+        let (mut consensus, _cmd_rx, _val_rx) = make_consensus();
+        let peer = PeerId(1);
+
+        // Our self-produced chain: blocks 1, 2, 3.
+        let (tip1, header1) = make_tip(1, 1, None);
+        consensus
+            .register_self_produced(&tip1.point, &header1, &BlockBody::opaque(Vec::new()))
+            .await;
+        let hash1 = match &tip1.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        let (tip2, header2) = make_tip(2, 2, Some(hash1));
+        consensus
+            .register_self_produced(&tip2.point, &header2, &BlockBody::opaque(Vec::new()))
+            .await;
+        let hash2 = match &tip2.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        let (tip3, header3) = make_tip(3, 3, Some(hash2));
+        consensus
+            .register_self_produced(&tip3.point, &header3, &BlockBody::opaque(Vec::new()))
+            .await;
+
+        // Peer forks at block 2 (common ancestor) and has blocks 3..7 on
+        // a different fork. Slots are offset to produce distinct hashes.
+        let (alt3_tip, alt3_hdr) = make_tip(103, 3, Some(hash2));
+        let alt3_hash = match &alt3_tip.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        let (alt4_tip, alt4_hdr) = make_tip(104, 4, Some(alt3_hash));
+        let alt4_hash = match &alt4_tip.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        let (alt5_tip, alt5_hdr) = make_tip(105, 5, Some(alt4_hash));
+        let alt5_hash = match &alt5_tip.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        let (alt6_tip, alt6_hdr) = make_tip(106, 6, Some(alt5_hash));
+        let alt6_hash = match &alt6_tip.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        let (alt7_tip, alt7_hdr) = make_tip(107, 7, Some(alt6_hash));
+
+        // --- Bug reproduction: only the tip is announced (no intermediates).
+        consensus.record_peer_tip(peer, &alt7_tip, &alt7_hdr);
+        match consensus.select_chain_once(&HashSet::new()) {
+            SelectionDecision::OrphanCandidate { .. } => {}
+            other => panic!("expected OrphanCandidate for tip-only peer_chain, got {other:?}"),
+        }
+
+        // --- Fixed behaviour: ChainSync streams every header from the
+        // common ancestor forward. After receiving alt3..alt7 contiguously,
+        // the walk back through peer_chain hits alt3, whose prev_hash is
+        // hash2 (in adopted_ancestors), so we classify as WaitingForBlocks.
+        consensus.record_peer_disconnected(peer);
+        consensus.record_peer_tip(peer, &alt3_tip, &alt3_hdr);
+        consensus.record_peer_tip(peer, &alt4_tip, &alt4_hdr);
+        consensus.record_peer_tip(peer, &alt5_tip, &alt5_hdr);
+        consensus.record_peer_tip(peer, &alt6_tip, &alt6_hdr);
+        consensus.record_peer_tip(peer, &alt7_tip, &alt7_hdr);
+
+        match consensus.select_chain_once(&HashSet::new()) {
+            SelectionDecision::WaitingForBlocks {
+                peer_id,
+                ancestor,
+                tip_block_no,
+                missing,
+            } => {
+                assert_eq!(peer_id, peer);
+                assert_eq!(ancestor, hash2, "common ancestor should be our block 2");
+                assert_eq!(tip_block_no, 7);
+                assert_eq!(
+                    missing.len(),
+                    5,
+                    "five alt-fork blocks (3..7) need fetching"
+                );
+            }
+            other => panic!("expected WaitingForBlocks after contiguous stream, got {other:?}"),
         }
     }
 

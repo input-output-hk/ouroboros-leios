@@ -193,7 +193,13 @@ async fn run_duplex_protocols(conn: DuplexConnection, params: DuplexProtocolPara
     let (peer_share_sender, peer_share_receiver) = mpsc::channel::<u8>(4);
     let (tx_submit_sender, tx_submit_receiver) = mpsc::channel::<PendingTx>(16);
 
-    let mut cs_client = spawn_chainsync(cs_send, cs_recv, peer_id, event_sender.clone());
+    let mut cs_client = spawn_chainsync(
+        cs_send,
+        cs_recv,
+        peer_id,
+        chain_store.clone(),
+        event_sender.clone(),
+    );
     let ka_client = spawn_keepalive(
         ka_send,
         ka_recv,

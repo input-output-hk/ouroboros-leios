@@ -170,6 +170,7 @@ impl Coordinator {
                 network_magic: self.config.network_magic,
                 keepalive_interval: self.config.keepalive_interval,
                 sdu_timeout: self.config.sdu_timeout,
+                chain_store: self.chain_store.clone(),
                 event_sender: self.peer_event_sender.clone(),
                 command_receiver: cmd_receiver,
                 leios_enabled: self.config.leios_enabled,
