@@ -75,6 +75,11 @@ cargo run -p net-cluster -- --config net-cluster/configs/sample-cluster.toml --n
 cat cluster-events.jsonl | python3 -m json.tool --no-ensure-ascii | head
 
 # Node logs are in logs/node-{i}.log
+
+# Live per-node tip/lag summary (hits the aggregator HTTP API):
+scripts/cluster-status.sh              # defaults to port 9100
+scripts/cluster-status.sh 9200         # custom aggregator port
+LAG_THRESHOLD=5 scripts/cluster-status.sh  # override "stuck" threshold
 ```
 
 Cluster config fields: `num_nodes`, `degree` (peers per node), `min_latency_ms`/`max_latency_ms` (random edge delays), `base_config` (shared net-node config), `base_port`, `seed`, `output_events`, `ordering_window_secs`, `aggregator_port`, `stake_distribution`, `stats_interval_secs`, `external_peers`. See `net-cluster/configs/sample-cluster.toml`.
