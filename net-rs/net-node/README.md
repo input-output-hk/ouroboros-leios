@@ -7,7 +7,7 @@ Configurable Leios-capable test node for local network simulation. Uses TOML con
 - VRF-based block production (stake-weighted lottery ported from sim-rs)
 - Longest-chain consensus with fork-tracking chain tree
 - Configurable fake validation with timed delays
-- Leios IB/EB/vote production at stage boundaries
+- Leios RB/EB/vote production at stage boundaries
 - Per-peer network delay injection for topology simulation
 - Tx pool with fake Poisson transaction generation
 - Telemetry: sim-rs-compatible JSONL events, per-peer bandwidth tracking

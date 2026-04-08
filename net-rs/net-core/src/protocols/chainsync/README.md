@@ -47,7 +47,7 @@ stateDiagram-v2
 
 - **Max message size**: 65,535 bytes
 - **Ingress limit**: 462,000 bytes
-- **Timeouts**: idle 3,673s, can-await 10s, must-reply 756s, intersect 10s
+- **Timeouts**: idle 3,673s, can-await 3,673s, must-reply 756s, intersect 10s
 
 ## Client Helpers
 

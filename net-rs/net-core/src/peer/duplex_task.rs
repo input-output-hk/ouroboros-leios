@@ -1,8 +1,8 @@
 //! Duplex peer task: runs both initiator (client) and responder (server)
 //! protocols on a single connection.
 //!
-//! Combines the sub-tasks from `peer_task` (client-side) and
-//! `responder_task` (server-side) on one mux, using `connect_duplex()`
+//! Reuses the client sub-tasks from `peer_task` alongside the server
+//! handlers from `server_handlers` on one mux, using `connect_duplex()`
 //! or `accept_duplex()` for connection setup.
 
 use std::sync::Arc;

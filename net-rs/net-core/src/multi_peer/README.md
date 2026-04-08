@@ -30,14 +30,17 @@ The coordinator creates and populates shared stores (`ChainStore`, `LeiosStore`)
 
 ```
 NetworkCommand (app -> coordinator)     NetworkEvent (coordinator -> app)
-├── AddPeer { address }                 ├── PeerConnected { peer_id }
-├── FetchBlock { point }                ├── PeerDisconnected { peer_id }
-├── DiscoverPeers                       ├── TipAdvanced { tip, header }
-├── InjectBlock { point, header, body } ├── RolledBack { point, tip }
+├── AddPeer { address }                 ├── PeerConnected { peer_id, address }
+├── FetchBlock { point }                ├── PeerDisconnected { peer_id, reason }
+├── FetchBlockRange { from, to }        ├── TipAdvanced { peer_id, tip, header }
+├── InjectBlock { point, header, body } ├── RolledBack { peer_id, point, tip }
 ├── InjectRollback { point }            ├── BlockReceived { point, body }
-├── FetchLeiosBlock { slot, hash }      ├── LeiosBlockOffered { slot, hash }
-├── FetchLeiosBlockTxs { .. }           ├── LeiosBlockReceived { .. }
-├── FetchLeiosVotes { votes }           ├── LeiosVotesReceived { .. }
+├── SubmitTransaction { tx }            ├── BlockFetchFailed { from, to }
+├── FetchLeiosBlock { point }           ├── LeiosBlockAnnounced { header }
+├── FetchLeiosBlockTxs { point, bitmap }├── LeiosBlockOffered { point }
+├── FetchLeiosVotes { votes }           ├── LeiosBlockTxsOffered { point }
+├── InjectLeiosBlock { point, block }   ├── LeiosVotesOffered { votes }
+├── InjectLeiosVotes { .. }             ├── LeiosBlockReceived { point, block }
 └── Shutdown                            └── ...
 ```
 

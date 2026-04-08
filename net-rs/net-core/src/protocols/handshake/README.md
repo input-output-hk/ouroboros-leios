@@ -14,23 +14,23 @@ Version negotiation at connection startup. Client proposes a version table; serv
 
 ```mermaid
 stateDiagram-v2
-    [*] --> StPropose
-    StPropose --> StConfirm : MsgProposeVersions
-    StConfirm --> StDone : MsgAcceptVersion
-    StConfirm --> StDone : MsgRefuse
-    StConfirm --> StDone : MsgQueryReply
-    StDone --> [*]
+    [*] --> Propose
+    Propose --> Confirm : MsgProposeVersions
+    Confirm --> Done : MsgAcceptVersion
+    Confirm --> Done : MsgRefuse
+    Confirm --> Done : MsgQueryReply
+    Done --> [*]
 ```
 
 ## Agency Table
 
 | State | Agency | Message | Next State |
 |-------|--------|---------|------------|
-| StPropose | **Client** | MsgProposeVersions(version_table) | StConfirm |
-| StConfirm | **Server** | MsgAcceptVersion(version, params) | StDone |
-| StConfirm | **Server** | MsgRefuse(reason) | StDone |
-| StConfirm | **Server** | MsgQueryReply(version_table) | StDone |
-| StDone | Nobody | — | — |
+| Propose | **Client** | MsgProposeVersions(version_table) | Confirm |
+| Confirm | **Server** | MsgAcceptVersion(version, params) | Done |
+| Confirm | **Server** | MsgRefuse(reason) | Done |
+| Confirm | **Server** | MsgQueryReply(version_table) | Done |
+| Done | Nobody | — | — |
 
 ## Limits
 
