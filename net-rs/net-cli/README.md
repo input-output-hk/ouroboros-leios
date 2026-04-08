@@ -20,17 +20,18 @@ Command-line tool for testing and demonstrating the Cardano N2N network stack. C
 
 ```
 src/
-├── main.rs         # CLI definition (clap) and subcommand dispatch
-├── connect.rs      # Re-exports net_core::peer::connect helpers
-├── handshake.rs    # handshake command
-├── capture.rs      # capture command (raw byte recording)
-├── chainsync.rs    # chain-sync command
-├── blockfetch.rs   # block-fetch command
-├── follow.rs       # follow command (single-peer, reconnecting)
-├── multi_follow.rs # multi-follow command (coordinator-based)
-├── serve.rs        # serve command (fake node with Poisson generation)
-├── submit.rs       # submit command (tx submission)
-└── peershare.rs    # peer-share command
+├── main.rs           # CLI definition (clap) and subcommand dispatch
+├── connect.rs        # Re-exports net_core::peer::connect helpers
+├── scheduler_args.rs # Shared --scheduler / --protocol-priority flags
+├── handshake.rs      # handshake command
+├── capture.rs        # capture command (raw byte recording)
+├── chainsync.rs      # chain-sync command
+├── blockfetch.rs     # block-fetch command
+├── follow.rs         # follow command (single-peer, reconnecting)
+├── multi_follow.rs   # multi-follow command (coordinator-based)
+├── serve.rs          # serve command (fake node with Poisson generation)
+├── submit.rs         # submit command (tx submission)
+└── peershare.rs      # peer-share command
 ```
 
 ## Usage
@@ -71,6 +72,22 @@ cargo run -p net-cli -- submit 127.0.0.1:9999 --tx-rate 2.0
 cargo run -p net-cli -- multi-follow \
   --host backbone.cardano.iog.io:3001 \
   --listen 0.0.0.0:8888
+```
+
+### Scheduler selection
+
+`serve`, `follow`, and `multi-follow` accept `--scheduler <priority-wfq|strict-priority|round-robin>` (default `priority-wfq`) and repeatable `--protocol-priority <id>,<P|weight>` overrides:
+
+```sh
+# strict-priority scheduler (hardwired tiers)
+cargo run -p net-cli -- serve --port 9999 --scheduler strict-priority
+
+# custom Leios weights under PriorityWfq
+cargo run -p net-cli -- multi-follow --host 127.0.0.1:9999 --leios \
+  --protocol-priority 18,3 --protocol-priority 19,1
+
+# promote PeerSharing into the Priority class
+cargo run -p net-cli -- follow 127.0.0.1:9999 --protocol-priority 10,P
 ```
 
 ### Leios simulation

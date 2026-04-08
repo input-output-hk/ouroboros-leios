@@ -32,7 +32,7 @@ Rust implementation of the Cardano node-to-node (N2N) network stack, covering bo
 **Test node** — configurable Leios-capable node for local network simulation:
 - VRF-based block production (stake-weighted lottery ported from sim-rs)
 - Longest-chain consensus with configurable fake validation delays
-- Leios IB/EB/vote production at stage boundaries
+- Leios RB/EB/vote production at stage boundaries
 - Per-peer network delay injection for topology simulation
 - Telemetry: sim-rs-compatible JSONL events, per-peer bandwidth tracking, HTTP + file sinks
 - TOML config with layering (base + per-node overlays + CLI overrides)
@@ -54,7 +54,7 @@ Rust implementation of the Cardano node-to-node (N2N) network stack, covering bo
 
 **[Security hardened](docs/security-audit.md)** — allocation bounds on all wire-read lengths, buffer caps, timeouts on all remote waits, clean error propagation, no panics in library code.
 
-**376 tests** — unit tests, codec round-trips, protocol state machines, integration tests with in-memory bearers, and test vectors captured from the live Cardano mainnet.
+**406 tests** — unit tests, codec round-trips, protocol state machines, integration tests with in-memory bearers, and test vectors captured from the live Cardano mainnet.
 
 ## Architecture
 
@@ -76,8 +76,7 @@ graph TD
 
         subgraph "Peer Layer (peer)"
             PT[Peer Task<br/>initiator]
-            RT[Responder Task]
-            DT[Duplex Task]
+            DT[Duplex Task<br/>client + server]
             SH[Server Handlers]
         end
 
@@ -107,11 +106,11 @@ graph TD
     end
 
     CLI --> COORD
-    COORD --> PT & RT & DT
+    COORD --> PT & DT
     COORD --> CS & LS
     SH --> CS & LS
-    PT & RT & DT --> SH
-    PT & RT & DT --> HS & CSYNC & BF & TX & KA & PS & LN & LF
+    PT & DT --> SH
+    PT & DT --> HS & CSYNC & BF & TX & KA & PS & LN & LF
     HS & CSYNC & BF & TX & KA & PS & LN & LF --> CODEC
     CODEC --> EG --> SCHED --> WIRE
     WIRE --> TCP & MEM
@@ -129,7 +128,7 @@ net-rs/
 │       ├── types/       # Shared Cardano types (Point, Tip, Header, Block)
 │       ├── protocols/   # All 8 mini-protocols (state machines + CBOR)
 │       ├── store/       # Shared data stores (ChainStore, LeiosStore)
-│       ├── peer/        # Per-peer tasks (initiator, responder, duplex), server handlers
+│       ├── peer/        # Per-peer tasks (initiator, duplex), server handlers
 │       └── multi_peer/  # Multi-peer coordinator, application interface
 ├── net-cli/           # Binary crate — CLI tool for testing and demos
 │   └── src/           # Subcommands: handshake, follow, serve, submit, ...
@@ -158,7 +157,7 @@ Requires stable Rust (no nightly features).
 
 ```sh
 cargo build            # build all crates
-cargo test             # run all 376 tests
+cargo test             # run all 406 tests
 cargo clippy           # lint
 cargo fmt --check      # format check
 ```

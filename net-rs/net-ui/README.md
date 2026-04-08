@@ -23,6 +23,8 @@ src/
 ├── types.ts              # TypeScript type definitions
 ├── theme.ts              # Material-UI theme configuration
 ├── components/
+│   ├── IconSidebar.tsx    # Left icon sidebar: panel toggles and nav
+│   ├── ControlPanel.tsx   # Cluster control: restart, live node config updates
 │   ├── TopologyGraph.tsx  # Force-directed network graph (D3)
 │   ├── TopologyNode.tsx   # Individual node rendering
 │   ├── TopologyEdge.tsx   # Edge rendering with latency labels
