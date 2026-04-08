@@ -61,7 +61,7 @@ export function EventLog() {
             <span style={{ minWidth: 55, color: "#999" }}>
               {e.time_s.toFixed(1)}s
             </span>
-            <span style={{ width: 55, flexShrink: 0 }}>
+            <span style={{ width: 72, flexShrink: 0, whiteSpace: "nowrap" }}>
               {e.message?.node ?? "?"}
             </span>
             <span
