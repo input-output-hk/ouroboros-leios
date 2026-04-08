@@ -11,12 +11,6 @@
 //! The current concrete ledger is `FakeLedger`: it does no real work,
 //! just sleeps for a configurable duration to simulate validation cost
 //! and tracks the current tip so `rollback` is meaningful.
-//!
-//! Consensus currently still consumes a `ValidationComplete { point }`
-//! shim rather than `LedgerOutcome` directly; the shim exists only so
-//! the validator can be refactored without churning the consensus layer
-//! at the same time, and goes away once consensus wires up rollback and
-//! failure outcomes.
 
 use std::fmt;
 use std::time::Duration;
@@ -24,7 +18,6 @@ use std::time::Duration;
 use async_trait::async_trait;
 use net_core::types::{BlockBody, Point};
 use tokio::sync::{mpsc, watch};
-use tracing::warn;
 
 use crate::config::DynamicConfig;
 
@@ -85,13 +78,11 @@ pub enum LedgerCommand {
     /// Validate + apply a block.
     Apply { point: Point, body: BlockBody },
     /// Roll the ledger state back to an earlier point.
-    #[allow(dead_code)] // consensus wires rollbacks in a follow-up commit
     Rollback { target: Point },
 }
 
 /// Outcomes reported by the validator actor after processing a command.
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // rollback/failure variants consumed once consensus reacts to them
 pub enum LedgerOutcome {
     /// `apply` succeeded for `point`.
     Applied { point: Point },
@@ -103,19 +94,7 @@ pub enum LedgerOutcome {
     RollbackFailed { target: Point, error: String },
 }
 
-/// Result of a completed block validation.
-///
-/// Temporary shim carrying only the validated point so the consensus
-/// layer's existing `on_validation_complete(ValidationComplete)` entry
-/// point keeps working while the validator is refactored. Delete when
-/// consensus consumes `LedgerOutcome` directly.
-#[derive(Debug)]
-pub struct ValidationComplete {
-    /// The block point that was validated.
-    pub point: Point,
-}
-
-/// Handle to the validator actor. Submitting work goes through this;
+/// Handle to the validator actor. Submitting work goes through `submit`;
 /// completion outcomes come back via the receiver returned from `new`.
 pub struct Validator {
     commands: mpsc::Sender<LedgerCommand>,
@@ -123,17 +102,17 @@ pub struct Validator {
 
 impl Validator {
     /// Create a new validator with the default `FakeLedger` backend.
-    /// Returns the handle and a receiver for completed validations.
+    /// Returns the handle and a receiver for outcomes.
     pub fn new(
         dyn_config: watch::Receiver<DynamicConfig>,
-    ) -> (Self, mpsc::Receiver<ValidationComplete>) {
+    ) -> (Self, mpsc::Receiver<LedgerOutcome>) {
         let ledger = Box::new(FakeLedger::new(dyn_config));
         Self::with_ledger(ledger)
     }
 
     /// Create a validator with a caller-supplied ledger. Used by tests
     /// and by future real-ledger wiring.
-    pub fn with_ledger(ledger: Box<dyn Ledger>) -> (Self, mpsc::Receiver<ValidationComplete>) {
+    pub fn with_ledger(ledger: Box<dyn Ledger>) -> (Self, mpsc::Receiver<LedgerOutcome>) {
         // Bounded channels give natural backpressure: if consensus
         // submits commands faster than the ledger can process them,
         // `send().await` blocks. 64 is enough for typical per-node
@@ -142,25 +121,13 @@ impl Validator {
         let (cmd_tx, cmd_rx) = mpsc::channel(64);
         let (outcome_tx, outcome_rx) = mpsc::channel(64);
         tokio::spawn(run_validator_actor(ledger, cmd_rx, outcome_tx));
-
-        let (shim_tx, shim_rx) = mpsc::channel(64);
-        tokio::spawn(run_outcome_shim(outcome_rx, shim_tx));
-
-        (Self { commands: cmd_tx }, shim_rx)
+        (Self { commands: cmd_tx }, outcome_rx)
     }
 
-    /// Submit a block for validation. Sends a `LedgerCommand::Apply`
-    /// to the actor. Backpressure is applied by the bounded command
-    /// channel; if it fills, this blocks until the actor drains it.
-    ///
-    /// Kept on the `(point, body)` signature to match consensus's
-    /// current call sites; a direct `LedgerCommand` submission path
-    /// replaces it once consensus handles the full outcome set.
-    pub fn validate_block(&self, point: Point, body: BlockBody) {
-        let tx = self.commands.clone();
-        tokio::spawn(async move {
-            let _ = tx.send(LedgerCommand::Apply { point, body }).await;
-        });
+    /// Submit a `LedgerCommand` to the validator actor. Bounded
+    /// channel: if the actor is behind, this awaits drain.
+    pub async fn submit(&self, cmd: LedgerCommand) {
+        let _ = self.commands.send(cmd).await;
     }
 }
 
@@ -193,33 +160,6 @@ async fn run_validator_actor(
         if outcomes.send(outcome).await.is_err() {
             // Receiver dropped — consensus tore down. Exit cleanly.
             return;
-        }
-    }
-}
-
-/// Temporary bridge between `LedgerOutcome` (emitted by the actor) and
-/// `ValidationComplete` (consumed by consensus). Delete when consensus
-/// consumes `LedgerOutcome` directly.
-async fn run_outcome_shim(
-    mut outcomes: mpsc::Receiver<LedgerOutcome>,
-    shim: mpsc::Sender<ValidationComplete>,
-) {
-    while let Some(outcome) = outcomes.recv().await {
-        match outcome {
-            LedgerOutcome::Applied { point } => {
-                if shim.send(ValidationComplete { point }).await.is_err() {
-                    return;
-                }
-            }
-            LedgerOutcome::ApplyFailed { point, error } => {
-                warn!(%point, %error, "ledger apply failed; consensus will retry on next tip advance");
-            }
-            LedgerOutcome::RolledBack { .. } | LedgerOutcome::RollbackFailed { .. } => {
-                // No caller currently issues `Rollback` commands, so
-                // these are unreachable in practice. They'll be wired
-                // into consensus once it drives ledger rollbacks on
-                // fork switch.
-            }
         }
     }
 }
@@ -317,17 +257,41 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn validate_block_completes() {
+    async fn submit_apply_returns_applied_outcome() {
         let rx = test_dyn_config(0.0, 0.0, 0.0);
-        let (validator, mut rx) = Validator::new(rx);
+        let (validator, mut outcome_rx) = Validator::new(rx);
 
         let point = fake_point(42, 0xAB);
         let body = BlockBody::opaque(vec![0u8; 100]);
+        validator
+            .submit(LedgerCommand::Apply {
+                point: point.clone(),
+                body,
+            })
+            .await;
 
-        validator.validate_block(point.clone(), body);
+        match outcome_rx.recv().await.expect("outcome") {
+            LedgerOutcome::Applied { point: applied } => assert_eq!(applied, point),
+            other => panic!("expected Applied, got {other:?}"),
+        }
+    }
 
-        let result = rx.recv().await.expect("should receive completion");
-        assert_eq!(result.point, point);
+    #[tokio::test]
+    async fn submit_rollback_returns_rolled_back_outcome() {
+        let rx = test_dyn_config(0.0, 0.0, 0.0);
+        let (validator, mut outcome_rx) = Validator::new(rx);
+
+        let target = fake_point(7, 0x77);
+        validator
+            .submit(LedgerCommand::Rollback {
+                target: target.clone(),
+            })
+            .await;
+
+        match outcome_rx.recv().await.expect("outcome") {
+            LedgerOutcome::RolledBack { target: t } => assert_eq!(t, target),
+            other => panic!("expected RolledBack, got {other:?}"),
+        }
     }
 
     #[tokio::test]
@@ -342,19 +306,21 @@ mod tests {
         let p2 = fake_point(2, 0x02);
         let p3 = fake_point(3, 0x03);
 
-        validator.validate_block(p1.clone(), BlockBody::opaque(vec![]));
-        validator.validate_block(p2.clone(), BlockBody::opaque(vec![]));
-        validator.validate_block(p3.clone(), BlockBody::opaque(vec![]));
+        for p in [&p1, &p2, &p3] {
+            validator
+                .submit(LedgerCommand::Apply {
+                    point: p.clone(),
+                    body: BlockBody::opaque(vec![]),
+                })
+                .await;
+        }
 
-        // submit-spawned tasks land in the channel in submission order
-        // because tokio::spawn + bounded send preserves it. Give them
-        // a moment to drain.
-        let r1 = outcome_rx.recv().await.unwrap();
-        let r2 = outcome_rx.recv().await.unwrap();
-        let r3 = outcome_rx.recv().await.unwrap();
-        assert_eq!(r1.point, p1);
-        assert_eq!(r2.point, p2);
-        assert_eq!(r3.point, p3);
+        for expected in [&p1, &p2, &p3] {
+            match outcome_rx.recv().await.unwrap() {
+                LedgerOutcome::Applied { point } => assert_eq!(&point, expected),
+                other => panic!("expected Applied, got {other:?}"),
+            }
+        }
     }
 
     #[tokio::test]

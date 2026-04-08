@@ -10,7 +10,7 @@ use tokio::sync::mpsc;
 use tracing::info;
 
 use crate::chain_tree::{is_better_tip, ChainTree, ChainTreeEntry};
-use crate::validation::{ValidationComplete, Validator};
+use crate::validation::{LedgerCommand, LedgerOutcome, Validator};
 
 /// How long an in-flight fetch entry remains "active" before being considered
 /// stale and eligible for retry. The coordinator may silently drop a fetch
@@ -155,6 +155,17 @@ pub struct Consensus {
     /// `RolledBack`, dropped on `PeerDisconnected`. Drives chain selection
     /// via `select_chain`.
     pub(crate) peer_chains: HashMap<PeerId, PeerChain>,
+    /// Hash the validator's queue will be at after every command we've
+    /// already submitted has been processed. We track this so a fork
+    /// switch can decide whether to insert a `LedgerCommand::Rollback`
+    /// before the next `Apply`. The actual ledger state lags this until
+    /// outcomes arrive.
+    queued_validator_tip: Option<[u8; 32]>,
+    /// Hash of the last block the validator has actually `Applied`. Used
+    /// to rewind `queued_validator_tip` after an `ApplyFailed`, since the
+    /// failed block (and any cascading failures behind it) leave the
+    /// queue's projected tip out of sync with reality.
+    last_validated_tip: Option<[u8; 32]>,
     commands: mpsc::Sender<NetworkCommand>,
     validator: Validator,
     /// Security parameter k — prune blocks deeper than this.
@@ -177,6 +188,8 @@ impl Consensus {
             validated: HashSet::new(),
             in_flight: HashMap::new(),
             peer_chains: HashMap::new(),
+            queued_validator_tip: None,
+            last_validated_tip: None,
             commands,
             validator,
             security_param_k,
@@ -428,43 +441,53 @@ impl Consensus {
         }
     }
 
-    /// Execute a fork switch decided by `select_chain`: roll back the
-    /// chain store to `ancestor`'s point and replay `replay` (oldest→newest).
+    /// Execute a fork switch decided by `select_chain`: enqueue a
+    /// `Rollback` to `ancestor` (if needed) followed by an `Apply` for
+    /// each block in `replay` (oldest→newest). The validator processes
+    /// the sequence in order, and `RolledBack`/`Applied` outcomes drive
+    /// the chain_store updates and `adopted_tip_hash` advancement.
     async fn execute_switch(&mut self, ancestor: [u8; 32], replay: Vec<[u8; 32]>) {
-        // For a fresh node starting from synthetic genesis, there's no
-        // rollback to issue — we're building from nothing.
-        if ancestor == [0u8; 32] && self.adopted_tip_hash.is_none() {
-            for hash in replay {
-                self.inject_block(hash).await;
-            }
-            return;
-        }
+        // Fresh node starting from synthetic genesis: no rollback to
+        // issue, just apply forward.
+        let needs_rollback = ancestor != [0u8; 32] || self.adopted_tip_hash.is_some();
 
-        let ancestor_point = match self.chain_tree.point(&ancestor) {
-            Some(p) => p.clone(),
-            None => {
-                tracing::warn!(
-                    node_id = %self.node_id,
-                    ancestor = format!("{:02x}{:02x}", ancestor[30], ancestor[31]),
-                    "select_chain: ancestor point not in chain_tree; aborting switch"
-                );
-                return;
-            }
-        };
-
-        // Only issue a rollback if we're actually moving off the current tip.
-        if self.adopted_tip_hash != Some(ancestor) {
-            let _ = self
-                .commands
-                .send(NetworkCommand::InjectRollback {
-                    point: ancestor_point,
+        if needs_rollback && self.queued_validator_tip != Some(ancestor) {
+            let ancestor_point = match self.chain_tree.point(&ancestor) {
+                Some(p) => p.clone(),
+                None => {
+                    tracing::warn!(
+                        node_id = %self.node_id,
+                        ancestor = format!("{:02x}{:02x}", ancestor[30], ancestor[31]),
+                        "select_chain: ancestor point not in chain_tree; aborting switch"
+                    );
+                    return;
+                }
+            };
+            self.validator
+                .submit(LedgerCommand::Rollback {
+                    target: ancestor_point,
                 })
                 .await;
+            self.queued_validator_tip = Some(ancestor);
             self.adopted_tip_hash = Some(ancestor);
         }
 
+        // Submit each replay block. submit_for_validation updates
+        // queued_validator_tip on each call so we don't insert
+        // redundant Rollbacks.
         for hash in replay {
-            self.inject_block(hash).await;
+            let (point, body, prev_hash) = match self.block_cache.get(&hash) {
+                Some(cb) => (cb.point.clone(), cb.body.clone(), cb.prev_hash),
+                None => {
+                    tracing::warn!(
+                        node_id = %self.node_id,
+                        hash = format!("{:02x}{:02x}", hash[30], hash[31]),
+                        "select_chain: replay block not in cache; aborting switch"
+                    );
+                    return;
+                }
+            };
+            self.submit_for_validation(point, body, prev_hash).await;
         }
     }
 
@@ -499,43 +522,53 @@ impl Consensus {
             .await;
     }
 
-    /// Register a block we produced ourselves, so we don't re-fetch it.
-    /// Returns the block_no to use for injection. Runs `select_chain`
-    /// afterwards so a pending peer fork that's still better than the
-    /// newly-produced tip is picked up immediately.
-    pub async fn register_self_produced(&mut self, point: &Point, header: &WrappedHeader) -> u64 {
+    /// Register a block we produced ourselves: cache it, hand it to the
+    /// validator (matching Haskell's `ChainDB.addBlockAsync` behaviour —
+    /// no fast-path for self-produced blocks), then run `select_chain`
+    /// in case a peer fork is even better than the newly-produced tip.
+    /// The chain_store update happens later, when the `Applied` outcome
+    /// arrives.
+    pub async fn register_self_produced(
+        &mut self,
+        point: &Point,
+        header: &WrappedHeader,
+        body: &BlockBody,
+    ) {
         self.self_produced.insert(point.clone());
 
-        let block_no = if let Some(info) = header.parsed.as_ref() {
-            let hash = match point {
-                Point::Specific { hash, .. } => *hash,
-                _ => return 1,
-            };
-            self.chain_tree.insert(
-                hash,
-                point.clone(),
-                info.block_number,
-                info.slot,
-                info.prev_hash,
-            );
-            // Self-produced blocks are immediately injected.
-            self.adopted_tip_hash = Some(hash);
-            self.block_cache.entry(hash).or_insert(CachedBlock {
-                point: point.clone(),
-                header: header.clone(),
-                body: BlockBody::opaque(Vec::new()),
-                block_no: info.block_number,
-                prev_hash: info.prev_hash,
-            });
-            self.validated.insert(hash);
-            info.block_number
-        } else {
-            // Fallback for opaque headers.
-            self.chain_tree.best_tip().map_or(1, |(_, bn)| bn + 1)
+        let info = match header.parsed.as_ref() {
+            Some(i) => i,
+            None => {
+                // Opaque header — nothing to insert into chain_tree, but
+                // still hand the body to the validator.
+                self.submit_for_validation(point.clone(), body.clone(), None)
+                    .await;
+                self.select_chain().await;
+                return;
+            }
         };
+        let hash = match point {
+            Point::Specific { hash, .. } => *hash,
+            _ => return,
+        };
+        self.chain_tree.insert(
+            hash,
+            point.clone(),
+            info.block_number,
+            info.slot,
+            info.prev_hash,
+        );
+        self.block_cache.entry(hash).or_insert(CachedBlock {
+            point: point.clone(),
+            header: header.clone(),
+            body: body.clone(),
+            block_no: info.block_number,
+            prev_hash: info.prev_hash,
+        });
 
+        self.submit_for_validation(point.clone(), body.clone(), info.prev_hash)
+            .await;
         self.select_chain().await;
-        block_no
     }
 
     /// Drop stale `in_flight` entries (older than `IN_FLIGHT_TTL`). Called
@@ -565,7 +598,7 @@ impl Consensus {
                 true
             }
             NetworkEvent::BlockReceived { point, body } => {
-                self.on_block_received(point, body);
+                self.on_block_received(point, body).await;
                 true
             }
             NetworkEvent::RolledBack { peer_id, point, .. } => {
@@ -685,49 +718,72 @@ impl Consensus {
         }
     }
 
-    /// Handle a completed validation: mark validated, inject if contiguous,
-    /// check fork switches, fetch missing ancestors.
-    /// Returns `true` if a fork switch rollback was issued.
-    pub async fn on_validation_complete(&mut self, result: ValidationComplete) -> bool {
-        let ValidationComplete { point } = result;
+    /// Handle one outcome from the validator actor.
+    ///
+    /// Returns `true` if the chain_store rolled back as a result (so the
+    /// telemetry layer can record the rollback event).
+    pub async fn on_validation_outcome(&mut self, outcome: LedgerOutcome) -> bool {
+        match outcome {
+            LedgerOutcome::Applied { point } => {
+                self.handle_applied(point).await;
+                false
+            }
+            LedgerOutcome::RolledBack { target } => {
+                self.handle_rolled_back(target).await;
+                true
+            }
+            LedgerOutcome::ApplyFailed { point, error } => {
+                self.handle_apply_failed(point, error);
+                false
+            }
+            LedgerOutcome::RollbackFailed { target, error } => {
+                tracing::error!(
+                    node_id = %self.node_id,
+                    %target,
+                    %error,
+                    "ledger rollback failed; consensus state may be inconsistent"
+                );
+                false
+            }
+        }
+    }
+
+    /// Apply succeeded: publish the block to the chain_store, update the
+    /// last-validated tip, prune below k, and re-run `select_chain` so any
+    /// peer chain that became actionable while we were validating gets
+    /// picked up.
+    async fn handle_applied(&mut self, point: Point) {
+        let hash = match &point {
+            Point::Specific { hash, .. } => *hash,
+            _ => return,
+        };
         self.in_flight.remove(&point);
 
-        let new_hash = match &point {
-            Point::Specific { hash, .. } => *hash,
-            _ => return false,
+        let inject = match self.block_cache.get(&hash) {
+            Some(cb) => NetworkCommand::InjectBlock {
+                point: cb.point.clone(),
+                header: Box::new(cb.header.clone()),
+                body: cb.body.clone(),
+                block_no: cb.block_no,
+            },
+            None => {
+                tracing::warn!(
+                    node_id = %self.node_id,
+                    %point,
+                    "applied outcome for block not in cache — ignoring"
+                );
+                return;
+            }
         };
+        self.validated.insert(hash);
+        self.last_validated_tip = Some(hash);
 
-        if !self.block_cache.contains_key(&new_hash) {
-            tracing::warn!(
-                node_id = %self.node_id,
-                %point,
-                "validation complete for block not in cache — ignoring"
-            );
-            return false;
-        }
-
-        self.validated.insert(new_hash);
-
-        // If contiguous with adopted tip, inject immediately + drain forward.
-        let prev_hash = self
-            .block_cache
-            .get(&new_hash)
-            .and_then(|cb| cb.prev_hash)
-            .or_else(|| self.chain_tree.prev_hash(&new_hash));
-        let contiguous = match (self.adopted_tip_hash, prev_hash) {
-            (None, None) => true,
-            (Some(a), Some(p)) => a == p,
-            _ => false,
-        };
-        if contiguous {
-            self.inject_block(new_hash).await;
-            self.drain_validated_blocks().await;
-        }
-
-        // Let select_chain decide whether to fork-switch or fetch more.
-        let adopted_before = self.adopted_tip_hash;
-        self.select_chain().await;
-        let rolled_back = adopted_before != self.adopted_tip_hash && adopted_before.is_some();
+        info!(
+            node_id = %self.node_id,
+            %point,
+            "block validated, publishing to chain store"
+        );
+        let _ = self.commands.send(inject).await;
 
         // Prune old blocks beyond k.
         if let Some(adopted) = self.adopted_tip_hash {
@@ -741,11 +797,100 @@ impl Consensus {
             }
         }
 
-        rolled_back
+        // A newly-validated block can unblock a fork switch we couldn't
+        // execute earlier (e.g. waiting for the last replay block).
+        self.select_chain().await;
     }
 
-    /// A fetched block arrived — cache it and submit to validation.
-    fn on_block_received(&mut self, point: &Point, body: &BlockBody) {
+    /// Rollback succeeded: the ledger is now back at `target`, so the
+    /// chain store should mirror that.
+    async fn handle_rolled_back(&mut self, target: Point) {
+        let hash = match &target {
+            Point::Specific { hash, .. } => *hash,
+            _ => return,
+        };
+        self.last_validated_tip = Some(hash);
+        info!(
+            node_id = %self.node_id,
+            %target,
+            "ledger rolled back, rolling chain store"
+        );
+        let _ = self
+            .commands
+            .send(NetworkCommand::InjectRollback { point: target })
+            .await;
+    }
+
+    /// Apply failed: the block (and any cascade behind it) is no longer
+    /// in the validator's accepted state. Rewind `queued_validator_tip`
+    /// and `adopted_tip_hash` so the next submission realigns with what
+    /// the ledger has actually accepted.
+    fn handle_apply_failed(&mut self, point: Point, error: String) {
+        let hash = match &point {
+            Point::Specific { hash, .. } => *hash,
+            _ => return,
+        };
+        self.in_flight.remove(&point);
+        tracing::warn!(
+            node_id = %self.node_id,
+            %point,
+            %error,
+            "ledger apply failed; rewinding to last validated tip"
+        );
+        // The queue is no longer aimed at the failed block. Rewind to
+        // whatever the last successfully-applied tip was; subsequent
+        // submissions will issue a Rollback if needed to realign.
+        self.queued_validator_tip = self.last_validated_tip;
+        self.adopted_tip_hash = self.last_validated_tip;
+        // The failed block stays in the cache but is no longer marked
+        // validated. select_chain may pick a different candidate.
+        self.validated.remove(&hash);
+    }
+
+    /// Submit a block for validation. Issues a `LedgerCommand::Apply`,
+    /// preceded by a `Rollback` if the validator queue isn't currently
+    /// aimed at the block's parent. Updates `queued_validator_tip` and
+    /// `adopted_tip_hash` eagerly so subsequent decisions see the
+    /// post-submission view.
+    async fn submit_for_validation(
+        &mut self,
+        point: Point,
+        body: BlockBody,
+        prev_hash: Option<[u8; 32]>,
+    ) {
+        let new_hash = match &point {
+            Point::Specific { hash, .. } => *hash,
+            _ => return,
+        };
+
+        // If the validator queue isn't currently aimed at this block's
+        // parent, queue a Rollback first so the ledger ends up in the
+        // right state for the apply.
+        if prev_hash != self.queued_validator_tip {
+            if let Some(parent_hash) = prev_hash {
+                if let Some(parent_point) = self.chain_tree.point(&parent_hash).cloned() {
+                    self.validator
+                        .submit(LedgerCommand::Rollback {
+                            target: parent_point,
+                        })
+                        .await;
+                    self.queued_validator_tip = Some(parent_hash);
+                }
+            }
+        }
+
+        self.validator
+            .submit(LedgerCommand::Apply {
+                point: point.clone(),
+                body,
+            })
+            .await;
+        self.queued_validator_tip = Some(new_hash);
+        self.adopted_tip_hash = Some(new_hash);
+    }
+
+    /// A fetched block arrived — cache it and hand it to the validator.
+    async fn on_block_received(&mut self, point: &Point, body: &BlockBody) {
         let hash = match point {
             Point::Specific { hash, .. } => *hash,
             _ => return,
@@ -793,54 +938,10 @@ impl Consensus {
             node_id = %self.node_id,
             %point,
             body_len = body.raw.len(),
-            "block received, validating"
+            "block received, submitting for validation"
         );
-        self.validator.validate_block(point.clone(), body.clone());
-    }
-
-    /// Inject a block into the chain store and update adopted tip.
-    async fn inject_block(&mut self, hash: [u8; 32]) {
-        let cb = match self.block_cache.get(&hash) {
-            Some(cb) => cb,
-            None => return,
-        };
-        info!(
-            node_id = %self.node_id,
-            point = %cb.point,
-            block_no = cb.block_no,
-            "block validated, adopting"
-        );
-        self.adopted_tip_hash = Some(hash);
-        self.validated.insert(hash);
-        let _ = self
-            .commands
-            .send(NetworkCommand::InjectBlock {
-                point: cb.point.clone(),
-                header: Box::new(cb.header.clone()),
-                body: cb.body.clone(),
-                block_no: cb.block_no,
-            })
+        self.submit_for_validation(point.clone(), body.clone(), prev_hash)
             .await;
-    }
-
-    /// Drain validated blocks forward from adopted tip, injecting each
-    /// contiguous block.
-    async fn drain_validated_blocks(&mut self) {
-        loop {
-            let adopted_hash = match self.adopted_tip_hash {
-                Some(h) => h,
-                None => return,
-            };
-            let next = self
-                .block_cache
-                .iter()
-                .find(|(&h, cb)| cb.prev_hash == Some(adopted_hash) && self.validated.contains(&h))
-                .map(|(h, _)| *h);
-            match next {
-                Some(h) => self.inject_block(h).await,
-                None => return,
-            }
-        }
     }
 
     /// Current local tip as a `Tip`, derived from the chain tree.
@@ -983,30 +1084,64 @@ mod tests {
         (tip, header)
     }
 
+    /// Watch receiver with zero validation delays so tests don't sit
+    /// in `tokio::time::sleep` for the production-default 1s per block.
     fn test_dyn_rx() -> tokio::sync::watch::Receiver<crate::config::DynamicConfig> {
-        let config = crate::config::NodeConfig::default();
-        tokio::sync::watch::channel(config.dynamic_config()).1
+        let mut config = crate::config::NodeConfig::default().dynamic_config();
+        config.rb_head_validation_ms = 0.0;
+        config.rb_body_validation_ms_constant = 0.0;
+        config.rb_body_validation_ms_per_byte = 0.0;
+        tokio::sync::watch::channel(config).1
     }
 
-    fn make_consensus() -> (Consensus, mpsc::Receiver<NetworkCommand>) {
+    /// Pump validator outcomes back into consensus until the outcome
+    /// channel is idle for `quiet_for`. Test analogue of `main.rs`'s
+    /// `validation_rx` recv loop — blocks until the actor has finished
+    /// processing all pending commands.
+    async fn drain_validator(
+        consensus: &mut Consensus,
+        val_rx: &mut mpsc::Receiver<LedgerOutcome>,
+    ) {
+        let quiet_for = Duration::from_millis(50);
+        loop {
+            match tokio::time::timeout(quiet_for, val_rx.recv()).await {
+                Ok(Some(outcome)) => {
+                    consensus.on_validation_outcome(outcome).await;
+                }
+                _ => return,
+            }
+        }
+    }
+
+    fn make_consensus() -> (
+        Consensus,
+        mpsc::Receiver<NetworkCommand>,
+        mpsc::Receiver<LedgerOutcome>,
+    ) {
         let (cmd_tx, cmd_rx) = mpsc::channel(16);
-        let (validator, _val_rx) = Validator::new(test_dyn_rx());
+        let (validator, val_rx) = Validator::new(test_dyn_rx());
         let consensus = Consensus::new("test".into(), cmd_tx, validator, 2160);
-        (consensus, cmd_rx)
+        (consensus, cmd_rx, val_rx)
     }
 
     /// Consensus with a small k so the peer-chain cap is also small —
     /// lets us exercise the cap without announcing thousands of headers.
-    fn make_consensus_with_k(k: u64) -> (Consensus, mpsc::Receiver<NetworkCommand>) {
+    fn make_consensus_with_k(
+        k: u64,
+    ) -> (
+        Consensus,
+        mpsc::Receiver<NetworkCommand>,
+        mpsc::Receiver<LedgerOutcome>,
+    ) {
         let (cmd_tx, cmd_rx) = mpsc::channel(16);
-        let (validator, _val_rx) = Validator::new(test_dyn_rx());
+        let (validator, val_rx) = Validator::new(test_dyn_rx());
         let consensus = Consensus::new("test".into(), cmd_tx, validator, k);
-        (consensus, cmd_rx)
+        (consensus, cmd_rx, val_rx)
     }
 
     #[tokio::test]
     async fn peer_chain_records_tip_advances() {
-        let (mut consensus, _cmd_rx) = make_consensus();
+        let (mut consensus, _cmd_rx, _val_rx) = make_consensus();
         let peer = PeerId(7);
 
         let (tip1, header1) = make_tip(1, 1, None);
@@ -1039,7 +1174,7 @@ mod tests {
 
     #[tokio::test]
     async fn peer_chain_rollback_truncates() {
-        let (mut consensus, _cmd_rx) = make_consensus();
+        let (mut consensus, _cmd_rx, _val_rx) = make_consensus();
         let peer = PeerId(7);
 
         let (tip1, header1) = make_tip(1, 1, None);
@@ -1096,7 +1231,7 @@ mod tests {
 
     #[tokio::test]
     async fn peer_chain_dropped_on_disconnect() {
-        let (mut consensus, _cmd_rx) = make_consensus();
+        let (mut consensus, _cmd_rx, _val_rx) = make_consensus();
         let peer = PeerId(7);
 
         let (tip1, header1) = make_tip(1, 1, None);
@@ -1122,7 +1257,7 @@ mod tests {
 
     #[tokio::test]
     async fn peer_chain_duplicate_announcement_ignored() {
-        let (mut consensus, _cmd_rx) = make_consensus();
+        let (mut consensus, _cmd_rx, _val_rx) = make_consensus();
         let peer = PeerId(7);
 
         let (tip1, header1) = make_tip(1, 1, None);
@@ -1141,7 +1276,7 @@ mod tests {
 
     #[tokio::test]
     async fn peer_chain_tracks_peers_independently() {
-        let (mut consensus, _cmd_rx) = make_consensus();
+        let (mut consensus, _cmd_rx, _val_rx) = make_consensus();
         let peer_a = PeerId(1);
         let peer_b = PeerId(2);
 
@@ -1168,13 +1303,13 @@ mod tests {
 
     #[tokio::test]
     async fn select_chain_no_better_chain_when_peer_matches_adopted() {
-        let (mut consensus, _cmd_rx) = make_consensus();
+        let (mut consensus, _cmd_rx, _val_rx) = make_consensus();
         let peer = PeerId(1);
 
         // Self-produce tip 1; peer announces the same.
         let (tip1, header1) = make_tip(1, 1, None);
         consensus
-            .register_self_produced(&tip1.point, &header1)
+            .register_self_produced(&tip1.point, &header1, &BlockBody::opaque(Vec::new()))
             .await;
         consensus.record_peer_tip(peer, &tip1, &header1);
 
@@ -1187,7 +1322,7 @@ mod tests {
 
     #[tokio::test]
     async fn select_chain_waiting_for_blocks_when_peer_has_longer_chain() {
-        let (mut consensus, _cmd_rx) = make_consensus();
+        let (mut consensus, _cmd_rx, _val_rx) = make_consensus();
         let peer = PeerId(1);
 
         // Self-produce block 1.
@@ -1197,7 +1332,7 @@ mod tests {
             _ => panic!(),
         };
         consensus
-            .register_self_produced(&tip1.point, &header1)
+            .register_self_produced(&tip1.point, &header1, &BlockBody::opaque(Vec::new()))
             .await;
 
         // Peer announces block 2 with prev_hash=hash1.
@@ -1223,13 +1358,13 @@ mod tests {
 
     #[tokio::test]
     async fn select_chain_orphan_candidate_when_peer_forks_outside_window() {
-        let (mut consensus, _cmd_rx) = make_consensus();
+        let (mut consensus, _cmd_rx, _val_rx) = make_consensus();
         let peer = PeerId(1);
 
         // Self-produce block 1.
         let (tip1, header1) = make_tip(1, 1, None);
         consensus
-            .register_self_produced(&tip1.point, &header1)
+            .register_self_produced(&tip1.point, &header1, &BlockBody::opaque(Vec::new()))
             .await;
 
         // Peer announces block 5 with a random prev_hash that doesn't
@@ -1252,7 +1387,7 @@ mod tests {
 
     #[tokio::test]
     async fn select_chain_picks_best_of_multiple_candidates() {
-        let (mut consensus, _cmd_rx) = make_consensus();
+        let (mut consensus, _cmd_rx, _val_rx) = make_consensus();
         let peer_a = PeerId(1);
         let peer_b = PeerId(2);
 
@@ -1263,7 +1398,7 @@ mod tests {
             _ => panic!(),
         };
         consensus
-            .register_self_produced(&tip1.point, &header1)
+            .register_self_produced(&tip1.point, &header1, &BlockBody::opaque(Vec::new()))
             .await;
 
         // peer_a's chain: block 2 with prev=hash1.
@@ -1299,7 +1434,7 @@ mod tests {
     async fn select_chain_fresh_node_accepts_any_chain() {
         // A freshly-started node with no adopted tip should treat any
         // peer chain as a valid candidate, replay from synthetic genesis.
-        let (mut consensus, _cmd_rx) = make_consensus();
+        let (mut consensus, _cmd_rx, _val_rx) = make_consensus();
         let peer = PeerId(1);
 
         let (tip1, header1) = make_tip(1, 1, None);
@@ -1328,7 +1463,7 @@ mod tests {
     #[tokio::test]
     async fn peer_chain_bounded_at_2k() {
         // k=4 → cap should be max(2*4, 64) = 64. Use 100 headers.
-        let (mut consensus, mut cmd_rx) = make_consensus_with_k(4);
+        let (mut consensus, mut cmd_rx, _val_rx) = make_consensus_with_k(4);
         let peer = PeerId(7);
 
         let mut prev: Option<[u8; 32]> = None;
@@ -1359,10 +1494,12 @@ mod tests {
 
     #[tokio::test]
     async fn skips_self_produced_blocks() {
-        let (mut consensus, mut cmd_rx) = make_consensus();
+        let (mut consensus, mut cmd_rx, mut _val_rx) = make_consensus();
 
         let (tip, header) = make_tip(1, 1, None);
-        consensus.register_self_produced(&tip.point, &header).await;
+        consensus
+            .register_self_produced(&tip.point, &header, &BlockBody::opaque(Vec::new()))
+            .await;
 
         let event = NetworkEvent::TipAdvanced {
             peer_id: TEST_PEER,
@@ -1379,7 +1516,7 @@ mod tests {
 
     #[tokio::test]
     async fn fetches_longer_chain() {
-        let (mut consensus, mut cmd_rx) = make_consensus();
+        let (mut consensus, mut cmd_rx, mut _val_rx) = make_consensus();
 
         let (tip, header) = make_tip(1, 1, None);
         let event = NetworkEvent::TipAdvanced {
@@ -1396,12 +1533,12 @@ mod tests {
 
     #[tokio::test]
     async fn ignores_shorter_chain() {
-        let (mut consensus, mut cmd_rx) = make_consensus();
+        let (mut consensus, mut cmd_rx, mut _val_rx) = make_consensus();
 
         // Set local tip to block 5.
         let (tip5, header5) = make_tip(5, 5, None);
         consensus
-            .register_self_produced(&tip5.point, &header5)
+            .register_self_produced(&tip5.point, &header5, &BlockBody::opaque(Vec::new()))
             .await;
         consensus
             .handle_event(&NetworkEvent::TipAdvanced {
@@ -1426,7 +1563,7 @@ mod tests {
 
     #[tokio::test]
     async fn no_duplicate_fetches() {
-        let (mut consensus, mut cmd_rx) = make_consensus();
+        let (mut consensus, mut cmd_rx, mut _val_rx) = make_consensus();
 
         let (tip, header) = make_tip(1, 1, None);
 
@@ -1453,7 +1590,7 @@ mod tests {
 
     #[tokio::test]
     async fn tip_hash_for_production() {
-        let (mut consensus, _cmd_rx) = make_consensus();
+        let (mut consensus, _cmd_rx, _val_rx) = make_consensus();
 
         assert!(consensus.tip_hash().is_none());
 
@@ -1462,99 +1599,93 @@ mod tests {
             Point::Specific { hash, .. } => *hash,
             _ => panic!("expected specific"),
         };
-        consensus.register_self_produced(&tip.point, &header).await;
+        consensus
+            .register_self_produced(&tip.point, &header, &BlockBody::opaque(Vec::new()))
+            .await;
 
         assert_eq!(consensus.tip_hash(), Some(expected_hash));
     }
 
     #[tokio::test]
     async fn fork_switch_issues_rollback() {
-        let (cmd_tx, mut cmd_rx) = mpsc::channel(32);
-        let (validator, _val_rx) = Validator::new(test_dyn_rx());
+        let (cmd_tx, mut cmd_rx) = mpsc::channel(64);
+        let (validator, mut val_rx) = Validator::new(test_dyn_rx());
         let mut consensus = Consensus::new("test".into(), cmd_tx, validator, 2160);
 
-        // Build chain A: blocks 1, 2, 3 (self-produced, so they're in the tree).
+        // Build chain A: blocks 1, 2, 3 (self-produced).
         let (tip1, hdr1) = make_tip(10, 1, None);
         let hash1 = match &tip1.point {
             Point::Specific { hash, .. } => *hash,
             _ => panic!(),
         };
-        consensus.register_self_produced(&tip1.point, &hdr1).await;
+        consensus
+            .register_self_produced(&tip1.point, &hdr1, &BlockBody::opaque(Vec::new()))
+            .await;
 
         let (tip2, hdr2) = make_tip(20, 2, Some(hash1));
         let hash2 = match &tip2.point {
             Point::Specific { hash, .. } => *hash,
             _ => panic!(),
         };
-        consensus.register_self_produced(&tip2.point, &hdr2).await;
+        consensus
+            .register_self_produced(&tip2.point, &hdr2, &BlockBody::opaque(Vec::new()))
+            .await;
 
         let (tip3, hdr3) = make_tip(30, 3, Some(hash2));
-        consensus.register_self_produced(&tip3.point, &hdr3).await;
+        consensus
+            .register_self_produced(&tip3.point, &hdr3, &BlockBody::opaque(Vec::new()))
+            .await;
 
+        // Drain validator outcomes for the self-produced blocks so the
+        // chain_store catches up before we start the fork switch.
+        drain_validator(&mut consensus, &mut val_rx).await;
         assert_eq!(consensus.local_tip().unwrap().block_no, 3);
+        while cmd_rx.try_recv().is_ok() {}
 
-        // Now announce a competing fork B: fork from block 1.
-        // B2 at slot 21, B3 at slot 31, B4 at slot 41 (longer than A).
+        // Now announce a competing fork B from block 1: B2, B3, B4
+        // (longer than A, so the fork switch should fire).
         let (tipb2, hdrb2) = make_tip(21, 2, Some(hash1));
         let hashb2 = match &tipb2.point {
             Point::Specific { hash, .. } => *hash,
             _ => panic!(),
         };
-
         let (tipb3, hdrb3) = make_tip(31, 3, Some(hashb2));
         let hashb3 = match &tipb3.point {
             Point::Specific { hash, .. } => *hash,
             _ => panic!(),
         };
-
         let (tipb4, hdrb4) = make_tip(41, 4, Some(hashb3));
 
-        // Insert B2 and B3 into tree (as if we received headers via TipAdvanced).
-        consensus
-            .handle_event(&NetworkEvent::TipAdvanced {
-                peer_id: TEST_PEER,
-                tip: tipb2.clone(),
-                header: hdrb2.clone(),
-            })
-            .await;
-        consensus
-            .handle_event(&NetworkEvent::TipAdvanced {
-                peer_id: TEST_PEER,
-                tip: tipb3.clone(),
-                header: hdrb3.clone(),
-            })
-            .await;
-        // B4 is the one that overtakes — announce and fetch it.
-        consensus
-            .handle_event(&NetworkEvent::TipAdvanced {
-                peer_id: TEST_PEER,
-                tip: tipb4.clone(),
-                header: hdrb4.clone(),
-            })
-            .await;
+        for (tip, hdr) in [
+            (tipb2.clone(), hdrb2.clone()),
+            (tipb3.clone(), hdrb3.clone()),
+            (tipb4.clone(), hdrb4.clone()),
+        ] {
+            consensus
+                .handle_event(&NetworkEvent::TipAdvanced {
+                    peer_id: TEST_PEER,
+                    tip,
+                    header: hdr,
+                })
+                .await;
+        }
+        while cmd_rx.try_recv().is_ok() {}
 
-        // Drain fetch command.
-        let cmd = cmd_rx.recv().await.unwrap();
-        assert!(matches!(cmd, NetworkCommand::FetchBlockRange { .. }));
-
-        // Simulate: blocks B2, B3, B4 were fetched and validated in order.
-        // The fork switch only happens once the full chain is available.
+        // Receive each fork-B block body. submit_for_validation issues
+        // a Rollback(A1) before the first Apply, then chains Applies
+        // through B2, B3, B4. The validator processes those in order
+        // and the outcome handlers fire InjectRollback + InjectBlocks.
         for (tip, hdr) in [
             (tipb2, hdrb2),
             (tipb3, hdrb3),
             (tipb4.clone(), hdrb4.clone()),
         ] {
-            consensus.on_block_received(&tip.point, &BlockBody::new(hdr.raw.clone()));
             consensus
-                .on_validation_complete(ValidationComplete {
-                    point: tip.point.clone(),
-                })
+                .on_block_received(&tip.point, &make_block_body(&hdr))
                 .await;
         }
+        drain_validator(&mut consensus, &mut val_rx).await;
 
-        // Run deferred fork switch check.
-
-        // Drain commands: we expect InjectRollback + InjectBlocks for B2,B3,B4.
         let mut got_rollback = false;
         let mut inject_count = 0;
         while let Ok(cmd) = cmd_rx.try_recv() {
@@ -1564,7 +1695,6 @@ mod tests {
                 _ => {}
             }
         }
-
         assert!(got_rollback, "fork switch should issue InjectRollback");
         assert!(
             inject_count >= 3,
@@ -1589,7 +1719,9 @@ mod tests {
                 Point::Specific { hash, .. } => *hash,
                 _ => panic!(),
             };
-            consensus.register_self_produced(&tip.point, &hdr).await;
+            consensus
+                .register_self_produced(&tip.point, &hdr, &BlockBody::opaque(Vec::new()))
+                .await;
             hashes.push(hash);
             prev = Some(hash);
         }
@@ -1642,9 +1774,11 @@ mod tests {
             (tipb5.clone(), hdrb5.clone()),
             (tipb6.clone(), hdrb6.clone()),
         ] {
-            consensus.on_block_received(&tip.point, &make_block_body(&hdr));
             consensus
-                .on_validation_complete(ValidationComplete {
+                .on_block_received(&tip.point, &make_block_body(&hdr))
+                .await;
+            consensus
+                .on_validation_outcome(LedgerOutcome::Applied {
                     point: tip.point.clone(),
                 })
                 .await;
@@ -1672,7 +1806,7 @@ mod tests {
     async fn block_received_inserts_into_chain_tree() {
         // Fix 1: on_block_received must insert into chain_tree so that
         // ancestors() and find_common_ancestor() work for fetched blocks.
-        let (mut consensus, _cmd_rx) = make_consensus();
+        let (mut consensus, _cmd_rx, _val_rx) = make_consensus();
 
         let (tip, header) = make_tip(10, 1, None);
         let hash = match &tip.point {
@@ -1685,20 +1819,18 @@ mod tests {
 
         // Simulate block fetch arrival with a proper block body.
         let body = make_block_body(&header);
-        consensus.on_block_received(&tip.point, &body);
+        consensus.on_block_received(&tip.point, &body).await;
 
         // After receiving, block should be in chain_tree.
         assert_eq!(consensus.chain_tree.block_number(&hash), Some(1));
     }
 
-    /// Regression: a fetch that the coordinator silently dropped (e.g. no
-    /// peer had the requested point in its fragment) must not permanently
-    /// block re-fetching. With TTL eviction in `select_chain`'s fetch path,
-    /// a later trigger sees the stale entry as expired, removes it, and
-    /// emits a retry.
+    /// Regression: when a peer announces a block whose body is later
+    /// silently dropped by the coordinator, the in_flight TTL eventually
+    /// expires and the next `select_chain` pass re-issues the fetch.
     #[tokio::test]
-    async fn stale_in_flight_evicted_so_fetch_retries() {
-        let (mut consensus, mut cmd_rx) = make_consensus();
+    async fn stale_in_flight_eviction_allows_refetch() {
+        let (mut consensus, mut cmd_rx, mut val_rx) = make_consensus();
 
         // Adopt block#1 (self-produced).
         let (tip1, hdr1) = make_tip(10, 1, None);
@@ -1706,63 +1838,198 @@ mod tests {
             Point::Specific { hash, .. } => *hash,
             _ => panic!(),
         };
-        consensus.register_self_produced(&tip1.point, &hdr1).await;
+        consensus
+            .register_self_produced(&tip1.point, &hdr1, &BlockBody::opaque(Vec::new()))
+            .await;
+        drain_validator(&mut consensus, &mut val_rx).await;
 
-        // Peer announces block#2: header inserted into tree, fetch issued,
-        // in_flight[block#2] set.
+        // Peer announces block#2 — select_chain issues a fetch and
+        // marks the point in_flight.
+        let (tip2, hdr2) = make_tip(20, 2, Some(hash1));
+        consensus
+            .handle_event(&NetworkEvent::TipAdvanced {
+                peer_id: TEST_PEER,
+                tip: tip2.clone(),
+                header: hdr2,
+            })
+            .await;
+        while cmd_rx.try_recv().is_ok() {}
+        assert!(
+            consensus.in_flight.contains_key(&tip2.point),
+            "first fetch should mark block#2 in_flight"
+        );
+
+        // The fetch was silently dropped (no body arrives). Mark
+        // in_flight stale and announce the same tip again — the next
+        // select_chain pass should evict the stale entry and re-issue.
+        let stale = Instant::now() - IN_FLIGHT_TTL - Duration::from_secs(1);
+        consensus.in_flight.insert(tip2.point.clone(), stale);
+        consensus
+            .handle_event(&NetworkEvent::TipAdvanced {
+                peer_id: TEST_PEER,
+                tip: tip2.clone(),
+                header: make_header(20, 2, Some(hash1)),
+            })
+            .await;
+
+        let mut saw_refetch = false;
+        while let Ok(cmd) = cmd_rx.try_recv() {
+            if let NetworkCommand::FetchBlockRange { to, .. } = cmd {
+                if to == tip2.point {
+                    saw_refetch = true;
+                }
+            }
+        }
+        assert!(
+            saw_refetch,
+            "stale in_flight should have been evicted, allowing a refetch of block#2"
+        );
+    }
+
+    /// Successful validation of a peer-fetched block must emit an
+    /// `InjectBlock` to the coordinator — the chain_store update only
+    /// happens on the `Applied` outcome, not eagerly from
+    /// `on_block_received`.
+    #[tokio::test]
+    async fn applied_outcome_emits_inject_block() {
+        let (mut consensus, mut cmd_rx, mut val_rx) = make_consensus();
+
+        let (tip1, hdr1) = make_tip(10, 1, None);
+        let hash1 = match &tip1.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus
+            .register_self_produced(&tip1.point, &hdr1, &BlockBody::opaque(Vec::new()))
+            .await;
+        drain_validator(&mut consensus, &mut val_rx).await;
+        while cmd_rx.try_recv().is_ok() {}
+
+        let (tip2, hdr2) = make_tip(20, 2, Some(hash1));
+        consensus
+            .on_block_received(&tip2.point, &make_block_body(&hdr2))
+            .await;
+        // Before the validator outcome fires, the chain_store has NOT
+        // been updated.
+        assert!(
+            !matches!(cmd_rx.try_recv(), Ok(NetworkCommand::InjectBlock { .. })),
+            "InjectBlock must not be sent before Applied outcome"
+        );
+
+        drain_validator(&mut consensus, &mut val_rx).await;
+
+        let mut saw_inject = false;
+        while let Ok(cmd) = cmd_rx.try_recv() {
+            if let NetworkCommand::InjectBlock { point, .. } = cmd {
+                if point == tip2.point {
+                    saw_inject = true;
+                }
+            }
+        }
+        assert!(
+            saw_inject,
+            "Applied outcome for block#2 should have emitted InjectBlock"
+        );
+    }
+
+    /// A `RolledBack` outcome must emit a `NetworkCommand::InjectRollback`
+    /// so the chain_store mirrors the ledger. This is the ONLY path that
+    /// issues chain_store rollbacks.
+    #[tokio::test]
+    async fn rolled_back_outcome_emits_inject_rollback() {
+        let (mut consensus, mut cmd_rx, _val_rx) = make_consensus();
+
+        // Plant a block in chain_tree so its point is lookup-able.
+        let (tip1, hdr1) = make_tip(10, 1, None);
+        consensus
+            .register_self_produced(&tip1.point, &hdr1, &BlockBody::opaque(Vec::new()))
+            .await;
+        while cmd_rx.try_recv().is_ok() {}
+
+        // Directly feed a RolledBack outcome to the handler.
+        consensus
+            .on_validation_outcome(LedgerOutcome::RolledBack {
+                target: tip1.point.clone(),
+            })
+            .await;
+
+        let mut saw_rollback = false;
+        while let Ok(cmd) = cmd_rx.try_recv() {
+            if let NetworkCommand::InjectRollback { point } = cmd {
+                if point == tip1.point {
+                    saw_rollback = true;
+                }
+            }
+        }
+        assert!(
+            saw_rollback,
+            "RolledBack outcome should have emitted InjectRollback"
+        );
+    }
+
+    /// Self-produced blocks must route through the validator: they should
+    /// NOT land in the chain_store until the `Applied` outcome fires.
+    /// This mirrors Haskell's `ChainDB.addBlockAsync` behaviour — there's
+    /// no fast-path for self-produced blocks.
+    #[tokio::test]
+    async fn self_produced_runs_through_validator() {
+        let (mut consensus, mut cmd_rx, mut val_rx) = make_consensus();
+
+        let (tip, hdr) = make_tip(10, 1, None);
+        consensus
+            .register_self_produced(&tip.point, &hdr, &BlockBody::opaque(Vec::new()))
+            .await;
+
+        // Before draining the validator, no InjectBlock has been sent.
+        assert!(
+            cmd_rx.try_recv().is_err(),
+            "self-produced block must not publish until validated"
+        );
+
+        drain_validator(&mut consensus, &mut val_rx).await;
+
+        let mut saw_inject = false;
+        while let Ok(cmd) = cmd_rx.try_recv() {
+            if let NetworkCommand::InjectBlock { point, .. } = cmd {
+                if point == tip.point {
+                    saw_inject = true;
+                }
+            }
+        }
+        assert!(
+            saw_inject,
+            "Applied outcome for self-produced block should emit InjectBlock"
+        );
+    }
+
+    /// `queued_validator_tip` tracks what the validator will be at
+    /// after the current submission stream drains. Submitting in chain
+    /// order advances it monotonically; a non-contiguous submission
+    /// inserts a rollback.
+    #[tokio::test]
+    async fn queued_validator_tip_tracks_submission_order() {
+        let (mut consensus, mut _cmd_rx, _val_rx) = make_consensus();
+
+        assert_eq!(consensus.queued_validator_tip, None);
+
+        let (tip1, hdr1) = make_tip(10, 1, None);
+        let hash1 = match &tip1.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus
+            .register_self_produced(&tip1.point, &hdr1, &BlockBody::opaque(Vec::new()))
+            .await;
+        assert_eq!(consensus.queued_validator_tip, Some(hash1));
+
         let (tip2, hdr2) = make_tip(20, 2, Some(hash1));
         let hash2 = match &tip2.point {
             Point::Specific { hash, .. } => *hash,
             _ => panic!(),
         };
         consensus
-            .handle_event(&NetworkEvent::TipAdvanced {
-                peer_id: TEST_PEER,
-                tip: tip2.clone(),
-                header: hdr2.clone(),
-            })
+            .register_self_produced(&tip2.point, &hdr2, &BlockBody::opaque(Vec::new()))
             .await;
-        while cmd_rx.try_recv().is_ok() {}
-        assert!(consensus.in_flight.contains_key(&tip2.point));
-
-        // The fetch is silently dropped — block#2 body never arrives. Now
-        // block#3 arrives directly (e.g. via a different peer's range fetch
-        // that reached us with block#3 but not block#2). Validate it.
-        let (tip3, hdr3) = make_tip(30, 3, Some(hash2));
-        consensus.on_block_received(&tip3.point, &make_block_body(&hdr3));
-        consensus
-            .on_validation_complete(ValidationComplete {
-                point: tip3.point.clone(),
-            })
-            .await;
-        while cmd_rx.try_recv().is_ok() {}
-
-        // Mark block#2's in_flight entry as stale.
-        let stale = Instant::now() - IN_FLIGHT_TTL - Duration::from_secs(1);
-        consensus.in_flight.insert(tip2.point.clone(), stale);
-
-        // Trigger another `fetch_unvalidated_ancestors` pass via a no-op
-        // validation complete. With stale eviction, the walk should now
-        // recognise block#2 as fetchable and emit a range fetch covering
-        // it. Without the fix, the walk hits `in_flight.contains_key` and
-        // breaks, emitting nothing.
-        consensus
-            .on_validation_complete(ValidationComplete {
-                point: tip3.point.clone(),
-            })
-            .await;
-
-        let mut saw_fetch_for_block2 = false;
-        while let Ok(cmd) = cmd_rx.try_recv() {
-            if let NetworkCommand::FetchBlockRange { from, to } = cmd {
-                if from == tip2.point || to == tip2.point {
-                    saw_fetch_for_block2 = true;
-                }
-            }
-        }
-        assert!(
-            saw_fetch_for_block2,
-            "stale in_flight should have been evicted; expected a fetch for block#2"
-        );
+        assert_eq!(consensus.queued_validator_tip, Some(hash2));
     }
 }

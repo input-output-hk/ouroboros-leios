@@ -140,13 +140,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         slot,
                         size_bytes: body.raw.len(),
                     });
-                    let block_no = consensus.register_self_produced(&point, &header).await;
-                    let _ = commands.send(NetworkCommand::InjectBlock {
-                        point,
-                        header: Box::new(header),
-                        body,
-                        block_no,
-                    }).await;
+                    consensus
+                        .register_self_produced(&point, &header, &body)
+                        .await;
                 }
 
                 // Leios: produce EBs and votes at stage boundaries.
@@ -190,13 +186,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     }
                 }
             }
-            Some(result) = validation_rx.recv() => {
-                telem.blocks_validated += 1;
-                telem.record(NodeEvent::BlockValidated {
-                    node: node_id.clone(),
-                    block_no: telem.blocks_validated,
-                });
-                let rolled_back = consensus.on_validation_complete(result).await;
+            Some(outcome) = validation_rx.recv() => {
+                use validation::LedgerOutcome;
+                if matches!(outcome, LedgerOutcome::Applied { .. }) {
+                    telem.blocks_validated += 1;
+                    telem.record(NodeEvent::BlockValidated {
+                        node: node_id.clone(),
+                        block_no: telem.blocks_validated,
+                    });
+                }
+                let rolled_back = consensus.on_validation_outcome(outcome).await;
                 if rolled_back {
                     telem.record(NodeEvent::RolledBack {
                         node: node_id.clone(),
