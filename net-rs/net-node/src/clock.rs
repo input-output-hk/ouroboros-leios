@@ -100,7 +100,7 @@ mod tests {
 
         let slot = compute_slot(now, genesis_unix, 1000);
         // Should be approximately 100 (±1 for timing).
-        assert!(slot >= 99 && slot <= 101, "slot was {slot}");
+        assert!((99..=101).contains(&slot), "slot was {slot}");
     }
 
     #[test]
@@ -147,6 +147,6 @@ mod tests {
         // First tick should be slot 1 (next boundary after genesis).
         // Allow up to 10 for CI/scheduling jitter (full workspace test
         // builds can take several seconds before reaching this point).
-        assert!(slot >= 1 && slot <= 10, "slot was {slot}");
+        assert!((1..=10).contains(&slot), "slot was {slot}");
     }
 }

@@ -268,7 +268,7 @@ mod tests {
     fn version_data_v7_v10_format_decode() {
         // v7-v10 used only 2 fields: [magic, diffusionMode].
         // Our decoder should handle this gracefully.
-        let v10_cbor = minicbor::to_vec(&(MAINNET_MAGIC, false)).unwrap();
+        let v10_cbor = minicbor::to_vec((MAINNET_MAGIC, false)).unwrap();
         let decoded = VersionData::decode(&v10_cbor).unwrap();
         assert_eq!(decoded.network_magic, MAINNET_MAGIC);
         assert!(!decoded.initiator_only_diffusion_mode);

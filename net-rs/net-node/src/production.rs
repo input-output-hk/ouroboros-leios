@@ -250,7 +250,6 @@ impl BlockProducer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::DynamicConfigUpdate;
 
     fn base_config() -> ProductionConfig {
         ProductionConfig {

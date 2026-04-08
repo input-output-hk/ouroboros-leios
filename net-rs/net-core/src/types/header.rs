@@ -293,6 +293,7 @@ mod tests {
 
     /// Build a fake Shelley+ header with the given fields for testing.
     /// Produces valid CBOR matching the wire format: [era_tag, #6.24(bytes .cbor [header_body, sig])]
+    #[allow(clippy::too_many_arguments)]
     fn build_test_header(
         era: u8,
         block_number: u64,
@@ -355,7 +356,7 @@ mod tests {
         ie.array(2).unwrap();
         ie.writer_mut()
             .write_all(&body_buf)
-            .map_err(|e| EncodeError::write(e))
+            .map_err(EncodeError::write)
             .unwrap();
         ie.bytes(&[0u8; 64]).unwrap(); // dummy signature
 
@@ -507,7 +508,7 @@ mod tests {
     #[test]
     fn parse_trivial_cbor_returns_none() {
         // Trivial CBOR used in test fixtures (e.g., [42])
-        let buf = minicbor::to_vec(&[42u64]).unwrap();
+        let buf = minicbor::to_vec([42u64]).unwrap();
         assert!(HeaderInfo::parse(&buf).is_none());
     }
 

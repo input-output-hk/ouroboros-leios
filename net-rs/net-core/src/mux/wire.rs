@@ -301,7 +301,7 @@ mod tests {
 
     #[tokio::test]
     async fn read_live_propose_segment() {
-        let mut cursor = &LIVE_PROPOSE_SEGMENT[..];
+        let mut cursor = LIVE_PROPOSE_SEGMENT;
         let seg = read_segment(&mut cursor, MAX_PAYLOAD_LEN).await.unwrap();
         assert_eq!(seg.header.protocol, 0);
         assert_eq!(seg.header.mode, 0);
@@ -310,7 +310,7 @@ mod tests {
 
     #[tokio::test]
     async fn read_live_accept_segment() {
-        let mut cursor = &LIVE_ACCEPT_SEGMENT[..];
+        let mut cursor = LIVE_ACCEPT_SEGMENT;
         let seg = read_segment(&mut cursor, MAX_PAYLOAD_LEN).await.unwrap();
         assert_eq!(seg.header.protocol, 0);
         assert_eq!(seg.header.mode, 0x8000);

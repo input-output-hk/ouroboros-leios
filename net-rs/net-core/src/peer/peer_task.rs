@@ -773,18 +773,13 @@ mod tests {
                 CodecSend::new(ka_send),
                 CodecRecv::new(ka_recv),
             );
-            loop {
-                match runner.recv().await {
-                    Ok(KaMsg::MsgKeepAlive { cookie }) => {
-                        if runner
-                            .send(&KaMsg::MsgKeepAliveResponse { cookie })
-                            .await
-                            .is_err()
-                        {
-                            break;
-                        }
-                    }
-                    _ => break,
+            while let Ok(KaMsg::MsgKeepAlive { cookie }) = runner.recv().await {
+                if runner
+                    .send(&KaMsg::MsgKeepAliveResponse { cookie })
+                    .await
+                    .is_err()
+                {
+                    break;
                 }
             }
         });
