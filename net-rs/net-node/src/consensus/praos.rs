@@ -441,7 +441,8 @@ impl PraosConsensus {
         // narrow after reconnection).
         if ancestor.is_none() {
             if let Some(anchor) = candidate.anchor() {
-                if anchor.hash == [0u8; 32] {
+                if anchor.hash == [0u8; 32] && self.adopted_tip_hash.is_none() {
+                    // Origin anchor only for fresh nodes.
                     ancestor = Some([0u8; 32]);
                 } else if adopted_ancestors.contains(&anchor.hash) {
                     ancestor = Some(anchor.hash);
