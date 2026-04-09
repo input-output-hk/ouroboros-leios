@@ -6,6 +6,62 @@
 > 
 > See also the [Post-CIP R&D Findings](post-cip/README.md) document for additional (after 2025-11-01) findings and artifacts not directly related to the implementation of Linear Leios.
 
+## 2026-04-09
+
+### SN/DP on discussing the consensus/ledger interface for leios
+
+- Discussing the separation of concerns between consensus and ledger.
+- Vote validation being likely a consensus concern, drives other aspects like cert aggregation and cert verification also to be consensus concerns.
+- This reinforces our believe that the ledger should just get a sequence of txs "as a block" and not be concerned with certificate (and resolving them into txs etc.)
+- We discussed whether expanding the `ShelleyBlock` definition would be more suitable?
+
+```haskell
+    data ShelleyBlock proto era = ShelleyBlock
+      { shelleyBlockRaw :: Either (TxRB proto era) CertRB
+      , shelleyBlockHeaderHash :: !ShelleyHash
+      }
+
+    type TxRB proto era = SL.Block (ShelleyProtocolHeader proto) era
+
+    data CertRB
+```
+
+- We also discussed whether an even more narrow definition of Leios support would be desirable?
+
+```haskell
+    type CardanoEras :: Type -> [Type]
+    type CardanoEras c = ByronBlock ': CardanoShelleyEras c
+
+    type CardanoShelleyEras :: Type -> [Type]
+    type CardanoShelleyEras c =
+      '[ ShelleyBlock (TPraos c) ShelleyEra
+       , ShelleyBlock (TPraos c) AllegraEra
+       , ShelleyBlock (TPraos c) MaryEra
+       , ShelleyBlock (TPraos c) AlonzoEra
+       , ShelleyBlock (Praos c) BabbageEra
+       , ShelleyBlock (Praos c) ConwayEra
+       , LeiosBlock (LeiosPraos c)
+       ]
+
+    data LeiosBlock proto
+      = TxRB (Ledger.Block proto DijkstraEra)
+      | CertRB
+```
+
+## 2026-03-21
+
+### SN on EB inclusion and drafting of voting
+
+- tx-centrifuge: inlining `signing_keys_file` would be good
+- signing<sub>keysfile</sub> should be resolved relative to main config
+- Transactions seem to be rejected, how to get ahold of the ledger errors? I suspect it's PP mismatch or so..
+- When reducing the targets to a single one it works. Obviously we can't chain across multiple node's mempools.. the logs don't show anything that indicates this though.
+- I realize that the `tx-centrifuge` is only start to load txs into the mempool at exactly second 60
+- The TPS is now plotted into the grafana dashboard, nice!
+- To have a proper data rate, I would need to know the individual tx sizes.. however they are all constant, so just multiplying should be fine.
+- On voting: I am using TDD to drive the requirements of the voting thread. This works well, but I am a bit surprised that there is actually not much reason to <u>not</u> vote multiple times on the same EB. The networking would take care of not pulling it twice?
+- How to test drive vote diffusion? Jsut add a trace for acquired votes?
+
 ## 2026-03-01
 
 ### SN on threadnet test suite
