@@ -232,12 +232,6 @@ pub struct PraosConsensus {
     /// the actor processes commands sequentially, if the parent's Apply
     /// is already queued, submitting the child right after is safe.
     in_flight_validation: HashSet<[u8; 32]>,
-    /// Bodies waiting for their parent to be known to the validator.
-    /// Keyed by the parent hash they're waiting on. When the parent
-    /// becomes known (arrives via `on_block_received`, is self-produced,
-    /// or reaches `Applied`), the children in its entry are drained and
-    /// submitted in chain order.
-    pending_validation: HashMap<[u8; 32], Vec<(Point, BlockBody)>>,
     commands: mpsc::Sender<NetworkCommand>,
     validator: Validator,
     /// Security parameter k — prune blocks deeper than this.
@@ -263,7 +257,6 @@ impl PraosConsensus {
             queued_validator_tip: None,
             last_validated_tip: None,
             in_flight_validation: HashSet::new(),
-            pending_validation: HashMap::new(),
             commands,
             validator,
             security_param_k,
@@ -501,7 +494,7 @@ impl PraosConsensus {
         // Which replay blocks lack a validated body?
         let missing: Vec<Point> = replay
             .iter()
-            .filter(|(_, h)| !self.validated.contains(h))
+            .filter(|(_, h)| !self.validated.contains(h) && !self.block_cache.contains_key(h))
             .map(|(p, _)| p.clone())
             .collect();
 
@@ -786,7 +779,6 @@ impl PraosConsensus {
 
         self.submit_for_validation(point.clone(), body.clone(), info.prev_hash)
             .await;
-        self.drain_pending(hash).await;
         self.select_chain().await;
     }
 
@@ -811,7 +803,7 @@ impl PraosConsensus {
         let before = self.in_flight.len();
         self.evict_stale_in_flight();
         let evicted = before - self.in_flight.len();
-        if evicted > 0 || !self.in_flight.is_empty() || !self.pending_validation.is_empty() {
+        if evicted > 0 || !self.in_flight.is_empty() {
             self.select_chain().await;
         }
     }
@@ -955,21 +947,9 @@ impl PraosConsensus {
                     self.chain_tree.prune_below(min);
                     self.block_cache.retain(|_, cb| cb.block_no >= min);
                     self.validated.retain(|h| self.block_cache.contains_key(h));
-                    // Drop pending_validation entries whose parent has
-                    // fallen out of the k-window — the children are
-                    // orphaned and will never become valid here.
-                    let tree = &self.chain_tree;
-                    self.pending_validation
-                        .retain(|parent, _| tree.point(parent).is_some());
                 }
             }
         }
-
-        // Drain any children that were waiting on this block. Do this
-        // after the prune so the prune doesn't sweep children we're
-        // about to submit, and before select_chain so newly-submitted
-        // children are visible to its in-flight checks.
-        self.drain_pending(hash).await;
 
         // A newly-validated block can unblock a fork switch we couldn't
         // execute earlier (e.g. waiting for the last replay block).
@@ -1035,10 +1015,6 @@ impl PraosConsensus {
         // The failed block stays in the cache but is no longer marked
         // validated. select_chain may pick a different candidate.
         self.validated.remove(&hash);
-        // Children waiting on this failed block will never become
-        // valid via this parent; drop them from the pending queue.
-        // (They stay in block_cache until prune_below_k reclaims them.)
-        self.pending_validation.remove(&hash);
     }
 
     /// Submit a block for validation. Issues a `LedgerCommand::Apply`,
@@ -1084,9 +1060,8 @@ impl PraosConsensus {
         self.in_flight_validation.insert(new_hash);
     }
 
-    /// A fetched block arrived — cache it and either submit it to the
-    /// validator (if its parent is known) or queue it in
-    /// `pending_validation` until the parent arrives.
+    /// A fetched block arrived — cache it and run chain selection.
+    /// Validation is driven by `select_chain` -> `execute_switch`.
     async fn on_block_received(&mut self, point: &Point, body: &BlockBody) {
         let hash = match point {
             Point::Specific { hash, .. } => *hash,
@@ -1150,75 +1125,13 @@ impl PraosConsensus {
             },
         );
 
-        if self.parent_known_to_validator(prev_hash) {
-            info!(
-                node_id = %self.node_id,
-                %point,
-                body_len = body.raw.len(),
-                "block received, submitting for validation"
-            );
-            self.submit_for_validation(point.clone(), body.clone(), prev_hash)
-                .await;
-            self.drain_pending(hash).await;
-        } else {
-            info!(
-                node_id = %self.node_id,
-                %point,
-                body_len = body.raw.len(),
-                parent = ?prev_hash.map(|h| format!("{:02x}{:02x}", h[30], h[31])),
-                "block received, queueing in pending_validation until parent arrives"
-            );
-            let parent_hash = prev_hash.expect("gate guarantees prev_hash is Some here");
-            self.pending_validation
-                .entry(parent_hash)
-                .or_default()
-                .push((point.clone(), body.clone()));
-        }
-    }
-
-    /// True if a block with the given `prev_hash` can be handed to the
-    /// validator directly. The validator's sequential actor will apply
-    /// the parent before this block as long as the parent is already in
-    /// its queue, so "submitted" is good enough — we don't need the
-    /// parent's `Applied` outcome to have arrived first.
-    fn parent_known_to_validator(&self, prev_hash: Option<[u8; 32]>) -> bool {
-        match prev_hash {
-            None => true, // genesis
-            Some(parent) => {
-                self.validated.contains(&parent)
-                    || self.in_flight_validation.contains(&parent)
-                    || self.queued_validator_tip == Some(parent)
-            }
-        }
-    }
-
-    /// Drain any pending_validation entries waiting on `parent_hash`.
-    /// Each drained child is submitted to the validator via
-    /// `submit_for_validation` (which handles Rollback insertion if
-    /// needed) and recursively drains its own children. The recursion
-    /// is flattened into a worklist to avoid the `Box::pin` dance for
-    /// recursive async fns.
-    async fn drain_pending(&mut self, parent_hash: [u8; 32]) {
-        let mut worklist: VecDeque<[u8; 32]> = VecDeque::new();
-        worklist.push_back(parent_hash);
-
-        while let Some(parent) = worklist.pop_front() {
-            let children = match self.pending_validation.remove(&parent) {
-                Some(c) => c,
-                None => continue,
-            };
-            for (point, body) in children {
-                let child_hash = match &point {
-                    Point::Specific { hash, .. } => *hash,
-                    _ => continue,
-                };
-                self.submit_for_validation(point, body, Some(parent)).await;
-                // submit_for_validation already put child_hash into
-                // in_flight_validation; now enqueue it so any of its
-                // own waiters get drained on the next loop iteration.
-                worklist.push_back(child_hash);
-            }
-        }
+        info!(
+            node_id = %self.node_id,
+            %point,
+            block_no,
+            "block received and cached"
+        );
+        self.select_chain().await;
     }
 
     /// Current local tip as a `Tip`, derived from the chain tree.
@@ -2281,7 +2194,10 @@ mod tests {
         drain_validator(&mut consensus, &mut val_rx).await;
         while cmd_rx.try_recv().is_ok() {}
 
+        // A peer must announce block#2 so select_chain can find it.
         let (tip2, hdr2) = make_tip(20, 2, Some(hash1));
+        consensus.record_peer_tip(TEST_PEER, &tip2, &hdr2);
+
         consensus
             .on_block_received(&tip2.point, &make_block_body(&hdr2))
             .await;
@@ -2674,262 +2590,5 @@ mod tests {
             .register_self_produced(&tip2.point, &hdr2, &BlockBody::opaque(Vec::new()))
             .await;
         assert_eq!(consensus.queued_validator_tip, Some(hash2));
-    }
-
-    /// A block whose parent isn't known to the validator should be
-    /// queued in `pending_validation` rather than blindly submitted.
-    #[tokio::test]
-    async fn child_arriving_before_parent_queued_in_pending() {
-        let (mut consensus, mut cmd_rx, mut val_rx) = make_consensus();
-
-        // Fabricate a child whose parent hash is completely unknown.
-        let unknown_parent: [u8; 32] = [0xEE; 32];
-        let (tip_child, hdr_child) = make_tip(5, 2, Some(unknown_parent));
-
-        consensus
-            .on_block_received(&tip_child.point, &make_block_body(&hdr_child))
-            .await;
-
-        // The child is sitting in pending_validation, not submitted.
-        assert!(
-            consensus.pending_validation.contains_key(&unknown_parent),
-            "child should be queued under its parent hash"
-        );
-        assert!(
-            consensus.in_flight_validation.is_empty(),
-            "nothing should have been submitted to the validator"
-        );
-
-        // Draining the validator shouldn't produce any outcomes.
-        drain_validator(&mut consensus, &mut val_rx).await;
-        assert!(
-            cmd_rx.try_recv().is_err(),
-            "no InjectBlock should have been emitted"
-        );
-    }
-
-    /// When the parent finally arrives, the child in `pending_validation`
-    /// should be submitted right after it. The validator sees Apply(parent)
-    /// then Apply(child), in that order.
-    #[tokio::test]
-    async fn parent_arrival_drains_pending_in_order() {
-        let (mut consensus, mut cmd_rx, mut val_rx) = make_consensus();
-
-        // Build a two-block chain: A1 (genesis) ← A2.
-        let (tip1, hdr1) = make_tip(10, 1, None);
-        let hash1 = match &tip1.point {
-            Point::Specific { hash, .. } => *hash,
-            _ => panic!(),
-        };
-        let (tip2, hdr2) = make_tip(20, 2, Some(hash1));
-        let hash2 = match &tip2.point {
-            Point::Specific { hash, .. } => *hash,
-            _ => panic!(),
-        };
-
-        // Deliver A2 first — parent is unknown, goes to pending.
-        consensus
-            .on_block_received(&tip2.point, &make_block_body(&hdr2))
-            .await;
-        assert!(consensus.pending_validation.contains_key(&hash1));
-        assert!(!consensus.in_flight_validation.contains(&hash2));
-
-        // Now deliver A1 — it's genesis, submits directly, then the
-        // drain cascades A2 into the queue.
-        consensus
-            .on_block_received(&tip1.point, &make_block_body(&hdr1))
-            .await;
-        assert!(consensus.pending_validation.is_empty());
-        assert!(consensus.in_flight_validation.contains(&hash1));
-        assert!(consensus.in_flight_validation.contains(&hash2));
-
-        // Drain outcomes → both should end up validated.
-        drain_validator(&mut consensus, &mut val_rx).await;
-        assert!(consensus.validated.contains(&hash1));
-        assert!(consensus.validated.contains(&hash2));
-
-        // InjectBlock should be sent for both, in chain order.
-        let mut injected = Vec::new();
-        while let Ok(cmd) = cmd_rx.try_recv() {
-            if let NetworkCommand::InjectBlock { point, .. } = cmd {
-                injected.push(point);
-            }
-        }
-        assert_eq!(injected.len(), 2);
-        assert_eq!(injected[0], tip1.point);
-        assert_eq!(injected[1], tip2.point);
-    }
-
-    /// A peer-fetched child can arrive before its parent is self-produced.
-    /// When the self-produced block is registered, the drain should pick
-    /// up the waiting child and submit it.
-    #[tokio::test]
-    async fn self_produced_block_drains_pending_children() {
-        let (mut consensus, _cmd_rx, mut val_rx) = make_consensus();
-
-        let (tip1, hdr1) = make_tip(10, 1, None);
-        let hash1 = match &tip1.point {
-            Point::Specific { hash, .. } => *hash,
-            _ => panic!(),
-        };
-        let (tip2, hdr2) = make_tip(20, 2, Some(hash1));
-        let hash2 = match &tip2.point {
-            Point::Specific { hash, .. } => *hash,
-            _ => panic!(),
-        };
-
-        // Peer delivers the child B2 before we've produced A1.
-        consensus
-            .on_block_received(&tip2.point, &make_block_body(&hdr2))
-            .await;
-        assert!(consensus.pending_validation.contains_key(&hash1));
-
-        // Now we self-produce A1 — should drain B2 out of pending.
-        consensus
-            .register_self_produced(&tip1.point, &hdr1, &make_block_body(&hdr1))
-            .await;
-        assert!(consensus.pending_validation.is_empty());
-        assert!(consensus.in_flight_validation.contains(&hash2));
-
-        drain_validator(&mut consensus, &mut val_rx).await;
-        assert!(consensus.validated.contains(&hash1));
-        assert!(consensus.validated.contains(&hash2));
-    }
-
-    /// Three blocks delivered in reverse (grandchild, child, parent)
-    /// should all end up validated in chain order when the parent
-    /// finally lands, via a cascading drain.
-    #[tokio::test]
-    async fn deep_chain_out_of_order_drains_correctly() {
-        let (mut consensus, _cmd_rx, mut val_rx) = make_consensus();
-
-        let (tip1, hdr1) = make_tip(10, 1, None);
-        let hash1 = match &tip1.point {
-            Point::Specific { hash, .. } => *hash,
-            _ => panic!(),
-        };
-        let (tip2, hdr2) = make_tip(20, 2, Some(hash1));
-        let hash2 = match &tip2.point {
-            Point::Specific { hash, .. } => *hash,
-            _ => panic!(),
-        };
-        let (tip3, hdr3) = make_tip(30, 3, Some(hash2));
-        let hash3 = match &tip3.point {
-            Point::Specific { hash, .. } => *hash,
-            _ => panic!(),
-        };
-
-        // Reverse delivery: A3 first, then A2, then A1.
-        consensus
-            .on_block_received(&tip3.point, &make_block_body(&hdr3))
-            .await;
-        consensus
-            .on_block_received(&tip2.point, &make_block_body(&hdr2))
-            .await;
-        // Both should be waiting in pending_validation.
-        assert!(consensus.pending_validation.contains_key(&hash1));
-        assert!(consensus.pending_validation.contains_key(&hash2));
-        assert!(consensus.in_flight_validation.is_empty());
-
-        consensus
-            .on_block_received(&tip1.point, &make_block_body(&hdr1))
-            .await;
-        // Cascade drain should have submitted all three.
-        assert!(consensus.pending_validation.is_empty());
-        assert!(consensus.in_flight_validation.contains(&hash1));
-        assert!(consensus.in_flight_validation.contains(&hash2));
-        assert!(consensus.in_flight_validation.contains(&hash3));
-
-        drain_validator(&mut consensus, &mut val_rx).await;
-        assert!(consensus.validated.contains(&hash1));
-        assert!(consensus.validated.contains(&hash2));
-        assert!(consensus.validated.contains(&hash3));
-    }
-
-    /// Pending entries whose parent has fallen out of the k-window
-    /// should be evicted when `prune_below_k` fires.
-    #[tokio::test]
-    async fn pending_evicted_when_parent_pruned() {
-        let (mut consensus, _cmd_rx, mut val_rx) = make_consensus_with_k(4);
-
-        // Parent A1 at block 1; it'll be pruned once we advance
-        // beyond k = 4.
-        let (tip1, hdr1) = make_tip(10, 1, None);
-        let hash1 = match &tip1.point {
-            Point::Specific { hash, .. } => *hash,
-            _ => panic!(),
-        };
-        consensus
-            .register_self_produced(&tip1.point, &hdr1, &make_block_body(&hdr1))
-            .await;
-        drain_validator(&mut consensus, &mut val_rx).await;
-
-        // Plant an orphan child whose parent is completely unknown
-        // (so pending_validation holds it).
-        let unknown_parent: [u8; 32] = [0xAB; 32];
-        let (tip_orphan, hdr_orphan) = make_tip(25, 2, Some(unknown_parent));
-        consensus
-            .on_block_received(&tip_orphan.point, &make_block_body(&hdr_orphan))
-            .await;
-        assert!(consensus.pending_validation.contains_key(&unknown_parent));
-
-        // Advance past the k-window by self-producing enough blocks.
-        // k=4 means once we reach block 6+, blocks below 2 get pruned.
-        // More importantly, pending entries whose parent isn't in
-        // chain_tree get dropped.
-        let mut prev = Some(hash1);
-        for i in 2..=7u64 {
-            let (tip, hdr) = make_tip(i * 10, i, prev);
-            prev = match &tip.point {
-                Point::Specific { hash, .. } => Some(*hash),
-                _ => None,
-            };
-            consensus
-                .register_self_produced(&tip.point, &hdr, &make_block_body(&hdr))
-                .await;
-            drain_validator(&mut consensus, &mut val_rx).await;
-        }
-
-        // The orphan's unknown parent was never in chain_tree, so the
-        // prune-time filter should have dropped it.
-        assert!(
-            !consensus.pending_validation.contains_key(&unknown_parent),
-            "orphan pending entry should have been evicted by prune_below_k"
-        );
-    }
-
-    /// ApplyFailed on a parent should drop any pending children waiting
-    /// on it: they'll never become valid via that parent.
-    #[tokio::test]
-    async fn apply_failed_drops_pending_children() {
-        let (mut consensus, _cmd_rx, _val_rx) = make_consensus();
-
-        let (tip1, _hdr1) = make_tip(10, 1, None);
-        let hash1 = match &tip1.point {
-            Point::Specific { hash, .. } => *hash,
-            _ => panic!(),
-        };
-        let (tip2, hdr2) = make_tip(20, 2, Some(hash1));
-
-        // Queue a child waiting on hash1.
-        consensus
-            .on_block_received(&tip2.point, &make_block_body(&hdr2))
-            .await;
-        assert!(consensus.pending_validation.contains_key(&hash1));
-
-        // Mark the parent as in-flight so handle_apply_failed sees it.
-        consensus.in_flight_validation.insert(hash1);
-
-        // Simulate the parent's Apply failing.
-        consensus
-            .on_validation_outcome(LedgerOutcome::ApplyFailed {
-                point: tip1.point.clone(),
-                error: "intentional test failure".to_string(),
-            })
-            .await;
-
-        // The pending entry for hash1 should have been dropped.
-        assert!(!consensus.pending_validation.contains_key(&hash1));
-        assert!(!consensus.in_flight_validation.contains(&hash1));
     }
 }
