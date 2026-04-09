@@ -63,14 +63,26 @@ pub(crate) struct PeerChainEntry {
 ///   headers, the chain can have logical gaps.
 /// - **Sliding window loses anchor**: when oldest entries are evicted on
 ///   cap overflow, the only link to the pre-window chain is
-///   `oldest().prev_hash`. If that hash isn't in `ChainTree` (pruned or
-///   never inserted due to opaque headers), the peer chain becomes
-///   permanently disconnected from the adopted chain, causing
-///   `select_chain_once` to classify it as `OrphanCandidate`.
+///   `oldest().prev_hash`. The explicit `anchor` field (set from the
+///   ChainSync intersection) provides a fallback — `select_chain_once`
+///   can use it as a guaranteed common ancestor even when the entry
+///   window is too narrow.
 #[derive(Debug)]
 pub(crate) struct PeerChain {
     entries: VecDeque<PeerChainEntry>,
     cap: usize,
+    /// The ChainSync intersection point — a guaranteed common ancestor
+    /// between the local chain and this peer's chain. Set when
+    /// `IntersectionFound` arrives, persists through rollbacks, replaced
+    /// on reconnect (new intersection), dropped on disconnect.
+    anchor: Option<PeerChainAnchor>,
+}
+
+/// The ChainSync intersection point stored as a peer chain anchor.
+#[derive(Debug, Clone)]
+pub(crate) struct PeerChainAnchor {
+    pub hash: [u8; 32],
+    pub point: Point,
 }
 
 impl PeerChain {
@@ -78,7 +90,22 @@ impl PeerChain {
         Self {
             entries: VecDeque::new(),
             cap,
+            anchor: None,
         }
+    }
+
+    /// Set the anchor (ChainSync intersection point).
+    pub fn set_anchor(&mut self, point: Point) {
+        let hash = match &point {
+            Point::Specific { hash, .. } => *hash,
+            Point::Origin => [0u8; 32],
+        };
+        self.anchor = Some(PeerChainAnchor { hash, point });
+    }
+
+    /// The anchor (ChainSync intersection), if set.
+    pub fn anchor(&self) -> Option<&PeerChainAnchor> {
+        self.anchor.as_ref()
     }
 
     /// Append a new header. If the queue would exceed `cap`, drop oldest.
@@ -143,9 +170,15 @@ pub(crate) enum SelectionDecision {
     /// ancestor and its tip haven't been fetched + validated yet.
     /// `missing` carries their points in oldest→newest order so the
     /// driver can issue a contiguous `FetchBlockRange`.
+    ///
+    /// `anchor_point` is set when the ancestor came from the peer chain's
+    /// anchor (ChainSync intersection) rather than from a direct hash
+    /// match. When set, `issue_fetch` uses it as the range start to
+    /// fill the gap between the anchor and the oldest PeerChain entry.
     WaitingForBlocks {
         peer_id: PeerId,
         ancestor: [u8; 32],
+        anchor_point: Option<Point>,
         missing: Vec<Point>,
         tip_block_no: u64,
     },
@@ -266,6 +299,15 @@ impl PraosConsensus {
             .entry(peer_id)
             .or_insert_with(|| PeerChain::new(cap))
             .append(entry);
+    }
+
+    /// Store the ChainSync intersection as the peer chain's anchor.
+    fn record_peer_intersection(&mut self, peer_id: PeerId, point: &Point) {
+        let cap = self.peer_chain_cap();
+        self.peer_chains
+            .entry(peer_id)
+            .or_insert_with(|| PeerChain::new(cap))
+            .set_anchor(point.clone());
     }
 
     /// Truncate a peer's candidate chain on a rollback.
@@ -389,6 +431,19 @@ impl PraosConsensus {
                 }
             }
         }
+        // Anchor fallback: the ChainSync intersection is a guaranteed
+        // common ancestor. Use it when the walk through entries and the
+        // prev_hash fallback both failed (e.g., peer chain window too
+        // narrow after reconnection).
+        if ancestor.is_none() {
+            if let Some(anchor) = candidate.anchor() {
+                if anchor.hash == [0u8; 32] {
+                    ancestor = Some([0u8; 32]);
+                } else if adopted_ancestors.contains(&anchor.hash) {
+                    ancestor = Some(anchor.hash);
+                }
+            }
+        }
         let ancestor = match ancestor {
             Some(a) => a,
             None => {
@@ -443,6 +498,21 @@ impl PraosConsensus {
             .map(|(p, _)| p.clone())
             .collect();
 
+        // Detect gap between anchor and oldest PeerChain entry. When
+        // the anchor was used as the common ancestor, the PeerChain
+        // window may not start right after the anchor — there could be
+        // blocks between the anchor and the oldest entry that need
+        // fetching. Record the anchor point so issue_fetch can request
+        // the full range.
+        let anchor_point = candidate.anchor().and_then(|a| {
+            let oldest_prev = candidate.iter().next().and_then(|e| e.prev_hash);
+            if a.hash == ancestor && oldest_prev != Some(ancestor) {
+                Some(a.point.clone())
+            } else {
+                None
+            }
+        });
+
         if missing.is_empty() {
             let replay_hashes: Vec<[u8; 32]> = replay.into_iter().map(|(_, h)| h).collect();
             SelectionDecision::Switched {
@@ -455,6 +525,7 @@ impl PraosConsensus {
             SelectionDecision::WaitingForBlocks {
                 peer_id,
                 ancestor,
+                anchor_point,
                 missing,
                 tip_block_no: candidate_tip.block_no,
             }
@@ -513,6 +584,7 @@ impl PraosConsensus {
                 SelectionDecision::WaitingForBlocks {
                     peer_id,
                     ancestor,
+                    anchor_point,
                     missing,
                     tip_block_no,
                 } => {
@@ -521,10 +593,11 @@ impl PraosConsensus {
                         %peer_id,
                         tip_block_no,
                         missing_len = missing.len(),
+                        has_anchor_gap = anchor_point.is_some(),
                         ancestor = format!("{:02x}{:02x}", ancestor[30], ancestor[31]),
                         "select_chain: fetching missing blocks"
                     );
-                    self.issue_fetch(missing).await;
+                    self.issue_fetch(missing, anchor_point).await;
                     return;
                 }
             }
@@ -598,18 +671,22 @@ impl PraosConsensus {
 
     /// Issue a `FetchBlockRange` covering the missing replay blocks,
     /// skipping blocks already in flight.
-    async fn issue_fetch(&mut self, missing: Vec<Point>) {
+    ///
+    /// When `anchor_point` is set, the range starts from the anchor
+    /// (ChainSync intersection) instead of the first missing entry.
+    /// This fills the gap between the anchor and the oldest PeerChain
+    /// entry — blocks that aren't in the PeerChain but are needed for
+    /// the chain to be contiguous from the common ancestor to the tip.
+    async fn issue_fetch(&mut self, missing: Vec<Point>, anchor_point: Option<Point>) {
         if missing.is_empty() {
             return;
         }
         self.evict_stale_in_flight();
 
-        // Single range from oldest to newest missing block. Any validated
-        // blocks interleaved with the missing ones will be re-received
-        // harmlessly. The key is the `to` point — if it's already in
-        // flight, a prior call already kicked a fetch that hasn't been
-        // dropped as stale yet.
-        let from = missing.first().unwrap().clone();
+        // Single range from oldest to newest missing block. When the
+        // anchor provided the common ancestor and there's a gap, use
+        // the anchor as `from` so BlockFetch fills the gap.
+        let from = anchor_point.unwrap_or_else(|| missing.first().unwrap().clone());
         let to = missing.last().unwrap().clone();
         if self.in_flight.contains_key(&to) {
             return;
@@ -695,6 +772,12 @@ impl PraosConsensus {
     /// consensus (caller should not log it separately).
     pub async fn handle_event(&mut self, event: &NetworkEvent) -> bool {
         match event {
+            NetworkEvent::IntersectionFound { peer_id, point } => {
+                self.record_peer_intersection(*peer_id, point);
+                // No select_chain here — the intersection alone doesn't
+                // change which chain is best; TipAdvanced triggers that.
+                true
+            }
             NetworkEvent::TipAdvanced {
                 peer_id,
                 tip,
@@ -1491,6 +1574,7 @@ mod tests {
                 ancestor,
                 tip_block_no,
                 missing,
+                ..
             } => {
                 assert_eq!(peer_id, peer);
                 assert_eq!(ancestor, hash1);
@@ -1613,6 +1697,7 @@ mod tests {
                 ancestor,
                 tip_block_no,
                 missing,
+                ..
             } => {
                 assert_eq!(peer_id, peer);
                 assert_eq!(ancestor, hash2, "common ancestor should be our block 2");
@@ -1662,6 +1747,7 @@ mod tests {
                 tip_block_no,
                 ancestor,
                 missing,
+                ..
             } => {
                 assert_eq!(peer_id, peer_b, "should pick peer_b (block 3)");
                 assert_eq!(tip_block_no, 3);
@@ -2326,6 +2412,154 @@ mod tests {
             consensus.last_validated_tip.is_none(),
             "last_validated_tip should be None after Origin rollback"
         );
+    }
+
+    /// Verify that record_peer_intersection stores the anchor on PeerChain.
+    #[tokio::test]
+    async fn anchor_set_on_intersection_found() {
+        let (mut consensus, _cmd_rx, _val_rx) = make_consensus();
+        let peer = PeerId(1);
+
+        let point = Point::Specific {
+            slot: 42,
+            hash: [0xAB; 32],
+        };
+        consensus.record_peer_intersection(peer, &point);
+
+        let chain = consensus.peer_chains.get(&peer).unwrap();
+        let anchor = chain.anchor().expect("anchor should be set");
+        assert_eq!(anchor.hash, [0xAB; 32]);
+        assert_eq!(anchor.point, point);
+    }
+
+    /// When the peer chain window is too narrow for the walk to find a
+    /// common ancestor, the anchor (ChainSync intersection) is used as
+    /// fallback. This is the core test for the anchor-based approach.
+    #[tokio::test]
+    async fn anchor_used_as_fallback_ancestor() {
+        let (mut consensus, _cmd_rx, _val_rx) = make_consensus();
+        let peer = PeerId(1);
+
+        // Self-produce blocks 1..5 (our adopted chain).
+        let mut prev = None;
+        for i in 1..=5u64 {
+            let (tip, hdr) = make_tip(i * 10, i, prev);
+            prev = match &tip.point {
+                Point::Specific { hash, .. } => Some(*hash),
+                _ => panic!(),
+            };
+            consensus
+                .register_self_produced(&tip.point, &hdr, &BlockBody::opaque(Vec::new()))
+                .await;
+        }
+        let adopted_hash = prev.unwrap();
+
+        // Set the anchor to block 3 in our adopted chain (a known common
+        // ancestor). The anchor hash must be in our chain_tree.
+        let block3_hash = consensus.chain_tree.ancestors(adopted_hash)[2]; // [5, 4, 3]
+        let block3_point = consensus.chain_tree.point(&block3_hash).unwrap().clone();
+        consensus.record_peer_intersection(peer, &block3_point);
+
+        // Peer announces blocks 64..68 with different hashes (different
+        // fork). The window doesn't overlap our chain at all.
+        let mut pprev = Some([0xDD; 32]); // unknown parent — simulates gap
+        for i in 64..=68u64 {
+            let (tip, hdr) = make_tip(i * 100, i, pprev);
+            pprev = match &tip.point {
+                Point::Specific { hash, .. } => Some(*hash),
+                _ => panic!(),
+            };
+            consensus.record_peer_tip(peer, &tip, &hdr);
+        }
+
+        // The walk through entries [68..64] won't find anything in
+        // adopted_ancestors. The prev_hash fallback (0xDD) isn't in
+        // adopted_ancestors either. But the anchor (block 3) IS.
+        match consensus.select_chain_once(&HashSet::new()) {
+            SelectionDecision::WaitingForBlocks {
+                ancestor,
+                anchor_point,
+                missing,
+                ..
+            } => {
+                assert_eq!(
+                    ancestor, block3_hash,
+                    "ancestor should be the anchor (block 3)"
+                );
+                assert!(
+                    anchor_point.is_some(),
+                    "anchor_point should be set for gap fetch"
+                );
+                assert_eq!(missing.len(), 5, "all 5 peer blocks should be missing");
+            }
+            other => panic!("expected WaitingForBlocks, got {other:?}"),
+        }
+    }
+
+    /// When the normal walk finds a common ancestor, the anchor should
+    /// not override it — the walk result is always preferred.
+    #[tokio::test]
+    async fn anchor_ignored_when_walk_succeeds() {
+        let (mut consensus, _cmd_rx, _val_rx) = make_consensus();
+        let peer = PeerId(1);
+
+        // Self-produce blocks 1..3.
+        let (tip1, hdr1) = make_tip(10, 1, None);
+        let hash1 = match &tip1.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus
+            .register_self_produced(&tip1.point, &hdr1, &BlockBody::opaque(Vec::new()))
+            .await;
+        let (tip2, hdr2) = make_tip(20, 2, Some(hash1));
+        let hash2 = match &tip2.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus
+            .register_self_produced(&tip2.point, &hdr2, &BlockBody::opaque(Vec::new()))
+            .await;
+        let (tip3, hdr3) = make_tip(30, 3, Some(hash2));
+        consensus
+            .register_self_produced(&tip3.point, &hdr3, &BlockBody::opaque(Vec::new()))
+            .await;
+
+        // Set anchor at Origin (deep).
+        consensus.record_peer_intersection(peer, &Point::Origin);
+
+        // Peer announces a fork from block 2 (blocks 3'..5').
+        let (alt3, alt3_hdr) = make_tip(103, 3, Some(hash2));
+        let alt3_hash = match &alt3.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus.record_peer_tip(peer, &alt3, &alt3_hdr);
+        let (alt4, alt4_hdr) = make_tip(104, 4, Some(alt3_hash));
+        let alt4_hash = match &alt4.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus.record_peer_tip(peer, &alt4, &alt4_hdr);
+        let (alt5, alt5_hdr) = make_tip(105, 5, Some(alt4_hash));
+        consensus.record_peer_tip(peer, &alt5, &alt5_hdr);
+
+        // Walk finds hash2 in adopted_ancestors — walk result preferred
+        // over anchor (Origin).
+        match consensus.select_chain_once(&HashSet::new()) {
+            SelectionDecision::WaitingForBlocks {
+                ancestor,
+                anchor_point,
+                ..
+            } => {
+                assert_eq!(ancestor, hash2, "walk should find block 2 as ancestor");
+                assert!(
+                    anchor_point.is_none(),
+                    "anchor_point should be None when walk succeeded"
+                );
+            }
+            other => panic!("expected WaitingForBlocks, got {other:?}"),
+        }
     }
 
     /// Self-produced blocks must route through the validator: they should
