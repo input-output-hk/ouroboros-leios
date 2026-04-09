@@ -327,10 +327,12 @@ impl Coordinator {
 
                 self.pending_fetches.remove(&point);
 
-                // Prune this point from all peer fragments (block is now fetched).
-                for peer in self.peers.values_mut() {
-                    peer.fragment.remove(&point);
-                }
+                // Note: we do NOT remove the point from peer fragments.
+                // Fragments represent what peers announced via ChainSync
+                // and are used for fetch routing. Removing fetched points
+                // would break future FetchBlockRange requests that use
+                // this point as `from` or `to`. The pending_fetches dedup
+                // already prevents duplicate in-flight fetches.
 
                 // Forward to app for validation. The app will InjectBlock after
                 // validation to make the block available to downstream peers.
@@ -505,17 +507,10 @@ impl Coordinator {
             }
 
             PeerEvent::BlockFetchFailed { from, to } => {
-                // Remove the failed range endpoints from this peer's fragment.
-                // Note: the coordinator currently only issues single-block fetches
-                // (from == to), so intermediate points don't exist in pending_fetches.
-                // If range fetches are added later, this will need to iterate all
-                // points in the range.
-                if let Some(peer) = self.peers.get_mut(&peer_id) {
-                    peer.fragment.remove(&from);
-                    if from != to {
-                        peer.fragment.remove(&to);
-                    }
-                }
+                // Clear pending_fetches so the app can retry via a
+                // different peer. Don't remove from fragments — the peer
+                // may still have the blocks (transient failure), and
+                // other peers' fragments should remain intact for rerouting.
                 self.pending_fetches.remove(&from);
                 if from != to {
                     self.pending_fetches.remove(&to);
@@ -2034,8 +2029,9 @@ mod tests {
             )
             .await;
 
-        // Point should be removed from peer A's fragment.
-        assert!(!coordinator
+        // Fragment should still contain the point (we no longer prune
+        // on fetch failure — the peer may still have the block).
+        assert!(coordinator
             .peers
             .get(&peer_a)
             .unwrap()
