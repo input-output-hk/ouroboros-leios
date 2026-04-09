@@ -236,8 +236,14 @@ impl Coordinator {
 
             PeerEvent::IntersectionFound { point } => {
                 if let Some(peer) = self.peers.get_mut(&peer_id) {
-                    peer.fragment.set_intersection(point);
+                    peer.fragment.set_intersection(point.clone());
                 }
+                // Forward to consensus so it can store the intersection as
+                // the peer chain's anchor (guaranteed common ancestor).
+                let _ = self
+                    .network_events
+                    .send(NetworkEvent::IntersectionFound { peer_id, point })
+                    .await;
             }
 
             PeerEvent::HeaderAnnounced { header, tip } => {
@@ -2036,6 +2042,10 @@ mod tests {
 
         // Pending fetch should be cleared.
         assert!(!coordinator.pending_fetches.contains_key(&point));
+
+        // Drain the IntersectionFound event that was forwarded.
+        let first = net_rx.try_recv().unwrap();
+        assert!(matches!(first, NetworkEvent::IntersectionFound { .. }));
 
         // App should receive BlockFetchFailed.
         let event = net_rx.try_recv().unwrap();

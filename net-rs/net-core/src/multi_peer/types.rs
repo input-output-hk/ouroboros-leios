@@ -36,6 +36,11 @@ pub enum NetworkEvent {
         header: WrappedHeader,
     },
 
+    /// ChainSync found an intersection with a peer — the common ancestor
+    /// between the local chain and the peer's chain. Consensus stores this
+    /// as the peer chain's anchor (guaranteed common ancestor).
+    IntersectionFound { peer_id: PeerId, point: Point },
+
     /// A peer rolled its chain back to a point. Emitted for every peer
     /// rollback, not just those affecting the local best tip.
     RolledBack {
