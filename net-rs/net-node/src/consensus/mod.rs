@@ -66,6 +66,12 @@ impl Consensus {
         }
     }
 
+    /// Periodic retry for lagging nodes — evicts stale fetches and
+    /// re-runs chain selection even when no network events arrive.
+    pub async fn retry_pending(&mut self) {
+        self.praos.retry_select_chain().await;
+    }
+
     pub async fn on_validation_outcome(&mut self, outcome: LedgerOutcome) -> bool {
         self.praos.on_validation_outcome(outcome).await
     }
