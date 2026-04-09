@@ -24,6 +24,152 @@ pub struct ProducedVotes {
     pub vote_data: Vec<Vec<u8>>,
 }
 
+// ---------------------------------------------------------------------------
+// Leios vote body — CIP-0164 CDDL encoding
+// ---------------------------------------------------------------------------
+
+/// BLS12-381 MinSig signature size (compressed G1).
+const BLS_SIGNATURE_BYTES: usize = 48;
+
+/// Decoded Leios vote body per CIP-0164.
+///
+/// ```cddl
+/// persistent_vote     = [0, election_id, voter_id, endorser_block_hash, vote_sig]
+/// non_persistent_vote = [1, election_id, pool_id, eligibility_sig, endorser_block_hash, vote_sig]
+/// ```
+#[derive(Debug, Clone, PartialEq)]
+pub struct VoteBody {
+    /// 0 = persistent, 1 = non-persistent.
+    pub tag: u8,
+    pub election_id: u64,
+    /// Voter/pool identifier.
+    pub voter_id: Vec<u8>,
+    /// Non-persistent only: eligibility proof (BLS signature).
+    pub eligibility_signature: Option<Vec<u8>>,
+    /// Hash of the endorser block this vote endorses.
+    pub endorser_block_hash: [u8; 32],
+    /// Vote signature (BLS).
+    pub vote_signature: Vec<u8>,
+}
+
+impl VoteBody {
+    /// Create a persistent vote with placeholder (zero) signatures.
+    pub fn stub_persistent(
+        election_id: u64,
+        voter_id: &[u8],
+        endorser_block_hash: &[u8; 32],
+    ) -> Self {
+        Self {
+            tag: 0,
+            election_id,
+            voter_id: voter_id.to_vec(),
+            eligibility_signature: None,
+            endorser_block_hash: *endorser_block_hash,
+            vote_signature: vec![0u8; BLS_SIGNATURE_BYTES],
+        }
+    }
+
+    /// Create a non-persistent vote with placeholder (zero) signatures.
+    pub fn stub_non_persistent(
+        election_id: u64,
+        voter_id: &[u8],
+        endorser_block_hash: &[u8; 32],
+    ) -> Self {
+        Self {
+            tag: 1,
+            election_id,
+            voter_id: voter_id.to_vec(),
+            eligibility_signature: Some(vec![0u8; BLS_SIGNATURE_BYTES]),
+            endorser_block_hash: *endorser_block_hash,
+            vote_signature: vec![0u8; BLS_SIGNATURE_BYTES],
+        }
+    }
+
+    /// Encode to CBOR, padded to at least `min_bytes`.
+    pub fn encode(&self, min_bytes: usize) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(min_bytes);
+        let mut enc = minicbor::Encoder::new(&mut buf);
+
+        if self.tag == 0 {
+            let _ = enc
+                .array(5)
+                .and_then(|e| e.u8(0))
+                .and_then(|e| e.u64(self.election_id))
+                .and_then(|e| e.bytes(&self.voter_id))
+                .and_then(|e| e.bytes(&self.endorser_block_hash))
+                .and_then(|e| e.bytes(&self.vote_signature));
+        } else {
+            let elig = self
+                .eligibility_signature
+                .as_deref()
+                .unwrap_or(&[0u8; BLS_SIGNATURE_BYTES]);
+            let _ = enc
+                .array(6)
+                .and_then(|e| e.u8(1))
+                .and_then(|e| e.u64(self.election_id))
+                .and_then(|e| e.bytes(&self.voter_id))
+                .and_then(|e| e.bytes(elig))
+                .and_then(|e| e.bytes(&self.endorser_block_hash))
+                .and_then(|e| e.bytes(&self.vote_signature));
+        }
+
+        if buf.len() < min_bytes {
+            buf.resize(min_bytes, 0);
+        }
+        buf
+    }
+
+    /// Decode from CBOR. Returns `None` if malformed.
+    pub fn decode(data: &[u8]) -> Option<Self> {
+        let mut dec = minicbor::Decoder::new(data);
+        let len = dec.array().ok()??;
+        let tag = dec.u8().ok()?;
+
+        match tag {
+            0 if len >= 5 => {
+                let election_id = dec.u64().ok()?;
+                let voter_id = dec.bytes().ok()?.to_vec();
+                let eb_hash_bytes = dec.bytes().ok()?;
+                if eb_hash_bytes.len() < 32 {
+                    return None;
+                }
+                let mut endorser_block_hash = [0u8; 32];
+                endorser_block_hash.copy_from_slice(&eb_hash_bytes[..32]);
+                let vote_signature = dec.bytes().ok()?.to_vec();
+                Some(Self {
+                    tag,
+                    election_id,
+                    voter_id,
+                    eligibility_signature: None,
+                    endorser_block_hash,
+                    vote_signature,
+                })
+            }
+            1 if len >= 6 => {
+                let election_id = dec.u64().ok()?;
+                let voter_id = dec.bytes().ok()?.to_vec();
+                let eligibility_signature = Some(dec.bytes().ok()?.to_vec());
+                let eb_hash_bytes = dec.bytes().ok()?;
+                if eb_hash_bytes.len() < 32 {
+                    return None;
+                }
+                let mut endorser_block_hash = [0u8; 32];
+                endorser_block_hash.copy_from_slice(&eb_hash_bytes[..32]);
+                let vote_signature = dec.bytes().ok()?.to_vec();
+                Some(Self {
+                    tag,
+                    election_id,
+                    voter_id,
+                    eligibility_signature,
+                    endorser_block_hash,
+                    vote_signature,
+                })
+            }
+            _ => None,
+        }
+    }
+}
+
 /// Produces fake blocks based on a VRF lottery.
 pub struct BlockProducer {
     rng: StdRng,
@@ -420,6 +566,58 @@ mod tests {
         let ex = extracted.unwrap();
         assert!(ex.parsed.is_some());
         assert_eq!(ex.parsed.as_ref().unwrap().slot, 12345);
+    }
+
+    #[test]
+    fn vote_body_persistent_size() {
+        let eb_hash = [0xAA; 32];
+        let vote = VoteBody::stub_persistent(42, &[0xBB; 32], &eb_hash);
+        let encoded = vote.encode(130);
+        assert_eq!(encoded.len(), 130);
+    }
+
+    #[test]
+    fn vote_body_non_persistent_size() {
+        let eb_hash = [0xAA; 32];
+        let vote = VoteBody::stub_non_persistent(42, &[0xBB; 32], &eb_hash);
+        let encoded = vote.encode(180);
+        assert_eq!(encoded.len(), 180);
+    }
+
+    #[test]
+    fn vote_body_persistent_roundtrip() {
+        let eb_hash = [0xCC; 32];
+        let voter = [0xDD; 32];
+        let vote = VoteBody::stub_persistent(99, &voter, &eb_hash);
+        let encoded = vote.encode(200);
+        let decoded = VoteBody::decode(&encoded).expect("should decode");
+        assert_eq!(decoded.tag, 0);
+        assert_eq!(decoded.election_id, 99);
+        assert_eq!(decoded.voter_id, voter.to_vec());
+        assert_eq!(decoded.endorser_block_hash, eb_hash);
+        assert!(decoded.eligibility_signature.is_none());
+        assert_eq!(decoded.vote_signature.len(), 48);
+    }
+
+    #[test]
+    fn vote_body_non_persistent_roundtrip() {
+        let eb_hash = [0x11; 32];
+        let voter = [0x22; 32];
+        let vote = VoteBody::stub_non_persistent(7, &voter, &eb_hash);
+        let encoded = vote.encode(180);
+        let decoded = VoteBody::decode(&encoded).expect("should decode");
+        assert_eq!(decoded.tag, 1);
+        assert_eq!(decoded.election_id, 7);
+        assert_eq!(decoded.voter_id, voter.to_vec());
+        assert_eq!(decoded.endorser_block_hash, eb_hash);
+        assert!(decoded.eligibility_signature.is_some());
+        assert_eq!(decoded.vote_signature.len(), 48);
+    }
+
+    #[test]
+    fn vote_body_decode_rejects_garbage() {
+        assert!(VoteBody::decode(&[0xFF, 0x00]).is_none());
+        assert!(VoteBody::decode(&[]).is_none());
     }
 
     #[test]

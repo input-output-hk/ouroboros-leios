@@ -8,6 +8,8 @@ use std::collections::HashMap;
 
 use figment::providers::{Format, Serialized, Toml};
 use figment::Figment;
+use rand::rngs::StdRng;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 /// Dynamic (hot-reloadable) subset of node configuration.
@@ -160,6 +162,148 @@ pub struct NodeConfig {
     pub peers: Vec<PeerConfig>,
 }
 
+// ---------------------------------------------------------------------------
+// Committee selection (Leios voting)
+// ---------------------------------------------------------------------------
+
+/// Decision from committee selection: what kind of vote to produce (if any).
+///
+/// Persistent votes are smaller (~130B) because the voter's eligibility is
+/// established per-epoch and doesn't need per-election proof. Non-persistent
+/// votes are larger (~180B) because they include a 48-byte eligibility
+/// signature proving the voter won the per-election sortition lottery.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VoteDecision {
+    /// Node does not vote this election.
+    NoVote,
+    /// Epoch-stable voter (wFA persistent committee, EveryoneVotes, StakeCentile).
+    PersistentVote,
+    /// Per-election sortition winner (LS non-persistent voter in wFA+LS).
+    NonPersistentVote,
+}
+
+/// Committee selection mechanism for Leios voting.
+///
+/// Determines which nodes vote and what type of vote they produce.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub enum CommitteeSelection {
+    /// CIP-0164 spec: weighted Fait Accompli persistent committee (wFA) +
+    /// Local Sortition non-persistent voters (LS).
+    ///
+    /// Persistent voters: top stake holders (semi-permanent per-epoch).
+    /// They always vote with small `PersistentVote` bodies.
+    ///
+    /// Non-persistent voters: elected per-election via VRF-like sortition
+    /// using `vote_generation_probability`. They produce larger
+    /// `NonPersistentVote` bodies that include an eligibility proof.
+    WfaLs {
+        /// Fraction of total stake held by the persistent committee.
+        /// A node is persistent if `stake/total_stake >= 1.0 - this`.
+        #[serde(default = "default_persistent_stake_fraction")]
+        persistent_stake_fraction: f64,
+    },
+
+    /// All staked nodes vote on every EB.
+    /// Eligibility is trivial and epoch-stable → `PersistentVote`.
+    EveryoneVotes,
+
+    /// Top centile of stake participates. E.g., 0.95 means include the
+    /// largest stakers until 95% of total stake is covered. For uniform
+    /// stake this approximates as a per-node probability.
+    /// Eligibility is epoch-stable → `PersistentVote`.
+    StakeCentile {
+        /// Target fraction of total stake that should participate.
+        #[serde(default = "default_top_centile")]
+        top_centile_of_stake: f64,
+    },
+}
+
+fn default_persistent_stake_fraction() -> f64 {
+    0.3
+}
+
+fn default_top_centile() -> f64 {
+    0.95
+}
+
+fn default_quorum_stake_fraction() -> f64 {
+    0.75
+}
+
+fn default_persistent_vote_bytes() -> usize {
+    130
+}
+
+fn default_non_persistent_vote_bytes() -> usize {
+    180
+}
+
+impl Default for CommitteeSelection {
+    fn default() -> Self {
+        CommitteeSelection::WfaLs {
+            persistent_stake_fraction: default_persistent_stake_fraction(),
+        }
+    }
+}
+
+impl CommitteeSelection {
+    /// Decide whether this node votes and what type of vote to produce.
+    ///
+    /// - `stake`: this node's stake
+    /// - `total_stake`: total network stake
+    /// - `vote_probability`: per-election sortition probability (from DynamicConfig)
+    /// - `rng`: random number generator for sortition lottery
+    pub fn decide_vote(
+        &self,
+        stake: u64,
+        total_stake: u64,
+        vote_probability: f64,
+        rng: &mut StdRng,
+    ) -> VoteDecision {
+        if stake == 0 || total_stake == 0 {
+            return VoteDecision::NoVote;
+        }
+        let stake_fraction = stake as f64 / total_stake as f64;
+
+        match self {
+            CommitteeSelection::WfaLs {
+                persistent_stake_fraction,
+            } => {
+                // Persistent: top-stake nodes always vote.
+                if stake_fraction >= (1.0 - persistent_stake_fraction) {
+                    return VoteDecision::PersistentVote;
+                }
+                // Non-persistent: per-election sortition lottery.
+                let per_node = vote_probability * stake_fraction;
+                if rng.gen::<f64>() < per_node {
+                    VoteDecision::NonPersistentVote
+                } else {
+                    VoteDecision::NoVote
+                }
+            }
+            CommitteeSelection::EveryoneVotes => VoteDecision::PersistentVote,
+            CommitteeSelection::StakeCentile {
+                top_centile_of_stake,
+            } => {
+                // Approximate: each node participates with probability
+                // equal to the target centile. For uniform stake this
+                // is exact; for skewed stake the cluster overlay can
+                // compute a per-node threshold instead.
+                if rng.gen::<f64>() < *top_centile_of_stake {
+                    VoteDecision::PersistentVote
+                } else {
+                    VoteDecision::NoVote
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Production config
+// ---------------------------------------------------------------------------
+
 /// Block production configuration.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ProductionConfig {
@@ -180,12 +324,29 @@ pub struct ProductionConfig {
     pub eb_generation_probability: f64,
 
     /// Per-stage probability of producing a vote (Leios).
+    /// Used as the sortition lottery probability for WfaLs non-persistent voters.
     #[serde(default)]
     pub vote_generation_probability: f64,
 
     /// Leios stage length in slots.
     #[serde(default = "default_stage_length")]
     pub stage_length_slots: u64,
+
+    /// Committee selection mechanism for Leios voting.
+    #[serde(default)]
+    pub committee_selection: CommitteeSelection,
+
+    /// Size of a persistent vote body in bytes (no eligibility proof).
+    #[serde(default = "default_persistent_vote_bytes")]
+    pub persistent_vote_bytes: usize,
+
+    /// Size of a non-persistent vote body in bytes (includes eligibility proof).
+    #[serde(default = "default_non_persistent_vote_bytes")]
+    pub non_persistent_vote_bytes: usize,
+
+    /// Fraction of total stake required for quorum.
+    #[serde(default = "default_quorum_stake_fraction")]
+    pub quorum_stake_fraction: f64,
 }
 
 fn default_total_stake() -> u64 {
@@ -209,6 +370,10 @@ impl Default for ProductionConfig {
             eb_generation_probability: 0.0,
             vote_generation_probability: 0.0,
             stage_length_slots: default_stage_length(),
+            committee_selection: CommitteeSelection::default(),
+            persistent_vote_bytes: default_persistent_vote_bytes(),
+            non_persistent_vote_bytes: default_non_persistent_vote_bytes(),
+            quorum_stake_fraction: default_quorum_stake_fraction(),
         }
     }
 }
@@ -553,6 +718,143 @@ mod tests {
             config.validation.rb_body_validation_ms_constant
         );
         assert_eq!(dyn_config.tx_rate, config.transactions.tx_rate);
+    }
+
+    // -- Committee selection tests --
+
+    fn make_rng(seed: u64) -> rand::rngs::StdRng {
+        use rand::SeedableRng;
+        rand::rngs::StdRng::seed_from_u64(seed)
+    }
+
+    #[test]
+    fn wfa_ls_persistent_voter_always_votes() {
+        // persistent_stake_fraction = 0.3 → persistent if stake_frac >= 0.7
+        let cs = CommitteeSelection::WfaLs {
+            persistent_stake_fraction: 0.3,
+        };
+        let mut rng = make_rng(42);
+        // stake=800/1000 = 0.8 >= 0.7 → always persistent
+        for _ in 0..100 {
+            assert_eq!(
+                cs.decide_vote(800, 1000, 0.0, &mut rng),
+                VoteDecision::PersistentVote
+            );
+        }
+    }
+
+    #[test]
+    fn wfa_ls_non_persistent_sortition() {
+        let cs = CommitteeSelection::WfaLs {
+            persistent_stake_fraction: 0.3,
+        };
+        let mut rng = make_rng(42);
+        // stake=100/1000 = 0.1, below 0.7 → not persistent.
+        // vote_probability=1.0 → per_node = 1.0 * 0.1 = 0.1, so ~10% hit rate
+        let hits: usize = (0..1000)
+            .filter(|_| cs.decide_vote(100, 1000, 1.0, &mut rng) == VoteDecision::NonPersistentVote)
+            .count();
+        // Expected ~100, allow wide margin.
+        assert!(hits > 50 && hits < 200, "hits={hits}, expected ~100");
+    }
+
+    #[test]
+    fn wfa_ls_zero_stake_no_vote() {
+        let cs = CommitteeSelection::WfaLs {
+            persistent_stake_fraction: 0.3,
+        };
+        let mut rng = make_rng(42);
+        assert_eq!(cs.decide_vote(0, 1000, 1.0, &mut rng), VoteDecision::NoVote);
+    }
+
+    #[test]
+    fn everyone_votes_with_stake() {
+        let cs = CommitteeSelection::EveryoneVotes;
+        let mut rng = make_rng(42);
+        assert_eq!(
+            cs.decide_vote(1, 1000, 0.0, &mut rng),
+            VoteDecision::PersistentVote
+        );
+    }
+
+    #[test]
+    fn everyone_votes_zero_stake() {
+        let cs = CommitteeSelection::EveryoneVotes;
+        let mut rng = make_rng(42);
+        assert_eq!(cs.decide_vote(0, 1000, 0.0, &mut rng), VoteDecision::NoVote);
+    }
+
+    #[test]
+    fn centile_high_includes_most() {
+        let cs = CommitteeSelection::StakeCentile {
+            top_centile_of_stake: 0.95,
+        };
+        let mut rng = make_rng(42);
+        let hits: usize = (0..1000)
+            .filter(|_| cs.decide_vote(100, 1000, 0.0, &mut rng) == VoteDecision::PersistentVote)
+            .count();
+        // Expected ~950, allow ±5%.
+        assert!(hits > 900 && hits < 990, "hits={hits}, expected ~950");
+    }
+
+    #[test]
+    fn centile_low_excludes_more() {
+        let cs = CommitteeSelection::StakeCentile {
+            top_centile_of_stake: 0.5,
+        };
+        let mut rng = make_rng(42);
+        let hits: usize = (0..1000)
+            .filter(|_| cs.decide_vote(100, 1000, 0.0, &mut rng) == VoteDecision::PersistentVote)
+            .count();
+        // Expected ~500, allow ±10%.
+        assert!(hits > 400 && hits < 600, "hits={hits}, expected ~500");
+    }
+
+    #[test]
+    fn committee_selection_toml_roundtrip() {
+        // WfaLs
+        let cs = CommitteeSelection::WfaLs {
+            persistent_stake_fraction: 0.4,
+        };
+        let toml = toml::to_string(&cs).unwrap();
+        let parsed: CommitteeSelection = toml::from_str(&toml).unwrap();
+        assert!(matches!(
+            parsed,
+            CommitteeSelection::WfaLs {
+                persistent_stake_fraction
+            } if (persistent_stake_fraction - 0.4).abs() < f64::EPSILON
+        ));
+
+        // EveryoneVotes
+        let cs = CommitteeSelection::EveryoneVotes;
+        let toml = toml::to_string(&cs).unwrap();
+        let parsed: CommitteeSelection = toml::from_str(&toml).unwrap();
+        assert!(matches!(parsed, CommitteeSelection::EveryoneVotes));
+
+        // StakeCentile
+        let cs = CommitteeSelection::StakeCentile {
+            top_centile_of_stake: 0.9,
+        };
+        let toml = toml::to_string(&cs).unwrap();
+        let parsed: CommitteeSelection = toml::from_str(&toml).unwrap();
+        assert!(matches!(
+            parsed,
+            CommitteeSelection::StakeCentile {
+                top_centile_of_stake
+            } if (top_centile_of_stake - 0.9).abs() < f64::EPSILON
+        ));
+    }
+
+    #[test]
+    fn production_config_default_has_new_fields() {
+        let config = ProductionConfig::default();
+        assert!(matches!(
+            config.committee_selection,
+            CommitteeSelection::WfaLs { .. }
+        ));
+        assert_eq!(config.persistent_vote_bytes, 130);
+        assert_eq!(config.non_persistent_vote_bytes, 180);
+        assert!((config.quorum_stake_fraction - 0.75).abs() < f64::EPSILON);
     }
 
     #[test]

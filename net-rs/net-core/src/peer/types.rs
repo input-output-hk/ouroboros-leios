@@ -65,7 +65,11 @@ pub enum PeerEvent {
     LeiosBlockFetched { point: Point, block: Vec<u8> },
 
     /// LeiosFetch: requested votes arrived.
-    LeiosVotesFetched { votes: Vec<Vec<u8>> },
+    /// `vote_ids` are (slot, issuer_id) keys; `vote_data` are the CBOR bodies.
+    LeiosVotesFetched {
+        vote_ids: Vec<(u64, Vec<u8>)>,
+        vote_data: Vec<Vec<u8>>,
+    },
 
     /// LeiosFetch: requested transactions for an EB arrived.
     LeiosBlockTxsFetched {

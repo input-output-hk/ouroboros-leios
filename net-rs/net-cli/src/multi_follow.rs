@@ -109,8 +109,8 @@ pub async fn run(
             NetworkEvent::LeiosBlockReceived { point, block } => {
                 println!("  leios: EB received at {point} ({} bytes)", block.len());
             }
-            NetworkEvent::LeiosVotesReceived { votes } => {
-                println!("  leios: {} vote(s) received", votes.len());
+            NetworkEvent::LeiosVotesReceived { vote_data, .. } => {
+                println!("  leios: {} vote(s) received", vote_data.len());
             }
             NetworkEvent::LeiosBlockTxsReceived {
                 point,
@@ -128,7 +128,7 @@ pub async fn run(
                     println!("  block fetch failed: {from}..{to}");
                 }
             }
-            NetworkEvent::PeerSnapshot { .. } => {}
+            NetworkEvent::PeerSnapshot { .. } | NetworkEvent::IntersectionFound { .. } => {}
         }
     }
 
