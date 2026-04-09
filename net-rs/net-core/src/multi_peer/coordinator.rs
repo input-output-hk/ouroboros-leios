@@ -611,6 +611,12 @@ impl Coordinator {
                 }
             }
 
+            NetworkCommand::ReIntersect { peer_id } => {
+                if let Some(peer) = self.peers.get(&peer_id) {
+                    let _ = peer.commands.send(PeerCommand::ReIntersect).await;
+                }
+            }
+
             NetworkCommand::DiscoverPeers => {
                 // Send to a random connected peer.
                 if let Some((&peer_id, _)) = self.peers.iter().next() {

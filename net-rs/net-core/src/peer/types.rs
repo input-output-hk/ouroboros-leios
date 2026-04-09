@@ -104,6 +104,11 @@ pub enum PeerCommand {
     /// Submit a transaction to this peer via TxSubmission.
     SubmitTransaction { tx: PendingTx },
 
+    /// Re-run ChainSync intersection with fresh candidates from the
+    /// current local chain. Used when the previous intersection became
+    /// stale due to a local fork switch.
+    ReIntersect,
+
     /// Gracefully disconnect this peer.
     Disconnect,
 }

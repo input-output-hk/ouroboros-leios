@@ -119,6 +119,11 @@ pub enum NetworkCommand {
     /// Request peers from connected nodes (triggers PeerSharing).
     DiscoverPeers,
 
+    /// Ask a specific peer to re-run ChainSync intersection with fresh
+    /// candidates from the current local chain. Used when a previous
+    /// intersection became stale due to a local fork switch.
+    ReIntersect { peer_id: PeerId },
+
     /// Inject a block into the chain store (for responder peers to serve).
     /// Used by block generators or other local producers.
     InjectBlock {

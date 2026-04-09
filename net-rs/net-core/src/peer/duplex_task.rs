@@ -192,6 +192,7 @@ async fn run_duplex_protocols(conn: DuplexConnection, params: DuplexProtocolPara
     let (fetch_sender, fetch_receiver) = mpsc::channel::<(Point, Point)>(16);
     let (peer_share_sender, peer_share_receiver) = mpsc::channel::<u8>(4);
     let (tx_submit_sender, tx_submit_receiver) = mpsc::channel::<PendingTx>(16);
+    let (cs_reintersect_sender, cs_reintersect_receiver) = mpsc::channel::<()>(4);
 
     let mut cs_client = spawn_chainsync(
         cs_send,
@@ -199,6 +200,7 @@ async fn run_duplex_protocols(conn: DuplexConnection, params: DuplexProtocolPara
         peer_id,
         chain_store.clone(),
         event_sender.clone(),
+        cs_reintersect_receiver,
     );
     let ka_client = spawn_keepalive(
         ka_send,
@@ -311,6 +313,7 @@ async fn run_duplex_protocols(conn: DuplexConnection, params: DuplexProtocolPara
         peer_share: peer_share_sender,
         tx_submit: tx_submit_sender,
         leios_fetch: leios_client_handles.as_ref().map(|(_, _, lf)| lf.clone()),
+        chainsync_reintersect: cs_reintersect_sender,
     };
 
     // Main select loop: dispatch commands and detect ChainSync client exit.

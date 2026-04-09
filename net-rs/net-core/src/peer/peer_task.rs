@@ -148,46 +148,67 @@ pub(crate) fn server_protocol_configs(leios_enabled: bool) -> Vec<ProtocolConfig
     configs
 }
 
+/// Run find_intersection and send the result as IntersectionFound.
+async fn do_intersection(
+    runner: &mut Runner<ChainSync>,
+    chain_store: &ChainStore,
+    peer_id: PeerId,
+    event_sender: &mpsc::Sender<(PeerId, PeerEvent)>,
+) -> Result<(), String> {
+    let candidates = chain_store.intersection_candidates(32);
+    match chainsync::find_intersection(runner, candidates).await {
+        Ok(Some((point, _tip))) => {
+            let _ = event_sender
+                .send((peer_id, PeerEvent::IntersectionFound { point }))
+                .await;
+            Ok(())
+        }
+        Ok(None) => Ok(()), // no intersection, continue from origin
+        Err(e) => Err(format!("chainsync intersection: {e}")),
+    }
+}
+
 /// Spawn the ChainSync sub-task. Runs find_intersection then request_next loop.
+/// Accepts a `reintersect_rx` signal channel: when a signal arrives, the task
+/// re-runs find_intersection with fresh candidates from the current local chain
+/// (used when the previous intersection became stale due to a local fork switch).
 pub(crate) fn spawn_chainsync(
     cs_send: CodecSend,
     cs_recv: CodecRecv,
     peer_id: PeerId,
     chain_store: Arc<ChainStore>,
     event_sender: mpsc::Sender<(PeerId, PeerEvent)>,
+    mut reintersect_rx: mpsc::Receiver<()>,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
         let mut runner = Runner::<ChainSync>::new(Role::Client, cs_send, cs_recv);
 
-        // Ask the peer to intersect with our local chain so RollForward
-        // streams every header between the common ancestor and the peer's
-        // current tip. Exponentially-spaced candidates cover the full chain
-        // with O(log n) probes; Origin is the ultimate fallback.
-        let candidates = chain_store.intersection_candidates(32);
-        let result = chainsync::find_intersection(&mut runner, candidates).await;
-
-        match result {
-            Ok(Some((point, _tip))) => {
-                let _ = event_sender
-                    .send((peer_id, PeerEvent::IntersectionFound { point }))
-                    .await;
-            }
-            Ok(None) => { /* no intersection, continue from origin */ }
-            Err(e) => {
-                let _ = event_sender
-                    .send((
-                        peer_id,
-                        PeerEvent::Failed {
-                            reason: format!("chainsync intersection: {e}"),
-                        },
-                    ))
-                    .await;
-                return;
-            }
+        // Initial intersection.
+        if let Err(reason) =
+            do_intersection(&mut runner, &chain_store, peer_id, &event_sender).await
+        {
+            let _ = event_sender
+                .send((peer_id, PeerEvent::Failed { reason }))
+                .await;
+            return;
         }
 
         // Main request_next loop.
         loop {
+            // Check for re-intersect signal before sending MsgRequestNext
+            // (we are in StIdle here, so MsgFindIntersect is valid).
+            if let Ok(()) = reintersect_rx.try_recv() {
+                // Drain any extra signals (only need one re-intersect).
+                while reintersect_rx.try_recv().is_ok() {}
+                if let Err(reason) =
+                    do_intersection(&mut runner, &chain_store, peer_id, &event_sender).await
+                {
+                    let _ = event_sender
+                        .send((peer_id, PeerEvent::Failed { reason }))
+                        .await;
+                    return;
+                }
+            }
             match chainsync::request_next(&mut runner).await {
                 Ok(ChainSyncEvent::RollForward { header, tip }) => {
                     let _ = event_sender
@@ -584,6 +605,7 @@ pub(crate) async fn run_peer_task(mut config: PeerTaskConfig) {
     let (fetch_sender, fetch_receiver) = mpsc::channel::<(Point, Point)>(16);
     let (peer_share_sender, peer_share_receiver) = mpsc::channel::<u8>(4);
     let (tx_submit_sender, tx_submit_receiver) = mpsc::channel::<PendingTx>(16);
+    let (cs_reintersect_sender, cs_reintersect_receiver) = mpsc::channel::<()>(4);
 
     // Spawn protocol sub-tasks.
     let mut cs_handle = spawn_chainsync(
@@ -592,6 +614,7 @@ pub(crate) async fn run_peer_task(mut config: PeerTaskConfig) {
         peer_id,
         config.chain_store.clone(),
         event_sender.clone(),
+        cs_reintersect_receiver,
     );
     let ka_handle = spawn_keepalive(
         ka_send,
@@ -650,6 +673,7 @@ pub(crate) async fn run_peer_task(mut config: PeerTaskConfig) {
         peer_share: peer_share_sender,
         tx_submit: tx_submit_sender,
         leios_fetch: leios_handles.as_ref().map(|(_, _, lf)| lf.clone()),
+        chainsync_reintersect: cs_reintersect_sender,
     };
 
     // Main select loop: dispatch commands and detect sub-task failure.
@@ -933,8 +957,15 @@ mod tests {
 
         // Spawn just ChainSync and KeepAlive sub-tasks.
         let (chain_store, _rx) = ChainStore::new(100);
-        let cs_handle =
-            spawn_chainsync(cs_send, cs_recv, peer_id, chain_store, event_sender.clone());
+        let (_reintersect_tx, reintersect_rx) = mpsc::channel::<()>(4);
+        let cs_handle = spawn_chainsync(
+            cs_send,
+            cs_recv,
+            peer_id,
+            chain_store,
+            event_sender.clone(),
+            reintersect_rx,
+        );
         let ka_handle = spawn_keepalive(
             ka_send,
             ka_recv,
