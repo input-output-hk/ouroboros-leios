@@ -579,9 +579,10 @@ impl PraosConsensus {
                             tip_block_no,
                             "select_chain: orphan with stale anchor, requesting re-intersection"
                         );
-                        if let Some(chain) = self.peer_chains.get_mut(&peer_id) {
-                            chain.clear_entries();
-                        }
+                        // Don't clear_entries — keep existing PeerChain
+                        // so the walk has entries to work with, and the
+                        // tried set properly skips this peer for other
+                        // candidates this pass.
                         let _ = self
                             .commands
                             .send(NetworkCommand::ReIntersect { peer_id })
