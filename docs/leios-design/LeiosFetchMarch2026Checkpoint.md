@@ -43,6 +43,14 @@ It's useful for this single document to collate their essential descriptions sin
     - It's not obvious what the tolerable performance lower bounds are nor how they should vary across time and/or peers.
     - **Constraint**: LeiosFetch must quickly react to changes in peer behavior.
 
+- **Challenge**: there are other mini protocols running concurrently, and so far the node's architecture has kept them independent.
+  The `ouroboros-network` Mux Layer combines their network traffic fairly.
+  The GHC run-time system and the node's careful use of synchronization primitives combines their CPU usages fairly.
+  But with the introduction of Leios and its intended throughput, mini protocols are no longer equal.
+  Leios itself is strictly lower-urgency than Praos (e.g. ChainSync and BlockFetch).
+  And the increased overall throughput means TxSubmission load is potentially much more heavy than before (e.g. refilling Mempool after an EB flushes some of its content).
+    - **Constraint**: LeiosFetch decision logic _may_ need to coordinate with other mini protocols' decision logic (e.g. to balance/schedule network load).
+
 - **Challenge**: intercontinental peers are important.
   Despite intercontinental peers inherently exhibiting poor latency, they drastically improve the diffusion of EBs through the global Cardano network when well-utilized.
   Thus, There is no one-dimensional metric that would be sufficient for peer performance: a variety of peers is desired.
@@ -113,6 +121,8 @@ Ultimately, Praos is lightweight enough to be less challenging.
 As a result, a greater fraction of a node's peers will each be performant enough to diffuse a Praos block within the required latency.
 The difference is unsurpising, since Leios so drastically increases throughput.
 
+TODO give some examples of e.g. _hedge requests_ in BlockFetch and TxSubmission today already
+
 # Prior Art: The Tail At Scale
 
 "[The Tail At Scale](https://research.google/pubs/the-tail-at-scale/)" by Jeffrey Dean and Luiz André Barroso (2013) discusses a similar goal: improving worst-case latencies among a large network of machines.
@@ -162,6 +172,8 @@ TODO find people with greater expertise---I'm a comparatively sheltered Ouroboro
   Major difference: The tree structure is a crucial element, and the existing Cardano p2p logic is not obviously compatible with that; e.g. that article mentions ~2 hops instead of our ~6.
   Major difference: The Solana objective includes much higher sustained traffic, so hopefully Linear Leios doesn't require as much complexity.
   Major difference: They're separately compensating for UDP issues instead of accepting TCP's limitations.
+
+TODO further discussion on the high-level trade-offs of erasure codes, esp. what resource usage does it improve the efficiency of versus how much CPU etc. it would consume?
 
 # Terminology
 
