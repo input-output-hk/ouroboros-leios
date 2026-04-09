@@ -768,6 +768,19 @@ impl PraosConsensus {
         self.in_flight.insert(point, Instant::now());
     }
 
+    /// Periodic retry: evict stale in-flight entries and re-run chain
+    /// selection. Called from the slot tick in the main loop to ensure
+    /// lagging nodes retry fetches even when no new network events arrive
+    /// (e.g., after block production stops).
+    pub async fn retry_select_chain(&mut self) {
+        let before = self.in_flight.len();
+        self.evict_stale_in_flight();
+        let evicted = before - self.in_flight.len();
+        if evicted > 0 || !self.in_flight.is_empty() || !self.pending_validation.is_empty() {
+            self.select_chain().await;
+        }
+    }
+
     /// Handle a network event. Returns true if the event was consumed by
     /// consensus (caller should not log it separately).
     pub async fn handle_event(&mut self, event: &NetworkEvent) -> bool {

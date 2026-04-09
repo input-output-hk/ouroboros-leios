@@ -119,10 +119,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let leios = config.leios_enabled;
     let node_id = config.node_id.clone();
 
+    let mut retry_counter: u64 = 0;
     loop {
         tokio::select! {
             slot = slot_clock.tick() => {
                 telem.current_slot = slot;
+                retry_counter += 1;
 
                 // Praos: try to produce a ranking block.
                 let prev_hash = consensus.tip_hash();
@@ -170,6 +172,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                             data: votes.vote_data,
                         }).await;
                     }
+                }
+
+                // Periodic retry: re-run chain selection every 5 slots
+                // to recover from stale fetches and pending_validation
+                // deadlocks, even when no new network events arrive.
+                if retry_counter.is_multiple_of(5) {
+                    consensus.retry_pending().await;
                 }
             }
             event = handle.events.recv() => {
