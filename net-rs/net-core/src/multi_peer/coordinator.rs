@@ -576,10 +576,12 @@ impl Coordinator {
             }
 
             NetworkCommand::FetchBlockRange { from, to } => {
-                // Range fetch: find a peer whose fragment contains both
-                // endpoints. Checking only `to` can misroute to a peer
-                // that lacks the `from` block (e.g., its ChainSync
-                // intersection is between `from` and `to`).
+                // Range fetch: find a peer whose fragment contains the
+                // `to` endpoint. We only check `to` because `from` may
+                // have been removed from the fragment after an earlier
+                // fetch (fragment.remove on BlockFetched). The server's
+                // get_range has a fallback for unknown `from` — it
+                // returns the prefix up to `to`.
                 if self.pending_fetches.contains_key(&to) {
                     return true;
                 }
@@ -587,7 +589,7 @@ impl Coordinator {
                 let best_peer = self
                     .peers
                     .iter()
-                    .filter(|(_, p)| p.fragment.contains(&to) && p.fragment.contains(&from))
+                    .filter(|(_, p)| p.fragment.contains(&to))
                     .min_by_key(|(_, p)| p.rtt.unwrap_or(Duration::from_secs(999)))
                     .map(|(id, _)| *id);
 
