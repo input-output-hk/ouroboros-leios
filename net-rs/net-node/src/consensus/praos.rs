@@ -349,13 +349,13 @@ impl PraosConsensus {
     ///    region, or if `adopted_ancestors` is truncated by a gap, no
     ///    ancestor is found.
     ///
-    /// 3. **Origin fallback handles genesis-diverged forks.** When
-    ///    `oldest.prev_hash` is `None` (peer chain roots at genesis),
-    ///    Origin is accepted as the common ancestor unconditionally.
-    ///    `execute_switch` handles the Origin rollback by submitting
-    ///    `LedgerCommand::Rollback { target: Point::Origin }` and
-    ///    resetting to fresh-node state. The entire peer chain becomes
-    ///    the replay set.
+    /// 3. **Origin fallback is fresh-node only.** When
+    ///    `oldest.prev_hash` is `None` (peer chain contains genesis
+    ///    child), Origin is accepted as ancestor only when
+    ///    `adopted_tip_hash` is `None` (fresh node). An adopted node
+    ///    seeing `prev_hash=None` means stale PeerChain entries from
+    ///    block 1 survived a rollback — the re-intersect mechanism
+    ///    handles this via `OrphanCandidate`.
     fn select_chain_once(&self, skip: &HashSet<PeerId>) -> SelectionDecision {
         // Pick the best peer candidate: strictly better tip, ties broken by lower hash.
         let (adopted_hash, adopted_bn) = match self.adopted_tip_hash {
@@ -413,12 +413,16 @@ impl PraosConsensus {
             if let Some(oldest) = candidate.iter().next() {
                 match oldest.prev_hash {
                     None => {
-                        // Peer's chain roots at genesis. Genesis is a
-                        // universal common ancestor — every valid chain
-                        // starts there. The entire peer chain becomes the
-                        // replay set, and execute_switch handles the Origin
-                        // rollback.
-                        ancestor = Some([0u8; 32]);
+                        // Peer's oldest entry has no parent (genesis child).
+                        // Only accept Origin as ancestor for a fresh node
+                        // with no adopted chain. An adopted node seeing
+                        // prev_hash=None means stale PeerChain entries from
+                        // block 1 survived a rollback — not a genuine
+                        // genesis-diverged fork. The re-intersect mechanism
+                        // handles stale state via OrphanCandidate.
+                        if self.adopted_tip_hash.is_none() {
+                            ancestor = Some([0u8; 32]);
+                        }
                     }
                     Some(parent) => {
                         if adopted_ancestors.contains(&parent) {
@@ -2324,19 +2328,18 @@ mod tests {
         consensus.record_peer_tip(peer, &p5_tip, &p5_hdr);
 
         // The peer has 5 blocks vs our 3 — strictly better. The chains
-        // share no common blocks, so Origin is the only valid ancestor.
+        // share no common blocks, but an adopted node does NOT roll back
+        // to Origin (that's only for fresh nodes). The re-intersect
+        // mechanism handles this via OrphanCandidate.
         match consensus.select_chain_once(&HashSet::new()) {
-            SelectionDecision::WaitingForBlocks {
-                ancestor,
-                missing,
+            SelectionDecision::OrphanCandidate {
+                peer_id: orphan_peer,
                 tip_block_no,
-                ..
             } => {
-                assert_eq!(ancestor, [0u8; 32], "ancestor should be Origin");
+                assert_eq!(orphan_peer, peer);
                 assert_eq!(tip_block_no, 5);
-                assert_eq!(missing.len(), 5, "all 5 peer blocks should be missing");
             }
-            other => panic!("expected WaitingForBlocks, got {other:?}"),
+            other => panic!("expected OrphanCandidate, got {other:?}"),
         }
     }
 
