@@ -18,6 +18,8 @@ pub(crate) struct ClientProtocolSenders {
     pub peer_share: mpsc::Sender<u8>,
     pub tx_submit: mpsc::Sender<PendingTx>,
     pub leios_fetch: Option<mpsc::Sender<LeiosFetchCommand>>,
+    /// Signal to ChainSync sub-task to re-run find_intersection.
+    pub chainsync_reintersect: mpsc::Sender<()>,
 }
 
 /// Dispatch a single PeerCommand to the appropriate protocol task.
@@ -50,6 +52,9 @@ pub(crate) async fn dispatch_command(
             if let Some(ref lf) = senders.leios_fetch {
                 let _ = lf.send(LeiosFetchCommand::Votes { votes }).await;
             }
+        }
+        Some(PeerCommand::ReIntersect) => {
+            let _ = senders.chainsync_reintersect.send(()).await;
         }
         Some(PeerCommand::Disconnect) | None => return false,
     }

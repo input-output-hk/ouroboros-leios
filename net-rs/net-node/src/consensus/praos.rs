@@ -129,6 +129,13 @@ impl PeerChain {
         }
     }
 
+    /// Clear all entries but preserve the anchor. Used when requesting
+    /// re-intersection — stale entries are discarded and ChainSync will
+    /// re-fill from the new intersection point.
+    pub fn clear_entries(&mut self) {
+        self.entries.clear();
+    }
+
     /// Last entry in the chain (the peer's current tip), if any.
     pub fn tip(&self) -> Option<&PeerChainEntry> {
         self.entries.back()
@@ -555,12 +562,40 @@ impl PraosConsensus {
                     peer_id,
                     tip_block_no,
                 } => {
-                    tracing::debug!(
-                        node_id = %self.node_id,
-                        %peer_id,
-                        tip_block_no,
-                        "select_chain: skipping orphan candidate"
-                    );
+                    // If this peer has an anchor but it's stale (not in
+                    // our adopted chain), request re-intersection over the
+                    // existing ChainSync connection. This gives a fresh
+                    // anchor on the current adopted chain and re-streams
+                    // headers from the correct starting point.
+                    let has_stale_anchor = self.peer_chains.get(&peer_id).is_some_and(|chain| {
+                        chain.anchor().is_some_and(|a| {
+                            self.adopted_tip_hash
+                                .map(|h| !self.chain_tree.ancestors(h).contains(&a.hash))
+                                .unwrap_or(false)
+                        })
+                    });
+                    if has_stale_anchor {
+                        info!(
+                            node_id = %self.node_id,
+                            %peer_id,
+                            tip_block_no,
+                            "select_chain: orphan with stale anchor, requesting re-intersection"
+                        );
+                        if let Some(chain) = self.peer_chains.get_mut(&peer_id) {
+                            chain.clear_entries();
+                        }
+                        let _ = self
+                            .commands
+                            .send(NetworkCommand::ReIntersect { peer_id })
+                            .await;
+                    } else {
+                        tracing::debug!(
+                            node_id = %self.node_id,
+                            %peer_id,
+                            tip_block_no,
+                            "select_chain: skipping orphan candidate"
+                        );
+                    }
                     tried.insert(peer_id);
                     continue;
                 }
