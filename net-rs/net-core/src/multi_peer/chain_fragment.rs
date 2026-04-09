@@ -3,6 +3,25 @@
 //! Each peer announces headers via ChainSync. The `ChainFragment` records
 //! the ordered sequence of points from intersection to tip, enabling the
 //! coordinator to answer "does this peer have block X?" in O(1).
+//!
+//! # Maintained invariants
+//!
+//! - **Vec/HashSet consistency**: `points` and `point_set` always contain
+//!   the same elements. All mutations update both.
+//! - **Deduplication**: `append()` is idempotent via `HashSet::insert`.
+//! - **Conservative rollback**: unknown points in `rollback_to()` are no-ops.
+//!
+//! # Known gaps
+//!
+//! - **No range awareness**: `contains()` answers per-point, but the
+//!   coordinator uses it to route `FetchBlockRange { from, to }` requests.
+//!   A peer having point X does NOT guarantee it has all blocks between
+//!   some other point and X. The coordinator at `coordinator.rs:582`
+//!   currently only checks `fragment.contains(&to)` — if it also checked
+//!   `from`, misrouted range fetches would be avoided.
+//! - **`remove()` creates ordering holes**: after removing a point from
+//!   the middle of `points`, the Vec has a logical gap. This is harmless
+//!   since only `contains()` (HashSet) is used for routing decisions.
 
 use std::collections::HashSet;
 

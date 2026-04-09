@@ -1,9 +1,39 @@
 //! Tree of block headers for fork tracking and longest-chain selection.
 //!
-//! Maintains a tree of block headers keyed by hash. When a peer announces
-//! a new block, it is inserted into the tree via its `prev_hash` link.
-//! The longest chain (highest `block_number`) is selected as the best tip.
-//! Blocks deeper than `k` below the best tip are pruned.
+//! [`ChainTree`] is a HashMap-backed forest of block headers, keyed by
+//! 32-byte block hash. It tracks all known block headers — from peers
+//! (via `on_block_received`) and self-production (via `register_self_produced`)
+//! — and maintains a cached `best_tip` for the highest-block-number chain.
+//!
+//! Its primary consumer is [`select_chain_once`](super::consensus::praos),
+//! which calls [`ancestors()`](ChainTree::ancestors) to compute the adopted
+//! chain's ancestry, then walks a peer's announced headers looking for a
+//! hash in that ancestry set.
+//!
+//! # Maintained invariants
+//!
+//! - **No duplicate hashes**: [`insert()`](ChainTree::insert) is idempotent;
+//!   re-inserting an existing hash is a no-op.
+//! - **`best_tip` accuracy**: After every [`insert()`](ChainTree::insert),
+//!   `best_tip` reflects the block with the highest `block_number` among all
+//!   nodes (ties broken by lexicographically lower hash).
+//! - **`ancestors()` termination**: The walk follows a finite HashMap and
+//!   stops at the first missing parent or `None` prev_hash.
+//!
+//! # Known gaps
+//!
+//! - **No contiguity enforcement**: [`insert()`](ChainTree::insert) accepts
+//!   any block regardless of whether its `prev_hash` exists in the tree.
+//!   Disconnected fragments are permitted.
+//! - **`ancestors()` is silent about gaps**: It stops at the first missing
+//!   parent but the caller cannot distinguish "reached genesis" from "hit a
+//!   gap where an intermediate block was never inserted or was pruned".
+//!   A truncated ancestry causes false `OrphanCandidate` classification in
+//!   `select_chain_once`. Two causes observed in practice:
+//!   - Blocks validated and adopted but never inserted into chain_tree
+//!     (opaque headers — partially fixed, but may still occur if the
+//!     fallback `block_no` is 0).
+//!   - `prune_below()` removing deep history on long-running forks.
 
 use std::collections::{HashMap, HashSet};
 
@@ -52,6 +82,8 @@ struct ChainNode {
 /// Blocks are keyed by their 32-byte hash. The `best_tip` is cached and
 /// updated on every insert. Pruning removes blocks deeper than `k` below
 /// the best tip.
+///
+/// See the [module-level documentation](self) for invariants and known gaps.
 #[derive(Debug)]
 pub struct ChainTree {
     nodes: HashMap<[u8; 32], ChainNode>,
@@ -67,6 +99,13 @@ impl ChainTree {
     }
 
     /// Insert a block. Returns true if this block becomes the new best tip.
+    ///
+    /// Accepts any block — does NOT check that `prev_hash` exists in the
+    /// tree or that `block_number` is consistent with the parent. The tree
+    /// may contain disconnected fragments after this call.
+    ///
+    /// Idempotent: re-inserting an existing hash returns false with no
+    /// changes.
     pub fn insert(
         &mut self,
         hash: [u8; 32],
@@ -140,13 +179,48 @@ impl ChainTree {
     }
 
     /// Prune blocks with block_number below the threshold.
+    ///
+    /// Recomputes `best_tip` if the current best was pruned. In normal
+    /// operation the caller prunes at `adopted_bn - k` where `best_tip`
+    /// is at or above `adopted_bn`, so the recomputation rarely fires.
     pub fn prune_below(&mut self, min_block_number: u64) {
         self.nodes
             .retain(|_, node| node.block_number >= min_block_number);
+
+        // Recompute best_tip if it was pruned.
+        let pruned = match &self.best_tip {
+            Some((_, bn)) => *bn < min_block_number,
+            None => false,
+        };
+        if pruned {
+            self.best_tip = None;
+            for (hash, node) in &self.nodes {
+                let is_new_best = match &self.best_tip {
+                    None => true,
+                    Some((_, best_bn)) => {
+                        let best_hash = self.best_tip_hash().unwrap_or([0xFF; 32]);
+                        is_better_tip(node.block_number, hash, *best_bn, &best_hash)
+                    }
+                };
+                if is_new_best {
+                    self.best_tip = Some((node.point.clone(), node.block_number));
+                }
+            }
+        }
     }
 
     /// Walk the prev_hash chain from `hash` back to genesis (or a gap),
     /// collecting hashes in reverse order (tip first).
+    ///
+    /// Stops when:
+    /// - `prev_hash` is `None` (reached genesis or an orphan root), OR
+    /// - `prev_hash` points to a hash not in `nodes` (gap — intermediate
+    ///   block was never inserted, or was pruned).
+    ///
+    /// **The caller cannot distinguish these two cases.** A truncated
+    /// result may mean the chain is incomplete, not that it's short.
+    /// `select_chain_once` depends on a complete ancestry to find common
+    /// ancestors with peers — gaps cause false `OrphanCandidate` results.
     pub(crate) fn ancestors(&self, mut hash: [u8; 32]) -> Vec<[u8; 32]> {
         let mut chain = vec![hash];
         while let Some(node) = self.nodes.get(&hash) {
@@ -615,5 +689,201 @@ mod tests {
         assert!(has_block_4, "fork point block 4 should be included");
         let has_fork = entries.iter().any(|e| e.hash == "f7f7");
         assert!(has_fork, "fork block should be included");
+    }
+
+    // --- Invariant-encoding tests ---
+
+    #[test]
+    fn ancestors_stops_at_gap() {
+        let mut tree = ChainTree::new();
+        // Insert blocks 1, 2, 4, 5 — skip 3, creating a gap.
+        tree.insert(
+            [1; 32],
+            Point::Specific {
+                slot: 1,
+                hash: [1; 32],
+            },
+            1,
+            1,
+            None,
+        );
+        tree.insert(
+            [2; 32],
+            Point::Specific {
+                slot: 2,
+                hash: [2; 32],
+            },
+            2,
+            2,
+            Some([1; 32]),
+        );
+        // Block 3 is missing.
+        tree.insert(
+            [4; 32],
+            Point::Specific {
+                slot: 4,
+                hash: [4; 32],
+            },
+            4,
+            4,
+            Some([3; 32]),
+        );
+        tree.insert(
+            [5; 32],
+            Point::Specific {
+                slot: 5,
+                hash: [5; 32],
+            },
+            5,
+            5,
+            Some([4; 32]),
+        );
+
+        // ancestors(5) should stop at 4 because 4's prev_hash ([3;32]) is
+        // not in nodes — it cannot walk past the gap.
+        let anc = tree.ancestors([5; 32]);
+        assert_eq!(anc, vec![[5; 32], [4; 32]]);
+    }
+
+    #[test]
+    fn ancestors_reaches_genesis() {
+        let mut tree = ChainTree::new();
+        tree.insert(
+            [1; 32],
+            Point::Specific {
+                slot: 1,
+                hash: [1; 32],
+            },
+            1,
+            1,
+            None,
+        );
+        tree.insert(
+            [2; 32],
+            Point::Specific {
+                slot: 2,
+                hash: [2; 32],
+            },
+            2,
+            2,
+            Some([1; 32]),
+        );
+        tree.insert(
+            [3; 32],
+            Point::Specific {
+                slot: 3,
+                hash: [3; 32],
+            },
+            3,
+            3,
+            Some([2; 32]),
+        );
+
+        let anc = tree.ancestors([3; 32]);
+        assert_eq!(anc, vec![[3; 32], [2; 32], [1; 32]]);
+    }
+
+    #[test]
+    fn prune_preserves_best_tip() {
+        let mut tree = ChainTree::new();
+        for i in 1..=10u64 {
+            let hash = [i as u8; 32];
+            let prev = if i > 1 {
+                Some([(i - 1) as u8; 32])
+            } else {
+                None
+            };
+            tree.insert(hash, Point::Specific { slot: i, hash }, i, i, prev);
+        }
+        assert_eq!(tree.best_tip().map(|(_, bn)| bn), Some(10));
+
+        // Prune below the best tip — best_tip should survive.
+        tree.prune_below(6);
+        assert_eq!(tree.best_tip().map(|(_, bn)| bn), Some(10));
+        assert!(tree.nodes.contains_key(&tree.best_tip_hash().unwrap()));
+    }
+
+    #[test]
+    fn prune_recomputes_best_tip() {
+        let mut tree = ChainTree::new();
+        // Two forks: A at heights 1-3, B at heights 1-5 (best tip).
+        tree.insert(
+            [1; 32],
+            Point::Specific {
+                slot: 1,
+                hash: [1; 32],
+            },
+            1,
+            1,
+            None,
+        );
+        tree.insert(
+            [2; 32],
+            Point::Specific {
+                slot: 2,
+                hash: [2; 32],
+            },
+            2,
+            2,
+            Some([1; 32]),
+        );
+        tree.insert(
+            [3; 32],
+            Point::Specific {
+                slot: 3,
+                hash: [3; 32],
+            },
+            3,
+            3,
+            Some([2; 32]),
+        );
+        tree.insert(
+            [0xB4; 32],
+            Point::Specific {
+                slot: 4,
+                hash: [0xB4; 32],
+            },
+            4,
+            4,
+            Some([2; 32]),
+        );
+        tree.insert(
+            [0xB5; 32],
+            Point::Specific {
+                slot: 5,
+                hash: [0xB5; 32],
+            },
+            5,
+            5,
+            Some([0xB4; 32]),
+        );
+        assert_eq!(tree.best_tip().map(|(_, bn)| bn), Some(5));
+
+        // Prune away the best tip's fork entirely.
+        tree.prune_below(4);
+        // best_tip should be recomputed to the surviving B fork block.
+        let (_, bn) = tree.best_tip().unwrap();
+        assert!(bn >= 4, "best_tip should be a surviving block");
+        assert!(tree.nodes.contains_key(&tree.best_tip_hash().unwrap()));
+    }
+
+    #[test]
+    fn prune_all_clears_best_tip() {
+        let mut tree = ChainTree::new();
+        tree.insert(
+            [1; 32],
+            Point::Specific {
+                slot: 1,
+                hash: [1; 32],
+            },
+            1,
+            1,
+            None,
+        );
+        assert!(tree.best_tip().is_some());
+
+        tree.prune_below(100);
+        assert!(tree.best_tip().is_none());
+        assert_eq!(tree.len(), 0);
     }
 }

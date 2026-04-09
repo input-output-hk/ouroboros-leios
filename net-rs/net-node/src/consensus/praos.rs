@@ -48,6 +48,25 @@ pub(crate) struct PeerChainEntry {
 /// exceed the cap, the oldest entries are dropped (effectively the anchor
 /// slides forward). A proper Haskell-style immutable-point anchor is a
 /// future refinement; for now the cap is a blunt safety rail.
+///
+/// # Maintained invariants
+///
+/// - **Bounded size**: `len() <= cap` after every `append()`.
+/// - **No duplicate hashes**: `append()` scans for existing hash (O(n)).
+/// - **Announcement order**: entries are push_back in ChainSync order.
+/// - **Conservative rollback**: unknown points in `rollback_to()` are no-ops.
+///
+/// # Known gaps
+///
+/// - **No contiguity enforcement**: nothing checks that
+///   `entries[i+1].prev_hash == entries[i].hash`. If ChainSync skips
+///   headers, the chain can have logical gaps.
+/// - **Sliding window loses anchor**: when oldest entries are evicted on
+///   cap overflow, the only link to the pre-window chain is
+///   `oldest().prev_hash`. If that hash isn't in `ChainTree` (pruned or
+///   never inserted due to opaque headers), the peer chain becomes
+///   permanently disconnected from the adopted chain, causing
+///   `select_chain_once` to classify it as `OrphanCandidate`.
 #[derive(Debug)]
 pub(crate) struct PeerChain {
     entries: VecDeque<PeerChainEntry>,
@@ -269,6 +288,31 @@ impl PraosConsensus {
     ///
     /// This is pure — it does not mutate state. The async driver
     /// `select_chain` consumes its output.
+    ///
+    /// # Cross-structure dependencies
+    ///
+    /// Correctness depends on invariants spanning multiple structures:
+    ///
+    /// 1. **`adopted_ancestors` completeness requires `ChainTree` contiguity.**
+    ///    `chain_tree.ancestors(adopted_hash)` returns only the connected
+    ///    prefix — if there's a gap (intermediate block never inserted into
+    ///    `chain_tree`), the ancestry is truncated. Peer chain entries whose
+    ///    common ancestor falls beyond the gap will never match, causing
+    ///    false `OrphanCandidate` classification.
+    ///
+    /// 2. **`PeerChain` must overlap with `adopted_ancestors`.** The walk
+    ///    finds a common ancestor only if some entry in the peer chain has
+    ///    a hash that appears in `adopted_ancestors`. If the peer chain's
+    ///    sliding window (bounded by `cap`) has evicted the overlapping
+    ///    region, or if `adopted_ancestors` is truncated by a gap, no
+    ///    ancestor is found.
+    ///
+    /// 3. **Origin fallback only works for fresh nodes.** When
+    ///    `oldest.prev_hash` is `None` (genesis), the fallback at the
+    ///    bottom of the walk only accepts it when `adopted_tip_hash` is
+    ///    `None`. An adopted node cannot roll back to genesis through this
+    ///    path. This is a known limitation — a proper fix requires a richer
+    ///    anchor concept (like Haskell's `AnchoredFragment`).
     fn select_chain_once(&self, skip: &HashSet<PeerId>) -> SelectionDecision {
         // Pick the best peer candidate: strictly better tip, ties broken by lower hash.
         let (adopted_hash, adopted_bn) = match self.adopted_tip_hash {
@@ -921,6 +965,18 @@ impl PraosConsensus {
                 info.slot,
                 info.prev_hash,
             );
+        } else if block_no > 0 {
+            // Opaque header — insert with fallback metadata to avoid gaps
+            // in chain_tree that break ancestors() walks. block_no and
+            // prev_hash were derived from chain_tree lookups above; guard
+            // block_no > 0 to avoid inserting with the default which would
+            // confuse pruning and best_tip selection.
+            let slot = match point {
+                Point::Specific { slot, .. } => *slot,
+                _ => 0,
+            };
+            self.chain_tree
+                .insert(hash, point.clone(), block_no, slot, prev_hash);
         }
         self.block_cache.insert(
             hash,

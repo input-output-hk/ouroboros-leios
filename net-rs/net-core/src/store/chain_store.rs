@@ -4,6 +4,28 @@
 //! The coordinator writes (appends blocks, performs rollbacks).
 //! Server-side protocol handlers read (intersection lookups, block ranges,
 //! subscribe to change notifications).
+//!
+//! # Maintained invariants
+//!
+//! - **Bounded capacity**: FIFO eviction when `blocks.len() > capacity`.
+//! - **No duplicate points**: `append_block()` checks for existing point.
+//! - **Thread safety**: all access through `Mutex<ChainStoreInner>`.
+//! - **Change notification**: every mutation signals the watch channel.
+//! - **Rollback truncation**: `rollback_to()` keeps the target point and
+//!   everything before it; updates `last_rollback_target`.
+//!
+//! # Known gaps
+//!
+//! - **`block_no` is caller-provided**: not validated for monotonicity.
+//!   Not decremented on rollback (high-water-mark semantics).
+//! - **`get_range` fallback is intentionally imprecise**: when `from` is
+//!   not on the local chain (peer on a different fork), returns the prefix
+//!   `[0..=to]` so the peer can walk back via `prev_hash`. This can return
+//!   more blocks than needed.
+//! - **`intersection_candidates` may reference evicted blocks**: the
+//!   exponential lookback pattern generates points from the stored VecDeque,
+//!   so evicted blocks are not included, but the Origin fallback ensures
+//!   intersection always succeeds eventually.
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
@@ -151,6 +173,12 @@ impl ChainStore {
     /// Find the best intersection between the given points and the chain.
     /// Points are checked in order; first match wins (so callers should
     /// order from most recent to oldest).
+    ///
+    /// Returns `Some((Origin, tip))` if `Origin` appears in `points` and no
+    /// earlier candidate matched — this means the only common point is
+    /// genesis. In the praos consensus layer, an Origin intersection maps
+    /// to `anchor=None`, which currently only allows a switch when
+    /// `adopted_tip_hash` is `None` (fresh node).
     pub fn find_intersection(&self, points: &[Point]) -> Option<(Point, Tip)> {
         let inner = self.inner.lock().unwrap();
         let tip = match inner.blocks.back() {
