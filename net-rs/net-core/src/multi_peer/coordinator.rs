@@ -496,13 +496,24 @@ impl Coordinator {
                     .await;
             }
 
-            PeerEvent::LeiosVotesFetched { votes } => {
+            PeerEvent::LeiosVotesFetched {
+                vote_ids,
+                vote_data,
+            } => {
                 if let Some(tracker) = self.leios.as_mut() {
                     tracker.complete_vote_fetch(peer_id);
                 }
+                // Re-inject fetched votes so this node can re-serve them
+                // (epidemic flooding rather than star topology).
+                if let Some(ref store) = self.leios_store {
+                    store.inject_votes(vote_ids.clone(), vote_data.clone());
+                }
                 let _ = self
                     .network_events
-                    .send(NetworkEvent::LeiosVotesReceived { votes })
+                    .send(NetworkEvent::LeiosVotesReceived {
+                        vote_ids,
+                        vote_data,
+                    })
                     .await;
             }
 

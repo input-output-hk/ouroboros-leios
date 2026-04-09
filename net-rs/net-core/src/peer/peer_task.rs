@@ -514,10 +514,16 @@ pub(crate) fn spawn_leios_fetch(
                     }
                 }
                 LeiosFetchCommand::Votes { votes } => {
-                    match leios_fetch::fetch_votes(&mut runner, votes).await {
+                    match leios_fetch::fetch_votes(&mut runner, votes.clone()).await {
                         Ok(vote_data) => {
                             let _ = event_sender
-                                .send((peer_id, PeerEvent::LeiosVotesFetched { votes: vote_data }))
+                                .send((
+                                    peer_id,
+                                    PeerEvent::LeiosVotesFetched {
+                                        vote_ids: votes,
+                                        vote_data,
+                                    },
+                                ))
                                 .await;
                         }
                         Err(e) => {

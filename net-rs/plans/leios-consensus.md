@@ -10,6 +10,131 @@ Commit `3c7eca140` split `consensus.rs` into `consensus/{mod,praos,leios}.rs`
 and moved the offer→fetch routing into `LeiosConsensus`. That module is now
 the home for everything below.
 
+## Immediate goal: vote bandwidth measurement
+
+Validate the bandwidth load of the Leios voting mechanism under different
+committee selection rules (wFA+LS, EveryoneVotes, StakeCentile). Three
+phases of work, each independently useful:
+
+**Phase 1** (in progress): Vote plumbing + structure + committee selection types.
+Vote IDs carried through fetch pipeline, fetched votes re-injected for
+epidemic flooding, structured fake vote bodies (130-180B), CommitteeSelection
+enum with VoteDecision (PersistentVote / NonPersistentVote / NoVote).
+
+### Phase 2: EB-triggered voting with committee selection
+
+Votes become reactive to EBs. Committee selection gates who votes.
+
+**`net-node/src/consensus/leios.rs`** — expand `LeiosConsensus` with:
+- `rng: StdRng`
+- `stake: u64, total_stake: u64`
+- `committee_selection: CommitteeSelection`
+- `persistent_vote_bytes: usize, non_persistent_vote_bytes: usize`
+- `stage_length_slots: u64`
+- `dyn_config: watch::Receiver<DynamicConfig>` (for `vote_generation_probability`)
+- `voted_ebs: HashSet<[u8; 32]>` — prevent double-voting on same EB
+
+New method `try_vote_on_eb(&mut self, eb_point: &Point)`:
+1. Extract hash from `Point::Specific`; skip if in `voted_ebs`
+2. Compute `election_id` from slot (slot / stage_length_slots)
+3. Read `vote_generation_probability` from `dyn_config`
+4. Call `committee_selection.decide_vote(stake, total_stake, vote_prob, &mut rng)`
+5. Match on `VoteDecision`:
+   - `NoVote` → return
+   - `PersistentVote` → vote_bytes = persistent_vote_bytes, tag = 0
+   - `NonPersistentVote` → vote_bytes = non_persistent_vote_bytes, tag = 1
+6. Build vote_id = `(slot, node_id_hash_bytes)`
+7. Build vote body via `build_fake_vote_body(tag, election_id, node_id, &eb_hash, vote_bytes)`
+8. Send `NetworkCommand::InjectLeiosVotes { votes: vec![vote_id], data: vec![body] }`
+9. Insert eb_hash into `voted_ebs`
+10. Buffer a `LeiosEvent::VoteProduced` for telemetry (includes vote_type + size)
+
+In `handle_event(LeiosBlockReceived { point, .. })`:
+- Call `self.try_vote_on_eb(&point)` after existing logging
+
+**`net-node/src/consensus/mod.rs`** — update `Consensus::new` to accept
+committee selection config + dyn_config, forward to `LeiosConsensus`.
+
+**`net-node/src/main.rs`**:
+- Pass config to `Consensus::new`
+- **Remove** the `try_produce_votes()` block (~lines 163-174)
+- Keep EB production at stage boundaries unchanged
+
+**`net-node/src/production.rs`**:
+- Remove `try_produce_votes()`, `ProducedVotes`, `vote_count`
+- Keep `build_fake_vote_body` as a public utility function
+
+**Tests (write first)**:
+- `vote_produced_on_eb_received_everyone`: EveryoneVotes + LeiosBlockReceived
+  → InjectLeiosVotes on channel with correct payload size
+- `no_vote_zero_stake`: stake=0 → no vote
+- `no_vote_low_centile`: StakeCentile(0.1), expect most nodes excluded
+- `vote_high_centile`: StakeCentile(0.95), expect most nodes included
+- `no_double_vote_same_eb`: same EB twice → one vote
+- `vote_body_references_correct_eb`: parse vote body, verify EB hash matches
+
+**Observable after**: Cluster with `committee_selection = "EveryoneVotes"`,
+`leios_enabled = true`: EB produced → all staked nodes receive it → each
+checks committee membership → selected nodes produce ~130-180B votes →
+votes flood via LeiosNotify/LeiosFetch → other nodes re-serve them.
+
+### Phase 3: Quorum detection + bandwidth stats
+
+Track votes per EB, detect quorum, emit telemetry for bandwidth analysis.
+
+**Vote aggregation in `net-node/src/consensus/leios.rs`**:
+
+```rust
+struct EbVoteTally {
+    eb_point: Point,
+    stage: u64,
+    voters: HashSet<Vec<u8>>,    // unique voter node IDs (parsed from vote body)
+    quorum_reached: bool,
+    first_vote_at: Instant,
+    quorum_at: Option<Instant>,
+}
+```
+
+Add to `LeiosConsensus`:
+- `tallies: HashMap<[u8; 32], EbVoteTally>` — keyed by EB hash
+- `votes_produced: u64, votes_received: u64, vote_bytes_received: u64`
+- `quorums_formed: u64`
+
+On `LeiosVotesReceived { ids, votes }`: for each vote blob:
+1. Parse to extract `endorser_block_hash` and `voter_node_id`
+2. Find or create `EbVoteTally` for that EB
+3. Insert voter into `voters` set (dedup)
+4. Estimate stake: `voters.len() * (total_stake / num_expected_nodes)`
+5. If crosses `quorum_stake_fraction`: set quorum, emit `QuorumReached` event
+6. Increment `vote_bytes_received += blob.len()`
+
+Own votes counted in tally when produced (Phase 2's `try_vote_on_eb`).
+Prune tallies older than `leios_dedup_window` slots.
+
+**Telemetry in `net-node/src/telemetry.rs`** — new `NodeEvent` variants:
+- `VoteProduced { node, slot, eb_hash_hex, payload_bytes }`
+- `QuorumReached { node, slot, eb_hash_hex, vote_count, time_to_quorum_ms }`
+- `LeiosStats { node, votes_produced, votes_received, vote_bytes_received, quorums_formed }`
+
+**Cluster config**:
+- `net-node/configs/mainnet.toml`: add `committee_selection`, vote byte
+  configs, `quorum_stake_fraction` defaults
+- `net-cluster/configs/sample-cluster.toml`: Leios committee selection examples
+
+**Tests**:
+- `quorum_after_enough_votes`: 4 voters, quorum=0.75, fires after 3rd
+- `no_quorum_below_threshold`: 2/4 → no event
+- `duplicate_voter_not_counted`: same voter twice → count=1
+- `quorum_time_recorded`: `time_to_quorum_ms > 0`
+- `leios_stats_counts`: verify counters increment
+
+**Observable after**: Full cluster run produces: `EBGenerated` → N ×
+`VoteProduced` → `QuorumReached { time_to_quorum_ms }`. Periodic
+`LeiosStats` shows total vote bytes per node. Compare:
+`--set committee_selection='"EveryoneVotes"'` vs
+`'{"WfaLs":{"persistent_stake_fraction":0.3}}'` vs
+`'{"StakeCentile":{"top_centile_of_stake":0.95}}'`
+
 ## Where we stand
 
 ### Already working

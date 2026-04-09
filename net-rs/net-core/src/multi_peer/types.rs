@@ -78,7 +78,11 @@ pub enum NetworkEvent {
     LeiosBlockReceived { point: Point, block: Vec<u8> },
 
     /// Leios: fetched votes arrived.
-    LeiosVotesReceived { votes: Vec<Vec<u8>> },
+    /// `vote_ids` are (slot, issuer_id) keys; `vote_data` are the CBOR bodies.
+    LeiosVotesReceived {
+        vote_ids: Vec<(u64, Vec<u8>)>,
+        vote_data: Vec<Vec<u8>>,
+    },
 
     /// Leios: fetched transactions for an EB arrived.
     LeiosBlockTxsReceived {

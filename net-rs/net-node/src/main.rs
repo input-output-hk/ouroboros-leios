@@ -309,10 +309,10 @@ fn record_network_event(
                 slot: telem.current_slot,
             });
         }
-        NetworkEvent::LeiosVotesReceived { votes } => {
+        NetworkEvent::LeiosVotesReceived { ref vote_data, .. } => {
             telem.record(NodeEvent::VotesReceived {
                 node: node_id.into(),
-                count: votes.len(),
+                count: vote_data.len(),
             });
         }
         NetworkEvent::RolledBack { point, .. } => {

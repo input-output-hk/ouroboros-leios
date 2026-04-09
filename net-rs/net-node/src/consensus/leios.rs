@@ -100,10 +100,10 @@ impl LeiosConsensus {
                 info!(node_id = %self.node_id, %point, "leios block received");
                 true
             }
-            NetworkEvent::LeiosVotesReceived { votes } => {
+            NetworkEvent::LeiosVotesReceived { vote_data, .. } => {
                 info!(
                     node_id = %self.node_id,
-                    count = votes.len(),
+                    count = vote_data.len(),
                     "leios votes received"
                 );
                 true
