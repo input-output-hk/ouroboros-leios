@@ -307,12 +307,13 @@ impl PraosConsensus {
     ///    region, or if `adopted_ancestors` is truncated by a gap, no
     ///    ancestor is found.
     ///
-    /// 3. **Origin fallback only works for fresh nodes.** When
-    ///    `oldest.prev_hash` is `None` (genesis), the fallback at the
-    ///    bottom of the walk only accepts it when `adopted_tip_hash` is
-    ///    `None`. An adopted node cannot roll back to genesis through this
-    ///    path. This is a known limitation — a proper fix requires a richer
-    ///    anchor concept (like Haskell's `AnchoredFragment`).
+    /// 3. **Origin fallback handles genesis-diverged forks.** When
+    ///    `oldest.prev_hash` is `None` (peer chain roots at genesis),
+    ///    Origin is accepted as the common ancestor unconditionally.
+    ///    `execute_switch` handles the Origin rollback by submitting
+    ///    `LedgerCommand::Rollback { target: Point::Origin }` and
+    ///    resetting to fresh-node state. The entire peer chain becomes
+    ///    the replay set.
     fn select_chain_once(&self, skip: &HashSet<PeerId>) -> SelectionDecision {
         // Pick the best peer candidate: strictly better tip, ties broken by lower hash.
         let (adopted_hash, adopted_bn) = match self.adopted_tip_hash {
@@ -370,12 +371,12 @@ impl PraosConsensus {
             if let Some(oldest) = candidate.iter().next() {
                 match oldest.prev_hash {
                     None => {
-                        // Peer's chain roots at genesis. Only usable as an
-                        // ancestor when we have no adopted tip yet — we can't
-                        // rewind an adopted chain to "before genesis".
-                        if self.adopted_tip_hash.is_none() {
-                            ancestor = Some([0u8; 32]);
-                        }
+                        // Peer's chain roots at genesis. Genesis is a
+                        // universal common ancestor — every valid chain
+                        // starts there. The entire peer chain becomes the
+                        // replay set, and execute_switch handles the Origin
+                        // rollback.
+                        ancestor = Some([0u8; 32]);
                     }
                     Some(parent) => {
                         if adopted_ancestors.contains(&parent) {
@@ -541,24 +542,39 @@ impl PraosConsensus {
         let needs_rollback = ancestor != [0u8; 32] || self.adopted_tip_hash.is_some();
 
         if needs_rollback && self.queued_validator_tip != Some(ancestor) {
-            let ancestor_point = match self.chain_tree.point(&ancestor) {
-                Some(p) => p.clone(),
-                None => {
-                    tracing::warn!(
-                        node_id = %self.node_id,
-                        ancestor = format!("{:02x}{:02x}", ancestor[30], ancestor[31]),
-                        "select_chain: ancestor point not in chain_tree; aborting switch"
-                    );
-                    return;
-                }
-            };
-            self.validator
-                .submit(LedgerCommand::Rollback {
-                    target: ancestor_point,
-                })
-                .await;
-            self.queued_validator_tip = Some(ancestor);
-            self.adopted_tip_hash = Some(ancestor);
+            if ancestor == [0u8; 32] {
+                // Origin rollback: the peer chain starts at genesis and
+                // shares no blocks with our adopted chain. Roll back to
+                // genesis and reset to fresh-node state so the first
+                // replay block (prev_hash=None) aligns correctly in
+                // submit_for_validation.
+                self.validator
+                    .submit(LedgerCommand::Rollback {
+                        target: Point::Origin,
+                    })
+                    .await;
+                self.queued_validator_tip = None;
+                self.adopted_tip_hash = None;
+            } else {
+                let ancestor_point = match self.chain_tree.point(&ancestor) {
+                    Some(p) => p.clone(),
+                    None => {
+                        tracing::warn!(
+                            node_id = %self.node_id,
+                            ancestor = format!("{:02x}{:02x}", ancestor[30], ancestor[31]),
+                            "select_chain: ancestor point not in chain_tree; aborting switch"
+                        );
+                        return;
+                    }
+                };
+                self.validator
+                    .submit(LedgerCommand::Rollback {
+                        target: ancestor_point,
+                    })
+                    .await;
+                self.queued_validator_tip = Some(ancestor);
+                self.adopted_tip_hash = Some(ancestor);
+            }
         }
 
         // Submit each replay block. submit_for_validation updates
@@ -832,6 +848,20 @@ impl PraosConsensus {
     /// Rollback succeeded: the ledger is now back at `target`, so the
     /// chain store should mirror that.
     async fn handle_rolled_back(&mut self, target: Point) {
+        if target == Point::Origin {
+            self.last_validated_tip = None;
+            info!(
+                node_id = %self.node_id,
+                "ledger rolled back to Origin, clearing chain store"
+            );
+            let _ = self
+                .commands
+                .send(NetworkCommand::InjectRollback {
+                    point: Point::Origin,
+                })
+                .await;
+            return;
+        }
         let hash = match &target {
             Point::Specific { hash, .. } => *hash,
             _ => return,
@@ -2176,6 +2206,125 @@ mod tests {
         assert!(
             saw_rollback,
             "RolledBack outcome should have emitted InjectRollback"
+        );
+    }
+
+    /// An adopted node whose only common ancestor with a peer is Origin
+    /// (genesis) must accept the peer's chain. This is the core regression
+    /// test for the Origin-as-ancestor fix.
+    #[tokio::test]
+    async fn select_chain_accepts_genesis_ancestor_for_adopted_node() {
+        let (mut consensus, _cmd_rx, _val_rx) = make_consensus();
+        let peer = PeerId(1);
+
+        // Self-produce blocks 1, 2, 3 (our adopted chain).
+        let (tip1, hdr1) = make_tip(10, 1, None);
+        consensus
+            .register_self_produced(&tip1.point, &hdr1, &BlockBody::opaque(Vec::new()))
+            .await;
+        let hash1 = match &tip1.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        let (tip2, hdr2) = make_tip(20, 2, Some(hash1));
+        consensus
+            .register_self_produced(&tip2.point, &hdr2, &BlockBody::opaque(Vec::new()))
+            .await;
+        let hash2 = match &tip2.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        let (tip3, hdr3) = make_tip(30, 3, Some(hash2));
+        consensus
+            .register_self_produced(&tip3.point, &hdr3, &BlockBody::opaque(Vec::new()))
+            .await;
+
+        // Peer announces a completely separate chain of 5 blocks, also
+        // rooted at genesis (prev_hash=None for block 1). Different slots
+        // produce different hashes — the chains share NO common blocks.
+        let (p1_tip, p1_hdr) = make_tip(100, 1, None);
+        let p1_hash = match &p1_tip.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus.record_peer_tip(peer, &p1_tip, &p1_hdr);
+
+        let (p2_tip, p2_hdr) = make_tip(200, 2, Some(p1_hash));
+        let p2_hash = match &p2_tip.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus.record_peer_tip(peer, &p2_tip, &p2_hdr);
+
+        let (p3_tip, p3_hdr) = make_tip(300, 3, Some(p2_hash));
+        let p3_hash = match &p3_tip.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus.record_peer_tip(peer, &p3_tip, &p3_hdr);
+
+        let (p4_tip, p4_hdr) = make_tip(400, 4, Some(p3_hash));
+        let p4_hash = match &p4_tip.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+        consensus.record_peer_tip(peer, &p4_tip, &p4_hdr);
+
+        let (p5_tip, p5_hdr) = make_tip(500, 5, Some(p4_hash));
+        consensus.record_peer_tip(peer, &p5_tip, &p5_hdr);
+
+        // The peer has 5 blocks vs our 3 — strictly better. The chains
+        // share no common blocks, so Origin is the only valid ancestor.
+        match consensus.select_chain_once(&HashSet::new()) {
+            SelectionDecision::WaitingForBlocks {
+                ancestor,
+                missing,
+                tip_block_no,
+                ..
+            } => {
+                assert_eq!(ancestor, [0u8; 32], "ancestor should be Origin");
+                assert_eq!(tip_block_no, 5);
+                assert_eq!(missing.len(), 5, "all 5 peer blocks should be missing");
+            }
+            other => panic!("expected WaitingForBlocks, got {other:?}"),
+        }
+    }
+
+    /// handle_rolled_back must handle Point::Origin by clearing
+    /// last_validated_tip and emitting InjectRollback.
+    #[tokio::test]
+    async fn handle_rolled_back_origin_sends_inject_rollback() {
+        let (mut consensus, mut cmd_rx, _val_rx) = make_consensus();
+
+        // Plant a block so the node has an adopted tip.
+        let (tip1, hdr1) = make_tip(10, 1, None);
+        consensus
+            .register_self_produced(&tip1.point, &hdr1, &BlockBody::opaque(Vec::new()))
+            .await;
+        while cmd_rx.try_recv().is_ok() {}
+
+        // Feed an Origin RolledBack outcome.
+        consensus
+            .on_validation_outcome(LedgerOutcome::RolledBack {
+                target: Point::Origin,
+            })
+            .await;
+
+        let mut saw_origin_rollback = false;
+        while let Ok(cmd) = cmd_rx.try_recv() {
+            if let NetworkCommand::InjectRollback { point } = cmd {
+                if point == Point::Origin {
+                    saw_origin_rollback = true;
+                }
+            }
+        }
+        assert!(
+            saw_origin_rollback,
+            "Origin RolledBack should emit InjectRollback with Point::Origin"
+        );
+        assert!(
+            consensus.last_validated_tip.is_none(),
+            "last_validated_tip should be None after Origin rollback"
         );
     }
 
