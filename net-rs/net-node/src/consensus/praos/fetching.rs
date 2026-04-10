@@ -72,43 +72,49 @@ impl super::PraosConsensus {
         let before = self.in_flight.len();
         self.evict_stale_in_flight();
         let evicted = before - self.in_flight.len();
+
+        // Try switching using stored blocks first.
+        if let Some(best) = self.chain_tree.best_tip_hash() {
+            self.try_switch_and_execute(best).await;
+        }
+
         if evicted > 0 || !self.in_flight.is_empty() {
-            self.select_chain().await;
+            self.evaluate_and_fetch().await;
         }
 
         // If chain_tree has a gap between best_tip and adopted, fetch
-        // the missing blocks. Done here (periodic) rather than in
-        // select_chain (per-event) to avoid fetch storms.
-        if let Err(Some(gap_point)) = self.try_stored_switch() {
-            let from = self
-                .adopted_tip_hash
-                .and_then(|h| self.chain_tree.point(&h).cloned())
-                .unwrap_or(Point::Origin);
-            // Only fetch forward (gap_point slot > adopted slot).
-            let from_slot = match &from {
-                Point::Specific { slot, .. } => *slot,
-                _ => 0,
-            };
-            let to_slot = match &gap_point {
-                Point::Specific { slot, .. } => *slot,
-                _ => 0,
-            };
-            if to_slot > from_slot && !self.in_flight.contains_key(&gap_point) {
-                info!(
-                    node_id = %self.node_id,
-                    %from,
-                    to = %gap_point,
-                    "retry: fetching gap to bridge chain_tree"
-                );
-                self.mark_in_flight(gap_point.clone());
-                let _ = self
-                    .commands
-                    .send(NetworkCommand::FetchBlockRange {
-                        from,
-                        to: gap_point,
-                        peer_id: None,
-                    })
-                    .await;
+        // the missing blocks. Done here (periodic) to avoid fetch storms.
+        if let Some(best) = self.chain_tree.best_tip_hash() {
+            if let Err(Some(gap_point)) = self.try_switch_to(best) {
+                let from = self
+                    .adopted_tip_hash
+                    .and_then(|h| self.chain_tree.point(&h).cloned())
+                    .unwrap_or(Point::Origin);
+                let from_slot = match &from {
+                    Point::Specific { slot, .. } => *slot,
+                    _ => 0,
+                };
+                let to_slot = match &gap_point {
+                    Point::Specific { slot, .. } => *slot,
+                    _ => 0,
+                };
+                if to_slot > from_slot && !self.in_flight.contains_key(&gap_point) {
+                    info!(
+                        node_id = %self.node_id,
+                        %from,
+                        to = %gap_point,
+                        "retry: fetching gap to bridge chain_tree"
+                    );
+                    self.mark_in_flight(gap_point.clone());
+                    let _ = self
+                        .commands
+                        .send(NetworkCommand::FetchBlockRange {
+                            from,
+                            to: gap_point,
+                            peer_id: None,
+                        })
+                        .await;
+                }
             }
         }
     }

@@ -329,50 +329,77 @@ impl super::PraosConsensus {
         }
     }
 
-    /// Find the longest switchable chain using only stored blocks.
-    /// Walks back from chain_tree's best tip to the adopted tip and
-    /// returns the contiguous cached prefix as a replay sequence.
-    /// Finds chains from ANY source — blocks from multiple peers that
-    /// form a contiguous path through chain_tree.
+    /// Try to switch to a specific block as chain tip. Walks back
+    /// through chain_tree from `tip_hash` to `adopted_tip` and returns
+    /// the contiguous prefix of cached blocks as a replay sequence.
     ///
     /// Returns `Ok((ancestor, replay))` on success, or `Err(gap_point)`
-    /// when the walk from best_tip doesn't reach adopted_tip — the
-    /// gap_point is where the walk stopped (the oldest block in the walk
-    /// whose parent is missing from chain_tree). Callers can fetch that
-    /// missing block to bridge the gap.
-    pub(super) fn try_stored_switch(&self) -> Result<([u8; 32], Vec<[u8; 32]>), Option<Point>> {
-        let best_hash = match self.chain_tree.best_tip_hash() {
-            Some(h) => h,
+    /// when the walk doesn't reach adopted_tip (gap in chain_tree).
+    pub(super) fn try_switch_to(
+        &self,
+        tip_hash: [u8; 32],
+    ) -> Result<([u8; 32], Vec<[u8; 32]>), Option<Point>> {
+        let adopted = self.adopted_tip_hash.unwrap_or([0u8; 32]);
+        if tip_hash == adopted {
+            return Err(None);
+        }
+        // Only consider strictly better chains.
+        let tip_bn = match self.chain_tree.block_number(&tip_hash) {
+            Some(bn) => bn,
             None => return Err(None),
         };
-        let adopted = self.adopted_tip_hash.unwrap_or([0u8; 32]);
-        if best_hash == adopted {
+        let adopted_bn = self
+            .adopted_tip_hash
+            .and_then(|h| self.chain_tree.block_number(&h))
+            .unwrap_or(0);
+        if !is_better_tip(tip_bn, &tip_hash, adopted_bn, &adopted) {
             return Err(None);
         }
 
-        let walk = self.chain_tree.ancestors(best_hash);
-        let adopted_pos = match walk.iter().position(|h| *h == adopted) {
+        // Walk back from the candidate tip. Find the common ancestor
+        // by intersecting with the adopted chain's ancestry.
+        let walk = self.chain_tree.ancestors(tip_hash);
+        let adopted_ancestors: HashSet<[u8; 32]> = self
+            .adopted_tip_hash
+            .map(|h| self.chain_tree.ancestors(h).into_iter().collect())
+            .unwrap_or_default();
+
+        let ancestor_pos = walk
+            .iter()
+            .position(|h| *h == adopted || adopted_ancestors.contains(h));
+        let ancestor_pos = match ancestor_pos {
             Some(p) => p,
+            None if self.adopted_tip_hash.is_none() => {
+                // Fresh node: accept if walk reaches genesis (prev_hash=None).
+                match walk.last() {
+                    Some(h) if self.chain_tree.prev_hash(h).is_none() => walk.len(),
+                    _ => {
+                        let gap_hash = walk.last().copied();
+                        let gap_point = gap_hash.and_then(|h| self.chain_tree.point(&h).cloned());
+                        return Err(gap_point);
+                    }
+                }
+            }
             None => {
-                // Walk didn't reach adopted_tip — there's a gap.
-                // The oldest block in the walk has a missing parent.
                 let gap_hash = walk.last().copied();
-                let _gap_parent = gap_hash.and_then(|h| self.chain_tree.prev_hash(&h));
-                // Return the point of the missing parent's child so
-                // the caller knows where to fetch around.
                 let gap_point = gap_hash.and_then(|h| self.chain_tree.point(&h).cloned());
                 return Err(gap_point);
             }
         };
+        let ancestor = if ancestor_pos < walk.len() {
+            walk[ancestor_pos]
+        } else {
+            [0u8; 32] // genesis
+        };
 
-        // Blocks from adopted (exclusive) to best_tip (inclusive), oldest first.
-        let replay: Vec<[u8; 32]> = walk[..adopted_pos].iter().rev().copied().collect();
+        // Blocks from ancestor (exclusive) to tip (inclusive), oldest first.
+        let replay: Vec<[u8; 32]> = walk[..ancestor_pos].iter().rev().copied().collect();
         if replay.is_empty() {
             return Err(None);
         }
 
-        // Longest contiguous prefix where we have the block body and
-        // it isn't already queued to the validator.
+        // Longest contiguous prefix with cached bodies, not already
+        // queued to the validator.
         let prefix: Vec<[u8; 32]> = replay
             .into_iter()
             .take_while(|h| {
@@ -384,34 +411,30 @@ impl super::PraosConsensus {
         if prefix.is_empty() {
             return Err(None);
         }
-        Ok((adopted, prefix))
+        Ok((ancestor, prefix))
     }
 
-    /// Drive chain selection to completion. First tries switching using
-    /// stored blocks (chain_tree walk), then falls through to peer-chain
-    /// based selection for fetching decisions.
-    pub(super) async fn select_chain(&mut self) {
-        // Try switching using blocks we already have, regardless of
-        // which peer announced them.
-        match self.try_stored_switch() {
-            Ok((ancestor, replay)) => {
-                info!(
-                    node_id = %self.node_id,
-                    replay_len = replay.len(),
-                    ancestor = format!("{:02x}{:02x}", ancestor[30], ancestor[31]),
-                    "select_chain: stored-block switch"
-                );
-                self.execute_switch(ancestor, replay).await;
-                return;
-            }
-            Err(Some(_gap_point)) => {
-                // Walk from best_tip didn't reach adopted — gap exists.
-                // Don't fetch here (select_chain runs too often); the
-                // periodic retry_select_chain handles gap fetching.
-            }
-            Err(None) => {}
+    /// Try switching to a specific block and execute the switch if
+    /// possible. Returns true if a switch was executed.
+    pub(super) async fn try_switch_and_execute(&mut self, tip_hash: [u8; 32]) -> bool {
+        if let Ok((ancestor, replay)) = self.try_switch_to(tip_hash) {
+            info!(
+                node_id = %self.node_id,
+                replay_len = replay.len(),
+                ancestor = format!("{:02x}{:02x}", ancestor[30], ancestor[31]),
+                "chain selection: switching to stored blocks"
+            );
+            self.execute_switch(ancestor, replay).await;
+            true
+        } else {
+            false
         }
+    }
 
+    /// Evaluate peer chains and issue fetches for missing blocks.
+    /// Also handles OrphanCandidate (re-intersection) and Switched
+    /// (fallback if on_block_received didn't catch it).
+    pub(super) async fn evaluate_and_fetch(&mut self) {
         let mut tried: HashSet<PeerId> = HashSet::new();
         loop {
             match self.select_chain_once(&tried) {
