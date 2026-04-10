@@ -490,14 +490,18 @@ Furthermore, the existing `forgeBlock` method and/or the `BlockForging` interfac
 
 > [!WARNING]
 >
-> TBD: Separate, new method or extending forgeBlock in `BlockForging`?
+> TODO: Separate, new method or extending forgeBlock in `BlockForging`?
+>
+> TODO: How does a LeiosEb relate to `blk`? Are all `blk` enhanced by Leios or only `ShelleyBlock proto era` or even only a specific `proto ~ LeiosPeras` and/or only for `era ~ DijkstraEra`?
 
 ### Endorser block diffusion
 
 > [!WARNING]
 >
 > TODO: announcements; announcement = signed (praos or eb?) headers; how to do EB equivocation detection
+>
 > TODO: offering bodies and txs
+>
 > TODO: what kind of validation while diffusing (only size and hash checks)
 
 - **REQ-DiffuseLeiosBlocks** The node must acquire and diffuse EBs and their closures (via the Network layer's new mini-protocols, see below).
@@ -508,8 +512,11 @@ Even the first version of LeiosFetch decision logic should consider EBs that are
 
 > [!WARNING]
 >
+> There is way more discussion of this in https://github.com/input-output-hk/ouroboros-leios/pull/797 and https://github.com/input-output-hk/ouroboros-leios/pull/848
+>
 > TODO: Discuss fetch decision logic for caught-up vs bulk syncing nodes, conservative pipelining depths, server-side reordering options.
 >  - fetch range via points
+>
 > TODO: what about newly synced nodes that need to acquire all EBs up to the immutable tip, how?
 >  - might demand a different mini-protocol design
 >  - query points of volatile suffix and request missing subset of it (like tx submission for the mempool)
@@ -527,10 +534,12 @@ This component therefore stores EBs on disk just as the ChainDB already does for
 >
 > TODO: discuss sizing and access patterns
 >  - up to 11k block opportunities within 12h? -> see nfrisby's eb storage document
+>
 > TODO: separate volatile/immutable stores? why?
 >  - having an immutable EBs table or database should bound access times on EBs
 >    and closures of the volatile part (which should be log n, thus bounding n
 >    is desirable)
+>
 > TODO: interaction with mempool (here or above) 
 
 ### Voting
@@ -540,7 +549,16 @@ A new thread dedicated to Leios vote production (**NEW-LeiosVoteProductionThread
 - **REQ-IssueLeiosVotes** The node must vote for EBs exactly according to the rules from the CIP.
 - **REQ-DiffuseLeiosVotes** The node must diffuse votes (via the Network layer's mini-protocols) at least until they're old enough that there remains only a negligible probability they could still enable an RB that was issued on-time to include a certificate for the EB they support.
 
+
+> ![WARNING]
+>
+> TODO: Detail the need for verifying votes and that this requires access to the selected committee (See certificate verification section)
+
 ### Vote storage
+
+> ![WARNING]
+>
+> TODO: "storage" implies persisting of votes, which is actually not needed. Votes can just be kept in memory. Rename this to "voting state"?
 
 A new storage component (**NEW-LeiosVoteStorage**) will store all votes received by a node, up to some conservative age (eg ten minutes). As votes arrive, they will be grouped according to the RB they support. When enough votes have arrived for some RB, the certificate can be generated immediately, which can avoid delaying the potential subsequent issuance of a CertRB by this node. A vote for the EB announced by an RB is irrelevant once all nodes will never switch their selection away from some block that is not older than that RB. This condition is very likely to be satisfied relatively soon on Cardano mainnet, unless its Praos growth is being disrupted. Therefore, the vote storage component can simply discard votes above some conservative age, which determines a stochastic upper bound the heap size of all sufficiently-young votes.
 
@@ -664,6 +682,10 @@ The endorsement block itself does not contain any additional information besides
 >
 > TODO: update the EB CDDL in the CIP with this fact about the tx validity information
 
+> ![WARNING]
+>
+> TODO: whats the concrete interface between consensus/ledger here? does it mean a change to the ledger `Block h (TxSeq era)` definition or how is the resolution of txs in a CertRB done before the ledger is asked to update the ledger state accordingly with it?
+
 ### Certificate verification
 
 In order to verify certificates contained in ranking blocks, the ledger must be aware of the voting committee and able to access their public keys. As defined by **REQ-RegisterBLSKeys**, SPOs must be able to register their BLS keys to become part of the voting committee. The ledger will need to be able to keep track of the registered keys and use them to do certificate verification. Besides verifying certificates, individual votes must also be verifiable by other components (e.g. to avoid diffusing invalid votes).
@@ -684,6 +706,12 @@ The voting committee consists of persistent and non-persistent voters. The persi
 Finally, block validation of the ledger can use the voting committee state to verify certificates contained in ranking blocks:
 
 - **REQ-LedgerCertificateVerification** The ledger must verify certificates contained in ranking blocks using the voting committee state.
+
+> ![WARNING]
+>
+> TODO: Certificate verification may be a consensus concern instead. Rationale:
+>  - the consensus layer would be a more natural fit to verify votes (before forwarding them) and verifying certificates is very similar
+>  - the consensus layer would also need to resolve transaction closures to update the ledger with, checking the cert must happen before doing that and this would mean less consensus/ledger interaction
 
 ### New protocol parameters
 
