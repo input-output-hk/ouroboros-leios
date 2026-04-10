@@ -190,6 +190,9 @@ pub(crate) enum SelectionDecision {
     WaitingForBlocks {
         peer_id: PeerId,
         ancestor: [u8; 32],
+        /// Full replay chain (oldest→newest hashes) from ancestor to tip.
+        /// Used to find the contiguous cached prefix for partial switches.
+        replay: Vec<[u8; 32]>,
         anchor_point: Option<Point>,
         missing: Vec<Point>,
         tip_block_no: u64,
@@ -523,9 +526,9 @@ impl PraosConsensus {
             }
         });
 
-        if missing.is_empty() {
-            let replay_hashes: Vec<[u8; 32]> = replay.iter().map(|(_, h)| *h).collect();
+        let replay_hashes: Vec<[u8; 32]> = replay.iter().map(|(_, h)| *h).collect();
 
+        if missing.is_empty() {
             // Verify chain_tree contiguity before switching. Walk
             // backward from the LAST replay block and check:
             //   (a) every replay hash lies on that chain
@@ -598,6 +601,7 @@ impl PraosConsensus {
             SelectionDecision::WaitingForBlocks {
                 peer_id,
                 ancestor,
+                replay: replay_hashes,
                 anchor_point,
                 missing,
                 tip_block_no: candidate_tip.block_no,
@@ -669,10 +673,30 @@ impl PraosConsensus {
                 SelectionDecision::WaitingForBlocks {
                     peer_id,
                     ancestor,
+                    replay,
                     anchor_point,
                     missing,
                     tip_block_no,
                 } => {
+                    // Switch to the contiguous prefix of cached blocks.
+                    // Remaining blocks are fetched separately; each
+                    // arrival triggers another partial switch.
+                    let prefix: Vec<[u8; 32]> = replay
+                        .into_iter()
+                        .take_while(|h| {
+                            self.validated.contains(h) || self.block_cache.contains_key(h)
+                        })
+                        .collect();
+                    if !prefix.is_empty() {
+                        info!(
+                            node_id = %self.node_id,
+                            %peer_id,
+                            prefix_len = prefix.len(),
+                            ancestor = format!("{:02x}{:02x}", ancestor[30], ancestor[31]),
+                            "select_chain: partial switch (cached prefix)"
+                        );
+                        self.execute_switch(ancestor, prefix).await;
+                    }
                     info!(
                         node_id = %self.node_id,
                         %peer_id,
