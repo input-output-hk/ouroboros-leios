@@ -609,20 +609,41 @@ impl PraosConsensus {
     /// returns the contiguous cached prefix as a replay sequence.
     /// Finds chains from ANY source — blocks from multiple peers that
     /// form a contiguous path through chain_tree.
-    fn try_stored_switch(&self) -> Option<([u8; 32], Vec<[u8; 32]>)> {
-        let best_hash = self.chain_tree.best_tip_hash()?;
+    ///
+    /// Returns `Ok((ancestor, replay))` on success, or `Err(gap_point)`
+    /// when the walk from best_tip doesn't reach adopted_tip — the
+    /// gap_point is where the walk stopped (the oldest block in the walk
+    /// whose parent is missing from chain_tree). Callers can fetch that
+    /// missing block to bridge the gap.
+    fn try_stored_switch(&self) -> Result<([u8; 32], Vec<[u8; 32]>), Option<Point>> {
+        let best_hash = match self.chain_tree.best_tip_hash() {
+            Some(h) => h,
+            None => return Err(None),
+        };
         let adopted = self.adopted_tip_hash.unwrap_or([0u8; 32]);
         if best_hash == adopted {
-            return None;
+            return Err(None);
         }
 
         let walk = self.chain_tree.ancestors(best_hash);
-        let adopted_pos = walk.iter().position(|h| *h == adopted)?;
+        let adopted_pos = match walk.iter().position(|h| *h == adopted) {
+            Some(p) => p,
+            None => {
+                // Walk didn't reach adopted_tip — there's a gap.
+                // The oldest block in the walk has a missing parent.
+                let gap_hash = walk.last().copied();
+                let gap_parent = gap_hash.and_then(|h| self.chain_tree.prev_hash(&h));
+                // Return the point of the missing parent's child so
+                // the caller knows where to fetch around.
+                let gap_point = gap_hash.and_then(|h| self.chain_tree.point(&h).cloned());
+                return Err(gap_point);
+            }
+        };
 
         // Blocks from adopted (exclusive) to best_tip (inclusive), oldest first.
         let replay: Vec<[u8; 32]> = walk[..adopted_pos].iter().rev().copied().collect();
         if replay.is_empty() {
-            return None;
+            return Err(None);
         }
 
         // Longest contiguous prefix where we have the block body and
@@ -636,9 +657,9 @@ impl PraosConsensus {
             .collect();
 
         if prefix.is_empty() {
-            return None;
+            return Err(None);
         }
-        Some((adopted, prefix))
+        Ok((adopted, prefix))
     }
 
     /// Drive chain selection to completion. First tries switching using
@@ -647,15 +668,23 @@ impl PraosConsensus {
     async fn select_chain(&mut self) {
         // Try switching using blocks we already have, regardless of
         // which peer announced them.
-        if let Some((ancestor, replay)) = self.try_stored_switch() {
-            info!(
-                node_id = %self.node_id,
-                replay_len = replay.len(),
-                ancestor = format!("{:02x}{:02x}", ancestor[30], ancestor[31]),
-                "select_chain: stored-block switch"
-            );
-            self.execute_switch(ancestor, replay).await;
-            return;
+        match self.try_stored_switch() {
+            Ok((ancestor, replay)) => {
+                info!(
+                    node_id = %self.node_id,
+                    replay_len = replay.len(),
+                    ancestor = format!("{:02x}{:02x}", ancestor[30], ancestor[31]),
+                    "select_chain: stored-block switch"
+                );
+                self.execute_switch(ancestor, replay).await;
+                return;
+            }
+            Err(Some(_gap_point)) => {
+                // Walk from best_tip didn't reach adopted — gap exists.
+                // Don't fetch here (select_chain runs too often); the
+                // periodic retry_select_chain handles gap fetching.
+            }
+            Err(None) => {}
         }
 
         let mut tried: HashSet<PeerId> = HashSet::new();
@@ -906,6 +935,42 @@ impl PraosConsensus {
         let evicted = before - self.in_flight.len();
         if evicted > 0 || !self.in_flight.is_empty() {
             self.select_chain().await;
+        }
+
+        // If chain_tree has a gap between best_tip and adopted, fetch
+        // the missing blocks. Done here (periodic) rather than in
+        // select_chain (per-event) to avoid fetch storms.
+        if let Err(Some(gap_point)) = self.try_stored_switch() {
+            let from = self
+                .adopted_tip_hash
+                .and_then(|h| self.chain_tree.point(&h).cloned())
+                .unwrap_or(Point::Origin);
+            // Only fetch forward (gap_point slot > adopted slot).
+            let from_slot = match &from {
+                Point::Specific { slot, .. } => *slot,
+                _ => 0,
+            };
+            let to_slot = match &gap_point {
+                Point::Specific { slot, .. } => *slot,
+                _ => 0,
+            };
+            if to_slot > from_slot && !self.in_flight.contains_key(&gap_point) {
+                info!(
+                    node_id = %self.node_id,
+                    %from,
+                    to = %gap_point,
+                    "retry: fetching gap to bridge chain_tree"
+                );
+                self.mark_in_flight(gap_point.clone());
+                let _ = self
+                    .commands
+                    .send(NetworkCommand::FetchBlockRange {
+                        from,
+                        to: gap_point,
+                        peer_id: None,
+                    })
+                    .await;
+            }
         }
     }
 
