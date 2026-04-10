@@ -121,11 +121,16 @@ impl PeerChain {
     }
 
     /// Truncate the chain to the given point (inclusive). If the point
-    /// is not in the chain, leave it unchanged — we can't rewrite history
-    /// we never knew.
+    /// matches the anchor (ChainSync intersection), clear all entries —
+    /// the rollback goes before any announced header. If the point is
+    /// not in entries and doesn't match the anchor, leave unchanged.
     pub fn rollback_to(&mut self, point: &Point) {
         if let Some(pos) = self.entries.iter().position(|e| &e.point == point) {
             self.entries.truncate(pos + 1);
+        } else if self.anchor.as_ref().is_some_and(|a| &a.point == point) {
+            // Rolling back to the intersection — everything after it
+            // is from a fork the peer abandoned.
+            self.entries.clear();
         }
     }
 
@@ -519,7 +524,71 @@ impl PraosConsensus {
         });
 
         if missing.is_empty() {
-            let replay_hashes: Vec<[u8; 32]> = replay.into_iter().map(|(_, h)| h).collect();
+            let replay_hashes: Vec<[u8; 32]> = replay.iter().map(|(_, h)| *h).collect();
+
+            // Verify chain_tree contiguity before switching. Walk
+            // backward from the LAST replay block and check:
+            //   (a) every replay hash lies on that chain
+            //   (b) the chain reaches the common ancestor (or genesis)
+            //
+            // Two distinct failure modes:
+            //   1. !all_on_chain: PeerChain entries span multiple forks
+            //      (stale entries survived a failed rollback). Fetching
+            //      can't fix this — skip the peer so re-intersect can
+            //      clean up the stale state.
+            //   2. !reaches_ancestor: genuine gap between ancestor and
+            //      first replay block (unfetched blocks). Fetchable.
+            if let Some(&last_hash) = replay_hashes.last() {
+                let walk_vec = self.chain_tree.ancestors(last_hash);
+                let walk: HashSet<[u8; 32]> = walk_vec.iter().copied().collect();
+                let all_on_chain = replay_hashes.iter().all(|h| walk.contains(h));
+
+                if !all_on_chain {
+                    // Replay entries from mixed forks — skip this peer.
+                    tracing::debug!(
+                        node_id = %self.node_id,
+                        %peer_id,
+                        tip_block_no = candidate_tip.block_no,
+                        replay_len = replay_hashes.len(),
+                        "select_chain: non-contiguous replay (mixed forks); skipping peer"
+                    );
+                    return SelectionDecision::OrphanCandidate {
+                        peer_id,
+                        tip_block_no: candidate_tip.block_no,
+                    };
+                }
+
+                let reaches_ancestor = if ancestor == [0u8; 32] {
+                    // Genesis: the walk must reach a block whose
+                    // prev_hash is None (the genesis child).
+                    walk_vec
+                        .last()
+                        .is_some_and(|h| self.chain_tree.prev_hash(h).is_none())
+                } else {
+                    walk.contains(&ancestor)
+                };
+
+                if !reaches_ancestor {
+                    // Genuine gap — fetch blocks between ancestor and
+                    // the start of the replay chain.
+                    let first_point = replay.first().map(|(p, _)| p.clone()).unwrap();
+                    let ancestor_point = self.chain_tree.point(&ancestor).cloned();
+                    info!(
+                        node_id = %self.node_id,
+                        %peer_id,
+                        tip_block_no = candidate_tip.block_no,
+                        "select_chain: chain_tree gap to ancestor; fetching"
+                    );
+                    return SelectionDecision::WaitingForBlocks {
+                        peer_id,
+                        ancestor,
+                        anchor_point: ancestor_point,
+                        missing: vec![first_point],
+                        tip_block_no: candidate_tip.block_no,
+                    };
+                }
+            }
+
             SelectionDecision::Switched {
                 peer_id,
                 ancestor,
@@ -1051,6 +1120,15 @@ impl PraosConsensus {
                         })
                         .await;
                     self.queued_validator_tip = Some(parent_hash);
+                } else {
+                    let hex = |h: &[u8; 32]| format!("{:02x}{:02x}", h[30], h[31]);
+                    tracing::debug!(
+                        node_id = %self.node_id,
+                        parent = hex(&parent_hash),
+                        queued_tip = self.queued_validator_tip.as_ref().map(|h| format!("{:02x}{:02x}", h[30], h[31])).as_deref().unwrap_or("<none>"),
+                        block = format!("{}", point),
+                        "parent not in chain_tree — skipping rollback"
+                    );
                 }
             }
         }
@@ -1165,14 +1243,22 @@ impl PraosConsensus {
         }
     }
 
-    /// Hash of the current best tip, for passing as prev_hash to block production.
+    /// Hash of the adopted tip, for passing as prev_hash to block production.
+    /// Returns `None` when no chain has been adopted yet — the production
+    /// code then builds the genesis child (block 1, prev_hash=None).
+    ///
+    /// Uses `adopted_tip_hash` (the validated chain) rather than
+    /// `chain_tree.best_tip_hash()` to avoid building on unvalidated
+    /// peer headers whose ancestor chain may be incomplete.
     pub fn tip_hash(&self) -> Option<[u8; 32]> {
-        self.chain_tree.best_tip_hash()
+        self.adopted_tip_hash
     }
 
-    /// Next block number (best tip + 1), for setting in produced block headers.
+    /// Next block number (adopted tip + 1), for setting in produced block headers.
     pub fn next_block_number(&self) -> u64 {
-        self.chain_tree.best_tip().map_or(1, |(_, bn)| bn + 1)
+        self.adopted_tip_hash
+            .and_then(|h| self.chain_tree.block_number(&h))
+            .map_or(1, |bn| bn + 1)
     }
 }
 
@@ -2595,5 +2681,142 @@ mod tests {
             .register_self_produced(&tip2.point, &hdr2, &BlockBody::opaque(Vec::new()))
             .await;
         assert_eq!(consensus.queued_validator_tip, Some(hash2));
+    }
+
+    #[test]
+    fn peer_chain_rollback_to_anchor_clears_entries() {
+        let mut chain = PeerChain::new(64);
+        let anchor_point = Point::Specific {
+            slot: 5,
+            hash: [5; 32],
+        };
+        chain.set_anchor(anchor_point.clone());
+
+        // Add entries after the anchor.
+        for i in 6..=10 {
+            chain.append(PeerChainEntry {
+                hash: [i; 32],
+                point: Point::Specific {
+                    slot: i as u64,
+                    hash: [i; 32],
+                },
+                block_no: i as u64,
+                prev_hash: Some([(i - 1); 32]),
+            });
+        }
+        assert_eq!(chain.len(), 5);
+
+        // Rolling back to the anchor should clear all entries.
+        chain.rollback_to(&anchor_point);
+        assert_eq!(chain.len(), 0);
+        // Anchor preserved.
+        assert!(chain.anchor().is_some());
+    }
+
+    /// When PeerChain entries are non-contiguous (stale entries from an
+    /// old fork + new entries from a new fork), select_chain_once must
+    /// NOT return Switched if the first replay block's chain_tree ancestry
+    /// doesn't reach the common ancestor. It should return WaitingForBlocks
+    /// so the gap blocks get fetched.
+    #[tokio::test]
+    async fn gap_between_ancestor_and_replay_returns_waiting() {
+        let (mut consensus, _cmd_rx, mut val_rx) = make_consensus();
+        let peer = PeerId(1);
+
+        // Build a 5-block adopted chain: 1 → 2 → 3 → 4 → 5
+        let mut prev = None;
+        let mut hashes = Vec::new();
+        for i in 1..=5u64 {
+            let (tip, hdr) = make_tip(i * 10, i, prev);
+            let hash = match &tip.point {
+                Point::Specific { hash, .. } => *hash,
+                _ => panic!(),
+            };
+            let body = make_block_body(&hdr);
+            consensus.on_block_received(&tip.point, &body).await;
+            hashes.push(hash);
+            prev = Some(hash);
+        }
+
+        // Validate blocks 1-5 by registering them as self-produced
+        // (which submits to validator) and draining outcomes.
+        for i in 1..=5u64 {
+            let (tip, hdr) = make_tip(
+                i * 10,
+                i,
+                if i == 1 {
+                    None
+                } else {
+                    Some(hashes[(i - 2) as usize])
+                },
+            );
+            let body = make_block_body(&hdr);
+            consensus
+                .register_self_produced(&tip.point, &hdr, &body)
+                .await;
+        }
+        drain_validator(&mut consensus, &mut val_rx).await;
+        assert_eq!(
+            consensus.adopted_tip_hash,
+            Some(*hashes.last().unwrap()),
+            "should be adopted at block 5"
+        );
+
+        // Peer announces a fork: same blocks 1-3, then 4' → 5' → 6'
+        // But we'll simulate non-contiguous PeerChain by only putting
+        // block 6' in the PeerChain with ancestor at block 3.
+        //
+        // Build block 4' (different slot → different hash, same block_no)
+        let (_, hdr4p) = make_tip(41, 4, Some(hashes[2])); // parent is block 3
+        let hash4p = match hdr4p.point() {
+            Some(Point::Specific { hash, .. }) => hash,
+            _ => panic!(),
+        };
+        let (_, hdr5p) = make_tip(51, 5, Some(hash4p));
+        let hash5p = match hdr5p.point() {
+            Some(Point::Specific { hash, .. }) => hash,
+            _ => panic!(),
+        };
+        let (tip6p, hdr6p) = make_tip(61, 6, Some(hash5p));
+        let hash6p = match &tip6p.point {
+            Point::Specific { hash, .. } => *hash,
+            _ => panic!(),
+        };
+
+        // Put block 6' body into block_cache (simulates a prior fetch
+        // that delivered the tip but not the intermediate blocks).
+        let body6p = make_block_body(&hdr6p);
+        consensus.on_block_received(&tip6p.point, &body6p).await;
+
+        // Set up PeerChain: intersection at block 3, but only entry is block 6'.
+        // This simulates the non-contiguous state after a failed rollback.
+        let intersection = Point::Specific {
+            slot: 30,
+            hash: hashes[2],
+        };
+        consensus.record_peer_intersection(peer, &intersection);
+        consensus
+            .peer_chains
+            .get_mut(&peer)
+            .unwrap()
+            .append(PeerChainEntry {
+                hash: hash6p,
+                point: tip6p.point.clone(),
+                block_no: 6,
+                prev_hash: Some(hash5p),
+            });
+
+        // select_chain_once should detect the gap (block 6' → 5' → 4' → 3
+        // but 5' and 4' aren't in chain_tree) and return WaitingForBlocks.
+        let decision = consensus.select_chain_once(&HashSet::new());
+        match decision {
+            SelectionDecision::WaitingForBlocks { .. } => { /* correct */ }
+            SelectionDecision::Switched { .. } => {
+                panic!("should NOT return Switched when there's a gap in chain_tree");
+            }
+            other => {
+                panic!("unexpected decision: {other:?}");
+            }
+        }
     }
 }
