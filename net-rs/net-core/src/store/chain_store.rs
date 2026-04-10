@@ -230,12 +230,19 @@ impl ChainStore {
     /// Get blocks in a range (inclusive on both endpoints).
     pub fn get_range(&self, from: &Point, to: &Point) -> Vec<StoredBlock> {
         let inner = self.inner.lock().unwrap();
-        let end = match inner.blocks.iter().position(|b| b.point == *to) {
-            Some(e) => e,
-            None => return Vec::new(),
-        };
+        // Find `to` in the store. If not present (peer rolled back past
+        // that fork tip), return up to the chain tip — the common prefix
+        // blocks are still useful to the client.
+        let end = inner
+            .blocks
+            .iter()
+            .position(|b| b.point == *to)
+            .unwrap_or_else(|| inner.blocks.len().saturating_sub(1));
+        if inner.blocks.is_empty() {
+            return Vec::new();
+        }
         // If `from` is on this chain, slice from there. Otherwise return the
-        // whole prefix up to `to` — the client may be on a fork whose `from`
+        // whole prefix up to `end` — the client may be on a fork whose `from`
         // we don't know, and giving it the chain prefix lets it walk back
         // through prev_hash to find a common ancestor.
         let start = inner
@@ -548,14 +555,24 @@ mod tests {
     }
 
     #[test]
-    fn get_range_missing_returns_empty() {
+    fn get_range_unknown_to_returns_available_blocks() {
         let (store, _rx) = ChainStore::new(100);
         for slot in 1..=3 {
             let (p, h, b) = make_block(slot);
             store.append_block(p, h, b, slot);
         }
 
+        // Both from and to are unknown — returns all available blocks
+        // (the peer rolled back past the requested tip but still has
+        // the common prefix).
         let range = store.get_range(&make_point(99), &make_point(100));
+        assert_eq!(range.len(), 3);
+    }
+
+    #[test]
+    fn get_range_empty_store_returns_empty() {
+        let (store, _rx) = ChainStore::new(100);
+        let range = store.get_range(&make_point(1), &make_point(2));
         assert!(range.is_empty());
     }
 
