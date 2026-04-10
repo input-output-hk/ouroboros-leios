@@ -1,4 +1,4 @@
-FROM ghcr.io/blinklabs-io/haskell:9.6.6-3.12.1.0-3 AS cardano-node-build
+FROM ghcr.io/blinklabs-io/haskell:9.6.7-3.12.1.0-1 AS cardano-node-build
 
 # From intersectmbo/cardano-node leios-prototype branch
 ARG CARDANO_NODE_VERSION=c53f7c0d9509675d0a5eddb5a45cd53dd09b1bff

@@ -7,7 +7,7 @@
 FROM ghcr.io/blinklabs-io/cardano-cli:10.14.0.0-1 AS cardano-cli
 
 # Build cardano-node from leios-prototype branch
-FROM ghcr.io/blinklabs-io/haskell:9.6.6-3.12.1.0-3 AS cardano-node-build
+FROM ghcr.io/blinklabs-io/haskell:9.6.7-3.12.1.0-1 AS cardano-node-build
 
 # From intersectmbo/cardano-node leios-prototype branch
 ARG CARDANO_NODE_VERSION_LEIOS=c53f7c0d9509675d0a5eddb5a45cd53dd09b1bff
@@ -27,7 +27,7 @@ RUN --mount=type=cache,target=/root/.cabal/store,id=cabal-store-cardano-node \
     && cabal install exe:cardano-node --install-method=copy --installdir=/root/.local/bin/
 
 # Build tx-generator from stable branch (leios-prototype tx-generator has API issues)
-FROM ghcr.io/blinklabs-io/haskell:9.6.6-3.12.1.0-3 AS tx-generator-build
+FROM ghcr.io/blinklabs-io/haskell:9.6.7-3.12.1.0-1 AS tx-generator-build
 
 # From intersectmbo/cardano-node master branch
 ARG CARDANO_NODE_VERSION_TXGEN=649f6a3ac56300fab0ba0fa57df7b7633ec88e8e

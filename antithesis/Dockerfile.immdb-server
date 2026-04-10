@@ -1,4 +1,4 @@
-FROM ghcr.io/blinklabs-io/haskell:9.6.6-3.12.1.0-3 AS immdb-server-build
+FROM ghcr.io/blinklabs-io/haskell:9.6.7-3.12.1.0-1 AS immdb-server-build
 
 # From intersectmbo/ouroboros-consensus leios-prototype branch
 ARG OUROBOROS_CONSENSUS_VERSION=5c62210fac956a3ecc5bd6fe4b2453e755d8f8e9
