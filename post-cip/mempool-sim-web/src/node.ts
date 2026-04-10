@@ -18,6 +18,12 @@ export class LightNode {
   seenBlocks: Set<string> = new Set();
   seenEBs: Set<string> = new Set();
 
+  // Arrival order of txs accepted into mempool.
+  // Values are tx indices, with -1 marking removed entries.
+  private mempoolTxOrder: number[] = [];
+  private mempoolTxPos: Map<number, number> = new Map();
+  private mempoolTxHead = 0;
+
   constructor(idx: number, id: string, honest: boolean, frontrunDelay_s: number, mempoolCapacity_B: number) {
     this.idx = idx;
     this.id = id;
@@ -38,9 +44,45 @@ export class LightNode {
     this.mempoolBytes = Math.max(0, this.mempoolBytes - size_B);
   }
 
+  addTxToOrder(txIdx: number): void {
+    if (this.mempoolTxPos.has(txIdx)) return;
+    this.mempoolTxPos.set(txIdx, this.mempoolTxOrder.length);
+    this.mempoolTxOrder.push(txIdx);
+  }
+
+  removeTxFromOrder(txIdx: number): void {
+    const pos = this.mempoolTxPos.get(txIdx);
+    if (pos === undefined) return;
+    this.mempoolTxOrder[pos] = -1;
+    this.mempoolTxPos.delete(txIdx);
+    this.advanceTxOrderHead();
+  }
+
+  scanTxOrder(visitor: (txIdx: number) => boolean): void {
+    this.advanceTxOrderHead();
+    for (let i = this.mempoolTxHead; i < this.mempoolTxOrder.length; i++) {
+      const txIdx = this.mempoolTxOrder[i]!;
+      if (txIdx < 0) continue;
+      if (!visitor(txIdx)) break;
+    }
+  }
+
+  hasTxInOrder(txIdx: number): boolean {
+    return this.mempoolTxPos.has(txIdx);
+  }
+
+  private advanceTxOrderHead(): void {
+    while (this.mempoolTxHead < this.mempoolTxOrder.length && this.mempoolTxOrder[this.mempoolTxHead] === -1) {
+      this.mempoolTxHead++;
+    }
+  }
+
   reset(): void {
     this.mempoolBytes = 0;
     this.seenBlocks.clear();
     this.seenEBs.clear();
+    this.mempoolTxOrder = [];
+    this.mempoolTxPos.clear();
+    this.mempoolTxHead = 0;
   }
 }
