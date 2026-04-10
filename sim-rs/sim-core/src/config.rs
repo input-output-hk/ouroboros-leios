@@ -57,6 +57,32 @@ impl From<DistributionConfig> for FloatDistribution {
     }
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Engine {
+    /// Tokio-based async actor system with virtual clock coordination
+    #[default]
+    Actor,
+    /// Sequential discrete event simulation with BSP parallelism
+    Sequential,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ShardStrategy {
+    /// Simple round-robin by node ID
+    #[default]
+    RoundRobin,
+    /// Round-robin but keeps 0-latency-connected nodes on the same shard
+    ZeroLatencyClusters,
+    /// K-means clustering by geographic coordinates to maximize cross-shard latency
+    Geographic,
+    /// Agglomerative clustering: merge lowest-latency pairs first (Kruskal-style)
+    MinLatencyClusters,
+    /// Min-cut partitioning: recursive bisection with Kernighan-Lin refinement
+    MinCut,
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct RawParameters {
@@ -65,6 +91,18 @@ pub struct RawParameters {
     pub relay_strategy: RelayStrategy,
     pub simulate_transactions: bool,
     pub timestamp_resolution_ms: f64,
+    #[serde(default = "default_shard_count")]
+    pub shard_count: usize,
+    #[serde(default)]
+    pub shard_strategy: ShardStrategy,
+    /// Max shard size as percentage of average (for min-latency-clusters). Default 200.
+    #[serde(default = "default_shard_max_size_pct")]
+    pub shard_max_size_pct: u64,
+    #[serde(default)]
+    pub engine: Engine,
+    /// Minimum simultaneous events before using rayon parallelism in the sequential engine.
+    #[serde(default = "default_parallel_threshold")]
+    pub parallel_threshold: usize,
 
     // Leios protocol configuration
     pub leios_stage_length_slots: u64,
@@ -363,6 +401,10 @@ impl From<RawTopology> for Topology {
                     id,
                     name: name.clone(),
                     stake: node.stake.unwrap_or_default(),
+                    location: match &node.location {
+                        RawNodeLocation::Coords(coords) => Some(*coords),
+                        RawNodeLocation::Cluster { .. } => None,
+                    },
                     cpu_multiplier: 1.0,
                     cores: node.cpu_core_count,
                     tx_conflict_fraction: node.tx_conflict_fraction,
@@ -709,6 +751,11 @@ impl LateTXAttackConfig {
 pub struct SimConfiguration {
     pub seed: u64,
     pub timestamp_resolution: Duration,
+    pub shard_count: usize,
+    pub shard_strategy: ShardStrategy,
+    pub shard_max_size_pct: u64,
+    pub engine: Engine,
+    pub parallel_threshold: usize,
     pub slots: Option<u64>,
     pub emit_conformance_events: bool,
     pub aggregate_events: bool,
@@ -780,6 +827,11 @@ impl SimConfiguration {
         Ok(Self {
             seed: 0,
             timestamp_resolution: duration_ms(params.timestamp_resolution_ms),
+            shard_count: params.shard_count.max(1),
+            shard_strategy: params.shard_strategy.clone(),
+            shard_max_size_pct: params.shard_max_size_pct,
+            engine: params.engine.clone(),
+            parallel_threshold: params.parallel_threshold,
             slots: None,
             emit_conformance_events: false,
             aggregate_events: false,
@@ -830,11 +882,23 @@ fn duration_ms(ms: f64) -> Duration {
     Duration::from_secs_f64(ms / 1000.0)
 }
 
+fn default_shard_count() -> usize {
+    1
+}
+
+fn default_shard_max_size_pct() -> u64 {
+    200
+}
+
+fn default_parallel_threshold() -> usize {
+    10
+}
 #[derive(Debug, Clone)]
 pub struct NodeConfiguration {
     pub id: NodeId,
     pub name: String,
     pub stake: u64,
+    pub location: Option<(f64, f64)>,
     pub cpu_multiplier: f64,
     pub cores: Option<u64>,
     pub tx_conflict_fraction: Option<f64>,

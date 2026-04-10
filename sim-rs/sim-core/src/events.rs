@@ -277,6 +277,12 @@ pub enum Event {
         sender: Node,
         recipient: Node,
     },
+    #[cfg(test)]
+    TestNodeEvent {
+        node: String,
+        event_type: String,
+        detail: String,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -315,6 +321,10 @@ impl EventTracker {
             clock,
             node_names,
         }
+    }
+
+    pub fn sender(&self) -> mpsc::UnboundedSender<(Event, Timestamp)> {
+        self.sender.clone()
     }
 
     pub fn track_global_slot(&self, slot: u64) {
@@ -852,6 +862,16 @@ impl EventTracker {
             id,
             name: self.node_names.get(&id).unwrap().clone(),
         }
+    }
+
+    #[cfg(test)]
+    pub fn track_test_event(&self, node_id: NodeId, event_type: &str, detail: &str) {
+        let node = self.to_node(node_id);
+        self.send(Event::TestNodeEvent {
+            node: node.name.to_string(),
+            event_type: event_type.to_string(),
+            detail: detail.to_string(),
+        });
     }
 }
 
