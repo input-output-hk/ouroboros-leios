@@ -389,6 +389,14 @@
       "properties": {},
       "type": "number"
     },
+    "leios-tx-generated-backlog-max-size": {
+      "description": "Maximum number of locally-generated transactions in the tx backlog (waiting area behind the mempool). null = unbounded.",
+      "type": ["number", "null"]
+    },
+    "leios-tx-peer-backlog-max-size": {
+      "description": "Maximum number of peer-received transactions in the tx backlog. null = unbounded.",
+      "type": ["number", "null"]
+    },
     "leios-stage-active-voting-slots": {
       "additionalProperties": false,
       "properties": {},
@@ -415,6 +423,10 @@
     "linear-eb-propagation-criteria": {
       "$ref": "#/definitions/EBPropagationCriteria",
       "description": "Which conditions must be met before a node will send an EB to peers?\n - \"eb-received\": the EB must only go through basic validation\n - \"txs-received\": all TXs in the EB must have been received\n - \"fully-valid\": the EB must be fully validated"
+    },
+    "linear-tx-max-age-slots": {
+      "description": "Maximum age (in slots) before a transaction can be pruned from node memory. When set, transactions older than this that are no longer in the mempool will be removed. Set to null to disable pruning.",
+      "type": ["number", "null"]
     },
     "linear-vote-stage-length-slots": {
       "additionalProperties": false,
@@ -475,6 +487,36 @@
       "description": "Only supported by Haskell simulation.",
       "type": "boolean"
     },
+    "shard-count": {
+      "description": "Number of clock shards for parallel simulation. Each shard advances time independently.\nOnly supported by Rust simulation.",
+      "type": "integer",
+      "minimum": 1,
+      "default": 1
+    },
+    "shard-strategy": {
+      "description": "Strategy for assigning nodes to shards.\n- round-robin: simple node_id % shard_count\n- zero-latency-clusters: keeps 0-latency-connected nodes on the same shard\n- geographic: k-means clustering by node coordinates\n- min-latency-clusters: agglomerative clustering maximizing cross-shard latency\nOnly supported by Rust simulation.",
+      "type": "string",
+      "enum": ["round-robin", "zero-latency-clusters", "geographic", "min-latency-clusters", "min-cut"],
+      "default": "round-robin"
+    },
+    "shard-max-size-pct": {
+      "description": "Max shard size as percentage of average size. Used by min-latency-clusters to prevent imbalanced shards.\nOnly supported by Rust simulation.",
+      "type": "integer",
+      "minimum": 100,
+      "default": 200
+    },
+    "engine": {
+      "description": "Simulation engine.\n- actor: tokio-based async actor system, non-deterministic, supports attacker scenarios\n- sequential: discrete event simulation, deterministic, does not support attacker scenarios\nOnly supported by Rust simulation.",
+      "type": "string",
+      "enum": ["actor", "sequential"],
+      "default": "actor"
+    },
+    "parallel-threshold": {
+      "description": "Minimum simultaneous events before using rayon parallelism in the sequential engine.\nOnly supported by Rust simulation.",
+      "type": "integer",
+      "minimum": 1,
+      "default": 10
+    },
     "timestamp-resolution-ms": {
       "description": "The smallest unit of time to simulate, in fractions of a millisecond.\nOnly supported by Rust simulation.",
       "type": "number"
@@ -482,6 +524,10 @@
     "treat-blocks-as-full": {
       "description": "When `true`, any delays and message sizes are calculated as if\neach block contained as much data as the expected average, rounded up.\nIn particular, for the sake of the above, we consider that:\n  - Each RB includes a certificate.\n  - Certificates contain votes from `vote-threshold` nodes.\n  - Vote bundles vote for `ceil eb-generation-probability` EBs.\n  - EBs reference `ceil (ib-generation-probability * leios-stage-length-slots)` IBs.\nOnly supported by Haskell simulation.",
       "type": "boolean"
+    },
+    "tx-batch-window-ms": {
+      "description": "When set, the sequential engine batches all TX generation events within this time window (in ms) into a single timestamp. Independent of timestamp-resolution-ms.",
+      "type": ["number", "null"]
     },
     "tx-conflict-fraction": {
       "description": "What fraction of TXs (from 0 to 1) should introduce conflicts with transactions which were produced before?\nOnly supported by Rust simulation.",
@@ -528,7 +574,14 @@
     },
     "vote-bundle-size-bytes-per-eb": {
       "additionalProperties": false,
+      "description": "Grandfathered for Haskell sim.",
       "properties": {},
+      "type": "number"
+    },
+    "persistent-vote-bundle-size-bytes-per-eb": {
+      "type": "number"
+    },
+    "non-persistent-vote-bundle-size-bytes-per-eb": {
       "type": "number"
     },
     "vote-diffusion-max-bodies-to-request": {
@@ -554,6 +607,13 @@
       "description": "Only supported by Haskell simulation."
     },
     "vote-generation-cpu-time-ms-constant": {
+      "description": "Grandfathered for Haskell sim.",
+      "type": "number"
+    },
+    "persistent-vote-generation-cpu-time-ms": {
+      "type": "number"
+    },
+    "non-persistent-vote-generation-cpu-time-ms": {
       "type": "number"
     },
     "vote-generation-cpu-time-ms-per-ib": {
@@ -563,6 +623,13 @@
       "type": "number"
     },
     "vote-generation-probability": {
+      "description": "Grandfathered for Haskell sim.",
+      "type": "number"
+    },
+    "persistent-vote-generation-probability": {
+      "type": "number"
+    },
+    "non-persistent-vote-generation-probability": {
       "type": "number"
     },
     "vote-threshold": {
@@ -571,6 +638,13 @@
       "type": "number"
     },
     "vote-validation-cpu-time-ms": {
+      "description": "Grandfathered for Haskell sim.",
+      "type": "number"
+    },
+    "persistent-vote-validation-cpu-time-ms": {
+      "type": "number"
+    },
+    "non-persistent-vote-validation-cpu-time-ms": {
       "type": "number"
     }
   },

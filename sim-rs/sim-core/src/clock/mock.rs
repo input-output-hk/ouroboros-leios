@@ -4,7 +4,7 @@ use std::{
     time::Duration,
 };
 
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{Notify, mpsc, oneshot};
 
 use crate::clock::{
     Clock, TaskInitiator, Timestamp, coordinator::ClockEvent, timestamp::AtomicTimestamp,
@@ -48,6 +48,7 @@ impl MockClockCoordinator {
             self.waiter_count.clone(),
             TaskInitiator::new(self.tasks.clone()),
             self.tx.clone(),
+            Arc::new(Notify::new()),
         )
     }
 
@@ -66,11 +67,6 @@ impl MockClockCoordinator {
                 ClockEvent::CancelWait { actor } => {
                     if self.waiters.remove(&actor).is_none() {
                         panic!("waiter {actor} cancelled a wait twice");
-                    }
-                }
-                ClockEvent::FinishTask => {
-                    if self.tasks.fetch_sub(1, std::sync::atomic::Ordering::AcqRel) == 0 {
-                        panic!("cancelled too many tasks");
                     }
                 }
             }

@@ -1,0 +1,11 @@
+# Performance-optimized simulation settings.
+# Uses sequential DES engine with 6 shards for ~5x speedup.
+engine: sequential
+shard-count: 6
+shard-strategy: zero-latency-clusters
+# Coarser time quantization batches more events per timestamp for parallelism.
+timestamp-resolution-ms: 1.0
+# Lower threshold so rayon kicks in with fewer work items.
+parallel-threshold: 4
+# Batch TX generation events within a 10ms window for better parallelism.
+tx-batch-window-ms: 10.0

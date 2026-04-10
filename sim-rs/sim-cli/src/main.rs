@@ -8,9 +8,7 @@ use figment::{
     providers::{Format as _, Yaml},
 };
 use sim_core::{
-    clock::ClockCoordinator,
     config::{NodeId, RawParameters, RawTopology, SimConfiguration, Topology},
-    events::EventTracker,
     sim::Simulation,
 };
 use tokio::{
@@ -39,8 +37,6 @@ struct Args {
     output: Option<PathBuf>,
     #[clap(short, long)]
     parameters: Vec<PathBuf>,
-    #[clap(short, long)]
-    timescale: Option<f64>,
     #[clap(long)]
     trace_node: Vec<usize>,
     #[clap(short, long)]
@@ -144,10 +140,7 @@ async fn main() -> Result<()> {
     let monitor = tokio::spawn(EventMonitor::new(&config, events_source, args.output).run());
     pin!(monitor);
 
-    let clock_coordinator = ClockCoordinator::new(config.timestamp_resolution);
-    let clock = clock_coordinator.clock();
-    let tracker = EventTracker::new(events_sink, clock.clone(), &config.nodes);
-    let mut simulation = Simulation::new(config, tracker, clock_coordinator).await?;
+    let simulation = Simulation::new(config, events_sink).await?;
 
     select! {
         result = simulation.run(token) => { result? }
@@ -155,7 +148,6 @@ async fn main() -> Result<()> {
         _ = ctrlc_source => {}
     };
 
-    simulation.shutdown()?;
     monitor.await??;
     Ok(())
 }
@@ -175,7 +167,6 @@ mod tests {
                 topology: Some(topology?.path()),
                 output: None,
                 parameters: vec![],
-                timescale: None,
                 trace_node: vec![],
                 slots: None,
                 conformance_events: false,

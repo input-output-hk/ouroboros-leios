@@ -128,7 +128,7 @@ When a node receives an EB referencing transactions it hasn't seen, it fetches t
 | Omniscient peer selection | Node checks global `inMempool` bitmap to find a peer that has the tx, then fetches from the first match | **Optimistic** — real nodes don't know which peers have which txs; would need to broadcast requests or use prior announcements as hints |
 | Single-source fetch | Only fetches from one peer (`break` after first match) | Optimistic — no retry on failure, no fan-out |
 | No EB validation delay | EB is accepted and triggers fetches immediately | Real nodes would validate EB structure before acting on it |
-| Fetched txs enter normal mempool | `SendEBTx` calls `acceptTx`, which triggers full gossip propagation | This is intentional — creates backpressure that defends against adversary front-running |
+| Fetched txs enter normal mempool | By default, `SendEBTx` calls `acceptTx`, which triggers full gossip propagation; disable with `--no-eb-tx-cache` | Default model adds backpressure; disabling it isolates EB fetch from mempool poisoning dynamics |
 
 ### Adversary Model
 
@@ -224,6 +224,7 @@ Options:
   --eb                             Enable endorser blocks (Leios) (default: false)
   --eb-size <bytes>                Endorser block size in bytes (default: "10000000")
   --eb-certification-rate <rate>   EB certification probability 0-1 (default: "0.5")
+  --no-eb-tx-cache                 Do not cache/gossip EB-fetched txs into mempools
   -h, --help                       display help for command
 ```
 

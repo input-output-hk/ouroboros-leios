@@ -57,6 +57,32 @@ impl From<DistributionConfig> for FloatDistribution {
     }
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Engine {
+    /// Tokio-based async actor system with virtual clock coordination
+    #[default]
+    Actor,
+    /// Sequential discrete event simulation with BSP parallelism
+    Sequential,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ShardStrategy {
+    /// Simple round-robin by node ID
+    #[default]
+    RoundRobin,
+    /// Round-robin but keeps 0-latency-connected nodes on the same shard
+    ZeroLatencyClusters,
+    /// K-means clustering by geographic coordinates to maximize cross-shard latency
+    Geographic,
+    /// Agglomerative clustering: merge lowest-latency pairs first (Kruskal-style)
+    MinLatencyClusters,
+    /// Min-cut partitioning: recursive bisection with Kernighan-Lin refinement
+    MinCut,
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct RawParameters {
@@ -65,6 +91,18 @@ pub struct RawParameters {
     pub relay_strategy: RelayStrategy,
     pub simulate_transactions: bool,
     pub timestamp_resolution_ms: f64,
+    #[serde(default = "default_shard_count")]
+    pub shard_count: usize,
+    #[serde(default)]
+    pub shard_strategy: ShardStrategy,
+    /// Max shard size as percentage of average (for min-latency-clusters). Default 200.
+    #[serde(default = "default_shard_max_size_pct")]
+    pub shard_max_size_pct: u64,
+    #[serde(default)]
+    pub engine: Engine,
+    /// Minimum simultaneous events before using rayon parallelism in the sequential engine.
+    #[serde(default = "default_parallel_threshold")]
+    pub parallel_threshold: usize,
 
     // Leios protocol configuration
     pub leios_stage_length_slots: u64,
@@ -75,11 +113,14 @@ pub struct RawParameters {
     pub leios_mempool_sampling_strategy: MempoolSamplingStrategy,
     pub leios_mempool_aggressive_pruning: bool,
     pub leios_mempool_size_bytes: Option<u64>,
+    pub leios_tx_generated_backlog_max_size: Option<usize>,
+    pub leios_tx_peer_backlog_max_size: Option<usize>,
     pub praos_chain_quality: u64,
     pub praos_fallback_enabled: bool,
     pub linear_vote_stage_length_slots: u64,
     pub linear_diffuse_stage_length_slots: u64,
     pub linear_eb_propagation_criteria: EBPropagationCriteria,
+    pub linear_tx_max_age_slots: Option<u64>,
 
     // Transaction configuration
     pub tx_generation_distribution: DistributionConfig,
@@ -91,6 +132,9 @@ pub struct RawParameters {
     pub tx_conflict_fraction: Option<f64>,
     pub tx_start_time: Option<f64>,
     pub tx_stop_time: Option<f64>,
+    /// When set, the sequential engine batches all TX generation events within this window
+    /// into a single timestamp, independent of timestamp-resolution-ms.
+    pub tx_batch_window_ms: Option<f64>,
 
     // Ranking block configuration
     pub rb_generation_probability: f64,
@@ -133,14 +177,18 @@ pub struct RawParameters {
     pub eb_include_txs_from_previous_stage: bool,
 
     // Vote configuration
-    pub vote_generation_probability: f64,
-    pub vote_generation_cpu_time_ms_constant: f64,
+    pub persistent_vote_generation_probability: f64,
+    pub non_persistent_vote_generation_probability: f64,
+    pub persistent_vote_generation_cpu_time_ms: f64,
+    pub non_persistent_vote_generation_cpu_time_ms: f64,
     pub vote_generation_cpu_time_ms_per_tx: f64,
     pub vote_generation_cpu_time_ms_per_ib: f64,
-    pub vote_validation_cpu_time_ms: f64,
+    pub persistent_vote_validation_cpu_time_ms: f64,
+    pub non_persistent_vote_validation_cpu_time_ms: f64,
     pub vote_threshold: u64,
     pub vote_bundle_size_bytes_constant: u64,
-    pub vote_bundle_size_bytes_per_eb: u64,
+    pub persistent_vote_bundle_size_bytes_per_eb: u64,
+    pub non_persistent_vote_bundle_size_bytes_per_eb: u64,
 
     // Certificate configuration
     pub cert_generation_cpu_time_ms_constant: f64,
@@ -172,6 +220,15 @@ pub enum LeiosVariant {
     FullWithTxReferences,
     Linear,
     LinearWithTxReferences,
+}
+
+impl LeiosVariant {
+    pub fn has_ibs(&self) -> bool {
+        !matches!(
+            self,
+            Self::FullWithoutIbs | Self::Linear | Self::LinearWithTxReferences
+        )
+    }
 }
 
 #[derive(Debug, Copy, Clone, Deserialize, PartialEq, Eq)]
@@ -353,6 +410,10 @@ impl From<RawTopology> for Topology {
                     id,
                     name: name.clone(),
                     stake: node.stake.unwrap_or_default(),
+                    location: match &node.location {
+                        RawNodeLocation::Coords(coords) => Some(*coords),
+                        RawNodeLocation::Cluster { .. } => None,
+                    },
                     cpu_multiplier: 1.0,
                     cores: node.cpu_core_count,
                     tx_conflict_fraction: node.tx_conflict_fraction,
@@ -391,6 +452,16 @@ impl From<RawTopology> for Topology {
             links,
         }
     }
+}
+
+fn vote_weighted_average(params: &RawParameters, persistent: f64, non_persistent: f64) -> f64 {
+    let total = params.persistent_vote_generation_probability
+        + params.non_persistent_vote_generation_probability;
+    if total == 0.0 {
+        return 0.0;
+    }
+    let frac = params.persistent_vote_generation_probability / total;
+    frac * persistent + (1.0 - frac) * non_persistent
 }
 
 #[derive(Debug, Clone)]
@@ -449,10 +520,18 @@ impl CpuTimeConfig {
             eb_body_validation_per_byte: duration_ms(
                 params.eb_body_validation_cpu_time_ms_per_byte,
             ),
-            vote_generation_constant: duration_ms(params.vote_generation_cpu_time_ms_constant),
+            vote_generation_constant: duration_ms(vote_weighted_average(
+                params,
+                params.persistent_vote_generation_cpu_time_ms,
+                params.non_persistent_vote_generation_cpu_time_ms,
+            )),
             vote_generation_per_tx: duration_ms(params.vote_generation_cpu_time_ms_per_tx),
             vote_generation_per_ib: duration_ms(params.vote_generation_cpu_time_ms_per_ib),
-            vote_validation: duration_ms(params.vote_validation_cpu_time_ms),
+            vote_validation: duration_ms(vote_weighted_average(
+                params,
+                params.persistent_vote_validation_cpu_time_ms,
+                params.non_persistent_vote_validation_cpu_time_ms,
+            )),
             cert_generation_constant: duration_ms(params.cert_generation_cpu_time_ms_constant),
             cert_generation_per_node: duration_ms(params.cert_generation_cpu_time_ms_per_node),
             cert_validation_constant: duration_ms(params.cert_validation_cpu_time_ms_constant),
@@ -485,7 +564,12 @@ impl BlockSizeConfig {
             eb_constant: params.eb_size_bytes_constant,
             eb_per_ib: params.eb_size_bytes_per_ib,
             vote_constant: params.vote_bundle_size_bytes_constant,
-            vote_per_eb: params.vote_bundle_size_bytes_per_eb,
+            vote_per_eb: vote_weighted_average(
+                params,
+                params.persistent_vote_bundle_size_bytes_per_eb as f64,
+                params.non_persistent_vote_bundle_size_bytes_per_eb as f64,
+            )
+            .round() as u64,
         }
     }
 
@@ -699,6 +783,11 @@ impl LateTXAttackConfig {
 pub struct SimConfiguration {
     pub seed: u64,
     pub timestamp_resolution: Duration,
+    pub shard_count: usize,
+    pub shard_strategy: ShardStrategy,
+    pub shard_max_size_pct: u64,
+    pub engine: Engine,
+    pub parallel_threshold: usize,
     pub slots: Option<u64>,
     pub emit_conformance_events: bool,
     pub aggregate_events: bool,
@@ -718,6 +807,8 @@ pub struct SimConfiguration {
     pub(crate) mempool_strategy: MempoolSamplingStrategy,
     pub(crate) mempool_aggressive_pruning: bool,
     pub(crate) mempool_size_bytes: u64,
+    pub(crate) tx_generated_backlog_max_size: Option<usize>,
+    pub(crate) tx_peer_backlog_max_size: Option<usize>,
     pub(crate) praos_chain_quality: u64,
     pub(crate) block_generation_probability: f64,
     pub(crate) ib_generation_probability: f64,
@@ -728,6 +819,7 @@ pub struct SimConfiguration {
     pub(crate) linear_vote_stage_length: u64,
     pub(crate) linear_diffuse_stage_length: u64,
     pub(crate) linear_eb_propagation_criteria: EBPropagationCriteria,
+    pub(crate) linear_tx_max_age_slots: Option<u64>,
     pub(crate) max_block_size: u64,
     pub(crate) max_ib_size: u64,
     pub(crate) max_eb_size: u64,
@@ -740,6 +832,8 @@ pub struct SimConfiguration {
     pub(crate) sizes: BlockSizeConfig,
     pub(crate) transactions: TransactionConfig,
     pub(crate) attacks: AttackConfig,
+    /// TX generation batching window for the sequential engine.
+    pub(crate) tx_batch_window: Option<Duration>,
 }
 
 impl SimConfiguration {
@@ -769,6 +863,11 @@ impl SimConfiguration {
         Ok(Self {
             seed: 0,
             timestamp_resolution: duration_ms(params.timestamp_resolution_ms),
+            shard_count: params.shard_count.max(1),
+            shard_strategy: params.shard_strategy.clone(),
+            shard_max_size_pct: params.shard_max_size_pct,
+            engine: params.engine.clone(),
+            parallel_threshold: params.parallel_threshold,
             slots: None,
             emit_conformance_events: false,
             aggregate_events: false,
@@ -787,17 +886,21 @@ impl SimConfiguration {
             mempool_strategy: params.leios_mempool_sampling_strategy,
             mempool_aggressive_pruning: params.leios_mempool_aggressive_pruning,
             mempool_size_bytes: params.leios_mempool_size_bytes.unwrap_or(u64::MAX),
+            tx_generated_backlog_max_size: params.leios_tx_generated_backlog_max_size,
+            tx_peer_backlog_max_size: params.leios_tx_peer_backlog_max_size,
             praos_chain_quality: params.praos_chain_quality,
             block_generation_probability: params.rb_generation_probability,
             ib_generation_probability: params.ib_generation_probability,
             eb_generation_probability: params.eb_generation_probability,
-            vote_probability: params.vote_generation_probability,
+            vote_probability: params.persistent_vote_generation_probability
+                + params.non_persistent_vote_generation_probability,
             vote_threshold: params.vote_threshold,
             vote_slot_length: params.leios_stage_active_voting_slots,
             eb_include_txs_from_previous_stage: params.eb_include_txs_from_previous_stage,
             linear_vote_stage_length: params.linear_vote_stage_length_slots,
             linear_diffuse_stage_length: params.linear_diffuse_stage_length_slots,
             linear_eb_propagation_criteria: params.linear_eb_propagation_criteria,
+            linear_tx_max_age_slots: params.linear_tx_max_age_slots,
             max_block_size: params.rb_body_max_size_bytes,
             max_ib_size: params.ib_body_max_size_bytes,
             max_eb_size: params.eb_referenced_txs_max_size_bytes,
@@ -810,6 +913,7 @@ impl SimConfiguration {
             sizes: BlockSizeConfig::new(&params),
             transactions: TransactionConfig::new(&params),
             attacks,
+            tx_batch_window: params.tx_batch_window_ms.map(duration_ms),
         })
     }
 }
@@ -818,11 +922,23 @@ fn duration_ms(ms: f64) -> Duration {
     Duration::from_secs_f64(ms / 1000.0)
 }
 
+fn default_shard_count() -> usize {
+    1
+}
+
+fn default_shard_max_size_pct() -> u64 {
+    200
+}
+
+fn default_parallel_threshold() -> usize {
+    10
+}
 #[derive(Debug, Clone)]
 pub struct NodeConfiguration {
     pub id: NodeId,
     pub name: String,
     pub stake: u64,
+    pub location: Option<(f64, f64)>,
     pub cpu_multiplier: f64,
     pub cores: Option<u64>,
     pub tx_conflict_fraction: Option<f64>,

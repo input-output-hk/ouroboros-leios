@@ -7,19 +7,36 @@ use std::{
     time::Duration,
 };
 
-use tokio::sync::{mpsc, oneshot};
+use tokio::{
+    select,
+    sync::{Notify, mpsc, oneshot},
+};
 
 use crate::clock::TaskInitiator;
 
 use super::{Clock, Timestamp, timestamp::AtomicTimestamp};
 
+/// Peer shard reference for CMB lookahead ceiling.
+pub struct PeerShard {
+    /// The peer shard's current published time.
+    pub time: Arc<AtomicTimestamp>,
+    /// Minimum link latency from that shard to this one (the CMB lookahead).
+    pub min_latency: Duration,
+    /// Notified when the peer advances time.
+    pub time_advanced: Arc<Notify>,
+}
+
 pub struct ClockCoordinator {
     timestamp_resolution: Duration,
     time: Arc<AtomicTimestamp>,
+    peer_shards: Vec<PeerShard>,
     tx: mpsc::UnboundedSender<ClockEvent>,
     rx: mpsc::UnboundedReceiver<ClockEvent>,
     waiter_count: Arc<AtomicUsize>,
     tasks: Arc<AtomicUsize>,
+    task_notify: Arc<Notify>,
+    /// Notified whenever this coordinator advances time, so peer shards can react.
+    time_advanced_notify: Arc<Notify>,
 }
 
 impl ClockCoordinator {
@@ -28,14 +45,34 @@ impl ClockCoordinator {
         let (tx, rx) = mpsc::unbounded_channel();
         let waiter_count = Arc::new(AtomicUsize::new(0));
         let tasks = Arc::new(AtomicUsize::new(0));
+        let task_notify = Arc::new(Notify::new());
+        let time_advanced_notify = Arc::new(Notify::new());
         Self {
             timestamp_resolution,
             time,
+            peer_shards: Vec::new(),
             tx,
             rx,
             waiter_count,
             tasks,
+            task_notify,
+            time_advanced_notify,
         }
+    }
+
+    /// Returns a shared reference to this coordinator's time.
+    pub fn shared_time(&self) -> Arc<AtomicTimestamp> {
+        self.time.clone()
+    }
+
+    /// Returns a Notify that fires whenever this coordinator advances time.
+    pub fn time_advanced_notify(&self) -> Arc<Notify> {
+        self.time_advanced_notify.clone()
+    }
+
+    /// Set peer shards for CMB lookahead ceiling.
+    pub fn set_peer_shards(&mut self, peers: Vec<PeerShard>) {
+        self.peer_shards = peers;
     }
 
     pub fn clock(&self) -> Clock {
@@ -45,6 +82,7 @@ impl ClockCoordinator {
             self.waiter_count.clone(),
             TaskInitiator::new(self.tasks.clone()),
             self.tx.clone(),
+            self.task_notify.clone(),
         )
     }
 
@@ -56,26 +94,55 @@ impl ClockCoordinator {
 
         let mut queue: BTreeMap<Timestamp, Vec<usize>> = BTreeMap::new();
         let mut running = waiters.len();
-        while let Some(event) = self.rx.recv().await {
-            match event {
-                ClockEvent::Wait { actor, until, done } => {
-                    assert!(until.is_none_or(|t| t >= self.time.load(Ordering::Acquire)));
-                    if waiters[actor].replace(Waiter { until, done }).is_some() {
-                        panic!("An actor has somehow managed to wait twice");
+        loop {
+            // If all actors are waiting, try to advance time
+            if running == 0 {
+                loop {
+                    // Register interest in notifications BEFORE checking state,
+                    // to avoid missing a notify between the check and the await.
+                    let task_notified = self.task_notify.notified();
+                    tokio::pin!(task_notified);
+                    task_notified.as_mut().enable();
+                    let mut peer_notified: Vec<_> = self.peer_shards
+                        .iter()
+                        .map(|p| Box::pin(p.time_advanced.notified()))
+                        .collect();
+                    // Eagerly register as waiters so we don't miss notifications
+                    // from peers running in parallel tasks.
+                    for notified in &mut peer_notified {
+                        notified.as_mut().enable();
                     }
-                    running = running.checked_sub(1).unwrap();
-                    if let Some(timestamp) = until {
-                        queue.entry(timestamp).or_default().push(actor);
-                    }
+                    let has_peers = !peer_notified.is_empty();
+
+                    // Advance time through queued events while no tasks are pending
                     while running == 0 && self.tasks.load(Ordering::Acquire) == 0 {
-                        // advance time
-                        let (timestamp, waiter_ids) = queue.pop_first().unwrap();
+                        let Some((timestamp, _)) = queue.first_key_value() else {
+                            break;
+                        };
+                        let timestamp = *timestamp;
+                        // CMB ceiling: can't advance past min(peer.time + peer.min_latency)
+                        let mut ceiling = Timestamp::max();
+                        for peer in &self.peer_shards {
+                            let c = peer.time.load(Ordering::Acquire) + peer.min_latency;
+                            if c < ceiling { ceiling = c; }
+                        }
+                        if timestamp > ceiling {
+                            // CMB null message: advance published time to ceiling
+                            // so peers can update their own ceilings.
+                            if ceiling > self.time.load(Ordering::Acquire) {
+                                self.time.store(ceiling, Ordering::Release);
+                                self.time_advanced_notify.notify_waiters();
+                            }
+                            break;
+                        }
+                        let (_, waiter_ids) = queue.pop_first().unwrap();
                         self.time.store(timestamp, Ordering::Release);
+                        self.time_advanced_notify.notify_waiters();
 
                         for id in waiter_ids {
                             if waiters[id]
                                 .as_ref()
-                                .and_then(|w| w.until)
+                                .and_then(|w: &Waiter| w.until)
                                 .is_some_and(|ts| ts == timestamp)
                             {
                                 running += 1;
@@ -84,19 +151,63 @@ impl ClockCoordinator {
                             }
                         }
                     }
-                }
-                ClockEvent::CancelWait { actor } => {
-                    if waiters[actor].take().is_some() {
-                        running += 1;
+                    if running != 0 {
+                        break;
+                    }
+                    // Blocked — wait for a channel event, task completion, or peer advancement
+                    select! {
+                        event = self.rx.recv() => {
+                            let Some(event) = event else { return };
+                            Self::handle_event(event, &mut waiters, &mut running, &mut queue, &self.time);
+                        }
+                        () = &mut task_notified => {
+                            continue;
+                        }
+                        _ = async { futures::future::select_all(peer_notified).await }, if has_peers => {
+                            continue;
+                        }
                     }
                 }
-                ClockEvent::FinishTask => {
-                    let prev_tasks = self.tasks.fetch_sub(1, Ordering::AcqRel);
-                    assert!(prev_tasks != 0, "Finished a task that was never started");
-                    assert!(
-                        running != 0,
-                        "All tasks were completed while there were no actors to complete them"
-                    );
+            }
+
+            // Actors are running — just process channel events
+            let Some(event) = self.rx.recv().await else {
+                return;
+            };
+            Self::handle_event(event, &mut waiters, &mut running, &mut queue, &self.time);
+        }
+    }
+
+    fn handle_event(
+        event: ClockEvent,
+        waiters: &mut [Option<Waiter>],
+        running: &mut usize,
+        queue: &mut BTreeMap<Timestamp, Vec<usize>>,
+        time: &AtomicTimestamp,
+    ) {
+        match event {
+            ClockEvent::Wait { actor, until, done } => {
+                // If time has advanced past the requested wait (due to the
+                // finish_task atomic+notify race), treat as a normal wait at
+                // the current time — it will be immediately woken by the
+                // time advancement loop.
+                let now = time.load(Ordering::Acquire);
+                let until = if until.is_some_and(|t| t < now) {
+                    Some(now)
+                } else {
+                    until
+                };
+                if waiters[actor].replace(Waiter { until, done }).is_some() {
+                    panic!("An actor has somehow managed to wait twice");
+                }
+                *running = running.checked_sub(1).unwrap();
+                if let Some(timestamp) = until {
+                    queue.entry(timestamp).or_default().push(actor);
+                }
+            }
+            ClockEvent::CancelWait { actor } => {
+                if waiters[actor].take().is_some() {
+                    *running += 1;
                 }
             }
         }
@@ -118,7 +229,6 @@ pub enum ClockEvent {
     CancelWait {
         actor: usize,
     },
-    FinishTask,
 }
 
 #[cfg(test)]

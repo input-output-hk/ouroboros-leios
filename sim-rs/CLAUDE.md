@@ -20,7 +20,6 @@ Rust toolchain: **1.88** (edition 2024). CI runs on Ubuntu 22.04.
 The `sim-cli` binary takes a topology YAML, optional output path, and flags:
 - `-p <file>` — parameter overrides (layered via figment on top of `parameters/config.default.yaml`)
 - `-s <n>` — number of slots to simulate
-- `-t <f>` — timescale multiplier
 - `--trace-node <id>` — enable per-node tracing
 - `-c` — conformance events mode
 - `-a` — aggregate events mode
@@ -31,9 +30,22 @@ Without a topology argument, it searches default paths including `../../data/sim
 
 Two-crate workspace: **sim-core** (library) and **sim-cli** (binary).
 
-### Virtual Clock Actor System
+### Simulation Engines
 
-The simulation is a tokio-based async actor system driven by a virtual clock (`sim-core/src/clock/`):
+Two engines selected by `engine` parameter (default: `actor`):
+
+- **`actor`** — tokio-based async actor system. Each node runs as a tokio task coordinated by a virtual clock (`sim-core/src/sim/actor.rs`). Non-deterministic due to async scheduling. Supports adversarial scenarios.
+- **`sequential`** — discrete event simulation (DES) processing events in strict timestamp order (`sim-core/src/sim/sequential.rs`). Deterministic. Uses rayon to parallelise simultaneous events across nodes within each timestep (BSP). Does not support attacker configs.
+
+### Sharding
+
+Nodes can be partitioned into shards for parallel execution. Both engines support sharding. Configured via:
+- `shard-count` — number of shards (default: 1)
+- `shard-strategy` — how nodes are assigned: `round-robin`, `zero-latency-clusters` (recommended), `geographic`, `min-latency-clusters`, `min-cut`
+
+Shard assignment: `sim-core/src/sharding.rs`. For fast runs, use `-p parameters/turbo.yaml` (sequential engine, 6 shards, zero-latency-clusters).
+
+### Virtual Clock (Actor Engine)
 
 - **`ClockCoordinator`** — priority queue of wake-up times; advances time only when ALL actors are waiting and no tasks are in-flight
 - **`ClockBarrier`** — per-actor handle; `wait_until(ts)` suspends the actor; `start_task()`/`finish_task()` prevent premature time advancement

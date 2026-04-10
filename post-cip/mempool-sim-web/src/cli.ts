@@ -3,6 +3,7 @@ import { generateNetwork, addAdversaryNode } from './topology.js';
 import { Simulation } from './simulation.js';
 import { logger, makeLogger } from './logger.js';
 import { OVERHEAD_B } from './link.js';
+import { computeFrontRunStats } from './stats.js';
 const DEFAULTS = {
   nodes: 50,
   degree: 6,
@@ -54,6 +55,7 @@ program
   .option('--eb', 'Enable endorser blocks (Leios)', false)
   .option('--eb-size <bytes>', 'Endorser block size in bytes', String(DEFAULTS.ebSize))
   .option('--eb-certification-rate <rate>', 'EB certification probability (0-1)', '0.5')
+  .option('--no-eb-tx-cache', 'Do not cache/gossip EB-fetched txs into mempools')
   .parse(process.argv);
 
 const opts = program.opts();
@@ -77,6 +79,7 @@ const config = {
   eb: opts.eb === true,
   ebSize: parseInt(opts.ebSize),
   ebCertificationRate: parseFloat(opts.ebCertificationRate),
+  ebTxCache: opts.ebTxCache as boolean,
 };
 
 const mempool = config.eb
@@ -128,6 +131,7 @@ try {
   sim.ebEnabled = config.eb;
   sim.ebSize_B = config.ebSize;
   sim.ebCertificationRate = config.ebCertificationRate;
+  sim.ebTxCacheEnabled = config.ebTxCache;
 
   // Register and inject transactions (byte-budget from KB/s load)
   const honestCount = config.nodes;
@@ -200,16 +204,26 @@ try {
 
   // Block statistics
   const blocks = sim.blocks;
-  const totalHonestInBlocks = blocks.reduce((s, b) => s + b.honestCount, 0);
-  const totalAdvInBlocks = blocks.reduce((s, b) => s + b.adversarialCount, 0);
-  const totalInBlocks = totalHonestInBlocks + totalAdvInBlocks;
+  const frontRunStats = computeFrontRunStats(
+    reg.txs,
+    blocks,
+    sim.endorserBlocks,
+    config.eb,
+  );
 
   logger.info({
     blocks_produced: blocks.length,
-    txs_in_blocks: totalInBlocks,
-    honest_tx_in_blocks: totalHonestInBlocks,
-    adversarial_tx_in_blocks: totalAdvInBlocks,
-    front_run_rate: totalInBlocks > 0 ? totalAdvInBlocks / totalInBlocks : 0,
+    txs_in_blocks: frontRunStats.rbTotalTx,
+    honest_tx_in_blocks: frontRunStats.rbHonestTx,
+    adversarial_tx_in_blocks: frontRunStats.rbAdversarialTx,
+    txs_in_chain: frontRunStats.totalTx,
+    honest_tx_in_chain: frontRunStats.totalHonestTx,
+    adversarial_tx_in_chain: frontRunStats.totalAdversarialTx,
+    certified_eb_honest_tx: frontRunStats.certifiedEBHonestTx,
+    certified_eb_adversarial_tx: frontRunStats.certifiedEBAdversarialTx,
+    rb_front_run_rate: frontRunStats.rbFrontRunRate,
+    total_front_run_rate: frontRunStats.totalFrontRunRate,
+    front_run_rate: frontRunStats.totalFrontRunRate,
     avg_block_fill: blocks.length > 0
       ? blocks.reduce((s, b) => s + b.size_B, 0) / (blocks.length * config.block)
       : 0,
@@ -223,6 +237,8 @@ try {
       certified: certifiedCount,
       uncertified: ebs.length - certifiedCount,
       total_eb_txRefs: ebs.reduce((s, eb) => s + eb.txRefs.length, 0),
+      certified_eb_honest_tx: frontRunStats.certifiedEBHonestTx,
+      certified_eb_adversarial_tx: frontRunStats.certifiedEBAdversarialTx,
     }, 'endorser block statistics');
   }
 
