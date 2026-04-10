@@ -190,9 +190,6 @@ pub(crate) enum SelectionDecision {
     WaitingForBlocks {
         peer_id: PeerId,
         ancestor: [u8; 32],
-        /// Full replay chain (oldest→newest hashes) from ancestor to tip.
-        /// Used to find the contiguous cached prefix for partial switches.
-        replay: Vec<[u8; 32]>,
         anchor_point: Option<Point>,
         missing: Vec<Point>,
         tip_block_no: u64,
@@ -526,9 +523,8 @@ impl PraosConsensus {
             }
         });
 
-        let replay_hashes: Vec<[u8; 32]> = replay.iter().map(|(_, h)| *h).collect();
-
         if missing.is_empty() {
+            let replay_hashes: Vec<[u8; 32]> = replay.iter().map(|(_, h)| *h).collect();
             // Verify chain_tree contiguity before switching. Walk
             // backward from the LAST replay block and check:
             //   (a) every replay hash lies on that chain
@@ -601,7 +597,6 @@ impl PraosConsensus {
             SelectionDecision::WaitingForBlocks {
                 peer_id,
                 ancestor,
-                replay: replay_hashes,
                 anchor_point,
                 missing,
                 tip_block_no: candidate_tip.block_no,
@@ -609,21 +604,60 @@ impl PraosConsensus {
         }
     }
 
-    /// Drive chain selection to completion. Repeatedly calls
-    /// `select_chain_once` and executes its decision. An
-    /// `OrphanCandidate` skips that peer and tries the next best.
-    /// A `Switched` performs the rollback+replay. A `WaitingForBlocks`
-    /// issues a range fetch for the missing blocks. `NoBetterChain`
-    /// terminates.
-    ///
-    /// Orphan peers are skipped within this pass via a `tried` set —
-    /// the peer's `PeerChain` is NOT mutated. Dropping the chain would
-    /// lose all historical announcements; the peer chain is the only
-    /// place they're kept, and ChainSync won't re-stream blocks the
-    /// peer already acknowledged. If the peer keeps extending, future
-    /// `TipAdvanced` events will accumulate enough history for the
-    /// walk to eventually find a common ancestor.
+    /// Find the longest switchable chain using only stored blocks.
+    /// Walks back from chain_tree's best tip to the adopted tip and
+    /// returns the contiguous cached prefix as a replay sequence.
+    /// Finds chains from ANY source — blocks from multiple peers that
+    /// form a contiguous path through chain_tree.
+    fn try_stored_switch(&self) -> Option<([u8; 32], Vec<[u8; 32]>)> {
+        let best_hash = self.chain_tree.best_tip_hash()?;
+        let adopted = self.adopted_tip_hash.unwrap_or([0u8; 32]);
+        if best_hash == adopted {
+            return None;
+        }
+
+        let walk = self.chain_tree.ancestors(best_hash);
+        let adopted_pos = walk.iter().position(|h| *h == adopted)?;
+
+        // Blocks from adopted (exclusive) to best_tip (inclusive), oldest first.
+        let replay: Vec<[u8; 32]> = walk[..adopted_pos].iter().rev().copied().collect();
+        if replay.is_empty() {
+            return None;
+        }
+
+        // Longest contiguous prefix where we have the block body and
+        // it isn't already queued to the validator.
+        let prefix: Vec<[u8; 32]> = replay
+            .into_iter()
+            .take_while(|h| {
+                !self.in_flight_validation.contains(h)
+                    && (self.validated.contains(h) || self.block_cache.contains_key(h))
+            })
+            .collect();
+
+        if prefix.is_empty() {
+            return None;
+        }
+        Some((adopted, prefix))
+    }
+
+    /// Drive chain selection to completion. First tries switching using
+    /// stored blocks (chain_tree walk), then falls through to peer-chain
+    /// based selection for fetching decisions.
     async fn select_chain(&mut self) {
+        // Try switching using blocks we already have, regardless of
+        // which peer announced them.
+        if let Some((ancestor, replay)) = self.try_stored_switch() {
+            info!(
+                node_id = %self.node_id,
+                replay_len = replay.len(),
+                ancestor = format!("{:02x}{:02x}", ancestor[30], ancestor[31]),
+                "select_chain: stored-block switch"
+            );
+            self.execute_switch(ancestor, replay).await;
+            return;
+        }
+
         let mut tried: HashSet<PeerId> = HashSet::new();
         loop {
             match self.select_chain_once(&tried) {
@@ -673,30 +707,11 @@ impl PraosConsensus {
                 SelectionDecision::WaitingForBlocks {
                     peer_id,
                     ancestor,
-                    replay,
                     anchor_point,
                     missing,
                     tip_block_no,
+                    ..
                 } => {
-                    // Switch to the contiguous prefix of cached blocks.
-                    // Remaining blocks are fetched separately; each
-                    // arrival triggers another partial switch.
-                    let prefix: Vec<[u8; 32]> = replay
-                        .into_iter()
-                        .take_while(|h| {
-                            self.validated.contains(h) || self.block_cache.contains_key(h)
-                        })
-                        .collect();
-                    if !prefix.is_empty() {
-                        info!(
-                            node_id = %self.node_id,
-                            %peer_id,
-                            prefix_len = prefix.len(),
-                            ancestor = format!("{:02x}{:02x}", ancestor[30], ancestor[31]),
-                            "select_chain: partial switch (cached prefix)"
-                        );
-                        self.execute_switch(ancestor, prefix).await;
-                    }
                     info!(
                         node_id = %self.node_id,
                         %peer_id,
