@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# Randomized tx-generator loop for Antithesis testing
+# Randomized tx-centrifuge loop for Antithesis testing
 #
-# Runs tx-generator in an infinite loop with randomized parameters:
-#   - tx_count: 100 to 100,000
+# Runs tx-centrifuge in an infinite loop with randomized parameters:
 #   - tps: 100 to 10,000
-#   - cooldown: 1 to 60 seconds between batches
+#   - duration: 10 to 300 seconds per run
+#   - cooldown: 1 to 60 seconds between runs
 #
 # Antithesis replaces /dev/urandom with a deterministic source it can
 # learn from and replay, enabling guided exploration of load patterns.
 
 set -euo pipefail
 
-echo "=== Starting randomized tx-generator loop ==="
+echo "=== Starting randomized tx-centrifuge loop ==="
 
 DATA_DIR="${DATA_DIR:-/data}"
 CONFIG_DIR="${CONFIG_DIR:-/app/config}"
@@ -27,10 +27,10 @@ PORT_POOL2="${PORT_POOL2:-3002}"
 PORT_POOL3="${PORT_POOL3:-3003}"
 
 # Randomization ranges
-TX_COUNT_MIN="${TX_COUNT_MIN:-100}"
-TX_COUNT_MAX="${TX_COUNT_MAX:-100000}"
 TPS_MIN="${TPS_MIN:-100}"
 TPS_MAX="${TPS_MAX:-10000}"
+DURATION_MIN="${DURATION_MIN:-10}"
+DURATION_MAX="${DURATION_MAX:-300}"
 COOLDOWN_MIN="${COOLDOWN_MIN:-1}"
 COOLDOWN_MAX="${COOLDOWN_MAX:-60}"
 
@@ -39,11 +39,11 @@ echo "  DATA_DIR: $DATA_DIR"
 echo "  Pool1: $IP_POOL1:$PORT_POOL1"
 echo "  Pool2: $IP_POOL2:$PORT_POOL2"
 echo "  Pool3: $IP_POOL3:$PORT_POOL3"
-echo "  TX_COUNT range: $TX_COUNT_MIN - $TX_COUNT_MAX"
 echo "  TPS range: $TPS_MIN - $TPS_MAX"
+echo "  DURATION range: ${DURATION_MIN}s - ${DURATION_MAX}s"
 echo "  COOLDOWN range: ${COOLDOWN_MIN}s - ${COOLDOWN_MAX}s"
 
-# --- One-time initialization (same as run-tx-generator.sh) ---
+# --- One-time initialization (same as run-tx-centrifuge.sh) ---
 
 mkdir -p "$DATA_DIR"
 
@@ -80,6 +80,9 @@ mkdir -p "$DATA_DIR/utxo-keys"
 cp -r "$UTXO_KEYS_DIR/"* "$DATA_DIR/utxo-keys/"
 chmod 400 "$DATA_DIR/utxo-keys"/*/*.skey
 
+# Copy funds.json
+cp "$CONFIG_DIR/funds.json" "$DATA_DIR/funds.json"
+
 # Wait for pool nodes
 echo "Waiting for pool nodes to be ready..."
 wait_for_node() {
@@ -107,6 +110,14 @@ wait_for_node "$IP_POOL3" "$PORT_POOL3" "pool3" || true
 echo "Waiting 10s for nodes to stabilize..."
 sleep 10
 
+# Query protocol parameters from node
+echo "Querying protocol parameters..."
+CARDANO_NODE_SOCKET_PATH="/pool1-data/socket" \
+    cardano-cli conway query protocol-parameters \
+    --testnet-magic 164 \
+    --out-file "$DATA_DIR/pp.json" \
+    || echo "WARNING: Could not query protocol parameters (will retry at startup)"
+
 # --- Helper: generate random integer in [min, max] from /dev/urandom ---
 rand_range() {
     local min=$1
@@ -122,42 +133,50 @@ iteration=0
 while true; do
     iteration=$((iteration + 1))
 
-    tx_count=$(rand_range "$TX_COUNT_MIN" "$TX_COUNT_MAX")
     tps=$(rand_range "$TPS_MIN" "$TPS_MAX")
+    duration=$(rand_range "$DURATION_MIN" "$DURATION_MAX")
     cooldown=$(rand_range "$COOLDOWN_MIN" "$COOLDOWN_MAX")
 
-    echo "=== Iteration $iteration: tx_count=$tx_count tps=$tps cooldown=${cooldown}s ==="
+    echo "=== Iteration $iteration: tps=$tps duration=${duration}s cooldown=${cooldown}s ==="
 
-    # Generate config with randomized parameters
-    if [ ! -f "$CONFIG_DIR/gen.template.json" ]; then
-        echo "ERROR: gen.template.json not found"
+    # Generate config with randomized tps
+    if [ ! -f "$CONFIG_DIR/centrifuge.template.json" ]; then
+        echo "ERROR: centrifuge.template.json not found"
         exit 1
     fi
 
-    cat "$CONFIG_DIR/gen.template.json" | \
-        sed "s/\${IP_NODE1}/$IP_POOL1/g" | \
-        sed "s/\${IP_NODE2}/$IP_POOL2/g" | \
-        sed "s/\${IP_NODE3}/$IP_POOL3/g" | \
-        sed "s/\${PORT_NODE1}/$PORT_POOL1/g" | \
-        sed "s/\${PORT_NODE2}/$PORT_POOL2/g" | \
-        sed "s/\${PORT_NODE3}/$PORT_POOL3/g" | \
-        jq --argjson tx_count "$tx_count" \
-           --argjson tps "$tps" \
-           '.tx_count = $tx_count | .tps = $tps' | \
-        jq '.localNodeSocketPath = "/pool1-data/socket"' | \
-        jq '.nodeConfigFile = "/data/config.yaml"' | \
-        jq '.sigKey = "/data/utxo-keys/utxo1/utxo.skey"' \
-        > "$DATA_DIR/gen.json"
+    cat "$CONFIG_DIR/centrifuge.template.json" | \
+        sed "s/\${IP_POOL1}/$IP_POOL1/g" | \
+        sed "s/\${IP_POOL2}/$IP_POOL2/g" | \
+        sed "s/\${IP_POOL3}/$IP_POOL3/g" | \
+        sed "s/\${PORT_POOL1}/$PORT_POOL1/g" | \
+        sed "s/\${PORT_POOL2}/$PORT_POOL2/g" | \
+        sed "s/\${PORT_POOL3}/$PORT_POOL3/g" | \
+        sed "s/\${TPS}/$tps/g" | \
+        jq '.nodeConfig = "/data/config.yaml"' | \
+        jq '.protocolParametersFile = "/data/pp.json"' | \
+        jq '.initial_inputs.params.signing_keys_file = "/data/funds.json"' | \
+        jq '.workloads["synthetic-chain"].targets.pool1.addr = "'"$IP_POOL1"'"' \
+        > "$DATA_DIR/centrifuge.json"
 
-    echo "  gen.json created: tx_count=$tx_count, tps=$tps"
+    echo "  centrifuge.json created: tps=$tps"
 
-    # Run tx-generator (exits after batch completes)
-    echo "  Running tx-generator..."
-    tx-generator json_highlevel \
-        "$DATA_DIR/gen.json" \
-        --nodeConfig "$DATA_DIR/config.yaml" \
-        || echo "  tx-generator exited with error (continuing)"
+    # Run tx-centrifuge for the randomized duration, then stop it
+    echo "  Running tx-centrifuge for ${duration}s..."
+    cd "$DATA_DIR"
+    tx-centrifuge centrifuge.json &
+    CENTRIFUGE_PID=$!
 
-    echo "  Batch complete. Cooling down for ${cooldown}s..."
+    sleep "$duration"
+
+    if kill -0 "$CENTRIFUGE_PID" 2>/dev/null; then
+        kill "$CENTRIFUGE_PID" 2>/dev/null || true
+        wait "$CENTRIFUGE_PID" 2>/dev/null || true
+        echo "  tx-centrifuge stopped after ${duration}s"
+    else
+        echo "  tx-centrifuge exited before duration elapsed"
+    fi
+
+    echo "  Run complete. Cooling down for ${cooldown}s..."
     sleep "$cooldown"
 done

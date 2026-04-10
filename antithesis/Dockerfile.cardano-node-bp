@@ -1,6 +1,6 @@
 # Block Producer Node Dockerfile for Proto-Devnet
 # Builds cardano-node from leios-prototype branch
-# Builds tx-generator from stable cardano-node (leios-prototype has API incompatibility)
+# Builds tx-centrifuge from stable cardano-node
 # Fetches cardano-cli from blink labs pre-built image
 # Includes proto-devnet genesis files, pool keys, and configuration
 
@@ -26,25 +26,25 @@ RUN --mount=type=cache,target=/root/.cabal/store,id=cabal-store-cardano-node \
     && cabal update \
     && cabal install exe:cardano-node --install-method=copy --installdir=/root/.local/bin/
 
-# Build tx-generator from stable branch (leios-prototype tx-generator has API issues)
-FROM ghcr.io/blinklabs-io/haskell:9.6.7-3.12.1.0-1 AS tx-generator-build
+# Build tx-centrifuge from bench/leios branch
+FROM ghcr.io/blinklabs-io/haskell:9.6.7-3.12.1.0-1 AS tx-centrifuge-build
 
-# From intersectmbo/cardano-node master branch
-ARG CARDANO_NODE_VERSION_TXGEN=649f6a3ac56300fab0ba0fa57df7b7633ec88e8e
+# From intersectmbo/cardano-node bench/leios branch
+ARG CARDANO_NODE_VERSION_TXCENT=314ecc8b69bc896d53e262b4777cc4ec5dffc50a
 
 RUN git clone https://github.com/intersectmbo/cardano-node.git \
     && cd cardano-node \
     && git fetch --all --tags \
-    && git checkout ${CARDANO_NODE_VERSION_TXGEN} \
+    && git checkout ${CARDANO_NODE_VERSION_TXCENT} \
     && echo "with-compiler: ghc-${GHC_VERSION}" >> cabal.project.local \
     && echo "tests: False" >> cabal.project.local
 
-RUN --mount=type=cache,target=/root/.cabal/store,id=cabal-store-tx-generator \
+RUN --mount=type=cache,target=/root/.cabal/store,id=cabal-store-tx-centrifuge \
     --mount=type=cache,target=/root/.cabal/packages,id=cabal-packages \
-    --mount=type=cache,target=/cardano-node/dist-newstyle,id=dist-tx-generator \
+    --mount=type=cache,target=/cardano-node/dist-newstyle,id=dist-tx-centrifuge \
     cd cardano-node \
     && cabal update \
-    && cabal install exe:tx-generator --install-method=copy --installdir=/root/.local/bin/
+    && cabal install tx-centrifuge:exe:tx-centrifuge --install-method=copy --installdir=/root/.local/bin/
 
 FROM debian:bookworm-slim AS cardano-node-bp
 
@@ -54,7 +54,7 @@ ENV PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH"
 COPY --from=cardano-node-build /usr/local/lib/ /usr/local/lib/
 COPY --from=cardano-node-build /usr/local/include/ /usr/local/include/
 COPY --from=cardano-node-build /root/.local/bin/cardano-node /usr/local/bin/
-COPY --from=tx-generator-build /root/.local/bin/tx-generator /usr/local/bin/
+COPY --from=tx-centrifuge-build /root/.local/bin/tx-centrifuge /usr/local/bin/
 COPY --from=cardano-cli /usr/local/bin/cardano-cli /usr/local/bin/
 
 RUN apt-get update -y && \
@@ -99,18 +99,19 @@ COPY demo/proto-devnet/config/pools-keys/pool1/ /app/pools-keys/pool1/
 COPY demo/proto-devnet/config/pools-keys/pool2/ /app/pools-keys/pool2/
 COPY demo/proto-devnet/config/pools-keys/pool3/ /app/pools-keys/pool3/
 
-# Copy utxo-keys for tx-generator
+# Copy utxo-keys and funds.json for tx-centrifuge
 COPY demo/proto-devnet/config/utxo-keys/ /app/utxo-keys/
+COPY demo/proto-devnet/config/funds.json /app/config/funds.json
 
-# Copy tx-generator template
-COPY antithesis/config/gen.template.json /app/config/gen.template.json
+# Copy tx-centrifuge template
+COPY antithesis/config/centrifuge.template.json /app/config/centrifuge.template.json
 
 # Copy scripts
 COPY antithesis/scripts/init-pool-node.sh /app/scripts/
 COPY antithesis/scripts/init-dingo-node.sh /app/scripts/
 COPY antithesis/scripts/run-pool-node.sh /app/scripts/
-COPY antithesis/scripts/run-tx-generator.sh /app/scripts/
-COPY antithesis/scripts/run-tx-generator-loop.sh /app/scripts/
+COPY antithesis/scripts/run-tx-centrifuge.sh /app/scripts/
+COPY antithesis/scripts/run-tx-centrifuge-loop.sh /app/scripts/
 COPY antithesis/scripts/setup-wan-emulation.sh /app/scripts/
 
 RUN chmod +x /app/scripts/*.sh /usr/local/bin/*

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Run tx-generator for load testing
-# Waits for pool nodes to be ready, generates config, then runs tx-generator
+# Run tx-centrifuge for load testing
+# Waits for pool nodes to be ready, generates config, then runs tx-centrifuge
 
 set -euo pipefail
 
-echo "=== Starting tx-generator ==="
+echo "=== Starting tx-centrifuge ==="
 
 DATA_DIR="${DATA_DIR:-/data}"
 CONFIG_DIR="${CONFIG_DIR:-/app/config}"
@@ -47,8 +47,7 @@ fi
 cp "$SHARED_GENESIS_DIR/"*.json "$DATA_DIR/"
 echo "  Genesis files copied"
 
-# Copy node config for cardano-cli / tx-generator
-# Proto-devnet uses config.yaml; other stacks may use config.json
+# Copy node config for tx-centrifuge
 if [ -f "$CONFIG_DIR/config.yaml" ]; then
     cp "$CONFIG_DIR/config.yaml" "$DATA_DIR/config.yaml"
 elif [ -f "$CONFIG_DIR/config.json" ]; then
@@ -62,6 +61,9 @@ fi
 mkdir -p "$DATA_DIR/utxo-keys"
 cp -r "$UTXO_KEYS_DIR/"* "$DATA_DIR/utxo-keys/"
 chmod 400 "$DATA_DIR/utxo-keys"/*/*.skey
+
+# Copy funds.json
+cp "$CONFIG_DIR/funds.json" "$DATA_DIR/funds.json"
 
 # Wait for at least one pool to be ready (check TCP connectivity)
 echo "Waiting for pool nodes to be ready..."
@@ -87,40 +89,44 @@ wait_for_node "$IP_POOL1" "$PORT_POOL1" "pool1" || true
 wait_for_node "$IP_POOL2" "$PORT_POOL2" "pool2" || true
 wait_for_node "$IP_POOL3" "$PORT_POOL3" "pool3" || true
 
-# Generate tx-generator config from template
-echo "Generating tx-generator config..."
-if [ -f "$CONFIG_DIR/gen.template.json" ]; then
-    # Substitute environment variables in template
-    export IP_NODE1="$IP_POOL1"
-    export IP_NODE2="$IP_POOL2"
-    export IP_NODE3="$IP_POOL3"
-    export PORT_NODE1="$PORT_POOL1"
-    export PORT_NODE2="$PORT_POOL2"
-    export PORT_NODE3="$PORT_POOL3"
-
-    # Use envsubst to substitute variables, or sed for simple cases
-    cat "$CONFIG_DIR/gen.template.json" | \
-        sed "s/\${IP_NODE1}/$IP_POOL1/g" | \
-        sed "s/\${IP_NODE2}/$IP_POOL2/g" | \
-        sed "s/\${IP_NODE3}/$IP_POOL3/g" | \
-        sed "s/\${PORT_NODE1}/$PORT_POOL1/g" | \
-        sed "s/\${PORT_NODE2}/$PORT_POOL2/g" | \
-        sed "s/\${PORT_NODE3}/$PORT_POOL3/g" | \
-        jq '.localNodeSocketPath = "/pool1-data/socket"' | \
-        jq '.nodeConfigFile = "/data/config.yaml"' | \
-        jq '.sigKey = "/data/utxo-keys/utxo1/utxo.skey"' \
-        > "$DATA_DIR/gen.json"
-    echo "  gen.json created"
-else
-    echo "ERROR: gen.template.json not found"
-    exit 1
-fi
-
 # Give nodes a bit more time to sync
 echo "Waiting 10s for nodes to stabilize..."
 sleep 10
 
-echo "Starting tx-generator..."
-exec tx-generator json_highlevel \
-    "$DATA_DIR/gen.json" \
-    --nodeConfig "$DATA_DIR/config.yaml"
+# Query protocol parameters from node
+echo "Querying protocol parameters..."
+CARDANO_NODE_SOCKET_PATH="/pool1-data/socket" \
+    cardano-cli conway query protocol-parameters \
+    --testnet-magic 164 \
+    --out-file "$DATA_DIR/pp.json" \
+    || echo "WARNING: Could not query protocol parameters (will retry at startup)"
+
+# Generate centrifuge config from template
+echo "Generating centrifuge config..."
+if [ -f "$CONFIG_DIR/centrifuge.template.json" ]; then
+    export IP_POOL1 IP_POOL2 IP_POOL3
+    export PORT_POOL1 PORT_POOL2 PORT_POOL3
+    export TPS="${TPS:-100}"
+
+    cat "$CONFIG_DIR/centrifuge.template.json" | \
+        sed "s/\${IP_POOL1}/$IP_POOL1/g" | \
+        sed "s/\${IP_POOL2}/$IP_POOL2/g" | \
+        sed "s/\${IP_POOL3}/$IP_POOL3/g" | \
+        sed "s/\${PORT_POOL1}/$PORT_POOL1/g" | \
+        sed "s/\${PORT_POOL2}/$PORT_POOL2/g" | \
+        sed "s/\${PORT_POOL3}/$PORT_POOL3/g" | \
+        sed "s/\${TPS}/$TPS/g" | \
+        jq '.nodeConfig = "/data/config.yaml"' | \
+        jq '.protocolParametersFile = "/data/pp.json"' | \
+        jq '.initial_inputs.params.signing_keys_file = "/data/funds.json"' | \
+        jq '.workloads["synthetic-chain"].targets.pool1.addr = "'"$IP_POOL1"'"' \
+        > "$DATA_DIR/centrifuge.json"
+    echo "  centrifuge.json created"
+else
+    echo "ERROR: centrifuge.template.json not found"
+    exit 1
+fi
+
+echo "Starting tx-centrifuge..."
+cd "$DATA_DIR"
+exec tx-centrifuge centrifuge.json

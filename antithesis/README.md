@@ -8,7 +8,7 @@ Docker Compose orchestration for testing Leios consensus using [Antithesis](http
 
 Two compose stacks for local testing:
 
-1. Proto-devnet (`docker-compose.devnet.yaml`): 3 block-producing pools with tx-generator
+1. Proto-devnet (`docker-compose.devnet.yaml`): 3 block-producing pools with tx-centrifuge
 2. ImmDB mock (`docker-compose.immdb.yaml`): upstream/node0/downstream with immdb-server
 
 An optional observability overlay (`docker-compose.observability.yaml`) can be layered onto either stack.
@@ -17,7 +17,7 @@ An optional observability overlay (`docker-compose.observability.yaml`) can be l
 
 Moog-compatible compose files for submission to [Antithesis](https://antithesis.com/) via the Cardano Foundation's [Moog](https://github.com/cardano-foundation/moog) service:
 
-1. Leios devnet (`testnets/leios-devnet/docker-compose.yaml`): 3-pool mesh with randomized tx-generator
+1. Leios devnet (`testnets/leios-devnet/docker-compose.yaml`): 3-pool mesh with randomized tx-centrifuge
 
 These files differ from local stacks: no `build:` directives (pre-built GHCR images only), hostname-based DNS, `init: true` on all services, and `${INTERNAL_NETWORK}` for Moog's config image generation. See [Antithesis Deployment](#antithesis-deployment) for details.
 
@@ -37,7 +37,7 @@ every other pool) with transaction load:
      └───────────────┼───────────────┘
                      │
               ┌──────┴──────┐
-              │tx-generator │
+              │tx-centrifuge │
               └──────┬──────┘
                      │
               ┌──────┴──────┐
@@ -50,7 +50,7 @@ every other pool) with transaction load:
 | pool1 | 172.28.0.10 | 3001 | Block producer with pool1 credentials |
 | pool2 | 172.28.0.20 | 3002 | Block producer with pool2 credentials |
 | pool3 | 172.28.0.30 | 3003 | Block producer with pool3 credentials |
-| tx-generator | dynamic | - | Transaction load generator |
+| tx-centrifuge | dynamic | - | Transaction load generator |
 | analysis | dynamic | - | Metrics analysis and Antithesis assertions |
 
 Features:
@@ -196,8 +196,8 @@ antithesis/
 ├── scripts/
 │   ├── init-pool-node.sh             # Pool initialization (proto-devnet)
 │   ├── run-pool-node.sh              # Pool runtime (proto-devnet)
-│   ├── run-tx-generator.sh           # TX generator — static batch (local)
-│   ├── run-tx-generator-loop.sh      # TX generator — randomized loop (Antithesis)
+│   ├── run-tx-centrifuge.sh           # TX centrifuge — continuous (local)
+│   ├── run-tx-centrifuge-loop.sh      # TX centrifuge — randomized loop (Antithesis)
 │   ├── init-node0.sh                 # Node0 initialization (immdb)
 │   ├── init-downstream.sh            # Downstream initialization (immdb)
 │   ├── init-upstream.sh              # Upstream initialization (immdb)
@@ -237,8 +237,8 @@ docker compose -f docker-compose.devnet.yaml ps
 # Verify blocks are being produced
 docker compose -f docker-compose.devnet.yaml logs pool1 | grep -i "AddedToCurrentChain"
 
-# Check tx-generator
-docker compose -f docker-compose.devnet.yaml logs tx-generator
+# Check tx-centrifuge
+docker compose -f docker-compose.devnet.yaml logs tx-centrifuge
 
 # View analysis output
 docker compose -f docker-compose.devnet.yaml logs analysis
@@ -305,17 +305,17 @@ The `testnets/` compose files are adapted for the Antithesis environment:
 | `init: true` | Not set | Set on all services (required for core dumps) |
 | `container_name`/`hostname` | Not set | Set and matching on all services |
 | Network isolation | `bridge` | `internal: ${INTERNAL_NETWORK}` |
-| TX generator | Static batch (10k txs) | Randomized loop (100-100k txs per batch) |
+| TX centrifuge | Continuous stream | Randomized loop (varying tps and duration) |
 
 ### Randomized TX Generator
 
-The Antithesis compose uses `run-tx-generator-loop.sh` instead of the one-shot `run-tx-generator.sh`. Each iteration:
+The Antithesis compose uses `run-tx-centrifuge-loop.sh` instead of the continuous `run-tx-centrifuge.sh`. Each iteration:
 
-1. Picks random `tx_count` (100-100,000), `tps` (100-10,000), and cooldown (1-60s)
+1. Picks random `tps` (100-10,000), `duration` (10-300s), and cooldown (1-60s)
 2. Random values sourced from `/dev/urandom`, which Antithesis replaces with a deterministic source it can learn from and replay
-3. Generates config, runs tx-generator to completion, sleeps, loops
+3. Generates config, runs tx-centrifuge for the duration, stops it, sleeps, loops
 
-Ranges are configurable via environment variables: `TX_COUNT_MIN`, `TX_COUNT_MAX`, `TPS_MIN`, `TPS_MAX`, `COOLDOWN_MIN`, `COOLDOWN_MAX`.
+Ranges are configurable via environment variables: `TPS_MIN`, `TPS_MAX`, `DURATION_MIN`, `DURATION_MAX`, `COOLDOWN_MIN`, `COOLDOWN_MAX`.
 
 ### Submitting a Test via Moog
 
