@@ -91,9 +91,12 @@ impl super::PraosConsensus {
             }
         }
 
-        // A newly-validated block can unblock a fork switch we couldn't
-        // execute earlier (e.g. waiting for the last replay block).
-        self.select_chain().await;
+        // Adopted tip advanced — try switching to chain_tree's best tip
+        // (new chains may now be reachable), then fetch missing blocks.
+        if let Some(best) = self.chain_tree.best_tip_hash() {
+            self.try_switch_and_execute(best).await;
+        }
+        self.evaluate_and_fetch().await;
     }
 
     /// Rollback succeeded: the ledger is now back at `target`, so the
@@ -280,6 +283,7 @@ impl super::PraosConsensus {
             block_no,
             "block received and cached"
         );
-        self.select_chain().await;
+        // Try switching to this specific block — no peer chain needed.
+        self.try_switch_and_execute(hash).await;
     }
 }

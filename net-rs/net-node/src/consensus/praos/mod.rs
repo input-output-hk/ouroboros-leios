@@ -188,7 +188,6 @@ impl PraosConsensus {
                 // still hand the body to the validator.
                 self.submit_for_validation(point.clone(), body.clone(), None)
                     .await;
-                self.select_chain().await;
                 return;
             }
         };
@@ -213,7 +212,7 @@ impl PraosConsensus {
 
         self.submit_for_validation(point.clone(), body.clone(), info.prev_hash)
             .await;
-        self.select_chain().await;
+        self.try_switch_and_execute(hash).await;
     }
 
     /// Handle a network event. Returns true if the event was consumed by
@@ -232,7 +231,7 @@ impl PraosConsensus {
                 header,
             } => {
                 self.record_peer_tip(*peer_id, tip, header);
-                self.select_chain().await;
+                self.evaluate_and_fetch().await;
                 true
             }
             NetworkEvent::BlockReceived { point, body } => {
@@ -247,31 +246,24 @@ impl PraosConsensus {
                     to = %point,
                     "peer chain rolled back"
                 );
-                self.select_chain().await;
+                self.evaluate_and_fetch().await;
                 true
             }
             NetworkEvent::PeerDisconnected { peer_id, .. } => {
                 self.record_peer_disconnected(*peer_id);
-                self.select_chain().await;
-                // Don't consume the event — the upstream log handler
-                // still wants to see it.
+                self.evaluate_and_fetch().await;
                 false
             }
             NetworkEvent::BlockFetchFailed { from, to } => {
-                // Clear both endpoints' in_flight entries so select_chain
-                // can reissue. The per-peer chains are the source of
-                // truth for what's still reachable — if no peer still
-                // claims these blocks, select_chain will pick a
-                // different candidate next pass.
                 self.in_flight.remove(from);
                 self.in_flight.remove(to);
                 info!(
                     node_id = %self.node_id,
                     from = %from,
                     to = %to,
-                    "block fetch failed; re-evaluating chain selection"
+                    "block fetch failed; re-evaluating fetch decisions"
                 );
-                self.select_chain().await;
+                self.evaluate_and_fetch().await;
                 true
             }
 
