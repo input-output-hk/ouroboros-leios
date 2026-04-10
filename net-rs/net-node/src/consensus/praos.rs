@@ -569,21 +569,20 @@ impl PraosConsensus {
                 };
 
                 if !reaches_ancestor {
-                    // Genuine gap — fetch blocks between ancestor and
-                    // the start of the replay chain.
-                    let first_point = replay.first().map(|(p, _)| p.clone()).unwrap();
-                    let ancestor_point = self.chain_tree.point(&ancestor).cloned();
-                    info!(
+                    // All replay blocks have bodies but the chain_tree
+                    // walk doesn't reach the ancestor — the replay
+                    // goes through a different fork. This happens when
+                    // the PeerChain has stale entries from an old fork
+                    // mixed with new fork entries.
+                    tracing::info!(
                         node_id = %self.node_id,
                         %peer_id,
                         tip_block_no = candidate_tip.block_no,
-                        "select_chain: chain_tree gap to ancestor; fetching"
+                        ancestor = format!("{:02x}{:02x}", ancestor[30], ancestor[31]),
+                        "select_chain: fork mismatch (replay doesn't reach ancestor); skipping peer"
                     );
-                    return SelectionDecision::WaitingForBlocks {
+                    return SelectionDecision::OrphanCandidate {
                         peer_id,
-                        ancestor,
-                        anchor_point: ancestor_point,
-                        missing: vec![first_point],
                         tip_block_no: candidate_tip.block_no,
                     };
                 }
@@ -629,41 +628,24 @@ impl PraosConsensus {
                     peer_id,
                     tip_block_no,
                 } => {
-                    // If this peer has an anchor but it's stale (not in
-                    // our adopted chain), request re-intersection over the
-                    // existing ChainSync connection. This gives a fresh
-                    // anchor on the current adopted chain and re-streams
-                    // headers from the correct starting point.
-                    let has_stale_anchor = self.peer_chains.get(&peer_id).is_some_and(|chain| {
-                        chain.anchor().is_some_and(|a| {
-                            self.adopted_tip_hash
-                                .map(|h| !self.chain_tree.ancestors(h).contains(&a.hash))
-                                .unwrap_or(false)
-                        })
-                    });
-                    if has_stale_anchor {
-                        info!(
-                            node_id = %self.node_id,
-                            %peer_id,
-                            tip_block_no,
-                            "select_chain: orphan with stale anchor, requesting re-intersection"
-                        );
-                        // Don't clear_entries — keep existing PeerChain
-                        // so the walk has entries to work with, and the
-                        // tried set properly skips this peer for other
-                        // candidates this pass.
-                        let _ = self
-                            .commands
-                            .send(NetworkCommand::ReIntersect { peer_id })
-                            .await;
-                    } else {
-                        tracing::debug!(
-                            node_id = %self.node_id,
-                            %peer_id,
-                            tip_block_no,
-                            "select_chain: skipping orphan candidate"
-                        );
+                    // Clear stale entries and request re-intersection.
+                    // Stale entries (from an old fork mixed with new
+                    // announcements) cause persistent fork mismatches
+                    // in the contiguity guard. Clearing forces ChainSync
+                    // to rebuild from a fresh intersection.
+                    if let Some(chain) = self.peer_chains.get_mut(&peer_id) {
+                        chain.clear_entries();
                     }
+                    info!(
+                        node_id = %self.node_id,
+                        %peer_id,
+                        tip_block_no,
+                        "select_chain: orphan, clearing entries and requesting re-intersection"
+                    );
+                    let _ = self
+                        .commands
+                        .send(NetworkCommand::ReIntersect { peer_id })
+                        .await;
                     tried.insert(peer_id);
                     continue;
                 }
@@ -2806,13 +2788,14 @@ mod tests {
                 prev_hash: Some(hash5p),
             });
 
-        // select_chain_once should detect the gap (block 6' → 5' → 4' → 3
-        // but 5' and 4' aren't in chain_tree) and return WaitingForBlocks.
+        // select_chain_once should detect the fork mismatch (block 6' is
+        // in chain_tree but its ancestors don't reach block 3) and return
+        // OrphanCandidate so the driver can re-intersect.
         let decision = consensus.select_chain_once(&HashSet::new());
         match decision {
-            SelectionDecision::WaitingForBlocks { .. } => { /* correct */ }
+            SelectionDecision::OrphanCandidate { .. } => { /* correct */ }
             SelectionDecision::Switched { .. } => {
-                panic!("should NOT return Switched when there's a gap in chain_tree");
+                panic!("should NOT return Switched when there's a fork mismatch in chain_tree");
             }
             other => {
                 panic!("unexpected decision: {other:?}");
