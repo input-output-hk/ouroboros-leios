@@ -581,23 +581,24 @@ impl Coordinator {
                 }
             }
 
-            NetworkCommand::FetchBlockRange { from, to } => {
-                // Range fetch: find a peer whose fragment contains the
-                // `to` endpoint. We only check `to` because `from` may
-                // have been removed from the fragment after an earlier
-                // fetch (fragment.remove on BlockFetched). The server's
-                // get_range has a fallback for unknown `from` — it
-                // returns the prefix up to `to`.
+            NetworkCommand::FetchBlockRange { from, to, peer_id } => {
                 if self.pending_fetches.contains_key(&to) {
                     return true;
                 }
 
-                let best_peer = self
-                    .peers
-                    .iter()
-                    .filter(|(_, p)| p.fragment.contains(&to))
-                    .min_by_key(|(_, p)| p.rtt.unwrap_or(Duration::from_secs(999)))
-                    .map(|(id, _)| *id);
+                // If the caller specified which peer announced this
+                // chain, route directly to it — its fragment may have
+                // been truncated by rollbacks but it still has the
+                // blocks. Fall back to fragment scan otherwise.
+                let best_peer = peer_id
+                    .filter(|id| self.peers.contains_key(id))
+                    .or_else(|| {
+                        self.peers
+                            .iter()
+                            .filter(|(_, p)| p.fragment.contains(&to))
+                            .min_by_key(|(_, p)| p.rtt.unwrap_or(Duration::from_secs(999)))
+                            .map(|(id, _)| *id)
+                    });
 
                 if let Some(best_id) = best_peer {
                     if let Some(peer) = self.peers.get(&best_id) {
@@ -611,10 +612,6 @@ impl Coordinator {
                         self.pending_fetches.insert(to, best_id);
                     }
                 } else {
-                    // No connected peer claims to have this point in its
-                    // fragment — it's currently unfetchable. Signal the
-                    // app so it can prune the dead fork instead of looping
-                    // forever issuing requests we'll silently drop.
                     let _ = self
                         .network_events
                         .send(NetworkEvent::BlockFetchFailed { from, to })

@@ -706,7 +706,7 @@ impl PraosConsensus {
                         ancestor = format!("{:02x}{:02x}", ancestor[30], ancestor[31]),
                         "select_chain: fetching missing blocks"
                     );
-                    self.issue_fetch(missing, anchor_point).await;
+                    self.issue_fetch(missing, anchor_point, Some(peer_id)).await;
                     return;
                 }
             }
@@ -786,7 +786,12 @@ impl PraosConsensus {
     /// This fills the gap between the anchor and the oldest PeerChain
     /// entry — blocks that aren't in the PeerChain but are needed for
     /// the chain to be contiguous from the common ancestor to the tip.
-    async fn issue_fetch(&mut self, missing: Vec<Point>, anchor_point: Option<Point>) {
+    async fn issue_fetch(
+        &mut self,
+        missing: Vec<Point>,
+        anchor_point: Option<Point>,
+        peer_id: Option<PeerId>,
+    ) {
         if missing.is_empty() {
             return;
         }
@@ -809,7 +814,7 @@ impl PraosConsensus {
         );
         let _ = self
             .commands
-            .send(NetworkCommand::FetchBlockRange { from, to })
+            .send(NetworkCommand::FetchBlockRange { from, to, peer_id })
             .await;
     }
 
