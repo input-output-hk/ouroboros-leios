@@ -35,13 +35,40 @@ use crate::peer::{ConnectionMode, PeerId};
 use crate::store::chain_store::ChainStore;
 use crate::store::leios_store::LeiosStore;
 
+/// Capacity of the per-peer command channel (coordinator → peer task).
+/// Large enough that a brief peer-task stall doesn't immediately force
+/// removal; full channel is treated as a broken peer.
+const PEER_COMMAND_CAPACITY: usize = 256;
+
+/// Capacity of the network_events channel (coordinator → application).
+const NETWORK_EVENTS_CAPACITY: usize = 8192;
+
+/// Capacity of the network_commands channel (application → coordinator).
+const NETWORK_COMMANDS_CAPACITY: usize = 1024;
+
+/// Capacity of the peer_events fan-in channel (all peer tasks → coordinator).
+const PEER_EVENTS_CAPACITY: usize = 2048;
+
+/// Minimum free slots in `network_events` before the coordinator pulls a new
+/// peer event. Handlers may emit several `NetworkEvent`s per peer event
+/// (e.g. `Failed` iterates `pending_fetches`), so we reserve headroom to
+/// guarantee every handler completes without an emit failure. When the
+/// free slot count drops below this threshold, the `peer_events` branch of
+/// the main `select!` is disabled, which blocks peer tasks on
+/// `peer_event_sender.send().await` and propagates backpressure all the
+/// way to TCP.
+const MIN_EMIT_HEADROOM: usize = 256;
+
 /// Per-peer state tracked by the coordinator.
 struct PeerState {
     address: String,
     #[allow(dead_code)]
     mode: ConnectionMode,
-    /// IP address for inbound peers (used for per-IP connection counting).
-    ip: Option<IpAddr>,
+    /// RAII guard for the per-IP connection slot. Present only for inbound
+    /// (accepted) peers. On drop (when this `PeerState` is removed from
+    /// `self.peers`), the guard decrements `ip_counts` — so cleanup doesn't
+    /// depend on the event loop being able to process `PeerEvent::Failed`.
+    ip_guard: Option<IpCountGuard>,
     commands: mpsc::Sender<PeerCommand>,
     task_handle: JoinHandle<()>,
     tip: Option<Tip>,
@@ -90,14 +117,21 @@ struct Coordinator {
     leios_store: Option<Arc<LeiosStore>>,
     /// Leios dedup, offer tracking, and fetch routing (None when leios_enabled=false).
     leios: Option<LeiosTracker>,
-    /// Completed inbound duplex connections from the accept loop.
-    inbound_connections: Option<mpsc::Receiver<(DuplexConnection, SocketAddr)>>,
+    /// Completed inbound duplex connections from the accept loop. The third
+    /// tuple element is the RAII guard holding the per-IP slot reservation;
+    /// it is stored in the new `PeerState` once the connection is added.
+    inbound_connections: Option<mpsc::Receiver<(DuplexConnection, SocketAddr, IpCountGuard)>>,
     /// Handle for the accept loop task (if listening).
     accept_task: Option<JoinHandle<()>>,
     /// Per-IP connection count (handshaking + established). Shared with accept loop.
     ip_counts: Arc<Mutex<HashMap<IpAddr, usize>>>,
     /// Peer provider callback for PeerSharing server.
     peer_provider: Arc<dyn Fn(u8) -> Vec<PeerAddress> + Send + Sync>,
+    /// Peers to remove after the current select! iteration completes.
+    /// Populated by `send_peer_command` when a peer's command channel is
+    /// full (treated as a broken peer task). Drained at the bottom of the
+    /// main loop body so removal doesn't happen mid-handler.
+    pending_removals: Vec<(PeerId, String)>,
 }
 
 impl Coordinator {
@@ -133,6 +167,56 @@ impl Coordinator {
             accept_task: None,
             ip_counts: Arc::new(Mutex::new(HashMap::new())),
             peer_provider: Arc::new(|_| Vec::new()),
+            pending_removals: Vec::new(),
+        }
+    }
+
+    /// Emit a NetworkEvent to the application using the non-blocking
+    /// `try_send`. The `peer_events` branch of the main `select!` gates
+    /// on `network_events.capacity() >= MIN_EMIT_HEADROOM` so handlers
+    /// always enter with sufficient headroom for several emits; seeing
+    /// `TrySendError::Full` here indicates a handler emitted more events
+    /// than the reserved headroom (a bug to fix) rather than normal load.
+    fn emit_event(&mut self, event: NetworkEvent) {
+        use tokio::sync::mpsc::error::TrySendError;
+        match self.network_events.try_send(event) {
+            Ok(()) => {}
+            Err(TrySendError::Full(_)) => {
+                tracing::error!(
+                    "emit_event: network_events unexpectedly full (handler exceeded MIN_EMIT_HEADROOM)"
+                );
+            }
+            Err(TrySendError::Closed(_)) => {
+                // Application has dropped its receiver. The main loop
+                // will observe this on its next `network_commands.recv()`
+                // and exit naturally.
+            }
+        }
+    }
+
+    /// Route a command to a specific peer using `try_send`. On `Full`, the
+    /// peer task is not draining its command channel — treat that peer as
+    /// broken and schedule it for removal. Returns true if the command was
+    /// accepted into the channel.
+    fn send_peer_command(&mut self, peer_id: PeerId, cmd: PeerCommand) -> bool {
+        use tokio::sync::mpsc::error::TrySendError;
+        let peer = match self.peers.get(&peer_id) {
+            Some(p) => p,
+            None => return false,
+        };
+        match peer.commands.try_send(cmd) {
+            Ok(()) => true,
+            Err(TrySendError::Full(_)) => {
+                tracing::error!(?peer_id, "peer command channel full; scheduling removal");
+                self.pending_removals
+                    .push((peer_id, "peer command channel full".to_string()));
+                false
+            }
+            Err(TrySendError::Closed(_)) => {
+                self.pending_removals
+                    .push((peer_id, "peer command channel closed".to_string()));
+                false
+            }
         }
     }
 
@@ -141,7 +225,7 @@ impl Coordinator {
         let peer_id = PeerId(self.next_peer_id);
         self.next_peer_id += 1;
 
-        let (cmd_sender, cmd_receiver) = mpsc::channel(16);
+        let (cmd_sender, cmd_receiver) = mpsc::channel(PEER_COMMAND_CAPACITY);
 
         let (task_handle, mode) = if self.config.duplex {
             let task_config = DuplexTaskConfig {
@@ -195,7 +279,7 @@ impl Coordinator {
             PeerState {
                 address,
                 mode,
-                ip: None,
+                ip_guard: None,
                 commands: cmd_sender,
                 task_handle,
                 tip: None,
@@ -228,10 +312,7 @@ impl Coordinator {
                     .get(&peer_id)
                     .map(|p| p.address.clone())
                     .unwrap_or_default();
-                let _ = self
-                    .network_events
-                    .send(NetworkEvent::PeerConnected { peer_id, address })
-                    .await;
+                self.emit_event(NetworkEvent::PeerConnected { peer_id, address });
             }
 
             PeerEvent::IntersectionFound { point } => {
@@ -240,10 +321,7 @@ impl Coordinator {
                 }
                 // Forward to consensus so it can store the intersection as
                 // the peer chain's anchor (guaranteed common ancestor).
-                let _ = self
-                    .network_events
-                    .send(NetworkEvent::IntersectionFound { peer_id, point })
-                    .await;
+                self.emit_event(NetworkEvent::IntersectionFound { peer_id, point });
             }
 
             PeerEvent::HeaderAnnounced { header, tip } => {
@@ -269,14 +347,11 @@ impl Coordinator {
 
                 // Forward every per-peer announcement so consensus can
                 // maintain a candidate chain per peer (Haskell-style).
-                let _ = self
-                    .network_events
-                    .send(NetworkEvent::TipAdvanced {
-                        peer_id,
-                        tip,
-                        header,
-                    })
-                    .await;
+                self.emit_event(NetworkEvent::TipAdvanced {
+                    peer_id,
+                    tip,
+                    header,
+                });
             }
 
             PeerEvent::RolledBack { point, tip } => {
@@ -309,14 +384,11 @@ impl Coordinator {
                 // Always forward (unless deduped) so consensus can retire
                 // headers from the peer's candidate chain.
                 if !duplicate {
-                    let _ = self
-                        .network_events
-                        .send(NetworkEvent::RolledBack {
-                            peer_id,
-                            point,
-                            tip,
-                        })
-                        .await;
+                    self.emit_event(NetworkEvent::RolledBack {
+                        peer_id,
+                        point,
+                        tip,
+                    });
                 }
             }
 
@@ -336,18 +408,16 @@ impl Coordinator {
 
                 // Forward to app for validation. The app will InjectBlock after
                 // validation to make the block available to downstream peers.
-                let _ = self
-                    .network_events
-                    .send(NetworkEvent::BlockReceived { point, body })
-                    .await;
+                self.emit_event(NetworkEvent::BlockReceived { point, body });
             }
 
             PeerEvent::LatencyMeasured { rtt } => {
                 if let Some(peer) = self.peers.get_mut(&peer_id) {
-                    // Accepted peers (ip.is_some()) don't have configured
-                    // inbound_delay — skip their RTT to avoid showing 0ms.
-                    // The outbound side of each connection tracks RTT.
-                    if peer.ip.is_none() {
+                    // Accepted peers (ip_guard.is_some()) don't have a
+                    // configured inbound_delay — skip their RTT to avoid
+                    // showing 0ms. The outbound side of each connection
+                    // tracks RTT.
+                    if peer.ip_guard.is_none() {
                         // Add the simulated inbound delay so RTT reflects
                         // configured link latency (real TCP on localhost is ~0).
                         peer.rtt = Some(rtt + peer.inbound_delay);
@@ -356,25 +426,16 @@ impl Coordinator {
             }
 
             PeerEvent::PeersDiscovered { peers } => {
-                let _ = self
-                    .network_events
-                    .send(NetworkEvent::PeersDiscovered { peers })
-                    .await;
+                self.emit_event(NetworkEvent::PeersDiscovered { peers });
             }
 
             PeerEvent::TransactionReceived { body } => {
-                let _ = self
-                    .network_events
-                    .send(NetworkEvent::TransactionReceived { peer_id, body })
-                    .await;
+                self.emit_event(NetworkEvent::TransactionReceived { peer_id, body });
             }
 
             // Leios events — deduplicated with offer tracking for smart routing.
             PeerEvent::LeiosBlockAnnounced { header } => {
-                let _ = self
-                    .network_events
-                    .send(NetworkEvent::LeiosBlockAnnounced { header })
-                    .await;
+                self.emit_event(NetworkEvent::LeiosBlockAnnounced { header });
             }
 
             PeerEvent::LeiosBlockOffered { point } => {
@@ -384,10 +445,7 @@ impl Coordinator {
                     match tracker.handle_block_offer(*slot, *hash, peer_id) {
                         OfferResult::New => {
                             tracing::debug!("leios: new EB offer at slot {slot} from {peer_id}");
-                            let _ = self
-                                .network_events
-                                .send(NetworkEvent::LeiosBlockOffered { point })
-                                .await;
+                            self.emit_event(NetworkEvent::LeiosBlockOffered { point });
                         }
                         OfferResult::Duplicate => {
                             tracing::debug!(
@@ -398,10 +456,7 @@ impl Coordinator {
                             tracing::warn!(
                                 "leios: seen_leios_blocks at capacity, forwarding without dedup"
                             );
-                            let _ = self
-                                .network_events
-                                .send(NetworkEvent::LeiosBlockOffered { point })
-                                .await;
+                            self.emit_event(NetworkEvent::LeiosBlockOffered { point });
                         }
                     }
                 }
@@ -414,10 +469,7 @@ impl Coordinator {
                     match tracker.handle_txs_offer(*slot, *hash, peer_id) {
                         OfferResult::New => {
                             tracing::debug!("leios: new TXs offer at slot {slot} from {peer_id}");
-                            let _ = self
-                                .network_events
-                                .send(NetworkEvent::LeiosBlockTxsOffered { point })
-                                .await;
+                            self.emit_event(NetworkEvent::LeiosBlockTxsOffered { point });
                         }
                         OfferResult::Duplicate => {
                             tracing::debug!(
@@ -428,10 +480,7 @@ impl Coordinator {
                             tracing::warn!(
                                 "leios: seen_leios_txs at capacity, forwarding without dedup"
                             );
-                            let _ = self
-                                .network_events
-                                .send(NetworkEvent::LeiosBlockTxsOffered { point })
-                                .await;
+                            self.emit_event(NetworkEvent::LeiosBlockTxsOffered { point });
                         }
                     }
                 }
@@ -450,12 +499,8 @@ impl Coordinator {
                             "leios: {} new vote(s) from {peer_id}",
                             result.unseen.len()
                         );
-                        let _ = self
-                            .network_events
-                            .send(NetworkEvent::LeiosVotesOffered {
-                                votes: result.unseen,
-                            })
-                            .await;
+                        let unseen = result.unseen;
+                        self.emit_event(NetworkEvent::LeiosVotesOffered { votes: unseen });
                     } else {
                         tracing::debug!("leios: all votes from {peer_id} deduplicated");
                     }
@@ -472,10 +517,7 @@ impl Coordinator {
                 if let Some(ref store) = self.leios_store {
                     store.inject_block(point.clone(), block.clone());
                 }
-                let _ = self
-                    .network_events
-                    .send(NetworkEvent::LeiosBlockReceived { point, block })
-                    .await;
+                self.emit_event(NetworkEvent::LeiosBlockReceived { point, block });
             }
 
             PeerEvent::LeiosBlockTxsFetched {
@@ -487,13 +529,10 @@ impl Coordinator {
                 {
                     tracker.complete_txs_fetch(*slot, *hash);
                 }
-                let _ = self
-                    .network_events
-                    .send(NetworkEvent::LeiosBlockTxsReceived {
-                        point,
-                        transactions,
-                    })
-                    .await;
+                self.emit_event(NetworkEvent::LeiosBlockTxsReceived {
+                    point,
+                    transactions,
+                });
             }
 
             PeerEvent::LeiosVotesFetched {
@@ -508,13 +547,10 @@ impl Coordinator {
                 if let Some(ref store) = self.leios_store {
                     store.inject_votes(vote_ids.clone(), vote_data.clone());
                 }
-                let _ = self
-                    .network_events
-                    .send(NetworkEvent::LeiosVotesReceived {
-                        vote_ids,
-                        vote_data,
-                    })
-                    .await;
+                self.emit_event(NetworkEvent::LeiosVotesReceived {
+                    vote_ids,
+                    vote_data,
+                });
             }
 
             PeerEvent::BlockFetchFailed { from, to } => {
@@ -527,10 +563,7 @@ impl Coordinator {
                     self.pending_fetches.remove(&to);
                 }
                 // Notify application with the full range so it can retry.
-                let _ = self
-                    .network_events
-                    .send(NetworkEvent::BlockFetchFailed { from, to })
-                    .await;
+                self.emit_event(NetworkEvent::BlockFetchFailed { from, to });
             }
 
             PeerEvent::Failed { reason } => {
@@ -568,14 +601,11 @@ impl Coordinator {
                     .map(|(id, _)| *id);
 
                 if let Some(best_id) = best_peer {
-                    if let Some(peer) = self.peers.get(&best_id) {
-                        let _ = peer
-                            .commands
-                            .send(PeerCommand::FetchBlocks {
-                                from: point.clone(),
-                                to: point.clone(),
-                            })
-                            .await;
+                    let cmd = PeerCommand::FetchBlocks {
+                        from: point.clone(),
+                        to: point.clone(),
+                    };
+                    if self.send_peer_command(best_id, cmd) {
                         self.pending_fetches.insert(point, best_id);
                     }
                 }
@@ -601,39 +631,30 @@ impl Coordinator {
                     });
 
                 if let Some(best_id) = best_peer {
-                    if let Some(peer) = self.peers.get(&best_id) {
-                        let _ = peer
-                            .commands
-                            .send(PeerCommand::FetchBlocks {
-                                from,
-                                to: to.clone(),
-                            })
-                            .await;
+                    let cmd = PeerCommand::FetchBlocks {
+                        from: from.clone(),
+                        to: to.clone(),
+                    };
+                    if self.send_peer_command(best_id, cmd) {
                         self.pending_fetches.insert(to, best_id);
+                    } else {
+                        // Peer was scheduled for removal; tell the app the
+                        // fetch failed so it can retry via another peer.
+                        self.emit_event(NetworkEvent::BlockFetchFailed { from, to });
                     }
                 } else {
-                    let _ = self
-                        .network_events
-                        .send(NetworkEvent::BlockFetchFailed { from, to })
-                        .await;
+                    self.emit_event(NetworkEvent::BlockFetchFailed { from, to });
                 }
             }
 
             NetworkCommand::ReIntersect { peer_id } => {
-                if let Some(peer) = self.peers.get(&peer_id) {
-                    let _ = peer.commands.send(PeerCommand::ReIntersect).await;
-                }
+                self.send_peer_command(peer_id, PeerCommand::ReIntersect);
             }
 
             NetworkCommand::DiscoverPeers => {
                 // Send to a random connected peer.
-                if let Some((&peer_id, _)) = self.peers.iter().next() {
-                    if let Some(peer) = self.peers.get(&peer_id) {
-                        let _ = peer
-                            .commands
-                            .send(PeerCommand::RequestPeers { amount: 10 })
-                            .await;
-                    }
+                if let Some(&peer_id) = self.peers.keys().next() {
+                    self.send_peer_command(peer_id, PeerCommand::RequestPeers { amount: 10 });
                 }
             }
 
@@ -652,63 +673,63 @@ impl Coordinator {
             }
 
             NetworkCommand::FetchLeiosBlock { point } => {
-                if let (Point::Specific { slot, hash }, Some(tracker)) =
+                let target = if let (Point::Specific { slot, hash }, Some(tracker)) =
                     (&point, self.leios.as_mut())
                 {
                     let slot = *slot;
                     let hash = *hash;
                     let lookup = CoordinatorRttLookup { peers: &self.peers };
-                    if let Some(best_id) = tracker.pick_block_fetch_peer(slot, hash, &lookup) {
-                        let rtt = self.peers.get(&best_id).and_then(|p| p.rtt);
-                        tracing::debug!(
-                            "leios: routing EB fetch slot {slot} to {best_id} (rtt={rtt:?})"
-                        );
-                        if let Some(peer) = self.peers.get(&best_id) {
-                            let _ = peer
-                                .commands
-                                .send(PeerCommand::FetchLeiosBlock { point })
-                                .await;
-                        }
-                    } else {
+                    let picked = tracker.pick_block_fetch_peer(slot, hash, &lookup);
+                    if picked.is_none() {
                         tracing::debug!("leios: no peer available or already pending for EB fetch at slot {slot}");
                     }
+                    picked
+                } else {
+                    None
+                };
+                if let Some(best_id) = target {
+                    let rtt = self.peers.get(&best_id).and_then(|p| p.rtt);
+                    tracing::debug!("leios: routing EB fetch to {best_id} (rtt={rtt:?})");
+                    self.send_peer_command(best_id, PeerCommand::FetchLeiosBlock { point });
                 }
             }
 
             NetworkCommand::FetchLeiosBlockTxs { point, bitmap } => {
-                if let (Point::Specific { slot, hash }, Some(tracker)) =
+                let target = if let (Point::Specific { slot, hash }, Some(tracker)) =
                     (&point, self.leios.as_mut())
                 {
                     let slot = *slot;
                     let hash = *hash;
                     let lookup = CoordinatorRttLookup { peers: &self.peers };
-                    if let Some(best_id) = tracker.pick_txs_fetch_peer(slot, hash, &lookup) {
-                        let rtt = self.peers.get(&best_id).and_then(|p| p.rtt);
-                        tracing::debug!(
-                            "leios: routing TXs fetch slot {slot} to {best_id} (rtt={rtt:?})"
-                        );
-                        if let Some(peer) = self.peers.get(&best_id) {
-                            let _ = peer
-                                .commands
-                                .send(PeerCommand::FetchLeiosBlockTxs { point, bitmap })
-                                .await;
-                        }
-                    }
+                    tracker.pick_txs_fetch_peer(slot, hash, &lookup)
+                } else {
+                    None
+                };
+                if let Some(best_id) = target {
+                    let rtt = self.peers.get(&best_id).and_then(|p| p.rtt);
+                    tracing::debug!("leios: routing TXs fetch to {best_id} (rtt={rtt:?})");
+                    self.send_peer_command(
+                        best_id,
+                        PeerCommand::FetchLeiosBlockTxs { point, bitmap },
+                    );
                 }
             }
 
             NetworkCommand::FetchLeiosVotes { votes } => {
-                if let Some(tracker) = self.leios.as_mut() {
+                let assignments: Vec<_> = if let Some(tracker) = self.leios.as_mut() {
                     let lookup = CoordinatorRttLookup { peers: &self.peers };
-                    let by_peer = tracker.pick_vote_fetch_peers(votes, &lookup);
-                    for (target_peer, vote_ids) in by_peer {
-                        if let Some(peer) = self.peers.get(&target_peer) {
-                            let _ = peer
-                                .commands
-                                .send(PeerCommand::FetchLeiosVotes { votes: vote_ids })
-                                .await;
-                        }
-                    }
+                    tracker
+                        .pick_vote_fetch_peers(votes, &lookup)
+                        .into_iter()
+                        .collect()
+                } else {
+                    Vec::new()
+                };
+                for (target_peer, vote_ids) in assignments {
+                    self.send_peer_command(
+                        target_peer,
+                        PeerCommand::FetchLeiosVotes { votes: vote_ids },
+                    );
                 }
             }
 
@@ -725,11 +746,12 @@ impl Coordinator {
             }
 
             NetworkCommand::SubmitTransaction { tx } => {
-                for peer in self.peers.values() {
-                    let _ = peer
-                        .commands
-                        .send(PeerCommand::SubmitTransaction { tx: tx.clone() })
-                        .await;
+                let peer_ids: Vec<PeerId> = self.peers.keys().copied().collect();
+                for peer_id in peer_ids {
+                    self.send_peer_command(
+                        peer_id,
+                        PeerCommand::SubmitTransaction { tx: tx.clone() },
+                    );
                 }
             }
 
@@ -752,19 +774,14 @@ impl Coordinator {
                         }
                     })
                     .collect();
-                let _ = self
-                    .network_events
-                    .send(NetworkEvent::PeerSnapshot { peers })
-                    .await;
+                self.emit_event(NetworkEvent::PeerSnapshot { peers });
             }
 
             NetworkCommand::Shutdown => {
                 // Disconnect all peers.
                 let peer_ids: Vec<PeerId> = self.peers.keys().copied().collect();
                 for peer_id in peer_ids {
-                    if let Some(peer) = self.peers.get(&peer_id) {
-                        let _ = peer.commands.send(PeerCommand::Disconnect).await;
-                    }
+                    self.send_peer_command(peer_id, PeerCommand::Disconnect);
                 }
                 return false; // signal to stop
             }
@@ -779,15 +796,13 @@ impl Coordinator {
         if let Some(peer) = self.peers.remove(&peer_id) {
             peer.task_handle.abort();
 
-            // Decrement per-IP connection count for inbound peers.
-            if let Some(ip) = peer.ip {
-                decrement_ip_count(&self.ip_counts, ip);
-            }
+            // The per-IP slot (if any) is released automatically when
+            // `peer.ip_guard` drops as the PeerState is moved out here.
 
             // Schedule reconnection for outbound peers only. Accepted (inbound)
-            // peers have `ip` set and should not reconnect — the remote side
-            // re-initiates those.
-            if peer.ip.is_none() {
+            // peers carry an ip_guard and should not reconnect — the remote
+            // side re-initiates those.
+            if peer.ip_guard.is_none() {
                 let backoff = peer.reconnect_backoff;
                 let next_backoff = (backoff * 2).min(MAX_BACKOFF);
                 self.reconnect_queue.push((
@@ -808,22 +823,16 @@ impl Coordinator {
                 .map(|(pt, _)| pt.clone())
                 .collect();
             for point in &orphaned {
-                let _ = self
-                    .network_events
-                    .send(NetworkEvent::BlockFetchFailed {
-                        from: point.clone(),
-                        to: point.clone(),
-                    })
-                    .await;
+                self.emit_event(NetworkEvent::BlockFetchFailed {
+                    from: point.clone(),
+                    to: point.clone(),
+                });
             }
             for point in &orphaned {
                 self.pending_fetches.remove(point);
             }
 
-            let _ = self
-                .network_events
-                .send(NetworkEvent::PeerDisconnected { peer_id, reason })
-                .await;
+            self.emit_event(NetworkEvent::PeerDisconnected { peer_id, reason });
 
             // Clean up Leios offer and fetch tracking for this peer.
             if let Some(tracker) = self.leios.as_mut() {
@@ -868,12 +877,19 @@ impl Coordinator {
         }
     }
 
-    /// Add a duplex peer for an accepted inbound connection.
-    fn add_accepted_peer(&mut self, connection: DuplexConnection, peer_addr: SocketAddr) -> PeerId {
+    /// Add a duplex peer for an accepted inbound connection. The caller
+    /// passes the `IpCountGuard` reserved at accept time; it is stored in
+    /// the new `PeerState` so the slot is released when the peer is removed.
+    fn add_accepted_peer(
+        &mut self,
+        connection: DuplexConnection,
+        peer_addr: SocketAddr,
+        ip_guard: IpCountGuard,
+    ) -> PeerId {
         let peer_id = PeerId(self.next_peer_id);
         self.next_peer_id += 1;
 
-        let (cmd_sender, cmd_receiver) = mpsc::channel(16);
+        let (cmd_sender, cmd_receiver) = mpsc::channel(PEER_COMMAND_CAPACITY);
 
         let task_config = AcceptedDuplexTaskConfig {
             peer_id,
@@ -889,7 +905,6 @@ impl Coordinator {
 
         let task_handle = tokio::spawn(run_accepted_duplex_task(task_config));
 
-        let ip = peer_addr.ip();
         let address = peer_addr.to_string();
         let inbound_delay = self
             .config
@@ -903,7 +918,7 @@ impl Coordinator {
             PeerState {
                 address,
                 mode: ConnectionMode::Duplex,
-                ip: Some(ip),
+                ip_guard: Some(ip_guard),
                 commands: cmd_sender,
                 task_handle,
                 tip: None,
@@ -955,7 +970,8 @@ impl Coordinator {
             }
         }
 
-        let (conn_sender, conn_receiver) = mpsc::channel::<(DuplexConnection, SocketAddr)>(16);
+        let (conn_sender, conn_receiver) =
+            mpsc::channel::<(DuplexConnection, SocketAddr, IpCountGuard)>(16);
         self.inbound_connections = Some(conn_receiver);
 
         let ip_counts = self.ip_counts.clone();
@@ -1010,26 +1026,28 @@ impl Coordinator {
                     }
                 };
 
-                // Reserve the per-IP slot before spawning.
-                {
-                    let mut counts = ip_counts.lock().expect("ip_counts lock poisoned");
-                    *counts.entry(ip).or_insert(0) += 1;
-                }
+                // Reserve the per-IP slot. The returned guard owns the
+                // decrement; it is dropped (auto-decrementing) if the
+                // handshake fails or conn_sender.send fails. On success
+                // it is forwarded to the coordinator and stored in the
+                // new peer's PeerState.
+                let ip_guard = IpCountGuard::reserve(ip_counts.clone(), ip);
 
                 let conn_sender = conn_sender.clone();
-                let ip_counts = ip_counts.clone();
                 let client_protos = client_protos.clone();
                 let server_protos = server_protos.clone();
                 let mux_config = mux_config.clone();
 
                 tokio::spawn(async move {
                     let _permit = permit; // held until task completes
+                                          // ip_guard lives until either (a) we transfer it into
+                                          // conn_sender or (b) it drops at the end of this task.
 
                     let bearer = match TcpBearer::from_accepted(stream) {
                         Ok(b) => b,
                         Err(e) => {
                             tracing::warn!("socket configuration failed for {peer_addr}: {e}");
-                            decrement_ip_count(&ip_counts, ip);
+                            // ip_guard dropped here — slot released.
                             return;
                         }
                     };
@@ -1046,14 +1064,18 @@ impl Coordinator {
                     .await
                     {
                         Ok(conn) => {
-                            if conn_sender.send((conn, peer_addr)).await.is_err() {
-                                // Coordinator shut down — clean up.
-                                decrement_ip_count(&ip_counts, ip);
+                            // Transfer the guard to the coordinator. If the
+                            // send fails (coordinator shut down), the guard
+                            // comes back in the error and drops here.
+                            if let Err(mpsc::error::SendError((_, _, _guard))) =
+                                conn_sender.send((conn, peer_addr, ip_guard)).await
+                            {
+                                // _guard dropped → slot released.
                             }
                         }
                         Err(e) => {
                             tracing::warn!("inbound handshake failed from {peer_addr}: {e}");
-                            decrement_ip_count(&ip_counts, ip);
+                            // ip_guard dropped here — slot released.
                         }
                     }
                 });
@@ -1088,8 +1110,18 @@ impl Coordinator {
             // Earliest delayed event deadline (only computed when buffer is non-empty).
             let next_delayed = delayed.iter().map(|(t, _, _)| *t).min();
 
+            // Gate peer_events on available network_events headroom. When
+            // the application is slow, `network_events.capacity()` drops
+            // below MIN_EMIT_HEADROOM and this branch is disabled — the
+            // coordinator stops reading from peer tasks. Peer tasks then
+            // block on their shared `peer_event_sender.send().await`,
+            // which cascades backpressure through the mux demuxer to TCP.
+            // Other branches (commands, inbound connections, timers)
+            // remain active so the coord continues running.
+            let have_headroom = self.network_events.capacity() >= MIN_EMIT_HEADROOM;
+
             tokio::select! {
-                event = self.peer_events.recv() => {
+                event = self.peer_events.recv(), if have_headroom => {
                     match event {
                         Some((peer_id, peer_event)) => {
                             // If delay simulation is active and this peer has
@@ -1126,21 +1158,22 @@ impl Coordinator {
                         None => std::future::pending().await,
                     }
                 } => {
-                    if let Some((conn, peer_addr)) = result {
+                    if let Some((conn, peer_addr, ip_guard)) = result {
                         if self.peers.len() < self.config.max_peers {
-                            let peer_id = self.add_accepted_peer(conn, peer_addr);
+                            let peer_id = self.add_accepted_peer(conn, peer_addr, ip_guard);
                             tracing::info!("accepted inbound peer as {peer_id}");
                         } else {
                             tracing::warn!("max peers reached, dropping inbound connection");
                             conn.running.abort();
-                            decrement_ip_count(&self.ip_counts, peer_addr.ip());
+                            // ip_guard dropped here → slot released.
+                            drop(ip_guard);
                         }
                     }
                 }
                 _ = tokio::time::sleep(reconnect_delay) => {
                     self.process_reconnections();
                 }
-                _ = tokio::time::sleep_until(next_delayed.unwrap_or_else(|| Instant::now() + Duration::from_secs(86400))), if !delayed.is_empty() => {
+                _ = tokio::time::sleep_until(next_delayed.unwrap_or_else(|| Instant::now() + Duration::from_secs(86400))), if !delayed.is_empty() && have_headroom => {
                     // Deliver all delayed events whose deadline has passed.
                     let now = Instant::now();
                     let mut i = 0;
@@ -1152,6 +1185,15 @@ impl Coordinator {
                             i += 1;
                         }
                     }
+                }
+            }
+
+            // Process peers scheduled for removal during this iteration
+            // (try_send Full on peer.commands). Done outside the select!
+            // so handler bodies don't re-enter remove_peer mid-traversal.
+            if !self.pending_removals.is_empty() {
+                for (peer_id, reason) in std::mem::take(&mut self.pending_removals) {
+                    self.remove_peer(peer_id, reason).await;
                 }
             }
         }
@@ -1193,15 +1235,45 @@ fn decrement_ip_count(ip_counts: &Mutex<HashMap<IpAddr, usize>>, ip: IpAddr) {
     }
 }
 
+/// RAII guard for a per-IP connection slot. Increments `ip_counts[ip]` on
+/// construction and decrements on drop. This means an inbound connection
+/// cannot leak a slot just because the coordinator never processed a
+/// `PeerEvent::Failed` — dropping the `PeerState` that owns the guard
+/// (from `self.peers.remove(...)`, `self.peers.drain()` on shutdown, or
+/// a task panic) releases the slot unconditionally.
+struct IpCountGuard {
+    ip_counts: Arc<Mutex<HashMap<IpAddr, usize>>>,
+    ip: IpAddr,
+}
+
+impl IpCountGuard {
+    /// Reserve a slot for `ip` and return the owning guard. The caller must
+    /// have already checked the per-IP limit; this unconditionally increments.
+    fn reserve(ip_counts: Arc<Mutex<HashMap<IpAddr, usize>>>, ip: IpAddr) -> Self {
+        {
+            let mut counts = ip_counts.lock().expect("ip_counts lock poisoned");
+            *counts.entry(ip).or_insert(0) += 1;
+        }
+        Self { ip_counts, ip }
+    }
+}
+
+impl Drop for IpCountGuard {
+    fn drop(&mut self) {
+        decrement_ip_count(&self.ip_counts, self.ip);
+    }
+}
+
 /// Spawn a coordinator task and return a handle for the application.
 pub fn spawn_coordinator(config: CoordinatorConfig) -> CoordinatorHandle {
-    // Network events channel sized to absorb bursts of per-peer announcements
-    // (header advances, rollbacks). The application loop drains it on every
-    // iteration, but a slow tick can leave many events queued — undersizing
-    // here back-pressures the coordinator and stalls all peers.
-    let (net_event_sender, net_event_receiver) = mpsc::channel(256);
-    let (net_cmd_sender, net_cmd_receiver) = mpsc::channel(64);
-    let (peer_event_sender, peer_event_receiver) = mpsc::channel(256);
+    // `network_events` is sized well above `MIN_EMIT_HEADROOM` so the
+    // `peer_events` select! branch is gated by free-slot count, not by
+    // the absolute channel capacity. When the app falls behind, the gate
+    // closes and peer tasks block on their fan-in send, propagating
+    // backpressure through the mux to TCP rather than deadlocking.
+    let (net_event_sender, net_event_receiver) = mpsc::channel(NETWORK_EVENTS_CAPACITY);
+    let (net_cmd_sender, net_cmd_receiver) = mpsc::channel(NETWORK_COMMANDS_CAPACITY);
+    let (peer_event_sender, peer_event_receiver) = mpsc::channel(PEER_EVENTS_CAPACITY);
     let (chain_store, _chain_rx) = ChainStore::new(config.chain_store_capacity);
 
     let leios_store = if config.leios_enabled {
@@ -1268,7 +1340,7 @@ mod tests {
             PeerState {
                 address: "test:3001".to_string(),
                 mode: ConnectionMode::InitiatorOnly,
-                ip: None,
+                ip_guard: None,
                 commands: cmd_sender,
                 task_handle: tokio::spawn(async {}),
                 tip: None,
@@ -1360,7 +1432,7 @@ mod tests {
                 PeerState {
                     address: format!("test-{:?}:3001", peer_id),
                     mode: ConnectionMode::InitiatorOnly,
-                    ip: None,
+                    ip_guard: None,
                     commands: cmd_sender,
                     task_handle: tokio::spawn(async {}),
                     tip: None,
@@ -1463,7 +1535,7 @@ mod tests {
             PeerState {
                 address: "test:3001".to_string(),
                 mode: ConnectionMode::InitiatorOnly,
-                ip: None,
+                ip_guard: None,
                 commands: cmd_sender,
                 task_handle: tokio::spawn(async {}),
                 tip: None,
@@ -1532,7 +1604,7 @@ mod tests {
             PeerState {
                 address: "test:3001".to_string(),
                 mode: ConnectionMode::InitiatorOnly,
-                ip: None,
+                ip_guard: None,
                 commands: cmd_sender,
                 task_handle: tokio::spawn(async {}),
                 tip: None,
@@ -1626,7 +1698,7 @@ mod tests {
             PeerState {
                 address: "test:3001".to_string(),
                 mode: ConnectionMode::InitiatorOnly,
-                ip: None,
+                ip_guard: None,
                 commands: cmd_sender,
                 task_handle: tokio::spawn(async {}),
                 tip: None,
@@ -1679,7 +1751,7 @@ mod tests {
             PeerState {
                 address: format!("test-{}:3001", peer_id.0),
                 mode: ConnectionMode::InitiatorOnly,
-                ip: None,
+                ip_guard: None,
                 commands: cmd_sender,
                 task_handle: tokio::spawn(async {}),
                 tip: None,
@@ -2111,9 +2183,12 @@ mod tests {
     // --- Reconnection tests ---
 
     /// Helper: create a coordinator and insert a peer, then remove it and
-    /// return the reconnect queue state. `inbound_ip` simulates an accepted
-    /// (inbound) peer when Some; outbound peers have None.
-    async fn reconnection_after_removal(inbound_ip: Option<IpAddr>) -> Vec<String> {
+    /// return (reconnect queue, ip_counts for the inbound IP if any). An
+    /// `inbound_ip` of `Some` simulates an accepted inbound peer (carries
+    /// an `IpCountGuard`); `None` simulates an outbound peer.
+    async fn reconnection_after_removal(
+        inbound_ip: Option<IpAddr>,
+    ) -> (Vec<String>, Option<usize>) {
         let (peer_event_sender, peer_event_receiver) = mpsc::channel(256);
         let (net_event_sender, mut net_event_receiver) = mpsc::channel(64);
         let (_net_cmd_sender, net_cmd_receiver) = mpsc::channel(64);
@@ -2129,6 +2204,9 @@ mod tests {
             None,
         );
 
+        let ip_guard =
+            inbound_ip.map(|ip| IpCountGuard::reserve(coordinator.ip_counts.clone(), ip));
+
         let peer_id = PeerId(0);
         let (cmd_sender, _cmd_receiver) = mpsc::channel(16);
         coordinator.peers.insert(
@@ -2136,7 +2214,7 @@ mod tests {
             PeerState {
                 address: "test:3001".to_string(),
                 mode: ConnectionMode::Duplex,
-                ip: inbound_ip,
+                ip_guard,
                 commands: cmd_sender,
                 task_handle: tokio::spawn(async {}),
                 tip: None,
@@ -2152,22 +2230,226 @@ mod tests {
         coordinator.remove_peer(peer_id, "test".to_string()).await;
         let _ = net_event_receiver.try_recv();
 
-        coordinator
+        let queue: Vec<String> = coordinator
             .reconnect_queue
             .iter()
             .map(|(addr, _, _)| addr.clone())
-            .collect()
+            .collect();
+        let ip_count_after =
+            inbound_ip.and_then(|ip| coordinator.ip_counts.lock().unwrap().get(&ip).copied());
+        (queue, ip_count_after)
     }
 
     #[tokio::test]
     async fn outbound_peer_schedules_reconnection() {
-        let queue = reconnection_after_removal(None).await;
+        let (queue, _) = reconnection_after_removal(None).await;
         assert_eq!(queue, vec!["test:3001"]);
     }
 
     #[tokio::test]
     async fn accepted_peer_does_not_schedule_reconnection() {
-        let queue = reconnection_after_removal(Some("127.0.0.1".parse().unwrap())).await;
+        let (queue, ip_count_after) =
+            reconnection_after_removal(Some("127.0.0.1".parse().unwrap())).await;
         assert!(queue.is_empty());
+        // Per-IP slot must be released when the PeerState drops.
+        assert_eq!(
+            ip_count_after, None,
+            "ip_counts entry should be removed when last guard drops"
+        );
+    }
+
+    #[test]
+    fn ip_count_guard_decrements_on_drop() {
+        let ip_counts: Arc<Mutex<HashMap<IpAddr, usize>>> = Arc::new(Mutex::new(HashMap::new()));
+        let ip: IpAddr = "10.0.0.1".parse().unwrap();
+
+        let guard = IpCountGuard::reserve(ip_counts.clone(), ip);
+        assert_eq!(
+            ip_counts.lock().unwrap().get(&ip).copied(),
+            Some(1),
+            "reserve should increment the counter"
+        );
+
+        drop(guard);
+        assert_eq!(
+            ip_counts.lock().unwrap().get(&ip).copied(),
+            None,
+            "drop should remove the entry when count reaches zero"
+        );
+
+        // Multiple guards stack and release independently.
+        let g1 = IpCountGuard::reserve(ip_counts.clone(), ip);
+        let g2 = IpCountGuard::reserve(ip_counts.clone(), ip);
+        assert_eq!(ip_counts.lock().unwrap().get(&ip).copied(), Some(2));
+        drop(g1);
+        assert_eq!(ip_counts.lock().unwrap().get(&ip).copied(), Some(1));
+        drop(g2);
+        assert_eq!(ip_counts.lock().unwrap().get(&ip).copied(), None);
+    }
+
+    /// When the app consumer is slow, the `peer_events` branch gate closes
+    /// (network_events capacity drops below MIN_EMIT_HEADROOM). The coord
+    /// must still process `network_commands` and other branches — only the
+    /// peer-event intake should pause. This is the core backpressure fix.
+    #[tokio::test]
+    async fn coordinator_still_processes_commands_when_app_is_slow() {
+        use crate::types::{Tip, WrappedHeader};
+
+        // Sized so that MIN_EMIT_HEADROOM cannot be satisfied: we pre-fill
+        // the network_events channel to (capacity - MIN_EMIT_HEADROOM + 1)
+        // to simulate the app being behind on draining.
+        let app_channel_cap = MIN_EMIT_HEADROOM + 4;
+        let (peer_event_sender, peer_event_receiver) = mpsc::channel(256);
+        let (net_event_sender, net_event_receiver) = mpsc::channel(app_channel_cap);
+        let (net_cmd_sender, net_cmd_receiver) = mpsc::channel(64);
+        let config = CoordinatorConfig::default();
+        let (chain_store, _chain_rx) = ChainStore::new(100);
+        let coordinator = Coordinator::new(
+            config,
+            peer_event_sender.clone(),
+            peer_event_receiver,
+            net_event_sender.clone(),
+            net_cmd_receiver,
+            chain_store,
+            None,
+        );
+
+        // Fill network_events to below MIN_EMIT_HEADROOM so the gate will
+        // close. We use a dummy event variant that's cheap to construct.
+        for _ in 0..(app_channel_cap - MIN_EMIT_HEADROOM + 1) {
+            net_event_sender
+                .try_send(NetworkEvent::PeersDiscovered { peers: Vec::new() })
+                .expect("pre-fill should succeed");
+        }
+        assert!(
+            net_event_sender.capacity() < MIN_EMIT_HEADROOM,
+            "test precondition: pre-fill must close the gate"
+        );
+
+        // Spawn the coordinator. It should not deadlock: even though the
+        // app is not draining, the coord's network_commands branch is still
+        // active.
+        let handle = tokio::spawn(coordinator.run());
+
+        // Wait briefly for the coord to enter the select! loop.
+        tokio::time::sleep(Duration::from_millis(20)).await;
+
+        // Inject a peer event on the fan-in channel. With the gate closed,
+        // the coord should NOT consume it yet.
+        let tip = Tip {
+            point: Point::Specific {
+                slot: 1,
+                hash: [0u8; 32],
+            },
+            block_no: 1,
+        };
+        peer_event_sender
+            .try_send((
+                PeerId(0),
+                PeerEvent::HeaderAnnounced {
+                    header: WrappedHeader::opaque(vec![0xA0]),
+                    tip,
+                },
+            ))
+            .expect("fan-in send should not be full");
+
+        // Even with the gate closed, a NetworkCommand should be processed
+        // (QueryPeers is a pure no-op emit that would also hit the gate,
+        // so use Shutdown which causes the coord to exit cleanly).
+        net_cmd_sender
+            .send(NetworkCommand::Shutdown)
+            .await
+            .expect("command channel should accept");
+
+        // The coord should exit promptly from the Shutdown command.
+        let result = tokio::time::timeout(Duration::from_secs(2), handle).await;
+        assert!(
+            result.is_ok(),
+            "coord should exit via Shutdown command within 2s; hung on gate"
+        );
+
+        // Drain the receiver for cleanup.
+        drop(net_event_receiver);
+    }
+
+    /// When a peer's command channel fills (peer task not draining), the
+    /// coord should mark it for removal and continue running.
+    #[tokio::test]
+    async fn coordinator_removes_peer_when_its_command_channel_fills() {
+        let (peer_event_sender, peer_event_receiver) = mpsc::channel(256);
+        let (net_event_sender, mut net_event_receiver) = mpsc::channel(NETWORK_EVENTS_CAPACITY);
+        let (_net_cmd_sender, net_cmd_receiver) = mpsc::channel(64);
+        let config = CoordinatorConfig::default();
+        let (chain_store, _chain_rx) = ChainStore::new(100);
+        let mut coordinator = Coordinator::new(
+            config,
+            peer_event_sender,
+            peer_event_receiver,
+            net_event_sender,
+            net_cmd_receiver,
+            chain_store,
+            None,
+        );
+
+        // Insert a peer with a tiny commands channel and don't drain it.
+        let peer_id = PeerId(0);
+        let (cmd_sender, cmd_receiver) = mpsc::channel(2);
+        coordinator.peers.insert(
+            peer_id,
+            PeerState {
+                address: "stuck:3001".to_string(),
+                mode: ConnectionMode::InitiatorOnly,
+                ip_guard: None,
+                commands: cmd_sender,
+                task_handle: tokio::spawn(async {}),
+                tip: None,
+                rtt: None,
+                fragment: ChainFragment::new(),
+                reconnect_backoff: Duration::from_secs(1),
+                inbound_delay: Duration::ZERO,
+                mux_stats: None,
+                last_rolled_back_to: None,
+            },
+        );
+
+        // Keep the receiver alive but never recv from it, so the channel
+        // saturates after two sends.
+        let _cmd_receiver_keeper = cmd_receiver;
+
+        // Fire commands until the peer's channel saturates and the next
+        // send_peer_command schedules removal.
+        for _ in 0..5 {
+            coordinator.send_peer_command(peer_id, PeerCommand::ReIntersect);
+        }
+
+        assert!(
+            coordinator
+                .pending_removals
+                .iter()
+                .any(|(id, _)| *id == peer_id),
+            "peer should be scheduled for removal after its command channel fills"
+        );
+
+        // Drain pending_removals (the main loop would do this; we invoke
+        // remove_peer directly) and verify the peer is gone.
+        for (id, reason) in std::mem::take(&mut coordinator.pending_removals) {
+            coordinator.remove_peer(id, reason).await;
+        }
+        assert!(
+            !coordinator.peers.contains_key(&peer_id),
+            "peer should be removed"
+        );
+
+        // A PeerDisconnected event should have been emitted.
+        let mut saw_disconnect = false;
+        while let Ok(ev) = net_event_receiver.try_recv() {
+            if matches!(ev, NetworkEvent::PeerDisconnected { peer_id: id, .. } if id == peer_id) {
+                saw_disconnect = true;
+            }
+        }
+        assert!(
+            saw_disconnect,
+            "PeerDisconnected should be emitted when peer is force-removed"
+        );
     }
 }
