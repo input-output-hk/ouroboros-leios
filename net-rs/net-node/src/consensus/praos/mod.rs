@@ -26,6 +26,13 @@ pub(crate) use peer_chain::{PeerChain, PeerChainEntry};
 /// attempt.
 pub(super) const IN_FLIGHT_TTL: Duration = Duration::from_secs(15);
 
+/// Minimum interval between successive `OrphanCandidate` classifications
+/// for the same peer. After one `evaluate_and_fetch` classifies a peer as
+/// orphan and sends `NetworkCommand::ReIntersect`, the peer is skipped in
+/// chain selection for this long. Caps the orphan-cascade rate at 1/sec
+/// per peer even when re-intersection round-trips are millisecond-scale.
+pub(super) const ORPHAN_COOLDOWN: Duration = Duration::from_secs(1);
+
 /// A block body cached after fetch or self-production.
 pub(super) struct CachedBlock {
     pub(super) point: Point,
@@ -58,6 +65,17 @@ pub struct PraosConsensus {
     /// `RolledBack`, dropped on `PeerDisconnected`. Drives chain selection
     /// via `select_chain`.
     pub(crate) peer_chains: HashMap<PeerId, PeerChain>,
+    /// Per-peer cooldown timestamps. After `evaluate_and_fetch` classifies
+    /// a peer as `OrphanCandidate` it is skipped in chain selection until
+    /// this timestamp passes. Cleared only on `PeerDisconnected`; *not*
+    /// cleared on `IntersectionFound`, because re-intersection round-trips
+    /// on localhost are faster than the rate of TipAdvanced events, so
+    /// clearing the cooldown there would reopen a ping-pong cascade
+    /// between orphan → ReIntersect → IntersectionFound → next event →
+    /// orphan again. The cooldown decouples these: after a re-intersection,
+    /// the peer is re-evaluated only once its cooldown expires, giving the
+    /// fresh ChainSync stream time to rebuild contiguous entries.
+    pub(super) orphan_cooldown: HashMap<PeerId, Instant>,
     /// Hash the validator's queue will be at after every command we've
     /// already submitted has been processed. We track this so a fork
     /// switch can decide whether to insert a `LedgerCommand::Rollback`
@@ -98,6 +116,7 @@ impl PraosConsensus {
             validated: HashSet::new(),
             in_flight: HashMap::new(),
             peer_chains: HashMap::new(),
+            orphan_cooldown: HashMap::new(),
             queued_validator_tip: None,
             last_validated_tip: None,
             in_flight_validation: HashSet::new(),
@@ -146,6 +165,10 @@ impl PraosConsensus {
     }
 
     /// Store the ChainSync intersection as the peer chain's anchor.
+    /// Entries are NOT cleared here — the orphan handler already clears
+    /// them at the point where re-intersection is requested, and the
+    /// anchor serves as a common-ancestor fallback for `select_chain_once`
+    /// when the entry walk can't reach the adopted chain.
     pub(super) fn record_peer_intersection(&mut self, peer_id: PeerId, point: &Point) {
         let cap = self.peer_chain_cap();
         self.peer_chains
@@ -221,8 +244,11 @@ impl PraosConsensus {
         match event {
             NetworkEvent::IntersectionFound { peer_id, point } => {
                 self.record_peer_intersection(*peer_id, point);
-                // No select_chain here — the intersection alone doesn't
-                // change which chain is best; TipAdvanced triggers that.
+                // Do NOT clear orphan_cooldown here — see the comment on
+                // the field. The cooldown must expire naturally.
+                // No select_chain here either: the intersection alone
+                // doesn't change which chain is best; TipAdvanced triggers
+                // that after the cooldown lifts.
                 true
             }
             NetworkEvent::TipAdvanced {
@@ -251,6 +277,8 @@ impl PraosConsensus {
             }
             NetworkEvent::PeerDisconnected { peer_id, .. } => {
                 self.record_peer_disconnected(*peer_id);
+                // Peer is gone; drop any orphan cooldown entry.
+                self.orphan_cooldown.remove(peer_id);
                 self.evaluate_and_fetch().await;
                 false
             }
@@ -729,6 +757,177 @@ mod tests {
             }
             other => panic!("expected OrphanCandidate, got {other:?}"),
         }
+    }
+
+    /// Helper: set up an orphaned peer chain (self-produced block 1,
+    /// peer announces a block 5 with a random prev_hash). Returns the
+    /// consensus and its NetworkCommand receiver.
+    async fn setup_orphaned_peer(peer: PeerId) -> (PraosConsensus, mpsc::Receiver<NetworkCommand>) {
+        let (mut consensus, cmd_rx, _val_rx) = make_consensus();
+        let (tip1, header1) = make_tip(1, 1, None);
+        consensus
+            .register_self_produced(&tip1.point, &header1, &BlockBody::opaque(Vec::new()))
+            .await;
+        let orphan_prev: [u8; 32] = [0xEF; 32];
+        let (tip5, header5) = make_tip(5, 5, Some(orphan_prev));
+        consensus
+            .handle_event(&NetworkEvent::TipAdvanced {
+                peer_id: peer,
+                tip: tip5,
+                header: header5,
+            })
+            .await;
+        (consensus, cmd_rx)
+    }
+
+    /// First orphan detection: ReIntersect is emitted and the peer is
+    /// placed on orphan_cooldown.
+    #[tokio::test]
+    async fn orphan_first_time_sends_reintersect_and_marks_cooldown() {
+        let peer = PeerId(1);
+        let (consensus, mut cmd_rx) = setup_orphaned_peer(peer).await;
+
+        // setup_orphaned_peer's TipAdvanced already ran evaluate_and_fetch;
+        // the command should be in the channel.
+        let mut reintersect_count = 0;
+        while let Ok(cmd) = cmd_rx.try_recv() {
+            if matches!(cmd, NetworkCommand::ReIntersect { peer_id } if peer_id == peer) {
+                reintersect_count += 1;
+            }
+        }
+        assert_eq!(
+            reintersect_count, 1,
+            "exactly one ReIntersect should have been emitted"
+        );
+        assert!(
+            consensus.orphan_cooldown.contains_key(&peer),
+            "peer should be recorded on orphan cooldown"
+        );
+    }
+
+    /// Subsequent evaluate_and_fetch calls while cooldown is active must
+    /// NOT re-emit ReIntersect — this is the anti-cascade guarantee.
+    #[tokio::test]
+    async fn orphan_while_cooling_does_not_resend_reintersect() {
+        let peer = PeerId(1);
+        let (mut consensus, mut cmd_rx) = setup_orphaned_peer(peer).await;
+
+        // Drain the first ReIntersect emitted by setup.
+        while cmd_rx.try_recv().is_ok() {}
+
+        // Drive many more events that would each re-run evaluate_and_fetch.
+        for _ in 0..100 {
+            consensus
+                .handle_event(&NetworkEvent::BlockFetchFailed {
+                    from: Point::Origin,
+                    to: Point::Origin,
+                })
+                .await;
+        }
+
+        // No new ReIntersect commands should have been emitted.
+        let mut reintersect_count = 0;
+        while let Ok(cmd) = cmd_rx.try_recv() {
+            if matches!(cmd, NetworkCommand::ReIntersect { peer_id } if peer_id == peer) {
+                reintersect_count += 1;
+            }
+        }
+        assert_eq!(
+            reintersect_count, 0,
+            "no additional ReIntersect should be sent while peer is on cooldown"
+        );
+        assert!(consensus.orphan_cooldown.contains_key(&peer));
+    }
+
+    /// Even a burst of TipAdvanced events for the same orphaned peer
+    /// should yield at most one ReIntersect (not one per event).
+    #[tokio::test]
+    async fn many_tip_advances_while_cooling_do_not_cascade() {
+        let peer = PeerId(1);
+        let (mut consensus, mut cmd_rx) = setup_orphaned_peer(peer).await;
+
+        // Pre-drain the first ReIntersect that setup produced.
+        let mut reintersect_count = 0;
+        while let Ok(cmd) = cmd_rx.try_recv() {
+            if matches!(cmd, NetworkCommand::ReIntersect { peer_id } if peer_id == peer) {
+                reintersect_count += 1;
+            }
+        }
+        assert_eq!(reintersect_count, 1);
+
+        // Fire 1000 TipAdvanced events with distinct new headers that
+        // still fork off the same stale parent — each would have triggered
+        // evaluate_and_fetch and the orphan path pre-fix.
+        for i in 6..1006 {
+            let orphan_prev: [u8; 32] = [0xEF; 32];
+            let (tip, header) = make_tip(i, i, Some(orphan_prev));
+            consensus
+                .handle_event(&NetworkEvent::TipAdvanced {
+                    peer_id: peer,
+                    tip,
+                    header,
+                })
+                .await;
+        }
+
+        // No additional ReIntersect commands.
+        let mut burst_count = 0;
+        while let Ok(cmd) = cmd_rx.try_recv() {
+            if matches!(cmd, NetworkCommand::ReIntersect { peer_id } if peer_id == peer) {
+                burst_count += 1;
+            }
+        }
+        assert_eq!(
+            burst_count, 0,
+            "1000 events while cooling should produce 0 additional ReIntersect"
+        );
+    }
+
+    /// `IntersectionFound` must NOT clear the orphan cooldown. The
+    /// cooldown exists precisely to prevent the orphan→ReIntersect→
+    /// IntersectionFound→orphan ping-pong on fast localhost round-trips.
+    #[tokio::test]
+    async fn intersection_found_does_not_clear_cooldown() {
+        let peer = PeerId(1);
+        let (mut consensus, _cmd_rx) = setup_orphaned_peer(peer).await;
+        assert!(consensus.orphan_cooldown.contains_key(&peer));
+
+        let new_point = Point::Specific {
+            slot: 99,
+            hash: [0xAA; 32],
+        };
+        consensus
+            .handle_event(&NetworkEvent::IntersectionFound {
+                peer_id: peer,
+                point: new_point,
+            })
+            .await;
+
+        assert!(
+            consensus.orphan_cooldown.contains_key(&peer),
+            "IntersectionFound must NOT clear the cooldown"
+        );
+    }
+
+    /// `PeerDisconnected` clears the cooldown entry so it doesn't leak
+    /// if the peer never reconnects.
+    #[tokio::test]
+    async fn peer_disconnected_clears_cooldown() {
+        let peer = PeerId(1);
+        let (mut consensus, _cmd_rx) = setup_orphaned_peer(peer).await;
+        assert!(consensus.orphan_cooldown.contains_key(&peer));
+
+        consensus
+            .handle_event(&NetworkEvent::PeerDisconnected {
+                peer_id: peer,
+                reason: "test".to_string(),
+            })
+            .await;
+
+        assert!(
+            !consensus.orphan_cooldown.contains_key(&peer),
+            "PeerDisconnected must clear cooldown"
+        );
     }
 
     /// Regression for the "jump to tip" ChainSync bug: if the peer_chain
