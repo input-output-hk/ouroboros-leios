@@ -930,6 +930,150 @@ mod tests {
         );
     }
 
+    // --- walk_ancestors_hybrid tests ---
+    //
+    // The hybrid walker is what the contiguity check in
+    // `select_chain_once` uses. It must walk chain_tree prev_hash links
+    // first, then fall back to block_cache prev_hash links when chain_tree
+    // is missing a block. These tests set up tiny fake block_cache
+    // entries to verify the fallback.
+
+    /// Helper: construct a minimal cached block with a prev_hash, for
+    /// walker tests. Header and body content don't matter for the walk.
+    fn cached(
+        prev_hash: Option<[u8; 32]>,
+        block_no: u64,
+        slot: u64,
+        hash: [u8; 32],
+    ) -> CachedBlock {
+        CachedBlock {
+            point: Point::Specific { slot, hash },
+            header: WrappedHeader::opaque(Vec::new()),
+            body: BlockBody::opaque(Vec::new()),
+            block_no,
+            prev_hash,
+        }
+    }
+
+    /// Chain-tree-only case: walk through chain_tree prev_hash links.
+    /// Also verifies the walk terminates at the genesis child (prev=None).
+    #[tokio::test]
+    async fn walk_ancestors_hybrid_chain_tree_only() {
+        let (mut consensus, _cmd_rx, _val_rx) = make_consensus();
+        let h1 = [1u8; 32];
+        let h2 = [2u8; 32];
+        let h3 = [3u8; 32];
+        // Insert blocks 1, 2, 3 with prev_hash links, 1 has prev=None.
+        consensus
+            .chain_tree
+            .insert(h1, Point::Specific { slot: 1, hash: h1 }, 1, 1, None);
+        consensus
+            .chain_tree
+            .insert(h2, Point::Specific { slot: 2, hash: h2 }, 2, 2, Some(h1));
+        consensus
+            .chain_tree
+            .insert(h3, Point::Specific { slot: 3, hash: h3 }, 3, 3, Some(h2));
+
+        let walk = consensus.walk_ancestors_hybrid(h3);
+        assert_eq!(walk.chain, vec![h3, h2, h1]);
+        assert!(walk.reached_origin, "walk should reach genesis");
+    }
+
+    /// Block-cache fallback case: chain_tree has the start block but its
+    /// parent is only in block_cache. The walk must cross the boundary.
+    #[tokio::test]
+    async fn walk_ancestors_hybrid_falls_back_to_block_cache() {
+        let (mut consensus, _cmd_rx, _val_rx) = make_consensus();
+        let h_anchor = [0xA1u8; 32];
+        let h_mid = [0xB2u8; 32];
+        let h_tip = [0xC3u8; 32];
+
+        // Anchor and tip go into chain_tree. The middle block goes ONLY
+        // into block_cache (simulating a block whose chain_tree insert
+        // was skipped, e.g., opaque header with block_no=0).
+        consensus.chain_tree.insert(
+            h_anchor,
+            Point::Specific {
+                slot: 10,
+                hash: h_anchor,
+            },
+            10,
+            10,
+            None,
+        );
+        consensus.chain_tree.insert(
+            h_tip,
+            Point::Specific {
+                slot: 12,
+                hash: h_tip,
+            },
+            12,
+            12,
+            Some(h_mid),
+        );
+        consensus
+            .block_cache
+            .insert(h_mid, cached(Some(h_anchor), 11, 11, h_mid));
+
+        // Walk should cross from chain_tree (h_tip) into block_cache
+        // (h_mid) and back into chain_tree (h_anchor), reaching origin.
+        let walk = consensus.walk_ancestors_hybrid(h_tip);
+        assert_eq!(walk.chain, vec![h_tip, h_mid, h_anchor]);
+        assert!(
+            walk.reached_origin,
+            "walk must reach origin via the block_cache fallback"
+        );
+    }
+
+    /// Gap case: chain_tree has the start block but neither chain_tree
+    /// nor block_cache has its parent. The walk terminates at the start
+    /// block and reports `reached_origin=false`.
+    #[tokio::test]
+    async fn walk_ancestors_hybrid_terminates_at_gap() {
+        let (mut consensus, _cmd_rx, _val_rx) = make_consensus();
+        let h_tip = [0xFFu8; 32];
+        let h_missing = [0xEEu8; 32];
+
+        // Only h_tip is present; its parent h_missing is in neither store.
+        consensus.chain_tree.insert(
+            h_tip,
+            Point::Specific {
+                slot: 99,
+                hash: h_tip,
+            },
+            99,
+            99,
+            Some(h_missing),
+        );
+
+        let walk = consensus.walk_ancestors_hybrid(h_tip);
+        assert_eq!(walk.chain, vec![h_tip]);
+        assert!(
+            !walk.reached_origin,
+            "walk terminated at a gap, not at origin"
+        );
+    }
+
+    /// Start-in-cache case: the start block isn't in chain_tree at all;
+    /// only in block_cache. Walker must still work.
+    #[tokio::test]
+    async fn walk_ancestors_hybrid_start_only_in_cache() {
+        let (mut consensus, _cmd_rx, _val_rx) = make_consensus();
+        let h1 = [1u8; 32];
+        let h2 = [2u8; 32];
+
+        // h1 goes into chain_tree as a valid genesis child.
+        consensus
+            .chain_tree
+            .insert(h1, Point::Specific { slot: 1, hash: h1 }, 1, 1, None);
+        // h2 goes ONLY into block_cache.
+        consensus.block_cache.insert(h2, cached(Some(h1), 2, 2, h2));
+
+        let walk = consensus.walk_ancestors_hybrid(h2);
+        assert_eq!(walk.chain, vec![h2, h1]);
+        assert!(walk.reached_origin);
+    }
+
     /// Regression for the "jump to tip" ChainSync bug: if the peer_chain
     /// contains only the tip header (because ChainSync skipped ahead instead
     /// of streaming every rollforward from the common ancestor), the walk
