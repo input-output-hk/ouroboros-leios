@@ -1,6 +1,6 @@
 # Leios Antithesis Docker Compose — Proto-Devnet (Moog-compatible)
 #
-# 3 block-producing pools with randomized tx-generator and analysis.
+# 3 block-producing pools with randomized tx-centrifuge and analysis.
 # Designed for submission to Antithesis via Cardano Foundation Moog service.
 #
 # Requirements:
@@ -215,14 +215,14 @@ services:
       start_period: 30s
 
   # ==========================================================================
-  # TX Generator (randomized loop for Antithesis)
+  # TX Centrifuge (randomized loop for Antithesis)
   # ==========================================================================
-  tx-generator:
+  tx-centrifuge:
     <<: *node-image
-    container_name: tx-generator
-    hostname: tx-generator
+    container_name: tx-centrifuge
+    hostname: tx-centrifuge
     init: true
-    command: ["/app/scripts/run-tx-generator-loop.sh"]
+    command: ["/app/scripts/run-tx-centrifuge-loop.sh"]
     depends_on:
       pool1:
         condition: service_healthy

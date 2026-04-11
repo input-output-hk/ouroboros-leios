@@ -1,6 +1,6 @@
 # Leios Antithesis Docker Compose Stack — Proto-Devnet
 #
-# 3 block-producing pools with tx-generator and analysis.
+# 3 block-producing pools with tx-centrifuge and analysis.
 #
 # Usage:
 #   docker compose -f docker-compose.devnet.yaml up
@@ -220,14 +220,14 @@ services:
       start_period: 30s
 
   # ==========================================================================
-  # TX Generator
+  # TX Centrifuge
   # ==========================================================================
-  tx-generator:
+  tx-centrifuge:
     image: ghcr.io/input-output-hk/ouroboros-leios/cardano-node-bp:${GIT_SHA:-latest}
     build:
       context: ..
       dockerfile: antithesis/Dockerfile.cardano-node-bp
-    command: ["${TX_GENERATOR_SCRIPT:-/app/scripts/run-tx-generator.sh}"]
+    command: ["${TX_CENTRIFUGE_SCRIPT:-/app/scripts/run-tx-centrifuge.sh}"]
     depends_on:
       pool1:
         condition: service_healthy
