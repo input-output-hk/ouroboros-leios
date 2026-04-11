@@ -12,6 +12,7 @@ use crate::chain_tree::is_better_tip;
 use crate::validation::LedgerCommand;
 
 use super::peer_chain::PeerChainEntry;
+use super::ORPHAN_COOLDOWN;
 
 /// Result of a single pass of the Haskell-aligned chain selection.
 #[derive(Debug, Clone)]
@@ -435,33 +436,53 @@ impl super::PraosConsensus {
     /// Also handles OrphanCandidate (re-intersection) and Switched
     /// (fallback if on_block_received didn't catch it).
     pub(super) async fn evaluate_and_fetch(&mut self) {
-        let mut tried: HashSet<PeerId> = HashSet::new();
+        // Skip set starts from peers that are on their orphan cooldown
+        // (classified as orphan recently, still waiting for the re-
+        // intersection round-trip to bring in fresh entries). Expired
+        // cooldown entries are harmless in the HashMap; we filter them
+        // out here when building the local skip.
+        use std::time::Instant;
+        let now = Instant::now();
+        let mut skip: HashSet<PeerId> = self
+            .orphan_cooldown
+            .iter()
+            .filter(|(_, until)| **until > now)
+            .map(|(p, _)| *p)
+            .collect();
+        // Prune expired cooldown entries so the map doesn't grow.
+        self.orphan_cooldown.retain(|_, until| *until > now);
+
         loop {
-            match self.select_chain_once(&tried) {
+            match self.select_chain_once(&skip) {
                 SelectionDecision::NoBetterChain => return,
                 SelectionDecision::OrphanCandidate {
                     peer_id,
                     tip_block_no,
                 } => {
-                    // Clear stale entries and request re-intersection.
-                    // Stale entries (from an old fork mixed with new
-                    // announcements) cause persistent fork mismatches
-                    // in the contiguity guard. Clearing forces ChainSync
-                    // to rebuild from a fresh intersection.
+                    // Clear stale entries. The anchor is preserved as a
+                    // common-ancestor fallback for select_chain_once.
                     if let Some(chain) = self.peer_chains.get_mut(&peer_id) {
                         chain.clear_entries();
                     }
-                    info!(
-                        node_id = %self.node_id,
-                        %peer_id,
-                        tip_block_no,
-                        "select_chain: orphan, clearing entries and requesting re-intersection"
-                    );
-                    let _ = self
-                        .commands
-                        .send(NetworkCommand::ReIntersect { peer_id })
-                        .await;
-                    tried.insert(peer_id);
+                    // Only send ReIntersect on the *transition* into
+                    // cooldown — i.e., when the peer wasn't already on
+                    // cooldown. Subsequent events that would orphan this
+                    // peer are short-circuited by the `skip` filter above.
+                    let already_cooling = self.orphan_cooldown.contains_key(&peer_id);
+                    self.orphan_cooldown.insert(peer_id, now + ORPHAN_COOLDOWN);
+                    skip.insert(peer_id);
+                    if !already_cooling {
+                        info!(
+                            node_id = %self.node_id,
+                            %peer_id,
+                            tip_block_no,
+                            "select_chain: orphan, clearing entries and requesting re-intersection"
+                        );
+                        let _ = self
+                            .commands
+                            .send(NetworkCommand::ReIntersect { peer_id })
+                            .await;
+                    }
                     continue;
                 }
                 SelectionDecision::Switched {
