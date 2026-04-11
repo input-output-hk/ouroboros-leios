@@ -14,6 +14,18 @@ use crate::validation::LedgerCommand;
 use super::peer_chain::PeerChainEntry;
 use super::ORPHAN_COOLDOWN;
 
+/// Result of a hybrid ancestor walk that uses `chain_tree` first and
+/// falls back to `block_cache` when chain_tree is missing a link.
+#[derive(Debug)]
+pub(super) struct HybridWalk {
+    /// Hashes from start_hash (index 0) back to the terminating block.
+    pub(super) chain: Vec<[u8; 32]>,
+    /// True if the walk terminated at a block with `prev_hash = None`
+    /// (i.e. genesis child), false if it terminated at a missing parent
+    /// or the start block was unknown.
+    pub(super) reached_origin: bool,
+}
+
 /// Result of a single pass of the Haskell-aligned chain selection.
 #[derive(Debug, Clone)]
 pub(crate) enum SelectionDecision {
@@ -87,6 +99,65 @@ impl super::PraosConsensus {
     ///    seeing `prev_hash=None` means stale PeerChain entries from
     ///    block 1 survived a rollback — the re-intersect mechanism
     ///    handles this via `OrphanCandidate`.
+    /// Walk backward from `start_hash` following `prev_hash` links,
+    /// using `chain_tree` first and falling back to `block_cache` when
+    /// a block is cached but not yet in chain_tree. This is the
+    /// contiguity walker for `select_chain_once`'s fork-mismatch check.
+    ///
+    /// Why the fallback: `on_block_received` inserts every fetched block
+    /// into both `chain_tree` and `block_cache`, but the chain_tree
+    /// insertion can be skipped for opaque headers whose `block_number`
+    /// can't be determined. The block stays in `block_cache` (and passes
+    /// the `missing` filter in select_chain_once) but the chain_tree
+    /// ancestors walk terminates at that block because its parent isn't
+    /// in chain_tree. Without this fallback, that block becomes a
+    /// permanent false-orphan trap that stuck-ifies the node over time.
+    pub(super) fn walk_ancestors_hybrid(&self, start_hash: [u8; 32]) -> HybridWalk {
+        let mut chain = vec![start_hash];
+        let mut current = start_hash;
+        let reached_origin;
+        loop {
+            // Resolve prev_hash using whichever store has the current block.
+            let parent_opt = if self.chain_tree.block_number(&current).is_some() {
+                self.chain_tree.prev_hash(&current)
+            } else if let Some(cached) = self.block_cache.get(&current) {
+                cached.prev_hash
+            } else {
+                // Neither store has the current block — the walk can't
+                // continue. This shouldn't happen on the first iteration
+                // because the caller is walking from a block it knows
+                // about; on later iterations we only descend to parents
+                // we just checked for presence below.
+                reached_origin = false;
+                break;
+            };
+            match parent_opt {
+                None => {
+                    // Current block is a genesis child — walk terminates
+                    // at origin.
+                    reached_origin = true;
+                    break;
+                }
+                Some(parent) => {
+                    let in_tree = self.chain_tree.block_number(&parent).is_some();
+                    let in_cache = self.block_cache.contains_key(&parent);
+                    if !in_tree && !in_cache {
+                        // Missing parent: walk terminates at a gap, not
+                        // at origin.
+                        reached_origin = false;
+                        break;
+                    }
+                    chain.push(parent);
+                    current = parent;
+                }
+            }
+        }
+        HybridWalk {
+            chain,
+            reached_origin,
+        }
+    }
+
     pub(super) fn select_chain_once(&self, skip: &HashSet<PeerId>) -> SelectionDecision {
         // Pick the best peer candidate: strictly better tip, ties broken by lower hash.
         let (adopted_hash, adopted_bn) = match self.adopted_tip_hash {
@@ -251,10 +322,18 @@ impl super::PraosConsensus {
 
         if missing.is_empty() {
             let replay_hashes: Vec<[u8; 32]> = replay.iter().map(|(_, h)| *h).collect();
-            // Verify chain_tree contiguity before switching. Walk
-            // backward from the LAST replay block and check:
+            // Verify contiguity before switching. Walk backward from the
+            // LAST replay block and check:
             //   (a) every replay hash lies on that chain
             //   (b) the chain reaches the common ancestor (or genesis)
+            //
+            // The walk uses `chain_tree` first and falls back to
+            // `block_cache` when a block is cached but not yet in
+            // chain_tree (e.g. opaque headers whose `chain_tree.insert`
+            // path was skipped, or pruning races). Without the block_cache
+            // fallback the walk terminates early at the first missing
+            // chain_tree entry and every evaluation fires a false fork
+            // mismatch, slowly stuck-ifying the node.
             //
             // Two distinct failure modes:
             //   1. !all_on_chain: PeerChain entries span multiple forks
@@ -264,8 +343,8 @@ impl super::PraosConsensus {
             //   2. !reaches_ancestor: genuine gap between ancestor and
             //      first replay block (unfetched blocks). Fetchable.
             if let Some(&last_hash) = replay_hashes.last() {
-                let walk_vec = self.chain_tree.ancestors(last_hash);
-                let walk: HashSet<[u8; 32]> = walk_vec.iter().copied().collect();
+                let walk_result = self.walk_ancestors_hybrid(last_hash);
+                let walk: HashSet<[u8; 32]> = walk_result.chain.iter().copied().collect();
                 let all_on_chain = replay_hashes.iter().all(|h| walk.contains(h));
 
                 if !all_on_chain {
@@ -284,11 +363,9 @@ impl super::PraosConsensus {
                 }
 
                 let reaches_ancestor = if ancestor == [0u8; 32] {
-                    // Genesis: the walk must reach a block whose
-                    // prev_hash is None (the genesis child).
-                    walk_vec
-                        .last()
-                        .is_some_and(|h| self.chain_tree.prev_hash(h).is_none())
+                    // Genesis: the walk must have terminated at a block
+                    // whose prev_hash is None (the genesis child).
+                    walk_result.reached_origin
                 } else {
                     walk.contains(&ancestor)
                 };
