@@ -24,6 +24,8 @@ pub struct DynamicConfig {
     pub rb_head_validation_ms: f64,
     pub rb_body_validation_ms_constant: f64,
     pub rb_body_validation_ms_per_byte: f64,
+    pub eb_validation_ms: f64,
+    pub vote_validation_ms: f64,
     pub tx_rate: f64,
 }
 
@@ -37,6 +39,8 @@ pub struct DynamicConfigUpdate {
     pub rb_head_validation_ms: Option<f64>,
     pub rb_body_validation_ms_constant: Option<f64>,
     pub rb_body_validation_ms_per_byte: Option<f64>,
+    pub eb_validation_ms: Option<f64>,
+    pub vote_validation_ms: Option<f64>,
     pub tx_rate: Option<f64>,
 }
 
@@ -61,6 +65,12 @@ impl DynamicConfig {
         }
         if let Some(v) = update.rb_body_validation_ms_per_byte {
             self.rb_body_validation_ms_per_byte = v;
+        }
+        if let Some(v) = update.eb_validation_ms {
+            self.eb_validation_ms = v;
+        }
+        if let Some(v) = update.vote_validation_ms {
+            self.vote_validation_ms = v;
         }
         if let Some(v) = update.tx_rate {
             self.tx_rate = v;
@@ -609,6 +619,8 @@ impl NodeConfig {
             rb_head_validation_ms: self.validation.rb_head_validation_ms,
             rb_body_validation_ms_constant: self.validation.rb_body_validation_ms_constant,
             rb_body_validation_ms_per_byte: self.validation.rb_body_validation_ms_per_byte,
+            eb_validation_ms: self.validation.eb_validation_ms,
+            vote_validation_ms: self.validation.vote_validation_ms,
             tx_rate: self.transactions.tx_rate,
         }
     }

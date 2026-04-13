@@ -414,6 +414,8 @@ mod tests {
             rb_head_validation_ms: 1.0,
             rb_body_validation_ms_constant: 1000.0,
             rb_body_validation_ms_per_byte: 0.0,
+            eb_validation_ms: 2.0,
+            vote_validation_ms: 1.0,
             tx_rate: 0.0,
         };
         watch::channel(dyn_config).1
@@ -634,6 +636,8 @@ mod tests {
             rb_head_validation_ms: 1.0,
             rb_body_validation_ms_constant: 1000.0,
             rb_body_validation_ms_per_byte: 0.0,
+            eb_validation_ms: 2.0,
+            vote_validation_ms: 1.0,
             tx_rate: 0.0,
         };
         let (tx, rx) = watch::channel(dyn_config);

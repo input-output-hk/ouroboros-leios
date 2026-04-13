@@ -35,10 +35,10 @@ impl Consensus {
         let praos = PraosConsensus::new(
             node_id.clone(),
             commands.clone(),
-            validator,
+            validator.clone(),
             security_param_k,
         );
-        let leios = LeiosConsensus::new(node_id, commands);
+        let leios = LeiosConsensus::new(node_id, commands, validator);
         Self { praos, leios }
     }
 
@@ -73,7 +73,17 @@ impl Consensus {
     }
 
     pub async fn on_validation_outcome(&mut self, outcome: LedgerOutcome) -> bool {
-        self.praos.on_validation_outcome(outcome).await
+        match outcome {
+            LedgerOutcome::EbValidated { point } => {
+                self.leios.on_validated_eb(point);
+                false
+            }
+            LedgerOutcome::VotesValidated { vote_ids } => {
+                self.leios.on_validated_votes(&vote_ids);
+                false
+            }
+            other => self.praos.on_validation_outcome(other).await,
+        }
     }
 
     #[allow(dead_code)]
