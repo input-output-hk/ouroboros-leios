@@ -62,6 +62,9 @@ pub enum NetworkEvent {
     /// A transaction was received from an inbound peer (via TxSubmission server).
     TransactionReceived { peer_id: PeerId, body: Vec<u8> },
 
+    /// TxSubmission client: a peer requested `count` tx ids (blocking mode).
+    TxsRequested { peer_id: PeerId, count: u16 },
+
     /// Leios: an EB was announced via an RB header.
     LeiosBlockAnnounced { header: WrappedHeader },
 
@@ -167,8 +170,11 @@ pub enum NetworkCommand {
         data: Vec<Vec<u8>>,
     },
 
-    /// Submit a transaction to all connected peers via TxSubmission.
-    SubmitTransaction { tx: PendingTx },
+    /// Provide transactions to a specific peer via TxSubmission.
+    ProvideTxs {
+        peer_id: PeerId,
+        txs: Vec<PendingTx>,
+    },
 
     /// Request a snapshot of all connected peers (for telemetry).
     QueryPeers,

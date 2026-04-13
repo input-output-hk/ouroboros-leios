@@ -96,11 +96,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         dyn_rx.clone(),
     );
 
+    // Transaction validator (validates received txs before mempool entry).
+    let (tx_valid_tx, tx_valid_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(1024);
+    let _tx_valid_handle = mempool::spawn_tx_validator(
+        config.validation.tx_validation_ms,
+        config.validation.tx_validation_ms_per_byte,
+        mempool.clone(),
+        tx_valid_rx,
+    );
+
     // Transaction generator (background task).
     let _tx_handle = mempool::spawn_tx_generator(
         &config.transactions,
         config.seed,
-        commands.clone(),
         mempool.clone(),
         config.node_id.clone(),
         dyn_rx.clone(),
@@ -200,11 +208,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             event = handle.events.recv() => {
                 match event {
                     Some(event) => {
-                        // Accumulate received txs into local mempool.
+                        // Validate received txs before mempool entry.
                         if let NetworkEvent::TransactionReceived { body, .. } = &event {
-                            let tx = mempool::tx_from_received_bytes(body.clone());
-                            let mut pool = mempool.lock().unwrap();
-                            pool.push(tx);
+                            let _ = tx_valid_tx.try_send(body.clone());
+                        }
+                        // Pull-model TxSubmission: provide txs from mempool on demand.
+                        if let NetworkEvent::TxsRequested { peer_id, count } = &event {
+                            let txs = {
+                                let pool = mempool.lock().unwrap();
+                                pool.peek_up_to(*count as usize)
+                            };
+                            if !txs.is_empty() {
+                                let _ = commands
+                                    .send(NetworkCommand::ProvideTxs {
+                                        peer_id: *peer_id,
+                                        txs,
+                                    })
+                                    .await;
+                            }
                         }
                         record_network_event(&mut telem, &node_id, &event, &consensus);
                         if !consensus.handle_event(&event).await {

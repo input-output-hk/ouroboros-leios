@@ -9,6 +9,8 @@ pub mod codec;
 use std::collections::VecDeque;
 use std::time::Duration;
 
+use tokio::sync::mpsc;
+
 use crate::protocols::{Agency, Protocol, ProtocolError, Runner};
 
 /// TxSubmission protocol ID in the multiplexer.
@@ -177,7 +179,8 @@ impl Protocol for TxSubmission {
 /// sent and acknowledged, sends MsgDone and returns.
 pub async fn run_client(
     runner: &mut Runner<TxSubmission>,
-    tx_receiver: &mut tokio::sync::mpsc::Receiver<PendingTx>,
+    tx_receiver: &mut mpsc::Receiver<PendingTx>,
+    request_sender: Option<mpsc::Sender<u16>>,
 ) -> Result<(), ProtocolError> {
     // Send MsgInit to transition StInit -> StIdle.
     runner.send(&Message::MsgInit).await?;
@@ -209,8 +212,12 @@ pub async fn run_client(
                     }
                 }
 
-                // If still empty, blocking wait for at least one tx.
+                // If still empty, notify the application that we need txs,
+                // then block waiting for at least one.
                 if new_txs.is_empty() {
+                    if let Some(ref sender) = request_sender {
+                        let _ = sender.try_send(req);
+                    }
                     match tx_receiver.recv().await {
                         Some(tx) => new_txs.push(tx),
                         None => {
@@ -595,7 +602,9 @@ mod tests {
             // Close channel so client knows no more txs.
             drop(tx_sender);
 
-            run_client(&mut runner, &mut tx_receiver).await.unwrap();
+            run_client(&mut runner, &mut tx_receiver, None)
+                .await
+                .unwrap();
         });
 
         client.await.unwrap();
@@ -644,7 +653,9 @@ mod tests {
             // Drop sender immediately — no txs to send.
             drop(_tx_sender);
 
-            run_client(&mut runner, &mut tx_receiver).await.unwrap();
+            run_client(&mut runner, &mut tx_receiver, None)
+                .await
+                .unwrap();
         });
 
         client.await.unwrap();

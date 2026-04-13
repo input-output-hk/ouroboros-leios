@@ -162,7 +162,7 @@ pub async fn run(
 
     // Run the client protocol.
     let mut runner = Runner::<TxSubmission>::new(Role::Client, ts_send, ts_recv);
-    let result = txsubmission::run_client(&mut runner, &mut tx_receiver).await;
+    let result = txsubmission::run_client(&mut runner, &mut tx_receiver, None).await;
 
     match &result {
         Ok(()) => println!("txsubmission complete"),

@@ -566,6 +566,10 @@ impl Coordinator {
                 self.emit_event(NetworkEvent::BlockFetchFailed { from, to });
             }
 
+            PeerEvent::TxsRequested { count } => {
+                self.emit_event(NetworkEvent::TxsRequested { peer_id, count });
+            }
+
             PeerEvent::Failed { reason } => {
                 self.remove_peer(peer_id, reason).await;
             }
@@ -745,14 +749,8 @@ impl Coordinator {
                 }
             }
 
-            NetworkCommand::SubmitTransaction { tx } => {
-                let peer_ids: Vec<PeerId> = self.peers.keys().copied().collect();
-                for peer_id in peer_ids {
-                    self.send_peer_command(
-                        peer_id,
-                        PeerCommand::SubmitTransaction { tx: tx.clone() },
-                    );
-                }
+            NetworkCommand::ProvideTxs { peer_id, txs } => {
+                self.send_peer_command(peer_id, PeerCommand::ProvideTxs { txs });
             }
 
             NetworkCommand::QueryPeers => {

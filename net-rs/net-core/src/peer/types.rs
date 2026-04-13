@@ -49,6 +49,9 @@ pub enum PeerEvent {
     /// TxSubmission server: received a transaction from a client.
     TransactionReceived { body: Vec<u8> },
 
+    /// TxSubmission client: peer requested `count` tx ids (blocking mode).
+    TxsRequested { count: u16 },
+
     /// LeiosNotify: server announced an RB header with EB announcement.
     LeiosBlockAnnounced { header: WrappedHeader },
 
@@ -105,8 +108,8 @@ pub enum PeerCommand {
     /// Fetch votes via LeiosFetch.
     FetchLeiosVotes { votes: Vec<(u64, Vec<u8>)> },
 
-    /// Submit a transaction to this peer via TxSubmission.
-    SubmitTransaction { tx: PendingTx },
+    /// Provide transactions to this peer via TxSubmission.
+    ProvideTxs { txs: Vec<PendingTx> },
 
     /// Re-run ChainSync intersection with fresh candidates from the
     /// current local chain. Used when the previous intersection became

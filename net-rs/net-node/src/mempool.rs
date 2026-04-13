@@ -16,7 +16,6 @@ use rand::{Rng, SeedableRng};
 use tokio::sync::{mpsc, watch};
 use tracing::info;
 
-use net_core::multi_peer::types::NetworkCommand;
 use net_core::protocols::txsubmission::{PendingTx, TxBody, TxId};
 
 use crate::config::{DynamicConfig, TxConfig};
@@ -72,6 +71,13 @@ impl Mempool {
         self.txs.drain(..).collect()
     }
 
+    /// Peek at up to `max_count` transactions without removing them.
+    /// Used by TxSubmission pull model — txs stay available for other
+    /// peers and block production.
+    pub fn peek_up_to(&self, max_count: usize) -> Vec<PendingTx> {
+        self.txs.iter().take(max_count).cloned().collect()
+    }
+
     /// Drain transactions up to a byte limit (for RB body path).
     pub fn drain_up_to(&mut self, max_bytes: usize) -> Vec<PendingTx> {
         let mut result = Vec::new();
@@ -111,14 +117,13 @@ pub fn tx_from_received_bytes(body: Vec<u8>) -> PendingTx {
 
 /// Spawn the transaction generator as a background task.
 ///
-/// Returns a `JoinHandle` that runs until the `commands` channel is closed.
 /// The generator reads `tx_rate` from the watch channel each iteration,
 /// so rate changes take effect immediately. Each generated tx is pushed
-/// into the local mempool AND broadcast to peers via `SubmitTransaction`.
+/// into the local mempool for block inclusion and peer advertisement via
+/// the TxSubmission pull model.
 pub fn spawn_tx_generator(
     config: &TxConfig,
     seed: Option<u64>,
-    commands: mpsc::Sender<NetworkCommand>,
     mempool: SharedMempool,
     node_id: String,
     mut dyn_config: watch::Receiver<DynamicConfig>,
@@ -158,7 +163,7 @@ pub fn spawn_tx_generator(
             // Push into local mempool for block inclusion.
             {
                 let mut pool = mempool.lock().unwrap();
-                pool.push(tx.clone());
+                pool.push(tx);
             }
 
             info!(
@@ -167,15 +172,36 @@ pub fn spawn_tx_generator(
                 size,
                 "generated transaction"
             );
+        }
+    })
+}
 
-            // Broadcast to peers via TxSubmission.
-            if commands
-                .send(NetworkCommand::SubmitTransaction { tx })
-                .await
-                .is_err()
-            {
-                break; // coordinator shut down
-            }
+/// Spawn the transaction validator as a background task.
+///
+/// Received transactions go through a simulated validation delay before
+/// entering the mempool. Each tx is validated concurrently (Phase 1
+/// validation is independent per tx). Concurrency is gated by a semaphore.
+pub fn spawn_tx_validator(
+    tx_validation_ms: f64,
+    tx_validation_ms_per_byte: f64,
+    mempool: SharedMempool,
+    mut rx: mpsc::Receiver<Vec<u8>>,
+) -> tokio::task::JoinHandle<()> {
+    let sem = Arc::new(tokio::sync::Semaphore::new(256));
+    tokio::spawn(async move {
+        while let Some(body) = rx.recv().await {
+            let permit = sem.clone().acquire_owned().await.unwrap();
+            let mempool = mempool.clone();
+            let ms = tx_validation_ms + tx_validation_ms_per_byte * body.len() as f64;
+            tokio::spawn(async move {
+                let _permit = permit;
+                if ms > 0.0 {
+                    tokio::time::sleep(std::time::Duration::from_secs_f64(ms / 1000.0)).await;
+                }
+                let tx = tx_from_received_bytes(body);
+                let mut pool = mempool.lock().unwrap();
+                pool.push(tx);
+            });
         }
     })
 }
@@ -357,5 +383,29 @@ mod tests {
         let mean = total / n as f64;
         // Expected mean = 1/rate = 0.5. Allow ±20%.
         assert!((0.4..=0.6).contains(&mean), "mean={mean}, expected ~0.5");
+    }
+
+    // -- peek_up_to tests --
+
+    #[test]
+    fn peek_up_to_doesnt_remove() {
+        let mut pool = Mempool::new(100);
+        pool.push(make_tx_with_id(1, 100));
+        pool.push(make_tx_with_id(2, 200));
+        pool.push(make_tx_with_id(3, 300));
+
+        let peeked = pool.peek_up_to(2);
+        assert_eq!(peeked.len(), 2);
+        assert_eq!(pool.len(), 3);
+    }
+
+    #[test]
+    fn peek_up_to_clamps_to_available() {
+        let mut pool = Mempool::new(100);
+        pool.push(make_tx_with_id(1, 100));
+        pool.push(make_tx_with_id(2, 200));
+
+        let peeked = pool.peek_up_to(10);
+        assert_eq!(peeked.len(), 2);
     }
 }
