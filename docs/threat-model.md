@@ -1,7 +1,7 @@
 ---
 title: Leios threat model
 status: Draft
-version: 0.3
+version: 0.4
 author:
   - Sebastian Nagel <sebastian.nagel@iohk.io>
 ---
@@ -19,6 +19,7 @@ This document is a living artifact and will be updated as implementation progres
 
 | Version | Date       | Changes                                                               |
 |---------|------------|-----------------------------------------------------------------------|
+| 0.4     | 2026-04-10 | Add adaptive key corruption scenarios                                 |
 | 0.3     | 2025-11-26 | Major restructure, grouped threats into categories, changed numbering |
 | 0.2     | 2025-08-05 | Update to Linear protocol variant, added honey pot attack vector      |
 | 0.1     | 2025-07-17 | Initial draft using EB-only protocol variant                          |
@@ -314,3 +315,26 @@ Excessive chain growth poses a different challenge where the success of Leios co
 | T29 | Exploit implementation differences between node versions | Network fork, chain splits                 | Technical analysis, mixed-version targeting  | Comprehensive conformance testing, staged deployment         |
 | T30 | Coordinate governance attacks to prevent hard fork       | Block beneficial upgrades, network splits  | Governance influence, infrastructure control | Communication, education, stakeholder coordination           |
 | T31 | Honest demand exceeds SPO storage capabilities           | Forced node dropouts, reduced honest stake | Indirect through parameterization            | Conservative parameterization, load tests, staged deployment |
+
+### Adaptive key corruption
+
+An adaptive adversary can gradually corrupt cryptographic keys held by honest parties, accumulating them silently over time rather than exploiting them immediately. This threat is distinct from active key exploitation (such as VRF grinding in T2/T3 or single BLS key compromise in T8) because the adversary does not use the corrupted keys until a critical threshold is reached. Since the keys are neither actively used nor revoked, the corruption remains undetected — there is no equivocation to observe and no anomalous behavior to flag.
+
+Note that the exact mechanism of key compromise is abstracted away in this threat — the adaptive adversary model assumes the ability to corrupt parties over time, but does not prescribe how (e.g. social engineering, side-channel attacks, operational security failures, or other means). The threat is relevant regardless of the specific compromise mechanism, as the core issue is the undetected accumulation of keys over time rather than any single vulnerability.
+
+This applies to both BLS voting keys and VRF keys. For BLS keys, the adversary corrupts honest parties one at a time, silently collecting their voting keys until enough are held to meet the certificate quorum threshold. At that point, the adversary can forge a certificate on invalid transactions and post it on-chain. This is particularly dangerous because Praos assumes that transactions on the main chain are valid, even against adaptive adversaries. If Leios is not adaptive-secure, this assumption breaks: an adaptive adversary could use forged certificates to get invalid transactions included on-chain, undermining the safety guarantees that Praos provides.
+
+**Impact**: Silent BLS key accumulation can compromise blockchain safety by enabling certificate forgery on invalid transactions, violating the Praos assumption that on-chain transactions are valid. Silent VRF key accumulation shifts eligibility beyond the adversary's stake proportion, reinforcing other stake-based attack vectors (EB manipulation, voting power concentration). In both cases, the lack of detection means the adversary can choose the optimal moment to strike.
+
+**Assets Affected**: Blockchain Safety, Transaction Validity/Availability/Determinism, Decentralization
+
+**Mitigation**: Key rotation is the primary defense — periodic mandatory rotation of both BLS and VRF keys limits the window during which corrupted keys remain valid and forces the adversary to continuously re-corrupt keys rather than accumulate them indefinitely. Vote equivocation detection provides a secondary signal: if corrupted keys are used in ways that produce detectable equivocation, the compromise can be identified earlier. Further research is needed to fully characterize the adaptive security of Leios and determine whether additional countermeasures are required.
+
+> [!WARNING]
+>
+> TODO: The adaptive security of Leios and the effectiveness of key rotation as a countermeasure require further research.
+
+| #   | Method                                           | Effect                                                   | Resources                              | Mitigation                                |
+|-----|--------------------------------------------------|----------------------------------------------------------|----------------------------------------|-------------------------------------------|
+| T32 | Silently accumulate BLS keys to forge certificate | Invalid transactions on-chain, Praos safety violation   | Adaptive adversary, time               | Key rotation, equivocation detection      |
+| T33 | Silently accumulate VRF keys for eligibility      | Disproportionate EB/voting eligibility beyond stake      | Adaptive adversary, time               | Key rotation                              |
