@@ -367,8 +367,10 @@ pub(crate) fn spawn_peersharing(
     })
 }
 
-/// Spawn the TxSubmission sub-task. Feeds transactions from the internal
-/// channel to the peer via the TxSubmission protocol.
+/// Spawn the TxSubmission sub-task. Provides transactions to the peer
+/// via the pull-based TxSubmission protocol: when the peer's server
+/// requests tx IDs, a `TxsRequested` event is emitted so the application
+/// can fill the `tx_receiver` channel from its mempool.
 pub(crate) fn spawn_txsubmission(
     ts_send: CodecSend,
     ts_recv: CodecRecv,
@@ -379,7 +381,19 @@ pub(crate) fn spawn_txsubmission(
     tokio::spawn(async move {
         let mut runner = Runner::<TxSubmission>::new(Role::Client, ts_send, ts_recv);
 
-        if let Err(e) = txsubmission::run_client(&mut runner, &mut tx_receiver).await {
+        // Bridge: run_client signals request counts, we forward as PeerEvents.
+        let (req_tx, mut req_rx) = mpsc::channel::<u16>(1);
+        let fwd_sender = event_sender.clone();
+        let forward_task = tokio::spawn(async move {
+            while let Some(count) = req_rx.recv().await {
+                let _ = fwd_sender
+                    .send((peer_id, PeerEvent::TxsRequested { count }))
+                    .await;
+            }
+        });
+
+        if let Err(e) = txsubmission::run_client(&mut runner, &mut tx_receiver, Some(req_tx)).await
+        {
             let _ = event_sender
                 .send((
                     peer_id,
@@ -389,6 +403,7 @@ pub(crate) fn spawn_txsubmission(
                 ))
                 .await;
         }
+        forward_task.abort();
     })
 }
 

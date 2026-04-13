@@ -35,8 +35,10 @@ pub(crate) async fn dispatch_command(
         Some(PeerCommand::RequestPeers { amount }) => {
             let _ = senders.peer_share.send(amount).await;
         }
-        Some(PeerCommand::SubmitTransaction { tx }) => {
-            let _ = senders.tx_submit.send(tx).await;
+        Some(PeerCommand::ProvideTxs { txs }) => {
+            for tx in txs {
+                let _ = senders.tx_submit.send(tx).await;
+            }
         }
         Some(PeerCommand::FetchLeiosBlock { point }) => {
             if let Some(ref lf) = senders.leios_fetch {
