@@ -99,6 +99,7 @@ impl super::PraosConsensus {
     ///    seeing `prev_hash=None` means stale PeerChain entries from
     ///    block 1 survived a rollback — the re-intersect mechanism
     ///    handles this via `OrphanCandidate`.
+    ///
     /// Walk backward from `start_hash` following `prev_hash` links,
     /// using `chain_tree` first and falling back to `block_cache` when
     /// a block is cached but not yet in chain_tree. This is the
@@ -413,6 +414,7 @@ impl super::PraosConsensus {
     ///
     /// Returns `Ok((ancestor, replay))` on success, or `Err(gap_point)`
     /// when the walk doesn't reach adopted_tip (gap in chain_tree).
+    #[allow(clippy::type_complexity)]
     pub(super) fn try_switch_to(
         &self,
         tip_hash: [u8; 32],

@@ -81,12 +81,7 @@ impl ChainFragment {
         self.point_set.contains(point)
     }
 
-    /// Remove a specific point (e.g., after successful fetch or fetch failure).
-    pub fn remove(&mut self, point: &Point) {
-        if self.point_set.remove(point) {
-            self.points.retain(|p| p != point);
-        }
-    }
+
 
     /// Number of points in the fragment.
     #[allow(dead_code)]
@@ -199,25 +194,4 @@ mod tests {
         assert!(f.contains(&point(101)));
     }
 
-    #[test]
-    fn remove_specific_point() {
-        let mut f = ChainFragment::new();
-        f.set_intersection(point(100));
-        f.append(point(101));
-        f.append(point(102));
-
-        f.remove(&point(101));
-        assert_eq!(f.len(), 2);
-        assert!(f.contains(&point(100)));
-        assert!(!f.contains(&point(101)));
-        assert!(f.contains(&point(102)));
-    }
-
-    #[test]
-    fn remove_nonexistent_point_is_noop() {
-        let mut f = ChainFragment::new();
-        f.append(point(1));
-        f.remove(&point(99));
-        assert_eq!(f.len(), 1);
-    }
 }
