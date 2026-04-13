@@ -288,6 +288,15 @@ impl LeiosConsensus {
 
     // -- Queries ------------------------------------------------------------
 
+    /// Returns true if any EB election has reached quorum and is in
+    /// CertEligible phase (full pipeline elapsed). Used by the RB
+    /// producer to set the certified_eb header flag.
+    pub fn has_certified_eb(&self) -> bool {
+        self.elections
+            .values()
+            .any(|e| e.quorum_reached && e.phase == PipelinePhase::CertEligible)
+    }
+
     #[cfg(test)]
     fn election_phase(&self, hash: &[u8; 32]) -> Option<PipelinePhase> {
         self.elections.get(hash).map(|e| e.phase)

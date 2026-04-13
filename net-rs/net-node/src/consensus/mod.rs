@@ -120,4 +120,9 @@ impl Consensus {
     pub fn next_block_number(&self) -> u64 {
         self.praos.next_block_number()
     }
+
+    /// Whether any EB has a valid certificate (quorum + pipeline elapsed).
+    pub fn has_certified_eb(&self) -> bool {
+        self.leios.has_certified_eb()
+    }
 }

@@ -220,6 +220,7 @@ impl BlockProducer {
         slot: u64,
         prev_hash: Option<[u8; 32]>,
         block_number: u64,
+        certified_eb: bool,
     ) -> Option<(Point, WrappedHeader, BlockBody)> {
         if !self.is_active() {
             return None;
@@ -231,7 +232,7 @@ impl BlockProducer {
         }
 
         self.block_count += 1;
-        Some(self.make_fake_block(slot, prev_hash, block_number))
+        Some(self.make_fake_block(slot, prev_hash, block_number, certified_eb))
     }
 
     /// Try to produce a Leios endorser block. Called at stage boundaries.
@@ -311,19 +312,20 @@ impl BlockProducer {
         slot: u64,
         prev_hash: Option<[u8; 32]>,
         block_number: u64,
+        certified_eb: bool,
     ) -> (Point, WrappedHeader, BlockBody) {
         let mut issuer_vkey = [0u8; 32];
         self.rng.fill(&mut issuer_vkey);
         let mut body_hash = [0u8; 32];
         self.rng.fill(&mut body_hash);
 
-        // Build header_body: 10-field array (Shelley+ minimum).
-        // [block_number, slot, prev_hash, issuer_vkey, vrf_vkey, vrf_result,
-        //  body_size, block_body_hash, operational_cert, protocol_version]
+        // Build header_body: 10-field base array (Shelley+), optionally
+        // extended to 11 with a certified_eb bool (CIP-0164).
+        let array_len: u64 = if certified_eb { 11 } else { 10 };
         let mut header_body = Vec::new();
         let mut hb = minicbor::Encoder::new(&mut header_body);
         let _ = hb
-            .array(10)
+            .array(array_len)
             .and_then(|e| e.u64(block_number)) // block_number
             .and_then(|e| e.u64(slot)) // slot
             .and_then(|e| match prev_hash {
@@ -345,6 +347,9 @@ impl BlockProducer {
             .and_then(|e| e.array(2)) // protocol_version: [major, minor]
             .and_then(|e| e.u32(10))
             .and_then(|e| e.u32(0));
+        if certified_eb {
+            let _ = minicbor::Encoder::new(&mut header_body).bool(true);
+        }
 
         // Inner header: [header_body, body_signature]
         let mut header_inner = Vec::new();
@@ -430,7 +435,9 @@ mod tests {
         let mut producer = BlockProducer::new(&config, Some(42), dyn_rx(&config));
         assert!(!producer.is_active());
         for slot in 0..100 {
-            assert!(producer.try_produce_block(slot, None, slot + 1).is_none());
+            assert!(producer
+                .try_produce_block(slot, None, slot + 1, false)
+                .is_none());
         }
     }
 
@@ -444,7 +451,7 @@ mod tests {
         let mut producer = BlockProducer::new(&config, Some(42), dyn_rx(&config));
         assert!(producer.is_active());
         for slot in 0..100 {
-            let result = producer.try_produce_block(slot, None, slot + 1);
+            let result = producer.try_produce_block(slot, None, slot + 1, false);
             assert!(result.is_some(), "should produce at slot {slot}");
             let (point, _, _) = result.unwrap();
             match point {
@@ -468,7 +475,7 @@ mod tests {
             (0..1000)
                 .filter_map(|slot| {
                     producer
-                        .try_produce_block(slot, None, slot + 1)
+                        .try_produce_block(slot, None, slot + 1, false)
                         .map(|_| slot)
                 })
                 .collect::<Vec<_>>()
@@ -489,7 +496,7 @@ mod tests {
         };
         let mut producer = BlockProducer::new(&config, Some(99), dyn_rx(&config));
         let wins: usize = (0..10_000)
-            .filter(|slot| producer.try_produce_block(*slot, None, 1).is_some())
+            .filter(|slot| producer.try_produce_block(*slot, None, 1, false).is_some())
             .count();
         // Expected: 10000 * (100/1000) * 0.5 = 500, allow ±20%.
         assert!(
@@ -547,7 +554,7 @@ mod tests {
             ..base_config()
         };
         let mut producer = BlockProducer::new(&config, Some(42), dyn_rx(&config));
-        let (point, header, body) = producer.try_produce_block(12345, None, 1).unwrap();
+        let (point, header, body) = producer.try_produce_block(12345, None, 1, false).unwrap();
 
         // Header should be parseable.
         assert!(header.parsed.is_some(), "header should parse");
@@ -571,6 +578,36 @@ mod tests {
         let ex = extracted.unwrap();
         assert!(ex.parsed.is_some());
         assert_eq!(ex.parsed.as_ref().unwrap().slot, 12345);
+    }
+
+    #[test]
+    fn certified_eb_header_roundtrips() {
+        let config = ProductionConfig {
+            stake: 1000,
+            total_stake: 1000,
+            rb_generation_probability: 1.0,
+            ..base_config()
+        };
+        let mut producer = BlockProducer::new(&config, Some(42), dyn_rx(&config));
+        let (_, header, _) = producer.try_produce_block(100, None, 1, true).unwrap();
+
+        let info = header.parsed.as_ref().unwrap();
+        assert_eq!(info.certified_eb, Some(true), "certified_eb should be true");
+    }
+
+    #[test]
+    fn no_certified_eb_when_false() {
+        let config = ProductionConfig {
+            stake: 1000,
+            total_stake: 1000,
+            rb_generation_probability: 1.0,
+            ..base_config()
+        };
+        let mut producer = BlockProducer::new(&config, Some(42), dyn_rx(&config));
+        let (_, header, _) = producer.try_produce_block(100, None, 1, false).unwrap();
+
+        let info = header.parsed.as_ref().unwrap();
+        assert_eq!(info.certified_eb, None, "certified_eb should be None");
     }
 
     #[test]
@@ -648,7 +685,7 @@ mod tests {
 
         // Should not produce with probability 0.
         let wins_before: usize = (0..100)
-            .filter(|slot| producer.try_produce_block(*slot, None, 1).is_some())
+            .filter(|slot| producer.try_produce_block(*slot, None, 1, false).is_some())
             .count();
         assert_eq!(wins_before, 0);
 
@@ -659,7 +696,7 @@ mod tests {
 
         // Now should always produce.
         let wins_after: usize = (100..200)
-            .filter(|slot| producer.try_produce_block(*slot, None, 1).is_some())
+            .filter(|slot| producer.try_produce_block(*slot, None, 1, false).is_some())
             .count();
         assert_eq!(wins_after, 100);
     }
