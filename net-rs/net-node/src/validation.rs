@@ -82,7 +82,10 @@ pub enum LedgerCommand {
     /// Validate an endorser block (fake delay, then succeed).
     ValidateEb { point: Point },
     /// Validate a vote bundle (fake delay, then succeed).
-    ValidateVotes { vote_ids: Vec<(u64, Vec<u8>)> },
+    ValidateVotes {
+        vote_ids: Vec<(u64, Vec<u8>)>,
+        vote_data: Vec<Vec<u8>>,
+    },
 }
 
 /// Outcomes reported by the validator actor after processing a command.
@@ -98,8 +101,12 @@ pub enum LedgerOutcome {
     RollbackFailed { target: Point, error: String },
     /// EB validation completed for `point`.
     EbValidated { point: Point },
-    /// Vote validation completed for `vote_ids`.
-    VotesValidated { vote_ids: Vec<(u64, Vec<u8>)> },
+    /// Vote validation completed.
+    VotesValidated {
+        #[allow(dead_code)] // kept for future telemetry/diagnostics
+        vote_ids: Vec<(u64, Vec<u8>)>,
+        vote_data: Vec<Vec<u8>>,
+    },
 }
 
 /// Handle to the validator actor. Submitting work goes through `submit`;
@@ -174,10 +181,16 @@ async fn run_validator_actor(
                 tokio::time::sleep(Duration::from_secs_f64(ms / 1000.0)).await;
                 LedgerOutcome::EbValidated { point }
             }
-            LedgerCommand::ValidateVotes { vote_ids } => {
+            LedgerCommand::ValidateVotes {
+                vote_ids,
+                vote_data,
+            } => {
                 let ms = dyn_config.borrow().vote_validation_ms;
                 tokio::time::sleep(Duration::from_secs_f64(ms / 1000.0)).await;
-                LedgerOutcome::VotesValidated { vote_ids }
+                LedgerOutcome::VotesValidated {
+                    vote_ids,
+                    vote_data,
+                }
             }
         };
         if outcomes.send(outcome).await.is_err() {
@@ -470,14 +483,22 @@ mod tests {
         let (validator, mut outcome_rx) = Validator::new(rx);
 
         let vote_ids = vec![(10u64, vec![0xAAu8]), (20u64, vec![0xBBu8])];
+        let vote_data = vec![vec![0x01], vec![0x02]];
         validator
             .submit(LedgerCommand::ValidateVotes {
                 vote_ids: vote_ids.clone(),
+                vote_data: vote_data.clone(),
             })
             .await;
 
         match outcome_rx.recv().await.expect("outcome") {
-            LedgerOutcome::VotesValidated { vote_ids: got } => assert_eq!(got, vote_ids),
+            LedgerOutcome::VotesValidated {
+                vote_ids: got_ids,
+                vote_data: got_data,
+            } => {
+                assert_eq!(got_ids, vote_ids);
+                assert_eq!(got_data, vote_data);
+            }
             other => panic!("expected VotesValidated, got {other:?}"),
         }
     }
