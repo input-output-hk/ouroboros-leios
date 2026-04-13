@@ -29,6 +29,8 @@ pub(crate) struct EbElection {
     pub(crate) phase: PipelinePhase,
     #[allow(dead_code)] // used by future telemetry
     pub(crate) validated_at: Instant,
+    /// True after this node has cast its vote for this EB.
+    pub(crate) voted: bool,
 }
 
 /// CIP-0164 pipeline timing configuration.

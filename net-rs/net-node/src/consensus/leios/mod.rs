@@ -2,31 +2,36 @@
 //!
 //! Tracks per-EB elections following the CIP-0164 Linear Leios pipeline model.
 //! Each validated EB gets its own election with phases driven by slot ticks
-//! and pipeline timing parameters (3×Δhdr + L_vote + L_diff).
+//! and pipeline timing parameters (3×Δhdr + L_vote + L_diff). When an election
+//! enters the Voting phase, committee selection determines whether this node
+//! votes, and if so, a structured vote body is injected into the network.
 //!
 //! Submodules:
 //! - `pipeline` — phase types, timing config, pure phase computation
-//! - `voting` — (future) EB-triggered vote production with committee selection
+//! - `voting` — EB-triggered vote production with committee selection
 //! - `aggregation` — (future) vote tallies, quorum detection, certificates
 
 mod aggregation;
 mod pipeline;
-mod voting;
+pub(crate) mod voting;
 
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
 use net_core::types::Point;
-use tokio::sync::mpsc;
+use rand::rngs::StdRng;
+use rand::SeedableRng;
+use tokio::sync::{mpsc, watch};
 use tracing::info;
 
+use crate::config::DynamicConfig;
 use crate::validation::{LedgerCommand, Validator};
 
 use pipeline::EbElection;
 pub use pipeline::PipelineConfig;
-#[cfg(test)]
 use pipeline::PipelinePhase;
+pub use voting::VotingConfig;
 
 /// How long an in-flight Leios fetch entry remains active before being
 /// considered stale. Matches the Praos in-flight TTL.
@@ -44,6 +49,12 @@ pub struct LeiosConsensus {
     current_slot: u64,
     /// Per-EB elections, keyed by EB hash.
     elections: HashMap<[u8; 32], EbElection>,
+    /// Voting configuration (committee selection, stake, vote sizes).
+    voting_config: VotingConfig,
+    /// RNG for committee selection sortition.
+    rng: StdRng,
+    /// Dynamic config for vote_generation_probability.
+    dyn_config: watch::Receiver<DynamicConfig>,
 }
 
 impl LeiosConsensus {
@@ -52,6 +63,9 @@ impl LeiosConsensus {
         commands: mpsc::Sender<NetworkCommand>,
         validator: Validator,
         pipeline: PipelineConfig,
+        voting_config: VotingConfig,
+        seed: Option<u64>,
+        dyn_config: watch::Receiver<DynamicConfig>,
     ) -> Self {
         Self {
             node_id,
@@ -61,15 +75,57 @@ impl LeiosConsensus {
             pipeline,
             current_slot: 0,
             elections: HashMap::new(),
+            voting_config,
+            rng: match seed {
+                Some(s) => StdRng::seed_from_u64(s),
+                None => StdRng::from_entropy(),
+            },
+            dyn_config,
         }
     }
 
     // -- Slot tick ----------------------------------------------------------
 
-    /// Advance slot tracking. Updates pipeline phases for all active
-    /// elections and prunes expired ones.
-    pub fn on_slot(&mut self, slot: u64) {
+    /// Advance slot tracking. Updates pipeline phases, triggers voting
+    /// for elections entering the Voting phase, and prunes expired ones.
+    pub async fn on_slot(&mut self, slot: u64) {
         self.current_slot = slot;
+
+        // Find elections that are in Voting phase and haven't been voted on.
+        let to_vote: Vec<([u8; 32], u64)> = self
+            .elections
+            .iter()
+            .filter(|(_, e)| {
+                let elapsed = slot.saturating_sub(e.announced_slot);
+                matches!(
+                    self.pipeline.phase_for_elapsed(elapsed),
+                    Some(PipelinePhase::Voting)
+                ) && !e.voted
+            })
+            .map(|(hash, e)| (*hash, e.announced_slot))
+            .collect();
+
+        // Vote on each eligible EB.
+        let vote_prob = self.dyn_config.borrow().vote_generation_probability;
+        for (hash, eb_slot) in to_vote {
+            if voting::try_vote_on_eb(
+                &self.node_id,
+                &hash,
+                eb_slot,
+                &self.voting_config,
+                vote_prob,
+                &mut self.rng,
+                &self.commands,
+            )
+            .await
+            {
+                if let Some(election) = self.elections.get_mut(&hash) {
+                    election.voted = true;
+                }
+            }
+        }
+
+        // Update phases and prune expired.
         self.elections.retain(|_, election| {
             match self
                 .pipeline
@@ -79,7 +135,7 @@ impl LeiosConsensus {
                     election.phase = phase;
                     true
                 }
-                None => false, // expired
+                None => false,
             }
         });
     }
@@ -184,7 +240,6 @@ impl LeiosConsensus {
             Point::Origin => return,
         };
 
-        // Dedup: skip if we already have an election for this EB.
         if self.elections.contains_key(&hash) {
             return;
         }
@@ -204,10 +259,10 @@ impl LeiosConsensus {
                     announced_slot: slot,
                     phase,
                     validated_at: Instant::now(),
+                    voted: false,
                 },
             );
         }
-        // else: EB is already expired, drop silently
     }
 
     /// Called when vote validation completes.
@@ -217,16 +272,19 @@ impl LeiosConsensus {
 
     // -- Queries ------------------------------------------------------------
 
-    /// Current pipeline phase for an EB, if it has an active election.
     #[cfg(test)]
     fn election_phase(&self, hash: &[u8; 32]) -> Option<PipelinePhase> {
         self.elections.get(hash).map(|e| e.phase)
     }
 
-    /// Number of active elections.
     #[cfg(test)]
     fn election_count(&self) -> usize {
         self.elections.len()
+    }
+
+    #[cfg(test)]
+    fn election_voted(&self, hash: &[u8; 32]) -> bool {
+        self.elections.get(hash).map(|e| e.voted).unwrap_or(false)
     }
 
     // -- Housekeeping -------------------------------------------------------
@@ -245,8 +303,7 @@ impl LeiosConsensus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::DynamicConfig;
-    use tokio::sync::watch;
+    use crate::config::CommitteeSelection;
 
     fn point(slot: u64) -> Point {
         Point::Specific {
@@ -263,7 +320,7 @@ mod tests {
         let config = DynamicConfig {
             rb_generation_probability: 0.0,
             eb_generation_probability: 0.0,
-            vote_generation_probability: 0.0,
+            vote_generation_probability: 1.0, // always vote in tests
             rb_head_validation_ms: 0.0,
             rb_body_validation_ms_constant: 0.0,
             rb_body_validation_ms_per_byte: 0.0,
@@ -278,6 +335,7 @@ mod tests {
         Validator::new(test_dyn_config())
     }
 
+    /// Pipeline config: delta_hdr=1, vote=5, diffuse=5, dedup=10
     fn test_pipeline() -> PipelineConfig {
         PipelineConfig {
             delta_hdr: 1,
@@ -287,8 +345,26 @@ mod tests {
         }
     }
 
+    fn test_voting_config() -> VotingConfig {
+        VotingConfig {
+            committee_selection: CommitteeSelection::EveryoneVotes,
+            stake: 100,
+            total_stake: 1000,
+            persistent_vote_bytes: 130,
+            non_persistent_vote_bytes: 180,
+        }
+    }
+
     fn test_leios(commands: mpsc::Sender<NetworkCommand>, validator: Validator) -> LeiosConsensus {
-        LeiosConsensus::new("test".into(), commands, validator, test_pipeline())
+        LeiosConsensus::new(
+            "test".into(),
+            commands,
+            validator,
+            test_pipeline(),
+            test_voting_config(),
+            Some(42),
+            test_dyn_config(),
+        )
     }
 
     // -- Election lifecycle tests -------------------------------------------
@@ -299,7 +375,7 @@ mod tests {
         let (validator, _) = test_validator();
         let mut leios = test_leios(tx, validator);
 
-        leios.on_slot(10);
+        leios.on_slot(10).await;
         leios.on_validated_eb(point(10));
         assert_eq!(leios.election_count(), 1);
         assert_eq!(
@@ -314,9 +390,9 @@ mod tests {
         let (validator, _) = test_validator();
         let mut leios = test_leios(tx, validator);
 
-        leios.on_slot(10);
+        leios.on_slot(10).await;
         leios.on_validated_eb(point(10));
-        leios.on_slot(13);
+        leios.on_slot(13).await;
         assert_eq!(
             leios.election_phase(&point_hash(10)),
             Some(PipelinePhase::Voting)
@@ -329,7 +405,7 @@ mod tests {
         let (validator, _) = test_validator();
         let mut leios = test_leios(tx, validator);
 
-        leios.on_slot(0);
+        leios.on_slot(0).await;
         leios.on_validated_eb(point(0));
 
         assert_eq!(
@@ -337,25 +413,25 @@ mod tests {
             Some(PipelinePhase::EquivocationCheck)
         );
 
-        leios.on_slot(3);
+        leios.on_slot(3).await;
         assert_eq!(
             leios.election_phase(&point_hash(0)),
             Some(PipelinePhase::Voting)
         );
 
-        leios.on_slot(8);
+        leios.on_slot(8).await;
         assert_eq!(
             leios.election_phase(&point_hash(0)),
             Some(PipelinePhase::Diffusing)
         );
 
-        leios.on_slot(13);
+        leios.on_slot(13).await;
         assert_eq!(
             leios.election_phase(&point_hash(0)),
             Some(PipelinePhase::CertEligible)
         );
 
-        leios.on_slot(23);
+        leios.on_slot(23).await;
         assert_eq!(leios.election_phase(&point_hash(0)), None);
         assert_eq!(leios.election_count(), 0);
     }
@@ -366,7 +442,7 @@ mod tests {
         let (validator, _) = test_validator();
         let mut leios = test_leios(tx, validator);
 
-        leios.on_slot(10);
+        leios.on_slot(10).await;
         leios.on_validated_eb(point(10));
         leios.on_validated_eb(point(10));
         assert_eq!(leios.election_count(), 1);
@@ -378,11 +454,11 @@ mod tests {
         let (validator, _) = test_validator();
         let mut leios = test_leios(tx, validator);
 
-        leios.on_slot(0);
+        leios.on_slot(0).await;
         leios.on_validated_eb(point(0));
         assert_eq!(leios.election_count(), 1);
 
-        leios.on_slot(23);
+        leios.on_slot(23).await;
         assert_eq!(leios.election_count(), 0);
     }
 
@@ -392,9 +468,9 @@ mod tests {
         let (validator, _) = test_validator();
         let mut leios = test_leios(tx, validator);
 
-        leios.on_slot(5);
-        leios.on_validated_eb(point(0)); // elapsed=5 → Voting
-        leios.on_validated_eb(point(5)); // elapsed=0 → EquivocationCheck
+        leios.on_slot(5).await;
+        leios.on_validated_eb(point(0));
+        leios.on_validated_eb(point(5));
 
         assert_eq!(leios.election_count(), 2);
         assert_eq!(
@@ -413,7 +489,7 @@ mod tests {
         let (validator, _) = test_validator();
         let mut leios = test_leios(tx, validator);
 
-        leios.on_slot(10);
+        leios.on_slot(10).await;
         leios.on_validated_eb(point(0));
         assert_eq!(
             leios.election_phase(&point_hash(0)),
@@ -427,9 +503,69 @@ mod tests {
         let (validator, _) = test_validator();
         let mut leios = test_leios(tx, validator);
 
-        leios.on_slot(30);
+        leios.on_slot(30).await;
         leios.on_validated_eb(point(0));
         assert_eq!(leios.election_count(), 0);
+    }
+
+    // -- Voting tests -------------------------------------------------------
+
+    #[tokio::test]
+    async fn on_slot_triggers_vote_when_entering_voting_phase() {
+        let (tx, mut rx) = mpsc::channel(16);
+        let (validator, _) = test_validator();
+        let mut leios = test_leios(tx, validator);
+
+        leios.on_slot(0).await;
+        leios.on_validated_eb(point(0));
+        // No vote yet — still in EquivocationCheck.
+        assert!(!leios.election_voted(&point_hash(0)));
+
+        // Advance to Voting phase (elapsed=3).
+        leios.on_slot(3).await;
+        assert!(leios.election_voted(&point_hash(0)));
+
+        // Check that InjectLeiosVotes was sent.
+        match rx.try_recv() {
+            Ok(NetworkCommand::InjectLeiosVotes { votes, data }) => {
+                assert_eq!(votes.len(), 1);
+                assert!(!data.is_empty());
+            }
+            other => panic!("expected InjectLeiosVotes, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn no_double_vote_same_eb() {
+        let (tx, mut rx) = mpsc::channel(16);
+        let (validator, _) = test_validator();
+        let mut leios = test_leios(tx, validator);
+
+        leios.on_slot(0).await;
+        leios.on_validated_eb(point(0));
+
+        // First slot in Voting → vote produced.
+        leios.on_slot(3).await;
+        assert!(rx.try_recv().is_ok());
+
+        // Second slot in Voting → no duplicate vote.
+        leios.on_slot(4).await;
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn no_vote_during_equivocation_check() {
+        let (tx, mut rx) = mpsc::channel(16);
+        let (validator, _) = test_validator();
+        let mut leios = test_leios(tx, validator);
+
+        leios.on_slot(0).await;
+        leios.on_validated_eb(point(0));
+
+        // Still in EquivocationCheck (elapsed=2).
+        leios.on_slot(2).await;
+        assert!(!leios.election_voted(&point_hash(0)));
+        assert!(rx.try_recv().is_err());
     }
 
     // -- Network event tests ------------------------------------------------

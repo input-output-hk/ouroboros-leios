@@ -2,21 +2,21 @@
 //!
 //! Owns both the Praos (longest-chain RB) and Leios (EB/vote) sub-layers and
 //! dispatches incoming network events to whichever cares. Praos is the
-//! foundation; Leios sits on top and, today, only routes offer/fetch events.
-//! Future Leios work (EB ranking, vote aggregation, certificates) lands in
-//! `leios.rs` without churning this facade.
+//! foundation; Leios sits on top and produces votes when EB elections enter
+//! the Voting pipeline phase.
 
 mod leios;
 mod praos;
 
 use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
 use net_core::types::{BlockBody, Point, Tip, WrappedHeader};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 
 use crate::chain_tree::ChainTreeEntry;
+use crate::config::DynamicConfig;
 use crate::validation::{LedgerOutcome, Validator};
 
-pub use leios::{LeiosConsensus, PipelineConfig};
+pub use leios::{LeiosConsensus, PipelineConfig, VotingConfig};
 pub use praos::PraosConsensus;
 
 /// Top-level consensus, composing Praos and Leios sub-layers.
@@ -26,12 +26,16 @@ pub struct Consensus {
 }
 
 impl Consensus {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         node_id: String,
         commands: mpsc::Sender<NetworkCommand>,
         validator: Validator,
         security_param_k: u64,
         pipeline: PipelineConfig,
+        voting_config: VotingConfig,
+        seed: Option<u64>,
+        dyn_config: watch::Receiver<DynamicConfig>,
     ) -> Self {
         let praos = PraosConsensus::new(
             node_id.clone(),
@@ -39,13 +43,21 @@ impl Consensus {
             validator.clone(),
             security_param_k,
         );
-        let leios = LeiosConsensus::new(node_id, commands, validator, pipeline);
+        let leios = LeiosConsensus::new(
+            node_id,
+            commands,
+            validator,
+            pipeline,
+            voting_config,
+            seed,
+            dyn_config,
+        );
         Self { praos, leios }
     }
 
     /// Notify the Leios layer of a new slot tick.
-    pub fn on_slot(&mut self, slot: u64) {
-        self.leios.on_slot(slot);
+    pub async fn on_slot(&mut self, slot: u64) {
+        self.leios.on_slot(slot).await;
     }
 
     /// Register a self-produced ranking block with Praos consensus.

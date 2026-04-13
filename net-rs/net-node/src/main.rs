@@ -82,6 +82,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             diffuse_window: config.production.leios_diffuse_window_slots,
             dedup_window: config.leios_dedup_window,
         },
+        consensus::VotingConfig {
+            committee_selection: config.production.committee_selection.clone(),
+            stake: config.production.stake,
+            total_stake: config.production.total_stake,
+            persistent_vote_bytes: config.production.persistent_vote_bytes,
+            non_persistent_vote_bytes: config.production.non_persistent_vote_bytes,
+        },
+        config.seed,
+        dyn_rx.clone(),
     );
 
     // Transaction generator (background task).
@@ -132,9 +141,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 telem.current_slot = slot;
                 retry_counter += 1;
 
-                // Leios: advance pipeline phase tracking.
+                // Leios: advance pipeline phases and trigger voting.
                 if leios {
-                    consensus.on_slot(slot);
+                    consensus.on_slot(slot).await;
                 }
 
                 // Praos: try to produce a ranking block.
@@ -158,7 +167,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         .await;
                 }
 
-                // Leios: produce EBs and votes at stage boundaries.
+                // Leios: produce EBs at stage boundaries.
+                // (Votes are now produced by the consensus layer when
+                // elections enter the Voting pipeline phase.)
                 if leios && producer.is_stage_boundary(slot) {
                     if let Some(eb) = producer.try_produce_eb(slot) {
                         info!(node_id = %node_id, %eb.point, "produced endorser block");
@@ -169,18 +180,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         let _ = commands.send(NetworkCommand::InjectLeiosBlock {
                             point: eb.point,
                             block: eb.data,
-                        }).await;
-                    }
-                    if let Some(votes) = producer.try_produce_votes(slot) {
-                        info!(node_id = %node_id, count = votes.vote_ids.len(), "produced votes");
-                        telem.record(NodeEvent::VTBundleGenerated {
-                            node: node_id.clone(),
-                            slot,
-                            count: votes.vote_ids.len(),
-                        });
-                        let _ = commands.send(NetworkCommand::InjectLeiosVotes {
-                            votes: votes.vote_ids,
-                            data: votes.vote_data,
                         }).await;
                     }
                 }
