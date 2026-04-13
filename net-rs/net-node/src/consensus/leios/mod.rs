@@ -2,9 +2,16 @@
 //!
 //! Tracks per-EB elections following the CIP-0164 Linear Leios pipeline model.
 //! Each validated EB gets its own election with phases driven by slot ticks
-//! and pipeline timing parameters (3×Δhdr + L_vote + L_diff). Future commits
-//! add vote aggregation, certificate formation, and certified-EB extraction
-//! for RB header population.
+//! and pipeline timing parameters (3×Δhdr + L_vote + L_diff).
+//!
+//! Submodules:
+//! - `pipeline` — phase types, timing config, pure phase computation
+//! - `voting` — (future) EB-triggered vote production with committee selection
+//! - `aggregation` — (future) vote tallies, quorum detection, certificates
+
+mod aggregation;
+mod pipeline;
+mod voting;
 
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -16,53 +23,14 @@ use tracing::info;
 
 use crate::validation::{LedgerCommand, Validator};
 
+use pipeline::EbElection;
+pub use pipeline::PipelineConfig;
+#[cfg(test)]
+use pipeline::PipelinePhase;
+
 /// How long an in-flight Leios fetch entry remains active before being
 /// considered stale. Matches the Praos in-flight TTL.
 const IN_FLIGHT_TTL: Duration = Duration::from_secs(15);
-
-// ---------------------------------------------------------------------------
-// CIP-0164 pipeline types
-// ---------------------------------------------------------------------------
-
-/// Pipeline phase for an EB election (CIP-0164 Linear Leios).
-///
-/// Each EB progresses through these phases based on elapsed slots since
-/// its announcement: EquivocationCheck (3×Δhdr) → Voting (L_vote) →
-/// Diffusing (L_diff) → CertEligible (held until pruned).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum PipelinePhase {
-    /// Waiting for equivocation detection (3 × Δhdr slots).
-    EquivocationCheck,
-    /// Voting window open (L_vote slots).
-    Voting,
-    /// Votes diffusing, certificate may form (L_diff slots).
-    Diffusing,
-    /// Pipeline complete, certificate may be included in an RB.
-    CertEligible,
-}
-
-/// Per-EB election state.
-struct EbElection {
-    #[allow(dead_code)] // used by future vote aggregation
-    eb_point: Point,
-    announced_slot: u64,
-    phase: PipelinePhase,
-    #[allow(dead_code)] // used by future telemetry
-    validated_at: Instant,
-}
-
-/// CIP-0164 pipeline timing configuration.
-#[derive(Debug, Clone, Copy)]
-pub struct PipelineConfig {
-    pub delta_hdr: u64,
-    pub vote_window: u64,
-    pub diffuse_window: u64,
-    pub dedup_window: u64,
-}
-
-// ---------------------------------------------------------------------------
-// LeiosConsensus
-// ---------------------------------------------------------------------------
 
 pub struct LeiosConsensus {
     node_id: String,
@@ -274,29 +242,6 @@ impl LeiosConsensus {
     }
 }
 
-impl PipelineConfig {
-    /// Compute the pipeline phase for an EB given the number of slots
-    /// elapsed since its announcement. Returns `None` if the election
-    /// has expired (past dedup_window after CertEligible).
-    fn phase_for_elapsed(&self, elapsed: u64) -> Option<PipelinePhase> {
-        let equivocation_end = 3 * self.delta_hdr;
-        let voting_end = equivocation_end + self.vote_window;
-        let diffuse_end = voting_end + self.diffuse_window;
-        let expiry = diffuse_end + self.dedup_window;
-        if elapsed < equivocation_end {
-            Some(PipelinePhase::EquivocationCheck)
-        } else if elapsed < voting_end {
-            Some(PipelinePhase::Voting)
-        } else if elapsed < diffuse_end {
-            Some(PipelinePhase::Diffusing)
-        } else if elapsed < expiry {
-            Some(PipelinePhase::CertEligible)
-        } else {
-            None
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -333,8 +278,6 @@ mod tests {
         Validator::new(test_dyn_config())
     }
 
-    /// Pipeline config: delta_hdr=1, vote=5, diffuse=5, dedup=10
-    /// Boundaries: EquivCheck [0,3), Voting [3,8), Diffusing [8,13), CertEligible [13,23), expired ≥23
     fn test_pipeline() -> PipelineConfig {
         PipelineConfig {
             delta_hdr: 1,
@@ -346,34 +289,6 @@ mod tests {
 
     fn test_leios(commands: mpsc::Sender<NetworkCommand>, validator: Validator) -> LeiosConsensus {
         LeiosConsensus::new("test".into(), commands, validator, test_pipeline())
-    }
-
-    // -- Pipeline phase tests -----------------------------------------------
-
-    #[test]
-    fn phase_for_elapsed_boundaries() {
-        let p = test_pipeline();
-        // EquivocationCheck: elapsed 0..3
-        assert_eq!(
-            p.phase_for_elapsed(0),
-            Some(PipelinePhase::EquivocationCheck)
-        );
-        assert_eq!(
-            p.phase_for_elapsed(2),
-            Some(PipelinePhase::EquivocationCheck)
-        );
-        // Voting: elapsed 3..8
-        assert_eq!(p.phase_for_elapsed(3), Some(PipelinePhase::Voting));
-        assert_eq!(p.phase_for_elapsed(7), Some(PipelinePhase::Voting));
-        // Diffusing: elapsed 8..13
-        assert_eq!(p.phase_for_elapsed(8), Some(PipelinePhase::Diffusing));
-        assert_eq!(p.phase_for_elapsed(12), Some(PipelinePhase::Diffusing));
-        // CertEligible: elapsed 13..23
-        assert_eq!(p.phase_for_elapsed(13), Some(PipelinePhase::CertEligible));
-        assert_eq!(p.phase_for_elapsed(22), Some(PipelinePhase::CertEligible));
-        // Expired: elapsed ≥23
-        assert_eq!(p.phase_for_elapsed(23), None);
-        assert_eq!(p.phase_for_elapsed(100), None);
     }
 
     // -- Election lifecycle tests -------------------------------------------
@@ -401,7 +316,6 @@ mod tests {
 
         leios.on_slot(10);
         leios.on_validated_eb(point(10));
-        // Advance past 3×Δhdr (3 slots) → Voting
         leios.on_slot(13);
         assert_eq!(
             leios.election_phase(&point_hash(10)),
@@ -418,34 +332,29 @@ mod tests {
         leios.on_slot(0);
         leios.on_validated_eb(point(0));
 
-        // EquivocationCheck at slot 0
         assert_eq!(
             leios.election_phase(&point_hash(0)),
             Some(PipelinePhase::EquivocationCheck)
         );
 
-        // Voting at slot 3 (3×1)
         leios.on_slot(3);
         assert_eq!(
             leios.election_phase(&point_hash(0)),
             Some(PipelinePhase::Voting)
         );
 
-        // Diffusing at slot 8 (3+5)
         leios.on_slot(8);
         assert_eq!(
             leios.election_phase(&point_hash(0)),
             Some(PipelinePhase::Diffusing)
         );
 
-        // CertEligible at slot 13 (3+5+5)
         leios.on_slot(13);
         assert_eq!(
             leios.election_phase(&point_hash(0)),
             Some(PipelinePhase::CertEligible)
         );
 
-        // Expired at slot 23 (13+10 dedup)
         leios.on_slot(23);
         assert_eq!(leios.election_phase(&point_hash(0)), None);
         assert_eq!(leios.election_count(), 0);
@@ -473,7 +382,6 @@ mod tests {
         leios.on_validated_eb(point(0));
         assert_eq!(leios.election_count(), 1);
 
-        // Advance past expiry (23 slots with our config)
         leios.on_slot(23);
         assert_eq!(leios.election_count(), 0);
     }
@@ -505,7 +413,6 @@ mod tests {
         let (validator, _) = test_validator();
         let mut leios = test_leios(tx, validator);
 
-        // EB from slot 0 arrives when current_slot=10 → elapsed=10 → Diffusing
         leios.on_slot(10);
         leios.on_validated_eb(point(0));
         assert_eq!(
@@ -520,13 +427,12 @@ mod tests {
         let (validator, _) = test_validator();
         let mut leios = test_leios(tx, validator);
 
-        // EB from slot 0 arrives at slot 30 → elapsed=30 → expired
         leios.on_slot(30);
         leios.on_validated_eb(point(0));
         assert_eq!(leios.election_count(), 0);
     }
 
-    // -- Existing network event tests ---------------------------------------
+    // -- Network event tests ------------------------------------------------
 
     #[tokio::test]
     async fn block_offered_issues_fetch() {
