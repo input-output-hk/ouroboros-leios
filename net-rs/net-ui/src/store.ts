@@ -48,7 +48,7 @@ export interface DashboardState {
   toggleEventsPause: () => void;
 
   // Node flash (block produced/received/rolled back)
-  nodeFlash: Record<string, "produced" | "received" | "rolledback" | null>;
+  nodeFlash: Record<string, "rb-produced" | "rb-received" | "eb-produced" | "eb-received" | "vote-produced" | "vote-received" | "rolledback" | null>;
 
   // Selection
   selectedNodeId: string | null;
@@ -259,15 +259,23 @@ export const useStore = create<DashboardState>()((set, get) => ({
     );
 
     // Compute flashes from new events.
-    // "produced" takes priority — don't let RBReceived overwrite it.
-    const flashes: Record<string, "produced" | "received" | "rolledback"> = {};
+    // "produced" takes priority — don't let a received overwrite a produced for the same node.
+    type FlashType = "rb-produced" | "rb-received" | "eb-produced" | "eb-received" | "vote-produced" | "vote-received" | "rolledback";
+    const produced = new Set(["rb-produced", "eb-produced", "vote-produced"]);
+    const flashes: Record<string, FlashType> = {};
     for (const e of newEvents) {
       const node = e.message?.node;
       const type = e.message?.type;
       if (!node) continue;
-      if (type === "RolledBack") flashes[node] = "rolledback";
-      else if (type === "RBGenerated") flashes[node] = "produced";
-      else if (type === "RBReceived" && flashes[node] !== "produced") flashes[node] = "received";
+      if (type === "RolledBack") { flashes[node] = "rolledback"; continue; }
+      const cur = flashes[node];
+      if (cur === "rolledback") continue;
+      if (type === "RBGenerated") flashes[node] = "rb-produced";
+      else if (type === "EBGenerated") flashes[node] = "eb-produced";
+      else if (type === "VTBundleGenerated") flashes[node] = "vote-produced";
+      else if (type === "RBReceived" && (!cur || !produced.has(cur))) flashes[node] = "rb-received";
+      else if (type === "EBReceived" && (!cur || !produced.has(cur))) flashes[node] = "eb-received";
+      else if (type === "VTBundleReceived" && (!cur || !produced.has(cur))) flashes[node] = "vote-received";
     }
 
     // Mutate ring buffer in place — no immutable copy in store state.
