@@ -8,6 +8,7 @@ use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use tokio::sync::watch;
 
+use net_core::protocols::txsubmission::PendingTx;
 use net_core::types::{BlockBody, Point, WrappedHeader};
 
 use crate::config::{DynamicConfig, ProductionConfig};
@@ -16,13 +17,6 @@ use crate::config::{DynamicConfig, ProductionConfig};
 pub struct ProducedEb {
     pub point: Point,
     pub data: Vec<u8>,
-}
-
-/// A produced Leios vote batch.
-#[allow(dead_code)]
-pub struct ProducedVotes {
-    pub vote_ids: Vec<(u64, Vec<u8>)>,
-    pub vote_data: Vec<Vec<u8>>,
 }
 
 // ---------------------------------------------------------------------------
@@ -171,17 +165,25 @@ impl VoteBody {
     }
 }
 
+/// Result of a successful RB production attempt.
+pub struct ProducedRb {
+    pub point: Point,
+    pub header: WrappedHeader,
+    pub body: BlockBody,
+    /// If the mempool overflowed, the EB manifest to inject into the network.
+    pub announced_eb: Option<ProducedEb>,
+    /// Number of transactions included in the RB body (RB path only).
+    pub included_tx_count: usize,
+}
+
 /// Produces fake blocks based on a VRF lottery.
 pub struct BlockProducer {
     rng: StdRng,
     stake: u64,
     total_stake: u64,
-    stage_length_slots: u64,
+    rb_body_max_bytes: usize,
     dyn_config: watch::Receiver<DynamicConfig>,
     block_count: u64,
-    eb_count: u64,
-    #[allow(dead_code)]
-    vote_count: u64,
 }
 
 impl BlockProducer {
@@ -199,11 +201,9 @@ impl BlockProducer {
             rng,
             stake: config.stake,
             total_stake: config.total_stake,
-            stage_length_slots: config.stage_length_slots,
+            rb_body_max_bytes: config.rb_body_max_bytes,
             dyn_config,
             block_count: 0,
-            eb_count: 0,
-            vote_count: 0,
         }
     }
 
@@ -212,16 +212,18 @@ impl BlockProducer {
         self.stake > 0 && self.total_stake > 0
     }
 
-    /// Run the VRF lottery for a Praos ranking block at the given slot.
-    /// `prev_hash` is the hash of the parent block (from consensus tip).
-    /// `block_number` is the chain height (parent block_number + 1).
+    /// Run the VRF lottery for a Praos ranking block. On win, drains the
+    /// mempool: if pending txs fit in `rb_body_max_bytes`, they go in the
+    /// RB body (RB path). Otherwise, ALL txs go into an EB manifest and
+    /// the RB body is empty (EB path).
     pub fn try_produce_block(
         &mut self,
         slot: u64,
         prev_hash: Option<[u8; 32]>,
         block_number: u64,
         certified_eb: bool,
-    ) -> Option<(Point, WrappedHeader, BlockBody)> {
+        mempool: &crate::mempool::SharedMempool,
+    ) -> Option<ProducedRb> {
         if !self.is_active() {
             return None;
         }
@@ -232,61 +234,37 @@ impl BlockProducer {
         }
 
         self.block_count += 1;
-        Some(self.make_fake_block(slot, prev_hash, block_number, certified_eb))
-    }
 
-    /// Try to produce a Leios endorser block. Called at stage boundaries.
-    pub fn try_produce_eb(&mut self, slot: u64) -> Option<ProducedEb> {
-        let eb_prob = self.dyn_config.borrow().eb_generation_probability;
-        if !self.is_active() || eb_prob <= 0.0 {
-            return None;
-        }
+        // Drain mempool and decide RB vs EB path.
+        let mut pool = mempool.lock().unwrap();
+        let (txs, announced_eb) = if pool.total_bytes() > self.rb_body_max_bytes {
+            // EB path: all txs → EB manifest, RB body empty.
+            let all_txs = pool.drain_all();
+            let eb = make_overflow_eb(slot, &all_txs);
+            (Vec::new(), Some(eb))
+        } else {
+            // RB path: txs in RB body, no EB.
+            let txs = pool.drain_up_to(self.rb_body_max_bytes);
+            (txs, None)
+        };
+        drop(pool);
 
-        if !self.run_lottery(eb_prob) {
-            return None;
-        }
+        let eb_ref = announced_eb.as_ref().map(|eb| match eb.point {
+            Point::Specific { hash, .. } => (hash, eb.data.len() as u32),
+            _ => unreachable!(),
+        });
 
-        self.eb_count += 1;
+        let tx_count = txs.len();
+        let (point, header, body) =
+            self.make_fake_block(slot, prev_hash, block_number, certified_eb, &txs, eb_ref);
 
-        let mut hash = [0u8; 32];
-        self.rng.fill(&mut hash);
-        let point = Point::Specific { slot, hash };
-        let data = vec![0x82, slot as u8, 0x00]; // minimal CBOR
-
-        Some(ProducedEb { point, data })
-    }
-
-    /// Try to produce Leios votes. Legacy stage-boundary path.
-    #[allow(dead_code)] // kept for reference; voting now in consensus layer
-    pub fn try_produce_votes(&mut self, slot: u64) -> Option<ProducedVotes> {
-        let vote_prob = self.dyn_config.borrow().vote_generation_probability;
-        if !self.is_active() || vote_prob <= 0.0 {
-            return None;
-        }
-
-        if !self.run_lottery(vote_prob) {
-            return None;
-        }
-
-        let num_votes = self.rng.gen_range(1..=3u8);
-        let mut vote_ids = Vec::new();
-        let mut vote_data = Vec::new();
-        for v in 0..num_votes {
-            vote_ids.push((slot, vec![v]));
-            vote_data.push(vec![0xA0, v]); // minimal CBOR
-        }
-
-        self.vote_count += num_votes as u64;
-
-        Some(ProducedVotes {
-            vote_ids,
-            vote_data,
+        Some(ProducedRb {
+            point,
+            header,
+            body,
+            announced_eb,
+            included_tx_count: tx_count,
         })
-    }
-
-    /// Check if this slot is a stage boundary.
-    pub fn is_stage_boundary(&self, slot: u64) -> bool {
-        self.stage_length_slots > 0 && slot.is_multiple_of(self.stage_length_slots)
     }
 
     /// Number of Praos blocks produced so far.
@@ -305,23 +283,40 @@ impl BlockProducer {
     ///
     /// The header and block body use proper era-tagged encoding so that
     /// `body.point()` and `WrappedHeader::parse()` both work correctly.
-    /// The point hash uses `header_hash()`, matching the real
-    /// Cardano derivation.
+    /// The point hash uses `header_hash()`, matching the real Cardano
+    /// derivation.
+    ///
+    /// CIP-0164 header field ordering (array-length disambiguation):
+    ///   10 = base only
+    ///   11 = base + certified_eb (bool)
+    ///   12 = base + announced_eb (hash + size)
+    ///   13 = base + announced_eb + certified_eb
     fn make_fake_block(
         &mut self,
         slot: u64,
         prev_hash: Option<[u8; 32]>,
         block_number: u64,
         certified_eb: bool,
+        txs: &[PendingTx],
+        announced_eb: Option<([u8; 32], u32)>,
     ) -> (Point, WrappedHeader, BlockBody) {
         let mut issuer_vkey = [0u8; 32];
         self.rng.fill(&mut issuer_vkey);
         let mut body_hash = [0u8; 32];
         self.rng.fill(&mut body_hash);
 
-        // Build header_body: 10-field base array (Shelley+), optionally
-        // extended to 11 with a certified_eb bool (CIP-0164).
-        let array_len: u64 = if certified_eb { 11 } else { 10 };
+        // Compute header array length based on optional Leios extensions.
+        let extra = match (announced_eb.is_some(), certified_eb) {
+            (false, false) => 0,
+            (false, true) => 1,
+            (true, false) => 2,
+            (true, true) => 3,
+        };
+        let array_len: u64 = 10 + extra;
+
+        // Compute body size from txs for the header field.
+        let tx_body_size: usize = txs.iter().map(|tx| tx.size as usize).sum();
+
         let mut header_body = Vec::new();
         let mut hb = minicbor::Encoder::new(&mut header_body);
         let _ = hb
@@ -337,16 +332,22 @@ impl BlockProducer {
             .and_then(|e| e.array(2)) // vrf_result: [output, proof]
             .and_then(|e| e.bytes(&[0u8; 32]))
             .and_then(|e| e.bytes(&[0u8; 64]))
-            .and_then(|e| e.u32(0)) // body_size
+            .and_then(|e| e.u32(tx_body_size as u32)) // body_size
             .and_then(|e| e.bytes(&body_hash)) // block_body_hash
-            .and_then(|e| e.array(4)) // operational_cert: [vkey, counter, kes_period, sig]
+            .and_then(|e| e.array(4)) // operational_cert
             .and_then(|e| e.bytes(&[0u8; 32]))
             .and_then(|e| e.u64(0))
             .and_then(|e| e.u64(0))
             .and_then(|e| e.bytes(&[0u8; 64]))
-            .and_then(|e| e.array(2)) // protocol_version: [major, minor]
+            .and_then(|e| e.array(2)) // protocol_version
             .and_then(|e| e.u32(10))
             .and_then(|e| e.u32(0));
+
+        // Optional Leios fields: announced_eb first, then certified_eb.
+        if let Some((eb_hash, eb_size)) = announced_eb {
+            let _ = minicbor::Encoder::new(&mut header_body).bytes(&eb_hash);
+            let _ = minicbor::Encoder::new(&mut header_body).u32(eb_size);
+        }
         if certified_eb {
             let _ = minicbor::Encoder::new(&mut header_body).bool(true);
         }
@@ -356,7 +357,7 @@ impl BlockProducer {
         let mut hi = minicbor::Encoder::new(&mut header_inner);
         let _ = hi.array(2);
         header_inner.extend_from_slice(&header_body);
-        let _ = minicbor::Encoder::new(&mut header_inner).bytes(&[0u8; 64]); // signature placeholder
+        let _ = minicbor::Encoder::new(&mut header_inner).bytes(&[0u8; 64]);
 
         // Header CBOR: [era_tag, #6.24(header_inner)]
         let era: u32 = 7; // Conway
@@ -368,24 +369,24 @@ impl BlockProducer {
             .and_then(|e| e.tag(minicbor::data::Tag::new(24)))
             .and_then(|e| e.bytes(&header_inner));
 
-        // Point: (slot, header_hash(header_cbor))
         let header = WrappedHeader::new(header_cbor.clone());
         let point = header
             .point()
             .expect("freshly-built Shelley+ header must parse");
 
         // Block body: #6.24([era_tag, [header, tx_bodies, tx_witnesses, metadata]])
-        // The header inside the block must be the same bytes so body.point()
-        // extracts the same hash.
         let mut block_inner = Vec::new();
         let mut bi = minicbor::Encoder::new(&mut block_inner);
         let _ = bi.array(2).and_then(|e| e.u32(era));
-        // era_block: [header, tx_bodies, ...]
         let _ = minicbor::Encoder::new(&mut block_inner).array(4);
-        // header: [header_body, sig] (raw, no #6.24 wrapping — matches real Cardano blocks)
         block_inner.extend_from_slice(&header_inner);
-        // tx_bodies (empty map)
-        let _ = minicbor::Encoder::new(&mut block_inner).map(0);
+
+        // tx_bodies: map of {index => bytes(tx_body)}
+        let _ = minicbor::Encoder::new(&mut block_inner).map(txs.len() as u64);
+        for (i, tx) in txs.iter().enumerate() {
+            let _ = minicbor::Encoder::new(&mut block_inner).u32(i as u32);
+            let _ = minicbor::Encoder::new(&mut block_inner).bytes(&tx.body.0);
+        }
         // tx_witnesses (empty map)
         let _ = minicbor::Encoder::new(&mut block_inner).map(0);
         // metadata (null)
@@ -401,9 +402,32 @@ impl BlockProducer {
     }
 }
 
+/// Build an EB manifest from overflow transactions. The EB body is a CBOR
+/// array `[slot, [tx_hash, ...]]` and the point hash is Blake2b-256 of
+/// the manifest bytes (content-addressed).
+fn make_overflow_eb(slot: u64, txs: &[PendingTx]) -> ProducedEb {
+    let mut data = Vec::new();
+    let mut enc = minicbor::Encoder::new(&mut data);
+    let _ = enc
+        .array(2)
+        .and_then(|e| e.u64(slot))
+        .and_then(|e| e.array(txs.len() as u64));
+    for tx in txs {
+        let _ = minicbor::Encoder::new(&mut data).bytes(&tx.tx_id.0);
+    }
+
+    let hash_result = blake2b_simd::Params::new().hash_length(32).hash(&data);
+    let mut hash = [0u8; 32];
+    hash.copy_from_slice(hash_result.as_bytes());
+    let point = Point::Specific { slot, hash };
+
+    ProducedEb { point, data }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use net_core::protocols::txsubmission::{PendingTx, TxBody, TxId};
 
     fn base_config() -> ProductionConfig {
         ProductionConfig {
@@ -413,7 +437,6 @@ mod tests {
         }
     }
 
-    /// Create a watch receiver with the given production config's dynamic values.
     fn dyn_rx(config: &ProductionConfig) -> watch::Receiver<DynamicConfig> {
         let dyn_config = DynamicConfig {
             rb_generation_probability: config.rb_generation_probability,
@@ -429,14 +452,40 @@ mod tests {
         watch::channel(dyn_config).1
     }
 
+    fn empty_mempool() -> crate::mempool::SharedMempool {
+        crate::mempool::new_mempool(1000)
+    }
+
+    fn make_test_tx(id: u8, size: usize) -> PendingTx {
+        PendingTx {
+            tx_id: TxId(vec![id; 32]),
+            body: TxBody(vec![id; size]),
+            size: size as u32,
+        }
+    }
+
+    fn mempool_with_txs(txs: Vec<PendingTx>) -> crate::mempool::SharedMempool {
+        let pool = crate::mempool::new_mempool(1000);
+        {
+            let mut p = pool.lock().unwrap();
+            for tx in txs {
+                p.push(tx);
+            }
+        }
+        pool
+    }
+
+    // -- Lottery tests (mempool-independent) --
+
     #[test]
     fn zero_stake_never_produces() {
         let config = base_config();
         let mut producer = BlockProducer::new(&config, Some(42), dyn_rx(&config));
+        let mempool = empty_mempool();
         assert!(!producer.is_active());
         for slot in 0..100 {
             assert!(producer
-                .try_produce_block(slot, None, slot + 1, false)
+                .try_produce_block(slot, None, slot + 1, false, &mempool)
                 .is_none());
         }
     }
@@ -449,12 +498,12 @@ mod tests {
             ..base_config()
         };
         let mut producer = BlockProducer::new(&config, Some(42), dyn_rx(&config));
+        let mempool = empty_mempool();
         assert!(producer.is_active());
         for slot in 0..100 {
-            let result = producer.try_produce_block(slot, None, slot + 1, false);
+            let result = producer.try_produce_block(slot, None, slot + 1, false, &mempool);
             assert!(result.is_some(), "should produce at slot {slot}");
-            let (point, _, _) = result.unwrap();
-            match point {
+            match result.unwrap().point {
                 Point::Specific { slot: s, .. } => assert_eq!(s, slot),
                 _ => panic!("expected Specific point"),
             }
@@ -469,18 +518,17 @@ mod tests {
             rb_generation_probability: 0.5,
             ..base_config()
         };
-
         let run = |seed| {
             let mut producer = BlockProducer::new(&config, Some(seed), dyn_rx(&config));
+            let mempool = empty_mempool();
             (0..1000)
                 .filter_map(|slot| {
                     producer
-                        .try_produce_block(slot, None, slot + 1, false)
+                        .try_produce_block(slot, None, slot + 1, false, &mempool)
                         .map(|_| slot)
                 })
                 .collect::<Vec<_>>()
         };
-
         let a = run(123);
         let b = run(123);
         assert_eq!(a, b);
@@ -495,56 +543,140 @@ mod tests {
             ..base_config()
         };
         let mut producer = BlockProducer::new(&config, Some(99), dyn_rx(&config));
+        let mempool = empty_mempool();
         let wins: usize = (0..10_000)
-            .filter(|slot| producer.try_produce_block(*slot, None, 1, false).is_some())
+            .filter(|slot| {
+                producer
+                    .try_produce_block(*slot, None, 1, false, &mempool)
+                    .is_some()
+            })
             .count();
-        // Expected: 10000 * (100/1000) * 0.5 = 500, allow ±20%.
         assert!(
             (400..=600).contains(&wins),
             "wins={wins}, expected ~500 (5%)"
         );
     }
 
-    #[test]
-    fn stage_boundary_detection() {
-        let config = ProductionConfig {
-            stage_length_slots: 20,
-            ..base_config()
-        };
-        let producer = BlockProducer::new(&config, Some(42), dyn_rx(&config));
-        assert!(producer.is_stage_boundary(0));
-        assert!(producer.is_stage_boundary(20));
-        assert!(producer.is_stage_boundary(40));
-        assert!(!producer.is_stage_boundary(1));
-        assert!(!producer.is_stage_boundary(19));
-    }
+    // -- RB path: txs in block body --
 
     #[test]
-    fn eb_production_at_full_stake() {
+    fn rb_path_includes_txs_in_body() {
         let config = ProductionConfig {
             stake: 1000,
-            eb_generation_probability: 1.0,
+            rb_generation_probability: 1.0,
+            rb_body_max_bytes: 65536,
             ..base_config()
         };
         let mut producer = BlockProducer::new(&config, Some(42), dyn_rx(&config));
-        let eb = producer.try_produce_eb(100);
-        assert!(eb.is_some());
+        let mempool = mempool_with_txs(vec![make_test_tx(1, 500), make_test_tx(2, 300)]);
+
+        let produced = producer
+            .try_produce_block(100, None, 1, false, &mempool)
+            .unwrap();
+
+        assert_eq!(produced.included_tx_count, 2);
+        assert!(produced.announced_eb.is_none());
+        // body.point() must still work with txs embedded.
+        assert!(produced.body.point().is_some());
+        assert_eq!(produced.body.point().unwrap(), produced.point);
+        // Body should be larger than an empty block.
+        assert!(produced.body.raw.len() > 500);
     }
 
     #[test]
-    fn vote_production_at_full_stake() {
+    fn empty_mempool_empty_block() {
         let config = ProductionConfig {
             stake: 1000,
-            vote_generation_probability: 1.0,
+            rb_generation_probability: 1.0,
             ..base_config()
         };
         let mut producer = BlockProducer::new(&config, Some(42), dyn_rx(&config));
-        let votes = producer.try_produce_votes(100);
-        assert!(votes.is_some());
-        let v = votes.unwrap();
-        assert!(!v.vote_ids.is_empty());
-        assert_eq!(v.vote_ids.len(), v.vote_data.len());
+        let mempool = empty_mempool();
+
+        let produced = producer
+            .try_produce_block(100, None, 1, false, &mempool)
+            .unwrap();
+
+        assert_eq!(produced.included_tx_count, 0);
+        assert!(produced.announced_eb.is_none());
+        assert!(produced.body.point().is_some());
     }
+
+    // -- EB path: overflow --
+
+    #[test]
+    fn eb_path_on_overflow() {
+        let config = ProductionConfig {
+            stake: 1000,
+            rb_generation_probability: 1.0,
+            rb_body_max_bytes: 1000, // 1KB limit
+            ..base_config()
+        };
+        let mut producer = BlockProducer::new(&config, Some(42), dyn_rx(&config));
+        // 3 txs totaling 1500 bytes — exceeds 1000 byte limit.
+        let mempool = mempool_with_txs(vec![
+            make_test_tx(1, 500),
+            make_test_tx(2, 500),
+            make_test_tx(3, 500),
+        ]);
+
+        let produced = producer
+            .try_produce_block(100, None, 1, false, &mempool)
+            .unwrap();
+
+        // EB path: RB body is empty, EB is announced.
+        assert_eq!(produced.included_tx_count, 0);
+        assert!(produced.announced_eb.is_some());
+        assert!(produced.body.point().is_some());
+
+        // announced_eb should appear in the header.
+        let info = produced.header.parsed.as_ref().unwrap();
+        assert!(info.announced_eb.is_some());
+        let (eb_hash, eb_size) = info.announced_eb.unwrap();
+        let eb = produced.announced_eb.unwrap();
+        match eb.point {
+            Point::Specific { hash, .. } => assert_eq!(hash, eb_hash),
+            _ => panic!("expected Specific point"),
+        }
+        assert_eq!(eb.data.len() as u32, eb_size);
+
+        // Mempool should be drained.
+        assert_eq!(mempool.lock().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn overflow_eb_is_content_addressed() {
+        let txs = vec![make_test_tx(1, 100), make_test_tx(2, 200)];
+        let eb1 = make_overflow_eb(50, &txs);
+        let eb2 = make_overflow_eb(50, &txs);
+        match (&eb1.point, &eb2.point) {
+            (Point::Specific { hash: h1, .. }, Point::Specific { hash: h2, .. }) => {
+                assert_eq!(h1, h2, "same inputs should produce same hash");
+            }
+            _ => panic!("expected Specific points"),
+        }
+    }
+
+    #[test]
+    fn overflow_eb_encodes_tx_hashes() {
+        let txs = vec![make_test_tx(0xAA, 100), make_test_tx(0xBB, 200)];
+        let eb = make_overflow_eb(42, &txs);
+
+        // Decode the manifest: [slot, [hash, ...]]
+        let mut dec = minicbor::Decoder::new(&eb.data);
+        let outer_len = dec.array().unwrap().unwrap();
+        assert_eq!(outer_len, 2);
+        let slot = dec.u64().unwrap();
+        assert_eq!(slot, 42);
+        let inner_len = dec.array().unwrap().unwrap();
+        assert_eq!(inner_len, 2);
+        let hash1 = dec.bytes().unwrap();
+        assert_eq!(hash1, &[0xAA; 32]);
+        let hash2 = dec.bytes().unwrap();
+        assert_eq!(hash2, &[0xBB; 32]);
+    }
+
+    // -- Header roundtrip tests --
 
     #[test]
     fn fake_block_has_parseable_cbor() {
@@ -554,30 +686,19 @@ mod tests {
             ..base_config()
         };
         let mut producer = BlockProducer::new(&config, Some(42), dyn_rx(&config));
-        let (point, header, body) = producer.try_produce_block(12345, None, 1, false).unwrap();
+        let mempool = empty_mempool();
+        let produced = producer
+            .try_produce_block(12345, None, 1, false, &mempool)
+            .unwrap();
 
-        // Header should be parseable.
-        assert!(header.parsed.is_some(), "header should parse");
-        let info = header.parsed.as_ref().unwrap();
+        assert!(produced.header.parsed.is_some(), "header should parse");
+        let info = produced.header.parsed.as_ref().unwrap();
         assert_eq!(info.slot, 12345);
-        assert_eq!(info.era, 7); // Conway
-
-        // Header point should match the produced point.
-        let header_point = header.point();
-        assert!(header_point.is_some(), "header.point() should work");
-        assert_eq!(header_point.unwrap(), point);
-
-        // Block body should derive the same point.
-        let body_point = body.point();
-        assert!(body_point.is_some(), "body.point() should work");
-        assert_eq!(body_point.unwrap(), point);
-
-        // Body should also extract a parseable header.
-        let extracted = body.header();
-        assert!(extracted.is_some(), "body.header() should work");
-        let ex = extracted.unwrap();
-        assert!(ex.parsed.is_some());
-        assert_eq!(ex.parsed.as_ref().unwrap().slot, 12345);
+        assert_eq!(info.era, 7);
+        assert_eq!(produced.header.point().unwrap(), produced.point);
+        assert_eq!(produced.body.point().unwrap(), produced.point);
+        let extracted = produced.body.header().unwrap();
+        assert_eq!(extracted.parsed.as_ref().unwrap().slot, 12345);
     }
 
     #[test]
@@ -589,10 +710,13 @@ mod tests {
             ..base_config()
         };
         let mut producer = BlockProducer::new(&config, Some(42), dyn_rx(&config));
-        let (_, header, _) = producer.try_produce_block(100, None, 1, true).unwrap();
+        let mempool = empty_mempool();
+        let produced = producer
+            .try_produce_block(100, None, 1, true, &mempool)
+            .unwrap();
 
-        let info = header.parsed.as_ref().unwrap();
-        assert_eq!(info.certified_eb, Some(true), "certified_eb should be true");
+        let info = produced.header.parsed.as_ref().unwrap();
+        assert_eq!(info.certified_eb, Some(true));
     }
 
     #[test]
@@ -604,11 +728,82 @@ mod tests {
             ..base_config()
         };
         let mut producer = BlockProducer::new(&config, Some(42), dyn_rx(&config));
-        let (_, header, _) = producer.try_produce_block(100, None, 1, false).unwrap();
+        let mempool = empty_mempool();
+        let produced = producer
+            .try_produce_block(100, None, 1, false, &mempool)
+            .unwrap();
 
-        let info = header.parsed.as_ref().unwrap();
-        assert_eq!(info.certified_eb, None, "certified_eb should be None");
+        let info = produced.header.parsed.as_ref().unwrap();
+        assert_eq!(info.certified_eb, None);
     }
+
+    #[test]
+    fn announced_eb_plus_certified_eb() {
+        let config = ProductionConfig {
+            stake: 1000,
+            total_stake: 1000,
+            rb_generation_probability: 1.0,
+            rb_body_max_bytes: 100, // force overflow
+            ..base_config()
+        };
+        let mut producer = BlockProducer::new(&config, Some(42), dyn_rx(&config));
+        let mempool = mempool_with_txs(vec![make_test_tx(1, 200)]);
+
+        let produced = producer
+            .try_produce_block(100, None, 1, true, &mempool)
+            .unwrap();
+
+        let info = produced.header.parsed.as_ref().unwrap();
+        assert!(info.announced_eb.is_some(), "should have announced_eb");
+        assert_eq!(info.certified_eb, Some(true), "should have certified_eb");
+    }
+
+    #[test]
+    fn dynamic_update_changes_production_rate() {
+        let config = ProductionConfig {
+            stake: 1000,
+            rb_generation_probability: 0.0,
+            ..base_config()
+        };
+        let dyn_config = DynamicConfig {
+            rb_generation_probability: 0.0,
+            eb_generation_probability: 0.0,
+            vote_generation_probability: 0.0,
+            rb_head_validation_ms: 1.0,
+            rb_body_validation_ms_constant: 1000.0,
+            rb_body_validation_ms_per_byte: 0.0,
+            eb_validation_ms: 2.0,
+            vote_validation_ms: 1.0,
+            tx_rate: 0.0,
+        };
+        let (tx, rx) = watch::channel(dyn_config);
+        let mut producer = BlockProducer::new(&config, Some(42), rx);
+        let mempool = empty_mempool();
+
+        let wins_before: usize = (0..100)
+            .filter(|slot| {
+                producer
+                    .try_produce_block(*slot, None, 1, false, &mempool)
+                    .is_some()
+            })
+            .count();
+        assert_eq!(wins_before, 0);
+
+        tx.send_modify(|c| {
+            c.rb_generation_probability = 1.0;
+        });
+
+        let wins_after: usize = (100..200)
+            .filter(|slot| {
+                producer
+                    .try_produce_block(*slot, None, 1, false, &mempool)
+                    .is_some()
+            })
+            .count();
+        assert_eq!(wins_after, 100);
+    }
+
+    // -- Vote body tests (unchanged) --
 
     #[test]
     fn vote_body_persistent_size() {
@@ -660,44 +855,5 @@ mod tests {
     fn vote_body_decode_rejects_garbage() {
         assert!(VoteBody::decode(&[0xFF, 0x00]).is_none());
         assert!(VoteBody::decode(&[]).is_none());
-    }
-
-    #[test]
-    fn dynamic_update_changes_production_rate() {
-        let config = ProductionConfig {
-            stake: 1000,
-            rb_generation_probability: 0.0, // starts at 0 — no production
-            ..base_config()
-        };
-        let dyn_config = DynamicConfig {
-            rb_generation_probability: 0.0,
-            eb_generation_probability: 0.0,
-            vote_generation_probability: 0.0,
-            rb_head_validation_ms: 1.0,
-            rb_body_validation_ms_constant: 1000.0,
-            rb_body_validation_ms_per_byte: 0.0,
-            eb_validation_ms: 2.0,
-            vote_validation_ms: 1.0,
-            tx_rate: 0.0,
-        };
-        let (tx, rx) = watch::channel(dyn_config);
-        let mut producer = BlockProducer::new(&config, Some(42), rx);
-
-        // Should not produce with probability 0.
-        let wins_before: usize = (0..100)
-            .filter(|slot| producer.try_produce_block(*slot, None, 1, false).is_some())
-            .count();
-        assert_eq!(wins_before, 0);
-
-        // Update probability to 1.0.
-        tx.send_modify(|c| {
-            c.rb_generation_probability = 1.0;
-        });
-
-        // Now should always produce.
-        let wins_after: usize = (100..200)
-            .filter(|slot| producer.try_produce_block(*slot, None, 1, false).is_some())
-            .count();
-        assert_eq!(wins_after, 100);
     }
 }

@@ -369,6 +369,11 @@ pub struct ProductionConfig {
     /// CIP-0164 diffusion window (L_diff) in slots.
     #[serde(default = "default_diffuse_window")]
     pub leios_diffuse_window_slots: u64,
+
+    /// Maximum bytes of transaction data in an RB body. When the mempool
+    /// exceeds this, transactions go into an EB instead.
+    #[serde(default = "default_rb_body_max_bytes")]
+    pub rb_body_max_bytes: usize,
 }
 
 fn default_total_stake() -> u64 {
@@ -395,6 +400,10 @@ fn default_diffuse_window() -> u64 {
     5
 }
 
+fn default_rb_body_max_bytes() -> usize {
+    65_536
+}
+
 impl Default for ProductionConfig {
     fn default() -> Self {
         Self {
@@ -411,6 +420,7 @@ impl Default for ProductionConfig {
             leios_delta_hdr_slots: default_delta_hdr(),
             leios_vote_window_slots: default_vote_window(),
             leios_diffuse_window_slots: default_diffuse_window(),
+            rb_body_max_bytes: default_rb_body_max_bytes(),
         }
     }
 }
@@ -429,6 +439,10 @@ pub struct TxConfig {
     /// Maximum transaction body size in bytes.
     #[serde(default = "default_tx_size_max")]
     pub tx_size_max: usize,
+
+    /// Maximum number of transactions in the mempool.
+    #[serde(default = "default_mempool_capacity")]
+    pub mempool_capacity: usize,
 }
 
 fn default_tx_size_min() -> usize {
@@ -439,12 +453,17 @@ fn default_tx_size_max() -> usize {
     16384
 }
 
+fn default_mempool_capacity() -> usize {
+    10_000
+}
+
 impl Default for TxConfig {
     fn default() -> Self {
         Self {
             tx_rate: 0.0,
             tx_size_min: default_tx_size_min(),
             tx_size_max: default_tx_size_max(),
+            mempool_capacity: default_mempool_capacity(),
         }
     }
 }

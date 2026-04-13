@@ -1,8 +1,14 @@
 //! Transaction pool and fake transaction generation.
 //!
-//! Spawns a background task that generates random transactions on a Poisson
-//! schedule and submits them via the coordinator.
+//! `Mempool` accumulates transactions from both local generation and received
+//! from peers. The block producer drains it when producing ranking blocks
+//! (txs fit in RB body) or endorser blocks (overflow → EB manifest).
+//!
+//! `spawn_tx_generator` runs a background Poisson process that pushes fake
+//! transactions into the mempool and broadcasts them via the coordinator.
 
+use std::collections::VecDeque;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use rand::rngs::StdRng;
@@ -15,15 +21,105 @@ use net_core::protocols::txsubmission::{PendingTx, TxBody, TxId};
 
 use crate::config::{DynamicConfig, TxConfig};
 
+/// Shared handle to the mempool.
+pub type SharedMempool = Arc<Mutex<Mempool>>;
+
+/// Transaction accumulator for block production.
+///
+/// Collects pending transactions from local generation and peer receipt.
+/// The block producer drains it on each RB production attempt.
+pub struct Mempool {
+    txs: VecDeque<PendingTx>,
+    total_bytes: usize,
+    capacity: usize,
+}
+
+impl Mempool {
+    /// Create an empty mempool with the given max transaction count.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            txs: VecDeque::new(),
+            total_bytes: 0,
+            capacity,
+        }
+    }
+
+    /// Add a transaction. Drops the oldest tx if at capacity.
+    pub fn push(&mut self, tx: PendingTx) {
+        if self.txs.len() >= self.capacity {
+            if let Some(old) = self.txs.pop_front() {
+                self.total_bytes -= old.size as usize;
+            }
+        }
+        self.total_bytes += tx.size as usize;
+        self.txs.push_back(tx);
+    }
+
+    /// Total bytes of pending transactions.
+    pub fn total_bytes(&self) -> usize {
+        self.total_bytes
+    }
+
+    /// Number of pending transactions.
+    #[cfg(test)]
+    pub fn len(&self) -> usize {
+        self.txs.len()
+    }
+
+    /// Drain all transactions (for EB overflow path).
+    pub fn drain_all(&mut self) -> Vec<PendingTx> {
+        self.total_bytes = 0;
+        self.txs.drain(..).collect()
+    }
+
+    /// Drain transactions up to a byte limit (for RB body path).
+    pub fn drain_up_to(&mut self, max_bytes: usize) -> Vec<PendingTx> {
+        let mut result = Vec::new();
+        let mut bytes = 0;
+        while let Some(front) = self.txs.front() {
+            if bytes + front.size as usize > max_bytes && !result.is_empty() {
+                break;
+            }
+            let tx = self.txs.pop_front().unwrap();
+            bytes += tx.size as usize;
+            self.total_bytes -= tx.size as usize;
+            result.push(tx);
+            if bytes >= max_bytes {
+                break;
+            }
+        }
+        result
+    }
+}
+
+/// Create a new shared mempool.
+pub fn new_mempool(capacity: usize) -> SharedMempool {
+    Arc::new(Mutex::new(Mempool::new(capacity)))
+}
+
+/// Build a `PendingTx` from raw bytes received from a peer.
+/// The tx_id is derived by hashing the body with Blake2b-256.
+pub fn tx_from_received_bytes(body: Vec<u8>) -> PendingTx {
+    let hash = blake2b_simd::Params::new().hash_length(32).hash(&body);
+    let size = body.len() as u32;
+    PendingTx {
+        tx_id: TxId(hash.as_bytes().to_vec()),
+        body: TxBody(body),
+        size,
+    }
+}
+
 /// Spawn the transaction generator as a background task.
 ///
 /// Returns a `JoinHandle` that runs until the `commands` channel is closed.
 /// The generator reads `tx_rate` from the watch channel each iteration,
-/// so rate changes take effect immediately.
+/// so rate changes take effect immediately. Each generated tx is pushed
+/// into the local mempool AND broadcast to peers via `SubmitTransaction`.
 pub fn spawn_tx_generator(
     config: &TxConfig,
     seed: Option<u64>,
     commands: mpsc::Sender<NetworkCommand>,
+    mempool: SharedMempool,
     node_id: String,
     mut dyn_config: watch::Receiver<DynamicConfig>,
 ) -> tokio::task::JoinHandle<()> {
@@ -59,6 +155,12 @@ pub fn spawn_tx_generator(
             let tx = make_fake_tx(&mut rng, size);
             tx_count += 1;
 
+            // Push into local mempool for block inclusion.
+            {
+                let mut pool = mempool.lock().unwrap();
+                pool.push(tx.clone());
+            }
+
             info!(
                 node_id = %node_id,
                 tx_count,
@@ -66,6 +168,7 @@ pub fn spawn_tx_generator(
                 "generated transaction"
             );
 
+            // Broadcast to peers via TxSubmission.
             if commands
                 .send(NetworkCommand::SubmitTransaction { tx })
                 .await
@@ -101,6 +204,129 @@ fn exp_sample(rng: &mut StdRng, rate: f64) -> Duration {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn make_tx(size: usize) -> PendingTx {
+        let mut rng = StdRng::seed_from_u64(42);
+        make_fake_tx(&mut rng, size)
+    }
+
+    fn make_tx_with_id(id: u8, size: usize) -> PendingTx {
+        PendingTx {
+            tx_id: TxId(vec![id; 32]),
+            body: TxBody(vec![0; size]),
+            size: size as u32,
+        }
+    }
+
+    // -- Mempool tests --
+
+    #[test]
+    fn mempool_push_and_len() {
+        let mut pool = Mempool::new(100);
+        assert_eq!(pool.len(), 0);
+        assert_eq!(pool.total_bytes(), 0);
+
+        pool.push(make_tx_with_id(1, 500));
+        assert_eq!(pool.len(), 1);
+        assert_eq!(pool.total_bytes(), 500);
+
+        pool.push(make_tx_with_id(2, 300));
+        assert_eq!(pool.len(), 2);
+        assert_eq!(pool.total_bytes(), 800);
+    }
+
+    #[test]
+    fn capacity_drops_oldest() {
+        let mut pool = Mempool::new(3);
+        pool.push(make_tx_with_id(1, 100));
+        pool.push(make_tx_with_id(2, 200));
+        pool.push(make_tx_with_id(3, 300));
+        assert_eq!(pool.len(), 3);
+        assert_eq!(pool.total_bytes(), 600);
+
+        // Push a 4th — oldest (100 bytes) should be dropped.
+        pool.push(make_tx_with_id(4, 400));
+        assert_eq!(pool.len(), 3);
+        assert_eq!(pool.total_bytes(), 900); // 200 + 300 + 400
+    }
+
+    #[test]
+    fn drain_all_empties_pool() {
+        let mut pool = Mempool::new(100);
+        pool.push(make_tx_with_id(1, 100));
+        pool.push(make_tx_with_id(2, 200));
+
+        let drained = pool.drain_all();
+        assert_eq!(drained.len(), 2);
+        assert_eq!(pool.len(), 0);
+        assert_eq!(pool.total_bytes(), 0);
+    }
+
+    #[test]
+    fn drain_up_to_respects_limit() {
+        let mut pool = Mempool::new(100);
+        pool.push(make_tx_with_id(1, 100));
+        pool.push(make_tx_with_id(2, 200));
+        pool.push(make_tx_with_id(3, 300));
+
+        // Drain up to 250 bytes — gets tx 1 (100), then tx 2 (200) would
+        // push to 300 > 250, so stops after tx 1 only.
+        let drained = pool.drain_up_to(250);
+        assert_eq!(drained.len(), 1);
+        assert_eq!(pool.len(), 2);
+        assert_eq!(pool.total_bytes(), 500);
+    }
+
+    #[test]
+    fn drain_up_to_takes_all_if_under_limit() {
+        let mut pool = Mempool::new(100);
+        pool.push(make_tx_with_id(1, 100));
+        pool.push(make_tx_with_id(2, 200));
+
+        let drained = pool.drain_up_to(1000);
+        assert_eq!(drained.len(), 2);
+        assert_eq!(pool.len(), 0);
+        assert_eq!(pool.total_bytes(), 0);
+    }
+
+    #[test]
+    fn drain_up_to_empty_pool() {
+        let mut pool = Mempool::new(100);
+        let drained = pool.drain_up_to(1000);
+        assert!(drained.is_empty());
+    }
+
+    #[test]
+    fn total_bytes_tracks_correctly() {
+        let mut pool = Mempool::new(100);
+        pool.push(make_tx_with_id(1, 100));
+        pool.push(make_tx_with_id(2, 200));
+        assert_eq!(pool.total_bytes(), 300);
+
+        pool.drain_up_to(150);
+        assert_eq!(pool.total_bytes(), 200);
+
+        pool.drain_all();
+        assert_eq!(pool.total_bytes(), 0);
+    }
+
+    #[test]
+    fn tx_from_received_bytes_deterministic() {
+        let body = vec![0xAA; 100];
+        let tx1 = tx_from_received_bytes(body.clone());
+        let tx2 = tx_from_received_bytes(body);
+        assert_eq!(tx1.tx_id.0, tx2.tx_id.0);
+        assert_eq!(tx1.size, 100);
+    }
+
+    #[test]
+    fn tx_from_received_bytes_different_inputs() {
+        let tx1 = tx_from_received_bytes(vec![0xAA; 100]);
+        let tx2 = tx_from_received_bytes(vec![0xBB; 100]);
+        assert_ne!(tx1.tx_id.0, tx2.tx_id.0);
+    }
+
+    // -- Existing generator tests --
 
     #[test]
     fn make_fake_tx_correct_size() {

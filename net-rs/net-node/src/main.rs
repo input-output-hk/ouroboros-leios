@@ -54,6 +54,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Dynamic config watch channel (hot-reloadable parameters).
     let (dyn_tx, dyn_rx) = tokio::sync::watch::channel(config.dynamic_config());
 
+    // Mempool: shared between tx generator and block producer.
+    let mempool = mempool::new_mempool(config.transactions.mempool_capacity);
+
     // Block producer.
     let mut producer =
         production::BlockProducer::new(&config.production, config.seed, dyn_rx.clone());
@@ -98,6 +101,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         &config.transactions,
         config.seed,
         commands.clone(),
+        mempool.clone(),
         config.node_id.clone(),
         dyn_rx.clone(),
     );
@@ -146,43 +150,44 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     consensus.on_slot(slot).await;
                 }
 
-                // Praos: try to produce a ranking block.
+                // Praos: try to produce a ranking block. If the mempool
+                // overflows rb_body_max_bytes, an EB manifest is produced
+                // instead of embedding txs in the RB body.
                 let prev_hash = consensus.tip_hash();
                 let next_block_no = consensus.next_block_number();
                 let certified_eb = leios && consensus.has_certified_eb();
-                if let Some((point, header, body)) = producer.try_produce_block(slot, prev_hash, next_block_no, certified_eb) {
+                if let Some(produced) = producer.try_produce_block(slot, prev_hash, next_block_no, certified_eb, &mempool) {
                     info!(
                         node_id = %node_id,
-                        %point,
+                        point = %produced.point,
                         block_count = producer.block_count(),
+                        tx_count = produced.included_tx_count,
+                        has_eb = produced.announced_eb.is_some(),
                         "produced block"
                     );
                     telem.blocks_produced += 1;
                     telem.record(NodeEvent::RBGenerated {
                         node: node_id.clone(),
                         slot,
-                        size_bytes: body.raw.len(),
+                        size_bytes: produced.body.raw.len(),
                     });
-                    consensus
-                        .register_self_produced(&point, &header, &body)
-                        .await;
-                }
 
-                // Leios: produce EBs at stage boundaries.
-                // (Votes are now produced by the consensus layer when
-                // elections enter the Voting pipeline phase.)
-                if leios && producer.is_stage_boundary(slot) {
-                    if let Some(eb) = producer.try_produce_eb(slot) {
-                        info!(node_id = %node_id, %eb.point, "produced endorser block");
+                    // If an EB was produced (overflow path), inject it.
+                    if let Some(ref eb) = produced.announced_eb {
+                        info!(node_id = %node_id, %eb.point, "produced endorser block (overflow)");
                         telem.record(NodeEvent::EBGenerated {
                             node: node_id.clone(),
                             slot,
                         });
                         let _ = commands.send(NetworkCommand::InjectLeiosBlock {
-                            point: eb.point,
-                            block: eb.data,
+                            point: eb.point.clone(),
+                            block: eb.data.clone(),
                         }).await;
                     }
+
+                    consensus
+                        .register_self_produced(&produced.point, &produced.header, &produced.body)
+                        .await;
                 }
 
                 // Periodic retry: re-run chain selection every 5 slots
@@ -195,6 +200,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             event = handle.events.recv() => {
                 match event {
                     Some(event) => {
+                        // Accumulate received txs into local mempool.
+                        if let NetworkEvent::TransactionReceived { body, .. } = &event {
+                            let tx = mempool::tx_from_received_bytes(body.clone());
+                            let mut pool = mempool.lock().unwrap();
+                            pool.push(tx);
+                        }
                         record_network_event(&mut telem, &node_id, &event, &consensus);
                         if !consensus.handle_event(&event).await {
                             log_event(&node_id, &event);
@@ -348,6 +359,8 @@ fn log_event(node_id: &str, event: &NetworkEvent) {
             info!(node_id, %peer_id, %reason, "peer disconnected");
         }
         NetworkEvent::TransactionReceived { peer_id, body } => {
+            // Accumulate received tx into local mempool for block inclusion.
+            // (The tx was already received via TxSubmission from a peer.)
             info!(node_id, %peer_id, bytes = body.len(), "transaction received");
         }
         NetworkEvent::PeersDiscovered { peers, .. } => {
