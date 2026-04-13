@@ -85,6 +85,9 @@ in the RB**, not on a fixed schedule.
   actually needed
 - RB body size limit config (currently RBs are tiny fake blocks with no tx
   payload)
+- EB selection policy when multiple EBs reach CertEligible: `has_certified_eb()`
+  currently returns `any(quorum && CertEligible)` with no preference. Need a
+  selection strategy (e.g. oldest-first to minimize latency, or newest-first)
 
 ### Stake-weighted quorum
 
@@ -94,6 +97,16 @@ Current quorum is a flat ≥3 voters. Should be stake-weighted:
 - Looking up voter stake from a registry (closer to spec)
 
 Config field `quorum_stake_fraction` already exists (default 0.75).
+
+### Ledger state for EB transactions
+
+Once EBs carry real transactions (mempool-driven production above), some form
+of transaction validation and conflict detection is needed. Currently there is
+no ledger state concept beyond fake validation delays. Work needed:
+- Track spent transaction inputs to detect double-spends across EBs
+- Validate EB transaction closures against ledger state from the prior RB
+- Decide whether certified EB transactions skip re-validation (per CIP-0164)
+  or get validated inline
 
 ### Telemetry
 
@@ -107,5 +120,6 @@ Missing events that would help cluster analysis:
 - Cert-backed chain-selection tie-breaking (requires real signatures)
 - Real BLS signatures / verification
 - Equivocation detection
-- Freshest-first transport scheduling
+- Freshest-first transport scheduling (security-relevant: prevents withholding
+  attacks where adversaries release stale EBs to waste pipeline slots)
 - `announced_eb` hash+size in RB headers (currently only `certified_eb` bool)
