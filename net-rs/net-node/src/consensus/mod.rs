@@ -96,8 +96,8 @@ impl Consensus {
                 self.leios.on_validated_eb(point);
                 false
             }
-            LedgerOutcome::VotesValidated { vote_ids } => {
-                self.leios.on_validated_votes(&vote_ids);
+            LedgerOutcome::VotesValidated { vote_data, .. } => {
+                self.leios.on_validated_votes(&vote_data);
                 false
             }
             other => self.praos.on_validation_outcome(other).await,

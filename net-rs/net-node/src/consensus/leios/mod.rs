@@ -206,10 +206,14 @@ impl LeiosConsensus {
                     .await;
                 true
             }
-            NetworkEvent::LeiosVotesReceived { vote_ids, .. } => {
+            NetworkEvent::LeiosVotesReceived {
+                vote_ids,
+                vote_data,
+            } => {
                 self.validator
                     .submit(LedgerCommand::ValidateVotes {
                         vote_ids: vote_ids.clone(),
+                        vote_data: vote_data.clone(),
                     })
                     .await;
                 true
@@ -260,14 +264,26 @@ impl LeiosConsensus {
                     phase,
                     validated_at: Instant::now(),
                     voted: false,
+                    voters: std::collections::HashSet::new(),
+                    quorum_reached: false,
                 },
             );
         }
     }
 
-    /// Called when vote validation completes.
-    pub fn on_validated_votes(&mut self, vote_ids: &[(u64, Vec<u8>)]) {
-        info!(node_id = %self.node_id, count = vote_ids.len(), "votes validated");
+    /// Called when vote validation completes. Attributes each vote to
+    /// its EB election and checks for quorum.
+    pub fn on_validated_votes(&mut self, vote_data: &[Vec<u8>]) {
+        for blob in vote_data {
+            if let Some(body) = crate::production::VoteBody::decode(blob) {
+                aggregation::record_vote(
+                    &mut self.elections,
+                    &body.endorser_block_hash,
+                    body.voter_id.clone(),
+                    &self.node_id,
+                );
+            }
+        }
     }
 
     // -- Queries ------------------------------------------------------------
@@ -285,6 +301,22 @@ impl LeiosConsensus {
     #[cfg(test)]
     fn election_voted(&self, hash: &[u8; 32]) -> bool {
         self.elections.get(hash).map(|e| e.voted).unwrap_or(false)
+    }
+
+    #[cfg(test)]
+    fn election_quorum(&self, hash: &[u8; 32]) -> bool {
+        self.elections
+            .get(hash)
+            .map(|e| e.quorum_reached)
+            .unwrap_or(false)
+    }
+
+    #[cfg(test)]
+    fn election_voter_count(&self, hash: &[u8; 32]) -> usize {
+        self.elections
+            .get(hash)
+            .map(|e| e.voters.len())
+            .unwrap_or(0)
     }
 
     // -- Housekeeping -------------------------------------------------------
@@ -684,10 +716,69 @@ mod tests {
             .await;
 
         match outcome_rx.recv().await.expect("outcome") {
-            crate::validation::LedgerOutcome::VotesValidated { vote_ids: got } => {
+            crate::validation::LedgerOutcome::VotesValidated { vote_ids: got, .. } => {
                 assert_eq!(got, vote_ids);
             }
             other => panic!("expected VotesValidated, got {other:?}"),
         }
+    }
+
+    // -- Vote aggregation tests ---------------------------------------------
+
+    #[tokio::test]
+    async fn votes_attributed_to_eb_election() {
+        let (tx, _rx) = mpsc::channel(8);
+        let (validator, _) = test_validator();
+        let mut leios = test_leios(tx, validator);
+
+        // Create an election for EB at slot 0.
+        leios.on_slot(0).await;
+        leios.on_validated_eb(point(0));
+
+        // Build a vote body referencing that EB's hash.
+        let eb_hash = point_hash(0);
+        let body = crate::production::VoteBody::stub_persistent(0, b"voter-1", &eb_hash);
+        let encoded = body.encode(130);
+
+        leios.on_validated_votes(&[encoded]);
+        assert_eq!(leios.election_voter_count(&eb_hash), 1);
+        assert!(!leios.election_quorum(&eb_hash));
+    }
+
+    #[tokio::test]
+    async fn quorum_reached_after_enough_votes() {
+        let (tx, _rx) = mpsc::channel(8);
+        let (validator, _) = test_validator();
+        let mut leios = test_leios(tx, validator);
+
+        leios.on_slot(0).await;
+        leios.on_validated_eb(point(0));
+
+        let eb_hash = point_hash(0);
+        for i in 0..3u8 {
+            let body = crate::production::VoteBody::stub_persistent(0, &[i], &eb_hash);
+            leios.on_validated_votes(&[body.encode(130)]);
+        }
+
+        assert_eq!(leios.election_voter_count(&eb_hash), 3);
+        assert!(leios.election_quorum(&eb_hash));
+    }
+
+    #[tokio::test]
+    async fn duplicate_voter_not_counted() {
+        let (tx, _rx) = mpsc::channel(8);
+        let (validator, _) = test_validator();
+        let mut leios = test_leios(tx, validator);
+
+        leios.on_slot(0).await;
+        leios.on_validated_eb(point(0));
+
+        let eb_hash = point_hash(0);
+        let body = crate::production::VoteBody::stub_persistent(0, b"same-voter", &eb_hash);
+        let encoded = body.encode(130);
+
+        leios.on_validated_votes(&[encoded.clone()]);
+        leios.on_validated_votes(&[encoded]);
+        assert_eq!(leios.election_voter_count(&eb_hash), 1);
     }
 }

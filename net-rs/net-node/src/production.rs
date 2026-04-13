@@ -121,7 +121,6 @@ impl VoteBody {
     }
 
     /// Decode from CBOR. Returns `None` if malformed.
-    #[allow(dead_code)] // used by future vote aggregation
     pub fn decode(data: &[u8]) -> Option<Self> {
         let mut dec = minicbor::Decoder::new(data);
         let len = dec.array().ok()??;

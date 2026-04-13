@@ -4,6 +4,7 @@
 //! its announcement: EquivocationCheck (3×Δhdr) → Voting (L_vote) →
 //! Diffusing (L_diff) → CertEligible (held until pruned).
 
+use std::collections::HashSet;
 use std::time::Instant;
 
 use net_core::types::Point;
@@ -23,7 +24,6 @@ pub(crate) enum PipelinePhase {
 
 /// Per-EB election state.
 pub(crate) struct EbElection {
-    #[allow(dead_code)] // used by future vote aggregation
     pub(crate) eb_point: Point,
     pub(crate) announced_slot: u64,
     pub(crate) phase: PipelinePhase,
@@ -31,6 +31,10 @@ pub(crate) struct EbElection {
     pub(crate) validated_at: Instant,
     /// True after this node has cast its vote for this EB.
     pub(crate) voted: bool,
+    /// Unique voter IDs that have voted for this EB.
+    pub(crate) voters: HashSet<Vec<u8>>,
+    /// True once quorum has been reached.
+    pub(crate) quorum_reached: bool,
 }
 
 /// CIP-0164 pipeline timing configuration.
