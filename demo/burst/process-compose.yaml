@@ -9,14 +9,8 @@ processes:
   InitNamespaces:
     is_elevated: true
     command: |
-      RATE_UP_TO_N0="${RATE_UP_TO_N0}" \
-      DELAY_UP_TO_N0="${DELAY_UP_TO_N0}" \
-      RATE_N0_TO_UP="${RATE_N0_TO_UP}" \
-      DELAY_N0_TO_UP="${DELAY_N0_TO_UP}" \
-      RATE_N0_TO_DOWN="${RATE_N0_TO_DOWN}" \
-      DELAY_N0_TO_DOWN="${DELAY_N0_TO_DOWN}" \
-      RATE_DOWN_TO_N0="${RATE_DOWN_TO_N0}" \
-      DELAY_DOWN_TO_N0="${DELAY_DOWN_TO_N0}" \
+      RATE="${RATE}" \
+      DELAY="${DELAY}" \
       IP_UPSTREAM_NODE="${IP_UPSTREAM_NODE}" \
       IP_NODE0="${IP_NODE0}" \
       IP_DOWNSTREAM_NODE="${IP_DOWNSTREAM_NODE}" \
