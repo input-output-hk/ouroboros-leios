@@ -19,18 +19,28 @@ const handleStyle = {
   pointerEvents: "none" as const,
 };
 
-function borderColor(selected: boolean, flash: "produced" | "received" | "rolledback" | null): string {
+type FlashType = "rb-produced" | "rb-received" | "eb-produced" | "eb-received" | "vote-produced" | "vote-received" | "rolledback" | null;
+
+function borderColor(selected: boolean, flash: FlashType): string {
   if (flash === "rolledback") return "#9c27b0";
-  if (flash === "produced") return "#4caf50";
-  if (flash === "received") return "#ffb74d";
+  if (flash === "rb-produced") return "#a5d6a7";
+  if (flash === "rb-received") return "#81c784";
+  if (flash === "eb-produced") return "#90caf9";
+  if (flash === "eb-received") return "#64b5f6";
+  if (flash === "vote-produced") return "#ce93d8";
+  if (flash === "vote-received") return "#ba68c8";
   if (selected) return "#90caf9";
   return "#616161";
 }
 
-function bgColor(_selected: boolean, flash: "produced" | "received" | "rolledback" | null): string {
+function bgColor(_selected: boolean, flash: FlashType): string {
   if (flash === "rolledback") return "#4a148c";
-  if (flash === "produced") return "#1b5e20";
-  if (flash === "received") return "#4e342e";
+  if (flash === "rb-produced") return "#1b5e20";
+  if (flash === "rb-received") return "#4e342e";
+  if (flash === "eb-produced") return "#0d47a1";
+  if (flash === "eb-received") return "#1a237e";
+  if (flash === "vote-produced") return "#4a148c";
+  if (flash === "vote-received") return "#311b92";
   return "#263238";
 }
 
