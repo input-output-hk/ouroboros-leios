@@ -206,8 +206,17 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build-images, check-moog-secrets]
     if: needs['check-moog-secrets'].outputs.available == 'true'
+    timeout-minutes: 180
     permissions:
       contents: read
+    env:
+      MOOG_GITHUB_PAT: ${{ secrets.MOOG_GITHUB_PAT }}
+      MOOG_WALLET_FILE: wallet.json
+      MOOG_MPFS_HOST: ${{ vars.MOOG_MPFS_HOST || 'https://mpfs.plutimus.com' }}
+      MOOG_PLATFORM: github
+      MOOG_REQUESTER: ${{ vars.MOOG_REQUESTER }}
+      MOOG_TOKEN_ID: ${{ vars.MOOG_TOKEN_ID || '21c523c3b4565f1fc1ad7e54e82ca976f60997d8e7e9946826813fabf341069b' }} # not a secret
+      DURATION: 1
 
     steps:
       - name: Checkout repository
@@ -240,18 +249,24 @@ jobs:
           MOOG_WALLET: ${{ secrets.MOOG_REQUESTER_WALLET }}
 
       - name: Submit test to Antithesis
+        id: request
         run: |
-          echo "Submitting Antithesis test for commit ${GITHUB_SHA}..."
-          moog requester create-test \
+          set -euo pipefail
+          TRY=$(moog facts test-runs --whose "$MOOG_REQUESTER" \
+            | jq --arg sha "$GITHUB_SHA" 'map(select(.key.commitId == $sha)) | length')
+          TRY=$((TRY + 1))
+          echo "Submitting Antithesis test for commit ${GITHUB_SHA} (try $TRY, duration ${DURATION}h)..."
+          RESULT=$(moog requester create-test \
             -d "antithesis/testnets/leios-devnet" \
             -c "${GITHUB_SHA}" \
             -r "${GITHUB_REPOSITORY}" \
-            -t 1 \
-            -y 1
-        env:
-          MOOG_GITHUB_PAT: ${{ secrets.MOOG_GITHUB_PAT }}
-          MOOG_WALLET_FILE: wallet.json
-          MOOG_MPFS_HOST: ${{ vars.MOOG_MPFS_HOST || 'https://mpfs.plutimus.com' }}
-          MOOG_PLATFORM: github
-          MOOG_REQUESTER: ${{ vars.MOOG_REQUESTER }}
-          MOOG_TOKEN_ID: ${{ vars.MOOG_TOKEN_ID || '21c523c3b4565f1fc1ad7e54e82ca976f60997d8e7e9946826813fabf341069b' }} # not a secret
+            --try "$TRY" \
+            -t "$DURATION")
+          echo "$RESULT"
+          ID=$(echo "$RESULT" | jq -e .value.testRunId | jq -r .)
+          TXID=$(echo "$RESULT" | jq -e .txHash | jq -r .)
+          echo "id=$ID" >> "$GITHUB_OUTPUT"
+          echo "txHash=$TXID" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for results
+        run: timeout $(((DURATION + 1) * 3600)) ./antithesis/scripts/wait-for-test.sh "${{ steps.request.outputs.id }}"
