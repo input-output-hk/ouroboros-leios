@@ -5,12 +5,10 @@ IP=10.0.0.
 #middle/N0   is 10.0.0.2
 #downstream is 10.0.0.3
 
-DELAYS1=([2]=$DELAY_UP_TO_N0)
-RATES1=([2]=$RATE_UP_TO_N0)
-DELAYS2=([1]=$DELAY_N0_TO_UP [3]=$DELAY_N0_TO_DOWN)
-RATES2=([1]=$RATE_N0_TO_UP [3]=$RATE_N0_TO_DOWN)
-DELAYS3=([2]=$DELAY_DOWN_TO_N0)
-RATES3=([2]=$RATE_DOWN_TO_N0)
+# Topology: upstream(1) - node0(2) - downstream(3)
+PEERS1="2"
+PEERS2="1 3"
+PEERS3="2"
 
 HOSTS=$(seq 1 3)
 
@@ -55,28 +53,24 @@ for i in $HOSTS; do
   add_edge $i
 done
 
-# shape egress
+# shape traffic: per-peer rate limit on node egress, delay on bridge-side via prio+netem
 for i in $HOSTS; do
-    declare -n DELAYS="DELAYS$i"
-    declare -n RATES="RATES$i"
     NS_=${NS[$i]}
+    peers_var="PEERS$i"
     set -x
     tc -n $NS_ qdisc add dev veth$i root handle 1: htb
     tc -n ns-br qdisc add dev veth${i}-br root handle 1: prio
     { set +x; } 2>/dev/null
-    for peer_x in ${!DELAYS[@]}; do
+    for peer in ${!peers_var}; do
         set -x
-        IP=10.0.0.$peer_x
-        DELAY=${DELAYS[$peer_x]}
-        RATE=${RATES[$peer_x]}
-        JITTER=$(bc <<< "$DELAY * .15")ms
-        tc -n $NS_ class add dev veth$i parent 1: classid 1:${peer_x} htb rate ${RATE} burst 15kb
-        tc -n $NS_ qdisc add dev veth$i parent 1:${peer_x} fq_codel \
+        PEER_IP=10.0.0.$peer
+        JITTER=$(( DELAY * 15 / 100 ))ms
+        tc -n $NS_ class add dev veth$i parent 1: classid 1:$peer htb rate $RATE burst 15kb
+        tc -n $NS_ qdisc add dev veth$i parent 1:$peer fq_codel \
            quantum 2000 target 5ms interval 10ms
-        tc -n $NS_ filter add dev veth$i protocol ip parent 1: prio 1 u32 match ip dst $IP flowid 1:$peer_x
-        tc -n ns-br filter add dev veth${i}-br protocol ip parent 1: prio 1 u32 match ip dst $IP flowid 1:$peer_x
-        tc -n ns-br qdisc add dev veth${i}-br parent 1:$peer_x netem delay ${DELAY}ms
+        tc -n $NS_ filter add dev veth$i protocol ip parent 1: prio 1 u32 match ip dst $PEER_IP flowid 1:$peer
+        tc -n ns-br filter add dev veth${i}-br protocol ip parent 1: prio 1 u32 match ip dst $PEER_IP flowid 1:$peer
+        tc -n ns-br qdisc add dev veth${i}-br parent 1:$peer netem delay ${DELAY}ms
         { set +x; } 2>/dev/null
     done
-    { set +x; } 2>/dev/null
 done
