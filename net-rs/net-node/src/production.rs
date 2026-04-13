@@ -19,6 +19,7 @@ pub struct ProducedEb {
 }
 
 /// A produced Leios vote batch.
+#[allow(dead_code)]
 pub struct ProducedVotes {
     pub vote_ids: Vec<(u64, Vec<u8>)>,
     pub vote_data: Vec<Vec<u8>>,
@@ -120,6 +121,7 @@ impl VoteBody {
     }
 
     /// Decode from CBOR. Returns `None` if malformed.
+    #[allow(dead_code)] // used by future vote aggregation
     pub fn decode(data: &[u8]) -> Option<Self> {
         let mut dec = minicbor::Decoder::new(data);
         let len = dec.array().ok()??;
@@ -179,6 +181,7 @@ pub struct BlockProducer {
     dyn_config: watch::Receiver<DynamicConfig>,
     block_count: u64,
     eb_count: u64,
+    #[allow(dead_code)]
     vote_count: u64,
 }
 
@@ -253,7 +256,8 @@ impl BlockProducer {
         Some(ProducedEb { point, data })
     }
 
-    /// Try to produce Leios votes. Called at stage boundaries.
+    /// Try to produce Leios votes. Legacy stage-boundary path.
+    #[allow(dead_code)] // kept for reference; voting now in consensus layer
     pub fn try_produce_votes(&mut self, slot: u64) -> Option<ProducedVotes> {
         let vote_prob = self.dyn_config.borrow().vote_generation_probability;
         if !self.is_active() || vote_prob <= 0.0 {
