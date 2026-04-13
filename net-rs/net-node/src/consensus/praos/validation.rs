@@ -38,6 +38,10 @@ impl super::PraosConsensus {
                 );
                 false
             }
+            LedgerOutcome::EbValidated { .. } | LedgerOutcome::VotesValidated { .. } => {
+                // Leios outcomes are handled by the facade before reaching Praos.
+                false
+            }
         }
     }
 

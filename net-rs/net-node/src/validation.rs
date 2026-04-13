@@ -79,6 +79,10 @@ pub enum LedgerCommand {
     Apply { point: Point, body: BlockBody },
     /// Roll the ledger state back to an earlier point.
     Rollback { target: Point },
+    /// Validate an endorser block (fake delay, then succeed).
+    ValidateEb { point: Point },
+    /// Validate a vote bundle (fake delay, then succeed).
+    ValidateVotes { vote_ids: Vec<(u64, Vec<u8>)> },
 }
 
 /// Outcomes reported by the validator actor after processing a command.
@@ -92,10 +96,15 @@ pub enum LedgerOutcome {
     ApplyFailed { point: Point, error: String },
     /// `rollback` failed for `target`.
     RollbackFailed { target: Point, error: String },
+    /// EB validation completed for `point`.
+    EbValidated { point: Point },
+    /// Vote validation completed for `vote_ids`.
+    VotesValidated { vote_ids: Vec<(u64, Vec<u8>)> },
 }
 
 /// Handle to the validator actor. Submitting work goes through `submit`;
 /// completion outcomes come back via the receiver returned from `new`.
+#[derive(Clone)]
 pub struct Validator {
     commands: mpsc::Sender<LedgerCommand>,
 }
@@ -106,13 +115,16 @@ impl Validator {
     pub fn new(
         dyn_config: watch::Receiver<DynamicConfig>,
     ) -> (Self, mpsc::Receiver<LedgerOutcome>) {
-        let ledger = Box::new(FakeLedger::new(dyn_config));
-        Self::with_ledger(ledger)
+        let ledger = Box::new(FakeLedger::new(dyn_config.clone()));
+        Self::with_ledger(ledger, dyn_config)
     }
 
     /// Create a validator with a caller-supplied ledger. Used by tests
     /// and by future real-ledger wiring.
-    pub fn with_ledger(ledger: Box<dyn Ledger>) -> (Self, mpsc::Receiver<LedgerOutcome>) {
+    pub fn with_ledger(
+        ledger: Box<dyn Ledger>,
+        dyn_config: watch::Receiver<DynamicConfig>,
+    ) -> (Self, mpsc::Receiver<LedgerOutcome>) {
         // Bounded channels give natural backpressure: if consensus
         // submits commands faster than the ledger can process them,
         // `send().await` blocks. 64 is enough for typical per-node
@@ -120,7 +132,7 @@ impl Validator {
         // accumulates arbitrary work.
         let (cmd_tx, cmd_rx) = mpsc::channel(64);
         let (outcome_tx, outcome_rx) = mpsc::channel(64);
-        tokio::spawn(run_validator_actor(ledger, cmd_rx, outcome_tx));
+        tokio::spawn(run_validator_actor(ledger, cmd_rx, outcome_tx, dyn_config));
         (Self { commands: cmd_tx }, outcome_rx)
     }
 
@@ -139,6 +151,7 @@ async fn run_validator_actor(
     mut ledger: Box<dyn Ledger>,
     mut commands: mpsc::Receiver<LedgerCommand>,
     outcomes: mpsc::Sender<LedgerOutcome>,
+    dyn_config: watch::Receiver<DynamicConfig>,
 ) {
     while let Some(cmd) = commands.recv().await {
         let outcome = match cmd {
@@ -156,6 +169,16 @@ async fn run_validator_actor(
                     error: e.to_string(),
                 },
             },
+            LedgerCommand::ValidateEb { point } => {
+                let ms = dyn_config.borrow().eb_validation_ms;
+                tokio::time::sleep(Duration::from_secs_f64(ms / 1000.0)).await;
+                LedgerOutcome::EbValidated { point }
+            }
+            LedgerCommand::ValidateVotes { vote_ids } => {
+                let ms = dyn_config.borrow().vote_validation_ms;
+                tokio::time::sleep(Duration::from_secs_f64(ms / 1000.0)).await;
+                LedgerOutcome::VotesValidated { vote_ids }
+            }
         };
         if outcomes.send(outcome).await.is_err() {
             // Receiver dropped — consensus tore down. Exit cleanly.
@@ -229,6 +252,8 @@ mod tests {
             rb_head_validation_ms: head_ms,
             rb_body_validation_ms_constant: body_const_ms,
             rb_body_validation_ms_per_byte: body_per_byte,
+            eb_validation_ms: 0.0,
+            vote_validation_ms: 0.0,
             tx_rate: 0.0,
         };
         watch::channel(config).1
@@ -383,10 +408,12 @@ mod tests {
         // shim (which drops failures).
         let (cmd_tx, cmd_rx) = mpsc::channel(8);
         let (outcome_tx, mut outcome_rx) = mpsc::channel(8);
+        let dyn_rx = test_dyn_config(0.0, 0.0, 0.0);
         tokio::spawn(run_validator_actor(
             Box::new(FailFirstLedger { applied: false }),
             cmd_rx,
             outcome_tx,
+            dyn_rx,
         ));
 
         cmd_tx
@@ -416,6 +443,42 @@ mod tests {
                 assert_eq!(point, fake_point(2, 0x02));
             }
             other => panic!("expected Applied, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn eb_validate_returns_eb_validated() {
+        let rx = test_dyn_config(0.0, 0.0, 0.0);
+        let (validator, mut outcome_rx) = Validator::new(rx);
+
+        let point = fake_point(50, 0xEB);
+        validator
+            .submit(LedgerCommand::ValidateEb {
+                point: point.clone(),
+            })
+            .await;
+
+        match outcome_rx.recv().await.expect("outcome") {
+            LedgerOutcome::EbValidated { point: got } => assert_eq!(got, point),
+            other => panic!("expected EbValidated, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn votes_validate_returns_votes_validated() {
+        let rx = test_dyn_config(0.0, 0.0, 0.0);
+        let (validator, mut outcome_rx) = Validator::new(rx);
+
+        let vote_ids = vec![(10u64, vec![0xAAu8]), (20u64, vec![0xBBu8])];
+        validator
+            .submit(LedgerCommand::ValidateVotes {
+                vote_ids: vote_ids.clone(),
+            })
+            .await;
+
+        match outcome_rx.recv().await.expect("outcome") {
+            LedgerOutcome::VotesValidated { vote_ids: got } => assert_eq!(got, vote_ids),
+            other => panic!("expected VotesValidated, got {other:?}"),
         }
     }
 }
