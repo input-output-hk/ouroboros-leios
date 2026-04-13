@@ -53,41 +53,38 @@ consensus/
 ```
 
 ### Test coverage
-135 tests across the workspace. Key Leios tests:
+149 tests across the workspace. Key Leios tests:
 - Pipeline phase boundaries (pure function)
 - Election lifecycle (create → advance through phases → prune)
 - Voting (phase trigger, no double vote, no vote during equivocation check)
 - Vote aggregation (accumulate, dedup, quorum threshold)
 - Certified EB header roundtrip (11-field CBOR with `certified_eb=true`)
 
+### Transaction & EB production (complete)
+- **Shared mempool**: `Mempool` struct accumulates txs from local Poisson
+  generator and peer receipt. `drain_up_to` for RB body, `drain_all` for
+  EB overflow. Configurable capacity (`mempool_capacity`, default 10K).
+- **Mempool-driven EB production**: `try_produce_block` checks mempool —
+  if pending bytes ≤ `rb_body_max_bytes` (default 64KB), txs go in the RB
+  body directly; otherwise ALL txs drain into a content-addressed EB manifest
+  `[slot, [tx_hash, ...]]` and the RB body is empty with the EB announced
+  in the header's `announced_eb` field (12-field header with hash+size).
+  Old `is_stage_boundary` / `stage_length_slots` lottery removed.
+- **Pull-model TxSubmission**: demand-driven dissemination — peer's server
+  requests tx IDs via `TxsRequested`, application peeks mempool and responds
+  with `ProvideTxs` routed to that specific peer. Replaces the push-based
+  `SubmitTransaction` broadcast that flooded per-peer command channels.
+- **Pre-mempool tx validation**: received transactions go through
+  `spawn_tx_validator` with `tx_validation_ms` + per-byte scaling before
+  entering the mempool, modeling Cardano Phase 1 validation.
+
 ### Cluster-verified
-25-node cluster with `leios_enabled=true`: EBs produced → elections track
-pipeline phases → votes produced and flooded → quorum detected → RB headers
-carry `certified_eb=true` (429→430 byte header size increase).
+25-node cluster with `leios_enabled=true`, `rb_generation_probability=0.05`,
+`tx_rate=2.0`: EBs produced → elections track pipeline phases → votes
+produced and flooded → quorum detected → RB headers carry `certified_eb=true`.
+Zero peer evictions, 100% EB propagation.
 
 ## What's next
-
-### Mempool-driven EB production
-
-Currently EBs are produced probabilistically at stage boundaries
-(`is_stage_boundary` + `eb_generation_probability` lottery). Per CIP-0164,
-EBs should be produced **when the mempool has transactions that won't fit
-in the RB**, not on a fixed schedule.
-
-**Work needed**:
-- EB production moves into `try_produce_block`: when producing an RB, if
-  the mempool has excess transactions beyond what fits in the RB body,
-  build an EB from the overflow and announce it in the RB header
-  (`announced_eb` field)
-- Remove `is_stage_boundary` / `stage_length_slots` from EB production path
-- The fake tx generator may need tuning: current Poisson rate may be too
-  low to overflow RBs. Need configurable tx rate high enough that EBs are
-  actually needed
-- RB body size limit config (currently RBs are tiny fake blocks with no tx
-  payload)
-- EB selection policy when multiple EBs reach CertEligible: `has_certified_eb()`
-  currently returns `any(quorum && CertEligible)` with no preference. Need a
-  selection strategy (e.g. oldest-first to minimize latency, or newest-first)
 
 ### Stake-weighted quorum
 
@@ -115,6 +112,13 @@ Missing events that would help cluster analysis:
 - `RbCertifiedEb { node, rb_point, eb_point }`
 - `LeiosElectionExpired { node, eb_point, had_quorum }`
 
+### EB selection policy
+
+When multiple EBs reach CertEligible, `has_certified_eb()` returns
+`any(quorum && CertEligible)` with no preference. Need a selection
+strategy (e.g. oldest-first to minimize latency, or per-slot to avoid
+starvation).
+
 ### Deferred
 
 - Cert-backed chain-selection tie-breaking (requires real signatures)
@@ -122,4 +126,3 @@ Missing events that would help cluster analysis:
 - Equivocation detection
 - Freshest-first transport scheduling (security-relevant: prevents withholding
   attacks where adversaries release stale EBs to waste pipeline slots)
-- `announced_eb` hash+size in RB headers (currently only `certified_eb` bool)
