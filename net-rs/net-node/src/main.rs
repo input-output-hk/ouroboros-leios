@@ -149,7 +149,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 // Praos: try to produce a ranking block.
                 let prev_hash = consensus.tip_hash();
                 let next_block_no = consensus.next_block_number();
-                if let Some((point, header, body)) = producer.try_produce_block(slot, prev_hash, next_block_no) {
+                let certified_eb = leios && consensus.has_certified_eb();
+                if let Some((point, header, body)) = producer.try_produce_block(slot, prev_hash, next_block_no, certified_eb) {
                     info!(
                         node_id = %node_id,
                         %point,
