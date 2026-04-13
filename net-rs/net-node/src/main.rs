@@ -76,6 +76,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         commands.clone(),
         validator,
         config.security_param_k,
+        consensus::PipelineConfig {
+            delta_hdr: config.production.leios_delta_hdr_slots,
+            vote_window: config.production.leios_vote_window_slots,
+            diffuse_window: config.production.leios_diffuse_window_slots,
+            dedup_window: config.leios_dedup_window,
+        },
     );
 
     // Transaction generator (background task).
@@ -125,6 +131,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             slot = slot_clock.tick() => {
                 telem.current_slot = slot;
                 retry_counter += 1;
+
+                // Leios: advance pipeline phase tracking.
+                if leios {
+                    consensus.on_slot(slot);
+                }
 
                 // Praos: try to produce a ranking block.
                 let prev_hash = consensus.tip_hash();

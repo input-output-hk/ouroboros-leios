@@ -16,7 +16,7 @@ use tokio::sync::mpsc;
 use crate::chain_tree::ChainTreeEntry;
 use crate::validation::{LedgerOutcome, Validator};
 
-pub use leios::LeiosConsensus;
+pub use leios::{LeiosConsensus, PipelineConfig};
 pub use praos::PraosConsensus;
 
 /// Top-level consensus, composing Praos and Leios sub-layers.
@@ -31,6 +31,7 @@ impl Consensus {
         commands: mpsc::Sender<NetworkCommand>,
         validator: Validator,
         security_param_k: u64,
+        pipeline: PipelineConfig,
     ) -> Self {
         let praos = PraosConsensus::new(
             node_id.clone(),
@@ -38,8 +39,13 @@ impl Consensus {
             validator.clone(),
             security_param_k,
         );
-        let leios = LeiosConsensus::new(node_id, commands, validator);
+        let leios = LeiosConsensus::new(node_id, commands, validator, pipeline);
         Self { praos, leios }
+    }
+
+    /// Notify the Leios layer of a new slot tick.
+    pub fn on_slot(&mut self, slot: u64) {
+        self.leios.on_slot(slot);
     }
 
     /// Register a self-produced ranking block with Praos consensus.

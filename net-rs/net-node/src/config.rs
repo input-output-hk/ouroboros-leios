@@ -357,6 +357,18 @@ pub struct ProductionConfig {
     /// Fraction of total stake required for quorum.
     #[serde(default = "default_quorum_stake_fraction")]
     pub quorum_stake_fraction: f64,
+
+    /// CIP-0164 header diffusion parameter (Δhdr) in slots.
+    #[serde(default = "default_delta_hdr")]
+    pub leios_delta_hdr_slots: u64,
+
+    /// CIP-0164 voting window (L_vote) in slots.
+    #[serde(default = "default_vote_window")]
+    pub leios_vote_window_slots: u64,
+
+    /// CIP-0164 diffusion window (L_diff) in slots.
+    #[serde(default = "default_diffuse_window")]
+    pub leios_diffuse_window_slots: u64,
 }
 
 fn default_total_stake() -> u64 {
@@ -369,6 +381,18 @@ fn default_rb_probability() -> f64 {
 
 fn default_stage_length() -> u64 {
     20
+}
+
+fn default_delta_hdr() -> u64 {
+    1
+}
+
+fn default_vote_window() -> u64 {
+    5
+}
+
+fn default_diffuse_window() -> u64 {
+    5
 }
 
 impl Default for ProductionConfig {
@@ -384,6 +408,9 @@ impl Default for ProductionConfig {
             persistent_vote_bytes: default_persistent_vote_bytes(),
             non_persistent_vote_bytes: default_non_persistent_vote_bytes(),
             quorum_stake_fraction: default_quorum_stake_fraction(),
+            leios_delta_hdr_slots: default_delta_hdr(),
+            leios_vote_window_slots: default_vote_window(),
+            leios_diffuse_window_slots: default_diffuse_window(),
         }
     }
 }

@@ -81,8 +81,6 @@ impl ChainFragment {
         self.point_set.contains(point)
     }
 
-
-
     /// Number of points in the fragment.
     #[allow(dead_code)]
     pub fn len(&self) -> usize {
@@ -193,5 +191,4 @@ mod tests {
         assert!(f.contains(&point(100)));
         assert!(f.contains(&point(101)));
     }
-
 }
