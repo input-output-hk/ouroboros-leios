@@ -6,6 +6,23 @@
 > 
 > See also the [Post-CIP R&D Findings](post-cip/README.md) document for additional (after 2025-11-01) findings and artifacts not directly related to the implementation of Linear Leios.
 
+## 2026-04-14
+
+### SN on voting/blueprints
+
+- Working on the leios prototype for voting
+- Wanted to write down the CDDLs first and wondered how and where they are usually kept and verified (by CI)
+- Seems like there are CDDLs even with ;# import statements in ouroboros-network and further definitions (e.g. block.cddl) in ouroboros-consensus repositories.
+- Usually the same test suite that ensures encoders match cddl, also do call `cddlc` and `cddl validate` to check cddl consistency.
+- However, both repos have only added this machinery lately (before our leios-prototype) fork point.. so not good for a quick win.
+- OTOH, we will want to have the cddls anyways in the blueprint and other implementors depend on the same CDDL (with their own test suites).
+- I decide to contribute the leios protocol cddls directly to the blueprint and add CI checks there.
+- Created a test suite using BATS that checks all the mini-protocol cddls in the blueprint https://github.com/cardano-scaling/cardano-blueprint/pull/64
+- Now, I can define the Leios mini-protocol CDDLs with confidence
+- Added them to the blueprints in this PR https://github.com/cardano-scaling/cardano-blueprint/pull/65
+  - Could not resist to fix the MsgDone tags, but these should not have been used by anyone yet...
+- The mermaid state diagrams are hard to read in dark themes, improved them to be visually more pleasing in all themes.
+
 ## 2026-04-09
 
 ### SN/DP on discussing the consensus/ledger interface for leios
