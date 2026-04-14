@@ -10,7 +10,10 @@ use tokio::sync::mpsc;
 
 use crate::{
     clock::{Clock, MockClockCoordinator, Timestamp},
-    config::{NodeId, RawLinkInfo, RawNode, RawTopology, SimConfiguration, TransactionConfig},
+    config::{
+        CommitteeSelectionAlgorithm, NodeId, RawLinkInfo, RawNode, RawTopology, SimConfiguration,
+        TransactionConfig,
+    },
     events::{Event, EventTracker},
     model::{LinearEndorserBlock, LinearRankingBlock, Transaction, VoteBundle},
     sim::{
@@ -21,6 +24,13 @@ use crate::{
 };
 
 fn new_sim_config(topology: RawTopology) -> Arc<SimConfiguration> {
+    new_sim_config_with(topology, |_| {})
+}
+
+fn new_sim_config_with(
+    topology: RawTopology,
+    customize: impl FnOnce(&mut crate::config::RawParameters),
+) -> Arc<SimConfiguration> {
     let mut params: crate::config::RawParameters =
         serde_yaml::from_slice(include_bytes!("../../../../parameters/config.default.yaml"))
             .unwrap();
@@ -33,6 +43,7 @@ fn new_sim_config(topology: RawTopology) -> Arc<SimConfiguration> {
     params.tx_max_size_bytes = tx_size;
     // it takes two votes to certify an EB
     params.vote_threshold = 2;
+    customize(&mut params);
     let topology = topology.into();
     Arc::new(SimConfiguration::build(params, topology).unwrap())
 }
@@ -116,7 +127,10 @@ struct TestDriver {
 
 impl TestDriver {
     fn new(topology: RawTopology) -> Self {
-        let config = new_sim_config(topology);
+        Self::new_with_config(new_sim_config(topology))
+    }
+
+    fn new_with_config(config: Arc<SimConfiguration>) -> Self {
         let rng = ChaChaRng::seed_from_u64(config.seed);
         let slot = 0;
         let time = MockClockCoordinator::new();
@@ -586,4 +600,94 @@ fn should_not_include_tx_twice() {
     // And it does not include any transactions of its own
     assert!(rb.transactions.is_empty());
     assert_eq!(new_eb, None);
+}
+
+#[test]
+fn everyone_committee_should_vote_for_eb() {
+    let topology = new_topology(vec![
+        ("node-1", new_node(Some(1000), vec!["node-2"])),
+        ("node-2", new_node(Some(1000), vec!["node-1"])),
+    ]);
+    let config = new_sim_config_with(topology, |params| {
+        params.committee_selection_algorithm = CommitteeSelectionAlgorithm::Everyone;
+    });
+    let mut sim = TestDriver::new_with_config(config);
+    let node1 = sim.id_for("node-1");
+    let node2 = sim.id_for("node-2");
+
+    let txs: [_; 3] = sim.produce_txs(node1, false);
+    for tx in &txs {
+        sim.expect_tx_sent(node1, node2, tx.clone());
+    }
+
+    // Node 1 produces an RB and EB
+    sim.win_next_rb_lottery(node1, 0);
+    sim.next_slot();
+    let (rb, eb) = sim.expect_cpu_task_matching(node1, is_new_rb_task);
+    let eb = eb.expect("node did not produce EB");
+
+    sim.expect_rb_and_eb_sent(node1, node2, rb.clone(), Some(eb.clone()));
+    sim.expect_eb_validated(node2, eb.clone());
+
+    // Both nodes should vote without needing win_next_vote_lottery
+    sim.advance_time_to(sim.now() + (sim.config.header_diffusion_time * 3));
+    let votes_1 = sim.expect_cpu_task_matching(node1, is_new_vote_task);
+    assert_eq!(*votes_1.ebs.first_key_value().unwrap().1, 1);
+    let votes_2 = sim.expect_cpu_task_matching(node2, is_new_vote_task);
+    assert_eq!(*votes_2.ebs.first_key_value().unwrap().1, 1);
+}
+
+#[test]
+fn top_stake_fraction_should_select_voters() {
+    let topology = new_topology(vec![
+        ("big", new_node(Some(500), vec!["medium", "small"])),
+        ("medium", new_node(Some(300), vec!["big", "small"])),
+        ("small", new_node(Some(200), vec!["big", "medium"])),
+    ]);
+    let config = new_sim_config_with(topology, |params| {
+        params.committee_selection_algorithm = CommitteeSelectionAlgorithm::TopStakeFraction;
+        params.committee_stake_fraction_threshold = 0.75;
+    });
+
+    // big (500) + medium (300) = 800 >= 750 (75% of 1000), so small is excluded
+    let mut sim = TestDriver::new_with_config(config);
+    let big = sim.id_for("big");
+    let medium = sim.id_for("medium");
+    let small = sim.id_for("small");
+
+    assert!(sim.config.vote_eligible_nodes.contains(&big));
+    assert!(sim.config.vote_eligible_nodes.contains(&medium));
+    assert!(!sim.config.vote_eligible_nodes.contains(&small));
+
+    let txs: [_; 3] = sim.produce_txs(big, false);
+    for tx in &txs {
+        sim.expect_tx_sent(big, medium, tx.clone());
+        sim.expect_tx_sent(big, small, tx.clone());
+    }
+
+    // big produces an RB and EB
+    sim.win_next_rb_lottery(big, 0);
+    sim.next_slot();
+    let (rb, eb) = sim.expect_cpu_task_matching(big, is_new_rb_task);
+    let eb = eb.expect("node did not produce EB");
+
+    sim.expect_rb_and_eb_sent(big, medium, rb.clone(), Some(eb.clone()));
+    sim.expect_rb_and_eb_sent(big, small, rb.clone(), Some(eb.clone()));
+    sim.expect_eb_validated(medium, eb.clone());
+    sim.expect_eb_validated(small, eb.clone());
+
+    // big and medium should vote; small should not
+    sim.advance_time_to(sim.now() + (sim.config.header_diffusion_time * 3));
+    let votes_big = sim.expect_cpu_task_matching(big, is_new_vote_task);
+    assert_eq!(*votes_big.ebs.first_key_value().unwrap().0, eb.id());
+    let votes_medium = sim.expect_cpu_task_matching(medium, is_new_vote_task);
+    assert_eq!(*votes_medium.ebs.first_key_value().unwrap().0, eb.id());
+
+    // small should have no vote task queued
+    let has_vote_task = sim
+        .queued
+        .get(&small)
+        .map(|q| q.tasks.iter().any(|t| matches!(t, CpuTask::VTBundleGenerated(..))))
+        .unwrap_or(false);
+    assert!(!has_vote_task, "small node should not have generated a vote");
 }

@@ -37,6 +37,10 @@
       },
       "type": "object"
     },
+    "CommitteeSelectionAlgorithm": {
+      "enum": ["wfa-ls", "everyone", "top-stake-fraction"],
+      "type": "string"
+    },
     "DiffusionStrategy": {
       "enum": ["peer-order", "freshest-first", "oldest-first"],
       "type": "string"
@@ -645,6 +649,14 @@
       "type": "number"
     },
     "non-persistent-vote-validation-cpu-time-ms": {
+      "type": "number"
+    },
+    "committee-selection-algorithm": {
+      "$ref": "#/definitions/CommitteeSelectionAlgorithm",
+      "description": "Committee selection algorithm. 'wfa-ls' (default) uses VRF lottery. 'everyone' means every node votes. 'top-stake-fraction' selects highest-stake nodes covering committee-stake-fraction-threshold of total stake."
+    },
+    "committee-stake-fraction-threshold": {
+      "description": "Fraction of total stake eligible to vote when committee-selection-algorithm is 'top-stake-fraction'. Default 0.95.",
       "type": "number"
     }
   },

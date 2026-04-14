@@ -189,6 +189,10 @@ pub struct RawParameters {
     pub vote_bundle_size_bytes_constant: u64,
     pub persistent_vote_bundle_size_bytes_per_eb: u64,
     pub non_persistent_vote_bundle_size_bytes_per_eb: u64,
+    #[serde(default)]
+    pub committee_selection_algorithm: CommitteeSelectionAlgorithm,
+    #[serde(default = "default_committee_stake_fraction_threshold")]
+    pub committee_stake_fraction_threshold: f64,
 
     // Certificate configuration
     pub cert_generation_cpu_time_ms_constant: f64,
@@ -251,6 +255,19 @@ pub enum EBPropagationCriteria {
     EbReceived,
     TxsReceived,
     FullyValid,
+}
+
+#[derive(Debug, Default, Copy, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum CommitteeSelectionAlgorithm {
+    #[default]
+    WfaLs,
+    Everyone,
+    TopStakeFraction,
+}
+
+fn default_committee_stake_fraction_threshold() -> f64 {
+    0.95
 }
 
 #[derive(Deserialize)]
@@ -813,6 +830,8 @@ pub struct SimConfiguration {
     pub(crate) block_generation_probability: f64,
     pub(crate) ib_generation_probability: f64,
     pub(crate) eb_generation_probability: f64,
+    pub(crate) committee_selection: CommitteeSelectionAlgorithm,
+    pub(crate) vote_eligible_nodes: HashSet<NodeId>,
     pub(crate) vote_probability: f64,
     pub(crate) vote_slot_length: u64,
     pub(crate) eb_include_txs_from_previous_stage: bool,
@@ -858,8 +877,32 @@ impl SimConfiguration {
                 params.ib_shard_period_length_slots
             );
         }
-        let total_stake = topology.nodes.iter().map(|n| n.stake).sum();
+        let total_stake: u64 = topology.nodes.iter().map(|n| n.stake).sum();
         let attacks = AttackConfig::build(&params, &mut topology);
+        let vote_eligible_nodes = match params.committee_selection_algorithm {
+            CommitteeSelectionAlgorithm::WfaLs | CommitteeSelectionAlgorithm::Everyone => {
+                HashSet::new()
+            }
+            CommitteeSelectionAlgorithm::TopStakeFraction => {
+                let threshold =
+                    (total_stake as f64 * params.committee_stake_fraction_threshold) as u64;
+                let mut nodes_by_stake: Vec<_> =
+                    topology.nodes.iter().map(|n| (n.id, n.stake)).collect();
+                nodes_by_stake.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+                let mut cumulative = 0u64;
+                nodes_by_stake
+                    .into_iter()
+                    .take_while(|&(_, stake)| {
+                        if cumulative >= threshold {
+                            return false;
+                        }
+                        cumulative += stake;
+                        true
+                    })
+                    .map(|(id, _)| id)
+                    .collect()
+            }
+        };
         Ok(Self {
             seed: 0,
             timestamp_resolution: duration_ms(params.timestamp_resolution_ms),
@@ -892,6 +935,8 @@ impl SimConfiguration {
             block_generation_probability: params.rb_generation_probability,
             ib_generation_probability: params.ib_generation_probability,
             eb_generation_probability: params.eb_generation_probability,
+            committee_selection: params.committee_selection_algorithm,
+            vote_eligible_nodes,
             vote_probability: params.persistent_vote_generation_probability
                 + params.non_persistent_vote_generation_probability,
             vote_threshold: params.vote_threshold,

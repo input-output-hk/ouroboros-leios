@@ -15,9 +15,9 @@ use rand_chacha::ChaChaRng;
 use crate::{
     clock::{Clock, Timestamp},
     config::{
-        CpuTimeConfig, EBPropagationCriteria, LeiosVariant, MempoolSamplingStrategy,
-        NodeBehaviours, NodeConfiguration, NodeId, RelayStrategy, SimConfiguration,
-        TransactionConfig,
+        CommitteeSelectionAlgorithm, CpuTimeConfig, EBPropagationCriteria, LeiosVariant,
+        MempoolSamplingStrategy, NodeBehaviours, NodeConfiguration, NodeId, RelayStrategy,
+        SimConfiguration, TransactionConfig,
     },
     events::EventTracker,
     model::{
@@ -1304,9 +1304,21 @@ impl LinearLeiosNode {
     }
 
     fn try_vote_for_endorser_block(&mut self, eb: &Arc<EndorserBlock>, seen: Timestamp) -> bool {
-        let vrf_wins = vrf_probabilities(self.sim_config.vote_probability)
-            .filter_map(|f| self.run_vrf(LotteryKind::GenerateVote, f))
-            .count();
+        let vrf_wins = match self.sim_config.committee_selection {
+            CommitteeSelectionAlgorithm::WfaLs => {
+                vrf_probabilities(self.sim_config.vote_probability)
+                    .filter_map(|f| self.run_vrf(LotteryKind::GenerateVote, f))
+                    .count()
+            }
+            CommitteeSelectionAlgorithm::Everyone => 1,
+            CommitteeSelectionAlgorithm::TopStakeFraction => {
+                if self.sim_config.vote_eligible_nodes.contains(&self.id) {
+                    1
+                } else {
+                    0
+                }
+            }
+        };
         if vrf_wins == 0 {
             return false;
         }
