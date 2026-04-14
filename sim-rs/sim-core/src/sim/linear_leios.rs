@@ -483,26 +483,24 @@ impl LinearLeiosNode {
         });
     }
 
-    fn prune_old_leios_state(&mut self, current_slot: u64) {
-        // Full EB lifecycle: 3*header_diffusion (equivocation wait) + vote_stage
-        // + diffuse_stage + a small buffer for the endorsing RB to be produced.
-        let header_diffusion_slots =
-            self.sim_config.header_diffusion_time.as_secs().max(1) * 3;
-        let margin = header_diffusion_slots
-            + self.sim_config.linear_vote_stage_length
-            + self.sim_config.linear_diffuse_stage_length
-            + 2;
-        let cutoff = current_slot.saturating_sub(margin);
-        if cutoff == 0 {
+    fn prune_old_leios_state(&mut self, _current_slot: u64) {
+        // Only prune state for EBs that have been superseded: a strictly newer
+        // EB has been endorsed on-chain, so the older ones will never be needed.
+        let latest_endorsed_slot = self
+            .leios
+            .endorsed_ebs
+            .values()
+            .copied()
+            .max();
+        let Some(latest_slot) = latest_endorsed_slot else {
             return;
-        }
+        };
 
-        // Prune all EBs older than the cutoff — both endorsed and unendorsed.
         let expired: Vec<EndorserBlockId> = self
             .leios
             .votes_by_eb
             .keys()
-            .filter(|eb_id| eb_id.slot < cutoff)
+            .filter(|eb_id| eb_id.slot < latest_slot)
             .copied()
             .collect();
 
@@ -517,18 +515,16 @@ impl LinearLeiosNode {
             self.leios.eb_peer_announcements.remove(eb_id);
         }
 
-        // Prune vote bundles that only reference expired EBs.
         self.leios.votes.retain(|_, view| match view {
             VoteBundleView::Received { votes } => {
-                votes.ebs.keys().any(|eb| eb.slot >= cutoff)
+                votes.ebs.keys().any(|eb| eb.slot >= latest_slot)
             }
             VoteBundleView::Requested => true,
         });
 
-        // Prune ebs_by_rb entries pointing to expired EBs.
         self.leios
             .ebs_by_rb
-            .retain(|_, eb_id| eb_id.slot >= cutoff);
+            .retain(|_, eb_id| eb_id.slot >= latest_slot);
     }
 }
 
