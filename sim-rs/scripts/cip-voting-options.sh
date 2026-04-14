@@ -106,8 +106,8 @@ echo "" >&2
 echo "Building release binary..."
 cargo build --release
 
-TMPDIR=$(mktemp -d)
-trap 'rm -rf "$TMPDIR"' EXIT
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT
 
 HEADER="throughput,committee,time_seconds,total_ebs,uncertified_ebs,ebs_with_endorsement,total_votes,votes_per_eb_mean,votes_per_eb_stddev"
 echo ""
@@ -126,7 +126,7 @@ for throughput in "${THROUGHPUTS[@]}"; do
 
     for mode in "${MODES_FILTER[@]}"; do
         # Build a mode-specific override file
-        override="$TMPDIR/override-$mode.yaml"
+        override="$WORK/override-$mode.yaml"
         {
             echo "committee-selection-algorithm: \"$mode\""
             echo "vote-threshold: ${VOTE_THRESHOLDS[$mode]}"
