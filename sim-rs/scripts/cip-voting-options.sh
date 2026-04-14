@@ -4,25 +4,34 @@ set -euo pipefail
 # Benchmark different committee selection algorithms.
 # Always uses turbo mode (sequential engine, sharded).
 #
-# Usage: SLOTS=1500 ./scripts/cip-voting-options.sh [topology]
+# Usage: ./scripts/cip-voting-options.sh [topology] [throughput,...] [mode,...]
+#
+# Examples:
+#   ./scripts/cip-voting-options.sh                              # all defaults
+#   ./scripts/cip-voting-options.sh topology-v1.yaml             # mainnet-scale
+#   ./scripts/cip-voting-options.sh - 0.250 everyone             # single run, default topology
+#   ./scripts/cip-voting-options.sh - 0.250,0.300 wfa-ls,everyone
+#   SLOTS=500 ./scripts/cip-voting-options.sh - - top-stake-fraction
 #
 # Topology can be a leafname (resolved in data/simulation/pseudo-mainnet/),
-# a relative path, or an absolute path. Defaults to topology-v2-cip.yaml.
-# For mainnet-scale: ./scripts/cip-voting-options.sh topology-v1.yaml
+# a relative path, or an absolute path. Use "-" for the default.
 # Vote thresholds are auto-computed at 60% of expected committee size.
 
 # Configuration
 SLOTS="${SLOTS:-1500}"
-THROUGHPUTS=(0.150 0.200 0.250 0.300 0.350)
+ALL_THROUGHPUTS=(0.150 0.200 0.250 0.300 0.350)
+ALL_MODES=("wfa-ls" "everyone" "top-stake-fraction")
 QUORUM_FRACTION="${QUORUM_FRACTION:-0.60}"
 STAKE_FRACTION="${STAKE_FRACTION:-0.95}"
 
 # Paths (relative to sim-rs/)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SIM_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-TOPO_ARG="${1:-topology-v2-cip.yaml}"
+TOPO_ARG="${1:--}"
 TOPO_DATA="$SIM_DIR/../data/simulation/pseudo-mainnet"
-if [[ "$TOPO_ARG" == /* ]]; then
+if [[ "$TOPO_ARG" == "-" ]]; then
+    TOPOLOGY="$TOPO_DATA/topology-v2-cip.yaml"
+elif [[ "$TOPO_ARG" == /* ]]; then
     TOPOLOGY="$TOPO_ARG"
 elif [[ -f "$TOPO_ARG" ]]; then
     TOPOLOGY="$TOPO_ARG"
@@ -32,6 +41,20 @@ else
     echo "ERROR: cannot find topology '$TOPO_ARG'" >&2
     echo "  Looked in: ./ and $TOPO_DATA/" >&2
     exit 1
+fi
+
+# Parse throughput and mode filters (comma-separated, "-" or omitted = all)
+THROUGHPUT_ARG="${2:--}"
+MODE_ARG="${3:--}"
+if [[ "$THROUGHPUT_ARG" == "-" ]]; then
+    THROUGHPUTS=("${ALL_THROUGHPUTS[@]}")
+else
+    IFS=',' read -ra THROUGHPUTS <<< "$THROUGHPUT_ARG"
+fi
+if [[ "$MODE_ARG" == "-" ]]; then
+    MODES_FILTER=("${ALL_MODES[@]}")
+else
+    IFS=',' read -ra MODES_FILTER <<< "$MODE_ARG"
 fi
 EXPERIMENTS="$SIM_DIR/../analysis/sims/cip/experiments"
 MEMORY_LIMIT="$SIM_DIR/parameters/memory-limit.yaml"
@@ -68,7 +91,6 @@ print(total_nodes, len(staking), top_n)
 # wfa-ls: VRF lottery with CIP default expected committee (~600), threshold from config
 # everyone: all nodes vote (1 each)
 # top-stake-fraction: top ${STAKE_FRACTION} of cumulative stake
-MODES=("wfa-ls" "everyone" "top-stake-fraction")
 declare -A VOTE_THRESHOLDS=(
     ["wfa-ls"]=450
     ["everyone"]=$(python3 -c "import math; print(math.ceil($TOTAL_NODES * $QUORUM_FRACTION))")
@@ -87,8 +109,13 @@ cargo build --release
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
+HEADER="throughput,committee,time_seconds,total_ebs,uncertified_ebs,ebs_with_endorsement,total_votes,votes_per_eb_mean,votes_per_eb_stddev"
 echo ""
-echo "throughput,committee,time_seconds,total_ebs,uncertified_ebs,ebs_with_endorsement,total_votes,votes_per_eb_mean,votes_per_eb_stddev" | tee "$RESULTS"
+if [[ ! -f "$RESULTS" ]] || ! head -1 "$RESULTS" | grep -q "^throughput,"; then
+    echo "$HEADER" | tee "$RESULTS"
+else
+    echo "$HEADER"
+fi
 
 for throughput in "${THROUGHPUTS[@]}"; do
     config="$EXPERIMENTS/NA,$throughput/config.yaml"
@@ -97,7 +124,7 @@ for throughput in "${THROUGHPUTS[@]}"; do
         continue
     fi
 
-    for mode in "${MODES[@]}"; do
+    for mode in "${MODES_FILTER[@]}"; do
         # Build a mode-specific override file
         override="$TMPDIR/override-$mode.yaml"
         {
