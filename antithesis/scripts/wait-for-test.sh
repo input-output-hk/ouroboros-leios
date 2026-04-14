@@ -19,19 +19,32 @@ function query_run() { moog facts test-runs --test-run-id "$ID"; }
 
 # Phase 1: wait for acceptance (fast poll)
 echo "Waiting to be accepted..."
+CONSECUTIVE_ERRORS=0
+MAX_CONSECUTIVE_ERRORS=10
 while true; do
   if ! RESULT=$(query_run 2>&1); then
-    echo "query failed (transient?): $RESULT"
+    CONSECUTIVE_ERRORS=$((CONSECUTIVE_ERRORS + 1))
+    echo "query failed (attempt $CONSECUTIVE_ERRORS/$MAX_CONSECUTIVE_ERRORS): $RESULT"
+    if [ "$CONSECUTIVE_ERRORS" -ge "$MAX_CONSECUTIVE_ERRORS" ]; then
+      echo "error: too many consecutive query failures in acceptance phase" >&2
+      exit 1
+    fi
     sleep 10
     echo "retrying..."
     continue
   fi
   echo "current status: $RESULT"
   STATUS=$(echo "$RESULT" | jq -r '.[0].value.phase') || {
-    echo "failed to parse status, retrying..."
+    CONSECUTIVE_ERRORS=$((CONSECUTIVE_ERRORS + 1))
+    echo "failed to parse status (attempt $CONSECUTIVE_ERRORS/$MAX_CONSECUTIVE_ERRORS), retrying..."
+    if [ "$CONSECUTIVE_ERRORS" -ge "$MAX_CONSECUTIVE_ERRORS" ]; then
+      echo "error: too many consecutive parse failures in acceptance phase" >&2
+      exit 1
+    fi
     sleep 10
     continue
   }
+  CONSECUTIVE_ERRORS=0
   case $STATUS in
     accepted)
       echo "accepted"
@@ -57,19 +70,32 @@ done
 
 # Phase 2: wait for completion (slow poll)
 echo "Waiting to finish..."
+CONSECUTIVE_ERRORS=0
+MAX_CONSECUTIVE_ERRORS=5
 while true; do
   if ! RESULT=$(query_run 2>&1); then
-    echo "query failed (transient?): $RESULT"
+    CONSECUTIVE_ERRORS=$((CONSECUTIVE_ERRORS + 1))
+    echo "query failed (attempt $CONSECUTIVE_ERRORS/$MAX_CONSECUTIVE_ERRORS): $RESULT"
+    if [ "$CONSECUTIVE_ERRORS" -ge "$MAX_CONSECUTIVE_ERRORS" ]; then
+      echo "error: too many consecutive query failures in completion phase" >&2
+      exit 1
+    fi
     sleep 300
     echo "retrying..."
     continue
   fi
   echo "current status: $RESULT"
   STATUS=$(echo "$RESULT" | jq -r '.[0].value.phase') || {
-    echo "failed to parse status, retrying..."
+    CONSECUTIVE_ERRORS=$((CONSECUTIVE_ERRORS + 1))
+    echo "failed to parse status (attempt $CONSECUTIVE_ERRORS/$MAX_CONSECUTIVE_ERRORS), retrying..."
+    if [ "$CONSECUTIVE_ERRORS" -ge "$MAX_CONSECUTIVE_ERRORS" ]; then
+      echo "error: too many consecutive parse failures in completion phase" >&2
+      exit 1
+    fi
     sleep 300
     continue
   }
+  CONSECUTIVE_ERRORS=0
   case $STATUS in
     finished)
       echo "finished"
@@ -86,15 +112,30 @@ while true; do
 done
 
 # Final outcome check (retry on transient errors)
+FINAL_RESULT_OK=false
+OUTCOME=""
 for i in 1 2 3; do
-  if RESULT=$(query_run 2>&1); then
-    break
+  if ! RESULT=$(query_run 2>&1); then
+    echo "final query failed (attempt $i/3): $RESULT"
+    sleep 10
+    continue
   fi
-  echo "final query failed (attempt $i/3): $RESULT"
-  sleep 10
+  echo "final result: $RESULT"
+  OUTCOME=$(echo "$RESULT" | jq -r '.[0].value.outcome') || {
+    echo "failed to parse final outcome (attempt $i/3), retrying..."
+    sleep 10
+    continue
+  }
+  FINAL_RESULT_OK=true
+  break
 done
-echo "final result: $RESULT"
-case $(echo "$RESULT" | jq -r '.[0].value.outcome') in
+
+if [ "$FINAL_RESULT_OK" != true ]; then
+  echo "error: failed to fetch a valid final outcome after 3 attempts" >&2
+  exit 1
+fi
+
+case $OUTCOME in
   success)
     exit 0
     ;;
