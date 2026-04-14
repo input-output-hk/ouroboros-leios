@@ -289,7 +289,7 @@ struct NodeLeiosState {
     eb_peer_announcements: HashMap<EndorserBlockId, Vec<NodeId>>,
     votes: HashMap<VoteBundleId, VoteBundleView>,
     votes_by_eb: HashMap<EndorserBlockId, BTreeMap<NodeId, usize>>,
-    certified_ebs: HashSet<EndorserBlockId>,
+    endorsed_ebs: HashMap<EndorserBlockId, u64>,
     incomplete_onchain_ebs: HashSet<EndorserBlockId>,
     missing_txs: HashMap<TransactionId, Vec<EndorserBlockId>>,
 }
@@ -377,6 +377,7 @@ impl NodeImpl for LinearLeiosNode {
         self.current_slot = slot;
         self.try_generate_rb(slot);
         self.prune_old_txs(slot);
+        self.prune_old_leios_state(slot);
 
         std::mem::take(&mut self.queued)
     }
@@ -480,6 +481,54 @@ impl LinearLeiosNode {
             }
             mempool.contains(id)
         });
+    }
+
+    fn prune_old_leios_state(&mut self, current_slot: u64) {
+        // Full EB lifecycle: 3*header_diffusion (equivocation wait) + vote_stage
+        // + diffuse_stage + a small buffer for the endorsing RB to be produced.
+        let header_diffusion_slots =
+            self.sim_config.header_diffusion_time.as_secs().max(1) * 3;
+        let margin = header_diffusion_slots
+            + self.sim_config.linear_vote_stage_length
+            + self.sim_config.linear_diffuse_stage_length
+            + 2;
+        let cutoff = current_slot.saturating_sub(margin);
+        if cutoff == 0 {
+            return;
+        }
+
+        // Prune all EBs older than the cutoff — both endorsed and unendorsed.
+        let expired: Vec<EndorserBlockId> = self
+            .leios
+            .votes_by_eb
+            .keys()
+            .filter(|eb_id| eb_id.slot < cutoff)
+            .copied()
+            .collect();
+
+        if expired.is_empty() {
+            return;
+        }
+
+        for eb_id in &expired {
+            self.leios.endorsed_ebs.remove(eb_id);
+            self.leios.votes_by_eb.remove(eb_id);
+            self.leios.ebs.remove(eb_id);
+            self.leios.eb_peer_announcements.remove(eb_id);
+        }
+
+        // Prune vote bundles that only reference expired EBs.
+        self.leios.votes.retain(|_, view| match view {
+            VoteBundleView::Received { votes } => {
+                votes.ebs.keys().any(|eb| eb.slot >= cutoff)
+            }
+            VoteBundleView::Requested => true,
+        });
+
+        // Prune ebs_by_rb entries pointing to expired EBs.
+        self.leios
+            .ebs_by_rb
+            .retain(|_, eb_id| eb_id.slot >= cutoff);
     }
 }
 
@@ -618,6 +667,8 @@ impl LinearLeiosNode {
                 // That won't stop us from generating the endorsement, though it'll make us produce an empty block.
                 self.leios.incomplete_onchain_ebs.insert(eb_id);
             }
+
+            self.leios.endorsed_ebs.entry(eb_id).or_insert(slot);
 
             Some(Endorsement {
                 eb: eb_id,
@@ -941,10 +992,14 @@ impl LinearLeiosNode {
                 header_seen,
             },
         );
-        if let Some(endorsement) = &rb.endorsement
-            && !self.is_eb_validated(endorsement.eb)
-        {
-            self.leios.incomplete_onchain_ebs.insert(endorsement.eb);
+        if let Some(endorsement) = &rb.endorsement {
+            self.leios
+                .endorsed_ebs
+                .entry(endorsement.eb)
+                .or_insert(rb.header.id.slot);
+            if !self.is_eb_validated(endorsement.eb) {
+                self.leios.incomplete_onchain_ebs.insert(endorsement.eb);
+            }
         }
 
         self.publish_rb(rb, true);
@@ -1448,17 +1503,14 @@ impl LinearLeiosNode {
     }
 
     fn count_votes(&mut self, votes: &VoteBundle) {
-        let vote_threshold = self.sim_config.vote_threshold as usize;
         for (eb_id, count) in votes.ebs.iter() {
-            let all_eb_votes = self.leios.votes_by_eb.entry(*eb_id).or_default();
-            let total_votes_before = all_eb_votes.values().sum::<usize>();
-            *all_eb_votes.entry(votes.id.producer).or_default() += count;
-
-            let total_votes_after = total_votes_before + count;
-            if total_votes_before < vote_threshold && total_votes_after >= vote_threshold {
-                // this EB is officially certified
-                self.leios.certified_ebs.insert(*eb_id);
-            }
+            *self
+                .leios
+                .votes_by_eb
+                .entry(*eb_id)
+                .or_default()
+                .entry(votes.id.producer)
+                .or_default() += count;
         }
     }
 }
