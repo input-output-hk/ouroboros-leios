@@ -1,38 +1,85 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Benchmark different committee selection algorithms under the CIP topology.
+# Benchmark different committee selection algorithms.
 # Always uses turbo mode (sequential engine, sharded).
 #
-# Usage: SLOTS=1500 ./scripts/cip-voting-options.sh
+# Usage: SLOTS=1500 ./scripts/cip-voting-options.sh [topology]
+#
+# Topology can be a leafname (resolved in data/simulation/pseudo-mainnet/),
+# a relative path, or an absolute path. Defaults to topology-v2-cip.yaml.
+# For mainnet-scale: ./scripts/cip-voting-options.sh topology-v1.yaml
+# Vote thresholds are auto-computed at 60% of expected committee size.
 
 # Configuration
 SLOTS="${SLOTS:-1500}"
 THROUGHPUTS=(0.150 0.200 0.250 0.300 0.350)
-# committee-selection-algorithm values and corresponding vote thresholds.
-# wfa-ls: CIP default (VRF lottery, ~600 expected committee, threshold 450)
-# everyone: all 750 nodes vote (1 each), threshold 450 (60%)
-# top-stake-fraction at 0.95: ~201 staking nodes vote, threshold 121 (60%)
-MODES=("wfa-ls" "everyone" "top-stake-fraction")
-declare -A VOTE_THRESHOLDS=(
-    ["wfa-ls"]=450
-    ["everyone"]=450
-    ["top-stake-fraction"]=121
-)
-declare -A STAKE_FRACTIONS=(
-    ["top-stake-fraction"]=0.95
-)
+QUORUM_FRACTION="${QUORUM_FRACTION:-0.60}"
+STAKE_FRACTION="${STAKE_FRACTION:-0.95}"
 
 # Paths (relative to sim-rs/)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SIM_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-TOPOLOGY="$SIM_DIR/../data/simulation/pseudo-mainnet/topology-v2-cip.yaml"
+TOPO_ARG="${1:-topology-v2-cip.yaml}"
+TOPO_DATA="$SIM_DIR/../data/simulation/pseudo-mainnet"
+if [[ "$TOPO_ARG" == /* ]]; then
+    TOPOLOGY="$TOPO_ARG"
+elif [[ -f "$TOPO_ARG" ]]; then
+    TOPOLOGY="$TOPO_ARG"
+elif [[ -f "$TOPO_DATA/$TOPO_ARG" ]]; then
+    TOPOLOGY="$TOPO_DATA/$TOPO_ARG"
+else
+    echo "ERROR: cannot find topology '$TOPO_ARG'" >&2
+    echo "  Looked in: ./ and $TOPO_DATA/" >&2
+    exit 1
+fi
 EXPERIMENTS="$SIM_DIR/../analysis/sims/cip/experiments"
 MEMORY_LIMIT="$SIM_DIR/parameters/memory-limit.yaml"
 TURBO="$SIM_DIR/parameters/turbo.yaml"
 RESULTS="$SIM_DIR/voting_results.csv"
 
 cd "$SIM_DIR"
+
+# Auto-compute committee sizes and vote thresholds from topology
+read -r TOTAL_NODES STAKING_NODES TOP_STAKE_NODES < <(python3 -c "
+import json, yaml, sys
+with open('$TOPOLOGY') as f:
+    first = f.read(1); f.seek(0)
+    d = json.load(f) if first == '{' else yaml.safe_load(f)
+nodes = d['nodes']
+if isinstance(nodes, dict):
+    stakes = [n.get('stake', 0) for n in nodes.values()]
+else:
+    stakes = [n.get('stake', 0) for n in nodes]
+total_nodes = len(stakes)
+staking = sorted([s for s in stakes if s > 0], reverse=True)
+total_stake = sum(staking)
+threshold = total_stake * $STAKE_FRACTION
+cum = 0
+top_n = 0
+for s in staking:
+    if cum >= threshold: break
+    cum += s
+    top_n += 1
+print(total_nodes, len(staking), top_n)
+")
+
+# committee-selection-algorithm values and corresponding vote thresholds.
+# wfa-ls: VRF lottery with CIP default expected committee (~600), threshold from config
+# everyone: all nodes vote (1 each)
+# top-stake-fraction: top ${STAKE_FRACTION} of cumulative stake
+MODES=("wfa-ls" "everyone" "top-stake-fraction")
+declare -A VOTE_THRESHOLDS=(
+    ["wfa-ls"]=450
+    ["everyone"]=$(python3 -c "import math; print(math.ceil($TOTAL_NODES * $QUORUM_FRACTION))")
+    ["top-stake-fraction"]=$(python3 -c "import math; print(math.ceil($TOP_STAKE_NODES * $QUORUM_FRACTION))")
+)
+
+echo "Topology: $TOPOLOGY" >&2
+echo "  Total nodes: $TOTAL_NODES, Staking: $STAKING_NODES" >&2
+echo "  Top ${STAKE_FRACTION} stake: $TOP_STAKE_NODES nodes" >&2
+echo "  Vote thresholds: wfa-ls=${VOTE_THRESHOLDS[wfa-ls]}, everyone=${VOTE_THRESHOLDS[everyone]}, top-stake-fraction=${VOTE_THRESHOLDS[top-stake-fraction]}" >&2
+echo "" >&2
 
 echo "Building release binary..."
 cargo build --release
@@ -56,8 +103,8 @@ for throughput in "${THROUGHPUTS[@]}"; do
         {
             echo "committee-selection-algorithm: \"$mode\""
             echo "vote-threshold: ${VOTE_THRESHOLDS[$mode]}"
-            if [[ -n "${STAKE_FRACTIONS[$mode]:-}" ]]; then
-                echo "committee-stake-fraction-threshold: ${STAKE_FRACTIONS[$mode]}"
+            if [[ "$mode" == "top-stake-fraction" ]]; then
+                echo "committee-stake-fraction-threshold: $STAKE_FRACTION"
             fi
         } > "$override"
 
