@@ -248,6 +248,10 @@ export interface Config {
   "vote-generation-cpu-time-ms-constant": number;
   "vote-validation-cpu-time-ms": number;
   "vote-bundle-size-bytes-per-eb": bigint;
+  /** Committee selection: "wfa-ls" (default VRF lottery), "everyone", or "top-stake-fraction". */
+  "committee-selection-algorithm"?: CommitteeSelectionAlgorithm;
+  /** Fraction of total stake eligible to vote with "top-stake-fraction". Default 0.95. */
+  "committee-stake-fraction-threshold"?: number;
   /** Only supported by Haskell simulation. */
   "vote-diffusion-strategy": DiffusionStrategy;
   /** Only supported by Haskell simulation. */
@@ -347,6 +351,15 @@ export enum MempoolSamplingStrategy {
   OrderedById = "ordered-by-id",
   /** Include transactions in random order. */
   Random = "random",
+}
+
+export enum CommitteeSelectionAlgorithm {
+  /** wFA+LS VRF-based lottery (default). */
+  WfaLs = "wfa-ls",
+  /** Every node votes. */
+  Everyone = "everyone",
+  /** Highest-stake nodes covering a fraction of total stake. */
+  TopStakeFraction = "top-stake-fraction",
 }
 
 export enum EBPropagationCriteria {

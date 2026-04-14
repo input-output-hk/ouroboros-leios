@@ -239,6 +239,12 @@ vote-generation-cpu-time-ms-constant: 164e-3
 vote-validation-cpu-time-ms: 816e-3
 vote-bundle-size-bytes-per-eb: 105
 
+# Committee selection algorithm: "wfa-ls" (default), "everyone", or "top-stake-fraction"
+# For "everyone" or "top-stake-fraction", adjust vote-threshold manually.
+committee-selection-algorithm: "wfa-ls"
+# Fraction of total stake eligible to vote when using "top-stake-fraction".
+committee-stake-fraction-threshold: 0.95
+
 vote-diffusion-strategy: "peer-order"
 
 # Haskell prototype relay mini-protocol parameters.
