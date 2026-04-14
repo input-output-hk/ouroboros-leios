@@ -5,6 +5,11 @@
 # Exits 0 on success, 1 on rejection/failure/unknown.
 set -euo pipefail
 
+if [ "$#" -ne 1 ]; then
+  echo "error: expected exactly 1 argument: <testRunId>" >&2
+  echo "usage: wait-for-test.sh <testRunId>" >&2
+  exit 1
+fi
 ID="$1"
 
 # Wallet auth isn't needed for read-only queries
