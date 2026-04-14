@@ -472,13 +472,21 @@ impl From<RawTopology> for Topology {
 }
 
 fn vote_weighted_average(params: &RawParameters, persistent: f64, non_persistent: f64) -> f64 {
-    let total = params.persistent_vote_generation_probability
-        + params.non_persistent_vote_generation_probability;
-    if total == 0.0 {
-        return 0.0;
+    match params.committee_selection_algorithm {
+        // Everyone and TopStakeFraction voters are all deterministically selected,
+        // so they use persistent vote parameters (no eligibility proofs needed).
+        CommitteeSelectionAlgorithm::Everyone
+        | CommitteeSelectionAlgorithm::TopStakeFraction => persistent,
+        CommitteeSelectionAlgorithm::WfaLs => {
+            let total = params.persistent_vote_generation_probability
+                + params.non_persistent_vote_generation_probability;
+            if total == 0.0 {
+                return 0.0;
+            }
+            let frac = params.persistent_vote_generation_probability / total;
+            frac * persistent + (1.0 - frac) * non_persistent
+        }
     }
-    let frac = params.persistent_vote_generation_probability / total;
-    frac * persistent + (1.0 - frac) * non_persistent
 }
 
 #[derive(Debug, Clone)]
