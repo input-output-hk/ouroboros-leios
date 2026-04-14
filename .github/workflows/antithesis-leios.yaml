@@ -210,7 +210,6 @@ jobs:
     permissions:
       contents: read
     env:
-      MOOG_GITHUB_PAT: ${{ secrets.MOOG_GITHUB_PAT }}
       MOOG_WALLET_FILE: wallet.json
       MOOG_MPFS_HOST: ${{ vars.MOOG_MPFS_HOST || 'https://mpfs.plutimus.com' }}
       MOOG_PLATFORM: github
@@ -267,6 +266,8 @@ jobs:
           TXID=$(echo "$RESULT" | jq -e .txHash | jq -r .)
           echo "id=$ID" >> "$GITHUB_OUTPUT"
           echo "txHash=$TXID" >> "$GITHUB_OUTPUT"
+        env:
+          MOOG_GITHUB_PAT: ${{ secrets.MOOG_GITHUB_PAT }}
 
       - name: Wait for results
         run: timeout $(((DURATION + 1) * 3600)) ./antithesis/scripts/wait-for-test.sh "${{ steps.request.outputs.id }}"
