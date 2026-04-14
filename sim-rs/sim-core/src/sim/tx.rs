@@ -208,10 +208,6 @@ impl<T> WeightedLookup<T> {
         }
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.elements.is_empty()
-    }
-
     pub fn sample<R: Rng>(&self, rng: &mut R) -> Option<&T> {
         if self.total_weight == 0 {
             return None;
