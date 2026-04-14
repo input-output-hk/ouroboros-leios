@@ -144,7 +144,7 @@ async fn main() -> Result<()> {
 
     select! {
         result = simulation.run(token) => { result? }
-        result = &mut monitor => { result?? }
+        result = &mut monitor => { return result?; }
         _ = ctrlc_source => {}
     };
 
