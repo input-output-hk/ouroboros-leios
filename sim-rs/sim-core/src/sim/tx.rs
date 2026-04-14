@@ -151,7 +151,7 @@ impl TransactionProducer {
             self.clock.wait_until(next_tx_at).await;
         }
 
-        if node_lookup.is_empty() {
+        if self.sinks.is_empty() {
             tracing::warn!(
                 "No nodes have tx_generation_weight > 0; \
                  skipping transaction generation. \
