@@ -295,7 +295,7 @@ struct NodeLeiosState {
     pruned_ebs: HashSet<EndorserBlockId>,
 }
 
-#[derive(Clone, Default)]
+#[derive(Default)]
 struct LedgerState {
     spent_inputs: HashSet<u64>,
     seen_blocks: HashSet<BlockId>,
@@ -313,7 +313,7 @@ pub struct LinearLeiosNode {
     current_slot: u64,
     txs: HashMap<TransactionId, TransactionView>,
     mempool: Mempool,
-    ledger_states: BTreeMap<BlockId, Arc<LedgerState>>,
+    ledger_state: Option<(BlockId, LedgerState)>,
     praos: NodePraosState,
     leios: NodeLeiosState,
     behaviours: NodeBehaviours,
@@ -361,7 +361,7 @@ impl NodeImpl for LinearLeiosNode {
                 tx_generated_backlog_max_size,
                 tx_peer_backlog_max_size,
             ),
-            ledger_states: BTreeMap::new(),
+            ledger_state: None,
             praos: NodePraosState::default(),
             leios: NodeLeiosState::default(),
             behaviours: config.behaviours.clone(),
@@ -574,14 +574,14 @@ impl LinearLeiosNode {
         // BTreeMap ~96B/entry, each Received: ~80B struct + 8B per tx ref
         let praos_bytes = praos_blocks * 96 + praos_tx_refs * 8;
 
-        // ledger_states
-        let ledger_count = self.ledger_states.len();
-        let ledger_inputs: usize = self
-            .ledger_states
-            .values()
-            .map(|ls| ls.spent_inputs.len())
-            .sum();
-        let ledger_bytes = ledger_count * 96 + ledger_inputs * 16;
+        // ledger_state
+        let ledger_count: usize = self.ledger_state.is_some().into();
+        let ledger_inputs = self
+            .ledger_state
+            .as_ref()
+            .map(|(_, ls)| ls.spent_inputs.len())
+            .unwrap_or(0);
+        let ledger_bytes = ledger_inputs * 16;
 
         // leios.ebs: count entries, sum tx refs
         let ebs_count = self.leios.ebs.len();
@@ -1661,8 +1661,12 @@ impl LinearLeiosNode {
 // Ledger/mempool operations
 impl LinearLeiosNode {
     fn try_add_tx_to_mempool(&mut self, tx: &Arc<Transaction>, is_local: bool) -> InsertResult {
-        let ledger_state = self.resolve_ledger_state(self.latest_rb_id());
-        if ledger_state.spent_inputs.contains(&tx.input_id) {
+        self.resolve_ledger_state(self.latest_rb_id());
+        if self
+            .ledger_state
+            .as_ref()
+            .is_some_and(|(_, ls)| ls.spent_inputs.contains(&tx.input_id))
+        {
             // This TX conflicts with something already on-chain
             return InsertResult::Backlogged;
         }
@@ -1752,22 +1756,25 @@ impl LinearLeiosNode {
         }
     }
 
-    fn resolve_ledger_state(&mut self, rb_ref: Option<BlockId>) -> Arc<LedgerState> {
+    fn resolve_ledger_state(&mut self, rb_ref: Option<BlockId>) {
         let Some(block_id) = rb_ref else {
-            return Arc::new(LedgerState::default());
+            return;
         };
-        if let Some(state) = self.ledger_states.get(&block_id) {
-            return state.clone();
-        };
+        if self
+            .ledger_state
+            .as_ref()
+            .is_some_and(|(id, _)| *id == block_id)
+        {
+            return;
+        }
 
         let mut state = self
-            .ledger_states
-            .last_key_value()
-            .map(|(_, v)| v.as_ref().clone())
+            .ledger_state
+            .take()
+            .map(|(_, s)| s)
             .unwrap_or_default();
 
         let mut block_queue = vec![block_id];
-        let mut complete = true;
         while let Some(block_id) = block_queue.pop() {
             if !state.seen_blocks.insert(block_id) {
                 continue;
@@ -1784,29 +1791,19 @@ impl LinearLeiosNode {
             }
 
             if let Some(endorsement) = &rb.endorsement {
-                match self.leios.ebs.get(&endorsement.eb) {
-                    Some(EndorserBlockView::Received { eb, .. }) => {
-                        for tx in &eb.txs {
-                            if self.has_tx(tx.id) {
-                                state.spent_inputs.insert(tx.input_id);
-                            } else {
-                                complete = false;
-                            }
+                if let Some(EndorserBlockView::Received { eb, .. }) =
+                    self.leios.ebs.get(&endorsement.eb)
+                {
+                    for tx in &eb.txs {
+                        if self.has_tx(tx.id) {
+                            state.spent_inputs.insert(tx.input_id);
                         }
-                    }
-                    _ => {
-                        // We haven't validated the EB yet, so we don't know the full ledger state
-                        complete = false;
                     }
                 }
             }
         }
 
-        let state = Arc::new(state);
-        if complete {
-            self.ledger_states.insert(block_id, state.clone());
-        }
-        state
+        self.ledger_state = Some((block_id, state));
     }
 }
 
