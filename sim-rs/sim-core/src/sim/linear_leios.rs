@@ -380,6 +380,10 @@ impl NodeImpl for LinearLeiosNode {
         self.prune_old_txs(slot);
         self.prune_old_leios_state(slot);
 
+        if slot % 60 == 0 && self.id.to_inner() == 0 {
+            self.log_memory_stats(slot);
+        }
+
         std::mem::take(&mut self.queued)
     }
 
@@ -537,6 +541,132 @@ impl LinearLeiosNode {
         self.leios
             .ebs_by_rb
             .retain(|_, eb_id| eb_id.slot >= latest_slot);
+    }
+
+    fn log_memory_stats(&self, slot: u64) {
+        let num_nodes = self.sim_config.nodes.len();
+
+        // txs: count received (hold Arc<Transaction>) vs pending (tiny)
+        let txs_total = self.txs.len();
+        let txs_received = self
+            .txs
+            .values()
+            .filter(|v| matches!(v, TransactionView::Received { .. }))
+            .count();
+        // HashMap overhead ~64B/entry, Received: Arc ptr(8) + u64(8), unique Transaction ~56B
+        let txs_bytes = txs_total * 64 + txs_received * 72;
+
+        // mempool
+        let (mp_len, mp_bytes, mp_local_bl, mp_peer_bl) = self.mempool.stats();
+        let mempool_bytes = mp_bytes as usize + mp_len * 96 + (mp_local_bl + mp_peer_bl) * 8;
+
+        // praos.blocks: count entries, sum tx refs in Received variants
+        let praos_blocks = self.praos.blocks.len();
+        let praos_tx_refs: usize = self
+            .praos
+            .blocks
+            .values()
+            .filter_map(|v| match v {
+                RankingBlockView::Received { rb, .. } => Some(rb.transactions.len()),
+                _ => None,
+            })
+            .sum();
+        // BTreeMap ~96B/entry, each Received: ~80B struct + 8B per tx ref
+        let praos_bytes = praos_blocks * 96 + praos_tx_refs * 8;
+
+        // ledger_states
+        let ledger_count = self.ledger_states.len();
+        let ledger_inputs: usize = self
+            .ledger_states
+            .values()
+            .map(|ls| ls.spent_inputs.len())
+            .sum();
+        let ledger_bytes = ledger_count * 96 + ledger_inputs * 16;
+
+        // leios.ebs: count entries, sum tx refs
+        let ebs_count = self.leios.ebs.len();
+        let ebs_tx_refs: usize = self
+            .leios
+            .ebs
+            .values()
+            .filter_map(|v| match v {
+                EndorserBlockView::Received { eb, .. } => Some(eb.txs.len()),
+                _ => None,
+            })
+            .sum();
+        let ebs_bytes = ebs_count * 64 + ebs_tx_refs * 8;
+
+        // leios.votes
+        let votes_count = self.leios.votes.len();
+        let votes_bytes = votes_count * 80;
+
+        // leios.votes_by_eb
+        let votes_by_eb_count = self.leios.votes_by_eb.len();
+        let votes_by_eb_voters: usize =
+            self.leios.votes_by_eb.values().map(|m| m.len()).sum();
+        let votes_by_eb_bytes = votes_by_eb_count * 64 + votes_by_eb_voters * 32;
+
+        // leios.eb_peer_announcements
+        let eb_announce_count = self.leios.eb_peer_announcements.len();
+        let eb_announce_peers: usize = self
+            .leios
+            .eb_peer_announcements
+            .values()
+            .map(|v| v.len())
+            .sum();
+        let eb_announce_bytes = eb_announce_count * 64 + eb_announce_peers * 8;
+
+        // smaller collections
+        let ebs_by_rb_count = self.leios.ebs_by_rb.len();
+        let endorsed_count = self.leios.endorsed_ebs.len();
+        let pruned_count = self.leios.pruned_ebs.len();
+        let missing_txs_count = self.leios.missing_txs.len();
+        let small_bytes =
+            ebs_by_rb_count * 48 + endorsed_count * 40 + pruned_count * 32 + missing_txs_count * 64;
+
+        let node_total = txs_bytes
+            + mempool_bytes
+            + praos_bytes
+            + ledger_bytes
+            + ebs_bytes
+            + votes_bytes
+            + votes_by_eb_bytes
+            + eb_announce_bytes
+            + small_bytes;
+        let all_nodes_mb = (node_total * num_nodes) as f64 / (1024.0 * 1024.0);
+
+        tracing::info!(
+            "Memory stats at slot {} (node 0, x{} nodes):\n\
+             \x20 txs:              {:>8} entries  ~ {:>6.1} MB  (received: {})\n\
+             \x20 mempool:          {:>8} entries  ~ {:>6.1} MB  (backlog: {}/{} local, {}/{} peer)\n\
+             \x20 praos.blocks:     {:>8} entries  ~ {:>6.1} MB  (tx_refs: {})\n\
+             \x20 ledger_states:    {:>8} entries  ~ {:>6.1} MB  (spent_inputs: {})\n\
+             \x20 leios.ebs:        {:>8} entries  ~ {:>6.1} MB  (tx_refs: {})\n\
+             \x20 leios.votes:      {:>8} entries  ~ {:>6.1} MB\n\
+             \x20 leios.votes_by_eb:{:>8} entries  ~ {:>6.1} MB  (voters: {})\n\
+             \x20 leios.eb_announce:{:>8} entries  ~ {:>6.1} MB  (peers: {})\n\
+             \x20 leios.ebs_by_rb:  {:>8} entries\n\
+             \x20 leios.endorsed:   {:>8} entries\n\
+             \x20 leios.pruned:     {:>8} entries\n\
+             \x20 leios.missing_txs:{:>8} entries\n\
+             \x20 ---\n\
+             \x20 Estimated total: ~ {:.1} MB  (x {} = ~ {:.1} MB)",
+            slot,
+            num_nodes,
+            txs_total, txs_bytes as f64 / 1e6, txs_received,
+            mp_len, mempool_bytes as f64 / 1e6, mp_local_bl, self.mempool.tx_generated_backlog_max_size.unwrap_or(0), mp_peer_bl, self.mempool.tx_peer_backlog_max_size.unwrap_or(0),
+            praos_blocks, praos_bytes as f64 / 1e6, praos_tx_refs,
+            ledger_count, ledger_bytes as f64 / 1e6, ledger_inputs,
+            ebs_count, ebs_bytes as f64 / 1e6, ebs_tx_refs,
+            votes_count, votes_bytes as f64 / 1e6,
+            votes_by_eb_count, votes_by_eb_bytes as f64 / 1e6, votes_by_eb_voters,
+            eb_announce_count, eb_announce_bytes as f64 / 1e6, eb_announce_peers,
+            ebs_by_rb_count,
+            endorsed_count,
+            pruned_count,
+            missing_txs_count,
+            node_total as f64 / 1e6, num_nodes, all_nodes_mb,
+        );
     }
 }
 
@@ -1738,6 +1868,15 @@ impl Mempool {
     fn is_generated_backlog_full(&self) -> bool {
         self.tx_generated_backlog_max_size
             .is_some_and(|max| self.local_backlog.len() >= max)
+    }
+
+    fn stats(&self) -> (usize, u64, usize, usize) {
+        (
+            self.mempool.len(),
+            self.mempool_size_bytes,
+            self.local_backlog.len(),
+            self.peer_backlog.len(),
+        )
     }
 
     fn is_peer_backlog_full(&self) -> bool {
