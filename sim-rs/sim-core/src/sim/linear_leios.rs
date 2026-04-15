@@ -546,6 +546,18 @@ impl LinearLeiosNode {
     fn log_memory_stats(&self, slot: u64) {
         let num_nodes = self.sim_config.nodes.len();
 
+        // Process RSS from /proc/self/status
+        let rss_mb = std::fs::read_to_string("/proc/self/status")
+            .ok()
+            .and_then(|s| {
+                s.lines()
+                    .find(|l| l.starts_with("VmRSS:"))
+                    .and_then(|l| l.split_whitespace().nth(1))
+                    .and_then(|v| v.parse::<u64>().ok())
+            })
+            .map(|kb| kb as f64 / 1024.0)
+            .unwrap_or(0.0);
+
         // txs: count received (hold Arc<Transaction>) vs pending (tiny)
         let txs_total = self.txs.len();
         let txs_received = self
@@ -560,7 +572,7 @@ impl LinearLeiosNode {
         let (mp_len, mp_bytes, mp_local_bl, mp_peer_bl) = self.mempool.stats();
         let mempool_bytes = mp_bytes as usize + mp_len * 96 + (mp_local_bl + mp_peer_bl) * 8;
 
-        // praos.blocks: count entries, sum tx refs in Received variants
+        // praos.blocks
         let praos_blocks = self.praos.blocks.len();
         let praos_tx_refs: usize = self
             .praos
@@ -571,8 +583,7 @@ impl LinearLeiosNode {
                 _ => None,
             })
             .sum();
-        // BTreeMap ~96B/entry, each Received: ~80B struct + 8B per tx ref
-        let praos_bytes = praos_blocks * 96 + praos_tx_refs * 8;
+        let praos_bytes = praos_blocks * 96 + praos_tx_refs * 56;
 
         // ledger_state
         let ledger_count: usize = self.ledger_state.is_some().into();
@@ -650,7 +661,8 @@ impl LinearLeiosNode {
              \x20 leios.pruned:     {:>8} entries\n\
              \x20 leios.missing_txs:{:>8} entries\n\
              \x20 ---\n\
-             \x20 Estimated total: ~ {:.1} MB  (x {} = ~ {:.1} MB)",
+             \x20 Estimated total: ~ {:.1} MB  (x {} = ~ {:.1} MB)\n\
+             \x20 Process RSS: {:.0} MB",
             slot,
             num_nodes,
             txs_total, txs_bytes as f64 / 1e6, txs_received,
@@ -666,6 +678,7 @@ impl LinearLeiosNode {
             pruned_count,
             missing_txs_count,
             node_total as f64 / 1e6, num_nodes, all_nodes_mb,
+            rss_mb,
         );
     }
 }
