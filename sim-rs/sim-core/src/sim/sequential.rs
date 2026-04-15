@@ -531,7 +531,18 @@ where
                 .into_iter()
                 .map(|shard| {
                     let token = token.clone();
-                    s.spawn(move || shard.run(token))
+                    s.spawn(move || {
+                        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                            shard.run(token.clone())
+                        }));
+                        match result {
+                            Ok(r) => r,
+                            Err(payload) => {
+                                token.cancel();
+                                std::panic::resume_unwind(payload);
+                            }
+                        }
+                    })
                 })
                 .collect();
 
