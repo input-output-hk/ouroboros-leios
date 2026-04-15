@@ -292,6 +292,7 @@ struct NodeLeiosState {
     endorsed_ebs: HashMap<EndorserBlockId, u64>,
     incomplete_onchain_ebs: HashSet<EndorserBlockId>,
     missing_txs: HashMap<TransactionId, Vec<EndorserBlockId>>,
+    pruned_ebs: HashSet<EndorserBlockId>,
 }
 
 #[derive(Clone, Default)]
@@ -509,10 +510,21 @@ impl LinearLeiosNode {
         }
 
         for eb_id in &expired {
+            // Don't prune EBs that are still being validated by the CPU
+            if matches!(
+                self.leios.ebs.get(eb_id),
+                Some(EndorserBlockView::Received {
+                    validated: false,
+                    ..
+                })
+            ) {
+                continue;
+            }
             self.leios.endorsed_ebs.remove(eb_id);
             self.leios.votes_by_eb.remove(eb_id);
             self.leios.ebs.remove(eb_id);
             self.leios.eb_peer_announcements.remove(eb_id);
+            self.leios.pruned_ebs.insert(*eb_id);
         }
 
         self.leios.votes.retain(|_, view| match view {
@@ -904,6 +916,10 @@ impl LinearLeiosNode {
         ) {
             return;
         }
+        if self.leios.pruned_ebs.contains(&eb_id) {
+            tracing::warn!("EB {} was re-announced after being pruned", eb_id);
+            return;
+        }
 
         let eb_peer_announcements = self.leios.eb_peer_announcements.entry(eb_id).or_default();
         if has_eb {
@@ -1197,7 +1213,8 @@ impl LinearLeiosNode {
         }
         let Some(EndorserBlockView::Received { validated, .. }) = self.leios.ebs.get_mut(&eb.id())
         else {
-            panic!("how did we validate this EB without ever seeing it?");
+            tracing::warn!("EB {} was pruned before CPU validation completed", eb.id());
+            return;
         };
         *validated = true;
         if matches!(
