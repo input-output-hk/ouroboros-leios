@@ -380,7 +380,7 @@ impl NodeImpl for LinearLeiosNode {
         self.prune_old_txs(slot);
         self.prune_old_leios_state(slot);
 
-        if slot % 60 == 0 && self.id.to_inner() == 0 {
+        if slot.is_multiple_of(60) && self.id.to_inner() == 0 {
             self.log_memory_stats(slot);
         }
 
@@ -1803,14 +1803,13 @@ impl LinearLeiosNode {
                 state.spent_inputs.insert(tx.input_id);
             }
 
-            if let Some(endorsement) = &rb.endorsement {
-                if let Some(EndorserBlockView::Received { eb, .. }) =
+            if let Some(endorsement) = &rb.endorsement
+                && let Some(EndorserBlockView::Received { eb, .. }) =
                     self.leios.ebs.get(&endorsement.eb)
-                {
-                    for tx in &eb.txs {
-                        if self.has_tx(tx.id) {
-                            state.spent_inputs.insert(tx.input_id);
-                        }
+            {
+                for tx in &eb.txs {
+                    if self.has_tx(tx.id) {
+                        state.spent_inputs.insert(tx.input_id);
                     }
                 }
             }
