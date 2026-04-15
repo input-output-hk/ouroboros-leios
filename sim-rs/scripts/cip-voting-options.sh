@@ -139,7 +139,7 @@ for throughput in "${THROUGHPUTS[@]}"; do
 
         echo -n "Running throughput=$throughput committee=$mode ... " >&2
         start=$(date +%s.%N)
-        output=$( cargo run --release -- "$TOPOLOGY" "${params[@]}" -s "$SLOTS" 2>&1 | tee /dev/stderr || true )
+        output=$( cargo run --release -- "$TOPOLOGY" "${params[@]}" -s "$SLOTS" 2>&1 | tee /dev/stderr )
         end=$(date +%s.%N)
         elapsed=$(echo "$end - $start" | bc)
 
