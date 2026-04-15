@@ -88,7 +88,7 @@ print(total_nodes, len(staking), top_n)
 ")
 
 # committee-selection-algorithm values and corresponding vote thresholds.
-# wfa-ls: VRF lottery with CIP default expected committee (~600), threshold from config
+# wfa-ls: VRF lottery with 600 total trials (480 persistent + 120 non-persistent), 75% quorum
 # everyone: all nodes vote (1 each)
 # top-stake-fraction: top ${STAKE_FRACTION} of cumulative stake
 declare -A VOTE_THRESHOLDS=(
@@ -130,6 +130,11 @@ for throughput in "${THROUGHPUTS[@]}"; do
         {
             echo "committee-selection-algorithm: \"$mode\""
             echo "vote-threshold: ${VOTE_THRESHOLDS[$mode]}"
+            if [[ "$mode" == "wfa-ls" ]]; then
+                # 600 total VRF trials, 80:20 persistent/non-persistent split
+                echo "persistent-vote-generation-probability: 480"
+                echo "non-persistent-vote-generation-probability: 120"
+            fi
             if [[ "$mode" == "top-stake-fraction" ]]; then
                 echo "committee-stake-fraction-threshold: $STAKE_FRACTION"
             fi
