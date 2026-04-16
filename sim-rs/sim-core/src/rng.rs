@@ -35,8 +35,11 @@ pub enum DrawSite {
     RbLottery,
     /// One of the `vote_probability` VRF trials for a given EB vote.
     VoteVrf { eb_id: EndorserBlockId, trial: u16 },
-    /// Fisher-Yates swap index `idx` during mempool sampling.
-    MempoolSwap { idx: u32 },
+    /// Fisher-Yates swap index `idx` during mempool sampling. `call`
+    /// distinguishes independent shuffle invocations at the same
+    /// `(node, slot)` — e.g. the RB-body sample and the EB-body sample
+    /// in the same slot must not collide.
+    MempoolSwap { call: u32, idx: u32 },
     /// Weighted node selection for transaction generation event `tx_idx`.
     TxGenNode { tx_idx: u64 },
     /// Transaction-body random fields for transaction generation event `tx_idx`.
@@ -110,6 +113,29 @@ impl Rng {
     pub fn draw_bool(&self, node: NodeId, slot: u64, site: DrawSite, p: f64) -> bool {
         let p = p.clamp(0.0, 1.0);
         self.draw_f64_01(node, slot, site) < p
+    }
+
+    /// Fisher-Yates shuffle of `items` using `DrawSite::MempoolSwap` at
+    /// each swap. `call` discriminates independent shuffles at the same
+    /// `(node, slot)` — pass `0` for the first sampling call in a slot,
+    /// `1` for the second, etc. Deterministic function of
+    /// `(seed, node, slot, call, len(items))`.
+    pub fn context_shuffle<T>(&self, items: &mut [T], node: NodeId, slot: u64, call: u32) {
+        let n = items.len();
+        // Fisher-Yates: for i from n-1 down to 1, swap items[i] with
+        // items[rand(0..=i)]. Only n-1 swaps needed.
+        for i in (1..n).rev() {
+            let j = self.draw_range(
+                node,
+                slot,
+                DrawSite::MempoolSwap {
+                    call,
+                    idx: i as u32,
+                },
+                (i + 1) as u64,
+            ) as usize;
+            items.swap(i, j);
+        }
     }
 }
 
@@ -249,7 +275,7 @@ mod tests {
                     DrawSite::RbLottery,
                     DrawSite::WithholdDecision,
                     DrawSite::WithholdTxCount,
-                    DrawSite::MempoolSwap { idx: 3 },
+                    DrawSite::MempoolSwap { call: 0, idx: 3 },
                     DrawSite::TestRoll { tag: 7 },
                 ] {
                     let draw = rng.draw_u64(NodeId::new(node), slot, site);
@@ -291,7 +317,7 @@ mod tests {
         let s = 100;
         let rb = rng.draw_u64(n, s, DrawSite::RbLottery);
         let withhold = rng.draw_u64(n, s, DrawSite::WithholdDecision);
-        let mempool = rng.draw_u64(n, s, DrawSite::MempoolSwap { idx: 0 });
+        let mempool = rng.draw_u64(n, s, DrawSite::MempoolSwap { call: 0, idx: 0 });
         let txgen = rng.draw_u64(n, s, DrawSite::TxGenNode { tx_idx: 0 });
         let vrf = rng.draw_u64(n, s, DrawSite::VoteVrf { eb_id: eb(s, 5), trial: 0 });
         let all = [rb, withhold, mempool, txgen, vrf];
@@ -334,6 +360,37 @@ mod tests {
             diff < 200,
             "draw_bool rate off by {diff} (got {hits}/{n}, expected ~{expected})"
         );
+    }
+
+    #[test]
+    fn context_shuffle_is_deterministic_per_context() {
+        let rng = Rng::new(42);
+        let mut a: Vec<u32> = (0..100).collect();
+        let mut b: Vec<u32> = (0..100).collect();
+        rng.context_shuffle(&mut a, NodeId::new(7), 5, 0);
+        rng.context_shuffle(&mut b, NodeId::new(7), 5, 0);
+        assert_eq!(a, b, "same (node,slot,call) must yield same permutation");
+    }
+
+    #[test]
+    fn context_shuffle_distinct_calls_yield_distinct_permutations() {
+        let rng = Rng::new(42);
+        let mut a: Vec<u32> = (0..100).collect();
+        let mut b: Vec<u32> = (0..100).collect();
+        rng.context_shuffle(&mut a, NodeId::new(7), 5, 0);
+        rng.context_shuffle(&mut b, NodeId::new(7), 5, 1);
+        assert_ne!(a, b, "different `call` must produce different shuffles");
+    }
+
+    #[test]
+    fn context_shuffle_preserves_multiset() {
+        let rng = Rng::new(42);
+        let mut v: Vec<u32> = (0..50).collect();
+        let original: std::collections::BTreeSet<_> = v.iter().copied().collect();
+        rng.context_shuffle(&mut v, NodeId::new(1), 99, 0);
+        let after: std::collections::BTreeSet<_> = v.iter().copied().collect();
+        assert_eq!(original, after, "shuffle must preserve multiset");
+        assert_eq!(v.len(), 50);
     }
 
     #[test]
