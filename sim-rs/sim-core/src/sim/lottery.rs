@@ -1,8 +1,11 @@
 use std::{collections::VecDeque, sync::Arc};
 
 use dashmap::DashMap;
-use rand::Rng;
-use rand_chacha::ChaChaRng;
+
+use crate::{
+    config::NodeId,
+    rng::{DrawSite, Rng},
+};
 
 pub fn compute_target_vrf_stake(stake: u64, total_stake: u64, success_rate: f64) -> u64 {
     let ratio = stake as f64 / total_stake as f64;
@@ -46,11 +49,23 @@ pub enum LotteryConfig {
 }
 
 impl LotteryConfig {
-    pub fn run(&self, kind: LotteryKind, success_rate: f64, rng: &mut ChaChaRng) -> Option<u64> {
+    /// Run one lottery trial. For `Random`, the outcome is a pure function
+    /// of `(rng.global_seed, node, slot, site)`: a VRF-style draw. For
+    /// `Mock`, the pre-configured queue for `kind` is popped and the
+    /// context is ignored (tests are already deterministic by construction).
+    pub fn run(
+        &self,
+        kind: LotteryKind,
+        success_rate: f64,
+        rng: &Rng,
+        node: NodeId,
+        slot: u64,
+        site: DrawSite,
+    ) -> Option<u64> {
         match self {
             Self::Random { stake, total_stake } => {
                 let target_vrf_stake = compute_target_vrf_stake(*stake, *total_stake, success_rate);
-                let result = rng.random_range(0..*total_stake);
+                let result = rng.draw_range(node, slot, site, *total_stake);
                 if result < target_vrf_stake {
                     Some(result)
                 } else {

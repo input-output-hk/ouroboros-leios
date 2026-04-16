@@ -19,6 +19,7 @@ use crate::{
         StracciatellaEndorserBlock as EndorserBlock, Transaction, TransactionId, VoteBundle,
         VoteBundleId,
     },
+    rng::{DrawSite, Rng},
     sim::{MiniProtocol, NodeImpl, SimCpuTask, SimMessage, lottery},
 };
 
@@ -430,7 +431,11 @@ impl StracciatellaLeiosNode {
 impl StracciatellaLeiosNode {
     fn try_generate_rb(&mut self, slot: u64) {
         // L1 block generation
-        let Some(vrf) = self.run_vrf(self.sim_config.block_generation_probability) else {
+        let Some(vrf) = self.run_vrf(
+            self.sim_config.block_generation_probability,
+            slot,
+            DrawSite::RbLottery,
+        ) else {
             return;
         };
 
@@ -544,8 +549,17 @@ impl StracciatellaLeiosNode {
         let pipeline = self.slot_to_pipeline(slot) + 1;
 
         let shards = self.find_available_shards(slot);
-        for next_p in lottery::vrf_probabilities(self.sim_config.eb_generation_probability) {
-            if let Some(vrf) = self.run_vrf(next_p) {
+        for (trial, next_p) in
+            lottery::vrf_probabilities(self.sim_config.eb_generation_probability).enumerate()
+        {
+            if let Some(vrf) = self.run_vrf(
+                next_p,
+                slot,
+                DrawSite::EbLottery {
+                    pipeline,
+                    trial: trial as u16,
+                },
+            ) {
                 self.tracker.track_eb_lottery_won(EndorserBlockId {
                     slot,
                     pipeline,
@@ -721,8 +735,19 @@ impl StracciatellaLeiosNode {
 // vote/endorsement operations
 impl StracciatellaLeiosNode {
     fn schedule_endorser_block_votes(&mut self, slot: u64) {
+        let pipeline = self.slot_to_pipeline(slot);
         let vrf_wins = lottery::vrf_probabilities(self.sim_config.vote_probability)
-            .filter_map(|f| self.run_vrf(f))
+            .enumerate()
+            .filter_map(|(trial, f)| {
+                self.run_vrf(
+                    f,
+                    slot,
+                    DrawSite::VoteVrfPipeline {
+                        pipeline,
+                        trial: trial as u16,
+                    },
+                )
+            })
             .count();
         if vrf_wins == 0 {
             return;
@@ -1211,13 +1236,16 @@ impl StracciatellaLeiosNode {
 // Common utilities
 impl StracciatellaLeiosNode {
     // Simulates the output of a VRF using this node's stake (if any).
-    fn run_vrf(&mut self, success_rate: f64) -> Option<u64> {
+    //
+    // Stateless: outcome is a pure function of (seed, node, slot, site).
+    fn run_vrf(&self, success_rate: f64, slot: u64, site: DrawSite) -> Option<u64> {
         let target_vrf_stake = lottery::compute_target_vrf_stake(
             self.stake,
             self.sim_config.total_stake,
             success_rate,
         );
-        let result = self.rng.random_range(0..self.sim_config.total_stake);
+        let rng = Rng::new(self.sim_config.seed);
+        let result = rng.draw_range(self.id, slot, site, self.sim_config.total_stake);
         if result < target_vrf_stake {
             Some(result)
         } else {
