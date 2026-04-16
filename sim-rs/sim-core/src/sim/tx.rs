@@ -1,6 +1,5 @@
 use anyhow::Result;
 use rand::Rng;
-use rand_chacha::ChaChaRng;
 use rand_distr::Distribution;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::sync::mpsc;
@@ -9,12 +8,18 @@ use crate::{
     clock::{ClockBarrier, Timestamp},
     config::{NodeConfiguration, NodeId, RealTransactionConfig, SimConfiguration, TransactionConfig},
     model::Transaction,
+    rng::Rng as SimRng,
 };
 
 /// Core transaction generation logic shared between actor and sequential engines.
 /// Uses usize indices to identify nodes; callers map these to their own node addressing.
 pub(super) struct TxGeneratorCore {
-    rng: ChaChaRng,
+    rng: SimRng,
+    /// Monotonic counter. The i-th generated TX draws its random state
+    /// deterministically from the context `("tx_generator", i)`, so the
+    /// TX stream is a pure function of the master seed regardless of any
+    /// per-node or network-timing behaviour elsewhere.
+    next_tx_idx: u64,
     config: Option<RealTransactionConfig>,
     node_weights: WeightedLookup<usize>,
     tx_conflict_fractions: Vec<Option<f64>>,
@@ -25,7 +30,7 @@ impl TxGeneratorCore {
     /// Create a new TxGeneratorCore.
     /// `nodes` is an iterator of (index, node_config) for nodes in this shard.
     pub(super) fn new<'a>(
-        rng: ChaChaRng,
+        rng: SimRng,
         config: &SimConfiguration,
         nodes: impl IntoIterator<Item = (usize, &'a NodeConfiguration)>,
     ) -> Self {
@@ -49,6 +54,7 @@ impl TxGeneratorCore {
 
         Self {
             rng,
+            next_tx_idx: 0,
             config: match &config.transactions {
                 TransactionConfig::Real(c) => Some(c.clone()),
                 _ => None,
@@ -85,17 +91,26 @@ impl TxGeneratorCore {
             return None;
         }
 
-        let &idx = self.node_weights.sample(&mut self.rng)?;
+        // Each generated TX gets its own seeded, one-shot ChaChaRng. The
+        // seed is derived from ("tx_generator", tx_idx), so the full
+        // sequence of generated TXs is a pure function of the master
+        // seed. This holds across shards (they increment their own
+        // tx_idx) and regardless of per-node network behaviour.
+        let tx_idx = self.next_tx_idx;
+        self.next_tx_idx += 1;
+        let mut tx_rng = self.rng.seeded_chacha_from(&("tx_generator", tx_idx));
+
+        let &idx = self.node_weights.sample(&mut tx_rng)?;
         let conflict_fraction = self
             .tx_conflict_fractions
             .get(idx)
             .copied()
             .flatten();
 
-        let tx = config.new_tx(&mut self.rng, conflict_fraction);
+        let tx = config.new_tx(&mut tx_rng, conflict_fraction);
 
         let millis_until_tx =
-            config.frequency_ms.sample(&mut self.rng) as u64 * self.shard_count as u64;
+            config.frequency_ms.sample(&mut tx_rng) as u64 * self.shard_count as u64;
         let next_at = now + Duration::from_millis(millis_until_tx);
 
         let next_time = if config.stop_time.is_some_and(|t| next_at > t) {
@@ -118,7 +133,7 @@ pub struct TransactionProducer {
 
 impl TransactionProducer {
     pub fn new(
-        rng: ChaChaRng,
+        rng: SimRng,
         clock: ClockBarrier,
         mut node_tx_sinks: HashMap<NodeId, mpsc::UnboundedSender<Arc<Transaction>>>,
         config: &SimConfiguration,

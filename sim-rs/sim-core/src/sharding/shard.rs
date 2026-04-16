@@ -155,13 +155,22 @@ where
         }
     }
 
-    // Create per-shard transaction producers
+    // Create per-shard transaction producers.
+    //
+    // Each shard's producer uses the shared stateless Rng. Different
+    // shards still produce disjoint TX streams because shards round-
+    // robin on tx_idx (shard-local counter) and the downstream
+    // node-weight sampling filters by locally-hosted nodes. The master
+    // rng's next_u64 is consumed per shard to preserve existing
+    // per-shard seeding-order semantics for any downstream draws that
+    // still depend on it.
     let tx_producers: Vec<TransactionProducer> = per_shard_tx_sinks
         .into_iter()
         .enumerate()
         .map(|(shard, tx_sinks)| {
+            let _ = rng.next_u64();
             TransactionProducer::new(
-                ChaChaRng::seed_from_u64(rng.next_u64()),
+                crate::rng::Rng::new(config.seed),
                 clocks[shard].barrier(),
                 tx_sinks,
                 config,

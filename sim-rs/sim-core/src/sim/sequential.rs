@@ -714,8 +714,12 @@ where
             }
         }
 
-        // TX generator + initial events
-        let tx_rng = ChaChaRng::seed_from_u64(rng.next_u64());
+        // TX generator + initial events. The TX generator uses the
+        // shared stateless Rng (seeded from config.seed); its TX stream
+        // is a pure function of (seed, tx_idx) independent of per-node
+        // behaviour.
+        let _ = rng.next_u64(); // preserve master-RNG consumption count for other draws below
+        let tx_rng = crate::rng::Rng::new(config.seed);
         let indexed_nodes: Vec<_> = config.nodes.iter()
             .filter_map(|n| node_indices.get(&n.id).map(|&idx| (idx, n)))
             .collect();

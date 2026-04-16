@@ -9,7 +9,6 @@ use std::{
     time::Duration,
 };
 
-use rand::{Rng as _, seq::SliceRandom as _};
 use rand_chacha::ChaChaRng;
 
 use crate::{
@@ -307,7 +306,6 @@ pub struct LinearLeiosNode {
     sim_config: Arc<SimConfiguration>,
     queued: EventResult,
     tracker: EventTracker,
-    rng: ChaChaRng,
     clock: Clock,
     lottery: LotteryConfig,
     consumers: Vec<NodeId>,
@@ -335,9 +333,13 @@ impl NodeImpl for LinearLeiosNode {
         config: &NodeConfiguration,
         sim_config: Arc<SimConfiguration>,
         tracker: EventTracker,
-        rng: ChaChaRng,
+        _rng: ChaChaRng,
         clock: Clock,
     ) -> Self {
+        // Linear Leios is fully stateless-RNG; `_rng` from NodeImpl::new
+        // is ignored. Randomness is derived on demand from
+        // Rng::new(sim_config.seed) with explicit (node, slot, site)
+        // context. See sim-core/src/rng.rs.
         let lottery = LotteryConfig::Random {
             stake: config.stake,
             total_stake: sim_config.total_stake,
@@ -351,7 +353,6 @@ impl NodeImpl for LinearLeiosNode {
             sim_config,
             queued: EventResult::default(),
             tracker,
-            rng,
             clock,
             lottery,
             consumers: config.consumers.clone(),
@@ -1484,15 +1485,26 @@ impl LinearLeiosNode {
         if withhold_tx_config.stop_time.is_some_and(|s| slot_ts > s) {
             return vec![];
         }
-        if !self.rng.random_bool(withhold_tx_config.probability) {
+        let rng = Rng::new(self.sim_config.seed);
+        if !rng.draw_bool(
+            self.id,
+            slot,
+            DrawSite::WithholdDecision,
+            withhold_tx_config.probability,
+        ) {
             return vec![];
         }
 
-        let txs_to_generate = withhold_tx_config.txs_to_generate.sample(&mut self.rng) as u64;
+        let mut count_rng = rng.seeded_chacha(self.id, slot, DrawSite::WithholdTxCount);
+        let txs_to_generate = withhold_tx_config.txs_to_generate.sample(&mut count_rng) as u64;
         let mut txs = vec![];
-        for _ in 0..txs_to_generate {
+        for i in 0..txs_to_generate {
             let tx = match &self.sim_config.transactions {
-                TransactionConfig::Real(cfg) => cfg.new_tx(&mut self.rng, None),
+                TransactionConfig::Real(cfg) => {
+                    let mut tx_rng =
+                        rng.seeded_chacha(self.id, slot, DrawSite::TxGenBody { tx_idx: i });
+                    cfg.new_tx(&mut tx_rng, None)
+                }
                 TransactionConfig::Mock(cfg) => cfg.mock_tx(cfg.eb_size / txs_to_generate),
             };
             self.tracker.track_transaction_generated(&tx, self.id);

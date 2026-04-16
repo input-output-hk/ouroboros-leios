@@ -20,6 +20,8 @@
 
 use std::hash::{Hash, Hasher};
 
+use rand_chacha::{ChaChaRng, rand_core::SeedableRng};
+
 use crate::{config::NodeId, model::EndorserBlockId};
 
 /// Identifies a distinct random-draw call site. The enum discriminant plus
@@ -113,6 +115,24 @@ impl Rng {
     pub fn draw_bool(&self, node: NodeId, slot: u64, site: DrawSite, p: f64) -> bool {
         let p = p.clamp(0.0, 1.0);
         self.draw_f64_01(node, slot, site) < p
+    }
+
+    /// Seed a one-shot `ChaChaRng` from the given context. Useful when
+    /// driving code that requires a `rand::Rng` interface (e.g., a
+    /// `rand_distr::Distribution::sample` call, or any function taking
+    /// `&mut ChaChaRng`) in a stateless way: the returned rng's initial
+    /// state depends only on `(global_seed, node, slot, site)`, and it's
+    /// discarded after use so its consumption pattern doesn't affect
+    /// other draws.
+    pub fn seeded_chacha(&self, node: NodeId, slot: u64, site: DrawSite) -> ChaChaRng {
+        ChaChaRng::seed_from_u64(self.draw_u64(node, slot, site))
+    }
+
+    /// Seed a one-shot `ChaChaRng` from an arbitrary hashable context.
+    /// For draws not associated with a specific `(node, slot, site)` —
+    /// e.g. the transaction generator, which is a sim-wide object.
+    pub fn seeded_chacha_from<K: Hash>(&self, ctx: &K) -> ChaChaRng {
+        ChaChaRng::seed_from_u64(self.draw_u64_with_context(ctx))
     }
 
     /// Fisher-Yates shuffle of `items` using `DrawSite::MempoolSwap` at
