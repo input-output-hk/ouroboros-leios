@@ -847,6 +847,8 @@ impl LinearLeiosNode {
                     &mut rb_transactions,
                     self.sim_config.max_block_size,
                     true,
+                    slot,
+                    0,
                 );
             }
         }
@@ -869,7 +871,13 @@ impl LinearLeiosNode {
                     eb_transactions.push(Arc::new(tx));
                 }
             } else {
-                self.sample_from_mempool(&mut eb_transactions, self.sim_config.max_eb_size, false);
+                self.sample_from_mempool(
+                    &mut eb_transactions,
+                    self.sim_config.max_eb_size,
+                    false,
+                    slot,
+                    1,
+                );
             }
         }
         let (eb_announcement, eb) = if eb_transactions.is_empty() {
@@ -1722,6 +1730,8 @@ impl LinearLeiosNode {
         txs: &mut Vec<Arc<Transaction>>,
         max_size: u64,
         remove: bool,
+        slot: u64,
+        shuffle_call: u32,
     ) {
         let mut size = txs.iter().map(|tx| tx.bytes).sum::<u64>();
         let mut candidates: Vec<_> = self.mempool.ids().collect();
@@ -1729,7 +1739,8 @@ impl LinearLeiosNode {
             self.sim_config.mempool_strategy,
             MempoolSamplingStrategy::Random
         ) {
-            candidates.shuffle(&mut self.rng);
+            let rng = Rng::new(self.sim_config.seed);
+            rng.context_shuffle(&mut candidates, self.id, slot, shuffle_call);
         } else {
             candidates.reverse();
         }
