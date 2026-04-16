@@ -42,7 +42,7 @@ pub(crate) trait NetworkRunnable: Send {
 use std::fmt::Debug;
 use std::hash::Hash;
 
-impl<TProtocol: Clone + Eq + Hash + Send + 'static, TMessage: Debug + Send + 'static> NetworkRunnable
+impl<TProtocol: Clone + Eq + Hash + Ord + Send + 'static, TMessage: Debug + Send + 'static> NetworkRunnable
     for Network<TProtocol, TMessage>
 {
     fn run(&mut self) -> futures::future::BoxFuture<'_, Result<()>> {
@@ -64,7 +64,7 @@ pub(crate) fn build_shards<TProtocol, TMessage>(
     mut networks: Vec<Network<TProtocol, TMessage>>,
 ) -> Vec<Shard>
 where
-    TProtocol: Clone + Eq + Hash + Send + Debug + 'static,
+    TProtocol: Clone + Eq + Hash + Ord + Send + Debug + 'static,
     TMessage: Debug + Send + 'static,
 {
     let shard_count = clocks.len();
