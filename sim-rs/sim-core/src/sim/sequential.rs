@@ -58,6 +58,47 @@ enum GlobalEvent<N: NodeImpl> {
     SlotBoundary { slot: u64 },
 }
 
+impl<N: NodeImpl> GlobalEvent<N> {
+    /// Content-derived total order for events that share a timestamp.
+    ///
+    /// `BinaryHeap` pop order for equal-timestamp events is a function
+    /// of push history, which under multi-shard can vary across runs.
+    /// After popping all events at a given timestamp we re-sort by this
+    /// key so that processing order is a pure function of which events
+    /// exist at that timestamp, not the order in which they arrived on
+    /// the heap. Leading discriminant tag gives variants a stable
+    /// relative order; subsequent fields break ties within a variant.
+    fn sort_key(&self) -> (u8, usize, usize, u64, u64) {
+        match self {
+            GlobalEvent::SlotBoundary { slot } => (0, 0, 0, *slot, 0),
+            GlobalEvent::TxGeneration => (1, 0, 0, 0, 0),
+            // Deliveries for a given (from, to) link all land at the
+            // same timestamp if pushed together; the link identifies
+            // them uniquely.
+            GlobalEvent::NetworkDelivery(link) => {
+                (2, link.from.to_inner(), link.to.to_inner(), 0, 0)
+            }
+            GlobalEvent::NodeTimed { node_idx, event } => {
+                let (sub, task, subtask) = match event {
+                    NodeEvent::NewSlot(slot) => (0u8, *slot, 0u64),
+                    NodeEvent::CpuSubtaskCompleted(s) => {
+                        (1u8, s.task_id, s.subtask_id)
+                    }
+                    NodeEvent::Other(_) => {
+                        // Node-local TimedEvents are opaque; they
+                        // originate from the single node identified by
+                        // node_idx and don't benefit from inter-variant
+                        // disambiguation (a single node's handlers
+                        // process them in order regardless).
+                        (2u8, 0, 0)
+                    }
+                };
+                (3, *node_idx, sub as usize, task, subtask)
+            }
+        }
+    }
+}
+
 /// Work item for the parallel compute phase.
 enum WorkItem<N: NodeImpl> {
     NewSlot(u64),
@@ -84,6 +125,16 @@ impl<N: NodeImpl> Default for BatchNodeOutput<N> {
 
 
 /// Cross-shard message sent between sequential shards.
+///
+/// `source_shard` and `seq` are the deterministic-ordering keys: the
+/// receiver buffers incoming messages into a priority queue keyed on
+/// `(send_time, source_shard, seq)` and only delivers those whose
+/// `send_time` is strictly less than the minimum of every peer's
+/// advertised `shared_time`. Under that rule no future message can
+/// arrive with an earlier send_time, so the drain order is a pure
+/// function of the sent messages (which are themselves deterministic
+/// per-shard) — OS thread scheduling no longer leaks into simulation
+/// state. See `drain_cross_shard_safe` below.
 struct CrossShardMsg<M> {
     from: NodeId,
     to: NodeId,
@@ -91,6 +142,8 @@ struct CrossShardMsg<M> {
     body: M,
     bytes: u64,
     send_time: Timestamp,
+    source_shard: usize,
+    seq: u64,
 }
 
 /// CMB peer shard reference for ceiling computation.
@@ -101,6 +154,39 @@ struct PeerShardInfo {
 
 use crate::sim::tx::TxGeneratorCore;
 
+/// Entry in the receiver-side priority queue. Ordered by
+/// `(send_time, source_shard, seq)` — the `seq` is a per-sender
+/// monotonic counter so that two messages with the same send_time from
+/// the same source still have a total order.
+struct PendingCrossShardMsg<M> {
+    send_time: Timestamp,
+    source_shard: usize,
+    seq: u64,
+    inner: CrossShardMsg<M>,
+}
+
+impl<M> PartialEq for PendingCrossShardMsg<M> {
+    fn eq(&self, other: &Self) -> bool {
+        self.key() == other.key()
+    }
+}
+impl<M> Eq for PendingCrossShardMsg<M> {}
+impl<M> PartialOrd for PendingCrossShardMsg<M> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl<M> Ord for PendingCrossShardMsg<M> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.key().cmp(&other.key())
+    }
+}
+impl<M> PendingCrossShardMsg<M> {
+    fn key(&self) -> (Timestamp, usize, u64) {
+        (self.send_time, self.source_shard, self.seq)
+    }
+}
+
 /// Cross-shard state for multi-shard CMB operation.
 struct CrossShardState<M> {
     shard_index: usize,
@@ -108,6 +194,14 @@ struct CrossShardState<M> {
     tx: Vec<std_mpsc::Sender<CrossShardMsg<M>>>,
     rx: std_mpsc::Receiver<CrossShardMsg<M>>,
     peer_shards: Vec<PeerShardInfo>,
+    /// Monotonic counter tagged onto each outgoing cross-shard message
+    /// so that same-`send_time` messages from this shard retain a total
+    /// order on the receiver side.
+    send_seq: u64,
+    /// Receiver-side priority queue of messages pending safe delivery.
+    /// `BinaryHeap::pop` returns the largest element, so we wrap each
+    /// entry in `Reverse` to get min-heap semantics on the sort key.
+    pending: BinaryHeap<std::cmp::Reverse<PendingCrossShardMsg<M>>>,
 }
 
 /// The sequential discrete event simulation engine.
@@ -153,37 +247,66 @@ impl<N: NodeImpl> SequentialSimulation<N> {
                 break;
             }
 
-            // === Drain incoming cross-shard messages ===
-            // Multi-shard is non-deterministic: try_recv/recv_timeout ordering
-            // depends on OS scheduling of peer shard threads. Single-shard
-            // (cross_shard is None) is deterministic after the bandwidth-queue
-            // fix in Connection.
-            if let Some(cs) = &self.cross_shard {
-                let msgs: Vec<_> = std::iter::from_fn(|| cs.rx.try_recv().ok()).collect();
-                for msg in msgs {
-                    Self::deliver_cross_shard_msg(
-                        &mut self.connections,
-                        &mut self.pending_deliveries,
-                        &mut self.event_queue,
-                        msg,
-                        self.config.timestamp_resolution,
-                    );
-                }
+            // === Drain + deliver safe cross-shard messages ===
+            // Under the per-peer safe-boundary rule (see
+            // `drain_cross_shard_safe`), delivery order is a pure
+            // function of sent messages regardless of OS thread
+            // scheduling; multi-shard sequential is now deterministic.
+            if let Some(cs) = self.cross_shard.as_mut() {
+                Self::drain_cross_shard_safe(
+                    cs,
+                    &mut self.connections,
+                    &mut self.pending_deliveries,
+                    &mut self.event_queue,
+                    self.config.timestamp_resolution,
+                );
             }
 
             // === Check next event timestamp ===
+            //
+            // Every shard stops at the same simulation time regardless of
+            // cancellation propagation. Terminate only when both of
+            // these hold:
+            //   1. the local event queue has no events with ts < end_time
+            //   2. no peer shard can deliver a cross-shard message that
+            //      would land with ts < end_time (i.e., CMB ceiling
+            //      >= end_time)
+            // Checking (2) matters because otherwise a non-primary shard
+            // that has no local events < end_time (maybe just NewSlot
+            // at end_time queued) could break before a still-in-flight
+            // cross-shard message at, say, ts = end_time - 5ms lands.
+            if let Some(max_slot) = self.config.slots {
+                let end_time = Timestamp::zero() + Duration::from_secs(max_slot);
+                let next_local_ts = self
+                    .event_queue
+                    .peek()
+                    .map(|e| e.0)
+                    .unwrap_or(Timestamp::max());
+                let peer_ceiling = if let Some(cs) = self.cross_shard.as_ref() {
+                    cs.peer_shards
+                        .iter()
+                        .map(|p| p.time.load(Ordering::Acquire) + p.min_latency)
+                        .min()
+                        .unwrap_or(Timestamp::max())
+                } else {
+                    Timestamp::max()
+                };
+                if next_local_ts >= end_time && peer_ceiling >= end_time {
+                    token.cancel();
+                    break;
+                }
+            }
             let Some(FutureEvent(timestamp, _)) = self.event_queue.peek() else {
                 // No events — if we have peers, wait for cross-shard messages
-                if let Some(cs) = &self.cross_shard {
-                    if let Ok(msg) = cs.rx.recv_timeout(blocked_timeout) {
-                        Self::deliver_cross_shard_msg(
-                            &mut self.connections,
-                            &mut self.pending_deliveries,
-                            &mut self.event_queue,
-                            msg,
-                            self.config.timestamp_resolution,
-                        );
-                    }
+                if let Some(cs) = self.cross_shard.as_mut() {
+                    Self::wait_for_cross_shard_and_deliver_safe(
+                        cs,
+                        &mut self.connections,
+                        &mut self.pending_deliveries,
+                        &mut self.event_queue,
+                        self.config.timestamp_resolution,
+                        blocked_timeout,
+                    );
                     continue;
                 }
                 break;
@@ -191,7 +314,20 @@ impl<N: NodeImpl> SequentialSimulation<N> {
             let timestamp = *timestamp;
 
             // === CMB ceiling check ===
-            if let Some(cs) = &self.cross_shard {
+            //
+            // Strict inequality: we may only process `timestamp` when
+            // `timestamp < ceiling` (NOT `<=`). At the boundary
+            // `timestamp == ceiling`, a peer j might still be at
+            // `T_peer_j = ceiling - min_latency_j` and yet to send a
+            // message at `send_time = T_peer_j` whose
+            // `delivery_time = ceiling = timestamp`. If we advanced, that
+            // delivery would be pushed into event_queue in a *later*
+            // loop iteration, after our intra-shard sends at `timestamp`
+            // have already been pushed — making heap push-order
+            // non-deterministic across runs. Strict inequality ensures
+            // `T_peer_j > timestamp - min_latency_j`, so every message
+            // with `delivery_time <= timestamp` is already on the mpsc.
+            if let Some(cs) = self.cross_shard.as_mut() {
                 let ceiling = cs
                     .peer_shards
                     .iter()
@@ -199,36 +335,68 @@ impl<N: NodeImpl> SequentialSimulation<N> {
                     .min()
                     .unwrap_or(Timestamp::max());
 
-                if timestamp > ceiling {
+                if timestamp >= ceiling {
                     let current = self.shared_time.load(Ordering::Acquire);
                     if ceiling > current {
                         self.shared_time.store(ceiling, Ordering::Release);
                     }
-                    if let Ok(msg) = cs.rx.recv_timeout(blocked_timeout) {
-                        Self::deliver_cross_shard_msg(
-                            &mut self.connections,
-                            &mut self.pending_deliveries,
-                            &mut self.event_queue,
-                            msg,
-                            self.config.timestamp_resolution,
-                        );
-                    }
+                    Self::wait_for_cross_shard_and_deliver_safe(
+                        cs,
+                        &mut self.connections,
+                        &mut self.pending_deliveries,
+                        &mut self.event_queue,
+                        self.config.timestamp_resolution,
+                        blocked_timeout,
+                    );
                     continue;
                 }
             }
 
+            // Second drain after ceiling check passes: we now know
+            // `timestamp < ceiling`, so every cross-shard message with
+            // delivery_time <= timestamp must have been sent by its peer
+            // shard (peer_time > timestamp - min_latency). Drain one more
+            // time to capture anything that may have landed on the mpsc
+            // since the top-of-loop drain, before we commit to popping.
+            // Without this, cross-shard deliveries for `timestamp` can
+            // land after we've already popped its intra-shard events,
+            // splitting the timestamp's processing into two batches.
+            if let Some(cs) = self.cross_shard.as_mut() {
+                Self::drain_cross_shard_safe(
+                    cs,
+                    &mut self.connections,
+                    &mut self.pending_deliveries,
+                    &mut self.event_queue,
+                    self.config.timestamp_resolution,
+                );
+            }
+
             self.shared_time.store(timestamp, Ordering::Release);
 
-            // === Pop all events at this timestamp ===
+            // === Pop all events at this timestamp, then sort by content ===
+            // BinaryHeap pop order for equal-timestamp events depends on
+            // push history. Under multi-shard operation, the push sequence
+            // at a given timestamp can vary across runs (cross-shard
+            // pushes happen at drain time, intra-shard pushes happen
+            // during apply_batch_output, and the interleaving of the two
+            // depends on peer-shard scheduling). Collecting and sorting
+            // by a content-derived key makes processing order a pure
+            // function of which events exist at the timestamp, not the
+            // order they arrived in the heap.
             let mut total_node_work = 0usize;
-            let mut done = false;
 
+            let mut events_at_ts: Vec<GlobalEvent<N>> = Vec::new();
             while self
                 .event_queue
                 .peek()
                 .is_some_and(|e| e.0 == timestamp)
             {
                 let FutureEvent(_, event) = self.event_queue.pop().unwrap();
+                events_at_ts.push(event);
+            }
+            events_at_ts.sort_by_key(|e| e.sort_key());
+
+            for event in events_at_ts {
                 match event {
                     GlobalEvent::NodeTimed { node_idx, event } => {
                         per_node_work[node_idx].push(match event {
@@ -283,21 +451,19 @@ impl<N: NodeImpl> SequentialSimulation<N> {
                             self.tracker.track_global_slot(slot);
                         }
                         let next_slot = slot + 1;
-                        if self.config.slots == Some(next_slot) {
-                            done = true;
-                            token.cancel();
-                        } else {
-                            self.event_queue.push(FutureEvent(
-                                Timestamp::zero() + Duration::from_secs(next_slot),
-                                GlobalEvent::SlotBoundary { slot: next_slot },
-                            ));
-                        }
+                        // Termination is handled at the top of the main
+                        // loop via the `timestamp >= end_time` check, so
+                        // every shard stops at the same simulation time
+                        // independently of cancellation propagation. We
+                        // always push the next boundary even when it's
+                        // past end_time — the top-of-loop check will see
+                        // it and exit cleanly.
+                        self.event_queue.push(FutureEvent(
+                            Timestamp::zero() + Duration::from_secs(next_slot),
+                            GlobalEvent::SlotBoundary { slot: next_slot },
+                        ));
                     }
                 }
-            }
-
-            if done {
-                break;
             }
 
             if total_node_work == 0 {
@@ -339,6 +505,81 @@ impl<N: NodeImpl> SequentialSimulation<N> {
         Ok(())
     }
 
+    /// Drain all messages currently available on the cross-shard receiver
+    /// into the per-shard priority queue, then deliver all messages whose
+    /// `send_time` is strictly less than the minimum of every peer's
+    /// advertised `shared_time`. "Strictly less than" is safe because
+    /// peers advertise `shared_time` BEFORE processing that timestamp's
+    /// events — observing peer shared_time = X means the peer has not
+    /// yet sent anything at send_time < X that isn't already on the mpsc.
+    ///
+    /// Delivery order is `(send_time, source_shard, seq)` which is a
+    /// pure function of sent messages; OS thread scheduling of peer
+    /// shards no longer leaks into the simulation state trajectory.
+    fn drain_cross_shard_safe(
+        cs: &mut CrossShardState<N::Message>,
+        connections: &mut HashMap<Link, Connection<MiniProtocol, N::Message>>,
+        pending_deliveries: &mut HashSet<Link>,
+        event_queue: &mut BinaryHeap<FutureEvent<GlobalEvent<N>>>,
+        timestamp_resolution: Duration,
+    ) {
+        while let Ok(msg) = cs.rx.try_recv() {
+            cs.pending.push(std::cmp::Reverse(PendingCrossShardMsg {
+                send_time: msg.send_time,
+                source_shard: msg.source_shard,
+                seq: msg.seq,
+                inner: msg,
+            }));
+        }
+        let safe = cs
+            .peer_shards
+            .iter()
+            .map(|p| p.time.load(Ordering::Acquire))
+            .min()
+            .unwrap_or(Timestamp::max());
+        while let Some(top) = cs.pending.peek() {
+            if top.0.send_time >= safe {
+                break;
+            }
+            let msg = cs.pending.pop().unwrap().0.inner;
+            Self::deliver_cross_shard_msg(
+                connections,
+                pending_deliveries,
+                event_queue,
+                msg,
+                timestamp_resolution,
+            );
+        }
+    }
+
+    /// Block for up to `blocked_timeout` waiting for one cross-shard
+    /// message, push it into the pending queue if received, then run
+    /// `drain_cross_shard_safe`.
+    fn wait_for_cross_shard_and_deliver_safe(
+        cs: &mut CrossShardState<N::Message>,
+        connections: &mut HashMap<Link, Connection<MiniProtocol, N::Message>>,
+        pending_deliveries: &mut HashSet<Link>,
+        event_queue: &mut BinaryHeap<FutureEvent<GlobalEvent<N>>>,
+        timestamp_resolution: Duration,
+        blocked_timeout: Duration,
+    ) {
+        if let Ok(msg) = cs.rx.recv_timeout(blocked_timeout) {
+            cs.pending.push(std::cmp::Reverse(PendingCrossShardMsg {
+                send_time: msg.send_time,
+                source_shard: msg.source_shard,
+                seq: msg.seq,
+                inner: msg,
+            }));
+        }
+        Self::drain_cross_shard_safe(
+            cs,
+            connections,
+            pending_deliveries,
+            event_queue,
+            timestamp_resolution,
+        );
+    }
+
     /// Deliver a single cross-shard message into the local connection.
     fn deliver_cross_shard_msg(
         connections: &mut HashMap<Link, Connection<MiniProtocol, N::Message>>,
@@ -369,9 +610,11 @@ impl<N: NodeImpl> SequentialSimulation<N> {
     fn apply_batch_output(&mut self, output: BatchNodeOutput<N>, timestamp: Timestamp) {
         for (from_id, to, bytes, protocol, msg) in output.messages {
             // Check if this is a cross-shard message
-            if let Some(cs) = &self.cross_shard {
+            if let Some(cs) = self.cross_shard.as_mut() {
                 let target_shard = cs.shard_lookup[&to];
                 if target_shard != cs.shard_index {
+                    let seq = cs.send_seq;
+                    cs.send_seq += 1;
                     let _ = cs.tx[target_shard].send(CrossShardMsg {
                         from: from_id,
                         to,
@@ -379,6 +622,8 @@ impl<N: NodeImpl> SequentialSimulation<N> {
                         body: msg,
                         bytes,
                         send_time: timestamp,
+                        source_shard: cs.shard_index,
+                        seq,
                     });
                     continue;
                 }
@@ -762,6 +1007,8 @@ where
                 tx: senders.clone(),
                 rx: receivers[shard_idx].take().unwrap(),
                 peer_shards,
+                send_seq: 0,
+                pending: BinaryHeap::new(),
             })
         } else {
             None

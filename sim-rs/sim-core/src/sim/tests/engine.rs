@@ -534,6 +534,45 @@ async fn test_sequential_deterministic_under_bandwidth_contention() {
 }
 
 #[tokio::test]
+async fn test_sequential_multi_shard_deterministic() {
+    // Multi-shard sequential previously let OS thread scheduling of peer
+    // shards leak into the drain order of the cross-shard mpsc, so runs
+    // with shard_count > 1 produced different event sequences across
+    // runs. The fix buffers per-shard cross-shard messages and only
+    // delivers those whose send_time is strictly less than the minimum
+    // advertised peer shared_time — a value which is a pure function of
+    // inputs. Delivery order is sorted by (send_time, source_shard, seq).
+    //
+    // Per-node event trajectories must therefore match across runs. (We
+    // can't compare raw event *order* via the mpsc because shards race
+    // through the event channel; compare by-node sorted sequences as we
+    // do for rayon.)
+    let events1 = run_sequential(2).await;
+    let events2 = run_sequential(2).await;
+
+    let canon = |events: &[(String, String, String, Timestamp)]| {
+        let mut by_node: std::collections::BTreeMap<String, Vec<_>> =
+            std::collections::BTreeMap::new();
+        for (node, ev, detail, ts) in events {
+            by_node
+                .entry(node.clone())
+                .or_default()
+                .push((*ts, ev.clone(), detail.clone()));
+        }
+        for v in by_node.values_mut() {
+            v.sort();
+        }
+        by_node
+    };
+
+    assert_eq!(
+        canon(&events1),
+        canon(&events2),
+        "multi-shard sequential must produce identical per-node trajectories across runs"
+    );
+}
+
+#[tokio::test]
 async fn test_sequential_deterministic_bw_under_rayon() {
     // With rayon enabled (parallel_threshold = 1), the event channel order
     // is intentionally non-deterministic across nodes — workers race through
