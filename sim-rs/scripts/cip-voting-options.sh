@@ -12,6 +12,7 @@ set -euo pipefail
 #   -m, --mode LIST              Comma-separated committee modes. Default: all
 #   -e, --engine ENGINE          Engine: actor | sequential | turbo. Default: turbo
 #   -s, --slots N                Number of slots. Default: 1500
+#   -P, --extra-params FILE      Extra parameter YAML to layer on top (may be repeated).
 #       --quorum-fraction FRAC   Default: 0.60
 #       --stake-fraction FRAC    Default: 0.95
 #   -h, --help                   Show this help
@@ -47,6 +48,7 @@ STAKE_FRACTION="${STAKE_FRACTION:-0.95}"
 
 ALL_THROUGHPUTS=(0.150 0.200 0.250 0.300 0.350)
 ALL_MODES=("wfa-ls" "everyone" "top-stake-fraction")
+EXTRA_PARAMS=()
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -55,11 +57,20 @@ while [[ $# -gt 0 ]]; do
         -m|--mode)          MODE_ARG="$2"; shift 2 ;;
         -e|--engine)        ENGINE="$2"; shift 2 ;;
         -s|--slots)         SLOTS="$2"; shift 2 ;;
+        -P|--extra-params)  EXTRA_PARAMS+=("$2"); shift 2 ;;
         --quorum-fraction)  QUORUM_FRACTION="$2"; shift 2 ;;
         --stake-fraction)   STAKE_FRACTION="$2"; shift 2 ;;
         -h|--help)          usage 0 ;;
         *)                  echo "ERROR: unknown option '$1'" >&2; usage 1 ;;
     esac
+done
+
+# Validate that extra-params files exist
+for extra in "${EXTRA_PARAMS[@]}"; do
+    if [[ ! -f "$extra" ]]; then
+        echo "ERROR: --extra-params file '$extra' not found" >&2
+        exit 1
+    fi
 done
 
 case "$ENGINE" in
@@ -202,6 +213,10 @@ for throughput in "${THROUGHPUTS[@]}"; do
         } > "$override"
 
         params=(-p "$config" -p "$MEMORY_LIMIT" "${ENGINE_PARAMS[@]}" -p "$override")
+        # Apply --extra-params last so they override everything above
+        for extra in "${EXTRA_PARAMS[@]}"; do
+            params+=(-p "$extra")
+        done
 
         echo -n "Running throughput=$throughput committee=$mode engine=$ENGINE ... " >&2
         start=$(date +%s.%N)
