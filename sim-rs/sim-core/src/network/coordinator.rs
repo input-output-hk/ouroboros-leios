@@ -47,7 +47,7 @@ pub struct EdgeConfig {
     pub bandwidth_bps: Option<u64>,
 }
 
-impl<TProtocol: Clone + Eq + Hash, TMessage: Debug> NetworkCoordinator<TProtocol, TMessage> {
+impl<TProtocol: Clone + Eq + Hash + Ord, TMessage: Debug> NetworkCoordinator<TProtocol, TMessage> {
     pub fn new(source: mpsc::UnboundedReceiver<Message<TProtocol, TMessage>>) -> Self {
         Self {
             source,
