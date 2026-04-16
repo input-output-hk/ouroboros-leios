@@ -26,6 +26,7 @@ use crate::{
         NoVoteReason, Transaction, TransactionId, TransactionLostReason, VoteBundle,
         VoteBundleId,
     },
+    rng::{DrawSite, Rng},
     sim::{
         MiniProtocol, NodeImpl, SimCpuTask, SimMessage,
         linear_leios::attackers::{EBWithholdingEvent, EBWithholdingSender},
@@ -783,6 +784,8 @@ impl LinearLeiosNode {
         let Some(vrf) = self.run_vrf(
             LotteryKind::GenerateRB,
             self.sim_config.block_generation_probability,
+            slot,
+            DrawSite::RbLottery,
         ) else {
             return;
         };
@@ -1517,8 +1520,20 @@ impl LinearLeiosNode {
     fn try_vote_for_endorser_block(&mut self, eb: &Arc<EndorserBlock>, seen: Timestamp) -> bool {
         let vrf_wins = match self.sim_config.committee_selection {
             CommitteeSelectionAlgorithm::WfaLs => {
+                let eb_id = eb.id();
                 vrf_probabilities(self.sim_config.vote_probability)
-                    .filter_map(|f| self.run_vrf(LotteryKind::GenerateVote, f))
+                    .enumerate()
+                    .filter_map(|(trial, f)| {
+                        self.run_vrf(
+                            LotteryKind::GenerateVote,
+                            f,
+                            eb.slot,
+                            DrawSite::VoteVrf {
+                                eb_id,
+                                trial: trial as u16,
+                            },
+                        )
+                    })
                     .count()
             }
             CommitteeSelectionAlgorithm::Everyone => 1,
@@ -1826,8 +1841,20 @@ impl LinearLeiosNode {
         self.lottery = LotteryConfig::Mock { results };
     }
     // Simulates the output of a VRF using this node's stake (if any).
-    fn run_vrf(&mut self, kind: LotteryKind, success_rate: f64) -> Option<u64> {
-        self.lottery.run(kind, success_rate, &mut self.rng)
+    //
+    // Pure function of (seed, node, slot, site): no per-node RNG state,
+    // so whether this node drew 0 or 600 random values in an earlier
+    // slot cannot affect this draw. Mirrors real VRF semantics (stateless
+    // per key+message).
+    fn run_vrf(
+        &self,
+        kind: LotteryKind,
+        success_rate: f64,
+        slot: u64,
+        site: DrawSite,
+    ) -> Option<u64> {
+        let rng = Rng::new(self.sim_config.seed);
+        self.lottery.run(kind, success_rate, &rng, self.id, slot, site)
     }
 }
 
