@@ -1,12 +1,22 @@
 #!/usr/bin/env bash
 # Print a concise status line for a currently-running sim-cli invocation.
-# Takes a log-file path; defaults to /tmp/det-500-1ms.log.
+# Takes a log-file path; if omitted, picks the most recently modified
+# /tmp/sim-*.log (matching the per-seed logs written by cip-voting-options.sh).
 #
 # Intended for use from /loop so we don't block Claude's thread on sleep.
 
 set -uo pipefail
 
-LOG="${1:-/tmp/det-500-1ms.log}"
+if [[ $# -ge 1 ]]; then
+    LOG="$1"
+else
+    LOG=$(ls -t /tmp/sim-*.log 2>/dev/null | head -1)
+    if [[ -z "$LOG" ]]; then
+        echo "No log given and no /tmp/sim-*.log found."
+        exit 1
+    fi
+fi
+echo "Log: $LOG"
 
 if ! ps -ef | grep -v grep | grep -q 'target/release/sim-cli'; then
     echo "sim-cli not running."
