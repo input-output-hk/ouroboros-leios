@@ -553,7 +553,7 @@ async fn test_sequential_deterministic_bw_under_rayon() {
             by_node
                 .entry(node.clone())
                 .or_default()
-                .push((ts.clone(), ev.clone(), detail.clone()));
+                .push((*ts, ev.clone(), detail.clone()));
         }
         for v in by_node.values_mut() {
             v.sort();
