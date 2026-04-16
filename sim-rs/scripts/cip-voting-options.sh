@@ -242,9 +242,14 @@ for throughput in "${THROUGHPUTS[@]}"; do
             done
             params+=(-p "$WORK/seed-$seed.yaml")
 
-            echo -n "Running throughput=$throughput committee=$mode engine=$ENGINE seed=$seed ... " >&2
+            run_log="/tmp/sim-T${throughput}-${mode}-${ENGINE}-seed${seed}.log"
+            echo -n "Running throughput=$throughput committee=$mode engine=$ENGINE seed=$seed (log: $run_log) ... " >&2
             start=$(date +%s.%N)
-            output=$( cargo run --release -- "$TOPOLOGY" "${params[@]}" -s "$SLOTS" 2>&1 | tee /dev/stderr )
+            # tee to a per-run log (and capture stdout for stats parsing via
+            # $(...)). Using an explicit file — not /dev/stderr — avoids a
+            # /proc/self/fd/2 re-open quirk that truncated the combined log
+            # when multiple runs shared one redirect target.
+            output=$( cargo run --release -- "$TOPOLOGY" "${params[@]}" -s "$SLOTS" 2>&1 | tee "$run_log" )
             end=$(date +%s.%N)
             elapsed=$(echo "$end - $start" | bc)
 
