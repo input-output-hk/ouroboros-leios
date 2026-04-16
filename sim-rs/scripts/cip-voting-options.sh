@@ -1,33 +1,75 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Benchmark different committee selection algorithms.
-# Always uses turbo mode (sequential engine, sharded).
+# Benchmark different committee selection algorithms across engines.
 #
-# Usage: ./scripts/cip-voting-options.sh [topology] [throughput,...] [mode,...]
+# Usage:
+#   ./scripts/cip-voting-options.sh [options]
+#
+# Options:
+#   -t, --topology PATH          Topology file (leafname, rel or abs path). Default: topology-v2-cip.yaml
+#   -T, --throughput LIST        Comma-separated throughputs. Default: all
+#   -m, --mode LIST              Comma-separated committee modes. Default: all
+#   -e, --engine ENGINE          Engine: actor | sequential | turbo. Default: turbo
+#   -s, --slots N                Number of slots. Default: 1500
+#       --quorum-fraction FRAC   Default: 0.60
+#       --stake-fraction FRAC    Default: 0.95
+#   -h, --help                   Show this help
+#
+# Engine choices:
+#   actor       — tokio async actor system (single-shard, non-deterministic by design)
+#   sequential  — single-shard sequential DES (deterministic)
+#   turbo       — sequential DES with 6 shards and zero-latency clusters (non-deterministic, fast)
 #
 # Examples:
-#   ./scripts/cip-voting-options.sh                              # all defaults
-#   ./scripts/cip-voting-options.sh topology-v1.yaml             # mainnet-scale
-#   ./scripts/cip-voting-options.sh - 0.250 everyone             # single run, default topology
-#   ./scripts/cip-voting-options.sh - 0.250,0.300 wfa-ls,everyone
-#   SLOTS=500 ./scripts/cip-voting-options.sh - - top-stake-fraction
+#   ./scripts/cip-voting-options.sh                                     # all defaults (turbo)
+#   ./scripts/cip-voting-options.sh -t topology-v1.yaml                 # mainnet-scale
+#   ./scripts/cip-voting-options.sh -T 0.250 -m everyone                # single run
+#   ./scripts/cip-voting-options.sh -T 0.250,0.300 -m wfa-ls,everyone
+#   ./scripts/cip-voting-options.sh -e sequential -T 0.200 -m wfa-ls    # determinism check
+#   ./scripts/cip-voting-options.sh --slots 500 -m top-stake-fraction
 #
-# Topology can be a leafname (resolved in data/simulation/pseudo-mainnet/),
-# a relative path, or an absolute path. Use "-" for the default.
-# Vote thresholds are auto-computed at 60% of expected committee size.
+# Vote thresholds are auto-computed at QUORUM_FRACTION of expected committee size.
 
-# Configuration
+usage() {
+    sed -n '3,/^$/p' "$0" | sed 's/^# \?//'
+    exit "${1:-0}"
+}
+
+# Defaults
+TOPO_ARG="-"
+THROUGHPUT_ARG="-"
+MODE_ARG="-"
+ENGINE="turbo"
 SLOTS="${SLOTS:-1500}"
-ALL_THROUGHPUTS=(0.150 0.200 0.250 0.300 0.350)
-ALL_MODES=("wfa-ls" "everyone" "top-stake-fraction")
 QUORUM_FRACTION="${QUORUM_FRACTION:-0.60}"
 STAKE_FRACTION="${STAKE_FRACTION:-0.95}"
+
+ALL_THROUGHPUTS=(0.150 0.200 0.250 0.300 0.350)
+ALL_MODES=("wfa-ls" "everyone" "top-stake-fraction")
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -t|--topology)      TOPO_ARG="$2"; shift 2 ;;
+        -T|--throughput)    THROUGHPUT_ARG="$2"; shift 2 ;;
+        -m|--mode)          MODE_ARG="$2"; shift 2 ;;
+        -e|--engine)        ENGINE="$2"; shift 2 ;;
+        -s|--slots)         SLOTS="$2"; shift 2 ;;
+        --quorum-fraction)  QUORUM_FRACTION="$2"; shift 2 ;;
+        --stake-fraction)   STAKE_FRACTION="$2"; shift 2 ;;
+        -h|--help)          usage 0 ;;
+        *)                  echo "ERROR: unknown option '$1'" >&2; usage 1 ;;
+    esac
+done
+
+case "$ENGINE" in
+    actor|sequential|turbo) ;;
+    *) echo "ERROR: --engine must be one of: actor, sequential, turbo (got '$ENGINE')" >&2; exit 1 ;;
+esac
 
 # Paths (relative to sim-rs/)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SIM_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-TOPO_ARG="${1:--}"
 TOPO_DATA="$SIM_DIR/../data/simulation/pseudo-mainnet"
 if [[ "$TOPO_ARG" == "-" ]]; then
     TOPOLOGY="$TOPO_DATA/topology-v2-cip.yaml"
@@ -43,9 +85,6 @@ else
     exit 1
 fi
 
-# Parse throughput and mode filters (comma-separated, "-" or omitted = all)
-THROUGHPUT_ARG="${2:--}"
-MODE_ARG="${3:--}"
 if [[ "$THROUGHPUT_ARG" == "-" ]]; then
     THROUGHPUTS=("${ALL_THROUGHPUTS[@]}")
 else
@@ -56,6 +95,7 @@ if [[ "$MODE_ARG" == "-" ]]; then
 else
     IFS=',' read -ra MODES_FILTER <<< "$MODE_ARG"
 fi
+
 EXPERIMENTS="$SIM_DIR/../analysis/sims/cip/experiments"
 MEMORY_LIMIT="$SIM_DIR/parameters/memory-limit.yaml"
 TURBO="$SIM_DIR/parameters/turbo.yaml"
@@ -97,21 +137,42 @@ declare -A VOTE_THRESHOLDS=(
     ["top-stake-fraction"]=$(python3 -c "import math; print(math.ceil($TOP_STAKE_NODES * $QUORUM_FRACTION))")
 )
 
+# Build the engine-specific parameter file.
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT
+
+ENGINE_PARAMS=()
+case "$ENGINE" in
+    actor)
+        # Default engine is actor; shard-count defaults to 1. Nothing to add.
+        ;;
+    sequential)
+        engine_override="$WORK/engine-sequential.yaml"
+        {
+            echo "engine: sequential"
+            echo "shard-count: 1"
+        } > "$engine_override"
+        ENGINE_PARAMS=(-p "$engine_override")
+        ;;
+    turbo)
+        ENGINE_PARAMS=(-p "$TURBO")
+        ;;
+esac
+
 echo "Topology: $TOPOLOGY" >&2
 echo "  Total nodes: $TOTAL_NODES, Staking: $STAKING_NODES" >&2
 echo "  Top ${STAKE_FRACTION} stake: $TOP_STAKE_NODES nodes" >&2
 echo "  Vote thresholds: wfa-ls=${VOTE_THRESHOLDS[wfa-ls]}, everyone=${VOTE_THRESHOLDS[everyone]}, top-stake-fraction=${VOTE_THRESHOLDS[top-stake-fraction]}" >&2
+echo "Engine: $ENGINE" >&2
+echo "Slots: $SLOTS" >&2
 echo "" >&2
 
 echo "Building release binary..."
 cargo build --release
 
-WORK=$(mktemp -d)
-trap 'rm -rf "$WORK"' EXIT
-
-HEADER="throughput,committee,time_seconds,total_ebs,uncertified_ebs,ebs_with_endorsement,total_votes,votes_per_eb_mean,votes_per_eb_stddev"
+HEADER="throughput,committee,engine,time_seconds,total_ebs,uncertified_ebs,ebs_with_endorsement,total_votes,votes_per_eb_mean,votes_per_eb_stddev"
 echo ""
-if [[ ! -f "$RESULTS" ]] || ! head -1 "$RESULTS" | grep -q "^throughput,"; then
+if [[ ! -f "$RESULTS" ]]; then
     echo "$HEADER" | tee "$RESULTS"
 else
     echo "$HEADER"
@@ -140,9 +201,9 @@ for throughput in "${THROUGHPUTS[@]}"; do
             fi
         } > "$override"
 
-        params=(-p "$config" -p "$MEMORY_LIMIT" -p "$TURBO" -p "$override")
+        params=(-p "$config" -p "$MEMORY_LIMIT" "${ENGINE_PARAMS[@]}" -p "$override")
 
-        echo -n "Running throughput=$throughput committee=$mode ... " >&2
+        echo -n "Running throughput=$throughput committee=$mode engine=$ENGINE ... " >&2
         start=$(date +%s.%N)
         output=$( cargo run --release -- "$TOPOLOGY" "${params[@]}" -s "$SLOTS" 2>&1 | tee /dev/stderr )
         end=$(date +%s.%N)
@@ -167,7 +228,7 @@ for throughput in "${THROUGHPUTS[@]}"; do
         votes_per_eb_stddev=$(echo "$output" | grep -oP 'Each EB received an average of [\d.]+ vote\(s\) \(stddev \K[\d.]+' | head -1)
         votes_per_eb_stddev=${votes_per_eb_stddev:-0}
 
-        echo "$throughput,$mode,$elapsed,$total_ebs,$uncertified_ebs,$ebs_with_endorsement,$total_votes,$votes_per_eb_mean,$votes_per_eb_stddev" | tee -a "$RESULTS"
+        echo "$throughput,$mode,$ENGINE,$elapsed,$total_ebs,$uncertified_ebs,$ebs_with_endorsement,$total_votes,$votes_per_eb_mean,$votes_per_eb_stddev" | tee -a "$RESULTS"
         echo "done (${elapsed}s)" >&2
     done
 done
