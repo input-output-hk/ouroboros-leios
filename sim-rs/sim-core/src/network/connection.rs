@@ -1,6 +1,5 @@
 use std::{
-    collections::{HashMap, VecDeque},
-    hash::Hash,
+    collections::{BTreeMap, VecDeque},
     time::Duration,
 };
 
@@ -54,7 +53,11 @@ impl<T> MiniProtocolQueue<T> {
 pub struct Connection<TProtocol, TMessage> {
     bandwidth_bps: Option<u64>,
     latency: Duration,
-    bandwidth_queues: HashMap<TProtocol, MiniProtocolQueue<(u64, TMessage)>>,
+    // BTreeMap (not HashMap) so that split_bytes_amongst_queues iterates in a
+    // deterministic order. The +1-byte remainder distribution below is
+    // sensitive to tie-breaks between equal-sized queues; using a HashMap
+    // leaks std RandomState hashing into simulation state. Do not change.
+    bandwidth_queues: BTreeMap<TProtocol, MiniProtocolQueue<(u64, TMessage)>>,
     latency_queue: VecDeque<(TMessage, Timestamp)>,
     last_event: Timestamp,
     next_id: u64,
@@ -62,13 +65,13 @@ pub struct Connection<TProtocol, TMessage> {
 
 impl<TProtocol, TMessage> Connection<TProtocol, TMessage>
 where
-    TProtocol: Clone + Eq + Hash,
+    TProtocol: Clone + Ord,
 {
     pub fn new(latency: Duration, bandwidth_bps: Option<u64>) -> Self {
         Self {
             bandwidth_bps,
             latency,
-            bandwidth_queues: HashMap::new(),
+            bandwidth_queues: BTreeMap::new(),
             latency_queue: VecDeque::new(),
             last_event: Timestamp::zero(),
             next_id: 0,
@@ -162,12 +165,14 @@ where
         self.last_event = now;
     }
 
-    fn split_bytes_amongst_queues(&self, bytes: u64) -> HashMap<TProtocol, u64> {
+    fn split_bytes_amongst_queues(&self, bytes: u64) -> BTreeMap<TProtocol, u64> {
         let mut queue_bytes: Vec<(&TProtocol, u64)> = self
             .bandwidth_queues
             .iter()
             .map(|(k, v)| (k, v.bytes()))
             .collect();
+        // Stable sort by bytes; BTreeMap::iter yields keys in ascending order,
+        // so ties break deterministically by TProtocol's Ord.
         queue_bytes.sort_by_key(|(_, bytes)| *bytes);
         let queues = queue_bytes.len() as u64;
         let target_bytes_per_queue = bytes / queues;
@@ -206,7 +211,7 @@ mod tests {
 
     use super::Connection;
 
-    #[derive(Clone, PartialEq, Eq, Hash)]
+    #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
     enum MiniProtocol {
         One,
         Two,

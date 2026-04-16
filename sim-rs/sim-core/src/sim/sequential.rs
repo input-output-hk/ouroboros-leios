@@ -154,6 +154,10 @@ impl<N: NodeImpl> SequentialSimulation<N> {
             }
 
             // === Drain incoming cross-shard messages ===
+            // Multi-shard is non-deterministic: try_recv/recv_timeout ordering
+            // depends on OS scheduling of peer shard threads. Single-shard
+            // (cross_shard is None) is deterministic after the bandwidth-queue
+            // fix in Connection.
             if let Some(cs) = &self.cross_shard {
                 let msgs: Vec<_> = std::iter::from_fn(|| cs.rx.try_recv().ok()).collect();
                 for msg in msgs {

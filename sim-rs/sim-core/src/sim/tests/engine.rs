@@ -24,11 +24,15 @@ use crate::{
 enum TestMessage {
     Ping { from: NodeId, slot: u64 },
     Pong { from: NodeId, slot: u64 },
+    Heartbeat { from: NodeId, slot: u64 },
 }
 
 impl SimMessage for TestMessage {
     fn protocol(&self) -> MiniProtocol {
-        MiniProtocol::Block
+        match self {
+            TestMessage::Ping { .. } | TestMessage::Pong { .. } => MiniProtocol::Block,
+            TestMessage::Heartbeat { .. } => MiniProtocol::Tx,
+        }
     }
     fn bytes_size(&self) -> u64 {
         100
@@ -114,6 +118,16 @@ impl NodeImpl for TestNode {
                     slot,
                 },
             );
+            // Send a Heartbeat on the Tx mini-protocol at the same time; this
+            // forces two mini-protocols to queue bytes simultaneously on the
+            // same link, exercising split_bytes_amongst_queues.
+            result.send_to(
+                peer,
+                TestMessage::Heartbeat {
+                    from: self.id,
+                    slot,
+                },
+            );
         }
         result
     }
@@ -144,6 +158,14 @@ impl NodeImpl for TestNode {
                 self.tracker.track_test_event(
                     self.id,
                     "pong_received",
+                    &format!("from={from},slot={slot}"),
+                );
+                EventResult::default()
+            }
+            TestMessage::Heartbeat { from, slot } => {
+                self.tracker.track_test_event(
+                    self.id,
+                    "heartbeat_received",
                     &format!("from={from},slot={slot}"),
                 );
                 EventResult::default()
@@ -184,6 +206,14 @@ impl NodeImpl for TestNode {
 // ---------------------------------------------------------------------------
 
 fn new_node(stake: Option<u64>, producers: Vec<&str>) -> RawNode {
+    new_node_with_bandwidth(stake, producers, None)
+}
+
+fn new_node_with_bandwidth(
+    stake: Option<u64>,
+    producers: Vec<&str>,
+    bandwidth_bytes_per_second: Option<u64>,
+) -> RawNode {
     RawNode {
         stake,
         location: RawNodeLocation::Cluster {
@@ -199,7 +229,7 @@ fn new_node(stake: Option<u64>, producers: Vec<&str>) -> RawNode {
                     n.to_string(),
                     RawLinkInfo {
                         latency_ms: 5.0,
-                        bandwidth_bytes_per_second: None,
+                        bandwidth_bytes_per_second,
                     },
                 )
             })
@@ -223,16 +253,53 @@ fn test_topology() -> RawTopology {
     }
 }
 
+/// 4 fully-connected nodes with a tight bandwidth cap, to force
+/// `Connection::split_bytes_amongst_queues` to run with multiple mini-protocols
+/// queued simultaneously (exercising the tie-break path).
+fn test_topology_bw(bandwidth_bps: u64) -> RawTopology {
+    let bw = Some(bandwidth_bps);
+    RawTopology {
+        nodes: vec![
+            (
+                "a".into(),
+                new_node_with_bandwidth(Some(250), vec!["b", "c", "d"], bw),
+            ),
+            (
+                "b".into(),
+                new_node_with_bandwidth(Some(250), vec!["a", "c", "d"], bw),
+            ),
+            (
+                "c".into(),
+                new_node_with_bandwidth(Some(250), vec!["a", "b", "d"], bw),
+            ),
+            (
+                "d".into(),
+                new_node_with_bandwidth(Some(250), vec!["a", "b", "c"], bw),
+            ),
+        ]
+        .into_iter()
+        .collect(),
+    }
+}
+
 fn test_config(shard_count: usize) -> Arc<SimConfiguration> {
+    build_config(shard_count, test_topology(), NUM_SLOTS)
+}
+
+fn test_config_bw(shard_count: usize, bandwidth_bps: u64, slots: u64) -> Arc<SimConfiguration> {
+    build_config(shard_count, test_topology_bw(bandwidth_bps), slots)
+}
+
+fn build_config(shard_count: usize, topology: RawTopology, slots: u64) -> Arc<SimConfiguration> {
     let mut params: crate::config::RawParameters =
         serde_yaml::from_slice(include_bytes!("../../../../parameters/config.default.yaml"))
             .unwrap();
     params.leios_variant = crate::config::LeiosVariant::Linear;
     params.simulate_transactions = false;
     params.shard_count = shard_count;
-    let topology = test_topology().into();
+    let topology = topology.into();
     let mut config = SimConfiguration::build(params, topology).unwrap();
-    config.slots = Some(NUM_SLOTS);
+    config.slots = Some(slots);
     Arc::new(config)
 }
 
@@ -337,15 +404,32 @@ async fn run_sequential_with_threshold(
 ) -> Vec<(String, String, String, Timestamp)> {
     let mut config = test_config(shard_count);
     Arc::get_mut(&mut config).unwrap().parallel_threshold = parallel_threshold;
+    run_with_config(config).await
+}
+
+async fn run_sequential_bw(
+    shard_count: usize,
+    parallel_threshold: usize,
+    bandwidth_bps: u64,
+    slots: u64,
+) -> Vec<(String, String, String, Timestamp)> {
+    let mut config = test_config_bw(shard_count, bandwidth_bps, slots);
+    Arc::get_mut(&mut config).unwrap().parallel_threshold = parallel_threshold;
+    run_with_config(config).await
+}
+
+async fn run_with_config(
+    config: Arc<SimConfiguration>,
+) -> Vec<(String, String, String, Timestamp)> {
     let (tx, rx) = mpsc::unbounded_channel();
     let mut rng = ChaChaRng::seed_from_u64(config.seed);
     let runner =
         crate::sim::sequential::build_for_test::<TestNode>(config.clone(), tx, &mut rng);
     let token = CancellationToken::new();
     tokio::task::spawn_blocking(move || runner.run(token))
-    .await
-    .unwrap()
-    .unwrap();
+        .await
+        .unwrap()
+        .unwrap();
     collect_test_events(rx)
 }
 
@@ -406,4 +490,22 @@ async fn test_sequential_deterministic() {
     let stripped1: Vec<_> = events1.iter().map(|e| (&e.0, &e.1, &e.2)).collect();
     let stripped2: Vec<_> = events2.iter().map(|e| (&e.0, &e.1, &e.2)).collect();
     assert_eq!(stripped1, stripped2, "sequential engine should be deterministic");
+}
+
+#[tokio::test]
+async fn test_sequential_deterministic_under_bandwidth_contention() {
+    // Forces Connection::split_bytes_amongst_queues to run with multiple
+    // mini-protocols queued at the same timestamp. With std HashMap this test
+    // would diverge across runs because the +1-byte remainder is awarded in
+    // HashMap iteration order. With the BTreeMap fix it must produce
+    // bit-identical output, timestamps included.
+    //
+    // Bandwidth (500 bps) × (2 protocols × 100 bytes × 3 peers = 600 bytes per
+    // slot-boundary burst) → messages span multiple slots, forcing ties.
+    let events1 = run_sequential_bw(1, usize::MAX, 500, 10).await;
+    let events2 = run_sequential_bw(1, usize::MAX, 500, 10).await;
+    assert_eq!(
+        events1, events2,
+        "sequential engine must produce bit-identical events (including timestamps) under bandwidth contention"
+    );
 }
