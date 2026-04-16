@@ -109,9 +109,17 @@ impl TxGeneratorCore {
 
         let tx = config.new_tx(&mut tx_rng, conflict_fraction);
 
-        let millis_until_tx =
-            config.frequency_ms.sample(&mut tx_rng) as u64 * self.shard_count as u64;
-        let next_at = now + Duration::from_millis(millis_until_tx);
+        // Preserve sub-millisecond precision from the frequency
+        // distribution: previously this truncated `f64 as u64`, so a
+        // configured 7.5 ms became 7 ms — ~7% faster generation than
+        // intended. `Duration::from_secs_f64` converts to a full
+        // nanosecond-resolution Duration. `.max(0.0)` matches the old
+        // saturating behaviour for non-positive samples from e.g. a
+        // Normal distribution (from_secs_f64 panics on negatives).
+        let secs_until_tx = (config.frequency_ms.sample(&mut tx_rng) / 1000.0
+            * self.shard_count as f64)
+            .max(0.0);
+        let next_at = now + Duration::from_secs_f64(secs_until_tx);
 
         let next_time = if config.stop_time.is_some_and(|t| next_at > t) {
             None
