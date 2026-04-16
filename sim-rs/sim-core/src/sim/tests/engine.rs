@@ -1,5 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
+use rand::Rng as _;
 use rand_chacha::ChaChaRng;
 use rand_chacha::rand_core::SeedableRng;
 use tokio::sync::mpsc;
@@ -23,7 +24,7 @@ use crate::{
 #[derive(Clone, Debug)]
 enum TestMessage {
     Ping { from: NodeId, slot: u64 },
-    Pong { from: NodeId, slot: u64 },
+    Pong { from: NodeId, slot: u64, roll: u64 },
     Heartbeat { from: NodeId, slot: u64 },
 }
 
@@ -58,7 +59,7 @@ impl SimCpuTask for TestCpuTask {
 
 #[derive(Debug)]
 enum TestTimedEvent {
-    SendPong { to: NodeId, slot: u64 },
+    SendPong { to: NodeId, slot: u64, roll: u64 },
 }
 
 // ---------------------------------------------------------------------------
@@ -70,6 +71,11 @@ struct TestNode {
     peers: Vec<NodeId>,
     clock: Clock,
     tracker: EventTracker,
+    // Per-node RNG. We consume from this on each incoming Ping/Heartbeat so
+    // that RNG state accumulates in message-delivery order. Any
+    // non-determinism in delivery order (or count) between runs desynchronises
+    // the RNG and shows up as a differing event payload in the assertions.
+    rng: ChaChaRng,
 }
 
 impl NodeImpl for TestNode {
@@ -82,7 +88,7 @@ impl NodeImpl for TestNode {
         config: &NodeConfiguration,
         sim_config: Arc<SimConfiguration>,
         tracker: EventTracker,
-        _rng: ChaChaRng,
+        rng: ChaChaRng,
         clock: Clock,
     ) -> Self {
         let peers: Vec<NodeId> = sim_config
@@ -103,6 +109,7 @@ impl NodeImpl for TestNode {
             peers,
             clock,
             tracker,
+            rng,
         }
     }
 
@@ -142,31 +149,40 @@ impl NodeImpl for TestNode {
     fn handle_message(&mut self, _from: NodeId, msg: Self::Message) -> EventResult<Self> {
         match msg {
             TestMessage::Ping { from, slot } => {
+                // Consume one u64 of RNG state per ping received. The roll is
+                // woven into the event payload AND the Pong reply below, so
+                // any desynchronisation of RNG state across runs (which
+                // implies a difference in message-delivery order or count)
+                // is detectable as a differing event payload.
+                let roll: u64 = self.rng.random();
                 self.tracker.track_test_event(
                     self.id,
                     "ping_received",
-                    &format!("from={from},slot={slot}"),
+                    &format!("from={from},slot={slot},roll={roll}"),
                 );
                 let mut result = EventResult::default();
                 result.schedule_event(
                     self.clock.now() + Duration::from_millis(100),
-                    TestTimedEvent::SendPong { to: from, slot },
+                    TestTimedEvent::SendPong { to: from, slot, roll },
                 );
                 result
             }
-            TestMessage::Pong { from, slot } => {
+            TestMessage::Pong { from, slot, roll } => {
                 self.tracker.track_test_event(
                     self.id,
                     "pong_received",
-                    &format!("from={from},slot={slot}"),
+                    &format!("from={from},slot={slot},roll={roll}"),
                 );
                 EventResult::default()
             }
             TestMessage::Heartbeat { from, slot } => {
+                // Also consume per Heartbeat so two mini-protocol deliveries
+                // interleave in the RNG stream.
+                let roll: u64 = self.rng.random();
                 self.tracker.track_test_event(
                     self.id,
                     "heartbeat_received",
-                    &format!("from={from},slot={slot}"),
+                    &format!("from={from},slot={slot},roll={roll}"),
                 );
                 EventResult::default()
             }
@@ -181,11 +197,11 @@ impl NodeImpl for TestNode {
 
     fn handle_timed_event(&mut self, event: Self::TimedEvent) -> EventResult<Self> {
         match event {
-            TestTimedEvent::SendPong { to, slot } => {
+            TestTimedEvent::SendPong { to, slot, roll } => {
                 self.tracker.track_test_event(
                     self.id,
                     "send_pong",
-                    &format!("to={to},slot={slot}"),
+                    &format!("to={to},slot={slot},roll={roll}"),
                 );
                 let mut result = EventResult::default();
                 result.send_to(
@@ -193,6 +209,7 @@ impl NodeImpl for TestNode {
                     TestMessage::Pong {
                         from: self.id,
                         slot,
+                        roll,
                     },
                 );
                 result
@@ -500,12 +517,53 @@ async fn test_sequential_deterministic_under_bandwidth_contention() {
     // HashMap iteration order. With the BTreeMap fix it must produce
     // bit-identical output, timestamps included.
     //
+    // TestNode now consumes per-node RNG on each incoming Ping/Heartbeat and
+    // weaves the roll into the event payload (and into Pong replies). Any
+    // non-determinism in message-delivery order or count across runs
+    // desynchronises the RNG state, which surfaces as a differing `roll=…`
+    // field in one of the compared events.
+    //
     // Bandwidth (500 bps) × (2 protocols × 100 bytes × 3 peers = 600 bytes per
     // slot-boundary burst) → messages span multiple slots, forcing ties.
     let events1 = run_sequential_bw(1, usize::MAX, 500, 10).await;
     let events2 = run_sequential_bw(1, usize::MAX, 500, 10).await;
     assert_eq!(
         events1, events2,
-        "sequential engine must produce bit-identical events (including timestamps) under bandwidth contention"
+        "sequential engine must produce bit-identical events (including timestamps and RNG-coupled payloads) under bandwidth contention"
+    );
+}
+
+#[tokio::test]
+async fn test_sequential_deterministic_bw_under_rayon() {
+    // With rayon enabled (parallel_threshold = 1), the event channel order
+    // is intentionally non-deterministic across nodes — workers race through
+    // the mpsc. But each node's STATE trajectory should still be deterministic
+    // (rayon workers don't cross-write per-node state; par_iter_mut preserves
+    // index order on collect). Sort events per-node and assert sequence
+    // equality — differing sequences would indicate rayon-visible state
+    // non-determinism (e.g. shared mutable state touched inside the map
+    // closure, or rayon-order-dependent RNG consumption).
+    let events1 = run_sequential_bw(1, 1, 500, 10).await;
+    let events2 = run_sequential_bw(1, 1, 500, 10).await;
+
+    let canon = |events: &[(String, String, String, Timestamp)]| {
+        let mut by_node: std::collections::BTreeMap<String, Vec<_>> =
+            std::collections::BTreeMap::new();
+        for (node, ev, detail, ts) in events {
+            by_node
+                .entry(node.clone())
+                .or_default()
+                .push((ts.clone(), ev.clone(), detail.clone()));
+        }
+        for v in by_node.values_mut() {
+            v.sort();
+        }
+        by_node
+    };
+
+    assert_eq!(
+        canon(&events1),
+        canon(&events2),
+        "per-node event trajectory must match across runs even with rayon parallelism"
     );
 }
