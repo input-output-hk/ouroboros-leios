@@ -30,9 +30,16 @@ fi
 latest_slot=$(grep -oE 'Slot [0-9]+ has begun' "$LOG" 2>/dev/null | tail -1)
 echo "Running: $latest_slot"
 
-# CPU time so far
-proc=$(ps -o pid,etime,time,pcpu,comm -p "$(pgrep -f 'target/release/sim-cli' | head -1)" 2>/dev/null | tail -1)
-echo "Process: $proc"
+# CPU time + RSS so far. ps prints RSS in KiB; reformat to MiB for readability.
+proc=$(ps -o pid,etime,time,pcpu,rss,comm -p "$(pgrep -f 'target/release/sim-cli' | head -1)" 2>/dev/null | tail -1)
+if [[ -n "$proc" ]]; then
+    echo "$proc" | awk '{
+      printf "Process: pid=%s elapsed=%s cpu_time=%s pcpu=%s%% rss=%.0fMiB (%s)\n",
+             $1, $2, $3, $4, $5/1024, $6
+    }'
+else
+    echo "Process: (not found)"
+fi
 
 # Any interesting events — EB gen, vote summary preview — in the last 30 lines
 echo
