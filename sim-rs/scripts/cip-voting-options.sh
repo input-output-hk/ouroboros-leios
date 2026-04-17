@@ -13,6 +13,7 @@ set -euo pipefail
 #   -e, --engine ENGINE          Engine: actor | sequential | turbo. Default: turbo
 #   -s, --slots N                Number of slots. Default: 1500
 #   -S, --seed LIST              Comma-separated seeds. Default: 0
+#   -L, --label TAG              Label for this run (added to CSV). Default: empty
 #   -P, --extra-params FILE      Extra parameter YAML to layer on top (may be repeated).
 #       --quorum-fraction FRAC   Default: 0.60
 #       --stake-fraction FRAC    Default: 0.95
@@ -46,6 +47,7 @@ MODE_ARG="-"
 ENGINE="turbo"
 SLOTS="${SLOTS:-1500}"
 SEED_ARG="0"
+LABEL=""
 QUORUM_FRACTION="${QUORUM_FRACTION:-0.60}"
 STAKE_FRACTION="${STAKE_FRACTION:-0.95}"
 
@@ -61,6 +63,7 @@ while [[ $# -gt 0 ]]; do
         -e|--engine)        ENGINE="$2"; shift 2 ;;
         -s|--slots)         SLOTS="$2"; shift 2 ;;
         -S|--seed)          SEED_ARG="$2"; shift 2 ;;
+        -L|--label)         LABEL="$2"; shift 2 ;;
         -P|--extra-params)  EXTRA_PARAMS+=("$2"); shift 2 ;;
         --quorum-fraction)  QUORUM_FRACTION="$2"; shift 2 ;;
         --stake-fraction)   STAKE_FRACTION="$2"; shift 2 ;;
@@ -194,7 +197,7 @@ echo "" >&2
 echo "Building release binary..."
 cargo build --release
 
-HEADER="throughput,committee,engine,seed,time_seconds,total_ebs,uncertified_ebs,ebs_with_endorsement,total_votes,votes_per_eb_mean,votes_per_eb_stddev"
+HEADER="throughput,committee,engine,seed,label,time_seconds,total_ebs,uncertified_ebs,ebs_with_endorsement,total_votes,votes_per_eb_mean,votes_per_eb_stddev"
 echo ""
 if [[ ! -f "$RESULTS" ]]; then
     echo "$HEADER" | tee "$RESULTS"
@@ -272,7 +275,7 @@ for throughput in "${THROUGHPUTS[@]}"; do
             votes_per_eb_stddev=$(echo "$output" | grep -oP 'Each EB received an average of [\d.]+ vote\(s\) \(stddev \K[\d.]+' | head -1)
             votes_per_eb_stddev=${votes_per_eb_stddev:-0}
 
-            echo "$throughput,$mode,$ENGINE,$seed,$elapsed,$total_ebs,$uncertified_ebs,$ebs_with_endorsement,$total_votes,$votes_per_eb_mean,$votes_per_eb_stddev" | tee -a "$RESULTS"
+            echo "$throughput,$mode,$ENGINE,$seed,$LABEL,$elapsed,$total_ebs,$uncertified_ebs,$ebs_with_endorsement,$total_votes,$votes_per_eb_mean,$votes_per_eb_stddev" | tee -a "$RESULTS"
             echo "done (${elapsed}s)" >&2
         done
     done
