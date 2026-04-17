@@ -75,7 +75,7 @@
   Rectangles are RBs and hexagons are EBs.
 
 ```mermaid
-flowchart TD
+flowchart LR
     X --> A{{A}}
     Y --> B{{B}}
     Z --> C{{C}}
@@ -89,7 +89,7 @@ flowchart TD
   In this diagram, the arrow is no longer merely the `prevHash`; it's instead a summary of both the `prevHash` and whether or not the RB contains a certificate.
 
 ```mermaid
-flowchart TD
+flowchart LR
     X --> A{{A}}
     Y --> B{{B}}
     Z --> C{{C}}
@@ -101,7 +101,7 @@ flowchart TD
 - Or if Z does but Y does not.
 
 ```mermaid
-flowchart TD
+flowchart LR
     X --> A{{A}}
     Y --> B{{B}}
     Z --> C{{C}}
