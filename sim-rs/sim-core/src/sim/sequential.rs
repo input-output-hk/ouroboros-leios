@@ -472,12 +472,19 @@ impl<N: NodeImpl> SequentialSimulation<N> {
 
             // === Compute — process node work items ===
             if total_node_work >= self.config.parallel_threshold {
+                // N.B. no .filter() here — rayon's filter() produces an
+                // unindexed iterator whose collect() does NOT preserve element
+                // order, making the output order depend on work-stealing
+                // scheduling.  Moving the empty-work check into .map() keeps
+                // the iterator indexed so collect() is deterministic.
                 let outputs: Vec<BatchNodeOutput<N>> = self
                     .nodes
                     .par_iter_mut()
                     .zip(per_node_work.par_iter_mut())
-                    .filter(|(_, work)| !work.is_empty())
                     .map(|(node_state, work)| {
+                        if work.is_empty() {
+                            return BatchNodeOutput::default();
+                        }
                         process_node_batch(node_state, std::mem::take(work), timestamp)
                     })
                     .collect();
