@@ -87,6 +87,8 @@ pub enum ShardStrategy {
 #[serde(rename_all = "kebab-case")]
 pub struct RawParameters {
     // Simulation Configuration
+    #[serde(default)]
+    pub seed: u64,
     pub leios_variant: LeiosVariant,
     pub relay_strategy: RelayStrategy,
     pub simulate_transactions: bool,
@@ -912,7 +914,7 @@ impl SimConfiguration {
             }
         };
         Ok(Self {
-            seed: 0,
+            seed: params.seed,
             timestamp_resolution: duration_ms(params.timestamp_resolution_ms),
             shard_count: params.shard_count.max(1),
             shard_strategy: params.shard_strategy.clone(),
