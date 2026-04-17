@@ -65,6 +65,68 @@
       | CertRB
 ```
 
+### NSF on the mental model for Leios block application
+
+- In the Consensus Office Hours this week, Sebastian joined and we all discussed how the existing Consensus components could support EBs.
+  Our conversation eventually lead to a particular framing that I think will be good to keep in mind.
+  I'm recording it here, at least.
+- This is how we usually would depict a chain of RBs X Y Z that each announce an EB, A B C.
+  Each arrow here is just the `prevHash` field of the RB.
+  Rectangles are RBs and hexagons are EBs.
+
+```mermaid
+flowchart LR
+    X --> A{{A}}
+    Y --> B{{B}}
+    Z --> C{{C}}
+
+    X --> Y --> Z
+```
+
+- However, this diagram could _also_ indicate whether or not each of Y and Z contains certificates.
+- Suppose Y does and Z does not.
+  That could be depicted as follows.
+  In this diagram, the arrow is no longer merely the `prevHash`; it's instead a summary of both the `prevHash` and whether or not the RB contains a certificate.
+
+```mermaid
+flowchart LR
+    X --> A{{A}}
+    Y --> B{{B}}
+    Z --> C{{C}}
+
+    A --> Y
+    Y --> Z
+```
+
+- Or if Z does but Y does not.
+
+```mermaid
+flowchart LR
+    X --> A{{A}}
+    Y --> B{{B}}
+    Z --> C{{C}}
+
+    X --> Y
+    B --> Z
+```
+
+- The ability to visualize those is nice-to-have, but it also suggests a more important underlying insight: every announcement creates a binary branch and the subsequent RB chooses that branch.
+  Y chooses between X and A, Z chooses between Y and B, and so on.
+- Ultimately, that thought influence our architecture discussion.
+  In particular, the Conensus Layer can use the same BBODY rule as it always had to apply Praos blocks, regardless of whether or not that contain a Leios certificate---well, BBODY would merely need to validate the certificate itself.
+  The so-called _inclusion_ of the certified EB could be handled separately.
+  It might even be as simple as Consensus using the existing `applyTx` interface to simply apply the txs from the EB to the ledger state resulting from its announcing RB and then passing the resulting ledger state to `tickThenApply` for the certifying RB.
+- More concretely: the realization is that with Leios, every RB that announces an EB creates two ledger states.
+  One is the same ledger state that RB has always introduced, its "proper" resulting ledger state.
+  The other extends the proper ledger state with the transactions in the announced EB.
+  And its the subsequent RB that chooses which ledger state to extend.
+- The above diagrams could now be interpeted in two ways: the familiar way in which each node is a block, or the new way in which each node is the ledger resulting from the block.
+  But that's merey the classic observation that blocks and ledger states are in one-to-one correspondence.
+  In Linear Leios, the ledger state resulting from an RB and the ledger state resulting from an EB are different, but either one (exclusively!) is a valid ledger state for the subsequent RB to extend.
+- The alternations to the Consensus-Ledger interface for Linear Leios can be designed around that.
+  Something like ChainSel will use the usual ledger state when validating a TxsRB but it'll instead use the previously RB's announced EB's ledger state when validating a CertRB---no other changes necessary.
+  (Maybe the LedgerDB provides both of those, or maybe some new Leios component provides the second one; not yet clear.)
+
 ## 2026-03-21
 
 ### SN on EB inclusion and drafting of voting
