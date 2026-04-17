@@ -6,6 +6,27 @@
 > 
 > See also the [Post-CIP R&D Findings](post-cip/README.md) document for additional (after 2025-11-01) findings and artifacts not directly related to the implementation of Linear Leios.
 
+## 2026-04-17
+
+### SN on prototyping voting
+
+- For vote creation I wanted to already see multiple (threadnet) nodes be having different `VoterId`. That's not so easy as we have a fully deterministic environment and possibly the "easiest" is to already think about where the keys come from?
+- The `BlockForging` handle is not much of help as it's passed in at run-time and the key is even curried on top of it.
+- Originally from within `protocolInfoCardano` via `praosSharedBlockForging`
+- The actual key comes from `credssShelleyBased` in that same (big ass) function
+- Looking at return types of the cardano protocol info initialization, the easiest would be to make Leios (or Peras) BLS keys part of the `TopLevelConfig`
+- Went forward with extending the `TopLevelConfig` with a `topLevelConfigVotingKey :: Maybe SomeKey`. That is, a monomorphic (maybe existential) additional key to be used for voting.
+- In fact, a `Maybe ByteString` is generic enough to get us going for the `TopLevelConfig`
+- It's a dirty hack, but it should work 🫠
+
+    ```haskell
+        topLevelConfigVotingKey =
+          Just
+            . rawSerialiseUnsoundPureSignKeyKES
+            . shelleyLeaderCredentialsInitSignKey
+            $ credssShelleyBased !! 0
+    ```
+
 ## 2026-04-14
 
 ### SN on voting/blueprints
