@@ -1,0 +1,6 @@
+# Disable TX memory caps to test whether the 0.200/wfa-ls pathology is
+# a sim-side memory-pruning artefact vs a genuine protocol behaviour.
+# Overrides parameters/memory-limit.yaml when applied after it via -P.
+leios-tx-generated-backlog-max-size: null
+leios-tx-peer-backlog-max-size: null
+linear-tx-max-age-slots: null
