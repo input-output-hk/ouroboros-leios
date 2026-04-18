@@ -44,3 +44,5 @@ throughput,committee,engine,seed,label,time_seconds,total_ebs,uncertified_ebs,eb
 0.200,wfa-ls,sequential,2,nocaps,2509.915508221,27,6,15,12239,470.731,216.830
 0.200,wfa-ls,sequential,3,nocaps,1238.146247513,18,4,8,8460,470.000,194.221
 0.200,wfa-ls,sequential,4,nocaps,3252.502650679,46,8,22,21794,473.783,212.019
+0.200,wfa-ls,sequential,4,caps-fixed,2791.883128342,48,19,16,16732,348.583,277.609
+0.200,wfa-ls,sequential,4,caps-retain,3035.712640943,45,8,20,21185,470.778,214.851
