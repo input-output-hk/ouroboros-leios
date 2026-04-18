@@ -24,7 +24,7 @@
 
     # Used by demo/
     ouroboros-consensus.url = "github:intersectmbo/ouroboros-consensus?ref=leios-prototype";
-    cardano-node-leios.url = "github:intersectmbo/cardano-node?ref=leios-prototype";
+    cardano-node-leios.url = "github:intersectmbo/cardano-node/75881ef42e9f699039a6cea03222c8a1690bc40f";
     cardano-node.url = "github:intersectmbo/cardano-node?ref=bench/leios"; # For latest tools
   };
 

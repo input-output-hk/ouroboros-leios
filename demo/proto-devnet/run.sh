@@ -25,9 +25,9 @@ if [ "$TC" = "1" ]; then
   : "${IP_NODE2:=172.28.0.20}"
   : "${IP_NODE3:=172.28.0.30}"
 else
-  IP_NODE1=127.0.0.1
-  IP_NODE2=127.0.0.1
-  IP_NODE3=127.0.0.1
+  : "${IP_NODE1:=127.0.0.1}"
+  : "${IP_NODE2:=127.0.0.1}"
+  : "${IP_NODE3:=127.0.0.1}"
 fi
 # X-ray observability (on by default, disable with XRAY=0)
 : "${XRAY:=1}"

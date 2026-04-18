@@ -30,14 +30,8 @@ set -a
 : "${IP_DOWNSTREAM_NODE:=10.0.0.3}"
 
 # Traffic control settings
-: "${RATE_UP_TO_N0:=10Mbps}"
-: "${DELAY_UP_TO_N0:=200ms}"
-: "${RATE_N0_TO_UP:=10Mbps}"
-: "${DELAY_N0_TO_UP:=200ms}"
-: "${RATE_N0_TO_DOWN:=10Mbps}"
-: "${DELAY_N0_TO_DOWN:=200ms}"
-: "${RATE_DOWN_TO_N0:=10Mbps}"
-: "${DELAY_DOWN_TO_N0:=200ms}"
+: "${RATE:=10mbit}"
+: "${DELAY:=200}"
 set +a
 
 # Check for required commands
@@ -104,6 +98,18 @@ echo "Starting burst demo with process-compose..."
 echo "  WORKING_DIR: $WORKING_DIR"
 echo "  CLUSTER_RUN: $CLUSTER_RUN"
 echo "  REF_SLOT: $REF_SLOT"
-echo "  Traffic control: ${RATE_UP_TO_N0} / ${DELAY_UP_TO_N0}"
+echo "  Traffic control: ${RATE} / ${DELAY}ms"
+
+cleanup() {
+  echo "Cleaning up network namespaces..."
+  sudo ip netns del "leios-experiment:upstream" 2>/dev/null || true
+  sudo ip netns del "leios-experiment:node0" 2>/dev/null || true
+  sudo ip netns del "leios-experiment:downstream" 2>/dev/null || true
+  # Clean up host-side veth interfaces in case they weren't removed with the namespace
+  sudo ip link del "host->up" 2>/dev/null || true
+  sudo ip link del "host->n0" 2>/dev/null || true
+  sudo ip link del "host->down" 2>/dev/null || true
+}
+trap cleanup EXIT
 
 process-compose --no-server -f "${SOURCE_DIR}/process-compose.yaml"

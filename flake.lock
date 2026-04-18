@@ -931,17 +931,17 @@
         "utils": "utils_2"
       },
       "locked": {
-        "lastModified": 1774270996,
-        "narHash": "sha256-OB5ROMv3Hxg9KbkPClhowDPzzG+wiL2td+XTuy3w6O8=",
+        "lastModified": 1772712138,
+        "narHash": "sha256-yreM14x34NnOxKxFA6A9y55wJ5WT4njv2Xpb+Io5Ggg=",
         "owner": "intersectmbo",
         "repo": "cardano-node",
-        "rev": "c53f7c0d9509675d0a5eddb5a45cd53dd09b1bff",
+        "rev": "75881ef42e9f699039a6cea03222c8a1690bc40f",
         "type": "github"
       },
       "original": {
         "owner": "intersectmbo",
-        "ref": "leios-prototype",
         "repo": "cardano-node",
+        "rev": "75881ef42e9f699039a6cea03222c8a1690bc40f",
         "type": "github"
       }
     },
