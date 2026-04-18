@@ -739,16 +739,22 @@ impl LinearLeiosNode {
             return;
         }
 
-        let referenced_by_eb = self.acknowledge_tx(&tx);
         let is_local = from == self.id;
         let result = self.try_add_tx_to_mempool(&tx, is_local);
 
         if matches!(result, InsertResult::PeerBacklogFull) {
-            // Peer backlog full — drop the tx entirely to avoid memory growth
-            self.txs.remove(&id);
-            return;
+            // Peer backlog full. If a pending EB references this TX
+            // (it's in missing_txs), keep it in self.txs so has_tx
+            // returns true and try_validating_eb's scan can succeed.
+            // Otherwise drop it to bound memory.
+            if !self.leios.missing_txs.contains_key(&id) {
+                self.txs.remove(&id);
+                return;
+            }
+            // Fall through: TX stays in self.txs, acknowledge below.
         }
 
+        let referenced_by_eb = self.acknowledge_tx(&tx);
         let added_to_mempool = matches!(result, InsertResult::AddedToMempool);
 
         // If we added the TX to our mempool, we want to propagate it so our peers can as well.
