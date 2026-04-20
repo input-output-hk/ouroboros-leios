@@ -169,13 +169,33 @@ impl EventMonitor {
             }
             None => OutputTarget::None,
         };
+        // Buffer events in timestamp buckets and flush sorted once we're
+        // confident all events for a given timestamp have arrived.  With
+        // multi-shard CMB, shards advance at different rates so events
+        // can arrive out of timestamp order.  A 1-second window is far
+        // larger than any inter-shard skew (bounded by min_latency,
+        // typically a few ms).
+        let mut buffered: std::collections::BTreeMap<Timestamp, Vec<OutputEvent>> =
+            std::collections::BTreeMap::new();
+        let mut high_watermark = Timestamp::zero();
+        let flush_window = Duration::from_secs(1);
+
         while let Some((event, time)) = self.events_source.recv().await {
             last_timestamp = time;
             let output_event = OutputEvent {
                 time_s: time,
                 message: event.clone(),
             };
-            output.write(output_event).await?;
+            buffered.entry(time).or_default().push(output_event);
+            if time > high_watermark {
+                high_watermark = time;
+                let cutoff = if high_watermark >= Timestamp::zero() + flush_window {
+                    high_watermark - flush_window
+                } else {
+                    Timestamp::zero()
+                };
+                flush_buffered(&mut buffered, cutoff, &mut output).await?;
+            }
             match event {
                 Event::GlobalSlot { slot: number } => {
                     info!("Slot {number} has begun.");
@@ -424,6 +444,9 @@ impl EventMonitor {
                 }
             }
         }
+
+        // Flush all remaining buffered events.
+        flush_buffered(&mut buffered, Timestamp::max(), &mut output).await?;
 
         output.flush().await?;
 
@@ -779,6 +802,29 @@ fn compute_stats<Iter: IntoIterator<Item = f64>>(data: Iter) -> Stats {
         mean: v.mean(),
         std_dev: v.population_variance().sqrt(),
     }
+}
+
+/// Flush all buffered events with timestamp strictly less than `up_to`.
+/// Within each timestamp bucket, events are sorted by originating node ID
+/// so that the output is deterministic regardless of cross-shard arrival order.
+async fn flush_buffered(
+    buffered: &mut std::collections::BTreeMap<Timestamp, Vec<OutputEvent>>,
+    up_to: Timestamp,
+    output: &mut OutputTarget,
+) -> Result<()> {
+    // Collect keys to flush (can't mutate while iterating).
+    let keys: Vec<Timestamp> = buffered
+        .range(..up_to)
+        .map(|(k, _)| *k)
+        .collect();
+    for ts in keys {
+        let mut events = buffered.remove(&ts).unwrap();
+        events.sort_by_key(|e| e.message.node_id());
+        for ev in events {
+            output.write(ev).await?;
+        }
+    }
+    Ok(())
 }
 
 #[allow(clippy::large_enum_variant)]
