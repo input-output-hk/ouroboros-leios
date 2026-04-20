@@ -193,6 +193,9 @@ def generate(source_path, target_n, seed):
             dist = haversine_km(locs[ri][0], locs[ri][1], locs[pi][0], locs[pi][1])
             lat = sample_latency(src, dist, rng)
             producers[ri][pi] = round(lat, 4)
+            # Symmetrize: ensure the reverse link exists too
+            if ri not in producers[pi]:
+                producers[pi][ri] = round(lat, 4)
 
     # --- Step 5: Connect BPs to 2 nearest relays ---
     print(f"Connecting {n_bp} BPs to relays...", file=sys.stderr)
@@ -202,6 +205,8 @@ def generate(source_path, target_n, seed):
             dist = haversine_km(locs[bi][0], locs[bi][1], locs[pi][0], locs[pi][1])
             lat = sample_latency(src, dist, rng)
             producers[bi][pi] = round(lat, 4)
+            if bi not in producers[pi]:
+                producers[pi][bi] = round(lat, 4)
 
     # --- Step 6: Assign stake ---
     bp_list = sorted(bp_indices)
@@ -240,11 +245,6 @@ def generate(source_path, target_n, seed):
 
 
 if __name__ == "__main__":
-    # Import sibling script for summary output
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    sys.path.insert(0, script_dir)
-    from summarize_topology import summarize_oneline
-
     parser = argparse.ArgumentParser(
         description="Generate a scaled topology by resampling from an existing one."
     )
@@ -264,4 +264,5 @@ if __name__ == "__main__":
         sys.stdout.close()
         sys.stdout = orig_stdout
         print(f"Wrote {args.output}", file=sys.stderr)
-        summarize_oneline(args.output)
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        os.system(f'{script_dir}/summarize-topology.py -1 {args.output}')
