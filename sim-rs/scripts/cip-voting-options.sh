@@ -269,23 +269,23 @@ for throughput in "${THROUGHPUTS[@]}"; do
             end=$(date +%s.%N)
             elapsed=$(echo "$end - $start" | bc)
 
-            # Parse stats from log output
-            total_ebs=$(echo "$output" | grep -oP '\d+(?= EB\(s\) were generated)' | head -1)
+            # Parse stats from log output (|| true: some lines are absent when the count is 0)
+            total_ebs=$(echo "$output" | grep -oP '\d+(?= EB\(s\) were generated)' | head -1 || true)
             total_ebs=${total_ebs:-0}
 
-            uncertified_ebs=$(echo "$output" | grep -oP '\d+(?= out of \d+ EB\(s\) did not reach the vote threshold)' | head -1)
+            uncertified_ebs=$(echo "$output" | grep -oP '\d+(?= out of \d+ EB\(s\) did not reach the vote threshold)' | head -1 || true)
             uncertified_ebs=${uncertified_ebs:-0}
 
-            ebs_with_endorsement=$(echo "$output" | grep -oP '\d+(?= L1 block\(s\) had a Leios endorsement)' | head -1)
+            ebs_with_endorsement=$(echo "$output" | grep -oP '\d+(?= L1 block\(s\) had a Leios endorsement)' | head -1 || true)
             ebs_with_endorsement=${ebs_with_endorsement:-0}
 
-            total_votes=$(echo "$output" | grep -oP '\d+(?= total votes were generated)' | head -1)
+            total_votes=$(echo "$output" | grep -oP '\d+(?= total votes were generated)' | head -1 || true)
             total_votes=${total_votes:-0}
 
-            votes_per_eb_mean=$(echo "$output" | grep -oP 'Each EB received an average of \K[\d.]+' | head -1)
+            votes_per_eb_mean=$(echo "$output" | grep -oP 'Each EB received an average of \K[\d.]+' | head -1 || true)
             votes_per_eb_mean=${votes_per_eb_mean:-0}
 
-            votes_per_eb_stddev=$(echo "$output" | grep -oP 'Each EB received an average of [\d.]+ vote\(s\) \(stddev \K[\d.]+' | head -1)
+            votes_per_eb_stddev=$(echo "$output" | grep -oP 'Each EB received an average of [\d.]+ vote\(s\) \(stddev \K[\d.]+' | head -1 || true)
             votes_per_eb_stddev=${votes_per_eb_stddev:-0}
 
             echo "$throughput,$mode,$ENGINE,$seed,$LABEL,$elapsed,$total_ebs,$uncertified_ebs,$ebs_with_endorsement,$total_votes,$votes_per_eb_mean,$votes_per_eb_stddev" | tee -a "$RESULTS"
