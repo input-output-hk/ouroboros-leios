@@ -4,7 +4,9 @@ use rand_distr::Distribution;
 use tokio::sync::mpsc;
 
 use std::{
-    collections::{BTreeMap, HashMap, HashSet, VecDeque},
+    // N.B. HashSet is only used for membership tests (contains/insert), never
+    // iterated in order-sensitive paths, so it does not affect determinism.
+    collections::{BTreeMap, BTreeSet, HashSet, VecDeque},
     sync::Arc,
     time::Duration,
 };
@@ -284,21 +286,21 @@ enum VoteBundleView {
 
 #[derive(Default)]
 struct NodeLeiosState {
-    ebs: HashMap<EndorserBlockId, EndorserBlockView>,
-    ebs_by_rb: HashMap<BlockId, EndorserBlockId>,
-    eb_peer_announcements: HashMap<EndorserBlockId, Vec<NodeId>>,
-    votes: HashMap<VoteBundleId, VoteBundleView>,
-    votes_by_eb: HashMap<EndorserBlockId, BTreeMap<NodeId, usize>>,
-    endorsed_ebs: HashMap<EndorserBlockId, u64>,
-    incomplete_onchain_ebs: HashSet<EndorserBlockId>,
-    missing_txs: HashMap<TransactionId, Vec<EndorserBlockId>>,
-    pruned_ebs: HashSet<EndorserBlockId>,
+    ebs: BTreeMap<EndorserBlockId, EndorserBlockView>,
+    ebs_by_rb: BTreeMap<BlockId, EndorserBlockId>,
+    eb_peer_announcements: BTreeMap<EndorserBlockId, Vec<NodeId>>,
+    votes: BTreeMap<VoteBundleId, VoteBundleView>,
+    votes_by_eb: BTreeMap<EndorserBlockId, BTreeMap<NodeId, usize>>,
+    endorsed_ebs: BTreeMap<EndorserBlockId, u64>,
+    incomplete_onchain_ebs: BTreeSet<EndorserBlockId>,
+    missing_txs: BTreeMap<TransactionId, Vec<EndorserBlockId>>,
+    pruned_ebs: BTreeSet<EndorserBlockId>,
 }
 
 #[derive(Default)]
 struct LedgerState {
-    spent_inputs: HashSet<u64>,
-    seen_blocks: HashSet<BlockId>,
+    spent_inputs: BTreeSet<u64>,
+    seen_blocks: BTreeSet<BlockId>,
 }
 
 pub struct LinearLeiosNode {
@@ -310,7 +312,7 @@ pub struct LinearLeiosNode {
     lottery: LotteryConfig,
     consumers: Vec<NodeId>,
     current_slot: u64,
-    txs: HashMap<TransactionId, TransactionView>,
+    txs: BTreeMap<TransactionId, TransactionView>,
     mempool: Mempool,
     ledger_state: Option<(BlockId, LedgerState)>,
     praos: NodePraosState,
@@ -357,7 +359,7 @@ impl NodeImpl for LinearLeiosNode {
             lottery,
             consumers: config.consumers.clone(),
             current_slot: 0,
-            txs: HashMap::new(),
+            txs: BTreeMap::new(),
             mempool: Mempool::new(
                 mempool_max_size_bytes,
                 tx_generated_backlog_max_size,
@@ -567,7 +569,7 @@ impl LinearLeiosNode {
             .values()
             .filter(|v| matches!(v, TransactionView::Received { .. }))
             .count();
-        // HashMap overhead ~64B/entry, Received: Arc ptr(8) + u64(8), unique Transaction ~56B
+        // BTreeMap overhead ~48B/entry, Received: Arc ptr(8) + u64(8), unique Transaction ~56B
         let txs_bytes = txs_total * 64 + txs_received * 72;
 
         // mempool
