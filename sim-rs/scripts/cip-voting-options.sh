@@ -15,6 +15,7 @@ set -euo pipefail
 #   -S, --seed LIST              Comma-separated seeds. Default: 0
 #   -L, --label TAG              Label for this run (added to CSV). Default: empty
 #   -P, --extra-params FILE      Extra parameter YAML to layer on top (may be repeated).
+#   -o, --output-dir DIR         Write per-run event streams to DIR/<run>.jsonl
 #       --quorum-fraction FRAC   Default: 0.60
 #       --stake-fraction FRAC    Default: 0.95
 #   -h, --help                   Show this help
@@ -54,6 +55,7 @@ STAKE_FRACTION="${STAKE_FRACTION:-0.95}"
 ALL_THROUGHPUTS=(0.150 0.200 0.250 0.300 0.350)
 ALL_MODES=("wfa-ls" "everyone" "top-stake-fraction")
 EXTRA_PARAMS=()
+OUTPUT_DIR=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -65,6 +67,7 @@ while [[ $# -gt 0 ]]; do
         -S|--seed)          SEED_ARG="$2"; shift 2 ;;
         -L|--label)         LABEL="$2"; shift 2 ;;
         -P|--extra-params)  EXTRA_PARAMS+=("$2"); shift 2 ;;
+        -o|--output-dir)    OUTPUT_DIR="$2"; shift 2 ;;
         --quorum-fraction)  QUORUM_FRACTION="$2"; shift 2 ;;
         --stake-fraction)   STAKE_FRACTION="$2"; shift 2 ;;
         -h|--help)          usage 0 ;;
@@ -194,6 +197,10 @@ echo "Slots: $SLOTS" >&2
 echo "Seeds: ${SEEDS[*]}" >&2
 echo "" >&2
 
+if [[ -n "$OUTPUT_DIR" ]]; then
+    mkdir -p "$OUTPUT_DIR"
+fi
+
 echo "Building release binary..."
 cargo build --release
 
@@ -248,11 +255,17 @@ for throughput in "${THROUGHPUTS[@]}"; do
             run_log="/tmp/sim-T${throughput}-${mode}-${ENGINE}-seed${seed}.log"
             echo -n "Running throughput=$throughput committee=$mode engine=$ENGINE seed=$seed (log: $run_log) ... " >&2
             start=$(date +%s.%N)
+            # Optional event-stream output (jsonl)
+            output_args=()
+            if [[ -n "$OUTPUT_DIR" ]]; then
+                jsonl="$OUTPUT_DIR/T${throughput}-${mode}-${ENGINE}-seed${seed}${LABEL:+-$LABEL}.jsonl"
+                output_args=("$jsonl")
+            fi
             # tee to a per-run log (and capture stdout for stats parsing via
             # $(...)). Using an explicit file — not /dev/stderr — avoids a
             # /proc/self/fd/2 re-open quirk that truncated the combined log
             # when multiple runs shared one redirect target.
-            output=$( cargo run --release -- "$TOPOLOGY" "${params[@]}" -s "$SLOTS" 2>&1 | tee "$run_log" )
+            output=$( cargo run --release -- "$TOPOLOGY" "${output_args[@]}" "${params[@]}" -s "$SLOTS" 2>&1 | tee "$run_log" )
             end=$(date +%s.%N)
             elapsed=$(echo "$end - $start" | bc)
 
