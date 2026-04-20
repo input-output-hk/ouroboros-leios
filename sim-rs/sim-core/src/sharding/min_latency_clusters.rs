@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::{
     config::{NodeId, SimConfiguration},
@@ -72,8 +72,8 @@ pub fn assign(config: &SimConfiguration) -> ShardLookup {
         }
     }
 
-    // Collect final components
-    let mut final_components: HashMap<NodeId, Vec<NodeId>> = HashMap::new();
+    // Collect final components (BTreeMap for deterministic iteration order).
+    let mut final_components: BTreeMap<NodeId, Vec<NodeId>> = BTreeMap::new();
     for node in &config.nodes {
         let root = union_find::find(&mut parent, node.id);
         final_components.entry(root).or_default().push(node.id);

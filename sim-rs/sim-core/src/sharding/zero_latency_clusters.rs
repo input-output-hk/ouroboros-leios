@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::{BTreeMap, HashMap}, sync::Arc, time::Duration};
 
 use crate::{
     config::{NodeId, SimConfiguration},
@@ -27,7 +27,9 @@ pub fn build_zero_latency_components(config: &SimConfiguration) -> Vec<Vec<NodeI
         }
     }
 
-    let mut components: HashMap<NodeId, Vec<NodeId>> = HashMap::new();
+    // BTreeMap so that components are grouped by root NodeId in a
+    // deterministic order — HashMap iteration order varies per process.
+    let mut components: BTreeMap<NodeId, Vec<NodeId>> = BTreeMap::new();
     for node in &config.nodes {
         let root = union_find::find(&mut parent, node.id);
         components.entry(root).or_default().push(node.id);
@@ -41,7 +43,10 @@ pub fn assign_components_balanced(
     mut components: Vec<Vec<NodeId>>,
     shard_count: usize,
 ) -> ShardLookup {
-    components.sort_by_key(|b| std::cmp::Reverse(b.len()));
+    // Sort largest-first; break ties by first NodeId for determinism.
+    components.sort_by(|a, b| {
+        b.len().cmp(&a.len()).then_with(|| a[0].cmp(&b[0]))
+    });
 
     let mut shard_sizes = vec![0usize; shard_count];
     let mut lookup = HashMap::new();
