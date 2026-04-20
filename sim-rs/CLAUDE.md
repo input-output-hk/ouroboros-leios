@@ -35,7 +35,7 @@ Two-crate workspace: **sim-core** (library) and **sim-cli** (binary).
 Two engines selected by `engine` parameter (default: `actor`):
 
 - **`actor`** — tokio-based async actor system. Each node runs as a tokio task coordinated by a virtual clock (`sim-core/src/sim/actor.rs`). Non-deterministic due to async scheduling. Supports adversarial scenarios.
-- **`sequential`** — discrete event simulation (DES) processing events in strict timestamp order (`sim-core/src/sim/sequential.rs`). Deterministic. Uses rayon to parallelise simultaneous events across nodes within each timestep (BSP). Does not support attacker configs.
+- **`sequential`** — discrete event simulation (DES) processing events in strict timestamp order (`sim-core/src/sim/sequential.rs`). Deterministic (see below). Uses rayon to parallelise simultaneous events across nodes within each timestep (BSP). Does not support attacker configs.
 
 ### Sharding
 
@@ -44,6 +44,24 @@ Nodes can be partitioned into shards for parallel execution. Both engines suppor
 - `shard-strategy` — how nodes are assigned: `round-robin`, `zero-latency-clusters` (recommended), `geographic`, `min-latency-clusters`, `min-cut`
 
 Shard assignment: `sim-core/src/sharding.rs`. For fast runs, use `-p parameters/turbo.yaml` (sequential engine, 6 shards, zero-latency-clusters).
+
+### Determinism
+
+The sequential engine (including multi-shard turbo) produces bit-identical results across runs with the same seed/config. This required fixing several non-obvious sources of non-determinism:
+
+1. **HashMap iteration** — Node state in `linear_leios.rs` uses `BTreeMap`/`BTreeSet` (not `HashMap`/`HashSet`) for all fields that could be iterated. Remaining `HashSet` usages are pure membership tests (contains/insert) and are noted as such. The `praos` state and `Connection` bandwidth queues were already `BTreeMap`.
+
+2. **Shard assignment** — Sharding strategies (`zero_latency_clusters`, `min_latency_clusters`, `min_cut`) use `BTreeMap` to collect components so that component ordering is deterministic. The component sort has a stable tiebreaker (first NodeId) for same-size components.
+
+3. **TX ID assignment** — `TxGeneratorCore` uses per-shard local counters (offset by `shard_index * 1B`) instead of shared `AtomicU64` counters, so ID assignment doesn't depend on cross-shard thread scheduling.
+
+4. **Rayon indexed collect** — The rayon parallel dispatch in `sequential.rs` uses `.map()` (not `.filter().map()`) to keep the iterator indexed, ensuring `collect()` preserves node order regardless of work-stealing schedule.
+
+5. **Cross-shard delivery** — The CMB (Conservative Message-Based) protocol delivers cross-shard messages sorted by `(send_time, source_shard, seq)` via a priority queue. Combined with the above fixes, this is deterministic without requiring barrier synchronization between shards.
+
+6. **Event stream sorting** — The event monitor buffers events in timestamp buckets with a 1-second window and sorts each bucket by originating node ID before writing, making `.jsonl` output byte-identical across runs even though shard threads emit tracking events concurrently.
+
+**What does NOT affect determinism**: `CpuTaskQueue` HashMap (keyed by monotonic task_id, only accessed by key lookup), `pending_deliveries` HashSet (only contains/insert/remove), config-level HashSets (`vote_eligible_nodes`, `attackers` — only contains checks).
 
 ### Virtual Clock (Actor Engine)
 
@@ -90,6 +108,58 @@ Three node implementations selected by `config.variant`:
 ### Lottery/VRF
 
 `LotteryConfig::run()` (`sim-core/src/sim/lottery.rs`) uses stake-weighted randomness. Tests use `MockLotteryResults` with pre-filled deterministic outcomes.
+
+## Benchmark Scripts
+
+### cip-voting-options.sh
+
+Runs voting/certification benchmarks across throughput levels, committee modes, and seeds.
+
+```sh
+# Basic usage (all defaults: turbo engine, 1500 slots, seed 0)
+./scripts/cip-voting-options.sh
+
+# Single config
+./scripts/cip-voting-options.sh -T 0.350 -m everyone -S 0
+
+# Multiple seeds
+./scripts/cip-voting-options.sh -T 0.200 -m wfa-ls -S 0,1,2,3,4
+
+# With event stream capture (jsonl)
+./scripts/cip-voting-options.sh -T 0.350 -m everyone -S 0 -o /tmp/events
+
+# Custom label and extra params
+./scripts/cip-voting-options.sh -T 0.350 -m everyone -S 0 -L my-test -P /tmp/override.yaml
+```
+
+Key flags: `-T` throughput, `-m` committee mode (`wfa-ls`, `everyone`, `top-stake-fraction`), `-e` engine (`turbo`, `sequential`, `actor`), `-S` seeds (comma-separated), `-L` label for CSV rows, `-P` extra parameter YAML (repeatable), `-o` output directory for `.jsonl` event streams, `-s` slots (default 1500).
+
+Results are appended to `voting_results.csv`. Per-run sim logs go to `/tmp/sim-T{throughput}-{mode}-{engine}-seed{seed}.log`.
+
+### poll-sim.sh
+
+Monitor a running benchmark:
+```sh
+./scripts/poll-sim.sh /tmp/sim-T0.350-everyone-turbo-seed0.log
+```
+Shows process status (PID, elapsed, CPU%, RSS) and recent log output.
+
+### Determinism verification
+
+To verify turbo determinism, run the same config twice and compare:
+```sh
+# Summary stats (should match exactly except wall-clock time):
+./scripts/cip-voting-options.sh -e turbo -T 0.350 -m everyone -S 0 -L run1
+./scripts/cip-voting-options.sh -e turbo -T 0.350 -m everyone -S 0 -L run2
+grep 'run[12]' voting_results.csv
+
+# Byte-identical event streams:
+./scripts/cip-voting-options.sh -e turbo -T 0.350 -m everyone -S 0 -L a -o /tmp/det -s 100
+./scripts/cip-voting-options.sh -e turbo -T 0.350 -m everyone -S 0 -L b -o /tmp/det -s 100
+cmp /tmp/det/T0.350-everyone-turbo-seed0-a.jsonl /tmp/det/T0.350-everyone-turbo-seed0-b.jsonl
+```
+
+**Performance notes**: Turbo at 0.350 throughput / 750 nodes / 1500 slots takes ~15 min and ~28GB RSS. The `.jsonl` event stream adds ~15GB memory (unbounded mpsc buffering) and ~60GB disk per run. Do not run two benchmarks simultaneously — they compete for CPU and memory.
 
 ## Test Structure
 
