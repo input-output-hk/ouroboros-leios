@@ -670,7 +670,7 @@ impl TransactionConfig {
 pub(crate) struct RealTransactionConfig {
     next_id: Arc<AtomicU64>,
     input_id: Arc<AtomicU64>,
-    ib_shards: u64,
+    pub(crate) ib_shards: u64,
     pub max_size: u64,
     pub frequency_ms: FloatDistribution,
     pub size_bytes: FloatDistribution,

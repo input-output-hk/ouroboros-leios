@@ -975,7 +975,7 @@ where
         let indexed_nodes: Vec<_> = config.nodes.iter()
             .filter_map(|n| node_indices.get(&n.id).map(|&idx| (idx, n)))
             .collect();
-        let tx_generator = TxGeneratorCore::new(tx_rng, &config, indexed_nodes);
+        let tx_generator = TxGeneratorCore::new(tx_rng, &config, shard_idx, indexed_nodes);
         let mut event_queue: BinaryHeap<FutureEvent<GlobalEvent<N>>> = BinaryHeap::new();
         for idx in 0..nodes.len() {
             event_queue.push(FutureEvent(
