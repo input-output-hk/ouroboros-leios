@@ -293,6 +293,48 @@ pub enum Event {
     },
 }
 
+impl Event {
+    /// Return the originating node ID for deterministic ordering of events
+    /// at the same timestamp.  Global events (no node) sort first.
+    pub fn node_id(&self) -> Option<NodeId> {
+        match self {
+            Self::GlobalSlot { .. } => None,
+            Self::Slot { node, .. }
+            | Self::TXLocalBacklogMax { node, .. }
+            | Self::TXPeerBacklogMax { node, .. }
+            | Self::NoIBGenerated { node, .. }
+            | Self::NoEBGenerated { node, .. }
+            | Self::NoVTBundleGenerated { node, .. } => Some(node.id),
+            Self::CpuTaskScheduled { task, .. }
+            | Self::CpuTaskFinished { task, .. }
+            | Self::Cpu { task, .. } => Some(task.node.id),
+            Self::TXGenerated { publisher, .. } => Some(publisher.id),
+            Self::TXSent { sender, .. } => Some(sender.id),
+            Self::TXReceived { recipient, .. } => Some(recipient.id),
+            Self::TXLost { .. } => None,
+            Self::RBLotteryWon { producer, .. }
+            | Self::RBGenerated { producer, .. } => Some(producer.id),
+            Self::RBSent { sender, .. } => Some(sender.id),
+            Self::RBReceived { recipient, .. } => Some(recipient.id),
+            Self::IBLotteryWon { producer, .. }
+            | Self::IBGenerated { producer, .. } => Some(producer.id),
+            Self::IBSent { sender, .. } => Some(sender.id),
+            Self::IBReceived { recipient, .. } => Some(recipient.id),
+            Self::EBLotteryWon { producer, .. }
+            | Self::EBGenerated { producer, .. } => Some(producer.id),
+            Self::EBSent { sender, .. } => Some(sender.id),
+            Self::EBReceived { recipient, .. } => Some(recipient.id),
+            Self::VTLotteryWon { producer, .. }
+            | Self::VTBundleGenerated { producer, .. }
+            | Self::VTBundleNotGenerated { producer, .. } => Some(producer.id),
+            Self::VTBundleSent { sender, .. } => Some(sender.id),
+            Self::VTBundleReceived { recipient, .. } => Some(recipient.id),
+            #[cfg(test)]
+            Self::TestNodeEvent { .. } => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Votes<Node>(pub BTreeMap<EndorserBlockId<Node>, usize>);
 
