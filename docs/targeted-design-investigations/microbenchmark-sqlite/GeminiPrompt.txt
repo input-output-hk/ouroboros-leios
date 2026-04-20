@@ -1,0 +1,17 @@
+Please write a python3 script that initializes a SQLite3 database named WorstCase.sql according to the following requirements.
+
+- A table named EB will contain 10000 rows.
+  Each row has two columns, both primary keys: the ebSlot and the ebHash.
+  The ebSlot is a uint64, and the ebHash is 32 bytes.
+  Let ebHash just be randomblob(32).
+  Let the minimum ebSlot be less than the maximum ebSlot, and let their difference be a random number near 129600 but no greater.
+  Also let the ebSlots values be the union of two distributions: about 3240 are from a poisson with an average of 20 slots between arrivals and the other 6760 are from a poisson with a higher arrival rate.
+- A table named EB2TX will contains 15000 entries per row in EB.
+  Each row contains the following columns.
+    - ebSlot and ebHash are foreign keys into EB.
+    - txIndex is a number between 0 and 14999.
+    - ebSlot, ebHash, and txIndex form the compound primary key.
+    - The data columns include txHash, which is another randomblob(32), and a txBytesSize.
+    - The 15000 txBytesSize values that all share the same ebSlot and ebHash should add up to a random number very near 12000000 but no greater, but none of them can be less than 50 nor greater than 16384---most should be near 800.
+      Their overall distribution should follow a power-law.
+- Include CREATE INDEX idx_EB2TX_txHash ON EB2TX(txHash).
