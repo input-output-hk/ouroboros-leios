@@ -67,8 +67,12 @@ lengthProbsNode10 = [(1, 0.40), (2, 3.91), (3, 31.06), (4, 61.85), (5, 2.78)]
 blendedDelay :: BlockSize -> DQ
 blendedDelay b = choices $ map (\(n, p) -> (p, hops n b)) lengthProbsNode10
 
+-- REVIEW(SN): B64 is 64kB blocks according to
+-- https://github.com/IntersectMBO/cardano-formal-specifications/blob/main/src/performance/app/PraosModel.lhs
 sendRBHeader :: DQ
 sendRBHeader = blendedDelay B64
 
+-- REVIEW(SN): B1024 is 1024kB blocks according to
+-- https://github.com/IntersectMBO/cardano-formal-specifications/blob/main/src/performance/app/PraosModel.lhs
 sendRBBody :: DQ
 sendRBBody = blendedDelay B1024
