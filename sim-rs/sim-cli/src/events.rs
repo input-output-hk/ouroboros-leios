@@ -180,26 +180,62 @@ impl EventMonitor {
         let mut high_watermark = Timestamp::zero();
         let flush_window = Duration::from_secs(1);
 
+        let has_output = !matches!(output, OutputTarget::None);
+
         while let Some((event, time)) = self.events_source.recv().await {
             last_timestamp = time;
-            let output_event = OutputEvent {
-                time_s: time,
-                message: event.clone(),
-            };
-            buffered.entry(time).or_default().push(output_event);
-            if time > high_watermark {
-                high_watermark = time;
-                let cutoff = if high_watermark >= Timestamp::zero() + flush_window {
-                    high_watermark - flush_window
-                } else {
-                    Timestamp::zero()
+            if has_output {
+                let output_event = OutputEvent {
+                    time_s: time,
+                    message: event.clone(),
                 };
-                flush_buffered(&mut buffered, cutoff, &mut output).await?;
+                buffered.entry(time).or_default().push(output_event);
+                if time > high_watermark {
+                    high_watermark = time;
+                    let cutoff = if high_watermark >= Timestamp::zero() + flush_window {
+                        high_watermark - flush_window
+                    } else {
+                        Timestamp::zero()
+                    };
+                    flush_buffered(&mut buffered, cutoff, &mut output).await?;
+                }
             }
             match event {
                 Event::GlobalSlot { slot: number } => {
                     info!("Slot {number} has begun.");
                     total_slots = number + 1;
+                    if number % 60 == 0 {
+                        let buffered_events: usize = buffered.values().map(|v| v.len()).sum();
+                        let (lm_txs, lm_ibs, lm_ebs, lm_queue) = self.events_source.stats();
+                        info!(
+                            "EventMonitor stats at slot {}:\n\
+                             \x20 monitor.txs: {} entries\n\
+                             \x20 monitor.ibs: {} entries\n\
+                             \x20 monitor.ebs: {} entries\n\
+                             \x20 monitor.votes_per_bundle: {} entries\n\
+                             \x20 monitor.eb_votes: {} entries\n\
+                             \x20 monitor.ibs_containing_tx: {} entries\n\
+                             \x20 monitor.ebs_containing_ib: {} entries\n\
+                             \x20 buffered output events: {}\n\
+                             \x20 liveness.txs: {} entries\n\
+                             \x20 liveness.ibs: {} entries\n\
+                             \x20 liveness.ebs: {} entries\n\
+                             \x20 liveness.queue: {} entries",
+                            number,
+                            txs.len(),
+                            ibs.len(),
+                            ebs.len(),
+                            votes_per_bundle.len(),
+                            eb_votes.len(),
+                            ibs_containing_tx.len(),
+                            ebs_containing_ib.len(),
+                            buffered_events,
+                            lm_txs,
+                            lm_ibs,
+                            lm_ebs,
+                            lm_queue,
+                        );
+                    }
                 }
                 Event::Slot { .. } => {}
                 Event::CpuTaskScheduled { .. } => {}
