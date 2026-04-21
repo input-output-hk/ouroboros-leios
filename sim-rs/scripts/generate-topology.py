@@ -193,9 +193,6 @@ def generate(source_path, target_n, seed):
             dist = haversine_km(locs[ri][0], locs[ri][1], locs[pi][0], locs[pi][1])
             lat = sample_latency(src, dist, rng)
             producers[ri][pi] = round(lat, 4)
-            # Symmetrize: ensure the reverse link exists too
-            if ri not in producers[pi]:
-                producers[pi][ri] = round(lat, 4)
 
     # --- Step 5: Connect BPs to 2 nearest relays ---
     print(f"Connecting {n_bp} BPs to relays...", file=sys.stderr)
@@ -205,8 +202,71 @@ def generate(source_path, target_n, seed):
             dist = haversine_km(locs[bi][0], locs[bi][1], locs[pi][0], locs[pi][1])
             lat = sample_latency(src, dist, rng)
             producers[bi][pi] = round(lat, 4)
-            if bi not in producers[pi]:
-                producers[pi][bi] = round(lat, 4)
+
+    # --- Step 5b: Ensure directed connectivity ---
+    # The sim validates by BFS over "consumers" (reverse of producers).
+    # Every node must be reachable from node 0 via consumer edges.  To
+    # guarantee this, ensure each node is *someone's* consumer — i.e., at
+    # least one of its producers also lists it back as a producer.  This
+    # adds at most one reverse link per node.
+    added = 0
+    # Build set of nodes that are already someone's consumer
+    is_consumer = set()
+    for nid in range(target_n):
+        for pid in producers[nid]:
+            is_consumer.add(nid)  # nid is a consumer of pid
+
+    # Every node that lists producers is already a consumer (it consumes
+    # from its producers).  The nodes that are NOT consumers are those
+    # listed as producers by others but who list no producers themselves —
+    # that shouldn't happen since relays and BPs all pick producers.
+    #
+    # The actual requirement: each node must be reachable, meaning it must
+    # appear in some other node's consumers list.  Node X appears in Y's
+    # consumers if X lists Y as a producer.  So X is reachable from Y if
+    # X lists Y as producer.  For X to be reachable at ALL, someone must
+    # list X as producer — i.e., X must appear in someone's producers dict.
+    listed_as_producer = set()
+    for nid in range(target_n):
+        for pid in producers[nid]:
+            listed_as_producer.add(pid)
+
+    # Nodes not listed as anyone's producer have no consumers pointing to
+    # them — they're invisible to the BFS.  Fix: for each such node, pick
+    # its first producer and add a reciprocal link.
+    for nid in range(target_n):
+        if nid not in listed_as_producer and producers[nid]:
+            # Pick first producer and have it list nid as producer too
+            first_prod = next(iter(producers[nid]))
+            if nid not in producers[first_prod]:
+                producers[first_prod][nid] = producers[nid][first_prod]
+                added += 1
+
+    if added:
+        print(f"Connectivity fixup: added {added} reciprocal links", file=sys.stderr)
+
+    # Verify full connectivity via BFS
+    from collections import defaultdict, deque
+
+    consumers = defaultdict(list)
+    for nid in range(target_n):
+        for pid in producers[nid]:
+            consumers[pid].append(nid)
+
+    visited = set()
+    frontier = deque([0])
+    while frontier:
+        cur = frontier.popleft()
+        if cur in visited:
+            continue
+        visited.add(cur)
+        for peer in consumers.get(cur, []):
+            if peer not in visited:
+                frontier.append(peer)
+
+    if len(visited) < target_n:
+        print(f"WARNING: graph still not fully connected! "
+              f"Reachable: {len(visited)}/{target_n}", file=sys.stderr)
 
     # --- Step 6: Assign stake ---
     bp_list = sorted(bp_indices)
