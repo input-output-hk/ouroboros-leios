@@ -863,6 +863,8 @@ pub struct SimConfiguration {
     pub(crate) attacks: AttackConfig,
     /// TX generation batching window for the sequential engine.
     pub(crate) tx_batch_window: Option<Duration>,
+    /// Shared network stats collector (set by sequential engine, read by nodes).
+    pub network_stats: Option<Arc<crate::network::stats::NetworkStatsCollector>>,
 }
 
 impl SimConfiguration {
@@ -969,6 +971,7 @@ impl SimConfiguration {
             transactions: TransactionConfig::new(&params),
             attacks,
             tx_batch_window: params.tx_batch_window_ms.map(duration_ms),
+            network_stats: None,
         })
     }
 }

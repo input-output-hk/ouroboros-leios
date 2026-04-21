@@ -78,6 +78,19 @@ where
         }
     }
 
+    /// Returns (message_count, total_bytes) across all bandwidth and latency queues.
+    pub fn queue_stats(&self) -> (usize, u64) {
+        let mut count = 0usize;
+        let mut bytes = 0u64;
+        for q in self.bandwidth_queues.values() {
+            count += q.queue.len();
+            bytes += q.bytes();
+        }
+        count += self.latency_queue.len();
+        // latency_queue doesn't track bytes, estimate from count
+        (count, bytes)
+    }
+
     pub fn send(&mut self, message: TMessage, bytes: u64, miniprotocol: TProtocol, now: Timestamp) {
         if self.bandwidth_bps.is_none() {
             self.latency_queue.push_back((message, now + self.latency));
