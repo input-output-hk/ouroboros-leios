@@ -684,6 +684,21 @@ impl LinearLeiosNode {
             node_total as f64 / 1e6, num_nodes, all_nodes_mb,
             rss_mb,
         );
+
+        // Network queue stats (aggregated across all shards by the sequential engine)
+        if let Some(ref collector) = self.sim_config.network_stats {
+            let (connections, active, msgs, bytes) = collector.totals();
+            tracing::info!(
+                "Network queue stats (all shards):\n\
+                 \x20 connections: {} total, {} active\n\
+                 \x20 queued messages: {}\n\
+                 \x20 queued bytes: {:.1} MB",
+                connections,
+                active,
+                msgs,
+                bytes as f64 / (1024.0 * 1024.0),
+            );
+        }
     }
 }
 

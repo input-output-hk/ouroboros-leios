@@ -16,7 +16,7 @@ use crate::{
     config::{LeiosVariant, NodeId, SimConfiguration},
     events::EventTracker,
     model::Transaction,
-    network::connection::Connection,
+    network::{connection::Connection, stats::NetworkStatsCollector},
     sim::{
         MiniProtocol, NodeImpl, SimMessage as _,
         common::{CpuTaskWrapper, NodeEvent, self},
@@ -218,6 +218,10 @@ pub(super) struct SequentialSimulation<N: NodeImpl> {
     shared_time: Arc<AtomicTimestamp>,
     /// Whether this shard tracks global slot boundaries.
     is_primary: bool,
+    /// Shard index (0-based).
+    shard_idx: usize,
+    /// Shared network stats collector (all shards write, nodes read).
+    network_stats: Option<Arc<NetworkStatsCollector>>,
     /// Present only in multi-shard mode.
     cross_shard: Option<CrossShardState<N::Message>>,
 }
@@ -449,6 +453,27 @@ impl<N: NodeImpl> SequentialSimulation<N> {
                     GlobalEvent::SlotBoundary { slot } => {
                         if self.is_primary {
                             self.tracker.track_global_slot(slot);
+                        }
+                        // Update per-shard network stats every slot
+                        if let Some(ref collector) = self.network_stats {
+                            let mut total_msgs = 0u64;
+                            let mut total_bytes = 0u64;
+                            let mut active_conns = 0u64;
+                            for conn in self.connections.values() {
+                                let (msgs, bytes) = conn.queue_stats();
+                                if msgs > 0 {
+                                    active_conns += 1;
+                                }
+                                total_msgs += msgs as u64;
+                                total_bytes += bytes;
+                            }
+                            collector.update_shard(
+                                self.shard_idx,
+                                self.connections.len() as u64,
+                                active_conns,
+                                total_msgs,
+                                total_bytes,
+                            );
                         }
                         let next_slot = slot + 1;
                         // Termination is handled at the top of the main
@@ -844,7 +869,7 @@ pub(super) fn build(
 }
 
 fn build_typed<N: NodeImpl + Send + 'static>(
-    config: Arc<SimConfiguration>,
+    mut config: Arc<SimConfiguration>,
     event_sender: tokio::sync::mpsc::UnboundedSender<(crate::events::Event, Timestamp)>,
     rng: &mut ChaChaRng,
 ) -> Box<dyn SequentialRunner>
@@ -867,6 +892,13 @@ where
         .iter()
         .map(|clock| EventTracker::new(event_sender.clone(), clock.clone(), &config.nodes))
         .collect();
+
+    // Shared network stats collector — set on config before nodes are created
+    // so nodes can read it via sim_config.network_stats.
+    let network_stats = Arc::new(NetworkStatsCollector::new(shard_count));
+    if let Some(cfg) = Arc::get_mut(&mut config) {
+        cfg.network_stats = Some(network_stats.clone());
+    }
 
     // Compute shard assignments
     let shard_lookup: Arc<HashMap<NodeId, usize>> =
@@ -1032,6 +1064,8 @@ where
             config: config.clone(),
             shared_time: shared_times[shard_idx].clone(),
             is_primary,
+            shard_idx,
+            network_stats: Some(network_stats.clone()),
             cross_shard,
         });
     }
