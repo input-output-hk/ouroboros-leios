@@ -11,6 +11,7 @@ use crate::{
 
 pub(crate) mod connection;
 pub(crate) mod coordinator;
+pub mod stats;
 
 /// Maps a node ID to its shard index.
 pub type ShardLookup = Arc<HashMap<NodeId, usize>>;
