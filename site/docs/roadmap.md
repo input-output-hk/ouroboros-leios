@@ -1,3 +1,6 @@
+---                                                                                                  
+toc_max_heading_level: 4                                                                             
+---
 # Roadmap
 
 Leios focuses on maturing a consensus protocol design from a research paper through multiple [software readiness
@@ -11,10 +14,11 @@ Together, these objectives and features form the product roadmap, which will be 
 
 <a href="https://github.com/orgs/input-output-hk/projects/167">
 
-![](./roadmap-preview.png)
+![](./leios-roadmap2026.png)
 
 </a>
 
+## 2025/2026 
 ### Improvement proposal 
 
 > As the Cardano community, we want to understand as early as possible what changes are being proposed, so that we can discuss them across relevant groups and committees and reference them in subsequent on-chain governance decisions.
@@ -23,7 +27,7 @@ To address the [Cardano Problem Statement (CPS-18)](https://github.com/cardano-s
 
 Publishing a CIP is the standard mechanism for proposing and reviewing protocol changes. It sets out the motivation, specification, and rationale for modifications to the Cardano consensus protocol. Open discussion helps identify blind spots, surface risks, and gather community feedback or support. Supporting evidence, including simulation results and cost analysis, builds confidence in the feasibility and informs governance decisions required to implement the upgrade through a hard fork.
 
-#### Scope
+**Scope**
 
 - Refine the protocol design [published by research](https://eprint.iacr.org/2025/1115.pdf) into concrete, implementable variants
 - Develop simulators to empirically evaluate protocol variants and explore trade-offs
@@ -43,7 +47,7 @@ Leios introduces a new consensus protocol and therefore requires a precise techn
 
 Node diversity strengthens Cardano’s security and resilience. Clear specifications, combined with executable conformance test suites, enable independent teams to validate correctness against a common standard and reduce the risk of consensus divergence.
 
-#### Scope
+**Scope**
 
 - Produce node-level design, architecture, and impact analysis documents
 - Conduct threat modeling and security analysis
@@ -61,7 +65,7 @@ A key milestone for Leios is to demonstrate an order-of-magnitude increase in th
 
 An early prototype that exercises the full network layer also enables validation of design assumptions under realistic conditions. It supports structured adversarial testing, assessment of mitigation strategies, and identification of weaknesses that must be resolved before deployment on a public network.
 
-#### Scope
+**Scope**
 
 - Develop a network prototype deployable in a controlled environment
 - Demonstrate throughput improvements over Praos using clear visual comparisons
@@ -82,7 +86,7 @@ Although Leios introduces limited structural changes, it modifies consensus and 
 
 It would enable SPOs, developers, and infrastructure providers to integrate Leios-related changes, assess operational impact, and verify that systems remain reliable under higher throughput. The network would also support large-scale experiments, repeated load tests, and systematic data collection to inform parameter tuning and readiness for mainnet deployment.
 
-#### Scope
+**Scope**
 
 - Bootstrap and promote a public testnet dedicated to Leios
 - Provide one or more compatible node implementations for the testnet
@@ -91,11 +95,97 @@ It would enable SPOs, developers, and infrastructure providers to integrate Leio
 - Monitor infrastructure compatibility across the community
 - Run large-scale experiments under varying load conditions and parameter configurations.
 
-### Hard fork
+---
+## 2026 Proposal
 
-> As an SPO and a DRep, we want a mature Cardano node implementation that enables Leios and is available to all Cardano users.
+### High Confidence
 
-Create a `cardano-node` release candidate and mature the feature set through `preview` and `preprod` environments, and eventually enable it with a hard fork on `mainnet`.
+> As a Cardano community member, I want assurance that the Leios protocol is secure and performs as expected under realistic and adversarial conditions, so that I can trust it with real value on mainnet.
+
+Systematically validate the protocol through parameter exploration, continuous load testing, and adversarial red-teaming on the public testnet, culminating in an updated threat model with validated mitigations.
+
+Once the Leios testnet is operational, it provides a larger-scale environment to study protocol behavior under realistic conditions. This objective runs in parallel with the Release Candidate work and is essential for building confidence among developers and the community alike. A threat model was created in the first budget cycle; this objective revisits it systematically and validates that all identified risks have effective mitigations.
+
+#### _Technical feasibility confirmed_
+
+**Scope**
+
+- Systematic study of timing parameters (L_hdr, L_vote, L_diff) and size limits (S_EB, S_EB-tx), including evidence that Praos is unaffected by Leios load
+- Continuous load testing under various load profiles
+- Synthetic load generation; potential use of condensed mainnet replay
+- Identify breaking points and operational margins
+- Develop parameter graduation plan: testnet → mainnet → gradual mainnet scale-up
+- Publish benchmark report covering every stage of the Leios transaction pipeline on reference cluster hardware
+
+#### _Risks & mitigations validated_
+
+**Scope**
+
+- Stake-based attack testing and quantitative analysis: equivocation, vote splitting, certification threshold manipulation
+- Network-based attack testing: delayed propagation, eclipse attacks, partition scenarios
+- Red-teaming exercises (extension point for external team involvement)
+- Systematic revisit and update of threat model
+- Document validated risks and mitigations with community-facing publication
+- Specification of the voting scheme and certificate soundness evidence
+
+### Release Candidate
+
+> As a node operator, I want a production-quality node implementation that has been thoroughly tested and reviewed, so that I can confidently prepare for the Leios hard fork.
+
+Mature the Leios implementation from early testnet prototype to a mainnet-ready release candidate, progressing through [Software Readiness Levels](https://committees.docs.intersectmbo.org/intersect-technical-steering-committee/technical-roadmap/project-cards-explained/software-readiness-level) 5–8.
+
+This is the critical path for the entire proposal. The implementation must be substantially rewritten and refined, conformance tested against formal specifications, and integrated into the primary node used by most stake pools before it can be deployed to `preview` and `preprod` testnets and considered in the hard-fork schedule. Feature completeness is defined by CIP-164.
+
+#### _Dijkstra era definition includes Leios_
+
+**Scope**
+
+- Implement Leios block structure and encoding for the Dijkstra ledger era
+- Define and implement Leios protocol parameters in the ledger
+- Produce a `cardano-node` release (11.x or later) that understands Leios-era blocks
+- Coordinate with the Hard Fork Working Group (HFWG) to confirm Leios is included in the Dijkstra era scoping decision
+
+#### _Leios-enabled cardano-node_
+
+
+**Scope**
+
+- Production-grade implementation of CIP-164 in cardano-node that can be configured through protocol parameters and allows enabling of Leios at a hard-fork boundary
+- Progress through SRL 5 (Initial Implementation) → SRL 6 (Main Implementation) → SRL 7 (Integration) → SRL 8 (Mainnet-ready)
+- Feature completeness per CIP-164 specification
+- Complete conformance test suite against Agda formal specification
+- Published performance benchmark report: throughput and latency under sustained Leios load on reference cluster hardware
+- CLI support for the complete Leios user journey (key registration, parameter queries, EB inspection)
+
+### Hardfork
+
+> As an ecosystem developer, SPO, or dRep, I want stable interfaces, clear documentation, and all technical and governance prerequisites for the Leios hard fork to be complete, so that I can confidently update our tools, ensure the constitutional requirements are met, and make an informed decision on enabling Leios on mainnet.
+
+Do everything within our control to make the Leios hard fork possible: prepare the broader ecosystem and all technical and governance stakeholders for Leios mainnet activation through stable client interfaces, comprehensive integration documentation, SPO outreach, and community workshops. See through testnet hard-forks, finalize the mainnet parameter graduation plan, coordinate with relevant bodies, and document contingency procedures.
+
+#### _Constitutional updates / governance prepared_
+
+**Scope**
+
+- Prepare updated guardrails script incorporating Leios protocol parameters, ready for submission as part of a Constitution update proposal
+- Draft rationale document for the Constitution update explaining why the new parameters and guardrail changes are needed
+- Protocol parameter rationale document with recommended initial values and supporting evidence from the risks & mitigations validated milestone
+- Consistency check confirming no discrepancies between the ratified CIP-164, the Agda formal specification, and the `cardano-node` implementation
+- Coordinate timing and scoping with relevant governance bodies and advocate for Leios inclusion in the hard-fork schedule
+
+#### _Hard-fork enabling Leios_
+
+
+**Scope**
+
+- Node-to-Client (N2C) mini-protocol and utxo-rpc API updates and stabilization, iterating based on integrator feedback
+- Complete implementation-independent technical documentation for Leios (`cardano-blueprint`)
+- Tactical support for close-by projects (DbSync, Mithril, Blockfrost, Ogmios)
+- SPO and developer workshops, and community coordination on ecosystem readiness
+- Integration guide for community developers updating wallets, tools, and SDKs
+- Finalize mainnet parameter graduation plan (preview → preprod → mainnet, with gradual mainnet scale-up)
+- Document contingency procedures for disabling Leios during an incident
+- Hard-fork activation on the preview testnet, with operational report covering EB certification rate, chain quality metrics, and SPO resource utilization
 
 ## Strategy
 
