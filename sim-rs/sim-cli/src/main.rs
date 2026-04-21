@@ -1,5 +1,8 @@
 use std::{fs, path::PathBuf, process};
 
+#[global_allocator]
+static GLOBAL: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
 use anyhow::Result;
 use clap::Parser;
 use events::EventMonitor;
