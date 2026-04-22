@@ -10,7 +10,12 @@ import { translate } from "@docusaurus/Translate";
 import type { Props } from "@theme/Navbar/Layout";
 import NavbarMobileSidebar from "@theme/Navbar/MobileSidebar";
 import clsx from "clsx";
-import { motion, useMotionValueEvent, useScroll } from "framer-motion";
+import {
+  motion,
+  useMotionValueEvent,
+  useScroll,
+  useTransform,
+} from "framer-motion";
 import { JSX, useEffect, useState, type ComponentProps } from "react";
 
 function NavbarBackdrop(props: ComponentProps<"div">) {
@@ -36,6 +41,12 @@ export default function NavbarLayout({ children }: Props): JSX.Element {
   const [isVisible, setIsVisible] = useState(true);
   const [lastY, setLastY] = useState(0);
 
+  const yBg = useTransform(
+    scrollY,
+    [0, 70],
+    ["rgba(21, 4, 32, 0)", "rgba(21, 4, 32, 1)"],
+  );
+
   // Hide/show on scroll similar to your previous code
   useMotionValueEvent(scrollY, "change", (latest) => {
     if (!isHomepage) return;
@@ -51,29 +62,37 @@ export default function NavbarLayout({ children }: Props): JSX.Element {
     if (mobileSidebar.shown) setIsVisible(true);
   }, [mobileSidebar.shown]);
 
-  const NavWrapper = isHomepage ? motion.nav : "nav";
-
   return (
-    <NavWrapper
+    <motion.nav
       ref={navbarRef}
       aria-label={translate({
         id: "theme.NavBar.navAriaLabel",
         message: "Main",
         description: "The ARIA label for the main navigation",
       })}
-      className={clsx("navbar", "navbar--fixed-top", {
-        "navbar--dark": style === "dark",
-        "navbar--primary": style === "primary",
-        "navbar-sidebar--show": mobileSidebar.shown,
-      })}
+      className={clsx(
+        "navbar",
+        "navbar--fixed-top",
+        isHomepage && "navbar-homepage",
+        {
+          "navbar--dark": style === "dark",
+          "navbar--primary": style === "primary",
+          "navbar-sidebar--show": mobileSidebar.shown,
+        },
+      )}
       animate={isHomepage ? { y: isVisible ? 0 : "-100%" } : undefined}
       transition={
         isHomepage ? { type: "spring", stiffness: 300, damping: 30 } : undefined
+      }
+      style={
+        isHomepage && {
+          backgroundColor: yBg,
+        }
       }
     >
       {children}
       <NavbarBackdrop onClick={mobileSidebar.toggle} />
       <NavbarMobileSidebar />
-    </NavWrapper>
+    </motion.nav>
   );
 }

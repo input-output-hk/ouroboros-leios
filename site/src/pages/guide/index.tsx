@@ -1,67 +1,15 @@
 import Link from "@docusaurus/Link";
 
 import useDocusaurusContext from "@docusaurus/useDocusaurusContext";
+import HomepageFeatures from "@site/src/components/HomepageFeatures";
 import Layout from "@theme/Layout";
-import clsx from "clsx";
 import React, { useEffect, useState } from "react";
 
-import LiveTrackerPreview from "@site/static/img/live-tracker-preview.png";
 import VideoCamUrl from "@site/static/img/video-cam.png";
-import { ArrowRightIcon } from "../components/icons";
-import { LinkButton } from "../components/LinkButton/LinkButton";
-import HowLeiosWorksGraphic from "./HowLeiosWorksGraphic";
+import { LinkButton } from "../../components/LinkButton/LinkButton";
+import HowLeiosWorksGraphic from "../HowLeiosWorksGraphic";
+import ResearchGraphic from "../ResearchGraphic";
 import styles from "./index.module.css";
-import ResearchGraphic from "./ResearchGraphic";
-
-function HomepageHeader() {
-  const { siteConfig } = useDocusaurusContext();
-
-  return (
-    <>
-      <header className={clsx("hero hero--primary")}>
-        <video className="hero-video-desktop" autoPlay muted loop playsInline>
-          <source
-            src="/homepage/hero-background-desktop.mp4"
-            type="video/mp4"
-          />
-        </video>
-        <video className="hero-video-mobile" autoPlay muted loop playsInline>
-          <source src="/homepage/hero-background-mobile.mp4" type="video/mp4" />
-        </video>
-        <div className="hero-overlay" />
-
-        <div className={clsx("container hero-content")}>
-          <div className={clsx("container-padding")}>
-            <div className={styles.heroBanner}>
-              <h1 className={styles.heroTitle}>{siteConfig.title}</h1>
-              <p className={styles.heroStandfirst}>{siteConfig.tagline}</p>
-              <div className={styles.heroButtonsContainer}>
-                <a
-                  className={clsx("primary-button homepage-button")}
-                  href="#dev-dashboard"
-                >
-                  View live development{" "}
-                  <ArrowRightIcon
-                    style={{ rotate: "90deg" }}
-                    height={12}
-                    width={12}
-                  />
-                </a>
-                <a
-                  className={clsx("secondary-button homepage-button")}
-                  href="/guide"
-                >
-                  {" "}
-                  Explore how it works <ArrowRightIcon height={12} width={12} />
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-    </>
-  );
-}
 
 function getLastWednesdayOfMonth(date = new Date()) {
   const year = date.getFullYear();
@@ -88,6 +36,7 @@ function UTCDateTime(year, month, day, hour, minute = 0, second = 0) {
 let exceptions = {
   "2025-9": UTCDateTime(2025, 9, 1, 14),
   "2025-12": UTCDateTime(2025, 11, 17, 14),
+  "2026-3": UTCDateTime(2026, 3, 1, 14),
 };
 
 function getNextMeeting(now = new Date()) {
@@ -101,8 +50,8 @@ function getNextMeeting(now = new Date()) {
   }
 
   // Unless there is an exception for next meeting
-  const exception =
-    exceptions[`${nextMeeting.getFullYear()}-${nextMeeting.getMonth() + 1}`];
+  const nextMonth = `${nextMeeting.getFullYear()}-${nextMeeting.getMonth() + 1}`;
+  const exception = exceptions[nextMonth];
   if (exception) {
     nextMeeting = exception;
   }
@@ -331,7 +280,7 @@ function MonthlyReviewsSection() {
               </p>
               <Link
                 style={{ justifySelf: "flex-end", marginTop: "auto" }}
-                to="/docs/development/monthly-reviews"
+                to="/docs/monthly-reviews"
               >
                 Catch up on past reviews
               </Link>
@@ -344,7 +293,7 @@ function MonthlyReviewsSection() {
               <div className={styles.countdownContainer}>
                 <Link
                   className={styles.countdown}
-                  to="https://youtube.com/live/Z4uA9tRGS7g"
+                  to="https://youtube.com/live/_FkCLJLTNco"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -359,55 +308,6 @@ function MonthlyReviewsSection() {
                     <span className={styles.reviewDate}>{nextDate}</span>
                   </>
                 )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function LiveTrackerSection() {
-  return (
-    <section id="tracker" className="homepage-section-primary">
-      <div className="container">
-        <div className="container-padding padding-section">
-          <div className={styles.trackerContentWrapper}>
-            <Link
-              to="https://engineering.iog.io/leios"
-              target="_blank"
-              rel="noopener noreferrer"
-              className={styles.trackerEmbedContainer}
-            >
-              <img
-                src={LiveTrackerPreview}
-                alt="Leios Live Development Tracker showing 3D globe with commit locations"
-                className={styles.trackerImage}
-              />
-            </Link>
-            <div className={styles.trackerContent}>
-              <h2>Live Development Tracker</h2>
-              <p className={styles.subtitle}>
-                Follow the real-time progress of Leios development with our
-                interactive tracker
-              </p>
-              <p>
-                Our live tracker provides transparency into the ongoing Leios
-                development work. See current sprint progress, completed
-                milestones, and upcoming tasks as the team builds towards the
-                next generation of Cardano consensus.
-              </p>
-              <p>
-                The tracker observes GitHub commits in real-time, giving you
-                direct insight into the engineering work happening across
-                simulations, specifications, and implementation efforts.
-              </p>
-              <div className={styles.trackerLinkButton}>
-                <LinkButton
-                  text="Open Full Tracker"
-                  url="https://engineering.iog.io/leios"
-                />
               </div>
             </div>
           </div>
@@ -471,39 +371,17 @@ function MempoolSimulationSection() {
 
 export default function Home(): React.ReactElement {
   const { siteConfig } = useDocusaurusContext();
-  const iframeRef = React.useRef<HTMLIFrameElement>(null);
-
-  useEffect(() => {
-    const handler = (event: MessageEvent) => {
-      if (event.data?.type === "dashboard-height" && iframeRef.current) {
-        iframeRef.current.style.height = event.data.height + "px";
-      }
-    };
-
-    window.addEventListener("message", handler);
-    return () => window.removeEventListener("message", handler);
-  }, []);
   return (
     <Layout
       title={siteConfig.title}
       description="A high-throughput protocol for Cardano"
     >
-      <HomepageHeader />
       <main>
-        {/* <HomepageFeatures /> */}
-
-        <iframe
-          ref={iframeRef}
-          src="https://engineering.iog.io/documentation-dashboard"
-          title="Leios"
-          className={styles.devTracker}
-          id="dev-dashboard"
-        />
-        {/* <LeiosSpecificationSection />
+        <HomepageFeatures />
+        <LeiosSpecificationSection />
         <HowLeiosWorksSection />
         <MonthlyReviewsSection />
-        <LiveTrackerSection />
-        <MempoolSimulationSection /> */}
+        <MempoolSimulationSection />
       </main>
     </Layout>
   );

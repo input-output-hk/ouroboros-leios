@@ -77,21 +77,23 @@
   --text-sm: 0.875rem;
   --text-base: 1rem;
   --text-lg: 1.125rem;
-  --text-xl: 1.25rem;
+  --text-xl: 1.375rem;
   --text-2xl: 1.5rem;
   --text-3xl: 1.875rem;
   --text-4xl: 2rem;
-  --text-5xl: 2.875rem;
-  --text-6xl: 4.5rem;
+  --text-5xl: 2.25rem;
+  --text-6xl: 2.75rem;
+  --text-7xl: 4.5rem;
 
   --line-height-lg: 1.71;
   --line-height-sm: 1.25;
   --line-height-xs: 1.1;
+  --line-height-medium: 1.3;
   --line-height-normal: 1.5;
 }
 
 h1 {
-  font-size: var(--text-6xl);
+  font-size: var(--text-7xl);
   font-weight: var(--font-weight-regular);
   line-height: var(--line-height-xs);
 }
@@ -103,9 +105,15 @@ h2 {
   line-height: var(--line-height-sm);
 }
 
+h4 {
+  font-size: var(--text-5xl);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-medium);
+}
+
 @media (max-width: 997px) {
   h1 {
-    font-size: var(--text-5xl);
+    font-size: var(--text-6xl);
   }
 
   h2 {
@@ -113,5 +121,11 @@ h2 {
     font-weight: var(--font-weight-regular);
     letter-spacing: -0.02rem;
     line-height: var(--line-height-sm);
+  }
+
+  h4 {
+    font-size: var(--text-xl);
+    font-weight: var(--font-weight-regular);
+    line-height: var(--line-height-medium);
   }
 }
