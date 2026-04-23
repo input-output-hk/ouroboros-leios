@@ -46,7 +46,7 @@ We make the following assumptions about the network:
 ### Praos Relay Node Egress Calculation
 
 1. **Header egress** (23 peers):
-   $131{,}400 \times 1{,}024 \times 23 = 3{,}094 \text{ MB} \approx 2.95 \text{ GiB}$
+   $131{,}400 \times 1{,}024 \times 23 = 3{,}094{,}732{,}800 \text{ bytes} \approx 2.88 \text{ GiB}$
 
 2. **Body egress to edge nodes** (3 peers):
    $131{,}400 \times 90{,}112 \times 3 \approx 33.08 \text{ GiB}$
@@ -70,9 +70,9 @@ node does not know in advance which EBs will be certified.
 | ----------------------------- | ------------ | ---------- |
 | Endorsement Block (EB) Header | 240          | 0.2        |
 | EB Body (32 B per tx ref)     | varies       | varies     |
-| Vote bundle (per voter)       | 105          | 0.1        |
+| Vote bundle (per voter)       | 164          | 0.2        |
 | Ranking Block (RB) Header     | 1,024        | 1          |
-| RB Body (certificate)         | 7,168        | 7          |
+| RB Body (certificate)         | 8,000        | 8          |
 
 ### Protocol Rates
 
@@ -120,7 +120,7 @@ Same assumptions as Praos:
 
    $$E_{\text{eb-body}} = R_{\text{eb}} \times T_{\text{month}} \times \frac{\text{TxkB/s} \times 1{,}000}{1{,}500 \times 0.05} \times 32 \times 2$$
 
-   Simplifying: $E_{\text{eb-body}} \approx \text{TxkB/s} \times 0.1121 \text{ GiB/month}$
+   Simplifying: $E_{\text{eb-body}} \approx \text{TxkB/s} \times 0.1044 \text{ GiB/month}$
 
 4. **EB Header Egress** (fixed):
 
@@ -128,51 +128,50 @@ Same assumptions as Praos:
 
 5. **RB Header Egress** (fixed):
 
-   $$E_{\text{rb-hdr}} = 131{,}400 \times 1{,}024 \times 23 = 3{,}093 \text{ MB} \approx 2.95 \text{ GiB}$$
+   $$E_{\text{rb-hdr}} = 131{,}400 \times 1{,}024 \times 23 = 3{,}094{,}732{,}800 \text{ bytes} \approx 2.88 \text{ GiB}$$
 
 6. **RB Body Egress** (certificate, fixed):
 
-   $$E_{\text{rb-body}} = 131{,}400 \times 7{,}168 \times 2 = 1{,}884 \text{ MB} \approx 1.75 \text{ GiB}$$
+   $$E_{\text{rb-body}} = 131{,}400 \times 8{,}000 \times 2 = 2{,}102{,}400{,}000 \text{ bytes} \approx 1.96 \text{ GiB}$$
 
 ### Fixed Overhead Summary
 
 | Component       | Monthly Egress | Notes                                   |
 | --------------- | -------------- | --------------------------------------- |
-| Vote traffic    | 12.05 GiB      | 600 voters × 164 B × 0.05 EB/s         |
-| RB headers      | 2.95 GiB       | To all 23 peers                         |
+| Vote traffic    | 12.04 GiB      | 600 voters × 164 B × 0.05 EB/s         |
+| RB headers      | 2.88 GiB       | To all 23 peers                         |
 | RB bodies       | 1.96 GiB       | To 2 relay peers (8,000 B cert each)    |
 | EB headers      | 0.68 GiB       | To all 23 peers                         |
-| **Fixed total** | **17.64 GiB**  | Independent of throughput               |
+| **Fixed total** | **17.56 GiB**  | Independent of throughput               |
 
 ### Monthly Egress at Different Confirmed Throughputs
 
 | TxkB/s | Tx Data     | EB Bodies | Fixed Overhead | **Total**     | vs Praos |
 | ------ | ----------- | --------- | -------------- | ------------- | -------- |
-| 4.5    | 55.07 GiB   | 0.50 GiB  | 17.64 GiB      | **73.21 GiB** | +26%     |
-| 50     | 612.2 GiB   | 5.61 GiB  | 17.64 GiB      | **635.5 GiB** | +994%    |
-| 100    | 1,224.4 GiB | 11.21 GiB | 17.64 GiB      | **1,253 GiB** | +2,057%  |
-| 150    | 1,836.5 GiB | 16.82 GiB | 17.64 GiB      | **1,871 GiB** | +3,121%  |
-| 200    | 2,448.7 GiB | 22.42 GiB | 17.64 GiB      | **2,489 GiB** | +4,185%  |
-| 250    | 3,060.9 GiB | 28.03 GiB | 17.64 GiB      | **3,107 GiB** | +5,249%  |
-| 300    | 3,673.1 GiB | 33.63 GiB | 17.64 GiB      | **3,724 GiB** | +6,314%  |
+| 4.5    | 55.07 GiB   | 0.47 GiB  | 17.56 GiB      | **73.10 GiB** | +26%     |
+| 50     | 612.2 GiB   | 5.22 GiB  | 17.56 GiB      | **635.0 GiB** | +993%    |
+| 100    | 1,224.4 GiB | 10.44 GiB | 17.56 GiB      | **1,252 GiB** | +2,056%  |
+| 150    | 1,836.5 GiB | 15.66 GiB | 17.56 GiB      | **1,870 GiB** | +3,119%  |
+| 200    | 2,448.7 GiB | 20.89 GiB | 17.56 GiB      | **2,487 GiB** | +4,182%  |
+| 250    | 3,060.9 GiB | 26.11 GiB | 17.56 GiB      | **3,105 GiB** | +5,245%  |
+| 300    | 3,673.1 GiB | 31.33 GiB | 17.56 GiB      | **3,722 GiB** | +6,308%  |
 
 > [!Note]
 >
 > - Transaction data egress dominates at all but the lowest throughput levels
-> - Vote overhead (38.54 GiB/month) is fixed — it represents the cost of
->   running 3,000 voters at 0.05 EB/s regardless of how many txs are confirmed
-> - This is a worst-case analysis: vote count = all 3,000 active pools; in
->   practice, a committee-based scheme would reduce this significantly
+> - Vote overhead (12.04 GiB/month) is fixed — it represents the cost of
+>   running 600 voters at 0.05 EB/s regardless of how many txs are confirmed
+>   (wFA+LS committee scheme from the CIP simulation config)
 > - "vs Praos" compares against Praos relay egress of 58.08 GiB/month
 
 ### Traffic Components at 200 TxkB/s
 
 | Component        | Egress    | % of Total |
 | ---------------- | --------- | ---------- |
-| Tx Data          | 2,449 GiB | 98.4%      |
-| EB Bodies        | 22.4 GiB  | 0.9%       |
-| Vote Traffic     | 12.1 GiB  | 0.5%       |
-| RB Headers       | 2.95 GiB  | 0.1%       |
+| Tx Data          | 2,449 GiB | 98.5%      |
+| EB Bodies        | 20.9 GiB  | 0.8%       |
+| Vote Traffic     | 12.0 GiB  | 0.5%       |
+| RB Headers       | 2.88 GiB  | 0.1%       |
 | RB Bodies        | 1.96 GiB  | 0.1%       |
 | EB Headers       | 0.68 GiB  | < 0.1%     |
 
@@ -185,15 +184,15 @@ Egress is billed per GB (10⁹ bytes); 1 GiB ≈ 1.074 GB.
 
 | Provider      | Price/GB | Free (GB)  | 4.5 TxkB/s | 50 TxkB/s | 100 TxkB/s | 150 TxkB/s | 200 TxkB/s | 250 TxkB/s | 300 TxkB/s |
 | ------------- | -------- | ---------- | ---------- | --------- | ---------- | ---------- | ---------- | ---------- | ---------- |
-| AWS           | $0.090   | 100        | $0.00      | $52.43    | $112.14    | $171.85    | $231.58    | $291.28    | $351.00    |
-| GCP           | $0.120   | 0          | $9.43      | $81.90    | $161.52    | $241.13    | $320.78    | $400.38    | $480.00    |
-| Azure         | $0.087   | 100        | $0.00      | $50.68    | $108.40    | $166.12    | $223.82    | $281.48    | $339.17    |
-| Railway       | $0.100   | 0          | $7.86      | $68.25    | $134.57    | $200.94    | $267.31    | $333.69    | $399.93    |
-| Alibaba Cloud | $0.074   | 10         | $5.08      | $49.77    | $98.84     | $147.96    | $197.07    | $246.21    | $295.31    |
-| DigitalOcean  | $0.010   | 1,000      | $0.00      | $0.00     | $3.46      | $10.09     | $16.73     | $23.36     | $30.00     |
+| AWS           | $0.090   | 100        | $0.00      | $52.36    | $112.03    | $171.68    | $231.35    | $291.02    | $350.68    |
+| GCP           | $0.120   | 0          | $9.42      | $81.82    | $161.37    | $240.91    | $320.47    | $400.02    | $479.57    |
+| Azure         | $0.087   | 100        | $0.00      | $50.62    | $108.29    | $165.96    | $223.64    | $281.31    | $338.99    |
+| Railway       | $0.100   | 0          | $7.85      | $68.17    | $134.42    | $200.66    | $266.92    | $333.18    | $399.43    |
+| Alibaba Cloud | $0.074   | 10         | $5.07      | $49.70    | $98.73     | $147.74    | $196.76    | $245.77    | $294.78    |
+| DigitalOcean  | $0.010   | 1,000      | $0.00      | $0.00     | $3.45      | $10.08     | $16.71     | $23.34     | $29.96     |
 | Oracle Cloud  | $0.0085  | 10,240     | $0.00      | $0.00     | $0.00      | $0.00      | $0.00      | $0.00      | $0.00      |
-| Linode        | $0.005   | 1,024      | $0.00      | $0.00     | $1.61      | $4.93      | $8.25      | $11.56     | $14.88     |
-| Hetzner       | $0.00108 | 1,024      | $0.00      | $0.00     | $0.35      | $1.06      | $1.78      | $2.50      | $3.21      |
+| Linode        | $0.005   | 1,024      | $0.00      | $0.00     | $1.60      | $4.92      | $8.23      | $11.55     | $14.86     |
+| Hetzner       | $0.00108 | 1,024      | $0.00      | $0.00     | $0.35      | $1.06      | $1.78      | $2.49      | $3.21      |
 | UpCloud       | $0.000   | 1,024–24,576 | $0.00    | $0.00     | $0.00      | $0.00      | $0.00      | $0.00      | $0.00      |
 
 > [!Note]
