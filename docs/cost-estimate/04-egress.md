@@ -192,7 +192,7 @@ Egress is billed per GB (10⁹ bytes); 1 GiB ≈ 1.074 GB.
 | DigitalOcean  | $0.010   | 1,000      | $0.00      | $0.00     | $3.45      | $10.08     | $16.71     | $23.34     | $29.96     |
 | Oracle Cloud  | $0.0085  | 10,240     | $0.00      | $0.00     | $0.00      | $0.00      | $0.00      | $0.00      | $0.00      |
 | Linode        | $0.005   | 1,024      | $0.00      | $0.00     | $1.60      | $4.92      | $8.23      | $11.55     | $14.86     |
-| Hetzner       | $0.00108 | 1,024      | $0.00      | $0.00     | $0.35      | $1.06      | $1.78      | $2.49      | $3.21      |
+| Hetzner       | $0.0011  | 1,024      | $0.00      | $0.00     | $0.35      | $1.08      | $1.81      | $2.54      | $3.27      |
 | UpCloud       | $0.000   | 1,024–24,576 | $0.00    | $0.00     | $0.00      | $0.00      | $0.00      | $0.00      | $0.00      |
 
 > [!Note]
@@ -208,12 +208,12 @@ Egress is billed per GB (10⁹ bytes); 1 GiB ≈ 1.074 GB.
 
 | Provider     | Price/GB | Source                                                 | Last Updated |
 | ------------ | -------- | ------------------------------------------------------ | ------------ |
-| AWS          | $0.090   | https://aws.amazon.com/ec2/pricing/                    | Apr 2025     |
-| GCP          | $0.120   | https://cloud.google.com/vpc/pricing                   | Apr 2025     |
-| Azure        | $0.087   | https://azure.microsoft.com/pricing/details/bandwidth/ | Apr 2025     |
+| AWS          | $0.090   | https://aws.amazon.com/ec2/pricing/                    | 2023         |
+| GCP          | $0.120   | https://cloud.google.com/vpc/pricing                   | Feb 2025     |
+| Azure        | $0.087   | https://azure.microsoft.com/pricing/details/bandwidth/ | Dec 2024     |
 | DigitalOcean | $0.010   | https://www.digitalocean.com/pricing/                  | Apr 2025     |
-| Linode       | $0.005   | https://www.linode.com/pricing/                        | Apr 2025     |
-| Hetzner      | $0.00108 | https://www.hetzner.com/cloud/pricing                  | Apr 2025     |
+| Linode       | $0.005   | https://www.linode.com/pricing/                        | Apr 2023     |
+| Hetzner      | $0.0011  | https://www.hetzner.com/cloud/pricing                  | Apr 2026     |
 
 Note: Prices may vary by region and volume. Some providers offer free tiers or
 volume discounts not reflected in these base rates.

@@ -158,7 +158,7 @@ Storage is billed per GB (10⁹ bytes); 1 GiB ≈ 1.074 GB.
 | Azure           | $0.075   | 100       | $0.00      | $2.54     | $12.50     | $22.46     | $32.42     | $42.38     | $52.34     |
 | DigitalOcean    | $0.100   | 100       | $0.00      | $3.39     | $16.67     | $29.95     | $43.22     | $56.50     | $69.79     |
 | Linode          | $0.100   | 1,024     | $0.00      | $0.00     | $0.00      | $0.00      | $0.00      | $0.00      | $0.00      |
-| Hetzner         | $0.046   | 0         | $0.60      | $6.16     | $12.27     | $18.38     | $24.48     | $30.59     | $36.70     |
+| Hetzner         | $0.063   | 0         | $0.83      | $8.44     | $16.80     | $25.17     | $33.53     | $41.89     | $50.26     |
 
 > [!Note]
 >
@@ -173,12 +173,12 @@ Storage is billed per GB (10⁹ bytes); 1 GiB ≈ 1.074 GB.
 
 | Provider        | Price/GB | Source                                                     | Last Updated |
 | --------------- | -------- | ---------------------------------------------------------- | ------------ |
-| AWS             | $0.080   | https://aws.amazon.com/ebs/pricing/                        | Apr 2025     |
-| GCP             | $0.040   | https://cloud.google.com/compute/disks-image-pricing       | Apr 2025     |
-| Azure           | $0.075   | https://azure.microsoft.com/pricing/details/managed-disks/ | Apr 2025     |
+| AWS             | $0.080   | https://aws.amazon.com/ebs/pricing/                        | 2023         |
+| GCP             | $0.040   | https://cloud.google.com/compute/disks-image-pricing       | Feb 2025     |
+| Azure           | $0.075   | https://azure.microsoft.com/pricing/details/managed-disks/ | Dec 2024     |
 | DigitalOcean    | $0.100   | https://www.digitalocean.com/pricing/                      | Apr 2025     |
-| Linode          | $0.100   | https://www.linode.com/pricing/                            | Apr 2025     |
-| Hetzner         | $0.046   | https://www.hetzner.com/cloud/pricing                      | Apr 2025     |
+| Linode          | $0.100   | https://www.linode.com/pricing/                            | Apr 2023     |
+| Hetzner         | $0.063   | https://www.hetzner.com/cloud/pricing                      | Apr 2026     |
 
 Note: Prices may vary by region and volume. Some providers offer free tiers or
 volume discounts not reflected in these base rates.

@@ -117,7 +117,7 @@ runtime overhead and load spikes.
 | Azure      | $19.50   | $39.00   | Standard_B2s and equivalents  |
 | DigitalOcean | $16.28 | $32.56   | Basic Droplets                |
 | Linode     | $21.75   | $43.51   | Dedicated CPU instances       |
-| Hetzner    | $4.98    | $9.96    | CX series                     |
+| Hetzner    | $4.39    | $7.14    | EUR prices at 1 EUR = 1.10 USD |
 
 > [!Note]
 > Monthly costs calculated as: hourly rate × 730 hours/month.
@@ -142,7 +142,7 @@ UTxO set to SSD storage.
 | Azure         | Standard_B2s       | https://azure.microsoft.com/pricing/details/virtual-machines/ | Apr 2025 |
 | DigitalOcean  | Basic Droplets     | https://www.digitalocean.com/pricing/droplets          | Apr 2025     |
 | Linode        | Dedicated CPU      | https://www.linode.com/pricing/                        | Apr 2025     |
-| Hetzner       | CX series          | https://www.hetzner.com/cloud/pricing                  | Apr 2025     |
+| Hetzner       | CX23/CX33          | https://www.hetzner.com/cloud/pricing                  | Apr 2026     |
 
 > [!Note]
 > Prices shown are based on standard/on-demand rates. Many providers offer

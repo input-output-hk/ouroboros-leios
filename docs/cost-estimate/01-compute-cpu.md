@@ -206,7 +206,7 @@ production deployments.
 | Azure Fsv2 | $61.76  | $123.37 | On-demand, East US     |
 | DO CPU-Opt | $42.00  | $84.00  | Regular pricing        |
 | Linode     | $36.00  | $60.00  | Standard pricing       |
-| Hetzner    | $5.40   | $17.80  | Standard pricing       |
+| Hetzner    | $6.59   | $17.80  | EUR prices at 1 EUR = 1.10 USD |
 
 > [!Note]
 >
@@ -243,4 +243,4 @@ production deployments.
 | Azure        | Fsv2          | https://azure.microsoft.com/pricing/details/virtual-machines/series/ | Apr 2025     |
 | DigitalOcean | CPU-Optimized | https://www.digitalocean.com/pricing/compute                         | Apr 2025     |
 | Linode       | Dedicated CPU | https://www.linode.com/pricing/                                      | Apr 2025     |
-| Hetzner      | CPX           | https://www.hetzner.com/cloud/pricing                                | Apr 2025     |
+| Hetzner      | CPX11         | https://www.hetzner.com/cloud/pricing                                | Apr 2026     |
