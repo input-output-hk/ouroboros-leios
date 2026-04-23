@@ -170,16 +170,6 @@ accounting for almost the entire difference.
 > - Tx Apply uses the mainnet-average cost (embeds organic Plutus demand);
 >   relays receiving EBs before individual txs only pay the cheaper Reapply cost
 
-### CPU Component Analysis (at 200 TxkB/s)
-
-| Component              | CPU Time | % of Total |
-| ---------------------- | -------- | ---------- |
-| Vote Validation        | 87.0ms   | 47.8%      |
-| Tx Apply (full)        | 82.68ms  | 45.5%      |
-| Certificate Validation | 7.86ms   | 4.3%       |
-| Tx Reapply (ledger)    | 4.32ms   | 2.4%       |
-| EB Header Validation   | 0.022ms  | < 0.1%     |
-
 ### Comparative Efficiency (Leios vs. Praos)
 
 | TxkB/s      | CPU (ms/s)      | CPU per TxkB/s (ms) | Praos CPU per TxkB/s (ms) | Ratio |
