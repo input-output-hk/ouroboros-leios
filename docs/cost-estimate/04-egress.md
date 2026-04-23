@@ -56,6 +56,11 @@ We make the following assumptions about the network:
 
 4. **Total relay egress**: $\approx 58.08 \text{ GiB/month}$
 
+At confirmed throughput at or below the Praos capacity ceiling (4.5 TxkB/s),
+Linear Leios gossips the same transaction bytes as Praos plus fixed protocol
+traffic (votes, RB/EB headers and cert bodies). At near-Praos load this fixed
+overhead represents a sizeable fraction; it is amortized as throughput grows.
+
 ## Ouroboros Leios
 
 In Linear Leios (CIP-164), transactions are gossiped via the mempool. EBs carry
@@ -146,18 +151,19 @@ Same assumptions as Praos:
 
 ### Monthly Egress at Different Confirmed Throughputs
 
-| TxkB/s | Tx Data     | EB Bodies | Fixed Overhead | **Total**     | vs Praos |
-| ------ | ----------- | --------- | -------------- | ------------- | -------- |
-| 4.5    | 55.07 GiB   | 0.47 GiB  | 17.56 GiB      | **73.10 GiB** | +26%     |
-| 50     | 612.2 GiB   | 5.22 GiB  | 17.56 GiB      | **635.0 GiB** | +993%    |
-| 100    | 1,224.4 GiB | 10.44 GiB | 17.56 GiB      | **1,252 GiB** | +2,056%  |
-| 150    | 1,836.5 GiB | 15.66 GiB | 17.56 GiB      | **1,870 GiB** | +3,119%  |
-| 200    | 2,448.7 GiB | 20.89 GiB | 17.56 GiB      | **2,487 GiB** | +4,182%  |
-| 250    | 3,060.9 GiB | 26.11 GiB | 17.56 GiB      | **3,105 GiB** | +5,245%  |
-| 300    | 3,673.1 GiB | 31.33 GiB | 17.56 GiB      | **3,722 GiB** | +6,308%  |
+| TxkB/s        | Tx Data     | EB Bodies | Fixed Overhead | **Total**       | vs Praos |
+| ------------- | ----------- | --------- | -------------- | --------------- | -------- |
+| 4.5 (Praos)   | —           | —         | —              | **58.08 GiB**   | —        |
+| 5             | 61.2 GiB    | 0.52 GiB  | 17.56 GiB      | **79.3 GiB**    | +37%     |
+| 50            | 612.2 GiB   | 5.22 GiB  | 17.56 GiB      | **635.0 GiB**   | +993%    |
+| 100           | 1,224.4 GiB | 10.44 GiB | 17.56 GiB      | **1,252 GiB**   | +2,056%  |
+| 200           | 2,448.7 GiB | 20.89 GiB | 17.56 GiB      | **2,487 GiB**   | +4,182%  |
+| 300           | 3,673.1 GiB | 31.33 GiB | 17.56 GiB      | **3,722 GiB**   | +6,308%  |
 
 > [!Note]
 >
+> - The 4.5 (Praos) row shows Praos relay egress (headers + bodies to peers,
+>   no vote/EB/cert traffic); the Leios 5 TxkB/s row is the Leios baseline
 > - Transaction data egress dominates at all but the lowest throughput levels
 > - Vote overhead (12.04 GiB/month) is fixed — it represents the cost of
 >   running 600 voters at 0.05 EB/s regardless of how many txs are confirmed
@@ -182,18 +188,18 @@ Vote traffic (fixed at 600 voters × 164 B × 0.05 EB/s) is a small floor cost.
 
 Egress is billed per GB (10⁹ bytes); 1 GiB ≈ 1.074 GB.
 
-| Provider      | Price/GB | Free (GB)  | 4.5 TxkB/s | 50 TxkB/s | 100 TxkB/s | 150 TxkB/s | 200 TxkB/s | 250 TxkB/s | 300 TxkB/s |
-| ------------- | -------- | ---------- | ---------- | --------- | ---------- | ---------- | ---------- | ---------- | ---------- |
-| AWS           | $0.090   | 100        | $0.00      | $52.36    | $112.03    | $171.68    | $231.35    | $291.02    | $350.68    |
-| GCP           | $0.120   | 0          | $9.42      | $81.82    | $161.37    | $240.91    | $320.47    | $400.02    | $479.57    |
-| Azure         | $0.087   | 100        | $0.00      | $50.62    | $108.29    | $165.96    | $223.64    | $281.31    | $338.99    |
-| Railway       | $0.100   | 0          | $7.85      | $68.17    | $134.42    | $200.66    | $266.92    | $333.18    | $399.43    |
-| Alibaba Cloud | $0.074   | 10         | $5.07      | $49.70    | $98.73     | $147.74    | $196.76    | $245.77    | $294.78    |
-| DigitalOcean  | $0.010   | 1,000      | $0.00      | $0.00     | $3.45      | $10.08     | $16.71     | $23.34     | $29.96     |
-| Oracle Cloud  | $0.0085  | 10,240     | $0.00      | $0.00     | $0.00      | $0.00      | $0.00      | $0.00      | $0.00      |
-| Linode        | $0.005   | 1,024      | $0.00      | $0.00     | $1.60      | $4.92      | $8.23      | $11.55     | $14.86     |
-| Hetzner       | $0.0011  | 1,024      | $0.00      | $0.00     | $0.35      | $1.08      | $1.81      | $2.54      | $3.27      |
-| UpCloud       | $0.000   | 1,024–24,576 | $0.00    | $0.00     | $0.00      | $0.00      | $0.00      | $0.00      | $0.00      |
+| Provider      | Price/GB | Free (GB)    | 4.5 (Praos) | 5 TxkB/s | 50 TxkB/s | 100 TxkB/s | 200 TxkB/s | 300 TxkB/s |
+| ------------- | -------- | ------------ | ----------- | --------- | --------- | ---------- | ---------- | ---------- |
+| AWS           | $0.090   | 100          | $0.00       | $0.00     | $52.36    | $112.03    | $231.35    | $350.68    |
+| GCP           | $0.120   | 0            | $7.49       | $10.21    | $81.82    | $161.37    | $320.47    | $479.57    |
+| Azure         | $0.087   | 100          | $0.00       | $0.00     | $50.62    | $108.29    | $223.64    | $338.99    |
+| Railway       | $0.100   | 0            | $6.24       | $8.52     | $68.17    | $134.42    | $266.92    | $399.43    |
+| Alibaba Cloud | $0.074   | 10           | $3.88       | $5.56     | $49.70    | $98.73     | $196.76    | $294.78    |
+| DigitalOcean  | $0.010   | 1,000        | $0.00       | $0.00     | $0.00     | $3.45      | $16.71     | $29.96     |
+| Oracle Cloud  | $0.0085  | 10,240       | $0.00       | $0.00     | $0.00     | $0.00      | $0.00      | $0.00      |
+| Linode        | $0.005   | 1,024        | $0.00       | $0.00     | $0.00     | $1.60      | $8.23      | $14.86     |
+| Hetzner       | $0.0011  | 1,024        | $0.00       | $0.00     | $0.00     | $0.35      | $1.81      | $3.27      |
+| UpCloud       | $0.000   | 1,024–24,576 | $0.00       | $0.00     | $0.00     | $0.00      | $0.00      | $0.00      |
 
 > [!Note]
 >

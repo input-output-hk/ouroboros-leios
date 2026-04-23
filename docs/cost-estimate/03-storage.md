@@ -50,6 +50,11 @@ In addition to blockchain history, nodes maintain ledger state on disk
 - Growth rate depends on the net UTxO set change over time (not directly
   proportional to throughput)
 
+At confirmed throughput at or below the Praos capacity ceiling (4.5 TxkB/s),
+Linear Leios stores the same transaction bytes as Praos plus fixed protocol
+overhead (EB headers, RBs with certificates). The overhead is small (~12% at
+4.5 TxkB/s) and amortized as throughput grows.
+
 ## Ouroboros Leios
 
 In Linear Leios (CIP-164), transactions are gossiped via the mempool and
@@ -102,41 +107,48 @@ votes arrives before the certification deadline; $P(\text{certified}) \approx 0.
 
    where 9,024 bytes = 1,024 B header + 8,000 B certificate (`cert-size-bytes-constant`).
 
-### Storage Calculation at 4.5 TxkB/s (Praos-equivalent)
+### Storage Calculation at 4.5 TxkB/s (Praos)
 
-1. **Tx closure**: $4{,}500 \times 2{,}628{,}000 = 11{,}826{,}000{,}000 \text{ bytes} \approx 11.01 \text{ GiB}$
+$$S_{\text{praos}} = 91{,}136 \times 0.05 \times 2{,}628{,}000 \approx 11.02 \text{ GiB/month}$$
 
-2. **EB body** (tx hashes): $\frac{4{,}500}{1{,}500} \times 32 \times 2{,}628{,}000 = 3 \times 32 \times 2{,}628{,}000 \approx 0.235 \text{ GiB}$
+(From the Praos section above — block headers + bodies only, no EB/cert overhead.)
+
+### Storage Calculation at 5 TxkB/s (Leios Baseline)
+
+1. **Tx closure**: $5{,}000 \times 2{,}628{,}000 = 13{,}140{,}000{,}000 \text{ bytes} \approx 12.24 \text{ GiB}$
+
+2. **EB body** (tx hashes): $\frac{5{,}000}{1{,}500} \times 32 \times 2{,}628{,}000 = 3.33 \times 32 \times 2{,}628{,}000 \approx 0.261 \text{ GiB}$
 
 3. **EB headers**: $0.029 \text{ GiB}$ (fixed)
 
 4. **RB**: $1.105 \text{ GiB}$ (fixed; 1,024 B header + 8,000 B cert)
 
-5. **Total**: $11.01 + 0.235 + 0.029 + 1.105 \approx 12.38 \text{ GiB/month}$
+5. **Total**: $12.24 + 0.261 + 0.029 + 1.105 \approx 13.64 \text{ GiB/month}$
 
-This is approximately 12% more than Praos (11.02 GiB) at equivalent throughput.
+This is approximately 24% more than Praos (11.02 GiB). The fixed RB+cert overhead
+(1.134 GiB) accounts for most of the difference at low throughput.
 
 ### Monthly Storage at Different Confirmed Throughputs
 
-| TxkB/s | Tx/s | Tx Closure  | EB Body    | EB Headers | RB        | Total       | vs Praos |
-| ------ | ---- | ----------- | ---------- | ---------- | --------- | ----------- | -------- |
-| 4.5    | 3    | 11.01 GiB   | 0.235 GiB  | 0.03 GiB   | 1.105 GiB | 12.38 GiB   | +12%     |
-| 50     | 33   | 122.4 GiB   | 2.613 GiB  | 0.03 GiB   | 1.105 GiB | 126.1 GiB   | +1,045%  |
-| 100    | 67   | 244.8 GiB   | 5.226 GiB  | 0.03 GiB   | 1.105 GiB | 251.2 GiB   | +2,180%  |
-| 150    | 100  | 367.2 GiB   | 7.840 GiB  | 0.03 GiB   | 1.105 GiB | 376.2 GiB   | +3,314%  |
-| 200    | 133  | 489.5 GiB   | 10.453 GiB | 0.03 GiB   | 1.105 GiB | 501.1 GiB   | +4,447%  |
-| 250    | 167  | 611.9 GiB   | 13.066 GiB | 0.03 GiB   | 1.105 GiB | 626.1 GiB   | +5,580%  |
-| 300    | 200  | 734.3 GiB   | 15.679 GiB | 0.03 GiB   | 1.105 GiB | 751.1 GiB   | +6,714%  |
+| TxkB/s        | Tx/s | Tx Closure  | EB Body    | EB Headers | RB        | Total       | vs Praos |
+| ------------- | ---- | ----------- | ---------- | ---------- | --------- | ----------- | -------- |
+| 4.5 (Praos)   | 3    | 11.02 GiB   | —          | —          | —         | **11.02 GiB** | —      |
+| 5             | 3    | 12.24 GiB   | 0.261 GiB  | 0.03 GiB   | 1.105 GiB | 13.64 GiB   | +24%     |
+| 50            | 33   | 122.4 GiB   | 2.613 GiB  | 0.03 GiB   | 1.105 GiB | 126.1 GiB   | +1,045%  |
+| 100           | 67   | 244.8 GiB   | 5.226 GiB  | 0.03 GiB   | 1.105 GiB | 251.2 GiB   | +2,180%  |
+| 200           | 133  | 489.5 GiB   | 10.453 GiB | 0.03 GiB   | 1.105 GiB | 501.1 GiB   | +4,447%  |
+| 300           | 200  | 734.3 GiB   | 15.679 GiB | 0.03 GiB   | 1.105 GiB | 751.1 GiB   | +6,714%  |
 
 > [!Note]
 >
+> - The 4.5 (Praos) row shows the Praos protocol baseline (block history only,
+>   no EB/vote/cert overhead)
 > - Tx/s assumes average transaction size of 1,500 bytes
 > - EB body storage grows with throughput because higher-throughput EBs reference
 >   more transaction hashes (32 bytes each)
 > - These are monthly increments; total accumulated storage grows over time
-> - CIP-164 Table 8 cross-check: 394 GB at 150 TxkB/s → our total 376 GiB ≈
->   404 GB; 526 GB at 200 TxkB/s → our total 501 GiB ≈ 538 GB (minor
->   difference from rounding and avg tx size assumptions)
+> - CIP-164 Table 8 cross-check: 526 GB at 200 TxkB/s → our total 501 GiB ≈
+>   538 GB (minor difference from rounding and avg tx size assumptions)
 
 ### Storage Component Analysis at 200 TxkB/s
 
@@ -156,14 +168,14 @@ Transaction closure data dominates at all throughput levels. The EB body
 
 Storage is billed per GB (10⁹ bytes); 1 GiB ≈ 1.074 GB.
 
-| Provider        | Price/GB | Free (GB) | 4.5 TxkB/s | 50 TxkB/s | 100 TxkB/s | 150 TxkB/s | 200 TxkB/s | 250 TxkB/s | 300 TxkB/s |
-| --------------- | -------- | --------- | ---------- | --------- | ---------- | ---------- | ---------- | ---------- | ---------- |
-| AWS             | $0.080   | 100       | $0.00      | $2.71     | $13.34     | $23.96     | $34.58     | $45.20     | $55.83     |
-| GCP             | $0.040   | 0         | $0.52      | $5.36     | $10.67     | $15.98     | $21.29     | $26.60     | $31.92     |
-| Azure           | $0.075   | 100       | $0.00      | $2.54     | $12.50     | $22.46     | $32.42     | $42.38     | $52.34     |
-| DigitalOcean    | $0.100   | 100       | $0.00      | $3.39     | $16.67     | $29.95     | $43.22     | $56.50     | $69.79     |
-| Linode          | $0.100   | 1,024     | $0.00      | $0.00     | $0.00      | $0.00      | $0.00      | $0.00      | $0.00      |
-| Hetzner         | $0.063   | 0         | $0.83      | $8.44     | $16.80     | $25.17     | $33.53     | $41.89     | $50.26     |
+| Provider        | Price/GB | Free (GB) | 4.5 (Praos) | 5 TxkB/s | 50 TxkB/s | 100 TxkB/s | 200 TxkB/s | 300 TxkB/s |
+| --------------- | -------- | --------- | ----------- | --------- | --------- | ---------- | ---------- | ---------- |
+| AWS             | $0.080   | 100       | $0.00       | $0.00     | $2.71     | $13.34     | $34.58     | $55.83     |
+| GCP             | $0.040   | 0         | $0.47       | $0.59     | $5.36     | $10.67     | $21.29     | $31.92     |
+| Azure           | $0.075   | 100       | $0.00       | $0.00     | $2.54     | $12.50     | $32.42     | $52.34     |
+| DigitalOcean    | $0.100   | 100       | $0.00       | $0.00     | $3.39     | $16.67     | $43.22     | $69.79     |
+| Linode          | $0.100   | 1,024     | $0.00       | $0.00     | $0.00     | $0.00      | $0.00      | $0.00      |
+| Hetzner         | $0.063   | 0         | $0.74       | $0.92     | $8.44     | $16.80     | $33.53     | $50.26     |
 
 > [!Note]
 >

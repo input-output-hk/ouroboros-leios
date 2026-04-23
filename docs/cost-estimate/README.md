@@ -7,7 +7,7 @@ operational costs associated with running a Leios node. As a baseline we use
 Ouroboros Praos for comparisons. All cost estimates are for **Linear Leios
 (CIP-164)** and assume fully confirmed transaction throughput (TxkB/s —
 transaction kilobytes per second reaching the ledger). Costs represent
-conservative upper bounds: 3,000 votes per EB (all active pools), individual
+conservative upper bounds: 600 votes per EB (wFA+LS committee), individual
 BLS vote verification, and 100% confirmed block utilization. CPU costs use
 **mainnet-average demand** (including organic Plutus usage as measured on
 Cardano mainnet); Plutus-heavy workloads will cost more.
@@ -17,6 +17,23 @@ CIP-164 design where:
 - EBs reference transactions by 32-byte hash at 0.05 EB/s
 - Transactions are gossiped via the mempool (not bundled in IBs)
 - $P(\text{EB certified}) \approx 0.48$ sets the capacity ceiling at ~288 TxkB/s
+
+### Leios at Praos-equivalent load
+
+At confirmed throughput at or below the Praos capacity ceiling (4.5 TxkB/s),
+Linear Leios processes the same transaction volume and incurs the same
+per-transaction Apply cost. The difference is fixed protocol overhead —
+vote validation, certificate validation, and the EB/RB gossip machinery — which
+is present regardless of throughput. At near-Praos load this overhead dominates;
+as throughput grows toward ~288 TxkB/s it is amortized over more confirmed
+transactions and the cost per TxkB/s converges.
+
+The **4.5 (Praos)** column in the tables below shows actual Praos protocol costs
+(no EB/vote/cert overhead). The **5 TxkB/s** column is the Leios baseline: just
+above Praos-equivalent load, where the fixed overhead is fully visible. Note that
+Praos requires ~16 GB RAM (in-memory UTxO) while Leios uses only ~4 GB RAM
+(UTxO-HD moves the UTxO set to disk), which partially offsets the fixed overhead
+cost at all throughput levels.
 
 ## Cost Items
 
@@ -33,63 +50,66 @@ Follow the links above to see detailed cost estimates per item.
 ## Aggregated Total Cost Table
 
 The table below provides an aggregated summary of all cost categories across
-different cloud providers based on confirmed throughput in TxkB/s.
+different cloud providers based on confirmed throughput in TxkB/s. The
+**4.5 (Praos)** column uses actual Praos protocol costs including 16 GB RAM
+(in-memory UTxO). All Leios columns use 4 GB RAM (UTxO-HD).
 
-| Provider         | Cost Item           | 4.5 TxkB/s | 50 TxkB/s  | 100 TxkB/s  | 150 TxkB/s  | 200 TxkB/s  | 250 TxkB/s  | 300 TxkB/s  |
-| ---------------- | ------------------- | ---------- | ---------- | ----------- | ----------- | ----------- | ----------- | ----------- |
-| **AWS**          | Compute (vCPU)      | $62.05     | $62.05     | $62.05      | $62.05      | $62.05      | $62.05      | $62.05      |
-|                  | Compute (RAM)       | $20.79     | $20.79     | $20.79      | $20.79      | $20.79      | $20.79      | $20.79      |
-|                  | Storage             | $0.00      | $2.71      | $13.34      | $23.96      | $34.58      | $45.20      | $55.83      |
-|                  | Egress              | $0.00      | $52.36     | $112.03     | $171.68     | $231.35     | $291.02     | $350.68     |
-|                  | IOPS                | $10.00     | $10.00     | $10.00      | $10.00      | $10.00      | $10.00      | $10.00      |
-|                  | **Total (AWS)**     | **$92.84** | **$147.91**| **$218.21** | **$288.48** | **$358.77** | **$429.06** | **$499.35** |
-| **GCP**          | Compute (vCPU)      | $52.34     | $52.34     | $52.34      | $52.34      | $52.34      | $52.34      | $52.34      |
-|                  | Compute (RAM)       | $35.95     | $35.95     | $35.95      | $35.95      | $35.95      | $35.95      | $35.95      |
-|                  | Storage             | $0.52      | $5.36      | $10.67      | $15.98      | $21.29      | $26.60      | $31.92      |
-|                  | Egress              | $9.42      | $81.82     | $161.37     | $240.91     | $320.47     | $400.02     | $479.57     |
-|                  | IOPS                | $15.00     | $15.00     | $15.00      | $15.00      | $15.00      | $15.00      | $15.00      |
-|                  | **Total (GCP)**     | **$113.23**| **$190.47**| **$275.33** | **$360.18** | **$445.05** | **$529.91** | **$614.78** |
-| **Azure**        | Compute (vCPU)      | $61.76     | $61.76     | $61.76      | $61.76      | $61.76      | $61.76      | $61.76      |
-|                  | Compute (RAM)       | $19.50     | $19.50     | $19.50      | $19.50      | $19.50      | $19.50      | $19.50      |
-|                  | Storage             | $0.00      | $2.54      | $12.50      | $22.46      | $32.42      | $42.38      | $52.34      |
-|                  | Egress              | $0.00      | $50.62     | $108.29     | $165.96     | $223.64     | $281.31     | $338.99     |
-|                  | IOPS                | $12.00     | $12.00     | $12.00      | $12.00      | $12.00      | $12.00      | $12.00      |
-|                  | **Total (Azure)**   | **$93.26** | **$146.42**| **$214.05** | **$281.68** | **$349.32** | **$416.95** | **$484.59** |
-| **DigitalOcean** | Compute (vCPU)      | $42.00     | $42.00     | $42.00      | $42.00      | $42.00      | $42.00      | $42.00      |
-|                  | Compute (RAM)       | $16.28     | $16.28     | $16.28      | $16.28      | $16.28      | $16.28      | $16.28      |
-|                  | Storage             | $0.00      | $3.39      | $16.67      | $29.95      | $43.22      | $56.50      | $69.79      |
-|                  | Egress              | $0.00      | $0.00      | $3.45       | $10.08      | $16.71      | $23.34      | $29.96      |
-|                  | IOPS                | $8.00      | $8.00      | $8.00       | $8.00       | $8.00       | $8.00       | $8.00       |
-|                  | **Total (DO)**      | **$66.28** | **$69.67** | **$86.40**  | **$106.31** | **$126.21** | **$146.12** | **$166.03** |
-| **Linode**       | Compute (vCPU)      | $36.00     | $36.00     | $36.00      | $36.00      | $36.00      | $36.00      | $36.00      |
-|                  | Compute (RAM)       | $21.75     | $21.75     | $21.75      | $21.75      | $21.75      | $21.75      | $21.75      |
-|                  | Storage             | $0.00      | $0.00      | $0.00       | $0.00       | $0.00       | $0.00       | $0.00       |
-|                  | Egress              | $0.00      | $0.00      | $1.60       | $4.92       | $8.23       | $11.55      | $14.86      |
-|                  | IOPS                | $7.00      | $7.00      | $7.00       | $7.00       | $7.00       | $7.00       | $7.00       |
-|                  | **Total (Linode)**  | **$64.75** | **$64.75** | **$66.35**  | **$69.67**  | **$72.98**  | **$76.30**  | **$79.61**  |
-| **Hetzner**      | Compute (vCPU)      | $6.59      | $6.59      | $6.59       | $6.59       | $6.59       | $6.59       | $6.59       |
-|                  | Compute (RAM)       | $4.39      | $4.39      | $4.39       | $4.39       | $4.39       | $4.39       | $4.39       |
-|                  | Storage             | $0.83      | $8.44      | $16.80      | $25.17      | $33.53      | $41.89      | $50.26      |
-|                  | Egress              | $0.00      | $0.00      | $0.35       | $1.08       | $1.81       | $2.54       | $3.27       |
-|                  | IOPS                | $5.00      | $5.00      | $5.00       | $5.00       | $5.00       | $5.00       | $5.00       |
-|                  | **Total (Hetzner)** | **$16.81** | **$24.42** | **$33.13**  | **$42.23**  | **$51.32**  | **$60.41**  | **$69.51**  |
+| Provider         | Cost Item           | 4.5 (Praos) | 5 TxkB/s    | 50 TxkB/s   | 100 TxkB/s  | 200 TxkB/s  | 300 TxkB/s  |
+|------------------|---------------------|-------------|-------------|-------------|-------------|-------------|-------------|
+| **AWS**          | Compute (vCPU)      | $62.05      | $62.05      | $62.05      | $62.05      | $62.05      | $62.05      |
+|                  | Compute (RAM)       | $83.18      | $20.79      | $20.79      | $20.79      | $20.79      | $20.79      |
+|                  | Storage             | $0.00       | $0.00       | $2.71       | $13.34      | $34.58      | $55.83      |
+|                  | Egress              | $0.00       | $0.00       | $52.36      | $112.03     | $231.35     | $350.68     |
+|                  | IOPS                | $10.00      | $10.00      | $10.00      | $10.00      | $10.00      | $10.00      |
+|                  | **Total (AWS)**     | **$155.23** | **$92.84**  | **$147.91** | **$218.21** | **$358.77** | **$499.35** |
+| **GCP**          | Compute (vCPU)      | $52.34      | $52.34      | $52.34      | $52.34      | $52.34      | $52.34      |
+|                  | Compute (RAM)       | $143.82     | $35.95      | $35.95      | $35.95      | $35.95      | $35.95      |
+|                  | Storage             | $0.47       | $0.59       | $5.36       | $10.67      | $21.29      | $31.92      |
+|                  | Egress              | $7.49       | $10.21      | $81.82      | $161.37     | $320.47     | $479.57     |
+|                  | IOPS                | $15.00      | $15.00      | $15.00      | $15.00      | $15.00      | $15.00      |
+|                  | **Total (GCP)**     | **$219.12** | **$114.09** | **$190.47** | **$275.33** | **$445.05** | **$614.78** |
+| **Azure**        | Compute (vCPU)      | $61.76      | $61.76      | $61.76      | $61.76      | $61.76      | $61.76      |
+|                  | Compute (RAM)       | $78.00      | $19.50      | $19.50      | $19.50      | $19.50      | $19.50      |
+|                  | Storage             | $0.00       | $0.00       | $2.54       | $12.50      | $32.42      | $52.34      |
+|                  | Egress              | $0.00       | $0.00       | $50.62      | $108.29     | $223.64     | $338.99     |
+|                  | IOPS                | $12.00      | $12.00      | $12.00      | $12.00      | $12.00      | $12.00      |
+|                  | **Total (Azure)**   | **$151.76** | **$93.26**  | **$146.42** | **$214.05** | **$349.32** | **$484.59** |
+| **DigitalOcean** | Compute (vCPU)      | $42.00      | $42.00      | $42.00      | $42.00      | $42.00      | $42.00      |
+|                  | Compute (RAM)       | $65.12      | $16.28      | $16.28      | $16.28      | $16.28      | $16.28      |
+|                  | Storage             | $0.00       | $0.00       | $3.39       | $16.67      | $43.22      | $69.79      |
+|                  | Egress              | $0.00       | $0.00       | $0.00       | $3.45       | $16.71      | $29.96      |
+|                  | IOPS                | $8.00       | $8.00       | $8.00       | $8.00       | $8.00       | $8.00       |
+|                  | **Total (DO)**      | **$115.12** | **$66.28**  | **$69.67**  | **$86.40**  | **$126.21** | **$166.03** |
+| **Linode**       | Compute (vCPU)      | $36.00      | $36.00      | $36.00      | $36.00      | $36.00      | $36.00      |
+|                  | Compute (RAM)       | $87.02      | $21.75      | $21.75      | $21.75      | $21.75      | $21.75      |
+|                  | Storage             | $0.00       | $0.00       | $0.00       | $0.00       | $0.00       | $0.00       |
+|                  | Egress              | $0.00       | $0.00       | $0.00       | $1.60       | $8.23       | $14.86      |
+|                  | IOPS                | $7.00       | $7.00       | $7.00       | $7.00       | $7.00       | $7.00       |
+|                  | **Total (Linode)**  | **$130.02** | **$64.75**  | **$64.75**  | **$66.35**  | **$72.98**  | **$79.61**  |
+| **Hetzner**      | Compute (vCPU)      | $6.59       | $6.59       | $6.59       | $6.59       | $6.59       | $6.59       |
+|                  | Compute (RAM)       | $12.42      | $4.39       | $4.39       | $4.39       | $4.39       | $4.39       |
+|                  | Storage             | $0.74       | $0.92       | $8.44       | $16.80      | $33.53      | $50.26      |
+|                  | Egress              | $0.00       | $0.00       | $0.00       | $0.35       | $1.81       | $3.27       |
+|                  | IOPS                | $5.00       | $5.00       | $5.00       | $5.00       | $5.00       | $5.00       |
+|                  | **Total (Hetzner)** | **$24.75**  | **$16.90**  | **$24.42**  | **$33.13**  | **$51.32**  | **$69.51**  |
 
 > [!Note]
 > All costs are monthly estimates in USD ($) based on confirmed throughput in
 > TxkB/s (transaction kilobytes per second reaching the ledger).
 >
-> - The 4.5 TxkB/s column corresponds to Praos-equivalent throughput
->   (0.05 blocks/s × 90 KiB = 4.5 TxkB/s)
-> - Compute (vCPU) uses the 2-core tier across all throughput levels (peak CPU
->   is 22.5% of one core at 300 TxkB/s at mainnet-average demand); 4 cores
->   recommended for production headroom
->   (see [01-compute-cpu.md](./01-compute-cpu.md))
+> - **4.5 (Praos)**: Praos protocol at its natural operating point —
+>   no EB/vote/cert overhead, but requires ~16 GB RAM for the in-memory UTxO set
+> - **5 TxkB/s**: Leios baseline just above Praos capacity; fixed protocol
+>   overhead (votes, certs) is fully visible but only ~11% more throughput
+>   than Praos — the economic case for Leios emerges at higher throughput
+> - Leios columns use the 4 GB RAM tier (UTxO-HD); Praos RAM costs ~4× more
+> - Compute (vCPU) uses the 2-core tier for all Leios rows; 4 cores recommended
+>   for production headroom (see [01-compute-cpu.md](./01-compute-cpu.md))
 > - At higher throughput, egress dominates for premium cloud providers;
 >   budget providers (Hetzner, Linode) remain affordable due to generous
 >   included transfer
 > - Fixed vote overhead (600 votes × 164 B × 0.05 EB/s) contributes ~12 GiB/month
->   in egress regardless of confirmed throughput; vote count is based on the
->   wFA+LS committee scheme from the CIP simulation config
+>   in egress regardless of confirmed throughput
 
 > [!Important] 
 > Storage costs shown above represent only one month of blockchain data. As
@@ -123,15 +143,14 @@ $$\text{Fee} = 0.155381 + (0.0000440576 \times 1{,}500) = 0.221467 \text{ ADA/tx
 
 ### Throughput and Revenue at Different Confirmed Rates
 
-| TxkB/s | Tx/s (1,500 B avg) | Monthly Txs     | Fee/Tx (ADA) | Monthly Revenue (ADA) |
-| ------ | ------------------ | --------------- | ------------ | --------------------- |
-| 4.5    | 3                  | 7,884,000       | 0.221467     | 1,745,932             |
-| 50     | 33                 | 86,724,000      | 0.221467     | 19,205,255            |
-| 100    | 67                 | 176,076,000     | 0.221467     | 38,991,426            |
-| 150    | 100                | 262,800,000     | 0.221467     | 58,201,412            |
-| 200    | 133                | 349,524,000     | 0.221467     | 77,411,397            |
-| 250    | 167                | 438,876,000     | 0.221467     | 97,197,568            |
-| 300    | 200                | 525,600,000     | 0.221467     | 116,402,822           |
+| TxkB/s        | Tx/s (1,500 B avg) | Monthly Txs     | Fee/Tx (ADA) | Monthly Revenue (ADA) |
+| ------------- | ------------------ | --------------- | ------------ | --------------------- |
+| 4.5 (Praos)   | 3                  | 7,884,000       | 0.221467     | 1,745,932             |
+| 5             | 3                  | 8,760,000       | 0.221467     | 1,940,051             |
+| 50            | 33                 | 86,724,000      | 0.221467     | 19,205,255            |
+| 100           | 67                 | 176,076,000     | 0.221467     | 38,991,426            |
+| 200           | 133                | 349,524,000     | 0.221467     | 77,411,397            |
+| 300           | 200                | 525,600,000     | 0.221467     | 116,402,822           |
 
 > [!Important]
 > The revenue figures above represent **total network revenue**, while cost
@@ -165,17 +184,18 @@ Assumptions:
 #### Infrastructure Cost Estimates
 
 Using the [Aggregated Total Cost Table](#aggregated-total-cost-table), we
-estimate total network infrastructure costs based on an average across providers:
+estimate total network infrastructure costs based on an average across providers.
+Note that Leios infrastructure is cheaper than Praos at all throughput levels
+because UTxO-HD reduces RAM from ~16 GB to ~4 GB per node.
 
-| TxkB/s | Cost per Node (Avg) | Network Cost (10,000 nodes) |
-| ------ | ------------------- | --------------------------- |
-| 4.5    | ~$75                | $750,000                    |
-| 50     | ~$107               | $1,070,000                  |
-| 100    | ~$149               | $1,490,000                  |
-| 150    | ~$191               | $1,910,000                  |
-| 200    | ~$234               | $2,340,000                  |
-| 250    | ~$277               | $2,770,000                  |
-| 300    | ~$319               | $3,190,000                  |
+| TxkB/s        | Cost per Node (Avg) | Network Cost (10,000 nodes) |
+| ------------- | ------------------- | --------------------------- |
+| 4.5 (Praos)   | ~$133               | $1,330,000                  |
+| 5 (Leios)     | ~$75                | $750,000                    |
+| 50            | ~$107               | $1,070,000                  |
+| 100           | ~$149               | $1,490,000                  |
+| 200           | ~$234               | $2,340,000                  |
+| 300           | ~$319               | $3,190,000                  |
 
 #### Required Confirmed Throughput for Infrastructure Cost Coverage
 

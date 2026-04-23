@@ -45,6 +45,14 @@ Thus, Praos at 0.05 blocks/s consumes approximately 1.884 ms/s — about
 > Plutus re-execution) is used for archival chain replay and is not modeled
 > here.
 
+At confirmed throughput at or below the Praos capacity ceiling (4.5 TxkB/s),
+Linear Leios processes the same transaction volume as Praos and incurs the same
+per-transaction Apply cost. The difference is the fixed protocol overhead —
+vote validation (87.0 ms/s) and certificate validation (7.86 ms/s) — which is
+present regardless of throughput. At low load, this overhead dominates; as
+confirmed throughput grows toward the ~288 TxkB/s capacity ceiling, it is
+amortized over more transactions and the cost per TxkB/s converges.
+
 ## Ouroboros Leios
 
 In Linear Leios (CIP-164), CPU utilization comes from five components:
@@ -125,11 +133,15 @@ the cheaper `Reapply` cost; the `Apply` cost is the upper bound.
 
    $$C_{\text{total}} = C_{\text{apply}} + C_{\text{reapply}} + C_{\text{eb}} + C_{\text{vote}} + C_{\text{cert}}$$
 
-### CPU Calculation at 4.5 TxkB/s (Praos-equivalent throughput)
+### CPU Calculation at 5 TxkB/s (Leios Baseline)
 
-1. **Tx Apply**: $\frac{4{,}500}{1{,}500} \times 0.6201 = 3 \times 0.6201 = 1.860\text{ ms/s}$
+The lowest meaningful Leios operating point: just above the Praos capacity
+ceiling (4.5 TxkB/s). For comparison, Praos at 4.5 TxkB/s requires only
+1.884 ms/s (0.19% of one core; see [Praos section](#ouroboros-praos)).
 
-2. **Tx Reapply**: $0.0177 + 0.02151 \times 4.5 = 0.11\text{ ms/s}$
+1. **Tx Apply**: $\frac{5{,}000}{1{,}500} \times 0.6201 = 3.33 \times 0.6201 = 2.07\text{ ms/s}$
+
+2. **Tx Reapply**: $0.0177 + 0.02151 \times 5 = 0.13\text{ ms/s}$
 
 3. **EB Header**: $0.022\text{ ms/s}$
 
@@ -138,28 +150,31 @@ the cheaper `Reapply` cost; the `Apply` cost is the upper bound.
 5. **Certificate Validation**: $7.86\text{ ms/s}$
 
 6. **Total**:
-   $$C_{\text{total}} = 1.860 + 0.11 + 0.022 + 87.0 + 7.86 = 96.85\text{ ms/s} \approx 9.7\%\text{ of one core}$$
+   $$C_{\text{total}} = 2.07 + 0.13 + 0.022 + 87.0 + 7.86 = 97.1\text{ ms/s} \approx 9.7\%\text{ of one core}$$
 
-At Praos-equivalent throughput, vote validation dominates (89.8% of CPU) due
-to the fixed cost of validating 600 votes per EB regardless of transaction volume.
+At this baseline, Leios requires ~52× more CPU than Praos at 4.5 TxkB/s
+(97.1 ms/s vs 1.884 ms/s), with the fixed vote validation overhead (87.0 ms/s)
+accounting for almost the entire difference.
 
 ### CPU Utilization at Different Confirmed Throughputs
 
-| TxkB/s | Tx/s | Tx Apply | Tx Reapply | EB Hdr | Vote   | Cert   | Total ms/s | % of One Core | Rec. Cores |
-| ------ | ---- | -------- | ---------- | ------ | ------ | ------ | ---------- | ------------- | ---------- |
-| 4.5    | 3    | 1.86ms   | 0.11ms     | 0.02ms | 87.0ms | 7.86ms | 96.85ms    | 9.7%          | 2          |
-| 50     | 33   | 20.67ms  | 1.09ms     | 0.02ms | 87.0ms | 7.86ms | 116.6ms    | 11.7%         | 2          |
-| 100    | 67   | 41.34ms  | 2.17ms     | 0.02ms | 87.0ms | 7.86ms | 138.4ms    | 13.8%         | 2          |
-| 150    | 100  | 62.01ms  | 3.24ms     | 0.02ms | 87.0ms | 7.86ms | 160.1ms    | 16.0%         | 2          |
-| 200    | 133  | 82.68ms  | 4.32ms     | 0.02ms | 87.0ms | 7.86ms | 181.9ms    | 18.2%         | 2          |
-| 250    | 167  | 103.35ms | 5.39ms     | 0.02ms | 87.0ms | 7.86ms | 203.6ms    | 20.4%         | 2          |
-| 300    | 200  | 124.02ms | 6.47ms     | 0.02ms | 87.0ms | 7.86ms | 225.4ms    | 22.5%         | 2          |
+| TxkB/s        | Tx/s | Tx Apply  | Tx Reapply | EB Hdr | Vote   | Cert   | Total ms/s | % of One Core | Rec. Cores |
+| ------------- | ---- | --------- | ---------- | ------ | ------ | ------ | ---------- | ------------- | ---------- |
+| 4.5 (Praos)   | 3    | 1.86ms    | —          | —      | —      | —      | **1.88ms** | **0.19%**     | 1          |
+| 5             | 3    | 2.07ms    | 0.13ms     | 0.02ms | 87.0ms | 7.86ms | 97.1ms     | 9.7%          | 2          |
+| 50            | 33   | 20.67ms   | 1.09ms     | 0.02ms | 87.0ms | 7.86ms | 116.6ms    | 11.7%         | 2          |
+| 100           | 67   | 41.34ms   | 2.17ms     | 0.02ms | 87.0ms | 7.86ms | 138.4ms    | 13.8%         | 2          |
+| 200           | 133  | 82.68ms   | 4.32ms     | 0.02ms | 87.0ms | 7.86ms | 181.9ms    | 18.2%         | 2          |
+| 300           | 200  | 124.02ms  | 6.47ms     | 0.02ms | 87.0ms | 7.86ms | 225.4ms    | 22.5%         | 2          |
 
 > [!Note]
 >
+> - The 4.5 (Praos) row shows the Praos protocol at its normal operating point;
+>   Leios Tx Apply at the same load would be identical, but fixed vote and
+>   certificate overhead add ~95 ms/s on top
 > - Tx/s assumes average transaction size of 1,500 bytes
 > - "% of One Core" = Total ms/s ÷ 1,000ms
-> - Rec. Cores is 2 for all levels; 4 cores recommended for production to cover
+> - Leios rows: 2 cores minimum; 4 cores recommended for production to cover
 >   GHC GC pressure, OS/network overhead, and burst load
 > - Tx Apply uses the mainnet-average cost (embeds organic Plutus demand);
 >   relays receiving EBs before individual txs only pay the cheaper Reapply cost
@@ -174,24 +189,22 @@ to the fixed cost of validating 600 votes per EB regardless of transaction volum
 | Tx Reapply (ledger)    | 4.32ms   | 2.4%       |
 | EB Header Validation   | 0.022ms  | < 0.1%     |
 
-At 200 TxkB/s, vote validation (47.8%) and transaction Apply (45.5%) are
-the two dominant components, with certificate validation now a visible
-third (4.3%) after the P(cert) fix.
-
 ### Comparative Efficiency (Leios vs. Praos)
 
-| TxkB/s | Leios CPU (ms/s) | CPU per TxkB/s (ms) | Praos CPU per TxkB/s (ms) | Leios:Praos ratio |
-| ------ | ---------------- | ------------------- | ------------------------- | ----------------- |
-| 4.5    | 96.85ms          | 21.5                | 0.419                     | 51:1              |
-| 50     | 116.6ms          | 2.33                | 0.419 (does not scale)    | 5.6:1             |
-| 100    | 138.4ms          | 1.38                | —                         | 3.3:1             |
-| 200    | 181.9ms          | 0.91                | —                         | 2.2:1             |
-| 300    | 225.4ms          | 0.75                | —                         | 1.8:1             |
+| TxkB/s      | CPU (ms/s)      | CPU per TxkB/s (ms) | Praos CPU per TxkB/s (ms) | Ratio |
+| ----------- | --------------- | ------------------- | ------------------------- | ----- |
+| 4.5 (Praos) | 1.884ms (Praos) | 0.419               | 0.419                     | 1:1   |
+| 5           | 97.1ms          | 19.4                | 0.419                     | 46:1  |
+| 50          | 116.6ms         | 2.33                | 0.419 (does not scale)    | 5.6:1 |
+| 100         | 138.4ms         | 1.38                | —                         | 3.3:1 |
+| 200         | 181.9ms         | 0.91                | —                         | 2.2:1 |
+| 300         | 225.4ms         | 0.75                | —                         | 1.8:1 |
 
-The high Leios:Praos ratio at low throughput is dominated by the fixed vote
-overhead (87 ms/s). As confirmed throughput grows, the ratio drops toward
-~1.8:1 at 300 TxkB/s, where Leios delivers 67× more confirmed throughput
-while using only ~14× more absolute CPU.
+The Praos row shows 1:1 because at 4.5 TxkB/s Praos IS the baseline. Moving
+to Leios at 5 TxkB/s jumps to 46:1 — the fixed vote overhead (87 ms/s)
+dominates at near-Praos loads. As confirmed throughput grows, the ratio drops
+toward ~1.8:1 at 300 TxkB/s, where Leios delivers 67× more confirmed
+throughput while using only ~14× more absolute CPU.
 
 ## Monthly Cost by Cloud Provider ($)
 

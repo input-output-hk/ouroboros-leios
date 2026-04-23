@@ -27,6 +27,11 @@ direct correlation between ledger size and RAM requirements.
 At today's ledger size (~8 million UTxO entries), Praos requires approximately
 13–16 GB of RAM. As UTxO growth continues, RAM requirements grow proportionally.
 
+At Praos-equivalent load (4.5 TxkB/s), Leios processes the same transactions
+and needs the same LeiosTxCache size, but uses fundamentally less RAM because
+UTxO-HD moves the UTxO set to disk. Praos requires ~16 GB RAM for the
+in-memory UTxO set; Leios requires only ~4 GB regardless of UTxO growth.
+
 ## Ouroboros Leios
 
 Linear Leios (CIP-164) solves the memory scaling problem by requiring UTxO-HD,
@@ -55,15 +60,14 @@ by a time window (approximately 1 hour to cover the full EB → RB pipeline):
 
 $$M_{\text{tx-cache}} = \text{TxkB/s} \times 1{,}000 \text{ B/s} \times 3{,}600 \text{ s}$$
 
-| TxkB/s | Tx Cache Size |
-| ------ | ------------- |
-| 4.5    | 16 MB         |
-| 50     | 180 MB        |
-| 100    | 360 MB        |
-| 150    | 540 MB        |
-| 200    | 720 MB        |
-| 250    | 900 MB        |
-| 300    | 1,080 MB      |
+| TxkB/s      | Tx Cache Size |
+| ----------- | ------------- |
+| 4.5 (Praos) | N/A (Leios cache not used; Praos keeps full UTxO in-memory: ~16 GB total) |
+| 5           | 18 MB         |
+| 50          | 180 MB        |
+| 100         | 360 MB        |
+| 200         | 720 MB        |
+| 300         | 1,080 MB      |
 
 ### Memory Component Sizes
 
@@ -86,20 +90,21 @@ Base fixed overhead (mid-range estimates):
 - Consensus overhead: 100 MB
 - **Fixed subtotal: ~1,400 MB ≈ 1.4 GB**
 
-| TxkB/s | Tx/s | Tx Cache | Base (GB) | Total RAM (GB) | Tier Needed |
-| ------ | ---- | -------- | --------- | -------------- | ----------- |
-| 4.5    | 3    | 16 MB    | 1.4       | 1.5            | 4 GB        |
-| 50     | 33   | 180 MB   | 1.4       | 1.6            | 4 GB        |
-| 100    | 67   | 360 MB   | 1.4       | 1.8            | 4 GB        |
-| 150    | 100  | 540 MB   | 1.4       | 1.9            | 4 GB        |
-| 200    | 133  | 720 MB   | 1.4       | 2.1            | 4 GB        |
-| 250    | 167  | 900 MB   | 1.4       | 2.3            | 4 GB        |
-| 300    | 200  | 1,080 MB | 1.4       | 2.5            | 4 GB        |
+| TxkB/s        | Tx/s | Tx Cache | Base (GB) | Total RAM (GB) | Tier Needed |
+| ------------- | ---- | -------- | --------- | -------------- | ----------- |
+| 4.5 (Praos)   | 3    | N/A      | ~15–16    | **~16**        | 16 GB       |
+| 5             | 3    | 18 MB    | 1.4       | 1.5            | 4 GB        |
+| 50            | 33   | 180 MB   | 1.4       | 1.6            | 4 GB        |
+| 100           | 67   | 360 MB   | 1.4       | 1.8            | 4 GB        |
+| 200           | 133  | 720 MB   | 1.4       | 2.1            | 4 GB        |
+| 300           | 200  | 1,080 MB | 1.4       | 2.5            | 4 GB        |
 
 > [!Note]
 >
+> - The 4.5 (Praos) row reflects Praos memory requirements (full UTxO in RAM);
+>   all Leios rows use UTxO-HD, making the 4 GB tier sufficient
 > - Tx/s assumes average transaction size of 1,500 bytes
-> - A 4 GB tier provides comfortable headroom across all throughput levels
+> - A 4 GB tier provides comfortable headroom for all Leios throughput levels
 > - GHC runtime overhead (GC, thunks) adds ~20–30% above these estimates
 > - UTxO-HD is a prerequisite for Linear Leios; without it, the UTxO set grows
 >   to 4–16+ GB in RAM as in Praos
@@ -110,28 +115,29 @@ A 4 GB RAM instance is sufficient for all throughput levels up to 300 TxkB/s.
 An 8 GB instance is recommended for production deployments to accommodate GHC
 runtime overhead and load spikes.
 
-| Provider   | 4 GB RAM | 8 GB RAM | Notes                         |
-| ---------- | -------- | -------- | ----------------------------- |
-| AWS        | $20.79   | $41.59   | t3.medium / t3.large          |
-| GCP        | $35.95   | $71.91   | n2-standard-1 / n2-standard-2 |
-| Azure      | $19.50   | $39.00   | Standard_B2s and equivalents  |
-| DigitalOcean | $16.28 | $32.56   | Basic Droplets                |
-| Linode     | $21.75   | $43.51   | Dedicated CPU instances       |
-| Hetzner    | $4.39    | $7.14    | EUR prices at 1 EUR = 1.10 USD |
+| Provider     | 4 GB RAM | 8 GB RAM | 16 GB RAM | Notes                          |
+| ------------ | -------- | -------- | --------- | ------------------------------ |
+| AWS          | $20.79   | $41.59   | $83.18    | t3 series                      |
+| GCP          | $35.95   | $71.91   | $143.82   | n2-standard series             |
+| Azure        | $19.50   | $39.00   | $78.00    | Standard_B series              |
+| DigitalOcean | $16.28   | $32.56   | $65.12    | Basic Droplets                 |
+| Linode       | $21.75   | $43.51   | $87.02    | Dedicated CPU instances        |
+| Hetzner      | $4.39    | $7.14    | $12.42    | EUR prices at 1 EUR = 1.10 USD |
 
 > [!Note]
 > Monthly costs calculated as: hourly rate × 730 hours/month.
 > Prices are for US/EU regions and may vary by location.
+> 16 GB RAM tier shown for Praos comparison; Leios uses the 4 GB tier.
 
 ### Cost Comparison: Praos vs Leios
 
-| Protocol | RAM Required  | Monthly Cost Range |
-| -------- | ------------- | ------------------ |
-| Praos    | 13–16 GB      | $65–$720           |
-| Leios    | 1.5–2.5 GB    | $5–$72 (4–8 GB tier) |
+| Protocol | RAM Required  | Monthly Cost Range     |
+| -------- | ------------- | ---------------------- |
+| Praos    | 13–16 GB      | $12–$144 (16 GB tier)  |
+| Leios    | 1.5–2.5 GB    | $4–$36 (4 GB tier)     |
 
 Leios with UTxO-HD reduces RAM costs by approximately 75–85% by moving the
-UTxO set to SSD storage.
+UTxO set to SSD storage, partially offsetting the fixed vote/cert overhead.
 
 ## RAM Cost Sources
 
