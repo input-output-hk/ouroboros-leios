@@ -104,11 +104,6 @@ each confirmed transaction triggers UTxO state updates on disk.
 
    $$IOPS_{\text{eb-hdr}} = 0.05 \times 1 \times 1.2 = 0.06 \text{ IOPS/s}$$
 
-### IOPS at 4.5 TxkB/s (Praos, with UTxO-HD)
-
-From the Praos section above: block writes/reads (1.27 IOPS/s) plus UTxO
-state updates (9.0 IOPS/s) = **≈ 10.3 IOPS/s**.
-
 ### IOPS at 5 TxkB/s (Leios Baseline)
 
 1. **Tx data**: $\frac{5{,}000}{4{,}096} \times 1.1 = 1.34 \text{ IOPS/s}$
@@ -127,14 +122,14 @@ the slightly higher throughput (5 vs 4.5 TxkB/s) plus EB overhead.
 
 ### IOPS Requirements at Different Confirmed Throughputs
 
-| TxkB/s        | Tx/s | Tx Data IOPS | UTxO IOPS | EB Body IOPS | Fixed IOPS | Total IOPS/s  |
-| ------------- | ---- | ------------ | --------- | ------------ | ---------- | ------------- |
-| 4.5 (Praos)   | 3    | 1.27         | 9.0       | —            | —          | **10.3**      |
-| 5             | 3    | 1.34         | 10.0      | 0.06         | 0.18       | 11.58         |
-| 50            | 33   | 13.4         | 100.0     | 0.36         | 0.18       | 113.9         |
-| 100           | 67   | 26.9         | 200.0     | 0.66         | 0.18       | 227.7         |
-| 200           | 133  | 53.7         | 400.0     | 1.26         | 0.18       | 455.1         |
-| 300           | 200  | 80.6         | 600.0     | 1.92         | 0.18       | 682.7         |
+| TxkB/s      | Tx/s | Tx Data IOPS | UTxO IOPS | EB Body IOPS | Fixed IOPS | Total IOPS/s |
+|-------------|------|--------------|-----------|--------------|------------|--------------|
+| 4.5 (Praos) | 3    | 1.27         | 9.0       | —            | —          | 10.3         |
+| 5           | 3    | 1.34         | 10.0      | 0.06         | 0.18       | 11.58        |
+| 50          | 33   | 13.4         | 100.0     | 0.36         | 0.18       | 113.9        |
+| 100         | 67   | 26.9         | 200.0     | 0.66         | 0.18       | 227.7        |
+| 200         | 133  | 53.7         | 400.0     | 1.26         | 0.18       | 455.1        |
+| 300         | 200  | 80.6         | 600.0     | 1.92         | 0.18       | 682.7        |
 
 > [!Note]
 >
@@ -151,13 +146,13 @@ the slightly higher throughput (5 vs 4.5 TxkB/s) plus EB overhead.
 
 ### IOPS Component Analysis at 200 TxkB/s
 
-| Component        | IOPS/s    | % of Total |
-| ---------------- | --------- | ---------- |
-| UTxO State       | 400.0     | 87.9%      |
-| Tx Data Writes   | 53.7      | 11.8%      |
-| EB Body          | 1.26      | 0.3%       |
-| RB + EB Headers  | 0.18      | < 0.1%     |
-| **Total**        | **455.1** | **100%**   |
+| Component       | IOPS/s    | % of Total |
+|-----------------|-----------|------------|
+| UTxO State      | 400.0     | 87.9%      |
+| Tx Data Writes  | 53.7      | 11.8%      |
+| EB Body         | 1.26      | 0.3%       |
+| RB + EB Headers | 0.18      | < 0.1%     |
+| **Total**       | **455.1** | **100%**   |
 
 ## Monthly Cost by Cloud Provider ($)
 

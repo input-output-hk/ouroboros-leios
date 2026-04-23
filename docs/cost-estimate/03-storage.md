@@ -2,12 +2,16 @@
 
 > [!Note] 
 >
-> **100% confirmed throughput assumption:**
+> **Scope**: This document covers **blockchain history** storage only —
+> the append-only chain data (blocks, EBs, transactions). It does not model
+> ledger state storage (UTxO set on disk under UTxO-HD, currently ~200 GiB
+> and growing with network usage independent of throughput). Ledger state
+> growth is orthogonal to the protocol comparison and not proportional to
+> confirmed TxkB/s.
 >
-> This analysis assumes fully utilized confirmed throughput for a conservative
-> upper bound on costs. Storage accumulates only for certified (confirmed)
-> transactions — uncertified EB contents are discarded and re-gossiped in
-> subsequent rounds.
+> **100% confirmed throughput assumption:**
+> Storage accumulates only for certified (confirmed) transactions —
+> uncertified EB contents are discarded and re-gossiped in subsequent rounds.
 >
 > **Compression note:** While early experiments show that >70% compression is
 > feasible on mainnet data, this analysis does not include compression benefits.
@@ -41,26 +45,17 @@ $$S_{\text{praos}} = 91{,}136 \times 0.05 \times 2{,}628{,}000 \approx 11.02 \te
 
 The Praos-equivalent confirmed throughput is $0.05 \times 90{,}112 = 4{,}505.6 \approx 4.5 \text{ TxkB/s}$.
 
-### Ledger State
-
-In addition to blockchain history, nodes maintain ledger state on disk
-(assuming UTxO-HD deployment, which is orthogonal to the protocol):
-
-- Current approximate size: 200 GiB (as of April 2025)
-- Growth rate depends on the net UTxO set change over time (not directly
-  proportional to throughput)
-
 At confirmed throughput at or below the Praos capacity ceiling (4.5 TxkB/s),
 Linear Leios stores the same transaction bytes as Praos plus fixed protocol
-overhead (EB headers, RBs with certificates). The overhead is small (~12% at
-4.5 TxkB/s) and amortized as throughput grows.
+overhead (EB headers, RBs with certificates). The overhead is small (~24% at
+5 TxkB/s) and amortized as throughput grows.
 
 ## Ouroboros Leios
 
 In Linear Leios (CIP-164), transactions are gossiped via the mempool and
 referenced by hash in Endorsement Blocks (EBs). Only the transactions in
 **certified** EBs are permanently stored. An EB is certified when a quorum of
-votes arrives before the certification deadline; $P(\text{certified}) \approx 0.48$.
+votes arrives before the certification deadline.
 
 ### Storage Components
 
@@ -85,11 +80,10 @@ votes arrives before the certification deadline; $P(\text{certified}) \approx 0.
 
 2. **EB Body Storage** (tx hash references, stored for all EBs):
 
-   In the asymptotic steady-state model, every transaction eventually appears
-   in exactly one persisted EB body. The P(certified) factor cancels — whether
-   we count all EBs at rate $R_{\text{eb}}$ or only certified EBs with a
-   correspondingly larger body, the total stored hash-reference bytes are the
-   same:
+   In the asymptotic steady-state model, every transaction eventually appears in
+   exactly one persisted EB body. No matter whether we count all EBs at rate
+   $R_{\text{eb}}$ or only certified EBs with a correspondingly larger body, the
+   total stored hash-reference bytes are the same:
 
    $$S_{\text{eb-body}} = \frac{\text{TxkB/s} \times 1{,}000}{S_{\text{tx-avg}}} \times 32 \text{ bytes/s} \times T_{\text{month}}$$
 
@@ -106,12 +100,6 @@ votes arrives before the certification deadline; $P(\text{certified}) \approx 0.
    $$S_{\text{rb}} = 0.05 \times 9{,}024 \times T_{\text{month}} = 1.105 \text{ GiB/month}$$
 
    where 9,024 bytes = 1,024 B header + 8,000 B certificate (`cert-size-bytes-constant`).
-
-### Storage Calculation at 4.5 TxkB/s (Praos)
-
-$$S_{\text{praos}} = 91{,}136 \times 0.05 \times 2{,}628{,}000 \approx 11.02 \text{ GiB/month}$$
-
-(From the Praos section above — block headers + bodies only, no EB/cert overhead.)
 
 ### Storage Calculation at 5 TxkB/s (Leios Baseline)
 
@@ -130,14 +118,14 @@ This is approximately 24% more than Praos (11.02 GiB). The fixed RB+cert overhea
 
 ### Monthly Storage at Different Confirmed Throughputs
 
-| TxkB/s        | Tx/s | Tx Closure  | EB Body    | EB Headers | RB        | Total       | vs Praos |
-| ------------- | ---- | ----------- | ---------- | ---------- | --------- | ----------- | -------- |
-| 4.5 (Praos)   | 3    | 11.02 GiB   | —          | —          | —         | **11.02 GiB** | —      |
-| 5             | 3    | 12.24 GiB   | 0.261 GiB  | 0.03 GiB   | 1.105 GiB | 13.64 GiB   | +24%     |
-| 50            | 33   | 122.4 GiB   | 2.613 GiB  | 0.03 GiB   | 1.105 GiB | 126.1 GiB   | +1,045%  |
-| 100           | 67   | 244.8 GiB   | 5.226 GiB  | 0.03 GiB   | 1.105 GiB | 251.2 GiB   | +2,180%  |
-| 200           | 133  | 489.5 GiB   | 10.453 GiB | 0.03 GiB   | 1.105 GiB | 501.1 GiB   | +4,447%  |
-| 300           | 200  | 734.3 GiB   | 15.679 GiB | 0.03 GiB   | 1.105 GiB | 751.1 GiB   | +6,714%  |
+| TxkB/s      | Tx/s | Tx Closure | EB Body    | EB Headers | RB        | Total         | vs Praos |
+|-------------|------|------------|------------|------------|-----------|---------------|----------|
+| 4.5 (Praos) | 3    | 11.02 GiB  | —          | —          | —         | **11.02 GiB** | —        |
+| 5           | 3    | 12.24 GiB  | 0.261 GiB  | 0.03 GiB   | 1.105 GiB | 13.64 GiB     | +24%     |
+| 50          | 33   | 122.4 GiB  | 2.613 GiB  | 0.03 GiB   | 1.105 GiB | 126.1 GiB     | +1,045%  |
+| 100         | 67   | 244.8 GiB  | 5.226 GiB  | 0.03 GiB   | 1.105 GiB | 251.2 GiB     | +2,180%  |
+| 200         | 133  | 489.5 GiB  | 10.453 GiB | 0.03 GiB   | 1.105 GiB | 501.1 GiB     | +4,447%  |
+| 300         | 200  | 734.3 GiB  | 15.679 GiB | 0.03 GiB   | 1.105 GiB | 751.1 GiB     | +6,714%  |
 
 > [!Note]
 >
@@ -152,15 +140,17 @@ This is approximately 24% more than Praos (11.02 GiB). The fixed RB+cert overhea
 
 ### Storage Component Analysis at 200 TxkB/s
 
-| Component        | Storage    | % of Total |
-| ---------------- | ---------- | ---------- |
-| Tx Closure Data  | 489.5 GiB  | 97.7%      |
-| EB Body (hashes) | 10.453 GiB | 2.1%       |
-| RB               | 1.105 GiB  | 0.2%       |
-| EB Headers       | 0.03 GiB   | < 0.1%     |
+| Component            | Storage    | % of Total |
+|----------------------|------------|------------|
+| Tx Closure Data      | 489.5 GiB  | 97.7%      |
+| RB with certificates | 1.105 GiB  | 0.2%       |
+| EB Body (hashes)     | 10.453 GiB | 2.1%       |
+| EB Headers           | 0.03 GiB   | < 0.1%     |
 
-Transaction closure data dominates at all throughput levels. The EB body
-(tx hash references) adds ~2% overhead.
+Transaction closure data dominates at all throughput levels. The overhead of
+Linear Leios is dominated by tx hash references in EB bodies at ~2%, which could
+even be avoided. The certificate overhead is not avoidable but only makes up
+0.2%.
 
 ## Cost Analysis
 
