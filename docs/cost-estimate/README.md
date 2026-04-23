@@ -12,21 +12,15 @@ BLS vote verification, and 100% confirmed block utilization. CPU costs use
 **mainnet-average demand** (including organic Plutus usage as measured on
 Cardano mainnet); Plutus-heavy workloads will cost more.
 
-The primary throughput metric is **confirmed TxkB/s**, derived from the
-CIP-164 design where:
-- EBs reference transactions by 32-byte hash at 0.05 EB/s
-- Transactions are gossiped via the mempool (not bundled in IBs)
-- $P(\text{EB certified}) \approx 0.48$ sets the capacity ceiling at ~288 TxkB/s
-
 ### Leios at Praos-equivalent load
 
 At confirmed throughput at or below the Praos capacity ceiling (4.5 TxkB/s),
 Linear Leios processes the same transaction volume and incurs the same
-per-transaction Apply cost. The difference is fixed protocol overhead —
-vote validation, certificate validation, and the EB/RB gossip machinery — which
-is present regardless of throughput. At near-Praos load this overhead dominates;
-as throughput grows toward ~288 TxkB/s it is amortized over more confirmed
-transactions and the cost per TxkB/s converges.
+per-transaction Apply cost. The difference is fixed protocol overhead — vote
+validation, certificate validation, and the EB/RB gossip machinery — which is
+present regardless of throughput. At near-Praos load this overhead dominates; as
+throughput grows toward it is amortized over more confirmed transactions and the
+cost per TxkB/s converges.
 
 The **4.5 (Praos)** column in the tables below shows actual Praos protocol costs
 (no EB/vote/cert overhead). The **5 TxkB/s** column is the Leios baseline: just
@@ -38,7 +32,7 @@ comparison and benefits both protocols equally (see
 ## Cost Items
 
 | Cost Item                             | Unit      | Description                                |
-| ------------------------------------- | --------- | ------------------------------------------ |
+|---------------------------------------|-----------|--------------------------------------------|
 | [Compute (vCPU)](./01-compute-cpu.md) | $/vCPU/h  | Cost per virtual CPU per hour              |
 | [Compute (RAM)](./02-compute-ram.md)  | $/GB/h    | Cost per gigabyte of RAM per hour          |
 | [Storage (SSD)](./03-storage.md)      | $/GiB/mo  | Cost per gibibyte of SSD storage per month |
@@ -97,17 +91,9 @@ see [02-compute-ram.md](./02-compute-ram.md) for why UTxO-HD is orthogonal.
 > All costs are monthly estimates in USD ($) based on confirmed throughput in
 > TxkB/s (transaction kilobytes per second reaching the ledger).
 >
-> - **UTxO-HD assumed for both protocols** (4 GB RAM tier); see
->   [02-compute-ram.md](./02-compute-ram.md). UTxO-HD is orthogonal to the
->   Praos vs Leios comparison.
-> - **4.5 (Praos)**: tx diffusion (22.0 GiB, 2 peers) + block body
->   re-transmission of the same txs (55.1 GiB, 5 peers) + headers (12.5 GiB,
->   100 peers) = 89.6 GiB. Every confirmed transaction is sent twice in Praos.
-> - **Leios at 5 TxkB/s is ~26% cheaper than Praos**: eliminating the block body
->   re-transmission (55.1 GiB) more than covers the fixed Leios overhead (38.95 GiB)
-> - **5 TxkB/s**: Leios baseline just above Praos capacity; fixed protocol
->   overhead (votes, certs) is fully visible but only ~11% more throughput
->   than Praos — the economic case for Leios emerges at higher throughput
+> - UTxO-HD assumed for both protocols (4 GB RAM tier); see
+>   [02-compute-ram.md](./02-compute-ram.md). UTxO-HD is orthogonal to the Praos
+>   vs Leios comparison.
 > - Compute (vCPU) uses the 2-core tier for Leios rows; 4 cores recommended
 >   for production headroom (see [01-compute-cpu.md](./01-compute-cpu.md))
 > - At higher throughput, egress dominates for premium cloud providers;
@@ -116,6 +102,9 @@ see [02-compute-ram.md](./02-compute-ram.md) for why UTxO-HD is orthogonal.
 > - Fixed vote overhead (600 votes × 164 B × 0.05 EB/s × 2 peers) contributes
 >   ~24 GiB/month in egress regardless of confirmed throughput (2× spanning-tree
 >   redundancy for a typical relay; hub nodes carry proportionally more)
+> - Leios at 5 TxkB/s results in ~26% less network egress than Praos (see
+>   [04-egress.md](./04-egress.md)), but does not change overall cost much as
+>   egress often still included in free tiers at these levels.
 
 > [!Important] 
 > Storage costs shown above represent only one month of blockchain data. As
@@ -149,14 +138,14 @@ $$\text{Fee} = 0.155381 + (0.0000440576 \times 1{,}500) = 0.221467 \text{ ADA/tx
 
 ### Throughput and Revenue at Different Confirmed Rates
 
-| TxkB/s        | Tx/s (1,500 B avg) | Monthly Txs     | Fee/Tx (ADA) | Monthly Revenue (ADA) |
-| ------------- | ------------------ | --------------- | ------------ | --------------------- |
-| 4.5 (Praos)   | 3                  | 7,884,000       | 0.221467     | 1,745,932             |
-| 5             | 3                  | 8,760,000       | 0.221467     | 1,940,051             |
-| 50            | 33                 | 86,724,000      | 0.221467     | 19,205,255            |
-| 100           | 67                 | 176,076,000     | 0.221467     | 38,991,426            |
-| 200           | 133                | 349,524,000     | 0.221467     | 77,411,397            |
-| 300           | 200                | 525,600,000     | 0.221467     | 116,402,822           |
+| TxkB/s      | Tx/s (1,500 B avg) | Monthly Txs | Fee/Tx (ADA) | Monthly Revenue (ADA) |
+|-------------|--------------------|-------------|--------------|-----------------------|
+| 4.5 (Praos) | 3                  | 7,884,000   | 0.221467     | 1,745,932             |
+| 5           | 3                  | 8,760,000   | 0.221467     | 1,940,051             |
+| 50          | 33                 | 86,724,000  | 0.221467     | 19,205,255            |
+| 100         | 67                 | 176,076,000 | 0.221467     | 38,991,426            |
+| 200         | 133                | 349,524,000 | 0.221467     | 77,411,397            |
+| 300         | 200                | 525,600,000 | 0.221467     | 116,402,822           |
 
 > [!Important]
 > The revenue figures above represent **total network revenue**, while cost
@@ -193,26 +182,26 @@ Using the [Aggregated Total Cost Table](#aggregated-total-cost-table), we
 estimate total network infrastructure costs based on an average across providers
 (both protocols with UTxO-HD).
 
-| TxkB/s        | Cost per Node (Avg) | Network Cost (10,000 nodes) |
-| ------------- | ------------------- | --------------------------- |
-| 4.5 (Praos)   | ~$75                | $750,000                    |
-| 5 (Leios)     | ~$74                | $740,000                    |
-| 50            | ~$90                | $900,000                    |
-| 100           | ~$112               | $1,120,000                  |
-| 200           | ~$158               | $1,580,000                  |
-| 300           | ~$204               | $2,040,000                  |
+| TxkB/s      | Cost per Node (Avg) | Network Cost (10,000 nodes) |
+|-------------|---------------------|-----------------------------|
+| 4.5 (Praos) | ~$75                | $750,000                    |
+| 5 (Leios)   | ~$74                | $740,000                    |
+| 50          | ~$90                | $900,000                    |
+| 100         | ~$112               | $1,120,000                  |
+| 200         | ~$158               | $1,580,000                  |
+| 300         | ~$204               | $2,040,000                  |
 
 #### Required Confirmed Throughput for Infrastructure Cost Coverage
 
 | Infrastructure Cost (USD) | Required ADA (at $0.45/ADA) | TPS (Avg Tx) | TxkB/s |
-| ------------------------- | --------------------------- | ------------ | ------ |
+|---------------------------|-----------------------------|--------------|--------|
 | $750,000                  | 1,666,667                   | 0.29         | 0.43   |
 | $1,080,000                | 2,400,000                   | 0.42         | 0.63   |
 | $2,000,000                | 4,444,444                   | 0.78         | 1.17   |
 | $2,840,000                | 6,311,111                   | 1.11         | 1.66   |
 
-At 200 TxkB/s, total network infrastructure costs (~$1.58M/month) represent
-less than 2% of total fee revenue at that throughput (~$77M ADA × $0.45 ≈
+At 200 TxkB/s, total network infrastructure costs (~$1.58M/month) represent less
+than 2% of total fee revenue at that throughput (~$77M ADA × $0.45 ≈
 $34.7M/month), demonstrating strong economic viability.
 
 #### Required Throughput for Current Reward Maintenance
@@ -221,7 +210,7 @@ To maintain current reward levels (~48 million ADA monthly) through transaction
 fees as the Reserve depletes:
 
 | Year | Reserve Depletion | Rewards from Fees (ADA) | Required Tx/s | Required TxkB/s |
-| ---- | ----------------- | ----------------------- | ------------- | --------------- |
+|------|-------------------|-------------------------|---------------|-----------------|
 | 2025 | ~0%               | 0                       | 0             | 0               |
 | 2026 | ~13%              | 6,240,000               | 10.9          | 16.4            |
 | 2027 | ~24%              | 11,520,000              | 20.1          | 30.2            |
@@ -232,5 +221,4 @@ fees as the Reserve depletes:
 > [!Important]
 > By 2029, to compensate for Reserve depletion, the network would need to
 > process approximately 36 Tx/s (~54 TxkB/s). This is well within the Leios
-> operating range — the protocol comfortably supports up to ~190 Tx/s
-> (~288 TxkB/s capacity ceiling) while maintaining decentralization.
+> operating range.
