@@ -78,14 +78,18 @@ votes arrives before the certification deadline; $P(\text{certified}) \approx 0.
 
    where $T_{\text{month}} = 2{,}628{,}000$ seconds/month.
 
-2. **EB Body Storage** (tx hash references, certified EBs only):
+2. **EB Body Storage** (tx hash references, stored for all EBs):
 
-   $$S_{\text{eb-body}} = N_{\text{cert}} \times \frac{\text{TxkB/s} \times 1{,}000}{S_{\text{tx-avg}} \times R_{\text{eb}}} \times 32 \text{ bytes}$$
+   In the asymptotic steady-state model, every transaction eventually appears
+   in exactly one persisted EB body. The P(certified) factor cancels — whether
+   we count all EBs at rate $R_{\text{eb}}$ or only certified EBs with a
+   correspondingly larger body, the total stored hash-reference bytes are the
+   same:
+
+   $$S_{\text{eb-body}} = \frac{\text{TxkB/s} \times 1{,}000}{S_{\text{tx-avg}}} \times 32 \text{ bytes/s} \times T_{\text{month}}$$
 
    where:
-   - $N_{\text{cert}}$ = certified EBs/month = $0.05 \times 0.48 \times 2{,}628{,}000 = 63{,}072$
    - $S_{\text{tx-avg}}$ = average transaction size (1,500 bytes)
-   - $R_{\text{eb}}$ = EB rate (0.05/s)
    - 32 bytes per tx hash reference
 
 3. **EB Header Storage** (all EBs, fixed):
@@ -102,27 +106,27 @@ votes arrives before the certification deadline; $P(\text{certified}) \approx 0.
 
 1. **Tx closure**: $4{,}500 \times 2{,}628{,}000 = 11{,}826{,}000{,}000 \text{ bytes} \approx 11.01 \text{ GiB}$
 
-2. **EB body** (tx hashes): $63{,}072 \times \frac{3}{0.05} \times 32 = 63{,}072 \times 1{,}920 \approx 0.11 \text{ GiB}$
+2. **EB body** (tx hashes): $\frac{4{,}500}{1{,}500} \times 32 \times 2{,}628{,}000 = 3 \times 32 \times 2{,}628{,}000 \approx 0.235 \text{ GiB}$
 
 3. **EB headers**: $0.029 \text{ GiB}$ (fixed)
 
 4. **RB**: $1.105 \text{ GiB}$ (fixed; 1,024 B header + 8,000 B cert)
 
-5. **Total**: $11.01 + 0.11 + 0.03 + 1.105 \approx 12.26 \text{ GiB/month}$
+5. **Total**: $11.01 + 0.235 + 0.029 + 1.105 \approx 12.38 \text{ GiB/month}$
 
-This is approximately 11% more than Praos (11.02 GiB) at equivalent throughput.
+This is approximately 12% more than Praos (11.02 GiB) at equivalent throughput.
 
 ### Monthly Storage at Different Confirmed Throughputs
 
-| TxkB/s | Tx/s | Tx Closure  | EB Body   | EB Headers | RB        | Total       | vs Praos |
-| ------ | ---- | ----------- | --------- | ---------- | --------- | ----------- | -------- |
-| 4.5    | 3    | 11.01 GiB   | 0.11 GiB  | 0.03 GiB   | 1.105 GiB | 12.26 GiB   | +11%     |
-| 50     | 33   | 122.4 GiB   | 1.25 GiB  | 0.03 GiB   | 1.105 GiB | 124.8 GiB   | +1,033%  |
-| 100    | 67   | 244.8 GiB   | 2.50 GiB  | 0.03 GiB   | 1.105 GiB | 248.4 GiB   | +2,153%  |
-| 150    | 100  | 367.2 GiB   | 3.75 GiB  | 0.03 GiB   | 1.105 GiB | 372.1 GiB   | +3,276%  |
-| 200    | 133  | 489.5 GiB   | 5.01 GiB  | 0.03 GiB   | 1.105 GiB | 495.6 GiB   | +4,399%  |
-| 250    | 167  | 611.9 GiB   | 6.26 GiB  | 0.03 GiB   | 1.105 GiB | 619.3 GiB   | +5,523%  |
-| 300    | 200  | 734.3 GiB   | 7.52 GiB  | 0.03 GiB   | 1.105 GiB | 743.0 GiB   | +6,646%  |
+| TxkB/s | Tx/s | Tx Closure  | EB Body    | EB Headers | RB        | Total       | vs Praos |
+| ------ | ---- | ----------- | ---------- | ---------- | --------- | ----------- | -------- |
+| 4.5    | 3    | 11.01 GiB   | 0.235 GiB  | 0.03 GiB   | 1.105 GiB | 12.38 GiB   | +12%     |
+| 50     | 33   | 122.4 GiB   | 2.613 GiB  | 0.03 GiB   | 1.105 GiB | 126.1 GiB   | +1,045%  |
+| 100    | 67   | 244.8 GiB   | 5.226 GiB  | 0.03 GiB   | 1.105 GiB | 251.2 GiB   | +2,180%  |
+| 150    | 100  | 367.2 GiB   | 7.840 GiB  | 0.03 GiB   | 1.105 GiB | 376.2 GiB   | +3,314%  |
+| 200    | 133  | 489.5 GiB   | 10.453 GiB | 0.03 GiB   | 1.105 GiB | 501.1 GiB   | +4,447%  |
+| 250    | 167  | 611.9 GiB   | 13.066 GiB | 0.03 GiB   | 1.105 GiB | 626.1 GiB   | +5,580%  |
+| 300    | 200  | 734.3 GiB   | 15.679 GiB | 0.03 GiB   | 1.105 GiB | 751.1 GiB   | +6,714%  |
 
 > [!Note]
 >
@@ -130,20 +134,21 @@ This is approximately 11% more than Praos (11.02 GiB) at equivalent throughput.
 > - EB body storage grows with throughput because higher-throughput EBs reference
 >   more transaction hashes (32 bytes each)
 > - These are monthly increments; total accumulated storage grows over time
-> - CIP-164 Table 8 cross-check: 394 GB at 150 TxkB/s ≈ 367 GiB ✓; 526 GB at
->   200 TxkB/s ≈ 490 GiB ✓ (minor difference from rounding and avg tx size)
+> - CIP-164 Table 8 cross-check: 394 GB at 150 TxkB/s → our total 376 GiB ≈
+>   404 GB; 526 GB at 200 TxkB/s → our total 501 GiB ≈ 538 GB (minor
+>   difference from rounding and avg tx size assumptions)
 
 ### Storage Component Analysis at 200 TxkB/s
 
-| Component        | Storage  | % of Total |
-| ---------------- | -------- | ---------- |
-| Tx Closure Data  | 489.5 GiB | 98.8%     |
-| EB Body (hashes) | 5.01 GiB  | 1.0%      |
-| RB               | 1.105 GiB | 0.2%      |
-| EB Headers       | 0.03 GiB  | < 0.1%    |
+| Component        | Storage    | % of Total |
+| ---------------- | ---------- | ---------- |
+| Tx Closure Data  | 489.5 GiB  | 97.7%      |
+| EB Body (hashes) | 10.453 GiB | 2.1%       |
+| RB               | 1.105 GiB  | 0.2%       |
+| EB Headers       | 0.03 GiB   | < 0.1%     |
 
 Transaction closure data dominates at all throughput levels. The EB body
-(tx hash references) adds only ~1% overhead.
+(tx hash references) adds ~2% overhead.
 
 ## Cost Analysis
 
