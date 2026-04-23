@@ -174,7 +174,7 @@ Assumptions:
 - Additional infrastructure for dApps and services (~1,000 nodes)
 - Total network nodes: 10,000
 - Current monthly rewards: ~48 million ADA
-- ADA price assumed at $0.45/ADA
+- ADA price assumed at $0.25/ADA (April 2026)
 
 #### Infrastructure Cost Estimates
 
@@ -193,16 +193,16 @@ estimate total network infrastructure costs based on an average across providers
 
 #### Required Confirmed Throughput for Infrastructure Cost Coverage
 
-| Infrastructure Cost (USD) | Required ADA (at $0.45/ADA) | TPS (Avg Tx) | TxkB/s |
+| Infrastructure Cost (USD) | Required ADA (at $0.25/ADA) | TPS (Avg Tx) | TxkB/s |
 |---------------------------|-----------------------------|--------------|--------|
-| $750,000                  | 1,666,667                   | 0.29         | 0.43   |
-| $1,080,000                | 2,400,000                   | 0.42         | 0.63   |
-| $2,000,000                | 4,444,444                   | 0.78         | 1.17   |
-| $2,840,000                | 6,311,111                   | 1.11         | 1.66   |
+| $750,000                  | 3,000,000                   | 5.15         | 7.73   |
+| $1,080,000                | 4,320,000                   | 7.42         | 11.13  |
+| $2,000,000                | 8,000,000                   | 13.74        | 20.61  |
+| $2,840,000                | 11,360,000                  | 19.52        | 29.29  |
 
-At 200 TxkB/s, total network infrastructure costs (~$1.58M/month) represent less
-than 2% of total fee revenue at that throughput (~$77M ADA × $0.45 ≈
-$34.7M/month), demonstrating strong economic viability.
+At 200 TxkB/s, total network infrastructure costs (~$1.58M/month) represent
+about 8% of total fee revenue at that throughput (~$77M ADA × $0.25 ≈
+$19.4M/month), demonstrating strong economic viability.
 
 #### Required Throughput for Current Reward Maintenance
 
