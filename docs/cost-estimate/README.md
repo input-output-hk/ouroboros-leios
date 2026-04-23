@@ -8,9 +8,9 @@ Ouroboros Praos for comparisons. All cost estimates are for **Linear Leios
 (CIP-164)** and assume fully confirmed transaction throughput (TxkB/s —
 transaction kilobytes per second reaching the ledger). Costs represent
 conservative upper bounds: 3,000 votes per EB (all active pools), individual
-BLS vote verification, 100% confirmed block utilization, and **full Plutus
-execution unit utilization per transaction** (20 Gstep/tx — the per-tx
-maximum; real-world CPU costs will be lower).
+BLS vote verification, and 100% confirmed block utilization. CPU costs use
+**mainnet-average demand** (including organic Plutus usage as measured on
+Cardano mainnet); Plutus-heavy workloads will cost more.
 
 The primary throughput metric is **confirmed TxkB/s**, derived from the
 CIP-164 design where:
@@ -37,42 +37,42 @@ different cloud providers based on confirmed throughput in TxkB/s.
 
 | Provider         | Cost Item           | 4.5 TxkB/s | 50 TxkB/s  | 100 TxkB/s  | 150 TxkB/s  | 200 TxkB/s  | 250 TxkB/s  | 300 TxkB/s  |
 | ---------------- | ------------------- | ---------- | ---------- | ----------- | ----------- | ----------- | ----------- | ----------- |
-| **AWS**          | Compute (vCPU)      | $62.05     | $62.05     | $62.05      | $124.10     | $124.10     | $124.10     | $124.10     |
+| **AWS**          | Compute (vCPU)      | $62.05     | $62.05     | $62.05      | $62.05      | $62.05      | $62.05      | $62.05      |
 |                  | Compute (RAM)       | $20.79     | $20.79     | $20.79      | $20.79      | $20.79      | $20.79      | $20.79      |
 |                  | Storage             | $0.00      | $2.71      | $13.34      | $23.96      | $34.58      | $45.20      | $55.83      |
 |                  | Egress              | $0.00      | $52.36     | $112.03     | $171.68     | $231.35     | $291.02     | $350.68     |
 |                  | IOPS                | $10.00     | $10.00     | $10.00      | $10.00      | $10.00      | $10.00      | $10.00      |
-|                  | **Total (AWS)**     | **$92.84** | **$147.91**| **$218.21** | **$350.53** | **$420.82** | **$491.11** | **$561.40** |
-| **GCP**          | Compute (vCPU)      | $52.34     | $52.34     | $52.34      | $152.35     | $152.35     | $152.35     | $152.35     |
+|                  | **Total (AWS)**     | **$92.84** | **$147.91**| **$218.21** | **$288.48** | **$358.77** | **$429.06** | **$499.35** |
+| **GCP**          | Compute (vCPU)      | $52.34     | $52.34     | $52.34      | $52.34      | $52.34      | $52.34      | $52.34      |
 |                  | Compute (RAM)       | $35.95     | $35.95     | $35.95      | $35.95      | $35.95      | $35.95      | $35.95      |
 |                  | Storage             | $0.52      | $5.36      | $10.67      | $15.98      | $21.29      | $26.60      | $31.92      |
 |                  | Egress              | $9.42      | $81.82     | $161.37     | $240.91     | $320.47     | $400.02     | $479.57     |
 |                  | IOPS                | $15.00     | $15.00     | $15.00      | $15.00      | $15.00      | $15.00      | $15.00      |
-|                  | **Total (GCP)**     | **$113.23**| **$190.47**| **$275.33** | **$460.19** | **$545.06** | **$629.92** | **$714.79** |
-| **Azure**        | Compute (vCPU)      | $61.76     | $61.76     | $61.76      | $123.37     | $123.37     | $123.37     | $123.37     |
+|                  | **Total (GCP)**     | **$113.23**| **$190.47**| **$275.33** | **$360.18** | **$445.05** | **$529.91** | **$614.78** |
+| **Azure**        | Compute (vCPU)      | $61.76     | $61.76     | $61.76      | $61.76      | $61.76      | $61.76      | $61.76      |
 |                  | Compute (RAM)       | $19.50     | $19.50     | $19.50      | $19.50      | $19.50      | $19.50      | $19.50      |
 |                  | Storage             | $0.00      | $2.54      | $12.50      | $22.46      | $32.42      | $42.38      | $52.34      |
 |                  | Egress              | $0.00      | $50.62     | $108.29     | $165.96     | $223.64     | $281.31     | $338.99     |
 |                  | IOPS                | $12.00     | $12.00     | $12.00      | $12.00      | $12.00      | $12.00      | $12.00      |
-|                  | **Total (Azure)**   | **$93.26** | **$146.42**| **$214.05** | **$343.29** | **$410.93** | **$478.56** | **$546.20** |
-| **DigitalOcean** | Compute (vCPU)      | $42.00     | $42.00     | $42.00      | $84.00      | $84.00      | $84.00      | $84.00      |
+|                  | **Total (Azure)**   | **$93.26** | **$146.42**| **$214.05** | **$281.68** | **$349.32** | **$416.95** | **$484.59** |
+| **DigitalOcean** | Compute (vCPU)      | $42.00     | $42.00     | $42.00      | $42.00      | $42.00      | $42.00      | $42.00      |
 |                  | Compute (RAM)       | $16.28     | $16.28     | $16.28      | $16.28      | $16.28      | $16.28      | $16.28      |
 |                  | Storage             | $0.00      | $3.39      | $16.67      | $29.95      | $43.22      | $56.50      | $69.79      |
 |                  | Egress              | $0.00      | $0.00      | $3.45       | $10.08      | $16.71      | $23.34      | $29.96      |
 |                  | IOPS                | $8.00      | $8.00      | $8.00       | $8.00       | $8.00       | $8.00       | $8.00       |
-|                  | **Total (DO)**      | **$66.28** | **$69.67** | **$86.40**  | **$148.31** | **$168.21** | **$188.12** | **$208.03** |
-| **Linode**       | Compute (vCPU)      | $36.00     | $36.00     | $36.00      | $60.00      | $60.00      | $60.00      | $60.00      |
+|                  | **Total (DO)**      | **$66.28** | **$69.67** | **$86.40**  | **$106.31** | **$126.21** | **$146.12** | **$166.03** |
+| **Linode**       | Compute (vCPU)      | $36.00     | $36.00     | $36.00      | $36.00      | $36.00      | $36.00      | $36.00      |
 |                  | Compute (RAM)       | $21.75     | $21.75     | $21.75      | $21.75      | $21.75      | $21.75      | $21.75      |
 |                  | Storage             | $0.00      | $0.00      | $0.00       | $0.00       | $0.00       | $0.00       | $0.00       |
 |                  | Egress              | $0.00      | $0.00      | $1.60       | $4.92       | $8.23       | $11.55      | $14.86      |
 |                  | IOPS                | $7.00      | $7.00      | $7.00       | $7.00       | $7.00       | $7.00       | $7.00       |
-|                  | **Total (Linode)**  | **$64.75** | **$64.75** | **$66.35**  | **$93.67**  | **$96.98**  | **$100.30** | **$103.61** |
-| **Hetzner**      | Compute (vCPU)      | $6.59      | $6.59      | $6.59       | $17.80      | $17.80      | $17.80      | $17.80      |
+|                  | **Total (Linode)**  | **$64.75** | **$64.75** | **$66.35**  | **$69.67**  | **$72.98**  | **$76.30**  | **$79.61**  |
+| **Hetzner**      | Compute (vCPU)      | $6.59      | $6.59      | $6.59       | $6.59       | $6.59       | $6.59       | $6.59       |
 |                  | Compute (RAM)       | $4.39      | $4.39      | $4.39       | $4.39       | $4.39       | $4.39       | $4.39       |
 |                  | Storage             | $0.83      | $8.44      | $16.80      | $25.17      | $33.53      | $41.89      | $50.26      |
 |                  | Egress              | $0.00      | $0.00      | $0.35       | $1.08       | $1.81       | $2.54       | $3.27       |
 |                  | IOPS                | $5.00      | $5.00      | $5.00       | $5.00       | $5.00       | $5.00       | $5.00       |
-|                  | **Total (Hetzner)** | **$16.81** | **$24.42** | **$33.13**  | **$53.44**  | **$62.53**  | **$71.62**  | **$80.72**  |
+|                  | **Total (Hetzner)** | **$16.81** | **$24.42** | **$33.13**  | **$42.23**  | **$51.32**  | **$60.41**  | **$69.51**  |
 
 > [!Note]
 > All costs are monthly estimates in USD ($) based on confirmed throughput in
@@ -80,9 +80,9 @@ different cloud providers based on confirmed throughput in TxkB/s.
 >
 > - The 4.5 TxkB/s column corresponds to Praos-equivalent throughput
 >   (0.05 blocks/s × 90 KiB = 4.5 TxkB/s)
-> - Compute (vCPU) uses the 2-core tier for ≤100 TxkB/s and the 4-core tier
->   for 150+ TxkB/s; at 300 TxkB/s the 4-core tier is fully utilized (402% of
->   one core) — 6+ cores recommended for production headroom
+> - Compute (vCPU) uses the 2-core tier across all throughput levels (peak CPU
+>   is 22.5% of one core at 300 TxkB/s at mainnet-average demand); 4 cores
+>   recommended for production headroom
 >   (see [01-compute-cpu.md](./01-compute-cpu.md))
 > - At higher throughput, egress dominates for premium cloud providers;
 >   budget providers (Hetzner, Linode) remain affordable due to generous
@@ -172,10 +172,10 @@ estimate total network infrastructure costs based on an average across providers
 | 4.5    | ~$75                | $750,000                    |
 | 50     | ~$107               | $1,070,000                  |
 | 100    | ~$149               | $1,490,000                  |
-| 150    | ~$242               | $2,420,000                  |
-| 200    | ~$284               | $2,840,000                  |
-| 250    | ~$327               | $3,270,000                  |
-| 300    | ~$369               | $3,690,000                  |
+| 150    | ~$191               | $1,910,000                  |
+| 200    | ~$234               | $2,340,000                  |
+| 250    | ~$277               | $2,770,000                  |
+| 300    | ~$319               | $3,190,000                  |
 
 #### Required Confirmed Throughput for Infrastructure Cost Coverage
 
