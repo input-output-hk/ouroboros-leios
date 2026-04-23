@@ -45,14 +45,6 @@ Thus, Praos at 0.05 blocks/s consumes approximately 1.884 ms/s — about
 > Plutus re-execution) is used for archival chain replay and is not modeled
 > here.
 
-At confirmed throughput at or below the Praos capacity ceiling (4.5 TxkB/s),
-Linear Leios processes the same transaction volume as Praos and incurs the same
-per-transaction Apply cost. The difference is the fixed protocol overhead —
-vote validation (87.0 ms/s) and certificate validation (7.86 ms/s) — which is
-present regardless of throughput. At low load, this overhead dominates; as
-confirmed throughput grows toward the ~288 TxkB/s capacity ceiling, it is
-amortized over more transactions and the cost per TxkB/s converges.
-
 ## Ouroboros Leios
 
 In Linear Leios (CIP-164), CPU utilization comes from five components:
@@ -84,22 +76,21 @@ the cheaper `Reapply` cost; the `Apply` cost is the upper bound.
 
 ### Component Processing Times
 
-| Component                    | Cost                      | Config Reference                                  |
-| ---------------------------- | ------------------------- | ------------------------------------------------- |
-| Transaction Apply (full)     | 0.6201 ms/tx              | `tx-validation-cpu-time-ms`; OLS on mainnet `Apply` (embeds avg Plutus) |
-| Transaction Reapply (ledger) | 0.3539 ms + 0.00002151 ms/B | `eb-body-validation-cpu-time-ms-*`              |
-| EB header validation         | 0.4438 ms/EB              | `eb-header-validation-cpu-time-ms`                |
-| Vote validation              | 2.9 ms/vote               | `vote-validation-cpu-time-ms`; non-persistent worst case |
-| Certificate validation       | 157.2 ms/cert             | `cert-validation-cpu-time-ms-constant`            |
+| Component                    | Cost                        | Config Reference                                                        |
+|------------------------------|-----------------------------|-------------------------------------------------------------------------|
+| Transaction Apply (full)     | 0.6201 ms/tx                | `tx-validation-cpu-time-ms`; OLS on mainnet `Apply` (embeds avg Plutus) |
+| Transaction Reapply (ledger) | 0.3539 ms + 0.00002151 ms/B | `eb-body-validation-cpu-time-ms-*`                                      |
+| EB header validation         | 0.4438 ms/EB                | `eb-header-validation-cpu-time-ms`                                      |
+| Vote validation              | 2.9 ms/vote                 | `vote-validation-cpu-time-ms`; non-persistent worst case                |
+| Certificate validation       | 157.2 ms/cert               | `cert-validation-cpu-time-ms-constant`                                  |
 
 ### Base Parameters
 
-| Parameter             | Value           | Source                                          |
-| --------------------- | --------------- | ----------------------------------------------- |
-| EB rate               | 0.05 EB/s       | Active slot coefficient                         |
-| Votes per EB          | 600             | `vote-generation-probability`; wFA+LS committee |
-| P(EB certified)       | ≈ 0.48          | Poisson: P(next RB ≥ 14 slots away); affects latency, not asymptotic throughput |
-| Average tx size       | 1,500 bytes     | Conservative estimate                           |
+| Parameter       | Value       | Source                                                                          |
+|-----------------|-------------|---------------------------------------------------------------------------------|
+| EB rate         | 0.05 EB/s   | Active slot coefficient                                                         |
+| Votes per EB    | 600         | `vote-generation-probability`; wFA+LS committee                                 |
+| Average tx size | 1,500 bytes | Conservative estimate                                                           |
 
 ### CPU Usage Formulas
 
@@ -113,7 +104,7 @@ the cheaper `Reapply` cost; the `Apply` cost is the upper bound.
 
    $$C_{\text{reapply}} = R_{\text{eb}} \times \left(0.3539 + 0.00002151 \times \frac{\text{TxkB/s} \times 1{,}000}{R_{\text{eb}}}\right)$$
 
-   Simplifying (where $R_{\text{eb}} = 0.05$ EB/s; P(cert) cancels in the dominant term):
+   Simplifying (where $R_{\text{eb}} = 0.05$ EB/s):
 
    $$C_{\text{reapply}} = 0.0177 + 0.02151 \times \text{TxkB/s} \text{ ms/s}$$
 
@@ -231,8 +222,9 @@ production deployments.
 
 1. **CPU floor**: 2 cores covers all throughput levels up to 300 TxkB/s
    (peak 22.5% of one core at mainnet-average demand)
-2. **Production**: 4 cores recommended to handle GHC GC, UTxO-HD I/O waits,
-   and burst conditions — consistent with the CIP-164 hardware recommendation
+2. **Production**: 4 cores recommended to handle GHC GC, disk I/O waits
+   (UTxO-HD), and burst conditions — consistent with the CIP-164 hardware
+   recommendation
 3. **Above 300 TxkB/s**: Additional cores needed for transaction Apply
    parallelism
 4. **Plutus-heavy workloads**: Workloads with higher-than-average Plutus usage

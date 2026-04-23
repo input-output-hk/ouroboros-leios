@@ -44,7 +44,7 @@ The Praos-equivalent confirmed throughput is $0.05 \times 90{,}112 = 4{,}505.6 \
 ### Ledger State
 
 In addition to blockchain history, nodes maintain ledger state on disk
-(UTxO-HD prerequisite for Leios):
+(assuming UTxO-HD deployment, which is orthogonal to the protocol):
 
 - Current approximate size: 200 GiB (as of April 2025)
 - Growth rate depends on the net UTxO set change over time (not directly
