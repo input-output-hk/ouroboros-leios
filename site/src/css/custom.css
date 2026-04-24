@@ -65,12 +65,13 @@ html {
 }
 
 /* For readability concerns, you should choose a lighter palette in dark mode. */
-html[data-theme="dark"] {
+html[data-theme="dark"],
+[data-theme="dark"] {
   --ifm-background-color: #150420;
   --ifm-navbar-background-color: #150420;
   --navbar-sidebar-background-color: #0c0213;
-  --ifm-background-color-primary: #18181f;
-  --ifm-background-color-secondary: #121218;
+  --ifm-background-color-primary: #200830;
+  --ifm-background-color-secondary: #200830;
   --ifm-border-color: rgba(255, 255, 255, 0.2);
   --ifm-toc-border-color: var(--ifm-border-color);
 
@@ -92,6 +93,10 @@ html[data-theme="dark"] {
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
 
   --ifm-card-background-color: rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"]:not(html) {
+  color: var(--ifm-font-color-base);
 }
 
 html[data-theme="dark"] .navbar {
