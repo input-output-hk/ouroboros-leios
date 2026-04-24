@@ -21,17 +21,22 @@ The Cardano relay network is asymmetric. A typical relay node has:
 
 Different traffic types have different directions and different fetch models:
 
-| Traffic type         | Flows      | Serves to (egress)                                         |
-|----------------------|------------|------------------------------------------------------------|
-| Headers (RB/EB)      | Downstream | All ~100 inbound ChainSync subscribers                     |
-| Block bodies (RB/EB) | Downstream | Fraction of inbound: 100 × (1/25 upstreams) ≈ **4 peers** |
-| Tx diffusion         | Upstream   | 25 upstream peers × (1/25 fetch ratio) = **1 peer**        |
-| Votes                | Downstream | ~2 peers (spanning-tree × 2 redundancy)                    |
+| Traffic type         | Flows      | Serves to (egress)                                                         |
+|----------------------|------------|----------------------------------------------------------------------------|
+| Headers (RB/EB)      | Downstream | All ~100 inbound ChainSync subscribers                                     |
+| Block bodies (RB/EB) | Downstream | 100 × (M/25) peers, where M = fetch multiplicity (typical 1, beefy 4–8)   |
+| Tx diffusion         | Upstream   | 25 upstream peers × (1/25 fetch ratio) = **1 peer**                        |
+| Votes                | Downstream | ~2 peers (spanning-tree × 2 redundancy)                                    |
 
 > [!Note]
 >
-> The block/EB body peer count (4) derives from: each of 100 inbound peers has
-> ~25 upstream sources and requests from ~1 of them on average → 100 × 1/25 = 4.
+> The block/EB body peer count derives from: each of 100 inbound peers has ~25
+> upstream sources and requests from M of them simultaneously (fetch multiplicity
+> M). Our expected egress peers = 100 × M/25. For a lean relay M=1 → **4 peers**;
+> for a beefy relay fetching from M=4–8 peers to reduce tail latency → **16–32
+> peers**. High-stake pool relays commonly use M=4–8 to minimise block arrival
+> latency at the cost of higher egress.
+>
 > Tx diffusion flows upstream (clients → relays → block producers): txs arrive
 > from our 100 downstream peers and we forward them to our 25 upstream peers.
 > Each upstream peer downloads each tx from 1 of its ~25 downstream connections
@@ -81,8 +86,9 @@ The following numbers are from Cardano Mainnet, April 2025.
 2. **Header egress** (100 inbound downstream peers):
    $131{,}400 \times 1{,}024 \times 100 \approx 12.5 \text{ GiB}$
 
-3. **Block body egress** (4 peers — fraction of inbound):
-   $131{,}400 \times 90{,}112 \times 4 \approx 44.1 \text{ GiB}$
+3. **Block body egress** (100 × M/25 peers; M=1 lean → 4 peers, M=4 beefy → 16):
+   $131{,}400 \times 90{,}112 \times 4 \approx 44.1 \text{ GiB}$ (lean) /
+   $131{,}400 \times 90{,}112 \times 16 \approx 176.5 \text{ GiB}$ (beefy, M=4)
 
    Block bodies contain the same transactions already gossiped via the mempool
    — the full tx data is **re-transmitted a second time** as part of block
@@ -165,11 +171,13 @@ normal tx diffusion already covers EB closure.
 
    Each confirmed tx appears in $1/P(\text{cert}) \approx 2.08$ EB bodies on
    average (non-certified EBs also gossip their tx hashes). EB bodies are
-   fetched by the same fraction of inbound peers as Praos block bodies (4 peers):
+   fetched by $100 \times M/25$ peers, the same model as Praos block bodies:
 
-   $$E_{\text{eb-body}} = R_{\text{eb}} \times T_{\text{month}} \times \frac{\text{TxkB/s} \times 1{,}000}{1{,}500 \times 0.05} \times 32 \times 4 \times \frac{1}{P(\text{cert})}$$
+   $$E_{\text{eb-body}} = R_{\text{eb}} \times T_{\text{month}} \times \frac{\text{TxkB/s} \times 1{,}000}{1{,}500 \times 0.05} \times 32 \times \frac{100 M}{25} \times \frac{1}{P(\text{cert})}$$
 
-   Simplifying: $E_{\text{eb-body}} \approx \text{TxkB/s} \times 0.4350 \text{ GiB/month}$
+   At M=1 (lean): $E_{\text{eb-body}} \approx \text{TxkB/s} \times 0.4350 \text{ GiB/month}$
+
+   At M=4 (beefy): $E_{\text{eb-body}} \approx \text{TxkB/s} \times 1.740 \text{ GiB/month}$
 
 4. **RB Header Egress** (combined RB/EB header, fixed):
 
@@ -177,21 +185,25 @@ normal tx diffusion already covers EB closure.
 
 5. **RB Body Egress** (certificate, certified RBs only):
 
-   Only certified RBs carry a certificate. Fetched by the same fraction of
-   inbound peers as Praos block bodies (4 peers). Using $N_{\text{cert}} = 63{,}072$/month:
+   Only certified RBs carry a certificate. Fetched by $100 \times M/25$ peers.
+   Using $N_{\text{cert}} = 63{,}072$/month:
 
-   $$E_{\text{rb-body}} = 63{,}072 \times 8{,}000 \times 4 \approx 1.88 \text{ GiB}$$
+   At M=1: $E_{\text{rb-body}} = 63{,}072 \times 8{,}000 \times 4 \approx 1.88 \text{ GiB}$
+
+   At M=4: $E_{\text{rb-body}} = 63{,}072 \times 8{,}000 \times 16 \approx 7.54 \text{ GiB}$
 
 ### Fixed Overhead Summary
 
-| Component       | Monthly Egress | Notes                                           |
-|-----------------|----------------|-------------------------------------------------|
-| Vote traffic    | 24.1 GiB       | 600 voters × 164 B × 0.05 EB/s × 2 peers        |
-| RB/EB headers   | 12.5 GiB       | To all ~100 inbound downstream peers            |
-| RB cert bodies  | 1.88 GiB       | 4 peers (same model as block bodies, 63,072/mo) |
-| **Fixed total** | **38.5 GiB**   | Independent of throughput                       |
+| Component       | Lean (M=1)   | Beefy (M=4)  | Notes                                      |
+|-----------------|--------------|--------------|---------------------------------------------|
+| Vote traffic    | 24.1 GiB     | 24.1 GiB     | 600 voters × 164 B × 0.05 EB/s × 2 peers   |
+| RB/EB headers   | 12.5 GiB     | 12.5 GiB     | To all ~100 inbound downstream peers        |
+| RB cert bodies  | 1.88 GiB     | 7.54 GiB     | 4 / 16 peers (63,072 certs/mo)              |
+| **Fixed total** | **38.5 GiB** | **44.1 GiB** | Independent of throughput                   |
 
 ### Monthly Egress at Different Confirmed Throughputs
+
+Lean relay (M=1, 4 body-fetch peers):
 
 | TxkB/s        | Tx Data    | Block/EB Bodies | Fixed Overhead | **Total**     | vs Praos  |
 | ------------- | ---------- | --------------- | -------------- | ------------- | --------- |
@@ -202,33 +214,46 @@ normal tx diffusion already covers EB closure.
 | 200           | 489.5 GiB  | 87.00 GiB       | 38.5 GiB       | **615.0 GiB** | +810%     |
 | 300           | 734.3 GiB  | 130.50 GiB      | 38.5 GiB       | **903.3 GiB** | +1,236%   |
 
+Beefy relay (M=4, 16 body-fetch peers):
+
+| TxkB/s        | Tx Data    | Block/EB Bodies | Fixed Overhead | **Total**       | vs Praos  |
+| ------------- | ---------- | --------------- | -------------- | --------------- | --------- |
+| 4.5 (Praos)   | 11.0 GiB   | 176.5 GiB (blk) | 12.5 GiB (hdr) | **200.0 GiB**   | —         |
+| 5             | 12.2 GiB   | 8.72 GiB (EB)   | 44.1 GiB       | **65.0 GiB**    | **-68%**  |
+| 50            | 122.4 GiB  | 87.00 GiB       | 44.1 GiB       | **253.5 GiB**   | +27%      |
+| 100           | 244.8 GiB  | 174.00 GiB      | 44.1 GiB       | **462.9 GiB**   | +131%     |
+| 200           | 489.5 GiB  | 348.00 GiB      | 44.1 GiB       | **881.6 GiB**   | +341%     |
+| 300           | 734.3 GiB  | 522.00 GiB      | 44.1 GiB       | **1,300 GiB**   | +550%     |
+
 > [!Note]
 >
 > - **Praos row**: tx mempool diffusion (11.0 GiB, 1 peer) + block body
->   re-transmission of the same txs (44.1 GiB, 4 peers) + headers (12.5 GiB,
->   100 peers) = 67.6 GiB. Every confirmed transaction is sent **twice** in Praos.
-> - **Leios at 5 TxkB/s is ~22% cheaper than Praos**: eliminating block body
->   re-transmission (44.1 GiB) more than covers the fixed Leios overhead
->   (38.5 GiB). This advantage shrinks as throughput grows and tx data dominates.
+>   re-transmission of the same txs (44.1 / 176.5 GiB, 4/16 peers) + headers
+>   (12.5 GiB, 100 peers). Every confirmed transaction is sent **twice** in Praos.
+> - **Leios saves more on a beefy relay**: at M=4 the 176.5 GiB Praos block body
+>   overhead is replaced by 8.72 GiB EB body overhead at 5 TxkB/s — a 68% saving.
+>   At high throughput tx data dominates and the saving shrinks.
 > - EB body egress is scaled by 1/P(cert) ≈ 2.08× (non-certified EBs gossip their
->   tx hashes) and uses 4 peers — the same fetch model as Praos block bodies
-> - Vote overhead (24.1 GiB/month) is fixed; votes flow downstream toward the
->   next block producer; 2-peer model reflects spanning-tree × 2 redundancy
-> - "vs Praos" compares against Praos relay egress of 67.6 GiB/month
+>   tx hashes) and by M/25 × 100 peers
+> - Vote overhead and headers are unaffected by M — headers are pushed to all
+>   subscribers; votes use a separate spanning-tree gossip
+> - "vs Praos" compares against the Praos relay egress in the same M row
 
 ### Traffic Components at 200 TxkB/s
 
-| Component        | Egress     | % of Total |
-| ---------------- | ---------- | ---------- |
-| Tx Data          | 489.5 GiB  | 79.6%      |
-| EB Bodies        | 87.00 GiB  | 14.1%      |
-| Vote Traffic     | 24.1 GiB    | 3.9%       |
-| RB/EB Headers    | 12.5 GiB    | 2.0%       |
-| RB Cert Bodies   | 1.88 GiB    | 0.3%       |
+| Component        | Lean (M=1) | % of Total | Beefy (M=4) | % of Total |
+| ---------------- | ---------- | ---------- | ----------- | ---------- |
+| Tx Data          | 489.5 GiB  | 79.6%      | 489.5 GiB   | 55.5%      |
+| EB Bodies        | 87.00 GiB  | 14.1%      | 348.0 GiB   | 39.5%      |
+| Vote Traffic     | 24.1 GiB   | 3.9%       | 24.1 GiB    | 2.7%       |
+| RB/EB Headers    | 12.5 GiB   | 2.0%       | 12.5 GiB    | 1.4%       |
+| RB Cert Bodies   | 1.88 GiB   | 0.3%       | 7.54 GiB    | 0.9%       |
+| **Total**        | **615 GiB**|            | **882 GiB** |            |
 
-At 200 TxkB/s, transaction data dominates (80%) but EB bodies (14%) are
-significant — they carry the 1/P(cert) overhead of non-certified EBs
-and are served to 4 downstream peers just like Praos block bodies.
+On a lean relay (M=1), tx data dominates (80%) and EB bodies are a secondary
+cost (14%). On a beefy relay (M=4), tx data still dominates (56%) but EB bodies
+grow to a significant secondary cost (39%), making the 1/P(cert) certification
+overhead and body-fetch multiplicity a much more material factor.
 
 ### Monthly Cost by Cloud Provider ($)
 
