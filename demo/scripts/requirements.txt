@@ -62,7 +62,7 @@ mistune==3.1.4
 mypy_extensions==1.1.0
 narwhals==2.6.0
 nbclient==0.10.2
-nbconvert==7.16.6
+nbconvert==7.17.1
 nbformat==5.10.4
 nest_asyncio==1.6.0
 notebook==7.4.4
@@ -85,7 +85,7 @@ psutil==7.1.0
 ptyprocess==0.7.0
 pure_eval==0.2.3
 pycparser==2.23
-Pygments==2.19.2
+Pygments==2.20.0
 python-dateutil==2.9.0.post0
 python-json-logger==3.3.0
 python-lsp-jsonrpc==1.1.2
@@ -110,7 +110,7 @@ terminado==0.18.1
 tinycss2==1.4.0
 toml==0.10.2
 toolz==1.0.0
-tornado==6.5.1
+tornado==6.5.5
 traitlets==5.14.3
 types-python-dateutil==2.9.0.20250708
 typing_extensions==4.15.0
