@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "antithesis/**"
+      - "demo/**"
+      - "flake.lock"
   push:
     branches:
       - main
