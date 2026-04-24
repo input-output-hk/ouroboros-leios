@@ -2,257 +2,269 @@
 'use strict'
 
 
-const millisecond = 0.001                 //  s/ms
-const bit = 1 / 8                         //  B/b
-const kilobyte = 1024                     //  B/kB
-const gigabyte = 1024 * 1024 * 1024       //  B/GB
-const month = 365.24 / 12 * 24 * 60 * 60  //  s/month
+// Constants
+const GiB = 1024 * 1024 * 1024            //  B/GiB
+const T_month = 365.24 / 12 * 24 * 3600   //  s/month  ≈ 2,628,000
 
 
-function getFloat(ui) {
-  return parseFloat(ui.value)
-}
-
-function sumResources(resources) {
-  return {
-    throughput   : resources.reduce((sum, resource) => sum + resource.throughput  , 0)
-  , disk         : resources.reduce((sum, resource) => sum + resource.disk        , 0)
-  , producerVcpu : resources.reduce((sum, resource) => sum + resource.producerVcpu, 0)
-  , relayVcpu    : resources.reduce((sum, resource) => sum + resource.relayVcpu   , 0)
-  , io           : resources.reduce((sum, resource) => sum + resource.io          , 0)
-  }
-}
-
-
-function calculateResources(rate /*  item/slot  */, elSize, elIo, elBuild, elVerify, persistent) {
-
-  const slot = getFloat(uiSlotRate)          //  slot/s
-  const size = getFloat(elSize)              //  kB/item
-  const io = getFloat(elIo)                  //  IO/item
-  const build = getFloat(elBuild)            //  vCPU*ms/item
-  const verify = getFloat(elVerify)          //  vCPU*ms/item
-  const bps = size * rate * slot * kilobyte  //  B/s
-
-  return {
-    throughput   : bps                                                  //  B/s
-  , disk         : persistent ? bps : 0                                 //  B/s
-  , producerVcpu : Math.max(build, verify) * rate * slot * millisecond  //  vCPU
-  , relayVcpu    : verify * rate * slot * millisecond                   //  vCPU
-  , io           : io * rate * slot                                     //  IO/s
-  }
-
-}
-
-function ibResources() {
-  const rate = getFloat(uiIbRate)  //  IB/slot
-  return calculateResources(rate, uiIbSize, uiIbIo, uiIbBuild, uiIbVerify, true)
-}
-
-function ebResources() {
-  const ebRate = getFloat(uiEbRate)      //  EB/pipline
-  const pipeline = getFloat(uiPhase)     //  slot/pipeline
-  const rate = ebRate / pipeline         //  EB/slot
-  return calculateResources(rate, uiEbSize, uiEbIo, uiEbBuild, uiEbVerify, true)
-}
-
-function voteResources() {
-  const voteRate = getFloat(uiVoteRate)  //  vote/pipline
-  const pipeline = getFloat(uiPhase)     //  slot/pipeline
-  const rate = voteRate / pipeline       //  vote/slot
-  return calculateResources(rate, uiVoteSize, uiVoteIo, uiVoteBuild, uiVoteVerify, false)
-}
-
-function certResources() {
-  const certRate = getFloat(uiCertRate)  //  cert/pipline
-  const pipeline = getFloat(uiPhase)     //  slot/pipeline
-  const rate = certRate / pipeline       //  cert/slot
-  return calculateResources(rate, uiCertSize, uiCertIo, uiCertBuild, uiCertVerify, false)
-}
-
-function rbResources() {
-  const rate = getFloat(uiRbRate)  //  RB/slot
-  return calculateResources(rate, uiRbSize, uiRbIo, uiRbBuild, uiRbVerify, true)
-}
-
-function txResources() {
-
-  const rate = getFloat(uiPraosTx) + getFloat(uiLeiosTx)  //  tx/s
-  const size = getFloat(uiTxSize)                         //  kB/tx
-  const verify = getFloat(uiTxVerify)                     //  vCPU*ms/tx
-  const vcpu = rate * verify * millisecond                //  vCPU
-  const mempool = rate * size * kilobyte                  //  B/s
-
-  return {
-    throughput   : mempool
-  , disk         : 0
-  , producerVcpu : vcpu
-  , relayVcpu    : vcpu
-  , io           : 0
-  }
-
+function getFloat(el) {
+  return parseFloat(el.value)
 }
 
 
 export async function calculate() {
 
-  // The variable names and units are awkard here: Because of Leios
-  // parallelism, the number of slots per pipeline equals the number
-  // of phases per pipeline.
+  // === Protocol Parameters ===
 
-  const slot = getFloat(uiSlotRate)   //  slot/s
-  const phases = getFloat(uiPhases)   //  phase/pipeline
-  const pipeline = getFloat(uiPhase)  //  slot/pipeline
+  const f = getFloat(uiASC)                          //  active slot coefficient
+  const slotRate = getFloat(uiSlotRate)               //  slot/s
+  const ebRate = f * slotRate                         //  EB/s  =  RB/s
+  const votingWindow = getFloat(uiVotingWindow)       //  slots
+  const votesPerEB = getFloat(uiVotesPerEB)           //  votes/EB
+  const pCert = Math.pow(1 - f, votingWindow)         //  P(EB certified)
+  const rCert = ebRate * pCert                        //  certified EB/s
 
-  const ibRate = getFloat(uiIbRate)      //  IB/slot
-  const ebRate = getFloat(uiEbRate)      //  EB/pipeline
-  const certRate = getFloat(uiCertRate)  //  cert/pipeline
-  const rbRate = getFloat(uiRbRate)      //  RB/slot
+  uiPcert.innerText = (pCert * 100).toFixed(1)
 
-  const praosTxRate = getFloat(uiPraosTx)  //  tx/s
-  const leiosTxRate = getFloat(uiLeiosTx)  //  tx/s
+  // === Throughput ===
 
-  const txSize = getFloat(uiTxSize)      //  kB/tx
-  const ibRefSize = getFloat(uiIbRef)    //  kB/IBref
-  const certSize = getFloat(uiCertSize)  //  kB/cert
+  const txkBps = getFloat(uiThroughput)               //  confirmed TxkB/s
+  const txSize = getFloat(uiTxSize)                   //  B/tx
+  const txPerSec = txkBps * 1000 / txSize             //  tx/s  (1 kB = 1000 B)
+  uiTxPerSec.innerText = Math.round(txPerSec)
 
-  uiRbSize.value = ((praosTxRate * txSize / slot + certRate * certSize / pipeline) / rbRate).toFixed(2)       //  kB/RB
-  uiIbSize.value = (leiosTxRate == 0 && ibRate == 0 ? 0 : leiosTxRate * txSize / ibRate / slot).toFixed(2)    //  kB/IB
-  uiEbSize.value = (leiosTxRate == 0 && ibRate == 0 ? 0 : ibRate * pipeline / ebRate * ibRefSize).toFixed(2)  //  kB/EB
+  // === Component Sizes (bytes) ===
 
-  const resources = sumResources([
-    ibResources()
-  , ebResources()
-  , voteResources()
-  , certResources()
-  , rbResources()
-  , txResources()
-  ])
+  const voteSize = getFloat(uiVoteSize)               //  B/vote
+  const ebHeaderSize = getFloat(uiEbHeaderSize)       //  B/EB header
+  const txRefSize = getFloat(uiTxRefSize)             //  B/tx hash reference
+  const certSize = getFloat(uiCertSize)               //  B/certificate
+  const rbHeaderSize = getFloat(uiRbHeaderSize)       //  B/RB header
 
-  const spike = getFloat(uiSpike)
+  // === Validation Times (ms) ===
+
+  const txApplyMs = getFloat(uiTxApply)               //  ms/tx
+  const ebHeaderValMs = getFloat(uiEbHeaderVal)       //  ms/EB
+  const voteValMs = getFloat(uiVoteVal)               //  ms/vote
+  const certValMs = getFloat(uiCertVal)               //  ms/cert
+
+  // Reapply constants (from CIP-164 config: eb-body-validation-cpu-time-ms-*)
+  const reapplyConstMs = 0.3539                       //  ms/EB
+  const reapplyPerByteMs = 0.00002151                 //  ms/B
+
+  // === Network Topology ===
+
+  const inboundPeers = getFloat(uiInboundPeers)      //  downstream peers per relay
+  const fetchMult = getFloat(uiFetchMult)             //  fetch multiplicity M
+  const voteRedundancy = getFloat(uiVoteRedundancy)   //  spanning-tree redundancy
+  const outboundPeers = 25                            //  upstream peers (fixed)
+  const bodyFetchPeers = inboundPeers * fetchMult / outboundPeers
+
+
+  // ================================================================
+  //  CPU  (ms/s per node)
+  // ================================================================
+  //
+  //  Five components from the CIP-164 cost analysis:
+  //  1. Tx Apply       — full validation at mempool ingestion
+  //  2. Tx Reapply     — ledger application when EB is certified
+  //  3. EB header      — EB/RB header validation
+  //  4. Vote           — individual BLS vote verification
+  //  5. Certificate    — certificate validation
+  //
+
+  const cpuApply    = txPerSec * txApplyMs
+  const cpuReapply  = ebRate * reapplyConstMs + reapplyPerByteMs * txkBps * 1000
+  const cpuEbHeader = ebRate * ebHeaderValMs
+  const cpuVote     = votesPerEB * ebRate * voteValMs
+  const cpuCert     = ebRate * certValMs
+  const cpuTotal    = cpuApply + cpuReapply + cpuEbHeader + cpuVote + cpuCert
+
+  uiCpuApply.innerText    = cpuApply.toFixed(2)
+  uiCpuReapply.innerText  = cpuReapply.toFixed(2)
+  uiCpuEbHeader.innerText = cpuEbHeader.toFixed(3)
+  uiCpuVote.innerText     = cpuVote.toFixed(1)
+  uiCpuCert.innerText     = cpuCert.toFixed(2)
+  uiCpuTotal.innerText    = cpuTotal.toFixed(1)
+  uiCpuPercent.innerText  = (cpuTotal / 10).toFixed(1)
+
+
+  // ================================================================
+  //  Storage  (GiB/month per node — new data only)
+  // ================================================================
+  //
+  //  Only confirmed data is persisted.  P(cert) cancels for EB body
+  //  storage (certified EBs are larger).  Votes are ephemeral.
+  //
+
+  const storageTx     = txkBps * 1000 * T_month / GiB                                //  tx closure data
+  const storageEbBody = txPerSec * txRefSize * T_month / GiB                          //  EB body (tx hashes)
+  const storageEbHdr  = rCert * ebHeaderSize * T_month / GiB                          //  certified EB headers
+  const storageRb     = ebRate * (rbHeaderSize + certSize) * T_month / GiB             //  RB headers + certs (simplified: every RB carries a cert)
+  const storageMonthly = storageTx + storageEbBody + storageEbHdr + storageRb
+
+
+  // ================================================================
+  //  Egress  (GiB/month per relay node)
+  // ================================================================
+  //
+  //  Five traffic components with different peer models:
+  //  1. Tx mempool diffusion  — 1 effective peer (fetch-from-one)
+  //  2. Vote gossip           — spanning-tree × redundancy
+  //  3. EB bodies (tx refs)   — bodyFetchPeers, ×1/P(cert) overcounting
+  //  4. RB/EB headers         — pushed to all inbound peers
+  //  5. RB cert bodies        — certified RBs only, bodyFetchPeers
+  //
+
+  const egressTx      = txkBps * 1000 * 1 * T_month / GiB
+  const egressVotes   = votesPerEB * voteSize * ebRate * voteRedundancy * T_month / GiB
+  const egressEbBody  = txPerSec * txRefSize / pCert * bodyFetchPeers * T_month / GiB
+  const egressRbHdr   = ebRate * rbHeaderSize * inboundPeers * T_month / GiB
+  const egressRbCert  = rCert * certSize * bodyFetchPeers * T_month / GiB
+  const egressMonthly = egressTx + egressVotes + egressEbBody + egressRbHdr + egressRbCert
+
+
+  // ================================================================
+  //  IOPS  (IO/s per node — with UTxO-HD)
+  // ================================================================
+  //
+  //  UTxO state updates dominate (~88% of total).
+  //
+
+  const iopsTxData  = txkBps * 1000 / 4096 * 1.1                                //  tx data write + read-back
+  const iopsUtxo    = txPerSec * 3                                               //  UTxO-HD inserts/deletes
+  const ebBodyBytes = txPerSec / ebRate * txRefSize                              //  bytes per EB body
+  const iopsEbBody  = ebRate * Math.ceil(ebBodyBytes / 4096) * 1.2               //  EB body writes
+  const iopsRb      = ebRate * 2 * 1.2                                           //  RB writes/reads
+  const iopsEbHdr   = rCert * 1.2                                                //  certified EB header writes
+  const iopsTotal   = iopsTxData + iopsUtxo + iopsEbBody + iopsRb + iopsEbHdr
+
+
+  // ================================================================
+  //  Resource & Cost Aggregation  (per SPO)
+  // ================================================================
+
+  const spike     = getFloat(uiSpike)
   const producers = getFloat(uiProducers)
-  const relays = getFloat(uiRelays)
-  const nodes = producers + relays
+  const relays    = getFloat(uiRelays)
+  const nodes     = producers + relays
 
-  const vcpu = producers * Math.max(2, Math.ceil(spike * resources.producerVcpu))
-             + relays    * Math.max(2, Math.ceil(spike * resources.relayVcpu   ))
+  //  vCPU  — minimum 2 cores per node, spike-adjusted
+  const cpuCoresNeeded = cpuTotal / 1000                                         //  steady-state cores
+  const vcpuPerNode = Math.max(2, Math.ceil(spike * cpuCoresNeeded))
+  const vcpu = nodes * vcpuPerNode
   uiTotalVcpu.innerText = vcpu
   const costVcpu = vcpu * getFloat(uiVcpu)
   uiCostVcpu.innerText = costVcpu.toFixed(2)
 
+  //  Storage  — ledger + monthly new data, with optional perpetual amortization
   uiAmortized.style.textDecoration = uiAmortize.checked ? "none" : "line-through"
-  const discount = getFloat(uiDiscount) / 100 / 12                                                  //  1/month
-  const perpetual = uiAmortize.checked ? (1 + discount) / discount : 1                              //  1
-  const compression = 1 - getFloat(uiCompression) / 100                                             //  1
-  const storage = nodes * compression * (getFloat(uiRbLedger) + resources.disk / gigabyte * month)  //  GB/month
+  const discount   = getFloat(uiDiscount) / 100 / 12                            //  1/month
+  const perpetual  = uiAmortize.checked ? (1 + discount) / discount : 1          //  amortization factor
+  const compression = 1 - getFloat(uiCompression) / 100                          //  effective ratio
+  const ledger     = getFloat(uiRbLedger)                                        //  GB (current ledger)
+  const storage    = nodes * compression * (ledger + storageMonthly)              //  GiB total
   uiTotalStorage.innerText = storage.toFixed(2)
   const costStorage = storage * perpetual * getFloat(uiStorage)
   uiCostStorage.innerText = costStorage.toFixed(2)
 
-  const throughput = resources.throughput                     //  B/s
-  const downstream = getFloat(uiDownsteam) * throughput       //  B/s
-  const upstream = getFloat(uiUpstream) * throughput          //  B/S
-  const network = (downstream + upstream) / gigabyte * month  //  GB/month
-  uiTotalEgress.innerText = network.toFixed(2)
-  const costEgress = network * getFloat(uiEgress)
+  //  Network egress  — relay egress × number of relays
+  const egressSPO = relays * egressMonthly                                       //  GiB/month
+  uiTotalEgress.innerText = egressSPO.toFixed(2)
+  const costEgress = egressSPO * getFloat(uiEgress)
   uiCostEgress.innerText = costEgress.toFixed(2)
 
-  uiNic.innerText = Math.max(1, Math.round(Math.pow(10, Math.ceil(Math.log(spike * Math.max(upstream, downstream) / gigabyte / bit) / Math.log(10)))))  // Gb/s
+  //  NIC  — per-relay peak, rounded to nearest power of 10
+  const perRelayBps = egressMonthly * GiB / T_month                              //  B/s steady state
+  const peakGbps = spike * perRelayBps * 8 / (1000 * 1000 * 1000)               //  Gb/s peak
+  uiNic.innerText = Math.max(1, Math.round(Math.pow(10, Math.ceil(Math.log10(Math.max(0.01, peakGbps))))))
 
-  const io = spike * nodes * resources.io  // IO/s
+  //  IOPS
+  const io = spike * nodes * iopsTotal
   uiTotalIops.innerText = io.toFixed(2)
   const costIops = io * getFloat(uiIops)
   uiCostIops.innerText = costIops.toFixed(2)
 
+  //  Total
   const cost = costVcpu + costStorage + costIops + costEgress
   uiCost.innerText = cost.toFixed(2)
 
-  const txRate = praosTxRate + leiosTxRate                               //  tx/s
-  const txFee = getFloat(uiTxFee) * getFloat(uiTxSize)                   //  ADA/tx
-  const price = getFloat(uiAda)                                          //  USD/ADA
-  const totalFees = txRate * txFee * price * month                       //  USD/month
-  const fraction = getFloat(uiStake) / 100 * getFloat(uiRetained) / 100  //  %/100
-  const retained = fraction * totalFees                                  //  USD/month
 
-  uiFees.innerText = retained.toFixed(2)
+  // ================================================================
+  //  Economic Metrics
+  // ================================================================
+
+  const txFeePerKB = getFloat(uiTxFee)                                          //  ADA/kB
+  const txFee      = txFeePerKB * txSize / 1000                                 //  ADA/tx
+  const price      = getFloat(uiAda)                                            //  USD/ADA
+  const totalFees  = txPerSec * txFee * price * T_month                         //  USD/month (network)
+  const fraction   = getFloat(uiStake) / 100 * getFloat(uiRetained) / 100       //  SPO share
+  const retained   = fraction * totalFees                                        //  USD/month
+
+  uiFees.innerText   = retained.toFixed(2)
   uiProfit.innerText = (retained - cost).toFixed(2)
   uiReturn.innerText = (100 * retained / cost).toFixed(2)
 
-  const txCostUSD = cost / fraction / txRate / month  //  USD/tx
-  const txCostADA = txCostUSD / price                 //  ADA/tx
-  uiCostTxUsd.innerText = txCostUSD.toFixed(2)
-  uiCostTxAda.innerText = txCostADA.toFixed(2)
-  
+  const txCostUSD = cost / fraction / txPerSec / T_month                         //  USD/tx
+  const txCostADA = txCostUSD / price                                            //  ADA/tx
+  uiCostTxUsd.innerText = txCostUSD.toFixed(4)
+  uiCostTxAda.innerText = txCostADA.toFixed(4)
+
 }
 
+
 export async function hyperscaleCosts() {
-  uiVcpu.value = "20"
+  uiVcpu.value    = "20"
   uiStorage.value = "0.12"
-  uiIops.value = "0.05"
-  uiEgress.value = "0.09"
+  uiIops.value    = "0.05"
+  uiEgress.value  = "0.09"
   calculate()
 }
 
 export async function discountCosts() {
-  uiVcpu.value = "20"
+  uiVcpu.value    = "20"
   uiStorage.value = "0.10"
-  uiIops.value = "0.00"
-  uiEgress.value = "0.00"
+  uiIops.value    = "0.00"
+  uiEgress.value  = "0.00"
   calculate()
 }
 
+
 export async function initialize() {
   [
-    uiAda
+    uiASC
+  , uiAda
   , uiAmortize
-  , uiCertBuild
-  , uiCertIo
-  , uiCertRate
   , uiCertSize
-  , uiCertVerify
+  , uiCertVal
   , uiCompression
   , uiDiscount
-  , uiDownsteam
-  , uiEbBuild
-  , uiEbIo
-  , uiEbRate
-//, uiEbSize
-  , uiEbVerify
+  , uiEbHeaderSize
+  , uiEbHeaderVal
   , uiEgress
-  , uiIbBuild
-  , uiIbIo
-  , uiIbRate
-  , uiIbRef
-//, uiIbSize
-  , uiIbVerify
+  , uiFetchMult
+  , uiInboundPeers
   , uiIops
-  , uiLeiosTx
-  , uiPhase
-//, uiPhases
-  , uiPraosTx
   , uiProducers
-  , uiRbBuild
+  , uiRbHeaderSize
   , uiRbLedger
-  , uiRbRate
-//, uiRbSize
-  , uiRbIo
-  , uiRbVerify
   , uiRelays
   , uiRetained
   , uiSlotRate
   , uiSpike
   , uiStake
   , uiStorage
+  , uiThroughput
+  , uiTxApply
   , uiTxFee
+  , uiTxRefSize
   , uiTxSize
-  , uiTxVerify
-  , uiUpstream
-//, uiVariant
   , uiVcpu
-  , uiVoteBuild
-  , uiVoteIo
-  , uiVoteRate
+  , uiVoteRedundancy
   , uiVoteSize
-  , uiVoteVerify
+  , uiVoteVal
+  , uiVotesPerEB
+  , uiVotingWindow
   ].forEach(el => el.addEventListener("input", calculate))
 
   calculate()
