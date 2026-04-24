@@ -528,6 +528,10 @@ impl LinearLeiosNode {
             ) {
                 continue;
             }
+            // Don't prune EBs that are on-chain but not yet fully validated.
+            if self.leios.incomplete_onchain_ebs.contains(eb_id) {
+                continue;
+            }
             self.leios.endorsed_ebs.remove(eb_id);
             self.leios.votes_by_eb.remove(eb_id);
             self.leios.ebs.remove(eb_id);
@@ -544,7 +548,10 @@ impl LinearLeiosNode {
 
         self.leios
             .ebs_by_rb
-            .retain(|_, eb_id| eb_id.slot >= latest_slot);
+            .retain(|_, eb_id| {
+                eb_id.slot >= latest_slot
+                    || self.leios.incomplete_onchain_ebs.contains(eb_id)
+            });
     }
 
     fn log_memory_stats(&self, slot: u64) {
@@ -840,9 +847,10 @@ impl LinearLeiosNode {
                 // If we're endorsing this EB, clear its TXs out of the mempool now
                 // so that we don't include them in new blocks.
                 self.remove_eb_txs_from_mempool(&eb);
-            } else {
+            } else if !self.leios.pruned_ebs.contains(&eb_id) {
                 // We haven't finished validating this EB, maybe even haven't received it and its contents.
                 // That won't stop us from generating the endorsement, though it'll make us produce an empty block.
+                // Skip if the EB was already validated and pruned — no conflict risk.
                 self.leios.incomplete_onchain_ebs.insert(eb_id);
             }
 
@@ -1095,7 +1103,6 @@ impl LinearLeiosNode {
             return;
         }
         if self.leios.pruned_ebs.contains(&eb_id) {
-            tracing::warn!("EB {} was re-announced after being pruned", eb_id);
             return;
         }
 
@@ -1187,7 +1194,9 @@ impl LinearLeiosNode {
                 .endorsed_ebs
                 .entry(endorsement.eb)
                 .or_insert(rb.header.id.slot);
-            if !self.is_eb_validated(endorsement.eb) {
+            if !self.is_eb_validated(endorsement.eb)
+                && !self.leios.pruned_ebs.contains(&endorsement.eb)
+            {
                 self.leios.incomplete_onchain_ebs.insert(endorsement.eb);
             }
         }
