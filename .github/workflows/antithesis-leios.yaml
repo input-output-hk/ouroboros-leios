@@ -9,6 +9,8 @@ on:
       - main
     paths:
       - "antithesis/**"
+      - "demo/**"
+      - "flake.lock"
   workflow_dispatch:
     inputs:
       push_images:
