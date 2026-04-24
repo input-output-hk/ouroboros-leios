@@ -8,13 +8,7 @@ A customized Jupyter iHaskell kernel for use with the [deltaq](https://github.co
 Launch Jupyter with the iHaskell kernel including the `deltaq` and `probability-polynomial` packages:
 
 ```bash
-nix run
-```
-
-In fact, this Jupyter kernel can be launced without directly cloning this repository:
-
-```bash
-nix run github:functionally/deltaq-jupyter
+nix run .#jupyterlab
 ```
 
 ## Docker
@@ -65,8 +59,8 @@ Use the "upload" and "download" features to move notebooks in and out of the con
 
 ## Updates
 
-In order to use the latest version of the `deltaq` packages, update the nix flake.
+In order to use the latest version of the `deltaq` packages, update the nix flake input.
 
 ```bash
-nix flake lock --update-input deltaq 
+nix flake update deltaq-src
 ```
