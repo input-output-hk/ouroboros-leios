@@ -32,8 +32,8 @@
     deltaq-src.flake = false;
 
     # Used by demo/
-    ouroboros-consensus.url = "github:intersectmbo/ouroboros-consensus?ref=leios-prototype";
-    cardano-node-leios.url = "github:intersectmbo/cardano-node?ref=leios-prototype";
+    ouroboros-consensus.url = "github:intersectmbo/ouroboros-consensus?ref=bladyjoker/leios-in-praos"; # TODO(bladyjoker): Update ref before merging
+    cardano-node-leios.url = "github:intersectmbo/cardano-node?ref=bladyjoker/leios-integrate-837"; # TODO(bladyjoker): Update ref before merging
     cardano-node.url = "github:intersectmbo/cardano-node?ref=bench/leios"; # For latest tools
   };
 
