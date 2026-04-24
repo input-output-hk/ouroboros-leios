@@ -99,8 +99,11 @@ independently as transactions arrive. Only transactions in certified EBs count
 as confirmed throughput.
 
 EBs are produced at the same rate as Praos blocks (0.05/s), but only those
-produced sufficiently before the next RB are certifiable. An EB needs no block
-to be produced in the following 14-slot voting window:
+produced sufficiently before the next RB are certifiable. An RB announcing an
+EB at slot $s$ can only include the certificate in a subsequent RB at slot
+$s' \geq s + 3 L_{\text{hdr}} + L_{\text{vote}} + L_{\text{diff}} = s + 14$.
+If any RB is produced within those 14 slots, the EB is discarded. Since each
+slot produces a block independently with probability $f = 0.05$ (Bernoulli):
 
 $$P(\text{EB certified}) = (1 - 0.05)^{14} = 0.95^{14} \approx 0.4877 \approx 0.48$$
 

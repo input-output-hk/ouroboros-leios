@@ -100,9 +100,10 @@ each confirmed transaction triggers UTxO state updates on disk.
 
    $$IOPS_{\text{rb}} = 0.05 \times 2 \times 1.2 = 0.12 \text{ IOPS/s}$$
 
-5. **EB Header IOPS** (fixed):
+5. **EB Header IOPS** (certified EBs only):
 
-   $$IOPS_{\text{eb-hdr}} = 0.05 \times 1 \times 1.2 = 0.06 \text{ IOPS/s}$$
+   Uncertified EB headers are not written to disk; only certified ones persist.
+   $$IOPS_{\text{eb-hdr}} = R_{\text{cert}} \times 1 \times 1.2 = 0.024 \times 1 \times 1.2 = 0.029 \text{ IOPS/s}$$
 
 ### IOPS at 5 TxkB/s (Leios Baseline)
 
@@ -112,9 +113,9 @@ each confirmed transaction triggers UTxO state updates on disk.
 
 3. **EB body**: $0.05 \times \lceil 2{,}133 / 4{,}096 \rceil \times 1.2 = 0.05 \times 1 \times 1.2 = 0.06 \text{ IOPS/s}$
 
-4. **RB + EB headers**: $0.12 + 0.06 = 0.18 \text{ IOPS/s}$
+4. **RB + EB headers**: $0.12 + 0.029 = 0.149 \text{ IOPS/s}$
 
-5. **Total**: $1.34 + 10.0 + 0.06 + 0.18 \approx 11.58 \text{ IOPS/s}$
+5. **Total**: $1.34 + 10.0 + 0.06 + 0.149 \approx 11.55 \text{ IOPS/s}$
 
 At 5 TxkB/s, Leios requires only ~12% more IOPS than Praos at 4.5 TxkB/s
 (11.6 vs 10.3 IOPS/s) when both use UTxO-HD. The small difference comes from
@@ -125,11 +126,11 @@ the slightly higher throughput (5 vs 4.5 TxkB/s) plus EB overhead.
 | TxkB/s      | Tx/s | Tx Data IOPS | UTxO IOPS | EB Body IOPS | Fixed IOPS | Total IOPS/s |
 |-------------|------|--------------|-----------|--------------|------------|--------------|
 | 4.5 (Praos) | 3    | 1.27         | 9.0       | —            | —          | 10.3         |
-| 5           | 3    | 1.34         | 10.0      | 0.06         | 0.18       | 11.58        |
-| 50          | 33   | 13.4         | 100.0     | 0.36         | 0.18       | 113.9        |
-| 100         | 67   | 26.9         | 200.0     | 0.66         | 0.18       | 227.7        |
-| 200         | 133  | 53.7         | 400.0     | 1.26         | 0.18       | 455.1        |
-| 300         | 200  | 80.6         | 600.0     | 1.92         | 0.18       | 682.7        |
+| 5           | 3    | 1.34         | 10.0      | 0.06         | 0.15       | 11.55        |
+| 50          | 33   | 13.4         | 100.0     | 0.36         | 0.15       | 113.9        |
+| 100         | 67   | 26.9         | 200.0     | 0.66         | 0.15       | 227.7        |
+| 200         | 133  | 53.7         | 400.0     | 1.26         | 0.15       | 455.1        |
+| 300         | 200  | 80.6         | 600.0     | 1.92         | 0.15       | 682.7        |
 
 > [!Note]
 >
@@ -151,7 +152,7 @@ the slightly higher throughput (5 vs 4.5 TxkB/s) plus EB overhead.
 | UTxO State      | 400.0     | 87.9%      |
 | Tx Data Writes  | 53.7      | 11.8%      |
 | EB Body         | 1.26      | 0.3%       |
-| RB + EB Headers | 0.18      | < 0.1%     |
+| RB + EB Headers | 0.15      | < 0.1%     |
 | **Total**       | **455.1** | **100%**   |
 
 ## Monthly Cost by Cloud Provider ($)

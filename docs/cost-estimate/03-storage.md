@@ -63,7 +63,7 @@ votes arrives before the certification deadline.
 | ------------------- | --------------------------------------- | ---------------- |
 | Tx closure data     | Confirmed transaction bytes             | TxkB/s           |
 | EB body (tx hashes) | 32-byte tx references in certified EBs  | TxkB/s           |
-| EB headers          | One EB header per RB opportunity        | Fixed (0.05/s)   |
+| EB headers          | Headers of certified EBs only           | Fixed (0.024/s)  |
 | RB (header + cert)  | Ranking blocks with embedded certificate| Fixed (0.05/s)   |
 
 > [!Note]
@@ -78,12 +78,12 @@ votes arrives before the certification deadline.
 
    where $T_{\text{month}} = 2{,}628{,}000$ seconds/month.
 
-2. **EB Body Storage** (tx hash references, stored for all EBs):
+2. **EB Body Storage** (tx hash references, certified EBs only):
 
-   In the asymptotic steady-state model, every transaction eventually appears in
-   exactly one persisted EB body. No matter whether we count all EBs at rate
-   $R_{\text{eb}}$ or only certified EBs with a correspondingly larger body, the
-   total stored hash-reference bytes are the same:
+   Only certified EB bodies are stored. Each certified EB body is correspondingly
+   larger — it must reference $1/P_{\text{cert}}$ more transactions than a
+   world where all EBs were certified — so the $P_{\text{cert}}$ factor cancels
+   and total stored bytes are independent of certification probability:
 
    $$S_{\text{eb-body}} = \frac{\text{TxkB/s} \times 1{,}000}{S_{\text{tx-avg}}} \times 32 \text{ bytes/s} \times T_{\text{month}}$$
 
@@ -91,9 +91,16 @@ votes arrives before the certification deadline.
    - $S_{\text{tx-avg}}$ = average transaction size (1,500 bytes)
    - 32 bytes per tx hash reference
 
-3. **EB Header Storage** (all EBs, fixed):
+   Note: EB headers do not share this cancellation — their size is fixed at
+   240 bytes regardless of body fill, so only storing certified EB headers
+   (at $R_{\text{cert}} = 0.024$/s) genuinely reduces header storage by $P_{\text{cert}}$.
 
-   $$S_{\text{eb-hdr}} = 0.05 \times 240 \times T_{\text{month}} = 0.029 \text{ GiB/month}$$
+3. **EB Header Storage** (certified EBs only, fixed):
+
+   Uncertified EBs are discarded after the certification deadline; only certified
+   EB headers are kept on disk.
+
+   $$S_{\text{eb-hdr}} = R_{\text{cert}} \times 240 \times T_{\text{month}} = 0.024 \times 240 \times 2{,}628{,}000 \approx 0.014 \text{ GiB/month}$$
 
 4. **RB Storage** (header + certificate, fixed):
 
@@ -107,11 +114,11 @@ votes arrives before the certification deadline.
 
 2. **EB body** (tx hashes): $\frac{5{,}000}{1{,}500} \times 32 \times 2{,}628{,}000 = 3.33 \times 32 \times 2{,}628{,}000 \approx 0.261 \text{ GiB}$
 
-3. **EB headers**: $0.029 \text{ GiB}$ (fixed)
+3. **EB headers**: $0.014 \text{ GiB}$ (certified only, $R_{\text{cert}} = 0.024$/s)
 
 4. **RB**: $1.105 \text{ GiB}$ (fixed; 1,024 B header + 8,000 B cert)
 
-5. **Total**: $12.24 + 0.261 + 0.029 + 1.105 \approx 13.64 \text{ GiB/month}$
+5. **Total**: $12.24 + 0.261 + 0.014 + 1.105 \approx 13.62 \text{ GiB/month}$
 
 This is approximately 24% more than Praos (11.02 GiB). The fixed RB+cert overhead
 (1.134 GiB) accounts for most of the difference at low throughput.
@@ -121,11 +128,11 @@ This is approximately 24% more than Praos (11.02 GiB). The fixed RB+cert overhea
 | TxkB/s      | Tx/s | Tx Closure | EB Body    | EB Headers | RB        | Total         | vs Praos |
 |-------------|------|------------|------------|------------|-----------|---------------|----------|
 | 4.5 (Praos) | 3    | 11.02 GiB  | —          | —          | —         | **11.02 GiB** | —        |
-| 5           | 3    | 12.24 GiB  | 0.261 GiB  | 0.03 GiB   | 1.105 GiB | 13.64 GiB     | +24%     |
-| 50          | 33   | 122.4 GiB  | 2.613 GiB  | 0.03 GiB   | 1.105 GiB | 126.1 GiB     | +1,045%  |
-| 100         | 67   | 244.8 GiB  | 5.226 GiB  | 0.03 GiB   | 1.105 GiB | 251.2 GiB     | +2,180%  |
-| 200         | 133  | 489.5 GiB  | 10.453 GiB | 0.03 GiB   | 1.105 GiB | 501.1 GiB     | +4,447%  |
-| 300         | 200  | 734.3 GiB  | 15.679 GiB | 0.03 GiB   | 1.105 GiB | 751.1 GiB     | +6,714%  |
+| 5           | 3    | 12.24 GiB  | 0.261 GiB  | 0.01 GiB   | 1.105 GiB | 13.62 GiB     | +24%     |
+| 50          | 33   | 122.4 GiB  | 2.613 GiB  | 0.01 GiB   | 1.105 GiB | 126.1 GiB     | +1,045%  |
+| 100         | 67   | 244.8 GiB  | 5.226 GiB  | 0.01 GiB   | 1.105 GiB | 251.1 GiB     | +2,180%  |
+| 200         | 133  | 489.5 GiB  | 10.453 GiB | 0.01 GiB   | 1.105 GiB | 501.1 GiB     | +4,447%  |
+| 300         | 200  | 734.3 GiB  | 15.679 GiB | 0.01 GiB   | 1.105 GiB | 751.1 GiB     | +6,714%  |
 
 > [!Note]
 >
@@ -145,7 +152,7 @@ This is approximately 24% more than Praos (11.02 GiB). The fixed RB+cert overhea
 | Tx Closure Data      | 489.5 GiB  | 97.7%      |
 | RB with certificates | 1.105 GiB  | 0.2%       |
 | EB Body (hashes)     | 10.453 GiB | 2.1%       |
-| EB Headers           | 0.03 GiB   | < 0.1%     |
+| EB Headers           | 0.01 GiB   | < 0.1%     |
 
 Transaction closure data dominates at all throughput levels. The overhead of
 Linear Leios is dominated by tx hash references in EB bodies at ~2%, which could

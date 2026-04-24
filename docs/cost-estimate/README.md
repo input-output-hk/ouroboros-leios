@@ -29,6 +29,31 @@ columns assume UTxO-HD deployed — UTxO-HD is orthogonal to the Praos vs Leios
 comparison and benefits both protocols equally (see
 [02-compute-ram.md](./02-compute-ram.md)).
 
+### EB Certification Probability
+
+CIP-164 proposes timing parameters $L_{\text{hdr}}=1$, $L_{\text{vote}}=4$,
+$L_{\text{diff}}=7$ slots. An EB announced in an RB at slot $s$ can only be
+certified by a subsequent RB at slot $s' \geq s + 3 L_{\text{hdr}} + L_{\text{vote}} + L_{\text{diff}} = s + 14$.
+If any RB arrives within those 14 slots, the EB is discarded. Since each slot
+independently produces a block with probability $f = 0.05$ (Bernoulli process):
+
+$$P(\text{EB certified}) = (1 - f)^{14} = 0.95^{14} \approx 0.488$$
+
+All EBs incur EB body and vote traffic regardless of certification outcome,
+scaling those costs by $1/P(\text{cert}) \approx 2\times$ relative to a
+100%-certified world. Storage and IOPS are unaffected — uncertified EBs are
+never written to disk.
+
+The $L_{\text{diff}} = 7$ slot value already includes a safety margin (calculated
+minimum: 4 slots). At lower throughput targets, tighter timings may be safe,
+raising $P(\text{cert})$ and reducing overhead proportionally.
+
+> [!Important]
+> These estimates model expected steady-state behavior. To make nodes resilient
+> against adversarial conditions — such as EB flooding, which drives up vote
+> verification (CPU), in-flight EB buffering (RAM), and traffic simultaneously —
+> higher capacity than the steady-state numbers suggest will be recommended.
+
 ## Cost Items
 
 | Cost Item                             | Unit      | Description                                |
