@@ -214,7 +214,7 @@ const config: Config = {
               to: "https://leios.cardano-scaling.org/mempool-viz/",
             },
             {
-              label: "Throughput Simulator",
+              label: "Throughput simulator",
               to: "https://www.insightmaker.com/insight/4DU4kmFVCFDaq30ux29PCe/Cardano-Throughput-v0-3",
             },
           ],
@@ -223,11 +223,11 @@ const config: Config = {
           title: "Community",
           items: [
             {
-              label: "Terms & Conditions",
+              label: "Terms and conditions",
               to: "https://static.iohk.io/terms/iohktermsandconditions.pdf",
             },
             {
-              label: "Privacy Policy",
+              label: "Privacy policy",
               to: "https://static.iohk.io/terms/iog-privacy-policy.pdf",
             },
             {
@@ -261,15 +261,15 @@ const config: Config = {
     },
     legal: [
       {
-        label: "Terms & Conditions",
+        label: "Terms and conditions",
         to: "https://static.iohk.io/terms/iohktermsandconditions.pdf",
       },
       {
-        label: "Privacy Policy",
+        label: "Privacy policy",
         to: "https://static.iohk.io/terms/iog-privacy-policy.pdf",
       },
       {
-        label: "Cookie Policy",
+        label: "Cookie policy",
         to: "https://static.iohk.io/terms/iog-cookie-policy.pdf",
       },
     ],

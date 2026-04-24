@@ -190,7 +190,7 @@ function LeiosSpecificationSection() {
               </p>
               <div className={styles.researchContentinkButton}>
                 <LinkButton
-                  text="Read the Full CIP"
+                  text="Read the full CIP"
                   url="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md"
                 />
               </div>
@@ -215,7 +215,7 @@ function HowLeiosWorksSection() {
               <HowLeiosWorksGraphic />
             </div>
             <div className={styles.howLeiosWorksContent}>
-              <h2>How Leios Works</h2>
+              <h2>How Leios works</h2>
               <p className={styles.subtitle}>
                 Block producers simultaneously create both a standard Praos
                 block and a larger secondary block referencing additional
@@ -269,7 +269,7 @@ function HowLeiosWorksSection() {
               </p>
               <div className={styles.howLeiosWorksContentinkButton}>
                 <LinkButton
-                  text="Read the Technical Details"
+                  text="Read the Technical details"
                   url="https://github.com/cardano-scaling/CIPs/blob/leios/CIP-0164/README.md#specification"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -444,7 +444,7 @@ function MempoolSimulationSection() {
               </p>
               <div className={styles.mempoolLinkButton}>
                 <LinkButton
-                  text="Try It Yourself"
+                  text="Try it yourself"
                   url="https://leios.cardano-scaling.org/mempool-viz/"
                 />
               </div>
@@ -452,14 +452,14 @@ function MempoolSimulationSection() {
             <div className={styles.mempoolEmbedContainer}>
               <iframe
                 src="https://leios.cardano-scaling.org/mempool-viz/?embed=true&autoPlay=true&loop=true&speed=2"
-                title="Mempool Simulation Visualization"
+                title="Mempool simulation visualization"
                 className={styles.mempoolIframe}
                 loading="lazy"
               />
               <Link
                 to="https://leios.cardano-scaling.org/mempool-viz/"
                 className={styles.mempoolOverlayLink}
-                aria-label="Open Mempool Simulation"
+                aria-label="Open mempool simulation"
               />
             </div>
           </div>
@@ -491,7 +491,10 @@ export default function Home(): React.ReactElement {
       <HomepageHeader />
       <main>
         {/* <HomepageFeatures /> */}
-
+        <div data-theme="dark">
+          <LeiosSpecificationSection />
+          <HowLeiosWorksSection />
+        </div>
         <iframe
           ref={iframeRef}
           src="https://engineering.iog.io/documentation-dashboard"
@@ -499,9 +502,11 @@ export default function Home(): React.ReactElement {
           className={styles.devTracker}
           id="dev-dashboard"
         />
+
+        <MonthlyReviewsSection />
+
         {/* <LeiosSpecificationSection />
         <HowLeiosWorksSection />
-        <MonthlyReviewsSection />
         <LiveTrackerSection />
         <MempoolSimulationSection /> */}
       </main>
