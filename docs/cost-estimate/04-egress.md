@@ -1,412 +1,296 @@
 # Egress cost estimation per node
 
 Network egress is metered for most cloud providers even though many have some
-monthly budget that's free. In the following example calculation, we try to be
+monthly budget that is free. In the following example calculation, we try to be
 as precise as possible given today's
 [p2p default configuration](https://book.world.dev.cardano.org/environments/mainnet/config.json)
 of the node.
 
+All values use confirmed throughput in TxkB/s (transaction kilobytes per
+second reaching the ledger). Seconds per month: 2,628,000 (30.4167 days).
+
+## Network Topology
+
+The Cardano relay network is asymmetric. A typical relay node has:
+
+- **~25 outbound (upstream) connections**: connections the relay initiates to
+  other relays; blocks, EB bodies, votes, and certificates are pulled from these
+- **~100 inbound (downstream) connections**: connections initiated by other
+  relays and clients; headers are pushed to all subscribers here, and txs arrive
+  from this direction (flowing upstream toward block producers)
+
+Different traffic types have different directions and different fetch models:
+
+| Traffic type         | Flows      | Serves to (egress)                                                         |
+|----------------------|------------|----------------------------------------------------------------------------|
+| Headers (RB/EB)      | Downstream | All ~100 inbound ChainSync subscribers                                     |
+| Block bodies (RB/EB) | Downstream | 100 × (M/25) peers, where M = fetch multiplicity (typical 1, beefy 4–8)   |
+| Tx diffusion         | Upstream   | 25 upstream peers × (1/25 fetch ratio) = **1 peer**                        |
+| Votes                | Downstream | ~2 peers (spanning-tree × 2 redundancy)                                    |
+
+> [!Note]
+>
+> The block/EB body peer count derives from: each of 100 inbound peers has ~25
+> upstream sources and requests from M of them simultaneously (fetch multiplicity
+> M). Our expected egress peers = 100 × M/25. For a lean relay M=1 → **4 peers**;
+> for a beefy relay fetching from M=4–8 peers to reduce tail latency → **16–32
+> peers**. High-stake pool relays commonly use M=4–8 to minimise block arrival
+> latency at the cost of higher egress.
+>
+> Tx diffusion flows upstream (clients → relays → block producers): txs arrive
+> from our 100 downstream peers and we forward them to our 25 upstream peers.
+> Each upstream peer downloads each tx from 1 of its ~25 downstream connections
+> → our selection probability = 1/25 → expected peers served = 25 × 1/25 = **1**.
+>
+> The **1-peer fetch** reflects the refactored TxSubmission V2
+> ([ouroboros-network#5336](https://github.com/IntersectMBO/ouroboros-network/issues/5336)),
+> which downloads each tx from one peer under normal conditions (additional
+> requests are only made if a download takes longer than ~250 ms). This matches
+> the CIP-164 simulation model (announce-to-all, fetch-from-one). TxSubmission
+> V1 (currently deployed) fetches from all advertising peers until one succeeds,
+> resulting in 20+ downloads per tx at a busy relay — significantly higher
+> egress. The shipped V2 (ouroboros-network 10.7.1) uses `txInflightMultiplicity
+> = 2` and is an intermediate step.
+>
+> **Not modelled**: txid announcements (32 bytes per tx, sent to all 25 upstream
+> peers ≈ 800 bytes/tx) and received from all 100 downstream peers. At 300
+> TxkB/s this adds ~4 GiB/month in txid egress — small relative to tx bodies
+> but non-negligible at high throughput.
+
 ## Ouroboros Praos
 
-We start with Ouroboros Praos to have a baseline. The following numbers are from
-Cardano Mainnet, April 2025.
+The following numbers are from Cardano Mainnet, April 2025.
 
 | Component  | Size (bytes) | Size (KiB) |
-| ---------- | ------------ | ---------- |
+|------------|--------------|------------|
 | Header (H) | 1,024        | 1          |
 | Body (B)   | 90,112       | 88         |
 
-### Blocks per Month Calculation
+### Blocks per Month
 
-| Parameter               | Value                  | Formula                     |
-| ----------------------- | ---------------------- | --------------------------- |
-| Epoch length            | 5 days (432,000 slots) | Protocol parameter          |
-| Active slot coefficient | 0.05                   | Protocol parameter          |
-| Blocks per epoch        | 21,600                 | $$432,000 \times 0.05$$     |
-| Epochs per month        | ~6.0833                | $$\frac{365}{5 \times 12}$$ |
-| **Blocks per month**    | **131,400**            | $$21,600 \times 6.0833$$    |
+| Parameter               | Value       | Formula                                 |
+|-------------------------|-------------|-----------------------------------------|
+| Active slot coefficient | 0.05        | Protocol parameter                      |
+| Seconds per month       | 2,628,000   | $30.4167 \times 24 \times 60 \times 60$ |
+| **Blocks per month**    | **131,400** | $0.05 \times 2{,}628{,}000$             |
 
-> [!NOTE]
-> On Cardano Mainnet one slot equals the duration of one second.
+### Praos Relay Node Egress Calculation
 
-### Network Topology Assumptions
+1. **Tx mempool diffusion** (1 peer):
 
-For our calculations, we consider two types of nodes:
+   Transactions arrive from our ~100 downstream peers and are forwarded to our
+   ~25 upstream peers; each upstream peer fetches from 1 of its ~25 downstreams
+   → 1 peer:
+   $4{,}500 \times 1 \times 2{,}628{,}000 \approx 11.0 \text{ GiB}$
 
-- Relay nodes: Connect to other relays
-- Edge nodes: Connect to relay nodes but not to other edge nodes
+2. **Header egress** (100 inbound downstream peers):
+   $131{,}400 \times 1{,}024 \times 100 \approx 12.5 \text{ GiB}$
 
-We make the following assumptions about the network:
+3. **Block body egress** (100 × M/25 peers; M=1 lean → 4 peers, M=4 beefy → 16):
+   $131{,}400 \times 90{,}112 \times 4 \approx 44.1 \text{ GiB}$ (lean) /
+   $131{,}400 \times 90{,}112 \times 16 \approx 176.5 \text{ GiB}$ (beefy, M=4)
 
-- [Default p2p configuration](https://book.world.dev.cardano.org/environments/mainnet/config.json):
-  20 (upstream) peers per relay node
-- ~3 edge nodes per relay node
-- Block propagation model:
-  - Headers: Propagated to 100% of peers
-  - Bodies: Requested by ~10% of peers (2 out of 20)
+   Block bodies contain the same transactions already gossiped via the mempool
+   — the full tx data is **re-transmitted a second time** as part of block
+   propagation. Leios avoids this by carrying only 32-byte hash references in
+   EBs; the confirmed tx data is never re-sent as part of block propagation.
 
-### Base Egress Formulas
-
-For any node type, we can calculate egress using these formulas:
-
-1. **Header Egress**:
-
-   $$E_{headers} = N_{blocks} \times H \times P_{total}$$
-   where:
-   - $N_{blocks}$ = Number of blocks per month
-   - $H$ = Header size in bytes
-   - $P_{total}$ = Total number of peers
-
-2. **Body Egress**:
-
-   $$E_{bodies} = N_{blocks} \times B \times P_{requesting}$$
-   where:
-   - $B$ = Body size in bytes
-   - $P_{requesting}$ = Number of peers requesting bodies
-
-### Edge Node Egress Calculation
-
-Edge nodes have minimal egress compared to relay nodes. Their egress consists
-of:
-
-1. Transaction data sent to relay nodes
-2. Block body responses when requested
-
-Using our base formulas with a typical edge node configuration:
-
-- Total peers ($P_{total}$) = 1 (single relay connection)
-- Requesting peers ($P_{requesting}$) = 1 (when relay requests body)
-
-The monthly egress for a typical edge node:
-
-$$
-E_{edge} = N_{blocks} \times B \approx 131,400 \times 90,112 \text{ bytes} = 11,840,722,560 \text{ bytes} \approx 11.03 \text{ GiB/month}
-$$
-
-This forms our baseline for minimal node egress in a Praos network.
-
-### Relay Node Egress Calculation
-
-Using our assumptions:
-
-- Total peers ($P_{total}$) = 20
-- Edge nodes per relay = 3
-- Relay peers = 20
-- Requesting peers = 2
-
-1. **Header egress to edge nodes**:
-
-   $$E_{headers}^{edge} = 131,400 \times 1,024 \times 3 = 403,983,360 \text{ bytes} \approx 0.376 \text{ GiB}$$
-
-2. **Body egress to edge nodes**:
-
-   $$E_{bodies}^{edge} = 131,400 \times 90,112 \times 3 = 35,522,167,680 \text{ bytes}$$
-   $$ \approx 33.08 \text{ GiB}$$
-
-3. **Header egress to relay nodes**:
-
-   $$E_{headers}^{relay} = 131,400 \times 1,024 \times 20 = 2,693,222,400 \text{ bytes}$$
-   $$\approx 2.51 \text{ GiB}$$
-
-4. **Body egress to relay nodes**:
-
-   $$E_{bodies}^{relay} = 131,400 \times 90,112 \times 2 = 23,681,445,120 \text{ bytes}$$
-   $$\approx 22.05 \text{ GiB}$$
-
-5. **Total relay node egress**:
-
-   $$E_{total} = E_{headers}^{edge} + E_{bodies}^{edge} + E_{headers}^{relay} + E_{bodies}^{relay}$$
-
-$$E_{total} \approx 58.02 \text{ GiB/month}$$
+4. **Total relay egress**: $\approx 67.6 \text{ GiB/month}$
 
 ## Ouroboros Leios
 
-We analyze Ouroboros Leios with the same network topology assumptions as Praos,
-but with its unique block types and propagation model.
+In Linear Leios (CIP-164), transactions are gossiped via the mempool. EBs carry
+only 32-byte tx hash references; actual transaction data is propagated
+independently as transactions arrive. Only transactions in certified EBs count
+as confirmed throughput.
+
+EBs are produced at the same rate as Praos blocks (0.05/s), but only those
+produced sufficiently before the next RB are certifiable. An RB announcing an
+EB at slot $s$ can only include the certificate in a subsequent RB at slot
+$s' \geq s + 3 L_{\text{hdr}} + L_{\text{vote}} + L_{\text{diff}} = s + 14$.
+If any RB is produced within those 14 slots, the EB is discarded. Since each
+slot produces a block independently with probability $f = 0.05$ (Bernoulli):
+
+$$P(\text{EB certified}) = (1 - 0.05)^{14} = 0.95^{14} \approx 0.4877 \approx 0.48$$
+
+Non-certified EBs still generate EB body traffic: their 32-byte tx hash
+references are gossiped whether or not the EB is eventually certified, because
+nodes do not know in advance which EBs will be certified. A confirmed transaction
+is therefore expected to appear in $1/P(\text{cert}) \approx 2.08$ EB bodies
+before one of those EBs is certified, scaling EB body egress accordingly.
+
+In the asymptotic steady state we assume tx diffusion reaches all nodes before
+any EB is certified, so no separate "missing tx fetch" traffic is needed — the
+normal tx diffusion already covers EB closure.
 
 ### Block Size Components
 
 | Component                     | Size (bytes) | Size (KiB) |
 | ----------------------------- | ------------ | ---------- |
-| Input Block (IB) Header       | 304          | 0.3        |
-| Input Block (IB) Body         | 98,304       | 96         |
-| Endorsement Block (EB) Header | 240          | 0.2        |
-| Endorsement Block (EB) Body   | 32           | 0.03       |
-| Vote                          | 150          | 0.15       |
-| Ranking Block (RB) Header     | 1,024        | 1          |
-| Ranking Block (RB) Body       | 7,168        | 7          |
-
-> [!NOTE]
-> The EB body size consists only of the IB reference (32 bytes per reference).
-> The RB body in Leios contains exactly one certificate of size 7 * 1024 = 7,168 bytes,
-> not the full 88 KiB as in Praos.
-
-### Blocks per Month Calculation
-
-For a fair comparison with Praos, we use the same block rate (0.05 blocks/s) for
-Leios' IBs. This ensures that both protocols are compared under similar
-conditions, with Leios producing the same number of IBs per month as Praos
-produces blocks per month (131,400).
-
-| Parameter         | Value       | Formula                                 |
-| ----------------- | ----------- | --------------------------------------- |
-| Stage length      | 20 slots    | Protocol parameter                      |
-| EBs per stage     | 1.5         | Protocol parameter                      |
-| Days per month    | 30.4167     | $\frac{365}{12}$                        |
-| Seconds per month | 2,628,000   | $30.4167 \times 24 \times 60 \times 60$ |
-| Stages per month  | 131,400     | $\frac{2,628,000}{20}$                  |
-| **IBs per month** | **131,400** | $0.05 \text{ IB/s} \times 2,628,000$    |
-| **EBs per month** | **197,100** | $1.5 \times 131,400$                    |
-| **RBs per month** | **131,400** | $1 \times 131,400$                      |
-
-### Network Topology Assumptions
-
-We maintain the same network assumptions as Praos:
-
-- Default p2p configuration: 20 peers per node
-- Network ratio: ~3 edge nodes per relay node
-- Block propagation model:
-  - Headers: Propagated to 100% of peers
-  - Bodies: Requested by ~10% of peers (2 out of 20)
-  - Votes: Propagated only to downstream peers that request them (typically 1 peer requests each vote)
-
-### Base Egress Formulas
-
-For any node type, we calculate egress using these formulas:
-
-1. **IB Header Egress**:
-
-   $$E_{ib\_headers} = N_{ibs} \times H_{ib} \times P_{total}$$
-   where:
-   - $N_{ibs}$ = Number of IBs per month
-   - $H_{ib}$ = IB header size in bytes
-   - $P_{total}$ = Total number of peers
-
-2. **IB Body Egress**:
-
-   $$E_{ib\_bodies} = N_{ibs} \times B_{ib} \times P_{requesting}$$
-   where:
-   - $B_{ib}$ = IB body size in bytes
-   - $P_{requesting}$ = Number of peers requesting bodies
-
-3. **EB Header Egress**:
-
-   $$E_{eb\_headers} = N_{ebs} \times H_{eb} \times P_{total}$$
-   where:
-   - $N_{ebs}$ = Number of EBs per month
-   - $H_{eb}$ = EB header size in bytes
-
-4. **EB Body Egress**:
-
-   $$E_{eb\_bodies} = N_{ebs} \times N_{ib\_refs} \times R_{ib} \times P_{requesting}$$
-   where:
-   - $N_{ebs}$ = Number of EBs per month (197,100)
-   - $N_{ib\_refs}$ = Number of IB references per EB (1, due to stage length and
-     IB rate)
-   - $R_{ib}$ = Size of IB reference in bytes (32)
-   - $P_{requesting}$ = Number of peers requesting bodies (2)
-
-5. **Vote Egress**:
-
-   $$E_{votes} = N_{ebs} \times V \times N_{voters} \times P_{requesting\_votes}$$
-   where:
-   - $N_{ebs}$ = Number of EBs per month (197,100)
-   - $V$ = Vote size in bytes
-   - $N_{voters}$ = Number of voters (600)
-   - $P_{requesting\_votes}$ = Number of peers requesting votes (typically 1)
-
-6. **RB Header Egress**:
-
-   $$E_{rb\_headers} = N_{rbs} \times H_{rb} \times P_{total}$$
-   where:
-   - $N_{rbs}$ = Number of RBs per month
-   - $H_{rb}$ = RB header size in bytes
-
-7. **RB Body Egress**:
-
-   $$E_{rb\_bodies} = N_{rbs} \times C_{rb} \times P_{requesting}$$
-   where:
-   - $N_{rbs}$ = Number of RBs per month
-   - $C_{rb}$ = Certificate size (7,168 bytes)
-   - $P_{requesting}$ = Number of peers requesting bodies
-
-### Edge Node Egress Calculation
-
-The edge node egress calculation for Leios is identical to that of Praos, as
-edge nodes only handle block body responses and transaction data. See the
-[Edge Node Egress Calculation](#edge-node-egress-calculation) section in the
-Praos part for details.
-
-### Relay Node Egress Calculation
-
-Using our assumptions:
-
-- Total peers ($P_{total}$) = 20
-- Edge nodes per relay = 3
-- Relay peers = 20
-- Requesting peers = 2
-
-#### Relay-to-Edge Traffic
-
-1. **IB header egress to edge nodes**:
-
-   $$E_{ib\_headers}^{edge} = 131,400 \times 304 \times 3 = 119,825,280 \text{ bytes}$$
-   $$\approx 0.112 \text{ GiB}$$
-
-2. **IB body egress to edge nodes**:
-
-   $$E_{ib\_bodies}^{edge} = 131,400 \times 98,304 \times 3 = 38,747,566,080 \text{ bytes}$$
-   $$\approx 36.09 \text{ GiB}$$
-
-3. **EB header egress to edge nodes**:
-
-   $$E_{eb\_headers}^{edge} = 197,100 \times 240 \times 3 = 141,912,000 \text{ bytes}$$
-   $$\approx 0.132 \text{ GiB}$$
-
-4. **EB body egress to edge nodes**:
-
-   $$E_{eb\_bodies}^{edge} = 197,100 \times 32 \times 3 = 18,921,600 \text{ bytes} \approx 0.018 \text{ GiB}$$
-
-5. **RB header egress to edge nodes**:
-
-   $$E_{rb\_headers}^{edge} = 131,400 \times 1,024 \times 3 = 403,939,200 \text{ bytes} \approx 0.376 \text{ GiB}$$
-
-6. **RB body egress to edge nodes**:
-
-   $$E_{rb\_bodies}^{edge} = 131,400 \times 7,168 \times 3 = 2,827,571,200 \text{ bytes}$$
-   $$\approx 2.63 \text{ GiB}$$
-
-Total relay-to-edge traffic:
-
-$$\approx 0.112 + 36.09 + 0.132 + 0.018 + 0.376 + 2.63 \approx 39.36 \text{ GiB/month}$$
-
-#### Relay-to-Relay Traffic
-
-1. **IB header egress to relay nodes**:
-
-   $$E_{ib\_headers}^{relay} = 131,400 \times 304 \times 20 = 798,835,200 \text{ bytes} \approx 0.744 \text{ GiB}$$
-
-2. **IB body egress to relay nodes**:
-
-   $$E_{ib\_bodies}^{relay} = 131,400 \times 98,304 \times 2 = 25,831,711,200 \text{ bytes} \approx 24.06 \text{ GiB}$$
-
-3. **EB header egress to relay nodes**:
-
-   $$E_{eb\_headers}^{relay} = 197,100 \times 240 \times 20 = 946,080,000 \text{ bytes} \approx 0.881 \text{ GiB}$$
-
-4. **EB body egress to relay nodes**:
-
-   $$E_{eb\_bodies}^{relay} = 197,100 \times 32 \times 2 = 12,614,400 \text{ bytes} \approx 0.012 \text{ GiB}$$
-
-5. **Vote egress to relay nodes**:
-
-   $$E_{votes}^{relay} = 197,100 \times 150 \times 600 \times 1 = 17,739,000,000 \text{ bytes}$$
-   $$\approx 16.52 \text{ GiB}$$
-
-6. **RB header egress to relay nodes**:
-
-   $$E_{rb\_headers}^{relay} = 131,400 \times 1,024 \times 20 = 2,689,536,000 \text{ bytes} \approx 2.505 \text{ GiB}$$
-
-7. **RB body egress to relay nodes**:
-
-   $$E_{rb\_bodies}^{relay} = 131,400 \times 7,168 \times 2 = 1,883,596,800 \text{ bytes} \approx 1.754 \text{ GiB}$$
-
-Total relay-to-relay traffic:
-
-$$\approx 0.744 + 24.06 + 0.881 + 0.012 + 16.52 + 2.505 + 1.754 \approx 46.48 \text{ GiB/month}$$
-
-#### Total Relay Node Egress
-
-$$E_{total} = 39.36 + 46.48 \approx 85.84 \text{ GiB/month}$$
-
-### Traffic Components by Size (Descending)
-
-| Component                       | Size (GiB) | Percentage of Total |
-| ------------------------------- | ---------- | ------------------- |
-| IB body egress to edge nodes    | 36.09      | 42.0%               |
-| IB body egress to relay nodes   | 24.06      | 28.0%               |
-| Vote egress to relay nodes      | 16.52      | 19.2%               |
-| RB body egress to edge nodes    | 2.63       | 3.1%                |
-| RB header egress to relay nodes | 2.51       | 2.9%                |
-| RB body egress to relay nodes   | 1.75       | 2.0%                |
-| EB header egress to relay nodes | 0.88       | 1.0%                |
-| IB header egress to relay nodes | 0.74       | 0.9%                |
-| RB header egress to edge nodes  | 0.38       | 0.4%                |
-| EB header egress to edge nodes  | 0.13       | 0.2%                |
-| IB header egress to edge nodes  | 0.11       | 0.1%                |
-| EB body egress to edge nodes    | 0.02       | 0.02%               |
-| EB body egress to relay nodes   | 0.01       | 0.01%               |
-
-
-This breakdown shows IB body propagation dominates the network traffic, accounting for 70.0% of the total egress (42.0% to edge nodes and 28.0% to relay nodes). Vote propagation is the third largest component at 19.2% of the total traffic. All other components contribute less than 4% each to the total traffic.
-
-> [!Important] 
-> The above traffic breakdown is based on the baseline Leios
-> configuration of 0.05 IB/s, which is equivalent to Praos's block rate for fair
-> comparison. However, it's crucial to note that different components scale
-> differently with higher IB/s rates:
+| EB Body (32 B per tx ref)     | varies       | varies     |
+| Vote (per voter, per EB)      | 164          | 0.2        |
+| RB Header (doubles as EB hdr) | 1,024        | 1          |
+| RB Body (certificate)         | 8,000        | 8          |
+
+> [!Note]
 >
-> | IB/s Rate | Vote Traffic | IB Body to Edge Nodes | IB Body to Relay Nodes | Total Traffic |
-> |-----------|--------------|------------------------|------------------------|---------------|
-> | 0.05      | 16.52 GiB (19.2%) | 36.09 GiB (42.0%) | 24.06 GiB (28.0%) | 85.84 GiB |
-> | 1         | 16.52 GiB (1.4%) | 0.72 TiB (61.2%) | 0.48 TiB (40.8%) | 1.18 TiB |
-> | 10        | 16.52 GiB (0.1%) | 7.22 TiB (60.6%) | 4.81 TiB (40.4%) | 11.91 TiB |
-> | 20        | 16.52 GiB (0.1%) | 14.44 TiB (60.0%) | 9.62 TiB (40.0%) | 24.01 TiB |
-> | 30        | 16.52 GiB (0.0%) | 21.65 TiB (60.0%) | 14.44 TiB (40.0%) | 36.04 TiB |
+> In the current CIP-164 implementation, the RB header doubles as the EB header.
+> One 1,024-byte combined header is produced per block slot; there is no separate
+> EB header message.
+
+### Protocol Rates
+
+| Parameter             | Value                  | Source                                                                                    |
+| --------------------- | ---------------------- | ----------------------------------------------------------------------------------------- |
+| EB/RB rate            | 0.05/s                 | Active slot coefficient                                                                   |
+| EBs per month         | 131,400                | $0.05 \times 2{,}628{,}000$                                                               |
+| Votes per EB          | 600                    | `vote-generation-probability`; wFA+LS committee                                           |
+| Vote size             | 164 bytes              | `vote-size-bytes`; per voter per EB                                                       |
+| P(EB certified)       | ≈ 0.48                 | $(1-0.05)^{14} = 0.95^{14} \approx 0.4877$: probability no block in 14-slot voting window |
+| Certified EBs/month   | 63,072                 | $0.05 \times 0.48 \times 2{,}628{,}000$                                                   |
+
+### Egress Formulas
+
+1. **Transaction Data Egress** (dominant — scales with TxkB/s):
+
+   Transactions arrive from ~100 downstream peers and are forwarded to ~25
+   upstream peers; each upstream peer fetches from 1 of its ~25 downstream
+   connections → 25 × (1/25) = 1 peer on average:
+
+   $$E_{\text{tx}} = \text{TxkB/s} \times 1{,}000 \times 1 \times T_{\text{month}}$$
+
+2. **Vote Egress** (fixed — independent of throughput):
+
+   Votes propagate downstream (toward the next block producer) using a pull-based
+   mini-protocol with deduplication. We model ~2× spanning-tree redundancy for a
+   typical relay:
+
+   $$E_{\text{votes}} = 600 \times 164 \times 0.05 \times 2 \times 2{,}628{,}000 \approx 24.1 \text{ GiB}$$
+
+3. **EB Body Egress** (tx hash references — scales with TxkB/s):
+
+   Each confirmed tx appears in $1/P(\text{cert}) \approx 2.08$ EB bodies on
+   average (non-certified EBs also gossip their tx hashes). EB bodies are
+   fetched by $100 \times M/25$ peers, the same model as Praos block bodies:
+
+   $$E_{\text{eb-body}} = R_{\text{eb}} \times T_{\text{month}} \times \frac{\text{TxkB/s} \times 1{,}000}{1{,}500 \times 0.05} \times 32 \times \frac{100 M}{25} \times \frac{1}{P(\text{cert})}$$
+
+   At M=1 (lean): $E_{\text{eb-body}} \approx \text{TxkB/s} \times 0.4350 \text{ GiB/month}$
+
+   At M=4 (beefy): $E_{\text{eb-body}} \approx \text{TxkB/s} \times 1.740 \text{ GiB/month}$
+
+4. **RB Header Egress** (combined RB/EB header, fixed):
+
+   $$E_{\text{rb-hdr}} = 131{,}400 \times 1{,}024 \times 100 \approx 12.5 \text{ GiB}$$
+
+5. **RB Body Egress** (certificate, certified RBs only):
+
+   Only certified RBs carry a certificate. Fetched by $100 \times M/25$ peers.
+   Using $N_{\text{cert}} = 63{,}072$/month:
+
+   At M=1: $E_{\text{rb-body}} = 63{,}072 \times 8{,}000 \times 4 \approx 1.88 \text{ GiB}$
+
+   At M=4: $E_{\text{rb-body}} = 63{,}072 \times 8{,}000 \times 16 \approx 7.54 \text{ GiB}$
+
+### Fixed Overhead Summary
+
+| Component       | Lean (M=1)   | Beefy (M=4)  | Notes                                      |
+|-----------------|--------------|--------------|---------------------------------------------|
+| Vote traffic    | 24.1 GiB     | 24.1 GiB     | 600 voters × 164 B × 0.05 EB/s × 2 peers   |
+| RB/EB headers   | 12.5 GiB     | 12.5 GiB     | To all ~100 inbound downstream peers        |
+| RB cert bodies  | 1.88 GiB     | 7.54 GiB     | 4 / 16 peers (63,072 certs/mo)              |
+| **Fixed total** | **38.5 GiB** | **44.1 GiB** | Independent of throughput                   |
+
+### Monthly Egress at Different Confirmed Throughputs
+
+Lean relay (M=1, 4 body-fetch peers):
+
+| TxkB/s        | Tx Data    | Block/EB Bodies | Fixed Overhead | **Total**     | vs Praos  |
+| ------------- | ---------- | --------------- | -------------- | ------------- | --------- |
+| 4.5 (Praos)   | 11.0 GiB   | 44.1 GiB (blk)  | 12.5 GiB (hdr) | **67.6 GiB**  | —         |
+| 5             | 12.2 GiB   | 2.18 GiB (EB)   | 38.5 GiB       | **52.9 GiB**  | **-22%**  |
+| 50            | 122.4 GiB  | 21.75 GiB       | 38.5 GiB       | **182.7 GiB** | +170%     |
+| 100           | 244.8 GiB  | 43.50 GiB       | 38.5 GiB       | **326.8 GiB** | +383%     |
+| 200           | 489.5 GiB  | 87.00 GiB       | 38.5 GiB       | **615.0 GiB** | +810%     |
+| 300           | 734.3 GiB  | 130.50 GiB      | 38.5 GiB       | **903.3 GiB** | +1,236%   |
+
+Beefy relay (M=4, 16 body-fetch peers):
+
+| TxkB/s        | Tx Data    | Block/EB Bodies | Fixed Overhead | **Total**       | vs Praos  |
+| ------------- | ---------- | --------------- | -------------- | --------------- | --------- |
+| 4.5 (Praos)   | 11.0 GiB   | 176.5 GiB (blk) | 12.5 GiB (hdr) | **200.0 GiB**   | —         |
+| 5             | 12.2 GiB   | 8.72 GiB (EB)   | 44.1 GiB       | **65.0 GiB**    | **-68%**  |
+| 50            | 122.4 GiB  | 87.00 GiB       | 44.1 GiB       | **253.5 GiB**   | +27%      |
+| 100           | 244.8 GiB  | 174.00 GiB      | 44.1 GiB       | **462.9 GiB**   | +131%     |
+| 200           | 489.5 GiB  | 348.00 GiB      | 44.1 GiB       | **881.6 GiB**   | +341%     |
+| 300           | 734.3 GiB  | 522.00 GiB      | 44.1 GiB       | **1,300 GiB**   | +550%     |
+
+> [!Note]
 >
-> As shown above, at 30 IB/s (600 times the baseline rate), IB body traffic dominates at over 99% of the total traffic,
-> while vote traffic—initially a significant component at 0.05 IB/s—becomes less than 0.1% of the total.
+> - **Praos row**: tx mempool diffusion (11.0 GiB, 1 peer) + block body
+>   re-transmission of the same txs (44.1 / 176.5 GiB, 4/16 peers) + headers
+>   (12.5 GiB, 100 peers). Every confirmed transaction is sent **twice** in Praos.
+> - **Leios saves more on a beefy relay**: at M=4 the 176.5 GiB Praos block body
+>   overhead is replaced by 8.72 GiB EB body overhead at 5 TxkB/s — a 68% saving.
+>   At high throughput tx data dominates and the saving shrinks.
+> - EB body egress is scaled by 1/P(cert) ≈ 2.08× (non-certified EBs gossip their
+>   tx hashes) and by M/25 × 100 peers
+> - Vote overhead and headers are unaffected by M — headers are pushed to all
+>   subscribers; votes use a separate spanning-tree gossip
+> - "vs Praos" compares against the Praos relay egress in the same M row
 
-### Monthly Traffic per Node
+### Traffic Components at 200 TxkB/s
 
-| IB/s | IB Headers | IB Bodies | EB Headers | EB Bodies | Votes     | RB Headers | RB Bodies | Total      | vs Praos |
-| ---- | ---------- | --------- | ---------- | --------- | --------- | ---------- | --------- | ---------- | -------- |
-| 0.05 | 0.86 GiB   | 60.15 GiB | 1.01 GiB   | 0.03 GiB  | 16.52 GiB | 2.88 GiB   | 4.39 GiB  | 85.84 GiB  | +48%     |
-| 1    | 17.12 GiB  | 1.17 TiB  | 1.01 GiB   | 0.03 GiB  | 16.52 GiB | 2.88 GiB   | 4.39 GiB  | 1.18 TiB   | +2,089%  |
-| 5    | 85.60 GiB  | 5.86 TiB  | 1.01 GiB   | 0.03 GiB  | 16.52 GiB | 2.88 GiB   | 4.39 GiB  | 5.95 TiB   | +11,350% |
-| 10   | 171.20 GiB | 11.73 TiB | 1.01 GiB   | 0.03 GiB  | 16.52 GiB | 2.88 GiB   | 4.39 GiB  | 11.91 TiB  | +22,743% |
-| 20   | 342.40 GiB | 23.45 TiB | 1.01 GiB   | 0.03 GiB  | 16.52 GiB | 2.88 GiB   | 4.39 GiB  | 23.80 TiB  | +45,529% |
-| 30   | 513.60 GiB | 35.18 TiB | 1.01 GiB   | 0.03 GiB  | 16.52 GiB | 2.88 GiB   | 4.39 GiB  | 35.69 TiB  | +68,314% |
+| Component        | Lean (M=1) | % of Total | Beefy (M=4) | % of Total |
+| ---------------- | ---------- | ---------- | ----------- | ---------- |
+| Tx Data          | 489.5 GiB  | 79.6%      | 489.5 GiB   | 55.5%      |
+| EB Bodies        | 87.00 GiB  | 14.1%      | 348.0 GiB   | 39.5%      |
+| Vote Traffic     | 24.1 GiB   | 3.9%       | 24.1 GiB    | 2.7%       |
+| RB/EB Headers    | 12.5 GiB   | 2.0%       | 12.5 GiB    | 1.4%       |
+| RB Cert Bodies   | 1.88 GiB   | 0.3%       | 7.54 GiB    | 0.9%       |
+| **Total**        | **615 GiB**|            | **882 GiB** |            |
 
-> [!NOTE]
-> These calculations assume fully utilized block space for Input Blocks (IBs). In practice, if blocks are not fully utilized, the actual egress for IB bodies would be proportionally lower based on the actual block utilization rate.
+On a lean relay (M=1), tx data dominates (80%) and EB bodies are a secondary
+cost (14%). On a beefy relay (M=4), tx data still dominates (56%) but EB bodies
+grow to a significant secondary cost (39%), making the 1/P(cert) certification
+overhead and body-fetch multiplicity a much more material factor.
 
 ### Monthly Cost by Cloud Provider ($)
 
-| Provider        | Price/GB | Free Allowance (GB) | 0.05 IB/s | 1 IB/s  | 5 IB/s  | 10 IB/s   | 20 IB/s   | 30 IB/s   |
-| --------------- | -------- | ------------------- | --------- | ------- | ------- | --------- | --------- | --------- |
-| Google Cloud    | $0.120   | 0                   | $10.30    | $141.60 | $714.00 | $1,429.20 | $2,856.00 | $4,282.80 |
-| Railway         | $0.100   | 0                   | $8.58     | $118.00 | $595.00 | $1,191.00 | $2,380.00 | $3,569.00 |
-| AWS             | $0.090   | 100                 | $0.00     | $108.00 | $535.50 | $1,071.90 | $2,142.00 | $3,212.10 |
-| Microsoft Azure | $0.087   | 100                 | $0.00     | $104.40 | $518.50 | $1,036.17 | $2,070.60 | $3,105.03 |
-| Alibaba Cloud   | $0.074   | 10                  | $5.61     | $87.32  | $440.30 | $881.34   | $1,761.20 | $2,641.06 |
-| DigitalOcean    | $0.010   | 100–10,000          | $0.00     | $11.80  | $59.50  | $119.10   | $238.00   | $356.90   |
-| Oracle Cloud    | $0.0085  | 10,240              | $0.00     | $0.00   | $50.58  | $101.24   | $202.30   | $303.37   |
-| Linode          | $0.005   | 1,024–20,480        | $0.00     | $5.90   | $29.75  | $59.55    | $119.00   | $178.45   |
-| Hetzner         | $0.00108 | 1,024               | $0.00     | $0.00   | $6.43   | $12.87    | $25.70    | $38.54    |
-| UpCloud         | $0.000   | 1,024–24,576        | $0.00     | $0.00   | $0.00   | $0.00     | $0.00     | $0.00     |
+Egress is billed per GB (10⁹ bytes); 1 GiB ≈ 1.074 GB.
 
-Note: Percentage increases are calculated against Praos scenario A (20 peers)
-baseline of 63.64 GiB/month and $7.73/month (using average cost across
-providers)
+| Provider      | Price/GB | Free (GB)    | 4.5 (Praos) | 5 TxkB/s | 50 TxkB/s | 100 TxkB/s | 200 TxkB/s | 300 TxkB/s |
+| ------------- | -------- | ------------ | ----------- | --------- | --------- | ---------- | ---------- | ---------- |
+| AWS           | $0.090   | 100          | $0.00       | $0.00     | $8.66     | $22.58     | $50.45     | $78.31     |
+| GCP           | $0.120   | 0            | $8.71       | $6.82     | $23.54    | $42.11     | $79.26     | $116.41    |
+| Azure         | $0.087   | 100          | $0.00       | $0.00     | $8.37     | $21.83     | $48.76     | $75.70     |
+| Railway       | $0.100   | 0            | $7.26       | $5.68     | $19.62    | $35.09     | $66.05     | $97.01     |
+| Alibaba Cloud | $0.074   | 10           | $4.63       | $3.46     | $13.78    | $25.23     | $48.14     | $71.05     |
+| DigitalOcean  | $0.010   | 1,000        | $0.00       | $0.00     | $0.00     | $0.00      | $0.00      | $0.00      |
+| Oracle Cloud  | $0.0085  | 10,240       | $0.00       | $0.00     | $0.00     | $0.00      | $0.00      | $0.00      |
+| Linode        | $0.005   | 1,024        | $0.00       | $0.00     | $0.00     | $0.00      | $0.00      | $0.00      |
+| Hetzner       | $0.0011  | 1,024        | $0.00       | $0.00     | $0.00     | $0.00      | $0.00      | $0.00      |
+| UpCloud       | $0.000   | 1,024–24,576 | $0.00       | $0.00     | $0.00     | $0.00      | $0.00      | $0.00      |
+
+> [!Note]
+>
+> - Prices are for US regions and may vary by location
+> - Free allowances vary by plan tier; values shown are typical baseline
+>   included transfer for standard instances
+> - Both Praos and Leios at 5 TxkB/s fall within AWS/Azure 100 GB free tiers
+> - DigitalOcean/Linode/Hetzner remain very cheap even at 200 TxkB/s due to
+>   generous included transfer
 
 ### Data Egress Cost Sources
 
-| Provider        | Price/GB | Source                                                 | Last Updated |
-| --------------- | -------- | ------------------------------------------------------ | ------------ |
-| Google Cloud    | $0.120   | https://cloud.google.com/vpc/pricing                   | Feb 2025     |
-| Railway         | $0.100   | https://railway.app/pricing                            | -            |
-| AWS             | $0.090   | https://aws.amazon.com/ec2/pricing/                    | 2023         |
-| Microsoft Azure | $0.087   | https://azure.microsoft.com/pricing/details/bandwidth/ | Dec 2024     |
-| Alibaba Cloud   | $0.074   | https://www.alibabacloud.com/pricing                   | 2024         |
-| DigitalOcean    | $0.010   | https://www.digitalocean.com/pricing/                  | -            |
-| Oracle Cloud    | $0.0085  | https://www.oracle.com/cloud/pricing/                  | Dec 2024     |
-| Linode          | $0.005   | https://www.linode.com/pricing/                        | Apr 2023     |
-| Hetzner         | $0.00108 | https://www.hetzner.com/cloud/pricing                  | 2024         |
-| UpCloud         | $0.000   | https://upcloud.com/pricing/                           | -            |
+| Provider     | Price/GB | Source                                                 | Last Updated |
+| ------------ | -------- | ------------------------------------------------------ | ------------ |
+| AWS          | $0.090   | https://aws.amazon.com/ec2/pricing/                    | 2023         |
+| GCP          | $0.120   | https://cloud.google.com/vpc/pricing                   | Feb 2025     |
+| Azure        | $0.087   | https://azure.microsoft.com/pricing/details/bandwidth/ | Dec 2024     |
+| DigitalOcean | $0.010   | https://www.digitalocean.com/pricing/                  | Apr 2025     |
+| Linode       | $0.005   | https://www.linode.com/pricing/                        | Apr 2023     |
+| Hetzner      | $0.0011  | https://www.hetzner.com/cloud/pricing                  | Apr 2026     |
 
 Note: Prices may vary by region and volume. Some providers offer free tiers or
-volume discounts not reflected in these base rates. The table shows the standard
-outbound data transfer rates for the most commonly used regions.
-
-no reserves fully filled blocks how many tx fees needed for covering SPO cost
+volume discounts not reflected in these base rates.

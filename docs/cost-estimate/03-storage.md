@@ -1,16 +1,24 @@
 # Storage cost estimation per node
 
 > [!Note] 
-> 
-> **100% filled blocks assumption:**
 >
-> This analysis assumes fully utilized block space for both Ouroboros Praos and
-> Leios protocols, similar to the egress analysis. We'll calculate storage
-> requirements at different IB/s rates.
+> **Scope**: This document covers **blockchain history** storage only —
+> the append-only chain data (blocks, EBs, transactions). It does not model
+> ledger state storage (UTxO set on disk under UTxO-HD, currently ~200 GiB
+> and growing with network usage independent of throughput). Ledger state
+> growth is orthogonal to the protocol comparison and not proportional to
+> confirmed TxkB/s.
+>
+> **100% confirmed throughput assumption:**
+> Storage accumulates only for certified (confirmed) transactions —
+> uncertified EB contents are discarded and re-gossiped in subsequent rounds.
 >
 > **Compression note:** While early experiments show that >70% compression is
 > feasible on mainnet data, this analysis does not include compression benefits.
 > The calculations represent raw storage requirements without compression.
+
+All values use confirmed throughput in TxkB/s (transaction kilobytes per
+second reaching the ledger). Seconds per month: 2,628,000 (30.4167 days).
 
 ## Ouroboros Praos
 
@@ -25,200 +33,166 @@ In Praos, storage is primarily used for maintaining the blockchain history.
 | Block body      | 90,112       | 88         |
 | **Total block** | **91,136**   | **89**     |
 
-### Block Production Rate
+### Monthly Storage Calculation
 
 | Parameter               | Value    | Formula            |
 | ----------------------- | -------- | ------------------ |
 | Slot duration           | 1 second | Protocol parameter |
 | Active slot coefficient | 0.05     | Protocol parameter |
-| **Blocks per second**   | **0.05** | $$1 \times 0.05$$  |
+| **Blocks per second**   | **0.05** |                    |
 
-### Monthly Storage Formula
+$$S_{\text{praos}} = 91{,}136 \times 0.05 \times 2{,}628{,}000 \approx 11.02 \text{ GiB/month}$$
 
-$$S_{\text{monthly}} = B_{\text{size}} \times R_{\text{block}} \times T_{\text{month}}$$
+The Praos-equivalent confirmed throughput is $0.05 \times 90{,}112 = 4{,}505.6 \approx 4.5 \text{ TxkB/s}$.
 
-where:
-
-- $S_{\text{monthly}}$ = Monthly storage requirement in bytes
-- $B_{\text{size}}$ = Size of each block in bytes
-- $R_{\text{block}}$ = Block production rate (blocks per second)
-- $T_{\text{month}}$ = Number of seconds in a month (30.4167 days = 2,628,000 seconds)
-
-### Monthly Storage Calculation
-
-$$S_{\text{monthly}} = 91,136 \times 0.05 \times 2,628,000$$
-
-$$S_{\text{monthly}} = 11,973,196,800 \text{ bytes} \approx 11.15 \text{ GiB}$$
-
-### Ledger State
-
-In addition to the blockchain history, nodes must maintain:
-
-- Current approximate size: 200 GiB (as of April 2025)
-- Growth rate depends on transaction volume
+At confirmed throughput at or below the Praos capacity ceiling (4.5 TxkB/s),
+Linear Leios stores the same transaction bytes as Praos plus fixed protocol
+overhead (EB headers, RBs with certificates). The overhead is small (~24% at
+5 TxkB/s) and amortized as throughput grows.
 
 ## Ouroboros Leios
 
-Leios introduces multiple block types that contribute to the overall storage
-requirements.
+In Linear Leios (CIP-164), transactions are gossiped via the mempool and
+referenced by hash in Endorsement Blocks (EBs). Only the transactions in
+**certified** EBs are permanently stored. An EB is certified when a quorum of
+votes arrives before the certification deadline.
 
-### Block Size Components
+### Storage Components
 
-| Component                      | Size (bytes) | Size (KiB) |
-| ------------------------------ | ------------ | ---------- |
-| Input Block (IB) Header        | 304          | 0.3        |
-| Input Block (IB) Body          | 98,304       | 96         |
-| **Total IB**                   | **98,608**   | **96.3**   |
-| Endorsement Block (EB) Header  | 240          | 0.2        |
-| EB Body (per IB reference)     | 32           | 0.03       |
-| Ranking Block (RB) Header      | 1,024        | 1          |
-| Ranking Block (RB) Certificate | 7,168        | 7          |
-| **Total RB**                   | **8,192**    | **8**      |
-
-> [!NOTE]
-> The RB body in Leios contains exactly one certificate of size 7,168 bytes, not
-> the full 88 KiB as in Praos blocks.
-
-### Time and Rate Parameters
-
-| Parameter         | Value                 | Formula/Source                            |
-| ----------------- | --------------------- | ----------------------------------------- |
-| Stage length      | 20 slots (20 seconds) | Protocol parameter                        |
-| EBs per stage     | 1.5                   | Protocol parameter                        |
-| Votes per EB      | 600                   | Protocol parameter                        |
-| RBs per stage     | 1                     | Protocol parameter                        |
-| Days per month    | 30.4167               | $$\frac{365}{12}$$                        |
-| Seconds per month | 2,628,000             | $$30.4167 \times 24 \times 60 \times 60$$ |
-| Stages per month  | 131,400               | $$\frac{2,628,000}{20}$$                  |
+| Component           | Description                             | Scales With      |
+| ------------------- | --------------------------------------- | ---------------- |
+| Tx closure data     | Confirmed transaction bytes             | TxkB/s           |
+| EB body (tx hashes) | 32-byte tx references in certified EBs  | TxkB/s           |
+| EB headers          | Headers of certified EBs only           | Fixed (0.024/s)  |
+| RB (header + cert)  | Ranking blocks with embedded certificate| Fixed (0.05/s)   |
 
 > [!Note]
-> Votes are ephemeral and don't require permanent storage, so they are
-> excluded from the storage calculations.
+> Votes are ephemeral and not persisted to disk. They are used to produce
+> certificates, which are included in the subsequent Ranking Block.
 
 ### Storage Formulas
 
-1. **IB Storage**: $$S_{\text{IB}} = R_{\text{IB}} \times T_{\text{month}} \times \text{Size}_{\text{IB}}$$
+1. **Transaction Closure Storage** (dominant):
+
+   $$S_{\text{tx}} = \text{TxkB/s} \times 1{,}000 \times T_{\text{month}}$$
+
+   where $T_{\text{month}} = 2{,}628{,}000$ seconds/month.
+
+2. **EB Body Storage** (tx hash references, certified EBs only):
+
+   Only certified EB bodies are stored. Each certified EB body is correspondingly
+   larger — it must reference $1/P_{\text{cert}}$ more transactions than a
+   world where all EBs were certified — so the $P_{\text{cert}}$ factor cancels
+   and total stored bytes are independent of certification probability:
+
+   $$S_{\text{eb-body}} = \frac{\text{TxkB/s} \times 1{,}000}{S_{\text{tx-avg}}} \times 32 \text{ bytes/s} \times T_{\text{month}}$$
+
    where:
-   - $R_{\text{IB}}$ = Input Block rate (IB/s)
-   - $T_{\text{month}}$ = Number of seconds in a month (2,628,000)
-   - $\text{Size}_{\text{IB}}$ = Size of each IB in bytes (98,608)
+   - $S_{\text{tx-avg}}$ = average transaction size (1,500 bytes)
+   - 32 bytes per tx hash reference
 
-2. **EB Storage**:
-   $$S_{EB} = N_{EB\_stage} \times N_{stages} \times (Size_{EB\_header} + Size_{EB\_body} \times N_{IB\_refs})$$
-   where:
-   - $N_{EB\_stage}$ = Number of EBs per stage (1.5)
-   - $N_{stages}$ = Number of stages per month (131,400)
-   - $Size_{EB\_header}$ = EB header size (240 bytes)
-   - $Size_{EB\_body}$ = EB body size per reference (32 bytes)
-   - $N_{IB\_refs}$ = Number of IB references per EB (varies by IB rate)
+   Note: EB headers do not share this cancellation — their size is fixed at
+   240 bytes regardless of body fill, so only storing certified EB headers
+   (at $R_{\text{cert}} = 0.024$/s) genuinely reduces header storage by $P_{\text{cert}}$.
 
-3. **RB Storage**: $$S_{\text{RB}} = N_{\text{RB\_stage}} \times N_{\text{stages}} \times \text{Size}_{\text{RB}}$$
-   where:
-   - $N_{\text{RB\_stage}}$ = Number of RBs per stage (1)
-   - $N_{\text{stages}}$ = Number of stages per month (131,400)
-   - $\text{Size}_{\text{RB}}$ = Size of each RB (8,192 bytes = header + certificate)
+3. **EB Header Storage** (certified EBs only, fixed):
 
-4. **Total Chain State Storage**: $$S_{\text{total}} = S_{\text{IB}} + S_{\text{EB}} + S_{\text{RB}}$$
+   Uncertified EBs are discarded after the certification deadline; only certified
+   EB headers are kept on disk.
 
-### Storage Calculation (0.05 IB/s)
+   $$S_{\text{eb-hdr}} = R_{\text{cert}} \times 240 \times T_{\text{month}} = 0.024 \times 240 \times 2{,}628{,}000 \approx 0.014 \text{ GiB/month}$$
 
-For a fair comparison, we calculate Leios storage at the same transaction
-throughput as Praos (0.05 blocks or IBs per second):
+4. **RB Storage** (header + certificate, fixed):
 
-1. **IB Storage**:
-   $$S_{\text{IB}} = 0.05 \times 2,628,000 \times 98,608 = 12,957,091,200 \text{ bytes} \approx 12.07 \text{ GiB}$$
+   $$S_{\text{rb}} = 0.05 \times 9{,}024 \times T_{\text{month}} = 1.105 \text{ GiB/month}$$
 
-2. **EB Storage**: At 0.05 IB/s and 20-second stages, each EB contains
-   references to approximately 1 IB:
-   $$S_{\text{EB}} = 1.5 \times 131,400 \times (240 + 32 \times 1) = 53,690,400 \text{ bytes} \approx 0.05 \text{ GiB}$$
+   where 9,024 bytes = 1,024 B header + 8,000 B certificate (`cert-size-bytes-constant`).
 
-3. **RB Storage**:
-   $$S_{\text{RB}} = 1 \times 131,400 \times 8,192 = 1,076,428,800 \text{ bytes} \approx 1.00 \text{ GiB}$$
+### Storage Calculation at 5 TxkB/s (Leios Baseline)
 
-4. **Total Storage**: $$S_{\text{total}} = 12.07 + 0.05 + 1.00 = 13.12 \text{ GiB}$$
+1. **Tx closure**: $5{,}000 \times 2{,}628{,}000 = 13{,}140{,}000{,}000 \text{ bytes} \approx 12.24 \text{ GiB}$
 
-### Storage Component Analysis (at 0.05 IB/s)
+2. **EB body** (tx hashes): $\frac{5{,}000}{1{,}500} \times 32 \times 2{,}628{,}000 = 3.33 \times 32 \times 2{,}628{,}000 \approx 0.261 \text{ GiB}$
 
-| Component | Storage Size | % of Total Chain State |
-| --------- | ------------ | ---------------------- |
-| IB        | 12.07 GiB    | 92.0%                  |
-| EB        | 0.05 GiB     | 0.4%                   |
-| RB        | 1.00 GiB     | 7.6%                   |
+3. **EB headers**: $0.014 \text{ GiB}$ (certified only, $R_{\text{cert}} = 0.024$/s)
 
-At the baseline rate, Input Blocks dominate the storage requirements (92.0%),
-with Ranking Blocks contributing a smaller portion, and Endorsement Blocks
-having minimal impact.
+4. **RB**: $1.105 \text{ GiB}$ (fixed; 1,024 B header + 8,000 B cert)
 
-### Monthly Storage at Higher IB Rates
+5. **Total**: $12.24 + 0.261 + 0.014 + 1.105 \approx 13.62 \text{ GiB/month}$
 
-| IB/s | IB Storage   | EB Storage | RB Storage | Total Storage | vs Praos |
-| ---- | ------------ | ---------- | ---------- | ------------- | -------- |
-| 0.05 | 12.07 GiB    | 0.05 GiB   | 1.00 GiB   | 13.12 GiB     | +18%     |
-| 1    | 241.40 GiB   | 0.10 GiB   | 1.00 GiB   | 242.50 GiB    | +2,075%  |
-| 5    | 1,207.01 GiB | 0.25 GiB   | 1.00 GiB   | 1,208.26 GiB  | +10,737% |
-| 10   | 2,414.02 GiB | 0.45 GiB   | 1.00 GiB   | 2,415.47 GiB  | +21,563% |
-| 20   | 4,828.04 GiB | 0.85 GiB   | 1.00 GiB   | 4,829.89 GiB  | +43,217% |
-| 30   | 7,242.06 GiB | 1.25 GiB   | 1.00 GiB   | 7,244.31 GiB  | +64,872% |
+This is approximately 24% more than Praos (11.02 GiB). The fixed RB+cert overhead
+(1.134 GiB) accounts for most of the difference at low throughput.
+
+### Monthly Storage at Different Confirmed Throughputs
+
+| TxkB/s      | Tx/s | Tx Closure | EB Body    | EB Headers | RB        | Total         | vs Praos |
+|-------------|------|------------|------------|------------|-----------|---------------|----------|
+| 4.5 (Praos) | 3    | 11.02 GiB  | —          | —          | —         | **11.02 GiB** | —        |
+| 5           | 3    | 12.24 GiB  | 0.261 GiB  | 0.01 GiB   | 1.105 GiB | 13.62 GiB     | +24%     |
+| 50          | 33   | 122.4 GiB  | 2.613 GiB  | 0.01 GiB   | 1.105 GiB | 126.1 GiB     | +1,045%  |
+| 100         | 67   | 244.8 GiB  | 5.226 GiB  | 0.01 GiB   | 1.105 GiB | 251.1 GiB     | +2,180%  |
+| 200         | 133  | 489.5 GiB  | 10.453 GiB | 0.01 GiB   | 1.105 GiB | 501.1 GiB     | +4,447%  |
+| 300         | 200  | 734.3 GiB  | 15.679 GiB | 0.01 GiB   | 1.105 GiB | 751.1 GiB     | +6,714%  |
 
 > [!Note]
 >
-> - Percentage increases are calculated against Praos baseline of 11.15
->   GiB/month
-> - EB sizes vary slightly with IB/s rates as they contain references to IBs
-> - While Leios chain state could potentially be compressed by >70% based on
->   early experiments, this analysis uses raw storage requirements
-> - Current Cardano nodes do not compress chain history, so we focus on
->   uncompressed values for practical deployment considerations
+> - The 4.5 (Praos) row shows the Praos protocol baseline (block history only,
+>   no EB/vote/cert overhead)
+> - Tx/s assumes average transaction size of 1,500 bytes
+> - EB body storage grows with throughput because higher-throughput EBs reference
+>   more transaction hashes (32 bytes each)
+> - These are monthly increments; total accumulated storage grows over time
+> - CIP-164 Table 8 cross-check: 526 GB at 200 TxkB/s → our total 501 GiB ≈
+>   538 GB (minor difference from rounding and avg tx size assumptions)
 
-### Storage Component Analysis at Higher IB Rates
+### Storage Component Analysis at 200 TxkB/s
 
-As the IB rate increases, the storage profile changes dramatically:
+| Component            | Storage    | % of Total |
+|----------------------|------------|------------|
+| Tx Closure Data      | 489.5 GiB  | 97.7%      |
+| RB with certificates | 1.105 GiB  | 0.2%       |
+| EB Body (hashes)     | 10.453 GiB | 2.1%       |
+| EB Headers           | 0.01 GiB   | < 0.1%     |
 
-| IB/s | IB Storage % | EB Storage % | RB Storage % |
-| ---- | ------------ | ------------ | ------------ |
-| 0.05 | 92.0%        | 0.4%         | 7.6%         |
-| 1    | 99.5%        | <0.1%        | 0.4%         |
-| 5    | 99.9%        | <0.1%        | <0.1%        |
-| 10   | >99.9%       | <0.1%        | <0.1%        |
-| 20   | >99.9%       | <0.1%        | <0.1%        |
-| 30   | >99.9%       | <0.1%        | <0.1%        |
-
-This shows that as throughput increases, Input Block storage completely
-dominates the requirements, comprising over 99% of storage at rates above 1
-IB/s.
+Transaction closure data dominates at all throughput levels. The overhead of
+Linear Leios is dominated by tx hash references in EB bodies at ~2%, which could
+even be avoided. The certificate overhead is not avoidable but only makes up
+0.2%.
 
 ## Cost Analysis
 
 ### Monthly Storage Cost by Cloud Provider ($)
 
-| Provider        | Price/GB | Free Allowance (GB) | 0.05 IB/s | 1 IB/s  | 5 IB/s  | 10 IB/s  | 20 IB/s  | 30 IB/s   |
-| --------------- | -------- | ------------------- | --------- | ------- | ------- | -------- | -------- | --------- |
-| Google Cloud    | $0.040   | 0                   | $0.52     | $9.70   | $48.33  | $96.62   | $193.20  | $289.77   |
-| Railway         | $0.150   | 0                   | $1.97     | $36.38  | $181.24 | $362.32  | $724.48  | $1,086.65 |
-| AWS             | $0.080   | 100                 | $0.00     | $11.40  | $88.66  | $185.24  | $378.39  | $571.54   |
-| Microsoft Azure | $0.075   | 100                 | $0.00     | $10.69  | $83.12  | $173.66  | $357.74  | $541.82   |
-| Alibaba Cloud   | $0.050   | 10                  | $0.16     | $11.63  | $59.91  | $120.27  | $241.00  | $361.72   |
-| DigitalOcean    | $0.100   | 100                 | $0.00     | $14.25  | $110.83 | $231.55  | $472.99  | $714.43   |
-| Oracle Cloud    | $0.0425  | 10,240              | $0.00     | $0.00   | $0.00   | $0.00    | $0.00    | $0.00     |
-| Linode          | $0.100   | 1,024               | $0.00     | $0.00   | $18.43  | $139.15  | $380.59  | $622.03   |
-| Hetzner         | $0.046   | 0                   | $0.60     | $11.16  | $55.58  | $111.11  | $222.17  | $333.24   |
-| UpCloud         | $0.056   | 1,024               | $0.00     | $0.00   | $10.30  | $77.88   | $213.67  | $349.27   |
+Storage is billed per GB (10⁹ bytes); 1 GiB ≈ 1.074 GB.
+
+| Provider        | Price/GB | Free (GB) | 4.5 (Praos) | 5 TxkB/s | 50 TxkB/s | 100 TxkB/s | 200 TxkB/s | 300 TxkB/s |
+| --------------- | -------- | --------- | ----------- | --------- | --------- | ---------- | ---------- | ---------- |
+| AWS             | $0.080   | 100       | $0.00       | $0.00     | $2.71     | $13.34     | $34.58     | $55.83     |
+| GCP             | $0.040   | 0         | $0.47       | $0.59     | $5.36     | $10.67     | $21.29     | $31.92     |
+| Azure           | $0.075   | 100       | $0.00       | $0.00     | $2.54     | $12.50     | $32.42     | $52.34     |
+| DigitalOcean    | $0.100   | 100       | $0.00       | $0.00     | $3.39     | $16.67     | $43.22     | $69.79     |
+| Linode          | $0.100   | 1,024     | $0.00       | $0.00     | $0.00     | $0.00      | $0.00      | $0.00      |
+| Hetzner         | $0.063   | 0         | $0.74       | $0.92     | $8.44     | $16.80     | $33.53     | $50.26     |
+
+> [!Note]
+>
+> - Linode includes up to 1,024 GB storage free with compute instances; all
+>   throughput levels fit within this allowance for the first ~1.4 months before
+>   cumulative history exceeds the free tier
+> - Costs above represent the monthly increment only; total storage costs grow
+>   as blockchain history accumulates
+> - AWS free tier is 100 GB/month on gp3 EBS volumes (new accounts only)
 
 ## Storage Cost Sources
 
 | Provider        | Price/GB | Source                                                     | Last Updated |
 | --------------- | -------- | ---------------------------------------------------------- | ------------ |
-| Google Cloud    | $0.040   | https://cloud.google.com/compute/disks-image-pricing       | Feb 2025     |
-| Railway         | $0.150   | https://railway.app/pricing                                | -            |
 | AWS             | $0.080   | https://aws.amazon.com/ebs/pricing/                        | 2023         |
-| Microsoft Azure | $0.075   | https://azure.microsoft.com/pricing/details/managed-disks/ | Dec 2024     |
-| Alibaba Cloud   | $0.050   | https://www.alibabacloud.com/pricing                       | 2024         |
-| DigitalOcean    | $0.100   | https://www.digitalocean.com/pricing/                      | -            |
-| Oracle Cloud    | $0.0425  | https://www.oracle.com/cloud/pricing/                      | Dec 2024     |
+| GCP             | $0.040   | https://cloud.google.com/compute/disks-image-pricing       | Feb 2025     |
+| Azure           | $0.075   | https://azure.microsoft.com/pricing/details/managed-disks/ | Dec 2024     |
+| DigitalOcean    | $0.100   | https://www.digitalocean.com/pricing/                      | Apr 2025     |
 | Linode          | $0.100   | https://www.linode.com/pricing/                            | Apr 2023     |
-| Hetzner         | $0.046   | https://www.hetzner.com/cloud/pricing                      | 2024         |
-| UpCloud         | $0.056   | https://upcloud.com/pricing/                               | -            |
+| Hetzner         | $0.063   | https://www.hetzner.com/cloud/pricing                      | Apr 2026     |
 
 Note: Prices may vary by region and volume. Some providers offer free tiers or
-volume discounts not reflected in these base rates. The table shows the standard
-storage rates for the most commonly used regions.
+volume discounts not reflected in these base rates.

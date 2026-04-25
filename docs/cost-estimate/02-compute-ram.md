@@ -1,185 +1,155 @@
 # Compute (RAM) cost estimation per node
 
 > [!Note] 
-> This analysis compares memory requirements between Ouroboros Praos and Leios
-> consensus protocols. For detailed technical background on the UTxO DB design,
+> This analysis compares memory requirements between Ouroboros Praos and Linear
+> Leios (CIP-164). For detailed technical background on the UTxO DB design,
 > see the [technical report](https://github.com/IntersectMBO/ouroboros-consensus/tree/main/docs/tech-reports/utxo-db).
 
-## Ouroboros Praos
+All values use confirmed throughput in TxkB/s (transaction kilobytes per
+second reaching the ledger).
 
-In Ouroboros Praos, the entire ledger state is stored in memory, which creates a
-direct correlation between ledger size and RAM requirements.
+UTxO-HD is assumed to have shipped for this comparison. It is an independent
+improvement that moves the UTxO set from RAM to disk (an LSM-tree backed store)
+and benefits both protocols equally. Leios does not require UTxO-HD more than
+Praos does; other than more capacity allowing the utxo set to grow quicker. This
+analysis uses **UTxO-HD for both** protocols, as this is the relevant deployment
+scenario: UTxO-HD is planned for deployment before Leios, and Leios would
+realistically be deployed on top of it.
 
-### Memory Component Sizes
+Without UTxO-HD, the UTxO set (currently ~4–8 GB) would remain in RAM for
+both protocols, adding 4–16+ GB to the totals below and making the 4 GB tier
+insufficient. That scenario is not modeled here.
 
-| Component            | Typical Size | Scaling Factor             |
-| -------------------- | ------------ | -------------------------- |
-| Base Node Process    | 500 MB       | Fixed                      |
-| UTxO Set             | 4-8 GB       | Linear with network usage  |
-| Stake Data           | 200-500 MB   | Linear with stake pools    |
-| Mempool              | 64-128 MB    | Configurable               |
-| Block Processing     | 100-200 MB   | Scales with block size     |
-| Other Runtime Data   | 200-500 MB   | Varies                     |
+## Ouroboros Praos (with UTxO-HD)
 
-### Memory Usage Formula
-
-$$M_{\text{praos}} = M_{\text{base}} + M_{\text{utxo}} + M_{\text{stake}} + M_{\text{mempool}} + M_{\text{processing}} + M_{\text{runtime}}$$
-
-where:
-- $M_{\text{base}}$ = Base process memory (500 MB)
-- $M_{\text{utxo}}$ = UTxO set size (varies with network activity)
-- $M_{\text{stake}}$ = Stake distribution data
-- $M_{\text{mempool}}$ = Mempool size (configurable)
-- $M_{\text{processing}}$ = Block processing memory
-- $M_{\text{runtime}}$ = Other runtime data
-
-### Current State & Projection
-
-Based on empirical measurements and ledger growth models:
-
-| UTxO Entries (Millions) | Stake Keys (Millions) | Estimated RAM |
-| ----------------------- | --------------------- | ------------- |
-| 2                       | 0.4                   | 13 GB         |
-| 10                      | 2                     | 30-40 GB      |
-| 50                      | 10                    | 150-200 GB    |
-| 100                     | 20                    | 300-400 GB    |
-
-At high transaction rates, the UTxO set growth makes this approach prohibitively
-expensive for decentralized participation.
-
-## Ouroboros Leios
-
-Leios solves the memory scaling problem by moving most of the UTxO set to disk,
-fundamentally changing the relationship between ledger size and RAM requirements.
-
-### Memory Usage Strategy
-
-According to the [UTxO DB technical report](https://github.com/IntersectMBO/ouroboros-consensus/tree/main/docs/tech-reports/utxo-db), 
-Leios uses key-value store technology with on-disk persistent storage for the majority of the ledger state.
-The implementation favors write-optimized structures (e.g., LSM trees) and keeps only critical components in memory.
-
-### Memory Component Formula
-
-$$M_{\text{leios}} = M_{\text{base}} + M_{\text{cache}} + M_{\text{indexes}} + M_{\text{buffers}} + M_{\text{stake}} + M_{\text{mempool}} + M_{\text{consensus}}$$
-
-where:
-- $M_{\text{base}}$ = Base process memory (500 MB)
-- $M_{\text{cache}}$ = Hot UTxO cache (200-500 MB)
-- $M_{\text{indexes}}$ = In-memory indexes and filters (100-300 MB)
-- $M_{\text{buffers}}$ = Write buffers (100-500 MB)
-- $M_{\text{stake}}$ = Stake distribution data
-- $M_{\text{mempool}}$ = Mempool size
-- $M_{\text{consensus}}$ = Consensus mechanism overhead (votes, certificates, etc.)
+With UTxO-HD deployed, Praos no longer keeps the full UTxO set in RAM. The
+in-memory footprint is bounded by the hot UTxO cache and other fixed overheads.
 
 ### Memory Component Sizes
 
-| Component              | Size Range   | Scaling Behavior                  |
-| ---------------------- | ------------ | --------------------------------- |
-| Base Node Process      | 500 MB       | Fixed                             |
-| Hot UTxO Cache         | 200-500 MB   | Configurable, minimal with IB/s   |
-| Indexes & Filters      | 100-300 MB   | Logarithmic with ledger size      |
-| Write Buffers          | 100-500 MB   | Linear with transaction rate      |
-| Stake Data             | 200-500 MB   | Linear with stake pool count      |
-| Vote Processing        | 50-100 MB    | Minimal with IB/s                 |
-| Certificate Processing | 20-40 MB     | Minimal with IB/s                 |
-| Consensus Overhead     | 100-300 MB   | Varies with network parameters    |
+| Component          | Typical Size | Scaling Factor               |
+|--------------------|--------------|------------------------------|
+| Base Node Process  | 500 MB       | Fixed                        |
+| Hot UTxO Cache     | 200–500 MB   | Configurable                 |
+| Indexes            | 100–300 MB   | Logarithmic with ledger size |
+| Stake Data         | 200–500 MB   | Linear with stake pools      |
+| Block Processing   | 100–200 MB   | Scales with block size       |
+| Other Runtime Data | 100–300 MB   | Varies                       |
 
-### Calculation by Input Block Rate
+Fixed subtotal (mid-range): ~1,200 MB ≈ **1.2 GB → 4 GB tier**
 
-| IB/s | Base (MB) | Cache (MB) | Indexes (MB) | Buffers (MB) | Stake (MB) | Consensus (MB) | Total RAM (GB) | % vs Praos |
-| ---- | --------- | ---------- | ------------ | ------------ | ---------- | -------------- | -------------- | ---------- |
-| 0.05 | 500       | 200        | 100          | 100          | 300        | 300            | 1.5            | 12%        |
-| 1    | 500       | 300        | 150          | 200          | 300        | 350            | 1.8            | 5%         |
-| 5    | 500       | 400        | 200          | 300          | 300        | 400            | 2.1            | 1.4%       |
-| 10   | 500       | 450        | 250          | 350          | 300        | 450            | 2.3            | 0.8%       |
-| 20   | 500       | 500        | 300          | 400          | 300        | 500            | 2.5            | 0.6%       |
-| 30   | 500       | 500        | 300          | 500          | 300        | 550            | 2.7            | 0.7%       |
+## Ouroboros Leios (with UTxO-HD)
 
-Percentage comparison assumes corresponding Praos values of 13GB, 40GB, 150GB, 300GB, 450GB, and 400GB.
+Leios uses the same UTxO-HD-backed ledger store as Praos. The additional
+Leios-specific RAM components are:
 
-### Disk Requirements and I/O Performance
+### Key Memory Components
 
-While RAM usage is significantly reduced, I/O performance becomes the limiting factor:
+$$M_{\text{leios}} = M_{\text{praos}} + M_{\text{tx-cache}} + M_{\text{consensus}}$$
 
-| IB/s | UTxO Size on Disk | Other Ledger Data | Min IOPS Required |
-| ---- | ----------------- | ----------------- | ----------------- |
-| 0.05 | 4-8 GB            | 2-4 GB            | 50-200            |
-| 1    | 8-15 GB           | 3-6 GB            | 1,000-2,000       |
-| 5    | 15-30 GB          | 5-10 GB           | 5,000-10,000      |
-| 10   | 30-60 GB          | 8-16 GB           | 10,000-20,000     |
-| 20   | 60-120 GB         | 15-30 GB          | 20,000-40,000     |
-| 30   | 90-180 GB         | 20-40 GB          | 30,000-60,000     |
+where beyond the Praos base:
 
-> [!Important]
-> High-performance storage is essential for Leios at higher transaction rates. NVMe SSDs 
-> with sufficient IOPS capacity are required for rates above 5 IB/s.
+- $M_{\text{tx-cache}}$ = LeiosTxCache: recently seen transactions (scales with throughput)
+- $M_{\text{consensus}}$ = Votes in-flight, pending EBs and certificates (50–100 MB, fixed)
+
+### LeiosTxCache
+
+In Linear Leios, transactions are gossiped via the mempool before being
+referenced by hash in EBs. Nodes keep a cache of recently seen transactions
+to serve peers requesting tx bodies when validating EBs. This cache is bounded
+by a time window (approximately 1 hour to cover the full EB → RB pipeline):
+
+$$M_{\text{tx-cache}} = \text{TxkB/s} \times 1{,}000 \text{ B/s} \times 3{,}600 \text{ s}$$
+
+| TxkB/s      | Tx Cache Size               |
+|-------------|-----------------------------|
+| 4.5 (Praos) | — (not applicable to Praos) |
+| 5           | 18 MB                       |
+| 50          | 180 MB                      |
+| 100         | 360 MB                      |
+| 200         | 720 MB                      |
+| 300         | 1,080 MB                    |
+
+### Memory Component Sizes (Leios-specific additions)
+
+| Component          | Size           | Scaling Behavior                    |
+|--------------------|----------------|-------------------------------------|
+| LeiosTxCache       | 18 MB–1,080 MB | Linear with confirmed TxkB/s (1 hr) |
+| Consensus Overhead | 50–100 MB      | Fixed (votes in-flight, certs, EBs) |
+
+### RAM Calculation at Different Confirmed Throughputs
+
+Praos base fixed overhead (with UTxO-HD, mid-range estimates):
+- Base process: 500 MB
+- Hot UTxO cache: 300 MB
+- Indexes: 200 MB
+- Stake data: 300 MB
+- Block/other: 200 MB
+- **Praos fixed subtotal: ~1,500 MB ≈ 1.5 GB**
+
+Leios adds consensus overhead (~100 MB) to get ~1.6 GB fixed base.
+
+| TxkB/s      | Tx/s | Tx Cache | Base (GB)       | Total RAM (GB) | Tier Needed |
+| ----------- | ---- | -------- | --------------- | -------------- | ----------- |
+| 4.5 (Praos) | 3    | —        | 1.5 (Praos)     | **~1.5**       | 4 GB        |
+| 5           | 3    | 18 MB    | 1.6 (Leios)     | 1.6            | 4 GB        |
+| 50          | 33   | 180 MB   | 1.6             | 1.8            | 4 GB        |
+| 100         | 67   | 360 MB   | 1.6             | 2.0            | 4 GB        |
+| 200         | 133  | 720 MB   | 1.6             | 2.3            | 4 GB        |
+| 300         | 200  | 1,080 MB | 1.6             | 2.7            | 4 GB        |
+
+> [!Note]
+>
+> - Both Praos and Leios use the 4 GB tier with UTxO-HD deployed
+> - The only RAM difference between Praos and Leios is the LeiosTxCache
+>   (18 MB–1,080 MB) and consensus overhead (~100 MB) — Leios uses
+>   100–1,180 MB more RAM than Praos at the same throughput
+> - Tx/s assumes average transaction size of 1,500 bytes
+> - GHC runtime overhead (GC, thunks) adds ~20–30% above these estimates
+> - Without UTxO-HD, both protocols would need 4–16+ GB additional RAM for
+>   the in-memory UTxO set
 
 ## Monthly Cost by Cloud Provider ($)
 
-Using the latest pricing data (April 2025) for various cloud providers, we can calculate the monthly costs for running nodes with different RAM configurations:
+A 4 GB RAM instance is sufficient for both protocols at all throughput levels.
+An 8 GB instance is recommended for production deployments to accommodate GHC
+runtime overhead and load spikes.
 
-| Provider      | 4 GB RAM   | 8 GB RAM   | 16 GB RAM  | Notes                         |
-| ------------- | ---------- | ---------- | ---------- | ----------------------------- |
-| AWS           | $20.79     | $41.59     | $83.18     | t3.medium/large/xlarge       |
-| Azure         | $19.50     | $39.00     | $78.00     | Standard_B2s and equivalents  |
-| Google Cloud  | $35.95     | $71.91     | $143.81    | n2-standard series           |
-| Railway       | $40.47     | $80.94     | $161.88    | Usage-based pricing           |
-| Alibaba Cloud | $43.07     | $86.14     | $172.28    | ecs.n4.large and equivalents  |
-| DigitalOcean  | $16.28     | $32.56     | $65.12     | Basic Droplets                |
-| Oracle Cloud  | $8.25      | $16.50     | $33.00     | VM.Standard.E3.x series       |
-| Linode        | $21.75     | $43.51     | $87.02     | Dedicated CPU instances       |
-| Hetzner       | $4.98      | $9.96      | $19.93     | CX series                     |
-| UpCloud       | $16.28     | $32.56     | $65.12     | General Purpose instances     |
+| Provider     | 4 GB RAM | 8 GB RAM | Notes                          |
+| ------------ | -------- | -------- | ------------------------------ |
+| AWS          | $20.79   | $41.59   | t3 series                      |
+| GCP          | $35.95   | $71.91   | n2-standard series             |
+| Azure        | $19.50   | $39.00   | Standard_B series              |
+| DigitalOcean | $16.28   | $32.56   | Basic Droplets                 |
+| Linode       | $21.75   | $43.51   | Dedicated CPU instances        |
+| Hetzner      | $4.39    | $7.14    | EUR prices at 1 EUR = 1.10 USD |
 
 > [!Note]
-> Monthly costs calculated using: hourly rate × 730 hours/month (24 hours × 30.4 days)
+> Monthly costs calculated as: hourly rate × 730 hours/month.
+> Prices are for US/EU regions and may vary by location.
 
-### Cost Comparison: Praos vs Leios
+### Cost Comparison: Praos vs Leios (both with UTxO-HD)
 
-| Throughput       | Praos RAM Needed | Praos Cost Range  | Leios RAM Needed | Leios Cost Range  | Monthly Savings |
-| ---------------- | ---------------- | ----------------- | ---------------- | ----------------- | --------------- |
-| 0.05 blocks/s    | 4-8 GB           | $5-86             | 2-3 GB           | $2.5-30           | $2.5-56 (50-65%)|
-| 1-5 IB/s         | 8-16 GB          | $10-172           | 2-4 GB           | $2.5-43           | $7.5-129 (75%+) |
-| 10-30 IB/s       | 16-32+ GB        | $20-344+          | 3-7 GB           | $3.7-80           | $16.3-264+ (80%+)|
+| Protocol | RAM Required  | Monthly Cost Range  |
+| -------- | ------------- | ------------------- |
+| Praos    | ~1.5 GB       | $4–$36 (4 GB tier)  |
+| Leios    | 1.6–2.7 GB    | $4–$36 (4 GB tier)  |
 
-> [!Note]
-> Cost ranges use average values across all providers, from most economical (Hetzner) to premium options (Google Cloud, Railway). For Leios, standard or compute-optimized instances may be more appropriate given the lower memory requirements, but will need to include high-performance SSDs.
+With UTxO-HD, both Praos and Leios fit comfortably in the same 4 GB RAM tier.
+The additional Leios components (LeiosTxCache + consensus overhead) are small
+relative to the UTxO-HD savings compared to in-memory UTxO.
 
 ## RAM Cost Sources
 
-| Provider      | Instance Type      | Source                                                 | Last Updated |
-| ------------- | ------------------ | ------------------------------------------------------ | ------------ |
-| AWS           | t3 series          | https://aws.amazon.com/ec2/pricing/                    | Apr 2025     |
-| Azure         | Standard_B2s       | https://azure.microsoft.com/pricing/details/virtual-machines/ | Apr 2025 |
-| Google Cloud  | n2-standard        | https://cloud.google.com/compute/vm-instance-pricing   | Apr 2025     |
-| Railway       | Usage-based        | https://railway.app/pricing                            | Apr 2025     |
-| Alibaba Cloud | ecs.n4.large       | Third-party benchmarks (VPSBenchmarks)                 | Apr 2025     |
-| DigitalOcean  | Basic Droplets     | https://www.digitalocean.com/pricing/droplets          | Apr 2025     |
-| Oracle Cloud  | VM.Standard.E3.x   | https://www.oracle.com/cloud/pricing/                  | Apr 2025     |
-| Linode        | Dedicated CPU      | https://www.linode.com/pricing/                        | Apr 2025     |
-| Hetzner       | CX series          | https://www.hetzner.com/cloud/pricing                  | Apr 2025     |
-| UpCloud       | General Purpose    | https://upcloud.com/pricing/                           | Apr 2025     |
+| Provider     | Instance Type  | Source                                                        | Last Updated |
+|--------------|----------------|---------------------------------------------------------------|--------------|
+| AWS          | t3 series      | https://aws.amazon.com/ec2/pricing/                           | Apr 2025     |
+| GCP          | n2-standard    | https://cloud.google.com/compute/vm-instance-pricing          | Apr 2025     |
+| Azure        | Standard_B2s   | https://azure.microsoft.com/pricing/details/virtual-machines/ | Apr 2025     |
+| DigitalOcean | Basic Droplets | https://www.digitalocean.com/pricing/droplets                 | Apr 2025     |
+| Linode       | Dedicated CPU  | https://www.linode.com/pricing/                               | Apr 2025     |
+| Hetzner      | CX23/CX33      | https://www.hetzner.com/cloud/pricing                         | Apr 2026     |
 
-Note: Prices shown are based on standard/on-demand rates. Many providers offer significant discounts for reserved instances or longer-term commitments. All prices are subject to change and may vary by region.
-
-## Key Findings and Recommendations
-
-1. **RAM Requirements**:
-   - Praos: 4-8 GB RAM (minimum), 8-16 GB (recommended), 16-32+ GB (high throughput)
-   - Leios: 1.5-2 GB RAM (minimum), 2-4 GB (typical), 2.5-3 GB (high throughput)
-
-2. **Storage Requirements for Leios**:
-   - SSD storage is mandatory for all deployment scenarios
-   - NVMe SSDs are essential for IB rates above 5 IB/s
-   - IOPS capacity is the critical metric, not just disk size
-   - Provision 2-3x the calculated disk space for future growth
-
-3. **Monthly Cost Savings**: 
-   - 50-65% savings at baseline throughput (0.05 blocks/s)
-   - 75%+ savings at medium throughput (1-5 IB/s)
-   - 80%+ savings at high throughput (10-30 IB/s)
-
-4. **Performance Considerations**:
-   - Leios shifts bottleneck from RAM to I/O performance
-   - High transaction rates require investment in storage performance
-   - For large ledger states (100M+ UTxOs), Leios is the only viable approach
+> [!Note]
+> Prices shown are based on standard/on-demand rates. Many providers offer
+> significant discounts for reserved instances or longer-term commitments.

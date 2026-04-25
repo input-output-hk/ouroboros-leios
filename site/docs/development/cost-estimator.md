@@ -4,19 +4,19 @@ sidebar_position: 4
 
 # Cost estimator
 
-The Leios [**cost estimator tool**](https://leios.cardano-scaling.org/cost-estimator/) provides detailed insights into node operating costs. Integrating data on resource usage, including CPU, disk, and network bandwidth effectively connects theoretical throughput growth with the actual monthly expenses that stake pool operators incur. This estimator aligns with the same parameters used in the throughput simulator – such as transaction rates, average block sizes, and compression settings – and translates these into projected bills for cloud servers or local hardware.
+The Linear Leios (CIP-164) [**cost estimator tool**](https://leios.cardano-scaling.org/cost-estimator/) estimates operating costs for running a Leios node. It integrates resource usage data — CPU, disk, network egress, and IOPS — to translate confirmed transaction throughput (TxkB/s) into projected monthly expenses for stake pool operators. See the [detailed cost analysis](https://github.com/input-output-hk/ouroboros-leios/tree/main/docs/cost-estimate) for methodology.
 
 ## How it works
 
-Start by specifying the number of block producers, relays, and certificates per epoch. Additionally, you can make assumptions about vCPU usage, disk input/output operations per second, and network egress. If you enable compression (for instance, at 50% or 70%), the tool recalculates monthly storage costs accordingly. This process demonstrates how overall expenses may increase or decrease based on different throughput levels.
+The primary input is **confirmed throughput** in TxkB/s (transaction kilobytes per second reaching the ledger). The tool computes per-node resource requirements using the CIP-164 protocol parameters (active slot coefficient, voting window, votes per EB) and benchmark data (validation times from `db-analyser` and cryptography prototypes). Cloud cost presets let you compare hyperscale providers against discount providers.
 
 ## Example use cases
 
-1. **Stake pool budgeting**:  
-   Operators can evaluate whether their fee revenue will cover a projected monthly cloud invoice when transaction volume reaches two million transactions per epoch.
+1. **Stake pool budgeting**:
+   Operators can evaluate whether their fee revenue will cover a projected monthly cloud invoice at different throughput levels.
 
-2. **Long-term planning**:  
-   By assuming a 15% annual decrease in hardware costs, the estimator can indicate whether compression and block production improvements can outpace ledger growth over the next five years.
+2. **Protocol parameter exploration**:
+   Adjusting the voting window, vote committee size, or fetch multiplicity shows how these parameters affect CPU overhead and network egress.
 
-3. **Resource balancing**:  
-   Some operators might opt to add more relays or upgrade to more powerful CPUs to accommodate higher throughput. The cost estimator illustrates how these decisions will affect monthly expenses, allowing for adjustments to strategy as needed.
+3. **Provider comparison**:
+   The cost presets for hyperscale and discount providers highlight where egress-heavy workloads benefit from providers with generous included transfer.

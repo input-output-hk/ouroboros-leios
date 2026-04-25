@@ -113,16 +113,10 @@ const config: Config = {
           label: "Tools",
           position: "right",
           items: [
-            // Cost Estimator and Traffic Estimator are based on parallel Leios model,
-            // not Linear Leios with linked EB proposal - hidden to avoid confusion
-            // {
-            //   to: "https://leios.cardano-scaling.org/cost-estimator/",
-            //   label: "Cost Estimator",
-            // },
-            // {
-            //   to: "/traffic-estimator",
-            //   label: "Traffic Estimator",
-            // },
+            {
+              to: "https://leios.cardano-scaling.org/cost-estimator/",
+              label: "Cost Estimator",
+            },
             {
               to: "https://leios.cardano-scaling.org/visualizer",
               label: "Visualizer",
