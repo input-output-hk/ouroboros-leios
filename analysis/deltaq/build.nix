@@ -127,13 +127,19 @@
           overlays = [ overlay ];
         };
 
+        # Use jupyenv's own nixpkgs for the kernel (compatible with its
+        # IHaskell version pins) but add our overlay for deltaq packages.
+        jupyenvPkgs = import inputs.jupyenv.inputs.nixpkgs {
+          inherit system;
+          overlays = [ overlay ];
+        };
+
         inherit (inputs.jupyenv.lib.${system}) mkJupyterlabNew;
 
         jupyterlab = mkJupyterlabNew (
           { ... }:
           {
-            inherit nixpkgs;
-            imports = [ (import ./kernels.nix { inherit pkgs; }) ];
+            imports = [ (import ./kernels.nix { pkgs = jupyenvPkgs; }) ];
           }
         );
 
@@ -146,7 +152,7 @@
               pkgs.dockerTools.binSh
               pkgs.bash
               pkgs.coreutils
-              pkgs.nodejs_18
+              pkgs.nodejs_22
               jupyterlab
             ];
             pathsToLink = [ "/bin" ];
