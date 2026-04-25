@@ -5,6 +5,7 @@ on:
     paths:
       - "**/*.d2"
       - "site/**"
+      - "cost-dashboard/**"
       - "ui/**"
       - "post-cip/mempool-sim-viz/**"
       - "post-cip/mempool-sim-web/**"
@@ -15,6 +16,7 @@ on:
     paths:
       - "**/*.d2"
       - "site/**"
+      - "cost-dashboard/**"
       - "ui/**"
       - "post-cip/mempool-sim-viz/**"
       - "post-cip/mempool-sim-web/**"
