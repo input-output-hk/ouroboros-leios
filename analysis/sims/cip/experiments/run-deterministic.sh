@@ -80,7 +80,7 @@ fi
 mkfifo sim.log
 
 # Create output subdirectory up front (before config generation)
-OUTDIR="$VOTING_MODE"
+OUTDIR="$VOTING_MODE/seed-$SEED"
 mkdir -p "$OUTDIR"
 
 sed -e 's/"bandwidth-bytes-per-second":125000000/"bandwidth-bytes-per-second":'"$((125000 * BW))"'/g' \
