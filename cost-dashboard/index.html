@@ -10,7 +10,7 @@
     <div id="uiHeader">
       <div>
         <h1>Linear Leios (CIP-164) cost estimator</h1>
-        <h2>v0.6</h2>
+        <h2><small><a href="https://github.com/input-output-hk/ouroboros-leios/tree/main/docs/cost-estimate">methodology</a></small></h2>
       </div>
       <p><em>Explore the costs and benefits of Linear Leios</em></p>
       <p><span style="color:red">NOTE:</span> This tool estimates operating costs for running a Leios node based on the <strong>Linear Leios (CIP-164)</strong> protocol design. Costs represent conservative upper bounds: 600 votes per EB (wFA+LS committee), individual BLS vote verification, and 100% confirmed block utilization. CPU costs use mainnet-average demand. See the <a href="https://github.com/input-output-hk/ouroboros-leios/tree/main/docs/cost-estimate">detailed cost analysis</a> for methodology. Ask questions <a href="https://discord.com/channels/826816523368005654/1247688618621927505">on Discord</a> or report problems on <a href="https://github.com/input-output-hk/ouroboros-leios/issues">GitHub</a>.</p>
@@ -144,7 +144,7 @@
             <td>&times;</td>
           </tr>
           <tr>
-            <th rowspan="5">Costs<br/>
+            <th rowspan="4">Costs<br/>
               <br/><input type="button" value="hyperscale provider" onclick="Controller.hyperscaleCosts()"/> <span title="Set costs to values typical of the largest cloud providers (AWS/GCP/Azure)">&#9432;</span>
               <br/><input type="button" value="discount provider" onclick="Controller.discountCosts()"/> <span title="Set costs to values typical of a discount cloud provider (Hetzner/Linode)">&#9432;</span>
             </th>
@@ -166,12 +166,6 @@
             <th colspan="2">Network egress <span title="Cost of cloud network egress per GB transferred.">&#9432;</span></th>
             <td><input id="uiEgress" type="number" min="0" max="1" value="0.00" step="0.01"/></td>
             <td>USD/GB</td>
-          </tr>
-          <tr>
-            <th colspan="1">Discount rate <span title="Annual rate at which cloud-computing costs decrease.">&#9432;</span></th>
-            <th>Amortize? <span title="Whether to compute perpetual storage cost (present value of storing this month's data forever).">&#9432;</span><input id="uiAmortize" type="checkbox"/></th>
-            <td><input id="uiDiscount" type="number" min="0" max="50" value="15" step="0.1" disabled="true"/></td>
-            <td>%/year</td>
           </tr>
           <tr>
             <th rowspan="6">Stakepools</th>
@@ -298,7 +292,7 @@
             <td>USD/month</td>
           </tr>
           <tr>
-            <th>Disk <span id="uiAmortized">(amortized)</span> <span title="Monthly cost of perpetually storing the month's transactions on disk.">&#9432;</span></th>
+            <th>Disk <span title="Monthly cost of storing ledger + this month's chain data on disk. Storage accumulates over time.">&#9432;</span></th>
             <td id="uiCostStorage">?</td>
             <td>USD/month</td>
           </tr>

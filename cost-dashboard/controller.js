@@ -152,15 +152,12 @@ var Controller = (function() {
     var costVcpu = vcpu * getFloat(uiVcpu)
     uiCostVcpu.innerText = costVcpu.toFixed(2)
 
-    //  Storage  — ledger + monthly new data, with optional perpetual amortization
-    uiAmortized.style.textDecoration = uiAmortize.checked ? "none" : "line-through"
-    var discount   = getFloat(uiDiscount) / 100 / 12                            //  1/month
-    var perpetual  = uiAmortize.checked ? (1 + discount) / discount : 1          //  amortization factor
+    //  Storage  — ledger + monthly new data
     var compression = 1 - getFloat(uiCompression) / 100                          //  effective ratio
     var ledger     = getFloat(uiRbLedger)                                        //  GB (current ledger)
     var storage    = nodes * compression * (ledger + storageMonthly)              //  GiB total
     uiTotalStorage.innerText = storage.toFixed(2)
-    var costStorage = storage * perpetual * getFloat(uiStorage)
+    var costStorage = storage * getFloat(uiStorage)
     uiCostStorage.innerText = costStorage.toFixed(2)
 
     //  Network egress  — relay egress × number of relays
@@ -226,11 +223,9 @@ var Controller = (function() {
     [
       uiASC
     , uiAda
-    , uiAmortize
     , uiCertSize
     , uiCertVal
     , uiCompression
-    , uiDiscount
     , uiEbHeaderSize
     , uiEbHeaderVal
     , uiEgress
