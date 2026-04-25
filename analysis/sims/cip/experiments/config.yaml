@@ -15,7 +15,7 @@ leios-stage-active-voting-slots: 1
 leios-mempool-sampling-strategy: ordered-by-id
 leios-mempool-size-bytes: 12000000
 relay-strategy: request-from-first
-treat-blocks-as-full: false                       
+treat-blocks-as-full: false
 eb-diffusion-strategy: peer-order
 eb-referenced-txs-max-size-bytes: 12000000
 eb-size-bytes-constant: 240
@@ -82,15 +82,26 @@ eb-body-validation-cpu-time-ms-per-byte: 0.00002151
 # to that of Cardano mainnet, and on the security requirement.
 vote-generation-probability: 600
 vote-threshold: 450
+# sim-rs split fields (same values, both halves equal for CIP replication)
+persistent-vote-generation-probability: 600
+non-persistent-vote-generation-probability: 0
 
 # Based on CDDL for votes, worst case for non-persistent voters.
 vote-bundle-size-bytes-constant: 0
 vote-bundle-size-bytes-per-eb: 164
+# sim-rs split fields
+persistent-vote-bundle-size-bytes-per-eb: 164
+non-persistent-vote-bundle-size-bytes-per-eb: 164
 
 # Worst case based on benchmarks from cryptography prototype.
 vote-generation-cpu-time-ms-constant: 0.280
 vote-generation-cpu-time-ms-per-tx: 0
 vote-validation-cpu-time-ms: 2.9
+# sim-rs split fields
+persistent-vote-generation-cpu-time-ms: 0.280
+non-persistent-vote-generation-cpu-time-ms: 0.280
+persistent-vote-validation-cpu-time-ms: 2.9
+non-persistent-vote-validation-cpu-time-ms: 2.9
 
 # Vote diffusion settings.
 vote-diffusion-strategy: peer-order
