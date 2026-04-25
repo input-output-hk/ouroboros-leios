@@ -256,6 +256,22 @@ var Controller = (function() {
     , uiVotingWindow
     ].forEach(function(el) { el.addEventListener("input", calculate) })
 
+    // Tap-friendly help: clicking a label with a title toggles a help bubble
+    document.addEventListener("click", function(e) {
+      var label = e.target.closest("label[title]")
+      var existing = document.querySelector(".help-bubble")
+      var sameLabel = existing && existing._label === label
+
+      if (existing) existing.remove()
+      if (!label || sameLabel) return
+
+      var bubble = document.createElement("div")
+      bubble.className = "help-bubble"
+      bubble.textContent = label.getAttribute("title")
+      bubble._label = label
+      label.closest(".field").after(bubble)
+    })
+
     calculate()
   }
 

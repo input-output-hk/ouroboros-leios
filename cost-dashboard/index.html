@@ -38,14 +38,14 @@
           <span class="unit">slots</span>
         </div>
         <div class="field">
-          <label title="Probability that an EB is certified: (1-f)^voting_window.">P(cert)</label>
+          <label title="Probability that an EB is certified: (1-f)^voting_window.">Certification probability</label>
           <span class="value" id="uiPcert">?</span>
           <span class="unit">%</span>
         </div>
         <div class="field">
           <label title="Average voting committee size per EB. Based on wFA+LS sortition.">Voting committee size</label>
           <input id="uiVotesPerEB" type="number" min="0" max="3000" value="600" step="10"/>
-          <span class="unit">vote/EB</span>
+          <span class="unit">voters</span>
         </div>
         <div class="field">
           <label title="Transaction kilobytes per second reaching the ledger via certified EBs.">Confirmed throughput</label>
@@ -53,14 +53,14 @@
           <span class="unit">TxkB/s</span>
         </div>
         <div class="field">
-          <label title="Average transaction size in bytes.">Average tx size</label>
-          <input id="uiTxSize" type="number" min="100" max="16384" value="1500" step="100"/>
-          <span class="unit">B/tx</span>
+          <label title="Average transaction size in bytes.">Average Tx size</label>
+          <input id="uiTxSize" type="number" min="100" max="16384" value="800" step="100"/>
+          <span class="unit">B/Tx</span>
         </div>
         <div class="field">
-          <label title="Derived from confirmed throughput and average tx size.">Tx/s</label>
+          <label title="Derived from confirmed throughput and average Tx size.">Tx per second</label>
           <span class="value" id="uiTxPerSec">?</span>
-          <span class="unit">tx/s</span>
+          <span class="unit">Tx/s</span>
         </div>
       </div>
     </div>
@@ -69,47 +69,47 @@
       <h2>Sizes &amp; Validation</h2>
       <div class="fields">
         <div class="field">
-          <label title="Per voter per EB. CDDL non-persistent worst case.">Vote</label>
-          <input id="uiVoteSize" type="number" min="0" max="1000" value="164" step="1"/>
-          <span class="unit">B/vote</span>
-        </div>
-        <div class="field">
-          <label title="Endorsement Block header size.">EB header</label>
-          <input id="uiEbHeaderSize" type="number" min="0" max="2000" value="240" step="1"/>
-          <span class="unit">B/EB</span>
-        </div>
-        <div class="field">
-          <label title="32-byte transaction hash reference in EB body.">Tx hash ref</label>
-          <input id="uiTxRefSize" type="number" min="0" max="100" value="32" step="1"/>
-          <span class="unit">B/ref</span>
-        </div>
-        <div class="field">
-          <label title="Certificate size from wFA+LS sortition worst case.">Certificate</label>
-          <input id="uiCertSize" type="number" min="0" max="50000" value="8000" step="100"/>
-          <span class="unit">B/cert</span>
-        </div>
-        <div class="field">
-          <label title="Ranking Block header (doubles as EB header in CIP-164).">RB header</label>
+          <label title="Ranking Block header (doubles as EB header in CIP-164).">RB header size</label>
           <input id="uiRbHeaderSize" type="number" min="0" max="5000" value="1024" step="1"/>
           <span class="unit">B/RB</span>
         </div>
         <div class="field">
-          <label title="Full tx validation at mempool ingestion. OLS on mainnet Apply data.">Tx Apply</label>
-          <input id="uiTxApply" type="number" min="0" max="10" value="0.6201" step="0.0001"/>
-          <span class="unit">ms/tx</span>
+          <label title="Endorsement Block header size.">EB header size</label>
+          <input id="uiEbHeaderSize" type="number" min="0" max="2000" value="240" step="1"/>
+          <span class="unit">B/EB</span>
         </div>
         <div class="field">
-          <label title="EB/RB header validation. From db-analyser empty block stats.">EB header val.</label>
+          <label title="32-byte Tx hash reference in EB body.">Tx hash reference</label>
+          <input id="uiTxRefSize" type="number" min="0" max="100" value="32" step="1"/>
+          <span class="unit">B/ref</span>
+        </div>
+        <div class="field">
+          <label title="Per voter per EB. CDDL non-persistent worst case.">Vote size</label>
+          <input id="uiVoteSize" type="number" min="0" max="1000" value="164" step="1"/>
+          <span class="unit">B/vote</span>
+        </div>
+        <div class="field">
+          <label title="Certificate size from wFA+LS sortition worst case.">Certificate size</label>
+          <input id="uiCertSize" type="number" min="0" max="50000" value="8000" step="100"/>
+          <span class="unit">B/cert</span>
+        </div>
+        <div class="field">
+          <label title="Full Tx validation at mempool ingestion. OLS on mainnet Apply data.">Tx apply</label>
+          <input id="uiTxApply" type="number" min="0" max="10" value="0.6201" step="0.0001"/>
+          <span class="unit">ms/Tx</span>
+        </div>
+        <div class="field">
+          <label title="EB/RB header validation. From db-analyser empty block stats.">EB header validation</label>
           <input id="uiEbHeaderVal" type="number" min="0" max="10" value="0.4438" step="0.0001"/>
           <span class="unit">ms/EB</span>
         </div>
         <div class="field">
-          <label title="Individual BLS vote verification. Non-persistent worst case.">Vote val.</label>
+          <label title="Individual BLS vote verification. Non-persistent worst case.">Vote validation</label>
           <input id="uiVoteVal" type="number" min="0" max="20" value="2.9" step="0.1"/>
           <span class="unit">ms/vote</span>
         </div>
         <div class="field">
-          <label title="Certificate validation from cryptography benchmarks.">Cert val.</label>
+          <label title="Certificate validation from cryptography benchmarks.">Certificate validation</label>
           <input id="uiCertVal" type="number" min="0" max="500" value="157.2" step="0.1"/>
           <span class="unit">ms/cert</span>
         </div>
@@ -162,7 +162,7 @@
         <div class="field">
           <label title="Monthly IOPS capacity cost. Usually zero (base IOPS suffice).">IOPS</label>
           <input id="uiIops" type="number" min="0" max="0.5" value="0.00" step="0.001"/>
-          <span class="unit">$/(IO/s)/mo</span>
+          <span class="unit">$/IOPS/mo</span>
         </div>
         <div class="field">
           <label title="Cost per GB of network egress.">Network egress</label>
@@ -223,7 +223,7 @@
         </div>
         <div class="field">
           <label title="Current market price of ADA.">ADA price</label>
-          <input id="uiAda" type="number" min="0" max="10" value="0.75" step="0.01"/>
+          <input id="uiAda" type="number" min="0" max="10" value="0.25" step="0.01"/>
           <span class="unit">USD/ADA</span>
         </div>
       </div>
@@ -238,17 +238,17 @@
       <h2>CPU per Node</h2>
       <div class="fields">
         <div class="field">
-          <label>Tx Apply</label>
+          <label>Tx apply</label>
           <span class="value" id="uiCpuApply">?</span>
           <span class="unit">ms/s</span>
         </div>
         <div class="field">
-          <label>Tx Reapply</label>
+          <label>Tx reapply</label>
           <span class="value" id="uiCpuReapply">?</span>
           <span class="unit">ms/s</span>
         </div>
         <div class="field">
-          <label>EB headers</label>
+          <label>Endorsement block headers</label>
           <span class="value" id="uiCpuEbHeader">?</span>
           <span class="unit">ms/s</span>
         </div>
@@ -258,7 +258,7 @@
           <span class="unit">ms/s</span>
         </div>
         <div class="field">
-          <label>Cert validation</label>
+          <label>Certificate validation</label>
           <span class="value" id="uiCpuCert">?</span>
           <span class="unit">ms/s</span>
         </div>
@@ -276,7 +276,7 @@
     </div>
 
     <div class="card">
-      <h2>Resources</h2>
+      <h2>Resources (all nodes)</h2>
       <div class="fields">
         <div class="field">
           <label>Compute</label>
@@ -296,7 +296,7 @@
         <div class="field">
           <label>IOPS</label>
           <span class="value" id="uiTotalIops">?</span>
-          <span class="unit">IO/s</span>
+          <span class="unit">IOPS</span>
         </div>
         <div class="field">
           <label>Egress</label>
@@ -312,7 +312,7 @@
     </div>
 
     <div class="card">
-      <h2>Monthly Costs</h2>
+      <h2>Monthly Costs (all nodes)</h2>
       <div class="fields">
         <div class="field">
           <label>Compute</label>
@@ -346,14 +346,14 @@
       <h2>Economics</h2>
       <div class="fields">
         <div class="field">
-          <label>Cost/tx</label>
+          <label>Cost per Tx</label>
           <span class="value" id="uiCostTxUsd">?</span>
-          <span class="unit">USD/tx</span>
+          <span class="unit">USD/Tx</span>
         </div>
         <div class="field">
-          <label>Cost/tx</label>
+          <label>Cost per Tx</label>
           <span class="value" id="uiCostTxAda">?</span>
-          <span class="unit">ADA/tx</span>
+          <span class="unit">ADA/Tx</span>
         </div>
         <div class="field">
           <label>Retained fees</label>

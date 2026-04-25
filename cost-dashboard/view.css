@@ -24,14 +24,6 @@ header h1 {
   margin-bottom: 4px;
 }
 
-header .subtitle {
-  font-size: 0.8rem;
-  color: #8c02c2;
-  margin-bottom: 8px;
-}
-
-header .subtitle a { color: #8c02c2; }
-
 header .note {
   font-size: 0.75rem;
   color: #555;
@@ -72,7 +64,7 @@ main {
 }
 
 .card h2 {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -96,11 +88,12 @@ main {
 }
 
 .field {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
   align-items: center;
   padding: 3px 12px;
   gap: 8px;
-  min-height: 28px;
+  min-height: 36px;
 }
 
 .field:hover {
@@ -108,20 +101,68 @@ main {
 }
 
 .field label {
-  flex: 1;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   color: #444;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+/* --- Help / info indicators (tap-friendly) --- */
+
 .field label[title] {
   cursor: help;
 }
 
+.field label[title]::after {
+  content: "?";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  font-size: 0.55rem;
+  font-weight: 600;
+  color: #b0a0c0;
+  border: 1px solid #ddd5e4;
+  background: #faf8fc;
+  margin-left: 5px;
+  vertical-align: middle;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.field label[title]:hover::after,
+.field label[title]:active::after {
+  color: #8c02c2;
+  border-color: #8c02c2;
+  background: #f1edf5;
+}
+
+.help-bubble {
+  display: block;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: #555;
+  background: #f8f6fa;
+  border: 1px solid #e4dfe8;
+  border-radius: 6px;
+  padding: 6px 12px;
+  margin: 0 12px 6px;
+  animation: fadeIn 0.15s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Inputs --- */
+
 .field .value {
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   font-weight: 500;
   font-family: 'Courier New', monospace;
   text-align: right;
@@ -131,8 +172,8 @@ main {
 
 .field input[type="number"],
 .field input[type="text"] {
-  width: 72px;
-  padding: 2px 6px;
+  width: 80px;
+  padding: 4px 6px;
   border: 1px solid #d4cede;
   border-radius: 4px;
   font-family: 'Courier New', monospace;
@@ -140,6 +181,14 @@ main {
   text-align: right;
   background: #fff;
   color: #180425;
+}
+
+/* Prevent iOS zoom on focus without forcing large font */
+@supports (-webkit-touch-callout: none) {
+  .field input[type="number"],
+  .field input[type="text"] {
+    font-size: 16px;
+  }
 }
 
 .field input[type="number"]:focus,
@@ -156,13 +205,14 @@ main {
 }
 
 .field .unit {
-  font-size: 0.65rem;
+  font-size: 0.7rem;
   color: #888;
   min-width: 65px;
   text-align: left;
 }
 
-/* Output fields */
+/* --- Output fields --- */
+
 .output-col .field .value {
   color: #200830;
   font-weight: 600;
@@ -188,24 +238,26 @@ main {
 .presets {
   display: flex;
   gap: 6px;
-  padding: 6px 12px;
+  padding: 8px 12px;
   border-bottom: 1px solid #f1edf5;
 }
 
 .presets button {
   flex: 1;
-  padding: 4px 8px;
+  padding: 8px 8px;
   font-family: 'Poppins', sans-serif;
-  font-size: 0.65rem;
+  font-size: 0.8rem;
   border: 1px solid #d4cede;
   border-radius: 4px;
   background: #fff;
   color: #180425;
   cursor: pointer;
   transition: all 0.15s;
+  -webkit-tap-highlight-color: rgba(140, 2, 194, 0.15);
 }
 
-.presets button:hover {
+.presets button:hover,
+.presets button:active {
   background: #f1edf5;
   border-color: #8c02c2;
   color: #8c02c2;
@@ -226,10 +278,41 @@ main {
 }
 
 @media (max-width: 700px) {
+  body {
+    padding: 16px;
+  }
+
   main {
     grid-template-columns: 1fr;
   }
+
   .output-col {
     grid-template-columns: 1fr;
+  }
+
+  .field {
+    min-height: 40px;
+    padding: 4px 12px;
+    flex-wrap: wrap;
+  }
+
+  .field label {
+    font-size: 0.8rem;
+  }
+
+  .field .unit {
+    font-size: 0.7rem;
+    min-width: 55px;
+  }
+
+  .field input[type="number"],
+  .field input[type="text"] {
+    width: 90px;
+    padding: 6px 8px;
+  }
+
+  .presets button {
+    padding: 10px 8px;
+    font-size: 0.75rem;
   }
 }
