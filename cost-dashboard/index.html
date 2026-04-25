@@ -1,343 +1,381 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <link href="view.css" type="text/css" rel="stylesheet"/>
-    <script src="controller.js" type="application/javascript"> </script>
-    <title>Linear Leios (CIP-164) cost estimator</title>
-  </head>
-  <body id="uiBody" onload="Controller.initialize()">
-    <div id="uiHeader">
-      <div>
-        <h1>Linear Leios (CIP-164) cost estimator</h1>
-        <h2><small><a href="https://github.com/input-output-hk/ouroboros-leios/tree/main/docs/cost-estimate">methodology</a></small></h2>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link href="view.css" rel="stylesheet"/>
+  <script src="controller.js"></script>
+  <title>Leios Cost Estimator</title>
+</head>
+<body onload="Controller.initialize()">
+
+<header>
+  <h1>Leios Cost Estimator</h1>
+  <p class="note">Interactive tool for estimating operating costs of a Linear Leios (CIP-164) node. Default values represent conservative upper bounds based on the <a href="https://github.com/input-output-hk/ouroboros-leios/tree/main/docs/cost-estimate">detailed cost analysis</a>. Questions <a href="https://discord.com/channels/826816523368005654/1247688618621927505">on Discord</a>, issues on <a href="https://github.com/input-output-hk/ouroboros-leios/issues">GitHub</a>.</p>
+</header>
+
+<main>
+
+  <!-- ============ INPUT COLUMN 1 ============ -->
+  <div class="input-col">
+
+    <div class="card">
+      <h2>Protocol &amp; Throughput</h2>
+      <div class="fields">
+        <div class="field">
+          <label title="Probability of producing a block (EB/RB) in each slot.">Active slot coefficient</label>
+          <input id="uiASC" type="number" min="0.01" max="0.20" value="0.05" step="0.01"/>
+          <span class="unit">EB/slot</span>
+        </div>
+        <div class="field">
+          <label title="Duration of a Praos/Leios slot.">Slot length</label>
+          <input id="uiSlotRate" type="number" min="1" max="1" value="1" step="1"/>
+          <span class="unit">slot/s</span>
+        </div>
+        <div class="field">
+          <label title="Slots between EB announcement and certification deadline (3*L_hdr + L_vote + L_diff).">Voting window</label>
+          <input id="uiVotingWindow" type="number" min="1" max="100" value="14" step="1"/>
+          <span class="unit">slots</span>
+        </div>
+        <div class="field">
+          <label title="Probability that an EB is certified: (1-f)^voting_window.">P(cert)</label>
+          <span class="value" id="uiPcert">?</span>
+          <span class="unit">%</span>
+        </div>
+        <div class="field">
+          <label title="Average voting committee size per EB. Based on wFA+LS sortition.">Voting committee size</label>
+          <input id="uiVotesPerEB" type="number" min="0" max="3000" value="600" step="10"/>
+          <span class="unit">vote/EB</span>
+        </div>
+        <div class="field">
+          <label title="Transaction kilobytes per second reaching the ledger via certified EBs.">Confirmed throughput</label>
+          <input id="uiThroughput" type="number" min="1" max="500" value="100" step="1"/>
+          <span class="unit">TxkB/s</span>
+        </div>
+        <div class="field">
+          <label title="Average transaction size in bytes.">Average tx size</label>
+          <input id="uiTxSize" type="number" min="100" max="16384" value="1500" step="100"/>
+          <span class="unit">B/tx</span>
+        </div>
+        <div class="field">
+          <label title="Derived from confirmed throughput and average tx size.">Tx/s</label>
+          <span class="value" id="uiTxPerSec">?</span>
+          <span class="unit">tx/s</span>
+        </div>
       </div>
-      <p><em>Explore the costs and benefits of Linear Leios</em></p>
-      <p><span style="color:red">NOTE:</span> This tool estimates operating costs for running a Leios node based on the <strong>Linear Leios (CIP-164)</strong> protocol design. Costs represent conservative upper bounds: 600 votes per EB (wFA+LS committee), individual BLS vote verification, and 100% confirmed block utilization. CPU costs use mainnet-average demand. See the <a href="https://github.com/input-output-hk/ouroboros-leios/tree/main/docs/cost-estimate">detailed cost analysis</a> for methodology. Ask questions <a href="https://discord.com/channels/826816523368005654/1247688618621927505">on Discord</a> or report problems on <a href="https://github.com/input-output-hk/ouroboros-leios/issues">GitHub</a>.</p>
     </div>
-    <div id="uiDisplays">
-      <table>
-        <thead>
-          <tr>
-            <th colspan="5">CIP-164 inputs</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <th rowspan="6">Protocol</th>
-            <th colspan="2">Variant <span title="Linear Leios as specified in CIP-164.">&#9432;</span></th>
-            <td colspan="2">
-              <input id="uiVariant" type="text" value="Linear Leios" disabled="true"/>
-            </td>
-          </tr>
-          <tr>
-            <th colspan="2">Active slot coefficient <span title="Probability of producing a block (EB/RB) in each slot. Determines both EB and RB production rate.">&#9432;</span></th>
-            <td><input id="uiASC" type="number" min="0.01" max="0.20" value="0.05" step="0.01"/></td>
-            <td>EB/slot</td>
-          </tr>
-          <tr>
-            <th colspan="2">Slot length <span title="Duration of a Praos/Leios slot.">&#9432;</span></th>
-            <td><input id="uiSlotRate" type="number" min="1" max="1" value="1" step="1"/></td>
-            <td>slot/s</td>
-          </tr>
-          <tr>
-            <th colspan="2">Voting window <span title="Number of slots between EB announcement and certification deadline (3*L_hdr + L_vote + L_diff). Determines P(cert).">&#9432;</span></th>
-            <td><input id="uiVotingWindow" type="number" min="1" max="100" value="14" step="1"/></td>
-            <td>slots</td>
-          </tr>
-          <tr>
-            <th colspan="2">P(cert) <span title="Probability that an EB is certified: (1-f)^voting_window. Uncertified EBs still incur vote and EB body traffic.">&#9432;</span></th>
-            <td id="uiPcert">?</td>
-            <td>%</td>
-          </tr>
-          <tr>
-            <th colspan="2">Votes per EB <span title="Average size of the voting committee for certifying each EB. Based on wFA+LS sortition analysis.">&#9432;</span></th>
-            <td><input id="uiVotesPerEB" type="number" min="0" max="2500" value="600" step="10"/></td>
-            <td>vote/EB</td>
-          </tr>
-          <tr>
-            <th rowspan="3">Throughput</th>
-            <th colspan="2">Confirmed throughput <span title="Transaction kilobytes per second reaching the ledger via certified EBs. This is the primary throughput metric.">&#9432;</span></th>
-            <td><input id="uiThroughput" type="number" min="1" max="500" value="100" step="1"/></td>
-            <td>TxkB/s</td>
-          </tr>
-          <tr>
-            <th colspan="2">Average tx size <span title="Average size of a Cardano transaction in bytes.">&#9432;</span></th>
-            <td><input id="uiTxSize" type="number" min="100" max="16384" value="1500" step="100"/></td>
-            <td>B/tx</td>
-          </tr>
-          <tr>
-            <th colspan="2">Tx/s <span title="Derived transactions per second based on confirmed throughput and average tx size.">&#9432;</span></th>
-            <td id="uiTxPerSec">?</td>
-            <td>tx/s</td>
-          </tr>
-          <tr>
-            <th rowspan="5">Sizes <span title="Sizes of protocol components from the CIP-164 specification and CDDL analysis.">&#9432;</span></th>
-            <th colspan="2">Vote <span title="Size of a single vote (per voter, per EB). Based on CDDL for non-persistent worst case.">&#9432;</span></th>
-            <td><input id="uiVoteSize" type="number" min="0" max="1000" value="164" step="1"/></td>
-            <td>B/vote</td>
-          </tr>
-          <tr>
-            <th colspan="2">EB header <span title="Size of an Endorsement Block header. Only certified EB headers are stored.">&#9432;</span></th>
-            <td><input id="uiEbHeaderSize" type="number" min="0" max="2000" value="240" step="1"/></td>
-            <td>B/EB</td>
-          </tr>
-          <tr>
-            <th colspan="2">Tx hash reference <span title="Size of a transaction hash reference in an EB body (32-byte hash).">&#9432;</span></th>
-            <td><input id="uiTxRefSize" type="number" min="0" max="100" value="32" step="1"/></td>
-            <td>B/ref</td>
-          </tr>
-          <tr>
-            <th colspan="2">Certificate <span title="Size of a certificate included in RB body. Based on wFA+LS sortition worst case.">&#9432;</span></th>
-            <td><input id="uiCertSize" type="number" min="0" max="50000" value="8000" step="100"/></td>
-            <td>B/cert</td>
-          </tr>
-          <tr>
-            <th colspan="2">RB header <span title="Size of a Ranking Block header (doubles as EB header in CIP-164).">&#9432;</span></th>
-            <td><input id="uiRbHeaderSize" type="number" min="0" max="5000" value="1024" step="1"/></td>
-            <td>B/RB</td>
-          </tr>
-          <tr>
-            <th rowspan="4">Validation <span title="CPU times from db-analyser mainnet measurements and cryptography benchmarks.">&#9432;</span></th>
-            <th colspan="2">Tx Apply <span title="Full transaction validation at mempool ingestion. Includes signature verification and Plutus script evaluation. Mainnet-average from OLS on db-analyser Apply data.">&#9432;</span></th>
-            <td><input id="uiTxApply" type="number" min="0" max="10" value="0.6201" step="0.0001"/></td>
-            <td>ms/tx</td>
-          </tr>
-          <tr>
-            <th colspan="2">EB header <span title="EB/RB header validation time. From db-analyser empty block Apply statistics.">&#9432;</span></th>
-            <td><input id="uiEbHeaderVal" type="number" min="0" max="10" value="0.4438" step="0.0001"/></td>
-            <td>ms/EB</td>
-          </tr>
-          <tr>
-            <th colspan="2">Vote <span title="Individual BLS vote verification time. Non-persistent worst case from cryptography benchmarks.">&#9432;</span></th>
-            <td><input id="uiVoteVal" type="number" min="0" max="20" value="2.9" step="0.1"/></td>
-            <td>ms/vote</td>
-          </tr>
-          <tr>
-            <th colspan="2">Certificate <span title="Certificate validation time from cryptography prototype benchmarks.">&#9432;</span></th>
-            <td><input id="uiCertVal" type="number" min="0" max="500" value="157.2" step="0.1"/></td>
-            <td>ms/cert</td>
-          </tr>
-        </tbody>
-      </table>
-      <table>
-        <thead>
-          <tr>
-            <th colspan="5">Other inputs</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <th rowspan="3">Network <span title="Relay node network topology. Different traffic types have different peer models.">&#9432;</span></th>
-            <th colspan="2">Inbound peers <span title="Number of downstream (inbound) connections per relay node. Headers are pushed to all; block/EB bodies are fetched by a subset.">&#9432;</span></th>
-            <td><input id="uiInboundPeers" type="number" min="1" max="500" value="100" step="1"/></td>
-            <td>peers</td>
-          </tr>
-          <tr>
-            <th colspan="2">Fetch multiplicity <span title="M: number of upstream peers each inbound peer fetches block/EB bodies from simultaneously. M=1 lean relay, M=4 beefy relay. Body-fetch peers = inbound × M / 25.">&#9432;</span></th>
-            <td><input id="uiFetchMult" type="number" min="1" max="8" value="1" step="1"/></td>
-            <td>M</td>
-          </tr>
-          <tr>
-            <th colspan="2">Vote gossip redundancy <span title="Spanning-tree redundancy factor for vote diffusion. Typically 2x for reliable propagation.">&#9432;</span></th>
-            <td><input id="uiVoteRedundancy" type="number" min="1" max="10" value="2" step="1"/></td>
-            <td>&times;</td>
-          </tr>
-          <tr>
-            <th rowspan="4">Costs<br/>
-              <br/><input type="button" value="hyperscale provider" onclick="Controller.hyperscaleCosts()"/> <span title="Set costs to values typical of the largest cloud providers (AWS/GCP/Azure)">&#9432;</span>
-              <br/><input type="button" value="discount provider" onclick="Controller.discountCosts()"/> <span title="Set costs to values typical of a discount cloud provider (Hetzner/Linode)">&#9432;</span>
-            </th>
-            <th colspan="2">vCPU <span title="Monthly cost of a virtual CPU.">&#9432;</span></th>
-            <td><input id="uiVcpu" type="number" min="0" max="100" value="20" step="0.01"/></td>
-            <td>USD/vCPU/month</td>
-          </tr>
-          <tr>
-            <th colspan="2">Storage <span title="Monthly cost of cloud disk attached to a virtual machine.">&#9432;</span></th>
-            <td><input id="uiStorage" type="number" min="0" max="1" value="0.10" step="0.01"/></td>
-            <td>USD/GB/month</td>
-          </tr>
-          <tr>
-            <th colspan="2">IOPS <span title="Monthly cost of cloud input/output operation capacity. Usually zero because base included IOPS suffice.">&#9432;</span></th>
-            <td><input id="uiIops" type="number" min="0" max="0.5" value="0.00" step="0.001"/></td>
-            <td>USD/(IO/s)/month</td>
-          </tr>
-          <tr>
-            <th colspan="2">Network egress <span title="Cost of cloud network egress per GB transferred.">&#9432;</span></th>
-            <td><input id="uiEgress" type="number" min="0" max="1" value="0.00" step="0.01"/></td>
-            <td>USD/GB</td>
-          </tr>
-          <tr>
-            <th rowspan="6">Stakepools</th>
-            <th colspan="2">Block producers <span title="Number of block-producing nodes operated by the stake pool.">&#9432;</span></th>
-            <td><input id="uiProducers" type="number" min="1" max="5" value="1" step="1"/></td>
-            <td>nodes</td>
-          </tr>
-          <tr>
-            <th colspan="2">Relays <span title="Number of relay nodes operated by the stake pool. Egress is computed per relay.">&#9432;</span></th>
-            <td><input id="uiRelays" type="number" min="0" max="10" value="2" step="1"/></td>
-            <td>nodes</td>
-          </tr>
-          <tr>
-            <th colspan="2">Design factor for spikes <span title="The factor by which the nodes are overprovisioned in CPU or IOPS in order to handle spikes in computing or input/output.">&#9432;</span></th>
-            <td><input id="uiSpike" type="number" min="1" max="20" value="5" step="0.01"/></td>
-            <td>&times;</td>
-          </tr>
-          <tr>
-            <th colspan="2">Fraction of stake <span title="Percentage of the total staked ADA that is staked at the pool.">&#9432;</span></th>
-            <td><input id="uiStake" type="number" min="0" max="0.2" value="0.1" step="0.01"/></td>
-            <td>%</td>
-          </tr>
-          <tr>
-            <th colspan="2">Retained fees <span title="Percentage of epoch rewards retained by the pool and not passed on to its delegators.">&#9432;</span></th>
-            <td><input id="uiRetained" type="number" min="0" max="100" value="20.92" step="0.1"/></td>
-            <td>%</td>
-          </tr>
-          <tr>
-            <th colspan="2">Current ledger size <span title="The current size of the Praos ledger. UTxO-HD keeps ledger state on disk.">&#9432;</span></th>
-            <td><input id="uiRbLedger" type="number" min="0" max="500" value="200" step="1"/></td>
-            <td>GB</td>
-          </tr>
-          <tr>
-            <th rowspan="4">Scenario</th>
-            <th colspan="2">Transaction fee <span title="Average fee paid per kilobyte of a typical Cardano transaction. Derived from the Cardano fee formula: Fee = 155,381 + 44.0576 * size_bytes lovelace.">&#9432;</span></th>
-            <td><input id="uiTxFee" type="number" min="0" max="20" value="0.148" step="0.001"/></td>
-            <td>ADA/kB</td>
-          </tr>
-          <tr>
-            <th colspan="2">Storage compression <span title="Percentage by which disk storage is reduced via compression. &gt;70% feasible on mainnet data; conservative 50% default.">&#9432;</span></th>
-            <td><input id="uiCompression" type="number" min="0" max="100" value="50" step="0.1"/></td>
-            <td>%</td>
-          </tr>
-          <tr>
-            <th colspan="2">Price of ADA <span title="Current market price of ADA.">&#9432;</span></th>
-            <td><input id="uiAda" type="number" min="0" max="10" value="0.75" step="0.01"/></td>
-            <td>USD/ADA</td>
-          </tr>
-        </tbody>
-      </table>
-      <table>
-        <thead>
-          <tr>
-            <th colspan="4">Estimates</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <th rowspan="7">CPU <span title="Per-node CPU breakdown. Vote validation dominates at low throughput; Tx Apply dominates at high throughput.">&#9432;</span></th>
-            <th>Tx Apply <span title="Full transaction validation (signature + Plutus).">&#9432;</span></th>
-            <td id="uiCpuApply">?</td>
-            <td>ms/s</td>
-          </tr>
-          <tr>
-            <th>Tx Reapply <span title="Ledger re-application when EB is certified (skips Plutus).">&#9432;</span></th>
-            <td id="uiCpuReapply">?</td>
-            <td>ms/s</td>
-          </tr>
-          <tr>
-            <th>EB headers <span title="EB/RB header validation.">&#9432;</span></th>
-            <td id="uiCpuEbHeader">?</td>
-            <td>ms/s</td>
-          </tr>
-          <tr>
-            <th>Vote validation <span title="Individual BLS vote verification. Fixed overhead: votes/EB &times; EB rate &times; ms/vote.">&#9432;</span></th>
-            <td id="uiCpuVote">?</td>
-            <td>ms/s</td>
-          </tr>
-          <tr>
-            <th>Cert validation <span title="Certificate validation. Fixed overhead: EB rate &times; ms/cert.">&#9432;</span></th>
-            <td id="uiCpuCert">?</td>
-            <td>ms/s</td>
-          </tr>
-          <tr>
-            <th><em>Total CPU</em> <span title="Total CPU load per node.">&#9432;</span></th>
-            <td id="uiCpuTotal">?</td>
-            <td>ms/s</td>
-          </tr>
-          <tr>
-            <th>Core utilization <span title="Percentage of a single CPU core used at steady state. 1000 ms/s = 100%.">&#9432;</span></th>
-            <td id="uiCpuPercent">?</td>
-            <td>%</td>
-          </tr>
-          <tr>
-            <th rowspan="5">Resources <span title="Per-SPO resource requirements.">&#9432;</span></th>
-            <th>Compute <span title="Total vCPU required by the stake pool (all nodes, spike-adjusted, minimum 2 per node).">&#9432;</span></th>
-            <td id="uiTotalVcpu">?</td>
-            <td>vCPU/month</td>
-          </tr>
-          <tr>
-            <th>Disk <span title="Total disk storage required (ledger + monthly chain growth, compressed, all nodes).">&#9432;</span></th>
-            <td id="uiTotalStorage">?</td>
-            <td>GiB</td>
-          </tr>
-          <tr>
-            <th>IOPS <span title="Total I/O operations capacity required (all nodes, spike-adjusted). Usually within base included IOPS.">&#9432;</span></th>
-            <td id="uiTotalIops">?</td>
-            <td>IO/s</td>
-          </tr>
-          <tr>
-            <th>Network egress <span title="Total monthly network egress for all relay nodes.">&#9432;</span></th>
-            <td id="uiTotalEgress">?</td>
-            <td>GiB/month</td>
-          </tr>
-          <tr>
-            <th>Network interface <span title="Network interface capacity required per relay node (peak, spike-adjusted).">&#9432;</span></th>
-            <td id="uiNic">?</td>
-            <td>Gb/s</td>
-          </tr>
-          <tr>
-            <th rowspan="5">Costs <span title="Monthly costs for the stake pool.">&#9432;</span></th>
-            <th>Compute <span title="Monthly cost of CPU.">&#9432;</span></th>
-            <td id="uiCostVcpu">?</td>
-            <td>USD/month</td>
-          </tr>
-          <tr>
-            <th>Disk <span title="Monthly cost of storing ledger + this month's chain data on disk. Storage accumulates over time.">&#9432;</span></th>
-            <td id="uiCostStorage">?</td>
-            <td>USD/month</td>
-          </tr>
-          <tr>
-            <th>IOPS <span title="Monthly cost for input/output operations capacity.">&#9432;</span></th>
-            <td id="uiCostIops">?</td>
-            <td>USD/month</td>
-          </tr>
-          <tr>
-            <th>Network egress <span title="Monthly cost for network egress.">&#9432;</span></th>
-            <td id="uiCostEgress">?</td>
-            <td>USD/month</td>
-          </tr>
-          <tr>
-            <th><em>Total</em> <span title="Total monthly cost for the stake pool.">&#9432;</span></th>
-            <td id="uiCost">?</td>
-            <td>USD/month</td>
-          </tr>
-          <tr>
-            <th rowspan="5">Metrics</th>
-            <th rowspan="2">Cost per transaction <span title="Average network-wide computing cost for a transaction, allocated proportional to this SPO's stake.">&#9432;</span></th>
-            <td id="uiCostTxUsd">?</td>
-            <td>USD/tx</td>
-          </tr>
-          <tr>
-            <td id="uiCostTxAda">?</td>
-            <td>ADA/tx</td>
-          </tr>
-          <tr>
-            <th>Retained fees <span title="Transaction fees accruing to the stake pool.">&#9432;</span></th>
-            <td id="uiFees">?</td>
-            <td>USD/month</td>
-          </tr>
-          <tr>
-            <th>Retained fees &minus; cost <span title="Profit: transaction fees minus operating costs.">&#9432;</span></th>
-            <td id="uiProfit">?</td>
-            <td>USD/month</td>
-          </tr>
-          <tr>
-            <th>Retained fees &divide; cost <span title="Return ratio: fees as a percentage of cost.">&#9432;</span></th>
-            <td id="uiReturn">?</td>
-            <td>%</td>
-          </tr>
-        </tbody>
-      </table>
+
+    <div class="card">
+      <h2>Sizes &amp; Validation</h2>
+      <div class="fields">
+        <div class="field">
+          <label title="Per voter per EB. CDDL non-persistent worst case.">Vote</label>
+          <input id="uiVoteSize" type="number" min="0" max="1000" value="164" step="1"/>
+          <span class="unit">B/vote</span>
+        </div>
+        <div class="field">
+          <label title="Endorsement Block header size.">EB header</label>
+          <input id="uiEbHeaderSize" type="number" min="0" max="2000" value="240" step="1"/>
+          <span class="unit">B/EB</span>
+        </div>
+        <div class="field">
+          <label title="32-byte transaction hash reference in EB body.">Tx hash ref</label>
+          <input id="uiTxRefSize" type="number" min="0" max="100" value="32" step="1"/>
+          <span class="unit">B/ref</span>
+        </div>
+        <div class="field">
+          <label title="Certificate size from wFA+LS sortition worst case.">Certificate</label>
+          <input id="uiCertSize" type="number" min="0" max="50000" value="8000" step="100"/>
+          <span class="unit">B/cert</span>
+        </div>
+        <div class="field">
+          <label title="Ranking Block header (doubles as EB header in CIP-164).">RB header</label>
+          <input id="uiRbHeaderSize" type="number" min="0" max="5000" value="1024" step="1"/>
+          <span class="unit">B/RB</span>
+        </div>
+        <div class="field">
+          <label title="Full tx validation at mempool ingestion. OLS on mainnet Apply data.">Tx Apply</label>
+          <input id="uiTxApply" type="number" min="0" max="10" value="0.6201" step="0.0001"/>
+          <span class="unit">ms/tx</span>
+        </div>
+        <div class="field">
+          <label title="EB/RB header validation. From db-analyser empty block stats.">EB header val.</label>
+          <input id="uiEbHeaderVal" type="number" min="0" max="10" value="0.4438" step="0.0001"/>
+          <span class="unit">ms/EB</span>
+        </div>
+        <div class="field">
+          <label title="Individual BLS vote verification. Non-persistent worst case.">Vote val.</label>
+          <input id="uiVoteVal" type="number" min="0" max="20" value="2.9" step="0.1"/>
+          <span class="unit">ms/vote</span>
+        </div>
+        <div class="field">
+          <label title="Certificate validation from cryptography benchmarks.">Cert val.</label>
+          <input id="uiCertVal" type="number" min="0" max="500" value="157.2" step="0.1"/>
+          <span class="unit">ms/cert</span>
+        </div>
+      </div>
     </div>
-  </body>
+
+    <div class="card">
+      <h2>Network Topology</h2>
+      <div class="fields">
+        <div class="field">
+          <label title="Downstream (inbound) connections per relay. Headers pushed to all; bodies fetched by subset.">Inbound peers</label>
+          <input id="uiInboundPeers" type="number" min="1" max="500" value="100" step="1"/>
+          <span class="unit">peers</span>
+        </div>
+        <div class="field">
+          <label title="Simultaneous upstream fetch sources per inbound peer. M=1 lean, M=4 beefy.">Fetch multiplicity</label>
+          <input id="uiFetchMult" type="number" min="1" max="8" value="1" step="1"/>
+          <span class="unit">M</span>
+        </div>
+        <div class="field">
+          <label title="Spanning-tree redundancy for vote gossip. Typically 2x.">Vote redundancy</label>
+          <input id="uiVoteRedundancy" type="number" min="1" max="10" value="2" step="1"/>
+          <span class="unit">&times;</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============ INPUT COLUMN 2 ============ -->
+  <div class="input-col">
+
+    <div class="card">
+      <h2>Cloud Costs</h2>
+      <div class="presets">
+        <button onclick="Controller.hyperscaleCosts()">Hyperscale</button>
+        <button onclick="Controller.discountCosts()">Discount</button>
+      </div>
+      <div class="fields">
+        <div class="field">
+          <label title="Monthly cost of a virtual CPU.">vCPU</label>
+          <input id="uiVcpu" type="number" min="0" max="100" value="20" step="0.01"/>
+          <span class="unit">$/vCPU/mo</span>
+        </div>
+        <div class="field">
+          <label title="Monthly cost of cloud disk storage.">Storage</label>
+          <input id="uiStorage" type="number" min="0" max="1" value="0.10" step="0.01"/>
+          <span class="unit">$/GB/mo</span>
+        </div>
+        <div class="field">
+          <label title="Monthly IOPS capacity cost. Usually zero (base IOPS suffice).">IOPS</label>
+          <input id="uiIops" type="number" min="0" max="0.5" value="0.00" step="0.001"/>
+          <span class="unit">$/(IO/s)/mo</span>
+        </div>
+        <div class="field">
+          <label title="Cost per GB of network egress.">Network egress</label>
+          <input id="uiEgress" type="number" min="0" max="1" value="0.00" step="0.01"/>
+          <span class="unit">$/GB</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Stake Pool</h2>
+      <div class="fields">
+        <div class="field">
+          <label title="Number of block-producing nodes.">Block producers</label>
+          <input id="uiProducers" type="number" min="1" max="5" value="1" step="1"/>
+          <span class="unit">nodes</span>
+        </div>
+        <div class="field">
+          <label title="Number of relay nodes. Egress is computed per relay.">Relays</label>
+          <input id="uiRelays" type="number" min="0" max="10" value="2" step="1"/>
+          <span class="unit">nodes</span>
+        </div>
+        <div class="field">
+          <label title="CPU/IOPS overprovisioning for burst load.">Spike factor</label>
+          <input id="uiSpike" type="number" min="1" max="20" value="5" step="0.01"/>
+          <span class="unit">&times;</span>
+        </div>
+        <div class="field">
+          <label title="Percentage of total staked ADA at this pool.">Stake fraction</label>
+          <input id="uiStake" type="number" min="0" max="0.2" value="0.1" step="0.01"/>
+          <span class="unit">%</span>
+        </div>
+        <div class="field">
+          <label title="Percentage of epoch rewards retained by the pool.">Retained fees</label>
+          <input id="uiRetained" type="number" min="0" max="100" value="20.92" step="0.1"/>
+          <span class="unit">%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Scenario</h2>
+      <div class="fields">
+        <div class="field">
+          <label title="Current total chain size on disk (blocks + ledger state). Starting point for storage projections.">Current chain size</label>
+          <input id="uiCurrentChain" type="number" min="0" max="2000" value="200" step="1"/>
+          <span class="unit">GB</span>
+        </div>
+        <div class="field">
+          <label title="Average fee per kilobyte from the Cardano fee formula.">Transaction fee</label>
+          <input id="uiTxFee" type="number" min="0" max="20" value="0.148" step="0.001"/>
+          <span class="unit">ADA/kB</span>
+        </div>
+        <div class="field">
+          <label title="Disk compression ratio. >70% feasible; 50% conservative.">Compression</label>
+          <input id="uiCompression" type="number" min="0" max="100" value="50" step="0.1"/>
+          <span class="unit">%</span>
+        </div>
+        <div class="field">
+          <label title="Current market price of ADA.">ADA price</label>
+          <input id="uiAda" type="number" min="0" max="10" value="0.75" step="0.01"/>
+          <span class="unit">USD/ADA</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============ OUTPUT COLUMN ============ -->
+  <div class="output-col">
+
+    <div class="card">
+      <h2>CPU per Node</h2>
+      <div class="fields">
+        <div class="field">
+          <label>Tx Apply</label>
+          <span class="value" id="uiCpuApply">?</span>
+          <span class="unit">ms/s</span>
+        </div>
+        <div class="field">
+          <label>Tx Reapply</label>
+          <span class="value" id="uiCpuReapply">?</span>
+          <span class="unit">ms/s</span>
+        </div>
+        <div class="field">
+          <label>EB headers</label>
+          <span class="value" id="uiCpuEbHeader">?</span>
+          <span class="unit">ms/s</span>
+        </div>
+        <div class="field">
+          <label>Vote validation</label>
+          <span class="value" id="uiCpuVote">?</span>
+          <span class="unit">ms/s</span>
+        </div>
+        <div class="field">
+          <label>Cert validation</label>
+          <span class="value" id="uiCpuCert">?</span>
+          <span class="unit">ms/s</span>
+        </div>
+        <div class="field total">
+          <label>Total CPU</label>
+          <span class="value" id="uiCpuTotal">?</span>
+          <span class="unit">ms/s</span>
+        </div>
+        <div class="field total">
+          <label>Core utilization</label>
+          <span class="value" id="uiCpuPercent">?</span>
+          <span class="unit">%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Resources</h2>
+      <div class="fields">
+        <div class="field">
+          <label>Compute</label>
+          <span class="value" id="uiTotalVcpu">?</span>
+          <span class="unit">vCPU/mo</span>
+        </div>
+        <div class="field">
+          <label title="Maximum new chain data per month per node (compressed). Assumes 100% block utilization at this throughput consistently.">Max chain growth</label>
+          <span class="value" id="uiChainGrowth">?</span>
+          <span class="unit">GiB/mo</span>
+        </div>
+        <div class="field">
+          <label title="Hypothetical total disk per SPO after 1 year consistently at this throughput: (current chain + 12 × monthly growth) × nodes.">Disk (after 1 year)</label>
+          <span class="value" id="uiTotalStorage">?</span>
+          <span class="unit">GiB</span>
+        </div>
+        <div class="field">
+          <label>IOPS</label>
+          <span class="value" id="uiTotalIops">?</span>
+          <span class="unit">IO/s</span>
+        </div>
+        <div class="field">
+          <label>Egress</label>
+          <span class="value" id="uiTotalEgress">?</span>
+          <span class="unit">GiB/mo</span>
+        </div>
+        <div class="field">
+          <label>Peak bandwidth</label>
+          <span class="value" id="uiNic">?</span>
+          <span class="unit">Mb/s</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Monthly Costs</h2>
+      <div class="fields">
+        <div class="field">
+          <label>Compute</label>
+          <span class="value" id="uiCostVcpu">?</span>
+          <span class="unit">$/mo</span>
+        </div>
+        <div class="field">
+          <label title="Hypothetical monthly storage bill after 1 year consistently at this throughput.">Disk (after 1 year)</label>
+          <span class="value" id="uiCostStorage">?</span>
+          <span class="unit">$/mo</span>
+        </div>
+        <div class="field">
+          <label>IOPS</label>
+          <span class="value" id="uiCostIops">?</span>
+          <span class="unit">$/mo</span>
+        </div>
+        <div class="field">
+          <label>Egress</label>
+          <span class="value" id="uiCostEgress">?</span>
+          <span class="unit">$/mo</span>
+        </div>
+        <div class="field total">
+          <label>Total</label>
+          <span class="value" id="uiCost">?</span>
+          <span class="unit">$/mo</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Economics</h2>
+      <div class="fields">
+        <div class="field">
+          <label>Cost/tx</label>
+          <span class="value" id="uiCostTxUsd">?</span>
+          <span class="unit">USD/tx</span>
+        </div>
+        <div class="field">
+          <label>Cost/tx</label>
+          <span class="value" id="uiCostTxAda">?</span>
+          <span class="unit">ADA/tx</span>
+        </div>
+        <div class="field">
+          <label>Retained fees</label>
+          <span class="value" id="uiFees">?</span>
+          <span class="unit">$/mo</span>
+        </div>
+        <div class="field">
+          <label>Fees &minus; cost</label>
+          <span class="value" id="uiProfit">?</span>
+          <span class="unit">$/mo</span>
+        </div>
+        <div class="field total">
+          <label>Fees &divide; cost</label>
+          <span class="value" id="uiReturn">?</span>
+          <span class="unit">%</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</main>
+
+</body>
 </html>

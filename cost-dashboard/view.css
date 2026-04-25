@@ -1,90 +1,235 @@
-#uiHeader {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 30px;
-}
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap');
 
-#uiHeader div h1 {
-  width: 550px;
-}
-
-#uiHeader h2 {
-  color: gray;
-}
-
-#uiDisplays {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 15px;
-}
-
-#uiDisplays thead th {
-  padding: 5px;
-  text-align: center;
-}
-
-#uiDisplays tbody th {
-  padding: 5px;
-  text-align: left;
-}
-
-#uiDisplays td {
-  padding: 5px;
-  text-align: left;
-}
-
-#uiVariant {
-  width: 90%;
-  text-align: left; 
-}
-
-input[type="text"] {
-  width: 75px;
-  text-align: right;
-  font-family: monospace;
-}
-
-input[type="number"] {
-  width: 75px;
-  text-align: right;
-  font-family: monospace;
-}
-
-input[type="button"] {
-  width: 75%;
-}
-
-table {
-  width: fit-content;
-  border-collapse: collapse;
-}
-
-th, td {
-  border: 1px solid black;
-  padding: 1px;
-}
-
-th {
-  background-color: #f2f2f2;
-  text-align: center;
-}
-
-th span {
-  font-weight: normal;
-}
-
-td {
-  font-family: monospace;
-  text-align: right;
-}
-
-h1, h2 {
-  margin-block-start: 0;
-  margin-block-end: 0;
-}
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  max-width: 100%;
-  overflow-x: hidden;
-  font-family: sans-serif;
+  font-family: 'Poppins', sans-serif;
+  background: #f8f6fa;
+  color: #180425;
+  padding: 24px;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+/* --- Header --- */
+
+header {
+  margin-bottom: 24px;
+}
+
+header h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #200830;
+  margin-bottom: 4px;
+}
+
+header .subtitle {
+  font-size: 0.8rem;
+  color: #8c02c2;
+  margin-bottom: 8px;
+}
+
+header .subtitle a { color: #8c02c2; }
+
+header .note {
+  font-size: 0.75rem;
+  color: #555;
+  line-height: 1.5;
+  max-width: 900px;
+}
+
+header .note a { color: #8c02c2; }
+
+/* --- Main grid --- */
+
+main {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.input-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.output-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* --- Cards --- */
+
+.card {
+  background: #fff;
+  border: 1px solid #e4dfe8;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.card h2 {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 8px 12px;
+  margin: 0;
+  background: #f1edf5;
+  color: #200830;
+  border-bottom: 1px solid #e4dfe8;
+}
+
+.output-col .card h2 {
+  background: #2d0a45;
+  color: #fff;
+  border-bottom: 1px solid #2d0a45;
+}
+
+/* --- Fields --- */
+
+.fields {
+  padding: 6px 0;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  padding: 3px 12px;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.field:hover {
+  background: #faf8fc;
+}
+
+.field label {
+  flex: 1;
+  font-size: 0.75rem;
+  color: #444;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.field label[title] {
+  cursor: help;
+}
+
+.field .value {
+  font-size: 0.8rem;
+  font-weight: 500;
+  font-family: 'Courier New', monospace;
+  text-align: right;
+  min-width: 60px;
+  color: #180425;
+}
+
+.field input[type="number"],
+.field input[type="text"] {
+  width: 72px;
+  padding: 2px 6px;
+  border: 1px solid #d4cede;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  text-align: right;
+  background: #fff;
+  color: #180425;
+}
+
+.field input[type="number"]:focus,
+.field input[type="text"]:focus {
+  outline: none;
+  border-color: #8c02c2;
+  box-shadow: 0 0 0 2px rgba(140, 2, 194, 0.15);
+}
+
+.field input:disabled {
+  background: #f1edf5;
+  color: #888;
+  border-color: #e4dfe8;
+}
+
+.field .unit {
+  font-size: 0.65rem;
+  color: #888;
+  min-width: 65px;
+  text-align: left;
+}
+
+/* Output fields */
+.output-col .field .value {
+  color: #200830;
+  font-weight: 600;
+}
+
+.output-col .field.total {
+  background: #f8f6fa;
+  border-top: 1px solid #e4dfe8;
+  font-weight: 600;
+}
+
+.output-col .field.total label {
+  font-weight: 600;
+  color: #200830;
+}
+
+.output-col .field.total .value {
+  color: #8c02c2;
+}
+
+/* --- Preset buttons --- */
+
+.presets {
+  display: flex;
+  gap: 6px;
+  padding: 6px 12px;
+  border-bottom: 1px solid #f1edf5;
+}
+
+.presets button {
+  flex: 1;
+  padding: 4px 8px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.65rem;
+  border: 1px solid #d4cede;
+  border-radius: 4px;
+  background: #fff;
+  color: #180425;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.presets button:hover {
+  background: #f1edf5;
+  border-color: #8c02c2;
+  color: #8c02c2;
+}
+
+/* --- Responsive --- */
+
+@media (max-width: 1100px) {
+  main {
+    grid-template-columns: 1fr 1fr;
+  }
+  .output-col {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+}
+
+@media (max-width: 700px) {
+  main {
+    grid-template-columns: 1fr;
+  }
+  .output-col {
+    grid-template-columns: 1fr;
+  }
 }

@@ -152,12 +152,14 @@ var Controller = (function() {
     var costVcpu = vcpu * getFloat(uiVcpu)
     uiCostVcpu.innerText = costVcpu.toFixed(2)
 
-    //  Storage  — ledger + monthly new data
+    //  Storage  — chain growth per month + projected total after 1 year
     var compression = 1 - getFloat(uiCompression) / 100                          //  effective ratio
-    var ledger     = getFloat(uiRbLedger)                                        //  GB (current ledger)
-    var storage    = nodes * compression * (ledger + storageMonthly)              //  GiB total
-    uiTotalStorage.innerText = storage.toFixed(2)
-    var costStorage = storage * getFloat(uiStorage)
+    var chainGrowth = compression * storageMonthly                               //  GiB/month per node
+    uiChainGrowth.innerText = chainGrowth.toFixed(2)
+    var currentChain = getFloat(uiCurrentChain)                                  //  GB (current chain size)
+    var storageAfter1y = nodes * (currentChain + chainGrowth * 12)               //  GiB total after 1 year
+    uiTotalStorage.innerText = storageAfter1y.toFixed(2)
+    var costStorage = storageAfter1y * getFloat(uiStorage)
     uiCostStorage.innerText = costStorage.toFixed(2)
 
     //  Network egress  — relay egress × number of relays
@@ -166,10 +168,10 @@ var Controller = (function() {
     var costEgress = egressSPO * getFloat(uiEgress)
     uiCostEgress.innerText = costEgress.toFixed(2)
 
-    //  NIC  — per-relay peak, rounded to nearest power of 10
+    //  NIC  — per-relay peak bandwidth
     var perRelayBps = egressMonthly * GiB / T_month                              //  B/s steady state
-    var peakGbps = spike * perRelayBps * 8 / (1000 * 1000 * 1000)               //  Gb/s peak
-    uiNic.innerText = Math.max(1, Math.round(Math.pow(10, Math.ceil(Math.log10(Math.max(0.01, peakGbps))))))
+    var peakMbps = spike * perRelayBps * 8 / (1000 * 1000)                       //  Mb/s peak
+    uiNic.innerText = peakMbps.toFixed(1)
 
     //  IOPS
     var io = spike * nodes * iopsTotal
@@ -234,7 +236,7 @@ var Controller = (function() {
     , uiIops
     , uiProducers
     , uiRbHeaderSize
-    , uiRbLedger
+    , uiCurrentChain
     , uiRelays
     , uiRetained
     , uiSlotRate
