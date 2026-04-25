@@ -25,7 +25,7 @@
     pre-commit-hooks.url = "github:cachix/git-hooks.nix";
 
     # Used by analysis/deltaq/
-    jupyenv.url = "github:tweag/jupyenv?ref=0c86802aaa3ffd3e48c6f0e7403031c9168a8be2";
+    jupyenv.url = "github:tweag/jupyenv";
     # NOTE: Also pinned in cabal.project (source-repository-package) for the
     # Haskell build. Keep both pins in sync.
     deltaq-src.url = "github:DeltaQ-SD/deltaq";
