@@ -5,21 +5,24 @@ set -e
 
 usage() {
   cat <<'USAGE'
-Usage: combine-results-multi-vote.sh -m MODE
+Usage: combine-results-multi-vote.sh -m MODE [-s SEED]
 
-Combine experiment results from a specific voting mode subdirectory.
+Combine experiment results from a specific voting mode and seed subdirectory.
 
 Options:
   -m, --voting-mode MODE   wfa-ls | everyone | top-stake-fraction
+  -s, --seed N             RNG seed (default: 0)
   -h, --help               Show this help
 USAGE
   exit "${1:-0}"
 }
 
 MODE=""
+SEED=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -m|--voting-mode) MODE="$2"; shift 2 ;;
+    -s|--seed)        SEED="$2"; shift 2 ;;
     -h|--help)        usage 0 ;;
     *)                echo "ERROR: unknown option '$1'" >&2; usage 1 ;;
   esac
@@ -51,7 +54,7 @@ do
   # Find first non-empty result to get headers
   FIRST=""
   for exp in "${EXPERIMENTS[@]}"; do
-    g="$SCRIPT_DIR/experiments/$exp/$MODE"
+    g="$SCRIPT_DIR/experiments/$exp/$MODE/seed-$SEED"
     if [ -f "$g/$f.csv.gz" ] && [ -s "$g/$f.csv.gz" ]; then
       FIRST="$g"
       break
@@ -73,7 +76,7 @@ do
   (
     echo "$HL,$HR"
     for exp in "${EXPERIMENTS[@]}"; do
-      g="$SCRIPT_DIR/experiments/$exp/$MODE"
+      g="$SCRIPT_DIR/experiments/$exp/$MODE/seed-$SEED"
       if [ ! -d "$g" ]; then
         echo "Skipping $exp/$MODE: directory not found" >&2
         continue
