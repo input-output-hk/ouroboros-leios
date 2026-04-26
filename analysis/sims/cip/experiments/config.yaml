@@ -90,18 +90,19 @@ non-persistent-vote-generation-probability: 0
 vote-bundle-size-bytes-constant: 0
 vote-bundle-size-bytes-per-eb: 164
 # sim-rs split fields
-persistent-vote-bundle-size-bytes-per-eb: 164
-non-persistent-vote-bundle-size-bytes-per-eb: 164
+persistent-vote-bundle-size-bytes-per-eb: 94
+non-persistent-vote-bundle-size-bytes-per-eb: 171
 
 # Worst case based on benchmarks from cryptography prototype.
 vote-generation-cpu-time-ms-constant: 0.280
 vote-generation-cpu-time-ms-per-tx: 0
 vote-validation-cpu-time-ms: 2.9
 # sim-rs split fields
-persistent-vote-generation-cpu-time-ms: 0.280
-non-persistent-vote-generation-cpu-time-ms: 0.280
-persistent-vote-validation-cpu-time-ms: 2.9
-non-persistent-vote-validation-cpu-time-ms: 2.9
+# Latest from Thomas Vellekoop benchmarks
+persistent-vote-generation-cpu-time-ms: 0.255
+non-persistent-vote-generation-cpu-time-ms: 0.427
+persistent-vote-validation-cpu-time-ms: 0.765
+non-persistent-vote-validation-cpu-time-ms: 1.75
 
 # Vote diffusion settings.
 vote-diffusion-strategy: peer-order
@@ -111,10 +112,12 @@ vote-diffusion-max-window-size: 100
 
 # Worst case based on CDDL for certificates and on empirical study of wFA+LS
 # sortition.
+# Note! Needs splitting into PV/NPV combinations as well
 cert-size-bytes-constant: 8000
 cert-size-bytes-per-node: 0
 
 # Worst case based on benchmarks from cryptography prototype.
+# Note! Needs splitting into PV/NPV combinations as well
 cert-generation-cpu-time-ms-constant: 92.5
 cert-generation-cpu-time-ms-per-node: 0
 cert-validation-cpu-time-ms-constant: 157.2
