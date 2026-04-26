@@ -22,6 +22,12 @@
               probability-polynomial = hprev.callCabal2nixWithOptions "probability-polynomial" (
                 inputs.deltaq-src.outPath + "/lib/probability-polynomial"
               ) "--no-check" { };
+              # Pin diagrams-svg 1.5 needed by deltaq (jupyenv's nixpkgs only has 1.4.x).
+              diagrams-svg = hprev.callHackageDirect {
+                pkg = "diagrams-svg";
+                ver = "1.5";
+                sha256 = "sha256-HYIgmtkgIUMWPTsSjbQYE4hVAhTmvXY+ghP/eDaVTDw=";
+              } { };
               # Use a more recent version of `lattices` than is available in the curated Nix package set.
               lattices = hprev.callPackage (
                 {
