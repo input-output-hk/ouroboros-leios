@@ -21,6 +21,40 @@ let
     leiosDocs
     ;
 
+  agda-web-docs-lib = import ./agda-web-docs-lib.nix { inherit pkgs lib; };
+
+  enhancedLeiosDocs = pkgs.stdenv.mkDerivation {
+    name = "enhanced-leios-docs";
+    src = leiosDocs;
+    nativeBuildInputs = [ agda-web-docs-lib ];
+
+    configFile = pkgs.writeText "agda-docs.config.json" (
+      builtins.toJSON {
+        backButtonUrl = "/formal-spec/";
+        modules = [
+          "Leios"
+          "Cardano"
+          "Network"
+          "Ouroboros"
+        ];
+        githubUrl = "https://github.com/input-output-hk/ouroboros-leios-formal-spec";
+      }
+    );
+
+    buildPhase = ''
+      mkdir -p build
+      cp -r html/* build/
+      chmod -R u+w build/
+
+      agda-docs process -i build -c $configFile
+    '';
+
+    installPhase = ''
+      mkdir -p $out
+      cp -r build/* $out/
+    '';
+  };
+
   agdaWithDeps = agdaWithPkgs.withPackages (p: [
     p.standard-library
     p.standard-library-classes
@@ -72,5 +106,5 @@ in
     ;
 }
 // lib.optionalAttrs (system != "aarch64-linux") {
-  inherit leiosDocs;
+  inherit leiosDocs enhancedLeiosDocs;
 }
