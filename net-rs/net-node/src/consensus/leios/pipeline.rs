@@ -4,7 +4,7 @@
 //! its announcement: EquivocationCheck (3×Δhdr) → Voting (L_vote) →
 //! Diffusing (L_diff) → CertEligible (held until pruned).
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::time::Instant;
 
 use net_core::types::Point;
@@ -31,8 +31,8 @@ pub(crate) struct EbElection {
     pub(crate) validated_at: Instant,
     /// True after this node has cast its vote for this EB.
     pub(crate) voted: bool,
-    /// Unique voter IDs that have voted for this EB.
-    pub(crate) voters: HashSet<Vec<u8>>,
+    /// Per-voter stake: voter_id → stake.
+    pub(crate) voter_stakes: HashMap<Vec<u8>, u64>,
     /// True once quorum has been reached.
     pub(crate) quorum_reached: bool,
 }

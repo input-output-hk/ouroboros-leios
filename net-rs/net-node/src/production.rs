@@ -29,8 +29,8 @@ const BLS_SIGNATURE_BYTES: usize = 48;
 /// Decoded Leios vote body per CIP-0164.
 ///
 /// ```cddl
-/// persistent_vote     = [0, election_id, voter_id, endorser_block_hash, vote_sig]
-/// non_persistent_vote = [1, election_id, pool_id, eligibility_sig, endorser_block_hash, vote_sig]
+/// persistent_vote     = [0, election_id, voter_id, voter_stake, endorser_block_hash, vote_sig]
+/// non_persistent_vote = [1, election_id, pool_id, voter_stake, eligibility_sig, endorser_block_hash, vote_sig]
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct VoteBody {
@@ -39,6 +39,8 @@ pub struct VoteBody {
     pub election_id: u64,
     /// Voter/pool identifier.
     pub voter_id: Vec<u8>,
+    /// Voter's stake weight (for stake-weighted quorum).
+    pub voter_stake: u64,
     /// Non-persistent only: eligibility proof (BLS signature).
     pub eligibility_signature: Option<Vec<u8>>,
     /// Hash of the endorser block this vote endorses.
@@ -52,12 +54,14 @@ impl VoteBody {
     pub fn stub_persistent(
         election_id: u64,
         voter_id: &[u8],
+        voter_stake: u64,
         endorser_block_hash: &[u8; 32],
     ) -> Self {
         Self {
             tag: 0,
             election_id,
             voter_id: voter_id.to_vec(),
+            voter_stake,
             eligibility_signature: None,
             endorser_block_hash: *endorser_block_hash,
             vote_signature: vec![0u8; BLS_SIGNATURE_BYTES],
@@ -68,12 +72,14 @@ impl VoteBody {
     pub fn stub_non_persistent(
         election_id: u64,
         voter_id: &[u8],
+        voter_stake: u64,
         endorser_block_hash: &[u8; 32],
     ) -> Self {
         Self {
             tag: 1,
             election_id,
             voter_id: voter_id.to_vec(),
+            voter_stake,
             eligibility_signature: Some(vec![0u8; BLS_SIGNATURE_BYTES]),
             endorser_block_hash: *endorser_block_hash,
             vote_signature: vec![0u8; BLS_SIGNATURE_BYTES],
@@ -87,10 +93,11 @@ impl VoteBody {
 
         if self.tag == 0 {
             let _ = enc
-                .array(5)
+                .array(6)
                 .and_then(|e| e.u8(0))
                 .and_then(|e| e.u64(self.election_id))
                 .and_then(|e| e.bytes(&self.voter_id))
+                .and_then(|e| e.u64(self.voter_stake))
                 .and_then(|e| e.bytes(&self.endorser_block_hash))
                 .and_then(|e| e.bytes(&self.vote_signature));
         } else {
@@ -99,10 +106,11 @@ impl VoteBody {
                 .as_deref()
                 .unwrap_or(&[0u8; BLS_SIGNATURE_BYTES]);
             let _ = enc
-                .array(6)
+                .array(7)
                 .and_then(|e| e.u8(1))
                 .and_then(|e| e.u64(self.election_id))
                 .and_then(|e| e.bytes(&self.voter_id))
+                .and_then(|e| e.u64(self.voter_stake))
                 .and_then(|e| e.bytes(elig))
                 .and_then(|e| e.bytes(&self.endorser_block_hash))
                 .and_then(|e| e.bytes(&self.vote_signature));
@@ -121,9 +129,10 @@ impl VoteBody {
         let tag = dec.u8().ok()?;
 
         match tag {
-            0 if len >= 5 => {
+            0 if len >= 6 => {
                 let election_id = dec.u64().ok()?;
                 let voter_id = dec.bytes().ok()?.to_vec();
+                let voter_stake = dec.u64().ok()?;
                 let eb_hash_bytes = dec.bytes().ok()?;
                 if eb_hash_bytes.len() < 32 {
                     return None;
@@ -135,14 +144,16 @@ impl VoteBody {
                     tag,
                     election_id,
                     voter_id,
+                    voter_stake,
                     eligibility_signature: None,
                     endorser_block_hash,
                     vote_signature,
                 })
             }
-            1 if len >= 6 => {
+            1 if len >= 7 => {
                 let election_id = dec.u64().ok()?;
                 let voter_id = dec.bytes().ok()?.to_vec();
+                let voter_stake = dec.u64().ok()?;
                 let eligibility_signature = Some(dec.bytes().ok()?.to_vec());
                 let eb_hash_bytes = dec.bytes().ok()?;
                 if eb_hash_bytes.len() < 32 {
@@ -155,6 +166,7 @@ impl VoteBody {
                     tag,
                     election_id,
                     voter_id,
+                    voter_stake,
                     eligibility_signature,
                     endorser_block_hash,
                     vote_signature,
@@ -808,7 +820,7 @@ mod tests {
     #[test]
     fn vote_body_persistent_size() {
         let eb_hash = [0xAA; 32];
-        let vote = VoteBody::stub_persistent(42, &[0xBB; 32], &eb_hash);
+        let vote = VoteBody::stub_persistent(42, &[0xBB; 32], 100, &eb_hash);
         let encoded = vote.encode(130);
         assert_eq!(encoded.len(), 130);
     }
@@ -816,7 +828,7 @@ mod tests {
     #[test]
     fn vote_body_non_persistent_size() {
         let eb_hash = [0xAA; 32];
-        let vote = VoteBody::stub_non_persistent(42, &[0xBB; 32], &eb_hash);
+        let vote = VoteBody::stub_non_persistent(42, &[0xBB; 32], 100, &eb_hash);
         let encoded = vote.encode(180);
         assert_eq!(encoded.len(), 180);
     }
@@ -825,12 +837,13 @@ mod tests {
     fn vote_body_persistent_roundtrip() {
         let eb_hash = [0xCC; 32];
         let voter = [0xDD; 32];
-        let vote = VoteBody::stub_persistent(99, &voter, &eb_hash);
+        let vote = VoteBody::stub_persistent(99, &voter, 500, &eb_hash);
         let encoded = vote.encode(200);
         let decoded = VoteBody::decode(&encoded).expect("should decode");
         assert_eq!(decoded.tag, 0);
         assert_eq!(decoded.election_id, 99);
         assert_eq!(decoded.voter_id, voter.to_vec());
+        assert_eq!(decoded.voter_stake, 500);
         assert_eq!(decoded.endorser_block_hash, eb_hash);
         assert!(decoded.eligibility_signature.is_none());
         assert_eq!(decoded.vote_signature.len(), 48);
@@ -840,12 +853,13 @@ mod tests {
     fn vote_body_non_persistent_roundtrip() {
         let eb_hash = [0x11; 32];
         let voter = [0x22; 32];
-        let vote = VoteBody::stub_non_persistent(7, &voter, &eb_hash);
+        let vote = VoteBody::stub_non_persistent(7, &voter, 250, &eb_hash);
         let encoded = vote.encode(180);
         let decoded = VoteBody::decode(&encoded).expect("should decode");
         assert_eq!(decoded.tag, 1);
         assert_eq!(decoded.election_id, 7);
         assert_eq!(decoded.voter_id, voter.to_vec());
+        assert_eq!(decoded.voter_stake, 250);
         assert_eq!(decoded.endorser_block_hash, eb_hash);
         assert!(decoded.eligibility_signature.is_some());
         assert_eq!(decoded.vote_signature.len(), 48);
