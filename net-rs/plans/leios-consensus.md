@@ -34,8 +34,9 @@ validated against the spec and sim-rs (`sim-core/src/sim/linear_leios.rs`).
   calls `try_vote_on_eb` with `CommitteeSelection::decide_vote`. Produces
   structured `VoteBody` (130-180B CBOR) and injects via `InjectLeiosVotes`.
 - **Vote aggregation**: `on_validated_votes` parses vote bodies, extracts
-  `endorser_block_hash` + `voter_id`, attributes to elections. Quorum at ≥3
-  unique voters (MVP threshold).
+  `endorser_block_hash` + `voter_id` + `voter_stake`, attributes to elections.
+  Stake-weighted quorum: `Σ(voter_stake) ≥ quorum_stake_fraction × total_stake`
+  (default 0.75). Vote bodies carry self-declared stake in CBOR encoding.
 - **Certified EB in RB headers**: `has_certified_eb()` checks for quorum +
   CertEligible phase. `try_produce_block` emits 11-field header with
   `certified_eb=true`.
@@ -53,7 +54,7 @@ consensus/
 ```
 
 ### Test coverage
-149 tests across the workspace. Key Leios tests:
+152 tests across the workspace. Key Leios tests:
 - Pipeline phase boundaries (pure function)
 - Election lifecycle (create → advance through phases → prune)
 - Voting (phase trigger, no double vote, no vote during equivocation check)
@@ -86,14 +87,36 @@ Zero peer evictions, 100% EB propagation.
 
 ## What's next
 
-### Stake-weighted quorum
+### WfaLs sortition formula
 
-Current quorum is a flat ≥3 voters. Should be stake-weighted:
-`Σ(voter_stake) ≥ quorum_fraction × total_stake`. Requires either:
-- Encoding stake in vote bodies (MVP approach), or
-- Looking up voter stake from a registry (closer to spec)
+`CommitteeSelection::WfaLs` at uniform stake never reaches quorum. With 25 equal-stake
+nodes (40/1000 each) and `vote_generation_probability=0.8`, observed quorum rate is 0/EB
+because:
+- Persistent committee: requires `stake_fraction ≥ 1 - persistent_stake_fraction`
+  (default 0.7). No uniform-stake node qualifies → all voting falls to LS.
+- Non-persistent: `per_node = vote_probability × stake_fraction = 0.8 × 0.04 = 0.032`.
+  Expected stake voted per EB = `vote_prob × Σ(stake²)/total_stake` ≈ 32 (3.2%) for
+  uniform stake — far below the 75% quorum threshold.
 
-Config field `quorum_stake_fraction` already exists (default 0.75).
+The variable `vote_generation_probability` reads as "fraction of stake that votes" but
+the formula treats it as "per-stake-unit win rate scaled by stake_fraction", which under-
+shoots dramatically. Three fix options:
+
+1. **Drop `stake_fraction` from `per_node`** (simplest):
+   `per_node = vote_probability`. Each node votes with prob `vote_prob`; vote carries
+   full stake. `Σ p × stake = vote_prob × total_stake`. Stake-flat per-node lottery,
+   stake-weighted at quorum. Loses "bigger stakers vote more often" property.
+2. **Per-stake-unit lottery**:
+   `per_node = 1 - (1 - p_unit)^stake` with `p_unit` calibrated so the expectation hits
+   the target. Reproduces "bigger stakers vote more often" while still hitting the
+   aggregate target.
+3. **Variable-weight votes** (closest to CIP-0164):
+   each node draws `Binomial(stake, p_unit)` ballots; quorum sums ballots, not stake.
+   Bigger refactor — voting code currently emits one vote per node carrying full stake.
+
+WfaLs at scale also needs a non-uniform stake distribution before persistent voters appear.
+For uniform-stake test clusters, `EveryoneVotes` exercises the quorum path cleanly
+(verified: 25/25 nodes detect quorum on every EB).
 
 ### Ledger state for EB transactions
 
@@ -108,9 +131,14 @@ no ledger state concept beyond fake validation delays. Work needed:
 ### Telemetry
 
 Missing events that would help cluster analysis:
-- `LeiosCertFormed { node, eb_point, vote_count }`
-- `RbCertifiedEb { node, rb_point, eb_point }`
-- `LeiosElectionExpired { node, eb_point, had_quorum }`
+- `LeiosCertFormed { node, eb_point, vote_count, voted_stake }` — fired when
+  `record_vote` flips `quorum_reached` to true. Currently only logged via `tracing::info!`.
+- `RbCertifiedEb { node, rb_point, eb_point }` — fired when an RB header is produced
+  with `certified_eb=true`. Cluster events show RBGenerated but with no cert flag.
+- `LeiosElectionExpired { node, eb_point, had_quorum, voted_stake, total_voters }` —
+  fired when an election is pruned past `dedup_window`, with final tally for analysis.
+
+Without these, cluster JSONL only shows EB/vote diffusion, not the certification outcome.
 
 ### EB selection policy
 
@@ -118,6 +146,13 @@ When multiple EBs reach CertEligible, `has_certified_eb()` returns
 `any(quorum && CertEligible)` with no preference. Need a selection
 strategy (e.g. oldest-first to minimize latency, or per-slot to avoid
 starvation).
+
+### TX bitmap selection policy
+
+`FetchLeiosBlockTxs` carries a `BTreeMap<u16, u64>` bitmap for selective TX
+addressing, plumbed end-to-end. Consensus always sends `BTreeMap::new()` (i.e.
+fetch all txs). No policy yet for "fetch only txs not already in mempool" — the
+intended saving the bitmap is meant to enable.
 
 ### Deferred
 

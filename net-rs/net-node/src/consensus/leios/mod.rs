@@ -51,6 +51,10 @@ pub struct LeiosConsensus {
     elections: HashMap<[u8; 32], EbElection>,
     /// Voting configuration (committee selection, stake, vote sizes).
     voting_config: VotingConfig,
+    /// Fraction of total stake required for quorum (0.0–1.0).
+    quorum_stake_fraction: f64,
+    /// Total stake across all nodes in the network.
+    total_stake: u64,
     /// RNG for committee selection sortition.
     rng: StdRng,
     /// Dynamic config for vote_generation_probability.
@@ -64,6 +68,8 @@ impl LeiosConsensus {
         validator: Validator,
         pipeline: PipelineConfig,
         voting_config: VotingConfig,
+        quorum_stake_fraction: f64,
+        total_stake: u64,
         seed: Option<u64>,
         dyn_config: watch::Receiver<DynamicConfig>,
     ) -> Self {
@@ -76,6 +82,8 @@ impl LeiosConsensus {
             current_slot: 0,
             elections: HashMap::new(),
             voting_config,
+            quorum_stake_fraction,
+            total_stake,
             rng: match seed {
                 Some(s) => StdRng::seed_from_u64(s),
                 None => StdRng::from_entropy(),
@@ -264,7 +272,7 @@ impl LeiosConsensus {
                     phase,
                     validated_at: Instant::now(),
                     voted: false,
-                    voters: std::collections::HashSet::new(),
+                    voter_stakes: HashMap::new(),
                     quorum_reached: false,
                 },
             );
@@ -280,6 +288,9 @@ impl LeiosConsensus {
                     &mut self.elections,
                     &body.endorser_block_hash,
                     body.voter_id.clone(),
+                    body.voter_stake,
+                    self.quorum_stake_fraction,
+                    self.total_stake,
                     &self.node_id,
                 );
             }
@@ -324,7 +335,7 @@ impl LeiosConsensus {
     fn election_voter_count(&self, hash: &[u8; 32]) -> usize {
         self.elections
             .get(hash)
-            .map(|e| e.voters.len())
+            .map(|e| e.voter_stakes.len())
             .unwrap_or(0)
     }
 
@@ -403,6 +414,8 @@ mod tests {
             validator,
             test_pipeline(),
             test_voting_config(),
+            0.75, // quorum_stake_fraction
+            1000, // total_stake
             Some(42),
             test_dyn_config(),
         )
@@ -746,7 +759,7 @@ mod tests {
 
         // Build a vote body referencing that EB's hash.
         let eb_hash = point_hash(0);
-        let body = crate::production::VoteBody::stub_persistent(0, b"voter-1", &eb_hash);
+        let body = crate::production::VoteBody::stub_persistent(0, b"voter-1", 100, &eb_hash);
         let encoded = body.encode(130);
 
         leios.on_validated_votes(&[encoded]);
@@ -755,7 +768,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn quorum_reached_after_enough_votes() {
+    async fn quorum_reached_after_enough_stake() {
         let (tx, _rx) = mpsc::channel(8);
         let (validator, _) = test_validator();
         let mut leios = test_leios(tx, validator);
@@ -763,13 +776,13 @@ mod tests {
         leios.on_slot(0).await;
         leios.on_validated_eb(point(0));
 
+        // total_stake=1000, quorum=0.75 → threshold=750
         let eb_hash = point_hash(0);
-        for i in 0..3u8 {
-            let body = crate::production::VoteBody::stub_persistent(0, &[i], &eb_hash);
-            leios.on_validated_votes(&[body.encode(130)]);
-        }
+        let body1 = crate::production::VoteBody::stub_persistent(0, &[1], 400, &eb_hash);
+        let body2 = crate::production::VoteBody::stub_persistent(0, &[2], 350, &eb_hash);
+        leios.on_validated_votes(&[body1.encode(130), body2.encode(130)]);
 
-        assert_eq!(leios.election_voter_count(&eb_hash), 3);
+        assert_eq!(leios.election_voter_count(&eb_hash), 2);
         assert!(leios.election_quorum(&eb_hash));
     }
 
@@ -783,7 +796,7 @@ mod tests {
         leios.on_validated_eb(point(0));
 
         let eb_hash = point_hash(0);
-        let body = crate::production::VoteBody::stub_persistent(0, b"same-voter", &eb_hash);
+        let body = crate::production::VoteBody::stub_persistent(0, b"same-voter", 500, &eb_hash);
         let encoded = body.encode(130);
 
         leios.on_validated_votes(&[encoded.clone()]);

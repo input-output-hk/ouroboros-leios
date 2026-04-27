@@ -43,11 +43,11 @@ pub(crate) async fn try_vote_on_eb(
         VoteDecision::NoVote => return false,
         VoteDecision::PersistentVote => (
             config.persistent_vote_bytes,
-            VoteBody::stub_persistent(eb_slot, node_id.as_bytes(), eb_hash),
+            VoteBody::stub_persistent(eb_slot, node_id.as_bytes(), config.stake, eb_hash),
         ),
         VoteDecision::NonPersistentVote => (
             config.non_persistent_vote_bytes,
-            VoteBody::stub_non_persistent(eb_slot, node_id.as_bytes(), eb_hash),
+            VoteBody::stub_non_persistent(eb_slot, node_id.as_bytes(), config.stake, eb_hash),
         ),
     };
 

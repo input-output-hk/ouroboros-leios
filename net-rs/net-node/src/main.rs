@@ -92,6 +92,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             persistent_vote_bytes: config.production.persistent_vote_bytes,
             non_persistent_vote_bytes: config.production.non_persistent_vote_bytes,
         },
+        config.production.quorum_stake_fraction,
+        config.production.total_stake,
         config.seed,
         dyn_rx.clone(),
     );

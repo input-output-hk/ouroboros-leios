@@ -34,6 +34,8 @@ impl Consensus {
         security_param_k: u64,
         pipeline: PipelineConfig,
         voting_config: VotingConfig,
+        quorum_stake_fraction: f64,
+        total_stake: u64,
         seed: Option<u64>,
         dyn_config: watch::Receiver<DynamicConfig>,
     ) -> Self {
@@ -49,6 +51,8 @@ impl Consensus {
             validator,
             pipeline,
             voting_config,
+            quorum_stake_fraction,
+            total_stake,
             seed,
             dyn_config,
         );
