@@ -19,10 +19,11 @@ const handleStyle = {
   pointerEvents: "none" as const,
 };
 
-type FlashType = "rb-produced" | "rb-received" | "eb-produced" | "eb-received" | "vote-produced" | "vote-received" | "rolledback" | null;
+type FlashType = "rb-produced" | "rb-certified" | "rb-received" | "eb-produced" | "eb-received" | "vote-produced" | "vote-received" | "rolledback" | null;
 
 function borderColor(selected: boolean, flash: FlashType): string {
   if (flash === "rolledback") return "#9c27b0";
+  if (flash === "rb-certified") return "#ffd54f";
   if (flash === "rb-produced") return "#a5d6a7";
   if (flash === "rb-received") return "#81c784";
   if (flash === "eb-produced") return "#90caf9";
@@ -35,6 +36,7 @@ function borderColor(selected: boolean, flash: FlashType): string {
 
 function bgColor(_selected: boolean, flash: FlashType): string {
   if (flash === "rolledback") return "#4a148c";
+  if (flash === "rb-certified") return "#5d4037";
   if (flash === "rb-produced") return "#1b5e20";
   if (flash === "rb-received") return "#4e342e";
   if (flash === "eb-produced") return "#0d47a1";
@@ -62,12 +64,13 @@ function TopologyNodeInner({ data }: Props) {
         alignItems: "center",
         justifyContent: "center",
         bgcolor: bgColor(selected, flash),
-        border: selected ? 4 : 2,
+        border: flash === "rb-certified" ? 4 : selected ? 4 : 2,
         borderColor: borderColor(selected, flash),
         cursor: "pointer",
         "&:hover": { borderColor: "primary.light" },
         position: "relative",
-        transition: "background-color 0.3s, border-color 0.3s",
+        transition: "background-color 0.3s, border-color 0.3s, box-shadow 0.3s",
+        boxShadow: flash === "rb-certified" ? "0 0 14px 4px #ffd54faa" : "none",
       }}
     >
       <Typography variant="caption" fontWeight="bold" lineHeight={1.2}>

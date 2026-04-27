@@ -48,7 +48,7 @@ export interface DashboardState {
   toggleEventsPause: () => void;
 
   // Node flash (block produced/received/rolled back)
-  nodeFlash: Record<string, "rb-produced" | "rb-received" | "eb-produced" | "eb-received" | "vote-produced" | "vote-received" | "rolledback" | null>;
+  nodeFlash: Record<string, "rb-produced" | "rb-certified" | "rb-received" | "eb-produced" | "eb-received" | "vote-produced" | "vote-received" | "rolledback" | null>;
 
   // Selection
   selectedNodeId: string | null;
@@ -259,9 +259,11 @@ export const useStore = create<DashboardState>()((set, get) => ({
     );
 
     // Compute flashes from new events.
-    // "produced" takes priority — don't let a received overwrite a produced for the same node.
-    type FlashType = "rb-produced" | "rb-received" | "eb-produced" | "eb-received" | "vote-produced" | "vote-received" | "rolledback";
-    const produced = new Set(["rb-produced", "eb-produced", "vote-produced"]);
+    // Priority order: rolledback > rb-certified > produced > received.
+    // RbCertifiedEb fires alongside RBGenerated on the same producer, and
+    // is the more specific signal — it should override rb-produced.
+    type FlashType = "rb-produced" | "rb-certified" | "rb-received" | "eb-produced" | "eb-received" | "vote-produced" | "vote-received" | "rolledback";
+    const produced = new Set(["rb-produced", "rb-certified", "eb-produced", "vote-produced"]);
     const flashes: Record<string, FlashType> = {};
     for (const e of newEvents) {
       const node = e.message?.node;
@@ -270,7 +272,8 @@ export const useStore = create<DashboardState>()((set, get) => ({
       if (type === "RolledBack") { flashes[node] = "rolledback"; continue; }
       const cur = flashes[node];
       if (cur === "rolledback") continue;
-      if (type === "RBGenerated") flashes[node] = "rb-produced";
+      if (type === "RbCertifiedEb") flashes[node] = "rb-certified";
+      else if (type === "RBGenerated" && cur !== "rb-certified") flashes[node] = "rb-produced";
       else if (type === "EBGenerated") flashes[node] = "eb-produced";
       else if (type === "VTBundleGenerated") flashes[node] = "vote-produced";
       else if (type === "RBReceived" && (!cur || !produced.has(cur))) flashes[node] = "rb-received";
