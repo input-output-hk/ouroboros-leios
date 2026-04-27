@@ -7,7 +7,7 @@ MODES=(wfa-ls everyone top-stake-fraction)
 
 for mode in "${MODES[@]}"; do
   echo "=== Voting mode: $mode ==="
-  bash "$SCRIPT_DIR/run-all-NA.sh" -m "$mode" "$@"
+  bash "$SCRIPT_DIR/run-sweep.sh" -m "$mode" "$@"
   echo ""
 done
 
