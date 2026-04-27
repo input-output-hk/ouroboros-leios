@@ -331,7 +331,7 @@ function MonthlyReviewsSection() {
               </p>
               <Link
                 style={{ justifySelf: "flex-end", marginTop: "auto" }}
-                to="/docs/development/monthly-reviews"
+                to="/docs/monthly-reviews"
               >
                 Catch up on past reviews
               </Link>
