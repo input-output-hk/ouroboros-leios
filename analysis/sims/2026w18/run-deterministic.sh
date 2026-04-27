@@ -65,7 +65,7 @@ TX_SPACING_HONEST=$(echo "scale=3; $TX_SIZE / $THROUGHPUT / 1000" | bc)
 
 # Deterministic turbo mode: sequential DES with sharded parallelism
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$SCRIPT_DIR/../../../.."
+REPO_ROOT="$SCRIPT_DIR/../../.."
 PARAMS_DIR="$REPO_ROOT/sim-rs/parameters"
 TURBO="$PARAMS_DIR/turbo.yaml"
 TOPO_SOURCE="$REPO_ROOT/data/simulation/pseudo-mainnet/$NETWORK.yaml"
