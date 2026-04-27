@@ -199,7 +199,21 @@ fn find_components(n: usize, adj: &[std::collections::HashSet<usize>]) -> Vec<Ve
     components
 }
 
+/// Default fraction of nodes that are zero-stake relays under
+/// `mainnet-shaped`. Derived from analysis of
+/// data/simulation/pseudo-mainnet/topology-v2.yaml: 534 / 750 = 0.712.
+const MAINNET_RELAY_FRACTION: f64 = 0.71;
+
 /// Distribute stake among nodes.
+///
+/// Strategies:
+/// - `"equal"`: every node gets `total_stake / n`.
+/// - `"mainnet-shaped"`: `MAINNET_RELAY_FRACTION` of the nodes get stake 0
+///   (relays); the remaining nodes (pools) split the total uniformly. This
+///   captures the dominant feature of Cardano mainnet's stake distribution
+///   — most nodes are zero-stake relays, with a saturated pool tail that's
+///   nearly uniform (slope ≈ -0.06 in log-rank). Pools occupy the lower
+///   indices so node-0..node-(pool_count-1) are pools.
 fn distribute_stake(n: usize, total_stake: u64, strategy: &str) -> Vec<u64> {
     match strategy {
         "equal" => {
@@ -210,6 +224,23 @@ fn distribute_stake(n: usize, total_stake: u64, strategy: &str) -> Vec<u64> {
             if let Some(last) = stakes.last_mut() {
                 *last += remainder;
             }
+            stakes
+        }
+        "mainnet-shaped" => {
+            let relay_count = ((n as f64) * MAINNET_RELAY_FRACTION).round() as usize;
+            let relay_count = relay_count.min(n.saturating_sub(1));
+            let pool_count = n - relay_count;
+            if pool_count == 0 {
+                return vec![0; n];
+            }
+            let per_pool = total_stake / pool_count as u64;
+            let remainder = total_stake % pool_count as u64;
+            let mut stakes = Vec::with_capacity(n);
+            for i in 0..pool_count {
+                let extra = if (i as u64) < remainder { 1 } else { 0 };
+                stakes.push(per_pool + extra);
+            }
+            stakes.extend(std::iter::repeat_n(0, relay_count));
             stakes
         }
         _ => {
@@ -282,6 +313,56 @@ mod tests {
     fn test_stake_distribution_equal() {
         let stakes = distribute_stake(3, 1000, "equal");
         assert_eq!(stakes, vec![333, 333, 334]);
+    }
+
+    #[test]
+    fn test_stake_distribution_mainnet_shaped_relay_split() {
+        // 100 nodes × 0.71 = 71 relays, 29 pools.
+        let stakes = distribute_stake(100, 1_000_000, "mainnet-shaped");
+        let zero_count = stakes.iter().filter(|s| **s == 0).count();
+        let pool_count = stakes.iter().filter(|s| **s > 0).count();
+        assert_eq!(zero_count, 71);
+        assert_eq!(pool_count, 29);
+    }
+
+    #[test]
+    fn test_stake_distribution_mainnet_shaped_total_preserved() {
+        let total = 12_697_141_247u64;
+        let stakes = distribute_stake(750, total, "mainnet-shaped");
+        assert_eq!(stakes.iter().sum::<u64>(), total);
+    }
+
+    #[test]
+    fn test_stake_distribution_mainnet_shaped_pools_first() {
+        let stakes = distribute_stake(10, 1_000_000, "mainnet-shaped");
+        // Pools occupy low indices; relays follow.
+        let mut seen_zero = false;
+        for s in &stakes {
+            if *s == 0 {
+                seen_zero = true;
+            } else {
+                assert!(!seen_zero, "pool encountered after relay");
+            }
+        }
+    }
+
+    #[test]
+    fn test_stake_distribution_mainnet_shaped_small_n() {
+        // 2 nodes, 0.71 fraction → would round to 1 relay, but min 1 pool.
+        let stakes = distribute_stake(2, 1000, "mainnet-shaped");
+        assert_eq!(stakes.len(), 2);
+        assert_eq!(stakes.iter().sum::<u64>(), 1000);
+        assert_eq!(stakes.iter().filter(|s| **s > 0).count(), 1);
+    }
+
+    #[test]
+    fn test_stake_distribution_mainnet_shaped_pools_nearly_uniform() {
+        // Within the pool prefix, stakes differ by at most 1 (rounding remainder).
+        let stakes = distribute_stake(100, 1_000_007, "mainnet-shaped");
+        let pool_stakes: Vec<u64> = stakes.iter().copied().filter(|s| *s > 0).collect();
+        let min = *pool_stakes.iter().min().unwrap();
+        let max = *pool_stakes.iter().max().unwrap();
+        assert!(max - min <= 1, "expected near-uniform, got {min}..{max}");
     }
 
     #[test]
