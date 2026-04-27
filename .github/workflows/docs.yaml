@@ -220,26 +220,11 @@ jobs:
           cp result/leios-design.pdf site/static/ 
           ls -la site/static/leios-design.pdf
 
-      - name: 📚 Build formal-spec HTML documentation
+      - name: 📚 Build enhanced formal-spec HTML documentation
         run: |
-          nix build .#leiosDocs
-          mkdir -p formal-spec-html
-          cp -r result/html/* formal-spec-html/
-          chmod -R +w formal-spec-html/
-          ls -la formal-spec-html/
-
-      - name: 🔄 Enhance formal-spec with interactive features
-        uses: will-break-it/agda-web-docs-lib@v1
-        with:
-          input-dir: formal-spec-html
-          config-file: site/agda-docs.config.json
-          cache-dependency-path: site/package-lock.json
-          node-options: "--max-old-space-size=8192 --expose-gc"
-
-      - name: 📦 Copy enhanced formal-spec to site
-        run: |
+          nix build .#enhancedLeiosDocs -L
           mkdir -p site/static/formal-spec
-          cp -r formal-spec-html/* site/static/formal-spec/
+          cp -r result/* site/static/formal-spec/
           echo "Formal spec files copied:"
           ls -la site/static/formal-spec/ | head -20
 
