@@ -158,6 +158,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 // Leios: advance pipeline phases and trigger voting.
                 if leios {
                     consensus.on_slot(slot).await;
+                    for ev in consensus.drain_leios_telemetry() {
+                        telem.record(ev);
+                    }
                 }
 
                 // Praos: try to produce a ranking block. If the mempool
@@ -166,6 +169,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 let prev_hash = consensus.tip_hash();
                 let next_block_no = consensus.next_block_number();
                 let certified_eb = leios && consensus.has_certified_eb();
+                let certified_eb_slot = if certified_eb { consensus.certified_eb_slot() } else { None };
                 if let Some(produced) = producer.try_produce_block(slot, prev_hash, next_block_no, certified_eb, &mempool) {
                     info!(
                         node_id = %node_id,
@@ -181,6 +185,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         slot,
                         size_bytes: produced.body.raw.len(),
                     });
+                    if let Some(eb_slot) = certified_eb_slot {
+                        telem.record(NodeEvent::RbCertifiedEb {
+                            node: node_id.clone(),
+                            rb_slot: slot,
+                            eb_slot,
+                        });
+                    }
 
                     // If an EB was produced (overflow path), inject it.
                     if let Some(ref eb) = produced.announced_eb {
@@ -255,6 +266,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         node: node_id.clone(),
                         slot: telem.current_slot,
                     });
+                }
+                for ev in consensus.drain_leios_telemetry() {
+                    telem.record(ev);
                 }
             }
             _ = stats_tick.tick(), if stats_interval > 0 => {
