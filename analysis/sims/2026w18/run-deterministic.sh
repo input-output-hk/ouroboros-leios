@@ -216,7 +216,7 @@ trap cleanup EXIT
 
 grep -E -v '(Slot|CpuTask|Lottery)' sim.log | pigz -p 3 -9c > "$OUTDIR/sim.log.gz" &
 
-../../sim-cli "${SIM_PARAMS[@]}" network.yaml --slots "$SIM_STOP" --conformance-events sim.log > "$OUTDIR/stdout" 2> "$OUTDIR/stderr"
+/usr/bin/time -v -o "$OUTDIR/time.txt" ../../sim-cli "${SIM_PARAMS[@]}" network.yaml --slots "$SIM_STOP" --conformance-events sim.log > "$OUTDIR/stdout" 2> "$OUTDIR/stderr"
 
 wait
 
