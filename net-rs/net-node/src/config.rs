@@ -325,6 +325,13 @@ pub struct ProductionConfig {
     #[serde(default = "default_total_stake")]
     pub total_stake: u64,
 
+    /// Network-wide stake registry: each entry is one node's id + stake.
+    /// Distributed at startup (mirrors what a real node reads from the
+    /// ledger at epoch boundaries). Empty by default for tests that
+    /// don't need ranked voting; populated by net-cluster from topology.
+    #[serde(default)]
+    pub stake_registry: Vec<StakeEntry>,
+
     /// Per-slot probability of producing a ranking block.
     #[serde(default = "default_rb_probability")]
     pub rb_generation_probability: f64,
@@ -376,6 +383,15 @@ pub struct ProductionConfig {
     pub rb_body_max_bytes: usize,
 }
 
+/// One entry in the network-wide stake registry. The pair is what each
+/// node uses to make ranked-stake committee decisions (top-N, persistent
+/// committee), independently arriving at the same answer everywhere.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+pub struct StakeEntry {
+    pub node_id: String,
+    pub stake: u64,
+}
+
 fn default_total_stake() -> u64 {
     1000
 }
@@ -409,6 +425,7 @@ impl Default for ProductionConfig {
         Self {
             stake: 0,
             total_stake: default_total_stake(),
+            stake_registry: Vec::new(),
             rb_generation_probability: default_rb_probability(),
             eb_generation_probability: 0.0,
             vote_generation_probability: 0.0,
@@ -761,6 +778,43 @@ mod tests {
     fn set_overrides_bool() {
         let config = load(&[], &["leios_enabled=true".to_string()]).unwrap();
         assert!(config.leios_enabled);
+    }
+
+    #[test]
+    fn stake_registry_roundtrips_via_toml() {
+        let toml_text = r#"
+[production]
+stake = 100
+
+[[production.stake_registry]]
+node_id = "node-0"
+stake = 100
+
+[[production.stake_registry]]
+node_id = "node-1"
+stake = 250
+
+[[production.stake_registry]]
+node_id = "node-2"
+stake = 0
+"#;
+        let figment = Figment::from(Serialized::defaults(NodeConfig::default()))
+            .merge(Toml::string(toml_text));
+        let config: NodeConfig = figment.extract().unwrap();
+        let registry = &config.production.stake_registry;
+        assert_eq!(registry.len(), 3);
+        assert_eq!(registry[0].node_id, "node-0");
+        assert_eq!(registry[0].stake, 100);
+        assert_eq!(registry[1].node_id, "node-1");
+        assert_eq!(registry[1].stake, 250);
+        assert_eq!(registry[2].node_id, "node-2");
+        assert_eq!(registry[2].stake, 0);
+    }
+
+    #[test]
+    fn stake_registry_default_empty() {
+        let config = NodeConfig::default();
+        assert!(config.production.stake_registry.is_empty());
     }
 
     #[test]

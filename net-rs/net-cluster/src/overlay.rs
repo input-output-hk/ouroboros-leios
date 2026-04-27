@@ -47,9 +47,21 @@ pub fn generate_overlays(
 
     let mut paths = Vec::with_capacity(topology.nodes.len());
 
+    let stake_registry: Vec<(String, u64)> = topology
+        .nodes
+        .iter()
+        .map(|n| (n.node_id.clone(), n.stake))
+        .collect();
+
     for node in &topology.nodes {
         let num_nodes = topology.nodes.len();
-        let toml_content = render_overlay(node, aggregator_port, stats_interval_secs, num_nodes);
+        let toml_content = render_overlay(
+            node,
+            aggregator_port,
+            stats_interval_secs,
+            num_nodes,
+            &stake_registry,
+        );
         let path = temp_dir.join(format!("node-{}.toml", node.index));
         std::fs::write(&path, &toml_content)?;
         paths.push(path);
@@ -68,6 +80,7 @@ fn render_overlay(
     aggregator_port: u16,
     stats_interval_secs: u64,
     num_nodes: usize,
+    stake_registry: &[(String, u64)],
 ) -> String {
     let mut s = String::new();
 
@@ -80,6 +93,12 @@ fn render_overlay(
     writeln!(s, "[production]").ok();
     writeln!(s, "stake = {}", node.stake).ok();
     writeln!(s).ok();
+    for (id, stake) in stake_registry {
+        writeln!(s, "[[production.stake_registry]]").ok();
+        writeln!(s, "node_id = \"{id}\"").ok();
+        writeln!(s, "stake = {stake}").ok();
+        writeln!(s).ok();
+    }
     writeln!(s, "[telemetry]").ok();
     writeln!(s, "stats_interval_secs = {stats_interval_secs}").ok();
     writeln!(s).ok();
@@ -168,7 +187,7 @@ mod tests {
     #[test]
     fn test_render_overlay() {
         let node = sample_node();
-        let toml = render_overlay(&node, 9100, 5, 5);
+        let toml = render_overlay(&node, 9100, 5, 5, &[]);
 
         assert!(toml.contains("node_id = \"node-0\""));
         assert!(toml.contains("listen_address = \"127.0.0.1:30000\""));
@@ -187,9 +206,29 @@ mod tests {
     #[test]
     fn test_render_parses_as_toml() {
         let node = sample_node();
-        let toml_str = render_overlay(&node, 9100, 5, 5);
+        let toml_str = render_overlay(&node, 9100, 5, 5, &[]);
         let parsed: toml::Value = toml::from_str(&toml_str).expect("generated TOML should parse");
         assert_eq!(parsed["node_id"].as_str(), Some("node-0"));
+    }
+
+    #[test]
+    fn test_render_overlay_with_stake_registry() {
+        let node = sample_node();
+        let registry = vec![
+            ("node-0".to_string(), 500u64),
+            ("node-1".to_string(), 300u64),
+            ("node-2".to_string(), 0u64),
+        ];
+        let toml_str = render_overlay(&node, 9100, 5, 3, &registry);
+        let parsed: toml::Value = toml::from_str(&toml_str).expect("generated TOML should parse");
+        let entries = parsed["production"]["stake_registry"]
+            .as_array()
+            .expect("stake_registry is an array");
+        assert_eq!(entries.len(), 3);
+        assert_eq!(entries[0]["node_id"].as_str(), Some("node-0"));
+        assert_eq!(entries[0]["stake"].as_integer(), Some(500));
+        assert_eq!(entries[2]["node_id"].as_str(), Some("node-2"));
+        assert_eq!(entries[2]["stake"].as_integer(), Some(0));
     }
 
     #[test]
