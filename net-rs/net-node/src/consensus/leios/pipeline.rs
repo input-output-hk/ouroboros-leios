@@ -31,8 +31,8 @@ pub(crate) struct EbElection {
     pub(crate) validated_at: Instant,
     /// True after this node has cast its vote for this EB.
     pub(crate) voted: bool,
-    /// Per-voter stake: voter_id → stake.
-    pub(crate) voter_stakes: HashMap<Vec<u8>, u64>,
+    /// Per-voter weight: voter_id+tag → derived weight.
+    pub(crate) voter_weights: HashMap<Vec<u8>, u32>,
     /// True once quorum has been reached.
     pub(crate) quorum_reached: bool,
 }

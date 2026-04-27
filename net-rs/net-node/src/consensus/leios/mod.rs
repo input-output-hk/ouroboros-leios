@@ -16,7 +16,7 @@ mod pipeline;
 pub(crate) mod voting;
 mod wfa;
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::time::{Duration, Instant};
 
 use net_core::multi_peer::types::{NetworkCommand, NetworkEvent};
@@ -26,7 +26,7 @@ use rand::SeedableRng;
 use tokio::sync::{mpsc, watch};
 use tracing::info;
 
-use crate::config::DynamicConfig;
+use crate::config::{CommitteeSelection, DynamicConfig, StakeEntry};
 use crate::telemetry::NodeEvent;
 use crate::validation::{LedgerCommand, Validator};
 
@@ -51,32 +51,74 @@ pub struct LeiosConsensus {
     current_slot: u64,
     /// Per-EB elections, keyed by EB hash.
     elections: HashMap<[u8; 32], EbElection>,
+    /// Committee selection mode.
+    committee_selection: CommitteeSelection,
     /// Voting configuration (committee selection, stake, vote sizes).
     voting_config: VotingConfig,
-    /// Fraction of total stake required for quorum (0.0–1.0).
-    quorum_stake_fraction: f64,
-    /// Total stake across all nodes in the network.
+    /// Per-pool persistent committee allocation, identical on every node.
+    persistent_committee: BTreeMap<String, u32>,
+    /// Network-wide stake registry. Used to look up a voter's stake when
+    /// re-running the NPV lottery for incoming votes.
+    stake_registry: BTreeMap<String, u64>,
+    /// Total network stake (sum of stake_registry).
     total_stake: u64,
-    /// RNG for committee selection sortition.
+    /// Fraction of expected committee weight required for quorum.
+    quorum_weight_fraction: f64,
+    /// Σ persistent_seats + non_persistent_voters. Threshold base.
+    expected_committee_size: u32,
+    /// RNG reserved for future randomization (currently unused: PV is
+    /// deterministic from the cached committee, NPV from the signature).
+    #[allow(dead_code)]
     rng: StdRng,
-    /// Dynamic config for vote_generation_probability.
+    /// Dynamic config (currently unused; reserved for future hot-reload).
+    #[allow(dead_code)]
     dyn_config: watch::Receiver<DynamicConfig>,
     /// Telemetry events buffered for the caller to drain.
     pending_telemetry: Vec<NodeEvent>,
 }
 
 impl LeiosConsensus {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         node_id: String,
         commands: mpsc::Sender<NetworkCommand>,
         validator: Validator,
         pipeline: PipelineConfig,
-        voting_config: VotingConfig,
-        quorum_stake_fraction: f64,
-        total_stake: u64,
-        seed: Option<u64>,
+        committee_selection: CommitteeSelection,
+        stake: u64,
+        stake_registry_entries: &[StakeEntry],
+        persistent_vote_bytes: usize,
+        non_persistent_vote_bytes: usize,
+        quorum_weight_fraction: f64,
+        committee_seed: u64,
+        rng_seed: Option<u64>,
         dyn_config: watch::Receiver<DynamicConfig>,
     ) -> Self {
+        let total_stake: u64 = stake_registry_entries.iter().map(|e| e.stake).sum();
+        let persistent_committee =
+            wfa::build_committee(&committee_selection, stake_registry_entries, committee_seed);
+        let expected_committee_size =
+            wfa::expected_committee_size(&committee_selection, &persistent_committee);
+        let persistent_seats = persistent_committee.get(&node_id).copied().unwrap_or(0);
+        let stake_registry: BTreeMap<String, u64> = stake_registry_entries
+            .iter()
+            .map(|e| (e.node_id.clone(), e.stake))
+            .collect();
+        let voting_config = VotingConfig {
+            committee_selection: committee_selection.clone(),
+            stake,
+            total_stake,
+            persistent_vote_bytes,
+            non_persistent_vote_bytes,
+            persistent_seats,
+        };
+        info!(
+            node_id = %node_id,
+            persistent_seats,
+            expected_committee_size,
+            committee_pools = persistent_committee.len(),
+            "leios committee initialized"
+        );
         Self {
             node_id,
             commands,
@@ -85,10 +127,14 @@ impl LeiosConsensus {
             pipeline,
             current_slot: 0,
             elections: HashMap::new(),
+            committee_selection,
             voting_config,
-            quorum_stake_fraction,
+            persistent_committee,
+            stake_registry,
             total_stake,
-            rng: match seed {
+            quorum_weight_fraction,
+            expected_committee_size,
+            rng: match rng_seed {
                 Some(s) => StdRng::seed_from_u64(s),
                 None => StdRng::from_entropy(),
             },
@@ -135,15 +181,12 @@ impl LeiosConsensus {
             .collect();
 
         // Vote on each eligible EB.
-        let vote_prob = self.dyn_config.borrow().vote_generation_probability;
         for (hash, eb_slot) in to_vote {
             if voting::try_vote_on_eb(
                 &self.node_id,
                 &hash,
                 eb_slot,
                 &self.voting_config,
-                vote_prob,
-                &mut self.rng,
                 &self.commands,
             )
             .await
@@ -171,8 +214,8 @@ impl LeiosConsensus {
                         node: node_id.clone(),
                         eb_slot: election.announced_slot,
                         had_quorum: election.quorum_reached,
-                        voted_stake: election.voter_stakes.values().sum(),
-                        voters: election.voter_stakes.len(),
+                        voted_weight: election.voter_weights.values().map(|w| *w as u64).sum(),
+                        voters: election.voter_weights.len(),
                     });
                     false
                 }
@@ -304,34 +347,62 @@ impl LeiosConsensus {
                     phase,
                     validated_at: Instant::now(),
                     voted: false,
-                    voter_stakes: HashMap::new(),
+                    voter_weights: HashMap::new(),
                     quorum_reached: false,
                 },
             );
         }
     }
 
-    /// Called when vote validation completes. Attributes each vote to
-    /// its EB election and checks for quorum.
+    /// Called when vote validation completes. Derives each vote's weight
+    /// (PV: persistent committee lookup; NPV: re-run the lottery from
+    /// the embedded eligibility signature and the voter's ledger stake)
+    /// and attributes it to the relevant EB election, checking quorum.
     pub fn on_validated_votes(&mut self, vote_data: &[Vec<u8>]) {
         for blob in vote_data {
-            if let Some(body) = crate::production::VoteBody::decode(blob) {
-                if let Some(formed) = aggregation::record_vote(
-                    &mut self.elections,
-                    &body.endorser_block_hash,
-                    body.voter_id.clone(),
-                    body.voter_stake,
-                    self.quorum_stake_fraction,
-                    self.total_stake,
-                    &self.node_id,
-                ) {
-                    self.pending_telemetry.push(NodeEvent::LeiosQuorumReached {
-                        node: self.node_id.clone(),
-                        eb_slot: formed.eb_slot,
-                        voted_stake: formed.voted_stake,
-                        voters: formed.voters,
-                    });
+            let Some(body) = crate::production::VoteBody::decode(blob) else {
+                continue;
+            };
+            let voter_id_str = String::from_utf8_lossy(&body.voter_id).into_owned();
+            let weight = match (body.tag, &body.eligibility_signature) {
+                (0, _) => self
+                    .persistent_committee
+                    .get(&voter_id_str)
+                    .copied()
+                    .unwrap_or(0),
+                (1, Some(sig)) => {
+                    let stake = self.stake_registry.get(&voter_id_str).copied().unwrap_or(0);
+                    wfa::count_npv_wins(
+                        sig,
+                        stake,
+                        self.total_stake,
+                        self.committee_selection.non_persistent_voters(),
+                    )
                 }
+                _ => 0,
+            };
+            if weight == 0 {
+                continue;
+            }
+            // Dedup key: voter_id + tag (a node may issue both a PV and
+            // an NPV body for the same EB).
+            let mut key = body.voter_id.clone();
+            key.push(body.tag);
+            if let Some(formed) = aggregation::record_vote(
+                &mut self.elections,
+                &body.endorser_block_hash,
+                key,
+                weight,
+                self.quorum_weight_fraction,
+                self.expected_committee_size,
+                &self.node_id,
+            ) {
+                self.pending_telemetry.push(NodeEvent::LeiosQuorumReached {
+                    node: self.node_id.clone(),
+                    eb_slot: formed.eb_slot,
+                    voted_weight: formed.voted_weight,
+                    voters: formed.voters,
+                });
             }
         }
     }
@@ -374,7 +445,7 @@ impl LeiosConsensus {
     fn election_voter_count(&self, hash: &[u8; 32]) -> usize {
         self.elections
             .get(hash)
-            .map(|e| e.voter_stakes.len())
+            .map(|e| e.voter_weights.len())
             .unwrap_or(0)
     }
 
@@ -436,26 +507,35 @@ mod tests {
         }
     }
 
-    fn test_voting_config() -> VotingConfig {
-        VotingConfig {
-            committee_selection: CommitteeSelection::EveryoneVotes,
+    fn test_registry() -> Vec<StakeEntry> {
+        // "test" + 9 peers, each 100 stake → total 1000. EveryoneVotes
+        // mode gives each pool 1 PV seat.
+        let mut entries = vec![StakeEntry {
+            node_id: "test".to_string(),
             stake: 100,
-            total_stake: 1000,
-            persistent_vote_bytes: 130,
-            non_persistent_vote_bytes: 180,
-        }
+        }];
+        entries.extend((0..9).map(|i| StakeEntry {
+            node_id: format!("peer-{i}"),
+            stake: 100,
+        }));
+        entries
     }
 
     fn test_leios(commands: mpsc::Sender<NetworkCommand>, validator: Validator) -> LeiosConsensus {
+        let registry = test_registry();
         LeiosConsensus::new(
             "test".into(),
             commands,
             validator,
             test_pipeline(),
-            test_voting_config(),
-            0.75, // quorum_stake_fraction
-            1000, // total_stake
-            Some(42),
+            CommitteeSelection::EveryoneVotes,
+            100, // own stake
+            &registry,
+            130,      // persistent_vote_bytes
+            180,      // non_persistent_vote_bytes
+            0.75,     // quorum_weight_fraction
+            42,       // committee_seed
+            Some(42), // rng_seed
             test_dyn_config(),
         )
     }
@@ -785,6 +865,12 @@ mod tests {
     }
 
     // -- Vote aggregation tests ---------------------------------------------
+    //
+    // Under EveryoneVotes (test_leios mode) every registered pool has 1
+    // PV seat, so each PV vote contributes weight 1. The 10-pool test
+    // registry yields expected_committee_size=10; quorum at 0.75 needs
+    // ≥7 distinct voters. Voter ids in tests must match registry node_ids
+    // ("test", "peer-0".."peer-8") for the PV-lookup weight to be 1.
 
     #[tokio::test]
     async fn votes_attributed_to_eb_election() {
@@ -792,22 +878,18 @@ mod tests {
         let (validator, _) = test_validator();
         let mut leios = test_leios(tx, validator);
 
-        // Create an election for EB at slot 0.
         leios.on_slot(0).await;
         leios.on_validated_eb(point(0));
 
-        // Build a vote body referencing that EB's hash.
         let eb_hash = point_hash(0);
-        let body = crate::production::VoteBody::stub_persistent(0, b"voter-1", 100, &eb_hash);
-        let encoded = body.encode(130);
-
-        leios.on_validated_votes(&[encoded]);
+        let body = crate::production::VoteBody::stub_persistent(0, b"peer-0", 100, &eb_hash);
+        leios.on_validated_votes(&[body.encode(130)]);
         assert_eq!(leios.election_voter_count(&eb_hash), 1);
         assert!(!leios.election_quorum(&eb_hash));
     }
 
     #[tokio::test]
-    async fn quorum_reached_after_enough_stake() {
+    async fn quorum_reached_after_enough_voters() {
         let (tx, _rx) = mpsc::channel(8);
         let (validator, _) = test_validator();
         let mut leios = test_leios(tx, validator);
@@ -815,13 +897,22 @@ mod tests {
         leios.on_slot(0).await;
         leios.on_validated_eb(point(0));
 
-        // total_stake=1000, quorum=0.75 → threshold=750
+        // expected_committee_size=10 (10 pools × 1 PV seat each), quorum
+        // at 0.75 → 7 distinct voters needed.
         let eb_hash = point_hash(0);
-        let body1 = crate::production::VoteBody::stub_persistent(0, &[1], 400, &eb_hash);
-        let body2 = crate::production::VoteBody::stub_persistent(0, &[2], 350, &eb_hash);
-        leios.on_validated_votes(&[body1.encode(130), body2.encode(130)]);
+        let voters = [
+            "test", "peer-0", "peer-1", "peer-2", "peer-3", "peer-4", "peer-5",
+        ];
+        let bodies: Vec<Vec<u8>> = voters
+            .iter()
+            .map(|v| {
+                crate::production::VoteBody::stub_persistent(0, v.as_bytes(), 100, &eb_hash)
+                    .encode(130)
+            })
+            .collect();
+        leios.on_validated_votes(&bodies);
 
-        assert_eq!(leios.election_voter_count(&eb_hash), 2);
+        assert_eq!(leios.election_voter_count(&eb_hash), 7);
         assert!(leios.election_quorum(&eb_hash));
     }
 
@@ -833,11 +924,20 @@ mod tests {
 
         leios.on_slot(0).await;
         leios.on_validated_eb(point(0));
+        let _ = leios.drain_telemetry();
 
         let eb_hash = point_hash(0);
-        let body1 = crate::production::VoteBody::stub_persistent(0, &[1], 400, &eb_hash);
-        let body2 = crate::production::VoteBody::stub_persistent(0, &[2], 350, &eb_hash);
-        leios.on_validated_votes(&[body1.encode(130), body2.encode(130)]);
+        let voters = [
+            "test", "peer-0", "peer-1", "peer-2", "peer-3", "peer-4", "peer-5",
+        ];
+        let bodies: Vec<Vec<u8>> = voters
+            .iter()
+            .map(|v| {
+                crate::production::VoteBody::stub_persistent(0, v.as_bytes(), 100, &eb_hash)
+                    .encode(130)
+            })
+            .collect();
+        leios.on_validated_votes(&bodies);
 
         let drained = leios.drain_telemetry();
         let cert = drained
@@ -846,19 +946,19 @@ mod tests {
             .expect("LeiosQuorumReached emitted");
         if let NodeEvent::LeiosQuorumReached {
             eb_slot,
-            voted_stake,
+            voted_weight,
             voters,
             ..
         } = cert
         {
             assert_eq!(*eb_slot, 0);
-            assert_eq!(*voted_stake, 750);
-            assert_eq!(*voters, 2);
+            assert_eq!(*voted_weight, 7);
+            assert_eq!(*voters, 7);
         }
 
-        // Second call doesn't re-emit.
-        let body3 = crate::production::VoteBody::stub_persistent(0, &[3], 100, &eb_hash);
-        leios.on_validated_votes(&[body3.encode(130)]);
+        // Subsequent votes don't re-fire.
+        let body8 = crate::production::VoteBody::stub_persistent(0, b"peer-6", 100, &eb_hash);
+        leios.on_validated_votes(&[body8.encode(130)]);
         let drained2 = leios.drain_telemetry();
         assert!(!drained2
             .iter()
@@ -902,22 +1002,24 @@ mod tests {
         let (validator, _) = test_validator();
         let mut leios = test_leios(tx, validator);
 
-        // Two EBs at different slots, both reaching quorum.
         leios.on_slot(0).await;
         leios.on_validated_eb(point(0));
         leios.on_slot(5).await;
         leios.on_validated_eb(point(5));
 
-        let body_a1 = crate::production::VoteBody::stub_persistent(0, &[1], 400, &point_hash(0));
-        let body_a2 = crate::production::VoteBody::stub_persistent(0, &[2], 350, &point_hash(0));
-        let body_b1 = crate::production::VoteBody::stub_persistent(5, &[1], 400, &point_hash(5));
-        let body_b2 = crate::production::VoteBody::stub_persistent(5, &[2], 350, &point_hash(5));
-        leios.on_validated_votes(&[
-            body_a1.encode(130),
-            body_a2.encode(130),
-            body_b1.encode(130),
-            body_b2.encode(130),
-        ]);
+        let voters = [
+            "test", "peer-0", "peer-1", "peer-2", "peer-3", "peer-4", "peer-5",
+        ];
+        let mut all_bodies = Vec::new();
+        for slot in [0u64, 5u64] {
+            let hash = point_hash(slot);
+            for v in &voters {
+                let body =
+                    crate::production::VoteBody::stub_persistent(slot, v.as_bytes(), 100, &hash);
+                all_bodies.push(body.encode(130));
+            }
+        }
+        leios.on_validated_votes(&all_bodies);
 
         // Neither is CertEligible yet.
         assert_eq!(leios.certified_eb_slot(), None);
@@ -941,7 +1043,7 @@ mod tests {
         leios.on_validated_eb(point(0));
 
         let eb_hash = point_hash(0);
-        let body = crate::production::VoteBody::stub_persistent(0, b"same-voter", 500, &eb_hash);
+        let body = crate::production::VoteBody::stub_persistent(0, b"peer-0", 100, &eb_hash);
         let encoded = body.encode(130);
 
         leios.on_validated_votes(&[encoded.clone()]);

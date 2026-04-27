@@ -10,31 +10,35 @@ use tracing::info;
 use super::pipeline::EbElection;
 
 /// Returned from `record_vote` when a vote causes quorum to fire for the
-/// first time. The caller uses this to emit `LeiosCertFormed` telemetry.
+/// first time. The caller uses this to emit `LeiosQuorumReached` telemetry.
 pub(crate) struct QuorumFormed {
     pub eb_slot: u64,
-    pub voted_stake: u64,
+    pub voted_weight: u64,
     pub voters: usize,
 }
 
-/// Record a vote for an EB. Deduplicates by voter_id.
-/// Quorum is stake-weighted: `Σ(voter_stake) ≥ quorum_fraction × total_stake`.
-/// Returns `Some(QuorumFormed)` exactly once per election — the call that
-/// flips `quorum_reached` from false to true.
+/// Record a vote for an EB. Deduplicates by `(voter_id, tag)`. The
+/// `weight` argument is what the aggregator derived for this body —
+/// for PV votes it's the cached persistent-committee seat count; for
+/// NPV votes it's the result of re-running the lottery from the
+/// embedded eligibility signature and the voter's stake.
+///
+/// Quorum: `Σ weight ≥ quorum_fraction × expected_committee_size`.
+/// Returns `Some(QuorumFormed)` exactly once per election.
 pub(crate) fn record_vote(
     elections: &mut HashMap<[u8; 32], EbElection>,
     eb_hash: &[u8; 32],
     voter_id: Vec<u8>,
-    voter_stake: u64,
-    quorum_stake_fraction: f64,
-    total_stake: u64,
+    weight: u32,
+    quorum_weight_fraction: f64,
+    expected_committee_size: u32,
     node_id: &str,
 ) -> Option<QuorumFormed> {
     let election = elections.get_mut(eb_hash)?;
 
     use std::collections::hash_map::Entry;
-    if let Entry::Vacant(e) = election.voter_stakes.entry(voter_id) {
-        e.insert(voter_stake);
+    if let Entry::Vacant(e) = election.voter_weights.entry(voter_id) {
+        e.insert(weight);
     } else {
         return None; // Duplicate voter
     }
@@ -43,25 +47,25 @@ pub(crate) fn record_vote(
         return None;
     }
 
-    let voted_stake: u64 = election.voter_stakes.values().sum();
-    let threshold = (quorum_stake_fraction * total_stake as f64) as u64;
-    if voted_stake < threshold {
+    let voted_weight: u64 = election.voter_weights.values().map(|w| *w as u64).sum();
+    let threshold = (quorum_weight_fraction * expected_committee_size as f64) as u64;
+    if voted_weight < threshold {
         return None;
     }
 
     election.quorum_reached = true;
-    let voters = election.voter_stakes.len();
+    let voters = election.voter_weights.len();
     info!(
         node_id = %node_id,
         eb_point = %election.eb_point,
-        voted_stake,
+        voted_weight,
         threshold,
         voters,
         "quorum reached for eb"
     );
     Some(QuorumFormed {
         eb_slot: election.announced_slot,
-        voted_stake,
+        voted_weight,
         voters,
     })
 }
@@ -74,9 +78,9 @@ mod tests {
 
     use super::super::pipeline::PipelinePhase;
 
-    /// Default quorum: 75% of 1000 = 750 stake.
+    /// Default quorum: 75% of 1000 = 750 weight.
     const QUORUM_FRACTION: f64 = 0.75;
-    const TOTAL_STAKE: u64 = 1000;
+    const EXPECTED_COMMITTEE_SIZE: u32 = 1000;
 
     fn make_election(slot: u64) -> ([u8; 32], EbElection) {
         let hash = [slot as u8; 32];
@@ -88,7 +92,7 @@ mod tests {
                 phase: PipelinePhase::Voting,
                 validated_at: Instant::now(),
                 voted: false,
-                voter_stakes: HashMap::new(),
+                voter_weights: HashMap::new(),
                 quorum_reached: false,
             },
         )
@@ -98,15 +102,15 @@ mod tests {
         elections: &mut HashMap<[u8; 32], EbElection>,
         hash: &[u8; 32],
         voter_id: Vec<u8>,
-        stake: u64,
+        weight: u32,
     ) {
         record_vote(
             elections,
             hash,
             voter_id,
-            stake,
+            weight,
             QUORUM_FRACTION,
-            TOTAL_STAKE,
+            EXPECTED_COMMITTEE_SIZE,
             "test",
         );
     }
@@ -121,12 +125,12 @@ mod tests {
         vote(&mut elections, &hash, vec![2], 100);
         vote(&mut elections, &hash, vec![1], 100); // duplicate
 
-        assert_eq!(elections[&hash].voter_stakes.len(), 2);
+        assert_eq!(elections[&hash].voter_weights.len(), 2);
         assert!(!elections[&hash].quorum_reached);
     }
 
     #[test]
-    fn quorum_reached_at_stake_threshold() {
+    fn quorum_reached_at_weight_threshold() {
         let mut elections = HashMap::new();
         let (hash, election) = make_election(10);
         elections.insert(hash, election);
@@ -147,29 +151,28 @@ mod tests {
         let (hash, election) = make_election(10);
         elections.insert(hash, election);
 
-        // 749 < 750 threshold
         vote(&mut elections, &hash, vec![1], 500);
         vote(&mut elections, &hash, vec![2], 249);
         assert!(!elections[&hash].quorum_reached);
     }
 
     #[test]
-    fn many_small_voters_reach_quorum() {
+    fn many_unit_voters_reach_quorum() {
         let mut elections = HashMap::new();
         let (hash, election) = make_election(10);
         elections.insert(hash, election);
 
-        // 25 nodes × 30 stake = 750 exactly
-        for i in 0..24u8 {
-            vote(&mut elections, &hash, vec![i], 30);
+        // 750 distinct voters × weight 1 each crosses 750 threshold.
+        for i in 0u32..749 {
+            vote(&mut elections, &hash, i.to_le_bytes().to_vec(), 1);
             assert!(!elections[&hash].quorum_reached);
         }
-        vote(&mut elections, &hash, vec![24], 30);
+        vote(&mut elections, &hash, 749u32.to_le_bytes().to_vec(), 1);
         assert!(elections[&hash].quorum_reached);
     }
 
     #[test]
-    fn zero_stake_voter_does_not_help_quorum() {
+    fn zero_weight_voter_does_not_help_quorum() {
         let mut elections = HashMap::new();
         let (hash, election) = make_election(10);
         elections.insert(hash, election);
@@ -198,9 +201,8 @@ mod tests {
         vote(&mut elections, &hash, vec![2], 400);
         assert!(elections[&hash].quorum_reached);
 
-        // Additional votes still tracked but quorum already set
         vote(&mut elections, &hash, vec![3], 200);
         assert!(elections[&hash].quorum_reached);
-        assert_eq!(elections[&hash].voter_stakes.len(), 3);
+        assert_eq!(elections[&hash].voter_weights.len(), 3);
     }
 }

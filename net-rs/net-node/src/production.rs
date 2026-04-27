@@ -32,6 +32,12 @@ const BLS_SIGNATURE_BYTES: usize = 48;
 /// persistent_vote     = [0, election_id, voter_id, voter_stake, endorser_block_hash, vote_sig]
 /// non_persistent_vote = [1, election_id, pool_id, voter_stake, eligibility_sig, endorser_block_hash, vote_sig]
 /// ```
+///
+/// `eligibility_sig` (NPV only) is the VRF proof. The aggregator
+/// reconstructs the per-stake-unit lottery wins from the signature and
+/// the voter's stake (looked up from the registry); the count is never
+/// transmitted on the wire. PV votes derive their weight from the
+/// pre-allocated wFA persistent committee, also looked up by voter_id.
 #[derive(Debug, Clone, PartialEq)]
 pub struct VoteBody {
     /// 0 = persistent, 1 = non-persistent.
@@ -39,9 +45,10 @@ pub struct VoteBody {
     pub election_id: u64,
     /// Voter/pool identifier.
     pub voter_id: Vec<u8>,
-    /// Voter's stake weight (for stake-weighted quorum).
+    /// Voter's stake (telemetry/diagnostics; quorum uses derived weight).
     pub voter_stake: u64,
-    /// Non-persistent only: eligibility proof (BLS signature).
+    /// Non-persistent only: VRF eligibility proof. 48 bytes modeling a
+    /// BLS-G1 signature; deterministic from (voter_id, eb_hash, eb_slot).
     pub eligibility_signature: Option<Vec<u8>>,
     /// Hash of the endorser block this vote endorses.
     pub endorser_block_hash: [u8; 32],
@@ -68,11 +75,12 @@ impl VoteBody {
         }
     }
 
-    /// Create a non-persistent vote with placeholder (zero) signatures.
+    /// Create a non-persistent vote with the given eligibility signature.
     pub fn stub_non_persistent(
         election_id: u64,
         voter_id: &[u8],
         voter_stake: u64,
+        eligibility_signature: Vec<u8>,
         endorser_block_hash: &[u8; 32],
     ) -> Self {
         Self {
@@ -80,7 +88,7 @@ impl VoteBody {
             election_id,
             voter_id: voter_id.to_vec(),
             voter_stake,
-            eligibility_signature: Some(vec![0u8; BLS_SIGNATURE_BYTES]),
+            eligibility_signature: Some(eligibility_signature),
             endorser_block_hash: *endorser_block_hash,
             vote_signature: vec![0u8; BLS_SIGNATURE_BYTES],
         }
@@ -828,7 +836,7 @@ mod tests {
     #[test]
     fn vote_body_non_persistent_size() {
         let eb_hash = [0xAA; 32];
-        let vote = VoteBody::stub_non_persistent(42, &[0xBB; 32], 100, &eb_hash);
+        let vote = VoteBody::stub_non_persistent(42, &[0xBB; 32], 100, vec![0u8; 48], &eb_hash);
         let encoded = vote.encode(180);
         assert_eq!(encoded.len(), 180);
     }
@@ -853,7 +861,8 @@ mod tests {
     fn vote_body_non_persistent_roundtrip() {
         let eb_hash = [0x11; 32];
         let voter = [0x22; 32];
-        let vote = VoteBody::stub_non_persistent(7, &voter, 250, &eb_hash);
+        let sig = vec![0xCDu8; 48];
+        let vote = VoteBody::stub_non_persistent(7, &voter, 250, sig.clone(), &eb_hash);
         let encoded = vote.encode(180);
         let decoded = VoteBody::decode(&encoded).expect("should decode");
         assert_eq!(decoded.tag, 1);
@@ -861,7 +870,10 @@ mod tests {
         assert_eq!(decoded.voter_id, voter.to_vec());
         assert_eq!(decoded.voter_stake, 250);
         assert_eq!(decoded.endorser_block_hash, eb_hash);
-        assert!(decoded.eligibility_signature.is_some());
+        assert_eq!(
+            decoded.eligibility_signature.as_deref(),
+            Some(sig.as_slice())
+        );
         assert_eq!(decoded.vote_signature.len(), 48);
     }
 

@@ -72,8 +72,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         );
     }
 
-    // Validator and consensus.
+    // Validator and consensus. The persistent committee allocation must
+    // be deterministic across the network; seed it from genesis_time so
+    // every node arrives at the same wFA committee.
     let (validator, mut validation_rx) = validation::Validator::new(dyn_rx.clone());
+    let stake_registry = if config.production.stake_registry.is_empty() {
+        vec![config::StakeEntry {
+            node_id: config.node_id.clone(),
+            stake: config.production.stake,
+        }]
+    } else {
+        config.production.stake_registry.clone()
+    };
     let mut consensus = consensus::Consensus::new(
         config.node_id.clone(),
         commands.clone(),
@@ -85,15 +95,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             diffuse_window: config.production.leios_diffuse_window_slots,
             dedup_window: config.leios_dedup_window,
         },
-        consensus::VotingConfig {
-            committee_selection: config.production.committee_selection.clone(),
-            stake: config.production.stake,
-            total_stake: config.production.total_stake,
-            persistent_vote_bytes: config.production.persistent_vote_bytes,
-            non_persistent_vote_bytes: config.production.non_persistent_vote_bytes,
-        },
+        config.production.committee_selection.clone(),
+        config.production.stake,
+        &stake_registry,
+        config.production.persistent_vote_bytes,
+        config.production.non_persistent_vote_bytes,
         config.production.quorum_stake_fraction,
-        config.production.total_stake,
+        config.genesis_time_unix,
         config.seed,
         dyn_rx.clone(),
     );
