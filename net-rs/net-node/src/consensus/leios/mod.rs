@@ -26,6 +26,7 @@ use tokio::sync::{mpsc, watch};
 use tracing::info;
 
 use crate::config::DynamicConfig;
+use crate::telemetry::NodeEvent;
 use crate::validation::{LedgerCommand, Validator};
 
 use pipeline::EbElection;
@@ -59,6 +60,8 @@ pub struct LeiosConsensus {
     rng: StdRng,
     /// Dynamic config for vote_generation_probability.
     dyn_config: watch::Receiver<DynamicConfig>,
+    /// Telemetry events buffered for the caller to drain.
+    pending_telemetry: Vec<NodeEvent>,
 }
 
 impl LeiosConsensus {
@@ -89,7 +92,24 @@ impl LeiosConsensus {
                 None => StdRng::from_entropy(),
             },
             dyn_config,
+            pending_telemetry: Vec::new(),
         }
+    }
+
+    /// Drain buffered telemetry events. Caller emits each via the telemetry sink.
+    pub fn drain_telemetry(&mut self) -> Vec<NodeEvent> {
+        std::mem::take(&mut self.pending_telemetry)
+    }
+
+    /// Slot of the earliest EB that's both at quorum and CertEligible.
+    /// Used by the RB producer to populate `RbCertifiedEb` telemetry when
+    /// the produced header carries `certified_eb=true`.
+    pub fn certified_eb_slot(&self) -> Option<u64> {
+        self.elections
+            .values()
+            .filter(|e| e.quorum_reached && e.phase == PipelinePhase::CertEligible)
+            .map(|e| e.announced_slot)
+            .min()
     }
 
     // -- Slot tick ----------------------------------------------------------
@@ -133,7 +153,9 @@ impl LeiosConsensus {
             }
         }
 
-        // Update phases and prune expired.
+        // Update phases and prune expired. Emit telemetry for each pruned election.
+        let node_id = &self.node_id;
+        let pending = &mut self.pending_telemetry;
         self.elections.retain(|_, election| {
             match self
                 .pipeline
@@ -143,7 +165,16 @@ impl LeiosConsensus {
                     election.phase = phase;
                     true
                 }
-                None => false,
+                None => {
+                    pending.push(NodeEvent::LeiosElectionExpired {
+                        node: node_id.clone(),
+                        eb_slot: election.announced_slot,
+                        had_quorum: election.quorum_reached,
+                        voted_stake: election.voter_stakes.values().sum(),
+                        voters: election.voter_stakes.len(),
+                    });
+                    false
+                }
             }
         });
     }
@@ -284,7 +315,7 @@ impl LeiosConsensus {
     pub fn on_validated_votes(&mut self, vote_data: &[Vec<u8>]) {
         for blob in vote_data {
             if let Some(body) = crate::production::VoteBody::decode(blob) {
-                aggregation::record_vote(
+                if let Some(formed) = aggregation::record_vote(
                     &mut self.elections,
                     &body.endorser_block_hash,
                     body.voter_id.clone(),
@@ -292,7 +323,14 @@ impl LeiosConsensus {
                     self.quorum_stake_fraction,
                     self.total_stake,
                     &self.node_id,
-                );
+                ) {
+                    self.pending_telemetry.push(NodeEvent::LeiosQuorumReached {
+                        node: self.node_id.clone(),
+                        eb_slot: formed.eb_slot,
+                        voted_stake: formed.voted_stake,
+                        voters: formed.voters,
+                    });
+                }
             }
         }
     }
@@ -784,6 +822,112 @@ mod tests {
 
         assert_eq!(leios.election_voter_count(&eb_hash), 2);
         assert!(leios.election_quorum(&eb_hash));
+    }
+
+    #[tokio::test]
+    async fn quorum_emits_cert_formed_telemetry() {
+        let (tx, _rx) = mpsc::channel(8);
+        let (validator, _) = test_validator();
+        let mut leios = test_leios(tx, validator);
+
+        leios.on_slot(0).await;
+        leios.on_validated_eb(point(0));
+
+        let eb_hash = point_hash(0);
+        let body1 = crate::production::VoteBody::stub_persistent(0, &[1], 400, &eb_hash);
+        let body2 = crate::production::VoteBody::stub_persistent(0, &[2], 350, &eb_hash);
+        leios.on_validated_votes(&[body1.encode(130), body2.encode(130)]);
+
+        let drained = leios.drain_telemetry();
+        let cert = drained
+            .iter()
+            .find(|e| matches!(e, NodeEvent::LeiosQuorumReached { .. }))
+            .expect("LeiosQuorumReached emitted");
+        if let NodeEvent::LeiosQuorumReached {
+            eb_slot,
+            voted_stake,
+            voters,
+            ..
+        } = cert
+        {
+            assert_eq!(*eb_slot, 0);
+            assert_eq!(*voted_stake, 750);
+            assert_eq!(*voters, 2);
+        }
+
+        // Second call doesn't re-emit.
+        let body3 = crate::production::VoteBody::stub_persistent(0, &[3], 100, &eb_hash);
+        leios.on_validated_votes(&[body3.encode(130)]);
+        let drained2 = leios.drain_telemetry();
+        assert!(!drained2
+            .iter()
+            .any(|e| matches!(e, NodeEvent::LeiosQuorumReached { .. })));
+    }
+
+    #[tokio::test]
+    async fn pruned_election_emits_expired_telemetry() {
+        let (tx, _rx) = mpsc::channel(8);
+        let (validator, _) = test_validator();
+        let mut leios = test_leios(tx, validator);
+
+        leios.on_slot(0).await;
+        leios.on_validated_eb(point(0));
+        let _ = leios.drain_telemetry(); // discard creation-side events
+
+        // Advance past expiry (dedup_window=10, full pipeline=23).
+        leios.on_slot(23).await;
+
+        let drained = leios.drain_telemetry();
+        let expired = drained
+            .iter()
+            .find(|e| matches!(e, NodeEvent::LeiosElectionExpired { .. }))
+            .expect("LeiosElectionExpired emitted");
+        if let NodeEvent::LeiosElectionExpired {
+            eb_slot,
+            had_quorum,
+            voters,
+            ..
+        } = expired
+        {
+            assert_eq!(*eb_slot, 0);
+            assert!(!*had_quorum);
+            assert_eq!(*voters, 0);
+        }
+    }
+
+    #[tokio::test]
+    async fn certified_eb_slot_returns_min_quorum_election() {
+        let (tx, _rx) = mpsc::channel(8);
+        let (validator, _) = test_validator();
+        let mut leios = test_leios(tx, validator);
+
+        // Two EBs at different slots, both reaching quorum.
+        leios.on_slot(0).await;
+        leios.on_validated_eb(point(0));
+        leios.on_slot(5).await;
+        leios.on_validated_eb(point(5));
+
+        let body_a1 = crate::production::VoteBody::stub_persistent(0, &[1], 400, &point_hash(0));
+        let body_a2 = crate::production::VoteBody::stub_persistent(0, &[2], 350, &point_hash(0));
+        let body_b1 = crate::production::VoteBody::stub_persistent(5, &[1], 400, &point_hash(5));
+        let body_b2 = crate::production::VoteBody::stub_persistent(5, &[2], 350, &point_hash(5));
+        leios.on_validated_votes(&[
+            body_a1.encode(130),
+            body_a2.encode(130),
+            body_b1.encode(130),
+            body_b2.encode(130),
+        ]);
+
+        // Neither is CertEligible yet.
+        assert_eq!(leios.certified_eb_slot(), None);
+
+        // Advance to make EB at slot 0 CertEligible (elapsed=13 from slot 0).
+        leios.on_slot(13).await;
+        assert_eq!(leios.certified_eb_slot(), Some(0));
+
+        // Advance further; both eligible — earliest wins.
+        leios.on_slot(18).await;
+        assert_eq!(leios.certified_eb_slot(), Some(0));
     }
 
     #[tokio::test]

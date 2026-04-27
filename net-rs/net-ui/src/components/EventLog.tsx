@@ -11,9 +11,21 @@ const typeColors: Record<string, string> = {
   EBReceived: "#64b5f6",
   VTBundleGenerated: "#ce93d8",
   VTBundleReceived: "#ba68c8",
+  VotesReceived: "#ba68c8",
   RolledBack: "#e040fb",
   Slot: "#fff59d",
+  TipAdvanced: "#80cbc4",
+  BlockValidated: "#aed581",
+  PeerConnected: "#90a4ae",
+  PeerDisconnected: "#90a4ae",
+  TXGenerated: "#fff59d",
+  LeiosQuorumReached: "#ffb74d",
+  LeiosElectionExpired: "#bcaaa4",
+  RbCertifiedEb: "#ffd54f",
 };
+
+const DEFAULT_COLOR = "#999999";
+const HIGHLIGHT_TYPES = new Set(["RbCertifiedEb"]);
 
 export function EventLog() {
   const eventVersion = useStore((s) => s.eventVersion);
@@ -55,10 +67,11 @@ export function EventLog() {
       )}
       {events.map((e, i) => {
         const msgType = e.message?.type ?? "unknown";
-        const color = typeColors[msgType] ?? "#999";
+        const color = typeColors[msgType] ?? DEFAULT_COLOR;
+        const highlight = HIGHLIGHT_TYPES.has(msgType);
         return (
           <div key={i} style={{ display: "flex", gap: 4, marginBottom: 2, alignItems: "center" }}>
-            <span style={{ minWidth: 55, color: "#999" }}>
+            <span style={{ minWidth: 55, color: "#999999" }}>
               {e.time_s.toFixed(1)}s
             </span>
             <span style={{ width: 72, flexShrink: 0, whiteSpace: "nowrap" }}>
@@ -66,12 +79,14 @@ export function EventLog() {
             </span>
             <span
               style={{
-                fontSize: 11,
-                padding: "1px 5px",
+                fontSize: highlight ? 12 : 11,
+                fontWeight: highlight ? 700 : 400,
+                padding: highlight ? "2px 7px" : "1px 5px",
                 borderRadius: 8,
-                backgroundColor: `${color}22`,
+                backgroundColor: highlight ? `${color}55` : `${color}22`,
                 color,
-                border: `1px solid ${color}`,
+                border: `${highlight ? 2 : 1}px solid ${color}`,
+                boxShadow: highlight ? `0 0 6px ${color}88` : undefined,
               }}
             >
               {msgType}

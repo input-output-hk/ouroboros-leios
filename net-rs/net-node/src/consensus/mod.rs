@@ -14,6 +14,7 @@ use tokio::sync::{mpsc, watch};
 
 use crate::chain_tree::ChainTreeEntry;
 use crate::config::DynamicConfig;
+use crate::telemetry::NodeEvent;
 use crate::validation::{LedgerOutcome, Validator};
 
 pub use leios::{LeiosConsensus, PipelineConfig, VotingConfig};
@@ -128,5 +129,16 @@ impl Consensus {
     /// Whether any EB has a valid certificate (quorum + pipeline elapsed).
     pub fn has_certified_eb(&self) -> bool {
         self.leios.has_certified_eb()
+    }
+
+    /// Slot of the earliest certified EB, if any. Used to populate the
+    /// eb_slot field on the `RbCertifiedEb` telemetry event.
+    pub fn certified_eb_slot(&self) -> Option<u64> {
+        self.leios.certified_eb_slot()
+    }
+
+    /// Drain Leios-side telemetry events buffered since the last call.
+    pub fn drain_leios_telemetry(&mut self) -> Vec<NodeEvent> {
+        self.leios.drain_telemetry()
     }
 }

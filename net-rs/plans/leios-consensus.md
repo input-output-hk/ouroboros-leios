@@ -130,15 +130,15 @@ no ledger state concept beyond fake validation delays. Work needed:
 
 ### Telemetry
 
-Missing events that would help cluster analysis:
-- `LeiosCertFormed { node, eb_point, vote_count, voted_stake }` — fired when
-  `record_vote` flips `quorum_reached` to true. Currently only logged via `tracing::info!`.
-- `RbCertifiedEb { node, rb_point, eb_point }` — fired when an RB header is produced
-  with `certified_eb=true`. Cluster events show RBGenerated but with no cert flag.
-- `LeiosElectionExpired { node, eb_point, had_quorum, voted_stake, total_voters }` —
-  fired when an election is pruned past `dedup_window`, with final tally for analysis.
-
-Without these, cluster JSONL only shows EB/vote diffusion, not the certification outcome.
+Telemetry now surfaces three Leios-specific events alongside RBGenerated/EBGenerated:
+- `LeiosQuorumReached { node, eb_slot, voted_stake, voters }` — per-node, when
+  this node's local vote tally first crosses `quorum_stake_fraction × total_stake`.
+  Multiple per EB (one per node that observes quorum) — useful for quorum-propagation
+  latency analysis.
+- `RbCertifiedEb { node, rb_slot, eb_slot }` — per-RB, fired only on the producing
+  node when an RB header is emitted with `certified_eb=true`.
+- `LeiosElectionExpired { node, eb_slot, had_quorum, voted_stake, voters }` — fired
+  when an election is pruned past `dedup_window`, with final tally for analysis.
 
 ### EB selection policy
 

@@ -9,8 +9,18 @@ use tracing::info;
 
 use super::pipeline::EbElection;
 
+/// Returned from `record_vote` when a vote causes quorum to fire for the
+/// first time. The caller uses this to emit `LeiosCertFormed` telemetry.
+pub(crate) struct QuorumFormed {
+    pub eb_slot: u64,
+    pub voted_stake: u64,
+    pub voters: usize,
+}
+
 /// Record a vote for an EB. Deduplicates by voter_id.
 /// Quorum is stake-weighted: `Σ(voter_stake) ≥ quorum_fraction × total_stake`.
+/// Returns `Some(QuorumFormed)` exactly once per election — the call that
+/// flips `quorum_reached` from false to true.
 pub(crate) fn record_vote(
     elections: &mut HashMap<[u8; 32], EbElection>,
     eb_hash: &[u8; 32],
@@ -19,33 +29,41 @@ pub(crate) fn record_vote(
     quorum_stake_fraction: f64,
     total_stake: u64,
     node_id: &str,
-) {
-    let Some(election) = elections.get_mut(eb_hash) else {
-        return; // No election for this EB (expired or not yet seen)
-    };
+) -> Option<QuorumFormed> {
+    let election = elections.get_mut(eb_hash)?;
 
     use std::collections::hash_map::Entry;
     if let Entry::Vacant(e) = election.voter_stakes.entry(voter_id) {
         e.insert(voter_stake);
     } else {
-        return; // Duplicate voter
+        return None; // Duplicate voter
     }
 
-    if !election.quorum_reached {
-        let voted_stake: u64 = election.voter_stakes.values().sum();
-        let threshold = (quorum_stake_fraction * total_stake as f64) as u64;
-        if voted_stake >= threshold {
-            election.quorum_reached = true;
-            info!(
-                node_id = %node_id,
-                eb_point = %election.eb_point,
-                voted_stake,
-                threshold,
-                voters = election.voter_stakes.len(),
-                "quorum reached for eb"
-            );
-        }
+    if election.quorum_reached {
+        return None;
     }
+
+    let voted_stake: u64 = election.voter_stakes.values().sum();
+    let threshold = (quorum_stake_fraction * total_stake as f64) as u64;
+    if voted_stake < threshold {
+        return None;
+    }
+
+    election.quorum_reached = true;
+    let voters = election.voter_stakes.len();
+    info!(
+        node_id = %node_id,
+        eb_point = %election.eb_point,
+        voted_stake,
+        threshold,
+        voters,
+        "quorum reached for eb"
+    );
+    Some(QuorumFormed {
+        eb_slot: election.announced_slot,
+        voted_stake,
+        voters,
+    })
 }
 
 #[cfg(test)]

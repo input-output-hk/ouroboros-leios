@@ -89,6 +89,24 @@ pub enum NodeEvent {
         node: String,
         count: usize,
     },
+    LeiosQuorumReached {
+        node: String,
+        eb_slot: u64,
+        voted_stake: u64,
+        voters: usize,
+    },
+    RbCertifiedEb {
+        node: String,
+        rb_slot: u64,
+        eb_slot: u64,
+    },
+    LeiosElectionExpired {
+        node: String,
+        eb_slot: u64,
+        had_quorum: bool,
+        voted_stake: u64,
+        voters: usize,
+    },
 }
 
 // ---------------------------------------------------------------------------
