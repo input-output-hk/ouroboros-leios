@@ -1,6 +1,5 @@
 {
   inputs,
-  self,
   lib,
   ...
 }:
@@ -10,8 +9,6 @@
 
     lib.optionalAttrs (system == "x86_64-linux") (
       let
-        inherit (inputs) nixpkgs;
-
         overlay = _next: prev: {
           haskell = prev.haskell // {
             packageOverrides = _hnext: hprev: {
@@ -22,6 +19,12 @@
               probability-polynomial = hprev.callCabal2nixWithOptions "probability-polynomial" (
                 inputs.deltaq-src.outPath + "/lib/probability-polynomial"
               ) "--no-check" { };
+              # Pin diagrams-svg 1.5 needed by deltaq (jupyenv's nixpkgs only has 1.4.x).
+              diagrams-svg = hprev.callHackageDirect {
+                pkg = "diagrams-svg";
+                ver = "1.5";
+                sha256 = "sha256-HYIgmtkgIUMWPTsSjbQYE4hVAhTmvXY+ghP/eDaVTDw=";
+              } { };
               # Use a more recent version of `lattices` than is available in the curated Nix package set.
               lattices = hprev.callPackage (
                 {
@@ -122,11 +125,6 @@
           };
         };
 
-        pkgs = import nixpkgs {
-          inherit system;
-          overlays = [ overlay ];
-        };
-
         # Use jupyenv's own nixpkgs for the kernel (compatible with its
         # IHaskell version pins) but add our overlay for deltaq packages.
         jupyenvPkgs = import inputs.jupyenv.inputs.nixpkgs {
@@ -143,56 +141,10 @@
           }
         );
 
-        docker = pkgs.dockerTools.buildImage {
-          name = "jupyter-deltaq";
-          copyToRoot = pkgs.buildEnv {
-            name = "image-root";
-            paths = [
-              pkgs.dockerTools.usrBinEnv
-              pkgs.dockerTools.binSh
-              pkgs.bash
-              pkgs.coreutils
-              pkgs.nodejs_22
-              jupyterlab
-            ];
-            pathsToLink = [ "/bin" ];
-          };
-          runAsRoot = ''
-            #!${pkgs.runtimeShell}
-            ${pkgs.dockerTools.shadowSetup}
-            groupadd -r deltaq
-            useradd -r -g deltaq deltaq
-            mkdir -p /home/deltaq/examples
-            chown -R deltaq:deltaq /home/deltaq
-            mkdir -p /usr/bin
-            ln -s /bin/env /usr/bin/env
-          '';
-          extraCommands = ''
-            #!${pkgs.runtimeShell}
-            chmod 0777 tmp
-            mkdir -p home/deltaq/examples
-            cp -r ${self}/analysis/deltaq/examples home/deltaq/
-          '';
-          config = {
-            User = "deltaq";
-            WorkingDir = "/home/deltaq";
-            Cmd = [
-              "${jupyterlab}/bin/jupyter-lab"
-              "--no-browser"
-              "--ip=0.0.0.0"
-              "--port=8888"
-              "--NotebookApp.token=deltaq"
-            ];
-            ExposedPorts = {
-              "8888" = { };
-            };
-          };
-        };
-
       in
       {
         packages = {
-          inherit jupyterlab docker;
+          inherit jupyterlab;
         };
 
         apps.jupyterlab = {
