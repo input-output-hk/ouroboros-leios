@@ -14,6 +14,7 @@
 mod aggregation;
 mod pipeline;
 pub(crate) mod voting;
+mod wfa;
 
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
