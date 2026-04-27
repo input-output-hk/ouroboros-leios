@@ -83,8 +83,8 @@ eb-body-validation-cpu-time-ms-per-byte: 0.00002151
 vote-generation-probability: 600
 vote-threshold: 450
 # sim-rs split fields (same values, both halves equal for CIP replication)
-persistent-vote-generation-probability: 600
-non-persistent-vote-generation-probability: 0
+persistent-vote-generation-probability: 480
+non-persistent-vote-generation-probability: 120
 
 # Based on CDDL for votes, worst case for non-persistent voters.
 vote-bundle-size-bytes-constant: 0
