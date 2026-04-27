@@ -16,7 +16,7 @@ echo "Args: $*"
 echo ""
 
 for exp in "${EXPERIMENTS[@]}"; do
-  dir="$SCRIPT_DIR/$exp"
+  dir="$SCRIPT_DIR/experiments/$exp"
   if [[ ! -d "$dir" ]]; then
     echo "WARNING: $dir not found, skipping" >&2
     continue

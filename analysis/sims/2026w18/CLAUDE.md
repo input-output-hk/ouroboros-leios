@@ -16,9 +16,9 @@ bash run-all-voting-modes.sh -s 1
 # Run a single voting mode across all throughputs
 bash run-all-NA.sh -m wfa-ls
 
-# Run a single experiment (from within an experiment directory, e.g. NA,0.200/)
-cd NA,0.200
-bash ../run-deterministic.sh -m everyone -s 0
+# Run a single experiment (from within an experiment directory, e.g. experiments/NA,0.200/)
+cd experiments/NA,0.200
+bash ../../run-deterministic.sh -m everyone -s 0
 
 # Monitor a running sweep
 bash check-progress.sh
@@ -102,13 +102,12 @@ bash run-all-voting-modes.sh --actor        # all modes, actor engine
 Monitoring script. Shows running sim-cli processes, current slot progress,
 and sweep log status.
 
-### combine-results-multi-vote.sh (in parent directory)
+### combine-results-multi-vote.sh
 
 Collects results from a specific voting mode and seed into the `results/`
 directory format expected by `analysis.ipynb`.
 
 ```sh
-cd ..  # from experiments/ to cip/
 bash combine-results-multi-vote.sh -m wfa-ls -s 0
 # then open analysis.ipynb
 ```
@@ -125,7 +124,7 @@ Key parameters:
 - TX generation: slots 60–960, 1500 total slots
 - Topology: `topology-v2` (750 nodes), bandwidth scaled to 10 Mb/s, 4 vCPU
 - EB size: 12 MB max
-- Vote probability: 600 (wfa-ls default), threshold 450
+- Vote probability: 480 persistent + 120 non-persistent (wfa-ls), threshold 450
 - Stage lengths: diffuse=7 slots, vote=4 slots
 
 ### Voting mode thresholds
