@@ -92,7 +92,7 @@ pub enum NodeEvent {
     LeiosQuorumReached {
         node: String,
         eb_slot: u64,
-        voted_stake: u64,
+        voted_weight: u64,
         voters: usize,
     },
     RbCertifiedEb {
@@ -104,7 +104,7 @@ pub enum NodeEvent {
         node: String,
         eb_slot: u64,
         had_quorum: bool,
-        voted_stake: u64,
+        voted_weight: u64,
         voters: usize,
     },
 }

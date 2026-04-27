@@ -13,11 +13,11 @@ use net_core::types::{BlockBody, Point, Tip, WrappedHeader};
 use tokio::sync::{mpsc, watch};
 
 use crate::chain_tree::ChainTreeEntry;
-use crate::config::DynamicConfig;
+use crate::config::{CommitteeSelection, DynamicConfig, StakeEntry};
 use crate::telemetry::NodeEvent;
 use crate::validation::{LedgerOutcome, Validator};
 
-pub use leios::{LeiosConsensus, PipelineConfig, VotingConfig};
+pub use leios::{LeiosConsensus, PipelineConfig};
 pub use praos::PraosConsensus;
 
 /// Top-level consensus, composing Praos and Leios sub-layers.
@@ -34,10 +34,14 @@ impl Consensus {
         validator: Validator,
         security_param_k: u64,
         pipeline: PipelineConfig,
-        voting_config: VotingConfig,
-        quorum_stake_fraction: f64,
-        total_stake: u64,
-        seed: Option<u64>,
+        committee_selection: CommitteeSelection,
+        stake: u64,
+        stake_registry: &[StakeEntry],
+        persistent_vote_bytes: usize,
+        non_persistent_vote_bytes: usize,
+        quorum_weight_fraction: f64,
+        committee_seed: u64,
+        rng_seed: Option<u64>,
         dyn_config: watch::Receiver<DynamicConfig>,
     ) -> Self {
         let praos = PraosConsensus::new(
@@ -51,10 +55,14 @@ impl Consensus {
             commands,
             validator,
             pipeline,
-            voting_config,
-            quorum_stake_fraction,
-            total_stake,
-            seed,
+            committee_selection,
+            stake,
+            stake_registry,
+            persistent_vote_bytes,
+            non_persistent_vote_bytes,
+            quorum_weight_fraction,
+            committee_seed,
+            rng_seed,
             dyn_config,
         );
         Self { praos, leios }
