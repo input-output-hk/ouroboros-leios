@@ -13,8 +13,8 @@ bash run-all-voting-modes.sh
 # Run with a different seed
 bash run-all-voting-modes.sh -s 1
 
-# Run a single voting mode across all throughputs
-bash run-all-NA.sh -m wfa-ls
+# Run a single voting mode across all experiments
+bash run-sweep.sh -m wfa-ls
 
 # Run a single experiment (from within an experiment directory, e.g. experiments/NA,0.200/)
 cd experiments/NA,0.200
@@ -72,19 +72,28 @@ NA,0.200/
         └── ...
 ```
 
-### run-all-NA.sh
+### run-sweep.sh
 
-Runs `run-deterministic.sh` for all CIP throughputs (0.150, 0.200, 0.250, 0.300,
-0.350). Passes all arguments through to `run-deterministic.sh`.
+Runs `run-deterministic.sh` for all sweep experiments — both NA throughputs
+(0.150, 0.200, 0.250, 0.300, 0.350 TxMB/s, no Plutus) and Plutus levels
+(1000, 2000, 5000, 10000, 20000, 50000 Gstep/EB at fixed 0.250 TxMB/s).
+Other arguments are passed through to `run-deterministic.sh`.
+
+| Flag | Effect |
+|------|--------|
+| `--na-only` | Run only the NA throughput experiments |
+| `--plutus-only` | Run only the Plutus experiments |
+| *(none)* | Run both groups (11 experiments per voting mode) |
 
 ```sh
-bash run-all-NA.sh -m wfa-ls -s 0          # single mode, single seed
-bash run-all-NA.sh -m everyone -s 1 --actor # actor engine, seed 1
+bash run-sweep.sh -m wfa-ls -s 0                    # both groups, single mode/seed
+bash run-sweep.sh --plutus-only -m wfa-ls -s 0      # Plutus only
+bash run-sweep.sh --na-only -m everyone -s 1 --actor
 ```
 
 ### run-all-voting-modes.sh
 
-Runs `run-all-NA.sh` for each of the three voting modes (wfa-ls, everyone,
+Runs `run-sweep.sh` for each of the three voting modes (wfa-ls, everyone,
 top-stake-fraction). Passes all arguments through.
 
 ```sh

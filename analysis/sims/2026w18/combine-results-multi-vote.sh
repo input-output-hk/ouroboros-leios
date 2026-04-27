@@ -40,11 +40,19 @@ esac
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EXPERIMENTS=(
+  # NA experiments — varying throughput, no Plutus
   NA,0.150
   NA,0.200
   NA,0.250
   NA,0.300
   NA,0.350
+  # Plutus experiments — fixed 0.250 TxMB/s, varying Plutus CPU load
+  1000,0.250
+  2000,0.250
+  5000,0.250
+  10000,0.250
+  20000,0.250
+  50000,0.250
 )
 
 mkdir -p results
@@ -102,6 +110,12 @@ require(data.table)
 sampleSize <- $FRACT
 print(sampleSize)
 $f <- fread("results/$f.csv.gz", stringsAsFactors=TRUE)
+# When all experiments have empty Plutus, fread infers column as logical NA;
+# coerce to factor with "" level so downstream factor() comparisons work.
+if ("Plutus" %in% names($f) && (is.logical($f\$Plutus) || all(is.na($f\$Plutus)))) {
+  $f[, Plutus := NULL]
+  $f[, Plutus := factor(rep("", .N), levels="")]
+}
 save($f, sampleSize, file="results/$f.Rdata", compression_level=9)
 EOI
 done
